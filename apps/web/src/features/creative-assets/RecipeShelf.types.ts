@@ -1,0 +1,19 @@
+import type { PromptBuilderDraft } from '../prompt-authoring';
+import type { CreativeAssetRepository, ModelModeId, SavedCharacterPrompt } from './types';
+
+export interface RecipeSelection {
+  origin: 'saved-prompt' | 'recent-prompt' | 'character-prompt';
+  prompt: string;
+  modelModeId: ModelModeId;
+  assetId?: string;
+  builderDraft?: PromptBuilderDraft;
+}
+
+export interface RecipeShelfProps {
+  repository: CreativeAssetRepository;
+  activeMode: ModelModeId;
+  promptUseDisabled?: boolean;
+  onUsePrompt: (selection: RecipeSelection) => void;
+  onOpenCharacterWorkshop?: (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => void;
+  onDirtyChange?: (dirty: boolean) => void;
+}
