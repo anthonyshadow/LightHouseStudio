@@ -9,3 +9,6 @@ test-results/
 .DS_Store
 apps/web/public/test-media/
 *.tsbuildinfo
+
+graphify-out/cost.json       
+graphify-out/cache/         
