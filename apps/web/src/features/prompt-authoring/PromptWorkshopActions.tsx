@@ -27,6 +27,17 @@ const actionRowStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 31rem)': {
     '& > button': { flex: '1 1 100%' },
   },
+  '@media (max-height: 36rem)': {
+    flexWrap: 'nowrap',
+    gap: theme.space.xs,
+    '& > button': {
+      flex: '1 1 0',
+      minWidth: 0,
+      paddingInline: theme.space.xs,
+      fontSize: theme.fontSizes.caption,
+      lineHeight: 1.2,
+    },
+  },
 });
 
 const saveFormStyles = (theme: Theme): CSSObject => ({

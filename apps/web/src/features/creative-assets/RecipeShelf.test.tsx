@@ -155,4 +155,63 @@ describe('RecipeShelf', () => {
       expect.objectContaining({ name: 'Field explorer' }),
     );
   });
+
+  it('derives tag filters from local recipes and exposes an accessible selected-card state', async () => {
+    const user = userEvent.setup();
+    const repository = createRepository();
+    repository.createSavedPrompt({
+      title: 'Editorial host',
+      prompt: 'Give the adult presenter a refined editorial wardrobe.',
+      modelModeId: 'lucy-2.5',
+      tags: ['Editorial', 'Studio'],
+    });
+    repository.createSavedPrompt({
+      title: 'Casual host',
+      prompt: 'Give the adult presenter a relaxed casual wardrobe.',
+      modelModeId: 'lucy-2.5',
+      tags: ['Casual'],
+    });
+
+    renderShelf(repository);
+
+    expect(document.querySelector('[data-scroll-region="recipe-shelf"]')).toBeInTheDocument();
+    await user.selectOptions(screen.getByLabelText('Filter by tag'), 'Editorial');
+    expect(screen.getByRole('heading', { name: 'Editorial host' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Casual host' })).not.toBeInTheDocument();
+
+    const selectRecipe = within(screen.getByRole('heading', { name: 'Editorial host' })).getByRole(
+      'button',
+    );
+    expect(selectRecipe).toHaveAttribute('aria-pressed', 'false');
+    await user.click(selectRecipe);
+    expect(selectRecipe).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Selected')).toBeInTheDocument();
+    expect(screen.getByText(/1 selected.*1 saved recipe/i)).toBeInTheDocument();
+  });
+
+  it('shows only the active model library without inventing unsupported collections', () => {
+    const repository = createRepository();
+    repository.createSavedPrompt({
+      title: 'Character direction',
+      prompt: 'Create a composed studio host.',
+      modelModeId: 'lucy-2.5',
+    });
+    repository.createSavedPrompt({
+      title: 'Garment direction',
+      prompt: 'Apply the linen overshirt.',
+      modelModeId: 'lucy-vton-3',
+    });
+
+    render(
+      <StudioDesignProvider>
+        <RecipeShelf repository={repository} activeMode="lucy-vton-3" onUsePrompt={vi.fn()} />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Garment direction' })).toBeInTheDocument();
+    expect(screen.queryByRole('heading', { name: 'Character direction' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Characters/ })).not.toBeInTheDocument();
+    expect(screen.getByText('Virtual Try-On recipes')).toBeInTheDocument();
+    expect(screen.queryByText(/favorites|team library|public library|import recipe/i)).toBeNull();
+  });
 });

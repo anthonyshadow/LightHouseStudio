@@ -21,6 +21,17 @@ vi.mock('../../adapters/api-client/apiClient', () => ({
 
 vi.mock('../../adapters/browser-media/browserMedia', () => ({
   acquireLocalMedia: adapters.acquireLocalMedia,
+  enumerateMediaDevices: vi.fn().mockResolvedValue([]),
+  supportsLocal1080pProfile: () => true,
+  readCaptureStreamSettings: () => ({ video: null, audio: null }),
+  withCaptureDevices: (
+    requirements: { width: number; height: number; frameRate: number },
+    preferences: { videoDeviceId: string | null; audioDeviceId: string | null },
+  ) => ({
+    ...requirements,
+    ...(preferences.videoDeviceId ? { deviceId: preferences.videoDeviceId } : {}),
+    ...(preferences.audioDeviceId ? { audioDeviceId: preferences.audioDeviceId } : {}),
+  }),
   hasLiveVideo: (stream: MediaStream | null) =>
     Boolean(stream?.getVideoTracks().some((item) => item.readyState === 'live')),
   hasLiveAudio: (stream: MediaStream | null) =>
@@ -122,6 +133,110 @@ afterEach(() => {
 });
 
 describe('useStudioSession explicit-start boundaries', () => {
+  it('keeps preferences session-only until Apply and uses them on explicit local start', async () => {
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    act(() => {
+      result.current.capturePreferences.updateVideoDeviceId('camera-2');
+      result.current.capturePreferences.updateAudioDeviceId('microphone-2');
+      result.current.capturePreferences.updateProfile('1080p30');
+    });
+    await act(async () => {
+      await result.current.capturePreferences.apply();
+    });
+    expect(adapters.acquireLocalMedia).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.startLocal();
+    });
+    expect(adapters.acquireLocalMedia).toHaveBeenCalledWith({
+      width: 1_920,
+      height: 1_080,
+      frameRate: 30,
+      deviceId: 'camera-2',
+      audioDeviceId: 'microphone-2',
+    });
+    unmount();
+  });
+
+  it('keeps the current preview live until a selected-device replacement succeeds', async () => {
+    const first = fakeStream();
+    const replacement = fakeStream();
+    const pendingReplacement = deferred<MediaStream>();
+    adapters.acquireLocalMedia
+      .mockResolvedValueOnce(first)
+      .mockImplementationOnce(() => pendingReplacement.promise);
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    await act(async () => {
+      await result.current.startLocal();
+    });
+    act(() => result.current.capturePreferences.updateVideoDeviceId('camera-2'));
+
+    let applyPromise!: Promise<boolean>;
+    act(() => {
+      applyPromise = result.current.capturePreferences.apply();
+    });
+    await waitFor(() => expect(adapters.acquireLocalMedia).toHaveBeenCalledTimes(2));
+    expect(result.current.localStream).toBe(first);
+    expect(first.getTracks().every((track) => vi.mocked(track.stop).mock.calls.length === 0)).toBe(
+      true,
+    );
+
+    await act(async () => {
+      pendingReplacement.resolve(replacement);
+      await applyPromise;
+    });
+    expect(result.current.localStream).toBe(replacement);
+    expect(first.getTracks().every((track) => vi.mocked(track.stop).mock.calls.length === 1)).toBe(
+      true,
+    );
+    expect(result.current.capturePreferences.applied.videoDeviceId).toBe('camera-2');
+    unmount();
+  });
+
+  it('preserves the current preview and committed settings when replacement fails', async () => {
+    const first = fakeStream();
+    adapters.acquireLocalMedia
+      .mockResolvedValueOnce(first)
+      .mockRejectedValueOnce(new DOMException('Camera is busy.', 'NotReadableError'));
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    await act(async () => {
+      await result.current.startLocal();
+    });
+    act(() => result.current.capturePreferences.updateVideoDeviceId('camera-2'));
+    let applied = true;
+    await act(async () => {
+      applied = await result.current.capturePreferences.apply();
+    });
+
+    expect(applied).toBe(false);
+    expect(result.current.localStream).toBe(first);
+    expect(result.current.lifecycle).toBe('ready');
+    expect(result.current.capturePreferences.applied.videoDeviceId).toBeNull();
+    expect(result.current.capturePreferences.draft.videoDeviceId).toBe('camera-2');
+    expect(result.current.capturePreferences.applyError).toMatch(
+      /current preview is still active/i,
+    );
+    expect(first.getTracks().every((track) => vi.mocked(track.stop).mock.calls.length === 0)).toBe(
+      true,
+    );
+    unmount();
+  });
+
   it('does no camera, token, model-resolution, or connection work while preparing a draft', async () => {
     const { result, unmount } = renderHook(() =>
       useStudioSession({
@@ -142,6 +257,43 @@ describe('useStudioSession explicit-start boundaries', () => {
     expect(adapters.requestRealtimeToken).not.toHaveBeenCalled();
     expect(adapters.getDecartModelRequirements).not.toHaveBeenCalled();
     expect(adapters.connectDecartRealtime).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('keeps independent text drafts while switching between inactive model modes', () => {
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    act(() => {
+      result.current.selectMode('lucy-2.5');
+    });
+    act(() => {
+      result.current.updatePrompt('A documentary host in a midnight studio');
+      result.current.updateEnhancement(true);
+    });
+    act(() => {
+      result.current.selectMode('lucy-vton-3');
+    });
+    act(() => {
+      result.current.updatePrompt('A structured amber field jacket');
+    });
+    expect(result.current.draft).toMatchObject({
+      mode: 'lucy-vton-3',
+      prompt: 'A structured amber field jacket',
+      enhance: false,
+    });
+
+    act(() => {
+      result.current.selectMode('lucy-2.5');
+    });
+    expect(result.current.draft).toMatchObject({
+      mode: 'lucy-2.5',
+      prompt: 'A documentary host in a midnight studio',
+      enhance: true,
+    });
     unmount();
   });
 

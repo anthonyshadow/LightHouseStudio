@@ -10,7 +10,9 @@ import {
 export type OwnedLocalMediaController = {
   stream: MediaStream | null;
   streamRef: RefObject<MediaStream | null>;
+  currentRequirements: MediaRequirements | null;
   ensure(requirements: MediaRequirements, operation: number): Promise<MediaStream>;
+  replace(requirements: MediaRequirements, operation: number): Promise<MediaStream>;
   release(): void;
 };
 
@@ -20,12 +22,22 @@ export type OwnedLocalMediaOptions = {
   onRequiredTrackEnded(kind: 'audio' | 'video'): void;
 };
 
+const requestedDevicesMatch = (stream: MediaStream, requirements: MediaRequirements): boolean => {
+  const videoDeviceId = stream.getVideoTracks()[0]?.getSettings?.().deviceId;
+  const audioDeviceId = stream.getAudioTracks()[0]?.getSettings?.().deviceId;
+  return (
+    (!requirements.deviceId || videoDeviceId === requirements.deviceId) &&
+    (!requirements.audioDeviceId || audioDeviceId === requirements.audioDeviceId)
+  );
+};
+
 export const useOwnedLocalMedia = ({
   operationRef,
   onMicrophoneEnded,
   onRequiredTrackEnded,
 }: OwnedLocalMediaOptions): OwnedLocalMediaController => {
   const [stream, setStream] = useState<MediaStream | null>(null);
+  const [currentRequirements, setCurrentRequirements] = useState<MediaRequirements | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const listenersRef = useRef(
     new Map<MediaStream, Array<{ track: MediaStreamTrack; listener: () => void }>>(),
@@ -58,6 +70,7 @@ export const useOwnedLocalMedia = ({
           unobserve(ownedStream);
           streamRef.current = null;
           setStream(null);
+          setCurrentRequirements(null);
           stopOwnedStream(ownedStream);
           requiredTrackEndedRef.current(track.kind === 'video' ? 'video' : 'audio');
         };
@@ -69,11 +82,12 @@ export const useOwnedLocalMedia = ({
     [unobserve],
   );
 
-  const replace = useCallback(
-    (nextStream: MediaStream) => {
+  const commitReplacement = useCallback(
+    (nextStream: MediaStream, requirements: MediaRequirements) => {
       const previous = streamRef.current;
       streamRef.current = nextStream;
       setStream(nextStream);
+      setCurrentRequirements(requirements);
       observe(nextStream);
       if (previous && previous !== nextStream) {
         unobserve(previous);
@@ -83,10 +97,27 @@ export const useOwnedLocalMedia = ({
     [observe, unobserve],
   );
 
+  const acquireReplacement = useCallback(
+    async (requirements: MediaRequirements, operation: number): Promise<MediaStream> => {
+      const acquired = await acquireLocalMedia(requirements);
+      if (operationRef.current !== operation) {
+        stopOwnedStream(acquired);
+        throw new DOMException('Superseded media request.', 'AbortError');
+      }
+      commitReplacement(acquired, requirements);
+      return acquired;
+    },
+    [commitReplacement, operationRef],
+  );
+
   const ensure = useCallback(
     async (requirements: MediaRequirements, operation: number): Promise<MediaStream> => {
       const existing = streamRef.current;
-      if (hasLiveVideo(existing) && hasLiveAudio(existing)) {
+      if (
+        hasLiveVideo(existing) &&
+        hasLiveAudio(existing) &&
+        requestedDevicesMatch(existing, requirements)
+      ) {
         const track = existing.getVideoTracks()[0];
         try {
           await track?.applyConstraints({
@@ -94,32 +125,33 @@ export const useOwnedLocalMedia = ({
             height: { ideal: requirements.height },
             frameRate: { ideal: requirements.frameRate },
           });
-          return existing;
-        } catch {
-          if (streamRef.current === existing) {
-            streamRef.current = null;
-            setStream(null);
+          if (operationRef.current !== operation || streamRef.current !== existing) {
+            throw new DOMException('Superseded media request.', 'AbortError');
           }
-          unobserve(existing);
-          stopOwnedStream(existing);
+          setCurrentRequirements(requirements);
+          return existing;
+        } catch (caught) {
+          if (operationRef.current !== operation || streamRef.current !== existing) throw caught;
+          // Keep the valid stream alive until a complete replacement has been acquired.
         }
       }
 
-      const acquired = await acquireLocalMedia(requirements);
-      if (operationRef.current !== operation) {
-        stopOwnedStream(acquired);
-        throw new DOMException('Superseded media request.', 'AbortError');
-      }
-      replace(acquired);
-      return acquired;
+      return acquireReplacement(requirements, operation);
     },
-    [operationRef, replace, unobserve],
+    [acquireReplacement, operationRef],
+  );
+
+  const replace = useCallback(
+    (requirements: MediaRequirements, operation: number) =>
+      acquireReplacement(requirements, operation),
+    [acquireReplacement],
   );
 
   const release = useCallback(() => {
     const owned = streamRef.current;
     streamRef.current = null;
     setStream(null);
+    setCurrentRequirements(null);
     if (owned) unobserve(owned);
     stopOwnedStream(owned);
   }, [unobserve]);
@@ -134,5 +166,5 @@ export const useOwnedLocalMedia = ({
     [unobserve],
   );
 
-  return { stream, streamRef, ensure, release };
+  return { stream, streamRef, currentRequirements, ensure, replace, release };
 };

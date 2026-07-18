@@ -1,10 +1,12 @@
-import { useId, useRef, useState, type ChangeEvent } from 'react';
+import { useEffect, useId, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { useTheme } from '@emotion/react';
 import { Button, StatusNotice } from '../../ui';
 import { validateReferenceImage } from './imageValidation';
 import {
+  referenceFieldStyles,
   referenceFileAreaStyles,
   referenceGuidanceStyles,
+  referencePickerStyles,
   referencePreviewStyles,
 } from './SessionComposer.styles';
 import type { ModelMode } from './types';
@@ -13,6 +15,7 @@ export interface ReferenceImageFieldProps {
   mode: ModelMode;
   image: File | null;
   previewUrl: string | null;
+  disabled?: boolean;
   onChange: (image: File | null, previewUrl: string | null) => void;
 }
 
@@ -23,10 +26,17 @@ interface ImageFeedback {
 
 const emptyFeedback = (): ImageFeedback => ({ messages: [], blocking: false });
 
+const formatFileSize = (bytes: number): string => {
+  if (bytes < 1_024) return `${bytes} B`;
+  if (bytes < 1_024 * 1_024) return `${(bytes / 1_024).toFixed(1)} KiB`;
+  return `${(bytes / (1_024 * 1_024)).toFixed(1)} MiB`;
+};
+
 export const ReferenceImageField = ({
   mode,
   image,
   previewUrl,
+  disabled = false,
   onChange,
 }: ReferenceImageFieldProps) => {
   const theme = useTheme();
@@ -35,19 +45,28 @@ export const ReferenceImageField = ({
   const guidanceId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const selectionRef = useRef(0);
+  const mountedRef = useRef(false);
+  const dragDepthRef = useRef(0);
   const [feedback, setFeedback] = useState<ImageFeedback>(emptyFeedback);
+  const [dragging, setDragging] = useState(false);
 
-  const chooseImage = async (event: ChangeEvent<HTMLInputElement>) => {
-    const input = event.currentTarget;
-    const file = input.files?.[0];
-    if (!file) return;
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      selectionRef.current += 1;
+    };
+  }, []);
+
+  const processImage = async (file: File) => {
+    if (disabled) return;
 
     const selection = ++selectionRef.current;
     const validation = await validateReferenceImage(file, mode);
-    if (selectionRef.current !== selection || !input.isConnected) return;
+    if (selectionRef.current !== selection || !mountedRef.current) return;
 
     if (validation.blockingError) {
-      input.value = '';
+      if (inputRef.current) inputRef.current.value = '';
       onChange(null, null);
       setFeedback({ messages: [validation.blockingError], blocking: true });
       return;
@@ -57,12 +76,51 @@ export const ReferenceImageField = ({
     setFeedback({ messages: validation.warnings, blocking: false });
   };
 
+  const chooseImage = (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.currentTarget.files?.[0];
+    if (file) void processImage(file);
+  };
+
   const clearImage = () => {
     selectionRef.current += 1;
     onChange(null, null);
     if (inputRef.current) inputRef.current.value = '';
     setFeedback(emptyFeedback());
+    setDragging(false);
+    dragDepthRef.current = 0;
     window.requestAnimationFrame(() => inputRef.current?.focus());
+  };
+
+  const startDrag = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (disabled) return;
+    dragDepthRef.current += 1;
+    setDragging(true);
+  };
+
+  const continueDrag = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (disabled) return;
+    event.dataTransfer.dropEffect = 'copy';
+  };
+
+  const endDrag = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    if (disabled) return;
+    dragDepthRef.current = Math.max(0, dragDepthRef.current - 1);
+    if (dragDepthRef.current === 0) setDragging(false);
+  };
+
+  const dropImage = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    dragDepthRef.current = 0;
+    setDragging(false);
+    if (disabled) return;
+
+    const file = event.dataTransfer.files[0];
+    if (!file) return;
+    if (inputRef.current) inputRef.current.value = '';
+    void processImage(file);
   };
 
   const referenceLabel =
@@ -73,38 +131,55 @@ export const ReferenceImageField = ({
       : 'Use one clearly visible, centered garment on a simple background.';
 
   return (
-    <>
-      <div css={referenceFileAreaStyles(theme)}>
-        <div id={guidanceId} css={referenceGuidanceStyles(theme)}>
-          <label htmlFor={inputId}>{referenceLabel}</label>
-          <span>JPEG, PNG, or WebP up to 10 MiB. {guidance}</span>
-        </div>
+    <div css={referenceFieldStyles(theme)}>
+      <div id={guidanceId} css={referenceGuidanceStyles(theme)}>
+        <label htmlFor={inputId}>{referenceLabel}</label>
+        <span>JPEG, PNG, or WebP up to 10 MiB. {guidance}</span>
+      </div>
+
+      <div
+        css={referenceFileAreaStyles(theme, dragging, disabled)}
+        onDragEnter={startDrag}
+        onDragOver={continueDrag}
+        onDragLeave={endDrag}
+        onDrop={dropImage}
+      >
         <input
           id={inputId}
           ref={inputRef}
           type="file"
           accept="image/jpeg,image/png,image/webp"
+          disabled={disabled}
           aria-invalid={feedback.blocking}
           aria-describedby={
             feedback.messages.length > 0 ? `${guidanceId} ${feedbackId}` : guidanceId
           }
-          onChange={(event) => void chooseImage(event)}
+          onChange={chooseImage}
         />
-        {image ? (
-          <Button size="small" variant="quiet" onClick={clearImage}>
-            Clear image
-          </Button>
-        ) : null}
+        <label htmlFor={inputId} css={referencePickerStyles(theme, disabled)}>
+          <strong>{dragging ? 'Drop image here' : image ? 'Replace image' : 'Upload image'}</strong>
+          <span>{dragging ? 'Release to validate the file' : 'Drag & drop or choose a file'}</span>
+        </label>
       </div>
 
       {image && previewUrl ? (
-        <div css={referencePreviewStyles(theme)}>
+        <div aria-live="polite" css={referencePreviewStyles(theme)}>
           <img src={previewUrl} alt="Current ephemeral reference preview" />
-          <p>
-            {image.name}
-            <br />
-            This image stays in memory and is never saved to the recipe shelf.
-          </p>
+          <div>
+            <strong title={image.name}>{image.name}</strong>
+            <span>{formatFileSize(image.size)}</span>
+            <small>This image stays in memory and is never saved to the recipe shelf.</small>
+          </div>
+          <Button
+            size="small"
+            variant="quiet"
+            disabled={disabled}
+            aria-label="Clear image"
+            title="Remove reference image"
+            onClick={clearImage}
+          >
+            Remove
+          </Button>
         </div>
       ) : null}
 
@@ -121,6 +196,6 @@ export const ReferenceImageField = ({
           ))}
         </div>
       ) : null}
-    </>
+    </div>
   );
 };

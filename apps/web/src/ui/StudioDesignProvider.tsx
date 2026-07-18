@@ -13,27 +13,38 @@ const globalStyles = (theme: StudioTheme): CSSObject => ({
   '*': {
     boxSizing: 'border-box',
   },
+  '*::before, *::after': {
+    boxSizing: 'border-box',
+  },
   'html, body, #root': {
-    minHeight: '100%',
+    width: '100%',
+    height: '100%',
+    minWidth: 0,
+    minHeight: 0,
     margin: 0,
+    overflow: 'hidden',
   },
   html: {
     background: theme.colors.canvas,
+    overscrollBehavior: 'none',
   },
   body: {
-    minHeight: '100vh',
+    width: '100%',
+    height: '100vh',
     color: theme.colors.text,
-    background: [
-      'radial-gradient(circle at 12% -12%, rgba(98, 230, 194, 0.12), transparent 32rem)',
-      'radial-gradient(circle at 96% 4%, rgba(255, 198, 92, 0.09), transparent 28rem)',
-      theme.colors.canvas,
-    ].join(', '),
+    background: theme.gradients.shellAmbient,
+    overscrollBehavior: 'none',
   },
-  '@supports (min-height: 100dvh)': {
-    body: { minHeight: '100dvh' },
+  '#root': {
+    position: 'relative',
+    isolation: 'isolate',
+  },
+  '@supports (height: 100dvh)': {
+    body: { height: '100dvh' },
   },
   'button, input, textarea, select': {
     font: 'inherit',
+    maxWidth: '100%',
   },
   button: {
     touchAction: 'manipulation',
@@ -42,8 +53,11 @@ const globalStyles = (theme: StudioTheme): CSSObject => ({
     display: 'block',
     maxWidth: '100%',
   },
-  'h1, h2, h3, p': {
+  'h1, h2, h3, h4, p': {
     marginBlockStart: 0,
+  },
+  'p, li, dd, dt, label, legend, button': {
+    overflowWrap: 'break-word',
   },
   a: {
     color: theme.colors.accentStrong,

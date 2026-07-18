@@ -7,25 +7,28 @@ import {
   promptIssueFor,
   promptValueFrom,
 } from './promptFieldLayout';
+import type { PromptWorkshopStepId } from './workshopSteps';
 
 type SingleEditDraft = Exclude<PromptBuilderDraft, { intent: 'character-transform' }>;
 
 interface SingleEditIntentFieldsProps {
   draft: SingleEditDraft;
   issues: readonly PromptIssue[];
+  activeStep: PromptWorkshopStepId;
   onChange: (draft: PromptBuilderDraft) => void;
 }
 
 export const SingleEditIntentFields = ({
   draft,
   issues,
+  activeStep,
   onChange,
 }: SingleEditIntentFieldsProps) => {
   const theme = useTheme();
 
   return (
     <div css={promptFieldGridStyles(theme)}>
-      {draft.intent === 'add-object' ? (
+      {activeStep === 'edit' && draft.intent === 'add-object' ? (
         <>
           <TextField
             label="Object to add"
@@ -48,7 +51,7 @@ export const SingleEditIntentFields = ({
         </>
       ) : null}
 
-      {draft.intent === 'replace-object' ? (
+      {activeStep === 'edit' && draft.intent === 'replace-object' ? (
         <>
           <TextField
             label="Visible object to replace"
@@ -73,7 +76,7 @@ export const SingleEditIntentFields = ({
         </>
       ) : null}
 
-      {draft.intent === 'change-attribute' ? (
+      {activeStep === 'edit' && draft.intent === 'change-attribute' ? (
         <>
           <TextField
             label="Object to restyle"
@@ -108,16 +111,18 @@ export const SingleEditIntentFields = ({
         </>
       ) : null}
 
-      <div css={promptFullWidthStyles()}>
-        <TextAreaField
-          label="Optional guardrails"
-          hint="Keep this focused on the same single edit. Up to 500 characters."
-          placeholder="Lighting, preservation, or consistency detail…"
-          value={draft.customDetails}
-          maxLength={500}
-          onChange={(event) => onChange({ ...draft, customDetails: promptValueFrom(event) })}
-        />
-      </div>
+      {activeStep === 'constraints' ? (
+        <div css={promptFullWidthStyles()}>
+          <TextAreaField
+            label="Optional guardrails"
+            hint="Keep this focused on the same single edit. Up to 500 characters."
+            placeholder="Lighting, preservation, or consistency detail…"
+            value={draft.customDetails}
+            maxLength={500}
+            onChange={(event) => onChange({ ...draft, customDetails: promptValueFrom(event) })}
+          />
+        </div>
+      ) : null}
     </div>
   );
 };

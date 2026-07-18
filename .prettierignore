@@ -5,3 +5,8 @@ playwright-report
 test-results
 package-lock.json
 REBUILD_FROM_SCRATCH_GUIDE_CREATIVE_EXPANSION.md
+.agents
+.codex
+AGENTS.md
+graphify-out
+screenshots

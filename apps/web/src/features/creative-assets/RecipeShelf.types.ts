@@ -13,6 +13,7 @@ export interface RecipeShelfProps {
   repository: CreativeAssetRepository;
   activeMode: ModelModeId;
   promptUseDisabled?: boolean;
+  embedded?: boolean;
   onUsePrompt: (selection: RecipeSelection) => void;
   onOpenCharacterWorkshop?: (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => void;
   onDirtyChange?: (dirty: boolean) => void;

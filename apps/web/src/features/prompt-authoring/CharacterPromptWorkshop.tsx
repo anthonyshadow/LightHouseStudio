@@ -1,6 +1,6 @@
-import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { useMemo, useState } from 'react';
-import { Surface, TextAreaField } from '../../ui';
+import { useTheme } from '@emotion/react';
+import { useId, useMemo, useState } from 'react';
+import { Surface } from '../../ui';
 import { GeneratedPromptPreview } from './GeneratedPromptPreview';
 import {
   createPromptBuilderDraft,
@@ -16,6 +16,31 @@ import { PromptFeedback } from './PromptFeedback';
 import { PromptIntentFields } from './PromptIntentFields';
 import { PromptWorkshopActions, type PromptSaveState } from './PromptWorkshopActions';
 import { PromptWorkshopHeader } from './PromptWorkshopHeader';
+import {
+  accordionStyles,
+  chevronStyles,
+  footerStyles,
+  headerRegionStyles,
+  reviewColumnStyles,
+  reviewToggleStyles,
+  scrollRegionStyles,
+  stepButtonStyles,
+  stepCopyStyles,
+  stepDescriptionStyles,
+  stepLabelStyles,
+  stepNumberStyles,
+  stepPanelStyles,
+  stepStyles,
+  stepSummaryStyles,
+  workshopStyles,
+  workshopSurfaceStyles,
+} from './CharacterPromptWorkshop.styles';
+import {
+  defaultPromptWorkshopStep,
+  getPromptWorkshopSteps,
+  promptWorkshopDraftHasContent,
+  type PromptWorkshopStepId,
+} from './workshopSteps';
 
 export interface PromptWorkshopAction {
   prompt: string;
@@ -29,6 +54,7 @@ export interface SavePromptWorkshopAction extends PromptWorkshopAction {
 
 export interface CharacterPromptWorkshopProps {
   initialDraft?: PromptBuilderDraft | undefined;
+  initialDrafts?: Partial<Record<PromptIntent, PromptBuilderDraft>> | undefined;
   hasReferenceImage?: boolean;
   referenceImage?: { width?: number; height?: number } | undefined;
   disabled?: boolean;
@@ -37,34 +63,32 @@ export interface CharacterPromptWorkshopProps {
   onSave?: ((action: SavePromptWorkshopAction) => void | Promise<void>) | undefined;
 }
 
-const workshopStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gap: `clamp(${theme.space.md}, 2.5vw, ${theme.space.lg})`,
-});
-
-const customFieldStyles = (): CSSObject => ({
-  display: 'grid',
-});
+const createDraftForIntent = (
+  intent: PromptIntent,
+  initial?: PromptBuilderDraft,
+  initialDrafts: Partial<Record<PromptIntent, PromptBuilderDraft>> = {},
+): PromptBuilderDraft => {
+  if (initial?.intent === intent) return normalizePromptBuilderDraft(initial);
+  const savedDraft = initialDrafts[intent];
+  if (savedDraft?.intent === intent) return normalizePromptBuilderDraft(savedDraft);
+  return createPromptBuilderDraft(intent);
+};
 
 const createDraftMap = (
   initial?: PromptBuilderDraft,
+  initialDrafts: Partial<Record<PromptIntent, PromptBuilderDraft>> = {},
 ): Record<PromptIntent, PromptBuilderDraft> => ({
-  'character-transform':
-    initial?.intent === 'character-transform'
-      ? normalizePromptBuilderDraft(initial)
-      : createPromptBuilderDraft('character-transform'),
-  'add-object':
-    initial?.intent === 'add-object'
-      ? normalizePromptBuilderDraft(initial)
-      : createPromptBuilderDraft('add-object'),
-  'replace-object':
-    initial?.intent === 'replace-object'
-      ? normalizePromptBuilderDraft(initial)
-      : createPromptBuilderDraft('replace-object'),
-  'change-attribute':
-    initial?.intent === 'change-attribute'
-      ? normalizePromptBuilderDraft(initial)
-      : createPromptBuilderDraft('change-attribute'),
+  'character-transform': createDraftForIntent('character-transform', initial, initialDrafts),
+  'add-object': createDraftForIntent('add-object', initial, initialDrafts),
+  'replace-object': createDraftForIntent('replace-object', initial, initialDrafts),
+  'change-attribute': createDraftForIntent('change-attribute', initial, initialDrafts),
+});
+
+const createStepMap = (): Record<PromptIntent, PromptWorkshopStepId> => ({
+  'character-transform': defaultPromptWorkshopStep('character-transform'),
+  'add-object': defaultPromptWorkshopStep('add-object'),
+  'replace-object': defaultPromptWorkshopStep('replace-object'),
+  'change-attribute': defaultPromptWorkshopStep('change-attribute'),
 });
 
 const referenceContext = (
@@ -78,6 +102,7 @@ const referenceContext = (
 
 export const CharacterPromptWorkshop = ({
   initialDraft,
+  initialDrafts,
   hasReferenceImage = false,
   referenceImage,
   disabled = false,
@@ -86,13 +111,19 @@ export const CharacterPromptWorkshop = ({
   onSave,
 }: CharacterPromptWorkshopProps) => {
   const theme = useTheme();
-  const [drafts, setDrafts] = useState(() => createDraftMap(initialDraft));
+  const componentId = useId();
+  const [drafts, setDrafts] = useState(() => createDraftMap(initialDraft, initialDrafts));
   const [intent, setIntent] = useState<PromptIntent>(initialDraft?.intent ?? 'character-transform');
+  const [activeSteps, setActiveSteps] = useState(createStepMap);
+  const [showSummary, setShowSummary] = useState(true);
   const [showSave, setShowSave] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [saveState, setSaveState] = useState<PromptSaveState>('idle');
 
   const draft = drafts[intent];
+  const activeStep = activeSteps[intent];
+  const steps = getPromptWorkshopSteps(draft);
+  const hasChanges = promptWorkshopDraftHasContent(draft);
   const context = useMemo(
     () => referenceContext(hasReferenceImage, referenceImage),
     [hasReferenceImage, referenceImage],
@@ -122,7 +153,14 @@ export const CharacterPromptWorkshop = ({
   };
 
   const resetCurrent = () => {
+    if (
+      hasChanges &&
+      !window.confirm('Reset this intent and discard its current workshop choices?')
+    ) {
+      return;
+    }
     updateDraft(createPromptBuilderDraft(intent));
+    setActiveSteps((current) => ({ ...current, [intent]: defaultPromptWorkshopStep(intent) }));
     setSaveName('');
     setShowSave(false);
   };
@@ -147,48 +185,113 @@ export const CharacterPromptWorkshop = ({
   };
 
   return (
-    <Surface aria-labelledby="character-workshop-title" padding="spacious">
-      <div css={workshopStyles(theme)}>
-        <PromptWorkshopHeader
-          intent={intent}
-          disabled={disabled}
-          onIntentChange={changeIntent}
-          onReset={resetCurrent}
-        />
+    <Surface
+      aria-labelledby="character-workshop-title"
+      padding="compact"
+      css={workshopSurfaceStyles(theme)}
+    >
+      <div css={workshopStyles()}>
+        <div css={headerRegionStyles(theme)}>
+          <PromptWorkshopHeader
+            intent={intent}
+            disabled={disabled}
+            hasChanges={hasChanges}
+            onIntentChange={changeIntent}
+            onReset={resetCurrent}
+          />
+        </div>
 
-        <PromptIntentFields draft={draft} issues={validation.blocking} onChange={updateDraft} />
+        <div css={scrollRegionStyles(theme)} data-scroll-region="character-workshop">
+          <div css={accordionStyles(theme)} aria-label="Prompt sections">
+            {steps.map((step, index) => {
+              const panelId = `${componentId}-${intent}-${step.id}-panel`;
+              const buttonId = `${componentId}-${intent}-${step.id}-button`;
+              const active = step.id === activeStep;
 
-        {draft.intent === 'character-transform' ? (
-          <div css={customFieldStyles()}>
-            <TextAreaField
-              label="Optional custom constraints"
-              hint="Add one focused visual constraint. Adult subjects only; up to 500 characters."
-              placeholder="e.g. Keep the camera framing and natural skin texture unchanged."
-              value={draft.customDetails}
-              maxLength={500}
-              onChange={(event) =>
-                updateDraft({ ...draft, customDetails: event.currentTarget.value })
-              }
-            />
+              return (
+                <section key={step.id} css={stepStyles(theme, active)}>
+                  <button
+                    id={buttonId}
+                    type="button"
+                    aria-expanded={active}
+                    aria-controls={panelId}
+                    css={stepButtonStyles(theme, active)}
+                    onClick={() => setActiveSteps((current) => ({ ...current, [intent]: step.id }))}
+                  >
+                    <span aria-hidden="true" css={stepNumberStyles(theme, active)}>
+                      {index + 1}
+                    </span>
+                    <span css={stepCopyStyles()}>
+                      <span css={stepLabelStyles(theme)}>{step.label}</span>
+                      <span css={stepSummaryStyles(theme)} title={step.summary}>
+                        {step.summary}
+                      </span>
+                    </span>
+                    <span aria-hidden="true" css={chevronStyles(theme, active)}>
+                      ›
+                    </span>
+                  </button>
+
+                  <div
+                    id={panelId}
+                    role="region"
+                    aria-labelledby={buttonId}
+                    hidden={!active}
+                    css={active ? stepPanelStyles(theme) : undefined}
+                  >
+                    {active ? (
+                      <>
+                        <p css={stepDescriptionStyles(theme)}>{step.description}</p>
+                        <PromptIntentFields
+                          draft={draft}
+                          issues={validation.blocking}
+                          activeStep={activeStep}
+                          onChange={updateDraft}
+                        />
+                      </>
+                    ) : null}
+                  </div>
+                </section>
+              );
+            })}
           </div>
-        ) : null}
 
-        <PromptFeedback validation={validation} />
-        <GeneratedPromptPreview prompt={generatedPrompt} />
-        <PromptWorkshopActions
-          canCommit={canCommit}
-          hasSaveAction={Boolean(onSave)}
-          showSave={showSave}
-          saveName={saveName}
-          saveState={saveState}
-          onUse={() => onUse(actionPayload())}
-          onToggleSave={() => setShowSave((visible) => !visible)}
-          onSaveNameChange={(name) => {
-            setSaveName(name);
-            setSaveState('idle');
-          }}
-          onSave={() => void savePrompt()}
-        />
+          <aside css={reviewColumnStyles(theme)} aria-label="Recipe review">
+            <button
+              type="button"
+              aria-expanded={showSummary}
+              aria-controls={`${componentId}-recipe-summary`}
+              css={reviewToggleStyles(theme)}
+              onClick={() => setShowSummary((visible) => !visible)}
+            >
+              <span>Generated recipe summary</span>
+              <span aria-hidden="true">{showSummary ? '−' : '+'}</span>
+            </button>
+            {showSummary ? (
+              <div id={`${componentId}-recipe-summary`}>
+                <GeneratedPromptPreview prompt={generatedPrompt} />
+              </div>
+            ) : null}
+            <PromptFeedback validation={validation} />
+          </aside>
+        </div>
+
+        <footer css={footerStyles(theme)}>
+          <PromptWorkshopActions
+            canCommit={canCommit}
+            hasSaveAction={Boolean(onSave)}
+            showSave={showSave}
+            saveName={saveName}
+            saveState={saveState}
+            onUse={() => onUse(actionPayload())}
+            onToggleSave={() => setShowSave((visible) => !visible)}
+            onSaveNameChange={(name) => {
+              setSaveName(name);
+              setSaveState('idle');
+            }}
+            onSave={() => void savePrompt()}
+          />
+        </footer>
       </div>
     </Surface>
   );

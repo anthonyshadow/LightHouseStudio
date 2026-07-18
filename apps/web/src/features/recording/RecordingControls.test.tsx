@@ -1,12 +1,11 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { RecordingController } from './types';
 import { StudioDesignProvider } from '../../ui';
-import type { RecordingSource } from './types';
 import { RecordingControls } from './RecordingControls';
+import type { RecordingController, RecordingSource } from './types';
 
 const source: RecordingSource = {
   stream: {} as MediaStream,
@@ -20,6 +19,7 @@ const createRecording = (
 ): RecordingController => ({
   lifecycle,
   activeSource: null,
+  metadata: null,
   original: null,
   processed: null,
   presented: null,
@@ -88,5 +88,52 @@ describe('RecordingControls accessibility', () => {
     await waitFor(() => expect(alertTarget).toHaveFocus());
     expect(alert).toHaveAttribute('aria-live', 'assertive');
     expect(alert).toHaveTextContent('The video source ended unexpectedly.');
+  });
+
+  it('handles Space only from a safe non-editable page context', async () => {
+    const recording = createRecording('idle');
+    const onStop = vi.fn().mockResolvedValue(undefined);
+    const view = render(
+      <StudioDesignProvider>
+        <RecordingControls
+          recording={recording}
+          source={source}
+          mode="local"
+          modelOutputReady={false}
+          supported
+          onStop={onStop}
+        />
+        <textarea aria-label="Direction" />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.keyDown(document.body, { code: 'Space' });
+    await waitFor(() => expect(recording.start).toHaveBeenCalledOnce());
+
+    view.rerender(
+      <StudioDesignProvider>
+        <RecordingControls
+          recording={createRecording('recording')}
+          source={source}
+          mode="local"
+          modelOutputReady={false}
+          supported
+          onStop={onStop}
+        />
+        <textarea aria-label="Direction" />
+      </StudioDesignProvider>,
+    );
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Direction' }), { code: 'Space' });
+    expect(onStop).not.toHaveBeenCalled();
+
+    const modal = document.createElement('div');
+    modal.setAttribute('aria-modal', 'true');
+    document.body.append(modal);
+    fireEvent.keyDown(document.body, { code: 'Space' });
+    expect(onStop).not.toHaveBeenCalled();
+    modal.remove();
+
+    fireEvent.keyDown(document.body, { code: 'Space' });
+    await waitFor(() => expect(onStop).toHaveBeenCalledOnce());
   });
 });

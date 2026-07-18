@@ -9,11 +9,22 @@ describe('mode replacement policy', () => {
     expect(confirm).not.toHaveBeenCalled();
   });
 
-  it('requires confirmation before another mode clears working content', () => {
+  it('preserves text drafts without an unnecessary confirmation', () => {
     const draft = { ...createEmptyDraft('lucy-vton-3'), prompt: 'A linen jacket' };
     const confirm = vi.fn().mockReturnValue(false);
 
     expect(hasDraftContent(draft)).toBe(true);
+    expect(confirmModeReplacement(draft, 'lucy-2.5', confirm)).toBe(true);
+    expect(confirm).not.toHaveBeenCalled();
+  });
+
+  it('requires confirmation before switching discards a reference image', () => {
+    const draft = {
+      ...createEmptyDraft('lucy-vton-3'),
+      image: new File(['image'], 'garment.png', { type: 'image/png' }),
+    };
+    const confirm = vi.fn().mockReturnValue(false);
+
     expect(confirmModeReplacement(draft, 'lucy-2.5', confirm)).toBe(false);
     expect(confirm).toHaveBeenCalledOnce();
   });

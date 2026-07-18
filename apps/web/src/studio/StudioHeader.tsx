@@ -35,13 +35,27 @@ export const StudioHeader = ({
 }: StudioHeaderProps) => {
   const theme = useTheme();
   const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
+  const localCaptureStatus = `Local capture ${localCaptureAvailable ? 'ready' : 'unavailable'}`;
+  const aiVideoStatus = `AI video ${capabilityLabel(
+    capabilityState,
+    availability.decart,
+    'not configured',
+  )}`;
+  const voiceCloudStatus = `Voice cloud ${capabilityLabel(
+    capabilityState,
+    availability.elevenLabs,
+    'optional',
+  )}`;
 
   return (
     <>
       <header css={headerStyles(theme)}>
         <div css={brandStyles(theme)}>
-          <span>Local-first creative camera</span>
-          <h1>Lightframe Studio</h1>
+          <img src="/favicon.svg" alt="" width="38" height="38" />
+          <div>
+            <h1>Lightframe Studio</h1>
+            <span>Local-first creative camera</span>
+          </div>
         </div>
         <div
           css={capabilityStyles(theme)}
@@ -50,21 +64,29 @@ export const StudioHeader = ({
           aria-live="polite"
           aria-atomic="true"
         >
-          <span css={capabilityPillStyles(theme, localCaptureAvailable)}>
-            Local capture {localCaptureAvailable ? 'ready' : 'unavailable'}
+          <span
+            css={capabilityPillStyles(theme, localCaptureAvailable)}
+            aria-label={localCaptureStatus}
+            title={localCaptureStatus}
+          >
+            {localCaptureStatus}
           </span>
           <span
             css={capabilityPillStyles(theme, capabilityState === 'ready' && availability.decart)}
+            aria-label={aiVideoStatus}
+            title={aiVideoStatus}
           >
-            AI video {capabilityLabel(capabilityState, availability.decart, 'not configured')}
+            {aiVideoStatus}
           </span>
           <span
             css={capabilityPillStyles(
               theme,
               capabilityState === 'ready' && availability.elevenLabs,
             )}
+            aria-label={voiceCloudStatus}
+            title={voiceCloudStatus}
           >
-            Voice cloud {capabilityLabel(capabilityState, availability.elevenLabs, 'optional')}
+            {voiceCloudStatus}
           </span>
         </div>
       </header>

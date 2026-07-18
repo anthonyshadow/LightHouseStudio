@@ -1,6 +1,11 @@
 import { canSwitchMode } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { hasLiveVideo, type MediaRequirements } from '../../adapters/browser-media/browserMedia';
+import {
+  hasLiveVideo,
+  withCaptureDevices,
+  type MediaRequirements,
+} from '../../adapters/browser-media/browserMedia';
+import type { CapturePreferences } from '../../application/types';
 import {
   toSafeMediaError,
   type ProviderAvailability,
@@ -9,7 +14,9 @@ import {
   type StudioSessionController,
   type StudioMode,
 } from '../../features/media-session';
-import { LOCAL_MEDIA_REQUIREMENTS } from './mediaRequirements';
+import type { CapturePreferencesController } from '../../features/recording';
+import { LOCAL_MEDIA_REQUIREMENTS, localMediaRequirements } from './mediaRequirements';
+import { useCapturePreferences } from './useCapturePreferences';
 import { useLiveTimer } from './useLiveTimer';
 import { useModelSessionActions } from './useModelSessionActions';
 import { useOwnedLocalMedia } from './useOwnedLocalMedia';
@@ -20,10 +27,14 @@ export type StudioSessionOptions = {
   onPromptCommitted?: (mode: 'lucy-2.5' | 'lucy-vton-3', prompt: string) => void;
 };
 
+export type StudioSessionWithCapturePreferences = StudioSessionController & {
+  capturePreferences: CapturePreferencesController;
+};
+
 export const useStudioSession = ({
   availability,
   onPromptCommitted,
-}: StudioSessionOptions): StudioSessionController => {
+}: StudioSessionOptions): StudioSessionWithCapturePreferences => {
   const [lifecycle, setLifecycle] = useState<SessionLifecycle>('idle');
   const [error, setError] = useState<SafeMediaError | null>(null);
   const [applying, setApplying] = useState(false);
@@ -37,6 +48,7 @@ export const useStudioSession = ({
     applied,
     setApplied,
     pendingChanges,
+    selectDraft,
     replaceWithEmptyDraft,
     revertDraft,
     updatePrompt,
@@ -74,12 +86,70 @@ export const useStudioSession = ({
     stream: localStream,
     streamRef: localRef,
     ensure: ensureMedia,
+    replace: replaceMedia,
+    currentRequirements,
     release: releaseLocalMedia,
   } = useOwnedLocalMedia({
     operationRef,
     onMicrophoneEnded: handleMicrophoneEnded,
     onRequiredTrackEnded: handleRequiredTrackEnded,
   });
+
+  const applyCapturePreferences = useCallback(
+    async (preferences: CapturePreferences): Promise<void> => {
+      if (!hasLiveVideo(localRef.current)) return;
+      if (
+        applying ||
+        [
+          'requesting-media',
+          'requesting-token',
+          'connecting',
+          'connected',
+          'generating',
+          'reconnecting',
+        ].includes(lifecycle)
+      ) {
+        throw new DOMException(
+          'Capture settings cannot change during an active media operation.',
+          'InvalidStateError',
+        );
+      }
+
+      const baseRequirements =
+        draftRef.current.mode === 'local'
+          ? localMediaRequirements(preferences.profile)
+          : (currentRequirements ?? LOCAL_MEDIA_REQUIREMENTS);
+      const requirements = withCaptureDevices(baseRequirements, preferences);
+      const operation = ++operationRef.current;
+      setError(null);
+      setLifecycle('requesting-media');
+      try {
+        await replaceMedia(requirements, operation);
+        if (operationRef.current !== operation) {
+          throw new DOMException('Superseded media request.', 'AbortError');
+        }
+        setLifecycle('ready');
+      } catch (caught) {
+        if (operationRef.current === operation) {
+          setLifecycle(hasLiveVideo(localRef.current) ? 'ready' : 'error');
+          setError(toSafeMediaError(caught, 'Capture settings could not be applied.'));
+        }
+        throw caught;
+      }
+    },
+    [applying, currentRequirements, draftRef, lifecycle, localRef, replaceMedia],
+  );
+
+  const capturePreferences = useCapturePreferences({
+    stream: localStream,
+    onApply: applyCapturePreferences,
+  });
+
+  const ensurePreferredMedia = useCallback(
+    (requirements: MediaRequirements, operation: number) =>
+      ensureMedia(withCaptureDevices(requirements, capturePreferences.applied), operation),
+    [capturePreferences.applied, ensureMedia],
+  );
 
   const { remoteStream, generationSeconds, disconnectRealtime, startModel, applyChanges } =
     useModelSessionActions({
@@ -93,7 +163,7 @@ export const useStudioSession = ({
       applying,
       setApplying,
       setError,
-      ensureMedia,
+      ensureMedia: ensurePreferredMedia,
       localRef,
       startLiveTimer,
       ...(onPromptCommitted ? { onPromptCommitted } : {}),
@@ -132,8 +202,13 @@ export const useStudioSession = ({
     startAbortRef.current = null;
     disconnectRealtime();
     setApplied(null);
-    await beginMedia(LOCAL_MEDIA_REQUIREMENTS);
-  }, [beginMedia, disconnectRealtime, setApplied]);
+    await beginMedia(
+      withCaptureDevices(
+        localMediaRequirements(capturePreferences.applied.profile),
+        capturePreferences.applied,
+      ),
+    );
+  }, [beginMedia, capturePreferences.applied, disconnectRealtime, setApplied]);
 
   const stopModel = useCallback(() => {
     ++operationRef.current;
@@ -178,12 +253,12 @@ export const useStudioSession = ({
       startAbortRef.current?.abort();
       startAbortRef.current = null;
       disconnectRealtime();
-      replaceWithEmptyDraft(mode);
+      selectDraft(mode);
       setApplied(null);
       setError(null);
       return true;
     },
-    [disconnectRealtime, draftRef, lifecycle, localRef, replaceWithEmptyDraft, setApplied],
+    [disconnectRealtime, draftRef, lifecycle, localRef, selectDraft, setApplied],
   );
 
   const clearError = useCallback(() => setError(null), []);
@@ -215,6 +290,7 @@ export const useStudioSession = ({
       liveSeconds,
       generationSeconds,
       applying,
+      capturePreferences,
       startLocal,
       preflight: startLocal,
       startModel,
@@ -242,6 +318,7 @@ export const useStudioSession = ({
       liveSeconds,
       generationSeconds,
       applying,
+      capturePreferences,
       startLocal,
       startModel,
       applyChanges,

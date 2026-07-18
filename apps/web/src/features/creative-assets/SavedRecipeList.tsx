@@ -1,6 +1,6 @@
 import { DeleteConfirmation, RecipeEditor, RenameForm, type RecipeFormValue } from './RecipeForms';
 import { SavedPromptCard } from './RecipeCards';
-import { listStyles } from './RecipeShelf.styles';
+import { listItemStyles, listStyles } from './RecipeShelf.styles';
 import type { SavedPrompt } from './types';
 import type { RecipeShelfController } from './useRecipeShelfController';
 import { useTheme } from '@emotion/react';
@@ -33,10 +33,12 @@ export const SavedRecipeList = ({
         const editing = controller.editing?.kind === 'saved' && controller.editing.id === item.id;
         if (!editing) {
           return (
-            <li key={item.id}>
+            <li key={item.id} css={listItemStyles()}>
               <SavedPromptCard
                 item={item}
+                selected={controller.isSelected('saved', item.id)}
                 useDisabled={useDisabled}
+                onSelect={() => controller.selectRecipe({ kind: 'saved', id: item.id })}
                 onUse={() => controller.selectSaved(item)}
                 onAction={(action) =>
                   controller.startEditing({ kind: 'saved', id: item.id, action })
@@ -47,7 +49,7 @@ export const SavedRecipeList = ({
         }
 
         return (
-          <li key={item.id}>
+          <li key={item.id} css={listItemStyles()}>
             {controller.editing?.action === 'edit' ? (
               <RecipeEditor
                 title={`Edit ${item.title}`}

@@ -15,16 +15,29 @@ export interface StudioTheme {
     accent: string;
     accentStrong: string;
     accentSoft: string;
+    onAccent: string;
+    violet: string;
+    violetSoft: string;
     signal: string;
     signalSoft: string;
     warning: string;
     warningSoft: string;
     danger: string;
     dangerSoft: string;
+    recording: string;
+    recordingSoft: string;
     success: string;
     successSoft: string;
     focus: string;
     shadow: string;
+    scrim: string;
+    overlaySurface: string;
+  };
+  gradients: {
+    shellAmbient: string;
+    stageIdle: string;
+    stageScrim: string;
+    recordingGlow: string;
   };
   radii: {
     small: string;
@@ -46,10 +59,19 @@ export interface StudioTheme {
     display: string;
     mono: string;
   };
+  fontSizes: {
+    caption: string;
+    metadata: string;
+    body: string;
+    label: string;
+    section: string;
+    stageTitle: string;
+  };
   shadows: {
     soft: string;
     lifted: string;
     focus: string;
+    recording: string;
   };
   motion: {
     quick: string;
@@ -84,16 +106,38 @@ export const studioTheme: StudioTheme = {
     accent: '#62e6c2',
     accentStrong: '#9ff3dc',
     accentSoft: '#153d37',
+    onAccent: '#041612',
+    violet: '#9b7cff',
+    violetSoft: '#261d45',
     signal: '#ffc65c',
     signalSoft: '#3b2d12',
     warning: '#ffbf69',
     warningSoft: '#3a2914',
     danger: '#ff8178',
     dangerSoft: '#411e20',
+    recording: '#ff5b64',
+    recordingSoft: '#48191f',
     success: '#69e6a6',
     successSoft: '#15382a',
     focus: '#92ddff',
     shadow: '#020405',
+    scrim: 'rgba(2, 5, 9, 0.72)',
+    overlaySurface: 'rgba(9, 13, 18, 0.96)',
+  },
+  gradients: {
+    shellAmbient: [
+      'radial-gradient(circle at 8% -8%, rgba(98, 230, 194, 0.12), transparent 34rem)',
+      'radial-gradient(circle at 92% 2%, rgba(155, 124, 255, 0.1), transparent 32rem)',
+      '#090d12',
+    ].join(', '),
+    stageIdle: [
+      'radial-gradient(circle at 18% 15%, rgba(98, 230, 194, 0.25), transparent 36%)',
+      'radial-gradient(circle at 82% 28%, rgba(155, 124, 255, 0.24), transparent 42%)',
+      'linear-gradient(145deg, #0b2027 0%, #101827 48%, #18132d 100%)',
+    ].join(', '),
+    stageScrim: 'linear-gradient(180deg, rgba(5, 9, 14, 0.04) 38%, rgba(5, 9, 14, 0.72) 100%)',
+    recordingGlow:
+      'radial-gradient(circle, rgba(255, 91, 100, 0.28) 0%, rgba(255, 91, 100, 0.1) 46%, transparent 72%)',
   },
   radii: {
     small: '0.5rem',
@@ -115,10 +159,19 @@ export const studioTheme: StudioTheme = {
     display: '"Avenir Next", "Segoe UI", ui-sans-serif, system-ui, sans-serif',
     mono: '"SFMono-Regular", Consolas, "Liberation Mono", monospace',
   },
+  fontSizes: {
+    caption: '0.75rem',
+    metadata: '0.8125rem',
+    body: '0.875rem',
+    label: '1rem',
+    section: '1.125rem',
+    stageTitle: 'clamp(1.375rem, 2vw, 1.875rem)',
+  },
   shadows: {
     soft: '0 12px 38px rgba(0, 0, 0, 0.18)',
     lifted: '0 24px 70px rgba(0, 0, 0, 0.32)',
     focus: '0 0 0 3px rgba(146, 221, 255, 0.35)',
+    recording: '0 0 0 1px rgba(255, 91, 100, 0.45), 0 0 26px rgba(255, 91, 100, 0.24)',
   },
   motion: {
     quick: '120ms ease',

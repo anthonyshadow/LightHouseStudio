@@ -1,10 +1,10 @@
 import { useTheme } from '@emotion/react';
-import { useLayoutEffect, useRef } from 'react';
+import { useId, useLayoutEffect, useRef } from 'react';
 import { Button } from '../../ui';
 import type { StudioSessionController } from './types';
 import { modeLabel } from './types';
 import { hasDraftContent } from './draftPolicy';
-import { composerActionsStyles } from './SessionComposer.styles';
+import { actionReasonStyles, composerActionsStyles } from './SessionComposer.styles';
 import { isModelSessionActive } from './sessionComposerModel';
 
 export interface SessionActionsProps {
@@ -18,13 +18,11 @@ export const SessionActions = ({ session, recording, onReset }: SessionActionsPr
   const model = session.draft.mode !== 'local';
   const active = isModelSessionActive(session);
   const draftHasContent = hasDraftContent(session.draft);
-  const actionState = !model
-    ? session.localStream
-      ? 'local-live'
-      : 'local-idle'
-    : active
-      ? 'model-active'
-      : 'model-idle';
+  const hasStartContent = Boolean(session.draft.prompt.trim() || session.draft.image);
+  const reasonId = useId();
+  let actionState: 'local-live' | 'local-idle' | 'model-active' | 'model-idle';
+  if (!model) actionState = session.localStream ? 'local-live' : 'local-idle';
+  else actionState = active ? 'model-active' : 'model-idle';
   const previousActionStateRef = useRef(actionState);
   const primaryActionRef = useRef<HTMLButtonElement>(null);
 
@@ -43,6 +41,7 @@ export const SessionActions = ({ session, recording, onReset }: SessionActionsPr
             ref={primaryActionRef}
             variant="danger"
             disabled={recording}
+            aria-describedby={recording ? reasonId : undefined}
             onClick={session.stopCamera}
           >
             Stop camera
@@ -52,26 +51,42 @@ export const SessionActions = ({ session, recording, onReset }: SessionActionsPr
             key="local-start"
             ref={primaryActionRef}
             variant="primary"
+            disabled={recording}
             busy={session.lifecycle === 'requesting-media'}
+            aria-describedby={recording ? reasonId : undefined}
             onClick={() => void session.startLocal()}
           >
             Start local preview
           </Button>
         )}
+        {recording ? (
+          <p id={reasonId} css={actionReasonStyles(theme)}>
+            Finish the current take before changing the camera session.
+          </p>
+        ) : null}
       </div>
     );
   }
 
   if (active) {
+    let applyReason: string | null = null;
+    if (recording) applyReason = 'Finish the current take before changing the live recipe.';
+    else if (!hasStartContent) {
+      applyReason = 'Add a direction or reference image before applying this draft.';
+    } else if (!session.pendingChanges) {
+      applyReason = 'Edit the working draft before applying changes.';
+    } else if (!['connected', 'generating'].includes(session.lifecycle)) {
+      applyReason = 'Wait for the live AI connection before applying changes.';
+    }
+
     return (
       <div key={actionState} css={composerActionsStyles(theme)}>
         <Button
           key="model-apply"
           variant="primary"
           busy={session.applying}
-          disabled={
-            !session.pendingChanges || !['connected', 'generating'].includes(session.lifecycle)
-          }
+          disabled={Boolean(applyReason)}
+          aria-describedby={applyReason ? reasonId : undefined}
           onClick={() => void session.applyChanges()}
         >
           Apply changes
@@ -79,7 +94,7 @@ export const SessionActions = ({ session, recording, onReset }: SessionActionsPr
         <Button
           key="model-revert"
           variant="quiet"
-          disabled={!session.pendingChanges}
+          disabled={recording || session.applying || !session.pendingChanges}
           onClick={session.revertDraft}
         >
           Revert draft
@@ -98,25 +113,51 @@ export const SessionActions = ({ session, recording, onReset }: SessionActionsPr
         <Button key="model-reset" variant="danger" disabled={recording} onClick={onReset}>
           Reset AI
         </Button>
+        {applyReason ? (
+          <p id={reasonId} css={actionReasonStyles(theme)}>
+            {applyReason}
+          </p>
+        ) : null}
       </div>
     );
   }
 
+  let startReason: string | null = null;
+  if (recording) startReason = 'Finish the current take before starting an AI session.';
+  else if (!hasStartContent) {
+    startReason =
+      session.draft.mode === 'lucy-2.5'
+        ? 'Add a character direction or portrait reference to start.'
+        : 'Add a garment direction or garment reference to start.';
+  }
+
   return (
     <div key={actionState} css={composerActionsStyles(theme)}>
-      <Button key="model-preflight" variant="secondary" onClick={() => void session.preflight()}>
-        Check camera &amp; mic
-      </Button>
       <Button
         key="model-start"
         ref={primaryActionRef}
         variant="primary"
+        disabled={Boolean(startReason)}
         busy={['requesting-media', 'requesting-token', 'connecting'].includes(session.lifecycle)}
+        aria-describedby={startReason ? reasonId : undefined}
         onClick={() => void session.startModel()}
       >
         Start {modeLabel(session.draft.mode)} AI
       </Button>
-      <Button key="model-clear" variant="quiet" disabled={!draftHasContent} onClick={onReset}>
+      <Button
+        key="model-preflight"
+        variant="secondary"
+        disabled={recording}
+        onClick={() => void session.preflight()}
+      >
+        Check camera &amp; mic
+      </Button>
+      <Button
+        key="model-clear"
+        variant="quiet"
+        disabled={recording || !draftHasContent}
+        onClick={onReset}
+      >
         Clear draft
       </Button>
       {session.localStream ? (
@@ -128,6 +169,11 @@ export const SessionActions = ({ session, recording, onReset }: SessionActionsPr
         >
           Release camera &amp; mic
         </Button>
+      ) : null}
+      {startReason ? (
+        <p id={reasonId} css={actionReasonStyles(theme)}>
+          {startReason}
+        </p>
       ) : null}
     </div>
   );

@@ -1,7 +1,11 @@
 import { useTheme } from '@emotion/react';
 import { Button, StatusNotice, TextAreaField } from '../../ui';
 import type { StudioSessionController } from './types';
-import { enhancementToggleStyles } from './SessionComposer.styles';
+import {
+  enhancementToggleStyles,
+  recipeFieldsHeadingStyles,
+  recipeFieldsStyles,
+} from './SessionComposer.styles';
 import { ReferenceImageField } from './ReferenceImageField';
 
 export interface ModelRecipeFieldsProps {
@@ -21,11 +25,23 @@ export const ModelRecipeFields = ({
   const mode = session.draft.mode;
 
   return (
-    <>
+    <section aria-labelledby={`${mode}-recipe-fields-heading`} css={recipeFieldsStyles(theme)}>
+      <header css={recipeFieldsHeadingStyles(theme)}>
+        <h3 id={`${mode}-recipe-fields-heading`}>
+          {mode === 'lucy-2.5' ? 'Character recipe' : 'Try-On recipe'}
+        </h3>
+        <p>
+          {session.applied
+            ? 'Refine the working draft, then apply the complete recipe when ready.'
+            : 'A direction, reference image, or both can start the session.'}
+        </p>
+      </header>
+
       <TextAreaField
         label={mode === 'lucy-2.5' ? 'Character direction' : 'Garment direction'}
         value={session.draft.prompt}
         maxLength={1_200}
+        disabled={recording}
         placeholder={
           mode === 'lucy-2.5'
             ? 'Describe the character or visible change…'
@@ -45,6 +61,7 @@ export const ModelRecipeFields = ({
         mode={mode}
         image={session.draft.image}
         previewUrl={session.draft.imagePreviewUrl}
+        disabled={recording}
         onChange={session.updateImage}
       />
 
@@ -52,6 +69,7 @@ export const ModelRecipeFields = ({
         <input
           type="checkbox"
           checked={session.draft.enhance}
+          disabled={recording}
           onChange={(event) => session.updateEnhancement(event.target.checked)}
         />
         <span>
@@ -67,6 +85,6 @@ export const ModelRecipeFields = ({
             : 'The working draft differs from the live recipe. Nothing changes until Apply.'}
         </StatusNotice>
       ) : null}
-    </>
+    </section>
   );
 };

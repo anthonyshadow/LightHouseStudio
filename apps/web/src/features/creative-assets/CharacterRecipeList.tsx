@@ -1,7 +1,7 @@
 import { useTheme } from '@emotion/react';
 import { CharacterPromptCard } from './RecipeCards';
 import { DeleteConfirmation, RecipeEditor, RenameForm, type RecipeFormValue } from './RecipeForms';
-import { listStyles } from './RecipeShelf.styles';
+import { listItemStyles, listStyles } from './RecipeShelf.styles';
 import type { SavedCharacterPrompt } from './types';
 import type { RecipeShelfController } from './useRecipeShelfController';
 
@@ -35,10 +35,12 @@ export const CharacterRecipeList = ({
           controller.editing?.kind === 'character' && controller.editing.id === item.id;
         if (!editing) {
           return (
-            <li key={item.id}>
+            <li key={item.id} css={listItemStyles()}>
               <CharacterPromptCard
                 item={item}
+                selected={controller.isSelected('character', item.id)}
                 useDisabled={useDisabled}
+                onSelect={() => controller.selectRecipe({ kind: 'character', id: item.id })}
                 onUse={() => controller.selectCharacter(item)}
                 {...(item.builderDraft && controller.canOpenCharacterWorkshop
                   ? { onOpenWorkshop: () => controller.openCharacterWorkshop(item) }
@@ -52,7 +54,7 @@ export const CharacterRecipeList = ({
         }
 
         return (
-          <li key={item.id}>
+          <li key={item.id} css={listItemStyles()}>
             {controller.editing?.action === 'edit' ? (
               <RecipeEditor
                 title={`Edit ${item.name}`}

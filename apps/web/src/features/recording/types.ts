@@ -3,6 +3,19 @@ import type {
   RecordingLifecycleStatus,
 } from '@studio/domain';
 import type { StudioMode } from '../../application/types';
+import type {
+  CaptureDeviceOption,
+  CapturePreferences,
+  CaptureStreamSettings,
+  LocalCaptureProfileId,
+} from '../../application/types';
+
+export type {
+  CaptureDeviceOption,
+  CapturePreferences,
+  CaptureStreamSettings,
+  LocalCaptureProfileId,
+} from '../../application/types';
 
 export type RecordingLifecycle = RecordingLifecycleStatus;
 
@@ -23,9 +36,49 @@ export type RecordingSource = {
   audioSource: 'provider' | 'microphone' | 'none';
 };
 
+/**
+ * Truthful, session-only details captured from the selected live tracks when a
+ * take starts. Optional measurements are omitted when a browser cannot report
+ * an actual value; this object is never persisted or updated after capture.
+ */
+export type TakeMetadata = Readonly<{
+  mode: StudioMode;
+  startedAt: string;
+  videoSource: RecordingSource['videoSource'];
+  audioSource: RecordingSource['audioSource'];
+  width?: number;
+  height?: number;
+  frameRate?: number;
+  videoSourceLabel?: string;
+  audioSourceLabel?: string;
+}>;
+
+export type CaptureDeviceState = 'idle' | 'loading' | 'ready' | 'error';
+
+export type CapturePreferencesController = {
+  draft: CapturePreferences;
+  applied: CapturePreferences;
+  cameraDevices: CaptureDeviceOption[];
+  microphoneDevices: CaptureDeviceOption[];
+  supportedProfiles: LocalCaptureProfileId[];
+  devicesState: CaptureDeviceState;
+  deviceError: string | null;
+  applyError: string | null;
+  applying: boolean;
+  hasPendingChanges: boolean;
+  actualSettings: CaptureStreamSettings;
+  refreshDevices(): Promise<void>;
+  updateVideoDeviceId(deviceId: string | null): void;
+  updateAudioDeviceId(deviceId: string | null): void;
+  updateProfile(profile: LocalCaptureProfileId): void;
+  apply(): Promise<boolean>;
+  discardPending(): void;
+};
+
 export type RecordingController = {
   lifecycle: RecordingLifecycle;
   activeSource: RecordingSource | null;
+  metadata: TakeMetadata | null;
   original: RecordingArtifact | null;
   processed: RecordingArtifact | null;
   presented: RecordingArtifact | null;

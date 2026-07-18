@@ -1,25 +1,35 @@
 import { useState } from 'react';
 import { useTheme } from '@emotion/react';
-import { SegmentedControl, StatusNotice, Surface } from '../../ui';
+import { Button, SegmentedControl, StatusNotice, Surface } from '../../ui';
 import type { StudioSessionController } from './types';
 import { confirmModeReplacement, hasDraftContent } from './draftPolicy';
 import { ModelRecipeFields } from './ModelRecipeFields';
 import { SessionActions } from './SessionActions';
 import {
+  composerBodyStyles,
+  composerFooterStyles,
+  composerHeaderStyles,
   composerHeadingStyles,
-  composerStackStyles,
+  composerShellStyles,
   providerDisclosureStyles,
 } from './SessionComposer.styles';
 import { isModelSessionActive, studioModeOptions } from './sessionComposerModel';
+import { AppliedRecipeSummary, SessionStatus } from './SessionStatus';
 import type { StudioMode } from './types';
 
 export interface SessionComposerProps {
   session: StudioSessionController;
   recording: boolean;
   onOpenWorkshop: () => void;
+  embedded?: boolean;
 }
 
-export const SessionComposer = ({ session, recording, onOpenWorkshop }: SessionComposerProps) => {
+export const SessionComposer = ({
+  session,
+  recording,
+  onOpenWorkshop,
+  embedded = false,
+}: SessionComposerProps) => {
   const theme = useTheme();
   const [modeSwitchNotice, setModeSwitchNotice] = useState(false);
   const [modelFieldsRevision, setModelFieldsRevision] = useState(0);
@@ -53,54 +63,85 @@ export const SessionComposer = ({ session, recording, onOpenWorkshop }: SessionC
   };
 
   return (
-    <Surface as="aside" aria-labelledby="recipe-heading">
-      <div css={composerStackStyles(theme)}>
-        <header css={composerHeadingStyles(theme)}>
-          <h2 id="recipe-heading">Recipe dock</h2>
-          <p>Prepare freely. Camera and provider work begin only from the actions below.</p>
+    <Surface
+      as="aside"
+      {...(embedded
+        ? { 'aria-label': 'Recipe Dock controls' }
+        : { 'aria-labelledby': 'recipe-heading' })}
+      padding="compact"
+      style={{ height: '100%', minHeight: 0, overflow: 'hidden', padding: 0 }}
+    >
+      <div css={composerShellStyles(theme)}>
+        <header css={composerHeaderStyles(theme)}>
+          {!embedded ? (
+            <div css={composerHeadingStyles(theme)}>
+              <span aria-hidden="true">✦</span>
+              <h2 id="recipe-heading">Recipe dock</h2>
+              <p>Prepare freely. Camera and provider work begin only from explicit actions.</p>
+            </div>
+          ) : null}
+
+          <SegmentedControl
+            label="Studio capability"
+            value={session.draft.mode}
+            options={studioModeOptions}
+            disabled={modeLocked}
+            onChange={changeMode}
+          />
         </header>
 
-        <SegmentedControl
-          label="Studio capability"
-          value={session.draft.mode}
-          options={studioModeOptions}
-          disabled={modeLocked}
-          onChange={changeMode}
-        />
+        <div data-scroll-region="recipe-dock" css={composerBodyStyles(theme)}>
+          {modeSwitchNotice ? (
+            <StatusNotice tone="warning" role="status">
+              Finish the current live or recording action before changing modes.
+            </StatusNotice>
+          ) : null}
 
-        {modeSwitchNotice ? (
-          <StatusNotice tone="warning" role="status">
-            Finish the current live or recording action before changing modes.
-          </StatusNotice>
-        ) : null}
+          <SessionStatus session={session} />
 
-        {model ? (
-          <ModelRecipeFields
-            key={`${session.draft.mode}-${modelFieldsRevision}`}
-            session={session}
-            recording={recording}
-            onOpenWorkshop={onOpenWorkshop}
-          />
-        ) : (
-          <StatusNotice title="Private local capture">
-            Camera and microphone remain in this browser. Local mode never loads or contacts Decart.
-          </StatusNotice>
-        )}
+          {!model ? (
+            <Button
+              variant="secondary"
+              disabled={modeLocked}
+              title={
+                modeLocked
+                  ? 'Release camera and finish active work before opening Character Workshop.'
+                  : undefined
+              }
+              onClick={onOpenWorkshop}
+            >
+              Open structured prompt workshop
+            </Button>
+          ) : null}
 
-        {session.error ? (
-          <StatusNotice tone="danger" title={session.error.message} role="alert">
-            {session.error.recovery ?? 'Review the setup and try again.'}
-          </StatusNotice>
-        ) : null}
+          {model ? (
+            <ModelRecipeFields
+              key={`${session.draft.mode}-${modelFieldsRevision}`}
+              session={session}
+              recording={recording}
+              onOpenWorkshop={onOpenWorkshop}
+            />
+          ) : null}
 
-        <SessionActions session={session} recording={recording} onReset={resetDraft} />
+          <AppliedRecipeSummary session={session} />
 
-        {model ? (
-          <p css={providerDisclosureStyles(theme)}>
-            Starting AI sends live camera, the applied recipe, and optional reference to Decart
-            while connected. Provider usage ends when you stop or finish a model take.
-          </p>
-        ) : null}
+          {session.error ? (
+            <StatusNotice tone="danger" title={session.error.message} role="alert">
+              {session.error.recovery ?? 'Review the setup and try again.'}
+            </StatusNotice>
+          ) : null}
+
+          {model ? (
+            <p css={providerDisclosureStyles(theme)}>
+              Starting AI sends live camera, the applied recipe, and optional reference to Decart
+              while connected. Provider usage ends when you stop or finish a model take.
+            </p>
+          ) : null}
+        </div>
+
+        <footer css={composerFooterStyles(theme)}>
+          <SessionActions session={session} recording={recording} onReset={resetDraft} />
+        </footer>
       </div>
     </Surface>
   );

@@ -1,4 +1,11 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
+
+const openRecipeDockWhenOverlaid = async (page: Page) => {
+  const launcher = page.getByRole('button', { name: 'Dock' });
+  if (!(await launcher.isVisible())) return;
+  await launcher.click();
+  await expect(page.getByRole('dialog', { name: 'Recipe Dock' })).toBeVisible();
+};
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {
@@ -65,7 +72,7 @@ test('prepares a character recipe accessibly without camera or provider work', a
 
   await expect(page.getByRole('main')).toBeVisible();
   await expect(page.getByLabel('Live studio stage')).toContainText(
-    'Your stage is private until you start.',
+    'Camera and microphone remain off until you start local preview.',
   );
   await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
 
@@ -75,6 +82,7 @@ test('prepares a character recipe accessibly without camera or provider work', a
   await page.keyboard.press('Enter');
   await expect(page.getByRole('main')).toBeFocused();
 
+  await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
   await expect(page.getByRole('button', { name: 'Character · Lucy 2.5' })).toHaveAttribute(
     'aria-pressed',
@@ -85,11 +93,15 @@ test('prepares a character recipe accessibly without camera or provider work', a
 
   await expect(page.getByRole('heading', { name: 'Direct one clear visual change' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Use in working draft' })).toBeDisabled();
-  await page.getByLabel('Character concept').fill('botanical field host');
+  await page
+    .getByRole('textbox', { name: 'Character concept', exact: true })
+    .fill('botanical field host');
   await expect(page.getByRole('button', { name: 'Use in working draft' })).toBeEnabled();
   await page.getByRole('button', { name: 'Close creative tool' }).click();
-  await page.getByRole('button', { name: 'Character workshop' }).click();
-  await expect(page.getByLabel('Character concept')).toHaveValue('botanical field host');
+  await page.getByRole('button', { name: 'Workshop', exact: true }).click();
+  await expect(page.getByRole('textbox', { name: 'Character concept', exact: true })).toHaveValue(
+    'botanical field host',
+  );
 
   const cameraCalls = await page.evaluate(() => {
     const testWindow = window as typeof window & {

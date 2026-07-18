@@ -79,6 +79,77 @@ describe('SessionComposer', () => {
     expect(onOpenWorkshop).toHaveBeenCalledOnce();
   });
 
+  it('keeps the action footer persistent and explains why an empty AI draft cannot start', () => {
+    const session = createSession('lucy-vton-3');
+    const view = renderComposer(session);
+
+    expect(view.container.querySelector('[data-scroll-region="recipe-dock"]')).toBeTruthy();
+    const start = screen.getByRole('button', { name: 'Start Virtual Try-On AI' });
+    expect(start).toBeDisabled();
+    expect(start).toHaveAccessibleDescription(
+      'Add a garment direction or garment reference to start.',
+    );
+    expect(session.startModel).not.toHaveBeenCalled();
+  });
+
+  it('communicates real preflight and live provider state without changing controllers', () => {
+    const applied = {
+      mode: 'lucy-2.5' as const,
+      prompt: 'Adult field correspondent',
+      image: null,
+      imageIdentity: null,
+      enhance: true,
+    };
+    const view = renderComposer(
+      createSession('lucy-2.5', {
+        lifecycle: 'ready',
+        localStream: {} as MediaStream,
+      }),
+    );
+
+    expect(screen.getByText('Camera & microphone checked')).toBeInTheDocument();
+
+    view.rerender(
+      <StudioDesignProvider>
+        <SessionComposer
+          session={createSession('lucy-2.5', {
+            draft: {
+              ...createEmptyDraft('lucy-2.5'),
+              prompt: 'Adult field correspondent',
+              enhance: true,
+            },
+            applied,
+            lifecycle: 'generating',
+            localStream: {} as MediaStream,
+            remoteStream: {} as MediaStream,
+            transformedVideoUsable: true,
+          })}
+          recording={false}
+          onOpenWorkshop={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByText('Character AI is live')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Applied recipe' })).toBeInTheDocument();
+    expect(screen.getByText('Video ready')).toBeInTheDocument();
+  });
+
+  it('locks recipe editing controls while recording', () => {
+    const session = createSession('lucy-2.5', {
+      draft: { ...createEmptyDraft('lucy-2.5'), prompt: 'Adult presenter' },
+    });
+    render(
+      <StudioDesignProvider>
+        <SessionComposer session={session} recording onOpenWorkshop={vi.fn()} />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByLabelText('Character direction')).toBeDisabled();
+    expect(screen.getByLabelText('Optional portrait reference')).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Start Character AI' })).toBeDisabled();
+  });
+
   it('does not reset a populated draft when the user declines confirmation', async () => {
     const user = userEvent.setup();
     const session = createSession('lucy-vton-3', {

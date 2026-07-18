@@ -5,6 +5,7 @@ import type { PromptIntent } from './model';
 interface PromptWorkshopHeaderProps {
   intent: PromptIntent;
   disabled: boolean;
+  hasChanges: boolean;
   onIntentChange: (intent: PromptIntent) => void;
   onReset: () => void;
 }
@@ -24,6 +25,10 @@ const headerStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 35rem)': {
     display: 'grid',
   },
+  '@media (max-height: 36rem)': {
+    display: 'flex',
+    alignItems: 'center',
+  },
 });
 
 const eyebrowStyles = (theme: Theme): CSSObject => ({
@@ -33,6 +38,7 @@ const eyebrowStyles = (theme: Theme): CSSObject => ({
   fontWeight: 820,
   letterSpacing: '0.13em',
   textTransform: 'uppercase',
+  '@media (max-height: 36rem)': { display: 'none' },
 });
 
 const titleStyles = (theme: Theme): CSSObject => ({
@@ -40,6 +46,10 @@ const titleStyles = (theme: Theme): CSSObject => ({
   fontFamily: theme.type.display,
   fontSize: 'clamp(1.25rem, 3vw, 1.75rem)',
   letterSpacing: '-0.025em',
+  '@media (max-height: 36rem)': {
+    margin: 0,
+    fontSize: theme.fontSizes.label,
+  },
 });
 
 const introStyles = (theme: Theme): CSSObject => ({
@@ -47,6 +57,24 @@ const introStyles = (theme: Theme): CSSObject => ({
   margin: 0,
   color: theme.colors.textMuted,
   lineHeight: 1.55,
+  '@media (max-height: 36rem)': { display: 'none' },
+});
+
+const draftStatusStyles = (theme: Theme): CSSObject => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: theme.space.xs,
+  marginBlockStart: theme.space.sm,
+  color: theme.colors.accentStrong,
+  fontSize: theme.fontSizes.caption,
+  fontWeight: 720,
+  '&::before': {
+    width: '0.45rem',
+    height: '0.45rem',
+    borderRadius: theme.radii.round,
+    background: theme.colors.accent,
+    content: '""',
+  },
 });
 
 const intentHintStyles = (theme: Theme): CSSObject => ({
@@ -54,11 +82,13 @@ const intentHintStyles = (theme: Theme): CSSObject => ({
   color: theme.colors.textFaint,
   fontSize: '0.8rem',
   lineHeight: 1.5,
+  '@media (max-height: 36rem)': { display: 'none' },
 });
 
 export const PromptWorkshopHeader = ({
   intent,
   disabled,
+  hasChanges,
   onIntentChange,
   onReset,
 }: PromptWorkshopHeaderProps) => {
@@ -76,8 +106,9 @@ export const PromptWorkshopHeader = ({
             Shape a concise recipe from visible choices. Nothing here opens the camera or updates a
             live model.
           </p>
+          {hasChanges ? <span css={draftStatusStyles(theme)}>Draft in progress</span> : null}
         </div>
-        <Button variant="quiet" size="small" onClick={onReset} disabled={disabled}>
+        <Button variant="quiet" size="small" onClick={onReset} disabled={disabled || !hasChanges}>
           Reset this intent
         </Button>
       </header>
@@ -86,6 +117,7 @@ export const PromptWorkshopHeader = ({
         label="Prompt intent"
         value={intent}
         options={intentOptions}
+        disabled={disabled}
         onChange={onIntentChange}
       />
       <p css={intentHintStyles(theme)}>

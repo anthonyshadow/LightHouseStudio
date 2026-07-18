@@ -12,6 +12,11 @@ export interface EditingState {
   action: EditAction;
 }
 
+export interface SelectedRecipeState {
+  kind: 'saved' | 'recent' | 'character';
+  id: string;
+}
+
 const errorMessage = (error: unknown) =>
   error instanceof CreativeAssetError
     ? error.message
@@ -36,17 +41,61 @@ export const useRecipeShelfController = ({
   const state = useCreativeAssetRepository(repository);
   const [query, setQuery] = useState('');
   const [category, setCategory] = useState<ShelfCategory>('saved');
+  const [tagFilter, setTagFilter] = useState('');
+  const [selectedRecipe, setSelectedRecipe] = useState<SelectedRecipeState | null>(null);
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [createSeed, setCreateSeed] = useState<Partial<RecipeFormValue> | null>(null);
   const [createKey, setCreateKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
-  const results = repository.search(query, activeMode);
+  const searchResults = repository.search(query, activeMode);
   const visibleCategory =
     activeMode === 'lucy-vton-3' && category === 'characters' ? 'saved' : category;
+  const availableTags = Array.from(
+    new Set(
+      [
+        ...state.store.savedPrompts
+          .filter((item) => item.modelModeId === activeMode)
+          .flatMap((item) => item.tags),
+        ...(activeMode === 'lucy-2.5'
+          ? state.store.savedCharacterPrompts.flatMap((item) => item.tags)
+          : []),
+      ].map((tag) => tag.trim()),
+    ),
+  )
+    .filter(Boolean)
+    .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }));
+  const matchesTag = (tags: readonly string[]) =>
+    !tagFilter ||
+    tags.some((tag) => tag.localeCompare(tagFilter, undefined, { sensitivity: 'base' }) === 0);
+  const results = {
+    savedPrompts: searchResults.savedPrompts.filter((item) => matchesTag(item.tags)),
+    recentPrompts: tagFilter ? [] : searchResults.recentPrompts,
+    savedCharacterPrompts: searchResults.savedCharacterPrompts.filter((item) =>
+      matchesTag(item.tags),
+    ),
+  };
+  const selectedRecipeRemainsVisible =
+    !selectedRecipe ||
+    (visibleCategory === 'saved' &&
+      selectedRecipe.kind === 'saved' &&
+      results.savedPrompts.some((item) => item.id === selectedRecipe.id)) ||
+    (visibleCategory === 'recent' &&
+      selectedRecipe.kind === 'recent' &&
+      results.recentPrompts.some((item) => item.id === selectedRecipe.id)) ||
+    (visibleCategory === 'characters' &&
+      selectedRecipe.kind === 'character' &&
+      results.savedCharacterPrompts.some((item) => item.id === selectedRecipe.id));
 
   useEffect(() => onDirtyChange?.(formDirty), [formDirty, onDirtyChange]);
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
+  useEffect(() => {
+    if (tagFilter && !availableTags.includes(tagFilter)) setTagFilter('');
+  }, [availableTags, tagFilter]);
+
+  useEffect(() => {
+    if (!selectedRecipeRemainsVisible) setSelectedRecipe(null);
+  }, [selectedRecipeRemainsVisible]);
 
   const canReplaceForm = () =>
     !formDirty ||
@@ -154,23 +203,51 @@ export const useRecipeShelfController = ({
     runAfterFormCheck(() => onOpenCharacterWorkshop(draft, item));
   };
 
-  const chooseCategory = (next: ShelfCategory) => runAfterFormCheck(() => setCategory(next));
+  const chooseCategory = (next: ShelfCategory) =>
+    runAfterFormCheck(() => {
+      setCategory(next);
+      setSelectedRecipe(null);
+      if (next === 'recent') setTagFilter('');
+    });
+
+  const chooseTag = (next: string) =>
+    runAfterFormCheck(() => {
+      setTagFilter(next);
+      setSelectedRecipe(null);
+    });
+
+  const selectRecipe = (next: SelectedRecipeState) => setSelectedRecipe(next);
+  const isSelected = (kind: SelectedRecipeState['kind'], id: string) =>
+    selectedRecipe?.kind === kind && selectedRecipe.id === id;
 
   const categoryCounts: Record<ShelfCategory, number> = {
+    saved: searchResults.savedPrompts.length,
+    recent: searchResults.recentPrompts.length,
+    characters: searchResults.savedCharacterPrompts.length,
+  };
+  const filteredCounts: Record<ShelfCategory, number> = {
     saved: results.savedPrompts.length,
     recent: results.recentPrompts.length,
     characters: results.savedCharacterPrompts.length,
   };
+  const visibleCount = filteredCounts[visibleCategory];
 
   return {
     repository,
     state,
     query,
     setQuery,
+    tagFilter,
+    availableTags,
+    chooseTag,
+    selectedRecipe,
+    selectRecipe,
+    isSelected,
     formDirty,
     visibleCategory,
     chooseCategory,
     categoryCounts,
+    visibleCount,
     results,
     editing,
     createSeed,

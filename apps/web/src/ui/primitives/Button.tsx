@@ -43,9 +43,9 @@ const buttonStyles = (theme: Theme, size: ButtonSize): CSSObject => ({
 const variantStyles = (theme: Theme, variant: ButtonVariant): CSSObject => {
   const variants: Record<ButtonVariant, CSSObject> = {
     primary: {
-      color: '#06110e',
+      color: theme.colors.onAccent,
       background: `linear-gradient(135deg, ${theme.colors.accentStrong}, ${theme.colors.accent})`,
-      boxShadow: '0 7px 22px rgba(98, 230, 194, 0.16)',
+      boxShadow: theme.shadows.soft,
     },
     secondary: {
       color: theme.colors.text,
@@ -64,7 +64,7 @@ const variantStyles = (theme: Theme, variant: ButtonVariant): CSSObject => {
     danger: {
       color: theme.colors.danger,
       background: theme.colors.dangerSoft,
-      borderColor: 'rgba(255, 129, 120, 0.35)',
+      borderColor: theme.colors.danger,
     },
   };
 

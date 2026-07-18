@@ -66,6 +66,7 @@ const recordingController = (): RecordingController => {
   return {
     lifecycle: 'recorded',
     activeSource: null,
+    metadata: null,
     original,
     processed: null,
     presented: original,

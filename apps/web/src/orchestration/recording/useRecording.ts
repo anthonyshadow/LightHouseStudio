@@ -17,6 +17,7 @@ import type {
   RecordingController,
   RecordingLifecycle,
   RecordingSource,
+  TakeMetadata,
   UseRecordingOptions,
 } from '../../features/recording/types';
 import { createOriginalRecordingArtifact, createRecordingSidecar } from './recordingArtifacts';
@@ -38,15 +39,112 @@ export type {
   UseRecordingOptions,
 } from '../../features/recording/types';
 
+type TrackMeasurements = Pick<TakeMetadata, 'width' | 'height' | 'frameRate'>;
+
+const asRecord = (value: unknown): Record<string, unknown> | null =>
+  typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;
+
+const positiveNumber = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : undefined;
+
+const fixedCapabilityValue = (value: unknown): number | undefined => {
+  const direct = positiveNumber(value);
+  if (direct !== undefined) return direct;
+  const range = asRecord(value);
+  if (!range) return undefined;
+  const minimum = positiveNumber(range.min);
+  const maximum = positiveNumber(range.max);
+  return minimum !== undefined && minimum === maximum ? minimum : undefined;
+};
+
+const safeTrackRecord = (
+  reader: (() => MediaTrackSettings | MediaTrackCapabilities) | undefined,
+): Record<string, unknown> | null => {
+  if (!reader) return null;
+  try {
+    return asRecord(reader());
+  } catch {
+    return null;
+  }
+};
+
+const captureTrackMeasurements = (track: MediaStreamTrack): TrackMeasurements => {
+  const settings = safeTrackRecord(
+    typeof track.getSettings === 'function' ? () => track.getSettings() : undefined,
+  );
+  const capabilities = safeTrackRecord(
+    typeof track.getCapabilities === 'function' ? () => track.getCapabilities() : undefined,
+  );
+  const measurement = (key: keyof TrackMeasurements): number | undefined =>
+    positiveNumber(settings?.[key]) ?? fixedCapabilityValue(capabilities?.[key]);
+  const width = measurement('width');
+  const height = measurement('height');
+  const frameRate = measurement('frameRate');
+  return {
+    ...(width !== undefined ? { width } : {}),
+    ...(height !== undefined ? { height } : {}),
+    ...(frameRate !== undefined ? { frameRate } : {}),
+  };
+};
+
+const safeTrackLabel = (track: MediaStreamTrack | null): string | undefined => {
+  if (!track) return undefined;
+  try {
+    const label = track.label.trim();
+    return label || undefined;
+  } catch {
+    return undefined;
+  }
+};
+
+const domainVideoSource = (
+  source: RecordingSource['videoSource'],
+): 'local-camera' | 'model-output' => (source === 'transformed' ? 'model-output' : 'local-camera');
+
+const domainAudioSource = (
+  source: RecordingSource['audioSource'],
+): 'local-microphone' | 'model-output' | 'none' => {
+  switch (source) {
+    case 'provider':
+      return 'model-output';
+    case 'microphone':
+      return 'local-microphone';
+    case 'none':
+      return 'none';
+  }
+};
+
+const captureTakeMetadata = (
+  source: RecordingSource,
+  mode: StudioMode,
+  startedAt: Date,
+  videoTrack: MediaStreamTrack,
+  audioTrack: MediaStreamTrack | null,
+): TakeMetadata => {
+  const videoSourceLabel = safeTrackLabel(videoTrack);
+  const audioSourceLabel = safeTrackLabel(audioTrack);
+  return Object.freeze({
+    mode,
+    startedAt: startedAt.toISOString(),
+    videoSource: source.videoSource,
+    audioSource: audioTrack ? source.audioSource : 'none',
+    ...captureTrackMeasurements(videoTrack),
+    ...(videoSourceLabel ? { videoSourceLabel } : {}),
+    ...(audioSourceLabel ? { audioSourceLabel } : {}),
+  });
+};
+
 export const useRecording = ({
   onAutomaticStop,
 }: UseRecordingOptions = {}): RecordingController => {
   const [lifecycle, setLifecycle] = useState<RecordingLifecycle>('idle');
   const [activeSource, setActiveSource] = useState<RecordingSource | null>(null);
+  const [metadata, setMetadata] = useState<TakeMetadata | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const artifacts = useRecordingArtifacts();
 
   const attemptRef = useRef<RecordingAttempt | null>(null);
+  const pendingMetadataRef = useRef<TakeMetadata | null>(null);
   const domainLifecycleRef = useRef<DomainRecordingLifecycle<Blob>>(
     createRecordingLifecycle<Blob>(),
   );
@@ -92,12 +190,14 @@ export const useRecording = ({
       setActiveSource(null);
 
       if (disposedRef.current) {
+        pendingMetadataRef.current = null;
         resolveStop(null);
         return;
       }
 
       const artifact = createOriginalRecordingArtifact(attempt);
       if (!artifact) {
+        pendingMetadataRef.current = null;
         domainLifecycleRef.current = failRecordingLifecycle(
           createSafeError('recording-failure', 'The browser produced an empty recording.'),
         );
@@ -109,6 +209,8 @@ export const useRecording = ({
       }
 
       artifacts.publishOriginal(artifact, createRecordingSidecar(attempt));
+      setMetadata(pendingMetadataRef.current);
+      pendingMetadataRef.current = null;
       try {
         domainLifecycleRef.current = completeRecordingLifecycle(
           domainLifecycleRef.current,
@@ -175,6 +277,7 @@ export const useRecording = ({
       artifacts.reportRecordingError(
         'The browser did not finish the recording in time. The live source can now be released safely.',
       );
+      pendingMetadataRef.current = null;
       markAutomaticStop(attempt, 'finalization-timeout');
       notifyAutomaticStop(attempt);
       resolveStop(null);
@@ -215,16 +318,8 @@ export const useRecording = ({
       const descriptor = videoTrack
         ? {
             modeId: mode,
-            videoSource:
-              source.videoSource === 'transformed'
-                ? ('model-output' as const)
-                : ('local-camera' as const),
-            audioSource:
-              source.audioSource === 'provider'
-                ? ('model-output' as const)
-                : source.audioSource === 'microphone'
-                  ? ('local-microphone' as const)
-                  : ('none' as const),
+            videoSource: domainVideoSource(source.videoSource),
+            audioSource: domainAudioSource(source.audioSource),
             hasLiveVideo: true as const,
             hasLiveAudio: Boolean(audioTrack),
           }
@@ -293,6 +388,14 @@ export const useRecording = ({
       attempt.audioTrack?.addEventListener('ended', attempt.onAudioEnded, { once: true });
       try {
         const sidecarStarted = startRecordingAttempt(attempt);
+        pendingMetadataRef.current = captureTakeMetadata(
+          source,
+          mode,
+          attempt.startedAt,
+          attempt.videoTrack,
+          attempt.audioTrack,
+        );
+        setMetadata(null);
         setElapsedSeconds(0);
         artifacts.clearRecordingError();
         setActiveSource(source);
@@ -304,6 +407,7 @@ export const useRecording = ({
         );
         setLifecycle(domainLifecycleRef.current.status);
       } catch {
+        pendingMetadataRef.current = null;
         cleanupRecordingAttempt(attempt);
         attemptRef.current = null;
         setActiveSource(null);
@@ -326,6 +430,8 @@ export const useRecording = ({
   const discard = useCallback(() => {
     if (attemptRef.current) return;
     artifacts.discardArtifacts();
+    pendingMetadataRef.current = null;
+    setMetadata(null);
     setActiveSource(null);
     domainLifecycleRef.current = createRecordingLifecycle<Blob>();
     setLifecycle(domainLifecycleRef.current.status);
@@ -347,6 +453,7 @@ export const useRecording = ({
       const attempt = attemptRef.current;
       if (attempt) cleanupRecordingAttempt(attempt);
       attemptRef.current = null;
+      pendingMetadataRef.current = null;
       if (attempt?.mainRecorder.state !== 'inactive') attempt?.mainRecorder.stop();
       if (attempt?.sidecarRecorder?.state !== 'inactive') attempt?.sidecarRecorder?.stop();
       if (stopTimerRef.current !== null) window.clearTimeout(stopTimerRef.current);
@@ -358,6 +465,7 @@ export const useRecording = ({
     () => ({
       lifecycle,
       activeSource,
+      metadata,
       original: artifacts.original,
       processed: artifacts.processed,
       presented: artifacts.processed ?? artifacts.original,
@@ -376,6 +484,6 @@ export const useRecording = ({
       failProcessing: artifacts.failProcessing,
       restoreOriginal: artifacts.restoreOriginal,
     }),
-    [lifecycle, activeSource, artifacts, elapsedSeconds, start, stop, discard],
+    [lifecycle, activeSource, metadata, artifacts, elapsedSeconds, start, stop, discard],
   );
 };

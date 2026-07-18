@@ -8,26 +8,53 @@ import { useRecording } from './useRecording';
 
 type RecorderListener = (event: { data: Blob }) => void;
 
-const createTrack = (kind: 'video' | 'audio'): MediaStreamTrack =>
+type TrackOptions = {
+  label?: string;
+  settings?: MediaTrackSettings;
+  capabilities?: MediaTrackCapabilities;
+  getSettingsError?: boolean;
+  getCapabilitiesError?: boolean;
+};
+
+const createTrack = (kind: 'video' | 'audio', options: TrackOptions = {}): MediaStreamTrack =>
   ({
     kind,
+    label: options.label ?? '',
     readyState: 'live',
     addEventListener: vi.fn(),
     removeEventListener: vi.fn(),
     stop: vi.fn(),
+    getSettings: vi.fn(() => {
+      if (options.getSettingsError) throw new Error('settings unavailable');
+      return options.settings ?? {};
+    }),
+    getCapabilities: vi.fn(() => {
+      if (options.getCapabilitiesError) throw new Error('capabilities unavailable');
+      return options.capabilities ?? {};
+    }),
   }) as unknown as MediaStreamTrack;
 
-const createSource = (): RecordingSource => {
-  const video = createTrack('video');
-  const audio = createTrack('audio');
+const createSource = ({
+  video = {},
+  audio = {},
+  videoSource = 'local',
+  audioSource = 'microphone',
+}: {
+  video?: TrackOptions;
+  audio?: TrackOptions | null;
+  videoSource?: RecordingSource['videoSource'];
+  audioSource?: RecordingSource['audioSource'];
+} = {}): RecordingSource => {
+  const videoTrack = createTrack('video', video);
+  const audioTrack = audio ? createTrack('audio', audio) : null;
   return {
     stream: {
-      getTracks: () => [video, audio],
-      getVideoTracks: () => [video],
-      getAudioTracks: () => [audio],
+      getTracks: () => (audioTrack ? [videoTrack, audioTrack] : [videoTrack]),
+      getVideoTracks: () => [videoTrack],
+      getAudioTracks: () => (audioTrack ? [audioTrack] : []),
     } as unknown as MediaStream,
-    videoSource: 'local',
-    audioSource: 'microphone',
+    videoSource,
+    audioSource,
   };
 };
 
@@ -327,6 +354,99 @@ describe('useRecording recorder construction failures', () => {
       filename: expect.stringMatching(/\.mp4$/),
     });
     expect(result.current.original?.media.type).toBe('video/mp4');
+    unmount();
+  });
+
+  it('captures immutable start-time metadata, retains it for voice variants, and clears it on replacement or discard', async () => {
+    installRecorderHarness();
+    const settings: MediaTrackSettings = { width: 1_920, height: 1_080, frameRate: 29.97 };
+    const source = createSource({
+      video: { label: 'FaceTime HD Camera', settings },
+      audio: { label: 'Studio Microphone' },
+    });
+    const { result, unmount } = renderHook(() => useRecording());
+
+    await act(async () => {
+      await result.current.start(source, 'local');
+    });
+    settings.width = 640;
+    settings.height = 480;
+    await act(async () => {
+      await result.current.stop();
+    });
+
+    const originalMetadata = result.current.metadata;
+    expect(originalMetadata).toMatchObject({
+      mode: 'local',
+      startedAt: result.current.original?.startedAt,
+      width: 1_920,
+      height: 1_080,
+      frameRate: 29.97,
+      videoSource: 'local',
+      audioSource: 'microphone',
+      videoSourceLabel: 'FaceTime HD Camera',
+      audioSourceLabel: 'Studio Microphone',
+    });
+    expect(Object.isFrozen(originalMetadata)).toBe(true);
+
+    act(() => {
+      result.current.completeProcessing(new Blob(['processed']), 'video/webm', 'warm-studio');
+    });
+    expect(result.current.metadata).toBe(originalMetadata);
+
+    await act(async () => {
+      await result.current.start(
+        createSource({
+          video: { settings: { width: 1_280, height: 720, frameRate: 30 } },
+          audio: null,
+          videoSource: 'transformed',
+          audioSource: 'none',
+        }),
+        'lucy-2.5',
+      );
+    });
+    expect(result.current.metadata).toBeNull();
+    await act(async () => {
+      await result.current.stop();
+    });
+    expect(result.current.metadata).toMatchObject({
+      mode: 'lucy-2.5',
+      width: 1_280,
+      height: 720,
+      frameRate: 30,
+      videoSource: 'transformed',
+      audioSource: 'none',
+    });
+
+    act(() => result.current.discard());
+    expect(result.current.metadata).toBeNull();
+    expect(result.current.presented).toBeNull();
+    unmount();
+  });
+
+  it('records safely when track settings and capabilities throw', async () => {
+    installRecorderHarness();
+    const { result, unmount } = renderHook(() => useRecording());
+
+    await act(async () => {
+      await result.current.start(
+        createSource({
+          video: { getSettingsError: true, getCapabilitiesError: true },
+          audio: null,
+          audioSource: 'none',
+        }),
+        'local',
+      );
+      await result.current.stop();
+    });
+
+    expect(result.current.lifecycle).toBe('recorded');
+    expect(result.current.metadata).toEqual({
+      mode: 'local',
+      startedAt: result.current.original?.startedAt,
+      videoSource: 'local',
+      audioSource: 'none',
+    });
     unmount();
   });
 

@@ -3,7 +3,9 @@ import { Button } from '../../ui';
 import {
   actionStyles,
   badgeStyles,
+  cardBadgeGroupStyles,
   cardHeaderStyles,
+  cardSelectButtonStyles,
   cardStyles,
   cardTitleStyles,
   emptyBodyStyles,
@@ -35,7 +37,7 @@ const Tags = ({ tags }: { tags: readonly string[] }) => {
   return (
     <div css={tagsStyles(theme)} aria-label="Tags">
       {tags.map((tag) => (
-        <span key={tag.toLocaleLowerCase()} css={tagStyles(theme)}>
+        <span key={tag.toLocaleLowerCase()} title={tag} css={tagStyles(theme)}>
           {tag}
         </span>
       ))}
@@ -45,23 +47,40 @@ const Tags = ({ tags }: { tags: readonly string[] }) => {
 
 export const SavedPromptCard = ({
   item,
+  selected = false,
   useDisabled = false,
+  onSelect,
   onUse,
   onAction,
 }: {
   item: SavedPrompt;
+  selected?: boolean;
   useDisabled?: boolean;
+  onSelect: () => void;
   onUse: () => void;
   onAction: (action: EditAction) => void;
 }) => {
   const theme = useTheme();
   return (
-    <article css={cardStyles(theme)}>
+    <article css={cardStyles(theme, selected)} data-selected={selected || undefined}>
       <header css={cardHeaderStyles(theme)}>
-        <h3 css={cardTitleStyles()}>{item.title}</h3>
-        <span css={badgeStyles(theme, item.modelModeId === 'lucy-2.5' ? 'accent' : 'signal')}>
-          {modeName(item.modelModeId)}
-        </span>
+        <h3 css={cardTitleStyles()}>
+          <button
+            type="button"
+            aria-pressed={selected}
+            title={`Select ${item.title}`}
+            css={cardSelectButtonStyles(theme)}
+            onClick={onSelect}
+          >
+            {item.title}
+          </button>
+        </h3>
+        <div css={cardBadgeGroupStyles(theme)}>
+          {selected ? <span css={badgeStyles(theme, 'accent')}>Selected</span> : null}
+          <span css={badgeStyles(theme, item.modelModeId === 'lucy-2.5' ? 'accent' : 'signal')}>
+            {modeName(item.modelModeId)}
+          </span>
+        </div>
       </header>
       <div css={metadataStyles(theme)}>
         <span>{item.source === 'generated' ? 'Generated' : 'Written'}</span>
@@ -69,7 +88,9 @@ export const SavedPromptCard = ({
         {item.useCount > 0 ? <span>Used {item.useCount}×</span> : null}
       </div>
       <div>
-        <p css={promptStyles(theme)}>{item.prompt}</p>
+        <p title={item.prompt} css={promptStyles(theme)}>
+          {item.prompt}
+        </p>
         <Tags tags={item.tags} />
       </div>
       <div css={actionStyles(theme)}>
@@ -78,7 +99,13 @@ export const SavedPromptCard = ({
           variant="primary"
           size="small"
           disabled={useDisabled}
-          onClick={onUse}
+          title={
+            useDisabled ? 'Recipe insertion is unavailable during the active session.' : undefined
+          }
+          onClick={() => {
+            onSelect();
+            onUse();
+          }}
         >
           Use
         </Button>
@@ -86,7 +113,10 @@ export const SavedPromptCard = ({
           aria-label={`Edit ${item.title}`}
           variant="quiet"
           size="small"
-          onClick={() => onAction('edit')}
+          onClick={() => {
+            onSelect();
+            onAction('edit');
+          }}
         >
           Edit
         </Button>
@@ -94,7 +124,10 @@ export const SavedPromptCard = ({
           aria-label={`Rename ${item.title}`}
           variant="quiet"
           size="small"
-          onClick={() => onAction('rename')}
+          onClick={() => {
+            onSelect();
+            onAction('rename');
+          }}
         >
           Rename
         </Button>
@@ -102,7 +135,10 @@ export const SavedPromptCard = ({
           aria-label={`Delete ${item.title}`}
           variant="quiet"
           size="small"
-          onClick={() => onAction('delete')}
+          onClick={() => {
+            onSelect();
+            onAction('delete');
+          }}
         >
           Delete
         </Button>
@@ -113,34 +149,59 @@ export const SavedPromptCard = ({
 
 export const RecentPromptCard = ({
   item,
+  selected = false,
   useDisabled = false,
+  onSelect,
   onUse,
   onSave,
 }: {
   item: RecentPrompt;
+  selected?: boolean;
   useDisabled?: boolean;
+  onSelect: () => void;
   onUse: () => void;
   onSave: () => void;
 }) => {
   const theme = useTheme();
   return (
-    <article css={cardStyles(theme)}>
+    <article css={cardStyles(theme, selected)} data-selected={selected || undefined}>
       <header css={cardHeaderStyles(theme)}>
-        <h3 css={cardTitleStyles()}>Recent direction</h3>
-        <span css={badgeStyles(theme)}>Used {formatDate(item.usedAt)}</span>
+        <h3 css={cardTitleStyles()}>
+          <button
+            type="button"
+            aria-pressed={selected}
+            title="Select recent direction"
+            css={cardSelectButtonStyles(theme)}
+            onClick={onSelect}
+          >
+            Recent direction
+          </button>
+        </h3>
+        <div css={cardBadgeGroupStyles(theme)}>
+          {selected ? <span css={badgeStyles(theme, 'accent')}>Selected</span> : null}
+          <span css={badgeStyles(theme)}>Used {formatDate(item.usedAt)}</span>
+        </div>
       </header>
       <div css={metadataStyles(theme)}>
         <span>{modeName(item.modelModeId)}</span>
         <span>{item.savedPromptId ? 'Linked to saved recipe' : 'Recent text only'}</span>
       </div>
-      <p css={promptStyles(theme)}>{item.prompt}</p>
+      <p title={item.prompt} css={promptStyles(theme)}>
+        {item.prompt}
+      </p>
       <div css={actionStyles(theme)}>
         <Button
           aria-label={`Use recent prompt: ${item.prompt}`}
           variant="primary"
           size="small"
           disabled={useDisabled}
-          onClick={onUse}
+          title={
+            useDisabled ? 'Recipe insertion is unavailable during the active session.' : undefined
+          }
+          onClick={() => {
+            onSelect();
+            onUse();
+          }}
         >
           Use
         </Button>
@@ -149,7 +210,10 @@ export const RecentPromptCard = ({
             aria-label={`Save a copy of recent prompt: ${item.prompt}`}
             variant="quiet"
             size="small"
-            onClick={onSave}
+            onClick={() => {
+              onSelect();
+              onSave();
+            }}
           >
             Save a copy
           </Button>
@@ -161,13 +225,17 @@ export const RecentPromptCard = ({
 
 export const CharacterPromptCard = ({
   item,
+  selected = false,
   useDisabled = false,
+  onSelect,
   onUse,
   onOpenWorkshop,
   onAction,
 }: {
   item: SavedCharacterPrompt;
+  selected?: boolean;
   useDisabled?: boolean;
+  onSelect: () => void;
   onUse: () => void;
   onOpenWorkshop?: (() => void) | undefined;
   onAction: (action: EditAction) => void;
@@ -180,10 +248,23 @@ export const CharacterPromptCard = ({
         ? 'Session portrait was not saved'
         : 'Add a portrait when using';
   return (
-    <article css={cardStyles(theme)}>
+    <article css={cardStyles(theme, selected)} data-selected={selected || undefined}>
       <header css={cardHeaderStyles(theme)}>
-        <h3 css={cardTitleStyles()}>{item.name}</h3>
-        <span css={badgeStyles(theme, 'accent')}>Character</span>
+        <h3 css={cardTitleStyles()}>
+          <button
+            type="button"
+            aria-pressed={selected}
+            title={`Select ${item.name}`}
+            css={cardSelectButtonStyles(theme)}
+            onClick={onSelect}
+          >
+            {item.name}
+          </button>
+        </h3>
+        <div css={cardBadgeGroupStyles(theme)}>
+          {selected ? <span css={badgeStyles(theme, 'accent')}>Selected</span> : null}
+          <span css={badgeStyles(theme, 'accent')}>Character</span>
+        </div>
       </header>
       <div css={metadataStyles(theme)}>
         <span>{referenceLabel}</span>
@@ -191,8 +272,14 @@ export const CharacterPromptCard = ({
         {item.useCount > 0 ? <span>Used {item.useCount}×</span> : null}
       </div>
       <div>
-        <p css={promptStyles(theme)}>{item.prompt}</p>
-        {item.notes ? <p css={notesStyles(theme)}>{item.notes}</p> : null}
+        <p title={item.prompt} css={promptStyles(theme)}>
+          {item.prompt}
+        </p>
+        {item.notes ? (
+          <p title={item.notes} css={notesStyles(theme)}>
+            {item.notes}
+          </p>
+        ) : null}
         <Tags tags={item.tags} />
       </div>
       <div css={actionStyles(theme)}>
@@ -201,7 +288,13 @@ export const CharacterPromptCard = ({
           variant="primary"
           size="small"
           disabled={useDisabled}
-          onClick={onUse}
+          title={
+            useDisabled ? 'Recipe insertion is unavailable during the active session.' : undefined
+          }
+          onClick={() => {
+            onSelect();
+            onUse();
+          }}
         >
           Use
         </Button>
@@ -211,7 +304,13 @@ export const CharacterPromptCard = ({
             variant="secondary"
             size="small"
             disabled={useDisabled}
-            onClick={onOpenWorkshop}
+            title={
+              useDisabled ? 'The workshop is unavailable during the active session.' : undefined
+            }
+            onClick={() => {
+              onSelect();
+              onOpenWorkshop();
+            }}
           >
             Open workshop
           </Button>
@@ -220,7 +319,10 @@ export const CharacterPromptCard = ({
           aria-label={`Edit ${item.name}`}
           variant="quiet"
           size="small"
-          onClick={() => onAction('edit')}
+          onClick={() => {
+            onSelect();
+            onAction('edit');
+          }}
         >
           Edit
         </Button>
@@ -228,7 +330,10 @@ export const CharacterPromptCard = ({
           aria-label={`Rename ${item.name}`}
           variant="quiet"
           size="small"
-          onClick={() => onAction('rename')}
+          onClick={() => {
+            onSelect();
+            onAction('rename');
+          }}
         >
           Rename
         </Button>
@@ -236,7 +341,10 @@ export const CharacterPromptCard = ({
           aria-label={`Delete ${item.name}`}
           variant="quiet"
           size="small"
-          onClick={() => onAction('delete')}
+          onClick={() => {
+            onSelect();
+            onAction('delete');
+          }}
         >
           Delete
         </Button>

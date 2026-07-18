@@ -1,4 +1,8 @@
-import type { BrowserCapabilities } from '../../application/types';
+import type {
+  BrowserCapabilities,
+  CapturePreferences,
+  CaptureStreamSettings,
+} from '../../application/types';
 
 export type MediaRequirements = {
   width: number;
@@ -6,6 +10,22 @@ export type MediaRequirements = {
   frameRate: number;
   deviceId?: string;
   audioDeviceId?: string;
+};
+
+export const withCaptureDevices = (
+  requirements: MediaRequirements,
+  preferences: CapturePreferences,
+): MediaRequirements => ({
+  width: requirements.width,
+  height: requirements.height,
+  frameRate: requirements.frameRate,
+  ...(preferences.videoDeviceId ? { deviceId: preferences.videoDeviceId } : {}),
+  ...(preferences.audioDeviceId ? { audioDeviceId: preferences.audioDeviceId } : {}),
+});
+
+export const supportsLocal1080pProfile = (): boolean => {
+  const supported = navigator.mediaDevices?.getSupportedConstraints?.();
+  return Boolean(supported?.width && supported.height && supported.frameRate);
 };
 
 export const detectBrowserCapabilities = (): BrowserCapabilities => ({
@@ -64,4 +84,32 @@ export const acquireLocalMedia = async (requirements: MediaRequirements): Promis
 export const enumerateMediaDevices = async (): Promise<MediaDeviceInfo[]> => {
   if (!navigator.mediaDevices?.enumerateDevices) return [];
   return navigator.mediaDevices.enumerateDevices();
+};
+
+const finiteSetting = (value: number | undefined): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
+
+export const readCaptureStreamSettings = (stream: MediaStream | null): CaptureStreamSettings => {
+  const videoTrack = stream?.getVideoTracks()[0];
+  const audioTrack = stream?.getAudioTracks()[0];
+  const videoSettings = videoTrack?.getSettings?.();
+  const audioSettings = audioTrack?.getSettings?.();
+
+  return {
+    video: videoTrack
+      ? {
+          label: videoTrack.label || 'Active camera',
+          deviceId: videoSettings?.deviceId || null,
+          width: finiteSetting(videoSettings?.width),
+          height: finiteSetting(videoSettings?.height),
+          frameRate: finiteSetting(videoSettings?.frameRate),
+        }
+      : null,
+    audio: audioTrack
+      ? {
+          label: audioTrack.label || 'Active microphone',
+          deviceId: audioSettings?.deviceId || null,
+        }
+      : null,
+  };
 };

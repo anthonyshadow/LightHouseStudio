@@ -35,11 +35,13 @@ const previewCountStyles = (theme: Theme): CSSObject => ({
 });
 
 const previewTextStyles = (theme: Theme, empty: boolean): CSSObject => ({
+  minWidth: 0,
   minHeight: '4.8rem',
   margin: 0,
   color: empty ? theme.colors.textFaint : theme.colors.text,
   fontSize: '0.95rem',
   lineHeight: 1.6,
+  overflowWrap: 'anywhere',
   whiteSpace: 'pre-wrap',
 });
 

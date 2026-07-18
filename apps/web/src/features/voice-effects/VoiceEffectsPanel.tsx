@@ -19,7 +19,7 @@ export type VoiceEffectsPanelProps = {
 
 const optionGridStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns: 'repeat(auto-fit, minmax(9rem, 1fr))',
+  gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 7rem), 1fr))',
   gap: theme.space.xs,
 });
 
