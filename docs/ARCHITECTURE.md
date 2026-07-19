@@ -81,7 +81,9 @@ The Recipe Shelf is behind a repository interface. It treats `localStorage` as u
 - `recovered`: corrupt or outdated records were dropped and the usable subset was repaired;
 - `session-only`: storage is unavailable or a write failed, so the in-memory repository continues for this tab.
 
-Only prompt text and bounded metadata are durable. The repository's explicit reference-image status documents that a saved character prompt contains no portrait bytes or URL.
+The v2 payload keeps prompt text, bounded metadata, and nullable opaque reference-image asset IDs. It migrates the legacy v1 key when v2 is absent; legacy records receive null references. Image bytes and content URLs never enter `localStorage`. Recents are versioned by mode, canonical prompt, and exact asset ID, while saved characters keep the immutable asset version captured at save time.
+
+Generated character references are the one durable server-owned media type. `ReferenceImageAssetStore` is injectable; the default filesystem implementation writes immutable image bytes, versioned private metadata, and request-id mappings atomically under `LIGHTFRAME_DATA_DIR`. Opaque browser-visible IDs are distinct from internal storage keys. Failed temporary writes are removed, while detached, regenerated, or otherwise unlinked assets are intentionally retained because historical records may still reference them and there is no complete server-side relationship graph.
 
 ## Backend boundary
 
@@ -89,16 +91,17 @@ The Fastify server binds to `127.0.0.1` and rejects non-loopback Host headers. P
 
 Permanent provider keys remain in server environment memory. App-owned Zod contracts validate every HTTP boundary, and provider adapters normalize upstream data. Automatic request URL logging is disabled because voice search terms and provider ids are ephemeral user data. Error mapping may retain a numeric upstream status and inspects only bounded allowlisted error-code/parameter fields; it excludes raw bodies/messages, request IDs, provider URLs, keys, temporary credentials, and stack traces. Invalid-audio codes are classified before plan guidance, and zero-retention guidance requires both an exact entitlement code and `param: enable_logging`, so malformed sidecars are never mislabeled as entitlement problems.
 
-The backend is intentionally stateless: no database, accounts, media upload store, analytics, jobs, migrations, or session history. This keeps the local-first privacy model inspectable. It is not a public multi-user security design.
+The backend remains database-free and single-operator, with no accounts, analytics, jobs, SQL migrations, or session history. It is stateful only for immutable generated-reference assets and their idempotency metadata. Generation requires exact loopback Origin/Host matching; reads require the local owner identity. This keeps the local-first privacy model inspectable, but it is not a public multi-user security design.
 
 ## Ownership and cleanup rules
 
 - Session orchestration owns local/remote streams, cloned provider-input tracks, provider client, start abort controller, operation generation, preview URL, live timers, and the single post-finalization `releaseForRecordedReview()` cleanup path.
-- The session draft controller owns the per-mode text/enhancement map and every ephemeral reference preview URL. It clears the departing reference on mode selection and revokes all remaining previews on unmount.
+- The session draft controller owns the per-mode text/enhancement map and a discriminated reference: either an ephemeral manual `File` with an owned object URL or a persisted asset ID with hydrated bytes and a stable content URL. Atomic recipe replacement validates persisted bytes before changing the draft, and stable asset IDs define pending/applied identity.
 - Capture preferences own session-only device/profile drafts and negotiated-setting display. Owned local media performs atomic stream replacement; neither recipes nor browser storage receive device ids.
 - Recording orchestration owns `MediaRecorder` instances, recording chunks, the audio sidecar, immutable original/processed artifact URLs, download-initiation state, and unload protection.
 - Voice processing owns processing abort controllers and temporary Web Audio/remux resources; it never mutates the originals.
-- The Recipe Shelf owns only serialized text and metadata.
+- The Recipe Shelf owns serialized text, metadata, and opaque asset relationships, never image bytes or storage keys.
+- The reference asset store owns atomic filesystem writes and private metadata. Detach and regeneration only change browser relationships; there is no ordinary delete route, and retained orphan cleanup is an explicit future operator policy.
 - The stable stage owns video DOM attachment and audio metering. Modal panels own only presentation/focus state and never own or restart media resources.
 - The API owns request abort/timeout wiring and upstream stream closure for the duration of each HTTP request. ElevenLabs fetches receive the abort signal. Decart SDK `0.1.14` token creation does not expose one, so the broker races and discards a late token result but cannot cancel that already-started upstream fetch.
 

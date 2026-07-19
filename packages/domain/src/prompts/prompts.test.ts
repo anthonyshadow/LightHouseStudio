@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { BUILDER_DETAIL_MAX_LENGTH } from '../common/text';
 import {
+  buildCharacterReferenceImagePrompt,
+  characterReferencePromptHashInput,
   createPromptBuilderDraft,
   generateStructuredPrompt,
   sanitizePromptBuilderDraft,
@@ -23,7 +25,7 @@ describe('structured prompt generation', () => {
     const result = generateStructuredPrompt(draft, { hasReferenceImage: true });
     expect(result.validation.valid).toBe(true);
     expect(result.prompt).toBe(
-      'Transform the subject into older adult woman lunar cartographer. Match the provided portrait reference. Outfit: indigo utility suit. Preserve: hand gestures.',
+      'Substitute the character in the video with older adult woman lunar cartographer. Match the provided portrait reference. Outfit: indigo utility suit. Preserve: hand gestures.',
     );
     expect(result.prompt).not.toContain('Hair:');
   });
@@ -146,7 +148,7 @@ describe('structured prompt validation', () => {
       characterBase: 'gallery curator',
     };
     expect(generateStructuredPrompt(draft).prompt).toBe(
-      'Transform the subject into adult non-binary person gallery curator.',
+      'Substitute the character in the video with adult non-binary person gallery curator.',
     );
 
     const sanitized = sanitizePromptBuilderDraft({
@@ -191,5 +193,25 @@ describe('structured prompt validation', () => {
     const validation = validatePromptBuilderDraft(draft, { hasReferenceImage: false });
     expect(validation.valid).toBe(true);
     expect(validation.warnings.map(({ code }) => code)).toContain('reference-image-missing');
+  });
+});
+
+describe('character reference image prompt', () => {
+  it('wraps the unchanged workshop prompt in the Lucy reference composition', () => {
+    const workshopPrompt =
+      '  Substitute the character in the video with an indigo-haired lunar\r\ncartographer.  ';
+    const imagePrompt = buildCharacterReferenceImagePrompt(workshopPrompt);
+
+    expect(imagePrompt).toContain('Exactly one character with one clearly visible face');
+    expect(imagePrompt).toContain('Front-facing, centered, and viewed at eye level');
+    expect(imagePrompt).toContain('Head-and-shoulders portrait framing by default');
+    expect(imagePrompt).toContain(workshopPrompt);
+    expect(imagePrompt.endsWith(workshopPrompt)).toBe(true);
+  });
+
+  it('provides a stable canonical value for server-side SHA-256 hashing', () => {
+    expect(characterReferencePromptHashInput('  Lunar   Cartographer  ')).toBe(
+      characterReferencePromptHashInput('lunar cartographer'),
+    );
   });
 });

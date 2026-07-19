@@ -11,7 +11,9 @@ import {
 import {
   createEmptyDraft,
   type AppliedRealtimeState,
+  type RecipeDraftReplacement,
   type SessionDraft,
+  type SessionReferenceImage,
   type StudioMode,
 } from '../../features/media-session';
 import { hasPendingChanges, revertToAppliedDraft } from './realtimeSnapshot';
@@ -23,15 +25,17 @@ export type SessionDraftState = {
   setApplied: Dispatch<SetStateAction<AppliedRealtimeState | null>>;
   pendingChanges: boolean;
   selectDraft(mode: StudioMode): void;
+  replaceRecipeDraft(replacement: RecipeDraftReplacement): void;
   replaceWithEmptyDraft(mode: StudioMode): void;
   revertDraft(): void;
   updatePrompt(prompt: string): void;
   updateEnhancement(enhance: boolean): void;
+  updateReferenceImage(referenceImage: SessionReferenceImage | null): void;
   updateImage(image: File | null, previewUrl: string | null): void;
 };
 
-const revokePreview = (previewUrl: string | null): void => {
-  if (previewUrl) URL.revokeObjectURL(previewUrl);
+const revokeReference = (referenceImage: SessionReferenceImage | null): void => {
+  if (referenceImage?.kind === 'ephemeral') URL.revokeObjectURL(referenceImage.previewUrl);
 };
 
 export const useSessionDraftState = (): SessionDraftState => {
@@ -59,13 +63,12 @@ export const useSessionDraftState = (): SessionDraftState => {
     activeModeRef.current = mode;
     setDrafts((current) => {
       const departing = current[currentMode];
-      revokePreview(departing.imagePreviewUrl);
+      revokeReference(departing.referenceImage);
       return {
         ...current,
         [currentMode]: {
           ...departing,
-          image: null,
-          imagePreviewUrl: null,
+          referenceImage: null,
         },
       };
     });
@@ -74,11 +77,45 @@ export const useSessionDraftState = (): SessionDraftState => {
 
   const replaceWithEmptyDraft = useCallback((mode: StudioMode) => {
     setDrafts((current) => {
-      revokePreview(current[mode].imagePreviewUrl);
+      revokeReference(current[mode].referenceImage);
       return { ...current, [mode]: createEmptyDraft(mode) };
     });
     activeModeRef.current = mode;
     setActiveMode(mode);
+  }, []);
+
+  const replaceRecipeDraft = useCallback((replacement: RecipeDraftReplacement) => {
+    const nextDraft: SessionDraft = {
+      mode: replacement.mode,
+      prompt: replacement.prompt,
+      referenceImage: replacement.referenceImage,
+      enhance: replacement.enhance ?? false,
+    };
+    const previousMode = activeModeRef.current;
+    setDrafts((current) => {
+      const replaced = current[replacement.mode];
+      if (replaced.referenceImage !== replacement.referenceImage) {
+        revokeReference(replaced.referenceImage);
+      }
+      if (previousMode !== replacement.mode) {
+        revokeReference(current[previousMode].referenceImage);
+      }
+      return {
+        ...current,
+        ...(previousMode !== replacement.mode
+          ? {
+              [previousMode]: {
+                ...current[previousMode],
+                referenceImage: null,
+              },
+            }
+          : {}),
+        [replacement.mode]: nextDraft,
+      };
+    });
+    activeModeRef.current = replacement.mode;
+    draftRef.current = nextDraft;
+    setActiveMode(replacement.mode);
   }, []);
 
   const updatePrompt = useCallback((prompt: string) => {
@@ -97,30 +134,55 @@ export const useSessionDraftState = (): SessionDraftState => {
     }));
   }, []);
 
-  const updateImage = useCallback((image: File | null, previewUrl: string | null) => {
+  const updateReferenceImage = useCallback((referenceImage: SessionReferenceImage | null) => {
     const mode = activeModeRef.current;
     setDrafts((current) => {
       const active = current[mode];
-      if (active.imagePreviewUrl !== previewUrl) revokePreview(active.imagePreviewUrl);
+      if (active.referenceImage !== referenceImage) revokeReference(active.referenceImage);
       return {
         ...current,
-        [mode]: { ...active, image, imagePreviewUrl: previewUrl },
+        [mode]: { ...active, referenceImage },
       };
     });
   }, []);
+
+  const updateImage = useCallback(
+    (image: File | null, previewUrl: string | null) => {
+      updateReferenceImage(
+        image
+          ? {
+              kind: 'ephemeral',
+              file: image,
+              previewUrl:
+                previewUrl ??
+                (typeof URL.createObjectURL === 'function' ? URL.createObjectURL(image) : ''),
+            }
+          : null,
+      );
+    },
+    [updateReferenceImage],
+  );
 
   const revertDraft = useCallback(() => {
     if (!applied) return;
     const mode = activeModeRef.current;
     setDrafts((current) => {
       const active = current[mode];
-      revokePreview(active.imagePreviewUrl);
+      revokeReference(active.referenceImage);
       const reverted = revertToAppliedDraft(active, applied);
+      const referenceImage = reverted.referenceImage;
       return {
         ...current,
         [mode]: {
           ...reverted,
-          imagePreviewUrl: reverted.image ? URL.createObjectURL(reverted.image) : null,
+          referenceImage:
+            referenceImage?.kind === 'ephemeral'
+              ? {
+                  kind: 'ephemeral',
+                  file: referenceImage.file,
+                  previewUrl: URL.createObjectURL(referenceImage.file),
+                }
+              : referenceImage,
         },
       };
     });
@@ -129,7 +191,7 @@ export const useSessionDraftState = (): SessionDraftState => {
   useEffect(
     () => () => {
       for (const storedDraft of Object.values(draftsRef.current)) {
-        revokePreview(storedDraft.imagePreviewUrl);
+        revokeReference(storedDraft.referenceImage);
       }
     },
     [],
@@ -143,20 +205,24 @@ export const useSessionDraftState = (): SessionDraftState => {
       setApplied,
       pendingChanges: hasPendingChanges(draft, applied),
       selectDraft,
+      replaceRecipeDraft,
       replaceWithEmptyDraft,
       revertDraft,
       updatePrompt,
       updateEnhancement,
+      updateReferenceImage,
       updateImage,
     }),
     [
       draft,
       applied,
       selectDraft,
+      replaceRecipeDraft,
       replaceWithEmptyDraft,
       revertDraft,
       updatePrompt,
       updateEnhancement,
+      updateReferenceImage,
       updateImage,
     ],
   );

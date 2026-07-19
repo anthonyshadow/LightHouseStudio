@@ -59,10 +59,9 @@ export const ModelRecipeFields = ({
 
       <ReferenceImageField
         mode={mode}
-        image={session.draft.image}
-        previewUrl={session.draft.imagePreviewUrl}
+        referenceImage={session.draft.referenceImage}
         disabled={recording}
-        onChange={session.updateImage}
+        onChange={session.updateReferenceImage}
       />
 
       <label css={enhancementToggleStyles(theme)}>
@@ -80,7 +79,7 @@ export const ModelRecipeFields = ({
 
       {session.pendingChanges ? (
         <StatusNotice tone="warning" title="Changes are pending" role="status">
-          {session.applied?.image && !session.draft.image
+          {session.applied?.referenceImage && !session.draft.referenceImage
             ? 'Reference removal is pending. Apply sends the complete recipe and explicitly clears the live image.'
             : 'The working draft differs from the live recipe. Nothing changes until Apply.'}
         </StatusNotice>

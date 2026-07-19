@@ -5,6 +5,7 @@ import {
   deleteSavedCharacterPrompt as deleteDomainCharacterPrompt,
   deleteSavedPrompt as deleteDomainSavedPrompt,
   DomainRuleError,
+  enrichNewestMatchingRecentWithReferenceImage,
   parseCreativeAssetStore,
   recordSuccessfulPromptUse,
   searchCreativeAssets,
@@ -17,6 +18,8 @@ import {
 import { createEmptyCreativeAssetStore, sanitizeCreativeAssetStore } from './sanitation';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
+  LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
+  LEGACY_CREATIVE_ASSET_STORAGE_KEY,
   type CreateSavedCharacterPromptInput,
   type CreateSavedPromptInput,
   type CreativeAssetRepository,
@@ -44,6 +47,7 @@ export class CreativeAssetError extends Error {
 export interface CreativeAssetRepositoryOptions {
   readonly storage?: StorageLike | null;
   readonly storageKey?: string;
+  readonly legacyStorageKey?: string | null;
   readonly now?: () => Date;
   readonly idFactory?: () => string;
 }
@@ -73,9 +77,24 @@ const storageNotice = (health: CreativeAssetRepositoryState['health']) => {
   return null;
 };
 
+const isSupportedLegacyPayload = (serialized: string): boolean => {
+  try {
+    const value = JSON.parse(serialized) as unknown;
+    return (
+      typeof value === 'object' &&
+      value !== null &&
+      'schemaVersion' in value &&
+      value.schemaVersion === LEGACY_CREATIVE_ASSET_SCHEMA_VERSION
+    );
+  } catch {
+    return false;
+  }
+};
+
 const loadInitialState = (
   storage: StorageLike | null,
   storageKey: string,
+  legacyStorageKey: string | null,
 ): { state: CreativeAssetRepositoryState; storage: StorageLike | null } => {
   if (!storage) {
     const health = 'session-only' as const;
@@ -86,8 +105,13 @@ const loadInitialState = (
   }
 
   let serialized: string | null;
+  let migratedLegacy = false;
   try {
     serialized = storage.getItem(storageKey);
+    if (serialized === null && legacyStorageKey && legacyStorageKey !== storageKey) {
+      serialized = storage.getItem(legacyStorageKey);
+      migratedLegacy = serialized !== null;
+    }
   } catch {
     const health = 'session-only' as const;
     return {
@@ -104,8 +128,10 @@ const loadInitialState = (
   }
 
   const result = parseCreativeAssetStore(serialized);
-  const health = result.recovered ? 'recovered' : 'ready';
-  if (result.recovered) {
+  const isCleanLegacyMigration =
+    migratedLegacy && isSupportedLegacyPayload(serialized) && result.droppedRecords === 0;
+  const health = result.recovered && !isCleanLegacyMigration ? 'recovered' : 'ready';
+  if (result.recovered || migratedLegacy) {
     try {
       storage.setItem(storageKey, JSON.stringify(result.store));
     } catch {
@@ -141,8 +167,14 @@ export const createCreativeAssetRepository = (
   options: CreativeAssetRepositoryOptions = {},
 ): CreativeAssetRepository => {
   const storageKey = options.storageKey ?? CREATIVE_ASSET_STORAGE_KEY;
+  const legacyStorageKey =
+    options.legacyStorageKey === undefined
+      ? options.storageKey === undefined
+        ? LEGACY_CREATIVE_ASSET_STORAGE_KEY
+        : null
+      : options.legacyStorageKey;
   let storage = options.storage === undefined ? browserStorage() : options.storage;
-  const initial = loadInitialState(storage, storageKey);
+  const initial = loadInitialState(storage, storageKey, legacyStorageKey);
   storage = initial.storage;
   let state = initial.state;
   const listeners = new Set<() => void>();
@@ -216,6 +248,7 @@ export const createCreativeAssetRepository = (
           prompt: input.prompt,
           modelModeId: input.modelModeId,
           source: input.source ?? 'manual',
+          referenceImageAssetId: input.referenceImageAssetId ?? null,
           tags: input.tags ?? [],
         },
         { ...context, createId: () => id },
@@ -236,6 +269,9 @@ export const createCreativeAssetRepository = (
         {
           ...(input.title === undefined ? {} : { title: input.title }),
           ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
+          ...(input.referenceImageAssetId === undefined
+            ? {}
+            : { referenceImageAssetId: input.referenceImageAssetId }),
           ...(input.tags === undefined ? {} : { tags: input.tags }),
         },
         timestamp(),
@@ -270,6 +306,7 @@ export const createCreativeAssetRepository = (
           promptIntent: input.promptIntent,
           builderDraft: input.builderDraft ?? null,
           referenceImageStatus: input.referenceImageStatus ?? 'prompt-only',
+          referenceImageAssetId: input.referenceImageAssetId ?? null,
           notes: input.notes ?? '',
           tags: input.tags ?? [],
         },
@@ -298,6 +335,9 @@ export const createCreativeAssetRepository = (
           ...(input.referenceImageStatus === undefined
             ? {}
             : { referenceImageStatus: input.referenceImageStatus }),
+          ...(input.referenceImageAssetId === undefined
+            ? {}
+            : { referenceImageAssetId: input.referenceImageAssetId }),
           ...(input.notes === undefined ? {} : { notes: input.notes }),
           ...(input.tags === undefined ? {} : { tags: input.tags }),
         },
@@ -329,6 +369,7 @@ export const createCreativeAssetRepository = (
         prompt: input.prompt,
         modelModeId: input.modelModeId,
         ...(input.savedPromptId ? { savedPromptId: input.savedPromptId } : {}),
+        referenceImageAssetId: input.referenceImageAssetId ?? null,
       },
       context,
     );
@@ -341,6 +382,23 @@ export const createCreativeAssetRepository = (
       if (character) next = markSavedCharacterPromptUsed(next, character.id, context.now).store;
     }
     if (next !== state.store) commit(next);
+  };
+
+  const enrichNewestMatchingRecent: CreativeAssetRepository['enrichNewestMatchingRecent'] = (
+    prompt,
+    modelModeId,
+    referenceImageAssetId,
+  ) => {
+    try {
+      const next = enrichNewestMatchingRecentWithReferenceImage(state.store, {
+        prompt,
+        modelModeId,
+        referenceImageAssetId,
+      });
+      if (next !== state.store) commit(next);
+    } catch (error) {
+      mapDomainError(error);
+    }
   };
 
   return {
@@ -358,6 +416,7 @@ export const createCreativeAssetRepository = (
     renameSavedCharacterPrompt: (id, name) => updateSavedCharacterPrompt(id, { name }),
     deleteSavedCharacterPrompt,
     recordSuccessfulPrompt,
+    enrichNewestMatchingRecent,
     search: (query, modelModeId) => searchCreativeAssets(state.store, query, modelModeId),
   };
 };

@@ -24,7 +24,7 @@ export const SessionActions = ({
   const model = session.draft.mode !== 'local';
   const active = isModelSessionActive(session);
   const draftHasContent = hasDraftContent(session.draft);
-  const hasStartContent = Boolean(session.draft.prompt.trim() || session.draft.image);
+  const hasStartContent = Boolean(session.draft.prompt.trim() || session.draft.referenceImage);
   const reasonId = useId();
   let actionState: 'local-live' | 'local-idle' | 'model-active' | 'model-idle';
   if (!model) actionState = session.localStream ? 'local-live' : 'local-idle';

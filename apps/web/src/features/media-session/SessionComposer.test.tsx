@@ -36,8 +36,10 @@ const createSession = (
   stopCamera: vi.fn(),
   releaseForRecordedReview: vi.fn().mockResolvedValue(undefined),
   selectMode: vi.fn().mockReturnValue(true),
+  replaceRecipeDraft: vi.fn().mockReturnValue(true),
   updatePrompt: vi.fn(),
   updateEnhancement: vi.fn(),
+  updateReferenceImage: vi.fn(),
   updateImage: vi.fn(),
   clearError: vi.fn(),
   ...overrides,
@@ -97,8 +99,8 @@ describe('SessionComposer', () => {
     const applied = {
       mode: 'lucy-2.5' as const,
       prompt: 'Adult field correspondent',
-      image: null,
-      imageIdentity: null,
+      referenceImage: null,
+      referenceIdentity: null,
       enhance: true,
     };
     const view = renderComposer(

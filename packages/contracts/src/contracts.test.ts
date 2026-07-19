@@ -6,10 +6,12 @@ import {
   VOICE_CONVERSION_MAX_BYTES,
   apiErrorResponseSchema,
   capabilitiesResponseSchema,
+  createReferenceImageRequestSchema,
   healthResponseSchema,
   importSharedVoiceRequestSchema,
   realtimeTokenRequestSchema,
   realtimeTokenResponseSchema,
+  referenceImageAssetSchema,
   sharedVoicePreviewParamsSchema,
   sharedVoicesQuerySchema,
   sharedVoicesResponseSchema,
@@ -40,16 +42,78 @@ describe('health and capabilities contracts', () => {
       capabilitiesResponseSchema.parse({
         realtimeVideo: { available: true, models: [...SUPPORTED_MODEL_IDS] },
         elevenLabs: { available: false, modelId: null },
+        referenceImages: {
+          available: true,
+          modelId: 'gpt-image-2',
+          size: '1024x1024',
+          quality: 'high',
+        },
       }),
     ).toEqual({
       realtimeVideo: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
       elevenLabs: { available: false, modelId: null },
+      referenceImages: {
+        available: true,
+        modelId: 'gpt-image-2',
+        size: '1024x1024',
+        quality: 'high',
+      },
     });
     expect(
       capabilitiesResponseSchema.safeParse({
         realtimeVideo: { available: true, models: ['local'] },
         elevenLabs: { available: false, modelId: null },
+        referenceImages: {
+          available: false,
+          modelId: 'gpt-image-2',
+          size: '1024x1024',
+          quality: 'high',
+        },
       }).success,
+    ).toBe(false);
+  });
+});
+
+describe('reference image contracts', () => {
+  it('accepts one bounded workshop prompt and an idempotency UUID', () => {
+    expect(
+      createReferenceImageRequestSchema.parse({
+        requestId: 'ffaf7176-b3f4-4506-9312-7a00d9dd6295',
+        workshopPrompt: '  A ceramic astronaut  ',
+      }),
+    ).toEqual({
+      requestId: 'ffaf7176-b3f4-4506-9312-7a00d9dd6295',
+      workshopPrompt: '  A ceramic astronaut  ',
+    });
+    expect(
+      createReferenceImageRequestSchema.safeParse({
+        requestId: 'not-a-uuid',
+        workshopPrompt: 'Astronaut',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('keeps browser metadata free of prompts, storage keys, and provider payloads', () => {
+    const metadata = {
+      assetId: '28d0b01f-70aa-4db6-ac65-379cdd916113',
+      mimeType: 'image/jpeg',
+      width: 1024,
+      height: 1024,
+      byteSize: 123_456,
+      source: 'generated',
+      provider: 'openai',
+      model: 'gpt-image-2',
+      promptHash: 'a'.repeat(64),
+      createdAt: '2026-07-18T12:00:00.000Z',
+      contentUrl: '/api/reference-images/28d0b01f-70aa-4db6-ac65-379cdd916113/content',
+    };
+
+    expect(referenceImageAssetSchema.parse(metadata)).toEqual(metadata);
+    expect(
+      referenceImageAssetSchema.safeParse({ ...metadata, storageKey: 'private/image.jpg' }).success,
+    ).toBe(false);
+    expect(
+      referenceImageAssetSchema.safeParse({ ...metadata, originalPrompt: 'secret prompt' }).success,
     ).toBe(false);
   });
 });

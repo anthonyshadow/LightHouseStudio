@@ -7,6 +7,8 @@ const unavailableProviders: ProviderAvailability = {
   decart: false,
   elevenLabs: false,
   elevenLabsModel: null,
+  referenceImages: false,
+  referenceImageModel: null,
 };
 
 export const useProviderAvailability = () => {

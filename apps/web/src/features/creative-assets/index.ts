@@ -24,6 +24,8 @@ export { useCreativeAssetRepository } from './useCreativeAssetRepository';
 export {
   CREATIVE_ASSET_SCHEMA_VERSION,
   CREATIVE_ASSET_STORAGE_KEY,
+  LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
+  LEGACY_CREATIVE_ASSET_STORAGE_KEY,
   type AssetSource,
   type CreateSavedCharacterPromptInput,
   type CreateSavedPromptInput,

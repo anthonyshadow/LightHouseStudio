@@ -19,9 +19,14 @@ describe('mode replacement policy', () => {
   });
 
   it('requires confirmation before switching discards a reference image', () => {
+    const file = new File(['image'], 'garment.png', { type: 'image/png' });
     const draft = {
       ...createEmptyDraft('lucy-vton-3'),
-      image: new File(['image'], 'garment.png', { type: 'image/png' }),
+      referenceImage: {
+        kind: 'ephemeral' as const,
+        file,
+        previewUrl: 'blob:garment',
+      },
     };
     const confirm = vi.fn().mockReturnValue(false);
 

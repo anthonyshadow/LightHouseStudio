@@ -15,10 +15,15 @@ import {
 const draft = (overrides: Partial<SessionDraft> = {}): SessionDraft => ({
   mode: 'lucy-2.5',
   prompt: '',
-  image: null,
-  imagePreviewUrl: null,
+  referenceImage: null,
   enhance: false,
   ...overrides,
+});
+
+const ephemeral = (file: File) => ({
+  kind: 'ephemeral' as const,
+  file,
+  previewUrl: `blob:${file.name}`,
 });
 
 describe('realtime state snapshots', () => {
@@ -37,7 +42,7 @@ describe('realtime state snapshots', () => {
 
     const snapshot = toProviderSnapshot(
       'lucy-2.5',
-      draft({ prompt: '  Keep   the  expression calm ', enhance: true, image: null }),
+      draft({ prompt: '  Keep   the  expression calm ', enhance: true, referenceImage: null }),
     );
 
     expect(snapshot).toEqual({
@@ -54,7 +59,7 @@ describe('realtime state snapshots', () => {
       lastModified: 1_720_955_200_000,
     });
 
-    expect(toProviderSnapshot('lucy-2.5', draft({ image: portrait }))).toEqual({
+    expect(toProviderSnapshot('lucy-2.5', draft({ referenceImage: ephemeral(portrait) }))).toEqual({
       prompt:
         'Transform the subject using the provided portrait as the character identity while preserving recognizable facial features.',
       image: portrait,
@@ -64,12 +69,12 @@ describe('realtime state snapshots', () => {
 
   it('reverts a portrait-only provider instruction to the empty authored prompt', () => {
     const portrait = new File(['portrait'], 'portrait.webp', { type: 'image/webp' });
-    const initial = draft({ image: portrait });
+    const initial = draft({ referenceImage: ephemeral(portrait) });
     const applied = toAppliedState(initial);
 
     expect(revertToAppliedDraft({ ...initial, prompt: 'pending edit' }, applied)).toMatchObject({
       prompt: '',
-      image: portrait,
+      referenceImage: expect.objectContaining({ file: portrait }),
       enhance: false,
     });
   });
@@ -81,7 +86,10 @@ describe('realtime state snapshots', () => {
     });
 
     expect(
-      toProviderSnapshot('lucy-vton-3', draft({ mode: 'lucy-vton-3', image: garment })),
+      toProviderSnapshot(
+        'lucy-vton-3',
+        draft({ mode: 'lucy-vton-3', referenceImage: ephemeral(garment) }),
+      ),
     ).toEqual({
       prompt: '',
       image: garment,
@@ -94,7 +102,7 @@ describe('realtime state snapshots', () => {
       type: 'image/jpeg',
       lastModified: 100,
     });
-    const initial = draft({ prompt: 'Explorer', image: portrait });
+    const initial = draft({ prompt: 'Explorer', referenceImage: ephemeral(portrait) });
     const applied = toAppliedState(initial);
 
     expect(imageIdentity(portrait)).toMatch(
@@ -103,20 +111,52 @@ describe('realtime state snapshots', () => {
     expect(hasPendingChanges(initial, applied)).toBe(false);
     expect(hasPendingChanges({ ...initial, prompt: 'Explorer in copper' }, applied)).toBe(true);
     expect(hasPendingChanges({ ...initial, enhance: true }, applied)).toBe(true);
-    expect(hasPendingChanges({ ...initial, image: null }, applied)).toBe(true);
-    expect(toProviderSnapshot('lucy-2.5', { ...initial, image: null }).image).toBeNull();
+    expect(hasPendingChanges({ ...initial, referenceImage: null }, applied)).toBe(true);
+    expect(toProviderSnapshot('lucy-2.5', { ...initial, referenceImage: null }).image).toBeNull();
   });
 
   it('treats distinct image objects as replacements even when browser metadata matches', () => {
     const metadata = { type: 'image/png', lastModified: 100 };
     const first = new File(['first'], 'portrait.png', metadata);
     const replacement = new File(['other'], 'portrait.png', metadata);
-    const initial = draft({ image: first });
+    const initial = draft({ referenceImage: ephemeral(first) });
 
     expect(first.size).toBe(replacement.size);
     expect(imageIdentity(first)).not.toBe(imageIdentity(replacement));
-    expect(hasPendingChanges({ ...initial, image: replacement }, toAppliedState(initial))).toBe(
-      true,
-    );
+    expect(
+      hasPendingChanges(
+        { ...initial, referenceImage: ephemeral(replacement) },
+        toAppliedState(initial),
+      ),
+    ).toBe(true);
+  });
+
+  it('uses the asset ID as persisted identity across separately hydrated File objects', () => {
+    const first = new File(['same'], 'reference.jpg', { type: 'image/jpeg' });
+    const hydratedAgain = new File(['same'], 'reference.jpg', { type: 'image/jpeg' });
+    const assetId = '550e8400-e29b-41d4-a716-446655440000';
+    const initial = draft({
+      referenceImage: {
+        kind: 'persisted',
+        assetId,
+        file: first,
+        contentUrl: `/api/reference-images/${assetId}/content`,
+      },
+    });
+
+    expect(
+      hasPendingChanges(
+        {
+          ...initial,
+          referenceImage: {
+            kind: 'persisted',
+            assetId,
+            file: hydratedAgain,
+            contentUrl: `/api/reference-images/${assetId}/content`,
+          },
+        },
+        toAppliedState(initial),
+      ),
+    ).toBe(false);
   });
 });

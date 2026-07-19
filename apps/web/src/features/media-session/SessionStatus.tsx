@@ -110,7 +110,7 @@ export const AppliedRecipeSummary = ({ session }: { session: StudioSessionContro
         </div>
         <div>
           <dt>Reference</dt>
-          <dd>{session.applied.image?.name ?? 'None'}</dd>
+          <dd>{session.applied.referenceImage?.file.name ?? 'None'}</dd>
         </div>
         <div>
           <dt>Enhancement</dt>

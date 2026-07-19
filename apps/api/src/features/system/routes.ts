@@ -6,6 +6,7 @@ export interface CapabilityAvailability {
   readonly decartAvailable: boolean;
   readonly elevenLabsAvailable: boolean;
   readonly elevenLabsModelId: string;
+  readonly referenceImagesAvailable: boolean;
 }
 
 export const registerSystemRoutes = (
@@ -23,6 +24,12 @@ export const registerSystemRoutes = (
       elevenLabs: {
         available: availability.elevenLabsAvailable,
         modelId: availability.elevenLabsAvailable ? availability.elevenLabsModelId : null,
+      },
+      referenceImages: {
+        available: availability.referenceImagesAvailable,
+        modelId: 'gpt-image-2',
+        size: '1024x1024',
+        quality: 'high',
       },
     }),
   );

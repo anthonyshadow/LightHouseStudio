@@ -1,7 +1,12 @@
 import { createPromptBuilderDraft } from '../prompt-authoring';
 import { describe, expect, it } from 'vitest';
 import { createCreativeAssetRepository } from './repository';
-import { CREATIVE_ASSET_SCHEMA_VERSION, type StorageLike } from './types';
+import {
+  CREATIVE_ASSET_SCHEMA_VERSION,
+  CREATIVE_ASSET_STORAGE_KEY,
+  LEGACY_CREATIVE_ASSET_STORAGE_KEY,
+  type StorageLike,
+} from './types';
 
 class MemoryStorage implements StorageLike {
   readonly records = new Map<string, string>();
@@ -95,6 +100,117 @@ describe('createCreativeAssetRepository', () => {
     const serialized = storage.records.get('test-recipes') ?? '';
     expect(serialized).toContain('session-portrait-not-saved');
     expect(serialized).not.toMatch(/imageData|objectUrl|blob:|deviceId|token/i);
+  });
+
+  it('persists exact image versions across recents, saved copies, characters, and refresh', () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFixture(storage);
+    repository.recordSuccessfulPrompt({
+      prompt: 'Substitute the character with a glassblower.',
+      modelModeId: 'lucy-2.5',
+      referenceImageAssetId: 'asset-a',
+    });
+    repository.recordSuccessfulPrompt({
+      prompt: 'Substitute the character with a glassblower.',
+      modelModeId: 'lucy-2.5',
+      referenceImageAssetId: 'asset-b',
+    });
+    const saved = repository.createSavedPrompt({
+      title: 'Glassblower',
+      prompt: 'Substitute the character with a glassblower.',
+      modelModeId: 'lucy-2.5',
+      referenceImageAssetId: 'asset-b',
+    });
+    const character = repository.createSavedCharacterPrompt({
+      name: 'Glassblower',
+      prompt: saved.prompt,
+      promptIntent: 'character-transform',
+      referenceImageStatus: 'persisted-reference',
+      referenceImageAssetId: 'asset-b',
+    });
+
+    expect(repository.getSnapshot().store.recentPrompts).toHaveLength(2);
+    expect(saved.referenceImageAssetId).toBe('asset-b');
+    expect(character).toMatchObject({
+      referenceImageStatus: 'persisted-reference',
+      referenceImageAssetId: 'asset-b',
+    });
+    expect(repositoryFixture(storage).getSnapshot().store).toMatchObject({
+      savedPrompts: [expect.objectContaining({ referenceImageAssetId: 'asset-b' })],
+      savedCharacterPrompts: [expect.objectContaining({ referenceImageAssetId: 'asset-b' })],
+    });
+  });
+
+  it('enriches the newest matching text-only recent without replacing an image version', () => {
+    const repository = repositoryFixture();
+    repository.recordSuccessfulPrompt({
+      prompt: 'Substitute the character with a cartographer.',
+      modelModeId: 'lucy-2.5',
+    });
+    repository.enrichNewestMatchingRecent(
+      'Substitute the character with a cartographer.',
+      'lucy-2.5',
+      'asset-a',
+    );
+    repository.enrichNewestMatchingRecent(
+      'Substitute the character with a cartographer.',
+      'lucy-2.5',
+      'asset-b',
+    );
+    expect(repository.getSnapshot().store.recentPrompts).toEqual([
+      expect.objectContaining({ referenceImageAssetId: 'asset-a' }),
+    ]);
+  });
+
+  it('migrates the legacy v1 key to v2 and hydrates null references after refresh', () => {
+    const storage = new MemoryStorage();
+    storage.records.set(
+      LEGACY_CREATIVE_ASSET_STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: 1,
+        savedPrompts: [
+          {
+            id: 'legacy-prompt',
+            title: 'Legacy prompt',
+            prompt: 'Keep the scene cinematic.',
+            modelModeId: 'lucy-2.5',
+            source: 'manual',
+            tags: [],
+            createdAt: '2026-07-14T12:00:00.000Z',
+            updatedAt: '2026-07-14T12:00:00.000Z',
+            lastUsedAt: null,
+            useCount: 0,
+          },
+        ],
+        recentPrompts: [],
+        savedCharacterPrompts: [],
+      }),
+    );
+
+    const migrated = createCreativeAssetRepository({ storage });
+    expect(migrated.getSnapshot()).toMatchObject({
+      health: 'ready',
+      store: {
+        schemaVersion: 2,
+        savedPrompts: [expect.objectContaining({ referenceImageAssetId: null })],
+      },
+    });
+    expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
+    expect(createCreativeAssetRepository({ storage }).getSnapshot().store.savedPrompts).toEqual(
+      migrated.getSnapshot().store.savedPrompts,
+    );
+  });
+
+  it('recovers rather than silently treating a corrupt legacy payload as a migration', () => {
+    const storage = new MemoryStorage();
+    storage.records.set(LEGACY_CREATIVE_ASSET_STORAGE_KEY, '{not-json');
+
+    const repository = createCreativeAssetRepository({ storage });
+    expect(repository.getSnapshot()).toMatchObject({
+      health: 'recovered',
+      store: { schemaVersion: 2, savedPrompts: [] },
+    });
+    expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
   });
 
   it('drops generated provenance when a character recipe prompt is manually edited', () => {

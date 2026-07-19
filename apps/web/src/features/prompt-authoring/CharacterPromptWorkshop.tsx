@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import { useId, useMemo, useState } from 'react';
+import { useEffect, useId, useMemo, useState } from 'react';
 import { Surface } from '../../ui';
 import { GeneratedPromptPreview } from './GeneratedPromptPreview';
 import {
@@ -16,6 +16,8 @@ import { PromptFeedback } from './PromptFeedback';
 import { PromptIntentFields } from './PromptIntentFields';
 import { PromptWorkshopActions, type PromptSaveState } from './PromptWorkshopActions';
 import { PromptWorkshopHeader } from './PromptWorkshopHeader';
+import type { ReferenceGenerationState, WorkshopReferenceImage } from './ReferenceImageGenerator';
+import { hashWorkshopPrompt, isSameCanonicalWorkshopPrompt } from './referencePromptHash';
 import {
   accordionStyles,
   chevronStyles,
@@ -46,6 +48,7 @@ export interface PromptWorkshopAction {
   prompt: string;
   draft: PromptBuilderDraft;
   validation: PromptValidation;
+  referenceImageAssetId: string | null;
 }
 
 export interface SavePromptWorkshopAction extends PromptWorkshopAction {
@@ -57,10 +60,16 @@ export interface CharacterPromptWorkshopProps {
   initialDrafts?: Partial<Record<PromptIntent, PromptBuilderDraft>> | undefined;
   hasReferenceImage?: boolean;
   referenceImage?: { width?: number; height?: number } | undefined;
+  generatedReferenceImage?: WorkshopReferenceImage | null | undefined;
+  referenceGeneration?: ReferenceGenerationState | undefined;
+  referenceImagesAvailable?: boolean | undefined;
   disabled?: boolean;
   onDraftChange?: ((draft: PromptBuilderDraft) => void) | undefined;
-  onUse: (action: PromptWorkshopAction) => void;
+  onUse: (action: PromptWorkshopAction) => void | Promise<void>;
   onSave?: ((action: SavePromptWorkshopAction) => void | Promise<void>) | undefined;
+  onGenerateReference?: ((workshopPrompt: string) => void) | undefined;
+  onDetachReference?: (() => void) | undefined;
+  onRetryReferenceRestore?: (() => void) | undefined;
 }
 
 const createDraftForIntent = (
@@ -105,10 +114,16 @@ export const CharacterPromptWorkshop = ({
   initialDrafts,
   hasReferenceImage = false,
   referenceImage,
+  generatedReferenceImage = null,
+  referenceGeneration = { status: 'idle', error: null },
+  referenceImagesAvailable = false,
   disabled = false,
   onDraftChange,
   onUse,
   onSave,
+  onGenerateReference,
+  onDetachReference,
+  onRetryReferenceRestore,
 }: CharacterPromptWorkshopProps) => {
   const theme = useTheme();
   const componentId = useId();
@@ -119,14 +134,21 @@ export const CharacterPromptWorkshop = ({
   const [showSave, setShowSave] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [saveState, setSaveState] = useState<PromptSaveState>('idle');
+  const [generatedPromptHash, setGeneratedPromptHash] = useState<string | null>(null);
 
   const draft = drafts[intent];
   const activeStep = activeSteps[intent];
   const steps = getPromptWorkshopSteps(draft);
   const hasChanges = promptWorkshopDraftHasContent(draft);
   const context = useMemo(
-    () => referenceContext(hasReferenceImage, referenceImage),
-    [hasReferenceImage, referenceImage],
+    () =>
+      referenceContext(
+        Boolean(hasReferenceImage || generatedReferenceImage),
+        generatedReferenceImage
+          ? { width: generatedReferenceImage.width, height: generatedReferenceImage.height }
+          : referenceImage,
+      ),
+    [generatedReferenceImage, hasReferenceImage, referenceImage],
   );
   const normalizedDraft = useMemo(() => normalizePromptBuilderDraft(draft), [draft]);
   const validation = useMemo(
@@ -137,7 +159,33 @@ export const CharacterPromptWorkshop = ({
     () => generateStructuredPrompt(normalizedDraft, context),
     [context, normalizedDraft],
   );
-  const canCommit = !disabled && validation.blocking.length === 0 && generatedPrompt.length > 0;
+  const referenceBusy =
+    ['generating', 'restoring'].includes(referenceGeneration.status) ||
+    (referenceGeneration.status === 'error' && referenceGeneration.errorKind === 'restore');
+  const canCommit =
+    !disabled && !referenceBusy && validation.blocking.length === 0 && generatedPrompt.length > 0;
+
+  useEffect(() => {
+    let active = true;
+    setGeneratedPromptHash(null);
+    void hashWorkshopPrompt(generatedPrompt)
+      .then((hash) => {
+        if (active) setGeneratedPromptHash(hash);
+      })
+      .catch(() => {
+        if (active) setGeneratedPromptHash(null);
+      });
+    return () => {
+      active = false;
+    };
+  }, [generatedPrompt]);
+
+  const referenceIsStale = Boolean(
+    generatedReferenceImage &&
+    (generatedReferenceImage.generatedFromPrompt
+      ? !isSameCanonicalWorkshopPrompt(generatedReferenceImage.generatedFromPrompt, generatedPrompt)
+      : generatedPromptHash && generatedPromptHash !== generatedReferenceImage.promptHash),
+  );
 
   const updateDraft = (nextDraft: PromptBuilderDraft) => {
     setDrafts((current) => ({ ...current, [nextDraft.intent]: nextDraft }));
@@ -169,6 +217,10 @@ export const CharacterPromptWorkshop = ({
     prompt: generatedPrompt,
     draft: normalizedDraft,
     validation,
+    referenceImageAssetId:
+      normalizedDraft.intent === 'character-transform'
+        ? (generatedReferenceImage?.assetId ?? null)
+        : null,
   });
 
   const savePrompt = async () => {
@@ -269,7 +321,26 @@ export const CharacterPromptWorkshop = ({
             </button>
             {showSummary ? (
               <div id={`${componentId}-recipe-summary`}>
-                <GeneratedPromptPreview prompt={generatedPrompt} />
+                <GeneratedPromptPreview
+                  prompt={generatedPrompt}
+                  {...(intent === 'character-transform' && onGenerateReference && onDetachReference
+                    ? {
+                        referenceGeneration: {
+                          available: referenceImagesAvailable,
+                          disabled,
+                          generateDisabled: !canCommit,
+                          stale: referenceIsStale,
+                          referenceImage: generatedReferenceImage,
+                          generation: referenceGeneration,
+                          onGenerate: onGenerateReference,
+                          onDetach: onDetachReference,
+                          ...(onRetryReferenceRestore
+                            ? { onRetryRestore: onRetryReferenceRestore }
+                            : {}),
+                        },
+                      }
+                    : {})}
+                />
               </div>
             ) : null}
             <PromptFeedback validation={validation} />
@@ -283,7 +354,7 @@ export const CharacterPromptWorkshop = ({
             showSave={showSave}
             saveName={saveName}
             saveState={saveState}
-            onUse={() => onUse(actionPayload())}
+            onUse={() => void onUse(actionPayload())}
             onToggleSave={() => setShowSave((visible) => !visible)}
             onSaveNameChange={(name) => {
               setSaveName(name);

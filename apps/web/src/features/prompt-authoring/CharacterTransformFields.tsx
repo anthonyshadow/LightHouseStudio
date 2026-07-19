@@ -183,8 +183,8 @@ export const CharacterTransformFields = ({
             <span>
               <strong>Match the current portrait</strong>
               <br />
-              Use the selected session image for identity and facial guidance. The image itself is
-              never saved.
+              Use the selected reference for identity and facial guidance. Manual uploads stay
+              session-only; generated references persist as immutable local assets.
             </span>
           </label>
           <div css={promptFullWidthStyles()}>

@@ -39,7 +39,7 @@ const generateCharacterTransform = (draft: CharacterTransformDraft): string => {
     .filter(Boolean)
     .join(' ');
 
-  if (base) parts.push(sentence(`Transform the subject into ${base}`));
+  if (base) parts.push(sentence(`Substitute the character in the video with ${base}`));
   if (draft.matchReference) parts.push('Match the provided portrait reference.');
   if (draft.appearance) parts.push(sentence(`Appearance: ${draft.appearance}`));
   if (draft.hair) parts.push(sentence(`Hair: ${draft.hair}`));

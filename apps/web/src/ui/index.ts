@@ -14,3 +14,7 @@ export {
   type OverlayPanelProps,
   type OverlayPanelSize,
 } from './primitives/OverlayPanel';
+export {
+  ReferenceImagePreview,
+  type ReferenceImagePreviewProps,
+} from './primitives/ReferenceImagePreview';

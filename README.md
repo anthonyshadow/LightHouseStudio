@@ -13,6 +13,7 @@ Local capture is the safe default. It works without provider credentials and doe
 - Draft-versus-applied realtime recipes with atomic Apply, Revert, and Reset
 - JPEG, PNG, and WebP reference images up to and including 10 MiB
 - A four-intent structured character prompt workshop with optional adult age and gender choices
+- Explicit `gpt-image-2` generation of durable Lucy 2.5 character references
 - A versioned browser-local Recipe Shelf for saved, recent, and restorable character prompts
 - Browser recording with transformed-video gating and provider-audio/microphone fallback
 - Temporary take review, download, confirmed discard, focus recovery, and unload protection
@@ -55,14 +56,16 @@ Open <http://127.0.0.1:4100>. The API serves the built client from the same loop
 
 All credentials are read only by `apps/api`. Do not create `VITE_*` key variables.
 
-| Variable                    | Required              | Purpose                                                                                                                                                                                                                                                                                           |
-| --------------------------- | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DECART_API_KEY`            | Only for AI video     | Server credential used to mint five-minute, origin-bound, single-model browser credentials.                                                                                                                                                                                                       |
-| `ELEVENLABS_API_KEY`        | Only for cloud voices | Server credential for voice discovery, proxied previews, public voice import, and speech-to-speech conversion.                                                                                                                                                                                    |
-| `ELEVENLABS_STS_MODEL_ID`   | No                    | Speech-to-speech model; defaults to `eleven_multilingual_sts_v2`.                                                                                                                                                                                                                                 |
-| `ELEVENLABS_ENABLE_LOGGING` | No                    | Strict `true`/`false` sent to ElevenLabs conversion as `enable_logging`; omission defaults to privacy-first `false`. ElevenLabs currently restricts zero-retention mode to eligible enterprise accounts, so other accounts must deliberately set `true` after reviewing provider retention terms. |
-| `PORT`                      | No                    | Loopback API port; defaults to `4100`.                                                                                                                                                                                                                                                            |
-| `NODE_ENV`                  | No                    | One of `development`, `test`, or `production`.                                                                                                                                                                                                                                                    |
+| Variable                    | Required                  | Purpose                                                                                                                                                                                                                                                                                           |
+| --------------------------- | ------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DECART_API_KEY`            | Only for AI video         | Server credential used to mint five-minute, origin-bound, single-model browser credentials.                                                                                                                                                                                                       |
+| `OPENAI_API_KEY`            | Only for image generation | Server-only credential used by the explicit Prompt Workshop reference-image action.                                                                                                                                                                                                               |
+| `LIGHTFRAME_DATA_DIR`       | No                        | Owner-only local storage for immutable generated reference images and metadata; defaults to `./.lightframe-data`.                                                                                                                                                                                 |
+| `ELEVENLABS_API_KEY`        | Only for cloud voices     | Server credential for voice discovery, proxied previews, public voice import, and speech-to-speech conversion.                                                                                                                                                                                    |
+| `ELEVENLABS_STS_MODEL_ID`   | No                        | Speech-to-speech model; defaults to `eleven_multilingual_sts_v2`.                                                                                                                                                                                                                                 |
+| `ELEVENLABS_ENABLE_LOGGING` | No                        | Strict `true`/`false` sent to ElevenLabs conversion as `enable_logging`; omission defaults to privacy-first `false`. ElevenLabs currently restricts zero-retention mode to eligible enterprise accounts, so other accounts must deliberately set `true` after reviewing provider retention terms. |
+| `PORT`                      | No                        | Loopback API port; defaults to `4100`.                                                                                                                                                                                                                                                            |
+| `NODE_ENV`                  | No                        | One of `development`, `test`, or `production`.                                                                                                                                                                                                                                                    |
 
 Provider availability is reported by `GET /api/capabilities`; missing optional configuration degrades only that capability. Environment values are validated at startup. `.env` is ignored by Git.
 
@@ -101,7 +104,7 @@ pure rules          runtime HTTP schemas
               Decart / ElevenLabs adapters
 ```
 
-The creator of a stream, recorder, timer, object URL, audio context, or provider client owns its cleanup. Domain rules and HTTP schemas are independent of React and provider payloads. A shared testing package declares the deny-external policy while feature-local suites provide focused fakes. The backend has no product database, account system, upload store, background jobs, or session history.
+The creator of a stream, recorder, timer, object URL, audio context, or provider client owns its cleanup. Domain rules and HTTP schemas are independent of React and provider payloads. A shared testing package declares the deny-external policy while feature-local suites provide focused fakes. The backend has no product database, account system, background jobs, or session history; its one durable responsibility is the owner-only local generated-reference asset store.
 
 Production browser builds omit source maps and fail if the development-only realtime test seam survives executable tree-shaking. Browser session and recording adapters use the tested domain mode, lifecycle, source-selection, and artifact contracts rather than maintaining independent rule sets.
 
@@ -109,8 +112,9 @@ Read [architecture](docs/ARCHITECTURE.md), [privacy and temporary data](docs/PRI
 
 ## Important operating boundaries
 
-- Images, recordings, sidecars, processed media, object URLs, tokens, voice selections, streams, and device identifiers are temporary and disappear on discard, replacement, unmount, or tab closure as applicable.
-- Only allowlisted, sanitized prompt text and metadata are stored in this browser profile.
+- Manually uploaded images, recordings, sidecars, processed media, object URLs, tokens, voice selections, streams, and device identifiers are temporary and disappear on discard, replacement, unmount, or tab closure as applicable.
+- Generated character references are immutable local assets under `LIGHTFRAME_DATA_DIR`; the Recipe Shelf stores only allowlisted metadata and opaque asset IDs in this browser profile.
+- Generating a reference sends the completed character prompt to OpenAI and may incur image-generation usage. Generation is never automatic or automatically retried.
 - Starting an AI session sends live camera media and the applied prompt/reference state to Decart and may incur provider usage. Finishing a model take finalizes the clip before releasing the model.
 - Applying an ElevenLabs voice sends only the completed audio sidecar through the same-origin backend and may use credits. Browsing or selecting a voice does not upload the take. Importing a public voice changes the configured ElevenLabs workspace.
 - The server accepts loopback hosts only. It is not designed for LAN, tunnel, or public hosting. Remote deployment requires authentication, authorization, CSRF analysis, abuse/rate controls, tenant isolation, secret management, and a new security review.

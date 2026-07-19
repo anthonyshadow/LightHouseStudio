@@ -8,6 +8,8 @@ export type ProviderAvailability = {
   decart: boolean;
   elevenLabs: boolean;
   elevenLabsModel: string | null;
+  referenceImages?: boolean;
+  referenceImageModel?: 'gpt-image-2' | null;
 };
 
 export type BrowserCapabilities = {

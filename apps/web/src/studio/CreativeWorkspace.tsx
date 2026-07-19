@@ -14,7 +14,9 @@ import {
   type PromptBuilderDraft,
   type PromptIntent,
   type PromptWorkshopAction,
+  type ReferenceGenerationState,
   type SavePromptWorkshopAction,
+  type WorkshopReferenceImage,
 } from '../features/prompt-authoring';
 import { Button, OverlayPanel, SegmentedControl, StatusNotice } from '../ui';
 import {
@@ -42,6 +44,15 @@ type CreativeWorkspaceProps = {
   sessionModeLocked: boolean;
   recipeInsertionBlocked: boolean;
   hasReferenceImage: boolean;
+  workshopReferenceImage: WorkshopReferenceImage | null;
+  referenceGeneration: ReferenceGenerationState;
+  referenceImagesAvailable: boolean;
+  referenceUsePending: boolean;
+  referenceUseFailure: {
+    message: string;
+    onRetry(): void;
+    onContinueWithoutReference(): void;
+  } | null;
   workshopToggleRef: RefObject<HTMLButtonElement | null>;
   shelfToggleRef: RefObject<HTMLButtonElement | null>;
   dockToggleRef: RefObject<HTMLButtonElement | null>;
@@ -56,6 +67,9 @@ type CreativeWorkspaceProps = {
   onWorkshopDraftChange(draft: PromptBuilderDraft): void;
   onUseWorkshop(action: PromptWorkshopAction): void;
   onSaveWorkshop(action: SavePromptWorkshopAction): void;
+  onGenerateReference(workshopPrompt: string): void;
+  onDetachReference(): void;
+  onRetryReferenceRestore?: (() => void) | undefined;
   onShelfDirtyChange(dirty: boolean): void;
   onUseRecipe(selection: RecipeSelection): void;
   onOpenSavedWorkshop(draft: PromptBuilderDraft, asset: SavedCharacterPrompt): void;
@@ -71,10 +85,18 @@ export type CreativePanelContentProps = Pick<
   | 'sessionModeLocked'
   | 'recipeInsertionBlocked'
   | 'hasReferenceImage'
+  | 'workshopReferenceImage'
+  | 'referenceGeneration'
+  | 'referenceImagesAvailable'
+  | 'referenceUsePending'
+  | 'referenceUseFailure'
   | 'onLibraryModeChange'
   | 'onWorkshopDraftChange'
   | 'onUseWorkshop'
   | 'onSaveWorkshop'
+  | 'onGenerateReference'
+  | 'onDetachReference'
+  | 'onRetryReferenceRestore'
   | 'onShelfDirtyChange'
   | 'onUseRecipe'
   | 'onOpenSavedWorkshop'
@@ -93,10 +115,18 @@ export const CreativePanelContent = ({
   sessionModeLocked,
   recipeInsertionBlocked,
   hasReferenceImage,
+  workshopReferenceImage,
+  referenceGeneration,
+  referenceImagesAvailable,
+  referenceUsePending,
+  referenceUseFailure,
   onLibraryModeChange,
   onWorkshopDraftChange,
   onUseWorkshop,
   onSaveWorkshop,
+  onGenerateReference,
+  onDetachReference,
+  onRetryReferenceRestore,
   onShelfDirtyChange,
   onUseRecipe,
   onOpenSavedWorkshop,
@@ -105,16 +135,32 @@ export const CreativePanelContent = ({
   const theme = useTheme();
 
   return (
-    <div css={creativeOverlayContentStyles(theme, panel)}>
+    <div
+      css={[
+        creativeOverlayContentStyles(theme, panel),
+        referenceUseFailure
+          ? {
+              gridTemplateRows:
+                panel === 'shelf' ? 'auto minmax(0, 1fr) auto' : 'minmax(0, 1fr) auto',
+            }
+          : {},
+      ]}
+    >
       {panel === 'workshop' ? (
         <CharacterPromptWorkshop
           initialDraft={workshopDraft}
           initialDrafts={workshopDrafts}
           hasReferenceImage={hasReferenceImage}
-          disabled={recordingActive}
+          generatedReferenceImage={workshopReferenceImage}
+          referenceGeneration={referenceGeneration}
+          referenceImagesAvailable={referenceImagesAvailable}
+          disabled={recordingActive || referenceUsePending}
           onDraftChange={onWorkshopDraftChange}
           onUse={onUseWorkshop}
           onSave={onSaveWorkshop}
+          onGenerateReference={onGenerateReference}
+          onDetachReference={onDetachReference}
+          {...(onRetryReferenceRestore ? { onRetryReferenceRestore } : {})}
         />
       ) : (
         <>
@@ -137,7 +183,7 @@ export const CreativePanelContent = ({
           <RecipeShelfView
             activeMode={libraryMode}
             embedded
-            promptUseDisabled={recipeInsertionBlocked}
+            promptUseDisabled={recipeInsertionBlocked || referenceUsePending}
             repository={repository}
             controller={shelfController}
             onDirtyChange={onShelfDirtyChange}
@@ -146,6 +192,30 @@ export const CreativePanelContent = ({
           />
         </>
       )}
+      {referenceUseFailure ? (
+        <StatusNotice tone="danger" title="Reference image could not be restored" role="alert">
+          {referenceUseFailure.message}
+          <div
+            style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              gap: theme.space.xs,
+              marginTop: theme.space.xs,
+            }}
+          >
+            <Button size="small" variant="secondary" onClick={referenceUseFailure.onRetry}>
+              Retry
+            </Button>
+            <Button
+              size="small"
+              variant="quiet"
+              onClick={referenceUseFailure.onContinueWithoutReference}
+            >
+              Continue without reference
+            </Button>
+          </div>
+        </StatusNotice>
+      ) : null}
     </div>
   );
 };
@@ -161,6 +231,11 @@ export const CreativeWorkspace = ({
   sessionModeLocked,
   recipeInsertionBlocked,
   hasReferenceImage,
+  workshopReferenceImage,
+  referenceGeneration,
+  referenceImagesAvailable,
+  referenceUsePending,
+  referenceUseFailure,
   workshopToggleRef,
   shelfToggleRef,
   dockToggleRef,
@@ -175,6 +250,9 @@ export const CreativeWorkspace = ({
   onWorkshopDraftChange,
   onUseWorkshop,
   onSaveWorkshop,
+  onGenerateReference,
+  onDetachReference,
+  onRetryReferenceRestore,
   onShelfDirtyChange,
   onUseRecipe,
   onOpenSavedWorkshop,
@@ -232,8 +310,8 @@ export const CreativeWorkspace = ({
         >
           Shelf
         </Button>
-        <span title="Prompts persist in this browser profile; images and takes stay temporary.">
-          Local-first workspace · private media stays temporary
+        <span title="Prompts and generated references persist locally; manual uploads and takes stay temporary.">
+          Local-first workspace · generated references persist locally
         </span>
       </nav>
 
@@ -266,10 +344,18 @@ export const CreativeWorkspace = ({
             sessionModeLocked={sessionModeLocked}
             recipeInsertionBlocked={recipeInsertionBlocked}
             hasReferenceImage={hasReferenceImage}
+            workshopReferenceImage={workshopReferenceImage}
+            referenceGeneration={referenceGeneration}
+            referenceImagesAvailable={referenceImagesAvailable}
+            referenceUsePending={referenceUsePending}
+            referenceUseFailure={referenceUseFailure}
             onLibraryModeChange={onLibraryModeChange}
             onWorkshopDraftChange={onWorkshopDraftChange}
             onUseWorkshop={onUseWorkshop}
             onSaveWorkshop={onSaveWorkshop}
+            onGenerateReference={onGenerateReference}
+            onDetachReference={onDetachReference}
+            {...(onRetryReferenceRestore ? { onRetryReferenceRestore } : {})}
             onShelfDirtyChange={onShelfDirtyChange}
             onUseRecipe={onUseRecipe}
             onOpenSavedWorkshop={onOpenSavedWorkshop}

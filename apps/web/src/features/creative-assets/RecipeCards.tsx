@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import { Button } from '../../ui';
+import { Button, ReferenceImagePreview } from '../../ui';
 import {
   actionStyles,
   badgeStyles,
@@ -87,6 +87,12 @@ export const SavedPromptCard = ({
         <span>Updated {formatDate(item.updatedAt)}</span>
         {item.useCount > 0 ? <span>Used {item.useCount}×</span> : null}
       </div>
+      {item.referenceImageAssetId ? (
+        <ReferenceImagePreview
+          assetId={item.referenceImageAssetId}
+          alt={`Reference image for ${item.title}`}
+        />
+      ) : null}
       <div>
         <p title={item.prompt} css={promptStyles(theme)}>
           {item.prompt}
@@ -184,8 +190,20 @@ export const RecentPromptCard = ({
       </header>
       <div css={metadataStyles(theme)}>
         <span>{modeName(item.modelModeId)}</span>
-        <span>{item.savedPromptId ? 'Linked to saved recipe' : 'Recent text only'}</span>
+        <span>
+          {item.referenceImageAssetId
+            ? 'Reference image attached'
+            : item.savedPromptId
+              ? 'Linked to saved recipe'
+              : 'Recent text only'}
+        </span>
       </div>
+      {item.referenceImageAssetId ? (
+        <ReferenceImagePreview
+          assetId={item.referenceImageAssetId}
+          alt="Recent character reference"
+        />
+      ) : null}
       <p title={item.prompt} css={promptStyles(theme)}>
         {item.prompt}
       </p>
@@ -242,11 +260,13 @@ export const CharacterPromptCard = ({
 }) => {
   const theme = useTheme();
   const referenceLabel =
-    item.referenceImageStatus === 'prompt-only'
-      ? 'Prompt only'
-      : item.referenceImageStatus === 'session-portrait-not-saved'
-        ? 'Session portrait was not saved'
-        : 'Add a portrait when using';
+    item.referenceImageStatus === 'persisted-reference'
+      ? 'Reference image attached'
+      : item.referenceImageStatus === 'prompt-only'
+        ? 'Prompt only'
+        : item.referenceImageStatus === 'session-portrait-not-saved'
+          ? 'Session portrait was not saved'
+          : 'Add a portrait when using';
   return (
     <article css={cardStyles(theme, selected)} data-selected={selected || undefined}>
       <header css={cardHeaderStyles(theme)}>
@@ -271,6 +291,12 @@ export const CharacterPromptCard = ({
         <span>Updated {formatDate(item.updatedAt)}</span>
         {item.useCount > 0 ? <span>Used {item.useCount}×</span> : null}
       </div>
+      {item.referenceImageAssetId ? (
+        <ReferenceImagePreview
+          assetId={item.referenceImageAssetId}
+          alt={`Reference image for ${item.name}`}
+        />
+      ) : null}
       <div>
         <p title={item.prompt} css={promptStyles(theme)}>
           {item.prompt}

@@ -5,6 +5,12 @@ import {
 } from '@studio/contracts';
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { VoiceServiceError } from '../features/voices/voice-service-error.js';
+import {
+  InvalidReferenceImageError,
+  ReferenceImageGenerationStateError,
+  ReferenceImageStorageError,
+} from '../features/reference-images/reference-image-service.js';
+import { ReferenceImageProviderError } from '../providers/openai/reference-image-provider.js';
 import { ProviderError } from '../providers/provider-error.js';
 
 export type ApiErrorBody = ApiErrorResponse;
@@ -210,6 +216,81 @@ const mapVoiceServiceError = (error: VoiceServiceError): AppError => {
   }
 };
 
+const providerStatusOptions = (
+  upstreamStatus: number | undefined,
+): { readonly upstreamStatus: number } | undefined =>
+  upstreamStatus === undefined ? undefined : { upstreamStatus };
+
+const mapReferenceImageProviderError = (error: ReferenceImageProviderError): AppError => {
+  const options = providerStatusOptions(error.upstreamStatus);
+  switch (error.reason) {
+    case 'moderation':
+      return new AppError(
+        400,
+        'moderation_blocked',
+        'OpenAI could not generate this reference under its safety checks. Revise the character description and try again.',
+        options,
+      );
+    case 'rate-limit':
+      return new AppError(
+        429,
+        'rate_limited',
+        'OpenAI is temporarily rate limiting image generation. Wait a moment, then generate again with a new request.',
+        options,
+      );
+    case 'authentication':
+      return new AppError(
+        502,
+        'provider_authentication',
+        'OpenAI rejected the configured server credential. Check OPENAI_API_KEY.',
+        options,
+      );
+    case 'configuration':
+      return new AppError(
+        503,
+        'provider_configuration',
+        'Reference generation is unavailable until OpenAI is configured on the server.',
+        options,
+      );
+    case 'timeout':
+      return new AppError(
+        504,
+        'request_timeout',
+        'OpenAI image generation took too long. Check the Recent Shelf before deliberately trying again.',
+        options,
+      );
+    case 'invalid-response':
+      return new AppError(
+        502,
+        'invalid_provider_image',
+        'OpenAI returned no usable image. Generate again when the provider is available.',
+        options,
+      );
+    case 'failure':
+      return new AppError(
+        502,
+        'provider_failure',
+        'OpenAI could not complete reference image generation. Try again with a new request when ready.',
+        options,
+      );
+  }
+};
+
+const mapReferenceImageGenerationStateError = (
+  error: ReferenceImageGenerationStateError,
+): AppError =>
+  error.reason === 'generation-in-progress'
+    ? new AppError(
+        409,
+        'generation_in_progress',
+        'Another reference image is still being created. Wait for it to finish before regenerating.',
+      )
+    : new AppError(
+        503,
+        'provider_configuration',
+        'Reference generation is unavailable until OPENAI_API_KEY is configured on the server.',
+      );
+
 const isFastifyError = (error: unknown): error is FastifyError =>
   error instanceof Error && 'code' in error && typeof error.code === 'string';
 
@@ -256,11 +337,27 @@ export const installErrorHandling = (
           ? error
           : error instanceof VoiceServiceError
             ? mapVoiceServiceError(error)
-            : error instanceof ProviderError
-              ? mapProviderError(error)
-              : isFastifyError(error)
-                ? normalizeFastifyError(error)
-                : undefined;
+            : error instanceof ReferenceImageGenerationStateError
+              ? mapReferenceImageGenerationStateError(error)
+              : error instanceof ReferenceImageProviderError
+                ? mapReferenceImageProviderError(error)
+                : error instanceof InvalidReferenceImageError
+                  ? new AppError(
+                      502,
+                      'invalid_provider_image',
+                      'OpenAI returned an image that is not a valid 1024 × 1024 JPEG, PNG, or WebP under 5 MiB.',
+                    )
+                  : error instanceof ReferenceImageStorageError
+                    ? new AppError(
+                        500,
+                        'storage_failure',
+                        'The generated image could not be saved to local storage. Check LIGHTFRAME_DATA_DIR and disk permissions.',
+                      )
+                    : error instanceof ProviderError
+                      ? mapProviderError(error)
+                      : isFastifyError(error)
+                        ? normalizeFastifyError(error)
+                        : undefined;
 
       const safeError =
         normalized ??

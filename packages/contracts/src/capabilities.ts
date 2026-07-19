@@ -15,6 +15,14 @@ export const capabilitiesResponseSchema = z
         modelId: z.string().trim().min(1).max(200).nullable(),
       })
       .strict(),
+    referenceImages: z
+      .object({
+        available: z.boolean(),
+        modelId: z.literal('gpt-image-2'),
+        size: z.literal('1024x1024'),
+        quality: z.literal('high'),
+      })
+      .strict(),
   })
   .strict();
 

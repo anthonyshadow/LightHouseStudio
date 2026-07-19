@@ -14,7 +14,7 @@ import {
 
 const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
 const SCREENSHOT_ROOT = path.join(process.cwd(), 'screenshots');
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
 const FIXED_WEBP = Buffer.from(
   'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v3AgAA=',
   'base64',
@@ -29,7 +29,7 @@ const VIEWPORTS = [
 ] as const;
 
 const SEEDED_SHELF = {
-  schemaVersion: 1,
+  schemaVersion: 2,
   savedPrompts: [
     {
       id: 'character-amber-host',
@@ -37,6 +37,7 @@ const SEEDED_SHELF = {
       prompt: 'Transform the adult subject into a cinematic field presenter.',
       modelModeId: 'lucy-2.5',
       source: 'manual',
+      referenceImageAssetId: null,
       tags: ['editorial', 'warm'],
       createdAt: '2026-07-15T14:30:00.000Z',
       updatedAt: '2026-07-18T14:30:00.000Z',
@@ -49,6 +50,7 @@ const SEEDED_SHELF = {
       prompt: 'Replace the current top with a structured amber field jacket.',
       modelModeId: 'lucy-vton-3',
       source: 'manual',
+      referenceImageAssetId: null,
       tags: ['outerwear', 'amber'],
       createdAt: '2026-07-14T14:30:00.000Z',
       updatedAt: '2026-07-17T14:30:00.000Z',
@@ -61,12 +63,14 @@ const SEEDED_SHELF = {
       id: 'recent-character',
       prompt: 'An adult stop-motion science presenter in a practical studio.',
       modelModeId: 'lucy-2.5',
+      referenceImageAssetId: null,
       usedAt: '2026-07-18T13:00:00.000Z',
     },
     {
       id: 'recent-vton',
       prompt: 'A tailored linen travel overshirt in soft copper.',
       modelModeId: 'lucy-vton-3',
+      referenceImageAssetId: null,
       usedAt: '2026-07-17T13:00:00.000Z',
     },
   ],
@@ -94,6 +98,7 @@ const SEEDED_SHELF = {
         preserve: 'camera framing',
       },
       referenceImageStatus: 'prompt-only',
+      referenceImageAssetId: null,
       notes: 'A grounded host treatment for field stories.',
       tags: ['host', 'editorial'],
       createdAt: '2026-07-16T14:30:00.000Z',
@@ -123,6 +128,12 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
         body: JSON.stringify({
           realtimeVideo: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
           elevenLabs: { available: true, modelId: 'eleven_multilingual_sts_v2' },
+          referenceImages: {
+            available: false,
+            modelId: 'gpt-image-2',
+            size: '1024x1024',
+            quality: 'high',
+          },
         }),
       });
     },

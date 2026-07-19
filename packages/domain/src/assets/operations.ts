@@ -47,6 +47,15 @@ const requirePrompt = (value: string): string => {
   return prompt;
 };
 
+const normalizeReferenceImageAssetId = (value: string | null | undefined): string | null => {
+  if (value == null) return null;
+  const assetId = normalizeWhitespace(value, 128);
+  if (!containsMeaningfulText(assetId)) {
+    throw new DomainRuleError('invalid-input', 'A reference image asset ID cannot be empty.');
+  }
+  return assetId;
+};
+
 const assertTimestamp = (value: string): string => {
   const date = new Date(value);
   if (!Number.isFinite(date.valueOf())) {
@@ -67,6 +76,7 @@ const unlinkRecentPrompt = (recent: RecentPrompt, savedPromptId: string): Recent
     id: recent.id,
     prompt: recent.prompt,
     modelModeId: recent.modelModeId,
+    referenceImageAssetId: recent.referenceImageAssetId,
     usedAt: recent.usedAt,
   };
 };
@@ -83,6 +93,7 @@ export const createSavedPrompt = (
     prompt: requirePrompt(input.prompt),
     modelModeId: input.modelModeId,
     source: input.source,
+    referenceImageAssetId: normalizeReferenceImageAssetId(input.referenceImageAssetId),
     tags: normalizeTags(input.tags ?? []),
     createdAt: now,
     updatedAt: now,
@@ -98,7 +109,9 @@ export const createSavedPrompt = (
 export const updateSavedPrompt = (
   store: CreativeAssetStore,
   id: string,
-  patch: Partial<Pick<SavedPromptInput, 'title' | 'prompt' | 'source' | 'tags'>>,
+  patch: Partial<
+    Pick<SavedPromptInput, 'title' | 'prompt' | 'source' | 'referenceImageAssetId' | 'tags'>
+  >,
   nowValue: string,
 ): CreativeAssetStore => {
   const now = assertTimestamp(nowValue);
@@ -111,6 +124,9 @@ export const updateSavedPrompt = (
       ...(patch.title === undefined ? {} : { title: requireName(patch.title, 'Saved prompt') }),
       ...(patch.prompt === undefined ? {} : { prompt: requirePrompt(patch.prompt) }),
       ...(patch.source === undefined ? {} : { source: patch.source }),
+      ...(patch.referenceImageAssetId === undefined
+        ? {}
+        : { referenceImageAssetId: normalizeReferenceImageAssetId(patch.referenceImageAssetId) }),
       ...(patch.tags === undefined ? {} : { tags: normalizeTags(patch.tags) }),
       updatedAt: now,
     };
@@ -153,6 +169,7 @@ export const recordSuccessfulPromptUse = (
     readonly prompt: string;
     readonly modelModeId: ModelModeId;
     readonly savedPromptId?: string;
+    readonly referenceImageAssetId?: string | null;
   },
   context: AssetMutationContext,
 ): CreativeAssetStore => {
@@ -160,6 +177,7 @@ export const recordSuccessfulPromptUse = (
   if (!containsMeaningfulText(prompt)) return store;
   const now = assertTimestamp(context.now);
   const promptKey = canonicalPrompt(prompt);
+  const referenceImageAssetId = normalizeReferenceImageAssetId(input.referenceImageAssetId);
   const matchingSaved =
     store.savedPrompts.find(
       (asset) =>
@@ -173,13 +191,16 @@ export const recordSuccessfulPromptUse = (
     );
   const existingRecent = store.recentPrompts.find(
     (recent) =>
-      recent.modelModeId === input.modelModeId && canonicalPrompt(recent.prompt) === promptKey,
+      recent.modelModeId === input.modelModeId &&
+      canonicalPrompt(recent.prompt) === promptKey &&
+      recent.referenceImageAssetId === referenceImageAssetId,
   );
   const recent: RecentPrompt = {
     id: existingRecent?.id ?? requireName(context.createId(), 'Recent prompt'),
     prompt,
     modelModeId: input.modelModeId,
     ...(matchingSaved ? { savedPromptId: matchingSaved.id } : {}),
+    referenceImageAssetId,
     usedAt: now,
   };
   const recentPrompts = [
@@ -188,7 +209,8 @@ export const recordSuccessfulPromptUse = (
       (candidate) =>
         !(
           candidate.modelModeId === input.modelModeId &&
-          canonicalPrompt(candidate.prompt) === promptKey
+          canonicalPrompt(candidate.prompt) === promptKey &&
+          candidate.referenceImageAssetId === referenceImageAssetId
         ),
     ),
   ].slice(0, RECENT_PROMPT_LIMIT);
@@ -206,6 +228,41 @@ export const recordSuccessfulPromptUse = (
   };
 };
 
+/**
+ * Enriches the newest matching text-only recent without creating a recent or replacing a
+ * reference already attached to an earlier successful use.
+ */
+export const enrichNewestMatchingRecentWithReferenceImage = (
+  store: CreativeAssetStore,
+  input: {
+    readonly prompt: string;
+    readonly modelModeId: ModelModeId;
+    readonly referenceImageAssetId: string;
+  },
+): CreativeAssetStore => {
+  const promptKey = canonicalPrompt(normalizeAuthoredPrompt(input.prompt));
+  if (!containsMeaningfulText(promptKey)) return store;
+  const referenceImageAssetId = normalizeReferenceImageAssetId(input.referenceImageAssetId);
+  if (!referenceImageAssetId) return store;
+
+  const target = [...store.recentPrompts]
+    .filter(
+      (recent) =>
+        recent.modelModeId === input.modelModeId &&
+        canonicalPrompt(recent.prompt) === promptKey &&
+        recent.referenceImageAssetId === null,
+    )
+    .sort((left, right) => right.usedAt.localeCompare(left.usedAt))[0];
+  if (!target) return store;
+
+  return {
+    ...store,
+    recentPrompts: store.recentPrompts.map((recent) =>
+      recent.id === target.id ? { ...recent, referenceImageAssetId } : recent,
+    ),
+  };
+};
+
 export const createSavedCharacterPrompt = (
   store: CreativeAssetStore,
   input: SavedCharacterPromptInput,
@@ -219,7 +276,12 @@ export const createSavedCharacterPrompt = (
     source: input.source,
     promptIntent: input.promptIntent,
     builderDraft: input.builderDraft ?? null,
-    referenceImageStatus: input.referenceImageStatus,
+    referenceImageStatus: input.referenceImageAssetId
+      ? 'persisted-reference'
+      : input.referenceImageStatus === 'persisted-reference'
+        ? 'prompt-only'
+        : input.referenceImageStatus,
+    referenceImageAssetId: normalizeReferenceImageAssetId(input.referenceImageAssetId),
     notes: normalizeWhitespace(input.notes ?? '', CHARACTER_NOTES_MAX_LENGTH),
     tags: normalizeTags(input.tags ?? []),
     createdAt: now,
@@ -248,6 +310,7 @@ export const updateSavedCharacterPrompt = (
       | 'promptIntent'
       | 'builderDraft'
       | 'referenceImageStatus'
+      | 'referenceImageAssetId'
       | 'notes'
       | 'tags'
     >
@@ -265,6 +328,17 @@ export const updateSavedCharacterPrompt = (
       patch.source === undefined &&
       patch.promptIntent === undefined &&
       patch.builderDraft === undefined;
+    const nextReferenceImageAssetId =
+      patch.referenceImageAssetId === undefined
+        ? asset.referenceImageAssetId
+        : normalizeReferenceImageAssetId(patch.referenceImageAssetId);
+    const requestedReferenceStatus = patch.referenceImageStatus ?? asset.referenceImageStatus;
+    const nextReferenceImageStatus: SavedCharacterPrompt['referenceImageStatus'] =
+      nextReferenceImageAssetId
+        ? 'persisted-reference'
+        : requestedReferenceStatus === 'persisted-reference'
+          ? 'prompt-only'
+          : requestedReferenceStatus;
     return {
       ...asset,
       ...(patch.name === undefined ? {} : { name: requireName(patch.name, 'Character prompt') }),
@@ -276,9 +350,8 @@ export const updateSavedCharacterPrompt = (
             ...(patch.promptIntent === undefined ? {} : { promptIntent: patch.promptIntent }),
             ...(patch.builderDraft === undefined ? {} : { builderDraft: patch.builderDraft }),
           }),
-      ...(patch.referenceImageStatus === undefined
-        ? {}
-        : { referenceImageStatus: patch.referenceImageStatus }),
+      referenceImageStatus: nextReferenceImageStatus,
+      referenceImageAssetId: nextReferenceImageAssetId,
       ...(patch.notes === undefined
         ? {}
         : { notes: normalizeWhitespace(patch.notes, CHARACTER_NOTES_MAX_LENGTH) }),

@@ -18,6 +18,8 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   elevenLabsModelId: 'eleven_multilingual_sts_v2',
   elevenLabsEnableLogging: false,
   providerTimeoutMs: 1_000,
+  referenceImageTimeoutMs: 1_000,
+  lightframeDataDir: './.lightframe-data-test',
   ...overrides,
 });
 

@@ -64,6 +64,12 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
           body: JSON.stringify({
             realtimeVideo: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
             elevenLabs: { available: false, modelId: null },
+            referenceImages: {
+              available: false,
+              modelId: 'gpt-image-2',
+              size: '1024x1024',
+              quality: 'high',
+            },
           }),
         });
         return;

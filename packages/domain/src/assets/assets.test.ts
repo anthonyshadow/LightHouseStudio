@@ -8,6 +8,7 @@ import {
   createSavedCharacterPrompt,
   createSavedPrompt,
   deleteSavedPrompt,
+  enrichNewestMatchingRecentWithReferenceImage,
   parseCreativeAssetStore,
   recordSuccessfulPromptUse,
   sanitizeCreativeAssetStore,
@@ -92,6 +93,44 @@ describe('creative asset CRUD and use', () => {
     ).toBe(store);
   });
 
+  it('versions recents by exact reference asset and only enriches a text-only version', () => {
+    let store = createEmptyCreativeAssetStore();
+    store = recordSuccessfulPromptUse(
+      store,
+      { prompt: 'Substitute the character with a lunar guide.', modelModeId: 'lucy-2.5' },
+      context('text-only', 0),
+    );
+    store = enrichNewestMatchingRecentWithReferenceImage(store, {
+      prompt: ' substitute the character with a lunar guide. ',
+      modelModeId: 'lucy-2.5',
+      referenceImageAssetId: 'asset-a',
+    });
+    expect(store.recentPrompts).toEqual([
+      expect.objectContaining({ id: 'text-only', referenceImageAssetId: 'asset-a' }),
+    ]);
+
+    store = recordSuccessfulPromptUse(
+      store,
+      {
+        prompt: 'Substitute the character with a lunar guide.',
+        modelModeId: 'lucy-2.5',
+        referenceImageAssetId: 'asset-b',
+      },
+      context('asset-b-version', 1),
+    );
+    expect(store.recentPrompts.map((recent) => recent.referenceImageAssetId)).toEqual([
+      'asset-b',
+      'asset-a',
+    ]);
+
+    const unchanged = enrichNewestMatchingRecentWithReferenceImage(store, {
+      prompt: 'Substitute the character with a lunar guide.',
+      modelModeId: 'lucy-2.5',
+      referenceImageAssetId: 'asset-c',
+    });
+    expect(unchanged).toBe(store);
+  });
+
   it('caps saved and recent collections at their contract limits', () => {
     let store = createEmptyCreativeAssetStore();
     for (let index = 0; index < SAVED_PROMPT_LIMIT + 1; index += 1) {
@@ -119,7 +158,7 @@ describe('creative asset CRUD and use', () => {
     expect(store.recentPrompts).toHaveLength(RECENT_PROMPT_LIMIT);
   });
 
-  it('stores restorable structured character data but no portrait data', () => {
+  it('stores restorable structured character data and an immutable opaque reference identity', () => {
     const builderDraft = {
       ...createPromptBuilderDraft('character-transform'),
       intent: 'character-transform' as const,
@@ -133,7 +172,8 @@ describe('creative asset CRUD and use', () => {
         source: 'generator',
         promptIntent: 'character-transform',
         builderDraft,
-        referenceImageStatus: 'session-portrait-not-saved',
+        referenceImageStatus: 'persisted-reference',
+        referenceImageAssetId: 'reference-asset-1',
         notes: '  Keep face lighting  ',
       },
       context('character-1'),
@@ -142,7 +182,8 @@ describe('creative asset CRUD and use', () => {
     expect(used.builderDraft).toEqual(builderDraft);
     expect(used.store.savedCharacterPrompts[0]).toMatchObject({
       useCount: 1,
-      referenceImageStatus: 'session-portrait-not-saved',
+      referenceImageStatus: 'persisted-reference',
+      referenceImageAssetId: 'reference-asset-1',
     });
     expect(JSON.stringify(store)).not.toMatch(/(?:imageData|objectUrl|portrait\.jpg)/u);
   });
@@ -222,6 +263,69 @@ describe('creative asset sanitation and recovery', () => {
     });
     expect(result.store.recentPrompts).toHaveLength(1);
     expect(result.store.recentPrompts[0]?.id).toBe('new');
+  });
+
+  it('migrates v1 records by adding nullable references without data loss', () => {
+    const result = sanitizeCreativeAssetStore({
+      schemaVersion: 1,
+      savedPrompts: [{ ...validSavedPrompt, referenceImageAssetId: 'untrusted-v1-asset' }],
+      recentPrompts: [
+        {
+          id: 'legacy-recent',
+          prompt: 'A useful prompt',
+          modelModeId: 'lucy-2.5',
+          referenceImageAssetId: 'untrusted-v1-asset',
+          usedAt: timestamp(),
+        },
+      ],
+      savedCharacterPrompts: [
+        {
+          id: 'legacy-character',
+          name: 'Legacy character',
+          prompt: 'A useful character prompt',
+          source: 'generator',
+          promptIntent: 'character-transform',
+          builderDraft: null,
+          referenceImageStatus: 'persisted-reference',
+          referenceImageAssetId: 'untrusted-v1-asset',
+          notes: '',
+          tags: [],
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+          lastUsedAt: null,
+          useCount: 0,
+        },
+      ],
+    });
+
+    expect(result.recovered).toBe(true);
+    expect(result.store).toMatchObject({ schemaVersion: 2 });
+    expect(result.store.savedPrompts[0]?.referenceImageAssetId).toBeNull();
+    expect(result.store.recentPrompts[0]?.referenceImageAssetId).toBeNull();
+    expect(result.store.savedCharacterPrompts[0]).toMatchObject({
+      referenceImageStatus: 'prompt-only',
+      referenceImageAssetId: null,
+    });
+  });
+
+  it('keeps distinct sanitized recent versions for distinct reference assets', () => {
+    const recent = {
+      id: 'asset-a-recent',
+      prompt: 'Ocean guide',
+      modelModeId: 'lucy-2.5',
+      usedAt: timestamp(0),
+      referenceImageAssetId: 'asset-a',
+    };
+    const result = sanitizeCreativeAssetStore({
+      schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+      savedPrompts: [],
+      recentPrompts: [
+        recent,
+        { ...recent, id: 'asset-b-recent', referenceImageAssetId: 'asset-b' },
+      ],
+      savedCharacterPrompts: [],
+    });
+    expect(result.store.recentPrompts).toHaveLength(2);
   });
 
   it('recovers corrupt JSON and unknown versions to an empty store', () => {

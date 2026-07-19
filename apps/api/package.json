@@ -11,12 +11,15 @@
     "test": "vitest run --root ../.. apps/api/src"
   },
   "dependencies": {
-    "@studio/contracts": "0.1.0",
     "@decartai/sdk": "0.1.14",
     "@fastify/helmet": "13.1.0",
     "@fastify/static": "10.1.0",
+    "@studio/contracts": "0.1.0",
+    "@studio/domain": "0.1.0",
     "dotenv": "17.4.2",
     "fastify": "5.10.0",
+    "openai": "6.48.0",
+    "sharp": "0.35.3",
     "zod": "4.4.3"
   },
   "devDependencies": {

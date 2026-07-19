@@ -49,6 +49,9 @@ export const useRecipeShelfController = ({
   const [selectedRecipe, setSelectedRecipe] = useState<SelectedRecipeState | null>(null);
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [createSeed, setCreateSeed] = useState<Partial<RecipeFormValue> | null>(null);
+  const [createReferenceImageAssetId, setCreateReferenceImageAssetId] = useState<string | null>(
+    null,
+  );
   const [editorDraft, setEditorDraft] = useState<RecipeEditorDraft | null>(null);
   const [renameDraft, setRenameDraft] = useState<string | null>(null);
   const [createKey, setCreateKey] = useState(0);
@@ -111,6 +114,7 @@ export const useRecipeShelfController = ({
     setFormDirty(false);
     setEditing(null);
     setCreateSeed(null);
+    setCreateReferenceImageAssetId(null);
     setEditorDraft(null);
     setRenameDraft(null);
   };
@@ -135,10 +139,14 @@ export const useRecipeShelfController = ({
     }
   };
 
-  const openCreate = (seed?: Partial<RecipeFormValue>) => {
+  const openCreate = (
+    seed?: Partial<RecipeFormValue>,
+    referenceImageAssetId: string | null = null,
+  ) => {
     if (!canReplaceForm()) return;
     const nextSeed = seed ?? {};
     setCreateSeed(nextSeed);
+    setCreateReferenceImageAssetId(referenceImageAssetId);
     setEditorDraft(createRecipeEditorDraft(nextSeed));
     setRenameDraft(null);
     setCreateKey((value) => value + 1);
@@ -149,6 +157,7 @@ export const useRecipeShelfController = ({
 
   const closeCreate = () => {
     setCreateSeed(null);
+    setCreateReferenceImageAssetId(null);
     setEditorDraft(null);
     setFormDirty(false);
     focusShelfHeading();
@@ -157,6 +166,7 @@ export const useRecipeShelfController = ({
   const startEditing = (next: EditingState, initialValue: Partial<RecipeFormValue>) => {
     if (!canReplaceForm()) return;
     setCreateSeed(null);
+    setCreateReferenceImageAssetId(null);
     setEditing(next);
     setEditorDraft(next.action === 'edit' ? createRecipeEditorDraft(initialValue) : null);
     setRenameDraft(next.action === 'rename' ? (initialValue.title ?? '') : null);
@@ -179,9 +189,11 @@ export const useRecipeShelfController = ({
         prompt: value.prompt,
         modelModeId: activeMode,
         source: 'manual',
+        referenceImageAssetId: createReferenceImageAssetId,
         tags: value.tags,
       });
       setCreateSeed(null);
+      setCreateReferenceImageAssetId(null);
     });
 
   const selectSaved = (item: SavedPrompt) =>
@@ -191,6 +203,7 @@ export const useRecipeShelfController = ({
         prompt: item.prompt,
         modelModeId: item.modelModeId,
         assetId: item.id,
+        referenceImageAssetId: item.referenceImageAssetId,
       }),
     );
 
@@ -201,6 +214,7 @@ export const useRecipeShelfController = ({
         prompt: item.prompt,
         modelModeId: item.modelModeId,
         ...(item.savedPromptId ? { assetId: item.savedPromptId } : {}),
+        referenceImageAssetId: item.referenceImageAssetId,
       }),
     );
 
@@ -211,6 +225,7 @@ export const useRecipeShelfController = ({
         prompt: item.prompt,
         modelModeId: 'lucy-2.5',
         assetId: item.id,
+        referenceImageAssetId: item.referenceImageAssetId,
         ...(item.builderDraft ? { builderDraft: item.builderDraft } : {}),
       }),
     );

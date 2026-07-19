@@ -11,6 +11,8 @@ export {
   normalizePromptBuilderDraft,
   validatePromptBuilderDraft,
 } from './model';
+export type { ReferenceGenerationState, WorkshopReferenceImage } from './ReferenceImageGenerator';
+export { hashWorkshopPrompt } from './referencePromptHash';
 export type {
   AdultAge,
   PromptBuilderDraft,

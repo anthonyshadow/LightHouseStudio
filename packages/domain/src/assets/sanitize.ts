@@ -12,6 +12,7 @@ import { canonicalPrompt } from '../common/text';
 import { createEmptyCreativeAssetStore } from './operations';
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
+  LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   RECENT_PROMPT_LIMIT,
   SAVED_CHARACTER_PROMPT_LIMIT,
   SAVED_PROMPT_LIMIT,
@@ -40,6 +41,9 @@ const normalizedId = (value: unknown): string | null => {
   return containsMeaningfulText(id) ? id : null;
 };
 
+const referenceImageAssetId = (value: unknown): string | null =>
+  value == null ? null : normalizedId(value);
+
 const count = (value: unknown): number =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 ? Math.floor(value) : 0;
 
@@ -60,6 +64,7 @@ const referenceStatus = (value: unknown): ReferenceImageStatus | null => {
     case 'prompt-only':
     case 'portrait-required-not-saved':
     case 'session-portrait-not-saved':
+    case 'persisted-reference':
       return value;
     default:
       return null;
@@ -71,7 +76,10 @@ const readTags = (value: unknown): readonly string[] =>
     Array.isArray(value) ? value.filter((tag): tag is string => typeof tag === 'string') : [],
   );
 
-const sanitizeSavedPrompt = (value: unknown): SavedPrompt | null => {
+const sanitizeSavedPrompt = (
+  value: unknown,
+  includeReferenceImage: boolean,
+): SavedPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
   const title =
@@ -102,6 +110,9 @@ const sanitizeSavedPrompt = (value: unknown): SavedPrompt | null => {
     prompt,
     modelModeId,
     source,
+    referenceImageAssetId: includeReferenceImage
+      ? referenceImageAssetId(value.referenceImageAssetId)
+      : null,
     tags: readTags(value.tags),
     createdAt,
     updatedAt,
@@ -110,7 +121,10 @@ const sanitizeSavedPrompt = (value: unknown): SavedPrompt | null => {
   };
 };
 
-const sanitizeRecentPrompt = (value: unknown): RecentPrompt | null => {
+const sanitizeRecentPrompt = (
+  value: unknown,
+  includeReferenceImage: boolean,
+): RecentPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
   const prompt = typeof value.prompt === 'string' ? normalizeAuthoredPrompt(value.prompt) : '';
@@ -134,11 +148,17 @@ const sanitizeRecentPrompt = (value: unknown): RecentPrompt | null => {
     prompt,
     modelModeId,
     ...(savedPromptId ? { savedPromptId } : {}),
+    referenceImageAssetId: includeReferenceImage
+      ? referenceImageAssetId(value.referenceImageAssetId)
+      : null,
     usedAt,
   };
 };
 
-const sanitizeSavedCharacterPrompt = (value: unknown): SavedCharacterPrompt | null => {
+const sanitizeSavedCharacterPrompt = (
+  value: unknown,
+  includeReferenceImage: boolean,
+): SavedCharacterPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
   const name =
@@ -152,6 +172,9 @@ const sanitizeSavedCharacterPrompt = (value: unknown): SavedCharacterPrompt | nu
   const lastUsedAt = nullableDate(value.lastUsedAt);
   const builderDraft =
     value.builderDraft == null ? null : sanitizePromptBuilderDraft(value.builderDraft);
+  const persistedReferenceImageAssetId = includeReferenceImage
+    ? referenceImageAssetId(value.referenceImageAssetId)
+    : null;
   if (
     !id ||
     !containsMeaningfulText(name) ||
@@ -173,7 +196,12 @@ const sanitizeSavedCharacterPrompt = (value: unknown): SavedCharacterPrompt | nu
     source,
     promptIntent: intent,
     builderDraft: intent && builderDraft?.intent === intent ? builderDraft : null,
-    referenceImageStatus: status,
+    referenceImageStatus: persistedReferenceImageAssetId
+      ? 'persisted-reference'
+      : status === 'persisted-reference'
+        ? 'prompt-only'
+        : status,
+    referenceImageAssetId: persistedReferenceImageAssetId,
     notes:
       typeof value.notes === 'string'
         ? normalizeWhitespace(value.notes, CHARACTER_NOTES_MAX_LENGTH)
@@ -207,13 +235,24 @@ const sanitizeArray = <T>(
 };
 
 export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAssetResult => {
-  if (!isRecord(value) || value.schemaVersion !== CREATIVE_ASSET_SCHEMA_VERSION) {
+  if (
+    !isRecord(value) ||
+    (value.schemaVersion !== CREATIVE_ASSET_SCHEMA_VERSION &&
+      value.schemaVersion !== LEGACY_CREATIVE_ASSET_SCHEMA_VERSION)
+  ) {
     return { store: createEmptyCreativeAssetStore(), recovered: true, droppedRecords: 0 };
   }
 
-  const savedInput = sanitizeArray(value.savedPrompts, sanitizeSavedPrompt);
-  const recentInput = sanitizeArray(value.recentPrompts, sanitizeRecentPrompt);
-  const characterInput = sanitizeArray(value.savedCharacterPrompts, sanitizeSavedCharacterPrompt);
+  const includeReferenceImages = value.schemaVersion === CREATIVE_ASSET_SCHEMA_VERSION;
+  const savedInput = sanitizeArray(value.savedPrompts, (record) =>
+    sanitizeSavedPrompt(record, includeReferenceImages),
+  );
+  const recentInput = sanitizeArray(value.recentPrompts, (record) =>
+    sanitizeRecentPrompt(record, includeReferenceImages),
+  );
+  const characterInput = sanitizeArray(value.savedCharacterPrompts, (record) =>
+    sanitizeSavedCharacterPrompt(record, includeReferenceImages),
+  );
 
   const savedPrompts = uniqueById(
     [...savedInput.records].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
@@ -224,7 +263,7 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
   const recentPrompts = [...recentInput.records]
     .sort((left, right) => right.usedAt.localeCompare(left.usedAt))
     .filter((recent) => {
-      const key = `${recent.modelModeId}\u0000${canonicalPrompt(recent.prompt)}`;
+      const key = `${recent.modelModeId}\u0000${canonicalPrompt(recent.prompt)}\u0000${recent.referenceImageAssetId ?? ''}`;
       if (recentKeys.has(key)) return false;
       recentKeys.add(key);
       return true;
@@ -243,6 +282,7 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
         id: recent.id,
         prompt: recent.prompt,
         modelModeId: recent.modelModeId,
+        referenceImageAssetId: recent.referenceImageAssetId,
         usedAt: recent.usedAt,
       };
     });
@@ -270,7 +310,10 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
   }
   return {
     store,
-    recovered: droppedRecords > 0 || !inputMatchesSanitizedStore,
+    recovered:
+      value.schemaVersion === LEGACY_CREATIVE_ASSET_SCHEMA_VERSION ||
+      droppedRecords > 0 ||
+      !inputMatchesSanitizedStore,
     droppedRecords,
   };
 };

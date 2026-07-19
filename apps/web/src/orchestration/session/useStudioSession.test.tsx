@@ -490,7 +490,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     expect(result.current.applied).toMatchObject({
       prompt: scenario.prompt.trim(),
-      image,
+      referenceImage: image ? expect.objectContaining({ file: image }) : null,
       enhance: scenario.enhance,
     });
     expect(result.current.pendingChanges).toBe(false);
@@ -499,7 +499,7 @@ describe('useStudioSession model lifecycle contract', () => {
     expect(result.current.transformedVideoUsable).toBe(true);
     expect(result.current.displayStream).toBe(remote);
     expect(onPromptCommitted).toHaveBeenCalledOnce();
-    expect(onPromptCommitted).toHaveBeenCalledWith(scenario.mode, scenario.prompt.trim());
+    expect(onPromptCommitted).toHaveBeenCalledWith(scenario.mode, scenario.prompt.trim(), null);
 
     unmount();
   });
@@ -713,7 +713,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     expect(apply).not.toHaveBeenCalled();
     expect(result.current.pendingChanges).toBe(true);
-    expect(result.current.applied?.image).toBe(originalImage);
+    expect(result.current.applied?.referenceImage?.file).toBe(originalImage);
 
     await act(async () => {
       await result.current.applyChanges();
@@ -725,7 +725,7 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     expect(result.current.error?.code).toBe('apply-failed');
     expect(result.current.applied?.prompt).toBe('Original live character');
-    expect(result.current.applied?.image).toBe(originalImage);
+    expect(result.current.applied?.referenceImage?.file).toBe(originalImage);
     expect(result.current.pendingChanges).toBe(true);
     expect(onPromptCommitted).toHaveBeenCalledTimes(1);
 
@@ -740,13 +740,13 @@ describe('useStudioSession model lifecycle contract', () => {
     expect(result.current.error).toBeNull();
     expect(result.current.applied).toMatchObject({
       prompt: 'Revised live character',
-      image: null,
-      imageIdentity: null,
+      referenceImage: null,
+      referenceIdentity: null,
       enhance: false,
     });
     expect(result.current.pendingChanges).toBe(false);
     expect(onPromptCommitted).toHaveBeenCalledTimes(2);
-    expect(onPromptCommitted).toHaveBeenLastCalledWith('lucy-2.5', 'Revised live character');
+    expect(onPromptCommitted).toHaveBeenLastCalledWith('lucy-2.5', 'Revised live character', null);
 
     unmount();
   });
@@ -780,7 +780,7 @@ describe('useStudioSession model lifecycle contract', () => {
     expect(result.current.applied?.prompt).toBe('A stop-motion botanist');
     expect(result.current.lifecycle).toBe('connected');
     expect(onPromptCommitted).toHaveBeenCalledOnce();
-    expect(onPromptCommitted).toHaveBeenCalledWith('lucy-2.5', 'A stop-motion botanist');
+    expect(onPromptCommitted).toHaveBeenCalledWith('lucy-2.5', 'A stop-motion botanist', null);
 
     unmount();
   });
@@ -896,7 +896,7 @@ describe('useStudioSession model lifecycle contract', () => {
       expect(result.current.draft).toMatchObject({
         mode: 'lucy-2.5',
         prompt: '',
-        image: null,
+        referenceImage: null,
         enhance: false,
       });
       expect(result.current.pendingChanges).toBe(false);

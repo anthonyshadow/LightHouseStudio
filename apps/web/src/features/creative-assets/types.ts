@@ -1,5 +1,6 @@
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
+  LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   type CreativeAssetSearchResults as DomainCreativeAssetSearchResults,
   type CreativeAssetStore as DomainCreativeAssetStore,
   type ModelModeId as DomainModelModeId,
@@ -12,8 +13,9 @@ import {
 } from '@studio/domain';
 import type { PromptBuilderDraft, PromptIntent } from '../prompt-authoring';
 
-export { CREATIVE_ASSET_SCHEMA_VERSION };
-export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
+export { CREATIVE_ASSET_SCHEMA_VERSION, LEGACY_CREATIVE_ASSET_SCHEMA_VERSION };
+export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
+export const LEGACY_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
 
 export type ModelModeId = DomainModelModeId;
 export type AssetSource = SavedPromptSource;
@@ -36,12 +38,14 @@ export interface CreateSavedPromptInput {
   readonly prompt: string;
   readonly modelModeId: ModelModeId;
   readonly source?: AssetSource;
+  readonly referenceImageAssetId?: string | null;
   readonly tags?: readonly string[];
 }
 
 export interface UpdateSavedPromptInput {
   readonly title?: string;
   readonly prompt?: string;
+  readonly referenceImageAssetId?: string | null;
   readonly tags?: readonly string[];
 }
 
@@ -52,6 +56,7 @@ export interface CreateSavedCharacterPromptInput {
   readonly promptIntent: PromptIntent;
   readonly builderDraft?: PromptBuilderDraft | null;
   readonly referenceImageStatus?: ReferenceImageStatus;
+  readonly referenceImageAssetId?: string | null;
   readonly notes?: string;
   readonly tags?: readonly string[];
 }
@@ -61,6 +66,7 @@ export interface UpdateSavedCharacterPromptInput {
   readonly prompt?: string;
   readonly builderDraft?: PromptBuilderDraft | null;
   readonly referenceImageStatus?: ReferenceImageStatus;
+  readonly referenceImageAssetId?: string | null;
   readonly notes?: string;
   readonly tags?: readonly string[];
 }
@@ -70,6 +76,7 @@ export interface RecordSuccessfulPromptInput {
   readonly modelModeId: ModelModeId;
   readonly savedPromptId?: string;
   readonly savedCharacterPromptId?: string;
+  readonly referenceImageAssetId?: string | null;
 }
 
 export interface CreativeAssetRepository {
@@ -87,6 +94,11 @@ export interface CreativeAssetRepository {
   renameSavedCharacterPrompt: (id: string, name: string) => SavedCharacterPrompt;
   deleteSavedCharacterPrompt: (id: string) => void;
   recordSuccessfulPrompt: (input: RecordSuccessfulPromptInput) => void;
+  enrichNewestMatchingRecent: (
+    prompt: string,
+    modelModeId: ModelModeId,
+    referenceImageAssetId: string,
+  ) => void;
   search: (query: string, modelModeId?: ModelModeId) => CreativeAssetSearchResults;
 }
 

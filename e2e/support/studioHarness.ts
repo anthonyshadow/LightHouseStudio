@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { expect, type Page } from '@playwright/test';
 
 // A 64px mint VP8/Opus WebM used by the deterministic MediaRecorder. Keeping a
@@ -5,6 +6,27 @@ import { expect, type Page } from '@playwright/test';
 // browser's recorded-source path instead of relying on an invalid text blob.
 const FIXED_WEBM_BASE64 =
   'GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZwEAAAAAAAPHEU2bdLpNu4tTq4QVSalmU6yBoU27i1OrhBZUrmtTrIHWTbuMU6uEElTDZ1OsggGJTbuMU6uEHFO7a1OsggOx7AEAAAAAAABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVSalmsCrXsYMPQkBNgIxMYXZmNjIuMy4xMDBXQYxMYXZmNjIuMy4xMDBEiYhAagAAAAAAABZUrmtAra4BAAAAAAAAP9eBAXPFiE2mk5i4/Zn+nIEAIrWcg3VuZIiBAIaFVl9WUDiDgQEj44OEC+vCAOCQsIFAuoFAmoECVbCEVbmBAa4BAAAAAAAAXNeBAnPFiJrGl6+a4otJnIEAIrWcg3VuZIiBAIaGQV9PUFVTVqqDYy6gVruEBMS0AIOBAuGRn4EBtYhA53AAAAAAAGJkgRBjopNPcHVzSGVhZAEBOAGAuwAAAAAAElTDZ0DVc3OfY8CAZ8iZRaOHRU5DT0RFUkSHjExhdmY2Mi4zLjEwMHNz1mPAi2PFiE2mk5i4/Zn+Z8ihRaOHRU5DT0RFUkSHlExhdmM2Mi4xMS4xMDAgbGlidnB4Z8ihRaOIRFVSQVRJT05Eh5MwMDowMDowMC4yMDAwMDAwMDAAc3PXY8CLY8WImsaXr5rii0lnyKJFo4dFTkNPREVSRIeVTGF2YzYyLjExLjEwMCBsaWJvcHVzZ8ihRaOIRFVSQVRJT05Eh5MwMDowMDowMC4yMDgwMDAwMDAAH0O2dUFH54EAo6CCAACACIIus9vut8Yiydk1Igkj/XNos8ZUDdGd8vz2MKO6gQAAgBADAJ0BKkAAQAAARwiFhYiFhIgCAgJ08luZhVWRB7sxegD+9fmr0//f7H//f7H//f7H/v50AKOZggAVgAikiHym31yBd+ehDC8B0hVsEPLSMKOWggApgAicj4HpIUJspisqtfWHNlvUQKOTggA9gAicjDp1JdFgdoOprHux2aOUggBRgAicj4HpKUuFVSZIMbH2jsCjk4IAZYAInIwlpyVeaTexeOR+tlCjlIIAeYAInI+B6SlLjAufLYbvtF9Ao5SCAI2ACJyMOnUl0V0DEtfAAWmxyKOSggChgAickgPUbL0GlSYkM3WQo5KCALWACJyPgekpS4VPZkeaNSqgnaGUggDJAAgF64Joa2wKFQPSWqLsI8B1ooQAzf5gHFO7a5G7j7OBALeK94EB8YICZPCBJQ==';
+
+// A valid one-pixel PNG. Browser-side image validation is deterministically
+// stubbed to 1024x1024 by the harness, so these bytes exercise the complete
+// fetch/File handoff while keeping the fixture tiny and fast.
+const REFERENCE_PNG_BASE64 =
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
+const REFERENCE_PNG = Buffer.from(REFERENCE_PNG_BASE64, 'base64');
+
+export type MockReferenceImageAsset = {
+  assetId: string;
+  mimeType: 'image/png';
+  width: 1024;
+  height: 1024;
+  byteSize: number;
+  source: 'generated';
+  provider: 'openai';
+  model: 'gpt-image-2';
+  promptHash: string;
+  createdAt: string;
+  contentUrl: string;
+};
 
 export type ModelId = 'lucy-2.5' | 'lucy-vton-3';
 
@@ -29,12 +51,49 @@ export type BrowserJourneyState = {
 
 export type NetworkJourneyState = {
   apiRequests: Array<{ path: string; model: ModelId | null }>;
+  referenceImageGenerations: Array<{
+    requestId: string;
+    workshopPrompt: string;
+    assetId: string;
+  }>;
+  referenceImageMetadataReads: string[];
+  referenceImageContentReads: string[];
   blockedExternalRequests: string[];
   blockedExternalWebSockets: string[];
 };
 
 export type StudioHarnessOptions = {
   stubMediaPlayback?: boolean;
+  referenceImagesAvailable?: boolean;
+};
+
+const canonicalPrompt = (value: string): string =>
+  value.replace(/\s+/gu, ' ').trim().slice(0, 4_000).toLocaleLowerCase('en-US');
+
+const promptHash = (value: string): string =>
+  createHash('sha256').update(canonicalPrompt(value), 'utf8').digest('hex');
+
+const assetIdForSequence = (sequence: number): string =>
+  `00000000-0000-4000-8000-${sequence.toString().padStart(12, '0')}`;
+
+const createMockReferenceAsset = (
+  sequence: number,
+  workshopPrompt: string,
+): MockReferenceImageAsset => {
+  const assetId = assetIdForSequence(sequence);
+  return {
+    assetId,
+    mimeType: 'image/png',
+    width: 1024,
+    height: 1024,
+    byteSize: REFERENCE_PNG.byteLength,
+    source: 'generated',
+    provider: 'openai',
+    model: 'gpt-image-2',
+    promptHash: promptHash(workshopPrompt),
+    createdAt: '2030-01-01T00:00:00.000Z',
+    contentUrl: `/api/reference-images/${assetId}/content`,
+  };
 };
 
 export const installSuccessfulStudioHarness = async (
@@ -43,9 +102,15 @@ export const installSuccessfulStudioHarness = async (
 ): Promise<NetworkJourneyState> => {
   const network: NetworkJourneyState = {
     apiRequests: [],
+    referenceImageGenerations: [],
+    referenceImageMetadataReads: [],
+    referenceImageContentReads: [],
     blockedExternalRequests: [],
     blockedExternalWebSockets: [],
   };
+  const assets = new Map<string, MockReferenceImageAsset>();
+  const assetsByRequestId = new Map<string, MockReferenceImageAsset>();
+  let assetSequence = 0;
 
   await page.addInitScript(
     ({ fixedWebmBase64, stubMediaPlayback }) => {
@@ -294,7 +359,94 @@ export const installSuccessfulStudioHarness = async (
         body: JSON.stringify({
           realtimeVideo: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
           elevenLabs: { available: false, modelId: null },
+          referenceImages: {
+            available: options.referenceImagesAvailable ?? true,
+            modelId: 'gpt-image-2',
+            size: '1024x1024',
+            quality: 'high',
+          },
         }),
+      });
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/reference-images' && route.request().method() === 'POST') {
+      const payload = route.request().postDataJSON() as {
+        requestId: string;
+        workshopPrompt: string;
+      };
+      let asset = assetsByRequestId.get(payload.requestId);
+      if (!asset) {
+        assetSequence += 1;
+        asset = createMockReferenceAsset(assetSequence, payload.workshopPrompt);
+        assetsByRequestId.set(payload.requestId, asset);
+        assets.set(asset.assetId, asset);
+      }
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.referenceImageGenerations.push({
+        requestId: payload.requestId,
+        workshopPrompt: payload.workshopPrompt,
+        assetId: asset.assetId,
+      });
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ asset }),
+      });
+      return;
+    }
+
+    const metadataMatch = requestUrl.pathname.match(/^\/api\/reference-images\/([0-9a-f-]+)$/u);
+    if (metadataMatch) {
+      const assetId = metadataMatch[1] ?? '';
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.referenceImageMetadataReads.push(assetId);
+      const asset = assets.get(assetId);
+      if (!asset) {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: {
+              code: 'not_found',
+              message: 'That local reference image is no longer available.',
+            },
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(asset),
+      });
+      return;
+    }
+
+    const contentMatch = requestUrl.pathname.match(
+      /^\/api\/reference-images\/([0-9a-f-]+)\/content$/u,
+    );
+    if (contentMatch) {
+      const assetId = contentMatch[1] ?? '';
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.referenceImageContentReads.push(assetId);
+      if (!assets.has(assetId)) {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: {
+              code: 'not_found',
+              message: 'That local reference image is no longer available.',
+            },
+          }),
+        });
+        return;
+      }
+      await route.fulfill({
+        status: 200,
+        contentType: 'image/png',
+        body: REFERENCE_PNG,
       });
       return;
     }

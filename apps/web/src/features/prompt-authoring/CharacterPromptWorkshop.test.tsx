@@ -8,6 +8,26 @@ import { StudioDesignProvider } from '../../ui';
 import { CharacterPromptWorkshop, type PromptWorkshopAction } from './CharacterPromptWorkshop';
 import { createPromptBuilderDraft } from './model';
 
+const generatedReference = {
+  assetId: '550e8400-e29b-41d4-a716-446655440000',
+  mimeType: 'image/jpeg' as const,
+  width: 1024 as const,
+  height: 1024 as const,
+  byteSize: 1_024,
+  source: 'generated' as const,
+  provider: 'openai' as const,
+  model: 'gpt-image-2' as const,
+  promptHash: 'a'.repeat(64),
+  createdAt: '2026-07-18T12:00:00.000Z',
+  contentUrl: '/api/reference-images/550e8400-e29b-41d4-a716-446655440000/content' as const,
+};
+
+const populatedCharacterDraft = (characterBase: string) => {
+  const draft = createPromptBuilderDraft('character-transform');
+  if (draft.intent !== 'character-transform') throw new Error('Expected character draft.');
+  return { ...draft, characterBase };
+};
+
 const renderWorkshop = (
   props: Partial<React.ComponentProps<typeof CharacterPromptWorkshop>> = {},
 ) => {
@@ -185,5 +205,103 @@ describe('CharacterPromptWorkshop', () => {
 
     await user.click(screen.getByRole('button', { name: 'Transform character' }));
     expect(screen.getByLabelText('Character concept')).toHaveValue('remembered field host');
+  });
+
+  it('disables generation without capability and exposes an accessible loading skeleton', () => {
+    const draft = populatedCharacterDraft('field correspondent');
+    const view = renderWorkshop({
+      initialDraft: draft,
+      referenceImagesAvailable: false,
+      onGenerateReference: vi.fn(),
+      onDetachReference: vi.fn(),
+    });
+
+    expect(screen.getByRole('button', { name: 'Generate reference image' })).toBeDisabled();
+
+    view.rerender(
+      <StudioDesignProvider>
+        <CharacterPromptWorkshop
+          initialDraft={draft}
+          referenceImagesAvailable
+          referenceGeneration={{ status: 'generating', error: null }}
+          onGenerateReference={vi.fn()}
+          onDetachReference={vi.fn()}
+          onUse={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+    expect(screen.getByRole('status')).toHaveTextContent('Creating character reference…');
+    expect(screen.getByRole('button', { name: 'Use in working draft' })).toBeDisabled();
+  });
+
+  it('shows success, stale guidance, and keyboard-accessible detach', async () => {
+    const user = userEvent.setup();
+    const onDetachReference = vi.fn();
+    renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      generatedReferenceImage: {
+        ...generatedReference,
+        generatedFromPrompt: 'Substitute the character in the video with a different character.',
+      },
+      onGenerateReference: vi.fn(),
+      onDetachReference,
+    });
+
+    expect(screen.getByText('Reference image attached')).toBeInTheDocument();
+    expect(
+      screen.getByText('Prompt changed — regenerate the reference image for a closer match.'),
+    ).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Regenerate' })).toBeEnabled();
+
+    const detach = screen.getByRole('button', { name: 'Detach generated reference image' });
+    detach.focus();
+    await user.keyboard('{Enter}');
+    expect(onDetachReference).toHaveBeenCalledOnce();
+  });
+
+  it('retains the prior asset and actionable controls after regeneration fails', () => {
+    renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      generatedReferenceImage: generatedReference,
+      referenceGeneration: {
+        status: 'error',
+        error: 'Generation timed out. Retry with a new request.',
+      },
+      onGenerateReference: vi.fn(),
+      onDetachReference: vi.fn(),
+    });
+
+    expect(screen.getByText('Reference image attached')).toBeInTheDocument();
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Generation timed out. Retry with a new request.',
+    );
+    expect(screen.getByRole('button', { name: 'Regenerate' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Retry' })).not.toBeInTheDocument();
+  });
+
+  it('requires explicit recovery after a persisted selection cannot be restored', async () => {
+    const user = userEvent.setup();
+    const onDetachReference = vi.fn();
+    const onRetryReferenceRestore = vi.fn();
+    renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      referenceGeneration: {
+        status: 'error',
+        error: 'That local reference is unavailable.',
+        errorKind: 'restore',
+      },
+      onGenerateReference: vi.fn(),
+      onDetachReference,
+      onRetryReferenceRestore,
+    });
+
+    expect(screen.getByRole('button', { name: 'Use in working draft' })).toBeDisabled();
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    expect(onRetryReferenceRestore).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole('button', { name: 'Continue without reference' }));
+    expect(onDetachReference).toHaveBeenCalledOnce();
   });
 });

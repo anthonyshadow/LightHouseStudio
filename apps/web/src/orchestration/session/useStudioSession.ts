@@ -13,6 +13,7 @@ import {
   type SessionLifecycle,
   type StudioSessionController,
   type StudioMode,
+  type RecipeDraftReplacement,
 } from '../../features/media-session';
 import type { CapturePreferencesController } from '../../features/recording';
 import { LOCAL_MEDIA_REQUIREMENTS, localMediaRequirements } from './mediaRequirements';
@@ -24,7 +25,11 @@ import { useSessionDraftState } from './useSessionDraftState';
 
 export type StudioSessionOptions = {
   availability: ProviderAvailability;
-  onPromptCommitted?: (mode: 'lucy-2.5' | 'lucy-vton-3', prompt: string) => void;
+  onPromptCommitted?: (
+    mode: 'lucy-2.5' | 'lucy-vton-3',
+    prompt: string,
+    referenceImageAssetId: string | null,
+  ) => void;
 };
 
 export type StudioSessionWithCapturePreferences = StudioSessionController & {
@@ -49,10 +54,12 @@ export const useStudioSession = ({
     setApplied,
     pendingChanges,
     selectDraft,
+    replaceRecipeDraft: replaceRecipeDraftState,
     replaceWithEmptyDraft,
     revertDraft,
     updatePrompt,
     updateEnhancement,
+    updateReferenceImage,
     updateImage,
   } = useSessionDraftState();
 
@@ -267,6 +274,29 @@ export const useStudioSession = ({
     [disconnectRealtime, draftRef, lifecycle, localRef, selectDraft, setApplied],
   );
 
+  const replaceRecipeDraft = useCallback(
+    (replacement: RecipeDraftReplacement): boolean => {
+      const currentMode = draftRef.current.mode;
+      if (
+        replacement.mode !== currentMode &&
+        !canSwitchMode(lifecycle, false, hasLiveVideo(localRef.current))
+      ) {
+        return false;
+      }
+      if (replacement.mode !== currentMode) {
+        ++operationRef.current;
+        startAbortRef.current?.abort();
+        startAbortRef.current = null;
+        disconnectRealtime();
+        setApplied(null);
+        setError(null);
+      }
+      replaceRecipeDraftState(replacement);
+      return true;
+    },
+    [disconnectRealtime, draftRef, lifecycle, localRef, replaceRecipeDraftState, setApplied],
+  );
+
   const clearError = useCallback(() => setError(null), []);
 
   useEffect(
@@ -307,8 +337,10 @@ export const useStudioSession = ({
       stopCamera,
       releaseForRecordedReview,
       selectMode,
+      replaceRecipeDraft,
       updatePrompt,
       updateEnhancement,
+      updateReferenceImage,
       updateImage,
       clearError,
     }),
@@ -335,8 +367,10 @@ export const useStudioSession = ({
       stopCamera,
       releaseForRecordedReview,
       selectMode,
+      replaceRecipeDraft,
       updatePrompt,
       updateEnhancement,
+      updateReferenceImage,
       updateImage,
       clearError,
     ],

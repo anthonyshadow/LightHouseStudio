@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const DEFAULT_API_PORT = 4100;
 export const DEFAULT_ELEVENLABS_STS_MODEL_ID = 'eleven_multilingual_sts_v2';
+export const DEFAULT_LIGHTFRAME_DATA_DIR = './.lightframe-data';
+export const DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
 
 const optionalSecretSchema = z.preprocess(
   (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
@@ -29,9 +31,14 @@ const environmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   PORT: portSchema,
   DECART_API_KEY: optionalSecretSchema,
+  OPENAI_API_KEY: optionalSecretSchema,
   ELEVENLABS_API_KEY: optionalSecretSchema,
   ELEVENLABS_STS_MODEL_ID: optionalModelSchema,
   ELEVENLABS_ENABLE_LOGGING: strictBooleanSchema,
+  LIGHTFRAME_DATA_DIR: z.preprocess(
+    (value) => (value === undefined || value === '' ? DEFAULT_LIGHTFRAME_DATA_DIR : value),
+    z.string().trim().min(1),
+  ),
 });
 
 export interface RuntimeConfig {
@@ -39,10 +46,13 @@ export interface RuntimeConfig {
   readonly host: '127.0.0.1';
   readonly port: number;
   readonly decartApiKey?: string;
+  readonly openAiApiKey?: string;
   readonly elevenLabsApiKey?: string;
   readonly elevenLabsModelId: string;
   readonly elevenLabsEnableLogging: boolean;
   readonly providerTimeoutMs: number;
+  readonly referenceImageTimeoutMs: number;
+  readonly lightframeDataDir: string;
 }
 
 export class EnvironmentValidationError extends Error {
@@ -73,11 +83,16 @@ export const parseEnvironment = (
     ...(result.data.DECART_API_KEY === undefined
       ? {}
       : { decartApiKey: result.data.DECART_API_KEY }),
+    ...(result.data.OPENAI_API_KEY === undefined
+      ? {}
+      : { openAiApiKey: result.data.OPENAI_API_KEY }),
     ...(result.data.ELEVENLABS_API_KEY === undefined
       ? {}
       : { elevenLabsApiKey: result.data.ELEVENLABS_API_KEY }),
     elevenLabsModelId: result.data.ELEVENLABS_STS_MODEL_ID ?? DEFAULT_ELEVENLABS_STS_MODEL_ID,
     elevenLabsEnableLogging: result.data.ELEVENLABS_ENABLE_LOGGING,
     providerTimeoutMs: 30_000,
+    referenceImageTimeoutMs: DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
+    lightframeDataDir: result.data.LIGHTFRAME_DATA_DIR,
   };
 };

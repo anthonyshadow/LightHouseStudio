@@ -21,7 +21,9 @@ export const RecentRecipeList = ({
             useDisabled={useDisabled}
             onSelect={() => controller.selectRecipe({ kind: 'recent', id: item.id })}
             onUse={() => controller.selectRecent(item)}
-            onSave={() => controller.openCreate({ prompt: item.prompt })}
+            onSave={() =>
+              controller.openCreate({ prompt: item.prompt }, item.referenceImageAssetId)
+            }
           />
         </li>
       ))}

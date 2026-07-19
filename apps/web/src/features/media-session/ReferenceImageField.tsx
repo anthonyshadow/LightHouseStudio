@@ -10,13 +10,13 @@ import {
   referencePreviewStyles,
 } from './SessionComposer.styles';
 import type { ModelMode } from './types';
+import type { SessionReferenceImage } from './types';
 
 export interface ReferenceImageFieldProps {
   mode: ModelMode;
-  image: File | null;
-  previewUrl: string | null;
+  referenceImage: SessionReferenceImage | null;
   disabled?: boolean;
-  onChange: (image: File | null, previewUrl: string | null) => void;
+  onChange: (referenceImage: SessionReferenceImage | null) => void;
 }
 
 interface ImageFeedback {
@@ -34,8 +34,7 @@ const formatFileSize = (bytes: number): string => {
 
 export const ReferenceImageField = ({
   mode,
-  image,
-  previewUrl,
+  referenceImage,
   disabled = false,
   onChange,
 }: ReferenceImageFieldProps) => {
@@ -67,12 +66,11 @@ export const ReferenceImageField = ({
 
     if (validation.blockingError) {
       if (inputRef.current) inputRef.current.value = '';
-      onChange(null, null);
       setFeedback({ messages: [validation.blockingError], blocking: true });
       return;
     }
 
-    onChange(file, URL.createObjectURL(file));
+    onChange({ kind: 'ephemeral', file, previewUrl: URL.createObjectURL(file) });
     setFeedback({ messages: validation.warnings, blocking: false });
   };
 
@@ -83,7 +81,7 @@ export const ReferenceImageField = ({
 
   const clearImage = () => {
     selectionRef.current += 1;
-    onChange(null, null);
+    onChange(null);
     if (inputRef.current) inputRef.current.value = '';
     setFeedback(emptyFeedback());
     setDragging(false);
@@ -129,6 +127,12 @@ export const ReferenceImageField = ({
     mode === 'lucy-2.5'
       ? 'Use a clear, well-lit portrait for the most consistent character.'
       : 'Use one clearly visible, centered garment on a simple background.';
+  const image = referenceImage?.file ?? null;
+  const previewUrl = referenceImage
+    ? referenceImage.kind === 'persisted'
+      ? referenceImage.contentUrl
+      : referenceImage.previewUrl
+    : null;
 
   return (
     <div css={referenceFieldStyles(theme)}>
@@ -164,11 +168,22 @@ export const ReferenceImageField = ({
 
       {image && previewUrl ? (
         <div aria-live="polite" css={referencePreviewStyles(theme)}>
-          <img src={previewUrl} alt="Current ephemeral reference preview" />
+          <img
+            src={previewUrl}
+            alt={
+              referenceImage?.kind === 'persisted'
+                ? 'Current persisted reference preview'
+                : 'Current ephemeral reference preview'
+            }
+          />
           <div>
             <strong title={image.name}>{image.name}</strong>
             <span>{formatFileSize(image.size)}</span>
-            <small>This image stays in memory and is never saved to the recipe shelf.</small>
+            <small>
+              {referenceImage?.kind === 'persisted'
+                ? 'This immutable local asset can be restored with its saved recipe.'
+                : 'This manual upload stays in memory and is never saved to the recipe shelf.'}
+            </small>
           </div>
           <Button
             size="small"

@@ -5,10 +5,11 @@ playwright-report/
 test-results/
 .env
 .env.local
+.lightframe-data/
 *.log
 .DS_Store
 apps/web/public/test-media/
 *.tsbuildinfo
 
-graphify-out/cost.json       
-graphify-out/cache/         
+graphify-out/cost.json
+graphify-out/cache/

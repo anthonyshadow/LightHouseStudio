@@ -63,8 +63,8 @@ export const RecipeShelfView = ({
                 Recipe Shelf
               </h2>
               <p css={introStyles(theme)}>
-                Keep reusable text close without saving portraits, garments, recordings, or provider
-                data.
+                Keep reusable prompts and generated reference links close. Manual images,
+                recordings, and provider secrets stay out of browser storage.
               </p>
             </div>
             <div css={headerActionsStyles(theme)}>
@@ -130,12 +130,12 @@ export const RecipeShelfView = ({
 
         <footer css={shelfFooterStyles(theme)}>
           <p
-            title={`${controller.visibleCount} ${categoryLabel}; text stored in this browser`}
+            title={`${controller.visibleCount} ${categoryLabel}; metadata stored in this browser`}
             css={footerMetadataStyles(theme)}
             aria-live="polite"
           >
             {controller.selectedRecipe ? '1 selected · ' : ''}
-            {controller.visibleCount} {categoryLabel} · text stored in this browser
+            {controller.visibleCount} {categoryLabel} · metadata stored in this browser
           </p>
           <Button
             aria-label={newRecipeLabel}

@@ -7,6 +7,8 @@ Lightframe Studio is local-first, not offline-only. Local capture stays in the b
 | Data                                                                                       | Location and lifetime                                                                                       | External recipient                                                           |
 | ------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
 | Saved/recent prompt text, names, tags, notes, structured builder state, timestamps, counts | Versioned and sanitized in this browser profile's `localStorage`                                            | None                                                                         |
+| Generated reference asset IDs                                                              | Nullable relationships in Recipe Shelf v2 `localStorage`; no image bytes or internal storage keys           | None                                                                         |
+| Generated character reference image and private generation metadata                        | Immutable owner-only files under `LIGHTFRAME_DATA_DIR` until the local operator removes retained assets     | Prompt sent to OpenAI only after explicit Generate                           |
 | Active Local, Character, and Try-On text/enhancement drafts                                | React memory for this tab; independent per mode until reset or reload                                       | Decart only when the corresponding model draft is explicitly started/applied |
 | Camera id, microphone id, and local quality target                                         | React memory for this tab; never written to recipes or browser storage                                      | None; used only in browser capture constraints                               |
 | Camera and microphone streams                                                              | Browser memory while the session is live                                                                    | None in local mode; Decart during an explicitly started model session        |
@@ -19,7 +21,7 @@ Lightframe Studio is local-first, not offline-only. Local capture stays in the b
 | Provider preview audio                                                                     | Streamed through the broker; not stored by the app                                                          | ElevenLabs/provider preview storage                                          |
 | Imported public voice                                                                      | Persistent external change in the configured ElevenLabs workspace                                           | ElevenLabs                                                                   |
 
-The backend has no product database or media store. It does not retain takes, images, sessions, prompt history, device ids, or user profiles. Automatic HTTP request URL logging is disabled so query-string voice searches and provider ids are not written to application logs.
+The backend has no product database, accounts, or take/session history. It retains only generated character-reference bytes, their original and derived prompts, prompt hash, safe image metadata, local owner ID, and idempotency mapping in the private local asset directory. These private prompts, image bytes, storage keys, OpenAI secrets, and provider request details are never returned to the browser. Automatic HTTP request URL logging is disabled so query-string voice searches and provider ids are not written to application logs.
 
 ## Explicit consent points
 
@@ -28,6 +30,7 @@ The backend has no product database or media store. It does not retain takes, im
 - **Check camera & mic** starts only the local preview; provider activation remains a separate action.
 - **Start Character AI / Start Try-On AI** sends live camera media and the complete applied recipe to Decart after local media succeeds.
 - **Apply changes** sends the complete current model snapshot, including an explicit image clear when applicable.
+- **Generate reference image** sends the completed character prompt through the loopback broker to OpenAI, validates the returned image, and persists a new immutable local asset. Regenerate is another explicit, potentially billable action; neither action is retried automatically.
 - **Browse ElevenLabs voices · contacts provider** requests workspace voice metadata only after the disclosure is opened; it does not send the take.
 - **Preview voice** requests provider preview audio but does not send the recording.
 - **Import voice** changes the configured ElevenLabs workspace and is an explicit action.
@@ -50,11 +53,12 @@ Opening Capture Settings may enumerate browser-visible input devices, but it doe
 
 Recordings are Blobs behind object URLs, not saved files. The app owns one take, not a take history. Finish finalizes the artifact before releasing camera/provider resources, then the take replaces live media on the same stage. A take survives tool-overlay closure but not a page refresh, browser crash, tab closure, or device restart. All new camera/provider work is blocked until review exits. Download dispatch leaves playback active and enables Close; the browser does not expose download completion to the app. Close releases recording URLs and returns to private idle. Confirmed Discard does the same without download and is irreversible. Rename and trim are not implemented.
 
-Images and generated object URLs are likewise ephemeral. Text and enhancement drafts are retained independently while switching idle modes, but the departing mode's reference file and preview URL are cleared and revoked. A saved character recipe records whether a portrait is needed or was present in the current session, but never stores the portrait itself.
+Manual image files and their object URLs are ephemeral. Text and enhancement drafts are retained independently while switching idle modes, but a departing manual reference and preview URL are cleared and revoked. Prompt Workshop-generated references are immutable local assets; saved prompts, Recents, and saved characters retain only their opaque asset IDs and fetch validated bytes when used. Detaching or regenerating does not delete older assets because a historical record may still reference them.
 
 ## Provider usage and cost
 
 - Decart usage can begin only after explicit model Start and ends on Stop/Reset, unexpected disconnect, or after a model recording is finalized. Realtime sessions are constrained to five minutes by the issued credential. Provider pricing, quota, and billing are external account concerns.
+- OpenAI image usage begins only after Generate or Regenerate. Each request uses one high-quality `gpt-image-2` image; client and server idempotency suppress duplicate submission, and the broker performs no automatic billable retry.
 - ElevenLabs browsing and previews create provider API requests. Import mutates the workspace. Speech-to-speech conversion can consume credits and is triggered only by Apply. The UI discloses this before the voice library action.
 - `ELEVENLABS_ENABLE_LOGGING=false` asks the conversion API for zero-retention mode. ElevenLabs currently limits that mode to eligible enterprise accounts. It is not a promise about infrastructure retention; confirm the configured account's terms and eligibility. A non-eligible account must deliberately choose `true` for conversion to work.
 - Local preview, recording, prompt assets, the prompt workshop, and local voice treatments require no provider account and incur no provider usage.
@@ -63,7 +67,7 @@ Do not put credentials, provider tokens, user media, or real personal data in so
 
 ## Server security scope
 
-The server is a trusted local integration broker. It binds to `127.0.0.1`, accepts loopback Host values only, requires a loopback Origin for provider mutations, uses no-store responses, validates inputs, restricts preview URL hosts, and sanitizes provider failures.
+The server is a trusted local integration broker. It binds to `127.0.0.1`, accepts loopback Host values only, requires an exactly matching loopback Origin/Host for provider mutations, uses no-store responses, validates inputs, restricts preview URL hosts, enforces the local owner for generated-asset reads, and sanitizes provider failures.
 
 There is no account authentication because there is one local operator. Do not expose this server through a LAN binding, tunnel, reverse proxy, container ingress, or public hostname. Such deployment needs a new threat model and implementation for authentication, authorization, CSRF, rate limits, abuse/cost controls, tenant isolation, TLS, secrets, and privacy disclosure.
 
@@ -73,8 +77,9 @@ There is no account authentication because there is one local operator. Do not e
 - Reload or close the tab to clear session-only mode drafts and capture-device preferences. Device ids are never part of `localStorage`.
 - Use Stop camera to release owned device tracks outside recording; Finish releases all owned live resources only after recording finalization settles.
 - Clear an image or Reset AI to revoke its preview and clear pending/applied reference state.
+- Detach a generated reference to unlink the current selection without deleting an asset used by history. Removing `LIGHTFRAME_DATA_DIR` is an operator-level destructive action that invalidates all stored reference IDs; retained orphans otherwise remain on disk by design.
 - Download then Close a take, or confirm Discard without download, to release recording and processed object URLs.
-- Clear site storage to remove Recipe Shelf text assets.
+- Clear site storage to remove Recipe Shelf text and asset relationships; generated files remain in `LIGHTFRAME_DATA_DIR` until separately removed by the operator.
 - Remove provider keys from `.env` and restart the API to disable integrations.
 
 Provider-side data or imported voices must be managed with the provider's own account controls; this app has no remote-delete authority.

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { fileURLToPath } from 'node:url';
-import { createApp } from './app.js';
+import { createApp, REFERENCE_IMAGE_CONNECTION_TIMEOUT_MARGIN_MS } from './app.js';
 import { FakeElevenLabsProvider, testConfig } from './test/fakes.js';
 
 describe('API shell', () => {
@@ -24,8 +24,25 @@ describe('API shell', () => {
     expect(capabilities.json()).toEqual({
       realtimeVideo: { available: false, models: ['lucy-2.5', 'lucy-vton-3'] },
       elevenLabs: { available: true, modelId: 'eleven_multilingual_sts_v2' },
+      referenceImages: {
+        available: false,
+        modelId: 'gpt-image-2',
+        size: '1024x1024',
+        quality: 'high',
+      },
     });
     expect(capabilities.body).not.toContain('apiKey');
+  });
+
+  it('keeps response sockets open beyond the configured image-generation timeout', () => {
+    const config = testConfig({ referenceImageTimeoutMs: 12_345 });
+    const app = createApp({ config });
+    apps.push(app);
+
+    expect(app.server.timeout).toBe(
+      config.referenceImageTimeoutMs + REFERENCE_IMAGE_CONNECTION_TIMEOUT_MARGIN_MS,
+    );
+    expect(app.server.requestTimeout).toBe(30_000);
   });
 
   it('returns consistent JSON for unknown routes and parser errors', async () => {

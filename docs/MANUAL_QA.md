@@ -82,12 +82,15 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Generate each intent: character transform, add object with placement, replace named object, and change an attribute.
 - Confirm required-field blocking, concise normalized output, advisory warnings, adult-only age choices, 500-character detail bounds, and no hidden traits.
 - Use generated text and confirm it changes only the draft—no media, token, or Apply.
-- Save and reopen a structured character prompt; confirm fields restore and no image was persisted.
+- For a completed character transform, confirm Generate is explicit, unavailable without the capability/prompt, prevents double clicks, shows an inline square loading state, and leaves the generated image attached after closing and reopening the workshop.
+- Edit the prompt after generation and confirm the stale warning appears without automatic regeneration. Confirm failed Regenerate keeps the previous image; successful Regenerate selects a new asset without changing an already saved character or populated Recent version.
+- Save and reopen a structured character prompt; confirm its exact generated reference ID and preview restore. Legacy/manual-image records still restore without durable image bytes.
 - Close and reopen an unsaved structured workshop draft or Recipe Shelf editor; confirm each draft is restored. Ordinary overlay closure must not discard edits. Explicit Reset/Discard/Delete actions retain their destructive confirmation where applicable.
 - Create/search/use/edit/rename/delete character and try-on recipes. Confirm model scoping and case-insensitive metadata search.
 - Successfully Start/Apply a nonempty prompt and confirm it enters Recents; typing alone must not.
-- Corrupt the `realtime-creator-studio.creative-assets.v1` storage value, reload, and confirm safe recovery notice. Block storage or force a quota failure and confirm session-only operation.
-- Inspect local storage: only versioned text/metadata should exist—no image data, URLs, tokens, device ids, recordings, sidecars, or voice selection.
+- Seed `realtime-creator-studio.creative-assets.v1` without image fields, reload, and confirm v2 migration preserves every record with null references. Corrupt v2, or block storage/force a quota failure, and confirm safe recovery/session-only behavior.
+- Use a persisted reference from Recent and Character cards. Confirm the exact asset is fetched and validated before prompt/image are committed together; a missing asset leaves the current draft unchanged and offers Retry plus explicit Continue without reference.
+- Inspect local storage: only versioned text/metadata and opaque asset IDs should exist—no image data, content URLs, storage keys, tokens, device ids, recordings, sidecars, or voice selection.
 
 ## Images
 
@@ -96,6 +99,7 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Accept exactly 10 MiB and reject anything larger before media/provider work.
 - Confirm guidance for files above 5 MiB, weak dimensions, and unsuitable portrait/garment framing.
 - Clear, switch modes, and Reset; confirm preview URLs are revoked and incompatible state does not leak between modes.
+- Open generated thumbnails from Recent and Character cards in the shared large preview. Break the content route and confirm each card shows a retryable placeholder without breaking text-only actions.
 
 ## Recording and take safety
 

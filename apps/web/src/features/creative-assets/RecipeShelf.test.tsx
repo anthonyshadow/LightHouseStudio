@@ -156,6 +156,53 @@ describe('RecipeShelf', () => {
     );
   });
 
+  it('shows persisted reference thumbnails and carries exact assets through Use and Save a copy', async () => {
+    const user = userEvent.setup();
+    const repository = createRepository();
+    repository.recordSuccessfulPrompt({
+      prompt: 'Substitute the character with an orbital cartographer.',
+      modelModeId: 'lucy-2.5',
+      referenceImageAssetId: 'recent-reference-1',
+    });
+    repository.createSavedCharacterPrompt({
+      name: 'Orbital cartographer',
+      prompt: 'Substitute the character with an orbital cartographer.',
+      promptIntent: 'character-transform',
+      referenceImageStatus: 'persisted-reference',
+      referenceImageAssetId: 'character-reference-1',
+    });
+    const { onUsePrompt } = renderShelf(repository);
+
+    await user.click(screen.getByRole('button', { name: /Recent/ }));
+    const recentPreview = screen.getByRole('button', { name: 'Open larger reference preview' });
+    expect(within(recentPreview).getByRole('img')).toHaveAttribute(
+      'src',
+      expect.stringContaining('/api/reference-images/recent-reference-1/content'),
+    );
+    await user.click(screen.getByRole('button', { name: /Use recent prompt/ }));
+    expect(onUsePrompt).toHaveBeenCalledWith(
+      expect.objectContaining({ referenceImageAssetId: 'recent-reference-1' }),
+    );
+
+    await user.click(screen.getByRole('button', { name: /Save a copy of recent prompt/ }));
+    const createForm = screen
+      .getByRole('heading', { name: 'New Character recipe' })
+      .closest('form');
+    await user.type(within(createForm!).getByLabelText(/^Name/), 'Saved orbital cartographer');
+    await user.click(within(createForm!).getByRole('button', { name: 'Save recipe' }));
+    expect(repository.getSnapshot().store.savedPrompts[0]).toMatchObject({
+      title: 'Saved orbital cartographer',
+      referenceImageAssetId: 'recent-reference-1',
+    });
+
+    await user.click(screen.getByRole('button', { name: /Characters/ }));
+    expect(screen.getByText('Reference image attached')).toBeInTheDocument();
+    expect(screen.getByAltText('Reference image for Orbital cartographer')).toHaveAttribute(
+      'src',
+      expect.stringContaining('/api/reference-images/character-reference-1/content'),
+    );
+  });
+
   it('derives tag filters from local recipes and exposes an accessible selected-card state', async () => {
     const user = userEvent.setup();
     const repository = createRepository();

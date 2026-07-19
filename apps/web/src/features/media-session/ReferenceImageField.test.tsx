@@ -21,8 +21,7 @@ describe('ReferenceImageField focus recovery', () => {
       <StudioDesignProvider>
         <ReferenceImageField
           mode="lucy-2.5"
-          image={image}
-          previewUrl="blob:portrait"
+          referenceImage={{ kind: 'ephemeral', file: image, previewUrl: 'blob:portrait' }}
           onChange={onChange}
         />
       </StudioDesignProvider>,
@@ -30,7 +29,7 @@ describe('ReferenceImageField focus recovery', () => {
 
     await user.click(screen.getByRole('button', { name: 'Clear image' }));
 
-    expect(onChange).toHaveBeenCalledWith(null, null);
+    expect(onChange).toHaveBeenCalledWith(null);
     await waitFor(() => expect(screen.getByLabelText('Optional portrait reference')).toHaveFocus());
   });
 
@@ -43,8 +42,7 @@ describe('ReferenceImageField focus recovery', () => {
       <StudioDesignProvider>
         <ReferenceImageField
           mode="lucy-vton-3"
-          image={image}
-          previewUrl="blob:garment"
+          referenceImage={{ kind: 'ephemeral', file: image, previewUrl: 'blob:garment' }}
           onChange={vi.fn()}
         />
       </StudioDesignProvider>,
@@ -71,12 +69,7 @@ describe('ReferenceImageField focus recovery', () => {
 
     render(
       <StudioDesignProvider>
-        <ReferenceImageField
-          mode="lucy-vton-3"
-          image={null}
-          previewUrl={null}
-          onChange={onChange}
-        />
+        <ReferenceImageField mode="lucy-vton-3" referenceImage={null} onChange={onChange} />
       </StudioDesignProvider>,
     );
 
@@ -85,7 +78,13 @@ describe('ReferenceImageField focus recovery', () => {
     expect(dropTarget).toBeTruthy();
     fireEvent.drop(dropTarget as HTMLElement, { dataTransfer: { files: [image] } });
 
-    await waitFor(() => expect(onChange).toHaveBeenCalledWith(image, 'blob:dropped-garment'));
+    await waitFor(() =>
+      expect(onChange).toHaveBeenCalledWith({
+        kind: 'ephemeral',
+        file: image,
+        previewUrl: 'blob:dropped-garment',
+      }),
+    );
   });
 
   it('disables replacement and removal while the enclosing session is recording', () => {
@@ -94,8 +93,7 @@ describe('ReferenceImageField focus recovery', () => {
       <StudioDesignProvider>
         <ReferenceImageField
           mode="lucy-2.5"
-          image={image}
-          previewUrl="blob:portrait"
+          referenceImage={{ kind: 'ephemeral', file: image, previewUrl: 'blob:portrait' }}
           disabled
           onChange={vi.fn()}
         />

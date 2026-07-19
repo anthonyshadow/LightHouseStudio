@@ -10,6 +10,7 @@ import {
   type SafeMediaError,
   type SessionDraft,
   type SessionLifecycle,
+  persistedReferenceAssetId,
 } from '../../features/media-session';
 import { toAppliedState, toProviderSnapshot, validateModelDraft } from './realtimeSnapshot';
 import { useRealtimeResource, type RealtimeDisconnectReason } from './useRealtimeResource';
@@ -35,7 +36,11 @@ export type ModelSessionActionsOptions = {
   ): Promise<MediaStream>;
   localRef: RefObject<MediaStream | null>;
   startLiveTimer(): void;
-  onPromptCommitted?: (mode: 'lucy-2.5' | 'lucy-vton-3', prompt: string) => void;
+  onPromptCommitted?: (
+    mode: 'lucy-2.5' | 'lucy-vton-3',
+    prompt: string,
+    referenceImageAssetId: string | null,
+  ) => void;
 };
 
 export type ModelSessionActions = {
@@ -155,7 +160,13 @@ export const useModelSessionActions = ({
       setApplied(toAppliedState(currentDraft));
       setLifecycle((value) => (value === 'connecting' ? 'connected' : value));
       const committedPrompt = currentDraft.prompt.trim();
-      if (committedPrompt) onPromptCommitted?.(currentDraft.mode, committedPrompt);
+      if (committedPrompt) {
+        onPromptCommitted?.(
+          currentDraft.mode,
+          committedPrompt,
+          persistedReferenceAssetId(currentDraft.referenceImage),
+        );
+      }
     } catch (caught) {
       if (operationRef.current === operation) startAbortRef.current = null;
       if (operationRef.current !== operation) return;
@@ -210,7 +221,13 @@ export const useModelSessionActions = ({
       if (operationRef.current !== operation) return;
       setApplied(toAppliedState(currentDraft));
       const committedPrompt = currentDraft.prompt.trim();
-      if (committedPrompt) onPromptCommitted?.(currentDraft.mode, committedPrompt);
+      if (committedPrompt) {
+        onPromptCommitted?.(
+          currentDraft.mode,
+          committedPrompt,
+          persistedReferenceAssetId(currentDraft.referenceImage),
+        );
+      }
     } catch {
       if (operationRef.current !== operation) return;
       setError({

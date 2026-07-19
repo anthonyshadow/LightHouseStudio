@@ -1,7 +1,12 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
+import {
+  ReferenceImageGenerator,
+  type ReferenceImageGeneratorProps,
+} from './ReferenceImageGenerator';
 
 interface GeneratedPromptPreviewProps {
   prompt: string;
+  referenceGeneration?: Omit<ReferenceImageGeneratorProps, 'prompt'> | undefined;
 }
 
 const previewStyles = (theme: Theme): CSSObject => ({
@@ -45,7 +50,10 @@ const previewTextStyles = (theme: Theme, empty: boolean): CSSObject => ({
   whiteSpace: 'pre-wrap',
 });
 
-export const GeneratedPromptPreview = ({ prompt }: GeneratedPromptPreviewProps) => {
+export const GeneratedPromptPreview = ({
+  prompt,
+  referenceGeneration,
+}: GeneratedPromptPreviewProps) => {
   const theme = useTheme();
 
   return (
@@ -57,6 +65,9 @@ export const GeneratedPromptPreview = ({ prompt }: GeneratedPromptPreviewProps) 
       <p css={previewTextStyles(theme, !prompt)}>
         {prompt || 'Your concise prompt will appear here as you make visible choices.'}
       </p>
+      {referenceGeneration ? (
+        <ReferenceImageGenerator prompt={prompt} {...referenceGeneration} />
+      ) : null}
     </div>
   );
 };
