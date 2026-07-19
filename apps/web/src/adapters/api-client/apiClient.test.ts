@@ -1,23 +1,81 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ReferenceImageAsset } from '@studio/contracts';
-import { createReferenceImage, hydrateReferenceImage } from './apiClient';
+import type {
+  CreateReferenceImageRequest,
+  OptimizeCharacterReferencePromptResponse,
+  ReferenceImageAsset,
+} from '@studio/contracts';
+import {
+  createReferenceImage,
+  fetchProviderAvailability,
+  hydrateReferenceImage,
+  optimizeCharacterReferencePrompt,
+} from './apiClient';
 
 const jpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0xff, 0xd9]);
+const rawPrompt = 'Substitute the character in the video with an adult lunar cartographer.';
+const options = {
+  framing: 'head_and_shoulders',
+  orientation: 'auto',
+  renderingMode: 'photorealistic',
+  expression: 'neutral',
+  background: 'neutral_gray',
+  targetUse: 'lucy_2_5_character_reference',
+} as const;
 
 const asset: ReferenceImageAsset = {
   assetId: '550e8400-e29b-41d4-a716-446655440000',
   mimeType: 'image/jpeg',
+  size: '1024x1024',
   width: 1024,
   height: 1024,
   byteSize: jpegBytes.byteLength,
   source: 'generated',
   provider: 'openai',
   model: 'gpt-image-2',
+  quality: 'high',
   promptHash: 'a'.repeat(64),
+  optimizationEnabled: true,
+  originalPrompt: rawPrompt,
+  optimizedImagePrompt:
+    'A canonical single-character reference photograph of the adult lunar cartographer.',
+  lucy25CharacterPrompt:
+    'Replace the character in the video with the adult lunar cartographer. Preserve source motion, expression, pose, and camera framing.',
+  normalizedCharacterDescription: 'An adult lunar cartographer.',
+  preservedCharacterFacts: ['adult', 'lunar cartographer'],
+  technicalDefaultsAdded: ['front-facing pose', 'neutral gray background'],
+  warnings: [],
+  options,
+  requestedGenerator: null,
+  optimizer: { model: 'gpt-5.6', version: 'lucy-character-reference-v1' },
+  optimizationInputHash: 'b'.repeat(64),
+  manuallyEdited: false,
   createdAt: '2026-07-18T12:00:00.000Z',
+  updatedAt: '2026-07-18T12:00:00.000Z',
   contentUrl: '/api/reference-images/550e8400-e29b-41d4-a716-446655440000/content',
+};
+const optimizationResponse: OptimizeCharacterReferencePromptResponse = {
+  result: {
+    optimizedImagePrompt:
+      'A canonical single-character reference photograph of the adult lunar cartographer.',
+    lucy25CharacterPrompt:
+      'Replace the character in the video with the adult lunar cartographer. Preserve source motion, expression, pose, and camera framing.',
+    normalizedCharacterDescription: 'An adult lunar cartographer.',
+    preservedCharacterFacts: ['adult', 'lunar cartographer'],
+    technicalDefaultsAdded: ['front-facing pose', 'neutral gray background'],
+    warnings: [],
+    recommendedSettings: {
+      framing: 'head_and_shoulders',
+      orientation: 'square',
+      size: '1024x1024',
+      quality: 'high',
+      format: 'png',
+    },
+  },
+  model: 'gpt-5.6',
+  version: 'lucy-character-reference-v1',
+  inputHash: 'b'.repeat(64),
 };
 
 afterEach(() => {
@@ -26,6 +84,66 @@ afterEach(() => {
 });
 
 describe('reference image API client', () => {
+  it('maps generator and optimizer capability metadata for the workshop', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            realtimeVideo: { available: true, models: ['lucy-2.5'] },
+            elevenLabs: { available: false, modelId: null },
+            referenceImages: {
+              available: true,
+              modelId: 'gpt-image-2',
+              sizes: ['1024x1024', '1024x1536', '1536x1024'],
+              quality: 'high',
+              optimizer: {
+                available: true,
+                model: 'gpt-5.6',
+                version: 'lucy-character-reference-v1',
+              },
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+
+    await expect(fetchProviderAvailability()).resolves.toMatchObject({
+      referenceImages: true,
+      referenceImageModel: 'gpt-image-2',
+      referenceImageSizes: ['1024x1024', '1024x1536', '1536x1024'],
+      referenceImageOptimizerAvailable: true,
+      referenceImageOptimizerModel: 'gpt-5.6',
+      referenceImageOptimizerVersion: 'lucy-character-reference-v1',
+    });
+  });
+
+  it('validates the structured prompt-optimization response', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify(optimizationResponse), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+
+    await expect(
+      optimizeCharacterReferencePrompt({ rawPrompt, options }, controller.signal),
+    ).resolves.toEqual(optimizationResponse);
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/reference-images/optimize',
+      expect.objectContaining({
+        method: 'POST',
+        cache: 'no-store',
+        signal: controller.signal,
+        body: JSON.stringify({ rawPrompt, options }),
+      }),
+    );
+  });
+
   it('sends one explicit idempotent generation request and validates safe metadata', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       new Response(JSON.stringify({ asset }), {
@@ -35,12 +153,17 @@ describe('reference image API client', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    await expect(
-      createReferenceImage(
-        'c35bd56f-5d16-4d54-b719-8bfb49d73080',
-        'Substitute the character in the video with an adult lunar cartographer.',
-      ),
-    ).resolves.toEqual(asset);
+    const request: CreateReferenceImageRequest = {
+      requestId: 'c35bd56f-5d16-4d54-b719-8bfb49d73080',
+      rawPrompt,
+      options,
+      optimization: {
+        enabled: true,
+        ...optimizationResponse,
+        manuallyEdited: false,
+      },
+    };
+    await expect(createReferenceImage(request)).resolves.toEqual(asset);
 
     expect(fetchMock).toHaveBeenCalledOnce();
     expect(fetchMock).toHaveBeenCalledWith(
@@ -48,10 +171,7 @@ describe('reference image API client', () => {
       expect.objectContaining({
         method: 'POST',
         cache: 'no-store',
-        body: JSON.stringify({
-          requestId: 'c35bd56f-5d16-4d54-b719-8bfb49d73080',
-          workshopPrompt: 'Substitute the character in the video with an adult lunar cartographer.',
-        }),
+        body: JSON.stringify(request),
       }),
     );
   });

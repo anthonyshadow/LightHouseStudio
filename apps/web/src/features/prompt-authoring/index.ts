@@ -1,8 +1,10 @@
 export { CharacterPromptWorkshop } from './CharacterPromptWorkshop';
 export type {
   CharacterPromptWorkshopProps,
+  OptimizeWorkshopReferencePrompt,
   PromptWorkshopAction,
   SavePromptWorkshopAction,
+  WorkshopReferenceGenerationInput,
 } from './CharacterPromptWorkshop';
 export {
   PROMPT_DETAIL_LIMIT,
@@ -11,7 +13,13 @@ export {
   normalizePromptBuilderDraft,
   validatePromptBuilderDraft,
 } from './model';
-export type { ReferenceGenerationState, WorkshopReferenceImage } from './ReferenceImageGenerator';
+export type {
+  ReferenceGenerationState,
+  ReferenceOptimizationStatus,
+  ReferencePromptOptimizationView,
+  WorkshopReferenceImage,
+} from './ReferenceImageGenerator';
+export type { WorkshopReferenceOptions } from './referenceOptimization';
 export { hashWorkshopPrompt } from './referencePromptHash';
 export type {
   AdultAge,

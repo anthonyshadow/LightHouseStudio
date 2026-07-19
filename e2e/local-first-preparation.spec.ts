@@ -53,8 +53,13 @@ test.beforeEach(async ({ page }) => {
         referenceImages: {
           available: false,
           modelId: 'gpt-image-2',
-          size: '1024x1024',
+          sizes: ['1024x1024', '1024x1536', '1536x1024'],
           quality: 'high',
+          optimizer: {
+            available: false,
+            model: 'gpt-5.6',
+            version: 'lucy-character-reference-v1',
+          },
         },
       }),
     });

@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, readdir, rm, stat } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -31,10 +31,43 @@ describe('LocalReferenceImageAssetStore', () => {
     localOwnerId: ownerId,
     bytes: Buffer.from('immutable-image-bytes'),
     mimeType: 'image/jpeg' as const,
+    size: '1024x1024' as const,
     width: 1024 as const,
     height: 1024 as const,
+    model: 'gpt-image-2',
+    quality: 'high' as const,
     originalPrompt: 'Original Lucy prompt',
     derivedPrompt: 'Reference wrapper\nOriginal Lucy prompt',
+    promptAudit: {
+      optimizationEnabled: true,
+      result: {
+        optimizedImagePrompt: 'Reference wrapper\nOriginal Lucy prompt',
+        lucy25CharacterPrompt: 'Replace the character with the original Lucy character.',
+        normalizedCharacterDescription: 'Original Lucy character.',
+        preservedCharacterFacts: ['Original Lucy character'],
+        technicalDefaultsAdded: ['Soft light'],
+        warnings: [],
+        recommendedSettings: {
+          framing: 'head_and_shoulders' as const,
+          orientation: 'square' as const,
+          size: '1024x1024' as const,
+          quality: 'high' as const,
+          format: 'jpeg' as const,
+        },
+      },
+      options: {
+        framing: 'head_and_shoulders' as const,
+        orientation: 'square' as const,
+        renderingMode: 'photorealistic' as const,
+        expression: 'neutral' as const,
+        background: 'neutral_gray' as const,
+        targetUse: 'lucy_2_5_character_reference' as const,
+      },
+      requestedGenerator: null,
+      optimizer: { model: 'gpt-5.6', version: 'lucy-character-reference-v1' },
+      inputHash: 'd'.repeat(64),
+      manuallyEdited: false,
+    },
     promptHash: 'c'.repeat(64),
     requestId,
     providerRequestId: 'provider-request-one',
@@ -55,6 +88,7 @@ describe('LocalReferenceImageAssetStore', () => {
       mimeType: 'image/jpeg',
       originalPrompt: input.originalPrompt,
       derivedPrompt: input.derivedPrompt,
+      promptAudit: input.promptAudit,
       promptHash: input.promptHash,
       requestId,
       providerRequestId: 'provider-request-one',
@@ -82,6 +116,49 @@ describe('LocalReferenceImageAssetStore', () => {
     await expect(restarted.findByRequestId(ownerId, requestId)).resolves.toMatchObject({ assetId });
     await expect(restarted.getMetadata(otherOwnerId, assetId)).resolves.toBeNull();
     await expect(restarted.getContent(otherOwnerId, assetId)).resolves.toBeNull();
+  });
+
+  it('continues to read strict legacy v1 metadata without optimization audit fields', async () => {
+    const { directory, store } = await setup();
+    await store.store(input);
+    const legacyAssetId = '741adf3f-e7d6-4852-8719-d264a055e9cc';
+    const legacyRequestId = 'dd2b8d66-e038-4e87-886c-b827da820df3';
+    const legacyBytes = Buffer.from('legacy-image-bytes');
+    const assetDirectory = path.join(directory, 'reference-images', 'v1', 'assets', legacyAssetId);
+    await mkdir(assetDirectory, { recursive: true });
+    await writeFile(path.join(assetDirectory, 'content.jpg'), legacyBytes);
+    await writeFile(
+      path.join(assetDirectory, 'metadata.json'),
+      JSON.stringify({
+        schemaVersion: 1,
+        assetId: legacyAssetId,
+        localOwnerId: ownerId,
+        storageKey: `reference-images/v1/assets/${legacyAssetId}/content.jpg`,
+        mimeType: 'image/jpeg',
+        width: 1024,
+        height: 1024,
+        byteSize: legacyBytes.byteLength,
+        source: 'generated',
+        provider: 'openai',
+        model: 'gpt-image-2',
+        originalPrompt: 'Legacy Lucy prompt',
+        derivedPrompt: 'Legacy image prompt',
+        promptHash: 'e'.repeat(64),
+        requestId: legacyRequestId,
+        createdAt: '2026-07-17T12:00:00.000Z',
+      }),
+    );
+
+    const legacyMetadata = await store.getMetadata(ownerId, legacyAssetId);
+    expect(legacyMetadata).toMatchObject({
+      assetId: legacyAssetId,
+      originalPrompt: 'Legacy Lucy prompt',
+    });
+    expect(legacyMetadata).not.toHaveProperty('size');
+    expect(legacyMetadata).not.toHaveProperty('promptAudit');
+    await expect(store.getContent(ownerId, legacyAssetId)).resolves.toMatchObject({
+      bytes: legacyBytes,
+    });
   });
 
   it('removes temporary asset directories when an atomic commit fails', async () => {

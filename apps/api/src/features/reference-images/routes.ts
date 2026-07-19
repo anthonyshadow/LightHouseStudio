@@ -1,6 +1,8 @@
 import {
   createReferenceImageRequestSchema,
   createReferenceImageResponseSchema,
+  optimizeCharacterReferencePromptRequestSchema,
+  optimizeCharacterReferencePromptResponseSchema,
   referenceImageAssetParamsSchema,
   referenceImageMetadataResponseSchema,
 } from '@studio/contracts';
@@ -27,21 +29,38 @@ export const registerReferenceImageRoutes = (
   service: ReferenceImageService,
 ): void => {
   app.post(
+    '/api/reference-images/optimize',
+    { bodyLimit: 64 * 1024, onRequest: verifyGenerationOrigin },
+    async (request) => {
+      const parsed = optimizeCharacterReferencePromptRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw new AppError(
+          400,
+          'validation_error',
+          'Provide a valid character description and reference-image options.',
+        );
+      }
+      return optimizeCharacterReferencePromptResponseSchema.parse(
+        await service.optimize(parsed.data),
+      );
+    },
+  );
+
+  app.post(
     '/api/reference-images',
-    { bodyLimit: 16 * 1024, onRequest: verifyGenerationOrigin },
+    { bodyLimit: 256 * 1024, onRequest: verifyGenerationOrigin },
     async (request) => {
       const parsed = createReferenceImageRequestSchema.safeParse(request.body);
       if (!parsed.success) {
         throw new AppError(
           400,
           'validation_error',
-          'Provide a completed character prompt and a new request ID.',
+          'Provide a valid reference generation request and a new request ID.',
         );
       }
       const asset = await service.generate({
         localOwnerId: localOwnerIdForRequest(request),
-        requestId: parsed.data.requestId,
-        workshopPrompt: parsed.data.workshopPrompt,
+        ...parsed.data,
       });
       return createReferenceImageResponseSchema.parse({ asset });
     },

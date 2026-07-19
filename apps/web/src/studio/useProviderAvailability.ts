@@ -9,6 +9,10 @@ const unavailableProviders: ProviderAvailability = {
   elevenLabsModel: null,
   referenceImages: false,
   referenceImageModel: null,
+  referenceImageSizes: [],
+  referenceImageOptimizerAvailable: false,
+  referenceImageOptimizerModel: null,
+  referenceImageOptimizerVersion: null,
 };
 
 export const useProviderAvailability = () => {

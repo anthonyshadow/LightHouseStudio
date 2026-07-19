@@ -1,7 +1,12 @@
 import OpenAI from 'openai';
 import type { ImagesResponse } from 'openai/resources/images';
+import {
+  REFERENCE_IMAGE_MODEL_ID,
+  REFERENCE_IMAGE_QUALITY,
+  type CharacterPromptOptimizationResult,
+} from '@studio/contracts';
 
-export const OPENAI_REFERENCE_IMAGE_MODEL = 'gpt-image-2' as const;
+export const OPENAI_REFERENCE_IMAGE_MODEL = REFERENCE_IMAGE_MODEL_ID;
 export const OPENAI_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
 
 export const OPENAI_REFERENCE_IMAGE_PARAMETERS = {
@@ -12,7 +17,7 @@ export const OPENAI_REFERENCE_IMAGE_PARAMETERS = {
   output_format: 'jpeg',
   output_compression: 90,
   background: 'opaque',
-  moderation: 'auto',
+  moderation: 'low',
 } as const;
 
 export interface GeneratedReferenceImagePayload {
@@ -20,8 +25,14 @@ export interface GeneratedReferenceImagePayload {
   readonly providerRequestId?: string;
 }
 
+export interface GenerateReferenceImageProviderInput {
+  readonly prompt: string;
+  readonly size: CharacterPromptOptimizationResult['recommendedSettings']['size'];
+  readonly format: CharacterPromptOptimizationResult['recommendedSettings']['format'];
+}
+
 export interface ReferenceImageProvider {
-  generate(derivedPrompt: string): Promise<GeneratedReferenceImagePayload>;
+  generate(input: GenerateReferenceImageProviderInput): Promise<GeneratedReferenceImagePayload>;
 }
 
 export type ReferenceImageProviderFailureReason =
@@ -53,7 +64,17 @@ export class ReferenceImageProviderError extends Error {
 interface OpenAIImageClient {
   readonly images: {
     generate(
-      parameters: typeof OPENAI_REFERENCE_IMAGE_PARAMETERS & { readonly prompt: string },
+      parameters: Omit<
+        typeof OPENAI_REFERENCE_IMAGE_PARAMETERS,
+        'model' | 'output_compression' | 'output_format' | 'quality' | 'size'
+      > & {
+        readonly model: string;
+        readonly output_compression?: number;
+        readonly quality: 'high' | 'medium';
+        readonly size: GenerateReferenceImageProviderInput['size'];
+        readonly output_format: GenerateReferenceImageProviderInput['format'];
+        readonly prompt: string;
+      },
     ): Promise<ImagesResponse>;
   };
 }
@@ -95,21 +116,44 @@ const defaultClientFactory: OpenAIClientFactory = (options) => new OpenAI(option
 
 export class OpenAIReferenceImageProvider implements ReferenceImageProvider {
   readonly #client: OpenAIImageClient;
+  readonly #model: string;
+  readonly #quality: 'high' | 'medium';
 
   constructor(
     apiKey: string,
-    timeoutMs = OPENAI_REFERENCE_IMAGE_TIMEOUT_MS,
+    options: {
+      readonly model?: string;
+      readonly quality?: 'high' | 'medium';
+      readonly timeoutMs?: number;
+    } = {},
     clientFactory: OpenAIClientFactory = defaultClientFactory,
   ) {
-    this.#client = clientFactory({ apiKey, maxRetries: 0, timeout: timeoutMs });
+    this.#model = options.model ?? OPENAI_REFERENCE_IMAGE_MODEL;
+    this.#quality = options.quality ?? REFERENCE_IMAGE_QUALITY;
+    this.#client = clientFactory({
+      apiKey,
+      maxRetries: 0,
+      timeout: options.timeoutMs ?? OPENAI_REFERENCE_IMAGE_TIMEOUT_MS,
+    });
   }
 
-  async generate(derivedPrompt: string): Promise<GeneratedReferenceImagePayload> {
+  async generate(
+    input: GenerateReferenceImageProviderInput,
+  ): Promise<GeneratedReferenceImagePayload> {
     try {
       // GPT Image models always return base64. response_format and user are deliberately omitted.
+      const { output_compression: outputCompression, ...parameters } =
+        OPENAI_REFERENCE_IMAGE_PARAMETERS;
       const response = await this.#client.images.generate({
-        ...OPENAI_REFERENCE_IMAGE_PARAMETERS,
-        prompt: derivedPrompt,
+        ...parameters,
+        model: this.#model,
+        quality: this.#quality,
+        size: input.size,
+        output_format: input.format,
+        ...(input.format === 'jpeg' || input.format === 'webp'
+          ? { output_compression: outputCompression }
+          : {}),
+        prompt: input.prompt,
       });
       const base64 = response.data?.[0]?.b64_json;
       if (typeof base64 !== 'string' || base64.length === 0) {

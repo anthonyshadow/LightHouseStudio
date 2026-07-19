@@ -21,9 +21,19 @@ describe('OpenAIReferenceImageProvider', () => {
       },
       options,
     }));
-    const provider = new OpenAIReferenceImageProvider('server-secret', 149_000, factory);
+    const provider = new OpenAIReferenceImageProvider(
+      'server-secret',
+      { timeoutMs: 149_000, model: 'gpt-image-configured', quality: 'medium' },
+      factory,
+    );
 
-    await expect(provider.generate('derived reference prompt')).resolves.toEqual({
+    await expect(
+      provider.generate({
+        prompt: 'derived reference prompt',
+        size: '1024x1536',
+        format: 'webp',
+      }),
+    ).resolves.toEqual({
       base64: 'aW1hZ2U=',
       providerRequestId: 'openai-request-one',
     });
@@ -33,20 +43,56 @@ describe('OpenAIReferenceImageProvider', () => {
       timeout: 149_000,
     });
     expect(calls).toEqual([
-      { ...OPENAI_REFERENCE_IMAGE_PARAMETERS, prompt: 'derived reference prompt' },
+      {
+        ...OPENAI_REFERENCE_IMAGE_PARAMETERS,
+        model: 'gpt-image-configured',
+        quality: 'medium',
+        size: '1024x1536',
+        output_format: 'webp',
+        prompt: 'derived reference prompt',
+      },
     ]);
     expect(calls[0]).not.toHaveProperty('response_format');
     expect(calls[0]).not.toHaveProperty('user');
   });
 
-  it('rejects a response without documented b64_json image data', async () => {
-    const provider = new OpenAIReferenceImageProvider('server-secret', 1_000, () => ({
-      images: {
-        generate: () => Promise.resolve({ created: 1, data: [{ url: 'https://expiring' }] }),
-      },
+  it('omits output compression for PNG generation', async () => {
+    const generate = vi.fn((_parameters: unknown) =>
+      Promise.resolve({ created: 1, data: [{ b64_json: 'cG5n' }] }),
+    );
+    const provider = new OpenAIReferenceImageProvider('server-secret', {}, () => ({
+      images: { generate },
     }));
 
-    await expect(provider.generate('prompt')).rejects.toMatchObject({
+    await provider.generate({
+      prompt: 'lossless reference prompt',
+      size: '1024x1024',
+      format: 'png',
+    });
+
+    expect(generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        output_format: 'png',
+        prompt: 'lossless reference prompt',
+      }),
+    );
+    expect(generate.mock.calls[0]?.[0]).not.toHaveProperty('output_compression');
+  });
+
+  it('rejects a response without documented b64_json image data', async () => {
+    const provider = new OpenAIReferenceImageProvider(
+      'server-secret',
+      { timeoutMs: 1_000 },
+      () => ({
+        images: {
+          generate: () => Promise.resolve({ created: 1, data: [{ url: 'https://expiring' }] }),
+        },
+      }),
+    );
+
+    await expect(
+      provider.generate({ prompt: 'prompt', size: '1024x1024', format: 'jpeg' }),
+    ).rejects.toMatchObject({
       name: 'ReferenceImageProviderError',
       reason: 'invalid-response',
     });
@@ -70,29 +116,41 @@ describe('OpenAIReferenceImageProvider', () => {
     ] as const;
 
     for (const failure of failures) {
-      const provider = new OpenAIReferenceImageProvider('server-secret', 1_000, () => ({
-        images: { generate: () => Promise.reject(failure.error) },
-      }));
-      const error = await provider.generate('prompt').catch((caught: unknown) => caught);
+      const provider = new OpenAIReferenceImageProvider(
+        'server-secret',
+        { timeoutMs: 1_000 },
+        () => ({
+          images: { generate: () => Promise.reject(failure.error) },
+        }),
+      );
+      const error = await provider
+        .generate({ prompt: 'prompt', size: '1024x1024', format: 'jpeg' })
+        .catch((caught: unknown) => caught);
       expect(error).toBeInstanceOf(ReferenceImageProviderError);
       expect(error).toMatchObject({ reason: failure.reason });
     }
   });
 
   it('does not misclassify an unrelated 400 that mentions moderation', async () => {
-    const provider = new OpenAIReferenceImageProvider('server-secret', 1_000, () => ({
-      images: {
-        generate: () =>
-          Promise.reject(
-            Object.assign(new Error('Invalid value for the moderation parameter'), {
-              status: 400,
-              code: 'invalid_value',
-            }),
-          ),
-      },
-    }));
+    const provider = new OpenAIReferenceImageProvider(
+      'server-secret',
+      { timeoutMs: 1_000 },
+      () => ({
+        images: {
+          generate: () =>
+            Promise.reject(
+              Object.assign(new Error('Invalid value for the moderation parameter'), {
+                status: 400,
+                code: 'invalid_value',
+              }),
+            ),
+        },
+      }),
+    );
 
-    await expect(provider.generate('prompt')).rejects.toMatchObject({
+    await expect(
+      provider.generate({ prompt: 'prompt', size: '1024x1024', format: 'jpeg' }),
+    ).rejects.toMatchObject({
       name: 'ReferenceImageProviderError',
       reason: 'failure',
       upstreamStatus: 400,

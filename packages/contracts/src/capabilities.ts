@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { supportedModelIdSchema } from './realtime';
+import { REFERENCE_IMAGE_SIZES } from './reference-images';
 
 export const capabilitiesResponseSchema = z
   .object({
@@ -18,9 +19,16 @@ export const capabilitiesResponseSchema = z
     referenceImages: z
       .object({
         available: z.boolean(),
-        modelId: z.literal('gpt-image-2'),
-        size: z.literal('1024x1024'),
-        quality: z.literal('high'),
+        modelId: z.string().trim().min(1).max(128),
+        sizes: z.array(z.enum(REFERENCE_IMAGE_SIZES)).length(REFERENCE_IMAGE_SIZES.length),
+        quality: z.enum(['high', 'medium']),
+        optimizer: z
+          .object({
+            available: z.boolean(),
+            model: z.string().trim().min(1).max(128),
+            version: z.string().trim().min(1).max(128),
+          })
+          .strict(),
       })
       .strict(),
   })

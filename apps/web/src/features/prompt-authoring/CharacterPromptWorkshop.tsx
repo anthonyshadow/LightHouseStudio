@@ -1,5 +1,10 @@
 import { useTheme } from '@emotion/react';
-import { useEffect, useId, useMemo, useState } from 'react';
+import type {
+  CreateReferenceImageRequest,
+  OptimizeCharacterReferencePromptRequest,
+  OptimizeCharacterReferencePromptResponse,
+} from '@studio/contracts';
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Surface } from '../../ui';
 import { GeneratedPromptPreview } from './GeneratedPromptPreview';
 import {
@@ -17,7 +22,14 @@ import { PromptIntentFields } from './PromptIntentFields';
 import { PromptWorkshopActions, type PromptSaveState } from './PromptWorkshopActions';
 import { PromptWorkshopHeader } from './PromptWorkshopHeader';
 import type { ReferenceGenerationState, WorkshopReferenceImage } from './ReferenceImageGenerator';
-import { hashWorkshopPrompt, isSameCanonicalWorkshopPrompt } from './referencePromptHash';
+import {
+  createWorkshopOptimizationKey,
+  loadWorkshopReferencePreferences,
+  saveWorkshopReferencePreferences,
+  type WorkshopReferenceOptions,
+  type WorkshopReferencePreferences,
+} from './referenceOptimization';
+import { isSameCanonicalWorkshopPrompt } from './referencePromptHash';
 import {
   accordionStyles,
   chevronStyles,
@@ -55,6 +67,13 @@ export interface SavePromptWorkshopAction extends PromptWorkshopAction {
   name: string;
 }
 
+export type WorkshopReferenceGenerationInput = Omit<CreateReferenceImageRequest, 'requestId'>;
+
+export type OptimizeWorkshopReferencePrompt = (
+  input: OptimizeCharacterReferencePromptRequest,
+  signal: AbortSignal,
+) => Promise<OptimizeCharacterReferencePromptResponse>;
+
 export interface CharacterPromptWorkshopProps {
   initialDraft?: PromptBuilderDraft | undefined;
   initialDrafts?: Partial<Record<PromptIntent, PromptBuilderDraft>> | undefined;
@@ -63,11 +82,16 @@ export interface CharacterPromptWorkshopProps {
   generatedReferenceImage?: WorkshopReferenceImage | null | undefined;
   referenceGeneration?: ReferenceGenerationState | undefined;
   referenceImagesAvailable?: boolean | undefined;
+  referenceImageModel?: string | null | undefined;
+  optimizerModel?: string | null | undefined;
+  optimizerVersion?: string | null | undefined;
   disabled?: boolean;
   onDraftChange?: ((draft: PromptBuilderDraft) => void) | undefined;
   onUse: (action: PromptWorkshopAction) => void | Promise<void>;
   onSave?: ((action: SavePromptWorkshopAction) => void | Promise<void>) | undefined;
-  onGenerateReference?: ((workshopPrompt: string) => void) | undefined;
+  onOptimizeReference?: OptimizeWorkshopReferencePrompt | undefined;
+  onGenerateReference?:
+    ((input: WorkshopReferenceGenerationInput) => void | Promise<void>) | undefined;
   onDetachReference?: (() => void) | undefined;
   onRetryReferenceRestore?: (() => void) | undefined;
 }
@@ -109,6 +133,50 @@ const referenceContext = (
   ...(typeof image?.height === 'number' ? { height: image.height } : {}),
 });
 
+type ReferenceOptimizationState = {
+  status: 'idle' | 'optimizing' | 'ready' | 'error';
+  response: OptimizeCharacterReferencePromptResponse | null;
+  responseInputKey: string | null;
+  manuallyEdited: boolean;
+  error: string | null;
+};
+
+type OptimizationRequest = {
+  inputKey: string;
+  controller: AbortController;
+  promise: Promise<OptimizeCharacterReferencePromptResponse | null>;
+};
+
+const createReferenceOptimizationState = (): ReferenceOptimizationState => ({
+  status: 'idle',
+  response: null,
+  responseInputKey: null,
+  manuallyEdited: false,
+  error: null,
+});
+
+const optimizationErrorMessage = (error: unknown): string => {
+  if (error instanceof Error && error.message.trim()) return error.message;
+  return 'The character prompt could not be optimized. Retry before generating the reference.';
+};
+
+const isAbortError = (error: unknown): boolean =>
+  error instanceof DOMException && error.name === 'AbortError';
+
+const optimizerOptions = (
+  options: WorkshopReferenceOptions,
+): OptimizeCharacterReferencePromptRequest['options'] => ({
+  framing: options.framing,
+  orientation: options.orientation,
+  renderingMode: options.renderingMode,
+  expression: options.expression,
+  background: options.background,
+  ...(options.background === 'plain_custom' && options.customBackground?.trim()
+    ? { customBackground: options.customBackground.replace(/\s+/gu, ' ').trim() }
+    : {}),
+  targetUse: 'lucy_2_5_character_reference',
+});
+
 export const CharacterPromptWorkshop = ({
   initialDraft,
   initialDrafts,
@@ -117,10 +185,14 @@ export const CharacterPromptWorkshop = ({
   generatedReferenceImage = null,
   referenceGeneration = { status: 'idle', error: null },
   referenceImagesAvailable = false,
+  referenceImageModel = null,
+  optimizerModel = null,
+  optimizerVersion = null,
   disabled = false,
   onDraftChange,
   onUse,
   onSave,
+  onOptimizeReference,
   onGenerateReference,
   onDetachReference,
   onRetryReferenceRestore,
@@ -134,7 +206,14 @@ export const CharacterPromptWorkshop = ({
   const [showSave, setShowSave] = useState(false);
   const [saveName, setSaveName] = useState('');
   const [saveState, setSaveState] = useState<PromptSaveState>('idle');
-  const [generatedPromptHash, setGeneratedPromptHash] = useState<string | null>(null);
+  const [referencePreferences, setReferencePreferences] = useState<WorkshopReferencePreferences>(
+    loadWorkshopReferencePreferences,
+  );
+  const [optimization, setOptimization] = useState<ReferenceOptimizationState>(
+    createReferenceOptimizationState,
+  );
+  const optimizationRequestRef = useRef<OptimizationRequest | null>(null);
+  const generationPipelineRef = useRef<Promise<void> | null>(null);
 
   const draft = drafts[intent];
   const activeStep = activeSteps[intent];
@@ -159,41 +238,295 @@ export const CharacterPromptWorkshop = ({
     () => generateStructuredPrompt(normalizedDraft, context),
     [context, normalizedDraft],
   );
+  const referenceOptions = referencePreferences.options;
+  const optimizationInput = useMemo<OptimizeCharacterReferencePromptRequest>(
+    () => ({
+      rawPrompt: generatedPrompt,
+      options: optimizerOptions(referenceOptions),
+      ...(referenceImageModel
+        ? { generator: { provider: 'openai', model: referenceImageModel } }
+        : {}),
+    }),
+    [generatedPrompt, referenceImageModel, referenceOptions],
+  );
+  const optimizationInputKey = useMemo(
+    () =>
+      createWorkshopOptimizationKey(
+        generatedPrompt,
+        referenceOptions,
+        optimizerModel,
+        optimizerVersion,
+        optimizationInput.generator,
+      ),
+    [
+      generatedPrompt,
+      optimizationInput.generator,
+      optimizerModel,
+      optimizerVersion,
+      referenceOptions,
+    ],
+  );
+  const optimizationInputKeyRef = useRef(optimizationInputKey);
+  const optimizationStale = Boolean(
+    optimization.response && optimization.responseInputKey !== optimizationInputKey,
+  );
+  const customBackgroundMissing =
+    referenceOptions.background === 'plain_custom' && !referenceOptions.customBackground?.trim();
+  const imageOperationBusy = ['generating', 'restoring'].includes(referenceGeneration.status);
+  const canOptimize =
+    !disabled &&
+    !imageOperationBusy &&
+    validation.blocking.length === 0 &&
+    generatedPrompt.length > 0 &&
+    !customBackgroundMissing;
   const referenceBusy =
-    ['generating', 'restoring'].includes(referenceGeneration.status) ||
+    imageOperationBusy ||
+    optimization.status === 'optimizing' ||
     (referenceGeneration.status === 'error' && referenceGeneration.errorKind === 'restore');
   const canCommit =
     !disabled && !referenceBusy && validation.blocking.length === 0 && generatedPrompt.length > 0;
 
   useEffect(() => {
-    let active = true;
-    setGeneratedPromptHash(null);
-    void hashWorkshopPrompt(generatedPrompt)
-      .then((hash) => {
-        if (active) setGeneratedPromptHash(hash);
-      })
-      .catch(() => {
-        if (active) setGeneratedPromptHash(null);
-      });
-    return () => {
-      active = false;
-    };
-  }, [generatedPrompt]);
+    saveWorkshopReferencePreferences(referencePreferences);
+  }, [referencePreferences]);
+
+  useEffect(() => {
+    optimizationInputKeyRef.current = optimizationInputKey;
+  }, [optimizationInputKey]);
+
+  useEffect(() => {
+    const request = optimizationRequestRef.current;
+    if (request && request.inputKey !== optimizationInputKey) {
+      request.controller.abort();
+      optimizationRequestRef.current = null;
+    }
+    setOptimization((current) =>
+      current.status === 'optimizing' || current.status === 'error'
+        ? { ...current, status: current.response ? 'ready' : 'idle', error: null }
+        : current,
+    );
+  }, [optimizationInputKey]);
+
+  useEffect(
+    () => () => {
+      optimizationRequestRef.current?.controller.abort();
+      optimizationRequestRef.current = null;
+    },
+    [],
+  );
+
+  const runOptimization =
+    useCallback((): Promise<OptimizeCharacterReferencePromptResponse | null> => {
+      const existing = optimizationRequestRef.current;
+      if (existing?.inputKey === optimizationInputKey) return existing.promise;
+      if (!canOptimize) {
+        if (customBackgroundMissing) {
+          setOptimization((current) => ({
+            ...current,
+            status: 'error',
+            error: 'Provide a short plain background description before optimizing.',
+          }));
+        }
+        return Promise.resolve(null);
+      }
+      if (!onOptimizeReference) {
+        setOptimization((current) => ({
+          ...current,
+          status: 'error',
+          error: 'Prompt optimization is unavailable. Retry after the local server is configured.',
+        }));
+        return Promise.resolve(null);
+      }
+
+      existing?.controller.abort();
+      const controller = new AbortController();
+      setOptimization((current) => ({ ...current, status: 'optimizing', error: null }));
+
+      const promise = Promise.resolve()
+        .then(() => onOptimizeReference(optimizationInput, controller.signal))
+        .then((response) => {
+          if (
+            controller.signal.aborted ||
+            optimizationInputKeyRef.current !== optimizationInputKey ||
+            optimizationRequestRef.current?.controller !== controller
+          ) {
+            return null;
+          }
+          if (
+            !response.result.optimizedImagePrompt.trim() ||
+            !response.result.lucy25CharacterPrompt.trim()
+          ) {
+            throw new Error(
+              'The optimizer returned an incomplete character prompt. Retry optimization.',
+            );
+          }
+          setOptimization({
+            status: 'ready',
+            response,
+            responseInputKey: optimizationInputKey,
+            manuallyEdited: false,
+            error: null,
+          });
+          return response;
+        })
+        .catch((error: unknown) => {
+          if (
+            controller.signal.aborted ||
+            isAbortError(error) ||
+            optimizationInputKeyRef.current !== optimizationInputKey ||
+            optimizationRequestRef.current?.controller !== controller
+          ) {
+            return null;
+          }
+          setOptimization((current) => ({
+            ...current,
+            status: 'error',
+            error: optimizationErrorMessage(error),
+          }));
+          return null;
+        })
+        .finally(() => {
+          if (optimizationRequestRef.current?.controller === controller) {
+            optimizationRequestRef.current = null;
+          }
+        });
+
+      optimizationRequestRef.current = { inputKey: optimizationInputKey, controller, promise };
+      return promise;
+    }, [
+      canOptimize,
+      customBackgroundMissing,
+      onOptimizeReference,
+      optimizationInput,
+      optimizationInputKey,
+    ]);
 
   const referenceIsStale = Boolean(
     generatedReferenceImage &&
-    (generatedReferenceImage.generatedFromPrompt
-      ? !isSameCanonicalWorkshopPrompt(generatedReferenceImage.generatedFromPrompt, generatedPrompt)
-      : generatedPromptHash && generatedPromptHash !== generatedReferenceImage.promptHash),
+    (!isSameCanonicalWorkshopPrompt(
+      generatedReferenceImage.generatedFromPrompt ?? generatedReferenceImage.originalPrompt,
+      generatedPrompt,
+    ) ||
+      JSON.stringify(generatedReferenceImage.options) !==
+        JSON.stringify(optimizationInput.options) ||
+      generatedReferenceImage.optimizationEnabled !== referencePreferences.optimizePrompt ||
+      (referenceImageModel !== null && generatedReferenceImage.model !== referenceImageModel) ||
+      (referencePreferences.optimizePrompt &&
+        ((optimizerModel !== null && generatedReferenceImage.optimizer?.model !== optimizerModel) ||
+          (optimizerVersion !== null &&
+            generatedReferenceImage.optimizer?.version !== optimizerVersion))) ||
+      (referencePreferences.optimizePrompt &&
+        optimization.responseInputKey === optimizationInputKey &&
+        optimization.response !== null &&
+        (optimization.response.result.optimizedImagePrompt.trim() !==
+          generatedReferenceImage.optimizedImagePrompt.trim() ||
+          optimization.response.result.lucy25CharacterPrompt.trim() !==
+            generatedReferenceImage.lucy25CharacterPrompt.trim() ||
+          optimization.response.model !== generatedReferenceImage.optimizer?.model ||
+          optimization.response.version !== generatedReferenceImage.optimizer?.version))),
   );
 
+  const cancelPendingOptimization = () => {
+    const request = optimizationRequestRef.current;
+    if (!request) return;
+    request.controller.abort();
+    optimizationRequestRef.current = null;
+    setOptimization((current) =>
+      current.status === 'optimizing'
+        ? { ...current, status: current.response ? 'ready' : 'idle', error: null }
+        : current,
+    );
+  };
+
+  const changeOptimizationEnabled = (enabled: boolean) => {
+    setReferencePreferences((current) => ({ ...current, optimizePrompt: enabled }));
+  };
+
+  const changeReferenceOptions = (options: WorkshopReferenceOptions) => {
+    cancelPendingOptimization();
+    setReferencePreferences((current) => ({ ...current, options }));
+  };
+
+  const changeOptimizedImagePrompt = (prompt: string) => {
+    setOptimization((current) => {
+      if (!current.response) return current;
+      const responseMatchesCurrentInput =
+        current.responseInputKey === optimizationInputKeyRef.current;
+      return {
+        ...current,
+        status: responseMatchesCurrentInput ? 'ready' : current.status,
+        response: {
+          ...current.response,
+          result: { ...current.response.result, optimizedImagePrompt: prompt },
+        },
+        manuallyEdited: true,
+        error: responseMatchesCurrentInput ? null : current.error,
+      };
+    });
+  };
+
+  const generateReference = () => {
+    if (generationPipelineRef.current || !onGenerateReference) return;
+
+    const pipeline = (async () => {
+      if (!referencePreferences.optimizePrompt) {
+        await onGenerateReference({
+          rawPrompt: generatedPrompt,
+          options: optimizationInput.options,
+          ...(optimizationInput.generator ? { generator: optimizationInput.generator } : {}),
+          optimization: { enabled: false },
+        });
+        return;
+      }
+
+      const existingResponse =
+        optimization.response &&
+        optimization.responseInputKey === optimizationInputKey &&
+        optimization.status === 'ready' &&
+        optimization.response.result.optimizedImagePrompt.trim() &&
+        optimization.response.result.lucy25CharacterPrompt.trim()
+          ? optimization.response
+          : null;
+      const response = existingResponse ?? (await runOptimization());
+      if (
+        !response ||
+        optimizationInputKeyRef.current !== optimizationInputKey ||
+        !response.result.optimizedImagePrompt.trim() ||
+        !response.result.lucy25CharacterPrompt.trim()
+      ) {
+        return;
+      }
+
+      await onGenerateReference({
+        rawPrompt: generatedPrompt,
+        options: optimizationInput.options,
+        ...(optimizationInput.generator ? { generator: optimizationInput.generator } : {}),
+        optimization: {
+          enabled: true,
+          result: response.result,
+          model: response.model,
+          version: response.version,
+          inputHash: response.inputHash,
+          manuallyEdited: existingResponse ? optimization.manuallyEdited : false,
+        },
+      });
+    })().catch(() => undefined);
+
+    generationPipelineRef.current = pipeline;
+    void pipeline.finally(() => {
+      if (generationPipelineRef.current === pipeline) generationPipelineRef.current = null;
+    });
+  };
+
   const updateDraft = (nextDraft: PromptBuilderDraft) => {
+    cancelPendingOptimization();
     setDrafts((current) => ({ ...current, [nextDraft.intent]: nextDraft }));
     setSaveState('idle');
     onDraftChange?.(nextDraft);
   };
 
   const changeIntent = (nextIntent: PromptIntent) => {
+    cancelPendingOptimization();
     setIntent(nextIntent);
     setShowSave(false);
     setSaveState('idle');
@@ -323,16 +656,36 @@ export const CharacterPromptWorkshop = ({
               <div id={`${componentId}-recipe-summary`}>
                 <GeneratedPromptPreview
                   prompt={generatedPrompt}
+                  label={intent === 'character-transform' ? 'Original character recipe' : undefined}
                   {...(intent === 'character-transform' && onGenerateReference && onDetachReference
                     ? {
                         referenceGeneration: {
                           available: referenceImagesAvailable,
                           disabled,
-                          generateDisabled: !canCommit,
+                          generateDisabled: !canCommit || customBackgroundMissing,
                           stale: referenceIsStale,
                           referenceImage: generatedReferenceImage,
                           generation: referenceGeneration,
-                          onGenerate: onGenerateReference,
+                          optimization: {
+                            enabled: referencePreferences.optimizePrompt,
+                            options: referenceOptions,
+                            status: optimization.status,
+                            stale: optimizationStale,
+                            optimizedImagePrompt:
+                              optimization.response?.result.optimizedImagePrompt ?? '',
+                            lucy25CharacterPrompt:
+                              optimization.response?.result.lucy25CharacterPrompt ?? '',
+                            warnings: optimization.response?.result.warnings ?? [],
+                            model: optimization.response?.model ?? null,
+                            version: optimization.response?.version ?? null,
+                            manuallyEdited: optimization.manuallyEdited,
+                            error: optimization.error,
+                          },
+                          onOptimizationEnabledChange: changeOptimizationEnabled,
+                          onReferenceOptionsChange: changeReferenceOptions,
+                          onOptimize: () => void runOptimization(),
+                          onOptimizedImagePromptChange: changeOptimizedImagePrompt,
+                          onGenerate: generateReference,
                           onDetach: onDetachReference,
                           ...(onRetryReferenceRestore
                             ? { onRetryRestore: onRetryReferenceRestore }

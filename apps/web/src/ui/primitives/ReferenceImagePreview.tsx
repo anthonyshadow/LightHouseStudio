@@ -34,7 +34,7 @@ const frameStyles = (theme: Theme, size: 'thumbnail' | 'panel'): CSSObject => ({
     width: '100%',
     height: '100%',
     display: 'block',
-    objectFit: 'cover',
+    objectFit: 'contain',
   },
 });
 

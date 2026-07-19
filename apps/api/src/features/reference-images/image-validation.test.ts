@@ -43,6 +43,17 @@ describe('reference image validation', () => {
     expect(result.bytes.byteLength).toBeLessThan(5 * 1024 * 1024);
   });
 
+  it.each([
+    ['1024x1536', 1024, 1536],
+    ['1536x1024', 1536, 1024],
+  ] as const)('validates the requested %s orientation exactly', async (size, width, height) => {
+    const result = await validateReferenceImage(await imageBase64(width, height), size);
+    expect(result).toMatchObject({ width, height, mimeType: 'image/jpeg' });
+    await expect(validateReferenceImage(await imageBase64(height, width), size)).rejects.toThrow(
+      `exactly ${width} by ${height}`,
+    );
+  });
+
   it('rejects an image that is not exactly 1024 by 1024', async () => {
     await expect(validateReferenceImage(await imageBase64(512, 512))).rejects.toThrow(
       'exactly 1024 by 1024',

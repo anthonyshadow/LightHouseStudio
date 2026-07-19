@@ -11,12 +11,14 @@ import {
 import type { StudioMode } from '../features/media-session';
 import {
   CharacterPromptWorkshop,
+  type OptimizeWorkshopReferencePrompt,
   type PromptBuilderDraft,
   type PromptIntent,
   type PromptWorkshopAction,
   type ReferenceGenerationState,
   type SavePromptWorkshopAction,
   type WorkshopReferenceImage,
+  type WorkshopReferenceGenerationInput,
 } from '../features/prompt-authoring';
 import { Button, OverlayPanel, SegmentedControl, StatusNotice } from '../ui';
 import {
@@ -47,6 +49,9 @@ type CreativeWorkspaceProps = {
   workshopReferenceImage: WorkshopReferenceImage | null;
   referenceGeneration: ReferenceGenerationState;
   referenceImagesAvailable: boolean;
+  referenceImageModel?: string | null;
+  optimizerModel: string | null;
+  optimizerVersion: string | null;
   referenceUsePending: boolean;
   referenceUseFailure: {
     message: string;
@@ -67,7 +72,8 @@ type CreativeWorkspaceProps = {
   onWorkshopDraftChange(draft: PromptBuilderDraft): void;
   onUseWorkshop(action: PromptWorkshopAction): void;
   onSaveWorkshop(action: SavePromptWorkshopAction): void;
-  onGenerateReference(workshopPrompt: string): void;
+  onOptimizeReference: OptimizeWorkshopReferencePrompt;
+  onGenerateReference(input: WorkshopReferenceGenerationInput): void | Promise<void>;
   onDetachReference(): void;
   onRetryReferenceRestore?: (() => void) | undefined;
   onShelfDirtyChange(dirty: boolean): void;
@@ -88,12 +94,16 @@ export type CreativePanelContentProps = Pick<
   | 'workshopReferenceImage'
   | 'referenceGeneration'
   | 'referenceImagesAvailable'
+  | 'referenceImageModel'
+  | 'optimizerModel'
+  | 'optimizerVersion'
   | 'referenceUsePending'
   | 'referenceUseFailure'
   | 'onLibraryModeChange'
   | 'onWorkshopDraftChange'
   | 'onUseWorkshop'
   | 'onSaveWorkshop'
+  | 'onOptimizeReference'
   | 'onGenerateReference'
   | 'onDetachReference'
   | 'onRetryReferenceRestore'
@@ -118,12 +128,16 @@ export const CreativePanelContent = ({
   workshopReferenceImage,
   referenceGeneration,
   referenceImagesAvailable,
+  referenceImageModel = null,
+  optimizerModel,
+  optimizerVersion,
   referenceUsePending,
   referenceUseFailure,
   onLibraryModeChange,
   onWorkshopDraftChange,
   onUseWorkshop,
   onSaveWorkshop,
+  onOptimizeReference,
   onGenerateReference,
   onDetachReference,
   onRetryReferenceRestore,
@@ -154,10 +168,14 @@ export const CreativePanelContent = ({
           generatedReferenceImage={workshopReferenceImage}
           referenceGeneration={referenceGeneration}
           referenceImagesAvailable={referenceImagesAvailable}
+          referenceImageModel={referenceImageModel}
+          optimizerModel={optimizerModel}
+          optimizerVersion={optimizerVersion}
           disabled={recordingActive || referenceUsePending}
           onDraftChange={onWorkshopDraftChange}
           onUse={onUseWorkshop}
           onSave={onSaveWorkshop}
+          onOptimizeReference={onOptimizeReference}
           onGenerateReference={onGenerateReference}
           onDetachReference={onDetachReference}
           {...(onRetryReferenceRestore ? { onRetryReferenceRestore } : {})}
@@ -234,6 +252,9 @@ export const CreativeWorkspace = ({
   workshopReferenceImage,
   referenceGeneration,
   referenceImagesAvailable,
+  referenceImageModel = null,
+  optimizerModel,
+  optimizerVersion,
   referenceUsePending,
   referenceUseFailure,
   workshopToggleRef,
@@ -250,6 +271,7 @@ export const CreativeWorkspace = ({
   onWorkshopDraftChange,
   onUseWorkshop,
   onSaveWorkshop,
+  onOptimizeReference,
   onGenerateReference,
   onDetachReference,
   onRetryReferenceRestore,
@@ -347,12 +369,16 @@ export const CreativeWorkspace = ({
             workshopReferenceImage={workshopReferenceImage}
             referenceGeneration={referenceGeneration}
             referenceImagesAvailable={referenceImagesAvailable}
+            referenceImageModel={referenceImageModel}
+            optimizerModel={optimizerModel}
+            optimizerVersion={optimizerVersion}
             referenceUsePending={referenceUsePending}
             referenceUseFailure={referenceUseFailure}
             onLibraryModeChange={onLibraryModeChange}
             onWorkshopDraftChange={onWorkshopDraftChange}
             onUseWorkshop={onUseWorkshop}
             onSaveWorkshop={onSaveWorkshop}
+            onOptimizeReference={onOptimizeReference}
             onGenerateReference={onGenerateReference}
             onDetachReference={onDetachReference}
             {...(onRetryReferenceRestore ? { onRetryReferenceRestore } : {})}

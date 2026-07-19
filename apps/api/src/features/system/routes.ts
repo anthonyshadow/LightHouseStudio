@@ -1,4 +1,8 @@
-import { capabilitiesResponseSchema, healthResponseSchema } from '@studio/contracts';
+import {
+  capabilitiesResponseSchema,
+  healthResponseSchema,
+  REFERENCE_IMAGE_SIZES,
+} from '@studio/contracts';
 import type { FastifyInstance } from 'fastify';
 import { SUPPORTED_MODEL_IDS } from '../../providers/decart/token-provider.js';
 
@@ -7,6 +11,11 @@ export interface CapabilityAvailability {
   readonly elevenLabsAvailable: boolean;
   readonly elevenLabsModelId: string;
   readonly referenceImagesAvailable: boolean;
+  readonly referenceImageModelId: string;
+  readonly referenceImageQuality: 'high' | 'medium';
+  readonly promptOptimizerAvailable: boolean;
+  readonly promptOptimizerModel: string;
+  readonly promptOptimizerVersion: string;
 }
 
 export const registerSystemRoutes = (
@@ -27,9 +36,14 @@ export const registerSystemRoutes = (
       },
       referenceImages: {
         available: availability.referenceImagesAvailable,
-        modelId: 'gpt-image-2',
-        size: '1024x1024',
-        quality: 'high',
+        modelId: availability.referenceImageModelId,
+        sizes: [...REFERENCE_IMAGE_SIZES],
+        quality: availability.referenceImageQuality,
+        optimizer: {
+          available: availability.promptOptimizerAvailable,
+          model: availability.promptOptimizerModel,
+          version: availability.promptOptimizerVersion,
+        },
       },
     }),
   );

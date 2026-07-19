@@ -51,6 +51,14 @@ Capture preferences are a separate tab-memory controller, not part of a prompt o
 
 The guide's Lucy 2.1 character identifier was intentionally superseded by the user's approved `lucy-2.5`. The VTON boundary remains independently selectable and testable as `lucy-vton-3`.
 
+### Character reference prompt pipeline
+
+The Character Workshop keeps three values deliberately separate. The structured workshop recipe is the raw character description and remains editable through its normal fields. A server-only OpenAI Responses API call compiles that recipe plus the selected reference settings into a strict structured result containing an editable image-generation prompt and a compact Lucy 2.5 character-replacement prompt. The image provider receives only the optimized image prompt while optimization is enabled; the Lucy prompt is stored with the immutable asset and becomes the prompt used when that asset is inserted into a session.
+
+The optimizer result is keyed to the raw recipe, framing, orientation, rendering mode, expression, background, configured model, and optimizer version. Changing any input makes the result stale. Generate re-optimizes stale input, reuses a current result, and never falls back after an optimizer error. An explicit default-on preference controls optimization; switching it off is the only direct-generation bypass. Generated-asset handoff hydrates the saved bytes and commits the saved Lucy prompt, image, and `enhance: true` together through the existing atomic realtime snapshot path.
+
+New references default to full-body framing with the complete silhouette and safe margin whenever the character's anatomy permits it. A closer crop remains an explicit workshop choice. The app's target media profile is known landscape 16:9, so the reference `auto` orientation resolves to `1536x1024`; explicit portrait and square choices continue to override it.
+
 ## Recording and processing flow
 
 Recording source composition is explicit:

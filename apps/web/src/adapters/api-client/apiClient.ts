@@ -2,9 +2,13 @@ import {
   apiErrorResponseSchema,
   capabilitiesResponseSchema,
   createReferenceImageResponseSchema,
+  optimizeCharacterReferencePromptResponseSchema,
   referenceImageMetadataResponseSchema,
   realtimeTokenResponseSchema,
   REFERENCE_IMAGE_MAX_BYTES,
+  type CreateReferenceImageRequest,
+  type OptimizeCharacterReferencePromptRequest,
+  type OptimizeCharacterReferencePromptResponse,
   type ReferenceImageAsset,
 } from '@studio/contracts';
 import type { ModelMode, ProviderAvailability } from '../../application/types';
@@ -54,6 +58,10 @@ export const fetchProviderAvailability = async (
     elevenLabsModel: payload.elevenLabs.modelId ?? null,
     referenceImages: payload.referenceImages.available,
     referenceImageModel: payload.referenceImages.modelId,
+    referenceImageSizes: payload.referenceImages.sizes,
+    referenceImageOptimizerAvailable: payload.referenceImages.optimizer.available,
+    referenceImageOptimizerModel: payload.referenceImages.optimizer.model,
+    referenceImageOptimizerVersion: payload.referenceImages.optimizer.version,
   };
 };
 
@@ -61,8 +69,7 @@ export const referenceImageContentUrl = (assetId: string): string =>
   `/api/reference-images/${encodeURIComponent(assetId)}/content`;
 
 export const createReferenceImage = async (
-  requestId: string,
-  workshopPrompt: string,
+  request: CreateReferenceImageRequest,
   signal?: AbortSignal,
 ): Promise<ReferenceImageAsset> => {
   const response = await fetch('/api/reference-images', {
@@ -70,7 +77,7 @@ export const createReferenceImage = async (
     cache: 'no-store',
     ...(signal ? { signal } : {}),
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ requestId, workshopPrompt }),
+    body: JSON.stringify(request),
   });
   if (!response.ok) throw await readError(response);
   const parsed = createReferenceImageResponseSchema.safeParse(await response.json());
@@ -82,6 +89,29 @@ export const createReferenceImage = async (
     );
   }
   return parsed.data.asset;
+};
+
+export const optimizeCharacterReferencePrompt = async (
+  request: OptimizeCharacterReferencePromptRequest,
+  signal: AbortSignal,
+): Promise<OptimizeCharacterReferencePromptResponse> => {
+  const response = await fetch('/api/reference-images/optimize', {
+    method: 'POST',
+    cache: 'no-store',
+    signal,
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) throw await readError(response);
+  const parsed = optimizeCharacterReferencePromptResponseSchema.safeParse(await response.json());
+  if (!parsed.success) {
+    throw new ApiClientError(
+      'The optimized character prompt response was invalid.',
+      502,
+      'invalid-optimizer-response',
+    );
+  }
+  return parsed.data;
 };
 
 export const fetchReferenceImageMetadata = async (

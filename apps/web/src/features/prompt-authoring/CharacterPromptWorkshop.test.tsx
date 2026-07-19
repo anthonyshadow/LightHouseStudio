@@ -1,24 +1,52 @@
 // @vitest-environment jsdom
 
 import '@testing-library/jest-dom/vitest';
+import type { OptimizeCharacterReferencePromptRequest } from '@studio/contracts';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
-import { CharacterPromptWorkshop, type PromptWorkshopAction } from './CharacterPromptWorkshop';
-import { createPromptBuilderDraft } from './model';
+import {
+  CharacterPromptWorkshop,
+  type PromptWorkshopAction,
+  type WorkshopReferenceGenerationInput,
+} from './CharacterPromptWorkshop';
+import { createPromptBuilderDraft, generateStructuredPrompt } from './model';
 
 const generatedReference = {
   assetId: '550e8400-e29b-41d4-a716-446655440000',
   mimeType: 'image/jpeg' as const,
+  size: '1024x1024' as const,
   width: 1024 as const,
   height: 1024 as const,
   byteSize: 1_024,
   source: 'generated' as const,
   provider: 'openai' as const,
-  model: 'gpt-image-2' as const,
+  model: 'gpt-image-2',
+  quality: 'high' as const,
   promptHash: 'a'.repeat(64),
+  optimizationEnabled: true,
+  originalPrompt: 'Substitute the character in the video with a midnight botanist.',
+  optimizedImagePrompt: 'Canonical photorealistic reference of a midnight botanist.',
+  lucy25CharacterPrompt: 'Replace the character in the video with a midnight botanist.',
+  normalizedCharacterDescription: 'A midnight botanist.',
+  preservedCharacterFacts: ['midnight botanist'],
+  technicalDefaultsAdded: ['neutral background'],
+  warnings: [],
+  options: {
+    framing: 'full_body' as const,
+    orientation: 'auto' as const,
+    renderingMode: 'photorealistic' as const,
+    expression: 'neutral' as const,
+    background: 'neutral_gray' as const,
+    targetUse: 'lucy_2_5_character_reference' as const,
+  },
+  requestedGenerator: null,
+  optimizer: { model: 'gpt-5.6', version: 'lucy-character-reference-v1' },
+  optimizationInputHash: 'b'.repeat(64),
+  manuallyEdited: false,
   createdAt: '2026-07-18T12:00:00.000Z',
+  updatedAt: '2026-07-18T12:00:00.000Z',
   contentUrl: '/api/reference-images/550e8400-e29b-41d4-a716-446655440000/content' as const,
 };
 
@@ -26,6 +54,37 @@ const populatedCharacterDraft = (characterBase: string) => {
   const draft = createPromptBuilderDraft('character-transform');
   if (draft.intent !== 'character-transform') throw new Error('Expected character draft.');
   return { ...draft, characterBase };
+};
+
+const optimizerResponse = (warnings: string[] = []) => ({
+  result: {
+    optimizedImagePrompt:
+      'Create a canonical photorealistic full-body reference of a midnight botanist.',
+    lucy25CharacterPrompt:
+      'Replace the character in the video with a midnight botanist in a dark field coat.',
+    normalizedCharacterDescription: 'A midnight botanist in a dark field coat.',
+    preservedCharacterFacts: ['midnight botanist'],
+    technicalDefaultsAdded: ['full-body framing', 'neutral gray background'],
+    warnings,
+    recommendedSettings: {
+      framing: 'full_body' as const,
+      orientation: 'landscape' as const,
+      size: '1536x1024' as const,
+      quality: 'high' as const,
+      format: 'png' as const,
+    },
+  },
+  model: 'gpt-5.6',
+  version: 'lucy-character-reference-v1',
+  inputHash: 'b'.repeat(64),
+});
+
+const deferred = <T,>() => {
+  let resolve!: (value: T) => void;
+  const promise = new Promise<T>((resolvePromise) => {
+    resolve = resolvePromise;
+  });
+  return { promise, resolve };
 };
 
 const renderWorkshop = (
@@ -42,6 +101,7 @@ const renderWorkshop = (
 
 afterEach(() => {
   cleanup();
+  localStorage.clear();
   vi.restoreAllMocks();
 });
 
@@ -205,6 +265,364 @@ describe('CharacterPromptWorkshop', () => {
 
     await user.click(screen.getByRole('button', { name: 'Transform character' }));
     expect(screen.getByLabelText('Character concept')).toHaveValue('remembered field host');
+  });
+
+  it('defaults to safe Lucy reference settings and persists only explicit preference changes', async () => {
+    const user = userEvent.setup();
+    const props = {
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      onOptimizeReference: vi.fn(() => Promise.resolve(optimizerResponse())),
+      onGenerateReference: vi.fn(),
+      onDetachReference: vi.fn(),
+    };
+    const first = renderWorkshop(props);
+
+    expect(screen.getByLabelText(/Optimize prompt with GPT/)).toBeChecked();
+    expect(screen.getByLabelText('Target Lucy framing')).toHaveValue('full_body');
+    expect(screen.getByLabelText('Orientation')).toHaveValue('auto');
+    expect(screen.getByLabelText('Rendering')).toHaveValue('photorealistic');
+    expect(screen.getByLabelText('Reference expression')).toHaveValue('neutral');
+    expect(screen.getByLabelText('Background')).toHaveValue('neutral_gray');
+
+    await user.click(screen.getByLabelText(/Optimize prompt with GPT/));
+    await user.selectOptions(screen.getByLabelText('Target Lucy framing'), 'waist_up');
+    first.unmount();
+    renderWorkshop(props);
+
+    expect(screen.getByLabelText(/Optimize prompt with GPT/)).not.toBeChecked();
+    expect(screen.getByLabelText('Target Lucy framing')).toHaveValue('waist_up');
+    expect(
+      localStorage.getItem('realtime-creator-studio.character-reference-preferences.v1'),
+    ).not.toMatch(/midnight botanist|optimizedImagePrompt|lucy25CharacterPrompt/u);
+  });
+
+  it('optimizes before generation and routes the optimized result with its server fingerprint', async () => {
+    const user = userEvent.setup();
+    const events: string[] = [];
+    const response = optimizerResponse(['A mask may reduce facial adherence.']);
+    const onOptimizeReference = vi.fn(
+      (_input: OptimizeCharacterReferencePromptRequest, _signal: AbortSignal) => {
+        events.push('optimize');
+        return Promise.resolve(response);
+      },
+    );
+    const onGenerateReference = vi.fn((_input: WorkshopReferenceGenerationInput) => {
+      events.push('generate');
+      return Promise.resolve();
+    });
+    renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      referenceImageModel: 'gpt-image-2',
+      optimizerModel: response.model,
+      optimizerVersion: response.version,
+      onOptimizeReference,
+      onGenerateReference,
+      onDetachReference: vi.fn(),
+    });
+
+    expect(screen.getByText('Original character recipe')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Generate reference image' }));
+
+    await waitFor(() => expect(onGenerateReference).toHaveBeenCalledOnce());
+    expect(events).toEqual(['optimize', 'generate']);
+    expect(onOptimizeReference.mock.calls[0]?.[0]).toMatchObject({
+      rawPrompt: expect.stringContaining('midnight botanist'),
+      options: {
+        framing: 'full_body',
+        orientation: 'auto',
+        renderingMode: 'photorealistic',
+        expression: 'neutral',
+        background: 'neutral_gray',
+        targetUse: 'lucy_2_5_character_reference',
+      },
+      generator: { provider: 'openai', model: 'gpt-image-2' },
+    });
+    expect(onGenerateReference.mock.calls[0]?.[0]).toEqual({
+      rawPrompt: expect.stringContaining('midnight botanist'),
+      options: expect.objectContaining({ targetUse: 'lucy_2_5_character_reference' }),
+      generator: { provider: 'openai', model: 'gpt-image-2' },
+      optimization: {
+        enabled: true,
+        result: response.result,
+        model: response.model,
+        version: response.version,
+        inputHash: response.inputHash,
+        manuallyEdited: false,
+      },
+    });
+    expect(screen.getByLabelText('Optimized reference-image prompt')).toHaveValue(
+      response.result.optimizedImagePrompt,
+    );
+    expect(screen.getByLabelText('Lucy 2.5 character prompt')).toHaveValue(
+      response.result.lucy25CharacterPrompt,
+    );
+    expect(screen.getByText('A mask may reduce facial adherence.')).toBeInTheDocument();
+    expect(screen.getByLabelText('Optimizer details')).toHaveTextContent(
+      'gpt-5.6lucy-character-reference-v1',
+    );
+  });
+
+  it('preserves a manual optimized-prompt edit and reuses it for generation retries', async () => {
+    const user = userEvent.setup();
+    const response = optimizerResponse();
+    const onOptimizeReference = vi.fn(
+      (_input: OptimizeCharacterReferencePromptRequest, _signal: AbortSignal) =>
+        Promise.resolve(response),
+    );
+    const onGenerateReference = vi.fn((_input: WorkshopReferenceGenerationInput) =>
+      Promise.resolve(),
+    );
+    renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      onOptimizeReference,
+      onGenerateReference,
+      onDetachReference: vi.fn(),
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Optimize prompt' }));
+    const optimized = await screen.findByLabelText('Optimized reference-image prompt');
+    await user.clear(optimized);
+    await user.type(optimized, 'A manually refined canonical character reference.');
+    expect(screen.getByLabelText('Optimizer details')).toHaveTextContent('Manually edited');
+
+    await user.click(screen.getByRole('button', { name: 'Generate reference image' }));
+    await waitFor(() => expect(onGenerateReference).toHaveBeenCalledOnce());
+    await user.click(screen.getByRole('button', { name: 'Generate reference image' }));
+    await waitFor(() => expect(onGenerateReference).toHaveBeenCalledTimes(2));
+
+    expect(onOptimizeReference).toHaveBeenCalledOnce();
+    expect(onGenerateReference.mock.calls[1]?.[0]).toMatchObject({
+      optimization: {
+        enabled: true,
+        result: {
+          optimizedImagePrompt: 'A manually refined canonical character reference.',
+          lucy25CharacterPrompt: response.result.lucy25CharacterPrompt,
+        },
+        inputHash: response.inputHash,
+        manuallyEdited: true,
+      },
+    });
+  });
+
+  it('retains a successful optimization when image generation fails and reuses it on retry', async () => {
+    const user = userEvent.setup();
+    const response = optimizerResponse();
+    const draft = populatedCharacterDraft('midnight botanist');
+    const onOptimizeReference = vi.fn(
+      (_input: OptimizeCharacterReferencePromptRequest, _signal: AbortSignal) =>
+        Promise.resolve(response),
+    );
+    const onGenerateReference = vi.fn();
+    const sharedProps = {
+      initialDraft: draft,
+      referenceImagesAvailable: true,
+      onOptimizeReference,
+      onGenerateReference,
+      onDetachReference: vi.fn(),
+      onUse: vi.fn(),
+    };
+    const view = renderWorkshop(sharedProps);
+
+    await user.click(screen.getByRole('button', { name: 'Generate reference image' }));
+    await waitFor(() => expect(onGenerateReference).toHaveBeenCalledOnce());
+
+    view.rerender(
+      <StudioDesignProvider>
+        <CharacterPromptWorkshop
+          {...sharedProps}
+          referenceGeneration={{
+            status: 'error',
+            error: 'The image provider failed after optimization.',
+            errorKind: 'generation',
+          }}
+        />
+      </StudioDesignProvider>,
+    );
+    expect(screen.getByLabelText('Optimized reference-image prompt')).toHaveValue(
+      response.result.optimizedImagePrompt,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Generate reference image' }));
+    await waitFor(() => expect(onGenerateReference).toHaveBeenCalledTimes(2));
+    expect(onOptimizeReference).toHaveBeenCalledOnce();
+  });
+
+  it('marks an option change stale and re-optimizes before generation', async () => {
+    const user = userEvent.setup();
+    const onOptimizeReference = vi.fn(
+      (_input: OptimizeCharacterReferencePromptRequest, _signal: AbortSignal) =>
+        Promise.resolve(optimizerResponse()),
+    );
+    const onGenerateReference = vi.fn();
+    renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      onOptimizeReference,
+      onGenerateReference,
+      onDetachReference: vi.fn(),
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Optimize prompt' }));
+    await screen.findByLabelText('Optimized reference-image prompt');
+    await user.selectOptions(screen.getByLabelText('Orientation'), 'portrait_9_16');
+    expect(screen.getByText(/Optimization is out of date/)).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Generate reference image' }));
+    await waitFor(() => expect(onGenerateReference).toHaveBeenCalledOnce());
+    expect(onOptimizeReference).toHaveBeenCalledTimes(2);
+    expect(onOptimizeReference.mock.calls[1]?.[0].options.orientation).toBe('portrait_9_16');
+
+    await user.type(screen.getByLabelText('Character concept'), ' revised');
+    expect(screen.getByText(/Optimization is out of date/)).toBeInTheDocument();
+  });
+
+  it('marks an attached asset stale when re-optimization changes only the Lucy prompt', async () => {
+    const user = userEvent.setup();
+    const draft = populatedCharacterDraft('midnight botanist');
+    const response = optimizerResponse();
+    const rawPrompt = generateStructuredPrompt(draft, {
+      hasReferenceImage: true,
+      width: generatedReference.width,
+      height: generatedReference.height,
+    });
+    renderWorkshop({
+      initialDraft: draft,
+      generatedReferenceImage: {
+        ...generatedReference,
+        originalPrompt: rawPrompt,
+        generatedFromPrompt: rawPrompt,
+        optimizedImagePrompt: response.result.optimizedImagePrompt,
+        lucy25CharacterPrompt: 'Replace the character with the prior midnight botanist.',
+      },
+      referenceImagesAvailable: true,
+      onOptimizeReference: vi.fn(() => Promise.resolve(response)),
+      onGenerateReference: vi.fn(),
+      onDetachReference: vi.fn(),
+    });
+
+    expect(screen.queryByText(/Prompt changed — regenerate/)).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Optimize prompt' }));
+    expect(await screen.findByText(/Prompt changed — regenerate/)).toBeInTheDocument();
+  });
+
+  it('canonicalizes custom-background whitespace in the optimizer request and stale key', async () => {
+    const user = userEvent.setup();
+    const onOptimizeReference = vi.fn(
+      (_input: OptimizeCharacterReferencePromptRequest, _signal: AbortSignal) =>
+        Promise.resolve(optimizerResponse()),
+    );
+    renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      onOptimizeReference,
+      onGenerateReference: vi.fn(),
+      onDetachReference: vi.fn(),
+    });
+
+    await user.selectOptions(screen.getByLabelText('Background'), 'plain_custom');
+    await user.type(screen.getByLabelText('Custom plain background'), 'muted  blue');
+    await user.click(screen.getByRole('button', { name: 'Optimize prompt' }));
+
+    await waitFor(() => expect(onOptimizeReference).toHaveBeenCalledOnce());
+    expect(onOptimizeReference.mock.calls[0]?.[0].options.customBackground).toBe('muted blue');
+  });
+
+  it('cancels and ignores an optimizer response made stale by a raw prompt edit', async () => {
+    const user = userEvent.setup();
+    const first = deferred<ReturnType<typeof optimizerResponse>>();
+    let firstSignal: AbortSignal | null = null;
+    const onOptimizeReference = vi
+      .fn((_input: OptimizeCharacterReferencePromptRequest, signal: AbortSignal) => {
+        firstSignal = signal;
+        return first.promise;
+      })
+      .mockImplementationOnce(
+        (_input: OptimizeCharacterReferencePromptRequest, signal: AbortSignal) => {
+          firstSignal = signal;
+          return first.promise;
+        },
+      )
+      .mockImplementationOnce(() => Promise.resolve(optimizerResponse()));
+    renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      onOptimizeReference,
+      onGenerateReference: vi.fn(),
+      onDetachReference: vi.fn(),
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Optimize prompt' }));
+    await user.clear(screen.getByLabelText('Character concept'));
+    await user.type(screen.getByLabelText('Character concept'), 'revised midnight botanist');
+    await waitFor(() => expect(firstSignal?.aborted).toBe(true));
+    first.resolve(optimizerResponse());
+    await waitFor(() =>
+      expect(screen.queryByLabelText('Optimized reference-image prompt')).toBeNull(),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Optimize prompt' }));
+    expect(await screen.findByLabelText('Optimized reference-image prompt')).toHaveValue(
+      optimizerResponse().result.optimizedImagePrompt,
+    );
+  });
+
+  it('blocks generation after optimizer failure, then retries without silently using raw text', async () => {
+    const user = userEvent.setup();
+    const onOptimizeReference = vi
+      .fn((_input: OptimizeCharacterReferencePromptRequest, _signal: AbortSignal) =>
+        Promise.resolve(optimizerResponse()),
+      )
+      .mockRejectedValueOnce(new Error('Optimizer timed out.'))
+      .mockResolvedValueOnce(optimizerResponse());
+    const onGenerateReference = vi.fn();
+    renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      onOptimizeReference,
+      onGenerateReference,
+      onDetachReference: vi.fn(),
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Generate reference image' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Optimizer timed out.');
+    expect(onGenerateReference).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Generate reference image' })).toBeDisabled();
+
+    await user.click(screen.getByRole('button', { name: 'Retry' }));
+    await screen.findByLabelText('Optimized reference-image prompt');
+    await user.click(screen.getByRole('button', { name: 'Generate reference image' }));
+    await waitFor(() => expect(onGenerateReference).toHaveBeenCalledOnce());
+    expect(onGenerateReference.mock.calls[0]?.[0].optimization.enabled).toBe(true);
+  });
+
+  it('only routes the raw recipe directly after optimization is explicitly disabled', async () => {
+    const user = userEvent.setup();
+    const onOptimizeReference = vi.fn(
+      (_input: OptimizeCharacterReferencePromptRequest, _signal: AbortSignal) =>
+        Promise.resolve(optimizerResponse()),
+    );
+    const onGenerateReference = vi.fn();
+    renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      onOptimizeReference,
+      onGenerateReference,
+      onDetachReference: vi.fn(),
+    });
+
+    await user.click(screen.getByLabelText(/Optimize prompt with GPT/));
+    expect(screen.getByText(/GPT optimization is off/)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Generate reference image' }));
+
+    await waitFor(() => expect(onGenerateReference).toHaveBeenCalledOnce());
+    expect(onOptimizeReference).not.toHaveBeenCalled();
+    expect(onGenerateReference.mock.calls[0]?.[0]).toMatchObject({
+      rawPrompt: expect.stringContaining('midnight botanist'),
+      optimization: { enabled: false },
+    });
   });
 
   it('disables generation without capability and exposes an accessible loading skeleton', () => {

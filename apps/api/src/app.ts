@@ -21,17 +21,22 @@ import {
 import { ElevenLabsHttpProvider } from './providers/elevenlabs/http-provider.js';
 import type { ElevenLabsProvider } from './providers/elevenlabs/types.js';
 import {
+  OpenAICharacterPromptOptimizer,
+  type CharacterPromptOptimizer,
+} from './providers/openai/character-prompt-optimizer.js';
+import {
   OpenAIReferenceImageProvider,
   type ReferenceImageProvider,
 } from './providers/openai/reference-image-provider.js';
 
-export const REFERENCE_IMAGE_CONNECTION_TIMEOUT_MARGIN_MS = 30_000;
+export const REFERENCE_IMAGE_CONNECTION_TIMEOUT_MARGIN_MS = 100_000;
 
 export interface AppDependencies {
   readonly config: RuntimeConfig;
   readonly decartProvider?: DecartTokenProvider | null;
   readonly elevenLabsProvider?: ElevenLabsProvider | null;
   readonly referenceImageProvider?: ReferenceImageProvider | null;
+  readonly characterPromptOptimizer?: CharacterPromptOptimizer | null;
   readonly referenceImageAssetStore?: ReferenceImageAssetStore;
   readonly fetchImplementation?: typeof fetch;
   readonly logger?: boolean;
@@ -45,7 +50,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     // provider ids are ephemeral user data, so this local broker never logs request URLs.
     logController: new LogController({ disableRequestLogging: true }),
     bodyLimit: 1024 * 1024,
-    requestTimeout: 30_000,
+    requestTimeout: 100_000,
     // Node's socket timeout also covers the quiet interval while a handler waits
     // for OpenAI. It must outlive the provider timeout plus image validation and
     // atomic storage, otherwise the client sees a 502 while the billable job keeps running.
@@ -111,16 +116,34 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
       ? dependencies.referenceImageProvider
       : dependencies.config.openAiApiKey === undefined
         ? null
-        : new OpenAIReferenceImageProvider(
-            dependencies.config.openAiApiKey,
-            dependencies.config.referenceImageTimeoutMs,
-          );
+        : new OpenAIReferenceImageProvider(dependencies.config.openAiApiKey, {
+            model: dependencies.config.openAiReferenceImageModel,
+            quality: dependencies.config.openAiReferenceImageQuality,
+            timeoutMs: dependencies.config.referenceImageTimeoutMs,
+          });
+  const characterPromptOptimizer =
+    dependencies.characterPromptOptimizer !== undefined
+      ? dependencies.characterPromptOptimizer
+      : dependencies.config.openAiApiKey === undefined
+        ? null
+        : new OpenAICharacterPromptOptimizer(dependencies.config.openAiApiKey, {
+            model: dependencies.config.openAiPromptOptimizerModel,
+            reasoning: dependencies.config.openAiPromptOptimizerReasoning,
+            version: dependencies.config.openAiPromptOptimizerVersion,
+            timeoutMs: dependencies.config.openAiPromptOptimizerTimeoutMs,
+          });
   const referenceImageAssetStore =
     dependencies.referenceImageAssetStore ??
     new LocalReferenceImageAssetStore(dependencies.config.lightframeDataDir);
   const referenceImageService = new ReferenceImageService(
     referenceImageProvider,
     referenceImageAssetStore,
+    {
+      optimizer: characterPromptOptimizer,
+      imageModel: dependencies.config.openAiReferenceImageModel,
+      imageQuality: dependencies.config.openAiReferenceImageQuality,
+      optimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
+    },
   );
 
   registerSystemRoutes(app, {
@@ -128,6 +151,11 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     elevenLabsAvailable: elevenLabsProvider !== null,
     elevenLabsModelId: dependencies.config.elevenLabsModelId,
     referenceImagesAvailable: referenceImageService.generationAvailable,
+    referenceImageModelId: dependencies.config.openAiReferenceImageModel,
+    referenceImageQuality: dependencies.config.openAiReferenceImageQuality,
+    promptOptimizerAvailable: referenceImageService.optimizationAvailable,
+    promptOptimizerModel: dependencies.config.openAiPromptOptimizerModel,
+    promptOptimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
   });
   registerRealtimeRoutes(app, decartProvider);
   registerReferenceImageRoutes(app, referenceImageService);

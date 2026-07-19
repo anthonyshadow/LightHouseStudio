@@ -1,4 +1,6 @@
 import { useTheme } from '@emotion/react';
+import type { CreateReferenceImageRequest } from '@studio/contracts';
+import { canonicalPrompt } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import {
@@ -6,6 +8,7 @@ import {
   createReferenceImage,
   fetchReferenceImageMetadata,
   hydrateReferenceImage,
+  optimizeCharacterReferencePrompt,
 } from '../adapters/api-client/apiClient';
 import {
   createCreativeAssetRepository,
@@ -26,6 +29,8 @@ import type {
   ReferenceGenerationState,
   SavePromptWorkshopAction,
   WorkshopReferenceImage,
+  OptimizeWorkshopReferencePrompt,
+  WorkshopReferenceGenerationInput,
 } from '../features/prompt-authoring';
 import {
   CaptureSettingsPanel,
@@ -148,14 +153,27 @@ const StudioExperience = () => {
   const takeToggleRef = useRef<HTMLButtonElement>(null);
 
   const rememberWorkshopDraft = useCallback((draft: PromptBuilderDraft) => {
+    workshopRevisionRef.current += 1;
     setWorkshopDraft(draft);
     setWorkshopDrafts((current) => ({ ...current, [draft.intent]: draft }));
   }, []);
 
   const recordCommittedPrompt = useCallback(
     (mode: ModelMode, prompt: string, referenceImageAssetId: string | null) => {
+      const matchingGeneratedReference =
+        mode === 'lucy-2.5' &&
+        referenceImageAssetId !== null &&
+        workshopReferenceImage?.assetId === referenceImageAssetId
+          ? workshopReferenceImage
+          : null;
+      const libraryPrompt =
+        matchingGeneratedReference &&
+        canonicalPrompt(prompt) ===
+          canonicalPrompt(matchingGeneratedReference.lucy25CharacterPrompt)
+          ? matchingGeneratedReference.originalPrompt
+          : prompt;
       repository.recordSuccessfulPrompt({
-        prompt,
+        prompt: libraryPrompt,
         modelModeId: mode,
         referenceImageAssetId,
         ...(selectedSavedPrompt.current ? { savedPromptId: selectedSavedPrompt.current } : {}),
@@ -164,38 +182,50 @@ const StudioExperience = () => {
           : {}),
       });
     },
-    [repository],
+    [repository, workshopReferenceImage],
   );
 
   const session = useStudioSession({ availability, onPromptCommitted: recordCommittedPrompt });
 
+  const optimizeWorkshopReference = useCallback<OptimizeWorkshopReferencePrompt>(
+    (input, signal) => optimizeCharacterReferencePrompt(input, signal),
+    [],
+  );
+
   const generateWorkshopReference = useCallback(
-    (workshopPrompt: string) => {
+    async (input: WorkshopReferenceGenerationInput): Promise<void> => {
       if (!availability.referenceImages || generationRequestRef.current) return;
       const requestId = crypto.randomUUID();
       const revision = workshopRevisionRef.current;
+      const request: CreateReferenceImageRequest = {
+        requestId,
+        ...input,
+      };
       generationRequestRef.current = requestId;
       setReferenceGeneration({ status: 'generating', error: null });
 
-      void createReferenceImage(requestId, workshopPrompt)
-        .then((asset) => {
-          if (workshopRevisionRef.current !== revision) return;
-          setWorkshopReferenceImage({ ...asset, generatedFromPrompt: workshopPrompt });
-          setReferenceGeneration({ status: 'idle', error: null });
-          referenceRestoreRef.current = { assetId: asset.assetId, prompt: workshopPrompt };
-          repository.enrichNewestMatchingRecent(workshopPrompt, 'lucy-2.5', asset.assetId);
-        })
-        .catch((error: unknown) => {
-          if (workshopRevisionRef.current !== revision) return;
-          setReferenceGeneration({
-            status: 'error',
-            error: referenceGenerationError(error),
-            errorKind: 'generation',
-          });
-        })
-        .finally(() => {
-          if (generationRequestRef.current === requestId) generationRequestRef.current = null;
+      try {
+        const asset = await createReferenceImage(request);
+        if (workshopRevisionRef.current !== revision) return;
+        setWorkshopReferenceImage({ ...asset, generatedFromPrompt: input.rawPrompt });
+        setReferenceGeneration({ status: 'idle', error: null });
+        referenceRestoreRef.current = { assetId: asset.assetId, prompt: input.rawPrompt };
+        repository.enrichNewestMatchingRecent(input.rawPrompt, 'lucy-2.5', asset.assetId);
+      } catch (error: unknown) {
+        if (workshopRevisionRef.current !== revision) return;
+        setReferenceGeneration({
+          status: 'error',
+          error: referenceGenerationError(error),
+          errorKind: 'generation',
         });
+      } finally {
+        if (generationRequestRef.current === requestId) {
+          generationRequestRef.current = null;
+          if (workshopRevisionRef.current !== revision) {
+            setReferenceGeneration({ status: 'idle', error: null });
+          }
+        }
+      }
     },
     [availability.referenceImages, repository],
   );
@@ -208,7 +238,7 @@ const StudioExperience = () => {
       void fetchReferenceImageMetadata(assetId)
         .then((asset) => {
           if (workshopRevisionRef.current !== revision) return;
-          setWorkshopReferenceImage(asset);
+          setWorkshopReferenceImage({ ...asset, generatedFromPrompt: asset.originalPrompt });
           setReferenceGeneration({ status: 'idle', error: null });
           repository.enrichNewestMatchingRecent(prompt, 'lucy-2.5', asset.assetId);
         })
@@ -522,7 +552,11 @@ const StudioExperience = () => {
       let referenceMetadata: WorkshopReferenceImage | null = null;
       try {
         if (pending.referenceImageAssetId && !continueWithoutReference) {
-          referenceMetadata = await fetchReferenceImageMetadata(pending.referenceImageAssetId);
+          const storedReference = await fetchReferenceImageMetadata(pending.referenceImageAssetId);
+          referenceMetadata = {
+            ...storedReference,
+            generatedFromPrompt: storedReference.originalPrompt,
+          };
           referenceImage = await hydrateReferenceImage(
             pending.referenceImageAssetId,
             referenceMetadata,
@@ -531,11 +565,15 @@ const StudioExperience = () => {
           referenceImage = session.draft.referenceImage;
         }
 
+        const generatedLucyReference = pending.mode === 'lucy-2.5' && referenceMetadata !== null;
         const committed = session.replaceRecipeDraft({
           mode: pending.mode,
-          prompt: pending.prompt,
+          prompt:
+            pending.mode === 'lucy-2.5' && referenceMetadata
+              ? referenceMetadata.lucy25CharacterPrompt
+              : pending.prompt,
           referenceImage,
-          enhance: false,
+          enhance: generatedLucyReference,
         });
         if (!committed) {
           setReferenceUseFailureMessage(
@@ -830,6 +868,9 @@ const StudioExperience = () => {
           workshopReferenceImage={workshopReferenceImage}
           referenceGeneration={referenceGeneration}
           referenceImagesAvailable={Boolean(availability.referenceImages)}
+          referenceImageModel={availability.referenceImageModel ?? null}
+          optimizerModel={availability.referenceImageOptimizerModel ?? null}
+          optimizerVersion={availability.referenceImageOptimizerVersion ?? null}
           referenceUsePending={referenceUsePending}
           referenceUseFailure={
             referenceUseFailureMessage
@@ -856,6 +897,7 @@ const StudioExperience = () => {
           onWorkshopDraftChange={rememberWorkshopDraft}
           onUseWorkshop={applyWorkshopPrompt}
           onSaveWorkshop={saveWorkshopPrompt}
+          onOptimizeReference={optimizeWorkshopReference}
           onGenerateReference={generateWorkshopReference}
           onDetachReference={detachWorkshopReference}
           {...(referenceGeneration.status === 'error' && referenceGeneration.errorKind === 'restore'

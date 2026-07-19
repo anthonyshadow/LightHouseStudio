@@ -6,6 +6,7 @@ import {
 
 interface GeneratedPromptPreviewProps {
   prompt: string;
+  label?: string | undefined;
   referenceGeneration?: Omit<ReferenceImageGeneratorProps, 'prompt'> | undefined;
 }
 
@@ -52,6 +53,7 @@ const previewTextStyles = (theme: Theme, empty: boolean): CSSObject => ({
 
 export const GeneratedPromptPreview = ({
   prompt,
+  label = 'Generated recipe',
   referenceGeneration,
 }: GeneratedPromptPreviewProps) => {
   const theme = useTheme();
@@ -59,7 +61,7 @@ export const GeneratedPromptPreview = ({
   return (
     <div css={previewStyles(theme)}>
       <div css={previewHeaderStyles(theme)}>
-        <span css={previewLabelStyles(theme)}>Generated recipe</span>
+        <span css={previewLabelStyles(theme)}>{label}</span>
         <span css={previewCountStyles(theme)}>{prompt.length} characters</span>
       </div>
       <p css={previewTextStyles(theme, !prompt)}>

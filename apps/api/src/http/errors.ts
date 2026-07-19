@@ -11,6 +11,7 @@ import {
   ReferenceImageStorageError,
 } from '../features/reference-images/reference-image-service.js';
 import { ReferenceImageProviderError } from '../providers/openai/reference-image-provider.js';
+import { CharacterPromptOptimizerError } from '../providers/openai/character-prompt-optimizer.js';
 import { ProviderError } from '../providers/provider-error.js';
 
 export type ApiErrorBody = ApiErrorResponse;
@@ -276,27 +277,97 @@ const mapReferenceImageProviderError = (error: ReferenceImageProviderError): App
   }
 };
 
+const mapCharacterPromptOptimizerError = (error: CharacterPromptOptimizerError): AppError => {
+  const options = providerStatusOptions(error.upstreamStatus);
+  switch (error.reason) {
+    case 'refusal':
+      return new AppError(
+        400,
+        'moderation_blocked',
+        'OpenAI could not optimize this character description under its safety checks. Revise it and retry.',
+        options,
+      );
+    case 'rate-limit':
+      return new AppError(
+        429,
+        'rate_limited',
+        'OpenAI is temporarily rate limiting prompt optimization. Wait a moment, then retry.',
+        options,
+      );
+    case 'authentication':
+      return new AppError(
+        502,
+        'provider_authentication',
+        'OpenAI rejected the configured server credential. Check OPENAI_API_KEY.',
+        options,
+      );
+    case 'timeout':
+      return new AppError(
+        504,
+        'request_timeout',
+        'OpenAI prompt optimization took too long. Retry before generating the image.',
+        options,
+      );
+    case 'invalid-response':
+      return new AppError(
+        502,
+        'provider_failure',
+        'OpenAI returned an invalid structured prompt optimization. Retry the optimization.',
+        options,
+      );
+    case 'failure':
+      return new AppError(
+        502,
+        'provider_failure',
+        'OpenAI could not optimize the character prompt. Retry when the provider is available.',
+        options,
+      );
+  }
+};
+
 const mapReferenceImageGenerationStateError = (
   error: ReferenceImageGenerationStateError,
-): AppError =>
-  error.reason === 'generation-in-progress'
-    ? new AppError(
+): AppError => {
+  switch (error.reason) {
+    case 'generation-in-progress':
+      return new AppError(
         409,
         'generation_in_progress',
         'Another reference image is still being created. Wait for it to finish before regenerating.',
-      )
-    : new AppError(
+      );
+    case 'provider-not-configured':
+      return new AppError(
         503,
         'provider_configuration',
         'Reference generation is unavailable until OPENAI_API_KEY is configured on the server.',
       );
+    case 'optimizer-not-configured':
+      return new AppError(
+        503,
+        'provider_configuration',
+        'Prompt optimization is unavailable until OPENAI_API_KEY is configured on the server.',
+      );
+    case 'stale-optimization':
+      return new AppError(
+        409,
+        'validation_error',
+        'The optimized prompt is stale for the current description, options, model, or optimizer version. Re-optimize before generating.',
+      );
+    case 'invalid-optimization':
+      return new AppError(
+        400,
+        'validation_error',
+        'The optimized prompt settings do not match the selected reference-image options.',
+      );
+  }
+};
 
 const isFastifyError = (error: unknown): error is FastifyError =>
   error instanceof Error && 'code' in error && typeof error.code === 'string';
 
 const normalizeFastifyError = (error: FastifyError): AppError | undefined => {
   if (error.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
-    return new AppError(413, 'payload_too_large', 'The audio sidecar must be 25 MiB or smaller.');
+    return new AppError(413, 'payload_too_large', 'The request body exceeds the allowed size.');
   }
   if (error.code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE') {
     return new AppError(
@@ -339,25 +410,27 @@ export const installErrorHandling = (
             ? mapVoiceServiceError(error)
             : error instanceof ReferenceImageGenerationStateError
               ? mapReferenceImageGenerationStateError(error)
-              : error instanceof ReferenceImageProviderError
-                ? mapReferenceImageProviderError(error)
-                : error instanceof InvalidReferenceImageError
-                  ? new AppError(
-                      502,
-                      'invalid_provider_image',
-                      'OpenAI returned an image that is not a valid 1024 × 1024 JPEG, PNG, or WebP under 5 MiB.',
-                    )
-                  : error instanceof ReferenceImageStorageError
+              : error instanceof CharacterPromptOptimizerError
+                ? mapCharacterPromptOptimizerError(error)
+                : error instanceof ReferenceImageProviderError
+                  ? mapReferenceImageProviderError(error)
+                  : error instanceof InvalidReferenceImageError
                     ? new AppError(
-                        500,
-                        'storage_failure',
-                        'The generated image could not be saved to local storage. Check LIGHTFRAME_DATA_DIR and disk permissions.',
+                        502,
+                        'invalid_provider_image',
+                        'OpenAI returned an image that does not match the requested dimensions or supported JPEG, PNG, and WebP limits.',
                       )
-                    : error instanceof ProviderError
-                      ? mapProviderError(error)
-                      : isFastifyError(error)
-                        ? normalizeFastifyError(error)
-                        : undefined;
+                    : error instanceof ReferenceImageStorageError
+                      ? new AppError(
+                          500,
+                          'storage_failure',
+                          'The generated image could not be saved to local storage. Check LIGHTFRAME_DATA_DIR and disk permissions.',
+                        )
+                      : error instanceof ProviderError
+                        ? mapProviderError(error)
+                        : isFastifyError(error)
+                          ? normalizeFastifyError(error)
+                          : undefined;
 
       const safeError =
         normalized ??

@@ -16,7 +16,7 @@ const openCharacterWorkshop = async (page: Page, concept: string): Promise<void>
   await expect(page.getByRole('button', { name: 'Generate reference image' })).toBeEnabled();
 };
 
-test('generated reference hydrates into Lucy and its exact Recent version survives refresh', async ({
+test('optimized reference hydrates its stored Lucy prompt atomically and survives refresh', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -27,10 +27,32 @@ test('generated reference hydrates into Lucy and its exact Recent version surviv
   await expect(page.getByText('Reference image attached', { exact: true })).toBeVisible();
   await expect(page.getByAltText('Generated front-facing character reference')).toBeVisible();
   expect(network.referenceImageGenerations).toHaveLength(1);
+  expect(network.referencePromptOptimizations).toHaveLength(1);
+  expect(network.referenceWorkflowCalls).toEqual(['optimize', 'generate']);
 
   const generated = network.referenceImageGenerations[0];
+  const optimized = network.referencePromptOptimizations[0];
   expect(generated).toBeDefined();
-  if (!generated) throw new Error('The deterministic reference was not generated.');
+  expect(optimized).toBeDefined();
+  if (!generated || !optimized) throw new Error('The deterministic reference was not generated.');
+  expect(generated.rawPrompt).toBe(optimized.request.rawPrompt);
+  expect(generated.options).toEqual(optimized.request.options);
+  expect(generated.options.framing).toBe('full_body');
+  expect(generated.options.orientation).toBe('auto');
+  expect(generated.optimization.enabled).toBe(true);
+  if (!generated.optimization.enabled) throw new Error('Prompt optimization was bypassed.');
+  expect(generated.optimization.result.optimizedImagePrompt).toBe(
+    optimized.response.result.optimizedImagePrompt,
+  );
+  expect(generated.imagePromptSentToProvider).toBe(optimized.response.result.optimizedImagePrompt);
+  expect(generated.optimization.result.lucy25CharacterPrompt).toBe(
+    optimized.response.result.lucy25CharacterPrompt,
+  );
+  expect(generated.optimization.result.recommendedSettings).toMatchObject({
+    framing: 'full_body',
+    orientation: 'landscape',
+    size: '1536x1024',
+  });
 
   await page.getByRole('button', { name: 'Use in working draft' }).click();
   await expect(page.getByRole('dialog', { name: 'Character Workshop' })).toBeHidden();
@@ -47,18 +69,43 @@ test('generated reference hydrates into Lucy and its exact Recent version surviv
     {
       model: 'lucy-2.5',
       initial: {
-        prompt: generated.workshopPrompt,
+        prompt: optimized.response.result.lucy25CharacterPrompt,
         imageName: `reference-${generated.assetId}.png`,
-        enhance: false,
+        enhance: true,
       },
+    },
+  ]);
+  expect(browser.applies).toEqual([]);
+
+  const recentRawPrompt = await page.evaluate((storageKey) => {
+    const serialized = localStorage.getItem(storageKey);
+    if (!serialized) return null;
+    const store = JSON.parse(serialized) as { recentPrompts?: Array<{ prompt?: string }> };
+    return store.recentPrompts?.[0]?.prompt ?? null;
+  }, CREATIVE_ASSET_STORAGE_KEY);
+  expect(recentRawPrompt).toBe(generated.rawPrompt);
+  expect(recentRawPrompt).not.toBe(optimized.response.result.lucy25CharacterPrompt);
+
+  const manuallyEditedLucyPrompt = `${optimized.response.result.lucy25CharacterPrompt} Keep the hand-painted badge visible.`;
+  await page.getByLabel('Character direction').fill(manuallyEditedLucyPrompt);
+  await page.getByRole('button', { name: 'Apply changes' }).click();
+  await expect.poll(async () => (await readBrowserState(page)).applies.length).toBe(1);
+  browser = await readBrowserState(page);
+  expect(browser.applies).toEqual([
+    {
+      prompt: manuallyEditedLucyPrompt,
+      imageName: `reference-${generated.assetId}.png`,
+      enhance: true,
     },
   ]);
 
   await page.reload();
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   await page.getByRole('button', { name: /^Recent\b/u }).click();
-  await expect(page.getByAltText('Recent character reference')).toBeVisible();
-  await page.getByRole('button', { name: /^Use recent prompt:/u }).click();
+  await expect(page.getByAltText('Recent character reference')).toHaveCount(2);
+  await page
+    .getByRole('button', { name: `Use recent prompt: ${generated.rawPrompt}`, exact: true })
+    .click();
   await expect(page.getByRole('dialog', { name: 'Recipe Shelf' })).toBeHidden();
 
   await openRecipeDockWhenOverlaid(page);
@@ -68,11 +115,13 @@ test('generated reference hydrates into Lucy and its exact Recent version surviv
 
   browser = await readBrowserState(page);
   expect(browser.connections[0]?.initial).toEqual({
-    prompt: generated.workshopPrompt,
+    prompt: optimized.response.result.lucy25CharacterPrompt,
     imageName: `reference-${generated.assetId}.png`,
-    enhance: false,
+    enhance: true,
   });
+  expect(browser.applies).toEqual([]);
   expect(network.referenceImageGenerations).toHaveLength(1);
+  expect(network.referenceWorkflowCalls).toEqual(['optimize', 'generate']);
   expect(network.referenceImageMetadataReads.filter((id) => id === generated.assetId).length).toBe(
     2,
   );

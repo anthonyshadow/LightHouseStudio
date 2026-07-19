@@ -19,6 +19,12 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   elevenLabsEnableLogging: false,
   providerTimeoutMs: 1_000,
   referenceImageTimeoutMs: 1_000,
+  openAiPromptOptimizerModel: 'gpt-5.6',
+  openAiPromptOptimizerReasoning: 'medium',
+  openAiPromptOptimizerVersion: 'lucy-character-reference-v1',
+  openAiPromptOptimizerTimeoutMs: 1_000,
+  openAiReferenceImageModel: 'gpt-image-2',
+  openAiReferenceImageQuality: 'high',
   lightframeDataDir: './.lightframe-data-test',
   ...overrides,
 });

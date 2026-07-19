@@ -1,9 +1,17 @@
 import { z } from 'zod';
+import {
+  CHARACTER_PROMPT_OPTIMIZER_DEFAULT_MODEL,
+  CHARACTER_PROMPT_OPTIMIZER_DEFAULT_REASONING,
+  CHARACTER_PROMPT_OPTIMIZER_DEFAULT_VERSION,
+  REFERENCE_IMAGE_MODEL_ID,
+  REFERENCE_IMAGE_QUALITY,
+} from '@studio/contracts';
 
 export const DEFAULT_API_PORT = 4100;
 export const DEFAULT_ELEVENLABS_STS_MODEL_ID = 'eleven_multilingual_sts_v2';
 export const DEFAULT_LIGHTFRAME_DATA_DIR = './.lightframe-data';
 export const DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
+export const DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS = 30_000;
 
 const optionalSecretSchema = z.preprocess(
   (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
@@ -32,6 +40,19 @@ const environmentSchema = z.object({
   PORT: portSchema,
   DECART_API_KEY: optionalSecretSchema,
   OPENAI_API_KEY: optionalSecretSchema,
+  OPENAI_PROMPT_OPTIMIZER_MODEL: optionalModelSchema,
+  OPENAI_PROMPT_OPTIMIZER_REASONING: z.preprocess(
+    (value) =>
+      typeof value === 'string' ? (value.trim() === '' ? undefined : value.trim()) : value,
+    z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
+  ),
+  OPENAI_PROMPT_OPTIMIZER_VERSION: optionalModelSchema,
+  OPENAI_REFERENCE_IMAGE_MODEL: optionalModelSchema,
+  OPENAI_REFERENCE_IMAGE_QUALITY: z.preprocess(
+    (value) =>
+      typeof value === 'string' ? (value.trim() === '' ? undefined : value.trim()) : value,
+    z.enum(['high', 'medium']).optional(),
+  ),
   ELEVENLABS_API_KEY: optionalSecretSchema,
   ELEVENLABS_STS_MODEL_ID: optionalModelSchema,
   ELEVENLABS_ENABLE_LOGGING: strictBooleanSchema,
@@ -47,6 +68,13 @@ export interface RuntimeConfig {
   readonly port: number;
   readonly decartApiKey?: string;
   readonly openAiApiKey?: string;
+  readonly openAiPromptOptimizerModel: string;
+  readonly openAiPromptOptimizerReasoning:
+    'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  readonly openAiPromptOptimizerVersion: string;
+  readonly openAiPromptOptimizerTimeoutMs: number;
+  readonly openAiReferenceImageModel: string;
+  readonly openAiReferenceImageQuality: 'high' | 'medium';
   readonly elevenLabsApiKey?: string;
   readonly elevenLabsModelId: string;
   readonly elevenLabsEnableLogging: boolean;
@@ -86,6 +114,16 @@ export const parseEnvironment = (
     ...(result.data.OPENAI_API_KEY === undefined
       ? {}
       : { openAiApiKey: result.data.OPENAI_API_KEY }),
+    openAiPromptOptimizerModel:
+      result.data.OPENAI_PROMPT_OPTIMIZER_MODEL ?? CHARACTER_PROMPT_OPTIMIZER_DEFAULT_MODEL,
+    openAiPromptOptimizerReasoning:
+      result.data.OPENAI_PROMPT_OPTIMIZER_REASONING ?? CHARACTER_PROMPT_OPTIMIZER_DEFAULT_REASONING,
+    openAiPromptOptimizerVersion:
+      result.data.OPENAI_PROMPT_OPTIMIZER_VERSION ?? CHARACTER_PROMPT_OPTIMIZER_DEFAULT_VERSION,
+    openAiPromptOptimizerTimeoutMs: DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS,
+    openAiReferenceImageModel: result.data.OPENAI_REFERENCE_IMAGE_MODEL ?? REFERENCE_IMAGE_MODEL_ID,
+    openAiReferenceImageQuality:
+      result.data.OPENAI_REFERENCE_IMAGE_QUALITY ?? REFERENCE_IMAGE_QUALITY,
     ...(result.data.ELEVENLABS_API_KEY === undefined
       ? {}
       : { elevenLabsApiKey: result.data.ELEVENLABS_API_KEY }),

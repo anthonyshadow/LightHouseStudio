@@ -1270,13 +1270,13 @@
     "semantic_hash": ""
   },
   "apps/api/src/providers/openai/reference-image-provider.test.ts": {
-    "mtime": 1784485645.4071007,
-    "ast_hash": "188c9d09c1bd34929d212e33371ac9b3",
+    "mtime": 1784484192.47389,
+    "ast_hash": "1d1779b332c4eb02914c233aa663866c",
     "semantic_hash": ""
   },
   "apps/api/src/providers/openai/reference-image-provider.ts": {
-    "mtime": 1784485619.7637882,
-    "ast_hash": "9d41e95d5f7a278fda952396bdbf1845",
+    "mtime": 1784484192.2981486,
+    "ast_hash": "fbb48dd65944df4bbcf1dd52c96cf520",
     "semantic_hash": ""
   },
   "apps/web/src/adapters/api-client/apiClient.test.ts": {

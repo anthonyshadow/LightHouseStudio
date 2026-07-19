@@ -6,9 +6,12 @@ import {
   VOICE_CONVERSION_MAX_BYTES,
   apiErrorResponseSchema,
   capabilitiesResponseSchema,
+  characterPromptOptimizationResultSchema,
   createReferenceImageRequestSchema,
   healthResponseSchema,
   importSharedVoiceRequestSchema,
+  optimizeCharacterReferencePromptRequestSchema,
+  optimizeCharacterReferencePromptResponseSchema,
   realtimeTokenRequestSchema,
   realtimeTokenResponseSchema,
   referenceImageAssetSchema,
@@ -45,8 +48,13 @@ describe('health and capabilities contracts', () => {
         referenceImages: {
           available: true,
           modelId: 'gpt-image-2',
-          size: '1024x1024',
+          sizes: ['1024x1024', '1024x1536', '1536x1024'],
           quality: 'high',
+          optimizer: {
+            available: true,
+            model: 'gpt-5.6',
+            version: 'lucy-character-reference-v1',
+          },
         },
       }),
     ).toEqual({
@@ -55,8 +63,13 @@ describe('health and capabilities contracts', () => {
       referenceImages: {
         available: true,
         modelId: 'gpt-image-2',
-        size: '1024x1024',
+        sizes: ['1024x1024', '1024x1536', '1536x1024'],
         quality: 'high',
+        optimizer: {
+          available: true,
+          model: 'gpt-5.6',
+          version: 'lucy-character-reference-v1',
+        },
       },
     });
     expect(
@@ -66,8 +79,13 @@ describe('health and capabilities contracts', () => {
         referenceImages: {
           available: false,
           modelId: 'gpt-image-2',
-          size: '1024x1024',
+          sizes: ['1024x1024', '1024x1536', '1536x1024'],
           quality: 'high',
+          optimizer: {
+            available: false,
+            model: 'gpt-5.6',
+            version: 'lucy-character-reference-v1',
+          },
         },
       }).success,
     ).toBe(false);
@@ -75,36 +93,143 @@ describe('health and capabilities contracts', () => {
 });
 
 describe('reference image contracts', () => {
-  it('accepts one bounded workshop prompt and an idempotency UUID', () => {
+  const options = {
+    framing: 'head_and_shoulders',
+    orientation: 'square',
+    renderingMode: 'photorealistic',
+    expression: 'neutral',
+    background: 'neutral_gray',
+    targetUse: 'lucy_2_5_character_reference',
+  } as const;
+  const result = {
+    optimizedImagePrompt: '  Canonical ceramic astronaut reference.\n',
+    lucy25CharacterPrompt:
+      'Replace the character in the video with the ceramic astronaut. Preserve motion naturally.',
+    normalizedCharacterDescription: 'A ceramic astronaut.',
+    preservedCharacterFacts: ['ceramic astronaut'],
+    technicalDefaultsAdded: ['soft diffuse lighting'],
+    warnings: [],
+    recommendedSettings: {
+      framing: 'head_and_shoulders',
+      orientation: 'square',
+      size: '1024x1024',
+      quality: 'high',
+      format: 'jpeg',
+    },
+  } as const;
+
+  it('trims raw input, validates strict options, and rejects empty or invalid custom input', () => {
     expect(
-      createReferenceImageRequestSchema.parse({
-        requestId: 'ffaf7176-b3f4-4506-9312-7a00d9dd6295',
-        workshopPrompt: '  A ceramic astronaut  ',
+      optimizeCharacterReferencePromptRequestSchema.parse({
+        rawPrompt: '  A ceramic astronaut  ',
+        options,
       }),
-    ).toEqual({
-      requestId: 'ffaf7176-b3f4-4506-9312-7a00d9dd6295',
-      workshopPrompt: '  A ceramic astronaut  ',
-    });
+    ).toEqual({ rawPrompt: 'A ceramic astronaut', options });
     expect(
-      createReferenceImageRequestSchema.safeParse({
-        requestId: 'not-a-uuid',
-        workshopPrompt: 'Astronaut',
+      optimizeCharacterReferencePromptRequestSchema.safeParse({ rawPrompt: '   ', options })
+        .success,
+    ).toBe(false);
+    expect(
+      optimizeCharacterReferencePromptRequestSchema.safeParse({
+        rawPrompt: 'Astronaut',
+        options: { ...options, background: 'plain_custom' },
+      }).success,
+    ).toBe(false);
+    expect(
+      optimizeCharacterReferencePromptRequestSchema.safeParse({
+        rawPrompt: 'Astronaut',
+        options: { ...options, framing: 'close_up' },
       }).success,
     ).toBe(false);
   });
 
-  it('keeps browser metadata free of prompts, storage keys, and provider payloads', () => {
+  it('accepts the strict optimizer result and rejects a missing or blank image prompt', () => {
+    expect(characterPromptOptimizationResultSchema.parse(result)).toEqual(result);
+    expect(
+      characterPromptOptimizationResultSchema.safeParse({
+        ...result,
+        optimizedImagePrompt: undefined,
+      }).success,
+    ).toBe(false);
+    expect(
+      characterPromptOptimizationResultSchema.safeParse({
+        ...result,
+        optimizedImagePrompt: '   ',
+      }).success,
+    ).toBe(false);
+    expect(
+      optimizeCharacterReferencePromptResponseSchema.parse({
+        result,
+        model: 'gpt-5.6',
+        version: 'lucy-character-reference-v1',
+        inputHash: 'b'.repeat(64),
+      }).result.optimizedImagePrompt,
+    ).toBe(result.optimizedImagePrompt);
+  });
+
+  it('requires an explicit optimization branch and preserves manual optimized prompt whitespace', () => {
+    const enabled = createReferenceImageRequestSchema.parse({
+      requestId: 'ffaf7176-b3f4-4506-9312-7a00d9dd6295',
+      rawPrompt: '  A ceramic astronaut  ',
+      options,
+      optimization: {
+        enabled: true,
+        result,
+        model: 'gpt-5.6',
+        version: 'lucy-character-reference-v1',
+        inputHash: 'b'.repeat(64),
+        manuallyEdited: true,
+      },
+    });
+    expect(enabled.rawPrompt).toBe('A ceramic astronaut');
+    expect(enabled.optimization.enabled && enabled.optimization.result.optimizedImagePrompt).toBe(
+      result.optimizedImagePrompt,
+    );
+    expect(
+      createReferenceImageRequestSchema.parse({
+        requestId: 'ffaf7176-b3f4-4506-9312-7a00d9dd6295',
+        rawPrompt: 'Astronaut',
+        options,
+        optimization: { enabled: false },
+      }).optimization,
+    ).toEqual({ enabled: false });
+    expect(
+      createReferenceImageRequestSchema.safeParse({
+        requestId: 'ffaf7176-b3f4-4506-9312-7a00d9dd6295',
+        rawPrompt: 'Astronaut',
+        options,
+      }).success,
+    ).toBe(false);
+  });
+
+  it('exposes owner-scoped prompt audit metadata but rejects internal storage/provider payloads', () => {
     const metadata = {
       assetId: '28d0b01f-70aa-4db6-ac65-379cdd916113',
       mimeType: 'image/jpeg',
+      size: '1024x1024',
       width: 1024,
       height: 1024,
       byteSize: 123_456,
       source: 'generated',
       provider: 'openai',
       model: 'gpt-image-2',
+      quality: 'high',
       promptHash: 'a'.repeat(64),
+      optimizationEnabled: true,
+      originalPrompt: 'A ceramic astronaut',
+      optimizedImagePrompt: result.optimizedImagePrompt,
+      lucy25CharacterPrompt: result.lucy25CharacterPrompt,
+      normalizedCharacterDescription: result.normalizedCharacterDescription,
+      preservedCharacterFacts: [...result.preservedCharacterFacts],
+      technicalDefaultsAdded: [...result.technicalDefaultsAdded],
+      warnings: [...result.warnings],
+      options,
+      requestedGenerator: null,
+      optimizer: { model: 'gpt-5.6', version: 'lucy-character-reference-v1' },
+      optimizationInputHash: 'b'.repeat(64),
+      manuallyEdited: false,
       createdAt: '2026-07-18T12:00:00.000Z',
+      updatedAt: '2026-07-18T12:00:00.000Z',
       contentUrl: '/api/reference-images/28d0b01f-70aa-4db6-ac65-379cdd916113/content',
     };
 
@@ -113,7 +238,16 @@ describe('reference image contracts', () => {
       referenceImageAssetSchema.safeParse({ ...metadata, storageKey: 'private/image.jpg' }).success,
     ).toBe(false);
     expect(
-      referenceImageAssetSchema.safeParse({ ...metadata, originalPrompt: 'secret prompt' }).success,
+      referenceImageAssetSchema.safeParse({ ...metadata, providerRequestId: 'private-request' })
+        .success,
+    ).toBe(false);
+    expect(
+      referenceImageAssetSchema.safeParse({
+        ...metadata,
+        size: '1024x1536',
+        width: 1536,
+        height: 1536,
+      }).success,
     ).toBe(false);
   });
 });

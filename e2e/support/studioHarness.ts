@@ -1,5 +1,11 @@
 import { createHash } from 'node:crypto';
 import { expect, type Page } from '@playwright/test';
+import type {
+  CreateReferenceImageRequest,
+  OptimizeCharacterReferencePromptRequest,
+  OptimizeCharacterReferencePromptResponse,
+  ReferenceImageAsset,
+} from '@studio/contracts';
 
 // A 64px mint VP8/Opus WebM used by the deterministic MediaRecorder. Keeping a
 // real media container here lets the stable main-stage playback exercise the
@@ -14,19 +20,7 @@ const REFERENCE_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const REFERENCE_PNG = Buffer.from(REFERENCE_PNG_BASE64, 'base64');
 
-export type MockReferenceImageAsset = {
-  assetId: string;
-  mimeType: 'image/png';
-  width: 1024;
-  height: 1024;
-  byteSize: number;
-  source: 'generated';
-  provider: 'openai';
-  model: 'gpt-image-2';
-  promptHash: string;
-  createdAt: string;
-  contentUrl: string;
-};
+export type MockReferenceImageAsset = ReferenceImageAsset;
 
 export type ModelId = 'lucy-2.5' | 'lucy-vton-3';
 
@@ -51,11 +45,14 @@ export type BrowserJourneyState = {
 
 export type NetworkJourneyState = {
   apiRequests: Array<{ path: string; model: ModelId | null }>;
-  referenceImageGenerations: Array<{
-    requestId: string;
-    workshopPrompt: string;
-    assetId: string;
+  referenceWorkflowCalls: Array<'optimize' | 'generate'>;
+  referencePromptOptimizations: Array<{
+    request: OptimizeCharacterReferencePromptRequest;
+    response: OptimizeCharacterReferencePromptResponse;
   }>;
+  referenceImageGenerations: Array<
+    CreateReferenceImageRequest & { assetId: string; imagePromptSentToProvider: string }
+  >;
   referenceImageMetadataReads: string[];
   referenceImageContentReads: string[];
   blockedExternalRequests: string[];
@@ -78,21 +75,113 @@ const assetIdForSequence = (sequence: number): string =>
 
 const createMockReferenceAsset = (
   sequence: number,
-  workshopPrompt: string,
+  request: CreateReferenceImageRequest,
 ): MockReferenceImageAsset => {
   const assetId = assetIdForSequence(sequence);
+  const optimization = request.optimization;
+  const generationPrompt = optimization.enabled
+    ? optimization.result.optimizedImagePrompt
+    : request.rawPrompt;
+  const recommendedSettings = optimization.enabled
+    ? optimization.result.recommendedSettings
+    : {
+        orientation: 'square' as const,
+        size: '1024x1024' as const,
+        quality: 'high' as const,
+        format: 'png' as const,
+      };
   return {
     assetId,
     mimeType: 'image/png',
-    width: 1024,
-    height: 1024,
+    size: recommendedSettings.size,
+    width: recommendedSettings.size === '1536x1024' ? 1536 : 1024,
+    height: recommendedSettings.size === '1024x1536' ? 1536 : 1024,
     byteSize: REFERENCE_PNG.byteLength,
     source: 'generated',
     provider: 'openai',
-    model: 'gpt-image-2',
-    promptHash: promptHash(workshopPrompt),
+    model: request.generator?.model ?? 'gpt-image-2',
+    quality: recommendedSettings.quality,
+    promptHash: promptHash(request.rawPrompt),
+    optimizationEnabled: optimization.enabled,
+    originalPrompt: request.rawPrompt,
+    optimizedImagePrompt: generationPrompt,
+    lucy25CharacterPrompt: optimization.enabled
+      ? optimization.result.lucy25CharacterPrompt
+      : request.rawPrompt,
+    normalizedCharacterDescription: optimization.enabled
+      ? optimization.result.normalizedCharacterDescription
+      : request.rawPrompt,
+    preservedCharacterFacts: optimization.enabled
+      ? optimization.result.preservedCharacterFacts
+      : [request.rawPrompt],
+    technicalDefaultsAdded: optimization.enabled ? optimization.result.technicalDefaultsAdded : [],
+    warnings: optimization.enabled ? optimization.result.warnings : [],
+    options: request.options,
+    requestedGenerator: request.generator ?? null,
+    optimizer: optimization.enabled
+      ? { model: optimization.model, version: optimization.version }
+      : null,
+    optimizationInputHash: optimization.enabled ? optimization.inputHash : null,
+    manuallyEdited: optimization.enabled && optimization.manuallyEdited,
     createdAt: '2030-01-01T00:00:00.000Z',
+    updatedAt: '2030-01-01T00:00:00.000Z',
     contentUrl: `/api/reference-images/${assetId}/content`,
+  } as MockReferenceImageAsset;
+};
+
+const createOptimizationResponse = (
+  request: OptimizeCharacterReferencePromptRequest,
+): OptimizeCharacterReferencePromptResponse => {
+  const normalized = request.rawPrompt.replace(/\s+/gu, ' ').trim();
+  const recommendedSettings =
+    request.options.orientation === 'portrait_9_16'
+      ? {
+          framing: request.options.framing,
+          orientation: 'portrait' as const,
+          size: '1024x1536' as const,
+          quality: 'high' as const,
+          format: 'png' as const,
+        }
+      : request.options.orientation === 'landscape_16_9'
+        ? {
+            framing: request.options.framing,
+            orientation: 'landscape' as const,
+            size: '1536x1024' as const,
+            quality: 'high' as const,
+            format: 'png' as const,
+          }
+        : request.options.orientation === 'square'
+          ? {
+              framing: request.options.framing,
+              orientation: 'square' as const,
+              size: '1024x1024' as const,
+              quality: 'high' as const,
+              format: 'png' as const,
+            }
+          : {
+              framing: request.options.framing,
+              orientation: 'landscape' as const,
+              size: '1536x1024' as const,
+              quality: 'high' as const,
+              format: 'png' as const,
+            };
+  return {
+    result: {
+      optimizedImagePrompt: `Canonical single-character reference image optimized for Decart Lucy 2.5 character transformation. Character: ${normalized} Centered, front-facing, eye-level, with clearly visible defining features, soft diffuse lighting, sharp natural detail, and a plain uncluttered background. Exactly one character; no watermark, caption, unrelated text, or background clutter.`,
+      lucy25CharacterPrompt: `Replace the character in the video with ${normalized} Preserve the source motion, expression, pose, and camera framing with natural tracking.`,
+      normalizedCharacterDescription: normalized,
+      preservedCharacterFacts: [normalized],
+      technicalDefaultsAdded: [
+        'Centered front-facing pose',
+        'Soft diffuse lighting',
+        'Plain uncluttered background',
+      ],
+      warnings: [],
+      recommendedSettings,
+    },
+    model: 'gpt-5.6',
+    version: 'lucy-character-reference-v1',
+    inputHash: createHash('sha256').update(JSON.stringify(request), 'utf8').digest('hex'),
   };
 };
 
@@ -102,6 +191,8 @@ export const installSuccessfulStudioHarness = async (
 ): Promise<NetworkJourneyState> => {
   const network: NetworkJourneyState = {
     apiRequests: [],
+    referenceWorkflowCalls: [],
+    referencePromptOptimizations: [],
     referenceImageGenerations: [],
     referenceImageMetadataReads: [],
     referenceImageContentReads: [],
@@ -295,7 +386,15 @@ export const installSuccessfulStudioHarness = async (
       });
       Object.defineProperty(window, 'createImageBitmap', {
         configurable: true,
-        value: () => Promise.resolve({ width: 1_024, height: 1_024, close: () => undefined }),
+        value: (source: Blob) => {
+          const persistedReference =
+            source instanceof File && /^reference-[0-9a-f-]+\./u.test(source.name);
+          return Promise.resolve({
+            width: persistedReference ? 1_536 : 1_024,
+            height: 1_024,
+            close: () => undefined,
+          });
+        },
       });
       if (stubMediaPlayback) {
         Object.defineProperty(HTMLMediaElement.prototype, 'play', {
@@ -362,31 +461,51 @@ export const installSuccessfulStudioHarness = async (
           referenceImages: {
             available: options.referenceImagesAvailable ?? true,
             modelId: 'gpt-image-2',
-            size: '1024x1024',
+            sizes: ['1024x1024', '1024x1536', '1536x1024'],
             quality: 'high',
+            optimizer: {
+              available: options.referenceImagesAvailable ?? true,
+              model: 'gpt-5.6',
+              version: 'lucy-character-reference-v1',
+            },
           },
         }),
       });
       return;
     }
 
+    if (
+      requestUrl.pathname === '/api/reference-images/optimize' &&
+      route.request().method() === 'POST'
+    ) {
+      const request = route.request().postDataJSON() as OptimizeCharacterReferencePromptRequest;
+      const response = createOptimizationResponse(request);
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.referenceWorkflowCalls.push('optimize');
+      network.referencePromptOptimizations.push({ request, response });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(response),
+      });
+      return;
+    }
+
     if (requestUrl.pathname === '/api/reference-images' && route.request().method() === 'POST') {
-      const payload = route.request().postDataJSON() as {
-        requestId: string;
-        workshopPrompt: string;
-      };
+      const payload = route.request().postDataJSON() as CreateReferenceImageRequest;
       let asset = assetsByRequestId.get(payload.requestId);
       if (!asset) {
         assetSequence += 1;
-        asset = createMockReferenceAsset(assetSequence, payload.workshopPrompt);
+        asset = createMockReferenceAsset(assetSequence, payload);
         assetsByRequestId.set(payload.requestId, asset);
         assets.set(asset.assetId, asset);
       }
       network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.referenceWorkflowCalls.push('generate');
       network.referenceImageGenerations.push({
-        requestId: payload.requestId,
-        workshopPrompt: payload.workshopPrompt,
+        ...payload,
         assetId: asset.assetId,
+        imagePromptSentToProvider: asset.optimizedImagePrompt,
       });
       await route.fulfill({
         status: 201,

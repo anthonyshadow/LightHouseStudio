@@ -9,7 +9,11 @@ export type ProviderAvailability = {
   elevenLabs: boolean;
   elevenLabsModel: string | null;
   referenceImages?: boolean;
-  referenceImageModel?: 'gpt-image-2' | null;
+  referenceImageModel?: string | null;
+  referenceImageSizes?: ReadonlyArray<'1024x1024' | '1024x1536' | '1536x1024'>;
+  referenceImageOptimizerAvailable?: boolean;
+  referenceImageOptimizerModel?: string | null;
+  referenceImageOptimizerVersion?: string | null;
 };
 
 export type BrowserCapabilities = {
