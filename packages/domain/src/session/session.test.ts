@@ -115,6 +115,20 @@ describe('atomic realtime state', () => {
 });
 
 describe('image and live-output rules', () => {
+  it('validates untrusted MIME metadata before it becomes an ephemeral image descriptor', () => {
+    expect(
+      validateImageDescriptor({
+        mimeType: 'image/gif',
+        sizeBytes: 1_000,
+      }),
+    ).toEqual([
+      {
+        code: 'unsupported-image-type',
+        message: 'Choose a JPEG, PNG, or WebP image.',
+      },
+    ]);
+  });
+
   it('accepts exactly 10 MiB and rejects one byte more', () => {
     expect(validateImageDescriptor(image({ sizeBytes: MAX_IMAGE_BYTES }))).toEqual([]);
     expect(validateImageDescriptor(image({ sizeBytes: MAX_IMAGE_BYTES + 1 }))[0]?.code).toBe(
@@ -132,6 +146,35 @@ describe('image and live-output rules', () => {
       'low-resolution',
       'weak-character-aspect',
     ]);
+  });
+
+  it('owns the inclusive dimension and aspect-ratio warning boundaries', () => {
+    expect(
+      getImageQualityWarnings(image({ width: 512, height: 512 }), 'character').map(
+        ({ code }) => code,
+      ),
+    ).toEqual([]);
+    expect(
+      getImageQualityWarnings(image({ width: 1_050, height: 1_000 }), 'character').map(
+        ({ code }) => code,
+      ),
+    ).toEqual([]);
+    expect(
+      getImageQualityWarnings(image({ width: 1_051, height: 1_000 }), 'character').map(
+        ({ code }) => code,
+      ),
+    ).toContain('weak-character-aspect');
+    const garmentBoundary = getImageQualityWarnings(
+      image({ width: 400, height: 1_000 }),
+      'garment',
+    ).map(({ code }) => code);
+    expect(garmentBoundary).toContain('low-resolution');
+    expect(garmentBoundary).not.toContain('weak-garment-aspect');
+    expect(
+      getImageQualityWarnings(image({ width: 399, height: 1_000 }), 'garment').map(
+        ({ code }) => code,
+      ),
+    ).toEqual(expect.arrayContaining(['low-resolution', 'weak-garment-aspect']));
   });
 
   it('permits Apply and mode switching only in eligible states', () => {

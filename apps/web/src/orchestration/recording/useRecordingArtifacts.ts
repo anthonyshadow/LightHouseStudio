@@ -11,6 +11,7 @@ export const useRecordingArtifacts = () => {
   const [original, setOriginal] = useState<RecordingArtifact | null>(null);
   const [processed, setProcessed] = useState<RecordingArtifact | null>(null);
   const [sidecar, setSidecar] = useState<RecordingAudioSidecar>(IDLE_AUDIO_SIDECAR);
+  const [recordingError, setRecordingError] = useState<string | null>(null);
   const [processingState, setProcessingState] = useState<VoiceProcessingState>('idle');
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [downloaded, setDownloaded] = useState(false);
@@ -26,6 +27,7 @@ export const useRecordingArtifacts = () => {
       setOriginal(artifact);
       setProcessed(null);
       setSidecar(nextSidecar);
+      setRecordingError(null);
       setProcessingState('idle');
       setProcessingError(null);
       setDownloaded(false);
@@ -41,6 +43,7 @@ export const useRecordingArtifacts = () => {
     setOriginal(null);
     setProcessed(null);
     setSidecar(IDLE_AUDIO_SIDECAR);
+    setRecordingError(null);
     setProcessingState('idle');
     setProcessingError(null);
     setDownloaded(false);
@@ -50,8 +53,8 @@ export const useRecordingArtifacts = () => {
     (blob: Blob, mimeType: string, label: string): RecordingArtifact => {
       const source = originalRef.current;
       if (!source) throw new Error('Original recording is unavailable.');
-      revokeArtifactUrl(processedRef.current, 'replacement');
       const artifact = createProcessedRecordingArtifact(source, blob, mimeType, label);
+      revokeArtifactUrl(processedRef.current, 'replacement');
       processedRef.current = artifact;
       setProcessed(artifact);
       setProcessingState('ready');
@@ -85,8 +88,8 @@ export const useRecordingArtifacts = () => {
     setSidecar({ ...IDLE_AUDIO_SIDECAR, state: 'error', error: message });
   }, []);
 
-  const clearRecordingError = useCallback(() => setProcessingError(null), []);
-  const reportRecordingError = useCallback((message: string) => setProcessingError(message), []);
+  const clearRecordingError = useCallback(() => setRecordingError(null), []);
+  const reportRecordingError = useCallback((message: string) => setRecordingError(message), []);
   const markDownloaded = useCallback(() => setDownloaded(true), []);
   const beginProcessing = useCallback(() => {
     setProcessingState('processing');
@@ -124,6 +127,7 @@ export const useRecordingArtifacts = () => {
       original,
       processed,
       sidecar,
+      recordingError,
       processingState,
       processingError,
       downloaded,
@@ -145,6 +149,7 @@ export const useRecordingArtifacts = () => {
       original,
       processed,
       sidecar,
+      recordingError,
       processingState,
       processingError,
       downloaded,

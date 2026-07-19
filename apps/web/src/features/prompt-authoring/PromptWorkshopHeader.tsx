@@ -79,7 +79,7 @@ const draftStatusStyles = (theme: Theme): CSSObject => ({
 
 const intentHintStyles = (theme: Theme): CSSObject => ({
   margin: 0,
-  color: theme.colors.textFaint,
+  color: theme.colors.textMuted,
   fontSize: '0.8rem',
   lineHeight: 1.5,
   '@media (max-height: 36rem)': { display: 'none' },

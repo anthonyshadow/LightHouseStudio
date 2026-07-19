@@ -1,11 +1,15 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTheme } from '@emotion/react';
 import { formatDuration } from '../recording/recordingHelpers';
+import type { RecordingArtifact } from '../recording/types';
 import { modeLabel, type SessionLifecycle, type StudioMode } from '../media-session';
 import {
+  activityIndicatorStyles,
   audioMeterStyles,
   audioTrackStyles,
   badgeStyles,
+  blockingCardStyles,
+  blockingOverlayStyles,
   bottomOverlayStyles,
   emptyIconStyles,
   emptyStyles,
@@ -20,17 +24,26 @@ import {
   videoStyles,
   visuallyHiddenTextStyles,
 } from './MediaStage.styles';
+import { StageNoticeLayer } from './StageNoticeLayer';
+import type { StageNotice } from './stageNotices';
 import { useAudioLevel } from './useAudioLevel';
 
+export type StagePresentation =
+  | { kind: 'idle'; mode: StudioMode }
+  | { kind: 'live'; stream: MediaStream; origin: 'local' | 'provider'; mirrored: boolean }
+  | { kind: 'finalizing'; retainedStream: MediaStream | null; startedAt: number }
+  | { kind: 'playback'; artifact: RecordingArtifact; controlsLocked: boolean };
+
 export type MediaStageProps = {
-  stream: MediaStream | null;
+  presentation: StagePresentation;
   mode: StudioMode;
   lifecycle: SessionLifecycle;
-  transformed: boolean;
   liveSeconds: number;
   generationSeconds: number;
   recording: boolean;
   recordingSeconds: number;
+  notices?: readonly StageNotice[];
+  onPlaybackError?: (message: string) => void;
 };
 
 type StreamDetails = {
@@ -38,6 +51,12 @@ type StreamDetails = {
   resolution: string;
   videoSource: string;
   audioSource: string | null;
+};
+
+type LiveSnapshot = {
+  stream: MediaStream;
+  origin: 'local' | 'provider';
+  mirrored: boolean;
 };
 
 const CameraIcon = () => (
@@ -255,24 +274,97 @@ const AudioLevelMeter = ({
 };
 
 export const MediaStage = ({
-  stream,
+  presentation,
   mode,
   lifecycle,
-  transformed,
   liveSeconds,
   generationSeconds,
   recording,
   recordingSeconds,
+  notices = [],
+  onPlaybackError,
 }: MediaStageProps) => {
   const theme = useTheme();
   const figureRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const boundKindRef = useRef<'idle' | 'stream' | 'playback'>('idle');
+  const boundPlaybackUrlRef = useRef<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
+  const [playbackError, setPlaybackError] = useState<string | null>(null);
+  const [lastLiveSnapshot, setLastLiveSnapshot] = useState<LiveSnapshot | null>(null);
+
+  const playbackArtifact = presentation.kind === 'playback' ? presentation.artifact : null;
+  const playbackUrl = playbackArtifact?.objectUrl ?? null;
+  const livePresentation =
+    presentation.kind === 'live'
+      ? presentation
+      : presentation.kind === 'finalizing'
+        ? lastLiveSnapshot
+        : null;
+  const stream =
+    presentation.kind === 'live'
+      ? presentation.stream
+      : presentation.kind === 'finalizing'
+        ? (presentation.retainedStream ?? lastLiveSnapshot?.stream ?? null)
+        : null;
+  const transformed = livePresentation?.origin === 'provider';
+  const streamDetails = describeStream(stream, transformed);
+  const details: StreamDetails =
+    presentation.kind === 'playback'
+      ? {
+          hasLiveVideo: true,
+          resolution: 'Recorded take',
+          videoSource: 'Recorded playback',
+          audioSource: null,
+        }
+      : presentation.kind === 'finalizing'
+        ? {
+            ...streamDetails,
+            hasLiveVideo: Boolean(stream),
+            resolution: 'Finalizing take',
+            videoSource: 'Last live frame',
+          }
+        : streamDetails;
+  const stageMode = presentation.kind === 'idle' ? presentation.mode : mode;
+  const copy = emptyCopy(stageMode);
+  const statusTone = presentation.kind === 'playback' ? 'accent' : lifecycleTone(lifecycle);
+  const mirrored =
+    presentation.kind === 'live'
+      ? presentation.mirrored
+      : presentation.kind === 'finalizing'
+        ? (lastLiveSnapshot?.mirrored ?? false)
+        : false;
+  const playbackLocked = presentation.kind === 'playback' && presentation.controlsLocked;
+  const isFinalizing = presentation.kind === 'finalizing';
+  const hasVisibleMedia = details.hasLiveVideo;
   useTrackRevision(stream);
-  const details = describeStream(stream, transformed);
-  const copy = emptyCopy(mode);
-  const statusTone = lifecycleTone(lifecycle);
-  const mirrored = details.hasLiveVideo && !transformed;
+
+  const currentLiveStream = presentation.kind === 'live' ? presentation.stream : null;
+  const currentLiveOrigin = presentation.kind === 'live' ? presentation.origin : null;
+  const currentLiveMirrored = presentation.kind === 'live' ? presentation.mirrored : false;
+
+  useEffect(() => {
+    if (!currentLiveStream || !currentLiveOrigin) return;
+    setLastLiveSnapshot((current) => {
+      if (
+        current?.stream === currentLiveStream &&
+        current.origin === currentLiveOrigin &&
+        current.mirrored === currentLiveMirrored
+      ) {
+        return current;
+      }
+      return {
+        stream: currentLiveStream,
+        origin: currentLiveOrigin,
+        mirrored: currentLiveMirrored,
+      };
+    });
+  }, [currentLiveMirrored, currentLiveOrigin, currentLiveStream]);
+
+  useEffect(() => {
+    if (presentation.kind === 'idle') setLastLiveSnapshot(null);
+  }, [presentation.kind]);
+
   const fullscreenSupported =
     typeof document !== 'undefined' &&
     document.fullscreenEnabled &&
@@ -282,18 +374,105 @@ export const MediaStage = ({
   useEffect(() => {
     const video = videoRef.current;
     if (!video) return;
-    video.srcObject = stream;
-    if (stream) {
+
+    let restorePlaybackPosition: (() => void) | null = null;
+
+    if (playbackUrl) {
+      const nextUrl = playbackUrl;
+      const replacingPlayback =
+        boundKindRef.current === 'playback' && boundPlaybackUrlRef.current !== nextUrl;
+      const restoreTime = replacingPlayback ? video.currentTime : 0;
+
+      video.pause();
+      if (video.srcObject) video.srcObject = null;
+      video.muted = false;
+      video.autoplay = false;
+      video.controls = !playbackLocked;
+
+      if (boundPlaybackUrlRef.current !== nextUrl || video.getAttribute('src') !== nextUrl) {
+        video.src = nextUrl;
+        boundPlaybackUrlRef.current = nextUrl;
+        boundKindRef.current = 'playback';
+
+        if (restoreTime > 0) {
+          restorePlaybackPosition = () => {
+            const lastPlayableTime =
+              Number.isFinite(video.duration) && video.duration > 0
+                ? Math.max(0, video.duration - 0.001)
+                : restoreTime;
+            try {
+              video.currentTime = Math.min(restoreTime, lastPlayableTime);
+            } catch {
+              // A malformed recording can reject seeking; playback error handling remains active.
+            }
+            video.pause();
+          };
+          video.addEventListener('loadedmetadata', restorePlaybackPosition, { once: true });
+        }
+      }
+
+      if (playbackLocked) video.pause();
+    } else if (stream) {
+      if (boundKindRef.current === 'playback') {
+        video.pause();
+        video.removeAttribute('src');
+        try {
+          video.load();
+        } catch {
+          // Some test and embedded browser environments do not implement load().
+        }
+      }
+
+      video.muted = true;
+      video.autoplay = true;
+      video.controls = false;
+      if (video.srcObject !== stream) video.srcObject = stream;
+      boundKindRef.current = 'stream';
+      boundPlaybackUrlRef.current = null;
       try {
         void video.play().catch(() => undefined);
       } catch {
         // Some test and embedded browser environments throw synchronously here.
       }
+    } else if (presentation.kind !== 'finalizing') {
+      video.pause();
+      if (video.srcObject) video.srcObject = null;
+      if (boundKindRef.current === 'playback' || video.hasAttribute('src')) {
+        video.removeAttribute('src');
+        try {
+          video.load();
+        } catch {
+          // Some test and embedded browser environments do not implement load().
+        }
+      }
+      video.muted = true;
+      video.autoplay = true;
+      video.controls = false;
+      boundKindRef.current = 'idle';
+      boundPlaybackUrlRef.current = null;
     }
+
     return () => {
-      if (video.srcObject === stream) video.srcObject = null;
+      if (restorePlaybackPosition) {
+        video.removeEventListener('loadedmetadata', restorePlaybackPosition);
+      }
     };
-  }, [stream]);
+  }, [playbackLocked, playbackUrl, presentation.kind, stream]);
+
+  useEffect(
+    () => () => {
+      const video = videoRef.current;
+      if (!video) return;
+      video.pause();
+      video.srcObject = null;
+      video.removeAttribute('src');
+    },
+    [],
+  );
+
+  useEffect(() => {
+    setPlaybackError(null);
+  }, [playbackArtifact?.id, playbackArtifact?.objectUrl]);
 
   useEffect(() => {
     if (!fullscreenSupported) return;
@@ -312,29 +491,93 @@ export const MediaStage = ({
     void stage.requestFullscreen().catch(() => undefined);
   };
 
+  const handlePlaybackError = () => {
+    if (presentation.kind !== 'playback') return;
+    const mediaErrorCode = videoRef.current?.error?.code;
+    const detail = mediaErrorCode ? ` (media error ${mediaErrorCode})` : '';
+    const message = `This take could not be loaded for playback${detail}. Retry, download it, or discard it from Take Review.`;
+    setPlaybackError(message);
+    onPlaybackError?.(message);
+  };
+
+  const retryPlayback = () => {
+    const video = videoRef.current;
+    if (!video || presentation.kind !== 'playback') return;
+    setPlaybackError(null);
+    try {
+      video.load();
+    } catch {
+      handlePlaybackError();
+    }
+  };
+
+  const effectiveNotices: readonly StageNotice[] = playbackError
+    ? [
+        {
+          id: 'stage-playback-error',
+          severity: 'error',
+          title: 'Playback unavailable',
+          message: playbackError,
+          priority: 1_000,
+          action: { label: 'Retry', onAction: retryPlayback },
+          onDismiss: () => setPlaybackError(null),
+        },
+        ...notices,
+      ]
+    : notices;
+
+  const statusLabel =
+    presentation.kind === 'playback'
+      ? 'Recorded take'
+      : presentation.kind === 'finalizing'
+        ? 'Finalizing take'
+        : lifecycleLabel(lifecycle);
+
   return (
     <figure
       ref={figureRef}
-      css={stageStyles(theme, recording)}
-      aria-label="Live studio stage"
-      aria-busy={['requesting-media', 'requesting-token', 'connecting', 'reconnecting'].includes(
-        lifecycle,
-      )}
+      css={stageStyles(theme, recording || isFinalizing)}
+      aria-label="Studio media stage"
+      aria-busy={
+        isFinalizing ||
+        playbackLocked ||
+        ['requesting-media', 'requesting-token', 'connecting', 'reconnecting'].includes(lifecycle)
+      }
       data-recording={recording ? 'true' : 'false'}
+      data-stage-presentation={presentation.kind}
     >
       <video
         ref={videoRef}
-        css={videoStyles(theme, details.hasLiveVideo, mirrored)}
-        muted
+        css={videoStyles(
+          theme,
+          hasVisibleMedia,
+          mirrored,
+          presentation.kind === 'playback' && !playbackLocked,
+        )}
+        muted={presentation.kind !== 'playback'}
+        controls={presentation.kind === 'playback' && !playbackLocked}
         playsInline
-        autoPlay
-        aria-hidden={!details.hasLiveVideo}
-        aria-label={transformed ? 'Live transformed camera preview' : 'Live local camera preview'}
+        autoPlay={presentation.kind !== 'playback'}
+        preload="metadata"
+        tabIndex={presentation.kind === 'playback' && !playbackLocked ? 0 : -1}
+        aria-hidden={!hasVisibleMedia}
+        aria-disabled={playbackLocked || undefined}
+        aria-label={
+          presentation.kind === 'playback'
+            ? 'Recorded take playback'
+            : transformed
+              ? 'Live transformed camera preview'
+              : 'Live local camera preview'
+        }
+        onError={handlePlaybackError}
+        onLoadedData={() => setPlaybackError(null)}
         data-media-fit="contain"
         data-mirrored={mirrored ? 'true' : 'false'}
+        data-playback-locked={playbackLocked ? 'true' : 'false'}
+        data-playback-artifact-id={playbackArtifact?.id}
       />
 
-      {!details.hasLiveVideo ? (
+      {!hasVisibleMedia ? (
         <div css={emptyStyles(theme)}>
           <span css={emptyIconStyles(theme)}>
             <StageIcon />
@@ -344,7 +587,10 @@ export const MediaStage = ({
         </div>
       ) : null}
 
-      <div css={framingGuideStyles(theme, details.hasLiveVideo)} aria-hidden="true">
+      <div
+        css={framingGuideStyles(theme, hasVisibleMedia && presentation.kind !== 'playback')}
+        aria-hidden="true"
+      >
         <span css={guideCornerStyles('tl')} />
         <span css={guideCornerStyles('tr')} />
         <span css={guideCornerStyles('bl')} />
@@ -371,7 +617,11 @@ export const MediaStage = ({
         </div>
 
         <div css={toolbarGroupStyles(theme)}>
-          {mode !== 'local' && generationSeconds > 0 ? (
+          {presentation.kind === 'playback' ? (
+            <span css={badgeStyles(theme, 'accent')}>
+              <span>Playback</span>
+            </span>
+          ) : mode !== 'local' && generationSeconds > 0 ? (
             <span css={badgeStyles(theme, 'accent')}>
               <span>AI {formatDuration(generationSeconds)}</span>
             </span>
@@ -390,41 +640,76 @@ export const MediaStage = ({
         </div>
       </div>
 
-      <figcaption css={bottomOverlayStyles(theme)}>
-        <span css={badgeStyles(theme)} title={details.videoSource}>
-          <CameraIcon />
-          <span>
-            {mode === 'local'
-              ? 'Local Camera'
-              : transformed
-                ? `${modeLabel(mode)} · AI output`
-                : modeLabel(mode)}
-          </span>
-        </span>
-
-        <AudioLevelMeter stream={stream} sourceLabel={details.audioSource} />
-
-        <div css={endStatusStyles}>
-          {details.hasLiveVideo ? (
-            <span
-              data-live-timer="true"
-              css={badgeStyles(theme)}
-              aria-label={`Live for ${formatDuration(liveSeconds)}`}
-            >
-              <span>Live {formatDuration(liveSeconds)}</span>
-            </span>
-          ) : null}
-          <span
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            css={badgeStyles(theme, statusTone)}
-          >
-            <span css={statusDotStyles(theme, statusTone)} aria-hidden="true" />
-            <span>{lifecycleLabel(lifecycle)}</span>
+      {isFinalizing ? (
+        <div
+          css={blockingOverlayStyles(theme, 'finalizing')}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+          data-finalizing-started-at={presentation.startedAt}
+        >
+          <span css={blockingCardStyles(theme)}>
+            <span css={activityIndicatorStyles(theme)} aria-hidden="true" />
+            <strong>Finalizing take…</strong>
+            <span>Securing the final recording data before camera and AI resources close.</span>
           </span>
         </div>
-      </figcaption>
+      ) : null}
+
+      {playbackLocked ? (
+        <div
+          css={blockingOverlayStyles(theme, 'processing')}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span css={blockingCardStyles(theme)}>
+            <span css={activityIndicatorStyles(theme)} aria-hidden="true" />
+            <strong>Processing voice treatment…</strong>
+            <span>Playback is paused until the current treatment is ready.</span>
+          </span>
+        </div>
+      ) : null}
+
+      <StageNoticeLayer notices={effectiveNotices} />
+
+      {presentation.kind !== 'playback' ? (
+        <figcaption css={bottomOverlayStyles(theme)}>
+          <span css={badgeStyles(theme)} title={details.videoSource}>
+            <CameraIcon />
+            <span>
+              {mode === 'local'
+                ? 'Local Camera'
+                : transformed
+                  ? `${modeLabel(mode)} · AI output`
+                  : modeLabel(mode)}
+            </span>
+          </span>
+
+          <AudioLevelMeter stream={stream} sourceLabel={details.audioSource} />
+
+          <div css={endStatusStyles}>
+            {hasVisibleMedia ? (
+              <span
+                data-live-timer="true"
+                css={badgeStyles(theme)}
+                aria-label={`Live for ${formatDuration(liveSeconds)}`}
+              >
+                <span>Live {formatDuration(liveSeconds)}</span>
+              </span>
+            ) : null}
+            <span
+              role="status"
+              aria-live="polite"
+              aria-atomic="true"
+              css={badgeStyles(theme, statusTone)}
+            >
+              <span css={statusDotStyles(theme, statusTone)} aria-hidden="true" />
+              <span>{statusLabel}</span>
+            </span>
+          </div>
+        </figcaption>
+      ) : null}
     </figure>
   );
 };

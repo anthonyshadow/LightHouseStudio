@@ -1,5 +1,4 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { useEffect, useRef } from 'react';
 import { Button, StatusNotice, Surface } from '../../ui';
 import { formatBytes, formatDuration } from '../recording';
 import type { RecordingController, TakeMetadata } from '../recording/types';
@@ -15,6 +14,9 @@ export type TakeDockProps = {
   elevenLabsAvailable: boolean;
   browserCapabilities?: VoiceBrowserCapabilities;
   view?: 'all' | 'take' | 'voice';
+  onCloseTake?(): void;
+  onOpenVoiceTreatments?(): void;
+  onBackToTake?(): void;
 };
 
 const gridStyles = (theme: Theme, view: NonNullable<TakeDockProps['view']>): CSSObject => ({
@@ -26,15 +28,6 @@ const gridStyles = (theme: Theme, view: NonNullable<TakeDockProps['view']>): CSS
   minHeight: 0,
   minBlockSize: '100%',
   '@media (max-width: 64rem)': { gridTemplateColumns: '1fr' },
-});
-const videoStyles = (theme: Theme): CSSObject => ({
-  width: '100%',
-  height: '100%',
-  maxHeight: '8rem',
-  aspectRatio: '16 / 9',
-  objectFit: 'contain',
-  borderRadius: theme.radii.medium,
-  background: theme.colors.canvas,
 });
 const metadataStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
@@ -93,11 +86,9 @@ const latestPanelStyles = (): CSSObject => ({
 
 const reviewBodyStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns: 'minmax(7rem, 9rem) minmax(0, 1fr)',
   alignItems: 'start',
   gap: theme.space.sm,
   minWidth: 0,
-  '@media (max-width: 32rem)': { gridTemplateColumns: '1fr' },
 });
 
 const reviewDetailsStyles = (): CSSObject => ({
@@ -204,16 +195,14 @@ export const TakeDock = ({
   elevenLabsAvailable,
   browserCapabilities,
   view = 'all',
+  onCloseTake,
+  onOpenVoiceTreatments,
+  onBackToTake,
 }: TakeDockProps) => {
   const theme = useTheme();
-  const videoRef = useRef<HTMLVideoElement>(null);
   const artifact = recording.presented;
   const locked = recording.processingState === 'processing';
   const captureChips = captureMetadataChips(recording.metadata);
-
-  useEffect(() => {
-    if (locked) videoRef.current?.pause();
-  }, [artifact?.objectUrl, locked]);
 
   if (!artifact) return null;
 
@@ -225,9 +214,7 @@ export const TakeDock = ({
     )
       return;
     recording.discard();
-    window.requestAnimationFrame(() => {
-      document.getElementById('record-take-action')?.focus();
-    });
+    onCloseTake?.();
   };
 
   return (
@@ -248,25 +235,10 @@ export const TakeDock = ({
                 Latest take
               </h2>
               <p role="status" aria-live="polite" aria-atomic="true" css={introStyles(theme)}>
-                Available in this tab only. Download it before refreshing or closing.
+                Playback remains on the main stage. Download this temporary take before closing it.
               </p>
             </header>
             <div css={reviewBodyStyles(theme)}>
-              <video
-                ref={videoRef}
-                css={videoStyles(theme)}
-                controls={!locked}
-                src={artifact.objectUrl}
-                aria-label={
-                  locked
-                    ? 'Latest recorded take. Playback is unavailable while voice processing completes.'
-                    : 'Latest recorded take'
-                }
-                aria-busy={locked}
-                onPlay={(event) => {
-                  if (locked) event.currentTarget.pause();
-                }}
-              />
               <div css={reviewDetailsStyles()}>
                 {captureChips.length > 0 ? (
                   <div css={metadataStyles(theme)} role="list" aria-label="Capture metadata">
@@ -317,6 +289,26 @@ export const TakeDock = ({
                   <Button variant="danger" disabled={locked} onClick={discard}>
                     Discard
                   </Button>
+                  {onOpenVoiceTreatments ? (
+                    <Button variant="secondary" disabled={locked} onClick={onOpenVoiceTreatments}>
+                      Voice treatments
+                    </Button>
+                  ) : null}
+                  <Button
+                    variant="secondary"
+                    disabled={locked || !recording.downloaded}
+                    title={
+                      recording.downloaded
+                        ? 'Release the temporary in-memory take.'
+                        : 'Start a download before closing this temporary take.'
+                    }
+                    onClick={() => {
+                      recording.discard();
+                      onCloseTake?.();
+                    }}
+                  >
+                    Close take
+                  </Button>
                 </div>
               </div>
             </div>
@@ -328,12 +320,19 @@ export const TakeDock = ({
           </div>
         ) : null}
         {view !== 'take' ? (
-          <VoiceEffectsPanel
-            recording={recording}
-            processing={processing}
-            elevenLabsAvailable={elevenLabsAvailable}
-            {...(browserCapabilities ? { browserCapabilities } : {})}
-          />
+          <div>
+            {onBackToTake ? (
+              <Button size="small" variant="quiet" onClick={onBackToTake}>
+                Back to take review
+              </Button>
+            ) : null}
+            <VoiceEffectsPanel
+              recording={recording}
+              processing={processing}
+              elevenLabsAvailable={elevenLabsAvailable}
+              {...(browserCapabilities ? { browserCapabilities } : {})}
+            />
+          </div>
         ) : null}
       </div>
     </Surface>

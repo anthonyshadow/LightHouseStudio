@@ -1,4 +1,11 @@
-export { RecipeShelf, type RecipeSelection, type RecipeShelfProps } from './RecipeShelf';
+export {
+  RecipeShelf,
+  RecipeShelfView,
+  type RecipeSelection,
+  type RecipeShelfProps,
+  type RecipeShelfViewProps,
+} from './RecipeShelf';
+export { useRecipeShelfController, type RecipeShelfController } from './useRecipeShelfController';
 export { createCreativeAssetRepository, CreativeAssetError } from './repository';
 export type { CreativeAssetErrorCode, CreativeAssetRepositoryOptions } from './repository';
 export {

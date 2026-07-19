@@ -35,6 +35,9 @@ const globalStyles = (theme: StudioTheme): CSSObject => ({
     background: theme.gradients.shellAmbient,
     overscrollBehavior: 'none',
   },
+  '@supports (height: 100svh)': {
+    body: { height: '100svh' },
+  },
   '#root': {
     position: 'relative',
     isolation: 'isolate',

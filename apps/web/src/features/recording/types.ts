@@ -83,6 +83,7 @@ export type RecordingController = {
   processed: RecordingArtifact | null;
   presented: RecordingArtifact | null;
   sidecar: RecordingAudioSidecar;
+  recordingError: string | null;
   processingState: VoiceProcessingState;
   processingError: string | null;
   elapsedSeconds: number;

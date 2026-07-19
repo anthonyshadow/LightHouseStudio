@@ -46,7 +46,15 @@ export const CharacterRecipeList = ({
                   ? { onOpenWorkshop: () => controller.openCharacterWorkshop(item) }
                   : {})}
                 onAction={(action) =>
-                  controller.startEditing({ kind: 'character', id: item.id, action })
+                  controller.startEditing(
+                    { kind: 'character', id: item.id, action },
+                    {
+                      title: item.name,
+                      prompt: item.prompt,
+                      notes: item.notes,
+                      tags: item.tags,
+                    },
+                  )
                 }
               />
             </li>
@@ -64,8 +72,10 @@ export const CharacterRecipeList = ({
                   notes: item.notes,
                   tags: item.tags,
                 }}
+                draft={controller.editorDraft ?? undefined}
                 includeNotes
                 submitLabel="Save changes"
+                onDraftChange={controller.setEditorDraft}
                 onDirtyChange={controller.setFormDirty}
                 onCancel={controller.closeEditor}
                 onSubmit={(value) => updateCharacterRecipe(controller, item, value)}
@@ -74,6 +84,8 @@ export const CharacterRecipeList = ({
               <RenameForm
                 label="Character recipe name"
                 initialName={item.name}
+                value={controller.renameDraft ?? undefined}
+                onValueChange={controller.setRenameDraft}
                 onDirtyChange={controller.setFormDirty}
                 onCancel={controller.closeEditor}
                 onRename={(name) =>

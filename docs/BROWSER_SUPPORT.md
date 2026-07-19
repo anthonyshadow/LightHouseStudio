@@ -10,32 +10,32 @@ The studio must run in a secure context. Loopback HTTP (`127.0.0.1`/`localhost`)
 
 ## Viewport and input layout
 
-The application is a viewport-bound studio, not a scrolling document. `html`, `body`, and `#root` are full-size, overflow-hidden roots; the shell uses `100dvh` when available and `100vh` as fallback. Safe-area insets are included in shell and overlay padding. The stage, dock, and workbench are shrinking grid children, and only named internal regions scroll.
+The application is a viewport-bound studio, not a scrolling document. `html`, `body`, and `#root` are full-size, overflow-hidden roots; the shell prefers `100dvh` with `100svh`/`100vh` fallbacks. Safe-area insets are included in shell and overlay padding. The fixed shell contains the header, stable stage, capture strip, and tool launcher; only named overlay bodies scroll.
 
 Responsive behavior is range-based:
 
-- Above `63.99rem` (1023.84 CSS px), the Recipe Dock is a persistent right column. Recording collapses it to a narrow recording rail.
-- Above `80rem` width and `48rem` height, Character Workshop widens the right workspace and Recipe Shelf replaces the bounded lower workbench while the stage remains visible.
-- At `80rem` width or `48rem` height and below, Latest Take and Voice Treatment share a single-tool tab tray rather than simultaneous panels; Workshop and Shelf use the common modal overlay system.
-- At `63.99rem` and below, Dock and Take launchers appear in the bottom tool rail and the Recipe Dock becomes a modal right drawer. Capture Settings remains an overlay at every size.
-- At `39.99rem` width and below, overlays occupy the full viewport, capture metadata is removed from the strip, capability text becomes labelled status dots, and the inline workbench is hidden. The primary Record/Finish action and bottom tool rail remain in the shell.
-- At `36rem` height and below, vertical gaps and secondary labels compact further; disabled and failure reasons remain reachable, and large tools continue to scroll inside their overlays.
+- Above `80rem` width and `48rem` height, Dock/Settings use standard right drawers, Workshop may use a wider overlay, and Shelf/Review/Voice use bounded bottom workspaces.
+- At `80rem` width or `48rem` height and below, shell rows compact without changing stage geometry; secondary copy collapses before actions or touch targets do.
+- From `40rem` through `63.99rem`, Dock/Settings use right slide-overs while Workshop/Shelf/Review/Voice use tall bottom workspaces.
+- From `20.01rem` through `39.99rem`, all tools use near-full-height bottom sheets with a small top gap, one body scroller, and sticky primary actions.
+- At `20rem` width or `36rem` height and below, tools become full-screen dialogs with visible Close and primary actions; operation must not depend on backdrop dismissal.
+- All breakpoints retain the fixed Record/Finish and Capture Settings actions. Mode, notice, recording, finalizing, playback, and overlay state must not resize the stage.
 
-The required visual regression sizes are `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`. At every size, document and body scroll width/height must stay within the viewport (allowing one pixel of browser rounding). Stage video uses `object-fit: contain` to preserve the whole frame, mirrors local preview only, and does not crop transformed output.
+The required visual regression sizes are `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`. At every size, document and body scroll width/height must stay within the viewport (allowing one pixel of browser rounding). Stage video uses `object-fit: contain` to preserve the whole frame, mirrors local preview only, and does not crop transformed output or recorded playback.
 
 ## Capability matrix
 
-| Capability                       | Required browser API or condition                                       | Degradation                                                  |
-| -------------------------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------ |
-| Prompt workshop and Recipe Shelf | React, `localStorage` for durability                                    | Falls back to in-memory session-only assets if storage fails |
-| Capture source selection         | `enumerateDevices`; labels may require prior permission                 | Default camera/microphone remain selectable                  |
-| Camera preview                   | Secure context, `navigator.mediaDevices.getUserMedia`                   | Blocked with actionable notice                               |
-| Recording                        | `MediaRecorder`, a live video track, a supported/default MIME type      | Recording disabled/error; preview remains                    |
-| Model output                     | Local capture, WebRTC, official Decart SDK/provider reachability        | Local fallback remains; AI unavailable                       |
-| Local voice effects              | `AudioContext`, `OfflineAudioContext`, decode support                   | Original take remains downloadable                           |
-| Processed remux                  | Mediabunny input parsing plus browser AAC or Opus encoding              | Processing fails safely; original/last valid take remains    |
-| ElevenLabs conversion            | Audio sidecar, same-origin broker, provider account/model/voice support | Local effects and original remain available                  |
-| Download                         | Blob URLs and browser download handling                                 | Mobile browsers may open/share instead of saving directly    |
+| Capability                       | Required browser API or condition                                       | Degradation                                                                                     |
+| -------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Prompt workshop and Recipe Shelf | React, `localStorage` for durability                                    | Falls back to in-memory session-only assets if storage fails                                    |
+| Capture source selection         | `enumerateDevices`; labels may require prior permission                 | Default camera/microphone remain selectable                                                     |
+| Camera preview                   | Secure context, `navigator.mediaDevices.getUserMedia`                   | Blocked with actionable notice                                                                  |
+| Recording                        | `MediaRecorder`, a live video track, a supported/default MIME type      | Start is disabled/errors safely; the current live session remains until Finish or explicit Stop |
+| Model output                     | Local capture, WebRTC, official Decart SDK/provider reachability        | Local fallback remains; AI unavailable                                                          |
+| Local voice effects              | `AudioContext`, `OfflineAudioContext`, decode support                   | Original take remains downloadable                                                              |
+| Processed remux                  | Mediabunny input parsing plus browser AAC or Opus encoding              | Processing fails safely; original/last valid take remains                                       |
+| ElevenLabs conversion            | Audio sidecar, same-origin broker, provider account/model/voice support | Local effects and original remain available                                                     |
+| Download                         | Blob URLs and browser download handling                                 | Mobile browsers may open/share instead of saving directly                                       |
 
 ## Recording formats
 

@@ -59,6 +59,7 @@ const createRecording = (
       mimeType: 'audio/webm',
       error: null,
     },
+    recordingError: null,
     processingState,
     processingError: null,
     elapsedSeconds: 2,
@@ -95,7 +96,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe('VoiceEffectsPanel', () => {
-  it('does not browse voices until the user intentionally opens the disclosure', async () => {
+  it('does not browse voices until the user intentionally opens the stacked browser', async () => {
     const user = userEvent.setup();
     renderWithTheme(
       <VoiceEffectsPanel
@@ -111,6 +112,7 @@ describe('VoiceEffectsPanel', () => {
 
     await user.click(screen.getByText(/Browse ElevenLabs voices/));
 
+    expect(screen.getByRole('dialog', { name: 'Voice Browser' })).toBeInTheDocument();
     await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
   });
 

@@ -10,10 +10,16 @@ import { isModelSessionActive } from './sessionComposerModel';
 export interface SessionActionsProps {
   session: StudioSessionController;
   recording: boolean;
+  lockReason?: string | undefined;
   onReset: () => void;
 }
 
-export const SessionActions = ({ session, recording, onReset }: SessionActionsProps) => {
+export const SessionActions = ({
+  session,
+  recording,
+  lockReason,
+  onReset,
+}: SessionActionsProps) => {
   const theme = useTheme();
   const model = session.draft.mode !== 'local';
   const active = isModelSessionActive(session);
@@ -61,7 +67,7 @@ export const SessionActions = ({ session, recording, onReset }: SessionActionsPr
         )}
         {recording ? (
           <p id={reasonId} css={actionReasonStyles(theme)}>
-            Finish the current take before changing the camera session.
+            {lockReason ?? 'Finish the current take before changing the camera session.'}
           </p>
         ) : null}
       </div>
@@ -70,7 +76,8 @@ export const SessionActions = ({ session, recording, onReset }: SessionActionsPr
 
   if (active) {
     let applyReason: string | null = null;
-    if (recording) applyReason = 'Finish the current take before changing the live recipe.';
+    if (recording)
+      applyReason = lockReason ?? 'Finish the current take before changing the live recipe.';
     else if (!hasStartContent) {
       applyReason = 'Add a direction or reference image before applying this draft.';
     } else if (!session.pendingChanges) {
@@ -123,7 +130,8 @@ export const SessionActions = ({ session, recording, onReset }: SessionActionsPr
   }
 
   let startReason: string | null = null;
-  if (recording) startReason = 'Finish the current take before starting an AI session.';
+  if (recording)
+    startReason = lockReason ?? 'Finish the current take before starting an AI session.';
   else if (!hasStartContent) {
     startReason =
       session.draft.mode === 'lucy-2.5'

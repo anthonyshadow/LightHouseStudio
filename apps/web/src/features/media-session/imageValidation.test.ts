@@ -29,7 +29,7 @@ describe('reference image validation', () => {
     expect(result.blockingError).toBeNull();
     expect(result).toMatchObject({ width: 800, height: 1_000 });
     expect(result.warnings).toContain(
-      'Files below 5 MiB usually update more quickly in a live session.',
+      'Images below 5 MiB usually respond faster in a realtime session.',
     );
     expect(close).toHaveBeenCalledOnce();
   });
@@ -43,7 +43,10 @@ describe('reference image validation', () => {
       'lucy-vton-3',
     );
 
-    expect(result).toEqual({ blockingError: 'Images may be at most 10 MiB.', warnings: [] });
+    expect(result).toEqual({
+      blockingError: 'Choose an image that is 10 MiB or smaller.',
+      warnings: [],
+    });
     expect(decoder).not.toHaveBeenCalled();
   });
 
@@ -56,7 +59,7 @@ describe('reference image validation', () => {
     ).resolves.toEqual({ blockingError: 'Choose a JPEG, PNG, or WebP image.', warnings: [] });
     await expect(
       validateReferenceImage(sizedFile(0, 'empty.webp', 'image/webp'), 'lucy-2.5'),
-    ).resolves.toEqual({ blockingError: 'The selected image is empty.', warnings: [] });
+    ).resolves.toEqual({ blockingError: 'Choose a nonempty image.', warnings: [] });
     expect(decoder).not.toHaveBeenCalled();
   });
 
@@ -70,7 +73,7 @@ describe('reference image validation', () => {
     expect(character.warnings).toEqual(
       expect.arrayContaining([
         expect.stringMatching(/shortest side of at least 512 px/i),
-        expect.stringMatching(/portrait-oriented character reference/i),
+        expect.stringMatching(/portrait-oriented reference/i),
       ]),
     );
 
@@ -81,7 +84,27 @@ describe('reference image validation', () => {
     );
     expect(garment.blockingError).toBeNull();
     expect(garment.warnings).toContain(
-      'A centered garment on a simple background is usually easiest to reproduce.',
+      'Use an image where the garment is clearly visible and fills the frame.',
+    );
+  });
+
+  it('uses the domain aspect-ratio thresholds for each reference semantic', async () => {
+    mockDimensions(1_100, 1_000);
+    const character = await validateReferenceImage(
+      sizedFile(1_024, 'slightly-wide.jpg', 'image/jpeg'),
+      'lucy-2.5',
+    );
+    expect(character.warnings).toContain(
+      'A clear portrait-oriented reference generally works best for character identity.',
+    );
+
+    mockDimensions(300, 1_000);
+    const garment = await validateReferenceImage(
+      sizedFile(1_024, 'very-narrow.webp', 'image/webp'),
+      'lucy-vton-3',
+    );
+    expect(garment.warnings).toContain(
+      'Use an image where the garment is clearly visible and fills the frame.',
     );
   });
 

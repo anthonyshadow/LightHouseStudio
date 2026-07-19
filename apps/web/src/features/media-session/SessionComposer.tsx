@@ -20,6 +20,7 @@ import type { StudioMode } from './types';
 export interface SessionComposerProps {
   session: StudioSessionController;
   recording: boolean;
+  lockReason?: string | undefined;
   onOpenWorkshop: () => void;
   embedded?: boolean;
 }
@@ -27,6 +28,7 @@ export interface SessionComposerProps {
 export const SessionComposer = ({
   session,
   recording,
+  lockReason,
   onOpenWorkshop,
   embedded = false,
 }: SessionComposerProps) => {
@@ -35,6 +37,10 @@ export const SessionComposer = ({
   const [modelFieldsRevision, setModelFieldsRevision] = useState(0);
   const model = session.draft.mode !== 'local';
   const modeLocked = recording || isModelSessionActive(session) || Boolean(session.localStream);
+  const formError =
+    session.error && ['model-input-required', 'apply-failed'].includes(session.error.code)
+      ? session.error
+      : null;
 
   const changeMode = (mode: StudioMode) => {
     if (!confirmModeReplacement(session.draft, mode, (message) => window.confirm(message))) {
@@ -93,7 +99,7 @@ export const SessionComposer = ({
         <div data-scroll-region="recipe-dock" css={composerBodyStyles(theme)}>
           {modeSwitchNotice ? (
             <StatusNotice tone="warning" role="status">
-              Finish the current live or recording action before changing modes.
+              {lockReason ?? 'Finish the current live or recording action before changing modes.'}
             </StatusNotice>
           ) : null}
 
@@ -125,9 +131,9 @@ export const SessionComposer = ({
 
           <AppliedRecipeSummary session={session} />
 
-          {session.error ? (
-            <StatusNotice tone="danger" title={session.error.message} role="alert">
-              {session.error.recovery ?? 'Review the setup and try again.'}
+          {formError ? (
+            <StatusNotice tone="danger" title={formError.message} role="alert">
+              {formError.recovery ?? 'Review the setup and try again.'}
             </StatusNotice>
           ) : null}
 
@@ -140,7 +146,12 @@ export const SessionComposer = ({
         </div>
 
         <footer css={composerFooterStyles(theme)}>
-          <SessionActions session={session} recording={recording} onReset={resetDraft} />
+          <SessionActions
+            session={session}
+            recording={recording}
+            lockReason={lockReason}
+            onReset={resetDraft}
+          />
         </footer>
       </div>
     </Surface>

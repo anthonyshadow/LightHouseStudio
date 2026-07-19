@@ -46,9 +46,14 @@ export const stageStyles = (theme: Theme, recording: boolean): CSSObject => ({
   },
 });
 
-export const videoStyles = (theme: Theme, visible: boolean, mirrored: boolean): CSSObject => ({
+export const videoStyles = (
+  theme: Theme,
+  visible: boolean,
+  mirrored: boolean,
+  interactive: boolean,
+): CSSObject => ({
   position: 'absolute',
-  zIndex: 1,
+  zIndex: theme.layers.stageMedia,
   inset: 0,
   width: '100%',
   height: '100%',
@@ -57,11 +62,11 @@ export const videoStyles = (theme: Theme, visible: boolean, mirrored: boolean): 
   transform: mirrored ? 'scaleX(-1)' : 'none',
   background: 'transparent',
   transition: `opacity ${theme.motion.standard}`,
-  pointerEvents: 'none',
+  pointerEvents: interactive ? 'auto' : 'none',
 });
 
 export const emptyStyles = (theme: Theme): CSSObject => ({
-  zIndex: 2,
+  zIndex: theme.layers.stageContent,
   placeSelf: 'center',
   display: 'grid',
   justifyItems: 'center',
@@ -110,7 +115,7 @@ export const emptyIconStyles = (theme: Theme): CSSObject => ({
 
 export const topToolbarStyles = (theme: Theme): CSSObject => ({
   position: 'absolute',
-  zIndex: 5,
+  zIndex: theme.layers.stageChrome,
   insetBlockStart: 'clamp(0.65rem, 1.4vw, 1rem)',
   insetInline: 'clamp(0.65rem, 1.4vw, 1rem)',
   display: 'flex',
@@ -180,8 +185,8 @@ export const badgeStyles = (
 
 export const iconButtonStyles = (theme: Theme): CSSObject => ({
   display: 'inline-grid',
-  width: '2.5rem',
-  height: '2.5rem',
+  width: '2.75rem',
+  height: '2.75rem',
   flex: '0 0 auto',
   placeItems: 'center',
   padding: 0,
@@ -204,14 +209,14 @@ export const iconButtonStyles = (theme: Theme): CSSObject => ({
   },
   '& svg': { width: '1.1rem', height: '1.1rem' },
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    width: '2.25rem',
-    height: '2.25rem',
+    width: '2.75rem',
+    height: '2.75rem',
   },
 });
 
 export const framingGuideStyles = (theme: Theme, visible: boolean): CSSObject => ({
   position: 'absolute',
-  zIndex: 3,
+  zIndex: theme.layers.stageGuides,
   inset: 'clamp(3.75rem, 10%, 5.5rem) clamp(1.5rem, 12%, 7rem)',
   opacity: visible ? 0.82 : 0.5,
   color: theme.colors.text,
@@ -247,7 +252,7 @@ export const guideCornerStyles = (position: 'tl' | 'tr' | 'bl' | 'br'): CSSObjec
 
 export const bottomOverlayStyles = (theme: Theme): CSSObject => ({
   position: 'absolute',
-  zIndex: 5,
+  zIndex: theme.layers.stageChrome,
   insetInline: 'clamp(0.65rem, 1.4vw, 1rem)',
   insetBlockEnd: 'clamp(0.65rem, 1.4vw, 1rem)',
   display: 'grid',
@@ -356,3 +361,163 @@ export const visuallyHiddenTextStyles: CSSObject = {
   whiteSpace: 'nowrap',
   border: 0,
 };
+
+export const blockingOverlayStyles = (
+  theme: Theme,
+  tone: 'finalizing' | 'processing',
+): CSSObject => ({
+  position: 'absolute',
+  zIndex: theme.layers.stageBlocking,
+  inset: 0,
+  display: 'grid',
+  placeItems: 'center',
+  padding: theme.space.lg,
+  color: theme.colors.text,
+  background:
+    tone === 'finalizing'
+      ? 'linear-gradient(180deg, rgba(5, 9, 14, 0.42), rgba(5, 9, 14, 0.72))'
+      : 'linear-gradient(180deg, rgba(5, 9, 14, 0.2), rgba(5, 9, 14, 0.58))',
+  backdropFilter: 'blur(2px)',
+  pointerEvents: 'auto',
+});
+
+export const blockingCardStyles = (theme: Theme): CSSObject => ({
+  display: 'grid',
+  justifyItems: 'center',
+  width: 'min(25rem, calc(100% - 2rem))',
+  gap: theme.space.xs,
+  padding: `${theme.space.md} ${theme.space.lg}`,
+  border: `1px solid ${theme.colors.borderStrong}`,
+  borderRadius: theme.radii.large,
+  color: theme.colors.textMuted,
+  background: theme.colors.overlaySurface,
+  boxShadow: theme.shadows.lifted,
+  textAlign: 'center',
+  '& strong': {
+    color: theme.colors.text,
+    fontFamily: theme.type.display,
+    fontSize: theme.fontSizes.label,
+  },
+  '& span': {
+    fontSize: theme.fontSizes.metadata,
+    lineHeight: 1.45,
+  },
+});
+
+export const activityIndicatorStyles = (theme: Theme): CSSObject => ({
+  width: '1.45rem',
+  height: '1.45rem',
+  border: `2px solid ${theme.colors.borderStrong}`,
+  borderBlockStartColor: theme.colors.accent,
+  borderRadius: '50%',
+  animation: 'stage-activity-spin 780ms linear infinite',
+  '@keyframes stage-activity-spin': {
+    to: { transform: 'rotate(360deg)' },
+  },
+  '@media (prefers-reduced-motion: reduce)': {
+    animation: 'none',
+    borderColor: theme.colors.accent,
+  },
+});
+
+export const noticeLayerStyles = (theme: Theme): CSSObject => ({
+  position: 'absolute',
+  zIndex: theme.layers.stageNotices,
+  insetBlockStart: 'clamp(3.6rem, 11%, 5rem)',
+  insetInline: 'clamp(0.65rem, 4vw, 2.5rem)',
+  display: 'grid',
+  justifyItems: 'center',
+  gap: '0.5rem',
+  pointerEvents: 'none',
+});
+
+export const noticeStyles = (theme: Theme, severity: 'info' | 'warning' | 'error'): CSSObject => ({
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto auto',
+  width: 'min(36rem, 100%)',
+  minHeight: '3.25rem',
+  alignItems: 'center',
+  gap: theme.space.sm,
+  padding: `${theme.space.xs} ${theme.space.xs} ${theme.space.xs} ${theme.space.md}`,
+  border: `1px solid ${
+    severity === 'error'
+      ? theme.colors.danger
+      : severity === 'warning'
+        ? theme.colors.warning
+        : theme.colors.borderStrong
+  }`,
+  borderRadius: theme.radii.medium,
+  color: theme.colors.text,
+  background:
+    severity === 'error'
+      ? `color-mix(in srgb, ${theme.colors.dangerSoft} 88%, ${theme.colors.overlaySurface})`
+      : severity === 'warning'
+        ? `color-mix(in srgb, ${theme.colors.warningSoft} 88%, ${theme.colors.overlaySurface})`
+        : theme.colors.overlaySurface,
+  boxShadow: theme.shadows.lifted,
+  backdropFilter: 'blur(12px)',
+  pointerEvents: 'auto',
+  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    gap: theme.space.xs,
+    paddingInlineStart: theme.space.sm,
+    '& > button:first-of-type:not(:last-of-type)': {
+      gridColumn: '1 / -1',
+      justifySelf: 'stretch',
+    },
+  },
+});
+
+export const noticeCopyStyles: CSSObject = {
+  display: 'grid',
+  minWidth: 0,
+  gap: '0.15rem',
+  '& strong': {
+    overflow: 'hidden',
+    fontSize: '0.82rem',
+    lineHeight: 1.25,
+    textOverflow: 'ellipsis',
+  },
+  '& span': {
+    color: 'inherit',
+    opacity: 0.78,
+    fontSize: '0.72rem',
+    lineHeight: 1.35,
+  },
+};
+
+export const noticeActionStyles = (theme: Theme): CSSObject => ({
+  minHeight: '2.75rem',
+  paddingInline: theme.space.md,
+  border: `1px solid ${theme.colors.accent}`,
+  borderRadius: theme.radii.medium,
+  color: theme.colors.onAccent,
+  background: theme.colors.accent,
+  font: 'inherit',
+  fontSize: theme.fontSizes.metadata,
+  fontWeight: 800,
+  cursor: 'pointer',
+  '&:focus-visible': {
+    outline: `2px solid ${theme.colors.focus}`,
+    outlineOffset: '2px',
+  },
+});
+
+export const noticeDismissStyles = (theme: Theme): CSSObject => ({
+  display: 'grid',
+  width: '2.75rem',
+  height: '2.75rem',
+  placeItems: 'center',
+  padding: 0,
+  border: 0,
+  borderRadius: theme.radii.medium,
+  color: theme.colors.textMuted,
+  background: 'transparent',
+  cursor: 'pointer',
+  '&:hover': { color: theme.colors.text, background: theme.colors.surfaceStrong },
+  '&:focus-visible': {
+    outline: `2px solid ${theme.colors.focus}`,
+    outlineOffset: '2px',
+  },
+  '& svg': { width: '1.25rem', height: '1.25rem' },
+});

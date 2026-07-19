@@ -1,5 +1,9 @@
 import { useEffect, useState } from 'react';
-import type { RecipeFormValue } from './RecipeForms';
+import {
+  createRecipeEditorDraft,
+  type RecipeEditorDraft,
+  type RecipeFormValue,
+} from './RecipeForms';
 import { CreativeAssetError } from './repository';
 import type { EditAction, ShelfCategory } from './RecipeCards';
 import type { RecipeShelfProps } from './RecipeShelf.types';
@@ -45,6 +49,8 @@ export const useRecipeShelfController = ({
   const [selectedRecipe, setSelectedRecipe] = useState<SelectedRecipeState | null>(null);
   const [editing, setEditing] = useState<EditingState | null>(null);
   const [createSeed, setCreateSeed] = useState<Partial<RecipeFormValue> | null>(null);
+  const [editorDraft, setEditorDraft] = useState<RecipeEditorDraft | null>(null);
+  const [renameDraft, setRenameDraft] = useState<string | null>(null);
   const [createKey, setCreateKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
@@ -105,6 +111,8 @@ export const useRecipeShelfController = ({
     setFormDirty(false);
     setEditing(null);
     setCreateSeed(null);
+    setEditorDraft(null);
+    setRenameDraft(null);
   };
 
   const runAfterFormCheck = (action: () => void) => {
@@ -118,6 +126,8 @@ export const useRecipeShelfController = ({
       action();
       setEditing(null);
       setFormDirty(false);
+      setEditorDraft(null);
+      setRenameDraft(null);
       setActionError(null);
       focusShelfHeading();
     } catch (error) {
@@ -127,7 +137,10 @@ export const useRecipeShelfController = ({
 
   const openCreate = (seed?: Partial<RecipeFormValue>) => {
     if (!canReplaceForm()) return;
-    setCreateSeed(seed ?? {});
+    const nextSeed = seed ?? {};
+    setCreateSeed(nextSeed);
+    setEditorDraft(createRecipeEditorDraft(nextSeed));
+    setRenameDraft(null);
     setCreateKey((value) => value + 1);
     setEditing(null);
     setFormDirty(false);
@@ -136,20 +149,25 @@ export const useRecipeShelfController = ({
 
   const closeCreate = () => {
     setCreateSeed(null);
+    setEditorDraft(null);
     setFormDirty(false);
     focusShelfHeading();
   };
 
-  const startEditing = (next: EditingState) => {
+  const startEditing = (next: EditingState, initialValue: Partial<RecipeFormValue>) => {
     if (!canReplaceForm()) return;
     setCreateSeed(null);
     setEditing(next);
+    setEditorDraft(next.action === 'edit' ? createRecipeEditorDraft(initialValue) : null);
+    setRenameDraft(next.action === 'rename' ? (initialValue.title ?? '') : null);
     setFormDirty(false);
     setActionError(null);
   };
 
   const closeEditor = () => {
     setEditing(null);
+    setEditorDraft(null);
+    setRenameDraft(null);
     setFormDirty(false);
     focusShelfHeading();
   };
@@ -252,6 +270,10 @@ export const useRecipeShelfController = ({
     editing,
     createSeed,
     createKey,
+    editorDraft,
+    setEditorDraft,
+    renameDraft,
+    setRenameDraft,
     actionError,
     setFormDirty,
     openCreate,

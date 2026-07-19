@@ -8,9 +8,9 @@ The guide was treated as a capability contract, not a clone checklist. The resul
 
 The user explicitly approved `lucy-2.5` during implementation. Character mode, API allowlists, saved-asset mode scoping, filenames, and tests use that exact identifier. `lucy-vton-3` remains a separate try-on capability. This update adopts the supported newer character model without merging the two workflows or weakening explicit provider consent.
 
-### Stage, Recipe dock, and Take dock share one adaptive workspace
+### One stable stage anchors an overlay workspace
 
-Instead of a screen-per-step wizard, the live stage and current recipe remain visible together, while the prompt workshop, Recipe Shelf, and latest take open as contextual tools. This shortens iteration and keeps media state legible. Responsive grids collapse to a single sensible order at narrow widths, and the design avoids hover-only actions.
+Instead of a screen-per-step wizard or resizing workbench, one permanently mounted media stage remains the visual anchor. Recipe Dock, Capture Settings, Take Review, Voice Treatments, Character Workshop, and Recipe Shelf open as modal overlays that never participate in shell sizing or own media. Responsive rules change overlay placement, not the stage rectangle, video identity, source, or playback time.
 
 Covered by: responsive/manual checks, semantic landmarks and labels, keyboard interaction, and component accessibility rules.
 
@@ -58,7 +58,7 @@ Covered by: domain and repository tests for CRUD, sanitation, search, deduplicat
 
 ### Creative drafts survive navigation and blocked actions explain themselves
 
-Closing and reopening the Character Workshop restores its current structured draft. Dirty inline Recipe Shelf forms require confirmation before another shelf action or panel replacement can discard them. While live local media locks a model change, the Character Workshop trigger and cross-model recipe insertion controls are disabled with an explanation; browsing and editing the shelf remain available. Recording no longer auto-unmounts an open creative form.
+Closing and reopening the Character Workshop or Recipe Shelf restores its current draft. Ordinary overlay closure and opening another tool do not discard feature state; only explicit Reset, Clear, Delete, or Discard actions are destructive. While live local media locks a model change, the Character Workshop trigger and cross-model recipe insertion controls are disabled with an explanation; browsing and editing the shelf remain available. Recording closes nonessential overlays without erasing their drafts.
 
 Changing recipe models now confirms and actually remounts a dirty form instead of silently retargeting its text. Search is paused while an inline edit is dirty so filtering cannot unmount unsaved work. Dynamic Clear, Save, and session-action controls hand focus to an intentional successor when the focused element disappears.
 
@@ -66,13 +66,15 @@ Why it fits: preparation is intentionally free and local, so losing work or pres
 
 Covered by: Recipe Shelf dirty-state/focus component tests and Playwright checks for workshop restoration and live-local insertion blocking.
 
-### Model take finalization is a first-class handoff
+### Take finalization is a first-class handoff
 
-Stopping a model recording waits for the recording and sidecar to finalize before releasing Decart, then returns to the existing healthy local preview. The latest take stays available independently of session stop. A before-unload warning and explicit discard confirmation reduce accidental loss.
+Finishing any recording waits for the main recorder and sidecar to settle and publishes the immutable artifact before releasing Decart, remote/cloned tracks, owned camera/microphone tracks, listeners, analysers, and timers. The artifact then replaces live media in the same persistent stage. The studio does not return to or reacquire local preview, and new media work remains locked until the operator closes or discards the take.
 
 The video recorder is authoritative and the audio sidecar is optional: if sidecar construction, start, error handling, or finalization fails, a valid main video still becomes the latest take with an audio-specific recovery notice. This closes a subtle clip-loss path without hiding that voice treatment is unavailable.
 
-Automatic source-ended, spontaneous-stop, recorder-error, and finalization-timeout paths also notify session orchestration exactly once, so a paid model session is released even when the operator did not click Finish. Browser-default recordings take their MIME type and extension from emitted chunks before recorder fallbacks, preserving native MP4 output where applicable. Recording lifecycle changes are announced and focus moves to the replacement action/status instead of disappearing.
+Automatic source-ended, spontaneous-stop, recorder-error, and finalization-timeout paths also notify session orchestration exactly once, so live resources are released even when the operator did not click Finish. Browser-default recordings take their MIME type and extension from emitted chunks before recorder fallbacks, preserving native MP4 output where applicable. Recording lifecycle changes are announced and focus moves to the replacement action/status instead of disappearing.
+
+Download dispatch leaves main-stage playback available and enables Close; the app truthfully does not claim browser download completion. Close revokes take URLs and returns to private idle. Confirmed Discard performs the same cleanup without download. A before-unload warning and explicit discard confirmation reduce accidental loss.
 
 The selected recording tracks are pinned for the lifetime of a take. If either selected video or audio ends, or provider subscription changes which audio/video would be selected, the current take finalizes before the UI accepts the replacement source. This prevents a label or preview from claiming one source while `MediaRecorder` is still capturing another.
 
@@ -82,7 +84,7 @@ Covered by: recorder-construction, chunk-MIME, hung-sidecar, automatic-stop, Str
 
 Every local or ElevenLabs treatment starts from the original take and original sidecar. Processing locks playback/download only while replacement is incomplete, exposes Cancel, and publishes a processed take only after remux success. Original restores immediately without network traffic.
 
-Starting a replacement take is also locked during processing, and superseded processing jobs cannot publish, fail, or unlock a newer job. A missing or unsupported sidecar remains a recoverable voice-only limitation and never invalidates the video take.
+All new capture is locked for the entire review, and superseded processing jobs cannot publish, fail, or unlock a newer job. A missing or unsupported sidecar remains a recoverable voice-only limitation and never invalidates the video take.
 
 Why it fits: creators can compare treatments without generational degradation or losing a valid clip.
 

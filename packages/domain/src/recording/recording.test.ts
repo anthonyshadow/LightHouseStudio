@@ -9,7 +9,7 @@ import {
   createRecordingFilename,
   formatDuration,
   formatFileSize,
-  recordingStopOrder,
+  recordingFinishOrder,
   selectRecordingMimeType,
   selectRecordingSource,
   shouldRevokeRecordingObjectUrl,
@@ -67,13 +67,12 @@ describe('recording source rules', () => {
     ).toMatchObject({ audioSource: 'local-microphone', hasLiveAudio: true });
   });
 
-  it('orders model finalization before disconnect and preserves local sessions', () => {
-    expect(recordingStopOrder('lucy-2.5')).toEqual([
+  it('finalizes every mode before releasing live resources and entering review', () => {
+    expect(recordingFinishOrder()).toEqual([
       'finalize-recording',
-      'disconnect-model',
-      'return-to-local-preview',
+      'release-live-resources',
+      'enter-recorded-review',
     ]);
-    expect(recordingStopOrder('local')).toEqual(['finalize-recording']);
   });
 });
 

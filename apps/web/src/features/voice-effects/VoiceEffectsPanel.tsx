@@ -1,7 +1,7 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { canUseVoiceEffects } from '@studio/domain';
-import { Button, StatusNotice } from '../../ui';
+import { Button, OverlayPanel, StatusNotice } from '../../ui';
 import type { RecordingController } from '../recording/types';
 import type { VoiceProcessingController } from './types';
 import type { BrowserCapabilities } from '../media-session';
@@ -39,23 +39,6 @@ const introStyles = (theme: Theme): CSSObject => ({
   fontSize: '0.8rem',
 });
 
-const summaryStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  alignItems: 'center',
-  minHeight: '2.75rem',
-  color: theme.colors.text,
-  fontWeight: 720,
-  cursor: 'pointer',
-  '&:focus-visible': {
-    outline: `2px solid ${theme.colors.focus}`,
-    outlineOffset: '3px',
-  },
-});
-
-const providerContentStyles = (theme: Theme): CSSObject => ({
-  marginTop: theme.space.md,
-});
-
 const detectVoiceBrowserCapabilities = (): VoiceBrowserCapabilities => ({
   webAudio: 'AudioContext' in window || 'webkitAudioContext' in window,
   offlineAudio: 'OfflineAudioContext' in window || 'webkitOfflineAudioContext' in window,
@@ -69,6 +52,7 @@ export const VoiceEffectsPanel = ({
 }: VoiceEffectsPanelProps) => {
   const theme = useTheme();
   const [voiceLibraryOpen, setVoiceLibraryOpen] = useState(false);
+  const voiceBrowserButtonRef = useRef<HTMLButtonElement>(null);
   const processingActive = recording.processingState === 'processing';
   const hasAudio = canUseVoiceEffects(
     recording.sidecar.state === 'ready' && recording.sidecar.blob
@@ -174,26 +158,34 @@ export const VoiceEffectsPanel = ({
             available.
           </StatusNotice>
         ) : (
-          <details
-            open={voiceLibraryOpen}
-            onToggle={(event) => setVoiceLibraryOpen(event.currentTarget.open)}
-          >
-            <summary css={summaryStyles(theme)}>
+          <>
+            <Button
+              ref={voiceBrowserButtonRef}
+              variant="secondary"
+              onClick={() => setVoiceLibraryOpen(true)}
+            >
               Browse ElevenLabs voices · contacts provider
-            </summary>
-            {voiceLibraryOpen ? (
-              <div css={providerContentStyles(theme)}>
-                <StatusNotice tone="warning">
-                  Previews do not send your recording. Applying a voice sends only the completed
-                  audio sidecar and may use provider credits.
-                </StatusNotice>
-                <VoiceLibrary
-                  disabled={!hasAudio || processingActive || !canReplaceAudio}
-                  onApply={(voice) => void processing.applyElevenLabs(voice.voiceId, voice.name)}
-                />
-              </div>
-            ) : null}
-          </details>
+            </Button>
+            <OverlayPanel
+              open={voiceLibraryOpen}
+              onClose={() => setVoiceLibraryOpen(false)}
+              title="Voice Browser"
+              description="Previewing voices does not upload this take. Applying a workspace voice sends only the immutable original audio sidecar."
+              placement="right"
+              size="wide"
+              bodyMode="scroll"
+              closeLabel="Close voice browser"
+              returnFocusRef={voiceBrowserButtonRef}
+            >
+              <StatusNotice tone="warning">
+                Previews do not send your recording. Applying a voice may use provider credits.
+              </StatusNotice>
+              <VoiceLibrary
+                disabled={!hasAudio || processingActive || !canReplaceAudio}
+                onApply={(voice) => void processing.applyElevenLabs(voice.voiceId, voice.name)}
+              />
+            </OverlayPanel>
+          </>
         )
       ) : (
         <StatusNotice>

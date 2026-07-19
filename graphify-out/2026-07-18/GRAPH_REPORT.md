@@ -1,16 +1,16 @@
 # Graph Report - webrtc2Sol  (2026-07-18)
 
 ## Corpus Check
-- 238 files · ~1,390,915 words
+- 239 files · ~99,036 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1707 nodes · 3850 edges · 112 communities (83 shown, 29 thin omitted)
+- 1721 nodes · 3874 edges · 111 communities (82 shown, 29 thin omitted)
 - Extraction: 99% EXTRACTED · 1% INFERRED · 0% AMBIGUOUS · INFERRED: 31 edges (avg confidence: 0.67)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `5602877c`
+- Built from commit: `da925e4a`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -100,10 +100,10 @@
 - Playwright Package Devdependencies
 - CharacterPresetPicker.tsx
 - Testing Library User
-- Package Tsx Devdependencies
+- VoiceLibrary.tsx
 - React Package Devdependencies
 - React Dom Package
-- Package Typescript Devdependencies
+- SegmentedControl.tsx
 - Typescript Eslint Package
 - Vitejs Plugin React
 - Vitest Coverage Package
@@ -115,22 +115,21 @@
 - graphify reference: transcribe video and audio
 - extraction-spec.md
 - GeneratedPromptPreview.tsx
-- image.ts
+- VoiceEffectsPanel.test.tsx
 - workshopSteps.ts
 - @testing-library/react
-- @axe-core/playwright
+- recordingArtifacts.ts
 - StudioDesignProvider
 - concurrently
 - useRecording.test.tsx
 - sanitation.ts
-- SessionComposer.test.tsx
-- @playwright/test
+- @axe-core/playwright
 
 ## God Nodes (most connected - your core abstractions)
 1. `CharacterPromptWorkshop()` - 31 edges
 2. `StudioExperience()` - 25 edges
-3. `MediaStage()` - 22 edges
-4. `useRecording()` - 21 edges
+3. `useRecording()` - 23 edges
+4. `MediaStage()` - 22 edges
 5. `normalizeWhitespace()` - 21 edges
 6. `RecipeShelf()` - 20 edges
 7. `createCreativeAssetRepository()` - 20 edges
@@ -147,8 +146,8 @@
   apps/api/src/features/voices/routes.ts → apps/api/src/providers/elevenlabs/http-provider.test.ts
 - `createCreativeAssetRepository()` --indirect_call--> `context()`  [INFERRED]
   apps/web/src/features/creative-assets/repository.ts → packages/domain/src/assets/assets.test.ts
-- `createCreativeAssetRepository()` --calls--> `sanitizeCreativeAssetStore()`  [EXTRACTED]
-  apps/web/src/features/creative-assets/repository.ts → packages/domain/src/assets/sanitize.ts
+- `formatBytes()` --calls--> `formatFileSize()`  [EXTRACTED]
+  apps/web/src/features/recording/recordingHelpers.ts → packages/domain/src/recording/format.ts
 
 ## Import Cycles
 - None detected.
@@ -156,11 +155,11 @@
 ## Hyperedges (group relationships)
 - **Composite Application Mark** — apps_web_public_favicon_teal_frame, apps_web_public_favicon_gold_l_glyph, apps_web_public_favicon_gold_dot [EXTRACTED 1.00]
 
-## Communities (112 total, 29 thin omitted)
+## Communities (111 total, 29 thin omitted)
 
 ### Community 0 - "Voice Effects Voiceeffectspanel"
-Cohesion: 0.23
-Nodes (10): actionRowStyles(), PromptSaveState, PromptWorkshopActions(), PromptWorkshopActionsProps, saveFormStyles(), noticeStyles(), noticeTitleStyles(), NoticeTone (+2 more)
+Cohesion: 0.39
+Nodes (10): acquireLocalMedia(), hasLiveAudio(), hasLiveTrack(), hasLiveVideo(), MediaRequirements, stopOwnedStream(), OwnedLocalMediaController, OwnedLocalMediaOptions (+2 more)
 
 ### Community 1 - "Creative Assets Recipeshelf"
 Cohesion: 0.09
@@ -168,83 +167,83 @@ Nodes (66): CharacterRecipeList(), updateCharacterRecipe(), RecentRecipeList(), 
 
 ### Community 2 - "Studio Studioapp Recording"
 Cohesion: 0.07
-Nodes (48): detectBrowserCapabilities(), stream(), root, FakeMediaStream, FakeTrack, useRecordingSource(), AuxiliaryPanel, CreativePanelContent() (+40 more)
+Nodes (50): ApiClientError, fetchProviderAvailability(), readError(), requestRealtimeToken(), detectBrowserCapabilities(), ProviderAvailability, RecordingLifecycle, root (+42 more)
 
 ### Community 3 - "Prompts Draft Validation"
 Cohesion: 0.21
-Nodes (24): CharacterPromptWorkshop(), createDraftMap(), createStepMap(), referenceContext(), accordionStyles(), chevronStyles(), footerStyles(), headerRegionStyles() (+16 more)
+Nodes (23): CharacterPromptWorkshop(), createDraftMap(), createStepMap(), referenceContext(), accordionStyles(), chevronStyles(), footerStyles(), headerRegionStyles() (+15 more)
 
 ### Community 4 - "Media Session Sessioncomposer"
-Cohesion: 0.17
-Nodes (26): confirmModeReplacement(), hasDraftContent(), ModelRecipeFields(), ModelRecipeFieldsProps, SessionActions(), SessionActionsProps, SessionComposer(), SessionComposerProps (+18 more)
+Cohesion: 0.08
+Nodes (46): StudioMode, confirmModeReplacement(), hasDraftContent(), ALLOWED_IMAGE_TYPES, ImageValidation, loadDimensions(), validateReferenceImage(), ModelRecipeFields() (+38 more)
 
 ### Community 5 - "Assets Creative Userecipeshelfcontroller"
-Cohesion: 0.26
-Nodes (20): count(), isRecord(), normalizedId(), nullableDate(), promptIntent(), readTags(), referenceStatus(), sanitizeArray() (+12 more)
+Cohesion: 0.23
+Nodes (10): actionRowStyles(), PromptSaveState, PromptWorkshopActions(), PromptWorkshopActionsProps, saveFormStyles(), noticeStyles(), noticeTitleStyles(), NoticeTone (+2 more)
 
 ### Community 6 - "Voice Processing Adapters"
-Cohesion: 0.17
-Nodes (18): LOCAL_EFFECTS, LocalVoiceEffectId, VoiceEffectSelection, safeProcessingMessage(), useVoiceProcessing(), beginVoiceProcessing(), completeVoiceProcessing(), createVoiceProcessingState() (+10 more)
+Cohesion: 0.13
+Nodes (25): connectClearEffect(), connectRobotEffect(), connectWarmEffect(), decodeAudioBlob(), getAudioContext(), getOfflineContext(), renderLocalEffect(), isMp4() (+17 more)
 
 ### Community 7 - "Api Package Dependencies"
 Cohesion: 0.05
 Nodes (36): dependencies, @decartai/sdk, dotenv, fastify, @fastify/helmet, @fastify/static, @studio/contracts, zod (+28 more)
 
 ### Community 8 - "Primitives Segmentedcontrol Button"
-Cohesion: 0.23
-Nodes (12): CaptureAudioSettings, CaptureStreamSettings, CaptureVideoSettings, VoiceLibraryKind, VoicePage, VoiceSummary, defaultVoiceLibraryClient, createClient() (+4 more)
+Cohesion: 0.26
+Nodes (14): apiFetch(), convertRecordingVoice(), importPublicVoice(), invalidResponse(), listPublicVoices(), listWorkspaceVoices(), VoicePage, VoiceSummary (+6 more)
 
 ### Community 9 - "Adapters Session Decart"
-Cohesion: 0.09
-Nodes (24): connectDecartRealtime(), ConnectRealtimeOptions, DevelopmentRealtimeDriver, getDecartModelRequirements(), ModelRequirements, RealtimeConnectionState, RealtimeSession, RealtimeSnapshot (+16 more)
+Cohesion: 0.10
+Nodes (21): connectDecartRealtime(), ConnectRealtimeOptions, DevelopmentRealtimeDriver, ModelRequirements, RealtimeConnectionState, RealtimeSession, RealtimeSnapshot, FakeMediaStream (+13 more)
 
 ### Community 10 - "E2E Spec Successful"
-Cohesion: 0.05
-Nodes (17): BrowserTestState, MockStudioState, representativeViewports, BrowserJourneyState, exactViewports, ModelId, NetworkJourneyState, SerializedSnapshot (+9 more)
+Cohesion: 0.11
+Nodes (5): BrowserJourneyState, exactViewports, ModelId, NetworkJourneyState, SerializedSnapshot
 
 ### Community 11 - "Session Image Modes"
-Cohesion: 0.11
-Nodes (32): EditAction, RecipeSelection, RecipeShelfProps, CreativeAssetError, CreativeAssetRepositoryOptions, MemoryStorage, AssetSource, CreateSavedCharacterPromptInput (+24 more)
+Cohesion: 0.05
+Nodes (102): EditAction, createRepository(), RecipeSelection, RecipeShelfProps, browserStorage(), createCreativeAssetRepository(), CreativeAssetError, CreativeAssetErrorCode (+94 more)
 
 ### Community 12 - "Tsconfig Base Compileroptions"
 Cohesion: 0.07
 Nodes (27): packages/contracts/src/index.ts, packages/domain/src/index.ts, packages/testing/src/index.ts, compilerOptions, baseUrl, exactOptionalPropertyTypes, ignoreDeprecations, isolatedModules (+19 more)
 
 ### Community 13 - "Api Voices Routes"
-Cohesion: 0.12
-Nodes (11): MAX_RECORDING_AUDIO_BYTES, FailingProvider, InvalidAudioProvider, LimitedProvider, originHeaders, ZeroRetentionRejectedProvider, VoiceSearchInput, FakeElevenLabsProvider (+3 more)
+Cohesion: 0.17
+Nodes (7): MAX_RECORDING_AUDIO_BYTES, FailingProvider, InvalidAudioProvider, LimitedProvider, originHeaders, ZeroRetentionRejectedProvider, standardModel
 
 ### Community 14 - "Recording Recordingcontrols Live"
-Cohesion: 0.19
-Nodes (14): actionRowStyles(), captureSurfaceStyles(), detailsStyles(), disabledReasonStyles(), focusTargetStyles(), headingStyles(), noticeLayerStyles(), recordActionStyles() (+6 more)
+Cohesion: 0.15
+Nodes (19): actionRowStyles(), captureResolutionLabel(), captureSurfaceStyles(), detailsStyles(), disabledReasonStyles(), focusTargetStyles(), headingStyles(), noticeLayerStyles() (+11 more)
 
 ### Community 15 - "Session Orchestration Realtimesnapshot"
-Cohesion: 0.18
-Nodes (24): hasPendingChanges(), imageIdentity(), imageIds, normalizePrompt, revertToAppliedDraft(), toAppliedState(), toDomainApplied(), toDomainDraft() (+16 more)
+Cohesion: 0.08
+Nodes (43): hasPendingChanges(), imageIdentity(), imageIds, normalizePrompt, revertToAppliedDraft(), toAppliedState(), toDomainApplied(), toDomainDraft() (+35 more)
 
 ### Community 16 - "Api Providers Decart"
-Cohesion: 0.14
-Nodes (13): CapabilityAvailability, CapabilitiesResponse, capabilitiesResponseSchema, HealthResponse, healthResponseSchema, DEFAULT_CHARACTER_MODEL_ID, RealtimeTokenConstraints, realtimeTokenConstraintsSchema (+5 more)
+Cohesion: 0.27
+Nodes (9): Button, ButtonProps, IconButton, IconButtonProps, Surface(), SurfaceProps, surfaceStyles(), VisuallyHidden() (+1 more)
 
 ### Community 17 - "Package Dependencies React"
 Cohesion: 0.08
 Nodes (24): dependencies, @decartai/sdk, @emotion/react, mediabunny, react, react-dom, @studio/contracts, @studio/domain (+16 more)
 
 ### Community 18 - "Contracts Voices Voice"
-Cohesion: 0.09
-Nodes (34): contentTypeEssence(), registerVoiceRoutes(), requireVoiceService(), streamProviderAudio(), validationError(), verifyProviderOrigin(), createRequestLifetime(), RequestLifetime (+26 more)
+Cohesion: 0.05
+Nodes (48): CapabilityAvailability, CapabilitiesResponse, capabilitiesResponseSchema, API_ERROR_CODES, apiErrorCodeSchema, ApiErrorDetail, apiErrorDetailSchema, ApiErrorResponse (+40 more)
 
 ### Community 19 - "Prompt Authoring Charactertransformfields"
-Cohesion: 0.24
-Nodes (18): CharacterTransformFields(), CharacterTransformFieldsProps, checkboxLabelStyles(), checkboxStyles(), CharacterGender, PromptIssue, promptFieldGridStyles(), promptFullWidthStyles() (+10 more)
+Cohesion: 0.26
+Nodes (17): CharacterTransformFields(), CharacterTransformFieldsProps, checkboxLabelStyles(), checkboxStyles(), PromptIssue, promptFieldGridStyles(), promptFullWidthStyles(), promptIssueFor() (+9 more)
 
 ### Community 20 - "Api Providers Elevenlabs"
 Cohesion: 0.11
 Nodes (23): ALLOWED_PREVIEW_HOSTS, audioExtension(), classifyProviderFailure(), ElevenLabsHttpProvider, FEATURE_UNAVAILABLE_CODES, importResponseSchema, INVALID_AUDIO_CODES, isAllowedPreviewUrl() (+15 more)
 
 ### Community 21 - "Orchestration Session Media"
-Cohesion: 0.15
-Nodes (13): enumerateMediaDevices(), finiteSetting(), readCaptureStreamSettings(), supportsLocal1080pProfile(), originalMediaDevices, CaptureDeviceOption, CapturePreferences, CapturePreferencesController (+5 more)
+Cohesion: 0.23
+Nodes (12): getDecartModelRequirements(), namedMessage(), SafeMediaError, toSafeMediaError(), isModelMode(), track(), disconnectError(), ModelSessionActions (+4 more)
 
 ### Community 22 - "Prompt Authoring Characterpromptworkshop"
 Cohesion: 0.06
@@ -255,40 +254,40 @@ Cohesion: 0.12
 Nodes (14): create(), DecartSdkClient, DecartSdkModule, DecartSdkTokenProvider, normalizeExpiry(), numericStatusFrom(), sdkTokenSchema, TemporaryToken (+6 more)
 
 ### Community 24 - "Session Recording Live"
-Cohesion: 0.15
-Nodes (19): browserErrorMap, classifyBrowserError(), createSafeError(), SafeError, SafeErrorCode, ModelRecordingStopAction, AudioSidecar, RecordingArtifact (+11 more)
+Cohesion: 0.14
+Nodes (21): browserErrorMap, classifyBrowserError(), createSafeError(), DomainRuleError, SafeError, SafeErrorCode, ModelRecordingStopAction, AudioSidecar (+13 more)
 
 ### Community 25 - "Recording Orchestration Recordingartifacts"
-Cohesion: 0.29
-Nodes (10): AUDIO_MIME_CANDIDATES, composeRecordingSource(), hasSameRecordingTracks(), live(), revokeArtifactUrl(), selectedLiveTracks(), selectSupportedMime(), selectRecordingMimeType() (+2 more)
+Cohesion: 0.16
+Nodes (15): AUDIO_MIME_CANDIDATES, composeRecordingSource(), hasSameRecordingTracks(), live(), selectAudioMime(), selectedLiveTracks(), selectSupportedMime(), selectVideoMime() (+7 more)
 
 ### Community 26 - "Recording Orchestration Recordingattempt"
-Cohesion: 0.13
-Nodes (23): StudioMode, AutomaticRecordingStopEvent, AutomaticRecordingStopReason, CaptureDeviceState, RecordingArtifact, RecordingAudioSidecar, RecordingLifecycle, RecordingSource (+15 more)
+Cohesion: 0.14
+Nodes (18): revokeArtifactUrl(), AutomaticRecordingStopEvent, AutomaticRecordingStopReason, CaptureDeviceState, RecordingArtifact, RecordingAudioSidecar, TakeMetadata, UseRecordingOptions (+10 more)
 
 ### Community 27 - "Api Voices Voice"
-Cohesion: 0.15
-Nodes (12): AudioStream, isModelCompatible(), isProfessionalVoice(), summarizePublicVoice(), summarizeVoice(), VoiceService, ElevenLabsModel, ElevenLabsProvider (+4 more)
+Cohesion: 0.11
+Nodes (16): AudioStream, isModelCompatible(), isProfessionalVoice(), summarizePublicVoice(), summarizeVoice(), VoiceService, ElevenLabsModel, ElevenLabsProvider (+8 more)
 
 ### Community 28 - "Package Devdependencies Json"
 Cohesion: 0.11
-Nodes (19): concurrently, @eslint/js, fast-check, devDependencies, concurrently, @eslint/js, fast-check, prettier (+11 more)
+Nodes (19): concurrently, @eslint/js, fast-check, devDependencies, concurrently, @eslint/js, fast-check, @playwright/test (+11 more)
 
 ### Community 29 - "Assets Sanitize Count"
-Cohesion: 0.10
-Nodes (41): normalizeWhitespace(), createPromptBuilderDraft(), isAdultAge(), isCharacterGender(), isIntent(), isRecord(), normalizeField(), normalizePreset() (+33 more)
+Cohesion: 0.09
+Nodes (43): SavedCharacterPromptInput, createPromptBuilderDraft(), isAdultAge(), isCharacterGender(), isIntent(), isRecord(), normalizeField(), normalizePreset() (+35 more)
 
 ### Community 31 - "Assets Creative Repository"
-Cohesion: 0.19
-Nodes (15): PromptWorkshopAction, SavePromptWorkshopAction, AdultAge, createPromptBuilderDraft(), generateStructuredPrompt(), PROMPT_DETAIL_LIMIT, PromptValidation, ReferenceImageContext (+7 more)
+Cohesion: 0.16
+Nodes (18): createDraftForIntent(), PromptWorkshopAction, SavePromptWorkshopAction, AdultAge, CharacterGender, createPromptBuilderDraft(), generateStructuredPrompt(), normalizePromptBuilderDraft() (+10 more)
 
 ### Community 32 - "Api Config Environment"
 Cohesion: 0.16
 Nodes (10): environmentSchema, EnvironmentValidationError, optionalModelSchema, optionalSecretSchema, parseEnvironment(), portSchema, strictBooleanSchema, app (+2 more)
 
 ### Community 33 - "Api Http Errors"
-Cohesion: 0.11
-Nodes (20): VoiceServiceError, VoiceServiceFailureReason, ApiErrorBody, AppError, errorBody(), installErrorHandling(), isFastifyError(), mapProviderError() (+12 more)
+Cohesion: 0.21
+Nodes (11): VoiceServiceError, VoiceServiceFailureReason, ApiErrorBody, AppError, errorBody(), installErrorHandling(), isFastifyError(), mapProviderError() (+3 more)
 
 ### Community 34 - "Tsconfig Api Json"
 Cohesion: 0.13
@@ -299,16 +298,16 @@ Cohesion: 0.13
 Nodes (14): compilerOptions, composite, jsx, jsxImportSource, noEmit, types, extends, include (+6 more)
 
 ### Community 36 - "Package Scripts Build"
-Cohesion: 0.13
-Nodes (15): scripts, build, build:packages, dev, format, format:check, lint, quality (+7 more)
+Cohesion: 0.12
+Nodes (16): scripts, build, build:packages, dev, format, format:check, lint, quality (+8 more)
 
 ### Community 37 - "index.ts"
-Cohesion: 0.09
-Nodes (19): Button, ButtonProps, ButtonSize, ButtonVariant, IconButton, IconButtonProps, fadeIn, focusableSelector (+11 more)
+Cohesion: 0.12
+Nodes (11): fadeIn, focusableSelector, openOverlayIds, OverlayPanelPlacement, OverlayPanelProps, OverlayPanelSize, panelEntrance(), panelStyles() (+3 more)
 
 ### Community 38 - "Session Orchestration Usemodelsessionactions"
-Cohesion: 0.18
-Nodes (14): SessionLifecycle, SafeMediaError, AppliedRealtimeState, isModelMode(), SessionDraft, disconnectError(), ModelSessionActions, ModelSessionActionsOptions (+6 more)
+Cohesion: 0.16
+Nodes (12): enumerateMediaDevices(), finiteSetting(), readCaptureStreamSettings(), supportsLocal1080pProfile(), originalMediaDevices, CaptureDeviceOption, CapturePreferencesController, DEFAULT_CAPTURE_PREFERENCES (+4 more)
 
 ### Community 39 - "Contracts Package Scripts"
 Cohesion: 0.14
@@ -316,39 +315,39 @@ Nodes (13): dependencies, zod, exports, zod, main, name, private, scripts (+5 mo
 
 ### Community 40 - "Assets Creativeassetsearchresults Recentprompt"
 Cohesion: 0.17
-Nodes (14): ALLOWED_IMAGE_TYPES, ImageValidation, loadDimensions(), validateReferenceImage(), emptyFeedback(), formatFileSize(), ImageFeedback, ReferenceImageField() (+6 more)
+Nodes (4): BrowserJourneyState, ModelId, NetworkJourneyState, SerializedSnapshot
 
 ### Community 41 - "useRecording.test.tsx"
-Cohesion: 0.18
-Nodes (13): LocalCaptureProfileId, actualSettingsStyles(), bodyStyles(), CaptureSettingsPanel(), CaptureSettingsPanelProps, footerStyles(), introductionStyles(), panelStyles() (+5 more)
+Cohesion: 0.20
+Nodes (12): actualSettingsStyles(), bodyStyles(), CaptureSettingsPanel(), CaptureSettingsPanelProps, footerStyles(), introductionStyles(), panelStyles(), profileLabels (+4 more)
 
 ### Community 42 - "Recording Recordinghelpers Mime"
 Cohesion: 0.22
-Nodes (15): selectAudioMime(), selectVideoMime(), createOriginalRecordingArtifact(), createRecordingSidecar(), firstChunkMimeType(), attachRecordingAttemptListeners(), createRecordingAttempt(), liveTrack() (+7 more)
+Nodes (8): VoiceLibraryKind, artifact(), processing, recording(), LOCAL_EFFECTS, LocalVoiceEffectId, VoiceEffectSelection, VoiceProcessingController
 
 ### Community 43 - "Api Providers Elevenlabs"
 Cohesion: 0.23
 Nodes (11): fullLabelStyles(), panelStyles(), rootStyles(), shortLabelStyles(), TabItem, tabListStyles(), Tabs(), TabsProps (+3 more)
 
 ### Community 44 - "Recording Mime Format"
-Cohesion: 0.13
-Nodes (20): cleanupRecordingAttempt(), startRecordingAttempt(), useRecording(), createRecordingFilename(), filenameMode, formatDuration(), formatFileSize(), timestampForFilename() (+12 more)
+Cohesion: 0.14
+Nodes (27): attachRecordingAttemptListeners(), cleanupRecordingAttempt(), createRecordingAttempt(), liveTrack(), RecordingAttempt, RecordingAttemptEvents, RecordingAttemptListeners, RecordingAttemptSetup (+19 more)
 
 ### Community 45 - "Api Http Security"
-Cohesion: 0.17
-Nodes (18): AppDependencies, createApp(), RuntimeConfig, registerRealtimeRoutes(), localOriginHeaders, verifyProviderOrigin(), registerSystemRoutes(), SUPPORTED_AUDIO_CONTENT_TYPES (+10 more)
+Cohesion: 0.13
+Nodes (27): AppDependencies, createApp(), RuntimeConfig, registerRealtimeRoutes(), localOriginHeaders, verifyProviderOrigin(), registerSystemRoutes(), contentTypeEssence() (+19 more)
 
 ### Community 46 - "Api Providers Provider"
-Cohesion: 0.12
-Nodes (24): formatBytes(), formatDuration(), FakeTrack, actionStyles(), captureMetadataChips(), downloadStyles(), formatFrameRate(), gridStyles() (+16 more)
+Cohesion: 0.17
+Nodes (19): formatBytes(), actionStyles(), captureMetadataChips(), defaultAudioSourceLabel(), downloadStyles(), formatFrameRate(), gridStyles(), headingStyles() (+11 more)
 
 ### Community 47 - "types.ts"
-Cohesion: 0.16
-Nodes (14): headingStyles(), introStyles(), optionGridStyles(), panelStyles(), providerContentStyles(), summaryStyles(), createOriginal(), createRecording() (+6 more)
+Cohesion: 0.27
+Nodes (10): headingStyles(), introStyles(), optionGridStyles(), panelStyles(), providerContentStyles(), summaryStyles(), VoiceBrowserCapabilities, VoiceEffectsPanel() (+2 more)
 
 ### Community 48 - "Primitives Formcontrols Fieldrootstyles"
-Cohesion: 0.13
-Nodes (15): buttonStyles(), controlStyles(), SelectField, SelectFieldProps, SharedFieldProps, TextAreaFieldProps, TextFieldProps, fullLabelStyles() (+7 more)
+Cohesion: 0.21
+Nodes (6): controlStyles(), SelectField, SelectFieldProps, SharedFieldProps, TextAreaFieldProps, TextFieldProps
 
 ### Community 49 - "Package Engines Ref"
 Cohesion: 0.18
@@ -367,12 +366,12 @@ Cohesion: 0.18
 Nodes (10): compilerOptions, composite, noEmit, types, extends, include, node, src (+2 more)
 
 ### Community 53 - "Prompt Authoring Promptworkshopheader"
-Cohesion: 0.20
-Nodes (9): `01-preparation`, `02-creative-tools`, `03-live-sessions`, `04-recording-and-review`, Capture details, Filename convention, Lightframe Studio responsive screenshot archive, State inventory (+1 more)
+Cohesion: 0.27
+Nodes (7): ButtonSize, buttonStyles(), ButtonVariant, @emotion/react, focusRingStyles(), StudioTheme, Theme
 
 ### Community 54 - "useVoiceProcessing.test.tsx"
-Cohesion: 0.14
-Nodes (33): createRepository(), browserStorage(), createCreativeAssetRepository(), CreativeAssetErrorCode, defaultIdFactory(), loadInitialState(), mapDomainError(), storageNotice() (+25 more)
+Cohesion: 0.22
+Nodes (3): BrowserTestState, MockStudioState, representativeViewports
 
 ### Community 55 - "Tsconfig Contracts Compileroptions"
 Cohesion: 0.20
@@ -395,28 +394,20 @@ Cohesion: 0.22
 Nodes (8): compilerOptions, types, exclude, extends, include, src/**/*.test.ts, src/**/*.ts, ../../tsconfig.base.json
 
 ### Community 60 - "Generatedpromptpreview Prompt Authoring"
-Cohesion: 0.18
-Nodes (15): CreativeAssetSearchResults, CreativeAssetStore, RecentPrompt, ReferenceImageStatus, SanitizeCreativeAssetResult, SavedCharacterPrompt, SavedCharacterPromptInput, SavedCharacterPromptSource (+7 more)
-
-### Community 61 - "StudioMode"
 Cohesion: 0.22
-Nodes (7): CHARACTER_MODEL_ID, isSessionModeId(), LocalSessionMode, MODEL_MODE_IDS, ModelSessionMode, SessionMode, VTON_MODEL_ID
+Nodes (8): compilerOptions, noEmit, types, extends, include, node, ../tsconfig.base.json, ./**/*.ts
 
 ### Community 62 - "Promptworkshopactions Prompt Authoring"
-Cohesion: 0.27
-Nodes (11): ApiClientError, apiFetch(), fetchProviderAvailability(), readError(), requestRealtimeToken(), convertRecordingVoice(), importPublicVoice(), invalidResponse() (+3 more)
+Cohesion: 0.23
+Nodes (10): createRecordingFilename(), filenameMode, formatDuration(), formatFileSize(), timestampForFilename(), isAudioMimeType(), isSupportedVoiceSidecarMimeType(), MimeSupportTest (+2 more)
 
 ### Community 63 - "Docs Lightframe Architecture"
 Cohesion: 0.33
 Nodes (6): Lightframe Web Shell, Architecture and Ownership, Browser Support, Live Provider Smoke Test, Manual QA Checklist, Lightframe Studio
 
-### Community 65 - "RecordingControls.test.tsx"
-Cohesion: 0.24
-Nodes (9): getImageQualityWarnings(), IMAGE_MIME_TYPES, ImageMimeType, ImageQualityWarning, ImageQualityWarningCode, ImageValidationCode, ImageValidationIssue, isImageMimeType() (+1 more)
-
 ### Community 66 - "createCreativeAssetRepository"
-Cohesion: 0.18
-Nodes (15): libraryOptions, pageStyles(), searchButtonStyles(), searchFormStyles(), stackStyles(), VoiceLibrary(), VoiceLibraryProps, audioStyles() (+7 more)
+Cohesion: 0.39
+Nodes (8): audioStyles(), listStyles(), previewUrl(), voiceActionStyles(), voiceBodyStyles(), VoiceList(), VoiceListProps, voiceStyles()
 
 ### Community 68 - "Prettierrc Printwidth Semi"
 Cohesion: 0.40
@@ -434,13 +425,17 @@ Nodes (5): For /graphify explain, For /graphify path, graphify reference: query,
 Cohesion: 0.27
 Nodes (11): CharacterPromptWorkshopProps, PromptIntent, draftStatusStyles(), eyebrowStyles(), headerStyles(), intentHintStyles(), intentOptions, introStyles() (+3 more)
 
-### Community 82 - "Playwright Package Devdependencies"
-Cohesion: 0.27
-Nodes (10): connectClearEffect(), connectRobotEffect(), connectWarmEffect(), decodeAudioBlob(), getAudioContext(), getOfflineContext(), renderLocalEffect(), isMp4() (+2 more)
-
 ### Community 83 - "CharacterPresetPicker.tsx"
 Cohesion: 0.29
 Nodes (10): CharacterPreset, CharacterPresetPicker(), CharacterPresetPickerProps, characterPresets, presetButtonStyles(), presetDescriptionStyles(), presetLabelStyles(), presetListStyles() (+2 more)
+
+### Community 85 - "VoiceLibrary.tsx"
+Cohesion: 0.39
+Nodes (7): libraryOptions, pageStyles(), searchButtonStyles(), searchFormStyles(), stackStyles(), VoiceLibrary(), VoiceLibraryProps
+
+### Community 88 - "SegmentedControl.tsx"
+Cohesion: 0.39
+Nodes (7): fullLabelStyles(), groupStyles(), SegmentedControl(), SegmentedControlProps, SegmentOption, segmentStyles(), shortLabelStyles()
 
 ### Community 95 - "graphify reference: add a URL and watch a folder"
 Cohesion: 0.50
@@ -458,49 +453,49 @@ Nodes (3): For --cluster-only, For --update (incremental re-extraction), graphif
 Cohesion: 0.43
 Nodes (7): GeneratedPromptPreview(), GeneratedPromptPreviewProps, previewCountStyles(), previewHeaderStyles(), previewLabelStyles(), previewStyles(), previewTextStyles()
 
-### Community 102 - "image.ts"
-Cohesion: 0.47
-Nodes (5): adapters, Deferred, originalArtifact(), readySidecar(), recordingController()
+### Community 102 - "VoiceEffectsPanel.test.tsx"
+Cohesion: 0.33
+Nodes (4): createOriginal(), createRecording(), emptyPage, voiceApi
 
 ### Community 103 - "workshopSteps.ts"
 Cohesion: 0.52
 Nodes (6): characterSteps(), concise(), editLabel, editSummary(), getPromptWorkshopSteps(), PromptWorkshopStep
 
+### Community 105 - "recordingArtifacts.ts"
+Cohesion: 0.52
+Nodes (6): createOriginalRecordingArtifact(), createRecordingSidecar(), firstChunkMimeType(), completeAudioSidecar(), failAudioSidecar(), startAudioSidecar()
+
 ### Community 106 - "StudioDesignProvider"
-Cohesion: 0.27
-Nodes (6): OverlayPanel, globalStyles(), StudioDesignProvider(), @emotion/react, StudioTheme, Theme
+Cohesion: 0.43
+Nodes (3): OverlayPanel, globalStyles(), StudioDesignProvider()
 
 ### Community 107 - "concurrently"
 Cohesion: 0.15
-Nodes (23): acquireLocalMedia(), hasLiveAudio(), hasLiveTrack(), hasLiveVideo(), MediaRequirements, stopOwnedStream(), withCaptureDevices(), BrowserCapabilities (+15 more)
+Nodes (16): withCaptureDevices(), BrowserCapabilities, CaptureAudioSettings, CapturePreferences, CaptureStreamSettings, CaptureVideoSettings, LocalCaptureProfileId, SessionLifecycle (+8 more)
 
 ### Community 108 - "useRecording.test.tsx"
-Cohesion: 0.33
-Nodes (6): createSource(), createTrack(), installRecorderHarness(), RecorderHarness, RecorderListener, TrackOptions
-
-### Community 109 - "sanitation.ts"
-Cohesion: 0.47
-Nodes (5): normalizeAssetName(), normalizeAssetNotes(), normalizeAssetText(), normalizePromptText(), normalizeTags()
+Cohesion: 0.21
+Nodes (7): createSource(), createTrack(), installRecorderHarness(), RecorderHarness, RecorderListener, TrackOptions, FakeMediaStream
 
 ## Knowledge Gaps
-- **419 isolated node(s):** `semi`, `singleQuote`, `trailingComma`, `printWidth`, `name` (+414 more)
+- **418 isolated node(s):** `semi`, `singleQuote`, `trailingComma`, `printWidth`, `name` (+413 more)
   These have ≤1 connection - possible missing edges or undocumented components.
 - **29 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `StudioMode` connect `Recording Orchestration Recordingattempt` to `Studio Studioapp Recording`, `Media Session Sessioncomposer`, `Session Orchestration Usemodelsessionactions`, `Primitives Segmentedcontrol Button`, `useRecording.test.tsx`, `Recording Recordinghelpers Mime`, `concurrently`, `SessionComposer.test.tsx`, `Recording Recordingcontrols Live`, `Prompt Authoring Characterpromptworkshop`, `Recording Orchestration Recordingartifacts`?**
+- **Why does `StudioMode` connect `Media Session Sessioncomposer` to `Studio Studioapp Recording`, `useRecording.test.tsx`, `concurrently`, `Recording Mime Format`, `Recording Recordingcontrols Live`, `Prompt Authoring Characterpromptworkshop`, `Recording Orchestration Recordingartifacts`, `Recording Orchestration Recordingattempt`?**
+  _High betweenness centrality (0.022) - this node is a cross-community bridge._
+- **Why does `ElevenLabsProvider` connect `Api Voices Voice` to `Api Providers Elevenlabs`, `Api Http Security`?**
   _High betweenness centrality (0.021) - this node is a cross-community bridge._
-- **Why does `ElevenLabsProvider` connect `Api Voices Voice` to `Api Voices Routes`, `Api Providers Elevenlabs`, `Api Http Security`?**
-  _High betweenness centrality (0.021) - this node is a cross-community bridge._
-- **Why does `ModelModeId` connect `Generatedpromptpreview Prompt Authoring` to `Assets Creative Userecipeshelfcontroller`, `Primitives Segmentedcontrol Button`, `Session Image Modes`, `Session Orchestration Realtimesnapshot`, `useVoiceProcessing.test.tsx`, `StudioMode`?**
+- **Why does `ModelModeId` connect `Session Image Modes` to `concurrently`, `Session Orchestration Realtimesnapshot`?**
   _High betweenness centrality (0.020) - this node is a cross-community bridge._
 - **What connects `semi`, `singleQuote`, `trailingComma` to the rest of the system?**
-  _419 weakly-connected nodes found - possible documentation gaps or missing edges._
+  _418 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `Creative Assets Recipeshelf` be split into smaller, more focused modules?**
   _Cohesion score 0.08663457978526472 - nodes in this community are weakly interconnected._
 - **Should `Studio Studioapp Recording` be split into smaller, more focused modules?**
-  _Cohesion score 0.06656426011264721 - nodes in this community are weakly interconnected._
-- **Should `Api Package Dependencies` be split into smaller, more focused modules?**
-  _Cohesion score 0.05405405405405406 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.0715846994535519 - nodes in this community are weakly interconnected._
+- **Should `Media Session Sessioncomposer` be split into smaller, more focused modules?**
+  _Cohesion score 0.08173076923076923 - nodes in this community are weakly interconnected._

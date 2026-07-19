@@ -1,6 +1,6 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { useCallback, useEffect, useRef } from 'react';
-import { Button, StatusNotice, Surface, type NoticeTone } from '../../ui';
+import { Button, Surface } from '../../ui';
 import { formatDuration } from './recordingHelpers';
 import type { RecordingController, RecordingSource } from './types';
 import type { StudioMode } from '../media-session';
@@ -19,6 +19,7 @@ export type RecordingControlsProps = {
 const captureSurfaceStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
+  height: '100%',
   display: 'grid',
   gridTemplateColumns: 'auto minmax(0, 1fr) auto',
   alignItems: 'center',
@@ -111,66 +112,17 @@ const settingsActionStyles = (): CSSObject => ({
   },
 });
 
-const noticeLayerStyles = (theme: Theme): CSSObject => ({
-  gridColumn: '1 / -1',
-  minWidth: 0,
-  display: 'grid',
-  gap: theme.space.xxs,
-  marginBlockStart: `-${theme.space.xs}`,
-  '& > *': { paddingBlock: theme.space.xs },
-  '& > [data-disabled-reason]': { paddingBlock: theme.space.xxs },
-  '@media (max-width: 39.99rem), (max-height: 48rem)': {
-    marginBlockStart: 0,
-    fontSize: theme.fontSizes.caption,
-    '& > *': { paddingBlock: theme.space.xxs },
-    '&[data-only-disabled-reason="true"]': {
-      position: 'absolute',
-      width: '1px',
-      height: '1px',
-      margin: '-1px',
-      overflow: 'hidden',
-    },
-  },
+const disabledReasonStyles = (): CSSObject => ({
+  position: 'absolute',
+  width: '1px',
+  height: '1px',
+  margin: '-1px',
+  padding: 0,
+  overflow: 'hidden',
+  border: 0,
+  clip: 'rect(0 0 0 0)',
+  whiteSpace: 'nowrap',
 });
-
-const focusTargetStyles = (theme: Theme): CSSObject => ({
-  marginBlock: theme.space.sm,
-  borderRadius: theme.radii.medium,
-  '&:focus': {
-    outline: `2px solid ${theme.colors.focus}`,
-    outlineOffset: '3px',
-  },
-});
-
-const disabledReasonStyles = (theme: Theme): CSSObject => ({
-  margin: 0,
-  padding: `${theme.space.xxs} ${theme.space.xs}`,
-  borderInlineStart: `2px solid ${theme.colors.warning}`,
-  borderRadius: theme.radii.small,
-  color: theme.colors.warning,
-  background: theme.colors.warningSoft,
-  fontSize: theme.fontSizes.caption,
-  fontWeight: 680,
-  lineHeight: 1.35,
-  overflowWrap: 'anywhere',
-  '@media (max-width: 39.99rem), (max-height: 48rem)': {
-    position: 'absolute',
-    width: '1px',
-    height: '1px',
-    margin: '-1px',
-    padding: 0,
-    overflow: 'hidden',
-    border: 0,
-    clip: 'rect(0 0 0 0)',
-    whiteSpace: 'nowrap',
-  },
-});
-
-type RecordingNotice = {
-  title: string;
-  message: string;
-  tone: NoticeTone;
-};
 
 type RecordingAvailability = Pick<
   RecordingControlsProps,
@@ -220,37 +172,6 @@ const captureResolutionLabel = (
   return `${settings.width}×${settings.height}${frameRate}`;
 };
 
-const recordingNotice = (recording: RecordingController): RecordingNotice | null => {
-  switch (recording.lifecycle) {
-    case 'recording':
-      return {
-        title: 'Recording in progress',
-        message: 'The current stage and selected audio source are being captured locally.',
-        tone: 'neutral',
-      };
-    case 'stopping':
-      return {
-        title: 'Finalizing your take…',
-        message: 'Keep this tab open while the browser finishes the local video file.',
-        tone: 'warning',
-      };
-    case 'recorded':
-      return {
-        title: 'Take ready',
-        message: 'Review and download the temporary take below before leaving this tab.',
-        tone: 'success',
-      };
-    case 'error':
-      return {
-        title: 'Recording stopped',
-        message: recording.processingError ?? 'The browser could not complete this recording.',
-        tone: 'danger',
-      };
-    default:
-      return null;
-  }
-};
-
 export const RecordingControls = ({
   recording,
   source,
@@ -263,11 +184,9 @@ export const RecordingControls = ({
 }: RecordingControlsProps) => {
   const theme = useTheme();
   const actionRef = useRef<HTMLButtonElement>(null);
-  const noticeRef = useRef<HTMLDivElement>(null);
   const previousLifecycleRef = useRef(recording.lifecycle);
   const active = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
   const processing = recording.processingState === 'processing';
-  const notice = recordingNotice(recording);
   const unavailableReason = recordingUnavailableReason({
     supported,
     processing,
@@ -287,14 +206,6 @@ export const RecordingControls = ({
     previousLifecycleRef.current = recording.lifecycle;
     if (recording.lifecycle === 'recording') {
       actionRef.current?.focus();
-      return;
-    }
-    if (
-      recording.lifecycle === 'stopping' ||
-      recording.lifecycle === 'recorded' ||
-      recording.lifecycle === 'error'
-    ) {
-      noticeRef.current?.focus();
     }
   }, [recording.lifecycle]);
 
@@ -327,7 +238,7 @@ export const RecordingControls = ({
       const target = event.target instanceof Element ? event.target : null;
       if (
         target?.closest(
-          'input, textarea, select, button, a[href], summary, [contenteditable="true"], [role="button"], [role="tab"]',
+          'input, textarea, select, button, a[href], audio, video, summary, [contenteditable]:not([contenteditable="false"]), [role], [tabindex]:not([tabindex="-1"])',
         )
       ) {
         return;
@@ -399,7 +310,6 @@ export const RecordingControls = ({
             id="record-take-action"
             variant="danger"
             busy={recording.lifecycle === 'stopping'}
-            aria-describedby="recording-state"
             aria-keyshortcuts="Space"
             css={recordActionStyles(theme, true)}
             onClick={() => void onStop()}
@@ -412,14 +322,7 @@ export const RecordingControls = ({
             id="record-take-action"
             variant="danger"
             disabled={unavailable}
-            aria-describedby={
-              [
-                unavailableReason ? 'recording-disabled-reason' : null,
-                notice ? 'recording-state' : null,
-              ]
-                .filter(Boolean)
-                .join(' ') || undefined
-            }
+            aria-describedby={unavailableReason ? 'recording-disabled-reason' : undefined}
             title={unavailableReason ?? undefined}
             aria-keyshortcuts="Space"
             css={recordActionStyles(theme, false)}
@@ -440,35 +343,15 @@ export const RecordingControls = ({
           </Button>
         ) : null}
       </div>
-      {unavailableReason || notice ? (
-        <div
-          data-only-disabled-reason={unavailableReason && !notice ? 'true' : undefined}
-          css={noticeLayerStyles(theme)}
+      {unavailableReason ? (
+        <p
+          id="recording-disabled-reason"
+          data-disabled-reason="true"
+          role="status"
+          css={disabledReasonStyles()}
         >
-          {unavailableReason ? (
-            <p
-              id="recording-disabled-reason"
-              data-disabled-reason="true"
-              role="status"
-              css={disabledReasonStyles(theme)}
-            >
-              {unavailableReason}
-            </p>
-          ) : null}
-          {notice ? (
-            <div ref={noticeRef} id="recording-state" tabIndex={-1} css={focusTargetStyles(theme)}>
-              <StatusNotice
-                tone={notice.tone}
-                title={notice.title}
-                role={recording.lifecycle === 'error' ? 'alert' : 'status'}
-                aria-live={recording.lifecycle === 'error' ? 'assertive' : 'polite'}
-                aria-atomic="true"
-              >
-                {notice.message}
-              </StatusNotice>
-            </div>
-          ) : null}
-        </div>
+          {unavailableReason}
+        </p>
       ) : null}
     </Surface>
   );

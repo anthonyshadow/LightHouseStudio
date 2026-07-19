@@ -77,6 +77,42 @@ export interface StudioTheme {
     quick: string;
     standard: string;
   };
+  layout: {
+    shellRows: {
+      header: string;
+      headerCompact: string;
+      headerMobile: string;
+      headerUltra: string;
+      capture: string;
+      captureCompact: string;
+      captureTablet: string;
+      captureMobile: string;
+      captureUltra: string;
+      launcher: string;
+      launcherCompact: string;
+      launcherMobile: string;
+      launcherUltra: string;
+    };
+    overlays: {
+      drawer: string;
+      drawerTablet: string;
+      drawerWide: string;
+      drawerWideCompact: string;
+      bottom: string;
+      bottomCompact: string;
+      bottomTablet: string;
+    };
+  };
+  layers: {
+    stageMedia: number;
+    stageContent: number;
+    stageGuides: number;
+    stageChrome: number;
+    stageBlocking: number;
+    stageNotices: number;
+    skipLink: number;
+    overlay: number;
+  };
   breakpoints: {
     tablet: string;
     laptop: string;
@@ -176,6 +212,42 @@ export const studioTheme: StudioTheme = {
   motion: {
     quick: '120ms ease',
     standard: '220ms cubic-bezier(0.2, 0.8, 0.2, 1)',
+  },
+  layout: {
+    shellRows: {
+      header: '4.5rem',
+      headerCompact: '4rem',
+      headerMobile: '3.5rem',
+      headerUltra: '3rem',
+      capture: '6.25rem',
+      captureCompact: '5.5rem',
+      captureTablet: '7.5rem',
+      captureMobile: '5rem',
+      captureUltra: '4.5rem',
+      launcher: '3rem',
+      launcherCompact: '2.75rem',
+      launcherMobile: '3.25rem',
+      launcherUltra: '3rem',
+    },
+    overlays: {
+      drawer: 'clamp(22.5rem, 27vw, 26rem)',
+      drawerTablet: 'min(30rem, calc(100vw - 2rem))',
+      drawerWide: 'min(50rem, calc(100vw - 1rem))',
+      drawerWideCompact: 'min(42rem, calc(100vw - 1rem))',
+      bottom: 'min(52dvh, 32rem)',
+      bottomCompact: 'min(68dvh, 30rem)',
+      bottomTablet: '88dvh',
+    },
+  },
+  layers: {
+    stageMedia: 1,
+    stageContent: 2,
+    stageGuides: 3,
+    stageChrome: 5,
+    stageBlocking: 6,
+    stageNotices: 7,
+    skipLink: 100,
+    overlay: 1_000,
   },
   breakpoints: {
     tablet: '40rem',

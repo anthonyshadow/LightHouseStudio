@@ -6,6 +6,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RecordingSource } from '../../features/recording/types';
 import { useRecording } from './useRecording';
 
+const NativeBlob = Blob;
+
 type RecorderListener = (event: { data: Blob }) => void;
 
 type TrackOptions = {
@@ -66,20 +68,26 @@ type RecorderHarness = {
 const installRecorderHarness = ({
   defaultRecorderMime = 'video/webm',
   errorOnStartCall,
+  failArtifactBlob = false,
   failRecorderCall,
+  failObjectUrl = false,
   failStreamConstruction = false,
   hangStopCall,
   mainChunkMime,
   supportedMime = true,
+  throwOnStopCall,
   unexpectedStopOnStartCall,
 }: {
   defaultRecorderMime?: string;
   errorOnStartCall?: number;
+  failArtifactBlob?: boolean;
   failRecorderCall?: number;
+  failObjectUrl?: boolean;
   failStreamConstruction?: boolean;
   hangStopCall?: number;
   mainChunkMime?: string;
   supportedMime?: boolean;
+  throwOnStopCall?: number;
   unexpectedStopOnStartCall?: number;
 } = {}): RecorderHarness => {
   let recorderCalls = 0;
@@ -149,24 +157,25 @@ const installRecorderHarness = ({
         queueMicrotask(() => {
           this.state = 'inactive';
           this.emit('dataavailable', {
-            data: new Blob(['recorded-video'], { type: mainChunkMime ?? this.mimeType }),
+            data: new NativeBlob(['recorded-video'], { type: mainChunkMime ?? this.mimeType }),
           });
-          this.emit('stop', { data: new Blob() });
+          this.emit('stop', { data: new NativeBlob() });
         });
       }
     }
 
     stop(): void {
       if (this.state === 'inactive') return;
+      if (this.callIndex === throwOnStopCall) throw new Error('recorder stop failed');
       this.state = 'inactive';
       if (this.callIndex === hangStopCall) return;
       queueMicrotask(() => {
         this.emit('dataavailable', {
-          data: new Blob(['recorded-video'], {
+          data: new NativeBlob(['recorded-video'], {
             type: this.callIndex === 1 ? (mainChunkMime ?? this.mimeType) : this.mimeType,
           }),
         });
-        this.emit('stop', { data: new Blob() });
+        this.emit('stop', { data: new NativeBlob() });
       });
     }
 
@@ -177,9 +186,23 @@ const installRecorderHarness = ({
 
   vi.stubGlobal('MediaStream', FakeMediaStream);
   vi.stubGlobal('MediaRecorder', FakeMediaRecorder);
+  vi.stubGlobal(
+    'Blob',
+    failArtifactBlob
+      ? class {
+          constructor() {
+            throw new Error('blob construction failed');
+          }
+        }
+      : NativeBlob,
+  );
   vi.stubGlobal('URL', {
     ...URL,
-    createObjectURL: vi.fn().mockReturnValue('blob:recording'),
+    createObjectURL: failObjectUrl
+      ? vi.fn(() => {
+          throw new Error('object URL unavailable');
+        })
+      : vi.fn().mockReturnValue('blob:recording'),
     revokeObjectURL: vi.fn(),
   });
   return { recorderConstructor, streamConstructor };
@@ -235,9 +258,10 @@ describe('useRecording recorder construction failures', () => {
     });
 
     expect(result.current.lifecycle).toBe('error');
-    expect(result.current.processingError).toBe(
+    expect(result.current.recordingError).toBe(
       'The browser recorder could not use this media source or format.',
     );
+    expect(result.current.processingError).toBeNull();
     expect(result.current.original).toBeNull();
     expect(result.current.sidecar.state).toBe('unavailable');
     expect(harness.recorderConstructor).toHaveBeenCalledTimes(1);
@@ -308,8 +332,16 @@ describe('useRecording recorder construction failures', () => {
     installRecorderHarness({ hangStopCall: 2 });
     const { result, unmount } = renderHook(() => useRecording());
 
+    act(() => {
+      vi.advanceTimersByTime(800);
+    });
+
     await act(async () => {
       await result.current.start(createSource(), 'local');
+    });
+
+    act(() => {
+      vi.advanceTimersByTime(800);
     });
 
     let stopping!: Promise<unknown>;
@@ -325,6 +357,7 @@ describe('useRecording recorder construction failures', () => {
 
     expect(result.current.lifecycle).toBe('recorded');
     expect(result.current.original?.media.size).toBeGreaterThan(0);
+    expect(result.current.original?.durationMs).toBe(800);
     expect(result.current.sidecar).toMatchObject({
       state: 'error',
       error: 'Audio sidecar did not finish; the video take was preserved.',
@@ -332,6 +365,48 @@ describe('useRecording recorder construction failures', () => {
 
     unmount();
     vi.useRealTimers();
+  });
+
+  it.each([
+    ['Blob construction', { failArtifactBlob: true }],
+    ['object URL creation', { failObjectUrl: true }],
+  ])('settles stop with a recording error when %s fails', async (_label, failure) => {
+    installRecorderHarness(failure);
+    const { result, unmount } = renderHook(() => useRecording());
+
+    await act(async () => {
+      await result.current.start(createSource(), 'local');
+    });
+
+    let artifact: unknown = 'unsettled';
+    await act(async () => {
+      artifact = await result.current.stop();
+    });
+
+    expect(artifact).toBeNull();
+    expect(result.current.lifecycle).toBe('error');
+    expect(result.current.recordingError).toMatch(/playable recording artifact/i);
+    expect(result.current.processingError).toBeNull();
+    expect(result.current.original).toBeNull();
+    unmount();
+  });
+
+  it('settles stop when the main recorder throws while stopping', async () => {
+    installRecorderHarness({ throwOnStopCall: 1 });
+    const { result, unmount } = renderHook(() => useRecording());
+
+    await act(async () => {
+      await result.current.start(createSource(), 'local');
+    });
+    await expect(
+      act(async () => {
+        await result.current.stop();
+      }),
+    ).resolves.toBeUndefined();
+
+    expect(result.current.lifecycle).toBe('error');
+    expect(result.current.recordingError).toMatch(/could not be stopped safely/i);
+    unmount();
   });
 
   it('uses the emitted MP4 chunk type when a default recorder reports no MIME type', async () => {
@@ -467,6 +542,47 @@ describe('useRecording recorder construction failures', () => {
     act(() => result.current.restoreOriginal());
     expect(result.current.processed).toBeNull();
     expect(result.current.downloaded).toBe(false);
+    unmount();
+  });
+
+  it('creates a replacement processed URL before revoking the currently playable variant', async () => {
+    installRecorderHarness();
+    const { result, unmount } = renderHook(() => useRecording());
+
+    await act(async () => {
+      await result.current.start(createSource(), 'local');
+      await result.current.stop();
+    });
+
+    vi.mocked(URL.createObjectURL).mockReturnValueOnce('blob:first-processed');
+    act(() => {
+      result.current.completeProcessing(new Blob(['first']), 'video/webm', 'warm');
+    });
+    const firstProcessed = result.current.processed;
+    expect(firstProcessed?.objectUrl).toBe('blob:first-processed');
+
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    vi.mocked(URL.createObjectURL).mockImplementationOnce(() => {
+      expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+      return 'blob:second-processed';
+    });
+    act(() => {
+      result.current.completeProcessing(new Blob(['second']), 'video/webm', 'clear');
+    });
+
+    expect(result.current.processed?.objectUrl).toBe('blob:second-processed');
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith(firstProcessed?.objectUrl);
+
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    vi.mocked(URL.createObjectURL).mockImplementationOnce(() => {
+      throw new Error('URL creation failed');
+    });
+    expect(() =>
+      result.current.completeProcessing(new Blob(['third']), 'video/webm', 'robot'),
+    ).toThrow('URL creation failed');
+    expect(result.current.processed?.objectUrl).toBe('blob:second-processed');
+    expect(URL.revokeObjectURL).not.toHaveBeenCalled();
+
     unmount();
   });
 

@@ -71,7 +71,7 @@ test('prepares a character recipe accessibly without camera or provider work', a
   expect(iconResponse.headers()['content-type']).toContain('image/svg+xml');
 
   await expect(page.getByRole('main')).toBeVisible();
-  await expect(page.getByLabel('Live studio stage')).toContainText(
+  await expect(page.getByLabel('Studio media stage')).toContainText(
     'Camera and microphone remain off until you start local preview.',
   );
   await expect(page.getByLabel('Integration availability')).toContainText('AI video available');

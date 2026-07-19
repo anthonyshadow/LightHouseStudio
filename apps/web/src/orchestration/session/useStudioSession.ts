@@ -240,10 +240,16 @@ export const useStudioSession = ({
     disconnectRealtime();
     releaseLocalMedia();
     setApplied(null);
+    setApplying(false);
     setLifecycle('idle');
     resetLiveTimer();
     setError(null);
   }, [disconnectRealtime, releaseLocalMedia, resetLiveTimer, setApplied]);
+
+  const releaseForRecordedReview = useCallback((): Promise<void> => {
+    stopCamera();
+    return Promise.resolve();
+  }, [stopCamera]);
 
   const selectMode = useCallback(
     (mode: StudioMode): boolean => {
@@ -299,6 +305,7 @@ export const useStudioSession = ({
       stopModel,
       resetModel,
       stopCamera,
+      releaseForRecordedReview,
       selectMode,
       updatePrompt,
       updateEnhancement,
@@ -326,6 +333,7 @@ export const useStudioSession = ({
       stopModel,
       resetModel,
       stopCamera,
+      releaseForRecordedReview,
       selectMode,
       updatePrompt,
       updateEnhancement,

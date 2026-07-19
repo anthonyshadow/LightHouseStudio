@@ -150,8 +150,8 @@
     "semantic_hash": "78396eb42a9fe6428c171a7eba5e962f"
   },
   "apps/web/src/adapters/browser-media/browserMedia.ts": {
-    "mtime": 1784404961.143218,
-    "ast_hash": "c6ef123ec3bd274ae0e692b4f6d59052",
+    "mtime": 1784413146.602481,
+    "ast_hash": "2ac995929ca0cd0d8b4e749f72186d1b",
     "semantic_hash": ""
   },
   "apps/web/src/adapters/decart-realtime/DecartRealtimeGateway.test.ts": {
@@ -265,8 +265,8 @@
     "semantic_hash": "c9728cc84f9975fe06a2f9f0a35a39e8"
   },
   "apps/web/src/features/creative-assets/useRecipeShelfController.ts": {
-    "mtime": 1784405645.8211477,
-    "ast_hash": "39ac06f5705ff58ea94a2e5cc6f4f95a",
+    "mtime": 1784413032.3288937,
+    "ast_hash": "44087904b850bbfce3f0f9628a5364e3",
     "semantic_hash": ""
   },
   "apps/web/src/features/live-stage/MediaStage.test.tsx": {
@@ -275,8 +275,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/features/live-stage/MediaStage.tsx": {
-    "mtime": 1784405793.6141427,
-    "ast_hash": "96902b1668419bcbcf35e2956cbd9e70",
+    "mtime": 1784413245.6749158,
+    "ast_hash": "51758d8b1d9f0991873602d1d0083e0b",
     "semantic_hash": ""
   },
   "apps/web/src/features/live-stage/index.ts": {
@@ -300,8 +300,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/features/media-session/SessionActions.tsx": {
-    "mtime": 1784403632.2865965,
-    "ast_hash": "69bbb69f51e7823569fb3d822b865049",
+    "mtime": 1784412965.9684296,
+    "ast_hash": "bcec2f2725a0b5295d02f686fc01bacf",
     "semantic_hash": ""
   },
   "apps/web/src/features/media-session/SessionComposer.styles.ts": {
@@ -370,8 +370,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/features/prompt-authoring/CharacterPromptWorkshop.tsx": {
-    "mtime": 1784408443.606953,
-    "ast_hash": "9c2303ece3b1a72fd926684b857fd564",
+    "mtime": 1784412666.8037093,
+    "ast_hash": "45a342b328b63492f5e246a5746caeba",
     "semantic_hash": ""
   },
   "apps/web/src/features/prompt-authoring/CharacterTransformFields.tsx": {
@@ -425,13 +425,13 @@
     "semantic_hash": "653dca254d84ed0588b6332d0076578b"
   },
   "apps/web/src/features/recording/RecordingControls.test.tsx": {
-    "mtime": 1784407796.7310314,
-    "ast_hash": "17aec1f51b1422ca86eaee84f1118ad3",
+    "mtime": 1784413173.5031364,
+    "ast_hash": "71b69de3260614d9cac754fde65316ed",
     "semantic_hash": ""
   },
   "apps/web/src/features/recording/RecordingControls.tsx": {
-    "mtime": 1784410790.645787,
-    "ast_hash": "650e72aaf1b0a063c442a0dc114ec454",
+    "mtime": 1784413062.8025825,
+    "ast_hash": "0e53cbef17995b39aa97b166beab000d",
     "semantic_hash": ""
   },
   "apps/web/src/features/recording/index.ts": {
@@ -455,8 +455,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/features/take-review/TakeDock.tsx": {
-    "mtime": 1784409900.252565,
-    "ast_hash": "618fe6b1b7735d5a8256ade26d886ef5",
+    "mtime": 1784413096.188026,
+    "ast_hash": "cd523a19519cbe1ef5c33a5430ef5d72",
     "semantic_hash": ""
   },
   "apps/web/src/features/take-review/index.ts": {
@@ -520,8 +520,8 @@
     "semantic_hash": ""
   },
   "apps/web/src/orchestration/recording/useRecording.ts": {
-    "mtime": 1784408006.7941775,
-    "ast_hash": "b9742e34cf4865986d997390ff892902",
+    "mtime": 1784413245.7777913,
+    "ast_hash": "5b8e9935c0fad81fea684d783db4a7ec",
     "semantic_hash": ""
   },
   "apps/web/src/orchestration/recording/useRecordingArtifacts.ts": {
@@ -570,8 +570,8 @@
     "semantic_hash": "fe942f15b3e600710d7ee392d709a8b6"
   },
   "apps/web/src/orchestration/session/useOwnedLocalMedia.ts": {
-    "mtime": 1784405009.7624595,
-    "ast_hash": "cc00322748dc2bb137d889fada02a633",
+    "mtime": 1784413245.789411,
+    "ast_hash": "8fe0a78e2b75e285398e5ca5dbe0150f",
     "semantic_hash": ""
   },
   "apps/web/src/orchestration/session/useRealtimeResource.ts": {
@@ -620,8 +620,8 @@
     "semantic_hash": "d46d857a6bb8065164d6151132326ff1"
   },
   "apps/web/src/studio/CreativeWorkspace.tsx": {
-    "mtime": 1784409569.873488,
-    "ast_hash": "e819416e24df59992ef2bd5c79714985",
+    "mtime": 1784413012.5062706,
+    "ast_hash": "c26925be43806380f9c0b9489f2ae884",
     "semantic_hash": ""
   },
   "apps/web/src/studio/StudioApp.styles.ts": {
@@ -630,13 +630,13 @@
     "semantic_hash": ""
   },
   "apps/web/src/studio/StudioApp.tsx": {
-    "mtime": 1784409831.921347,
-    "ast_hash": "2ac44f05c18cd6202fa27c02cdb946a4",
+    "mtime": 1784412800.276691,
+    "ast_hash": "642a1367b8a10ba837d23ee7e8e239c2",
     "semantic_hash": ""
   },
   "apps/web/src/studio/StudioHeader.tsx": {
-    "mtime": 1784404295.8906152,
-    "ast_hash": "eeedb61167e6e40bf369326cd0dc66ca",
+    "mtime": 1784412836.0389583,
+    "ast_hash": "2345735612d2ea2d695f0f5fbb6822d4",
     "semantic_hash": ""
   },
   "apps/web/src/studio/studioPolicies.test.ts": {
@@ -745,9 +745,9 @@
     "semantic_hash": "78116c5375fd849dabe6702dc1a9536f"
   },
   "package.json": {
-    "mtime": 1784088082.6974752,
-    "ast_hash": "189fd00741f1b8cd978cba4398dc786c",
-    "semantic_hash": "189fd00741f1b8cd978cba4398dc786c"
+    "mtime": 1784415497.6702328,
+    "ast_hash": "8ec81603a17bde7e3f0bb3c81f754dd2",
+    "semantic_hash": ""
   },
   "packages/contracts/package.json": {
     "mtime": 1784081699.2373245,
@@ -1130,743 +1130,18 @@
     "semantic_hash": ""
   },
   "apps/web/src/ui/primitives/OverlayPanel.tsx": {
-    "mtime": 1784409165.1587133,
-    "ast_hash": "86e6b8c4bc22555419c6f2032585962b",
+    "mtime": 1784413245.8770564,
+    "ast_hash": "36b407d18055015d4136db144b9c6f26",
     "semantic_hash": ""
   },
   "apps/web/src/ui/primitives/Tabs.test.tsx": {
-    "mtime": 1784403477.1525822,
-    "ast_hash": "ac7e1c3ca4814c9e189bb43560f65361",
+    "mtime": 1784413337.8172314,
+    "ast_hash": "6d36aed453b02642fee6859a7c9a3964",
     "semantic_hash": ""
   },
   "apps/web/src/ui/primitives/Tabs.tsx": {
-    "mtime": 1784403533.3913083,
-    "ast_hash": "d0e8a99e55e0fdffb5ec3cc87b635ff1",
-    "semantic_hash": ""
-  },
-  "screenshots/README.md": {
-    "mtime": 1784398142.9366057,
-    "ast_hash": "db6798193a134ba90326f51553a7f7e6",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/01-preparation/01-local-camera-idle--full-page.png": {
-    "mtime": 1784398002.3557813,
-    "ast_hash": "59d0f25c872e25d4b496b6e4f205b199",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/01-preparation/01-local-camera-idle--viewport.png": {
-    "mtime": 1784398002.4312983,
-    "ast_hash": "49c68d950f3730e9ca8c70c61579d9bd",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/01-preparation/02-character-ai-prepared--full-page.png": {
-    "mtime": 1784398003.2390406,
-    "ast_hash": "9b6e911bc8c065d53cef380bdca21644",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/01-preparation/02-character-ai-prepared--viewport.png": {
-    "mtime": 1784398003.3080575,
-    "ast_hash": "72a3ed1e04be74e53e63b0c8ac13ccb2",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/01-preparation/03-virtual-try-on-prepared--full-page.png": {
-    "mtime": 1784398004.1160114,
-    "ast_hash": "c1b301d973c033dc7a251c1bb2ce8b5a",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/01-preparation/03-virtual-try-on-prepared--viewport.png": {
-    "mtime": 1784398004.1817665,
-    "ast_hash": "44674e699700a70bda78e5ee3b840059",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/02-creative-tools/01-character-workshop--full-page.png": {
-    "mtime": 1784398005.076865,
-    "ast_hash": "f4e059887c87c2a1b21446a8fc905695",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/02-creative-tools/01-character-workshop--viewport.png": {
-    "mtime": 1784398005.146537,
-    "ast_hash": "0574b11c900be44c35b8a793971de83e",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/02-creative-tools/02-character-recipe-shelf--full-page.png": {
-    "mtime": 1784398005.9549887,
-    "ast_hash": "8bf29ca94bb9c69052ff999facc03211",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/02-creative-tools/02-character-recipe-shelf--viewport.png": {
-    "mtime": 1784398006.022387,
-    "ast_hash": "65688b7a61a00794bd1e7c5b59d1c116",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/02-creative-tools/03-virtual-try-on-recipe-shelf--full-page.png": {
-    "mtime": 1784398006.8861876,
-    "ast_hash": "5ea80a49b09bbf64986402f97653813c",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/02-creative-tools/03-virtual-try-on-recipe-shelf--viewport.png": {
-    "mtime": 1784398006.9563289,
-    "ast_hash": "c3ff2fe44dd9f197a101e6c8cb99f77a",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/03-live-sessions/01-local-camera-live--full-page.png": {
-    "mtime": 1784398007.984167,
-    "ast_hash": "3828767d2366701536a1fa7dbb107bdf",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/03-live-sessions/01-local-camera-live--viewport.png": {
-    "mtime": 1784398008.062127,
-    "ast_hash": "6df1aaf3f972aedf7e77ddae035f77e5",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/03-live-sessions/02-character-ai-live--full-page.png": {
-    "mtime": 1784398008.8550286,
-    "ast_hash": "be4dfeb32ca1a872ae5d981efa9322a1",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/03-live-sessions/02-character-ai-live--viewport.png": {
-    "mtime": 1784398008.9374802,
-    "ast_hash": "1dfdf7324d140b3d35b2b5b373a5bdcf",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/03-live-sessions/03-virtual-try-on-live--full-page.png": {
-    "mtime": 1784398009.7129164,
-    "ast_hash": "e88839bb83b14a5d705bb80a3fe9155f",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/03-live-sessions/03-virtual-try-on-live--viewport.png": {
-    "mtime": 1784398009.795685,
-    "ast_hash": "7bbd6b6d4a7beddb7e41693d53a9c2fe",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/04-recording-and-review/01-recording-in-progress--full-page.png": {
-    "mtime": 1784398010.523008,
-    "ast_hash": "32a38e50b06a6e7797656f0221a77a32",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/04-recording-and-review/01-recording-in-progress--viewport.png": {
-    "mtime": 1784398010.5922887,
-    "ast_hash": "a2217ba2325ce551f8af717e40340d86",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/04-recording-and-review/02-latest-take-review--full-page.png": {
-    "mtime": 1784398011.3853736,
-    "ast_hash": "a2de87d1d256c49dbd1e1bc5e0ce3615",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/04-recording-and-review/02-latest-take-review--viewport.png": {
-    "mtime": 1784398011.4582095,
-    "ast_hash": "03bd704f7d76ba966cdcc725d9a2adcc",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/04-recording-and-review/03-elevenlabs-voice-browser--full-page.png": {
-    "mtime": 1784398012.3709927,
-    "ast_hash": "da6b4fdd2a98c02ed962872ab0bf9c6e",
-    "semantic_hash": ""
-  },
-  "screenshots/01-small-mobile-320x568/04-recording-and-review/03-elevenlabs-voice-browser--viewport.png": {
-    "mtime": 1784398012.438165,
-    "ast_hash": "b5af17bd762efea40546d493a04d1a29",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/01-preparation/01-local-camera-idle--full-page.png": {
-    "mtime": 1784398013.10198,
-    "ast_hash": "503a32cc8f82346af542f9462481a3ca",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/01-preparation/01-local-camera-idle--viewport.png": {
-    "mtime": 1784398013.1745017,
-    "ast_hash": "5b93d06b88bdbd6d5fa51949cf0ce130",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/01-preparation/02-character-ai-prepared--full-page.png": {
-    "mtime": 1784398013.8894825,
-    "ast_hash": "e69af0ee17bee44f96f2d80495e41df1",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/01-preparation/02-character-ai-prepared--viewport.png": {
-    "mtime": 1784398013.9636579,
-    "ast_hash": "820935d1ff6f6658e3ac2aad45b03844",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/01-preparation/03-virtual-try-on-prepared--full-page.png": {
-    "mtime": 1784398014.749276,
-    "ast_hash": "1f6d27c6abcf6bff8024a43b9a801efc",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/01-preparation/03-virtual-try-on-prepared--viewport.png": {
-    "mtime": 1784398014.8221765,
-    "ast_hash": "3a58315765bc40ce4e40267043e7379a",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/02-creative-tools/01-character-workshop--full-page.png": {
-    "mtime": 1784398015.709126,
-    "ast_hash": "fcf08b2417df88fb6ea5a35436fd8ab0",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/02-creative-tools/01-character-workshop--viewport.png": {
-    "mtime": 1784398015.7846704,
-    "ast_hash": "b51f6e354b00f56ad470551cad89cf5e",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/02-creative-tools/02-character-recipe-shelf--full-page.png": {
-    "mtime": 1784398016.6159642,
-    "ast_hash": "558ed33f0b487de28db25cd92923c04c",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/02-creative-tools/02-character-recipe-shelf--viewport.png": {
-    "mtime": 1784398016.685428,
-    "ast_hash": "5e6ea55f14d49dcfd8da3e9a840f51ad",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/02-creative-tools/03-virtual-try-on-recipe-shelf--full-page.png": {
-    "mtime": 1784398017.5233932,
-    "ast_hash": "5a0bdeac215f5bdae6a9e7c0b4fb7df9",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/02-creative-tools/03-virtual-try-on-recipe-shelf--viewport.png": {
-    "mtime": 1784398017.593107,
-    "ast_hash": "d51f5c87e3cdab0475f19a1f553ff48d",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/03-live-sessions/01-local-camera-live--full-page.png": {
-    "mtime": 1784398018.2761836,
-    "ast_hash": "087906b5c8c649a96bef0f0c53ceb102",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/03-live-sessions/01-local-camera-live--viewport.png": {
-    "mtime": 1784398018.3589365,
-    "ast_hash": "eb10120bb71d83c3cb93a49353cf63bc",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/03-live-sessions/02-character-ai-live--full-page.png": {
-    "mtime": 1784398019.167126,
-    "ast_hash": "dcc1ca489d133b169ad904e114bcd3a9",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/03-live-sessions/02-character-ai-live--viewport.png": {
-    "mtime": 1784398019.2610571,
-    "ast_hash": "ea125c57028b224efb0f8169c0f82aee",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/03-live-sessions/03-virtual-try-on-live--full-page.png": {
-    "mtime": 1784398020.0483952,
-    "ast_hash": "57ad74430eab05e84d4f18ea0e12b336",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/03-live-sessions/03-virtual-try-on-live--viewport.png": {
-    "mtime": 1784398020.140941,
-    "ast_hash": "59d33351ba4ab4512712cccd2c1fb23a",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/04-recording-and-review/01-recording-in-progress--full-page.png": {
-    "mtime": 1784398020.8454108,
-    "ast_hash": "9bc3aa7843ea4d75e99cb8e26134bad7",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/04-recording-and-review/01-recording-in-progress--viewport.png": {
-    "mtime": 1784398020.916429,
-    "ast_hash": "a550989573acfb1fbfdb2ca1f6291bc3",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/04-recording-and-review/02-latest-take-review--full-page.png": {
-    "mtime": 1784398021.7030637,
-    "ast_hash": "fca76720189da0d174f5dc85dba36358",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/04-recording-and-review/02-latest-take-review--viewport.png": {
-    "mtime": 1784398021.7752209,
-    "ast_hash": "db81f61fbd0c41f0a7c5d69cedfd371f",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/04-recording-and-review/03-elevenlabs-voice-browser--full-page.png": {
-    "mtime": 1784398022.669292,
-    "ast_hash": "e2d430cf498e022a1ec0ee126ccc3ca5",
-    "semantic_hash": ""
-  },
-  "screenshots/02-mobile-390x844/04-recording-and-review/03-elevenlabs-voice-browser--viewport.png": {
-    "mtime": 1784398022.7412438,
-    "ast_hash": "9b1e489d3741b2fcc3e322c23a59d16f",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/01-preparation/01-local-camera-idle--full-page.png": {
-    "mtime": 1784398023.417888,
-    "ast_hash": "d0b84008f93f8c2251b930e29880cd99",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/01-preparation/01-local-camera-idle--viewport.png": {
-    "mtime": 1784398023.529871,
-    "ast_hash": "40a3413716dc680f49b2b6086dc631a3",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/01-preparation/02-character-ai-prepared--full-page.png": {
-    "mtime": 1784398024.2967253,
-    "ast_hash": "69450d6586209619b9627d271433d497",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/01-preparation/02-character-ai-prepared--viewport.png": {
-    "mtime": 1784398024.3975365,
-    "ast_hash": "10d6e6127f594d02b3dad9255a66e95f",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/01-preparation/03-virtual-try-on-prepared--full-page.png": {
-    "mtime": 1784398025.1757798,
-    "ast_hash": "339aeb3b9b2952de5661765e512f992a",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/01-preparation/03-virtual-try-on-prepared--viewport.png": {
-    "mtime": 1784398025.2639089,
-    "ast_hash": "ed4294c8f72c57341df95e7e698a9f88",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/02-creative-tools/01-character-workshop--full-page.png": {
-    "mtime": 1784398026.1872516,
-    "ast_hash": "cea44e9c6bb3627957710a73a381f343",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/02-creative-tools/01-character-workshop--viewport.png": {
-    "mtime": 1784398026.2777855,
-    "ast_hash": "373c8581a607ee358f99f744984178cf",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/02-creative-tools/02-character-recipe-shelf--full-page.png": {
-    "mtime": 1784398027.1597252,
-    "ast_hash": "85ac8ac4418997da51513945f67aa95d",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/02-creative-tools/02-character-recipe-shelf--viewport.png": {
-    "mtime": 1784398027.2579486,
-    "ast_hash": "7ab02892b010896ef279ceb95814a635",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/02-creative-tools/03-virtual-try-on-recipe-shelf--full-page.png": {
-    "mtime": 1784398028.162223,
-    "ast_hash": "bcee979318085f5ca7143aae1d46d5a1",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/02-creative-tools/03-virtual-try-on-recipe-shelf--viewport.png": {
-    "mtime": 1784398028.2463613,
-    "ast_hash": "84c48aec72d1904195b726a14c04a5d9",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/03-live-sessions/01-local-camera-live--full-page.png": {
-    "mtime": 1784398028.9545724,
-    "ast_hash": "83790e78ea6ee2ef151c37fbeafd051b",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/03-live-sessions/01-local-camera-live--viewport.png": {
-    "mtime": 1784398029.0578651,
-    "ast_hash": "40c9b31aa0e4e4584e5681b6a546b7aa",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/03-live-sessions/02-character-ai-live--full-page.png": {
-    "mtime": 1784398029.8614705,
-    "ast_hash": "6010feb78821d69191fa21fe6be3a049",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/03-live-sessions/02-character-ai-live--viewport.png": {
-    "mtime": 1784398029.9732523,
-    "ast_hash": "9f7d6df8c8559de60c52a9c05cc51a0d",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/03-live-sessions/03-virtual-try-on-live--full-page.png": {
-    "mtime": 1784398030.8161376,
-    "ast_hash": "86e8294af7a9e9400bdaa8fe24861944",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/03-live-sessions/03-virtual-try-on-live--viewport.png": {
-    "mtime": 1784398030.9310277,
-    "ast_hash": "ac1dc11eb1f3bc95daddddae10f87d8c",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/04-recording-and-review/01-recording-in-progress--full-page.png": {
-    "mtime": 1784398031.6890578,
-    "ast_hash": "3b263fbdee20680050428f1f2a11a7a7",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/04-recording-and-review/01-recording-in-progress--viewport.png": {
-    "mtime": 1784398031.7771757,
-    "ast_hash": "d749c345ee458845ee4efe43cdb2eb58",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/04-recording-and-review/02-latest-take-review--full-page.png": {
-    "mtime": 1784398032.595954,
-    "ast_hash": "3a848bd82cdfe64874a3593cca28699e",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/04-recording-and-review/02-latest-take-review--viewport.png": {
-    "mtime": 1784398032.6855717,
-    "ast_hash": "394bd23fb2e0825769b3dfb39218951e",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/04-recording-and-review/03-elevenlabs-voice-browser--full-page.png": {
-    "mtime": 1784398033.6149318,
-    "ast_hash": "8585f2bb132e23be4d0629b271cf78a2",
-    "semantic_hash": ""
-  },
-  "screenshots/03-tablet-834x1112/04-recording-and-review/03-elevenlabs-voice-browser--viewport.png": {
-    "mtime": 1784398033.708583,
-    "ast_hash": "efb4d4f06787c7b59c4850fabc3f3a0c",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/01-preparation/01-local-camera-idle--full-page.png": {
-    "mtime": 1784398034.4099379,
-    "ast_hash": "dbe562ec3e97121e11b65f18b228a5c8",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/01-preparation/01-local-camera-idle--viewport.png": {
-    "mtime": 1784398034.5419085,
-    "ast_hash": "39415b4140407fd5d70dec5de57c9a2b",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/01-preparation/02-character-ai-prepared--full-page.png": {
-    "mtime": 1784398035.3380527,
-    "ast_hash": "f6d9ffb05d609ed3578ec2c2a7ba7c7b",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/01-preparation/02-character-ai-prepared--viewport.png": {
-    "mtime": 1784398035.4381506,
-    "ast_hash": "d69180591bcfa6b3586394598e1cd404",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/01-preparation/03-virtual-try-on-prepared--full-page.png": {
-    "mtime": 1784398036.2261941,
-    "ast_hash": "3727218dd097683129f1c5350c9be609",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/01-preparation/03-virtual-try-on-prepared--viewport.png": {
-    "mtime": 1784398036.3307722,
-    "ast_hash": "ce4d2b439ab8118521b9151f54b30086",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/02-creative-tools/01-character-workshop--full-page.png": {
-    "mtime": 1784398037.333201,
-    "ast_hash": "fc981b84e2a0e1f034729a3a9cf26928",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/02-creative-tools/01-character-workshop--viewport.png": {
-    "mtime": 1784398037.4147036,
-    "ast_hash": "27265da98be62844a0bcd4b1e2b0b7cd",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/02-creative-tools/02-character-recipe-shelf--full-page.png": {
-    "mtime": 1784398038.2992043,
-    "ast_hash": "852371ecaea633893d611247e5a0dae0",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/02-creative-tools/02-character-recipe-shelf--viewport.png": {
-    "mtime": 1784398038.3794348,
-    "ast_hash": "b5e1efa188be1e70ce275a44d6d0e45c",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/02-creative-tools/03-virtual-try-on-recipe-shelf--full-page.png": {
-    "mtime": 1784398039.2780745,
-    "ast_hash": "2a52f5014373c9e9240b7cb1574536d3",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/02-creative-tools/03-virtual-try-on-recipe-shelf--viewport.png": {
-    "mtime": 1784398039.3537297,
-    "ast_hash": "7c1e59364a22b119af14a3ea03dc74e0",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/03-live-sessions/01-local-camera-live--full-page.png": {
-    "mtime": 1784398040.1036968,
-    "ast_hash": "ba7eda6dba21f0dc4fd2c933ec432525",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/03-live-sessions/01-local-camera-live--viewport.png": {
-    "mtime": 1784398040.217979,
-    "ast_hash": "56e08b2cd3deb80172d219ad39994b7d",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/03-live-sessions/02-character-ai-live--full-page.png": {
-    "mtime": 1784398041.0248516,
-    "ast_hash": "b41c83741008fa95f18289b3b242f494",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/03-live-sessions/02-character-ai-live--viewport.png": {
-    "mtime": 1784398041.153064,
-    "ast_hash": "66a393cdd3e47247aa91a4496e92ba5b",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/03-live-sessions/03-virtual-try-on-live--full-page.png": {
-    "mtime": 1784398042.0496504,
-    "ast_hash": "06ef5ec1f478b37411612b04aea71cfe",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/03-live-sessions/03-virtual-try-on-live--viewport.png": {
-    "mtime": 1784398042.1768959,
-    "ast_hash": "6d2eb7bc0c85b58ab670af2511524086",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/04-recording-and-review/01-recording-in-progress--full-page.png": {
-    "mtime": 1784398042.9654045,
-    "ast_hash": "7a1c2bf116965a821c2ed4ea3a5766a4",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/04-recording-and-review/01-recording-in-progress--viewport.png": {
-    "mtime": 1784398043.0590453,
-    "ast_hash": "18ae3ff9663f8289eb4e3a6ef152404d",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/04-recording-and-review/02-latest-take-review--full-page.png": {
-    "mtime": 1784398043.9240801,
-    "ast_hash": "2cf63dc4b6098d43fc3159b80ecb8860",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/04-recording-and-review/02-latest-take-review--viewport.png": {
-    "mtime": 1784398044.0171535,
-    "ast_hash": "53883540b622ef57882709d516baa1bc",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/04-recording-and-review/03-elevenlabs-voice-browser--full-page.png": {
-    "mtime": 1784398045.005975,
-    "ast_hash": "0775979417d38aa6753066d3ee2e8436",
-    "semantic_hash": ""
-  },
-  "screenshots/04-laptop-1280x720/04-recording-and-review/03-elevenlabs-voice-browser--viewport.png": {
-    "mtime": 1784398045.0921016,
-    "ast_hash": "d1d7e0a8bf191fc3115956ef6ab0cdc3",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/01-preparation/01-local-camera-idle--full-page.png": {
-    "mtime": 1784398045.775737,
-    "ast_hash": "35a3bbeae4c1a20eac747d33c42892d1",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/01-preparation/01-local-camera-idle--viewport.png": {
-    "mtime": 1784398045.9286232,
-    "ast_hash": "dac347f10be051e5c015f6e8bb352d31",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/01-preparation/02-character-ai-prepared--full-page.png": {
-    "mtime": 1784398046.7140284,
-    "ast_hash": "d048f2d0d72a667db7b87dc2aa6018a9",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/01-preparation/02-character-ai-prepared--viewport.png": {
-    "mtime": 1784398046.856022,
-    "ast_hash": "ce72e232dac94aab779e5a5e4af4e0bd",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/01-preparation/03-virtual-try-on-prepared--full-page.png": {
-    "mtime": 1784398047.6264307,
-    "ast_hash": "9693c4695e0366ead5c17b2d9d124271",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/01-preparation/03-virtual-try-on-prepared--viewport.png": {
-    "mtime": 1784398047.7596395,
-    "ast_hash": "836c36c544774f8790e830534435351c",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/02-creative-tools/01-character-workshop--full-page.png": {
-    "mtime": 1784398048.7404175,
-    "ast_hash": "50691410ed77056c62808f6172979ccb",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/02-creative-tools/01-character-workshop--viewport.png": {
-    "mtime": 1784398048.8300138,
-    "ast_hash": "8ca6c91c576ad64f643114583f2af4da",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/02-creative-tools/02-character-recipe-shelf--full-page.png": {
-    "mtime": 1784398049.7415485,
-    "ast_hash": "39e35f3eab3bab2614ec390a9a63f1e8",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/02-creative-tools/02-character-recipe-shelf--viewport.png": {
-    "mtime": 1784398049.8358328,
-    "ast_hash": "473f525dc78556360a5c93d83b33fe48",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/02-creative-tools/03-virtual-try-on-recipe-shelf--full-page.png": {
-    "mtime": 1784398050.8183954,
-    "ast_hash": "d9feeddbd56f11127b49b6c09dd8a731",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/02-creative-tools/03-virtual-try-on-recipe-shelf--viewport.png": {
-    "mtime": 1784398050.9084733,
-    "ast_hash": "32c821190194cff027a1ee54e1851922",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/03-live-sessions/01-local-camera-live--full-page.png": {
-    "mtime": 1784398051.651839,
-    "ast_hash": "309732f4ad559649e62a13a4aa2a59f4",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/03-live-sessions/01-local-camera-live--viewport.png": {
-    "mtime": 1784398051.765789,
-    "ast_hash": "b3ff0116821835b6ae0987e2d81fc41d",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/03-live-sessions/02-character-ai-live--full-page.png": {
-    "mtime": 1784398052.621808,
-    "ast_hash": "9281b28692354b3057deaa42c6da2622",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/03-live-sessions/02-character-ai-live--viewport.png": {
-    "mtime": 1784398052.7681882,
-    "ast_hash": "12bf651cd40b4d265fe25dd62a112ce3",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/03-live-sessions/03-virtual-try-on-live--full-page.png": {
-    "mtime": 1784398053.6179821,
-    "ast_hash": "994e68b011c345ba3c235648055d82af",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/03-live-sessions/03-virtual-try-on-live--viewport.png": {
-    "mtime": 1784398053.7542763,
-    "ast_hash": "cfdcce8fd104c91cf01bfe8695189f13",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/04-recording-and-review/01-recording-in-progress--full-page.png": {
-    "mtime": 1784398054.516016,
-    "ast_hash": "06890ed5caa801e2f48500768781ce82",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/04-recording-and-review/01-recording-in-progress--viewport.png": {
-    "mtime": 1784398054.6202257,
-    "ast_hash": "a3fee4a8aff139ae58780e0260e2c6ed",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/04-recording-and-review/02-latest-take-review--full-page.png": {
-    "mtime": 1784398055.5867887,
-    "ast_hash": "74518d30eb151027c047b76273355743",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/04-recording-and-review/02-latest-take-review--viewport.png": {
-    "mtime": 1784398055.7280533,
-    "ast_hash": "cf9deefc517799ee670a551e5b5086cb",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/04-recording-and-review/03-elevenlabs-voice-browser--full-page.png": {
-    "mtime": 1784398056.7752957,
-    "ast_hash": "c11ff32a5c29a0817004bfe9826d543a",
-    "semantic_hash": ""
-  },
-  "screenshots/05-desktop-1440x960/04-recording-and-review/03-elevenlabs-voice-browser--viewport.png": {
-    "mtime": 1784398056.8711307,
-    "ast_hash": "44c24ecd30fe4fe3b2c7565e1ec981a6",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/01-preparation/01-local-camera-idle--full-page.png": {
-    "mtime": 1784398057.6587615,
-    "ast_hash": "907a31bdf732a0910acdeec2040cf056",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/01-preparation/01-local-camera-idle--viewport.png": {
-    "mtime": 1784398057.8423808,
-    "ast_hash": "bd37a02ebd85948a4724ce7ad8794785",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/01-preparation/02-character-ai-prepared--full-page.png": {
-    "mtime": 1784398058.686075,
-    "ast_hash": "17c711ec335bf1b9d1245eaa8ddbf8b5",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/01-preparation/02-character-ai-prepared--viewport.png": {
-    "mtime": 1784398058.8745313,
-    "ast_hash": "5b2af0d4de06b3904aa6566665e6b02d",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/01-preparation/03-virtual-try-on-prepared--full-page.png": {
-    "mtime": 1784398059.8146212,
-    "ast_hash": "94c9f305161a444d2c719b27cbdf5f83",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/01-preparation/03-virtual-try-on-prepared--viewport.png": {
-    "mtime": 1784398060.0162199,
-    "ast_hash": "9baee2c60aeafe982ef04cd905fbe5a2",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/02-creative-tools/01-character-workshop--full-page.png": {
-    "mtime": 1784398061.335654,
-    "ast_hash": "a89e1128a806fb70ca338ef5cfae47ae",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/02-creative-tools/01-character-workshop--viewport.png": {
-    "mtime": 1784398061.4363735,
-    "ast_hash": "ea64df0f727cff7e2a514b4b5d931677",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/02-creative-tools/02-character-recipe-shelf--full-page.png": {
-    "mtime": 1784398062.509851,
-    "ast_hash": "9b8a0a6537ec4a9ef711fa775847440b",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/02-creative-tools/02-character-recipe-shelf--viewport.png": {
-    "mtime": 1784398062.6301124,
-    "ast_hash": "a5b2850c0a8ead897cfce5342befce4e",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/02-creative-tools/03-virtual-try-on-recipe-shelf--full-page.png": {
-    "mtime": 1784398063.7804432,
-    "ast_hash": "6530a5bfc331fd0fb04abb14c4734cfd",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/02-creative-tools/03-virtual-try-on-recipe-shelf--viewport.png": {
-    "mtime": 1784398063.8866582,
-    "ast_hash": "6f02808ee72d3c617551c1a590bcc45a",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/03-live-sessions/01-local-camera-live--full-page.png": {
-    "mtime": 1784398064.736147,
-    "ast_hash": "744a9c367191ac7c16734cc427dd3aac",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/03-live-sessions/01-local-camera-live--viewport.png": {
-    "mtime": 1784398064.86857,
-    "ast_hash": "6fe0555743ed1af27dc6b6094fa321bb",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/03-live-sessions/02-character-ai-live--full-page.png": {
-    "mtime": 1784398065.788506,
-    "ast_hash": "1a4ccee2cc772665aba5a2d2abca8d05",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/03-live-sessions/02-character-ai-live--viewport.png": {
-    "mtime": 1784398065.9441519,
-    "ast_hash": "b231df292b3783695be8efb97e55e58c",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/03-live-sessions/03-virtual-try-on-live--full-page.png": {
-    "mtime": 1784398066.9238102,
-    "ast_hash": "ed48b438651a1df7688a1c2962f86870",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/03-live-sessions/03-virtual-try-on-live--viewport.png": {
-    "mtime": 1784398067.0899343,
-    "ast_hash": "bd3eaf34b47d4ac0e66d33da511f986b",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/04-recording-and-review/01-recording-in-progress--full-page.png": {
-    "mtime": 1784398068.0884714,
-    "ast_hash": "3c474388c3b7db7f2d9a2a76d9ad0faf",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/04-recording-and-review/01-recording-in-progress--viewport.png": {
-    "mtime": 1784398068.2061708,
-    "ast_hash": "da13e2901b97b0cc9eb499d9b826f326",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/04-recording-and-review/02-latest-take-review--full-page.png": {
-    "mtime": 1784398069.2609007,
-    "ast_hash": "cebd15deec7a2b997498243043cf9aad",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/04-recording-and-review/02-latest-take-review--viewport.png": {
-    "mtime": 1784398069.3884282,
-    "ast_hash": "fe23f8da77c600db91091cc7873c17bc",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/04-recording-and-review/03-elevenlabs-voice-browser--full-page.png": {
-    "mtime": 1784398070.45149,
-    "ast_hash": "89790f17ee2c902e64556e1c6401dc2c",
-    "semantic_hash": ""
-  },
-  "screenshots/06-large-desktop-1920x1080/04-recording-and-review/03-elevenlabs-voice-browser--viewport.png": {
-    "mtime": 1784398070.5563252,
-    "ast_hash": "e262980c30d277fa9184236c1a4b752a",
+    "mtime": 1784412992.3110027,
+    "ast_hash": "8b113640928452082bcf7e2ea9bb8771",
     "semantic_hash": ""
   },
   "apps/web/src/features/live-stage/useAudioLevel.test.tsx": {
@@ -1915,8 +1190,18 @@
     "semantic_hash": ""
   },
   "apps/web/src/features/take-review/TakeDock.test.tsx": {
-    "mtime": 1784407897.716816,
-    "ast_hash": "42a600d43bf110855ddd029a2aae586c",
+    "mtime": 1784413337.9680564,
+    "ast_hash": "60782edd9f1ba9a15f06292783438589",
+    "semantic_hash": ""
+  },
+  "playwright.screenshots.config.ts": {
+    "mtime": 1784415585.4173188,
+    "ast_hash": "b63deecb7c91af6e5a6fce96aee04e54",
+    "semantic_hash": ""
+  },
+  "e2e/support/studioHarness.ts": {
+    "mtime": 1784415596.5113654,
+    "ast_hash": "c2caabea82443205c2af1458db809a35",
     "semantic_hash": ""
   }
 }

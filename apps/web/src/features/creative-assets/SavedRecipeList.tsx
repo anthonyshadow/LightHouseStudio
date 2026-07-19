@@ -41,7 +41,10 @@ export const SavedRecipeList = ({
                 onSelect={() => controller.selectRecipe({ kind: 'saved', id: item.id })}
                 onUse={() => controller.selectSaved(item)}
                 onAction={(action) =>
-                  controller.startEditing({ kind: 'saved', id: item.id, action })
+                  controller.startEditing(
+                    { kind: 'saved', id: item.id, action },
+                    { title: item.title, prompt: item.prompt, tags: item.tags },
+                  )
                 }
               />
             </li>
@@ -54,7 +57,9 @@ export const SavedRecipeList = ({
               <RecipeEditor
                 title={`Edit ${item.title}`}
                 initialValue={{ title: item.title, prompt: item.prompt, tags: item.tags }}
+                draft={controller.editorDraft ?? undefined}
                 submitLabel="Save changes"
+                onDraftChange={controller.setEditorDraft}
                 onDirtyChange={controller.setFormDirty}
                 onCancel={controller.closeEditor}
                 onSubmit={(value) => updateSavedRecipe(controller, item, value)}
@@ -63,6 +68,8 @@ export const SavedRecipeList = ({
               <RenameForm
                 label="Recipe name"
                 initialName={item.title}
+                value={controller.renameDraft ?? undefined}
+                onValueChange={controller.setRenameDraft}
                 onDirtyChange={controller.setFormDirty}
                 onCancel={controller.closeEditor}
                 onRename={(name) =>

@@ -1,5 +1,4 @@
 import { DomainRuleError, type SafeError } from '../errors/safe-error';
-import type { SessionModeId } from '../session';
 import type {
   AudioSidecar,
   RecordingArtifact,
@@ -142,10 +141,16 @@ export const canUseVoiceEffects = (sidecar: AudioSidecar): boolean =>
 export const shouldRevokeRecordingObjectUrl = (reason: RecordingReleaseReason): boolean =>
   reason === 'discard' || reason === 'replacement' || reason === 'unmount';
 
-export type ModelRecordingStopAction =
-  'finalize-recording' | 'disconnect-model' | 'return-to-local-preview';
+export type RecordingFinishAction =
+  'finalize-recording' | 'release-live-resources' | 'enter-recorded-review';
 
-export const recordingStopOrder = (modeId: SessionModeId): readonly ModelRecordingStopAction[] =>
-  modeId === 'local'
-    ? ['finalize-recording']
-    : ['finalize-recording', 'disconnect-model', 'return-to-local-preview'];
+/**
+ * A finished take follows the same privacy boundary for every source mode:
+ * finalize borrowed recorder data before releasing its live owners, then enter
+ * review without reacquiring media.
+ */
+export const recordingFinishOrder = (): readonly RecordingFinishAction[] => [
+  'finalize-recording',
+  'release-live-resources',
+  'enter-recorded-review',
+];

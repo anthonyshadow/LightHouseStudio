@@ -15,6 +15,18 @@ export interface EphemeralImageDescriptor {
   readonly height?: number;
 }
 
+/**
+ * Untrusted image metadata at the validation boundary. A candidate deliberately
+ * accepts any MIME type; successful validation is what permits narrowing it to
+ * an {@link EphemeralImageDescriptor}.
+ */
+export interface ImageDescriptorCandidate {
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  readonly width?: number;
+  readonly height?: number;
+}
+
 export type ImageValidationCode = 'empty-image' | 'image-too-large' | 'unsupported-image-type';
 
 export interface ImageValidationIssue {
@@ -34,7 +46,7 @@ export const isImageMimeType = (value: string): value is ImageMimeType =>
   IMAGE_MIME_TYPES.some((type) => type === value);
 
 export const validateImageDescriptor = (
-  image: EphemeralImageDescriptor,
+  image: ImageDescriptorCandidate,
 ): readonly ImageValidationIssue[] => {
   const issues: ImageValidationIssue[] = [];
   if (image.sizeBytes <= 0) {
@@ -56,7 +68,7 @@ export const validateImageDescriptor = (
 };
 
 export const getImageQualityWarnings = (
-  image: EphemeralImageDescriptor,
+  image: ImageDescriptorCandidate,
   semantics: 'character' | 'garment',
 ): readonly ImageQualityWarning[] => {
   const warnings: ImageQualityWarning[] = [];

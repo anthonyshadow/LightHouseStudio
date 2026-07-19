@@ -43,6 +43,7 @@ const recording = (): RecordingController => {
     processed: null,
     presented: original,
     sidecar: { state: 'unavailable', blob: null, mimeType: null, error: null },
+    recordingError: null,
     processingState: 'idle',
     processingError: null,
     elapsedSeconds: 2,
@@ -95,27 +96,23 @@ describe('TakeDock metadata', () => {
     expect(metadata.getByText('1920 × 1080')).toBeInTheDocument();
     expect(metadata.getByText('29.97 fps')).toBeInTheDocument();
     expect(screen.queryByText('browser default format')).not.toBeInTheDocument();
+    expect(screen.queryByLabelText('Recorded take playback')).not.toBeInTheDocument();
   });
 
-  it('discards only after confirmation and restores focus after acceptance', async () => {
+  it('discards only after confirmation and delegates overlay closure after acceptance', async () => {
     const user = userEvent.setup();
     const controller = recording();
+    const onCloseTake = vi.fn();
     vi.spyOn(window, 'confirm').mockReturnValueOnce(false).mockReturnValueOnce(true);
-    vi.spyOn(window, 'requestAnimationFrame').mockImplementation((callback) => {
-      callback(0);
-      return 1;
-    });
 
     render(
       <StudioDesignProvider>
-        <button id="record-take-action" type="button">
-          Record another take
-        </button>
         <TakeDock
           recording={controller}
           processing={processing}
           elevenLabsAvailable={false}
           view="take"
+          onCloseTake={onCloseTake}
         />
       </StudioDesignProvider>,
     );
@@ -123,9 +120,10 @@ describe('TakeDock metadata', () => {
     const discard = screen.getByRole('button', { name: 'Discard' });
     await user.click(discard);
     expect(controller.discard).not.toHaveBeenCalled();
+    expect(onCloseTake).not.toHaveBeenCalled();
 
     await user.click(discard);
     expect(controller.discard).toHaveBeenCalledOnce();
-    expect(screen.getByRole('button', { name: 'Record another take' })).toHaveFocus();
+    expect(onCloseTake).toHaveBeenCalledOnce();
   });
 });

@@ -1,9 +1,11 @@
 import { useTheme } from '@emotion/react';
 import type { RefObject } from 'react';
 import {
-  RecipeShelf,
+  RecipeShelfView,
+  useRecipeShelfController,
   type CreativeAssetRepository,
   type RecipeSelection,
+  type RecipeShelfController,
   type SavedCharacterPrompt,
 } from '../features/creative-assets';
 import type { StudioMode } from '../features/media-session';
@@ -14,14 +16,10 @@ import {
   type PromptWorkshopAction,
   type SavePromptWorkshopAction,
 } from '../features/prompt-authoring';
-import { Button, OverlayPanel, SegmentedControl, StatusNotice, Surface } from '../ui';
+import { Button, OverlayPanel, SegmentedControl, StatusNotice } from '../ui';
 import {
   creativeOverlayContentStyles,
-  inlineCreativeBodyStyles,
-  inlineCreativeHeaderStyles,
-  inlineCreativePanelStyles,
   libraryModeStyles,
-  mobileToolButtonStyles,
   toolRailStyles,
 } from './StudioApp.styles';
 
@@ -61,7 +59,6 @@ type CreativeWorkspaceProps = {
   onShelfDirtyChange(dirty: boolean): void;
   onUseRecipe(selection: RecipeSelection): void;
   onOpenSavedWorkshop(draft: PromptBuilderDraft, asset: SavedCharacterPrompt): void;
-  renderPanelInOverlay?: boolean;
 };
 
 export type CreativePanelContentProps = Pick<
@@ -83,6 +80,7 @@ export type CreativePanelContentProps = Pick<
   | 'onOpenSavedWorkshop'
 > & {
   panel: Exclude<AuxiliaryPanel, 'closed'>;
+  shelfController: RecipeShelfController;
 };
 
 export const CreativePanelContent = ({
@@ -102,6 +100,7 @@ export const CreativePanelContent = ({
   onShelfDirtyChange,
   onUseRecipe,
   onOpenSavedWorkshop,
+  shelfController,
 }: CreativePanelContentProps) => {
   const theme = useTheme();
 
@@ -135,12 +134,12 @@ export const CreativePanelContent = ({
               </StatusNotice>
             ) : null}
           </div>
-          <RecipeShelf
-            key={libraryMode}
-            repository={repository}
+          <RecipeShelfView
             activeMode={libraryMode}
             embedded
             promptUseDisabled={recipeInsertionBlocked}
+            repository={repository}
+            controller={shelfController}
             onDirtyChange={onShelfDirtyChange}
             onUsePrompt={onUseRecipe}
             onOpenCharacterWorkshop={onOpenSavedWorkshop}
@@ -148,48 +147,6 @@ export const CreativePanelContent = ({
         </>
       )}
     </div>
-  );
-};
-
-export type DesktopCreativePanelProps = CreativePanelContentProps & {
-  onClose(): void;
-};
-
-export const DesktopCreativePanel = ({
-  panel,
-  onClose,
-  ...contentProps
-}: DesktopCreativePanelProps) => {
-  const theme = useTheme();
-  const title = panel === 'workshop' ? 'Character Workshop' : 'Recipe Shelf';
-  const description =
-    panel === 'workshop'
-      ? 'Structured prompt builder'
-      : 'Browser-local Character and Try-On recipes';
-  const titleId = `creative-inline-${panel}-title`;
-
-  return (
-    <Surface
-      as="section"
-      aria-labelledby={titleId}
-      padding="compact"
-      css={inlineCreativePanelStyles(theme)}
-    >
-      <header css={inlineCreativeHeaderStyles(theme)}>
-        <div>
-          <h2 id={titleId} tabIndex={-1}>
-            {title}
-          </h2>
-          <p>{description}</p>
-        </div>
-        <Button aria-label="Close creative tool" size="small" variant="quiet" onClick={onClose}>
-          Close
-        </Button>
-      </header>
-      <div css={inlineCreativeBodyStyles()}>
-        <CreativePanelContent panel={panel} {...contentProps} />
-      </div>
-    </Surface>
   );
 };
 
@@ -221,19 +178,24 @@ export const CreativeWorkspace = ({
   onShelfDirtyChange,
   onUseRecipe,
   onOpenSavedWorkshop,
-  renderPanelInOverlay = true,
 }: CreativeWorkspaceProps) => {
   const theme = useTheme();
   const characterWorkshopBlocked =
     recordingActive || (activeSessionMode !== 'lucy-2.5' && sessionModeLocked);
   const activePanel = panel === 'closed' ? null : panel;
+  const shelfController = useRecipeShelfController({
+    repository,
+    activeMode: libraryMode,
+    onUsePrompt: onUseRecipe,
+    onOpenCharacterWorkshop: onOpenSavedWorkshop,
+    onDirtyChange: onShelfDirtyChange,
+  });
 
   return (
     <>
       <nav css={toolRailStyles(theme)} aria-label="Creative workspace tools">
         <Button
           ref={dockToggleRef}
-          css={mobileToolButtonStyles()}
           variant="secondary"
           disabled={recordingActive}
           aria-haspopup="dialog"
@@ -243,7 +205,6 @@ export const CreativeWorkspace = ({
         </Button>
         <Button
           ref={takeToggleRef}
-          css={mobileToolButtonStyles()}
           variant="secondary"
           disabled={!hasTake || recordingActive}
           aria-haspopup="dialog"
@@ -256,7 +217,7 @@ export const CreativeWorkspace = ({
           variant={panel === 'workshop' ? 'primary' : 'secondary'}
           disabled={characterWorkshopBlocked}
           aria-expanded={panel === 'workshop'}
-          aria-haspopup={renderPanelInOverlay ? 'dialog' : undefined}
+          aria-haspopup="dialog"
           onClick={() => (panel === 'workshop' ? onClose('workshop') : onOpenWorkshop())}
         >
           Workshop
@@ -266,7 +227,7 @@ export const CreativeWorkspace = ({
           variant={panel === 'shelf' ? 'primary' : 'secondary'}
           disabled={recordingActive}
           aria-expanded={panel === 'shelf'}
-          aria-haspopup={renderPanelInOverlay ? 'dialog' : undefined}
+          aria-haspopup="dialog"
           onClick={onToggleShelf}
         >
           Shelf
@@ -277,7 +238,7 @@ export const CreativeWorkspace = ({
       </nav>
 
       <OverlayPanel
-        open={renderPanelInOverlay && activePanel !== null}
+        open={activePanel !== null}
         onClose={() => {
           if (activePanel) onClose(activePanel);
         }}
@@ -287,8 +248,9 @@ export const CreativeWorkspace = ({
             ? 'Build a clear character direction with the supported structured prompt fields.'
             : 'Browse and manage browser-local Character and Try-On recipes.'
         }
-        placement={panel === 'shelf' ? 'fullscreen' : 'right'}
-        size={panel === 'workshop' ? 'wide' : 'standard'}
+        placement={panel === 'shelf' ? 'bottom' : 'right'}
+        size="wide"
+        bodyMode="contained"
         closeLabel="Close creative tool"
         returnFocusRef={panel === 'workshop' ? workshopToggleRef : shelfToggleRef}
         closeOnBackdrop
@@ -311,6 +273,7 @@ export const CreativeWorkspace = ({
             onShelfDirtyChange={onShelfDirtyChange}
             onUseRecipe={onUseRecipe}
             onOpenSavedWorkshop={onOpenSavedWorkshop}
+            shelfController={shelfController}
           />
         ) : null}
       </OverlayPanel>

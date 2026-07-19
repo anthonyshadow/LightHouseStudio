@@ -23,27 +23,21 @@ import {
 } from './RecipeShelf.styles';
 import { RecipeShelfToolbar } from './RecipeShelfToolbar';
 import type { RecipeShelfProps } from './RecipeShelf.types';
-import { useRecipeShelfController } from './useRecipeShelfController';
+import { useRecipeShelfController, type RecipeShelfController } from './useRecipeShelfController';
 
 export type { RecipeSelection, RecipeShelfProps } from './RecipeShelf.types';
 
-export const RecipeShelf = ({
-  repository,
+export type RecipeShelfViewProps = RecipeShelfProps & {
+  controller: RecipeShelfController;
+};
+
+export const RecipeShelfView = ({
   activeMode,
   promptUseDisabled = false,
   embedded = false,
-  onUsePrompt,
-  onOpenCharacterWorkshop,
-  onDirtyChange,
-}: RecipeShelfProps) => {
+  controller,
+}: RecipeShelfViewProps) => {
   const theme = useTheme();
-  const controller = useRecipeShelfController({
-    repository,
-    activeMode,
-    onUsePrompt,
-    ...(onOpenCharacterWorkshop ? { onOpenCharacterWorkshop } : {}),
-    ...(onDirtyChange ? { onDirtyChange } : {}),
-  });
   const categoryLabel =
     controller.visibleCategory === 'saved'
       ? 'saved recipes'
@@ -99,7 +93,9 @@ export const RecipeShelf = ({
               key={controller.createKey}
               title={`New ${modeName(activeMode)} recipe`}
               initialValue={controller.createSeed}
+              draft={controller.editorDraft ?? undefined}
               submitLabel="Save recipe"
+              onDraftChange={controller.setEditorDraft}
               onDirtyChange={controller.setFormDirty}
               onCancel={controller.closeCreate}
               onSubmit={controller.createRecipe}
@@ -153,4 +149,18 @@ export const RecipeShelf = ({
       </div>
     </Surface>
   );
+};
+
+export const RecipeShelf = (props: RecipeShelfProps) => {
+  const controller = useRecipeShelfController({
+    repository: props.repository,
+    activeMode: props.activeMode,
+    onUsePrompt: props.onUsePrompt,
+    ...(props.onOpenCharacterWorkshop
+      ? { onOpenCharacterWorkshop: props.onOpenCharacterWorkshop }
+      : {}),
+    ...(props.onDirtyChange ? { onDirtyChange: props.onDirtyChange } : {}),
+  });
+
+  return <RecipeShelfView {...props} controller={controller} />;
 };

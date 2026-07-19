@@ -1,5 +1,4 @@
 import { useTheme } from '@emotion/react';
-import { recordingStopOrder } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import {
@@ -7,7 +6,7 @@ import {
   type RecipeSelection,
   type SavedCharacterPrompt,
 } from '../features/creative-assets';
-import { MediaStage } from '../features/live-stage';
+import { MediaStage, type StageNotice, type StagePresentation } from '../features/live-stage';
 import {
   SessionComposer,
   confirmModeReplacement,
@@ -27,29 +26,33 @@ import { TakeDock } from '../features/take-review';
 import { useRecording, useRecordingSource } from '../orchestration/recording';
 import { useStudioSession } from '../orchestration/session';
 import { useVoiceProcessing } from '../orchestration/voice-processing';
-import { OverlayPanel, StudioDesignProvider, Tabs } from '../ui';
+import { OverlayPanel, StudioDesignProvider } from '../ui';
 import {
-  dockColumnStyles,
   headerRegionStyles,
   mainGridStyles,
   pageStyles,
-  recordingRailStyles,
   shellStyles,
   skipLinkStyles,
   stageColumnStyles,
-  workbenchTrayStyles,
-  workbenchStyles,
 } from './StudioApp.styles';
-import {
-  CreativeWorkspace,
-  DesktopCreativePanel,
-  type AuxiliaryPanel,
-  type ModelMode,
-} from './CreativeWorkspace';
+import { CreativeWorkspace, type AuxiliaryPanel, type ModelMode } from './CreativeWorkspace';
 import { StudioHeader } from './StudioHeader';
 import { canReplaceDirtyLibraryMode, shouldFinalizeForUnusableModelOutput } from './studioPolicies';
 import { useProviderAvailability } from './useProviderAvailability';
-import { useMediaQuery } from './useMediaQuery';
+
+type ActiveOverlay =
+  | 'recipe-dock'
+  | 'capture-settings'
+  | 'take-review'
+  | 'voice-treatments'
+  | 'workshop'
+  | 'recipe-shelf'
+  | null;
+
+const REVIEW_LOCK_REASON =
+  'Download and close or discard the recorded take before starting or changing media.';
+
+const FORM_ERROR_CODES = new Set(['model-input-required', 'apply-failed']);
 
 const StudioExperience = () => {
   const theme = useTheme();
@@ -60,27 +63,24 @@ const StudioExperience = () => {
     state: capabilityState,
     retry: retryProviderAvailability,
   } = useProviderAvailability();
-  const [panel, setPanel] = useState<AuxiliaryPanel>('closed');
-  const [dockOpen, setDockOpen] = useState(false);
-  const [takeOpen, setTakeOpen] = useState(false);
-  const [captureSettingsOpen, setCaptureSettingsOpen] = useState(false);
-  const [workbenchTool, setWorkbenchTool] = useState<'take' | 'voice'>('take');
+  const [activeOverlay, setActiveOverlay] = useState<ActiveOverlay>(null);
   const [libraryMode, setLibraryMode] = useState<ModelMode>('lucy-2.5');
   const [workshopDraft, setWorkshopDraft] = useState<PromptBuilderDraft | undefined>();
   const [workshopDrafts, setWorkshopDrafts] = useState<
     Partial<Record<PromptIntent, PromptBuilderDraft>>
   >({});
   const [shelfDirty, setShelfDirty] = useState(false);
+  const [reviewReady, setReviewReady] = useState(false);
+  const [finalizingStream, setFinalizingStream] = useState<MediaStream | null>(null);
+  const [finalizingStartedAt, setFinalizingStartedAt] = useState<number | null>(null);
+  const [dismissedNotices, setDismissedNotices] = useState<ReadonlySet<string>>(new Set());
+  const finishPromiseRef = useRef<Promise<void> | null>(null);
   const selectedSavedPrompt = useRef<string | undefined>(undefined);
   const selectedCharacterPrompt = useRef<string | undefined>(undefined);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
   const shelfToggleRef = useRef<HTMLButtonElement>(null);
   const dockToggleRef = useRef<HTMLButtonElement>(null);
   const takeToggleRef = useRef<HTMLButtonElement>(null);
-  const compactLayout = useMediaQuery('(max-width: 63.99rem)');
-  const mobileLayout = useMediaQuery('(max-width: 39.99rem), (max-height: 36rem)');
-  const compactWorkbench = useMediaQuery('(max-width: 80rem), (max-height: 48rem)');
-  const creativeOverlayLayout = compactLayout || compactWorkbench;
 
   const rememberWorkshopDraft = useCallback((draft: PromptBuilderDraft) => {
     setWorkshopDraft(draft);
@@ -102,14 +102,21 @@ const StudioExperience = () => {
   );
 
   const session = useStudioSession({ availability, onPromptCommitted: recordCommittedPrompt });
-  const recording = useRecording({
-    onAutomaticStop: ({ mode }) => {
-      if (mode !== 'local') session.stopModel();
-    },
-  });
-  const previousRecordingLifecycleRef = useRef(recording.lifecycle);
+  const automaticDisplayStream = session.displayStream;
+  const automaticReviewRelease = session.releaseForRecordedReview;
+  const handleAutomaticRecordingStop = useCallback(() => {
+    setFinalizingStream((current) => current ?? automaticDisplayStream);
+    setFinalizingStartedAt((current) => current ?? Date.now());
+    void automaticReviewRelease().then(() => {
+      setFinalizingStream(null);
+      setReviewReady(true);
+    });
+  }, [automaticDisplayStream, automaticReviewRelease]);
+  const recording = useRecording({ onAutomaticStop: handleAutomaticRecordingStop });
   const processing = useVoiceProcessing(recording);
   const recordingActive = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
+  const reviewLocked = Boolean(recording.presented);
+  const mediaLocked = recordingActive || reviewLocked;
   const aiSessionActive = [
     'requesting-media',
     'requesting-token',
@@ -119,13 +126,13 @@ const StudioExperience = () => {
     'reconnecting',
   ].includes(session.lifecycle);
   const sessionModeLocked =
-    recordingActive ||
+    mediaLocked ||
     Boolean(session.localStream) ||
     aiSessionActive ||
     session.lifecycle === 'ready' ||
     session.lifecycle === 'disconnected';
   const recipeInsertionBlocked =
-    recordingActive || (sessionModeLocked && session.draft.mode !== libraryMode);
+    mediaLocked || (sessionModeLocked && session.draft.mode !== libraryMode);
   const recordingSource = useRecordingSource(
     session.draft.mode,
     session.localStream,
@@ -137,94 +144,64 @@ const StudioExperience = () => {
   }, [session.draft.mode, shelfDirty]);
 
   useEffect(() => {
-    const previous = previousRecordingLifecycleRef.current;
-    previousRecordingLifecycleRef.current = recording.lifecycle;
-
-    if (!mobileLayout || !recording.presented) {
-      setTakeOpen(false);
-      return;
-    }
-
-    if (recording.lifecycle === 'recorded' && previous !== 'recorded') {
-      setDockOpen(false);
-      setPanel('closed');
-      setCaptureSettingsOpen(false);
-      setWorkbenchTool('take');
-      setTakeOpen(true);
-    }
-  }, [mobileLayout, recording.lifecycle, recording.presented]);
+    if (recording.lifecycle !== 'recorded' || !recording.presented || !reviewReady) return;
+    setFinalizingStartedAt(null);
+    setFinalizingStream(null);
+    setActiveOverlay((current) => current ?? 'take-review');
+  }, [recording.lifecycle, recording.presented, reviewReady]);
 
   useEffect(() => {
-    if (panel === 'closed') return;
-    const frame = window.requestAnimationFrame(() => {
-      document
-        .getElementById(
-          panel === 'workshop' ? 'character-workshop-title' : 'creative-inline-shelf-title',
-        )
-        ?.focus();
-    });
-    return () => window.cancelAnimationFrame(frame);
-  }, [panel]);
-
-  useEffect(() => {
-    if (!recordingActive || panel === 'closed') return;
-    if (panel === 'shelf' && shelfDirty) return;
-    setPanel('closed');
-  }, [panel, recordingActive, shelfDirty]);
-
-  const closeCreativePanel = useCallback(
-    (source: Exclude<AuxiliaryPanel, 'closed'>, replacementAlreadyConfirmed = false) => {
-      if (
-        source === 'shelf' &&
-        shelfDirty &&
-        !replacementAlreadyConfirmed &&
-        !window.confirm('Close the Recipe Shelf and discard the unsaved form changes?')
-      ) {
-        return;
-      }
-      if (source === 'shelf') setShelfDirty(false);
-      setPanel('closed');
-      window.requestAnimationFrame(() => {
-        (source === 'workshop' ? workshopToggleRef : shelfToggleRef).current?.focus();
-      });
-    },
-    [shelfDirty],
-  );
-
-  useEffect(() => {
-    if (creativeOverlayLayout || panel === 'closed') return;
-    const closeOnEscape = (event: KeyboardEvent) => {
-      if (event.key !== 'Escape' || event.defaultPrevented) return;
-      event.preventDefault();
-      closeCreativePanel(panel);
-    };
-    document.addEventListener('keydown', closeOnEscape);
-    return () => document.removeEventListener('keydown', closeOnEscape);
-  }, [closeCreativePanel, creativeOverlayLayout, panel]);
-
-  const closeDock = useCallback(() => {
-    setDockOpen(false);
-  }, []);
-
-  const closeCaptureSettings = useCallback(() => {
-    if (
-      session.capturePreferences.hasPendingChanges &&
-      !window.confirm('Close capture settings and discard the unapplied changes?')
-    ) {
-      return;
+    if (recording.presented) return;
+    setReviewReady(false);
+    if (recording.lifecycle !== 'stopping') {
+      setFinalizingStartedAt(null);
+      setFinalizingStream(null);
     }
-    session.capturePreferences.discardPending();
-    setCaptureSettingsOpen(false);
-  }, [session.capturePreferences]);
+    setActiveOverlay((current) =>
+      current === 'take-review' || current === 'voice-treatments' ? null : current,
+    );
+  }, [recording.lifecycle, recording.presented]);
+
+  useEffect(() => {
+    if (!session.error || FORM_ERROR_CODES.has(session.error.code)) return;
+    setActiveOverlay((current) =>
+      current === 'recipe-dock' || current === 'capture-settings' ? null : current,
+    );
+  }, [session.error]);
 
   const stopRecording = recording.stop;
-  const stopModel = session.stopModel;
-  const activeMode = session.draft.mode;
-  const finishTake = useCallback(async () => {
-    const stopOrder = recordingStopOrder(activeMode);
-    await stopRecording();
-    if (stopOrder.includes('disconnect-model')) stopModel();
-  }, [activeMode, stopModel, stopRecording]);
+  const releaseForRecordedReview = session.releaseForRecordedReview;
+  const currentDisplayStream = session.displayStream;
+  const finishTake = useCallback((): Promise<void> => {
+    if (finishPromiseRef.current) return finishPromiseRef.current;
+
+    setFinalizingStream(currentDisplayStream);
+    setFinalizingStartedAt(Date.now());
+    setReviewReady(false);
+
+    const finishPromise = (async () => {
+      let artifact = null;
+      try {
+        artifact = await stopRecording();
+      } finally {
+        await releaseForRecordedReview();
+        setFinalizingStream(null);
+      }
+
+      if (artifact) {
+        setReviewReady(true);
+        setActiveOverlay('take-review');
+      } else {
+        setReviewReady(false);
+        setFinalizingStartedAt(null);
+      }
+    })().finally(() => {
+      finishPromiseRef.current = null;
+    });
+
+    finishPromiseRef.current = finishPromise;
+    return finishPromise;
+  }, [currentDisplayStream, releaseForRecordedReview, stopRecording]);
 
   useEffect(() => {
     if (
@@ -247,6 +224,132 @@ const StudioExperience = () => {
     }
   }, [finishTake, recording.activeSource, recording.lifecycle, recordingSource]);
 
+  const stagePresentation = useMemo<StagePresentation>(() => {
+    if (reviewReady && recording.presented) {
+      return {
+        kind: 'playback',
+        artifact: recording.presented,
+        controlsLocked: recording.processingState === 'processing',
+      };
+    }
+    if (recording.lifecycle === 'stopping' || finalizingStartedAt !== null) {
+      return {
+        kind: 'finalizing',
+        retainedStream: finalizingStream ?? session.displayStream,
+        startedAt: finalizingStartedAt ?? 0,
+      };
+    }
+    if (session.displayStream) {
+      const provider = session.draft.mode !== 'local' && session.transformedVideoUsable;
+      return {
+        kind: 'live',
+        stream: session.displayStream,
+        origin: provider ? 'provider' : 'local',
+        mirrored: !provider,
+      };
+    }
+    return { kind: 'idle', mode: session.draft.mode };
+  }, [
+    finalizingStartedAt,
+    finalizingStream,
+    recording.lifecycle,
+    recording.presented,
+    recording.processingState,
+    reviewReady,
+    session.displayStream,
+    session.draft.mode,
+    session.transformedVideoUsable,
+  ]);
+
+  const dismissNotice = useCallback((id: string) => {
+    setDismissedNotices((current) => new Set([...current, id]));
+  }, []);
+
+  const stageNotices = useMemo<readonly StageNotice[]>(() => {
+    const notices: StageNotice[] = [];
+    const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
+
+    if (!localCaptureAvailable) {
+      notices.push({
+        id: 'local-capture-unavailable',
+        severity: 'error',
+        title: 'Camera capture needs a secure supported browser',
+        message:
+          'Open the studio on localhost or HTTPS in a current browser with camera and microphone APIs.',
+        priority: 950,
+      });
+    }
+
+    if (capabilityState === 'error' && !dismissedNotices.has('provider-broker')) {
+      notices.push({
+        id: 'provider-broker',
+        severity: 'warning',
+        title: 'Integration broker is unreachable',
+        message: 'Local preparation still works, but provider availability could not be checked.',
+        action: { label: 'Retry check', onAction: retryProviderAvailability },
+        onDismiss: () => dismissNotice('provider-broker'),
+      });
+    }
+
+    if (session.error && !FORM_ERROR_CODES.has(session.error.code)) {
+      const deviceError = [
+        'permission-denied',
+        'device-missing',
+        'device-busy',
+        'constraints-unavailable',
+      ].includes(session.error.code);
+      notices.push({
+        id: `session-${session.error.code}`,
+        severity: 'error',
+        title: session.error.message,
+        message: session.error.recovery ?? 'Review the setup and try again.',
+        priority: 900,
+        action: deviceError
+          ? { label: 'Capture settings', onAction: () => setActiveOverlay('capture-settings') }
+          : { label: 'Dismiss', onAction: session.clearError },
+        onDismiss: session.clearError,
+      });
+    }
+
+    if (recording.recordingError) {
+      notices.push({
+        id: 'recording-error',
+        severity: 'error',
+        title: 'Recording stopped',
+        message: recording.recordingError,
+        priority: 1_000,
+      });
+    }
+
+    if (
+      recording.sidecar.state === 'error' &&
+      recording.sidecar.error &&
+      !dismissedNotices.has('recording-sidecar')
+    ) {
+      notices.push({
+        id: 'recording-sidecar',
+        severity: 'warning',
+        title: 'Video preserved without separate voice audio',
+        message: recording.sidecar.error,
+        onDismiss: () => dismissNotice('recording-sidecar'),
+      });
+    }
+
+    return notices;
+  }, [
+    browser.mediaDevices,
+    browser.secureContext,
+    capabilityState,
+    dismissNotice,
+    dismissedNotices,
+    recording.recordingError,
+    recording.sidecar.error,
+    recording.sidecar.state,
+    retryProviderAvailability,
+    session.clearError,
+    session.error,
+  ]);
+
   const changeLibraryMode = (mode: ModelMode) => {
     if (mode === libraryMode) return;
     if (
@@ -261,12 +364,15 @@ const StudioExperience = () => {
   };
 
   const selectModeWithDraftProtection = (mode: StudioMode): boolean =>
+    !mediaLocked &&
     confirmModeReplacement(session.draft, mode, (message) => window.confirm(message)) &&
     session.selectMode(mode);
 
+  const closeCreativePanel = useCallback(() => setActiveOverlay(null), []);
+
   const useRecipe = (selection: RecipeSelection) => {
     if (
-      recordingActive ||
+      mediaLocked ||
       (session.draft.mode !== selection.modelModeId &&
         !selectModeWithDraftProtection(selection.modelModeId))
     )
@@ -277,7 +383,7 @@ const StudioExperience = () => {
     selectedCharacterPrompt.current =
       selection.origin === 'character-prompt' ? selection.assetId : undefined;
     if (selection.builderDraft) rememberWorkshopDraft(selection.builderDraft);
-    closeCreativePanel('shelf', true);
+    setActiveOverlay(null);
   };
 
   const openSavedWorkshop = (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => {
@@ -286,18 +392,17 @@ const StudioExperience = () => {
     selectedCharacterPrompt.current = asset.id;
     selectedSavedPrompt.current = undefined;
     rememberWorkshopDraft(draft);
-    setShelfDirty(false);
-    setPanel('workshop');
+    setActiveOverlay('workshop');
   };
 
   const applyWorkshopPrompt = (prompt: string, draft: PromptBuilderDraft) => {
-    if (recordingActive) return;
+    if (mediaLocked) return;
     if (session.draft.mode !== 'lucy-2.5' && !selectModeWithDraftProtection('lucy-2.5')) return;
     session.updatePrompt(prompt);
     selectedSavedPrompt.current = undefined;
     selectedCharacterPrompt.current = undefined;
     rememberWorkshopDraft(draft);
-    closeCreativePanel('workshop');
+    setActiveOverlay(null);
   };
 
   const saveWorkshopPrompt = (action: SavePromptWorkshopAction) => {
@@ -318,130 +423,37 @@ const StudioExperience = () => {
   };
 
   const openWorkshop = () => {
-    if (
-      panel === 'shelf' &&
-      shelfDirty &&
-      !window.confirm('Open the Character Workshop and discard the unsaved shelf form changes?')
-    ) {
-      return;
-    }
+    if (recordingActive) return;
     if (session.draft.mode !== 'lucy-2.5' && !selectModeWithDraftProtection('lucy-2.5')) return;
-    setDockOpen(false);
-    setTakeOpen(false);
-    setCaptureSettingsOpen(false);
-    setShelfDirty(false);
-    setPanel('workshop');
+    setActiveOverlay('workshop');
   };
 
   const openDock = () => {
     if (recordingActive) return;
-    if (panel === 'shelf' && shelfDirty) {
-      if (!window.confirm('Open the Recipe Dock and discard the unsaved shelf form changes?')) {
-        return;
-      }
-      setShelfDirty(false);
-    }
-    setTakeOpen(false);
-    setCaptureSettingsOpen(false);
-    setPanel('closed');
-    setDockOpen(true);
+    setActiveOverlay('recipe-dock');
   };
 
   const openTake = () => {
     if (!recording.presented || recordingActive) return;
-    if (panel === 'shelf' && shelfDirty) {
-      if (!window.confirm('Open the latest take and discard the unsaved shelf form changes?')) {
-        return;
-      }
-      setShelfDirty(false);
-    }
-    setDockOpen(false);
-    setPanel('closed');
-    setCaptureSettingsOpen(false);
-    setWorkbenchTool('take');
-    setTakeOpen(mobileLayout);
-    if (!mobileLayout) {
-      window.requestAnimationFrame(() => document.getElementById('take-heading')?.focus());
-    }
+    setActiveOverlay('take-review');
   };
 
   const openCaptureSettings = () => {
     if (recordingActive) return;
-    setDockOpen(false);
-    setTakeOpen(false);
-    setPanel('closed');
-    setCaptureSettingsOpen(true);
+    setActiveOverlay('capture-settings');
   };
 
-  const hasWorkbench = Boolean(recording.presented);
-  const desktopShelfOpen = !creativeOverlayLayout && !recordingActive && panel === 'shelf';
-  const desktopWorkshopOpen = !creativeOverlayLayout && !recordingActive && panel === 'workshop';
-  const hasInlineWorkbench = hasWorkbench && !mobileLayout && !desktopShelfOpen;
-  const hasLowerPanel = hasInlineWorkbench || desktopShelfOpen;
-
-  const renderDesktopCreativePanel = (activePanel: Exclude<AuxiliaryPanel, 'closed'>) => (
-    <DesktopCreativePanel
-      panel={activePanel}
-      libraryMode={libraryMode}
-      workshopDraft={workshopDraft}
-      workshopDrafts={workshopDrafts}
-      repository={repository}
-      recordingActive={recordingActive}
-      sessionModeLocked={sessionModeLocked}
-      recipeInsertionBlocked={recipeInsertionBlocked}
-      hasReferenceImage={Boolean(session.draft.image)}
-      onClose={() => closeCreativePanel(activePanel)}
-      onLibraryModeChange={changeLibraryMode}
-      onWorkshopDraftChange={rememberWorkshopDraft}
-      onUseWorkshop={(action) => applyWorkshopPrompt(action.prompt, action.draft)}
-      onSaveWorkshop={saveWorkshopPrompt}
-      onShelfDirtyChange={setShelfDirty}
-      onUseRecipe={useRecipe}
-      onOpenSavedWorkshop={openSavedWorkshop}
-    />
-  );
-
-  const renderTakeWorkbenchTabs = (label: string) => (
-    <div css={workbenchTrayStyles(theme)}>
-      <Tabs
-        label={label}
-        value={workbenchTool}
-        onChange={setWorkbenchTool}
-        items={[
-          {
-            value: 'take',
-            label: 'Latest Take',
-            shortLabel: 'Take',
-            content:
-              workbenchTool === 'take' ? (
-                <TakeDock
-                  view="take"
-                  recording={recording}
-                  processing={processing}
-                  elevenLabsAvailable={availability.elevenLabs}
-                  browserCapabilities={browser}
-                />
-              ) : null,
-          },
-          {
-            value: 'voice',
-            label: 'Voice Treatment',
-            shortLabel: 'Voice',
-            content:
-              workbenchTool === 'voice' ? (
-                <TakeDock
-                  view="voice"
-                  recording={recording}
-                  processing={processing}
-                  elevenLabsAvailable={availability.elevenLabs}
-                  browserCapabilities={browser}
-                />
-              ) : null,
-          },
-        ]}
-      />
-    </div>
-  );
+  const creativePanel: AuxiliaryPanel =
+    activeOverlay === 'workshop'
+      ? 'workshop'
+      : activeOverlay === 'recipe-shelf'
+        ? 'shelf'
+        : 'closed';
+  const captureBlockedReason = reviewLocked
+    ? REVIEW_LOCK_REASON
+    : shelfDirty
+      ? 'Save or discard Recipe Shelf changes before recording.'
+      : undefined;
 
   return (
     <div css={pageStyles(theme)}>
@@ -454,130 +466,120 @@ const StudioExperience = () => {
             availability={availability}
             browser={browser}
             capabilityState={capabilityState}
-            onRetry={retryProviderAvailability}
           />
         </div>
 
-        <main
-          id="studio-main"
-          tabIndex={-1}
-          css={mainGridStyles(theme, recordingActive, desktopWorkshopOpen)}
-        >
-          <div css={stageColumnStyles(theme, hasLowerPanel, recordingActive, desktopShelfOpen)}>
+        <main id="studio-main" tabIndex={-1} css={mainGridStyles()}>
+          <div css={stageColumnStyles(theme)}>
             <MediaStage
-              stream={session.displayStream}
+              presentation={stagePresentation}
               mode={session.draft.mode}
               lifecycle={session.lifecycle}
-              transformed={session.transformedVideoUsable}
               liveSeconds={session.liveSeconds}
               generationSeconds={session.generationSeconds}
-              recording={recordingActive}
+              recording={recording.lifecycle === 'recording'}
               recordingSeconds={recording.elapsedSeconds}
+              notices={stageNotices}
             />
             <RecordingControls
               recording={recording}
-              source={recordingActive ? recording.activeSource : recordingSource}
+              source={
+                recordingActive ? recording.activeSource : reviewLocked ? null : recordingSource
+              }
               mode={session.draft.mode}
               modelOutputReady={session.transformedVideoUsable}
               supported={browser.mediaRecorder}
-              {...(shelfDirty
-                ? { blockedReason: 'Save or discard Recipe Shelf changes before recording.' }
-                : {})}
+              {...(captureBlockedReason ? { blockedReason: captureBlockedReason } : {})}
               onOpenSettings={openCaptureSettings}
               onStop={finishTake}
             />
-            {desktopShelfOpen ? (
-              <div data-scroll-region="desktop-recipe-shelf" css={workbenchStyles(theme)}>
-                {renderDesktopCreativePanel('shelf')}
-              </div>
-            ) : hasInlineWorkbench && !recordingActive ? (
-              <div data-scroll-region="studio-workbench" css={workbenchStyles(theme)}>
-                {compactWorkbench ? (
-                  renderTakeWorkbenchTabs('Take workbench')
-                ) : (
-                  <TakeDock
-                    recording={recording}
-                    processing={processing}
-                    elevenLabsAvailable={availability.elevenLabs}
-                    browserCapabilities={browser}
-                  />
-                )}
-              </div>
-            ) : null}
           </div>
-          {!compactLayout ? (
-            recordingActive ? (
-              <aside
-                aria-label="Recipe Dock collapsed while recording"
-                css={recordingRailStyles(theme)}
-              >
-                <span>REC</span>
-              </aside>
-            ) : desktopWorkshopOpen ? (
-              <aside aria-label="Character Workshop" css={dockColumnStyles()}>
-                {renderDesktopCreativePanel('workshop')}
-              </aside>
-            ) : (
-              <aside aria-label="Recipe Dock" css={dockColumnStyles()}>
-                <SessionComposer
-                  session={session}
-                  recording={recordingActive}
-                  onOpenWorkshop={openWorkshop}
-                />
-              </aside>
-            )
-          ) : null}
         </main>
 
         <OverlayPanel
-          open={compactLayout && dockOpen}
-          onClose={closeDock}
+          open={activeOverlay === 'recipe-dock'}
+          onClose={() => setActiveOverlay(null)}
           title="Recipe Dock"
           description="Prepare freely. Camera and provider work begin only from explicit actions."
           placement="right"
+          bodyMode="contained"
           returnFocusRef={dockToggleRef}
         >
           <SessionComposer
             embedded
             session={session}
-            recording={recordingActive}
+            recording={mediaLocked}
+            {...(reviewLocked ? { lockReason: REVIEW_LOCK_REASON } : {})}
             onOpenWorkshop={openWorkshop}
           />
         </OverlayPanel>
 
         <OverlayPanel
-          open={captureSettingsOpen}
-          onClose={closeCaptureSettings}
+          open={activeOverlay === 'capture-settings'}
+          onClose={() => setActiveOverlay(null)}
           title="Capture Settings"
           description="Choose session-only sources and a local capture target without starting media."
           placement="right"
+          bodyMode="contained"
         >
           <CaptureSettingsPanel
             controller={session.capturePreferences}
             mode={session.draft.mode}
-            disabled={recordingActive || aiSessionActive}
-            {...(recordingActive
-              ? { disabledReason: 'Finish the current take before changing capture settings.' }
-              : aiSessionActive
-                ? { disabledReason: 'Stop AI before changing camera or microphone sources.' }
-                : {})}
-            onApplied={() => setCaptureSettingsOpen(false)}
+            disabled={mediaLocked || aiSessionActive}
+            {...(reviewLocked
+              ? { disabledReason: REVIEW_LOCK_REASON }
+              : recordingActive
+                ? { disabledReason: 'Finish the current take before changing capture settings.' }
+                : aiSessionActive
+                  ? { disabledReason: 'Stop AI before changing camera or microphone sources.' }
+                  : {})}
+            onApplied={() => setActiveOverlay(null)}
           />
         </OverlayPanel>
 
         <OverlayPanel
-          open={mobileLayout && takeOpen && Boolean(recording.presented)}
-          onClose={() => setTakeOpen(false)}
+          open={activeOverlay === 'take-review' && Boolean(recording.presented)}
+          onClose={() => setActiveOverlay(null)}
           title="Latest Take"
-          description="Review, process, download, or discard this temporary in-memory recording."
+          description="Playback stays on the stage while you review this temporary in-memory recording."
           placement="bottom"
-          returnFocusRef={takeToggleRef}
+          size="wide"
+          bodyMode="contained"
+          returnFocusRef={recording.presented ? takeToggleRef : dockToggleRef}
         >
-          {renderTakeWorkbenchTabs('Take review tools')}
+          <TakeDock
+            view="take"
+            recording={recording}
+            processing={processing}
+            elevenLabsAvailable={availability.elevenLabs}
+            browserCapabilities={browser}
+            onCloseTake={() => setActiveOverlay(null)}
+            onOpenVoiceTreatments={() => setActiveOverlay('voice-treatments')}
+          />
+        </OverlayPanel>
+
+        <OverlayPanel
+          open={activeOverlay === 'voice-treatments' && Boolean(recording.presented)}
+          onClose={() => setActiveOverlay(null)}
+          title="Voice Treatments"
+          description="Every treatment starts from the immutable original audio."
+          placement="bottom"
+          size="wide"
+          bodyMode="contained"
+          returnFocusRef={recording.presented ? takeToggleRef : dockToggleRef}
+        >
+          <TakeDock
+            view="voice"
+            recording={recording}
+            processing={processing}
+            elevenLabsAvailable={availability.elevenLabs}
+            browserCapabilities={browser}
+            onBackToTake={() => setActiveOverlay('take-review')}
+          />
         </OverlayPanel>
 
         <CreativeWorkspace
-          panel={panel}
+          panel={creativePanel}
           activeSessionMode={session.draft.mode}
           libraryMode={libraryMode}
           workshopDraft={workshopDraft}
@@ -595,15 +597,9 @@ const StudioExperience = () => {
           onOpenDock={openDock}
           onOpenTake={openTake}
           onOpenWorkshop={openWorkshop}
-          onToggleShelf={() => {
-            if (panel === 'shelf') closeCreativePanel('shelf');
-            else {
-              setDockOpen(false);
-              setTakeOpen(false);
-              setCaptureSettingsOpen(false);
-              setPanel('shelf');
-            }
-          }}
+          onToggleShelf={() =>
+            setActiveOverlay((current) => (current === 'recipe-shelf' ? null : 'recipe-shelf'))
+          }
           onClose={closeCreativePanel}
           onLibraryModeChange={changeLibraryMode}
           onWorkshopDraftChange={rememberWorkshopDraft}
@@ -612,7 +608,6 @@ const StudioExperience = () => {
           onShelfDirtyChange={setShelfDirty}
           onUseRecipe={useRecipe}
           onOpenSavedWorkshop={openSavedWorkshop}
-          renderPanelInOverlay={creativeOverlayLayout}
         />
       </div>
     </div>

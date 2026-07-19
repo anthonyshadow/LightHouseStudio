@@ -34,6 +34,7 @@ const createSession = (
   stopModel: vi.fn(),
   resetModel: vi.fn(),
   stopCamera: vi.fn(),
+  releaseForRecordedReview: vi.fn().mockResolvedValue(undefined),
   selectMode: vi.fn().mockReturnValue(true),
   updatePrompt: vi.fn(),
   updateEnhancement: vi.fn(),

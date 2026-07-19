@@ -785,6 +785,65 @@ describe('useStudioSession model lifecycle contract', () => {
     unmount();
   });
 
+  it('releases local and provider resources for recorded review without clearing the draft', async () => {
+    vi.useFakeTimers();
+    const local = fakeStream();
+    const remote = fakeStream();
+    const realtimeSession = fakeRealtimeSession();
+    adapters.acquireLocalMedia.mockResolvedValue(local);
+    adapters.connectDecartRealtime.mockImplementation((options: ConnectRealtimeOptions) => {
+      options.onConnectionChange('connected');
+      options.onRemoteStream(remote);
+      options.onConnectionChange('generating');
+      return Promise.resolve(realtimeSession);
+    });
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    act(() => {
+      result.current.selectMode('lucy-2.5');
+      result.current.updatePrompt('An adult studio presenter in amber light');
+      result.current.updateEnhancement(true);
+    });
+    await act(async () => {
+      await result.current.startModel();
+    });
+    act(() => {
+      vi.advanceTimersByTime(2_100);
+    });
+    expect(result.current.displayStream).toBe(remote);
+    expect(result.current.liveSeconds).toBeGreaterThanOrEqual(2);
+
+    await act(async () => {
+      await result.current.releaseForRecordedReview();
+    });
+
+    expect(realtimeSession.disconnect).toHaveBeenCalledOnce();
+    expect(remote.getTracks().every((track) => vi.mocked(track.stop).mock.calls.length === 1)).toBe(
+      true,
+    );
+    expect(local.getTracks().every((track) => vi.mocked(track.stop).mock.calls.length === 1)).toBe(
+      true,
+    );
+    expect(result.current.localStream).toBeNull();
+    expect(result.current.remoteStream).toBeNull();
+    expect(result.current.displayStream).toBeNull();
+    expect(result.current.lifecycle).toBe('idle');
+    expect(result.current.applied).toBeNull();
+    expect(result.current.liveSeconds).toBe(0);
+    expect(result.current.error).toBeNull();
+    expect(result.current.draft).toMatchObject({
+      mode: 'lucy-2.5',
+      prompt: 'An adult studio presenter in amber light',
+      enhance: true,
+    });
+
+    unmount();
+  });
+
   it.each([
     ['Reset', 'resetModel' as const],
     ['Stop', 'stopModel' as const],

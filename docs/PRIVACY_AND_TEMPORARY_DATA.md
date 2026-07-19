@@ -12,9 +12,9 @@ Lightframe Studio is local-first, not offline-only. Local capture stays in the b
 | Camera and microphone streams                                                              | Browser memory while the session is live                                                                    | None in local mode; Decart during an explicitly started model session        |
 | Portrait or garment file and preview URL                                                   | Browser memory until clear, departure from that mode, reset, or unmount                                     | Decart when included in model Start/Apply                                    |
 | Decart temporary credential                                                                | Browser memory for connection setup; scoped to one model/origin with a five-minute expiry and session limit | Decart realtime service                                                      |
-| Current original recording and object URL                                                  | Browser memory until discard, next-take replacement, or unmount/tab closure                                 | None unless its audio sidecar is explicitly converted                        |
+| Current original recording and object URL                                                  | Browser memory until Close, confirmed Discard, or unmount/tab closure                                       | None unless its audio sidecar is explicitly converted                        |
 | Audio sidecar                                                                              | Browser memory, tied to the current original take                                                           | ElevenLabs only after explicit cloud voice Apply                             |
-| Locally processed take                                                                     | Browser memory until restored, replaced, discarded, or unmounted                                            | None                                                                         |
+| Locally processed take                                                                     | Browser memory until restored, replaced, Close, confirmed Discard, or unmount                               | None                                                                         |
 | Voice selection and voice-list pages                                                       | React memory for the current page                                                                           | Voice metadata is obtained from ElevenLabs through the broker                |
 | Provider preview audio                                                                     | Streamed through the broker; not stored by the app                                                          | ElevenLabs/provider preview storage                                          |
 | Imported public voice                                                                      | Persistent external change in the configured ElevenLabs workspace                                           | ElevenLabs                                                                   |
@@ -48,7 +48,7 @@ Opening Capture Settings may enumerate browser-visible input devices, but it doe
 
 ## Temporary artifact warning
 
-Recordings are Blobs behind object URLs, not saved files. The app owns one take, not a take history. A take survives session/model stop but not a page refresh, browser crash, tab closure, or device restart. Download a wanted take before leaving. Starting a new take replaces the previous artifact; an undownloaded current take requires confirmation first. Confirmed discard is irreversible. Rename and trim are not implemented.
+Recordings are Blobs behind object URLs, not saved files. The app owns one take, not a take history. Finish finalizes the artifact before releasing camera/provider resources, then the take replaces live media on the same stage. A take survives tool-overlay closure but not a page refresh, browser crash, tab closure, or device restart. All new camera/provider work is blocked until review exits. Download dispatch leaves playback active and enables Close; the browser does not expose download completion to the app. Close releases recording URLs and returns to private idle. Confirmed Discard does the same without download and is irreversible. Rename and trim are not implemented.
 
 Images and generated object URLs are likewise ephemeral. Text and enhancement drafts are retained independently while switching idle modes, but the departing mode's reference file and preview URL are cleared and revoked. A saved character recipe records whether a portrait is needed or was present in the current session, but never stores the portrait itself.
 
@@ -71,9 +71,9 @@ There is no account authentication because there is one local operator. Do not e
 
 - Revoke camera/microphone permission in browser site settings.
 - Reload or close the tab to clear session-only mode drafts and capture-device preferences. Device ids are never part of `localStorage`.
-- Use Stop camera to release owned device tracks.
+- Use Stop camera to release owned device tracks outside recording; Finish releases all owned live resources only after recording finalization settles.
 - Clear an image or Reset AI to revoke its preview and clear pending/applied reference state.
-- Download then Discard a take to release recording and processed object URLs.
+- Download then Close a take, or confirm Discard without download, to release recording and processed object URLs.
 - Clear site storage to remove Recipe Shelf text assets.
 - Remove provider keys from `.env` and restart the API to disable integrations.
 

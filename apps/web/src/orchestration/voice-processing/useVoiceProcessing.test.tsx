@@ -71,6 +71,7 @@ const recordingController = (): RecordingController => {
     processed: null,
     presented: original,
     sidecar: readySidecar(),
+    recordingError: null,
     processingState: 'idle',
     processingError: null,
     elapsedSeconds: 1,

@@ -46,6 +46,7 @@ export type StudioSessionController = {
   stopModel(): void;
   resetModel(): void;
   stopCamera(): void;
+  releaseForRecordedReview(): Promise<void>;
   selectMode(mode: StudioMode): boolean;
   updatePrompt(prompt: string): void;
   updateEnhancement(enhance: boolean): void;

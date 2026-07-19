@@ -15,7 +15,7 @@ const source: RecordingSource = {
 
 const createRecording = (
   lifecycle: RecordingController['lifecycle'],
-  processingError: string | null = null,
+  recordingError: string | null = null,
 ): RecordingController => ({
   lifecycle,
   activeSource: null,
@@ -24,8 +24,9 @@ const createRecording = (
   processed: null,
   presented: null,
   sidecar: { state: 'unavailable', blob: null, mimeType: null, error: null },
+  recordingError,
   processingState: 'idle',
-  processingError,
+  processingError: null,
   elapsedSeconds: 3,
   downloaded: false,
   start: vi.fn().mockResolvedValue(undefined),
@@ -55,39 +56,27 @@ const controls = (recording: RecordingController): ReactNode => (
 afterEach(cleanup);
 
 describe('RecordingControls accessibility', () => {
-  it('announces each capture transition and hands focus to its relevant control or status', async () => {
+  it('keeps lifecycle notices out of the fixed control strip and focuses Finish', async () => {
     const view = render(controls(createRecording('idle')));
 
     view.rerender(controls(createRecording('recording')));
     await waitFor(() => expect(screen.getByRole('button', { name: 'Finish take' })).toHaveFocus());
-    expect(screen.getByRole('status')).toHaveTextContent('Recording in progress');
-    expect(screen.getByRole('status')).toHaveAttribute('aria-live', 'polite');
+    expect(screen.queryByText('Recording in progress')).not.toBeInTheDocument();
 
     view.rerender(controls(createRecording('stopping')));
-    const finalizingTarget = screen
-      .getByText('Finalizing your take…')
-      .closest<HTMLElement>('[tabindex="-1"]');
-    await waitFor(() => expect(finalizingTarget).toHaveFocus());
+    expect(screen.queryByText('Finalizing your take…')).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Finish take' })).toBeDisabled();
 
     view.rerender(controls(createRecording('recorded')));
-    const readyTarget = screen.getByText('Take ready').closest<HTMLElement>('[tabindex="-1"]');
-    await waitFor(() => expect(readyTarget).toHaveFocus());
-    expect(screen.getByRole('button', { name: 'Record a take' })).toHaveAttribute(
-      'aria-describedby',
-      'recording-state',
-    );
+    expect(screen.queryByText('Take ready')).not.toBeInTheDocument();
   });
 
-  it('moves focus to an assertive error without hiding the actionable message', async () => {
+  it('leaves recording errors to the stage notice layer', () => {
     const view = render(controls(createRecording('idle')));
 
     view.rerender(controls(createRecording('error', 'The video source ended unexpectedly.')));
-    const alert = screen.getByRole('alert');
-    const alertTarget = alert.closest<HTMLElement>('[tabindex="-1"]');
-
-    await waitFor(() => expect(alertTarget).toHaveFocus());
-    expect(alert).toHaveAttribute('aria-live', 'assertive');
-    expect(alert).toHaveTextContent('The video source ended unexpectedly.');
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText('The video source ended unexpectedly.')).not.toBeInTheDocument();
   });
 
   it('handles Space only from a safe non-editable page context', async () => {

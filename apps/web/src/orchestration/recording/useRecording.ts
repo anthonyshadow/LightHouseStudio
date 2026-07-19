@@ -20,7 +20,11 @@ import type {
   TakeMetadata,
   UseRecordingOptions,
 } from '../../features/recording/types';
-import { createOriginalRecordingArtifact, createRecordingSidecar } from './recordingArtifacts';
+import {
+  createOriginalRecordingArtifact,
+  createRecordingSidecar,
+  IDLE_AUDIO_SIDECAR,
+} from './recordingArtifacts';
 import {
   attachRecordingAttemptListeners,
   cleanupRecordingAttempt,
@@ -134,6 +138,15 @@ const captureTakeMetadata = (
   });
 };
 
+const stopRecorderBestEffort = (recorder: MediaRecorder | null): void => {
+  if (!recorder || recorder.state === 'inactive') return;
+  try {
+    recorder.stop();
+  } catch {
+    // Resource owners still release the borrowed tracks after stop settles.
+  }
+};
+
 export const useRecording = ({
   onAutomaticStop,
 }: UseRecordingOptions = {}): RecordingController => {
@@ -151,6 +164,7 @@ export const useRecording = ({
   const stopPromiseRef = useRef<Promise<RecordingArtifact | null> | null>(null);
   const stopResolverRef = useRef<((artifact: RecordingArtifact | null) => void) | null>(null);
   const stopTimerRef = useRef<number | null>(null);
+  const mainStoppedAtRef = useRef<number | null>(null);
   const disposedRef = useRef(false);
   const automaticStopCallbackRef = useRef(onAutomaticStop);
 
@@ -182,6 +196,30 @@ export const useRecording = ({
     stopPromiseRef.current = null;
   }, []);
 
+  const failAttempt = useCallback(
+    (
+      attempt: RecordingAttempt,
+      message: string,
+      reportMessage = message,
+      automaticReason?: AutomaticRecordingStopReason,
+    ) => {
+      cleanupRecordingAttempt(attempt);
+      if (attemptRef.current === attempt) attemptRef.current = null;
+      setActiveSource(null);
+      pendingMetadataRef.current = null;
+      mainStoppedAtRef.current = null;
+      domainLifecycleRef.current = failRecordingLifecycle(
+        createSafeError('recording-failure', message),
+      );
+      setLifecycle(domainLifecycleRef.current.status);
+      artifacts.reportRecordingError(reportMessage);
+      if (automaticReason) markAutomaticStop(attempt, automaticReason);
+      notifyAutomaticStop(attempt);
+      resolveStop(null);
+    },
+    [artifacts, markAutomaticStop, notifyAutomaticStop, resolveStop],
+  );
+
   const finalizeAttempt = useCallback(
     (attempt: RecordingAttempt) => {
       if (attemptRef.current !== attempt || !attempt.mainStopped) return;
@@ -191,26 +229,58 @@ export const useRecording = ({
 
       if (disposedRef.current) {
         pendingMetadataRef.current = null;
+        mainStoppedAtRef.current = null;
         resolveStop(null);
         return;
       }
 
-      const artifact = createOriginalRecordingArtifact(attempt);
-      if (!artifact) {
-        pendingMetadataRef.current = null;
-        domainLifecycleRef.current = failRecordingLifecycle(
-          createSafeError('recording-failure', 'The browser produced an empty recording.'),
+      let artifact: RecordingArtifact | null;
+      try {
+        artifact = createOriginalRecordingArtifact(
+          attempt,
+          mainStoppedAtRef.current ?? performance.now(),
         );
-        setLifecycle(domainLifecycleRef.current.status);
-        artifacts.reportRecordingError('The browser produced an empty recording.');
-        notifyAutomaticStop(attempt);
-        resolveStop(null);
+      } catch {
+        failAttempt(
+          attempt,
+          'The browser could not create a playable recording artifact.',
+          'The browser could not create a playable recording artifact. The live source can now be released safely.',
+        );
+        return;
+      }
+      if (!artifact) {
+        failAttempt(attempt, 'The browser produced an empty recording.');
         return;
       }
 
-      artifacts.publishOriginal(artifact, createRecordingSidecar(attempt));
+      let sidecar;
+      try {
+        sidecar = createRecordingSidecar(attempt);
+      } catch {
+        sidecar = {
+          ...IDLE_AUDIO_SIDECAR,
+          state: 'error' as const,
+          error: 'The audio sidecar could not be finalized; the video take was preserved.',
+        };
+      }
+      try {
+        artifacts.publishOriginal(artifact, sidecar);
+      } catch {
+        try {
+          URL.revokeObjectURL(artifact.objectUrl);
+        } catch {
+          // Best-effort cleanup for a browser URL implementation that has already failed.
+        }
+        failAttempt(
+          attempt,
+          'The browser could not publish the completed recording.',
+          'The browser could not publish the completed recording. The live source can now be released safely.',
+        );
+        return;
+      }
       setMetadata(pendingMetadataRef.current);
       pendingMetadataRef.current = null;
+      mainStoppedAtRef.current = null;
       try {
         domainLifecycleRef.current = completeRecordingLifecycle(
           domainLifecycleRef.current,
@@ -222,12 +292,15 @@ export const useRecording = ({
           createSafeError('recording-failure', 'The recording could not be finalized.'),
         );
         setLifecycle(domainLifecycleRef.current.status);
+        artifacts.reportRecordingError(
+          'The take was preserved, but the recording review state could not be finalized.',
+        );
       }
 
       notifyAutomaticStop(attempt);
       resolveStop(artifact);
     },
-    [artifacts, notifyAutomaticStop, resolveStop],
+    [artifacts, failAttempt, notifyAutomaticStop, resolveStop],
   );
 
   const tryFinalize = useCallback(() => {
@@ -252,50 +325,67 @@ export const useRecording = ({
     const attempt = attemptRef.current;
     if (!attempt) return artifacts.originalRef.current;
 
-    attempt.stopRequested = true;
-    domainLifecycleRef.current = stopRecordingLifecycle(domainLifecycleRef.current);
-    setLifecycle(domainLifecycleRef.current.status);
     const stopPromise = new Promise<RecordingArtifact | null>((resolve) => {
       stopResolverRef.current = resolve;
     });
     stopPromiseRef.current = stopPromise;
+    attempt.stopRequested = true;
+    try {
+      if (domainLifecycleRef.current.status === 'recording') {
+        domainLifecycleRef.current = stopRecordingLifecycle(domainLifecycleRef.current);
+      } else if (domainLifecycleRef.current.status !== 'stopping') {
+        throw new Error('Recording lifecycle is not active.');
+      }
+      setLifecycle(domainLifecycleRef.current.status);
+    } catch {
+      failAttempt(attempt, 'The active recording could not enter finalization.');
+      return stopPromise;
+    }
     stopTimerRef.current = window.setTimeout(() => {
       if (attemptRef.current !== attempt) return;
       if (attempt.mainStopped) {
+        mainStoppedAtRef.current ??= performance.now();
         attempt.sidecarStopped = true;
         attempt.sidecarError = 'Audio sidecar did not finish; the video take was preserved.';
         finalizeAttempt(attempt);
         return;
       }
-      cleanupRecordingAttempt(attempt);
-      attemptRef.current = null;
-      setActiveSource(null);
-      domainLifecycleRef.current = failRecordingLifecycle(
-        createSafeError('recording-failure', 'The browser did not finish the recording in time.'),
-      );
-      setLifecycle(domainLifecycleRef.current.status);
-      artifacts.reportRecordingError(
+      failAttempt(
+        attempt,
+        'The browser did not finish the recording in time.',
         'The browser did not finish the recording in time. The live source can now be released safely.',
+        'finalization-timeout',
       );
-      pendingMetadataRef.current = null;
-      markAutomaticStop(attempt, 'finalization-timeout');
-      notifyAutomaticStop(attempt);
-      resolveStop(null);
     }, RECORDING_FINALIZATION_TIMEOUT_MS);
-    if (attempt.sidecarRecorder?.state !== 'inactive') attempt.sidecarRecorder?.stop();
-    else attempt.sidecarStopped = true;
-    if (attempt.mainRecorder.state !== 'inactive') attempt.mainRecorder.stop();
-    else attempt.mainStopped = true;
+    if (attempt.sidecarRecorder && attempt.sidecarRecorder.state !== 'inactive') {
+      try {
+        attempt.sidecarRecorder.stop();
+      } catch {
+        attempt.sidecarStopped = true;
+        attempt.sidecarError = 'Audio sidecar capture failed while stopping.';
+        artifacts.failSidecar(attempt.sidecarError);
+      }
+    } else {
+      attempt.sidecarStopped = true;
+    }
+    if (attempt.mainRecorder.state !== 'inactive') {
+      try {
+        attempt.mainRecorder.stop();
+      } catch {
+        failAttempt(
+          attempt,
+          'The browser recorder could not be stopped safely.',
+          'The browser recorder could not be stopped safely. The live source can now be released.',
+        );
+        return stopPromise;
+      }
+    } else {
+      attempt.mainStopped = true;
+      mainStoppedAtRef.current ??= performance.now();
+    }
     tryFinalize();
     return stopPromise;
-  }, [
-    artifacts,
-    finalizeAttempt,
-    markAutomaticStop,
-    notifyAutomaticStop,
-    resolveStop,
-    tryFinalize,
-  ]);
+  }, [artifacts, failAttempt, finalizeAttempt, tryFinalize]);
 
   const start = useCallback(
     (source: RecordingSource, mode: StudioMode): Promise<void> => {
@@ -365,6 +455,7 @@ export const useRecording = ({
 
       attachRecordingAttemptListeners(attempt, {
         onMainStopped: () => {
+          mainStoppedAtRef.current ??= performance.now();
           if (!attempt.stopRequested) {
             markAutomaticStop(attempt, 'recorder-stopped');
             void stop();
@@ -397,6 +488,7 @@ export const useRecording = ({
         );
         setMetadata(null);
         setElapsedSeconds(0);
+        mainStoppedAtRef.current = null;
         artifacts.clearRecordingError();
         setActiveSource(source);
         artifacts.markSidecarRecording(sidecarStarted, attempt.sidecarError);
@@ -410,6 +502,8 @@ export const useRecording = ({
         pendingMetadataRef.current = null;
         cleanupRecordingAttempt(attempt);
         attemptRef.current = null;
+        stopRecorderBestEffort(attempt.mainRecorder);
+        stopRecorderBestEffort(attempt.sidecarRecorder);
         setActiveSource(null);
         domainLifecycleRef.current = failRecordingLifecycle(
           createSafeError(
@@ -431,6 +525,7 @@ export const useRecording = ({
     if (attemptRef.current) return;
     artifacts.discardArtifacts();
     pendingMetadataRef.current = null;
+    mainStoppedAtRef.current = null;
     setMetadata(null);
     setActiveSource(null);
     domainLifecycleRef.current = createRecordingLifecycle<Blob>();
@@ -454,8 +549,9 @@ export const useRecording = ({
       if (attempt) cleanupRecordingAttempt(attempt);
       attemptRef.current = null;
       pendingMetadataRef.current = null;
-      if (attempt?.mainRecorder.state !== 'inactive') attempt?.mainRecorder.stop();
-      if (attempt?.sidecarRecorder?.state !== 'inactive') attempt?.sidecarRecorder?.stop();
+      mainStoppedAtRef.current = null;
+      stopRecorderBestEffort(attempt?.mainRecorder ?? null);
+      stopRecorderBestEffort(attempt?.sidecarRecorder ?? null);
       if (stopTimerRef.current !== null) window.clearTimeout(stopTimerRef.current);
       resolveStop(null);
     };
@@ -470,6 +566,7 @@ export const useRecording = ({
       processed: artifacts.processed,
       presented: artifacts.processed ?? artifacts.original,
       sidecar: artifacts.sidecar,
+      recordingError: artifacts.recordingError,
       processingState: artifacts.processingState,
       processingError: artifacts.processingError,
       elapsedSeconds,
