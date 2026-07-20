@@ -13,13 +13,19 @@ export const DEFAULT_LIGHTFRAME_DATA_DIR = './.lightframe-data';
 export const DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
 export const DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS = 30_000;
 
+const normalizeOptionalString = (value: unknown): unknown => {
+  if (typeof value !== 'string') return value;
+  const trimmed = value.trim();
+  return trimmed === '' ? undefined : trimmed;
+};
+
 const optionalSecretSchema = z.preprocess(
-  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  normalizeOptionalString,
   z.string().trim().min(1).optional(),
 );
 
 const optionalModelSchema = z.preprocess(
-  (value) => (typeof value === 'string' && value.trim() === '' ? undefined : value),
+  normalizeOptionalString,
   z.string().trim().min(1).max(128).optional(),
 );
 
@@ -42,15 +48,13 @@ const environmentSchema = z.object({
   OPENAI_API_KEY: optionalSecretSchema,
   OPENAI_PROMPT_OPTIMIZER_MODEL: optionalModelSchema,
   OPENAI_PROMPT_OPTIMIZER_REASONING: z.preprocess(
-    (value) =>
-      typeof value === 'string' ? (value.trim() === '' ? undefined : value.trim()) : value,
+    normalizeOptionalString,
     z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
   ),
   OPENAI_PROMPT_OPTIMIZER_VERSION: optionalModelSchema,
   OPENAI_REFERENCE_IMAGE_MODEL: optionalModelSchema,
   OPENAI_REFERENCE_IMAGE_QUALITY: z.preprocess(
-    (value) =>
-      typeof value === 'string' ? (value.trim() === '' ? undefined : value.trim()) : value,
+    normalizeOptionalString,
     z.enum(['high', 'medium']).optional(),
   ),
   ELEVENLABS_API_KEY: optionalSecretSchema,

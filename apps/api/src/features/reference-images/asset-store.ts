@@ -7,6 +7,8 @@ import {
   characterPromptOptimizationResultSchema,
   characterReferenceGeneratorSchema,
   characterReferenceOptionsSchema,
+  REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH,
+  REFERENCE_IMAGE_MAX_BYTES,
   REFERENCE_IMAGE_MODEL_ID,
   REFERENCE_IMAGE_PROMPT_MAX_LENGTH,
   REFERENCE_IMAGE_QUALITY,
@@ -54,13 +56,13 @@ const internalMetadataSchema = z
       .number()
       .int()
       .positive()
-      .max(5 * 1024 * 1024 - 1),
+      .max(REFERENCE_IMAGE_MAX_BYTES - 1),
     source: z.literal('generated'),
     provider: z.literal('openai'),
     model: z.string().trim().min(1).max(128),
     quality: z.enum(['high', 'medium']).optional(),
     originalPrompt: z.string().min(1).max(REFERENCE_IMAGE_PROMPT_MAX_LENGTH),
-    derivedPrompt: z.string().min(1).max(32_000),
+    derivedPrompt: z.string().min(1).max(REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH),
     promptAudit: promptAuditSchema.optional(),
     promptHash: z.string().regex(/^[a-f0-9]{64}$/u),
     requestId: z.uuid(),

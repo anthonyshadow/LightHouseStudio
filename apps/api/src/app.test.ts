@@ -47,7 +47,7 @@ describe('API shell', () => {
     expect(app.server.timeout).toBe(
       config.referenceImageTimeoutMs + REFERENCE_IMAGE_CONNECTION_TIMEOUT_MARGIN_MS,
     );
-    expect(app.server.requestTimeout).toBe(30_000);
+    expect(app.server.requestTimeout).toBe(100_000);
   });
 
   it('returns consistent JSON for unknown routes and parser errors', async () => {

@@ -1,7 +1,7 @@
 # Graph Report - webrtc2Sol  (2026-07-19)
 
 ## Corpus Check
-- 267 files · ~131,884 words
+- 267 files · ~131,974 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
@@ -237,8 +237,8 @@ Cohesion: 0.14
 Nodes (14): AudioStream, isModelCompatible(), isProfessionalVoice(), summarizePublicVoice(), summarizeVoice(), VoiceService, ElevenLabsModel, ElevenLabsProvider (+6 more)
 
 ### Community 13 - "Live Media Stage"
-Cohesion: 0.14
-Nodes (27): AudioLevelMeter(), emptyCopy(), lifecycleLabel(), lifecycleTone(), LiveSnapshot, MediaStage(), StreamDetails, activityIndicatorStyles() (+19 more)
+Cohesion: 0.13
+Nodes (28): describeStream(), emptyCopy(), formatFrameRate(), isFinitePositive(), lifecycleLabel(), lifecycleTone(), LiveSnapshot, MediaStage() (+20 more)
 
 ### Community 14 - "Decart Realtime Gateway"
 Cohesion: 0.15
@@ -342,7 +342,7 @@ Nodes (15): actionRowStyles(), captureResolutionLabel(), captureSurfaceStyles(),
 
 ### Community 39 - "Workspace Development Dependencies"
 Cohesion: 0.11
-Nodes (19): @axe-core/playwright, @eslint/js, fast-check, devDependencies, @axe-core/playwright, @eslint/js, fast-check, @playwright/test (+11 more)
+Nodes (19): @eslint/js, fast-check, devDependencies, @eslint/js, fast-check, @playwright/test, prettier, @testing-library/jest-dom (+11 more)
 
 ### Community 40 - "Model Session Actions"
 Cohesion: 0.16
@@ -393,8 +393,8 @@ Cohesion: 0.13
 Nodes (14): compilerOptions, composite, jsx, jsxImportSource, noEmit, types, extends, include (+6 more)
 
 ### Community 52 - "Prompt Text Normalization"
-Cohesion: 0.18
-Nodes (8): normalizeAssetName(), normalizeAssetNotes(), normalizeAssetText(), normalizePromptText(), normalizeTags(), CHARACTER_REFERENCE_PROMPT_TEMPLATE_VERSION, CharacterReferencePromptFraming, framingInstructions
+Cohesion: 0.47
+Nodes (5): normalizeAssetName(), normalizeAssetNotes(), normalizeAssetText(), normalizePromptText(), normalizeTags()
 
 ### Community 53 - "Accessible Tab Controls"
 Cohesion: 0.23
@@ -517,8 +517,8 @@ Cohesion: 0.50
 Nodes (4): Dark Rounded-Square Application Favicon, Gold Circular Accent, Gold L-Shaped Glyph, Teal Rounded-Square Frame
 
 ### Community 84 - "Media Stream Diagnostics"
-Cohesion: 0.50
-Nodes (4): describeStream(), formatFrameRate(), isFinitePositive(), trackSettings()
+Cohesion: 0.67
+Nodes (3): AudioLevelMeter(), audioMeterStyles(), audioTrackStyles()
 
 ### Community 85 - "Cross-Repository Graph Merging"
 Cohesion: 0.67
@@ -589,8 +589,8 @@ Cohesion: 0.21
 Nodes (11): MediaRequirements, withCaptureDevices(), LOCAL_MEDIA_PROFILES, LOCAL_MEDIA_REQUIREMENTS, localMediaRequirements(), LiveTimerController, useLiveTimer(), StudioSessionOptions (+3 more)
 
 ### Community 128 - "types.ts"
-Cohesion: 0.20
-Nodes (14): CreativeAssetSearchResults, RecentPrompt, ReferenceImageStatus, SanitizeCreativeAssetResult, SavedCharacterPrompt, SavedCharacterPromptInput, SavedCharacterPromptSource, SavedPrompt (+6 more)
+Cohesion: 0.13
+Nodes (17): CreativeAssetSearchResults, RecentPrompt, ReferenceImageStatus, SanitizeCreativeAssetResult, SavedCharacterPrompt, SavedCharacterPromptInput, SavedCharacterPromptSource, SavedPrompt (+9 more)
 
 ### Community 129 - "browserMedia.ts"
 Cohesion: 0.44
@@ -622,7 +622,7 @@ _Questions this graph is uniquely positioned to answer:_
 
 - **Why does `CreateReferenceImageRequest` connect `ElevenLabsHttpProvider` to `Studio Application Shell`, `Character Prompt Workshop`, `studioHarness.ts`, `voice-service.ts`, `Owned Local Media Streams`?**
   _High betweenness centrality (0.024) - this node is a cross-community bridge._
-- **Why does `canonicalPrompt()` connect `Creative Asset Operations` to `Prompt Authoring Model`, `Studio Application Shell`, `Prompt Draft Generation`, `Prompt Text Normalization`, `VoiceService`, `Creative Asset Repository`, `Creative Asset Sanitization`?**
+- **Why does `canonicalPrompt()` connect `Creative Asset Operations` to `types.ts`, `Prompt Authoring Model`, `Studio Application Shell`, `Prompt Draft Generation`, `VoiceService`, `Creative Asset Repository`, `Creative Asset Sanitization`?**
   _High betweenness centrality (0.020) - this node is a cross-community bridge._
 - **Why does `OptimizeCharacterReferencePromptRequest` connect `voice-service.ts` to `Studio Application Shell`, `Character Prompt Workshop`, `studioHarness.ts`, `ElevenLabsHttpProvider`, `Owned Local Media Streams`, `PromptFeedback.tsx`, `Form Field Components`?**
   _High betweenness centrality (0.019) - this node is a cross-community bridge._

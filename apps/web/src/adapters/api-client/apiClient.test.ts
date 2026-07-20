@@ -24,6 +24,24 @@ const options = {
   targetUse: 'lucy_2_5_character_reference',
 } as const;
 
+const optimizationResult: OptimizeCharacterReferencePromptResponse['result'] = {
+  optimizedImagePrompt:
+    'A canonical single-character reference photograph of the adult lunar cartographer.',
+  lucy25CharacterPrompt:
+    'Replace the character in the video with the adult lunar cartographer. Preserve source motion, expression, pose, and camera framing.',
+  normalizedCharacterDescription: 'An adult lunar cartographer.',
+  preservedCharacterFacts: ['adult', 'lunar cartographer'],
+  technicalDefaultsAdded: ['front-facing pose', 'neutral gray background'],
+  warnings: [],
+  recommendedSettings: {
+    framing: 'head_and_shoulders',
+    orientation: 'square',
+    size: '1024x1024',
+    quality: 'high',
+    format: 'png',
+  },
+};
+
 const asset: ReferenceImageAsset = {
   assetId: '550e8400-e29b-41d4-a716-446655440000',
   mimeType: 'image/jpeg',
@@ -38,14 +56,12 @@ const asset: ReferenceImageAsset = {
   promptHash: 'a'.repeat(64),
   optimizationEnabled: true,
   originalPrompt: rawPrompt,
-  optimizedImagePrompt:
-    'A canonical single-character reference photograph of the adult lunar cartographer.',
-  lucy25CharacterPrompt:
-    'Replace the character in the video with the adult lunar cartographer. Preserve source motion, expression, pose, and camera framing.',
-  normalizedCharacterDescription: 'An adult lunar cartographer.',
-  preservedCharacterFacts: ['adult', 'lunar cartographer'],
-  technicalDefaultsAdded: ['front-facing pose', 'neutral gray background'],
-  warnings: [],
+  optimizedImagePrompt: optimizationResult.optimizedImagePrompt,
+  lucy25CharacterPrompt: optimizationResult.lucy25CharacterPrompt,
+  normalizedCharacterDescription: optimizationResult.normalizedCharacterDescription,
+  preservedCharacterFacts: optimizationResult.preservedCharacterFacts,
+  technicalDefaultsAdded: optimizationResult.technicalDefaultsAdded,
+  warnings: optimizationResult.warnings,
   options,
   requestedGenerator: null,
   optimizer: { model: 'gpt-5.6', version: 'lucy-character-reference-v1' },
@@ -56,23 +72,7 @@ const asset: ReferenceImageAsset = {
   contentUrl: '/api/reference-images/550e8400-e29b-41d4-a716-446655440000/content',
 };
 const optimizationResponse: OptimizeCharacterReferencePromptResponse = {
-  result: {
-    optimizedImagePrompt:
-      'A canonical single-character reference photograph of the adult lunar cartographer.',
-    lucy25CharacterPrompt:
-      'Replace the character in the video with the adult lunar cartographer. Preserve source motion, expression, pose, and camera framing.',
-    normalizedCharacterDescription: 'An adult lunar cartographer.',
-    preservedCharacterFacts: ['adult', 'lunar cartographer'],
-    technicalDefaultsAdded: ['front-facing pose', 'neutral gray background'],
-    warnings: [],
-    recommendedSettings: {
-      framing: 'head_and_shoulders',
-      orientation: 'square',
-      size: '1024x1024',
-      quality: 'high',
-      format: 'png',
-    },
-  },
+  result: optimizationResult,
   model: 'gpt-5.6',
   version: 'lucy-character-reference-v1',
   inputHash: 'b'.repeat(64),

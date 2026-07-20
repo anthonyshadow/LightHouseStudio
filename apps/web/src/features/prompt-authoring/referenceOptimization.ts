@@ -60,6 +60,8 @@ export const DEFAULT_WORKSHOP_REFERENCE_PREFERENCES: WorkshopReferencePreference
 
 type PreferenceStorage = Pick<Storage, 'getItem' | 'setItem'>;
 
+const normalizeWhitespace = (value: string): string => value.replace(/\s+/gu, ' ').trim();
+
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
@@ -96,7 +98,7 @@ export const sanitizeWorkshopReferencePreferences = (
 
   const customBackground =
     typeof options.customBackground === 'string'
-      ? options.customBackground.replace(/\s+/gu, ' ').trim().slice(0, 200)
+      ? normalizeWhitespace(options.customBackground).slice(0, 200)
       : '';
 
   return {
@@ -141,16 +143,28 @@ export const saveWorkshopReferencePreferences = (
   }
 };
 
-const normalizedOptions = (options: WorkshopReferenceOptions): WorkshopReferenceOptions => ({
+export const normalizeWorkshopReferenceOptions = (
+  options: WorkshopReferenceOptions,
+): WorkshopReferenceOptions => ({
   framing: options.framing,
   orientation: options.orientation,
   renderingMode: options.renderingMode,
   expression: options.expression,
   background: options.background,
   ...(options.background === 'plain_custom' && options.customBackground?.trim()
-    ? { customBackground: options.customBackground.replace(/\s+/gu, ' ').trim() }
+    ? { customBackground: normalizeWhitespace(options.customBackground) }
     : {}),
 });
+
+export const createOptimizerReferenceOptions = (
+  options: WorkshopReferenceOptions,
+): CharacterReferenceOptions => ({
+  ...normalizeWorkshopReferenceOptions(options),
+  targetUse: 'lucy_2_5_character_reference',
+});
+
+export const isCustomBackgroundMissing = (options: WorkshopReferenceOptions): boolean =>
+  options.background === 'plain_custom' && !options.customBackground?.trim();
 
 export const createWorkshopOptimizationKey = (
   rawPrompt: string,
@@ -160,8 +174,8 @@ export const createWorkshopOptimizationKey = (
   generator: CharacterReferenceGenerator | null | undefined,
 ): string =>
   JSON.stringify({
-    rawPrompt: rawPrompt.replace(/\s+/gu, ' ').trim(),
-    options: normalizedOptions(options),
+    rawPrompt: normalizeWhitespace(rawPrompt),
+    options: normalizeWorkshopReferenceOptions(options),
     optimizerModel: optimizerModel ?? null,
     optimizerVersion: optimizerVersion ?? null,
     generator: generator ?? null,

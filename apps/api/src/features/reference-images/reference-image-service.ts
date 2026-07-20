@@ -69,7 +69,23 @@ interface PreparedReferenceImageGeneration {
   };
 }
 
-const LEGACY_REFERENCE_OPTIONS: CreateReferenceImageRequest['options'] = {
+type ReferenceImageOptions = CreateReferenceImageRequest['options'];
+type RecommendedReferenceImageSettings = CharacterPromptOptimizationResult['recommendedSettings'];
+
+const ORIENTATION_DEFAULTS: Record<
+  ReferenceImageOptions['orientation'],
+  {
+    readonly orientation: RecommendedReferenceImageSettings['orientation'];
+    readonly size: ReferenceImageSize;
+  }
+> = {
+  auto: { orientation: 'landscape', size: '1536x1024' },
+  portrait_9_16: { orientation: 'portrait', size: '1024x1536' },
+  landscape_16_9: { orientation: 'landscape', size: '1536x1024' },
+  square: { orientation: 'square', size: '1024x1024' },
+};
+
+const LEGACY_REFERENCE_OPTIONS: ReferenceImageOptions = {
   framing: 'head_and_shoulders',
   orientation: 'square',
   renderingMode: 'faithful_source_style',
@@ -103,13 +119,9 @@ const recommendedSettingsForSize = (
 };
 
 const requestedOrientationMatches = (
-  requested: CreateReferenceImageRequest['options']['orientation'],
-  actual: CharacterPromptOptimizationResult['recommendedSettings']['orientation'],
-): boolean =>
-  (requested === 'auto' && actual === 'landscape') ||
-  (requested === 'portrait_9_16' && actual === 'portrait') ||
-  (requested === 'landscape_16_9' && actual === 'landscape') ||
-  (requested === 'square' && actual === 'square');
+  requested: ReferenceImageOptions['orientation'],
+  actual: RecommendedReferenceImageSettings['orientation'],
+): boolean => ORIENTATION_DEFAULTS[requested].orientation === actual;
 
 const settingsMatchOptions = (
   result: CharacterPromptOptimizationResult,
@@ -120,13 +132,8 @@ const settingsMatchOptions = (
   requestedOrientationMatches(options.orientation, result.recommendedSettings.orientation) &&
   (quality === undefined || result.recommendedSettings.quality === quality);
 
-const sizeForBypass = (
-  orientation: CreateReferenceImageRequest['options']['orientation'],
-): ReferenceImageSize => {
-  if (orientation === 'portrait_9_16') return '1024x1536';
-  if (orientation === 'auto' || orientation === 'landscape_16_9') return '1536x1024';
-  return '1024x1024';
-};
+const sizeForBypass = (orientation: ReferenceImageOptions['orientation']): ReferenceImageSize =>
+  ORIENTATION_DEFAULTS[orientation].size;
 
 const legacyResult = (
   metadata: StoredReferenceImageMetadata,

@@ -1,3 +1,4 @@
+import type { ReferenceImageSize } from '@studio/contracts';
 import type { ModelModeId, SessionLifecycleStatus, SessionModeId } from '@studio/domain';
 
 export type StudioMode = SessionModeId;
@@ -10,7 +11,7 @@ export type ProviderAvailability = {
   elevenLabsModel: string | null;
   referenceImages?: boolean;
   referenceImageModel?: string | null;
-  referenceImageSizes?: ReadonlyArray<'1024x1024' | '1024x1536' | '1536x1024'>;
+  referenceImageSizes?: readonly ReferenceImageSize[];
   referenceImageOptimizerAvailable?: boolean;
   referenceImageOptimizerModel?: string | null;
   referenceImageOptimizerVersion?: string | null;

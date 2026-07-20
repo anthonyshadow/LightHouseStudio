@@ -73,6 +73,19 @@ const promptHash = (value: string): string =>
 const assetIdForSequence = (sequence: number): string =>
   `00000000-0000-4000-8000-${sequence.toString().padStart(12, '0')}`;
 
+const IMAGE_LAYOUT_BY_ORIENTATION = {
+  auto: { orientation: 'landscape', size: '1536x1024' },
+  portrait_9_16: { orientation: 'portrait', size: '1024x1536' },
+  landscape_16_9: { orientation: 'landscape', size: '1536x1024' },
+  square: { orientation: 'square', size: '1024x1024' },
+} as const;
+
+const IMAGE_DIMENSIONS_BY_SIZE = {
+  '1024x1024': { size: '1024x1024', width: 1024, height: 1024 },
+  '1024x1536': { size: '1024x1536', width: 1024, height: 1536 },
+  '1536x1024': { size: '1536x1024', width: 1536, height: 1024 },
+} as const;
+
 const createMockReferenceAsset = (
   sequence: number,
   request: CreateReferenceImageRequest,
@@ -93,9 +106,7 @@ const createMockReferenceAsset = (
   return {
     assetId,
     mimeType: 'image/png',
-    size: recommendedSettings.size,
-    width: recommendedSettings.size === '1536x1024' ? 1536 : 1024,
-    height: recommendedSettings.size === '1024x1536' ? 1536 : 1024,
+    ...IMAGE_DIMENSIONS_BY_SIZE[recommendedSettings.size],
     byteSize: REFERENCE_PNG.byteLength,
     source: 'generated',
     provider: 'openai',
@@ -126,45 +137,19 @@ const createMockReferenceAsset = (
     createdAt: '2030-01-01T00:00:00.000Z',
     updatedAt: '2030-01-01T00:00:00.000Z',
     contentUrl: `/api/reference-images/${assetId}/content`,
-  } as MockReferenceImageAsset;
+  };
 };
 
 const createOptimizationResponse = (
   request: OptimizeCharacterReferencePromptRequest,
 ): OptimizeCharacterReferencePromptResponse => {
   const normalized = request.rawPrompt.replace(/\s+/gu, ' ').trim();
-  const recommendedSettings =
-    request.options.orientation === 'portrait_9_16'
-      ? {
-          framing: request.options.framing,
-          orientation: 'portrait' as const,
-          size: '1024x1536' as const,
-          quality: 'high' as const,
-          format: 'png' as const,
-        }
-      : request.options.orientation === 'landscape_16_9'
-        ? {
-            framing: request.options.framing,
-            orientation: 'landscape' as const,
-            size: '1536x1024' as const,
-            quality: 'high' as const,
-            format: 'png' as const,
-          }
-        : request.options.orientation === 'square'
-          ? {
-              framing: request.options.framing,
-              orientation: 'square' as const,
-              size: '1024x1024' as const,
-              quality: 'high' as const,
-              format: 'png' as const,
-            }
-          : {
-              framing: request.options.framing,
-              orientation: 'landscape' as const,
-              size: '1536x1024' as const,
-              quality: 'high' as const,
-              format: 'png' as const,
-            };
+  const recommendedSettings = {
+    framing: request.options.framing,
+    ...IMAGE_LAYOUT_BY_ORIENTATION[request.options.orientation],
+    quality: 'high' as const,
+    format: 'png' as const,
+  };
   return {
     result: {
       optimizedImagePrompt: `Canonical single-character reference image optimized for Decart Lucy 2.5 character transformation. Character: ${normalized} Centered, front-facing, eye-level, with clearly visible defining features, soft diffuse lighting, sharp natural detail, and a plain uncluttered background. Exactly one character; no watermark, caption, unrelated text, or background clutter.`,

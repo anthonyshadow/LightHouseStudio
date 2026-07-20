@@ -23,7 +23,9 @@ import { PromptWorkshopActions, type PromptSaveState } from './PromptWorkshopAct
 import { PromptWorkshopHeader } from './PromptWorkshopHeader';
 import type { ReferenceGenerationState, WorkshopReferenceImage } from './ReferenceImageGenerator';
 import {
+  createOptimizerReferenceOptions,
   createWorkshopOptimizationKey,
+  isCustomBackgroundMissing,
   loadWorkshopReferencePreferences,
   saveWorkshopReferencePreferences,
   type WorkshopReferenceOptions,
@@ -155,6 +157,23 @@ const createReferenceOptimizationState = (): ReferenceOptimizationState => ({
   error: null,
 });
 
+const settleOptimizationState = (
+  current: ReferenceOptimizationState,
+): ReferenceOptimizationState => ({
+  ...current,
+  status: current.response ? 'ready' : 'idle',
+  error: null,
+});
+
+const hasCompleteOptimizationResponse = (
+  response: OptimizeCharacterReferencePromptResponse | null,
+): response is OptimizeCharacterReferencePromptResponse => {
+  if (!response) return false;
+  return Boolean(
+    response.result.optimizedImagePrompt.trim() && response.result.lucy25CharacterPrompt.trim(),
+  );
+};
+
 const optimizationErrorMessage = (error: unknown): string => {
   if (error instanceof Error && error.message.trim()) return error.message;
   return 'The character prompt could not be optimized. Retry before generating the reference.';
@@ -162,20 +181,6 @@ const optimizationErrorMessage = (error: unknown): string => {
 
 const isAbortError = (error: unknown): boolean =>
   error instanceof DOMException && error.name === 'AbortError';
-
-const optimizerOptions = (
-  options: WorkshopReferenceOptions,
-): OptimizeCharacterReferencePromptRequest['options'] => ({
-  framing: options.framing,
-  orientation: options.orientation,
-  renderingMode: options.renderingMode,
-  expression: options.expression,
-  background: options.background,
-  ...(options.background === 'plain_custom' && options.customBackground?.trim()
-    ? { customBackground: options.customBackground.replace(/\s+/gu, ' ').trim() }
-    : {}),
-  targetUse: 'lucy_2_5_character_reference',
-});
 
 export const CharacterPromptWorkshop = ({
   initialDraft,
@@ -242,7 +247,7 @@ export const CharacterPromptWorkshop = ({
   const optimizationInput = useMemo<OptimizeCharacterReferencePromptRequest>(
     () => ({
       rawPrompt: generatedPrompt,
-      options: optimizerOptions(referenceOptions),
+      options: createOptimizerReferenceOptions(referenceOptions),
       ...(referenceImageModel
         ? { generator: { provider: 'openai', model: referenceImageModel } }
         : {}),
@@ -270,8 +275,7 @@ export const CharacterPromptWorkshop = ({
   const optimizationStale = Boolean(
     optimization.response && optimization.responseInputKey !== optimizationInputKey,
   );
-  const customBackgroundMissing =
-    referenceOptions.background === 'plain_custom' && !referenceOptions.customBackground?.trim();
+  const customBackgroundMissing = isCustomBackgroundMissing(referenceOptions);
   const imageOperationBusy = ['generating', 'restoring'].includes(referenceGeneration.status);
   const canOptimize =
     !disabled &&
@@ -302,7 +306,7 @@ export const CharacterPromptWorkshop = ({
     }
     setOptimization((current) =>
       current.status === 'optimizing' || current.status === 'error'
-        ? { ...current, status: current.response ? 'ready' : 'idle', error: null }
+        ? settleOptimizationState(current)
         : current,
     );
   }, [optimizationInputKey]);
@@ -352,10 +356,7 @@ export const CharacterPromptWorkshop = ({
           ) {
             return null;
           }
-          if (
-            !response.result.optimizedImagePrompt.trim() ||
-            !response.result.lucy25CharacterPrompt.trim()
-          ) {
+          if (!hasCompleteOptimizationResponse(response)) {
             throw new Error(
               'The optimizer returned an incomplete character prompt. Retry optimization.',
             );
@@ -401,30 +402,51 @@ export const CharacterPromptWorkshop = ({
       optimizationInputKey,
     ]);
 
-  const referenceIsStale = Boolean(
-    generatedReferenceImage &&
-    (!isSameCanonicalWorkshopPrompt(
-      generatedReferenceImage.generatedFromPrompt ?? generatedReferenceImage.originalPrompt,
-      generatedPrompt,
-    ) ||
-      JSON.stringify(generatedReferenceImage.options) !==
-        JSON.stringify(optimizationInput.options) ||
-      generatedReferenceImage.optimizationEnabled !== referencePreferences.optimizePrompt ||
-      (referenceImageModel !== null && generatedReferenceImage.model !== referenceImageModel) ||
-      (referencePreferences.optimizePrompt &&
-        ((optimizerModel !== null && generatedReferenceImage.optimizer?.model !== optimizerModel) ||
-          (optimizerVersion !== null &&
-            generatedReferenceImage.optimizer?.version !== optimizerVersion))) ||
-      (referencePreferences.optimizePrompt &&
-        optimization.responseInputKey === optimizationInputKey &&
-        optimization.response !== null &&
-        (optimization.response.result.optimizedImagePrompt.trim() !==
-          generatedReferenceImage.optimizedImagePrompt.trim() ||
-          optimization.response.result.lucy25CharacterPrompt.trim() !==
-            generatedReferenceImage.lucy25CharacterPrompt.trim() ||
-          optimization.response.model !== generatedReferenceImage.optimizer?.model ||
-          optimization.response.version !== generatedReferenceImage.optimizer?.version))),
-  );
+  const referenceIsStale = (() => {
+    if (!generatedReferenceImage) return false;
+    if (
+      !isSameCanonicalWorkshopPrompt(
+        generatedReferenceImage.generatedFromPrompt ?? generatedReferenceImage.originalPrompt,
+        generatedPrompt,
+      )
+    ) {
+      return true;
+    }
+    if (
+      JSON.stringify(generatedReferenceImage.options) !== JSON.stringify(optimizationInput.options)
+    ) {
+      return true;
+    }
+    if (generatedReferenceImage.optimizationEnabled !== referencePreferences.optimizePrompt) {
+      return true;
+    }
+    if (referenceImageModel !== null && generatedReferenceImage.model !== referenceImageModel) {
+      return true;
+    }
+    if (!referencePreferences.optimizePrompt) return false;
+    if (optimizerModel !== null && generatedReferenceImage.optimizer?.model !== optimizerModel) {
+      return true;
+    }
+    if (
+      optimizerVersion !== null &&
+      generatedReferenceImage.optimizer?.version !== optimizerVersion
+    ) {
+      return true;
+    }
+
+    const currentResponse =
+      optimization.responseInputKey === optimizationInputKey ? optimization.response : null;
+    if (!currentResponse) return false;
+
+    return (
+      currentResponse.result.optimizedImagePrompt.trim() !==
+        generatedReferenceImage.optimizedImagePrompt.trim() ||
+      currentResponse.result.lucy25CharacterPrompt.trim() !==
+        generatedReferenceImage.lucy25CharacterPrompt.trim() ||
+      currentResponse.model !== generatedReferenceImage.optimizer?.model ||
+      currentResponse.version !== generatedReferenceImage.optimizer?.version
+    );
+  })();
 
   const cancelPendingOptimization = () => {
     const request = optimizationRequestRef.current;
@@ -432,9 +454,7 @@ export const CharacterPromptWorkshop = ({
     request.controller.abort();
     optimizationRequestRef.current = null;
     setOptimization((current) =>
-      current.status === 'optimizing'
-        ? { ...current, status: current.response ? 'ready' : 'idle', error: null }
-        : current,
+      current.status === 'optimizing' ? settleOptimizationState(current) : current,
     );
   };
 
@@ -471,9 +491,7 @@ export const CharacterPromptWorkshop = ({
     const pipeline = (async () => {
       if (!referencePreferences.optimizePrompt) {
         await onGenerateReference({
-          rawPrompt: generatedPrompt,
-          options: optimizationInput.options,
-          ...(optimizationInput.generator ? { generator: optimizationInput.generator } : {}),
+          ...optimizationInput,
           optimization: { enabled: false },
         });
         return;
@@ -483,24 +501,20 @@ export const CharacterPromptWorkshop = ({
         optimization.response &&
         optimization.responseInputKey === optimizationInputKey &&
         optimization.status === 'ready' &&
-        optimization.response.result.optimizedImagePrompt.trim() &&
-        optimization.response.result.lucy25CharacterPrompt.trim()
+        hasCompleteOptimizationResponse(optimization.response)
           ? optimization.response
           : null;
       const response = existingResponse ?? (await runOptimization());
       if (
         !response ||
         optimizationInputKeyRef.current !== optimizationInputKey ||
-        !response.result.optimizedImagePrompt.trim() ||
-        !response.result.lucy25CharacterPrompt.trim()
+        !hasCompleteOptimizationResponse(response)
       ) {
         return;
       }
 
       await onGenerateReference({
-        rawPrompt: generatedPrompt,
-        options: optimizationInput.options,
-        ...(optimizationInput.generator ? { generator: optimizationInput.generator } : {}),
+        ...optimizationInput,
         optimization: {
           enabled: true,
           result: response.result,

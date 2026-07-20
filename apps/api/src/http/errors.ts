@@ -382,6 +382,34 @@ const normalizeFastifyError = (error: FastifyError): AppError | undefined => {
   return undefined;
 };
 
+const normalizeKnownError = (error: Error): AppError | undefined => {
+  if (error instanceof AppError) return error;
+  if (error instanceof VoiceServiceError) return mapVoiceServiceError(error);
+  if (error instanceof ReferenceImageGenerationStateError) {
+    return mapReferenceImageGenerationStateError(error);
+  }
+  if (error instanceof CharacterPromptOptimizerError) {
+    return mapCharacterPromptOptimizerError(error);
+  }
+  if (error instanceof ReferenceImageProviderError) return mapReferenceImageProviderError(error);
+  if (error instanceof InvalidReferenceImageError) {
+    return new AppError(
+      502,
+      'invalid_provider_image',
+      'OpenAI returned an image that does not match the requested dimensions or supported JPEG, PNG, and WebP limits.',
+    );
+  }
+  if (error instanceof ReferenceImageStorageError) {
+    return new AppError(
+      500,
+      'storage_failure',
+      'The generated image could not be saved to local storage. Check LIGHTFRAME_DATA_DIR and disk permissions.',
+    );
+  }
+  if (error instanceof ProviderError) return mapProviderError(error);
+  return isFastifyError(error) ? normalizeFastifyError(error) : undefined;
+};
+
 export const installErrorHandling = (
   app: FastifyInstance,
   options: { readonly serveSpa?: boolean } = {},
@@ -403,37 +431,8 @@ export const installErrorHandling = (
 
   app.setErrorHandler(
     async (error: Error, _request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-      const normalized =
-        error instanceof AppError
-          ? error
-          : error instanceof VoiceServiceError
-            ? mapVoiceServiceError(error)
-            : error instanceof ReferenceImageGenerationStateError
-              ? mapReferenceImageGenerationStateError(error)
-              : error instanceof CharacterPromptOptimizerError
-                ? mapCharacterPromptOptimizerError(error)
-                : error instanceof ReferenceImageProviderError
-                  ? mapReferenceImageProviderError(error)
-                  : error instanceof InvalidReferenceImageError
-                    ? new AppError(
-                        502,
-                        'invalid_provider_image',
-                        'OpenAI returned an image that does not match the requested dimensions or supported JPEG, PNG, and WebP limits.',
-                      )
-                    : error instanceof ReferenceImageStorageError
-                      ? new AppError(
-                          500,
-                          'storage_failure',
-                          'The generated image could not be saved to local storage. Check LIGHTFRAME_DATA_DIR and disk permissions.',
-                        )
-                      : error instanceof ProviderError
-                        ? mapProviderError(error)
-                        : isFastifyError(error)
-                          ? normalizeFastifyError(error)
-                          : undefined;
-
       const safeError =
-        normalized ??
+        normalizeKnownError(error) ??
         new AppError(500, 'provider_failure', 'The server could not complete the request.');
 
       await reply

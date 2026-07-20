@@ -2,8 +2,11 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   DEFAULT_WORKSHOP_REFERENCE_PREFERENCES,
   WORKSHOP_REFERENCE_PREFERENCES_STORAGE_KEY,
+  createOptimizerReferenceOptions,
   createWorkshopOptimizationKey,
+  isCustomBackgroundMissing,
   loadWorkshopReferencePreferences,
+  normalizeWorkshopReferenceOptions,
   saveWorkshopReferencePreferences,
   sanitizeWorkshopReferencePreferences,
 } from './referenceOptimization';
@@ -118,5 +121,32 @@ describe('workshop reference optimization preferences', () => {
         { provider: 'openai', model: 'gpt-image-2' },
       ),
     ).toBe(customSpaced);
+  });
+
+  it('normalizes one canonical option shape for optimization requests and freshness keys', () => {
+    const customOptions = {
+      ...DEFAULT_WORKSHOP_REFERENCE_PREFERENCES.options,
+      background: 'plain_custom' as const,
+      customBackground: '  muted   blue  ',
+    };
+
+    expect(normalizeWorkshopReferenceOptions(customOptions)).toEqual({
+      ...DEFAULT_WORKSHOP_REFERENCE_PREFERENCES.options,
+      background: 'plain_custom',
+      customBackground: 'muted blue',
+    });
+    expect(createOptimizerReferenceOptions(customOptions)).toEqual({
+      ...DEFAULT_WORKSHOP_REFERENCE_PREFERENCES.options,
+      background: 'plain_custom',
+      customBackground: 'muted blue',
+      targetUse: 'lucy_2_5_character_reference',
+    });
+    expect(isCustomBackgroundMissing({ ...customOptions, customBackground: '   ' })).toBe(true);
+    expect(
+      createOptimizerReferenceOptions({
+        ...customOptions,
+        background: 'neutral_gray',
+      }),
+    ).not.toHaveProperty('customBackground');
   });
 });

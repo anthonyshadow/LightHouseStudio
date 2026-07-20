@@ -43,6 +43,11 @@ export interface AppDependencies {
   readonly staticRoot?: string;
 }
 
+const resolveOptionalProvider = <Provider>(
+  provided: Provider | null | undefined,
+  createProvider: () => Provider | null,
+): Provider | null => (provided === undefined ? createProvider() : provided);
+
 export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   const app = Fastify({
     logger: dependencies.logger ?? dependencies.config.nodeEnv !== 'test',
@@ -84,23 +89,21 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
 
   installLocalSecurityBoundary(app);
 
-  const decartProvider =
-    dependencies.decartProvider !== undefined
-      ? dependencies.decartProvider
-      : dependencies.config.decartApiKey === undefined
-        ? null
-        : new DecartSdkTokenProvider(dependencies.config.decartApiKey);
+  const decartProvider = resolveOptionalProvider(dependencies.decartProvider, () =>
+    dependencies.config.decartApiKey === undefined
+      ? null
+      : new DecartSdkTokenProvider(dependencies.config.decartApiKey),
+  );
 
-  const elevenLabsProvider =
-    dependencies.elevenLabsProvider !== undefined
-      ? dependencies.elevenLabsProvider
-      : dependencies.config.elevenLabsApiKey === undefined
-        ? null
-        : new ElevenLabsHttpProvider(
-            dependencies.config.elevenLabsApiKey,
-            dependencies.fetchImplementation,
-            dependencies.config.providerTimeoutMs,
-          );
+  const elevenLabsProvider = resolveOptionalProvider(dependencies.elevenLabsProvider, () =>
+    dependencies.config.elevenLabsApiKey === undefined
+      ? null
+      : new ElevenLabsHttpProvider(
+          dependencies.config.elevenLabsApiKey,
+          dependencies.fetchImplementation,
+          dependencies.config.providerTimeoutMs,
+        ),
+  );
 
   const voiceService =
     elevenLabsProvider === null
@@ -111,27 +114,27 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
           dependencies.config.elevenLabsEnableLogging,
         );
 
-  const referenceImageProvider =
-    dependencies.referenceImageProvider !== undefined
-      ? dependencies.referenceImageProvider
-      : dependencies.config.openAiApiKey === undefined
-        ? null
-        : new OpenAIReferenceImageProvider(dependencies.config.openAiApiKey, {
-            model: dependencies.config.openAiReferenceImageModel,
-            quality: dependencies.config.openAiReferenceImageQuality,
-            timeoutMs: dependencies.config.referenceImageTimeoutMs,
-          });
-  const characterPromptOptimizer =
-    dependencies.characterPromptOptimizer !== undefined
-      ? dependencies.characterPromptOptimizer
-      : dependencies.config.openAiApiKey === undefined
+  const referenceImageProvider = resolveOptionalProvider(dependencies.referenceImageProvider, () =>
+    dependencies.config.openAiApiKey === undefined
+      ? null
+      : new OpenAIReferenceImageProvider(dependencies.config.openAiApiKey, {
+          model: dependencies.config.openAiReferenceImageModel,
+          quality: dependencies.config.openAiReferenceImageQuality,
+          timeoutMs: dependencies.config.referenceImageTimeoutMs,
+        }),
+  );
+  const characterPromptOptimizer = resolveOptionalProvider(
+    dependencies.characterPromptOptimizer,
+    () =>
+      dependencies.config.openAiApiKey === undefined
         ? null
         : new OpenAICharacterPromptOptimizer(dependencies.config.openAiApiKey, {
             model: dependencies.config.openAiPromptOptimizerModel,
             reasoning: dependencies.config.openAiPromptOptimizerReasoning,
             version: dependencies.config.openAiPromptOptimizerVersion,
             timeoutMs: dependencies.config.openAiPromptOptimizerTimeoutMs,
-          });
+          }),
+  );
   const referenceImageAssetStore =
     dependencies.referenceImageAssetStore ??
     new LocalReferenceImageAssetStore(dependencies.config.lightframeDataDir);

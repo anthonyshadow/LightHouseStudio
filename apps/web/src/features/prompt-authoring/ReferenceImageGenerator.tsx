@@ -16,7 +16,7 @@ import {
   TextAreaField,
   TextField,
 } from '../../ui';
-import type { WorkshopReferenceOptions } from './referenceOptimization';
+import { isCustomBackgroundMissing, type WorkshopReferenceOptions } from './referenceOptimization';
 
 export type ReferenceGenerationState = {
   status: 'idle' | 'generating' | 'restoring' | 'error';
@@ -171,11 +171,13 @@ const actionsStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xs,
 });
 
-const updateOptions = <K extends keyof WorkshopReferenceOptions>(
-  options: WorkshopReferenceOptions,
-  key: K,
-  value: WorkshopReferenceOptions[K],
-): WorkshopReferenceOptions => ({ ...options, [key]: value });
+const optimizationActionLabel = (
+  status: ReferenceOptimizationStatus,
+  hasOptimization: boolean,
+): string => {
+  if (status === 'error') return 'Retry';
+  return hasOptimization ? 'Re-optimize' : 'Optimize prompt';
+};
 
 export const ReferenceImageGenerator = ({
   prompt,
@@ -202,9 +204,7 @@ export const ReferenceImageGenerator = ({
     optimization.status === 'ready' &&
     !optimization.stale &&
     !optimization.optimizedImagePrompt.trim();
-  const customBackgroundMissing =
-    optimization.options.background === 'plain_custom' &&
-    !optimization.options.customBackground?.trim();
+  const customBackgroundMissing = isCustomBackgroundMissing(optimization.options);
   const optimizerMustRecover = optimization.enabled && optimization.status === 'error';
   const generationBlocked =
     disabled ||
@@ -215,6 +215,12 @@ export const ReferenceImageGenerator = ({
     optimizedPromptEmpty ||
     customBackgroundMissing;
   const hasOptimization = Boolean(optimization.model && optimization.version);
+  const changeReferenceOption = <K extends keyof WorkshopReferenceOptions>(
+    key: K,
+    value: WorkshopReferenceOptions[K],
+  ): void => {
+    onReferenceOptionsChange({ ...optimization.options, [key]: value });
+  };
 
   return (
     <section aria-label="Character reference image" css={generatorStyles(theme)}>
@@ -244,12 +250,9 @@ export const ReferenceImageGenerator = ({
             value={optimization.options.framing}
             disabled={disabled || busy || optimizing}
             onChange={(event) =>
-              onReferenceOptionsChange(
-                updateOptions(
-                  optimization.options,
-                  'framing',
-                  event.currentTarget.value as CharacterReferenceFraming,
-                ),
+              changeReferenceOption(
+                'framing',
+                event.currentTarget.value as CharacterReferenceFraming,
               )
             }
           >
@@ -262,12 +265,9 @@ export const ReferenceImageGenerator = ({
             value={optimization.options.orientation}
             disabled={disabled || busy || optimizing}
             onChange={(event) =>
-              onReferenceOptionsChange(
-                updateOptions(
-                  optimization.options,
-                  'orientation',
-                  event.currentTarget.value as CharacterReferenceOrientation,
-                ),
+              changeReferenceOption(
+                'orientation',
+                event.currentTarget.value as CharacterReferenceOrientation,
               )
             }
           >
@@ -281,12 +281,9 @@ export const ReferenceImageGenerator = ({
             value={optimization.options.renderingMode}
             disabled={disabled || busy || optimizing}
             onChange={(event) =>
-              onReferenceOptionsChange(
-                updateOptions(
-                  optimization.options,
-                  'renderingMode',
-                  event.currentTarget.value as CharacterReferenceRenderingMode,
-                ),
+              changeReferenceOption(
+                'renderingMode',
+                event.currentTarget.value as CharacterReferenceRenderingMode,
               )
             }
           >
@@ -298,12 +295,9 @@ export const ReferenceImageGenerator = ({
             value={optimization.options.expression}
             disabled={disabled || busy || optimizing}
             onChange={(event) =>
-              onReferenceOptionsChange(
-                updateOptions(
-                  optimization.options,
-                  'expression',
-                  event.currentTarget.value as CharacterReferenceExpression,
-                ),
+              changeReferenceOption(
+                'expression',
+                event.currentTarget.value as CharacterReferenceExpression,
               )
             }
           >
@@ -315,12 +309,9 @@ export const ReferenceImageGenerator = ({
             value={optimization.options.background}
             disabled={disabled || busy || optimizing}
             onChange={(event) =>
-              onReferenceOptionsChange(
-                updateOptions(
-                  optimization.options,
-                  'background',
-                  event.currentTarget.value as CharacterReferenceBackground,
-                ),
+              changeReferenceOption(
+                'background',
+                event.currentTarget.value as CharacterReferenceBackground,
               )
             }
           >
@@ -341,13 +332,7 @@ export const ReferenceImageGenerator = ({
               }
               placeholder="e.g. muted slate blue"
               onChange={(event) =>
-                onReferenceOptionsChange(
-                  updateOptions(
-                    optimization.options,
-                    'customBackground',
-                    event.currentTarget.value,
-                  ),
-                )
+                changeReferenceOption('customBackground', event.currentTarget.value)
               }
             />
           ) : null}
@@ -363,11 +348,7 @@ export const ReferenceImageGenerator = ({
                 disabled={disabled || generateDisabled || busy}
                 onClick={onOptimize}
               >
-                {optimization.status === 'error'
-                  ? 'Retry'
-                  : hasOptimization
-                    ? 'Re-optimize'
-                    : 'Optimize prompt'}
+                {optimizationActionLabel(optimization.status, hasOptimization)}
               </Button>
               {optimizing ? (
                 <span role="status" css={copyStyles(theme)}>

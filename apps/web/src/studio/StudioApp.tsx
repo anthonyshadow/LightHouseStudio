@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import type { CreateReferenceImageRequest } from '@studio/contracts';
+import type { CreateReferenceImageRequest, ReferenceImageAsset } from '@studio/contracts';
 import { canonicalPrompt } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
@@ -28,9 +28,8 @@ import type {
   PromptWorkshopAction,
   ReferenceGenerationState,
   SavePromptWorkshopAction,
-  WorkshopReferenceImage,
-  OptimizeWorkshopReferencePrompt,
   WorkshopReferenceGenerationInput,
+  WorkshopReferenceImage,
 } from '../features/prompt-authoring';
 import {
   CaptureSettingsPanel,
@@ -111,6 +110,11 @@ const referenceHydrationError = (error: unknown): string =>
     ? 'This local reference asset is no longer available. Retry after restoring the data directory, or continue without it.'
     : 'The exact local reference could not be validated. Retry, or continue without the reference.';
 
+const toWorkshopReferenceImage = (
+  asset: ReferenceImageAsset,
+  generatedFromPrompt = asset.originalPrompt,
+): WorkshopReferenceImage => ({ ...asset, generatedFromPrompt });
+
 const StudioExperience = () => {
   const theme = useTheme();
   const repository = useMemo(() => createCreativeAssetRepository(), []);
@@ -187,11 +191,6 @@ const StudioExperience = () => {
 
   const session = useStudioSession({ availability, onPromptCommitted: recordCommittedPrompt });
 
-  const optimizeWorkshopReference = useCallback<OptimizeWorkshopReferencePrompt>(
-    (input, signal) => optimizeCharacterReferencePrompt(input, signal),
-    [],
-  );
-
   const generateWorkshopReference = useCallback(
     async (input: WorkshopReferenceGenerationInput): Promise<void> => {
       if (!availability.referenceImages || generationRequestRef.current) return;
@@ -207,7 +206,7 @@ const StudioExperience = () => {
       try {
         const asset = await createReferenceImage(request);
         if (workshopRevisionRef.current !== revision) return;
-        setWorkshopReferenceImage({ ...asset, generatedFromPrompt: input.rawPrompt });
+        setWorkshopReferenceImage(toWorkshopReferenceImage(asset, input.rawPrompt));
         setReferenceGeneration({ status: 'idle', error: null });
         referenceRestoreRef.current = { assetId: asset.assetId, prompt: input.rawPrompt };
         repository.enrichNewestMatchingRecent(input.rawPrompt, 'lucy-2.5', asset.assetId);
@@ -238,7 +237,7 @@ const StudioExperience = () => {
       void fetchReferenceImageMetadata(assetId)
         .then((asset) => {
           if (workshopRevisionRef.current !== revision) return;
-          setWorkshopReferenceImage({ ...asset, generatedFromPrompt: asset.originalPrompt });
+          setWorkshopReferenceImage(toWorkshopReferenceImage(asset));
           setReferenceGeneration({ status: 'idle', error: null });
           repository.enrichNewestMatchingRecent(prompt, 'lucy-2.5', asset.assetId);
         })
@@ -553,10 +552,7 @@ const StudioExperience = () => {
       try {
         if (pending.referenceImageAssetId && !continueWithoutReference) {
           const storedReference = await fetchReferenceImageMetadata(pending.referenceImageAssetId);
-          referenceMetadata = {
-            ...storedReference,
-            generatedFromPrompt: storedReference.originalPrompt,
-          };
+          referenceMetadata = toWorkshopReferenceImage(storedReference);
           referenceImage = await hydrateReferenceImage(
             pending.referenceImageAssetId,
             referenceMetadata,
@@ -897,7 +893,7 @@ const StudioExperience = () => {
           onWorkshopDraftChange={rememberWorkshopDraft}
           onUseWorkshop={applyWorkshopPrompt}
           onSaveWorkshop={saveWorkshopPrompt}
-          onOptimizeReference={optimizeWorkshopReference}
+          onOptimizeReference={optimizeCharacterReferencePrompt}
           onGenerateReference={generateWorkshopReference}
           onDetachReference={detachWorkshopReference}
           {...(referenceGeneration.status === 'error' && referenceGeneration.errorKind === 'restore'
