@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createPromptBuilderDraft } from '../prompts';
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
+  PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   RECENT_PROMPT_LIMIT,
   SAVED_PROMPT_LIMIT,
   createEmptyCreativeAssetStore,
@@ -14,13 +15,36 @@ import {
   sanitizeCreativeAssetStore,
   searchCreativeAssets,
   updateSavedPrompt,
+  updateSavedCharacterPrompt,
   useSavedCharacterPrompt,
   useSavedPrompt,
+  type GuidedDesignV1,
 } from './index';
 
 const timestamp = (offset = 0): string =>
   new Date(Date.UTC(2026, 6, 14, 12, 0, offset)).toISOString();
 const context = (id: string, offset = 0) => ({ now: timestamp(offset), createId: () => id });
+
+const guidedDesign = (): GuidedDesignV1 => ({
+  catalogVersion: 1,
+  starterId: 'documentary-presenter',
+  choices: {
+    gender: { optionId: 'woman' },
+    adultAge: { optionId: 'adult' },
+    appearance: null,
+    skinTone: null,
+    bodyShape: { optionId: 'woman-athletic' },
+    hair: { optionId: 'woman-long-waves' },
+    hairColor: { optionId: 'custom', customValue: 'deep auburn' },
+    outfit: { optionId: 'woman-professional' },
+    accessories: null,
+    expression: null,
+    mood: null,
+    role: { optionId: 'presenter' },
+    style: { optionId: 'cinematic' },
+    background: { optionId: 'studio' },
+  },
+});
 
 describe('creative asset CRUD and use', () => {
   it('creates, normalizes, updates, uses, searches, and deletes saved prompts', () => {
@@ -163,6 +187,8 @@ describe('creative asset CRUD and use', () => {
       ...createPromptBuilderDraft('character-transform'),
       intent: 'character-transform' as const,
       characterBase: 'deep-sea navigator',
+      bodyShape: 'athletic build',
+      hairColor: 'deep auburn',
     };
     const store = createSavedCharacterPrompt(
       createEmptyCreativeAssetStore(),
@@ -172,6 +198,7 @@ describe('creative asset CRUD and use', () => {
         source: 'generator',
         promptIntent: 'character-transform',
         builderDraft,
+        guidedDesign: guidedDesign(),
         referenceImageStatus: 'persisted-reference',
         referenceImageAssetId: 'reference-asset-1',
         notes: '  Keep face lighting  ',
@@ -180,12 +207,47 @@ describe('creative asset CRUD and use', () => {
     );
     const used = useSavedCharacterPrompt(store, 'character-1', timestamp(1));
     expect(used.builderDraft).toEqual(builderDraft);
+    expect(used.guidedDesign).toEqual(guidedDesign());
     expect(used.store.savedCharacterPrompts[0]).toMatchObject({
       useCount: 1,
       referenceImageStatus: 'persisted-reference',
       referenceImageAssetId: 'reference-asset-1',
     });
     expect(JSON.stringify(store)).not.toMatch(/(?:imageData|objectUrl|portrait\.jpg)/u);
+  });
+
+  it('drops guided provenance when a generated prompt is manually edited', () => {
+    const builderDraft = {
+      ...createPromptBuilderDraft('character-transform'),
+      characterBase: 'documentary presenter',
+    };
+    let store = createSavedCharacterPrompt(
+      createEmptyCreativeAssetStore(),
+      {
+        name: 'Presenter',
+        prompt: 'Substitute the character with a documentary presenter.',
+        source: 'generator',
+        promptIntent: 'character-transform',
+        builderDraft,
+        guidedDesign: guidedDesign(),
+        referenceImageStatus: 'prompt-only',
+      },
+      context('character-guided'),
+    );
+
+    store = updateSavedCharacterPrompt(
+      store,
+      'character-guided',
+      { prompt: 'Substitute the character with a manually edited host.' },
+      timestamp(1),
+    );
+
+    expect(store.savedCharacterPrompts[0]).toMatchObject({
+      source: 'manual',
+      promptIntent: null,
+      builderDraft: null,
+      guidedDesign: null,
+    });
   });
 });
 
@@ -299,13 +361,111 @@ describe('creative asset sanitation and recovery', () => {
     });
 
     expect(result.recovered).toBe(true);
-    expect(result.store).toMatchObject({ schemaVersion: 2 });
+    expect(result.store).toMatchObject({ schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION });
     expect(result.store.savedPrompts[0]?.referenceImageAssetId).toBeNull();
     expect(result.store.recentPrompts[0]?.referenceImageAssetId).toBeNull();
     expect(result.store.savedCharacterPrompts[0]).toMatchObject({
       referenceImageStatus: 'prompt-only',
       referenceImageAssetId: null,
+      guidedDesign: null,
     });
+  });
+
+  it('migrates v2 records, preserving references while defaulting new draft fields and provenance', () => {
+    const result = sanitizeCreativeAssetStore({
+      schemaVersion: PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+      savedPrompts: [],
+      recentPrompts: [],
+      savedCharacterPrompts: [
+        {
+          id: 'v2-character',
+          name: 'Legacy presenter',
+          prompt: 'Substitute the character with a presenter.',
+          source: 'generator',
+          promptIntent: 'character-transform',
+          builderDraft: {
+            intent: 'character-transform',
+            presetId: null,
+            customDetails: '',
+            adultAge: 'adult',
+            gender: 'woman',
+            characterBase: 'presenter',
+            matchReference: false,
+            appearance: '',
+            hair: 'long waves with black hair',
+            outfit: '',
+            accessories: '',
+            expression: '',
+            mood: '',
+            preserve: '',
+          },
+          referenceImageStatus: 'persisted-reference',
+          referenceImageAssetId: 'reference-v2',
+          notes: '',
+          tags: [],
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+          lastUsedAt: null,
+          useCount: 0,
+        },
+      ],
+    });
+
+    expect(result.recovered).toBe(true);
+    expect(result.store.savedCharacterPrompts[0]).toMatchObject({
+      referenceImageStatus: 'persisted-reference',
+      referenceImageAssetId: 'reference-v2',
+      guidedDesign: null,
+      builderDraft: {
+        skinTone: '',
+        bodyShape: '',
+        hair: 'long waves with black hair',
+        hairColor: '',
+      },
+    });
+  });
+
+  it('allowlists and normalizes guided catalog provenance', () => {
+    const design = guidedDesign();
+    const result = sanitizeCreativeAssetStore({
+      schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+      savedPrompts: [],
+      recentPrompts: [],
+      savedCharacterPrompts: [
+        {
+          id: 'guided-character',
+          name: 'Guided presenter',
+          prompt: 'Substitute the character with a presenter.',
+          source: 'generator',
+          promptIntent: 'character-transform',
+          builderDraft: createPromptBuilderDraft('character-transform'),
+          guidedDesign: {
+            ...design,
+            token: 'must-not-survive',
+            choices: {
+              ...design.choices,
+              hairColor: {
+                optionId: 'custom',
+                customValue: '  deep   auburn ',
+                secret: 'must-not-survive',
+              },
+            },
+          },
+          referenceImageStatus: 'prompt-only',
+          referenceImageAssetId: null,
+          notes: '',
+          tags: [],
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+          lastUsedAt: null,
+          useCount: 0,
+        },
+      ],
+    });
+
+    expect(result.recovered).toBe(true);
+    expect(result.store.savedCharacterPrompts[0]?.guidedDesign).toEqual(guidedDesign());
+    expect(JSON.stringify(result.store)).not.toMatch(/(?:token|secret|must-not-survive)/u);
   });
 
   it('keeps distinct sanitized recent versions for distinct reference assets', () => {

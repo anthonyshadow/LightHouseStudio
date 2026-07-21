@@ -1,4 +1,5 @@
 import { canApplyRealtimeChanges } from '@studio/domain';
+import type { RealtimeSessionProfile } from '@studio/contracts';
 import { useCallback, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { requestRealtimeToken } from '../../adapters/api-client/apiClient';
 import { getDecartModelRequirements } from '../../adapters/decart-realtime/DecartRealtimeGateway';
@@ -36,6 +37,7 @@ export type ModelSessionActionsOptions = {
   ): Promise<MediaStream>;
   localRef: RefObject<MediaStream | null>;
   startLiveTimer(): void;
+  realtimeSessionProfile?: RealtimeSessionProfile;
   onPromptCommitted?: (
     mode: 'lucy-2.5' | 'lucy-vton-3',
     prompt: string,
@@ -78,6 +80,7 @@ export const useModelSessionActions = ({
   ensureMedia,
   localRef,
   startLiveTimer,
+  realtimeSessionProfile,
   onPromptCommitted,
 }: ModelSessionActionsOptions): ModelSessionActions => {
   const handleDisconnected = useCallback(
@@ -107,7 +110,15 @@ export const useModelSessionActions = ({
 
   const startModel = useCallback(async () => {
     const currentDraft = draftRef.current;
-    if (!isModelMode(currentDraft.mode)) return;
+    if (!isModelMode(currentDraft.mode)) {
+      setError({
+        code: 'model-input-required',
+        message: 'Choose an AI character mode before starting the AI session.',
+        recovery: 'Your local camera remains available. Choose a character and try again.',
+      });
+      setLifecycle(hasLiveVideo(localRef.current) ? 'ready' : 'error');
+      return;
+    }
 
     const validation = validateModelDraft(currentDraft);
     if (validation) {
@@ -142,7 +153,9 @@ export const useModelSessionActions = ({
       setLifecycle('requesting-token');
       const controller = new AbortController();
       startAbortRef.current = controller;
-      const token = await requestRealtimeToken(currentDraft.mode, controller.signal);
+      const token = realtimeSessionProfile
+        ? await requestRealtimeToken(currentDraft.mode, controller.signal, realtimeSessionProfile)
+        : await requestRealtimeToken(currentDraft.mode, controller.signal);
       if (operationRef.current !== operation) return;
 
       setLifecycle('connecting');
@@ -187,6 +200,7 @@ export const useModelSessionActions = ({
     onPromptCommitted,
     operationRef,
     realtime,
+    realtimeSessionProfile,
     setApplied,
     setError,
     setLifecycle,

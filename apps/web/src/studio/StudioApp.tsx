@@ -15,6 +15,7 @@ import {
   type RecipeSelection,
   type SavedCharacterPrompt,
 } from '../features/creative-assets';
+import { GuidedExperience } from '../features/guided-experience/GuidedExperience';
 import { MediaStage, type StageNotice, type StagePresentation } from '../features/live-stage';
 import {
   SessionComposer,
@@ -908,8 +909,56 @@ const StudioExperience = () => {
   );
 };
 
+export type CharacterFlowRollout = 'off' | 'opt-in' | 'all';
+
+export type StudioDestination =
+  | { kind: 'advanced' }
+  | { kind: 'guided'; projectId: string | null; resumeLatest: boolean }
+  | { kind: 'projects' };
+
+const characterFlowRollout = (value: unknown): CharacterFlowRollout => {
+  if (value === 'off' || value === 'opt-in' || value === 'all') return value;
+  return 'all';
+};
+
+export const resolveStudioDestination = (
+  location: Pick<Location, 'pathname' | 'search'>,
+  rollout = characterFlowRollout(import.meta.env.VITE_CHARACTER_FLOW_ROLLOUT),
+): StudioDestination => {
+  const pathname = location.pathname.replace(/\/+$/u, '') || '/';
+  const params = new URLSearchParams(location.search);
+
+  if (pathname === '/advanced') return { kind: 'advanced' };
+  if (rollout !== 'off' && pathname === '/projects') return { kind: 'projects' };
+
+  const explicitlyGuided = pathname === '/guided' || params.get('characterFlow') === 'guided';
+  if (rollout === 'all' || (rollout === 'opt-in' && explicitlyGuided)) {
+    return {
+      kind: 'guided',
+      projectId: params.get('project'),
+      resumeLatest: params.get('new') !== '1',
+    };
+  }
+
+  return { kind: 'advanced' };
+};
+
+const RoutedStudioExperience = () => {
+  const destination = resolveStudioDestination(window.location);
+  if (destination.kind === 'projects') return <GuidedExperience projectsOnly />;
+  if (destination.kind === 'guided') {
+    return (
+      <GuidedExperience
+        initialProjectId={destination.projectId}
+        resumeLatest={destination.resumeLatest}
+      />
+    );
+  }
+  return <StudioExperience />;
+};
+
 export const StudioApp = () => (
   <StudioDesignProvider>
-    <StudioExperience />
+    <RoutedStudioExperience />
   </StudioDesignProvider>
 );

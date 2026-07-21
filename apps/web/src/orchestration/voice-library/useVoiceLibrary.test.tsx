@@ -57,12 +57,33 @@ describe('useVoiceLibrary', () => {
     act(() => result.current.changeKind('public'));
     await waitFor(() => expect(result.current.voices).toEqual([publicVoice]));
 
-    await act(() => result.current.importVoice(publicVoice));
+    let importedVoice: VoiceSummary | null = null;
+    await act(async () => {
+      importedVoice = await result.current.importVoice(publicVoice);
+    });
 
     expect(client.importPublicVoice).toHaveBeenCalledWith(publicVoice, expect.any(AbortSignal));
+    expect(importedVoice).toEqual({ ...publicVoice, voiceId: 'workspace-voice' });
     expect(result.current.kind).toBe('workspace');
     expect(result.current.selected).toEqual({ ...publicVoice, voiceId: 'workspace-voice' });
     expect(result.current.importSuccess).toContain('imported and is selected');
+  });
+
+  it('returns null without selecting a voice when a public import fails', async () => {
+    const client = createClient();
+    vi.mocked(client.importPublicVoice).mockRejectedValue(new Error('Voice capacity reached.'));
+    const { result } = renderHook(() => useVoiceLibrary(client));
+
+    await waitFor(() => expect(result.current.loading).toBe(false));
+
+    let importedVoice: VoiceSummary | null = publicVoice;
+    await act(async () => {
+      importedVoice = await result.current.importVoice(publicVoice);
+    });
+
+    expect(importedVoice).toBeNull();
+    expect(result.current.selected).toBeNull();
+    expect(result.current.error).toBe('Voice capacity reached.');
   });
 
   it('aborts an active library request when the owner unmounts', async () => {

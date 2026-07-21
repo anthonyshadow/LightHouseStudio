@@ -1,7 +1,8 @@
 import type { PromptBuilderDraft, PromptIntent } from '../prompts';
 import type { ModelModeId } from '../session';
 
-export const CREATIVE_ASSET_SCHEMA_VERSION = 2 as const;
+export const CREATIVE_ASSET_SCHEMA_VERSION = 3 as const;
+export const PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION = 2 as const;
 export const LEGACY_CREATIVE_ASSET_SCHEMA_VERSION = 1 as const;
 export const SAVED_PROMPT_LIMIT = 100;
 export const RECENT_PROMPT_LIMIT = 30;
@@ -15,6 +16,36 @@ export type ReferenceImageStatus =
   | 'session-portrait-not-saved'
   | 'persisted-reference';
 export type StorageHealth = 'ready' | 'recovered' | 'session-only';
+
+export type VisualProfile = 'woman' | 'man' | 'non-binary' | 'unspecified';
+
+export const GUIDED_CHOICE_KEYS = [
+  'gender',
+  'adultAge',
+  'appearance',
+  'skinTone',
+  'bodyShape',
+  'hair',
+  'hairColor',
+  'outfit',
+  'accessories',
+  'expression',
+  'mood',
+  'role',
+  'style',
+  'background',
+] as const;
+export type GuidedChoiceKey = (typeof GUIDED_CHOICE_KEYS)[number];
+
+export type GuidedChoiceValue =
+  | { readonly optionId: string; readonly customValue?: never }
+  | { readonly optionId: 'custom'; readonly customValue: string };
+
+export interface GuidedDesignV1 {
+  readonly catalogVersion: 1;
+  readonly starterId: string | null;
+  readonly choices: Readonly<Record<GuidedChoiceKey, GuidedChoiceValue | null>>;
+}
 
 export interface SavedPrompt {
   readonly id: string;
@@ -46,6 +77,8 @@ export interface SavedCharacterPrompt {
   readonly source: SavedCharacterPromptSource;
   readonly promptIntent: PromptIntent | null;
   readonly builderDraft: PromptBuilderDraft | null;
+  /** Optional guided-catalog provenance. The canonical builder draft remains authoritative. */
+  readonly guidedDesign: GuidedDesignV1 | null;
   /** Explicitly records that no image bytes or URL are included in this asset. */
   readonly referenceImageStatus: ReferenceImageStatus;
   /** Opaque local asset identity. Image bytes and storage details are not persisted here. */
@@ -80,6 +113,7 @@ export interface SavedCharacterPromptInput {
   readonly source: SavedCharacterPromptSource;
   readonly promptIntent: PromptIntent | null;
   readonly builderDraft?: PromptBuilderDraft | null;
+  readonly guidedDesign?: GuidedDesignV1 | null;
   readonly referenceImageStatus: ReferenceImageStatus;
   readonly referenceImageAssetId?: string | null;
   readonly notes?: string;

@@ -40,9 +40,12 @@ const generateCharacterTransform = (draft: CharacterTransformDraft): string => {
     .join(' ');
 
   if (base) parts.push(sentence(`Substitute the character in the video with ${base}`));
+  if (draft.bodyShape) parts.push(sentence(`Body shape: ${draft.bodyShape}`));
   if (draft.matchReference) parts.push('Match the provided portrait reference.');
   if (draft.appearance) parts.push(sentence(`Appearance: ${draft.appearance}`));
-  if (draft.hair) parts.push(sentence(`Hair: ${draft.hair}`));
+  if (draft.skinTone) parts.push(sentence(`Skin tone: ${draft.skinTone}`));
+  const hair = [draft.hair, draft.hairColor].filter(Boolean).join(', ');
+  if (hair) parts.push(sentence(`Hair: ${hair}`));
   if (draft.outfit) parts.push(sentence(`Outfit: ${draft.outfit}`));
   if (draft.accessories) parts.push(sentence(`Accessories: ${draft.accessories}`));
   if (draft.expression) parts.push(sentence(`Expression: ${draft.expression}`));

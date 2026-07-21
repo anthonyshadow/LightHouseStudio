@@ -3,10 +3,15 @@ import {
   createRecordingFilename,
   createSafeError,
   failAudioSidecar,
+  isSessionModeId,
   startAudioSidecar,
 } from '@studio/domain';
 import { selectAudioMime, selectVideoMime } from '../../features/recording/recordingHelpers';
-import type { RecordingArtifact, RecordingAudioSidecar } from '../../features/recording/types';
+import type {
+  RecordingArtifact,
+  RecordingAudioSidecar,
+  RestorePersistedOriginalInput,
+} from '../../features/recording/types';
 import type { RecordingAttempt } from './recordingAttempt';
 
 export const IDLE_AUDIO_SIDECAR: RecordingAudioSidecar = {
@@ -23,6 +28,71 @@ const createArtifactObjectUrl = (blob: Blob): string => {
   const objectUrl = URL.createObjectURL(blob);
   if (!objectUrl) throw new Error('The browser did not create a recording URL.');
   return objectUrl;
+};
+
+const requireNonEmptyText = (value: string, field: string): string => {
+  const normalized = value.trim();
+  if (!normalized) throw new Error(`Persisted recording ${field} is required.`);
+  return normalized;
+};
+
+/**
+ * Rebuilds runtime-owned recording objects from IndexedDB-safe data. Object
+ * URLs are always created here so callers never persist or transfer their
+ * ownership across application sessions.
+ */
+export const createPersistedOriginalRecording = (
+  input: RestorePersistedOriginalInput,
+): Readonly<{ artifact: RecordingArtifact; sidecar: RecordingAudioSidecar }> => {
+  if (!(input.blob instanceof Blob) || input.blob.size <= 0) {
+    throw new Error('Persisted recording media is empty or invalid.');
+  }
+  const id = requireNonEmptyText(input.artifactMetadata.id, 'ID');
+  const mimeType = requireNonEmptyText(
+    input.artifactMetadata.mimeType || input.blob.type,
+    'MIME type',
+  );
+  const filename = requireNonEmptyText(input.artifactMetadata.filename, 'filename');
+  if (!isSessionModeId(input.artifactMetadata.sourceModeId)) {
+    throw new Error('Persisted recording source mode is invalid.');
+  }
+  const startedAt = input.artifactMetadata.startedAt;
+  if (!Number.isFinite(new Date(startedAt).valueOf())) {
+    throw new Error('Persisted recording start time is invalid.');
+  }
+  const durationMs = input.artifactMetadata.durationMs;
+  if (!Number.isFinite(durationMs) || durationMs < 0) {
+    throw new Error('Persisted recording duration is invalid.');
+  }
+
+  let sidecar: RecordingAudioSidecar = IDLE_AUDIO_SIDECAR;
+  if (input.audioSidecar) {
+    if (!(input.audioSidecar.blob instanceof Blob) || input.audioSidecar.blob.size <= 0) {
+      throw new Error('Persisted recording audio is empty or invalid.');
+    }
+    sidecar = {
+      state: 'ready',
+      blob: input.audioSidecar.blob,
+      mimeType: requireNonEmptyText(
+        input.audioSidecar.mimeType || input.audioSidecar.blob.type,
+        'audio MIME type',
+      ),
+      error: null,
+    };
+  }
+
+  const artifact = Object.freeze({
+    id,
+    media: input.blob,
+    objectUrl: createArtifactObjectUrl(input.blob),
+    mimeType,
+    filename,
+    sourceModeId: input.artifactMetadata.sourceModeId,
+    startedAt,
+    durationMs,
+    sizeBytes: input.blob.size,
+  });
+  return Object.freeze({ artifact, sidecar });
 };
 
 export const createOriginalRecordingArtifact = (

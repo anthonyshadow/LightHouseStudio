@@ -13,8 +13,8 @@ import {
   type ReplaceObjectDraft,
 } from './types';
 
-const normalizeField = (value: string): string =>
-  normalizeWhitespace(value, BUILDER_DETAIL_MAX_LENGTH);
+const normalizeField = (value: string | null | undefined): string =>
+  normalizeWhitespace(value ?? '', BUILDER_DETAIL_MAX_LENGTH);
 const normalizePreset = (value: string | null): string | null =>
   value ? normalizeWhitespace(value, 80) || null : null;
 
@@ -35,7 +35,10 @@ export function createPromptBuilderDraft(intent: PromptIntent): PromptBuilderDra
         characterBase: '',
         matchReference: false,
         appearance: '',
+        skinTone: '',
+        bodyShape: '',
         hair: '',
+        hairColor: '',
         outfit: '',
         accessories: '',
         expression: '',
@@ -68,7 +71,10 @@ export const normalizePromptBuilderDraft = (draft: PromptBuilderDraft): PromptBu
         characterBase: normalizeField(draft.characterBase),
         matchReference: draft.matchReference,
         appearance: normalizeField(draft.appearance),
+        skinTone: normalizeField(draft.skinTone),
+        bodyShape: normalizeField(draft.bodyShape),
         hair: normalizeField(draft.hair),
+        hairColor: normalizeField(draft.hairColor),
         outfit: normalizeField(draft.outfit),
         accessories: normalizeField(draft.accessories),
         expression: normalizeField(draft.expression),
@@ -132,7 +138,10 @@ export const sanitizePromptBuilderDraft = (value: unknown): PromptBuilderDraft |
         characterBase: stringField(value, 'characterBase'),
         matchReference: value.matchReference === true,
         appearance: stringField(value, 'appearance'),
+        skinTone: stringField(value, 'skinTone'),
+        bodyShape: stringField(value, 'bodyShape'),
         hair: stringField(value, 'hair'),
+        hairColor: stringField(value, 'hairColor'),
         outfit: stringField(value, 'outfit'),
         accessories: stringField(value, 'accessories'),
         expression: stringField(value, 'expression'),

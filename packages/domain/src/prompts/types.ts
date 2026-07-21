@@ -32,7 +32,10 @@ export interface CharacterTransformDraft extends PromptBuilderBase {
   readonly characterBase: string;
   readonly matchReference: boolean;
   readonly appearance: string;
+  readonly skinTone: string;
+  readonly bodyShape: string;
   readonly hair: string;
+  readonly hairColor: string;
   readonly outfit: string;
   readonly accessories: string;
   readonly expression: string;

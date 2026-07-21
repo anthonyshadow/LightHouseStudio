@@ -213,6 +213,167 @@ beforeEach(() => {
 });
 
 describe('useRecording recorder construction failures', () => {
+  it('restores a persisted original and audio sidecar into recorded review', () => {
+    installRecorderHarness();
+    vi.mocked(URL.createObjectURL).mockReturnValueOnce('blob:persisted-original');
+    const video = new Blob(['persisted-video'], { type: 'video/webm' });
+    const audio = new Blob(['persisted-audio'], { type: 'audio/webm' });
+    const { result, unmount } = renderHook(() => useRecording());
+
+    let restored: ReturnType<typeof result.current.restorePersistedOriginal> | null = null;
+    act(() => {
+      restored = result.current.restorePersistedOriginal({
+        blob: video,
+        artifactMetadata: {
+          id: 'take-persisted',
+          mimeType: 'video/webm',
+          filename: 'saved-take.webm',
+          sourceModeId: 'lucy-2.5',
+          startedAt: '2026-07-19T12:30:00.000Z',
+          durationMs: 4_250,
+        },
+        takeMetadata: {
+          mode: 'lucy-2.5',
+          startedAt: '2026-07-19T12:30:00.000Z',
+          videoSource: 'transformed',
+          audioSource: 'provider',
+          width: 1_920,
+          height: 1_080,
+        },
+        audioSidecar: { blob: audio, mimeType: 'audio/webm' },
+      });
+    });
+
+    expect(URL.createObjectURL).toHaveBeenCalledWith(video);
+    expect(restored).toBe(result.current.original);
+    expect(result.current).toMatchObject({
+      lifecycle: 'recorded',
+      processed: null,
+      presented: restored,
+      elapsedSeconds: 4,
+      downloaded: false,
+    });
+    expect(result.current.original).toMatchObject({
+      id: 'take-persisted',
+      media: video,
+      objectUrl: 'blob:persisted-original',
+      sizeBytes: video.size,
+    });
+    expect(result.current.sidecar).toEqual({
+      state: 'ready',
+      blob: audio,
+      mimeType: 'audio/webm',
+      error: null,
+    });
+    expect(result.current.metadata).toMatchObject({
+      mode: 'lucy-2.5',
+      width: 1_920,
+      height: 1_080,
+    });
+    expect(Object.isFrozen(result.current.original)).toBe(true);
+    expect(Object.isFrozen(result.current.metadata)).toBe(true);
+
+    unmount();
+  });
+
+  it('revokes the prior original and processed URLs when a persisted original replaces them', () => {
+    installRecorderHarness();
+    vi.mocked(URL.createObjectURL)
+      .mockReturnValueOnce('blob:first-original')
+      .mockReturnValueOnce('blob:processed')
+      .mockReturnValueOnce('blob:second-original');
+    const { result, unmount } = renderHook(() => useRecording());
+
+    act(() => {
+      result.current.restorePersistedOriginal({
+        blob: new Blob(['first'], { type: 'video/webm' }),
+        artifactMetadata: {
+          id: 'first',
+          mimeType: 'video/webm',
+          filename: 'first.webm',
+          sourceModeId: 'local',
+          startedAt: '2026-07-19T12:30:00.000Z',
+          durationMs: 1_000,
+        },
+      });
+      result.current.completeProcessing(
+        new Blob(['processed'], { type: 'video/webm' }),
+        'video/webm',
+        'voice',
+      );
+    });
+    vi.mocked(URL.revokeObjectURL).mockClear();
+
+    act(() => {
+      result.current.restorePersistedOriginal({
+        blob: new Blob(['second'], { type: 'video/webm' }),
+        artifactMetadata: {
+          id: 'second',
+          mimeType: 'video/webm',
+          filename: 'second.webm',
+          sourceModeId: 'local',
+          startedAt: '2026-07-19T12:31:00.000Z',
+          durationMs: 2_000,
+        },
+      });
+    });
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(2);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:first-original');
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:processed');
+    expect(result.current.original?.objectUrl).toBe('blob:second-original');
+    expect(result.current.processed).toBeNull();
+
+    unmount();
+  });
+
+  it('revokes a restored original exactly when it is discarded or unmounted', () => {
+    installRecorderHarness();
+    vi.mocked(URL.createObjectURL)
+      .mockReturnValueOnce('blob:discarded-original')
+      .mockReturnValueOnce('blob:unmounted-original');
+    const first = renderHook(() => useRecording());
+
+    act(() => {
+      first.result.current.restorePersistedOriginal({
+        blob: new Blob(['discard'], { type: 'video/webm' }),
+        artifactMetadata: {
+          id: 'discard',
+          mimeType: 'video/webm',
+          filename: 'discard.webm',
+          sourceModeId: 'local',
+          startedAt: '2026-07-19T12:30:00.000Z',
+          durationMs: 1_000,
+        },
+      });
+      first.result.current.discard();
+    });
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:discarded-original');
+    expect(first.result.current.lifecycle).toBe('idle');
+    expect(first.result.current.original).toBeNull();
+    first.unmount();
+
+    vi.mocked(URL.revokeObjectURL).mockClear();
+    const second = renderHook(() => useRecording());
+    act(() => {
+      second.result.current.restorePersistedOriginal({
+        blob: new Blob(['unmount'], { type: 'video/webm' }),
+        artifactMetadata: {
+          id: 'unmount',
+          mimeType: 'video/webm',
+          filename: 'unmount.webm',
+          sourceModeId: 'local',
+          startedAt: '2026-07-19T12:30:00.000Z',
+          durationMs: 1_000,
+        },
+      });
+    });
+    second.unmount();
+
+    expect(URL.revokeObjectURL).toHaveBeenCalledTimes(1);
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:unmounted-original');
+  });
+
   it.each([
     ['sidecar MediaStream', { failStreamConstruction: true }],
     ['sidecar MediaRecorder', { failRecorderCall: 2 }],

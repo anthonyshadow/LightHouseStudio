@@ -10,7 +10,7 @@ import type {
 // A 64px mint VP8/Opus WebM used by the deterministic MediaRecorder. Keeping a
 // real media container here lets the stable main-stage playback exercise the
 // browser's recorded-source path instead of relying on an invalid text blob.
-const FIXED_WEBM_BASE64 =
+export const FIXED_WEBM_BASE64 =
   'GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZwEAAAAAAAPHEU2bdLpNu4tTq4QVSalmU6yBoU27i1OrhBZUrmtTrIHWTbuMU6uEElTDZ1OsggGJTbuMU6uEHFO7a1OsggOx7AEAAAAAAABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVSalmsCrXsYMPQkBNgIxMYXZmNjIuMy4xMDBXQYxMYXZmNjIuMy4xMDBEiYhAagAAAAAAABZUrmtAra4BAAAAAAAAP9eBAXPFiE2mk5i4/Zn+nIEAIrWcg3VuZIiBAIaFVl9WUDiDgQEj44OEC+vCAOCQsIFAuoFAmoECVbCEVbmBAa4BAAAAAAAAXNeBAnPFiJrGl6+a4otJnIEAIrWcg3VuZIiBAIaGQV9PUFVTVqqDYy6gVruEBMS0AIOBAuGRn4EBtYhA53AAAAAAAGJkgRBjopNPcHVzSGVhZAEBOAGAuwAAAAAAElTDZ0DVc3OfY8CAZ8iZRaOHRU5DT0RFUkSHjExhdmY2Mi4zLjEwMHNz1mPAi2PFiE2mk5i4/Zn+Z8ihRaOHRU5DT0RFUkSHlExhdmM2Mi4xMS4xMDAgbGlidnB4Z8ihRaOIRFVSQVRJT05Eh5MwMDowMDowMC4yMDAwMDAwMDAAc3PXY8CLY8WImsaXr5rii0lnyKJFo4dFTkNPREVSRIeVTGF2YzYyLjExLjEwMCBsaWJvcHVzZ8ihRaOIRFVSQVRJT05Eh5MwMDowMDowMC4yMDgwMDAwMDAAH0O2dUFH54EAo6CCAACACIIus9vut8Yiydk1Igkj/XNos8ZUDdGd8vz2MKO6gQAAgBADAJ0BKkAAQAAARwiFhYiFhIgCAgJ08luZhVWRB7sxegD+9fmr0//f7H//f7H//f7H/v50AKOZggAVgAikiHym31yBd+ehDC8B0hVsEPLSMKOWggApgAicj4HpIUJspisqtfWHNlvUQKOTggA9gAicjDp1JdFgdoOprHux2aOUggBRgAicj4HpKUuFVSZIMbH2jsCjk4IAZYAInIwlpyVeaTexeOR+tlCjlIIAeYAInI+B6SlLjAufLYbvtF9Ao5SCAI2ACJyMOnUl0V0DEtfAAWmxyKOSggChgAickgPUbL0GlSYkM3WQo5KCALWACJyPgekpS4VPZkeaNSqgnaGUggDJAAgF64Joa2wKFQPSWqLsI8B1ooQAzf5gHFO7a5G7j7OBALeK94EB8YICZPCBJQ==';
 
 // A valid one-pixel PNG. Browser-side image validation is deterministically
@@ -19,6 +19,34 @@ const FIXED_WEBM_BASE64 =
 const REFERENCE_PNG_BASE64 =
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
 const REFERENCE_PNG = Buffer.from(REFERENCE_PNG_BASE64, 'base64');
+
+const createReplacementVoiceWav = (): Buffer => {
+  const sampleRate = 48_000;
+  const sampleCount = 9_600;
+  const bytesPerSample = 2;
+  const dataBytes = sampleCount * bytesPerSample;
+  const wav = Buffer.alloc(44 + dataBytes);
+  wav.write('RIFF', 0);
+  wav.writeUInt32LE(36 + dataBytes, 4);
+  wav.write('WAVE', 8);
+  wav.write('fmt ', 12);
+  wav.writeUInt32LE(16, 16);
+  wav.writeUInt16LE(1, 20);
+  wav.writeUInt16LE(1, 22);
+  wav.writeUInt32LE(sampleRate, 24);
+  wav.writeUInt32LE(sampleRate * bytesPerSample, 28);
+  wav.writeUInt16LE(bytesPerSample, 32);
+  wav.writeUInt16LE(16, 34);
+  wav.write('data', 36);
+  wav.writeUInt32LE(dataBytes, 40);
+  for (let index = 0; index < sampleCount; index += 1) {
+    const sample = Math.sin((index / sampleRate) * Math.PI * 440) * 0.08;
+    wav.writeInt16LE(Math.round(sample * 32_767), 44 + index * bytesPerSample);
+  }
+  return wav;
+};
+
+const REPLACEMENT_VOICE_WAV = createReplacementVoiceWav();
 
 export type MockReferenceImageAsset = ReferenceImageAsset;
 
@@ -57,11 +85,15 @@ export type NetworkJourneyState = {
   referenceImageContentReads: string[];
   blockedExternalRequests: string[];
   blockedExternalWebSockets: string[];
+  setCapabilityFailuresRemaining(count: number): void;
 };
 
 export type StudioHarnessOptions = {
   stubMediaPlayback?: boolean;
   referenceImagesAvailable?: boolean;
+  elevenLabsAvailable?: boolean;
+  realtimeProvidesVideo?: boolean;
+  capabilityFailuresBeforeSuccess?: number;
 };
 
 const canonicalPrompt = (value: string): string =>
@@ -174,6 +206,7 @@ export const installSuccessfulStudioHarness = async (
   page: Page,
   options: StudioHarnessOptions = {},
 ): Promise<NetworkJourneyState> => {
+  let remainingCapabilityFailures = options.capabilityFailuresBeforeSuccess ?? 0;
   const network: NetworkJourneyState = {
     apiRequests: [],
     referenceWorkflowCalls: [],
@@ -183,13 +216,16 @@ export const installSuccessfulStudioHarness = async (
     referenceImageContentReads: [],
     blockedExternalRequests: [],
     blockedExternalWebSockets: [],
+    setCapabilityFailuresRemaining: (count) => {
+      remainingCapabilityFailures = Math.max(0, Math.trunc(count));
+    },
   };
   const assets = new Map<string, MockReferenceImageAsset>();
   const assetsByRequestId = new Map<string, MockReferenceImageAsset>();
   let assetSequence = 0;
 
   await page.addInitScript(
-    ({ fixedWebmBase64, stubMediaPlayback }) => {
+    ({ fixedWebmBase64, stubMediaPlayback, realtimeProvidesVideo }) => {
       type TestModel = 'lucy-2.5' | 'lucy-vton-3';
       type TestSnapshot = { prompt: string; image: File | null; enhance: boolean };
       type TestConnectionOptions = {
@@ -322,7 +358,7 @@ export const installSuccessfulStudioHarness = async (
           queueMicrotask(() => {
             if (disconnected) return;
             options.onConnectionChange('connected');
-            options.onRemoteStream(remote);
+            if (realtimeProvidesVideo) options.onRemoteStream(remote);
             options.onConnectionChange('generating');
             options.onGenerationTick(1);
           });
@@ -412,6 +448,7 @@ export const installSuccessfulStudioHarness = async (
     {
       fixedWebmBase64: FIXED_WEBM_BASE64,
       stubMediaPlayback: options.stubMediaPlayback ?? true,
+      realtimeProvidesVideo: options.realtimeProvidesVideo ?? true,
     },
   );
 
@@ -437,12 +474,26 @@ export const installSuccessfulStudioHarness = async (
 
     if (requestUrl.pathname === '/api/capabilities') {
       network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      if (remainingCapabilityFailures > 0) {
+        remainingCapabilityFailures -= 1;
+        await route.fulfill({
+          status: 503,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: { code: 'capabilities-starting', message: 'The local API is still starting.' },
+          }),
+        });
+        return;
+      }
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
           realtimeVideo: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
-          elevenLabs: { available: false, modelId: null },
+          elevenLabs: {
+            available: options.elevenLabsAvailable ?? false,
+            modelId: options.elevenLabsAvailable ? 'eleven_multilingual_sts_v2' : null,
+          },
           referenceImages: {
             available: options.referenceImagesAvailable ?? true,
             modelId: 'gpt-image-2',
@@ -566,6 +617,43 @@ export const installSuccessfulStudioHarness = async (
           expiresAt: '2030-01-01T00:00:00.000Z',
           constraints: { model: payload.model, maxSessionDurationSeconds: 300 },
         }),
+      });
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/elevenlabs/voices' && route.request().method() === 'GET') {
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          voices: [
+            {
+              voiceId: 'northstar-narrator',
+              name: 'Northstar Narrator',
+              category: 'professional',
+              description: 'Warm, grounded documentary narration',
+              labels: { style: 'narration' },
+              previewAvailable: false,
+            },
+          ],
+          hasMore: false,
+          nextPageToken: null,
+          total: 1,
+        }),
+      });
+      return;
+    }
+
+    if (
+      requestUrl.pathname === '/api/elevenlabs/voice-changer/recording' &&
+      route.request().method() === 'POST'
+    ) {
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      await route.fulfill({
+        status: 200,
+        contentType: 'audio/wav',
+        body: REPLACEMENT_VOICE_WAV,
       });
       return;
     }

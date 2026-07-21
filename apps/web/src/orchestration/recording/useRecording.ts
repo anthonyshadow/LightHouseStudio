@@ -17,6 +17,7 @@ import type {
   RecordingController,
   RecordingLifecycle,
   RecordingSource,
+  RestorePersistedOriginalInput,
   TakeMetadata,
   UseRecordingOptions,
 } from '../../features/recording/types';
@@ -39,7 +40,10 @@ import { useRecordingArtifacts } from './useRecordingArtifacts';
 export type {
   AutomaticRecordingStopEvent,
   AutomaticRecordingStopReason,
+  PersistedRecordingArtifactMetadata,
+  PersistedRecordingAudioSidecar,
   RecordingController,
+  RestorePersistedOriginalInput,
   UseRecordingOptions,
 } from '../../features/recording/types';
 
@@ -532,6 +536,29 @@ export const useRecording = ({
     setLifecycle(domainLifecycleRef.current.status);
   }, [artifacts]);
 
+  const restorePersistedOriginal = useCallback(
+    (input: RestorePersistedOriginalInput): RecordingArtifact => {
+      const status = domainLifecycleRef.current.status;
+      if (attemptRef.current || status === 'recording' || status === 'stopping') {
+        throw new Error('A persisted take cannot be restored while recording is active.');
+      }
+      if (artifacts.processingState === 'processing') {
+        throw new Error('A persisted take cannot be restored while voice processing is active.');
+      }
+
+      const artifact = artifacts.restorePersistedOriginal(input);
+      pendingMetadataRef.current = null;
+      mainStoppedAtRef.current = null;
+      setMetadata(input.takeMetadata ? Object.freeze({ ...input.takeMetadata }) : null);
+      setActiveSource(null);
+      setElapsedSeconds(Math.max(0, Math.floor(artifact.durationMs / 1_000)));
+      domainLifecycleRef.current = { status: 'recorded', artifact };
+      setLifecycle(domainLifecycleRef.current.status);
+      return artifact;
+    },
+    [artifacts],
+  );
+
   useEffect(() => {
     if (lifecycle !== 'recording') return;
     const started = attemptRef.current?.startTime ?? performance.now();
@@ -573,6 +600,7 @@ export const useRecording = ({
       downloaded: artifacts.downloaded,
       start,
       stop,
+      restorePersistedOriginal,
       discard,
       markDownloaded: artifacts.markDownloaded,
       beginProcessing: artifacts.beginProcessing,
@@ -581,6 +609,16 @@ export const useRecording = ({
       failProcessing: artifacts.failProcessing,
       restoreOriginal: artifacts.restoreOriginal,
     }),
-    [lifecycle, activeSource, metadata, artifacts, elapsedSeconds, start, stop, discard],
+    [
+      lifecycle,
+      activeSource,
+      metadata,
+      artifacts,
+      elapsedSeconds,
+      start,
+      stop,
+      restorePersistedOriginal,
+      discard,
+    ],
   );
 };

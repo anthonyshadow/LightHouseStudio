@@ -20,6 +20,8 @@ import {
   CREATIVE_ASSET_STORAGE_KEY,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   LEGACY_CREATIVE_ASSET_STORAGE_KEY,
+  PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+  PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
   type CreateSavedCharacterPromptInput,
   type CreateSavedPromptInput,
   type CreativeAssetRepository,
@@ -84,7 +86,8 @@ const isSupportedLegacyPayload = (serialized: string): boolean => {
       typeof value === 'object' &&
       value !== null &&
       'schemaVersion' in value &&
-      value.schemaVersion === LEGACY_CREATIVE_ASSET_SCHEMA_VERSION
+      (value.schemaVersion === LEGACY_CREATIVE_ASSET_SCHEMA_VERSION ||
+        value.schemaVersion === PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION)
     );
   } catch {
     return false;
@@ -94,7 +97,7 @@ const isSupportedLegacyPayload = (serialized: string): boolean => {
 const loadInitialState = (
   storage: StorageLike | null,
   storageKey: string,
-  legacyStorageKey: string | null,
+  legacyStorageKeys: readonly string[],
 ): { state: CreativeAssetRepositoryState; storage: StorageLike | null } => {
   if (!storage) {
     const health = 'session-only' as const;
@@ -108,7 +111,9 @@ const loadInitialState = (
   let migratedLegacy = false;
   try {
     serialized = storage.getItem(storageKey);
-    if (serialized === null && legacyStorageKey && legacyStorageKey !== storageKey) {
+    for (const legacyStorageKey of legacyStorageKeys) {
+      if (serialized !== null) break;
+      if (legacyStorageKey === storageKey) continue;
       serialized = storage.getItem(legacyStorageKey);
       migratedLegacy = serialized !== null;
     }
@@ -167,14 +172,16 @@ export const createCreativeAssetRepository = (
   options: CreativeAssetRepositoryOptions = {},
 ): CreativeAssetRepository => {
   const storageKey = options.storageKey ?? CREATIVE_ASSET_STORAGE_KEY;
-  const legacyStorageKey =
+  const legacyStorageKeys =
     options.legacyStorageKey === undefined
       ? options.storageKey === undefined
-        ? LEGACY_CREATIVE_ASSET_STORAGE_KEY
-        : null
-      : options.legacyStorageKey;
+        ? [PREVIOUS_CREATIVE_ASSET_STORAGE_KEY, LEGACY_CREATIVE_ASSET_STORAGE_KEY]
+        : []
+      : options.legacyStorageKey === null
+        ? []
+        : [options.legacyStorageKey];
   let storage = options.storage === undefined ? browserStorage() : options.storage;
-  const initial = loadInitialState(storage, storageKey, legacyStorageKey);
+  const initial = loadInitialState(storage, storageKey, legacyStorageKeys);
   storage = initial.storage;
   let state = initial.state;
   const listeners = new Set<() => void>();
@@ -305,6 +312,7 @@ export const createCreativeAssetRepository = (
           source: input.source ?? 'generator',
           promptIntent: input.promptIntent,
           builderDraft: input.builderDraft ?? null,
+          guidedDesign: input.guidedDesign ?? null,
           referenceImageStatus: input.referenceImageStatus ?? 'prompt-only',
           referenceImageAssetId: input.referenceImageAssetId ?? null,
           notes: input.notes ?? '',
@@ -332,6 +340,7 @@ export const createCreativeAssetRepository = (
           ...(input.name === undefined ? {} : { name: input.name }),
           ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
           ...(input.builderDraft === undefined ? {} : { builderDraft: input.builderDraft }),
+          ...(input.guidedDesign === undefined ? {} : { guidedDesign: input.guidedDesign }),
           ...(input.referenceImageStatus === undefined
             ? {}
             : { referenceImageStatus: input.referenceImageStatus }),

@@ -1,8 +1,12 @@
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
+  PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   type CreativeAssetSearchResults as DomainCreativeAssetSearchResults,
   type CreativeAssetStore as DomainCreativeAssetStore,
+  type GuidedChoiceKey as DomainGuidedChoiceKey,
+  type GuidedChoiceValue as DomainGuidedChoiceValue,
+  type GuidedDesignV1 as DomainGuidedDesignV1,
   type ModelModeId as DomainModelModeId,
   type RecentPrompt as DomainRecentPrompt,
   type ReferenceImageStatus as DomainReferenceImageStatus,
@@ -10,17 +14,27 @@ import {
   type SavedPrompt as DomainSavedPrompt,
   type SavedPromptSource,
   type StorageHealth as DomainStorageHealth,
+  type VisualProfile as DomainVisualProfile,
 } from '@studio/domain';
 import type { PromptBuilderDraft, PromptIntent } from '../prompt-authoring';
 
-export { CREATIVE_ASSET_SCHEMA_VERSION, LEGACY_CREATIVE_ASSET_SCHEMA_VERSION };
-export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
+export {
+  CREATIVE_ASSET_SCHEMA_VERSION,
+  LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
+  PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+};
+export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
+export const PREVIOUS_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
 export const LEGACY_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
 
 export type ModelModeId = DomainModelModeId;
 export type AssetSource = SavedPromptSource;
 export type ReferenceImageStatus = DomainReferenceImageStatus;
 export type StorageHealth = DomainStorageHealth;
+export type VisualProfile = DomainVisualProfile;
+export type GuidedChoiceKey = DomainGuidedChoiceKey;
+export type GuidedChoiceValue = DomainGuidedChoiceValue;
+export type GuidedDesignV1 = DomainGuidedDesignV1;
 export type SavedPrompt = DomainSavedPrompt;
 export type RecentPrompt = DomainRecentPrompt;
 export type SavedCharacterPrompt = DomainSavedCharacterPrompt;
@@ -55,6 +69,7 @@ export interface CreateSavedCharacterPromptInput {
   readonly source?: 'manual' | 'generator';
   readonly promptIntent: PromptIntent;
   readonly builderDraft?: PromptBuilderDraft | null;
+  readonly guidedDesign?: DomainGuidedDesignV1 | null;
   readonly referenceImageStatus?: ReferenceImageStatus;
   readonly referenceImageAssetId?: string | null;
   readonly notes?: string;
@@ -65,6 +80,7 @@ export interface UpdateSavedCharacterPromptInput {
   readonly name?: string;
   readonly prompt?: string;
   readonly builderDraft?: PromptBuilderDraft | null;
+  readonly guidedDesign?: DomainGuidedDesignV1 | null;
   readonly referenceImageStatus?: ReferenceImageStatus;
   readonly referenceImageAssetId?: string | null;
   readonly notes?: string;

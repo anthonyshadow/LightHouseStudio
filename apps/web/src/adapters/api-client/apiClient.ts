@@ -10,6 +10,7 @@ import {
   type OptimizeCharacterReferencePromptRequest,
   type OptimizeCharacterReferencePromptResponse,
   type ReferenceImageAsset,
+  type RealtimeSessionProfile,
 } from '@studio/contracts';
 import type { ModelMode, ProviderAvailability } from '../../application/types';
 import { validateReferenceImage } from '../../features/media-session/imageValidation';
@@ -209,13 +210,14 @@ export const hydrateReferenceImage = async (
 export const requestRealtimeToken = async (
   model: ModelMode,
   signal: AbortSignal,
+  sessionProfile?: RealtimeSessionProfile,
 ): Promise<{ apiKey: string; expiresAt: string }> => {
   const response = await fetch('/api/realtime-token', {
     method: 'POST',
     signal,
     cache: 'no-store',
     headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ model }),
+    body: JSON.stringify({ model, ...(sessionProfile ? { sessionProfile } : {}) }),
   });
   if (!response.ok) throw await readError(response);
   const parsed = realtimeTokenResponseSchema.safeParse(await response.json());

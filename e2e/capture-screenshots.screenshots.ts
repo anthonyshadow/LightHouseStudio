@@ -14,7 +14,7 @@ import {
 
 const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
 const SCREENSHOT_ROOT = path.join(process.cwd(), 'screenshots');
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
 const FIXED_WEBP = Buffer.from(
   'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v3AgAA=',
   'base64',
@@ -29,7 +29,7 @@ const VIEWPORTS = [
 ] as const;
 
 const SEEDED_SHELF = {
-  schemaVersion: 2,
+  schemaVersion: 3,
   savedPrompts: [
     {
       id: 'character-amber-host',
@@ -90,13 +90,17 @@ const SEEDED_SHELF = {
         characterBase: 'documentary field presenter',
         matchReference: false,
         appearance: 'natural editorial complexion',
+        skinTone: '',
+        bodyShape: '',
         hair: '',
+        hairColor: '',
         outfit: 'structured amber field jacket',
         accessories: '',
         expression: 'focused half-smile',
         mood: 'grounded and cinematic',
         preserve: 'camera framing',
       },
+      guidedDesign: null,
       referenceImageStatus: 'prompt-only',
       referenceImageAssetId: null,
       notes: 'A grounded host treatment for field stories.',
@@ -717,7 +721,7 @@ for (const viewport of VIEWPORTS) {
         value: JSON.stringify(SEEDED_SHELF),
       });
 
-      await page.goto('/');
+      await page.goto('/advanced');
       await expect(page.getByRole('main')).toBeVisible();
       await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
       await page.addStyleTag({

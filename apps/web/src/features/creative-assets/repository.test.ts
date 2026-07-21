@@ -5,6 +5,8 @@ import {
   CREATIVE_ASSET_SCHEMA_VERSION,
   CREATIVE_ASSET_STORAGE_KEY,
   LEGACY_CREATIVE_ASSET_STORAGE_KEY,
+  PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
+  type GuidedDesignV1,
   type StorageLike,
 } from './types';
 
@@ -32,6 +34,27 @@ const repositoryFixture = (storage: StorageLike | null = new MemoryStorage()) =>
     now: () => new Date(Date.UTC(2026, 6, 14, 12, minute++)),
   });
 };
+
+const guidedDesign = (): GuidedDesignV1 => ({
+  catalogVersion: 1,
+  starterId: 'documentary-presenter',
+  choices: {
+    gender: { optionId: 'woman' },
+    adultAge: { optionId: 'adult' },
+    appearance: null,
+    skinTone: null,
+    bodyShape: { optionId: 'woman-athletic' },
+    hair: { optionId: 'woman-long-waves' },
+    hairColor: { optionId: 'auburn' },
+    outfit: { optionId: 'woman-professional' },
+    accessories: null,
+    expression: null,
+    mood: null,
+    role: { optionId: 'presenter' },
+    style: { optionId: 'cinematic' },
+    background: { optionId: 'studio' },
+  },
+});
 
 describe('createCreativeAssetRepository', () => {
   it('supports CRUD, mode-scoped search, recent deduplication, usage tracking, and unlink-on-delete', () => {
@@ -85,18 +108,22 @@ describe('createCreativeAssetRepository', () => {
       ...createPromptBuilderDraft('character-transform'),
       characterBase: 'night-shift radio host',
       matchReference: true,
+      bodyShape: 'balanced build',
+      hairColor: 'black',
     };
     const character = repository.createSavedCharacterPrompt({
       name: 'Night host',
       prompt: 'Transform the subject into an adult night-shift radio host.',
       promptIntent: 'character-transform',
       builderDraft: draft,
+      guidedDesign: guidedDesign(),
       referenceImageStatus: 'session-portrait-not-saved',
       notes: 'Use a portrait again next time.',
     });
 
     expect(character.source).toBe('generator');
     expect(character.builderDraft).toMatchObject({ characterBase: 'night-shift radio host' });
+    expect(character.guidedDesign).toEqual(guidedDesign());
     const serialized = storage.records.get('test-recipes') ?? '';
     expect(serialized).toContain('session-portrait-not-saved');
     expect(serialized).not.toMatch(/imageData|objectUrl|blob:|deviceId|token/i);
@@ -162,7 +189,7 @@ describe('createCreativeAssetRepository', () => {
     ]);
   });
 
-  it('migrates the legacy v1 key to v2 and hydrates null references after refresh', () => {
+  it('migrates the legacy v1 key to v3 and hydrates null references after refresh', () => {
     const storage = new MemoryStorage();
     storage.records.set(
       LEGACY_CREATIVE_ASSET_STORAGE_KEY,
@@ -191,7 +218,7 @@ describe('createCreativeAssetRepository', () => {
     expect(migrated.getSnapshot()).toMatchObject({
       health: 'ready',
       store: {
-        schemaVersion: 2,
+        schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
         savedPrompts: [expect.objectContaining({ referenceImageAssetId: null })],
       },
     });
@@ -201,6 +228,60 @@ describe('createCreativeAssetRepository', () => {
     );
   });
 
+  it('prefers and migrates the v2 key while preserving reference identities', () => {
+    const storage = new MemoryStorage();
+    storage.records.set(
+      PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: 2,
+        savedPrompts: [],
+        recentPrompts: [],
+        savedCharacterPrompts: [
+          {
+            id: 'v2-character',
+            name: 'V2 character',
+            prompt: 'Substitute the character with an adult presenter.',
+            source: 'generator',
+            promptIntent: 'character-transform',
+            builderDraft: {
+              ...createPromptBuilderDraft('character-transform'),
+              hair: 'short black hair',
+            },
+            referenceImageStatus: 'persisted-reference',
+            referenceImageAssetId: 'v2-reference',
+            notes: '',
+            tags: [],
+            createdAt: '2026-07-14T12:00:00.000Z',
+            updatedAt: '2026-07-14T12:00:00.000Z',
+            lastUsedAt: null,
+            useCount: 0,
+          },
+        ],
+      }),
+    );
+
+    const migrated = createCreativeAssetRepository({ storage });
+    expect(migrated.getSnapshot()).toMatchObject({
+      health: 'ready',
+      store: {
+        schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+        savedCharacterPrompts: [
+          {
+            referenceImageAssetId: 'v2-reference',
+            guidedDesign: null,
+            builderDraft: {
+              skinTone: '',
+              bodyShape: '',
+              hair: 'short black hair',
+              hairColor: '',
+            },
+          },
+        ],
+      },
+    });
+    expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
+  });
+
   it('recovers rather than silently treating a corrupt legacy payload as a migration', () => {
     const storage = new MemoryStorage();
     storage.records.set(LEGACY_CREATIVE_ASSET_STORAGE_KEY, '{not-json');
@@ -208,7 +289,7 @@ describe('createCreativeAssetRepository', () => {
     const repository = createCreativeAssetRepository({ storage });
     expect(repository.getSnapshot()).toMatchObject({
       health: 'recovered',
-      store: { schemaVersion: 2, savedPrompts: [] },
+      store: { schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION, savedPrompts: [] },
     });
     expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
   });
@@ -225,6 +306,7 @@ describe('createCreativeAssetRepository', () => {
       prompt: 'Transform the subject into an adult night-shift radio host.',
       promptIntent: 'character-transform',
       builderDraft: draft,
+      guidedDesign: guidedDesign(),
     });
 
     const edited = repository.updateSavedCharacterPrompt(character.id, {
@@ -235,11 +317,13 @@ describe('createCreativeAssetRepository', () => {
       source: 'manual',
       promptIntent: null,
       builderDraft: null,
+      guidedDesign: null,
     });
     expect(repositoryFixture(storage).getSnapshot().store.savedCharacterPrompts[0]).toMatchObject({
       source: 'manual',
       promptIntent: null,
       builderDraft: null,
+      guidedDesign: null,
     });
   });
 

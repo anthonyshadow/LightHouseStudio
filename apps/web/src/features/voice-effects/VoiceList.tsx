@@ -46,6 +46,7 @@ type VoiceListProps = {
   selected: VoiceSummary | null;
   loading: boolean;
   importingVoiceKey: string | null;
+  collapsePublicImport?: boolean;
   onSelect(voice: VoiceSummary): void;
   onImport(voice: VoiceSummary): void;
   onPreviewError(voice: VoiceSummary): void;
@@ -57,6 +58,7 @@ export const VoiceList = ({
   selected,
   loading,
   importingVoiceKey,
+  collapsePublicImport = false,
   onSelect,
   onImport,
   onPreviewError,
@@ -94,7 +96,7 @@ export const VoiceList = ({
               >
                 {voiceSelected ? 'Selected' : 'Select'}
               </Button>
-              {kind === 'public' ? (
+              {kind === 'public' && !collapsePublicImport ? (
                 <Button
                   size="small"
                   busy={importingVoiceKey === voiceKey}

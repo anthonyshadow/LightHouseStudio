@@ -122,11 +122,32 @@ export const CharacterTransformFields = ({
             onChange={(event) => changeCharacter({ appearance: promptValueFrom(event) })}
           />
           <TextField
+            label="Skin tone"
+            placeholder="Deep, medium brown, olive, light…"
+            value={draft.skinTone}
+            maxLength={220}
+            onChange={(event) => changeCharacter({ skinTone: promptValueFrom(event) })}
+          />
+          <TextField
+            label="Body shape"
+            placeholder="Build, proportions, silhouette…"
+            value={draft.bodyShape}
+            maxLength={220}
+            onChange={(event) => changeCharacter({ bodyShape: promptValueFrom(event) })}
+          />
+          <TextField
             label="Hair"
-            placeholder="Cut, texture, color…"
+            placeholder="Cut, length, texture…"
             value={draft.hair}
             maxLength={220}
             onChange={(event) => changeCharacter({ hair: promptValueFrom(event) })}
+          />
+          <TextField
+            label="Hair color"
+            placeholder="Black, dark brown, auburn…"
+            value={draft.hairColor}
+            maxLength={220}
+            onChange={(event) => changeCharacter({ hairColor: promptValueFrom(event) })}
           />
         </>
       ) : null}

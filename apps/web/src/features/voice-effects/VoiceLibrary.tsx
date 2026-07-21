@@ -7,6 +7,7 @@ import { useVoiceLibrary } from '../../orchestration/voice-library/useVoiceLibra
 
 export type VoiceLibraryProps = {
   disabled: boolean;
+  collapsePublicImport?: boolean;
   onApply(voice: VoiceSummary): void;
 };
 
@@ -29,14 +30,28 @@ const libraryOptions = [
   { value: 'public', label: 'Public library' },
 ] as const;
 
-export const VoiceLibrary = ({ disabled, onApply }: VoiceLibraryProps) => {
+export const VoiceLibrary = ({
+  disabled,
+  collapsePublicImport = false,
+  onApply,
+}: VoiceLibraryProps) => {
   const theme = useTheme();
   const library = useVoiceLibrary();
   const applyButtonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (library.importSuccess) applyButtonRef.current?.focus();
-  }, [library.importSuccess]);
+    if (library.importSuccess && !collapsePublicImport) applyButtonRef.current?.focus();
+  }, [collapsePublicImport, library.importSuccess]);
+
+  const applySelectedVoice = async () => {
+    if (!library.selected) return;
+    if (collapsePublicImport && library.kind === 'public') {
+      const importedVoice = await library.importVoice(library.selected);
+      if (importedVoice) onApply(importedVoice);
+      return;
+    }
+    onApply(library.selected);
+  };
 
   return (
     <div css={stackStyles(theme)}>
@@ -96,6 +111,7 @@ export const VoiceLibrary = ({ disabled, onApply }: VoiceLibraryProps) => {
         selected={library.selected}
         loading={library.loading}
         importingVoiceKey={library.importingVoiceKey}
+        collapsePublicImport={collapsePublicImport}
         onSelect={library.setSelected}
         onImport={(voice) => void library.importVoice(voice)}
         onPreviewError={(voice) =>
@@ -125,16 +141,22 @@ export const VoiceLibrary = ({ disabled, onApply }: VoiceLibraryProps) => {
         <Button
           ref={applyButtonRef}
           variant="primary"
-          disabled={disabled || library.kind === 'public'}
-          onClick={() => onApply(library.selected!)}
+          busy={
+            collapsePublicImport && library.kind === 'public' && library.importingVoiceKey !== null
+          }
+          disabled={disabled || (library.kind === 'public' && !collapsePublicImport)}
+          onClick={() => void applySelectedVoice()}
         >
-          Apply {library.selected.name} to recorded audio
+          {collapsePublicImport && library.kind === 'public'
+            ? `Add & Apply ${library.selected.name}`
+            : `Apply ${library.selected.name} to recorded audio`}
         </Button>
       ) : null}
       {library.kind === 'public' ? (
         <StatusNotice role="status" aria-live="polite" tone="warning">
-          Import is a separate explicit change to the configured ElevenLabs workspace and may be
-          subject to its plan or voice-library limits. Import before conversion.
+          {collapsePublicImport
+            ? 'Add & Apply imports the selected voice into the configured ElevenLabs workspace, then applies it to this take. Provider plan or voice-library limits may apply.'
+            : 'Import is a separate explicit change to the configured ElevenLabs workspace and may be subject to its plan or voice-library limits. Import before conversion.'}
         </StatusNotice>
       ) : null}
     </div>

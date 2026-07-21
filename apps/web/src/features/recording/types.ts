@@ -53,6 +53,31 @@ export type TakeMetadata = Readonly<{
   audioSourceLabel?: string;
 }>;
 
+/**
+ * Serializable fields required to restore an original take from browser-local
+ * storage. The Blob and its runtime-only object URL are deliberately excluded.
+ */
+export type PersistedRecordingArtifactMetadata = Readonly<{
+  id: string;
+  mimeType: string;
+  filename: string;
+  sourceModeId: StudioMode;
+  startedAt: string;
+  durationMs: number;
+}>;
+
+export type PersistedRecordingAudioSidecar = Readonly<{
+  blob: Blob;
+  mimeType: string;
+}>;
+
+export type RestorePersistedOriginalInput = Readonly<{
+  blob: Blob;
+  artifactMetadata: PersistedRecordingArtifactMetadata;
+  takeMetadata?: TakeMetadata | null;
+  audioSidecar?: PersistedRecordingAudioSidecar | null;
+}>;
+
 export type CaptureDeviceState = 'idle' | 'loading' | 'ready' | 'error';
 
 export type CapturePreferencesController = {
@@ -90,6 +115,7 @@ export type RecordingController = {
   downloaded: boolean;
   start(source: RecordingSource, mode: StudioMode): Promise<void>;
   stop(): Promise<RecordingArtifact | null>;
+  restorePersistedOriginal(input: RestorePersistedOriginalInput): RecordingArtifact;
   discard(): void;
   markDownloaded(): void;
   beginProcessing(): void;

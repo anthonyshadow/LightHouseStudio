@@ -276,6 +276,11 @@ export const createSavedCharacterPrompt = (
     source: input.source,
     promptIntent: input.promptIntent,
     builderDraft: input.builderDraft ?? null,
+    guidedDesign:
+      input.promptIntent === 'character-transform' &&
+      input.builderDraft?.intent === 'character-transform'
+        ? (input.guidedDesign ?? null)
+        : null,
     referenceImageStatus: input.referenceImageAssetId
       ? 'persisted-reference'
       : input.referenceImageStatus === 'persisted-reference'
@@ -309,6 +314,7 @@ export const updateSavedCharacterPrompt = (
       | 'source'
       | 'promptIntent'
       | 'builderDraft'
+      | 'guidedDesign'
       | 'referenceImageStatus'
       | 'referenceImageAssetId'
       | 'notes'
@@ -327,7 +333,28 @@ export const updateSavedCharacterPrompt = (
       nextPrompt !== asset.prompt &&
       patch.source === undefined &&
       patch.promptIntent === undefined &&
-      patch.builderDraft === undefined;
+      patch.builderDraft === undefined &&
+      patch.guidedDesign === undefined;
+    const nextPromptIntent = promptWasManuallyEdited
+      ? null
+      : patch.promptIntent === undefined
+        ? asset.promptIntent
+        : patch.promptIntent;
+    const nextBuilderDraft = promptWasManuallyEdited
+      ? null
+      : patch.builderDraft === undefined
+        ? asset.builderDraft
+        : patch.builderDraft;
+    const requestedGuidedDesign = promptWasManuallyEdited
+      ? null
+      : patch.guidedDesign === undefined
+        ? asset.guidedDesign
+        : patch.guidedDesign;
+    const nextGuidedDesign =
+      nextPromptIntent === 'character-transform' &&
+      nextBuilderDraft?.intent === 'character-transform'
+        ? requestedGuidedDesign
+        : null;
     const nextReferenceImageAssetId =
       patch.referenceImageAssetId === undefined
         ? asset.referenceImageAssetId
@@ -344,12 +371,13 @@ export const updateSavedCharacterPrompt = (
       ...(patch.name === undefined ? {} : { name: requireName(patch.name, 'Character prompt') }),
       ...(patch.prompt === undefined ? {} : { prompt: nextPrompt }),
       ...(promptWasManuallyEdited
-        ? { source: 'manual' as const, promptIntent: null, builderDraft: null }
+        ? { source: 'manual' as const }
         : {
             ...(patch.source === undefined ? {} : { source: patch.source }),
-            ...(patch.promptIntent === undefined ? {} : { promptIntent: patch.promptIntent }),
-            ...(patch.builderDraft === undefined ? {} : { builderDraft: patch.builderDraft }),
           }),
+      promptIntent: nextPromptIntent,
+      builderDraft: nextBuilderDraft,
+      guidedDesign: nextGuidedDesign,
       referenceImageStatus: nextReferenceImageStatus,
       referenceImageAssetId: nextReferenceImageAssetId,
       ...(patch.notes === undefined
@@ -379,6 +407,7 @@ export const useSavedCharacterPrompt = (
   readonly store: CreativeAssetStore;
   readonly prompt: string;
   readonly builderDraft: SavedCharacterPrompt['builderDraft'];
+  readonly guidedDesign: SavedCharacterPrompt['guidedDesign'];
 } => {
   const now = assertTimestamp(nowValue);
   const asset = store.savedCharacterPrompts.find((candidate) => candidate.id === id);
@@ -386,6 +415,7 @@ export const useSavedCharacterPrompt = (
   return {
     prompt: asset.prompt,
     builderDraft: asset.builderDraft,
+    guidedDesign: asset.guidedDesign,
     store: {
       ...store,
       savedCharacterPrompts: store.savedCharacterPrompts.map((candidate) =>

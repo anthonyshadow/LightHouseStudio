@@ -43,7 +43,10 @@ const characterSteps = (
     id: 'appearance',
     label: 'Appearance & hair',
     description: 'Describe visible facial styling, complexion, and hair.',
-    summary: concise([draft.appearance, draft.hair], 'Optional visible details'),
+    summary: concise(
+      [draft.appearance, draft.skinTone, draft.bodyShape, draft.hair, draft.hairColor],
+      'Optional visible details',
+    ),
   },
   {
     id: 'wardrobe',

@@ -104,7 +104,7 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
     else setPublicPage((value) => Math.max(0, value - 1));
   };
 
-  const importVoice = async (voice: VoiceSummary) => {
+  const importVoice = async (voice: VoiceSummary): Promise<VoiceSummary | null> => {
     importAbortRef.current?.abort();
     const controller = new AbortController();
     const voiceKey = `${voice.publicOwnerId ?? 'public'}:${voice.voiceId}`;
@@ -115,17 +115,20 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
     try {
       const voiceId = await client.importPublicVoice(voice, controller.signal);
       controller.signal.throwIfAborted();
-      if (importAbortRef.current !== controller) return;
-      setSelected({ ...voice, voiceId });
+      if (importAbortRef.current !== controller) return null;
+      const importedVoice = { ...voice, voiceId };
+      setSelected(importedVoice);
       setKind('workspace');
       setWorkspaceTokens([null]);
       setWorkspaceIndex(0);
       setImportSuccess(`${voice.name} was imported and is selected for this take.`);
+      return importedVoice;
     } catch (caught) {
-      if (caught instanceof DOMException && caught.name === 'AbortError') return;
+      if (caught instanceof DOMException && caught.name === 'AbortError') return null;
       setError(
         caught instanceof Error ? caught.message : 'The public voice could not be imported.',
       );
+      return null;
     } finally {
       if (importAbortRef.current === controller) {
         importAbortRef.current = null;

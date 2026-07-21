@@ -6,7 +6,7 @@ import {
   readBrowserState,
 } from './support/studioHarness';
 
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
 const LEGACY_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
 
 const openCharacterWorkshop = async (page: Page, concept: string): Promise<void> => {
@@ -20,7 +20,7 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/advanced');
 
   await openCharacterWorkshop(page, 'botanical field correspondent');
   await page.getByRole('button', { name: 'Generate reference image' }).click();
@@ -132,7 +132,7 @@ test('saved character restores its original asset after workshop regeneration', 
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/advanced');
 
   await openCharacterWorkshop(page, 'paper-cut astronomy presenter');
   await page.getByRole('button', { name: 'Generate reference image' }).click();
@@ -198,7 +198,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
       localStorage.setItem(
         storageKey,
         JSON.stringify({
-          schemaVersion: 2,
+          schemaVersion: 3,
           savedPrompts: [],
           recentPrompts: [
             {
@@ -219,7 +219,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
       storageKey: CREATIVE_ASSET_STORAGE_KEY,
     },
   );
-  await page.goto('/');
+  await page.goto('/advanced');
 
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   await page.getByRole('button', { name: /^Recent\b/u }).click();
@@ -244,7 +244,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
   expectNoExternalProviderTraffic(network);
 });
 
-test('legacy v1 text-only shelf migrates to v2 with null reference identities', async ({
+test('legacy v1 text-only shelf migrates to v3 with null reference identities', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page, {
@@ -284,7 +284,7 @@ test('legacy v1 text-only shelf migrates to v2 with null reference identities', 
     },
     { legacyKey: LEGACY_CREATIVE_ASSET_STORAGE_KEY },
   );
-  await page.goto('/');
+  await page.goto('/advanced');
 
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Use Legacy text host' })).toBeVisible();
@@ -298,7 +298,7 @@ test('legacy v1 text-only shelf migrates to v2 with null reference identities', 
       recentPrompts: Array<{ referenceImageAssetId?: string | null }>;
     };
   }, CREATIVE_ASSET_STORAGE_KEY);
-  expect(migrated?.schemaVersion).toBe(2);
+  expect(migrated?.schemaVersion).toBe(3);
   expect(migrated?.savedPrompts[0]?.referenceImageAssetId).toBeNull();
   expect(migrated?.recentPrompts[0]?.referenceImageAssetId).toBeNull();
   expect(network.referenceImageGenerations).toEqual([]);

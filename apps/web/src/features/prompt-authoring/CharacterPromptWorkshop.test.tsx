@@ -225,7 +225,39 @@ describe('CharacterPromptWorkshop', () => {
     expect(appearanceStep).toHaveAttribute('aria-expanded', 'true');
     expect(screen.queryByLabelText('Character concept')).not.toBeInTheDocument();
     expect(screen.getByLabelText('Appearance')).toBeInTheDocument();
+    expect(screen.getByLabelText('Body shape')).toBeInTheDocument();
+    expect(screen.getByLabelText('Hair')).toBeInTheDocument();
+    expect(screen.getByLabelText('Hair color')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Use in working draft' })).toBeInTheDocument();
+  });
+
+  it('round-trips skin tone, body shape, and hair color independently through Advanced', async () => {
+    const user = userEvent.setup();
+    const { onUse } = renderWorkshop({
+      initialDraft: populatedCharacterDraft('documentary presenter'),
+    });
+
+    await user.click(screen.getByRole('button', { name: /Appearance & hair/ }));
+    await user.type(screen.getByLabelText('Skin tone'), 'medium brown');
+    await user.type(screen.getByLabelText('Body shape'), 'athletic build');
+    await user.type(screen.getByLabelText('Hair'), 'long waves');
+    await user.type(screen.getByLabelText('Hair color'), 'deep auburn');
+    await user.click(screen.getByRole('button', { name: 'Use in working draft' }));
+
+    expect(onUse).toHaveBeenCalledWith(
+      expect.objectContaining({
+        prompt: expect.stringContaining('Body shape: athletic build.'),
+        draft: expect.objectContaining({
+          skinTone: 'medium brown',
+          bodyShape: 'athletic build',
+          hair: 'long waves',
+          hairColor: 'deep auburn',
+        }),
+      }),
+    );
+    expect(onUse.mock.calls[0]?.[0].prompt).toContain(
+      'Skin tone: medium brown. Hair: long waves, deep auburn.',
+    );
   });
 
   it('confirms before resetting a nonempty intent and leaves other intent drafts intact', async () => {

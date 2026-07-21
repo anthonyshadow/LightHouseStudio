@@ -118,7 +118,7 @@ for (const viewport of exactViewports) {
     test.skip(browserName !== 'chromium', 'The exact visual-state matrix runs in Chromium.');
     const network = await installSuccessfulStudioHarness(page);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.goto('/');
+    await page.goto('/advanced');
     await expectNoDocumentOverflow(page);
     const stableStageRect = await readStageRect(page);
 
@@ -251,7 +251,7 @@ test('Local Camera starts, records, and finalizes a playable take without provid
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/advanced');
   await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
 
   await page.getByRole('button', { name: 'Shelf' }).click();
@@ -299,7 +299,7 @@ test('Download initiation enables Close and releases the reviewed take without r
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/advanced');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Start local preview' }).click();
@@ -341,7 +341,7 @@ test('ordinary Shelf closure and a breakpoint change preserve the unsaved recipe
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.setViewportSize({ width: 834, height: 1_112 });
-  await page.goto('/');
+  await page.goto('/advanced');
 
   await page.getByRole('button', { name: 'Shelf' }).click();
   await page.getByRole('button', { name: 'New character recipe' }).click();
@@ -365,7 +365,7 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/advanced');
   await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
 
   await openRecipeDockWhenOverlaid(page);
@@ -430,7 +430,7 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
 
 test('a Lucy model take finalizes before the provider session is released', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/advanced');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
@@ -486,7 +486,7 @@ test('VTON 3 accepts a valid ephemeral garment image and starts with image-only 
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/advanced');
   await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
 
   await openRecipeDockWhenOverlaid(page);
@@ -523,7 +523,7 @@ test('VTON 3 accepts a valid ephemeral garment image and starts with image-only 
 test('Space records and finishes only outside editable controls', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.setViewportSize({ width: 1_280, height: 720 });
-  await page.goto('/');
+  await page.goto('/advanced');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Start local preview' }).click();

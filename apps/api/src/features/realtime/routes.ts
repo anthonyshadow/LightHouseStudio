@@ -9,7 +9,8 @@ import {
 } from '../../providers/decart/token-provider.js';
 
 const TOKEN_EXPIRY_SECONDS = 300;
-const MAX_SESSION_DURATION_SECONDS = 300;
+const ADVANCED_MAX_SESSION_DURATION_SECONDS = 300;
+const GUIDED_MAX_SESSION_DURATION_SECONDS = 420;
 
 const verifyProviderOrigin = (request: FastifyRequest): Promise<void> => {
   requireTrustedOrigin(request);
@@ -41,13 +42,17 @@ export const registerRealtimeRoutes = (
       }
 
       const origin = requireTrustedOrigin(request);
+      const maxSessionDurationSeconds =
+        parsed.data.sessionProfile === 'guided'
+          ? GUIDED_MAX_SESSION_DURATION_SECONDS
+          : ADVANCED_MAX_SESSION_DURATION_SECONDS;
       const lifetime = createRequestLifetime(request, reply);
       try {
         const token = await provider.createToken({
           model: parsed.data.model,
           origin,
           expiresInSeconds: TOKEN_EXPIRY_SECONDS,
-          maxSessionDurationSeconds: MAX_SESSION_DURATION_SECONDS,
+          maxSessionDurationSeconds,
           signal: lifetime.signal,
         });
         return realtimeTokenResponseSchema.parse({
@@ -55,7 +60,7 @@ export const registerRealtimeRoutes = (
           expiresAt: token.expiresAt,
           constraints: {
             model: parsed.data.model,
-            maxSessionDurationSeconds: MAX_SESSION_DURATION_SECONDS,
+            maxSessionDurationSeconds,
             applicationOrigin: origin,
           },
         });

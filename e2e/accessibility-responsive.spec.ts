@@ -170,7 +170,7 @@ for (const viewport of representativeViewports) {
   test(`${viewport.name} preparation is accessible and viewport-bound`, async ({ page }) => {
     const network = await installProviderFreeStudio(page);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.goto('/');
+    await page.goto('/advanced');
 
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
@@ -214,7 +214,7 @@ test('small-mobile Recipe Dock scrolls internally and Escape restores launcher f
 }) => {
   const network = await installProviderFreeStudio(page);
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/');
+  await page.goto('/advanced');
 
   const launcher = page.getByRole('button', { name: 'Dock' });
   await launcher.focus();
@@ -260,7 +260,7 @@ test('large text keeps critical preparation controls usable at a narrow width', 
 }) => {
   const network = await installProviderFreeStudio(page);
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/');
+  await page.goto('/advanced');
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '150%';
   });
@@ -278,7 +278,7 @@ test('large text keeps critical preparation controls usable at a narrow width', 
 
 test('empty VTON Start is blocked before camera access or token issuance', async ({ page }) => {
   const network = await installProviderFreeStudio(page);
-  await page.goto('/');
+  await page.goto('/advanced');
 
   await openRecipeDockWhenOverlaid(page);
   const vtonMode = page.getByRole('button', { name: 'Virtual Try-On · VTON 3' });
@@ -302,7 +302,7 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
   page,
 }) => {
   const network = await installProviderFreeStudio(page);
-  await page.goto('/');
+  await page.goto('/advanced');
 
   await openRecipeDockWhenOverlaid(page);
   const start = page.getByRole('button', { name: 'Start local preview' });

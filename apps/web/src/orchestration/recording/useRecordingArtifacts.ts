@@ -3,9 +3,14 @@ import { revokeArtifactUrl } from '../../features/recording/recordingHelpers';
 import type {
   RecordingArtifact,
   RecordingAudioSidecar,
+  RestorePersistedOriginalInput,
   VoiceProcessingState,
 } from '../../features/recording/types';
-import { createProcessedRecordingArtifact, IDLE_AUDIO_SIDECAR } from './recordingArtifacts';
+import {
+  createPersistedOriginalRecording,
+  createProcessedRecordingArtifact,
+  IDLE_AUDIO_SIDECAR,
+} from './recordingArtifacts';
 
 export const useRecordingArtifacts = () => {
   const [original, setOriginal] = useState<RecordingArtifact | null>(null);
@@ -33,6 +38,20 @@ export const useRecordingArtifacts = () => {
       setDownloaded(false);
     },
     [],
+  );
+
+  const restorePersistedOriginal = useCallback(
+    (input: RestorePersistedOriginalInput): RecordingArtifact => {
+      const restored = createPersistedOriginalRecording(input);
+      try {
+        publishOriginal(restored.artifact, restored.sidecar);
+      } catch (error) {
+        URL.revokeObjectURL(restored.artifact.objectUrl);
+        throw error;
+      }
+      return restored.artifact;
+    },
+    [publishOriginal],
   );
 
   const discardArtifacts = useCallback(() => {
@@ -133,6 +152,7 @@ export const useRecordingArtifacts = () => {
       downloaded,
       originalRef,
       publishOriginal,
+      restorePersistedOriginal,
       discardArtifacts,
       markSidecarRecording,
       failSidecar,
@@ -154,6 +174,7 @@ export const useRecordingArtifacts = () => {
       processingError,
       downloaded,
       publishOriginal,
+      restorePersistedOriginal,
       discardArtifacts,
       markSidecarRecording,
       failSidecar,

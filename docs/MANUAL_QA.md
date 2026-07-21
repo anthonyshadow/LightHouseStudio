@@ -22,6 +22,14 @@ For the Recipe Dock, Character Workshop, Recipe Shelf, Capture Settings, and tak
 
 At `320×568` and `390×844`, repeat with browser chrome expanded/collapsed and the software keyboard open. Safe-area padding must keep the header, close control, primary action, and bottom rail reachable. At 150–200% text/zoom, dense tools may scroll internally; the document still must not scroll.
 
+### Guided responsive page
+
+For Guided, repeat at `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`. Vertical page scrolling is expected in Create; horizontal document or body scrolling is not. Open Presentation, Skin Tone, Body Shape, Hairstyle, Hair Color, and Outfit together and confirm every card and action remains within the viewport. Expand and collapse each of the 16 category drawers independently. Body and outfit imagery must show the complete head-to-feet silhouette, hairstyle imagery must show the complete defining cut, and every applicable image container must use a contain/letterbox treatment instead of subject-cropping.
+
+Before choosing Presentation, confirm all nine starter cards and the direction preview use a diverse four-profile montage. Choose Woman, Man, Non-binary, and explicit Not specified in turn; confirm person-bearing artwork swaps immediately, the change is announced, shared Skin Tone remains unfiltered, and any outside-suggestion current choice remains pinned rather than erased.
+
+Force IndexedDB open, transaction, and quota failures. Confirm **Retry Save** genuinely reopens durable storage and flushes all in-memory project records and Blobs; a failed retry must leave the tab copy intact. Reopen a project with a missing reference, processed Blob, or original Blob and confirm it falls back respectively to the complete prompt, immutable original, or a safe Live state instead of opening an unusable stage.
+
 ## No-key and local guarantee
 
 1. Leave both provider key fields empty, restart `npm run dev`, and open a private browser window.
@@ -88,7 +96,7 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Close and reopen an unsaved structured workshop draft or Recipe Shelf editor; confirm each draft is restored. Ordinary overlay closure must not discard edits. Explicit Reset/Discard/Delete actions retain their destructive confirmation where applicable.
 - Create/search/use/edit/rename/delete character and try-on recipes. Confirm model scoping and case-insensitive metadata search.
 - Successfully Start/Apply a nonempty prompt and confirm it enters Recents; typing alone must not.
-- Seed `realtime-creator-studio.creative-assets.v1` without image fields, reload, and confirm v2 migration preserves every record with null references. Corrupt v2, or block storage/force a quota failure, and confirm safe recovery/session-only behavior.
+- Seed `realtime-creator-studio.creative-assets.v1` without image fields, reload, and confirm v3 migration preserves every record with null references and empty Skin Tone/Body Shape/Hair Color values without splitting legacy Appearance or Hair text. Repeat from a valid v2 shelf to confirm reference identities survive. Corrupt v3, or block storage/force a quota failure, and confirm safe recovery/session-only behavior.
 - Use a persisted reference from Recent and Character cards. Confirm the exact asset is fetched and validated before prompt/image are committed together; a missing asset leaves the current draft unchanged and offers Retry plus explicit Continue without reference.
 - Inspect local storage: only versioned text/metadata and opaque asset IDs should exist—no image data, content URLs, storage keys, tokens, device ids, recordings, sidecars, or voice selection.
 
@@ -150,7 +158,7 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Test a screen reader on idle, requesting permission, pending Apply, recording, processing, error, and success states.
 - Test exactly `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`, then one intermediate width on each side of the 1024 px and 640 px layout changes. Also test portrait/landscape, 200% zoom, large text, touch targets, and reduced motion.
 - At narrow sizes confirm status pills retain complete accessible names when visible text becomes dots, More settings retains its accessible label when icon-only, and truncated metadata exposes its full value through a title or accessible name.
-- Confirm no horizontal or vertical document overflow, clipped critical action/focus ring, hover-only function, unexpected multi-line button, or stage content covering controls. Every touch action must remain approximately 44×44 CSS px or larger.
+- In Advanced, confirm no horizontal or vertical document overflow. In Guided Create, confirm controlled vertical scrolling and no horizontal document overflow. In both experiences, confirm no clipped critical action/focus ring, hover-only function, unexpected multi-line button, or stage content covering controls. Every touch action must remain approximately 44×44 CSS px or larger.
 
 ## Cleanup inspection
 

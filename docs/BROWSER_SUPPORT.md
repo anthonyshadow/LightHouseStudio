@@ -10,7 +10,9 @@ The studio must run in a secure context. Loopback HTTP (`127.0.0.1`/`localhost`)
 
 ## Viewport and input layout
 
-The application is a viewport-bound studio, not a scrolling document. `html`, `body`, and `#root` are full-size, overflow-hidden roots; the shell prefers `100dvh` with `100svh`/`100vh` fallbacks. Safe-area insets are included in shell and overlay padding. The fixed shell contains the header, stable stage, capture strip, and tool launcher; only named overlay bodies scroll.
+Advanced Studio is a viewport-bound workspace rather than a scrolling document. `html`, `body`, and `#root` are full-size, overflow-hidden roots; the shell prefers `100dvh` with `100svh`/`100vh` fallbacks. Safe-area insets are included in shell and overlay padding. The fixed Advanced shell contains the header, stable stage, capture strip, and tool launcher; only named overlay bodies scroll.
+
+Guided Create is intentionally a vertically scrolling page because its independently collapsible choice drawers can contain many visual options. Its shell owns that scrolling, never creates horizontal document overflow, and keeps cards, controls, focus rings, and navigation within the available width. Guided Live, Record, Voice, Download, and Projects use the same responsive containment rules at phone, tablet, laptop, and desktop sizes.
 
 Responsive behavior is range-based:
 
@@ -28,6 +30,7 @@ The required visual regression sizes are `1440×960`, `1280×720`, `834×1112`, 
 | Capability                       | Required browser API or condition                                       | Degradation                                                                                     |
 | -------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | Prompt workshop and Recipe Shelf | React, `localStorage` for durability                                    | Falls back to in-memory session-only assets if storage fails                                    |
+| Guided projects                  | IndexedDB with structured-clone `Blob` support                          | Keeps the current project in memory and exposes retry/original-download/tab-only recovery       |
 | Capture source selection         | `enumerateDevices`; labels may require prior permission                 | Default camera/microphone remain selectable                                                     |
 | Camera preview                   | Secure context, `navigator.mediaDevices.getUserMedia`                   | Blocked with actionable notice                                                                  |
 | Recording                        | `MediaRecorder`, a live video track, a supported/default MIME type      | Start is disabled/errors safely; the current live session remains until Finish or explicit Stop |
@@ -50,7 +53,7 @@ Codec claims from `MediaRecorder.isTypeSupported` are necessary but not sufficie
 - Mobile browsers may stop camera tracks when the tab backgrounds, the screen locks, a call arrives, or another app claims the camera.
 - Multiple cameras/microphones, Bluetooth handoff, privacy switches, and virtual devices can end tracks unexpectedly.
 - Enterprise policies, browser extensions, VPN/firewall rules, NAT, and provider outages can block WebRTC while local capture still works.
-- Long recordings and audio remuxing are memory-intensive because artifacts are held in the tab. Model credentials cap realtime sessions at five minutes; ElevenLabs UI limits conversion to takes no longer than five minutes.
+- Long recordings and audio remuxing are memory-intensive because artifacts are held in the tab. Connection-start credentials expire after five minutes. Advanced active sessions are capped at five minutes; Guided Character sessions are capped at seven minutes and reconnect before countdown when needed to preserve a five-minute take. ElevenLabs UI limits conversion to takes no longer than five minutes.
 - Reduced-power/mobile devices may not render offline audio or remux quickly enough for a comfortable workflow.
 
 ## Release browser matrix

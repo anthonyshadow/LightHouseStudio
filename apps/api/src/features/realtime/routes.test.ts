@@ -87,6 +87,23 @@ describe('realtime token API', () => {
     expect(createToken).toHaveBeenCalledTimes(1);
   });
 
+  it('issues a seven-minute active session only for the guided recording profile', async () => {
+    const { app, scopes } = setup();
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/realtime-token',
+      headers: localOriginHeaders,
+      payload: { model: 'lucy-2.5', sessionProfile: 'guided' },
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.json().constraints.maxSessionDurationSeconds).toBe(420);
+    expect(scopes[0]).toMatchObject({
+      expiresInSeconds: 300,
+      maxSessionDurationSeconds: 420,
+    });
+  });
+
   it('requires a canonical loopback browser origin', async () => {
     const { app, createToken } = setup();
     const missing = await app.inject({ method: 'POST', url: '/api/realtime-token', payload: {} });

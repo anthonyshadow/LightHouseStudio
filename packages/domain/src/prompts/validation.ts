@@ -52,7 +52,10 @@ const hasCharacterDetail = (draft: CharacterTransformDraft): boolean =>
     draft.characterBase.trim() ||
     draft.matchReference ||
     draft.appearance.trim() ||
+    draft.skinTone?.trim() ||
+    draft.bodyShape?.trim() ||
     draft.hair.trim() ||
+    draft.hairColor?.trim() ||
     draft.outfit.trim() ||
     draft.accessories.trim() ||
     draft.expression.trim() ||

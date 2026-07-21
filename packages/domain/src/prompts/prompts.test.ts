@@ -18,16 +18,36 @@ describe('structured prompt generation', () => {
       adultAge: 'older-adult',
       gender: 'woman',
       characterBase: 'lunar cartographer',
+      bodyShape: 'athletic build',
       matchReference: true,
+      skinTone: 'medium brown',
+      hair: 'long waves',
+      hairColor: 'auburn',
       outfit: 'indigo utility suit',
       preserve: 'hand gestures',
     };
     const result = generateStructuredPrompt(draft, { hasReferenceImage: true });
     expect(result.validation.valid).toBe(true);
     expect(result.prompt).toBe(
-      'Substitute the character in the video with older adult woman lunar cartographer. Match the provided portrait reference. Outfit: indigo utility suit. Preserve: hand gestures.',
+      'Substitute the character in the video with older adult woman lunar cartographer. Body shape: athletic build. Match the provided portrait reference. Skin tone: medium brown. Hair: long waves, auburn. Outfit: indigo utility suit. Preserve: hand gestures.',
     );
-    expect(result.prompt).not.toContain('Hair:');
+    expect(result.prompt).not.toContain('Appearance:');
+  });
+
+  it('keeps hairstyle and hair color independent and treats either as useful detail', () => {
+    const hairstyle = {
+      ...createPromptBuilderDraft('character-transform'),
+      hair: 'textured crop',
+    };
+    const color = {
+      ...createPromptBuilderDraft('character-transform'),
+      hairColor: 'gray-silver',
+    };
+
+    expect(generateStructuredPrompt(hairstyle).prompt).toBe('Hair: textured crop.');
+    expect(generateStructuredPrompt(color).prompt).toBe('Hair: gray-silver.');
+    expect(validatePromptBuilderDraft(hairstyle).valid).toBe(true);
+    expect(validatePromptBuilderDraft(color).valid).toBe(true);
   });
 
   it.each([
@@ -141,6 +161,24 @@ describe('structured prompt validation', () => {
     expect(JSON.stringify(sanitized)).not.toContain('token');
   });
 
+  it('migrates legacy character drafts with empty first-class visual fields', () => {
+    const sanitized = sanitizePromptBuilderDraft({
+      intent: 'character-transform',
+      adultAge: 'adult',
+      characterBase: 'archivist',
+      hair: 'short black hair',
+    });
+
+    expect(sanitized).toMatchObject({
+      intent: 'character-transform',
+      characterBase: 'archivist',
+      skinTone: '',
+      bodyShape: '',
+      hair: 'short black hair',
+      hairColor: '',
+    });
+  });
+
   it('offers an optional allowlisted gender choice with an adult-safe generated description', () => {
     const draft = {
       ...createPromptBuilderDraft('character-transform'),
@@ -222,6 +260,23 @@ describe('character reference image prompt', () => {
   it('provides a stable canonical value for server-side SHA-256 hashing', () => {
     expect(characterReferencePromptHashInput('  Lunar   Cartographer  ')).toBe(
       characterReferencePromptHashInput('lunar cartographer'),
+    );
+  });
+
+  it('changes the reference fingerprint input when body shape or hair color changes', () => {
+    const base = {
+      ...createPromptBuilderDraft('character-transform'),
+      characterBase: 'lunar cartographer',
+    };
+    const original = generateStructuredPrompt(base).prompt;
+    const bodyChanged = generateStructuredPrompt({ ...base, bodyShape: 'athletic build' }).prompt;
+    const colorChanged = generateStructuredPrompt({ ...base, hairColor: 'silver' }).prompt;
+
+    expect(characterReferencePromptHashInput(bodyChanged)).not.toBe(
+      characterReferencePromptHashInput(original),
+    );
+    expect(characterReferencePromptHashInput(colorChanged)).not.toBe(
+      characterReferencePromptHashInput(original),
     );
   });
 });

@@ -66,6 +66,7 @@ const createRecording = (
     downloaded: false,
     start: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(original),
+    restorePersistedOriginal: vi.fn().mockReturnValue(original),
     discard: vi.fn(),
     markDownloaded: vi.fn(),
     beginProcessing: vi.fn(),
@@ -153,6 +154,7 @@ describe('VoiceEffectsPanel', () => {
 describe('VoiceLibrary accessibility', () => {
   it('uses item-specific import and preview names, then announces and focuses a successful import', async () => {
     const user = userEvent.setup();
+    const onApply = vi.fn();
     voiceApi.listPublicVoices.mockResolvedValue({
       ...emptyPage,
       voices: [
@@ -170,7 +172,7 @@ describe('VoiceLibrary accessibility', () => {
     });
     voiceApi.importPublicVoice.mockResolvedValue('workspace-voice');
 
-    renderWithTheme(<VoiceLibrary disabled={false} onApply={vi.fn()} />);
+    renderWithTheme(<VoiceLibrary disabled={false} onApply={onApply} />);
     await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
 
     await user.click(screen.getByRole('button', { name: 'Public library' }));
@@ -187,5 +189,42 @@ describe('VoiceLibrary accessibility', () => {
     expect(
       screen.getByRole('button', { name: 'Apply Public Star to recorded audio' }),
     ).toHaveFocus();
+    expect(onApply).not.toHaveBeenCalled();
+  });
+
+  it('can collapse public import and application into one explicit Add & Apply action', async () => {
+    const user = userEvent.setup();
+    const onApply = vi.fn();
+    const sharedVoice = {
+      voiceId: 'shared-voice',
+      name: 'Public Star',
+      category: 'featured',
+      description: 'Bright delivery',
+      labels: {},
+      previewAvailable: true,
+      publicOwnerId: 'owner-1',
+    };
+    voiceApi.listPublicVoices.mockResolvedValue({
+      ...emptyPage,
+      voices: [sharedVoice],
+      total: 1,
+    });
+    voiceApi.importPublicVoice.mockResolvedValue('workspace-voice');
+
+    renderWithTheme(<VoiceLibrary disabled={false} collapsePublicImport onApply={onApply} />);
+    await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
+
+    await user.click(screen.getByRole('button', { name: 'Public library' }));
+    await user.click(await screen.findByRole('button', { name: 'Select Public Star' }));
+
+    expect(
+      screen.queryByRole('button', { name: 'Import Public Star into workspace' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Add & Apply Public Star' }));
+
+    await waitFor(() =>
+      expect(onApply).toHaveBeenCalledWith({ ...sharedVoice, voiceId: 'workspace-voice' }),
+    );
+    expect(voiceApi.importPublicVoice).toHaveBeenCalledTimes(1);
   });
 });

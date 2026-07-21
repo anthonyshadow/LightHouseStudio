@@ -1,4 +1,5 @@
 import { canSwitchMode } from '@studio/domain';
+import type { RealtimeSessionProfile } from '@studio/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   hasLiveVideo,
@@ -25,6 +26,7 @@ import { useSessionDraftState } from './useSessionDraftState';
 
 export type StudioSessionOptions = {
   availability: ProviderAvailability;
+  realtimeSessionProfile?: RealtimeSessionProfile;
   onPromptCommitted?: (
     mode: 'lucy-2.5' | 'lucy-vton-3',
     prompt: string,
@@ -38,6 +40,7 @@ export type StudioSessionWithCapturePreferences = StudioSessionController & {
 
 export const useStudioSession = ({
   availability,
+  realtimeSessionProfile,
   onPromptCommitted,
 }: StudioSessionOptions): StudioSessionWithCapturePreferences => {
   const [lifecycle, setLifecycle] = useState<SessionLifecycle>('idle');
@@ -173,6 +176,7 @@ export const useStudioSession = ({
       ensureMedia: ensurePreferredMedia,
       localRef,
       startLiveTimer,
+      ...(realtimeSessionProfile ? { realtimeSessionProfile } : {}),
       ...(onPromptCommitted ? { onPromptCommitted } : {}),
     });
 

@@ -267,6 +267,13 @@ describe('realtime credential contracts', () => {
     expect(realtimeTokenRequestSchema.safeParse({ model: 'lucy-2.5', apiKey: 'bad' }).success).toBe(
       false,
     );
+    expect(
+      realtimeTokenRequestSchema.parse({ model: 'lucy-2.5', sessionProfile: 'guided' }),
+    ).toEqual({ model: 'lucy-2.5', sessionProfile: 'guided' });
+    expect(
+      realtimeTokenRequestSchema.safeParse({ model: 'lucy-2.5', sessionProfile: 'unknown' })
+        .success,
+    ).toBe(false);
   });
 
   it('requires a nonempty temporary key and ISO expiry', () => {
