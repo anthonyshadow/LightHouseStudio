@@ -101,7 +101,7 @@ describe('voice API provider intent', () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
-        new Response(new Blob(['preview'], { type: 'audio/mpeg' }), {
+        new Response('preview', {
           status: 200,
           headers: { 'Content-Type': 'audio/mpeg' },
         }),
@@ -113,7 +113,7 @@ describe('voice API provider intent', () => {
         }),
       )
       .mockResolvedValueOnce(
-        new Response(new Blob(['converted'], { type: 'audio/mpeg' }), {
+        new Response('converted', {
           status: 200,
           headers: { 'Content-Type': 'audio/mpeg' },
         }),

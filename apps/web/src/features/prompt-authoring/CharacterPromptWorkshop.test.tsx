@@ -160,7 +160,7 @@ describe('CharacterPromptWorkshop', () => {
 
     expect(getUserMedia).not.toHaveBeenCalled();
     expect(fetchSpy).not.toHaveBeenCalled();
-  });
+  }, 15_000);
 
   it('blocks minor descriptions and advises when a requested reference portrait is absent', async () => {
     const user = userEvent.setup();

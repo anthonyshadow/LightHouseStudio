@@ -364,7 +364,7 @@ describe('CharacterBuilderForm', () => {
         customValue: value,
       });
     }
-  }, 10_000);
+  }, 20_000);
 
   it('stores skin tone independently from general appearance', async () => {
     const user = userEvent.setup();

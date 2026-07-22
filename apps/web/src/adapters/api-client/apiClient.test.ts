@@ -258,12 +258,12 @@ describe('reference image API client', () => {
   });
 
   it('hydrates a persisted reference from its stable URL and validates exact integrity', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(jpegBytes, {
-        status: 200,
-        headers: { 'Content-Type': 'image/jpeg' },
-      }),
-    );
+    const response = new Response(null, {
+      status: 200,
+      headers: { 'Content-Type': 'image/jpeg' },
+    });
+    vi.spyOn(response, 'blob').mockResolvedValue(new Blob([jpegBytes], { type: 'image/jpeg' }));
+    const fetchMock = vi.fn().mockResolvedValue(response);
     vi.stubGlobal('fetch', fetchMock);
     vi.stubGlobal(
       'createImageBitmap',
@@ -276,8 +276,10 @@ describe('reference image API client', () => {
       kind: 'persisted',
       assetId: asset.assetId,
       contentUrl: asset.contentUrl,
-      file: { name: `reference-${asset.assetId}.jpg`, type: 'image/jpeg', size: jpegBytes.length },
     });
+    expect(reference.file.name).toBe(`reference-${asset.assetId}.jpg`);
+    expect(reference.file.type).toBe('image/jpeg');
+    expect(reference.file.size).toBe(jpegBytes.length);
     expect(fetchMock).toHaveBeenCalledWith(
       asset.contentUrl,
       expect.objectContaining({ cache: 'no-store', headers: { Accept: 'image/jpeg' } }),
