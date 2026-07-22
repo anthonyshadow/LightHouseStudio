@@ -23,13 +23,26 @@ const focusedBaselines = [
   '06-take-review/latest-take.png',
 ];
 
-const retained = new Set(
+const curatedBaselines = new Set(
   viewportFolders.flatMap((viewport) => coreBaselines.map((baseline) => `${viewport}/${baseline}`)),
 );
 for (const viewport of [viewportFolders[0], viewportFolders[4]]) {
-  for (const baseline of focusedBaselines) retained.add(`${viewport}/${baseline}`);
+  for (const baseline of focusedBaselines) curatedBaselines.add(`${viewport}/${baseline}`);
 }
-if (retained.size !== 27) throw new Error(`Expected 27 curated baselines, got ${retained.size}.`);
+if (curatedBaselines.size !== 27) {
+  throw new Error(`Expected 27 curated baselines, got ${curatedBaselines.size}.`);
+}
+
+const platformFolders = (await readdir(screenshotsRoot, { withFileTypes: true }))
+  .filter((entry) => entry.isDirectory() && entry.name.startsWith('chromium-'))
+  .map((entry) => entry.name);
+if (platformFolders.length === 0) throw new Error('No platform-specific visual baselines found.');
+
+const retained = new Set(
+  platformFolders.flatMap((platformFolder) =>
+    [...curatedBaselines].map((baseline) => `${platformFolder}/${baseline}`),
+  ),
+);
 
 const files = [];
 const directories = [];
@@ -65,5 +78,5 @@ for (const directory of directories.toReversed()) {
 }
 
 console.log(
-  `Retained ${retained.size} curated baselines and removed ${removed.length} broad captures.`,
+  `Retained ${retained.size} curated baselines across ${platformFolders.length} platforms and removed ${removed.length} broad captures.`,
 );

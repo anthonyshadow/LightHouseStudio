@@ -1,7 +1,8 @@
 import { defineConfig, devices } from '@playwright/test';
-import { env } from 'node:process';
+import { env, platform } from 'node:process';
 
 const runningInCi = Boolean((env as unknown as Readonly<Record<string, string | undefined>>).CI);
+const snapshotPlatform = `chromium-${platform}`;
 
 export default defineConfig({
   testDir: './e2e',
@@ -12,7 +13,7 @@ export default defineConfig({
   retries: 0,
   reporter: [['list'], ['html', { open: 'never', outputFolder: 'playwright-report/visual' }]],
   outputDir: 'test-results/visual',
-  snapshotPathTemplate: '{testDir}/../screenshots/{arg}{ext}',
+  snapshotPathTemplate: `{testDir}/../screenshots/${snapshotPlatform}/{arg}{ext}`,
   expect: {
     toHaveScreenshot: {
       animations: 'disabled',
@@ -39,7 +40,7 @@ export default defineConfig({
       ],
     },
   },
-  projects: [{ name: 'chromium-linux' }],
+  projects: [{ name: snapshotPlatform }],
   webServer: {
     command: 'npm run build:packages && npm run dev --workspace @studio/web -- --strictPort',
     url: 'http://127.0.0.1:4173',
