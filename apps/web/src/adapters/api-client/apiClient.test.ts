@@ -3,11 +3,13 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
   CreateReferenceImageRequest,
+  EditReferenceImageRequest,
   OptimizeCharacterReferencePromptResponse,
   ReferenceImageAsset,
 } from '@studio/contracts';
 import {
   createReferenceImage,
+  editReferenceImage,
   fetchProviderAvailability,
   hydrateReferenceImage,
   optimizeCharacterReferencePrompt,
@@ -94,6 +96,7 @@ describe('reference image API client', () => {
             elevenLabs: { available: false, modelId: null },
             referenceImages: {
               available: true,
+              editAvailable: true,
               modelId: 'gpt-image-2',
               sizes: ['1024x1024', '1024x1536', '1536x1024'],
               quality: 'high',
@@ -111,6 +114,7 @@ describe('reference image API client', () => {
 
     await expect(fetchProviderAvailability()).resolves.toMatchObject({
       referenceImages: true,
+      referenceImageEditAvailable: true,
       referenceImageModel: 'gpt-image-2',
       referenceImageSizes: ['1024x1024', '1024x1536', '1536x1024'],
       referenceImageOptimizerAvailable: true,
@@ -174,6 +178,45 @@ describe('reference image API client', () => {
         body: JSON.stringify(request),
       }),
     );
+  });
+
+  it('edits by opaque source asset ID without sending source image bytes', async () => {
+    const editedAsset: ReferenceImageAsset = {
+      ...asset,
+      assetId: '7bf5e842-3cfe-4c5d-b945-a6ead02a3f01',
+      derivation: { kind: 'edit', sourceAssetId: asset.assetId },
+      contentUrl: '/api/reference-images/7bf5e842-3cfe-4c5d-b945-a6ead02a3f01/content',
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ asset: editedAsset }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const request: EditReferenceImageRequest = {
+      requestId: 'cb6ab812-0ebd-455b-8fe1-3a3665daf158',
+      rawPrompt,
+      changeInstructions: 'Change only the coat to green.',
+      options,
+      optimization: {
+        enabled: true,
+        ...optimizationResponse,
+        manuallyEdited: false,
+      },
+    };
+
+    await expect(editReferenceImage(asset.assetId, request)).resolves.toEqual(editedAsset);
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/reference-images/${asset.assetId}/edits`,
+      expect.objectContaining({
+        method: 'POST',
+        cache: 'no-store',
+        body: JSON.stringify(request),
+      }),
+    );
+    expect(JSON.stringify(request)).not.toContain('sourceImage');
+    expect(JSON.stringify(request)).not.toContain('base64');
   });
 
   it('hydrates a persisted reference from its stable URL and validates exact integrity', async () => {

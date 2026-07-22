@@ -278,15 +278,17 @@ export const useStudioSession = ({
     [disconnectRealtime, draftRef, lifecycle, localRef, selectDraft, setApplied],
   );
 
+  const canReplaceRecipeDraft = useCallback(
+    (mode: StudioMode): boolean =>
+      mode === draftRef.current.mode ||
+      canSwitchMode(lifecycle, false, hasLiveVideo(localRef.current)),
+    [draftRef, lifecycle, localRef],
+  );
+
   const replaceRecipeDraft = useCallback(
     (replacement: RecipeDraftReplacement): boolean => {
       const currentMode = draftRef.current.mode;
-      if (
-        replacement.mode !== currentMode &&
-        !canSwitchMode(lifecycle, false, hasLiveVideo(localRef.current))
-      ) {
-        return false;
-      }
+      if (!canReplaceRecipeDraft(replacement.mode)) return false;
       if (replacement.mode !== currentMode) {
         ++operationRef.current;
         startAbortRef.current?.abort();
@@ -298,7 +300,7 @@ export const useStudioSession = ({
       replaceRecipeDraftState(replacement);
       return true;
     },
-    [disconnectRealtime, draftRef, lifecycle, localRef, replaceRecipeDraftState, setApplied],
+    [canReplaceRecipeDraft, disconnectRealtime, draftRef, replaceRecipeDraftState, setApplied],
   );
 
   const clearError = useCallback(() => setError(null), []);
@@ -341,6 +343,7 @@ export const useStudioSession = ({
       stopCamera,
       releaseForRecordedReview,
       selectMode,
+      canReplaceRecipeDraft,
       replaceRecipeDraft,
       updatePrompt,
       updateEnhancement,
@@ -371,6 +374,7 @@ export const useStudioSession = ({
       stopCamera,
       releaseForRecordedReview,
       selectMode,
+      canReplaceRecipeDraft,
       replaceRecipeDraft,
       updatePrompt,
       updateEnhancement,

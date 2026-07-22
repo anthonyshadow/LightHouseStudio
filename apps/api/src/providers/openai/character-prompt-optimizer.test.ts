@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { APIConnectionError, APIConnectionTimeoutError } from 'openai';
 import type {
   CharacterPromptOptimizationResult,
   OptimizeCharacterReferencePromptRequest,
@@ -121,11 +122,15 @@ describe('OpenAICharacterPromptOptimizer', () => {
     await expect(malformed.optimize(input)).rejects.toMatchObject({ reason: 'invalid-response' });
   });
 
-  it('normalizes timeout, rate limit, authentication, and unknown failures', async () => {
+  it('normalizes connection, timeout, HTTP, and unknown failures', async () => {
     const failures = [
       {
-        error: Object.assign(new Error('timeout'), { name: 'APIConnectionTimeoutError' }),
+        error: new APIConnectionTimeoutError(),
         reason: 'timeout',
+      },
+      {
+        error: new APIConnectionError({ cause: new Error('unreachable') }),
+        reason: 'connection',
       },
       { error: Object.assign(new Error('slow down'), { status: 429 }), reason: 'rate-limit' },
       { error: Object.assign(new Error('bad key'), { status: 401 }), reason: 'authentication' },

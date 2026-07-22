@@ -4,6 +4,7 @@ import {
   RecipeShelfView,
   useRecipeShelfController,
   type CreativeAssetRepository,
+  type ActiveRecipeIdentity,
   type RecipeSelection,
   type RecipeShelfController,
   type SavedCharacterPrompt,
@@ -62,6 +63,9 @@ type CreativeWorkspaceProps = {
   shelfToggleRef: RefObject<HTMLButtonElement | null>;
   dockToggleRef: RefObject<HTMLButtonElement | null>;
   takeToggleRef: RefObject<HTMLButtonElement | null>;
+  legacyManagerToggleRef?: RefObject<HTMLButtonElement | null> | undefined;
+  legacyProjectCount?: number | undefined;
+  activeRecipe?: ActiveRecipeIdentity | undefined;
   hasTake: boolean;
   onOpenDock(): void;
   onOpenTake(): void;
@@ -79,6 +83,7 @@ type CreativeWorkspaceProps = {
   onShelfDirtyChange(dirty: boolean): void;
   onUseRecipe(selection: RecipeSelection): void;
   onOpenSavedWorkshop(draft: PromptBuilderDraft, asset: SavedCharacterPrompt): void;
+  onOpenLegacyProjects?(): void;
 };
 
 export type CreativePanelContentProps = Pick<
@@ -99,6 +104,9 @@ export type CreativePanelContentProps = Pick<
   | 'optimizerVersion'
   | 'referenceUsePending'
   | 'referenceUseFailure'
+  | 'activeRecipe'
+  | 'legacyManagerToggleRef'
+  | 'legacyProjectCount'
   | 'onLibraryModeChange'
   | 'onWorkshopDraftChange'
   | 'onUseWorkshop'
@@ -110,6 +118,7 @@ export type CreativePanelContentProps = Pick<
   | 'onShelfDirtyChange'
   | 'onUseRecipe'
   | 'onOpenSavedWorkshop'
+  | 'onOpenLegacyProjects'
 > & {
   panel: Exclude<AuxiliaryPanel, 'closed'>;
   shelfController: RecipeShelfController;
@@ -133,6 +142,9 @@ export const CreativePanelContent = ({
   optimizerVersion,
   referenceUsePending,
   referenceUseFailure,
+  activeRecipe,
+  legacyManagerToggleRef,
+  legacyProjectCount = 0,
   onLibraryModeChange,
   onWorkshopDraftChange,
   onUseWorkshop,
@@ -144,6 +156,7 @@ export const CreativePanelContent = ({
   onShelfDirtyChange,
   onUseRecipe,
   onOpenSavedWorkshop,
+  onOpenLegacyProjects,
   shelfController,
 }: CreativePanelContentProps) => {
   const theme = useTheme();
@@ -197,6 +210,15 @@ export const CreativePanelContent = ({
                   : 'Release camera & mic before inserting a recipe for another model. You can keep browsing and editing this shelf.'}
               </StatusNotice>
             ) : null}
+            {legacyProjectCount > 0 && onOpenLegacyProjects ? (
+              <Button
+                ref={legacyManagerToggleRef}
+                variant="secondary"
+                onClick={onOpenLegacyProjects}
+              >
+                Manage Legacy Projects ({legacyProjectCount})
+              </Button>
+            ) : null}
           </div>
           <RecipeShelfView
             activeMode={libraryMode}
@@ -204,6 +226,7 @@ export const CreativePanelContent = ({
             promptUseDisabled={recipeInsertionBlocked || referenceUsePending}
             repository={repository}
             controller={shelfController}
+            {...(activeRecipe !== undefined ? { activeRecipe } : {})}
             onDirtyChange={onShelfDirtyChange}
             onUsePrompt={onUseRecipe}
             onOpenCharacterWorkshop={onOpenSavedWorkshop}
@@ -261,6 +284,9 @@ export const CreativeWorkspace = ({
   shelfToggleRef,
   dockToggleRef,
   takeToggleRef,
+  legacyManagerToggleRef,
+  legacyProjectCount = 0,
+  activeRecipe,
   hasTake,
   onOpenDock,
   onOpenTake,
@@ -278,6 +304,7 @@ export const CreativeWorkspace = ({
   onShelfDirtyChange,
   onUseRecipe,
   onOpenSavedWorkshop,
+  onOpenLegacyProjects,
 }: CreativeWorkspaceProps) => {
   const theme = useTheme();
   const characterWorkshopBlocked =
@@ -289,6 +316,7 @@ export const CreativeWorkspace = ({
     onUsePrompt: onUseRecipe,
     onOpenCharacterWorkshop: onOpenSavedWorkshop,
     onDirtyChange: onShelfDirtyChange,
+    ...(activeRecipe !== undefined ? { activeRecipe } : {}),
   });
 
   return (
@@ -374,6 +402,9 @@ export const CreativeWorkspace = ({
             optimizerVersion={optimizerVersion}
             referenceUsePending={referenceUsePending}
             referenceUseFailure={referenceUseFailure}
+            {...(activeRecipe !== undefined ? { activeRecipe } : {})}
+            {...(legacyManagerToggleRef ? { legacyManagerToggleRef } : {})}
+            legacyProjectCount={legacyProjectCount}
             onLibraryModeChange={onLibraryModeChange}
             onWorkshopDraftChange={onWorkshopDraftChange}
             onUseWorkshop={onUseWorkshop}
@@ -385,6 +416,7 @@ export const CreativeWorkspace = ({
             onShelfDirtyChange={onShelfDirtyChange}
             onUseRecipe={onUseRecipe}
             onOpenSavedWorkshop={onOpenSavedWorkshop}
+            {...(onOpenLegacyProjects ? { onOpenLegacyProjects } : {})}
             shelfController={shelfController}
           />
         ) : null}

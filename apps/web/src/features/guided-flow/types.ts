@@ -10,8 +10,6 @@ export type { GuidedChoiceKey, GuidedChoiceValue, GuidedDesignV1, VisualProfile 
 
 export const GUIDED_PROJECT_SCHEMA_VERSION = 1 as const;
 
-export type GuidedStage = 'create' | 'live' | 'record' | 'voice' | 'download';
-
 export type GuidedReferenceMode = 'prompt-only' | 'generate' | 'existing';
 
 export type GuidedFinalVariant = 'original' | 'processed';

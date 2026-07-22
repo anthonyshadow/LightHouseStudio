@@ -2,6 +2,7 @@ import { createHash } from 'node:crypto';
 import { expect, type Page } from '@playwright/test';
 import type {
   CreateReferenceImageRequest,
+  EditReferenceImageRequest,
   OptimizeCharacterReferencePromptRequest,
   OptimizeCharacterReferencePromptResponse,
   ReferenceImageAsset,
@@ -73,13 +74,20 @@ export type BrowserJourneyState = {
 
 export type NetworkJourneyState = {
   apiRequests: Array<{ path: string; model: ModelId | null }>;
-  referenceWorkflowCalls: Array<'optimize' | 'generate'>;
+  referenceWorkflowCalls: Array<'optimize' | 'generate' | 'edit'>;
   referencePromptOptimizations: Array<{
     request: OptimizeCharacterReferencePromptRequest;
     response: OptimizeCharacterReferencePromptResponse;
   }>;
   referenceImageGenerations: Array<
     CreateReferenceImageRequest & { assetId: string; imagePromptSentToProvider: string }
+  >;
+  referenceImageEdits: Array<
+    EditReferenceImageRequest & {
+      sourceAssetId: string;
+      assetId: string;
+      imagePromptSentToProvider: string;
+    }
   >;
   referenceImageMetadataReads: string[];
   referenceImageContentReads: string[];
@@ -212,6 +220,7 @@ export const installSuccessfulStudioHarness = async (
     referenceWorkflowCalls: [],
     referencePromptOptimizations: [],
     referenceImageGenerations: [],
+    referenceImageEdits: [],
     referenceImageMetadataReads: [],
     referenceImageContentReads: [],
     blockedExternalRequests: [],
@@ -496,6 +505,7 @@ export const installSuccessfulStudioHarness = async (
           },
           referenceImages: {
             available: options.referenceImagesAvailable ?? true,
+            editAvailable: options.referenceImagesAvailable ?? true,
             modelId: 'gpt-image-2',
             sizes: ['1024x1024', '1024x1536', '1536x1024'],
             quality: 'high',
@@ -540,6 +550,47 @@ export const installSuccessfulStudioHarness = async (
       network.referenceWorkflowCalls.push('generate');
       network.referenceImageGenerations.push({
         ...payload,
+        assetId: asset.assetId,
+        imagePromptSentToProvider: asset.optimizedImagePrompt,
+      });
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ asset }),
+      });
+      return;
+    }
+
+    const editMatch = requestUrl.pathname.match(/^\/api\/reference-images\/([0-9a-f-]+)\/edits$/u);
+    if (editMatch && route.request().method() === 'POST') {
+      const sourceAssetId = editMatch[1] ?? '';
+      const payload = route.request().postDataJSON() as EditReferenceImageRequest;
+      const source = assets.get(sourceAssetId);
+      if (!source) {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: { code: 'not_found', message: 'That local reference image is unavailable.' },
+          }),
+        });
+        return;
+      }
+      let asset = assetsByRequestId.get(payload.requestId);
+      if (!asset) {
+        assetSequence += 1;
+        asset = {
+          ...createMockReferenceAsset(assetSequence, payload),
+          derivation: { kind: 'edit', sourceAssetId },
+        };
+        assetsByRequestId.set(payload.requestId, asset);
+        assets.set(asset.assetId, asset);
+      }
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.referenceWorkflowCalls.push('edit');
+      network.referenceImageEdits.push({
+        ...payload,
+        sourceAssetId,
         assetId: asset.assetId,
         imagePromptSentToProvider: asset.optimizedImagePrompt,
       });

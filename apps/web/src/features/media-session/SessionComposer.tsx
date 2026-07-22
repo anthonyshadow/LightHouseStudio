@@ -23,6 +23,7 @@ export interface SessionComposerProps {
   lockReason?: string | undefined;
   onOpenWorkshop: () => void;
   embedded?: boolean;
+  activeCharacterName?: string | undefined;
 }
 
 export const SessionComposer = ({
@@ -31,6 +32,7 @@ export const SessionComposer = ({
   lockReason,
   onOpenWorkshop,
   embedded = false,
+  activeCharacterName,
 }: SessionComposerProps) => {
   const theme = useTheme();
   const [modeSwitchNotice, setModeSwitchNotice] = useState(false);
@@ -100,6 +102,12 @@ export const SessionComposer = ({
           {modeSwitchNotice ? (
             <StatusNotice tone="warning" role="status">
               {lockReason ?? 'Finish the current live or recording action before changing modes.'}
+            </StatusNotice>
+          ) : null}
+
+          {activeCharacterName ? (
+            <StatusNotice tone="neutral" role="status" title="Active character">
+              {activeCharacterName} is preloaded. Apply or Start when you are ready.
             </StatusNotice>
           ) : null}
 

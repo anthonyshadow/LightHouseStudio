@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   CHARACTER_PROMPT_OPTIMIZER_DEFAULT_VERSION,
   optimizeCharacterReferencePromptResponseSchema,
@@ -6,6 +7,7 @@ import {
   REFERENCE_IMAGE_QUALITY,
   type CharacterPromptOptimizationResult,
   type CreateReferenceImageRequest,
+  type EditReferenceImageRequest,
   type OptimizeCharacterReferencePromptRequest,
   type OptimizeCharacterReferencePromptResponse,
   type ReferenceImageAsset,
@@ -19,8 +21,10 @@ import {
 } from './asset-store.js';
 import { InvalidReferenceImageError, validateReferenceImage } from './image-validation.js';
 import {
+  createReferenceImageEditPrompt,
   createPromptOptimizationInputHash,
   createWorkshopPromptHash,
+  REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION,
   versionReferenceImagePrompt,
 } from './prompt.js';
 import {
@@ -33,7 +37,10 @@ import {
 } from '../../providers/openai/reference-image-provider.js';
 
 export type ReferenceImageGenerationStateErrorReason =
+  | 'edit-not-configured'
   | 'generation-in-progress'
+  | 'request-id-conflict'
+  | 'source-asset-not-found'
   | 'optimizer-not-configured'
   | 'provider-not-configured'
   | 'stale-optimization'
@@ -51,6 +58,13 @@ export class ReferenceImageGenerationStateError extends Error {
 
 export interface GenerateReferenceImageInput extends CreateReferenceImageRequest {
   readonly localOwnerId: string;
+  readonly signal?: AbortSignal;
+}
+
+export interface EditReferenceImageInput extends EditReferenceImageRequest {
+  readonly localOwnerId: string;
+  readonly sourceAssetId: string;
+  readonly signal?: AbortSignal;
 }
 
 interface PreparedReferenceImageGeneration {
@@ -71,6 +85,51 @@ interface PreparedReferenceImageGeneration {
 
 type ReferenceImageOptions = CreateReferenceImageRequest['options'];
 type RecommendedReferenceImageSettings = CharacterPromptOptimizationResult['recommendedSettings'];
+
+type ActiveReferenceImageOperation = {
+  readonly requestId: string;
+  readonly requestFingerprint: string;
+  readonly result: Promise<StoredReferenceImageMetadata>;
+};
+
+const sha256 = (value: string): string => createHash('sha256').update(value, 'utf8').digest('hex');
+
+const generationRequestFingerprint = (input: GenerateReferenceImageInput): string =>
+  sha256(
+    JSON.stringify({
+      kind: 'generate',
+      rawPrompt: input.rawPrompt,
+      options: input.options,
+      generator: input.generator ?? null,
+      optimization: input.optimization,
+    }),
+  );
+
+const editRequestFingerprint = (input: EditReferenceImageInput): string =>
+  sha256(
+    JSON.stringify({
+      kind: 'edit',
+      templateVersion: REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION,
+      sourceAssetId: input.sourceAssetId,
+      rawPrompt: input.rawPrompt,
+      changeInstructions: input.changeInstructions,
+      options: input.options,
+      generator: input.generator ?? null,
+      optimization: input.optimization,
+    }),
+  );
+
+const assertMatchingFingerprint = (
+  metadata: StoredReferenceImageMetadata,
+  requestFingerprint: string,
+): void => {
+  if (
+    metadata.requestFingerprint !== undefined &&
+    metadata.requestFingerprint !== requestFingerprint
+  ) {
+    throw new ReferenceImageGenerationStateError('request-id-conflict');
+  }
+};
 
 const ORIENTATION_DEFAULTS: Record<
   ReferenceImageOptions['orientation'],
@@ -183,6 +242,16 @@ const safeMetadata = (metadata: StoredReferenceImageMetadata): ReferenceImageAss
     optimizer: audit?.optimizer ?? null,
     optimizationInputHash: audit?.inputHash ?? null,
     manuallyEdited: audit?.manuallyEdited ?? false,
+    ...(metadata.derivation === undefined
+      ? {}
+      : metadata.derivation.kind === 'edit'
+        ? {
+            derivation: {
+              kind: 'edit' as const,
+              sourceAssetId: metadata.derivation.sourceAssetId,
+            },
+          }
+        : { derivation: { kind: 'generate' as const } }),
     createdAt: metadata.createdAt,
     updatedAt: metadata.updatedAt ?? metadata.createdAt,
     contentUrl: `/api/reference-images/${metadata.assetId}/content`,
@@ -200,13 +269,7 @@ export class ReferenceImageService {
     string,
     Promise<OptimizeCharacterReferencePromptResponse>
   >();
-  #active:
-    | {
-        readonly localOwnerId: string;
-        readonly requestId: string;
-        readonly result: Promise<StoredReferenceImageMetadata>;
-      }
-    | undefined;
+  readonly #activeByOwner = new Map<string, ActiveReferenceImageOperation>();
 
   constructor(
     provider: ReferenceImageProvider | null,
@@ -235,6 +298,10 @@ export class ReferenceImageService {
 
   get optimizationAvailable(): boolean {
     return this.#optimizer !== null;
+  }
+
+  get editAvailable(): boolean {
+    return this.#provider?.edit !== undefined && this.#optimizer !== null;
   }
 
   async optimize(
@@ -278,12 +345,19 @@ export class ReferenceImageService {
   }
 
   async generate(input: GenerateReferenceImageInput): Promise<ReferenceImageAsset> {
+    const requestFingerprint = generationRequestFingerprint(input);
     const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
-    if (persisted !== null) return safeMetadata(persisted);
+    if (persisted !== null) {
+      assertMatchingFingerprint(persisted, requestFingerprint);
+      return safeMetadata(persisted);
+    }
 
-    const active = this.#active;
+    const active = this.#activeByOwner.get(input.localOwnerId);
     if (active !== undefined) {
-      if (active.localOwnerId === input.localOwnerId && active.requestId === input.requestId) {
+      if (active.requestId === input.requestId) {
+        if (active.requestFingerprint !== requestFingerprint) {
+          throw new ReferenceImageGenerationStateError('request-id-conflict');
+        }
         return safeMetadata(await active.result);
       }
       throw new ReferenceImageGenerationStateError('generation-in-progress');
@@ -292,20 +366,62 @@ export class ReferenceImageService {
       throw new ReferenceImageGenerationStateError('provider-not-configured');
     }
 
-    const result = this.#generateAndStore(this.#provider, input);
-    this.#active = {
-      localOwnerId: input.localOwnerId,
+    const result = this.#generateAndStore(this.#provider, input, requestFingerprint);
+    this.#activeByOwner.set(input.localOwnerId, {
       requestId: input.requestId,
+      requestFingerprint,
       result,
-    };
+    });
     try {
       return safeMetadata(await result);
     } finally {
-      if (this.#active?.result === result) this.#active = undefined;
+      if (this.#activeByOwner.get(input.localOwnerId)?.result === result) {
+        this.#activeByOwner.delete(input.localOwnerId);
+      }
     }
   }
 
-  #prepareGeneration(input: GenerateReferenceImageInput): PreparedReferenceImageGeneration {
+  async edit(input: EditReferenceImageInput): Promise<ReferenceImageAsset> {
+    const requestFingerprint = editRequestFingerprint(input);
+    const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
+    if (persisted !== null) {
+      assertMatchingFingerprint(persisted, requestFingerprint);
+      return safeMetadata(persisted);
+    }
+
+    const active = this.#activeByOwner.get(input.localOwnerId);
+    if (active !== undefined) {
+      if (active.requestId === input.requestId) {
+        if (active.requestFingerprint !== requestFingerprint) {
+          throw new ReferenceImageGenerationStateError('request-id-conflict');
+        }
+        return safeMetadata(await active.result);
+      }
+      throw new ReferenceImageGenerationStateError('generation-in-progress');
+    }
+    const editProvider = this.#provider?.edit;
+    if (editProvider === undefined || this.#provider === null) {
+      throw new ReferenceImageGenerationStateError('edit-not-configured');
+    }
+
+    const result = this.#editAndStore(this.#provider, editProvider, input, requestFingerprint);
+    this.#activeByOwner.set(input.localOwnerId, {
+      requestId: input.requestId,
+      requestFingerprint,
+      result,
+    });
+    try {
+      return safeMetadata(await result);
+    } finally {
+      if (this.#activeByOwner.get(input.localOwnerId)?.result === result) {
+        this.#activeByOwner.delete(input.localOwnerId);
+      }
+    }
+  }
+
+  #prepareGeneration(
+    input: GenerateReferenceImageInput | EditReferenceImageInput,
+  ): PreparedReferenceImageGeneration {
     if (input.optimization.enabled) {
       if (this.#optimizer === null) {
         throw new ReferenceImageGenerationStateError('optimizer-not-configured');
@@ -386,6 +502,7 @@ export class ReferenceImageService {
   async #generateAndStore(
     provider: ReferenceImageProvider,
     input: GenerateReferenceImageInput,
+    requestFingerprint: string,
   ): Promise<StoredReferenceImageMetadata> {
     const prepared = this.#prepareGeneration(input);
     let generated: Awaited<ReturnType<ReferenceImageProvider['generate']>>;
@@ -394,6 +511,7 @@ export class ReferenceImageService {
         prompt: prepared.prompt,
         size: prepared.size,
         format: prepared.format,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
       });
     } catch (error) {
       if (error instanceof ReferenceImageProviderError) throw error;
@@ -414,9 +532,72 @@ export class ReferenceImageService {
       promptAudit: prepared.promptAudit,
       promptHash: prepared.promptHash,
       requestId: input.requestId,
+      requestFingerprint,
+      derivation: { kind: 'generate' },
       ...(generated.providerRequestId === undefined
         ? {}
         : { providerRequestId: generated.providerRequestId }),
+    });
+  }
+
+  async #editAndStore(
+    provider: ReferenceImageProvider,
+    editProvider: NonNullable<ReferenceImageProvider['edit']>,
+    input: EditReferenceImageInput,
+    requestFingerprint: string,
+  ): Promise<StoredReferenceImageMetadata> {
+    const source = await this.#store.getContent(input.localOwnerId, input.sourceAssetId);
+    if (source === null) {
+      throw new ReferenceImageGenerationStateError('source-asset-not-found');
+    }
+
+    const prepared = this.#prepareGeneration(input);
+    const providerPrompt = createReferenceImageEditPrompt(
+      prepared.prompt,
+      input.changeInstructions,
+    );
+    let edited: Awaited<ReturnType<NonNullable<ReferenceImageProvider['edit']>>>;
+    try {
+      edited = await editProvider.call(provider, {
+        prompt: providerPrompt,
+        size: prepared.size,
+        format: prepared.format,
+        source: {
+          bytes: source.bytes,
+          mimeType: source.metadata.mimeType,
+        },
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      });
+    } catch (error) {
+      if (error instanceof ReferenceImageProviderError) throw error;
+      throw new ReferenceImageProviderError('failure', { cause: error });
+    }
+
+    const image = await validateReferenceImage(edited.base64, prepared.size);
+    return this.#store.store({
+      localOwnerId: input.localOwnerId,
+      bytes: image.bytes,
+      mimeType: image.mimeType,
+      size: prepared.size,
+      width: image.width,
+      height: image.height,
+      model: this.#imageModel,
+      quality: this.#imageQuality,
+      originalPrompt: input.rawPrompt,
+      // The provider-only prompt contains the raw requested change and must not be persisted.
+      derivedPrompt: prepared.prompt,
+      promptAudit: prepared.promptAudit,
+      promptHash: prepared.promptHash,
+      requestId: input.requestId,
+      requestFingerprint,
+      derivation: {
+        kind: 'edit',
+        sourceAssetId: input.sourceAssetId,
+        changeInstructionsHash: sha256(input.changeInstructions),
+      },
+      ...(edited.providerRequestId === undefined
+        ? {}
+        : { providerRequestId: edited.providerRequestId }),
     });
   }
 

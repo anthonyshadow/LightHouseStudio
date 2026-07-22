@@ -134,6 +134,7 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
           elevenLabs: { available: true, modelId: 'eleven_multilingual_sts_v2' },
           referenceImages: {
             available: false,
+            editAvailable: false,
             modelId: 'gpt-image-2',
             sizes: ['1024x1024', '1024x1536', '1536x1024'],
             quality: 'high',
@@ -721,7 +722,7 @@ for (const viewport of VIEWPORTS) {
         value: JSON.stringify(SEEDED_SHELF),
       });
 
-      await page.goto('/advanced');
+      await page.goto('/');
       await expect(page.getByRole('main')).toBeVisible();
       await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
       await page.addStyleTag({

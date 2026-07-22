@@ -154,6 +154,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     elevenLabsAvailable: elevenLabsProvider !== null,
     elevenLabsModelId: dependencies.config.elevenLabsModelId,
     referenceImagesAvailable: referenceImageService.generationAvailable,
+    referenceImageEditAvailable: referenceImageService.editAvailable,
     referenceImageModelId: dependencies.config.openAiReferenceImageModel,
     referenceImageQuality: dependencies.config.openAiReferenceImageQuality,
     promptOptimizerAvailable: referenceImageService.optimizationAvailable,

@@ -32,12 +32,18 @@ const focusShelfHeading = () => {
 
 type ControllerOptions = Pick<
   RecipeShelfProps,
-  'repository' | 'activeMode' | 'onUsePrompt' | 'onOpenCharacterWorkshop' | 'onDirtyChange'
+  | 'repository'
+  | 'activeMode'
+  | 'activeRecipe'
+  | 'onUsePrompt'
+  | 'onOpenCharacterWorkshop'
+  | 'onDirtyChange'
 >;
 
 export const useRecipeShelfController = ({
   repository,
   activeMode,
+  activeRecipe,
   onUsePrompt,
   onOpenCharacterWorkshop,
   onDirtyChange,
@@ -57,6 +63,16 @@ export const useRecipeShelfController = ({
   const [createKey, setCreateKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
+  const controlledSelection: SelectedRecipeState | null | undefined = activeRecipe
+    ? {
+        kind: activeRecipe.origin === 'character-prompt' ? 'character' : 'saved',
+        id: activeRecipe.assetId,
+      }
+    : activeRecipe === null
+      ? null
+      : undefined;
+  const effectiveSelectedRecipe =
+    controlledSelection === undefined ? selectedRecipe : controlledSelection;
   const searchResults = repository.search(query, activeMode);
   const visibleCategory =
     activeMode === 'lucy-vton-3' && category === 'characters' ? 'saved' : category;
@@ -101,6 +117,13 @@ export const useRecipeShelfController = ({
   useEffect(() => {
     if (tagFilter && !availableTags.includes(tagFilter)) setTagFilter('');
   }, [availableTags, tagFilter]);
+
+  useEffect(() => {
+    if (!activeRecipe) return;
+    setCategory(activeRecipe.origin === 'character-prompt' ? 'characters' : 'saved');
+    setQuery('');
+    setTagFilter('');
+  }, [activeRecipe]);
 
   useEffect(() => {
     if (!selectedRecipeRemainsVisible) setSelectedRecipe(null);
@@ -251,7 +274,7 @@ export const useRecipeShelfController = ({
 
   const selectRecipe = (next: SelectedRecipeState) => setSelectedRecipe(next);
   const isSelected = (kind: SelectedRecipeState['kind'], id: string) =>
-    selectedRecipe?.kind === kind && selectedRecipe.id === id;
+    effectiveSelectedRecipe?.kind === kind && effectiveSelectedRecipe.id === id;
 
   const categoryCounts: Record<ShelfCategory, number> = {
     saved: searchResults.savedPrompts.length,
@@ -273,7 +296,7 @@ export const useRecipeShelfController = ({
     tagFilter,
     availableTags,
     chooseTag,
-    selectedRecipe,
+    selectedRecipe: effectiveSelectedRecipe,
     selectRecipe,
     isSelected,
     formDirty,

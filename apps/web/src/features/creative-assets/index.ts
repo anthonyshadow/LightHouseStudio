@@ -1,6 +1,7 @@
 export {
   RecipeShelf,
   RecipeShelfView,
+  type ActiveRecipeIdentity,
   type RecipeSelection,
   type RecipeShelfProps,
   type RecipeShelfViewProps,
@@ -39,6 +40,7 @@ export {
   type GuidedChoiceValue,
   type GuidedDesignV1,
   type ModelModeId,
+  type PersistSavedCharacterPromptInput,
   type RecentPrompt,
   type RecordSuccessfulPromptInput,
   type ReferenceImageStatus,

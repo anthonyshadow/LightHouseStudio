@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import { APIConnectionError, APIConnectionTimeoutError, APIUserAbortError } from 'openai';
 import {
   OPENAI_REFERENCE_IMAGE_PARAMETERS,
   OpenAIReferenceImageProvider,
@@ -79,6 +80,53 @@ describe('OpenAIReferenceImageProvider', () => {
     expect(generate.mock.calls[0]?.[0]).not.toHaveProperty('output_compression');
   });
 
+  it('uploads stored source bytes to the image edit endpoint without input_fidelity', async () => {
+    const edit = vi.fn((_parameters: unknown, _options?: unknown) =>
+      Promise.resolve({
+        created: 1,
+        data: [{ b64_json: 'ZWRpdGVk' }],
+        _request_id: 'openai-edit-one',
+      }),
+    );
+    const provider = new OpenAIReferenceImageProvider(
+      'server-secret',
+      { model: 'gpt-image-2', quality: 'high' },
+      () => ({ images: { generate: vi.fn(), edit } }),
+    );
+    const controller = new AbortController();
+
+    await expect(
+      provider.edit({
+        source: { bytes: new Uint8Array([1, 2, 3]), mimeType: 'image/webp' },
+        prompt: 'Keep the same character and change only the coat to green.',
+        size: '1024x1536',
+        format: 'webp',
+        signal: controller.signal,
+      }),
+    ).resolves.toEqual({
+      base64: 'ZWRpdGVk',
+      providerRequestId: 'openai-edit-one',
+    });
+
+    expect(edit).toHaveBeenCalledOnce();
+    const [parameters, requestOptions] = edit.mock.calls[0] ?? [];
+    expect(parameters).toMatchObject({
+      model: 'gpt-image-2',
+      n: 1,
+      background: 'opaque',
+      quality: 'high',
+      size: '1024x1536',
+      output_format: 'webp',
+      output_compression: 90,
+      prompt: 'Keep the same character and change only the coat to green.',
+      image: { name: 'reference.webp', type: 'image/webp', size: 3 },
+    });
+    expect(parameters).not.toHaveProperty('input_fidelity');
+    expect(parameters).not.toHaveProperty('moderation');
+    expect(parameters).not.toHaveProperty('user');
+    expect(requestOptions).toEqual({ signal: controller.signal });
+  });
+
   it('rejects a response without documented b64_json image data', async () => {
     const provider = new OpenAIReferenceImageProvider(
       'server-secret',
@@ -98,11 +146,19 @@ describe('OpenAIReferenceImageProvider', () => {
     });
   });
 
-  it('normalizes provider timeout, rate limit, authentication, and moderation failures', async () => {
+  it('normalizes provider connection, timeout, abort, and HTTP failures', async () => {
     const failures = [
       {
-        error: Object.assign(new Error('timeout'), { name: 'APIConnectionTimeoutError' }),
+        error: new APIUserAbortError(),
+        reason: 'aborted',
+      },
+      {
+        error: new APIConnectionTimeoutError(),
         reason: 'timeout',
+      },
+      {
+        error: new APIConnectionError({ cause: new Error('unreachable') }),
+        reason: 'connection',
       },
       { error: Object.assign(new Error('slow down'), { status: 429 }), reason: 'rate-limit' },
       { error: Object.assign(new Error('bad key'), { status: 401 }), reason: 'authentication' },

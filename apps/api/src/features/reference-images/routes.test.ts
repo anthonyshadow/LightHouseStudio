@@ -1,4 +1,5 @@
-import { mkdtemp, rm } from 'node:fs/promises';
+import { request as httpRequest } from 'node:http';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import sharp from 'sharp';
@@ -14,6 +15,7 @@ import {
   type CharacterPromptOptimizer,
 } from '../../providers/openai/character-prompt-optimizer.js';
 import type {
+  EditReferenceImageProviderInput,
   GenerateReferenceImageProviderInput,
   ReferenceImageProvider,
 } from '../../providers/openai/reference-image-provider.js';
@@ -136,13 +138,13 @@ describe('reference image API', () => {
     });
 
     expect(generated.statusCode).toBe(200);
-    expect(providerInputs).toEqual([
-      {
-        prompt: optimizedResult.optimizedImagePrompt,
-        size: '1024x1024',
-        format: 'jpeg',
-      },
-    ]);
+    expect(providerInputs).toHaveLength(1);
+    expect(providerInputs[0]).toMatchObject({
+      prompt: optimizedResult.optimizedImagePrompt,
+      size: '1024x1024',
+      format: 'jpeg',
+    });
+    expect(providerInputs[0]?.signal).toBeInstanceOf(AbortSignal);
     expect(generated.json().asset).toMatchObject({
       optimizationEnabled: true,
       originalPrompt: 'A moss-covered guardian.',
@@ -152,11 +154,189 @@ describe('reference image API', () => {
       optimizer: { model: 'gpt-5.6', version: 'lucy-character-reference-v1' },
       optimizationInputHash: optimization.inputHash,
       manuallyEdited: false,
+      derivation: { kind: 'generate' },
       size: '1024x1024',
       quality: 'high',
     });
     expect(generated.body).not.toContain('storageKey');
     expect(generated.body).not.toContain('base64');
+  });
+
+  it('does not cancel a pending generation when a normal POST body finishes', async () => {
+    const image = await createImage('1024x1024');
+    let providerSignal: AbortSignal | undefined;
+    const provider: ReferenceImageProvider = {
+      generate: vi.fn(
+        (input: GenerateReferenceImageProviderInput) =>
+          new Promise<{ readonly base64: string }>((resolve, reject) => {
+            providerSignal = input.signal;
+            const timer = setTimeout(() => resolve({ base64: image.toString('base64') }), 50);
+            const abort = () => {
+              clearTimeout(timer);
+              reject(new ReferenceImageProviderError('aborted'));
+            };
+            if (input.signal?.aborted === true) abort();
+            else input.signal?.addEventListener('abort', abort, { once: true });
+          }),
+      ),
+    };
+    const app = await setup(provider);
+    await app.listen({ host: '127.0.0.1', port: 0 });
+    const address = app.server.address();
+    if (address === null || typeof address === 'string') throw new Error('Missing test address.');
+    const origin = `http://127.0.0.1:${address.port}`;
+    const requestBody = JSON.stringify(bypassPayload('A patient cartographer'));
+
+    const responseStatus = await new Promise<number | undefined>((resolve, reject) => {
+      const outgoing = httpRequest(
+        `${origin}/api/reference-images`,
+        {
+          method: 'POST',
+          headers: {
+            'content-type': 'application/json',
+            'content-length': Buffer.byteLength(requestBody),
+            origin,
+          },
+        },
+        (response) => {
+          response.resume();
+          response.once('end', () => resolve(response.statusCode));
+        },
+      );
+      outgoing.once('error', reject);
+      outgoing.end(requestBody);
+    });
+
+    expect(responseStatus).toBe(200);
+    expect(providerSignal).toBeInstanceOf(AbortSignal);
+    expect(providerSignal?.aborted).toBe(false);
+  });
+
+  it('edits an owner-scoped stored image and exposes only immutable lineage metadata', async () => {
+    const editInputs: EditReferenceImageProviderInput[] = [];
+    const provider: ReferenceImageProvider = {
+      generate: vi.fn(async (input: GenerateReferenceImageProviderInput) => ({
+        base64: (await createImage(input.size)).toString('base64'),
+      })),
+      edit: vi.fn(async (input: EditReferenceImageProviderInput) => {
+        editInputs.push(input);
+        return {
+          base64: (await createImage(input.size)).toString('base64'),
+          providerRequestId: 'provider-edit-one',
+        };
+      }),
+    };
+    const app = await setup(provider, optimizer());
+    const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
+    expect(capabilities.json().referenceImages.editAvailable).toBe(true);
+    const rawPrompt = 'A moss-covered guardian.';
+    const optimized = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/optimize',
+      headers: localHeaders,
+      payload: { rawPrompt, options },
+    });
+    const optimization = optimized.json<OptimizeCharacterReferencePromptResponse>();
+    const sourceResponse = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images',
+      headers: localHeaders,
+      payload: {
+        requestId,
+        rawPrompt,
+        options,
+        optimization: { enabled: true, ...optimization, manuallyEdited: false },
+      },
+    });
+    const sourceAssetId = sourceResponse.json().asset.assetId as string;
+    const changeInstructions = 'Change only the coat to green.';
+    const editPayload = {
+      requestId: secondRequestId,
+      rawPrompt,
+      changeInstructions,
+      options,
+      optimization: { enabled: true as const, ...optimization, manuallyEdited: false },
+    };
+
+    const edited = await app.inject({
+      method: 'POST',
+      url: `/api/reference-images/${sourceAssetId}/edits`,
+      headers: localHeaders,
+      payload: editPayload,
+    });
+
+    expect(edited.statusCode).toBe(200);
+    expect(editInputs).toHaveLength(1);
+    expect(editInputs[0]).toMatchObject({
+      source: { mimeType: 'image/jpeg' },
+      size: '1024x1024',
+      format: 'jpeg',
+    });
+    expect(editInputs[0]?.source.bytes.byteLength).toBeGreaterThan(0);
+    expect(editInputs[0]?.prompt).toContain(optimizedResult.optimizedImagePrompt.trim());
+    expect(editInputs[0]?.prompt).toContain(changeInstructions);
+    expect(edited.json().asset).toMatchObject({
+      derivation: { kind: 'edit', sourceAssetId },
+      originalPrompt: rawPrompt,
+      optimizedImagePrompt: optimizedResult.optimizedImagePrompt,
+    });
+    expect(edited.body).not.toContain(changeInstructions);
+    expect(edited.body).not.toContain('provider-edit-one');
+    const editedAssetId = edited.json().asset.assetId as string;
+    const dataDirectory = directories[0];
+    expect(dataDirectory).toBeDefined();
+    const storedMetadata = await readFile(
+      path.join(
+        dataDirectory ?? '',
+        'reference-images',
+        'v1',
+        'assets',
+        editedAssetId,
+        'metadata.json',
+      ),
+      'utf8',
+    );
+    expect(storedMetadata).not.toContain(changeInstructions);
+    expect(JSON.parse(storedMetadata)).toMatchObject({
+      requestFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      derivation: {
+        kind: 'edit',
+        sourceAssetId,
+        changeInstructionsHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
+      },
+    });
+
+    const replay = await app.inject({
+      method: 'POST',
+      url: `/api/reference-images/${sourceAssetId}/edits`,
+      headers: localHeaders,
+      payload: editPayload,
+    });
+    const conflict = await app.inject({
+      method: 'POST',
+      url: `/api/reference-images/${sourceAssetId}/edits`,
+      headers: localHeaders,
+      payload: { ...editPayload, changeInstructions: 'Change only the coat to blue.' },
+    });
+    expect(replay.json()).toEqual(edited.json());
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json().error.code).toBe('request_id_conflict');
+
+    const otherOwner = await app.inject({
+      method: 'POST',
+      url: `/api/reference-images/${sourceAssetId}/edits`,
+      headers: { origin: 'http://127.0.0.1:5173', host: '127.0.0.1:5173' },
+      payload: {
+        ...editPayload,
+        requestId: 'b83f42c1-0111-44af-a31b-d847771acd27',
+      },
+    });
+    expect(otherOwner.statusCode).toBe(404);
+    expect(otherOwner.json().error).toMatchObject({
+      code: 'not_found',
+      message: 'That local reference image is unavailable.',
+    });
+    expect(provider.edit).toHaveBeenCalledTimes(1);
   });
 
   it('keeps the explicit disabled branch and existing deterministic wrapper', async () => {
@@ -347,13 +527,55 @@ describe('reference image API', () => {
       method: 'POST',
       url: '/api/reference-images',
       headers: localHeaders,
+      payload,
+    });
+    const conflict = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images',
+      headers: localHeaders,
       payload: bypassPayload('A different prompt cannot change this request'),
     });
 
     expect(firstResponse.statusCode).toBe(200);
     expect(duplicateResponse.json()).toEqual(firstResponse.json());
     expect(replay.json()).toEqual(firstResponse.json());
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json().error.code).toBe('request_id_conflict');
     expect(generate).toHaveBeenCalledTimes(1);
+  });
+
+  it('serializes operations per owner without blocking a different local owner', async () => {
+    const image = await createImage('1024x1024');
+    let finishFirst: ((payload: { readonly base64: string }) => void) | undefined;
+    const generate = vi
+      .fn<ReferenceImageProvider['generate']>()
+      .mockImplementationOnce(
+        () =>
+          new Promise<{ readonly base64: string }>((resolve) => {
+            finishFirst = resolve;
+          }),
+      )
+      .mockResolvedValueOnce({ base64: image.toString('base64') });
+    const app = await setup({ generate });
+    const first = app.inject({
+      method: 'POST',
+      url: '/api/reference-images',
+      headers: localHeaders,
+      payload: bypassPayload('Owner one character'),
+    });
+    await vi.waitFor(() => expect(generate).toHaveBeenCalledTimes(1));
+
+    const otherOwner = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images',
+      headers: { origin: 'http://127.0.0.1:5173', host: '127.0.0.1:5173' },
+      payload: bypassPayload('Owner two character', secondRequestId),
+    });
+
+    expect(otherOwner.statusCode).toBe(200);
+    expect(generate).toHaveBeenCalledTimes(2);
+    finishFirst?.({ base64: image.toString('base64') });
+    await expect(first).resolves.toMatchObject({ statusCode: 200 });
   });
 
   it('releases generation after provider failure and normalizes configuration safely', async () => {
@@ -393,6 +615,7 @@ describe('reference image API', () => {
 
   it.each([
     ['authentication', 502, 'provider_authentication'],
+    ['connection', 502, 'provider_failure'],
     ['rate-limit', 429, 'rate_limited'],
     ['timeout', 504, 'request_timeout'],
     ['refusal', 400, 'moderation_blocked'],

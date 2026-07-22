@@ -225,6 +225,8 @@ const providerStatusOptions = (
 const mapReferenceImageProviderError = (error: ReferenceImageProviderError): AppError => {
   const options = providerStatusOptions(error.upstreamStatus);
   switch (error.reason) {
+    case 'aborted':
+      return new AppError(499, 'request_aborted', 'The reference image request was cancelled.');
     case 'moderation':
       return new AppError(
         400,
@@ -251,6 +253,13 @@ const mapReferenceImageProviderError = (error: ReferenceImageProviderError): App
         503,
         'provider_configuration',
         'Reference generation is unavailable until OpenAI is configured on the server.',
+        options,
+      );
+    case 'connection':
+      return new AppError(
+        502,
+        'provider_failure',
+        'The API server lost its connection to OpenAI during reference image generation. Check the Recent Shelf, then verify server network, DNS, TLS, and proxy access before deliberately trying again.',
         options,
       );
     case 'timeout':
@@ -301,6 +310,13 @@ const mapCharacterPromptOptimizerError = (error: CharacterPromptOptimizerError):
         'OpenAI rejected the configured server credential. Check OPENAI_API_KEY.',
         options,
       );
+    case 'connection':
+      return new AppError(
+        502,
+        'provider_failure',
+        'The API server could not reach OpenAI for prompt optimization. Verify server network, DNS, TLS, and proxy access, then retry the optimization.',
+        options,
+      );
     case 'timeout':
       return new AppError(
         504,
@@ -329,12 +345,26 @@ const mapReferenceImageGenerationStateError = (
   error: ReferenceImageGenerationStateError,
 ): AppError => {
   switch (error.reason) {
+    case 'edit-not-configured':
+      return new AppError(
+        503,
+        'feature_unavailable',
+        'Image-guided reference editing is unavailable from the configured provider.',
+      );
     case 'generation-in-progress':
       return new AppError(
         409,
         'generation_in_progress',
         'Another reference image is still being created. Wait for it to finish before regenerating.',
       );
+    case 'request-id-conflict':
+      return new AppError(
+        409,
+        'request_id_conflict',
+        'That request ID is already bound to different reference-image inputs. Start a new request.',
+      );
+    case 'source-asset-not-found':
+      return new AppError(404, 'not_found', 'That local reference image is unavailable.');
     case 'provider-not-configured':
       return new AppError(
         503,

@@ -35,8 +35,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command:
-      'VITE_CHARACTER_FLOW_ROLLOUT=all npm run build:packages && npm run dev --workspace @studio/web -- --strictPort',
+    command: 'npm run build:packages && npm run dev --workspace @studio/web -- --strictPort',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

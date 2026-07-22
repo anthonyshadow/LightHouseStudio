@@ -155,6 +155,125 @@ describe('creative asset CRUD and use', () => {
     expect(unchanged).toBe(store);
   });
 
+  it('attributes saved-prompt usage only to an exact prompt and reference version', () => {
+    let store = createSavedPrompt(
+      createEmptyCreativeAssetStore(),
+      {
+        title: 'Lunar guide A',
+        prompt: 'Substitute the character with a lunar guide.',
+        modelModeId: 'lucy-2.5',
+        source: 'manual',
+        referenceImageAssetId: 'asset-a',
+      },
+      context('saved-a'),
+    );
+    store = createSavedPrompt(
+      store,
+      {
+        title: 'Lunar guide B',
+        prompt: 'Substitute the character with a lunar guide.',
+        modelModeId: 'lucy-2.5',
+        source: 'manual',
+        referenceImageAssetId: 'asset-b',
+      },
+      context('saved-b', 1),
+    );
+
+    store = recordSuccessfulPromptUse(
+      store,
+      {
+        prompt: 'Substitute the character with a lunar guide.',
+        modelModeId: 'lucy-2.5',
+        savedPromptId: 'saved-a',
+        referenceImageAssetId: 'asset-b',
+      },
+      context('recent-b', 2),
+    );
+
+    expect(store.recentPrompts[0]?.savedPromptId).toBe('saved-b');
+    expect(store.savedPrompts.find((asset) => asset.id === 'saved-a')?.useCount).toBe(0);
+    expect(store.savedPrompts.find((asset) => asset.id === 'saved-b')?.useCount).toBe(1);
+
+    store = recordSuccessfulPromptUse(
+      store,
+      {
+        prompt: 'Substitute the character with a lunar guide.',
+        modelModeId: 'lucy-2.5',
+        savedPromptId: 'saved-b',
+        referenceImageAssetId: null,
+      },
+      context('recent-text', 3),
+    );
+    expect(store.recentPrompts[0]?.savedPromptId).toBeUndefined();
+    expect(store.savedPrompts.find((asset) => asset.id === 'saved-b')?.useCount).toBe(1);
+  });
+
+  it('detaches stale references and recent links when a saved prompt changes', () => {
+    let store = createSavedPrompt(
+      createEmptyCreativeAssetStore(),
+      {
+        title: 'Linked guide',
+        prompt: 'Substitute the character with an orbital guide.',
+        modelModeId: 'lucy-2.5',
+        source: 'manual',
+        referenceImageAssetId: 'asset-a',
+      },
+      context('saved-guide'),
+    );
+    store = recordSuccessfulPromptUse(
+      store,
+      {
+        prompt: 'Substitute the character with an orbital guide.',
+        modelModeId: 'lucy-2.5',
+        savedPromptId: 'saved-guide',
+        referenceImageAssetId: 'asset-a',
+      },
+      context('recent-guide', 1),
+    );
+
+    store = updateSavedPrompt(
+      store,
+      'saved-guide',
+      { prompt: 'Substitute the character with a desert guide.' },
+      timestamp(2),
+    );
+
+    expect(store.savedPrompts[0]?.referenceImageAssetId).toBeNull();
+    expect(store.recentPrompts[0]?.savedPromptId).toBeUndefined();
+  });
+
+  it('unlinks a sanitized recent when its saved recipe points at another reference version', () => {
+    let store = createSavedPrompt(
+      createEmptyCreativeAssetStore(),
+      {
+        title: 'Reference A',
+        prompt: 'Substitute the character with an orbital guide.',
+        modelModeId: 'lucy-2.5',
+        source: 'manual',
+        referenceImageAssetId: 'asset-a',
+      },
+      context('saved-a'),
+    );
+    store = recordSuccessfulPromptUse(
+      store,
+      {
+        prompt: 'Substitute the character with an orbital guide.',
+        modelModeId: 'lucy-2.5',
+        savedPromptId: 'saved-a',
+        referenceImageAssetId: 'asset-a',
+      },
+      context('recent-a', 1),
+    );
+    const recent = store.recentPrompts[0];
+    expect(recent).toBeDefined();
+
+    const sanitized = sanitizeCreativeAssetStore({
+      ...store,
+      recentPrompts: [{ ...recent, referenceImageAssetId: 'asset-b' }],
+    });
+    expect(sanitized.store.recentPrompts[0]?.savedPromptId).toBeUndefined();
+  });
+
   it('caps saved and recent collections at their contract limits', () => {
     let store = createEmptyCreativeAssetStore();
     for (let index = 0; index < SAVED_PROMPT_LIMIT + 1; index += 1) {
@@ -230,7 +349,8 @@ describe('creative asset CRUD and use', () => {
         promptIntent: 'character-transform',
         builderDraft,
         guidedDesign: guidedDesign(),
-        referenceImageStatus: 'prompt-only',
+        referenceImageStatus: 'persisted-reference',
+        referenceImageAssetId: 'asset-guided',
       },
       context('character-guided'),
     );
@@ -247,6 +367,8 @@ describe('creative asset CRUD and use', () => {
       promptIntent: null,
       builderDraft: null,
       guidedDesign: null,
+      referenceImageStatus: 'prompt-only',
+      referenceImageAssetId: null,
     });
   });
 });

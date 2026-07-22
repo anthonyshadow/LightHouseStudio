@@ -22,13 +22,17 @@ For the Recipe Dock, Character Workshop, Recipe Shelf, Capture Settings, and tak
 
 At `320×568` and `390×844`, repeat with browser chrome expanded/collapsed and the software keyboard open. Safe-area padding must keep the header, close control, primary action, and bottom rail reachable. At 150–200% text/zoom, dense tools may scroll internally; the document still must not scroll.
 
-### Guided responsive page
+### Fullscreen character builder
 
-For Guided, repeat at `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`. Vertical page scrolling is expected in Create; horizontal document or body scrolling is not. Open Presentation, Skin Tone, Body Shape, Hairstyle, Hair Color, and Outfit together and confirm every card and action remains within the viewport. Expand and collapse each of the 16 category drawers independently. Body and outfit imagery must show the complete head-to-feet silhouette, hairstyle imagery must show the complete defining cut, and every applicable image container must use a contain/letterbox treatment instead of subject-cropping.
+Open **Build Your Character** and repeat at `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`, plus portrait/landscape, short-height, notched-safe-area, and 200% zoom cases. The Studio document must remain fixed while the fullscreen panel scrolls internally. Open Presentation, Skin Tone, Body Shape, Hairstyle, Hair Color, and Outfit together and confirm every card, preview state, and footer action remains reachable. Expand and collapse each category independently. Body and outfit imagery must show the complete head-to-feet silhouette, hairstyle imagery must show the complete defining cut, and every applicable image container must use a contain/letterbox treatment instead of subject-cropping.
+
+Above `64rem`, confirm Character Direction Preview remains in the sticky right rail beside the form. At `64rem` and below, confirm it follows **Preserve and constraints** as the final item in the single-column flow, so users can reach preview and generation without returning to the top.
 
 Before choosing Presentation, confirm all nine starter cards and the direction preview use a diverse four-profile montage. Choose Woman, Man, Non-binary, and explicit Not specified in turn; confirm person-bearing artwork swaps immediately, the change is announced, shared Skin Tone remains unfiltered, and any outside-suggestion current choice remains pinned rather than erased.
 
-Force IndexedDB open, transaction, and quota failures. Confirm **Retry Save** genuinely reopens durable storage and flushes all in-memory project records and Blobs; a failed retry must leave the tab copy intact. Reopen a project with a missing reference, processed Blob, or original Blob and confirm it falls back respectively to the complete prompt, immutable original, or a safe Live state instead of opening an unusable stage.
+Edit the form, close and reopen the panel, then reload and confirm the single active IndexedDB draft resumes. Confirm **Reset Draft** requires confirmation and the next open is fresh. Force IndexedDB open, transaction, and quota failures; a failed close flush must leave the tab copy intact, explain that changes are not reload-safe, and require explicit discard. After a successful Save Character, reopen and confirm a fresh character starts.
+
+Enter through `/projects`, `/?project=…`, and `/guided?project=…`; confirm each history-replaces to `/` and opens Legacy Projects. Seed a project with original/processed media, confirm download uses the selected variant, and confirm deletion removes the project and owned artifacts after accessible confirmation. No Reopen action or Guided navigation may be present.
 
 ## No-key and local guarantee
 
@@ -158,7 +162,7 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Test a screen reader on idle, requesting permission, pending Apply, recording, processing, error, and success states.
 - Test exactly `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`, then one intermediate width on each side of the 1024 px and 640 px layout changes. Also test portrait/landscape, 200% zoom, large text, touch targets, and reduced motion.
 - At narrow sizes confirm status pills retain complete accessible names when visible text becomes dots, More settings retains its accessible label when icon-only, and truncated metadata exposes its full value through a title or accessible name.
-- In Advanced, confirm no horizontal or vertical document overflow. In Guided Create, confirm controlled vertical scrolling and no horizontal document overflow. In both experiences, confirm no clipped critical action/focus ring, hover-only function, unexpected multi-line button, or stage content covering controls. Every touch action must remain approximately 44×44 CSS px or larger.
+- In Studio, confirm no horizontal or vertical document overflow. In the fullscreen character builder, confirm controlled internal scrolling and no document overflow. Confirm no clipped critical action/focus ring, hover-only function, unexpected multi-line button, or stage content covering controls. Every touch action must remain approximately 44×44 CSS px or larger.
 
 ## Cleanup inspection
 

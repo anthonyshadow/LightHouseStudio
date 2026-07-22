@@ -71,6 +71,7 @@ export type StudioSessionController = {
   stopCamera(): void;
   releaseForRecordedReview(): Promise<void>;
   selectMode(mode: StudioMode): boolean;
+  canReplaceRecipeDraft(mode: StudioMode): boolean;
   replaceRecipeDraft(replacement: RecipeDraftReplacement): boolean;
   updatePrompt(prompt: string): void;
   updateEnhancement(enhance: boolean): void;

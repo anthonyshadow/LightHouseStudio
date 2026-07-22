@@ -128,7 +128,8 @@ export const PromptWorkshopActions = ({
 
       {saveState === 'saved' ? (
         <StatusNotice role="status" tone="success">
-          Saved as text and restorable workshop choices. Portrait images are never stored.
+          Saved with restorable workshop choices. Manual portraits are not copied into the Shelf;
+          generated references remain immutable local assets linked by ID.
         </StatusNotice>
       ) : null}
       {saveState === 'error' ? (

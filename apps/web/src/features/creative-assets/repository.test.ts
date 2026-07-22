@@ -1,5 +1,5 @@
 import { createPromptBuilderDraft } from '../prompt-authoring';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { createCreativeAssetRepository } from './repository';
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
@@ -166,6 +166,39 @@ describe('createCreativeAssetRepository', () => {
       savedPrompts: [expect.objectContaining({ referenceImageAssetId: 'asset-b' })],
       savedCharacterPrompts: [expect.objectContaining({ referenceImageAssetId: 'asset-b' })],
     });
+  });
+
+  it('increments character use only for the exact saved reference version', () => {
+    const repository = repositoryFixture();
+    const character = repository.createSavedCharacterPrompt({
+      name: 'Orbital guide',
+      prompt: 'Substitute the character with an orbital guide.',
+      promptIntent: 'character-transform',
+      referenceImageStatus: 'persisted-reference',
+      referenceImageAssetId: 'asset-a',
+    });
+
+    repository.recordSuccessfulPrompt({
+      prompt: character.prompt,
+      modelModeId: 'lucy-2.5',
+      savedCharacterPromptId: character.id,
+      referenceImageAssetId: 'asset-b',
+    });
+    expect(
+      repository.getSnapshot().store.savedCharacterPrompts.find((item) => item.id === character.id)
+        ?.useCount,
+    ).toBe(0);
+
+    repository.recordSuccessfulPrompt({
+      prompt: character.prompt,
+      modelModeId: 'lucy-2.5',
+      savedCharacterPromptId: character.id,
+      referenceImageAssetId: 'asset-a',
+    });
+    expect(
+      repository.getSnapshot().store.savedCharacterPrompts.find((item) => item.id === character.id)
+        ?.useCount,
+    ).toBe(1);
   });
 
   it('enriches the newest matching text-only recent without replacing an image version', () => {
@@ -395,5 +428,96 @@ describe('createCreativeAssetRepository', () => {
     expect(repository.getSnapshot().health).toBe('session-only');
     expect(repository.getSnapshot().notice).toMatch(/tab closes/i);
     expect(repository.getSnapshot().store.savedPrompts).toHaveLength(1);
+  });
+
+  it('durably saves a caller-identified character before publishing it', () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFixture(storage);
+    let publishedSerialized: string | null = null;
+    repository.subscribe(() => {
+      publishedSerialized = storage.getItem('test-recipes');
+    });
+
+    const saved = repository.persistSavedCharacterPrompt({
+      id: 'character-save-1',
+      name: 'Morgan',
+      prompt: 'An adult documentary presenter in a neutral studio.',
+      promptIntent: 'character-transform',
+      builderDraft: createPromptBuilderDraft('character-transform'),
+      referenceImageStatus: 'prompt-only',
+    });
+
+    expect(saved.id).toBe('character-save-1');
+    expect(publishedSerialized).toContain('character-save-1');
+    expect(repository.getSnapshot().store.savedCharacterPrompts).toEqual([saved]);
+  });
+
+  it('does not publish a character when strict durable storage fails and retries idempotently', () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFixture(storage);
+    const listener = vi.fn();
+    repository.subscribe(listener);
+    const input = {
+      id: 'character-save-retry',
+      name: 'Morgan',
+      prompt: 'An adult documentary presenter in a neutral studio.',
+      promptIntent: 'character-transform' as const,
+      builderDraft: createPromptBuilderDraft('character-transform'),
+      referenceImageStatus: 'prompt-only' as const,
+    };
+
+    storage.failWrites = true;
+    expect(() => repository.persistSavedCharacterPrompt(input)).toThrowError(
+      expect.objectContaining({ code: 'storage-write-failed', retryable: true }),
+    );
+    expect(repository.getSnapshot().store.savedCharacterPrompts).toEqual([]);
+    expect(listener).not.toHaveBeenCalled();
+
+    storage.failWrites = false;
+    const saved = repository.persistSavedCharacterPrompt(input);
+    const retried = repository.persistSavedCharacterPrompt(input);
+    expect(retried).toEqual(saved);
+    expect(repository.getSnapshot().store.savedCharacterPrompts).toHaveLength(1);
+    expect(listener).toHaveBeenCalledTimes(1);
+
+    const reopened = repositoryFixture(storage);
+    expect(reopened.persistSavedCharacterPrompt(input)).toEqual(saved);
+    expect(reopened.getSnapshot().store.savedCharacterPrompts).toHaveLength(1);
+  });
+
+  it('reports unavailable durable storage as a typed retryable failure', () => {
+    const repository = repositoryFixture(null);
+    expect(() =>
+      repository.persistSavedCharacterPrompt({
+        id: 'character-save-unavailable',
+        name: 'Morgan',
+        prompt: 'An adult documentary presenter in a neutral studio.',
+        promptIntent: 'character-transform',
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'storage-unavailable', retryable: true }));
+    expect(repository.getSnapshot().store.savedCharacterPrompts).toEqual([]);
+  });
+
+  it('rejects a caller ID reused for different character content without writing', () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFixture(storage);
+    const original = repository.persistSavedCharacterPrompt({
+      id: 'character-save-conflict',
+      name: 'Morgan',
+      prompt: 'An adult documentary presenter in a neutral studio.',
+      promptIntent: 'character-transform',
+    });
+    const durableBeforeConflict = storage.getItem('test-recipes');
+
+    expect(() =>
+      repository.persistSavedCharacterPrompt({
+        id: original.id,
+        name: 'Taylor',
+        prompt: 'An adult field reporter outdoors.',
+        promptIntent: 'character-transform',
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'id-conflict', retryable: false }));
+    expect(storage.getItem('test-recipes')).toBe(durableBeforeConflict);
+    expect(repository.getSnapshot().store.savedCharacterPrompts).toEqual([original]);
   });
 });

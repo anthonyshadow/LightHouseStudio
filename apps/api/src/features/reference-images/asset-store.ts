@@ -42,6 +42,17 @@ const promptAuditSchema = z
   })
   .strict();
 
+const internalDerivationSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('generate') }).strict(),
+  z
+    .object({
+      kind: z.literal('edit'),
+      sourceAssetId: z.uuid(),
+      changeInstructionsHash: z.string().regex(/^[a-f0-9]{64}$/u),
+    })
+    .strict(),
+]);
+
 const internalMetadataSchema = z
   .object({
     schemaVersion: z.literal(ASSET_LAYOUT_VERSION),
@@ -66,6 +77,11 @@ const internalMetadataSchema = z
     promptAudit: promptAuditSchema.optional(),
     promptHash: z.string().regex(/^[a-f0-9]{64}$/u),
     requestId: z.uuid(),
+    requestFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/u)
+      .optional(),
+    derivation: internalDerivationSchema.optional(),
     providerRequestId: z.string().min(1).max(500).optional(),
     createdAt: z.iso.datetime({ offset: true }),
     updatedAt: z.iso.datetime({ offset: true }).optional(),
@@ -117,6 +133,14 @@ export interface StoreReferenceImageInput {
   };
   readonly promptHash: string;
   readonly requestId: string;
+  readonly requestFingerprint?: string;
+  readonly derivation?:
+    | { readonly kind: 'generate' }
+    | {
+        readonly kind: 'edit';
+        readonly sourceAssetId: string;
+        readonly changeInstructionsHash: string;
+      };
   readonly providerRequestId?: string;
 }
 
@@ -394,6 +418,10 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
       promptAudit: input.promptAudit,
       promptHash: input.promptHash,
       requestId: input.requestId,
+      ...(input.requestFingerprint === undefined
+        ? {}
+        : { requestFingerprint: input.requestFingerprint }),
+      ...(input.derivation === undefined ? {} : { derivation: input.derivation }),
       ...(input.providerRequestId === undefined
         ? {}
         : { providerRequestId: input.providerRequestId }),

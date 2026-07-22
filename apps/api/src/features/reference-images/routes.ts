@@ -1,6 +1,9 @@
 import {
   createReferenceImageRequestSchema,
   createReferenceImageResponseSchema,
+  editReferenceImageParamsSchema,
+  editReferenceImageRequestSchema,
+  editReferenceImageResponseSchema,
   optimizeCharacterReferencePromptRequestSchema,
   optimizeCharacterReferencePromptResponseSchema,
   referenceImageAssetParamsSchema,
@@ -9,6 +12,7 @@ import {
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/errors.js';
 import { localOwnerIdForRequest, requireTrustedOrigin } from '../../http/security.js';
+import { createRequestLifetime } from '../../http/streaming.js';
 import type { ReferenceImageService } from './reference-image-service.js';
 
 const verifyGenerationOrigin = (request: FastifyRequest): Promise<void> => {
@@ -22,6 +26,14 @@ const requireAssetId = (params: unknown): string => {
     throw new AppError(400, 'validation_error', 'Choose a valid reference image asset.');
   }
   return parsed.data.assetId;
+};
+
+const requireSourceAssetId = (params: unknown): string => {
+  const parsed = editReferenceImageParamsSchema.safeParse(params);
+  if (!parsed.success) {
+    throw new AppError(400, 'validation_error', 'Choose a valid source reference image.');
+  }
+  return parsed.data.sourceAssetId;
 };
 
 export const registerReferenceImageRoutes = (
@@ -49,7 +61,7 @@ export const registerReferenceImageRoutes = (
   app.post(
     '/api/reference-images',
     { bodyLimit: 256 * 1024, onRequest: verifyGenerationOrigin },
-    async (request) => {
+    async (request, reply) => {
       const parsed = createReferenceImageRequestSchema.safeParse(request.body);
       if (!parsed.success) {
         throw new AppError(
@@ -58,11 +70,45 @@ export const registerReferenceImageRoutes = (
           'Provide a valid reference generation request and a new request ID.',
         );
       }
-      const asset = await service.generate({
-        localOwnerId: localOwnerIdForRequest(request),
-        ...parsed.data,
-      });
-      return createReferenceImageResponseSchema.parse({ asset });
+      const lifetime = createRequestLifetime(request, reply);
+      try {
+        const asset = await service.generate({
+          localOwnerId: localOwnerIdForRequest(request),
+          signal: lifetime.signal,
+          ...parsed.data,
+        });
+        return createReferenceImageResponseSchema.parse({ asset });
+      } finally {
+        lifetime.release();
+      }
+    },
+  );
+
+  app.post(
+    '/api/reference-images/:sourceAssetId/edits',
+    { bodyLimit: 256 * 1024, onRequest: verifyGenerationOrigin },
+    async (request, reply) => {
+      const sourceAssetId = requireSourceAssetId(request.params);
+      const parsed = editReferenceImageRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw new AppError(
+          400,
+          'validation_error',
+          'Provide a valid reference edit request, change instructions, and a new request ID.',
+        );
+      }
+      const lifetime = createRequestLifetime(request, reply);
+      try {
+        const asset = await service.edit({
+          localOwnerId: localOwnerIdForRequest(request),
+          sourceAssetId,
+          signal: lifetime.signal,
+          ...parsed.data,
+        });
+        return editReferenceImageResponseSchema.parse({ asset });
+      } finally {
+        lifetime.release();
+      }
     },
   );
 

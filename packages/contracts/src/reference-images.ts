@@ -6,6 +6,7 @@ export const REFERENCE_IMAGE_SIZES = ['1024x1024', '1024x1536', '1536x1024'] as 
 export const REFERENCE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
 export const REFERENCE_IMAGE_PROMPT_MAX_LENGTH = 4_000;
 export const REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH = 32_000;
+export const REFERENCE_IMAGE_CHANGE_INSTRUCTIONS_MAX_LENGTH = 2_000;
 
 export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_MODEL = 'gpt-5.6' as const;
 export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_REASONING = 'medium' as const;
@@ -139,7 +140,7 @@ export const optimizeCharacterReferencePromptResponseSchema = z
   })
   .strict();
 
-const enabledReferenceImageOptimizationSchema = z
+export const enabledReferenceImageOptimizationSchema = z
   .object({
     enabled: z.literal(true),
     result: characterPromptOptimizationResultSchema,
@@ -179,11 +180,42 @@ export const createReferenceImageRequestSchema = z
   })
   .strict();
 
+export const editReferenceImageRequestSchema = z
+  .object({
+    requestId: referenceImageRequestIdSchema,
+    rawPrompt: rawCharacterPromptSchema,
+    changeInstructions: z
+      .string()
+      .trim()
+      .min(1, 'Describe what should change in the reference image.')
+      .max(REFERENCE_IMAGE_CHANGE_INSTRUCTIONS_MAX_LENGTH),
+    options: characterReferenceOptionsSchema,
+    generator: characterReferenceGeneratorSchema.optional(),
+    optimization: enabledReferenceImageOptimizationSchema,
+  })
+  .strict();
+
 export const referenceImageAssetParamsSchema = z
   .object({
     assetId: referenceImageAssetIdSchema,
   })
   .strict();
+
+export const editReferenceImageParamsSchema = z
+  .object({
+    sourceAssetId: referenceImageAssetIdSchema,
+  })
+  .strict();
+
+export const referenceImageDerivationSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('generate') }).strict(),
+  z
+    .object({
+      kind: z.literal('edit'),
+      sourceAssetId: referenceImageAssetIdSchema,
+    })
+    .strict(),
+]);
 
 const referenceImageOptimizerAuditSchema = z
   .object({
@@ -218,6 +250,7 @@ const referenceImageAssetCommonShape = {
   optimizer: referenceImageOptimizerAuditSchema.nullable(),
   optimizationInputHash: characterPromptOptimizationInputHashSchema.nullable(),
   manuallyEdited: z.boolean(),
+  derivation: referenceImageDerivationSchema.optional(),
   createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }),
   contentUrl: z.string().regex(/^\/api\/reference-images\/[0-9a-f-]+\/content$/u),
@@ -257,6 +290,8 @@ export const createReferenceImageResponseSchema = z
   })
   .strict();
 
+export const editReferenceImageResponseSchema = createReferenceImageResponseSchema;
+
 export const referenceImageMetadataResponseSchema = referenceImageAssetSchema;
 
 export type CharacterReferenceFraming = z.infer<typeof characterReferenceFramingSchema>;
@@ -278,7 +313,11 @@ export type OptimizeCharacterReferencePromptResponse = z.infer<
 export type ReferenceImageOptimization = z.infer<typeof referenceImageOptimizationSchema>;
 export type ReferenceImageSize = z.infer<typeof referenceImageSizeSchema>;
 export type CreateReferenceImageRequest = z.infer<typeof createReferenceImageRequestSchema>;
+export type EditReferenceImageRequest = z.infer<typeof editReferenceImageRequestSchema>;
 export type ReferenceImageAssetParams = z.infer<typeof referenceImageAssetParamsSchema>;
+export type EditReferenceImageParams = z.infer<typeof editReferenceImageParamsSchema>;
+export type ReferenceImageDerivation = z.infer<typeof referenceImageDerivationSchema>;
 export type ReferenceImageAsset = z.infer<typeof referenceImageAssetSchema>;
 export type ReferenceImageMetadataResponse = z.infer<typeof referenceImageMetadataResponseSchema>;
 export type CreateReferenceImageResponse = z.infer<typeof createReferenceImageResponseSchema>;
+export type EditReferenceImageResponse = z.infer<typeof editReferenceImageResponseSchema>;

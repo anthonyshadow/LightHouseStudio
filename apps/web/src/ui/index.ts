@@ -11,6 +11,7 @@ export { Tabs, type TabItem, type TabsProps } from './primitives/Tabs';
 export {
   OverlayPanel,
   type OverlayPanelPlacement,
+  type OverlayPanelInitialFocus,
   type OverlayPanelProps,
   type OverlayPanelSize,
 } from './primitives/OverlayPanel';

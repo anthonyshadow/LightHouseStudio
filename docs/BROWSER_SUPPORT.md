@@ -10,9 +10,9 @@ The studio must run in a secure context. Loopback HTTP (`127.0.0.1`/`localhost`)
 
 ## Viewport and input layout
 
-Advanced Studio is a viewport-bound workspace rather than a scrolling document. `html`, `body`, and `#root` are full-size, overflow-hidden roots; the shell prefers `100dvh` with `100svh`/`100vh` fallbacks. Safe-area insets are included in shell and overlay padding. The fixed Advanced shell contains the header, stable stage, capture strip, and tool launcher; only named overlay bodies scroll.
+Studio is a viewport-bound workspace rather than a scrolling document. `html`, `body`, and `#root` are full-size, overflow-hidden roots; the shell prefers `100dvh` with `100svh`/`100vh` fallbacks. Safe-area insets are included in shell and overlay padding. The fixed Studio shell contains the header, stable stage, capture strip, and tool launcher; only named overlay bodies scroll.
 
-Guided Create is intentionally a vertically scrolling page because its independently collapsible choice drawers can contain many visual options. Its shell owns that scrolling, never creates horizontal document overflow, and keeps cards, controls, focus rings, and navigation within the available width. Guided Live, Record, Voice, Download, and Projects use the same responsive containment rules at phone, tablet, laptop, and desktop sizes.
+The fullscreen character builder owns one internal vertical scroller because its independently collapsible choice drawers can contain many visual options. It never creates document overflow and keeps its header, 4:5 preview, controls, focus rings, footer actions, and safe-area padding within the available width and height. The Studio stage remains mounted and inert beneath the panel.
 
 Responsive behavior is range-based:
 
@@ -30,7 +30,8 @@ The required visual regression sizes are `1440×960`, `1280×720`, `834×1112`, 
 | Capability                       | Required browser API or condition                                       | Degradation                                                                                     |
 | -------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
 | Prompt workshop and Recipe Shelf | React, `localStorage` for durability                                    | Falls back to in-memory session-only assets if storage fails                                    |
-| Guided projects                  | IndexedDB with structured-clone `Blob` support                          | Keeps the current project in memory and exposes retry/original-download/tab-only recovery       |
+| Character drafts                 | IndexedDB                                                               | Keeps the current draft in memory, warns before unsafe close, and exposes retry or discard      |
+| Legacy Guided projects           | IndexedDB with structured-clone `Blob` support                          | Keeps retained records available for manager download/delete when durable storage can be opened |
 | Capture source selection         | `enumerateDevices`; labels may require prior permission                 | Default camera/microphone remain selectable                                                     |
 | Camera preview                   | Secure context, `navigator.mediaDevices.getUserMedia`                   | Blocked with actionable notice                                                                  |
 | Recording                        | `MediaRecorder`, a live video track, a supported/default MIME type      | Start is disabled/errors safely; the current live session remains until Finish or explicit Stop |
@@ -53,7 +54,7 @@ Codec claims from `MediaRecorder.isTypeSupported` are necessary but not sufficie
 - Mobile browsers may stop camera tracks when the tab backgrounds, the screen locks, a call arrives, or another app claims the camera.
 - Multiple cameras/microphones, Bluetooth handoff, privacy switches, and virtual devices can end tracks unexpectedly.
 - Enterprise policies, browser extensions, VPN/firewall rules, NAT, and provider outages can block WebRTC while local capture still works.
-- Long recordings and audio remuxing are memory-intensive because artifacts are held in the tab. Connection-start credentials expire after five minutes. Advanced active sessions are capped at five minutes; Guided Character sessions are capped at seven minutes and reconnect before countdown when needed to preserve a five-minute take. ElevenLabs UI limits conversion to takes no longer than five minutes.
+- Long recordings and audio remuxing are memory-intensive because current Studio artifacts are held in the tab. Connection-start credentials expire after five minutes, Studio active sessions are capped at five minutes, and every recording still warns at 4:30 and stops at 5:00. ElevenLabs UI limits conversion to takes no longer than five minutes.
 - Reduced-power/mobile devices may not render offline audio or remux quickly enough for a comfortable workflow.
 
 ## Release browser matrix

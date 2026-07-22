@@ -29,10 +29,10 @@ export const shellStyles = (theme: Theme): CSSObject => ({
     gap: theme.space.xs,
   },
   '@media (max-width: 39.99rem)': {
-    gridTemplateRows: `${theme.layout.shellRows.headerMobile} minmax(0, 1fr) ${theme.layout.shellRows.launcherMobile}`,
+    gridTemplateRows: `6.5rem minmax(0, 1fr) ${theme.layout.shellRows.launcherMobile}`,
   },
   '@media (max-width: 20rem), (max-height: 36rem)': {
-    gridTemplateRows: `${theme.layout.shellRows.headerUltra} minmax(0, 1fr) ${theme.layout.shellRows.launcherUltra}`,
+    gridTemplateRows: `6rem minmax(0, 1fr) ${theme.layout.shellRows.launcherUltra}`,
   },
 });
 
@@ -57,14 +57,32 @@ export const skipLinkStyles = (theme: Theme): CSSObject => ({
 });
 
 export const headerStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
+  display: 'grid',
+  gridTemplateColumns: 'minmax(15rem, 1fr) auto minmax(15rem, 1fr)',
   alignItems: 'center',
-  justifyContent: 'space-between',
   gap: theme.space.lg,
   minWidth: 0,
   paddingBlock: theme.space.xxs,
   '@media (max-width: 45rem), (max-height: 48rem)': {
+    gridTemplateColumns: 'minmax(11rem, 1fr) auto minmax(8rem, 1fr)',
     gap: theme.space.xs,
+  },
+  '@media (max-width: 39.99rem)': {
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    gridTemplateRows: 'auto auto',
+    alignContent: 'stretch',
+  },
+});
+
+export const characterBuilderActionStyles = (): CSSObject => ({
+  display: 'flex',
+  justifyContent: 'center',
+  minWidth: 0,
+  '& > button': { minHeight: '2.75rem', whiteSpace: 'nowrap' },
+  '@media (max-width: 39.99rem)': {
+    gridColumn: '1 / -1',
+    gridRow: '2',
+    '& > button': { width: '100%', minHeight: '2.75rem' },
   },
 });
 
@@ -107,6 +125,10 @@ export const capabilityStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.xs,
   minWidth: 0,
   overflow: 'hidden',
+  '@media (max-width: 39.99rem)': {
+    gridColumn: '2',
+    gridRow: '1',
+  },
 });
 
 export const capabilityPillStyles = (theme: Theme, available: boolean): CSSObject => ({

@@ -15,6 +15,7 @@ import { IconButton } from './IconButton';
 export type OverlayPanelPlacement = 'right' | 'bottom' | 'fullscreen';
 export type OverlayPanelSize = 'standard' | 'wide';
 export type OverlayPanelBodyMode = 'scroll' | 'contained';
+export type OverlayPanelInitialFocus = 'first-focusable' | 'heading';
 
 export interface OverlayPanelProps {
   open: boolean;
@@ -26,7 +27,9 @@ export interface OverlayPanelProps {
   placement?: OverlayPanelPlacement;
   size?: OverlayPanelSize;
   closeLabel?: string;
+  closeDisabled?: boolean;
   closeOnBackdrop?: boolean;
+  initialFocus?: OverlayPanelInitialFocus;
   initialFocusRef?: RefObject<HTMLElement | null>;
   returnFocusRef?: RefObject<HTMLElement | null>;
   bodyMode?: OverlayPanelBodyMode;
@@ -393,12 +396,12 @@ const headerStyles = (theme: Theme): CSSObject => ({
   gridTemplateColumns: 'minmax(0, 1fr) auto',
   alignItems: 'start',
   gap: theme.space.md,
-  padding: `max(${theme.space.md}, env(safe-area-inset-top)) ${theme.space.md} ${theme.space.md}`,
+  padding: `max(${theme.space.md}, env(safe-area-inset-top)) max(${theme.space.md}, env(safe-area-inset-right)) ${theme.space.md} max(${theme.space.md}, env(safe-area-inset-left))`,
   borderBlockEnd: `1px solid ${theme.colors.border}`,
   background: theme.colors.overlaySurface,
   '@media (max-height: 36rem)': {
     alignItems: 'center',
-    padding: `max(${theme.space.sm}, env(safe-area-inset-top)) ${theme.space.sm} ${theme.space.sm}`,
+    padding: `max(${theme.space.sm}, env(safe-area-inset-top)) max(${theme.space.sm}, env(safe-area-inset-right)) ${theme.space.sm} max(${theme.space.sm}, env(safe-area-inset-left))`,
   },
 });
 
@@ -424,7 +427,7 @@ const descriptionStyles = (theme: Theme): CSSObject => ({
 const bodyStyles = (theme: Theme, bodyMode: OverlayPanelBodyMode): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
-  padding: `${theme.space.md} ${theme.space.md} max(${theme.space.md}, env(safe-area-inset-bottom))`,
+  padding: `${theme.space.md} max(${theme.space.md}, env(safe-area-inset-right)) max(${theme.space.md}, env(safe-area-inset-bottom)) max(${theme.space.md}, env(safe-area-inset-left))`,
   overflow: bodyMode === 'scroll' ? 'auto' : 'hidden',
   overscrollBehavior: 'contain',
   scrollbarGutter: bodyMode === 'scroll' ? 'stable' : undefined,
@@ -432,7 +435,7 @@ const bodyStyles = (theme: Theme, bodyMode: OverlayPanelBodyMode): CSSObject => 
 
 const footerStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
-  padding: `${theme.space.md} ${theme.space.md} max(${theme.space.md}, env(safe-area-inset-bottom))`,
+  padding: `${theme.space.md} max(${theme.space.md}, env(safe-area-inset-right)) max(${theme.space.md}, env(safe-area-inset-bottom)) max(${theme.space.md}, env(safe-area-inset-left))`,
   borderBlockStart: `1px solid ${theme.colors.border}`,
   background: theme.colors.overlaySurface,
 });
@@ -448,7 +451,9 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
     placement = 'right',
     size = 'standard',
     closeLabel = 'Close panel',
+    closeDisabled = false,
     closeOnBackdrop = true,
+    initialFocus = 'first-focusable',
     initialFocusRef,
     returnFocusRef,
     bodyMode = 'scroll',
@@ -461,9 +466,11 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
   const titleId = `${reactId}-title`;
   const descriptionId = `${reactId}-description`;
   const panelRef = useRef<HTMLDivElement | null>(null);
+  const headingRef = useRef<HTMLHeadingElement | null>(null);
   const backdropRef = useRef<HTMLDivElement | null>(null);
   const onCloseRef = useRef(onClose);
   const openRef = useRef(open);
+  const closeDisabledRef = useRef(closeDisabled);
   const initialFocusTargetRef = useRef(initialFocusRef);
   const returnFocusTargetRef = useRef(returnFocusRef);
   const [present, setPresent] = useState(open && typeof document !== 'undefined');
@@ -471,6 +478,7 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
 
   onCloseRef.current = onClose;
   openRef.current = open;
+  closeDisabledRef.current = closeDisabled;
   initialFocusTargetRef.current = initialFocusRef;
   returnFocusTargetRef.current = returnFocusRef;
 
@@ -512,9 +520,11 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
       panel?.contains(preferredTarget) &&
       isFocusableElement(preferredTarget, panel)
         ? preferredTarget
-        : panel
-          ? (getFocusableElements(panel)[0] ?? panel)
-          : null;
+        : initialFocus === 'heading'
+          ? headingRef.current
+          : panel
+            ? (getFocusableElements(panel)[0] ?? panel)
+            : null;
 
     // Move focus out of the application root before aria-hiding it. Browsers may reject
     // aria-hidden on an ancestor that still contains the active element.
@@ -528,7 +538,7 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
       if (event.key === 'Escape' && !event.defaultPrevented) {
         event.preventDefault();
         event.stopPropagation();
-        if (openRef.current) onCloseRef.current();
+        if (openRef.current && !closeDisabledRef.current) onCloseRef.current();
         return;
       }
 
@@ -567,12 +577,13 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
         else focusTopmostDialog();
       });
     };
-  }, [overlayId, present]);
+  }, [initialFocus, overlayId, present]);
 
   if (!present || typeof document === 'undefined') return null;
 
   const requestClose = () => {
-    if (openRef.current && isTopmostOverlay(overlayId)) onCloseRef.current();
+    if (openRef.current && !closeDisabledRef.current && isTopmostOverlay(overlayId))
+      onCloseRef.current();
   };
 
   const interceptBackdropEvent = (
@@ -613,7 +624,7 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
       >
         <header css={headerStyles(theme)}>
           <div css={{ minWidth: 0 }}>
-            <h2 id={titleId} css={headingStyles(theme)}>
+            <h2 ref={headingRef} id={titleId} tabIndex={-1} css={headingStyles(theme)}>
               {title}
             </h2>
             {description ? (
@@ -622,7 +633,12 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
               </p>
             ) : null}
           </div>
-          <IconButton label={closeLabel} variant="quiet" onClick={requestClose}>
+          <IconButton
+            label={closeLabel}
+            variant="quiet"
+            disabled={closeDisabled}
+            onClick={requestClose}
+          >
             <span aria-hidden="true" css={{ fontSize: '1.5rem', lineHeight: 1 }}>
               ×
             </span>

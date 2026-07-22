@@ -236,6 +236,52 @@ describe('RecipeShelf', () => {
     expect(screen.getByText(/1 selected.*1 saved recipe/i)).toBeInTheDocument();
   });
 
+  it('reveals and highlights a Studio-controlled active character', async () => {
+    const user = userEvent.setup();
+    const repository = createRepository();
+    repository.createSavedPrompt({
+      title: 'Editorial host',
+      prompt: 'Give the presenter an editorial wardrobe.',
+      modelModeId: 'lucy-2.5',
+      tags: ['Editorial'],
+    });
+    const character = repository.createSavedCharacterPrompt({
+      name: 'Active cartographer',
+      prompt: 'Substitute the character with an orbital cartographer.',
+      promptIntent: 'character-transform',
+      referenceImageStatus: 'prompt-only',
+    });
+    const onUsePrompt = vi.fn();
+    const view = render(
+      <StudioDesignProvider>
+        <RecipeShelf
+          repository={repository}
+          activeMode="lucy-2.5"
+          activeRecipe={null}
+          onUsePrompt={onUsePrompt}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await user.selectOptions(screen.getByLabelText('Filter by tag'), 'Editorial');
+    await user.type(screen.getByLabelText('Search this mode'), 'editorial');
+    view.rerender(
+      <StudioDesignProvider>
+        <RecipeShelf
+          repository={repository}
+          activeMode="lucy-2.5"
+          activeRecipe={{ origin: 'character-prompt', assetId: character.id }}
+          onUsePrompt={onUsePrompt}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const characterHeading = await screen.findByRole('heading', { name: 'Active cartographer' });
+    expect(screen.getByLabelText('Search this mode')).toHaveValue('');
+    expect(screen.getByLabelText('Filter by tag')).toHaveValue('');
+    expect(within(characterHeading).getByRole('button')).toHaveAttribute('aria-pressed', 'true');
+  });
+
   it('shows only the active model library without inventing unsupported collections', () => {
     const repository = createRepository();
     repository.createSavedPrompt({

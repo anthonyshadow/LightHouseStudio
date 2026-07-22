@@ -26,6 +26,7 @@ describe('API shell', () => {
       elevenLabs: { available: true, modelId: 'eleven_multilingual_sts_v2' },
       referenceImages: {
         available: false,
+        editAvailable: false,
         modelId: 'gpt-image-2',
         sizes: ['1024x1024', '1024x1536', '1536x1024'],
         quality: 'high',

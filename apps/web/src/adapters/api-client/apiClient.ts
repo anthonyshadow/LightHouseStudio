@@ -2,11 +2,13 @@ import {
   apiErrorResponseSchema,
   capabilitiesResponseSchema,
   createReferenceImageResponseSchema,
+  editReferenceImageResponseSchema,
   optimizeCharacterReferencePromptResponseSchema,
   referenceImageMetadataResponseSchema,
   realtimeTokenResponseSchema,
   REFERENCE_IMAGE_MAX_BYTES,
   type CreateReferenceImageRequest,
+  type EditReferenceImageRequest,
   type OptimizeCharacterReferencePromptRequest,
   type OptimizeCharacterReferencePromptResponse,
   type ReferenceImageAsset,
@@ -58,6 +60,7 @@ export const fetchProviderAvailability = async (
     elevenLabs: payload.elevenLabs.available,
     elevenLabsModel: payload.elevenLabs.modelId ?? null,
     referenceImages: payload.referenceImages.available,
+    referenceImageEditAvailable: payload.referenceImages.editAvailable,
     referenceImageModel: payload.referenceImages.modelId,
     referenceImageSizes: payload.referenceImages.sizes,
     referenceImageOptimizerAvailable: payload.referenceImages.optimizer.available,
@@ -85,6 +88,30 @@ export const createReferenceImage = async (
   if (!parsed.success) {
     throw new ApiClientError(
       'The generated reference response was invalid.',
+      502,
+      'invalid_provider_image',
+    );
+  }
+  return parsed.data.asset;
+};
+
+export const editReferenceImage = async (
+  sourceAssetId: string,
+  request: EditReferenceImageRequest,
+  signal?: AbortSignal,
+): Promise<ReferenceImageAsset> => {
+  const response = await fetch(`/api/reference-images/${encodeURIComponent(sourceAssetId)}/edits`, {
+    method: 'POST',
+    cache: 'no-store',
+    ...(signal ? { signal } : {}),
+    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+    body: JSON.stringify(request),
+  });
+  if (!response.ok) throw await readError(response);
+  const parsed = editReferenceImageResponseSchema.safeParse(await response.json());
+  if (!parsed.success) {
+    throw new ApiClientError(
+      'The edited reference response was invalid.',
       502,
       'invalid_provider_image',
     );

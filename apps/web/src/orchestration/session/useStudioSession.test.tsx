@@ -367,6 +367,24 @@ describe('useStudioSession explicit-start boundaries', () => {
     unmount();
   });
 
+  it('exposes the same safe-replacement preflight used by character Save', async () => {
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    expect(result.current.canReplaceRecipeDraft('lucy-2.5')).toBe(true);
+    await act(async () => {
+      await result.current.startLocal();
+    });
+    expect(result.current.canReplaceRecipeDraft('lucy-2.5')).toBe(false);
+
+    act(() => result.current.stopCamera());
+    expect(result.current.canReplaceRecipeDraft('lucy-2.5')).toBe(true);
+    unmount();
+  });
+
   it('reacquires media instead of reusing a stream whose microphone ended', async () => {
     const first = fakeStream();
     const replacement = fakeStream();

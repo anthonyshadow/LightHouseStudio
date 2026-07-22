@@ -27,14 +27,14 @@ const buttonStyles = (theme: Theme, size: ButtonSize): CSSObject => ({
   cursor: 'pointer',
   transition: `transform ${theme.motion.quick}, border-color ${theme.motion.quick}, background ${theme.motion.quick}`,
   WebkitTapHighlightColor: 'transparent',
-  '&:hover:not(:disabled)': {
+  '&:hover:not(:disabled):not([aria-disabled="true"])': {
     transform: 'translateY(-1px)',
   },
-  '&:active:not(:disabled)': {
+  '&:active:not(:disabled):not([aria-disabled="true"])': {
     transform: 'translateY(0)',
   },
   '&:focus-visible': focusRingStyles(theme),
-  '&:disabled': {
+  '&:disabled, &[aria-disabled="true"]': {
     cursor: 'not-allowed',
     opacity: 0.48,
   },
@@ -51,12 +51,14 @@ const variantStyles = (theme: Theme, variant: ButtonVariant): CSSObject => {
       color: theme.colors.text,
       background: theme.colors.surfaceStrong,
       borderColor: theme.colors.borderStrong,
-      '&:hover:not(:disabled)': { borderColor: theme.colors.accent },
+      '&:hover:not(:disabled):not([aria-disabled="true"])': {
+        borderColor: theme.colors.accent,
+      },
     },
     quiet: {
       color: theme.colors.textMuted,
       background: 'transparent',
-      '&:hover:not(:disabled)': {
+      '&:hover:not(:disabled):not([aria-disabled="true"])': {
         color: theme.colors.text,
         background: theme.colors.surfaceStrong,
       },

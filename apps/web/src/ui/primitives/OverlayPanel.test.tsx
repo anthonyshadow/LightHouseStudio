@@ -5,7 +5,11 @@ import userEvent from '@testing-library/user-event';
 import { useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../StudioDesignProvider';
-import { OverlayPanel, type OverlayPanelBodyMode } from './OverlayPanel';
+import {
+  OverlayPanel,
+  type OverlayPanelBodyMode,
+  type OverlayPanelInitialFocus,
+} from './OverlayPanel';
 
 afterEach(() => {
   cleanup();
@@ -16,14 +20,18 @@ interface HarnessProps {
   onClose?: () => void;
   onUnderlayClick?: () => void;
   closeOnBackdrop?: boolean;
+  closeDisabled?: boolean;
   bodyMode?: OverlayPanelBodyMode;
+  initialFocus?: OverlayPanelInitialFocus;
 }
 
 const Harness = ({
   onClose = vi.fn(),
   onUnderlayClick = vi.fn(),
   closeOnBackdrop = true,
+  closeDisabled = false,
   bodyMode = 'scroll',
+  initialFocus = 'first-focusable',
 }: HarnessProps) => {
   const [open, setOpen] = useState(false);
 
@@ -41,7 +49,9 @@ const Harness = ({
         description="Choose a contained tool."
         footer={<button type="button">Apply</button>}
         closeOnBackdrop={closeOnBackdrop}
+        closeDisabled={closeDisabled}
         bodyMode={bodyMode}
+        initialFocus={initialFocus}
         onClose={() => {
           onClose();
           setOpen(false);
@@ -197,6 +207,22 @@ describe('OverlayPanel', () => {
     expect(screen.getByRole('dialog')).toBeInTheDocument();
   });
 
+  it('guards every close affordance during an atomic operation', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    render(<Harness onClose={onClose} closeDisabled />);
+
+    await user.click(screen.getByRole('button', { name: 'Open tools' }));
+    const closeButton = screen.getByRole('button', { name: 'Close panel' });
+    expect(closeButton).toBeDisabled();
+    await user.keyboard('{Escape}');
+    const backdrop = screen.getByRole('dialog').parentElement;
+    if (backdrop) fireEvent.pointerDown(backdrop);
+
+    expect(onClose).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
   it('isolates underlying dialogs and lets only the topmost dialog dismiss', async () => {
     const user = userEvent.setup();
     const onParentClose = vi.fn();
@@ -281,6 +307,17 @@ describe('OverlayPanel', () => {
     const body = document.querySelector<HTMLElement>('[data-overlay-body-mode="contained"]');
     expect(body).not.toBeNull();
     expect(body).toHaveStyle({ overflow: 'hidden' });
+  });
+
+  it('can place initial focus on the dialog heading', async () => {
+    const user = userEvent.setup();
+    render(<Harness initialFocus="heading" />);
+
+    await user.click(screen.getByRole('button', { name: 'Open tools' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'Studio tools' })).toHaveFocus(),
+    );
   });
 
   it('skips the exit delay when reduced motion is requested', async () => {

@@ -12,11 +12,18 @@ export interface RecipeSelection {
   builderDraft?: PromptBuilderDraft;
 }
 
+export type ActiveRecipeIdentity = {
+  origin: 'character-prompt' | 'saved-prompt';
+  assetId: string;
+} | null;
+
 export interface RecipeShelfProps {
   repository: CreativeAssetRepository;
   activeMode: ModelModeId;
   promptUseDisabled?: boolean;
   embedded?: boolean;
+  /** Studio-owned applied/preloaded recipe identity used for controlled highlighting. */
+  activeRecipe?: ActiveRecipeIdentity;
   onUsePrompt: (selection: RecipeSelection) => void;
   onOpenCharacterWorkshop?: (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => void;
   onDirtyChange?: (dirty: boolean) => void;

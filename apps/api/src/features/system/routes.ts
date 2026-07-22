@@ -11,6 +11,7 @@ export interface CapabilityAvailability {
   readonly elevenLabsAvailable: boolean;
   readonly elevenLabsModelId: string;
   readonly referenceImagesAvailable: boolean;
+  readonly referenceImageEditAvailable: boolean;
   readonly referenceImageModelId: string;
   readonly referenceImageQuality: 'high' | 'medium';
   readonly promptOptimizerAvailable: boolean;
@@ -36,6 +37,7 @@ export const registerSystemRoutes = (
       },
       referenceImages: {
         available: availability.referenceImagesAvailable,
+        editAvailable: availability.referenceImageEditAvailable,
         modelId: availability.referenceImageModelId,
         sizes: [...REFERENCE_IMAGE_SIZES],
         quality: availability.referenceImageQuality,

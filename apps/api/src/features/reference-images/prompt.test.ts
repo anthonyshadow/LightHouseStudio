@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createReferenceImageEditPrompt,
   createReferenceImagePrompt,
   createPromptOptimizationInputHash,
   createWorkshopPromptHash,
@@ -58,5 +59,20 @@ describe('reference image prompt versioning', () => {
       ),
     );
     expect(first).not.toBe(createPromptOptimizationInputHash(input, 'optimizer-v2'));
+  });
+
+  it('builds a bounded edit prompt that preserves identity unless explicitly changed', () => {
+    const prompt = createReferenceImageEditPrompt(
+      'A blue fox wearing a red scarf.',
+      'Change only the scarf to green.',
+    );
+
+    expect(prompt).toContain('preserving the same character identity');
+    expect(prompt).toContain('A blue fox wearing a red scarf.');
+    expect(prompt).toContain('Change only the scarf to green.');
+    expect(prompt.length).toBeLessThanOrEqual(32_000);
+    expect(createReferenceImageEditPrompt('x'.repeat(32_000), 'Change the scarf.').length).toBe(
+      32_000,
+    );
   });
 });

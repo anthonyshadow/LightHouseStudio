@@ -119,20 +119,39 @@ export const updateSavedPrompt = (
   const savedPrompts = store.savedPrompts.map((asset) => {
     if (asset.id !== id) return asset;
     found = true;
+    const nextPrompt = patch.prompt === undefined ? asset.prompt : requirePrompt(patch.prompt);
+    const promptChanged = canonicalPrompt(nextPrompt) !== canonicalPrompt(asset.prompt);
+    const nextReferenceImageAssetId =
+      patch.referenceImageAssetId === undefined
+        ? promptChanged
+          ? null
+          : asset.referenceImageAssetId
+        : normalizeReferenceImageAssetId(patch.referenceImageAssetId);
     return {
       ...asset,
       ...(patch.title === undefined ? {} : { title: requireName(patch.title, 'Saved prompt') }),
-      ...(patch.prompt === undefined ? {} : { prompt: requirePrompt(patch.prompt) }),
+      ...(patch.prompt === undefined ? {} : { prompt: nextPrompt }),
       ...(patch.source === undefined ? {} : { source: patch.source }),
-      ...(patch.referenceImageAssetId === undefined
-        ? {}
-        : { referenceImageAssetId: normalizeReferenceImageAssetId(patch.referenceImageAssetId) }),
+      referenceImageAssetId: nextReferenceImageAssetId,
       ...(patch.tags === undefined ? {} : { tags: normalizeTags(patch.tags) }),
       updatedAt: now,
     };
   });
   if (!found) throw new DomainRuleError('invalid-input', 'Saved prompt was not found.');
-  return { ...store, savedPrompts };
+  const updated = savedPrompts.find((asset) => asset.id === id);
+  return {
+    ...store,
+    savedPrompts,
+    recentPrompts: store.recentPrompts.map((recent) =>
+      recent.savedPromptId === id &&
+      (!updated ||
+        recent.modelModeId !== updated.modelModeId ||
+        canonicalPrompt(recent.prompt) !== canonicalPrompt(updated.prompt) ||
+        recent.referenceImageAssetId !== updated.referenceImageAssetId)
+        ? unlinkRecentPrompt(recent, id)
+        : recent,
+    ),
+  };
 };
 
 export const deleteSavedPrompt = (store: CreativeAssetStore, id: string): CreativeAssetStore => ({
@@ -183,11 +202,14 @@ export const recordSuccessfulPromptUse = (
       (asset) =>
         asset.modelModeId === input.modelModeId &&
         asset.id === input.savedPromptId &&
-        canonicalPrompt(asset.prompt) === promptKey,
+        canonicalPrompt(asset.prompt) === promptKey &&
+        asset.referenceImageAssetId === referenceImageAssetId,
     ) ??
     store.savedPrompts.find(
       (asset) =>
-        asset.modelModeId === input.modelModeId && canonicalPrompt(asset.prompt) === promptKey,
+        asset.modelModeId === input.modelModeId &&
+        canonicalPrompt(asset.prompt) === promptKey &&
+        asset.referenceImageAssetId === referenceImageAssetId,
     );
   const existingRecent = store.recentPrompts.find(
     (recent) =>
@@ -355,9 +377,12 @@ export const updateSavedCharacterPrompt = (
       nextBuilderDraft?.intent === 'character-transform'
         ? requestedGuidedDesign
         : null;
+    const promptChanged = canonicalPrompt(nextPrompt) !== canonicalPrompt(asset.prompt);
     const nextReferenceImageAssetId =
       patch.referenceImageAssetId === undefined
-        ? asset.referenceImageAssetId
+        ? promptChanged
+          ? null
+          : asset.referenceImageAssetId
         : normalizeReferenceImageAssetId(patch.referenceImageAssetId);
     const requestedReferenceStatus = patch.referenceImageStatus ?? asset.referenceImageStatus;
     const nextReferenceImageStatus: SavedCharacterPrompt['referenceImageStatus'] =

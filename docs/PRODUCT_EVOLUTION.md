@@ -1,6 +1,6 @@
 # Product evolution and changed flows
 
-The guide was treated as a capability contract, not a clone checklist. Lightframe Studio now opens into a focused five-stage Guided journey for every user while preserving the original Advanced workspace. The changes reduce consent ambiguity, accidental provider work, and clip loss without removing the direct-control tools.
+The guide was treated as a capability contract, not a clone checklist. Lightframe Studio now has one canonical Studio experience at `/`, with character creation moved into a resumable fullscreen panel over the permanently mounted stage. The changes reduce route and ownership ambiguity without removing direct-control tools or legacy project access.
 
 ## Intentional changes
 
@@ -8,17 +8,17 @@ The guide was treated as a capability contract, not a clone checklist. Lightfram
 
 The user explicitly approved `lucy-2.5` during implementation. Character mode, API allowlists, saved-asset mode scoping, filenames, and tests use that exact identifier. `lucy-vton-3` remains a separate try-on capability. This update adopts the supported newer character model without merging the two workflows or weakening explicit provider consent.
 
-### Guided is the all-user default; Advanced remains explicit
+### Studio is the sole application route
 
-The normal `/` entry creates or resumes Guided's Create → Live → Record → Voice → Download flow. `/projects` opens browser-local Guided projects, `/advanced` always opens the original workspace, and `?new=1` starts a fresh Guided project. The non-secret `VITE_CHARACTER_FLOW_ROLLOUT` supports `off`, `opt-in`, and `all`; absent or invalid values default to `all`. Opt-in requires `/guided` or `?characterFlow=guided` for the Guided journey while leaving `/projects` available; off routes every non-Advanced entry back to Advanced.
+The normal `/` entry opens Studio. `/advanced`, `/guided`, `/projects`, deprecated character-flow queries, and other non-API SPA entries use history replacement to canonicalize to `/`, so Back cannot re-enter a retired journey. Project-oriented entries open the Studio legacy-project manager without changing the canonical URL.
 
-Why it fits: one clear primary journey is available to all creators, while experienced users retain every Advanced Character, Add, Replace, Restyle, and Virtual Try-On option.
+Why it fits: one runtime owns streams, recording, recipes, active selection, and overlays. Character building cannot accidentally create a parallel media session or repository.
 
-Covered by: route-resolution, rollout-default, explicit Advanced, project-route, resume, and new-project tests.
+Covered by: route canonicalization, history replacement, legacy-project focus, and Studio-mounted overlay tests.
 
-### One stable stage anchors the Advanced overlay workspace
+### One stable stage anchors the Studio overlay workspace
 
-Advanced retains one permanently mounted media stage as its visual anchor. Recipe Dock, Capture Settings, Take Review, Voice Treatments, Character Workshop, and Recipe Shelf open as modal overlays that never participate in shell sizing or own media. Responsive rules change overlay placement, not the stage rectangle, video identity, source, or playback time. Guided instead presents one responsive stage at a time beneath a persistent progress header while reusing the same media controllers.
+Studio retains one permanently mounted media stage as its visual anchor. Recipe Dock, Capture Settings, Take Review, Voice Treatments, Character Workshop, Recipe Shelf, Character Builder, and Legacy Projects open as modal overlays that never participate in shell sizing or own media. Responsive rules change overlay placement, not the stage rectangle, video identity, source, or playback time.
 
 Covered by: responsive/manual checks, semantic landmarks and labels, keyboard interaction, and component accessibility rules.
 
@@ -42,21 +42,21 @@ Covered by: realtime snapshot tests for normalization, image-only behavior, pend
 
 ### Character direction is visual, gender-aware, and still open-ended
 
-The structured Character transform now gives Skin Tone, Body Shape, and Hair Color their own canonical fields alongside Gender, Adult Age, Appearance, Hair, Outfit, Accessories, Expression, and Mood. Advanced exposes every field without removing its existing controls or presets.
+The structured Character transform gives Skin Tone, Body Shape, and Hair Color their own canonical fields alongside Gender, Adult Age, Appearance, Hair, Outfit, Accessories, Expression, and Mood. Studio exposes every field without removing the existing Workshop controls or presets.
 
-Guided adds nine illustrated starters and presentation-aware visual catalogs for Woman, Man, Non-binary, and Not specified. Applicable categories show six tailored suggestions, while fixed enums retain their true cardinality. Hair color remains independent of hairstyle, shared skin tones are never gender-filtered, Show All exposes cross-profile options, and Describe My Own preserves text outside the catalog. Changing gender recomputes recommendations but pins an existing out-of-suggestion choice instead of deleting it.
+The fullscreen builder uses nine illustrated starters and presentation-aware visual catalogs for Woman, Man, Non-binary, and Not specified. Applicable categories show tailored suggestions, while fixed enums retain their true cardinality. Hair color remains independent of hairstyle, shared skin tones are never gender-filtered, Show All exposes cross-profile options, and Describe My Own preserves text outside the catalog. Changing presentation recomputes recommendations but pins an existing out-of-suggestion choice instead of deleting it.
 
 Why it fits: creators can make fast visual decisions without turning gender into a restriction or losing the precision of free-form direction.
 
 Covered by: schema migration, prompt generation, catalog cardinality, shared-choice, custom-value, gender-change preservation, and Character Workshop component tests.
 
-### Reference generation is an optional save-time decision
+### Reference generation is optional, automatic when requested, and stale-safe
 
-Save Character validates and compiles the design before showing an unselected choice. Continue with Prompt Only activates Character AI without an image-generation request. Generate Reference & Continue exposes the existing reference settings and generates only after the final explicit action. Keep Existing Reference appears only for a compatible non-stale saved asset. Generation failure keeps every choice and offers retry or deliberate prompt-only continuation.
+Save Character validates and compiles the design but never generates an image. `Generate Preview` automatically optimizes the current character and then creates one immutable reference. Existing framing/output controls live in a disclosure. Any later character or setting edit marks the visible preview stale and excludes it from Save; prompt-only Save remains available. Regenerate always asks for optional feedback: blank feedback creates a fresh image without the old asset, while written feedback uses the owner-scoped prior asset through the image-edit endpoint.
 
 Why it fits: saving a reusable character no longer implies a potentially billable image request, while generated references remain available when visual consistency matters.
 
-Covered by: prompt-only no-request, one-shot generation, existing-reference reuse, stale-reference, and recovery tests.
+Covered by: prompt-only no-request, optimize→generate, blank regeneration, instructed edit, stale-reference detachment, and recovery tests.
 
 ### Local fallback remains on stage until transformed video is truly usable
 
@@ -76,19 +76,19 @@ Why it fits: repeated creative work becomes faster without accounts, sync, or cl
 
 Covered by: domain and repository tests for CRUD, sanitation, search, deduplication, caps, use counts, recovery, and storage fallback.
 
-### Guided projects checkpoint media in this browser
+### Legacy Guided projects remain manageable in Studio
 
-Guided saves stable character, take, voice, delivery, and completion checkpoints to a versioned IndexedDB repository. Original video/audio Blobs are immutable, processed variants point back to the original, and revision-checked writes keep metadata and artifacts atomic. Streams, devices, credentials, provider state, and object URLs remain runtime-only. Reopening creates fresh URLs; deleting a project removes its metadata and media without deleting the reusable character.
+Existing Guided project and media records remain in their versioned IndexedDB repository. The temporary Studio manager lists them, downloads the selected final/original video, and transactionally deletes project metadata with owned artifacts. It deliberately has no Reopen action because the Guided runtime is retired. No project or media is deleted automatically.
 
 Storage permission and quota remain browser-controlled. The app requests persistent storage only after an explicit media save and reports best-effort or tab-only fallback truthfully. An unsuccessful write keeps the active Blob available for retry or original download.
 
-Why it fits: refresh/resume and Download Again work locally without introducing accounts, cloud media, or a server-side project database.
+Why it fits: route retirement does not strand or silently erase previously saved local media.
 
 Covered by: revision-conflict, byte-integrity, sanitation, immutable-original, processed-replacement, deletion, URL cleanup, session-only fallback, retention, stable-restore, and route tests.
 
 ### Creative drafts survive navigation and blocked actions explain themselves
 
-Closing and reopening the Character Workshop or Recipe Shelf restores its current draft. Ordinary overlay closure and opening another tool do not discard feature state; only explicit Reset, Clear, Delete, or Discard actions are destructive. While live local media locks a model change, the Character Workshop trigger and cross-model recipe insertion controls are disabled with an explanation; browsing and editing the shelf remain available. Recording closes nonessential overlays without erasing their drafts.
+Closing and reopening the Character Workshop or Recipe Shelf restores its current draft. The Character Builder additionally autosaves one active draft to IndexedDB after 400 ms, flushes pending work on close, resumes across reload, and exposes explicit Reset Draft. Save is single-flight and journals a stable character ID across strict Shelf persistence, draft completion, and Studio preload. Ordinary overlay closure is nondestructive; only explicit Reset, Clear, Delete, or Discard actions own data loss.
 
 Changing recipe models now confirms and actually remounts a dirty form instead of silently retargeting its text. Search is paused while an inline edit is dirty so filtering cannot unmount unsaved work. Dynamic Clear, Save, and session-action controls hand focus to an intentional successor when the focused element disappears.
 
@@ -106,7 +106,7 @@ Automatic source-ended, spontaneous-stop, recorder-error, and finalization-timeo
 
 Download dispatch leaves main-stage playback available and enables Close; the app truthfully does not claim browser download completion. Close revokes take URLs and returns to private idle. Confirmed Discard performs the same cleanup without download. A before-unload warning and explicit discard confirmation reduce accidental loss.
 
-Guided adds a 3–2–1 countdown, warns at 4:30, and automatically stops at the five-minute maximum. Its Decart session profile permits seven minutes of active time, distinct from the five-minute credential start TTL, so the full take window remains available. Advanced keeps its five-minute active-session profile. Guided checkpoints finalized media before resource release and preserves the previous valid take until a re-record replacement is safely finalized.
+The retired Guided implementation used a 3–2–1 countdown and a seven-minute Decart profile around a five-minute take. Studio keeps its existing five-minute active-session policy identifier and runtime behavior; route retirement does not rename or broaden that unrelated realtime policy.
 
 The selected recording tracks are pinned for the lifetime of a take. If either selected video or audio ends, or provider subscription changes which audio/video would be selected, the current take finalizes before the UI accepts the replacement source. This prevents a label or preview from claiming one source while `MediaRecorder` is still capturing another.
 
@@ -140,4 +140,4 @@ Covered by: voice-panel loading/cancel tests, strict HTTP/WebSocket guards, capa
 
 ## Scope guardrails
 
-The build deliberately excludes accounts, remote/cloud projects, server-side take history, collaboration, live distribution, network analytics, payments, social publishing, and speculative AI features. Guided browser-local projects are intentionally scoped to one origin/profile and remain subject to explicit deletion, site-data clearing, private-session lifetime, and browser eviction. Broader persistence would change the privacy/security category and require a new design.
+The build deliberately excludes accounts, remote/cloud projects, server-side take history, collaboration, live distribution, network analytics, payments, social publishing, and speculative AI features. Character drafts and legacy projects are intentionally scoped to one origin/profile and remain subject to explicit deletion, site-data clearing, private-session lifetime, and browser eviction. Broader persistence would change the privacy/security category and require a new design.

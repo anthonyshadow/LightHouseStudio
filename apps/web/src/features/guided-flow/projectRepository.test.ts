@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { createPromptBuilderDraft } from '@studio/domain';
-import { createProjectObjectUrlRegistry } from './objectUrlRegistry';
 import {
   createLocalProjectRepository,
   requestPersistentProjectStorage,
@@ -570,26 +569,6 @@ describe('createLocalProjectRepository', () => {
     await repository.deleteProject('project-1');
     await expect(repository.load('project-1')).resolves.toBeNull();
     await expect(repository.readArtifact('project-1', 'original-1')).resolves.toBeNull();
-  });
-});
-
-describe('createProjectObjectUrlRegistry', () => {
-  it('creates fresh URLs and deterministically revokes replacements and project cleanup', () => {
-    let next = 0;
-    const revoked: string[] = [];
-    const registry = createProjectObjectUrlRegistry({
-      createObjectURL: () => `blob:test-${++next}`,
-      revokeObjectURL: (url) => revoked.push(url),
-    });
-    const blob = new Blob(['video'], { type: 'video/webm' });
-
-    expect(registry.create('project-1', 'video-1', blob)).toBe('blob:test-1');
-    expect(registry.create('project-1', 'video-1', blob)).toBe('blob:test-2');
-    expect(revoked).toEqual(['blob:test-1']);
-    expect(registry.size).toBe(1);
-    registry.revokeProject('project-1');
-    expect(revoked).toEqual(['blob:test-1', 'blob:test-2']);
-    expect(registry.size).toBe(0);
   });
 });
 

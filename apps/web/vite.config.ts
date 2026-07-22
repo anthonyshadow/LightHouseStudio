@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import react from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
@@ -39,29 +38,8 @@ const productionSeamGuard = (): Plugin => ({
   },
 });
 
-const repositoryCharacterFlowRollout = (): string => {
-  const processValue = process.env.VITE_CHARACTER_FLOW_ROLLOUT?.trim();
-  if (processValue) return processValue;
-  try {
-    const source = readFileSync(new URL('../../.env', import.meta.url), 'utf8');
-    const assignment = source.match(/^\s*VITE_CHARACTER_FLOW_ROLLOUT\s*=\s*(.*?)\s*$/mu)?.[1];
-    if (!assignment) return '';
-    const value = assignment.replace(/\s+#.*$/u, '').trim();
-    return /^(['"]).*\1$/u.test(value) ? value.slice(1, -1) : value;
-  } catch {
-    return '';
-  }
-};
-
 export default defineConfig(() => {
-  // Read only this public feature flag from the repository-level .env. Vite's
-  // general env loader would also honor that file's server-side NODE_ENV.
   return {
-    define: {
-      'import.meta.env.VITE_CHARACTER_FLOW_ROLLOUT': JSON.stringify(
-        repositoryCharacterFlowRollout(),
-      ),
-    },
     plugins: [react({ jsxImportSource: '@emotion/react' }), productionSeamGuard()],
     resolve: {
       alias: {

@@ -19,6 +19,7 @@ const availableProviders: ProviderAvailability = {
   elevenLabs: true,
   elevenLabsModel: 'eleven_multilingual_sts_v2',
   referenceImages: true,
+  referenceImageEditAvailable: true,
   referenceImageModel: 'gpt-image-2',
   referenceImageSizes: ['1024x1024', '1024x1536', '1536x1024'],
   referenceImageOptimizerAvailable: true,

@@ -8,6 +8,7 @@ const unavailableProviders: ProviderAvailability = {
   elevenLabs: false,
   elevenLabsModel: null,
   referenceImages: false,
+  referenceImageEditAvailable: false,
   referenceImageModel: null,
   referenceImageSizes: [],
   referenceImageOptimizerAvailable: false,

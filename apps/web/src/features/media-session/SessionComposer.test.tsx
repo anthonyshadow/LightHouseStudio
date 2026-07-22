@@ -36,6 +36,7 @@ const createSession = (
   stopCamera: vi.fn(),
   releaseForRecordedReview: vi.fn().mockResolvedValue(undefined),
   selectMode: vi.fn().mockReturnValue(true),
+  canReplaceRecipeDraft: vi.fn().mockReturnValue(true),
   replaceRecipeDraft: vi.fn().mockReturnValue(true),
   updatePrompt: vi.fn(),
   updateEnhancement: vi.fn(),

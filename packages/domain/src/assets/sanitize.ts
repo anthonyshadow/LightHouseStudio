@@ -319,7 +319,8 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
       const saved = savedById.get(recent.savedPromptId);
       if (
         saved?.modelModeId === recent.modelModeId &&
-        canonicalPrompt(saved.prompt) === canonicalPrompt(recent.prompt)
+        canonicalPrompt(saved.prompt) === canonicalPrompt(recent.prompt) &&
+        saved.referenceImageAssetId === recent.referenceImageAssetId
       ) {
         return recent;
       }

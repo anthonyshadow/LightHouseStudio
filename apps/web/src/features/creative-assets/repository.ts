@@ -1,4 +1,5 @@
 import {
+  ASSET_NAME_MAX_LENGTH,
   canonicalPrompt,
   createSavedCharacterPrompt as createDomainCharacterPrompt,
   createSavedPrompt as createDomainSavedPrompt,
@@ -7,6 +8,7 @@ import {
   DomainRuleError,
   enrichNewestMatchingRecentWithReferenceImage,
   parseCreativeAssetStore,
+  normalizeWhitespace,
   recordSuccessfulPromptUse,
   searchCreativeAssets,
   updateSavedCharacterPrompt as updateDomainCharacterPrompt,
@@ -26,6 +28,7 @@ import {
   type CreateSavedPromptInput,
   type CreativeAssetRepository,
   type CreativeAssetRepositoryState,
+  type PersistSavedCharacterPromptInput,
   type RecordSuccessfulPromptInput,
   type SavedCharacterPrompt,
   type SavedPrompt,
@@ -34,15 +37,28 @@ import {
   type UpdateSavedPromptInput,
 } from './types';
 
-export type CreativeAssetErrorCode = 'invalid-name' | 'invalid-prompt' | 'not-found';
+export type CreativeAssetErrorCode =
+  | 'invalid-id'
+  | 'invalid-name'
+  | 'invalid-prompt'
+  | 'not-found'
+  | 'id-conflict'
+  | 'storage-unavailable'
+  | 'storage-write-failed';
 
 export class CreativeAssetError extends Error {
   readonly code: CreativeAssetErrorCode;
+  readonly retryable: boolean;
 
-  constructor(code: CreativeAssetErrorCode, message: string) {
-    super(message);
+  constructor(
+    code: CreativeAssetErrorCode,
+    message: string,
+    options: ErrorOptions & { readonly retryable?: boolean } = {},
+  ) {
+    super(message, options);
     this.name = 'CreativeAssetError';
     this.code = code;
+    this.retryable = options.retryable ?? false;
   }
 }
 
@@ -180,7 +196,8 @@ export const createCreativeAssetRepository = (
       : options.legacyStorageKey === null
         ? []
         : [options.legacyStorageKey];
-  let storage = options.storage === undefined ? browserStorage() : options.storage;
+  const durableStorage = options.storage === undefined ? browserStorage() : options.storage;
+  let storage = durableStorage;
   const initial = loadInitialState(storage, storageKey, legacyStorageKeys);
   storage = initial.storage;
   let state = initial.state;
@@ -204,6 +221,30 @@ export const createCreativeAssetRepository = (
       }
     }
     state = { store, health, notice };
+    notify();
+  };
+
+  const commitDurably = (nextStore: CreativeAssetStore, publish: boolean) => {
+    const store = sanitizeCreativeAssetStore(nextStore).store;
+    if (!durableStorage) {
+      throw new CreativeAssetError(
+        'storage-unavailable',
+        'Durable browser storage is unavailable. The character was not saved.',
+        { retryable: true },
+      );
+    }
+    try {
+      durableStorage.setItem(storageKey, JSON.stringify(store));
+    } catch (error) {
+      throw new CreativeAssetError(
+        'storage-write-failed',
+        'Durable browser storage could not save the character. No character was published.',
+        { cause: error, retryable: true },
+      );
+    }
+    storage = durableStorage;
+    if (!publish && state.health === 'ready') return;
+    state = { store, health: 'ready', notice: null };
     notify();
   };
 
@@ -242,6 +283,62 @@ export const createCreativeAssetRepository = (
         'The character prompt could not be read after saving.',
       );
     return item;
+  };
+
+  const characterPayloadMatches = (
+    existing: SavedCharacterPrompt,
+    candidate: SavedCharacterPrompt,
+  ) =>
+    existing.id === candidate.id &&
+    existing.name === candidate.name &&
+    existing.prompt === candidate.prompt &&
+    existing.source === candidate.source &&
+    existing.promptIntent === candidate.promptIntent &&
+    JSON.stringify(existing.builderDraft) === JSON.stringify(candidate.builderDraft) &&
+    JSON.stringify(existing.guidedDesign) === JSON.stringify(candidate.guidedDesign) &&
+    existing.referenceImageStatus === candidate.referenceImageStatus &&
+    existing.referenceImageAssetId === candidate.referenceImageAssetId &&
+    existing.notes === candidate.notes &&
+    JSON.stringify(existing.tags) === JSON.stringify(candidate.tags);
+
+  const candidateForDurableCharacter = (
+    input: PersistSavedCharacterPromptInput,
+    createdAt: string,
+  ): SavedCharacterPrompt => {
+    if (
+      !input.id ||
+      input.id.length > ASSET_NAME_MAX_LENGTH ||
+      normalizeWhitespace(input.id, ASSET_NAME_MAX_LENGTH) !== input.id
+    ) {
+      throw new CreativeAssetError(
+        'invalid-id',
+        `The character save ID must be normalized text no longer than ${ASSET_NAME_MAX_LENGTH} characters.`,
+      );
+    }
+    try {
+      const candidateStore = sanitizeCreativeAssetStore(
+        createDomainCharacterPrompt(
+          createEmptyCreativeAssetStore(),
+          {
+            name: input.name,
+            prompt: input.prompt,
+            source: input.source ?? 'generator',
+            promptIntent: input.promptIntent,
+            builderDraft: input.builderDraft ?? null,
+            guidedDesign: input.guidedDesign ?? null,
+            referenceImageStatus: input.referenceImageStatus ?? 'prompt-only',
+            referenceImageAssetId: input.referenceImageAssetId ?? null,
+            notes: input.notes ?? '',
+            tags: input.tags ?? [],
+          },
+          { now: createdAt, createId: () => input.id },
+        ),
+      ).store;
+      const candidate = createdCharacterPrompt(candidateStore, input.id);
+      return candidate;
+    } catch (error) {
+      return mapDomainError(error);
+    }
   };
 
   const createSavedPrompt = (input: CreateSavedPromptInput): SavedPrompt => {
@@ -328,6 +425,55 @@ export const createCreativeAssetRepository = (
     }
   };
 
+  const persistSavedCharacterPrompt = (
+    input: PersistSavedCharacterPromptInput,
+  ): SavedCharacterPrompt => {
+    const createdAt = timestamp();
+    const candidate = candidateForDurableCharacter(input, createdAt);
+    if (
+      state.store.savedPrompts.some((item) => item.id === input.id) ||
+      state.store.recentPrompts.some((item) => item.id === input.id)
+    ) {
+      throw new CreativeAssetError(
+        'id-conflict',
+        `Character save ID ${input.id} is already in use by another creative asset.`,
+      );
+    }
+    const existing = state.store.savedCharacterPrompts.find((item) => item.id === input.id);
+    if (existing) {
+      if (!characterPayloadMatches(existing, candidate)) {
+        throw new CreativeAssetError(
+          'id-conflict',
+          `Character save ID ${input.id} already belongs to a different character.`,
+        );
+      }
+      commitDurably(state.store, state.health !== 'ready');
+      return state.store.savedCharacterPrompts.find((item) => item.id === input.id) ?? existing;
+    }
+    try {
+      const next = createDomainCharacterPrompt(
+        state.store,
+        {
+          name: input.name,
+          prompt: input.prompt,
+          source: input.source ?? 'generator',
+          promptIntent: input.promptIntent,
+          builderDraft: input.builderDraft ?? null,
+          guidedDesign: input.guidedDesign ?? null,
+          referenceImageStatus: input.referenceImageStatus ?? 'prompt-only',
+          referenceImageAssetId: input.referenceImageAssetId ?? null,
+          notes: input.notes ?? '',
+          tags: input.tags ?? [],
+        },
+        { now: createdAt, createId: () => input.id },
+      );
+      commitDurably(next, true);
+      return createdCharacterPrompt(state.store, input.id);
+    } catch (error) {
+      return mapDomainError(error);
+    }
+  };
+
   const updateSavedCharacterPrompt = (
     id: string,
     input: UpdateSavedCharacterPromptInput,
@@ -386,7 +532,8 @@ export const createCreativeAssetRepository = (
       const character = next.savedCharacterPrompts.find(
         (item) =>
           item.id === input.savedCharacterPromptId &&
-          canonicalPrompt(item.prompt) === canonicalPrompt(input.prompt),
+          canonicalPrompt(item.prompt) === canonicalPrompt(input.prompt) &&
+          item.referenceImageAssetId === (input.referenceImageAssetId ?? null),
       );
       if (character) next = markSavedCharacterPromptUsed(next, character.id, context.now).store;
     }
@@ -421,6 +568,7 @@ export const createCreativeAssetRepository = (
     renameSavedPrompt: (id, title) => updateSavedPrompt(id, { title }),
     deleteSavedPrompt,
     createSavedCharacterPrompt,
+    persistSavedCharacterPrompt,
     updateSavedCharacterPrompt,
     renameSavedCharacterPrompt: (id, name) => updateSavedCharacterPrompt(id, { name }),
     deleteSavedCharacterPrompt,

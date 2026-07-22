@@ -76,6 +76,14 @@ export interface CreateSavedCharacterPromptInput {
   readonly tags?: readonly string[];
 }
 
+/**
+ * A retry-stable character save. The caller owns the ID and must reuse it for
+ * every retry of the same logical save operation.
+ */
+export interface PersistSavedCharacterPromptInput extends CreateSavedCharacterPromptInput {
+  readonly id: string;
+}
+
 export interface UpdateSavedCharacterPromptInput {
   readonly name?: string;
   readonly prompt?: string;
@@ -103,6 +111,11 @@ export interface CreativeAssetRepository {
   renameSavedPrompt: (id: string, title: string) => SavedPrompt;
   deleteSavedPrompt: (id: string) => void;
   createSavedCharacterPrompt: (input: CreateSavedCharacterPromptInput) => SavedCharacterPrompt;
+  /**
+   * Writes durable storage before publishing repository state. A failed write
+   * never exposes the character through `getSnapshot()` or subscribers.
+   */
+  persistSavedCharacterPrompt: (input: PersistSavedCharacterPromptInput) => SavedCharacterPrompt;
   updateSavedCharacterPrompt: (
     id: string,
     input: UpdateSavedCharacterPromptInput,

@@ -19,6 +19,7 @@ export const API_ERROR_CODES = [
   'provider_quota',
   'rate_limited',
   'request_aborted',
+  'request_id_conflict',
   'request_timeout',
   'storage_failure',
   'unsupported_media_type',

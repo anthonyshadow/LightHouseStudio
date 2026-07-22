@@ -52,6 +52,7 @@ test.beforeEach(async ({ page }) => {
         elevenLabs: { available: false, modelId: null },
         referenceImages: {
           available: false,
+          editAvailable: false,
           modelId: 'gpt-image-2',
           sizes: ['1024x1024', '1024x1536', '1536x1024'],
           quality: 'high',
@@ -73,7 +74,7 @@ test('prepares a character recipe accessibly without camera or provider work', a
     if (url.pathname.startsWith('/api/')) apiRequests.push(url.pathname);
   });
 
-  await page.goto('/advanced');
+  await page.goto('/');
 
   const icon = page.locator('link[rel~="icon"]');
   await expect(icon).toHaveAttribute('href', '/favicon.svg');

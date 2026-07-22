@@ -2,7 +2,7 @@ import type {
   CharacterPromptOptimizationResult,
   OptimizeCharacterReferencePromptRequest,
 } from '@studio/contracts';
-import OpenAI from 'openai';
+import OpenAI, { APIConnectionError, APIConnectionTimeoutError } from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { characterPromptOptimizationResultSchema } from '@studio/contracts';
 import { CHARACTER_REFERENCE_OPTIMIZER_PROMPT } from './character-prompt-optimizer-prompt.js';
@@ -19,7 +19,13 @@ export interface CharacterPromptOptimizer {
 }
 
 export type CharacterPromptOptimizerFailureReason =
-  'authentication' | 'failure' | 'invalid-response' | 'rate-limit' | 'refusal' | 'timeout';
+  | 'authentication'
+  | 'connection'
+  | 'failure'
+  | 'invalid-response'
+  | 'rate-limit'
+  | 'refusal'
+  | 'timeout';
 
 export class CharacterPromptOptimizerError extends Error {
   readonly reason: CharacterPromptOptimizerFailureReason;
@@ -86,8 +92,11 @@ const normalizeOpenAIError = (error: unknown): CharacterPromptOptimizerError => 
   const status = typeof error.status === 'number' ? error.status : undefined;
   const options =
     status === undefined ? { cause: error } : { cause: error, upstreamStatus: status };
-  if (error.name === 'APIConnectionTimeoutError' || error.name === 'AbortError') {
+  if (error instanceof APIConnectionTimeoutError || error.name === 'AbortError') {
     return new CharacterPromptOptimizerError('timeout', options);
+  }
+  if (error instanceof APIConnectionError) {
+    return new CharacterPromptOptimizerError('connection', options);
   }
   if (status === 401) return new CharacterPromptOptimizerError('authentication', options);
   if (status === 429) return new CharacterPromptOptimizerError('rate-limit', options);

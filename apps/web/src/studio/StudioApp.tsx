@@ -12,10 +12,19 @@ import {
 } from '../adapters/api-client/apiClient';
 import {
   createCreativeAssetRepository,
+  useCreativeAssetRepository,
   type RecipeSelection,
   type SavedCharacterPrompt,
 } from '../features/creative-assets';
-import { GuidedExperience } from '../features/guided-experience/GuidedExperience';
+import {
+  CharacterBuilderCoordinator,
+  type CharacterSaveProgress,
+  type CharacterSaveSnapshot,
+  type CharacterSaveStage,
+} from '../features/character-builder';
+import { createLocalProjectRepository } from '../features/guided-flow/projectRepository';
+import type { ProjectStorageState } from '../features/guided-flow/types';
+import { LegacyProjectManager } from '../features/legacy-projects';
 import { MediaStage, type StageNotice, type StagePresentation } from '../features/live-stage';
 import {
   SessionComposer,
@@ -52,7 +61,9 @@ import {
 } from './StudioApp.styles';
 import { CreativeWorkspace, type AuxiliaryPanel, type ModelMode } from './CreativeWorkspace';
 import { StudioHeader } from './StudioHeader';
+import { resolveLegacyEntry, type StudioInitialOverlay } from './routeResolution';
 import { canReplaceDirtyLibraryMode, shouldFinalizeForUnusableModelOutput } from './studioPolicies';
+import { createNoopStudioTelemetry } from './telemetry';
 import { useProviderAvailability } from './useProviderAvailability';
 
 type ActiveOverlay =
@@ -62,12 +73,20 @@ type ActiveOverlay =
   | 'voice-treatments'
   | 'workshop'
   | 'recipe-shelf'
+  | 'character-builder'
+  | 'legacy-projects'
   | null;
+
+export type ActiveStudioRecipe = {
+  origin: 'character-prompt' | 'saved-prompt';
+  assetId: string;
+} | null;
 
 const REVIEW_LOCK_REASON =
   'Download and close or discard the recorded take before starting or changing media.';
 
 const FORM_ERROR_CODES = new Set(['model-input-required', 'apply-failed']);
+const EPHEMERAL_REFERENCE_IDENTITY = 'session:ephemeral-reference';
 
 type PendingReferenceUse = {
   mode: ModelMode;
@@ -116,16 +135,29 @@ const toWorkshopReferenceImage = (
   generatedFromPrompt = asset.originalPrompt,
 ): WorkshopReferenceImage => ({ ...asset, generatedFromPrompt });
 
-const StudioExperience = () => {
+interface StudioExperienceProps {
+  initialOverlay: StudioInitialOverlay;
+}
+
+const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   const theme = useTheme();
   const repository = useMemo(() => createCreativeAssetRepository(), []);
+  const repositoryState = useCreativeAssetRepository(repository);
+  const legacyRepository = useMemo(() => createLocalProjectRepository(), []);
   const browser = useMemo(() => detectBrowserCapabilities(), []);
   const {
     availability,
     state: capabilityState,
     retry: retryProviderAvailability,
   } = useProviderAvailability();
-  const [activeOverlay, setActiveOverlay] = useState<ActiveOverlay>(null);
+  const [activeOverlay, setActiveOverlay] = useState<ActiveOverlay>(
+    initialOverlay?.kind === 'legacy-projects' ? 'legacy-projects' : null,
+  );
+  const [legacyStorage, setLegacyStorage] = useState<ProjectStorageState>(() =>
+    legacyRepository.getStorageState(),
+  );
+  const [legacyProjectCount, setLegacyProjectCount] = useState(0);
+  const [activeRecipe, setActiveRecipe] = useState<ActiveStudioRecipe>(null);
   const [libraryMode, setLibraryMode] = useState<ModelMode>('lucy-2.5');
   const [workshopDraft, setWorkshopDraft] = useState<PromptBuilderDraft | undefined>();
   const [workshopDrafts, setWorkshopDrafts] = useState<
@@ -152,10 +184,34 @@ const StudioExperience = () => {
   const finishPromiseRef = useRef<Promise<void> | null>(null);
   const selectedSavedPrompt = useRef<string | undefined>(undefined);
   const selectedCharacterPrompt = useRef<string | undefined>(undefined);
+  const workshopSourceRecipeRef = useRef<ActiveStudioRecipe>(null);
+  const activeRecipeFingerprintRef = useRef<{
+    mode: StudioMode;
+    prompt: string;
+    referenceImageAssetId: string | null;
+    assetPrompt: string;
+    assetReferenceImageAssetId: string | null;
+  } | null>(null);
+  const characterBuilderButtonRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
   const shelfToggleRef = useRef<HTMLButtonElement>(null);
+  const legacyManagerToggleRef = useRef<HTMLButtonElement>(null);
   const dockToggleRef = useRef<HTMLButtonElement>(null);
   const takeToggleRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    let active = true;
+    void legacyRepository.initialize().then((storage) => {
+      if (!active) return;
+      setLegacyStorage(storage);
+      void legacyRepository.list().then((projects) => {
+        if (active) setLegacyProjectCount(projects.length);
+      });
+    });
+    return () => {
+      active = false;
+    };
+  }, [legacyRepository]);
 
   const rememberWorkshopDraft = useCallback((draft: PromptBuilderDraft) => {
     workshopRevisionRef.current += 1;
@@ -165,24 +221,36 @@ const StudioExperience = () => {
 
   const recordCommittedPrompt = useCallback(
     (mode: ModelMode, prompt: string, referenceImageAssetId: string | null) => {
+      const activeFingerprint = activeRecipeFingerprintRef.current;
+      const activeRecipeStillMatches = Boolean(
+        activeFingerprint &&
+        activeFingerprint.mode === mode &&
+        canonicalPrompt(activeFingerprint.prompt) === canonicalPrompt(prompt) &&
+        activeFingerprint.referenceImageAssetId === referenceImageAssetId &&
+        activeFingerprint.referenceImageAssetId === activeFingerprint.assetReferenceImageAssetId,
+      );
       const matchingGeneratedReference =
+        !activeRecipeStillMatches &&
         mode === 'lucy-2.5' &&
         referenceImageAssetId !== null &&
         workshopReferenceImage?.assetId === referenceImageAssetId
           ? workshopReferenceImage
           : null;
-      const libraryPrompt =
-        matchingGeneratedReference &&
-        canonicalPrompt(prompt) ===
-          canonicalPrompt(matchingGeneratedReference.lucy25CharacterPrompt)
+      const libraryPrompt = activeRecipeStillMatches
+        ? (activeFingerprint?.assetPrompt ?? prompt)
+        : matchingGeneratedReference &&
+            canonicalPrompt(prompt) ===
+              canonicalPrompt(matchingGeneratedReference.lucy25CharacterPrompt)
           ? matchingGeneratedReference.originalPrompt
           : prompt;
       repository.recordSuccessfulPrompt({
         prompt: libraryPrompt,
         modelModeId: mode,
         referenceImageAssetId,
-        ...(selectedSavedPrompt.current ? { savedPromptId: selectedSavedPrompt.current } : {}),
-        ...(selectedCharacterPrompt.current
+        ...(activeRecipeStillMatches && selectedSavedPrompt.current
+          ? { savedPromptId: selectedSavedPrompt.current }
+          : {}),
+        ...(activeRecipeStillMatches && selectedCharacterPrompt.current
           ? { savedCharacterPromptId: selectedCharacterPrompt.current }
           : {}),
       });
@@ -297,6 +365,22 @@ const StudioExperience = () => {
     session.lifecycle === 'disconnected';
   const recipeInsertionBlocked =
     mediaLocked || (sessionModeLocked && session.draft.mode !== libraryMode);
+  const characterBuilderOpenBlockedReason = recordingActive
+    ? 'Finish recording and finalization before building a character.'
+    : finalizingStartedAt !== null || finalizingStream !== null
+      ? 'Wait for the current take to finish finalizing before building a character.'
+      : reviewLocked
+        ? 'Download and close or discard the current take before building a character.'
+        : undefined;
+  const characterBuilderSaveBlockedReason =
+    characterBuilderOpenBlockedReason ??
+    (shelfDirty
+      ? 'Save or discard the unfinished Recipe Shelf changes before saving this character.'
+      : !session.canReplaceRecipeDraft('lucy-2.5')
+        ? 'Release the active camera or AI session before Studio can preload Lucy 2.5.'
+        : referenceUsePending
+          ? 'Wait for the current recipe handoff to finish before saving this character.'
+          : undefined);
   const recordingSource = useRecordingSource(
     session.draft.mode,
     session.localStream,
@@ -306,6 +390,69 @@ const StudioExperience = () => {
   useEffect(() => {
     if (session.draft.mode !== 'local' && !shelfDirty) setLibraryMode(session.draft.mode);
   }, [session.draft.mode, shelfDirty]);
+
+  const activeRecipeAsset = useMemo(() => {
+    if (!activeRecipe) return null;
+    return activeRecipe.origin === 'character-prompt'
+      ? (repositoryState.store.savedCharacterPrompts.find(
+          (candidate) => candidate.id === activeRecipe.assetId,
+        ) ?? null)
+      : (repositoryState.store.savedPrompts.find(
+          (candidate) => candidate.id === activeRecipe.assetId,
+        ) ?? null);
+  }, [
+    activeRecipe,
+    repositoryState.store.savedCharacterPrompts,
+    repositoryState.store.savedPrompts,
+  ]);
+  const activeCharacterName =
+    activeRecipe?.origin === 'character-prompt'
+      ? repositoryState.store.savedCharacterPrompts.find(
+          (candidate) => candidate.id === activeRecipe.assetId,
+        )?.name
+      : undefined;
+
+  useEffect(() => {
+    if (activeRecipe && !activeRecipeAsset) {
+      setActiveRecipe(null);
+      activeRecipeFingerprintRef.current = null;
+      selectedSavedPrompt.current = undefined;
+      selectedCharacterPrompt.current = undefined;
+    }
+  }, [activeRecipe, activeRecipeAsset]);
+
+  useEffect(() => {
+    const fingerprint = activeRecipeFingerprintRef.current;
+    if (!activeRecipe || !activeRecipeAsset || !fingerprint) return;
+    const currentReferenceId =
+      session.draft.referenceImage?.kind === 'persisted'
+        ? session.draft.referenceImage.assetId
+        : session.draft.referenceImage?.kind === 'ephemeral'
+          ? EPHEMERAL_REFERENCE_IDENTITY
+          : null;
+    const assetMode =
+      'modelModeId' in activeRecipeAsset ? activeRecipeAsset.modelModeId : 'lucy-2.5';
+    if (
+      session.draft.mode !== fingerprint.mode ||
+      canonicalPrompt(session.draft.prompt) !== canonicalPrompt(fingerprint.prompt) ||
+      currentReferenceId !== fingerprint.referenceImageAssetId ||
+      assetMode !== fingerprint.mode ||
+      canonicalPrompt(activeRecipeAsset.prompt) !== canonicalPrompt(fingerprint.assetPrompt) ||
+      activeRecipeAsset.referenceImageAssetId !== fingerprint.assetReferenceImageAssetId ||
+      fingerprint.referenceImageAssetId !== fingerprint.assetReferenceImageAssetId
+    ) {
+      activeRecipeFingerprintRef.current = null;
+      selectedSavedPrompt.current = undefined;
+      selectedCharacterPrompt.current = undefined;
+      setActiveRecipe(null);
+    }
+  }, [
+    activeRecipe,
+    activeRecipeAsset,
+    session.draft.mode,
+    session.draft.prompt,
+    session.draft.referenceImage,
+  ]);
 
   useEffect(() => {
     if (recording.lifecycle !== 'recorded' || !recording.presented || !reviewReady) return;
@@ -563,12 +710,13 @@ const StudioExperience = () => {
         }
 
         const generatedLucyReference = pending.mode === 'lucy-2.5' && referenceMetadata !== null;
+        const appliedPrompt =
+          pending.mode === 'lucy-2.5' && referenceMetadata
+            ? referenceMetadata.lucy25CharacterPrompt
+            : pending.prompt;
         const committed = session.replaceRecipeDraft({
           mode: pending.mode,
-          prompt:
-            pending.mode === 'lucy-2.5' && referenceMetadata
-              ? referenceMetadata.lucy25CharacterPrompt
-              : pending.prompt,
+          prompt: appliedPrompt,
           referenceImage,
           enhance: generatedLucyReference,
         });
@@ -579,8 +727,58 @@ const StudioExperience = () => {
           return;
         }
 
-        selectedSavedPrompt.current = pending.savedPromptId;
-        selectedCharacterPrompt.current = pending.savedCharacterPromptId;
+        const repositorySnapshot = repository.getSnapshot().store;
+        const sourceAsset = pending.savedCharacterPromptId
+          ? repositorySnapshot.savedCharacterPrompts.find(
+              (candidate) => candidate.id === pending.savedCharacterPromptId,
+            )
+          : pending.savedPromptId
+            ? repositorySnapshot.savedPrompts.find(
+                (candidate) => candidate.id === pending.savedPromptId,
+              )
+            : null;
+        const sourceMode =
+          sourceAsset && 'modelModeId' in sourceAsset ? sourceAsset.modelModeId : 'lucy-2.5';
+        const appliedReferenceIdentity =
+          referenceImage?.kind === 'persisted'
+            ? referenceImage.assetId
+            : referenceImage?.kind === 'ephemeral'
+              ? EPHEMERAL_REFERENCE_IDENTITY
+              : null;
+        const referenceMatchesPendingPrompt =
+          !referenceMetadata ||
+          canonicalPrompt(referenceMetadata.originalPrompt) === canonicalPrompt(pending.prompt);
+        const sourceStillMatches = Boolean(
+          sourceAsset &&
+          sourceMode === pending.mode &&
+          canonicalPrompt(sourceAsset.prompt) === canonicalPrompt(pending.prompt) &&
+          sourceAsset.referenceImageAssetId === pending.referenceImageAssetId &&
+          appliedReferenceIdentity === sourceAsset.referenceImageAssetId &&
+          referenceMatchesPendingPrompt,
+        );
+        const exactSavedPromptId =
+          sourceStillMatches && pending.savedPromptId ? pending.savedPromptId : undefined;
+        const exactCharacterPromptId =
+          sourceStillMatches && pending.savedCharacterPromptId
+            ? pending.savedCharacterPromptId
+            : undefined;
+        selectedSavedPrompt.current = exactSavedPromptId;
+        selectedCharacterPrompt.current = exactCharacterPromptId;
+        const nextActiveRecipe: ActiveStudioRecipe = exactCharacterPromptId
+          ? { origin: 'character-prompt', assetId: exactCharacterPromptId }
+          : exactSavedPromptId
+            ? { origin: 'saved-prompt', assetId: exactSavedPromptId }
+            : null;
+        setActiveRecipe(nextActiveRecipe);
+        activeRecipeFingerprintRef.current = nextActiveRecipe
+          ? {
+              mode: pending.mode,
+              prompt: appliedPrompt,
+              referenceImageAssetId: appliedReferenceIdentity,
+              assetPrompt: sourceAsset?.prompt ?? pending.prompt,
+              assetReferenceImageAssetId: sourceAsset?.referenceImageAssetId ?? null,
+            }
+          : null;
         if (pending.builderDraft) rememberWorkshopDraft(pending.builderDraft);
         workshopRevisionRef.current += 1;
         setWorkshopReferenceImage(referenceMetadata);
@@ -588,13 +786,14 @@ const StudioExperience = () => {
         referenceRestoreRef.current = referenceMetadata
           ? { assetId: referenceMetadata.assetId, prompt: pending.prompt }
           : null;
-        if (referenceMetadata) {
+        if (referenceMetadata && referenceMatchesPendingPrompt) {
           repository.enrichNewestMatchingRecent(
             pending.prompt,
             pending.mode,
             referenceMetadata.assetId,
           );
         }
+        if (pending.destination === 'workshop') workshopSourceRecipeRef.current = null;
         pendingReferenceUseRef.current = null;
         setReferenceUseFailureMessage(null);
         setActiveOverlay(null);
@@ -610,23 +809,37 @@ const StudioExperience = () => {
 
   const useRecipe = useCallback(
     (selection: RecipeSelection) => {
+      const selectedReferenceAssetId = selection.referenceImageAssetId ?? null;
+      const linkedRecentPrompt =
+        selection.origin === 'recent-prompt' && selection.assetId
+          ? repository
+              .getSnapshot()
+              .store.savedPrompts.find(
+                (candidate) =>
+                  candidate.id === selection.assetId &&
+                  candidate.modelModeId === selection.modelModeId &&
+                  canonicalPrompt(candidate.prompt) === canonicalPrompt(selection.prompt) &&
+                  candidate.referenceImageAssetId === selectedReferenceAssetId,
+              )
+          : null;
       const pending: PendingReferenceUse = {
         mode: selection.modelModeId,
         prompt: selection.prompt,
-        referenceImageAssetId: selection.referenceImageAssetId ?? null,
+        referenceImageAssetId: selectedReferenceAssetId,
         preserveCurrentReference: false,
         destination: 'shelf',
         ...(selection.builderDraft ? { builderDraft: selection.builderDraft } : {}),
         ...(selection.origin === 'saved-prompt' && selection.assetId
           ? { savedPromptId: selection.assetId }
           : {}),
+        ...(linkedRecentPrompt ? { savedPromptId: linkedRecentPrompt.id } : {}),
         ...(selection.origin === 'character-prompt' && selection.assetId
           ? { savedCharacterPromptId: selection.assetId }
           : {}),
       };
       void commitReferenceUse(pending);
     },
-    [commitReferenceUse],
+    [commitReferenceUse, repository],
   );
 
   const retryReferenceUse = useCallback(() => {
@@ -639,11 +852,112 @@ const StudioExperience = () => {
     if (pending) void commitReferenceUse(pending, true);
   }, [commitReferenceUse]);
 
+  const saveBuiltCharacter = useCallback(
+    async (
+      snapshot: CharacterSaveSnapshot,
+      characterId: string,
+      stage: CharacterSaveStage,
+      progress: CharacterSaveProgress,
+    ): Promise<void> => {
+      if (characterBuilderSaveBlockedReason) {
+        throw new Error(characterBuilderSaveBlockedReason);
+      }
+      if (
+        session.draft.mode !== 'lucy-2.5' &&
+        !confirmModeReplacement(session.draft, 'lucy-2.5', (message) => window.confirm(message))
+      ) {
+        throw new Error('Character save was cancelled. The resumable draft is unchanged.');
+      }
+
+      const referenceMetadata = snapshot.referenceImage;
+      let hydratedReference: SessionReferenceImage | null = null;
+      if (referenceMetadata) {
+        hydratedReference = await hydrateReferenceImage(
+          referenceMetadata.assetId,
+          referenceMetadata,
+        );
+      }
+
+      const studioPrompt = referenceMetadata
+        ? referenceMetadata.lucy25CharacterPrompt
+        : snapshot.prompt;
+      const currentReferenceId =
+        session.draft.referenceImage?.kind === 'persisted'
+          ? session.draft.referenceImage.assetId
+          : session.draft.referenceImage?.kind === 'ephemeral'
+            ? EPHEMERAL_REFERENCE_IDENTITY
+            : null;
+      const incomingReferenceId = referenceMetadata?.assetId ?? null;
+      const hasCurrentLucyRecipe =
+        session.draft.mode === 'lucy-2.5' &&
+        (canonicalPrompt(session.draft.prompt).length > 0 || currentReferenceId !== null);
+      if (
+        hasCurrentLucyRecipe &&
+        (canonicalPrompt(session.draft.prompt) !== canonicalPrompt(studioPrompt) ||
+          currentReferenceId !== incomingReferenceId) &&
+        !window.confirm(
+          'Replace the current Lucy 2.5 recipe in the Dock with this saved character? Your current Dock values will be replaced.',
+        )
+      ) {
+        throw new Error('Character save was cancelled. The resumable draft is unchanged.');
+      }
+
+      repository.persistSavedCharacterPrompt({
+        id: characterId,
+        name: snapshot.name,
+        prompt: snapshot.prompt,
+        source: 'generator',
+        promptIntent: 'character-transform',
+        builderDraft: snapshot.draft,
+        guidedDesign: snapshot.design,
+        referenceImageStatus: referenceMetadata ? 'persisted-reference' : 'prompt-only',
+        referenceImageAssetId: referenceMetadata?.assetId ?? null,
+      });
+      if (stage === 'intent') {
+        await progress.markCharacterPersisted();
+      }
+
+      const preloaded = session.replaceRecipeDraft({
+        mode: 'lucy-2.5',
+        prompt: studioPrompt,
+        referenceImage: hydratedReference,
+        enhance: Boolean(referenceMetadata),
+      });
+      if (!preloaded) {
+        throw new Error(
+          'Release the active camera or AI session, then retry preloading this saved character.',
+        );
+      }
+
+      selectedSavedPrompt.current = undefined;
+      selectedCharacterPrompt.current = characterId;
+      setActiveRecipe({ origin: 'character-prompt', assetId: characterId });
+      activeRecipeFingerprintRef.current = {
+        mode: 'lucy-2.5',
+        prompt: studioPrompt,
+        referenceImageAssetId: referenceMetadata?.assetId ?? null,
+        assetPrompt: snapshot.prompt,
+        assetReferenceImageAssetId: referenceMetadata?.assetId ?? null,
+      };
+      setLibraryMode('lucy-2.5');
+      rememberWorkshopDraft(snapshot.draft);
+      workshopRevisionRef.current += 1;
+      setWorkshopReferenceImage(
+        referenceMetadata ? toWorkshopReferenceImage(referenceMetadata, snapshot.prompt) : null,
+      );
+      referenceRestoreRef.current = referenceMetadata
+        ? { assetId: referenceMetadata.assetId, prompt: snapshot.prompt }
+        : null;
+      setReferenceGeneration({ status: 'idle', error: null });
+      await progress.markStudioPreloaded();
+    },
+    [characterBuilderSaveBlockedReason, rememberWorkshopDraft, repository, session],
+  );
+
   const openSavedWorkshop = (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => {
     if (recordingActive) return;
     if (session.draft.mode !== 'lucy-2.5' && !selectModeWithDraftProtection('lucy-2.5')) return;
-    selectedCharacterPrompt.current = asset.id;
-    selectedSavedPrompt.current = undefined;
+    workshopSourceRecipeRef.current = { origin: 'character-prompt', assetId: asset.id };
     rememberWorkshopDraft(draft);
     workshopRevisionRef.current += 1;
     setWorkshopReferenceImage(null);
@@ -656,16 +970,37 @@ const StudioExperience = () => {
   };
 
   const applyWorkshopPrompt = (action: PromptWorkshopAction) => {
+    const sourceRecipe = workshopSourceRecipeRef.current;
+    const sourceAsset = sourceRecipe
+      ? sourceRecipe.origin === 'character-prompt'
+        ? repository
+            .getSnapshot()
+            .store.savedCharacterPrompts.find((candidate) => candidate.id === sourceRecipe.assetId)
+        : repository
+            .getSnapshot()
+            .store.savedPrompts.find((candidate) => candidate.id === sourceRecipe.assetId)
+      : null;
+    const preserveCurrentReference =
+      action.referenceImageAssetId === null && session.draft.referenceImage?.kind === 'ephemeral';
+    const sourceStillMatches =
+      sourceAsset &&
+      !preserveCurrentReference &&
+      (sourceRecipe?.origin !== 'saved-prompt' ||
+        ('modelModeId' in sourceAsset && sourceAsset.modelModeId === 'lucy-2.5')) &&
+      canonicalPrompt(sourceAsset.prompt) === canonicalPrompt(action.prompt) &&
+      sourceAsset.referenceImageAssetId === action.referenceImageAssetId;
     void commitReferenceUse({
       mode: 'lucy-2.5',
       prompt: action.prompt,
       referenceImageAssetId: action.referenceImageAssetId,
-      preserveCurrentReference:
-        action.referenceImageAssetId === null && session.draft.referenceImage?.kind === 'ephemeral',
+      preserveCurrentReference,
       builderDraft: action.draft,
       destination: 'workshop',
-      ...(selectedCharacterPrompt.current
-        ? { savedCharacterPromptId: selectedCharacterPrompt.current }
+      ...(sourceStillMatches && sourceRecipe?.origin === 'character-prompt'
+        ? { savedCharacterPromptId: sourceRecipe.assetId }
+        : {}),
+      ...(sourceStillMatches && sourceRecipe?.origin === 'saved-prompt'
+        ? { savedPromptId: sourceRecipe.assetId }
         : {}),
     });
   };
@@ -694,6 +1029,7 @@ const StudioExperience = () => {
   const openWorkshop = () => {
     if (recordingActive) return;
     if (session.draft.mode !== 'lucy-2.5' && !selectModeWithDraftProtection('lucy-2.5')) return;
+    workshopSourceRecipeRef.current = activeRecipe;
     if (!workshopReferenceImage && session.draft.referenceImage?.kind === 'persisted') {
       workshopRevisionRef.current += 1;
       restoreWorkshopReference(session.draft.referenceImage.assetId, session.draft.prompt);
@@ -715,6 +1051,13 @@ const StudioExperience = () => {
     if (recordingActive) return;
     setActiveOverlay('capture-settings');
   };
+
+  const openCharacterBuilder = () => {
+    if (characterBuilderOpenBlockedReason) return;
+    setActiveOverlay('character-builder');
+  };
+
+  const openLegacyProjects = () => setActiveOverlay('legacy-projects');
 
   const creativePanel: AuxiliaryPanel =
     activeOverlay === 'workshop'
@@ -739,6 +1082,11 @@ const StudioExperience = () => {
             availability={availability}
             browser={browser}
             capabilityState={capabilityState}
+            characterBuilderButtonRef={characterBuilderButtonRef}
+            {...(characterBuilderOpenBlockedReason
+              ? { characterBuilderDisabledReason: characterBuilderOpenBlockedReason }
+              : {})}
+            onBuildCharacter={openCharacterBuilder}
           />
         </div>
 
@@ -782,6 +1130,7 @@ const StudioExperience = () => {
             embedded
             session={session}
             recording={mediaLocked}
+            {...(activeCharacterName ? { activeCharacterName } : {})}
             {...(reviewLocked ? { lockReason: REVIEW_LOCK_REASON } : {})}
             onOpenWorkshop={openWorkshop}
           />
@@ -851,6 +1200,42 @@ const StudioExperience = () => {
           />
         </OverlayPanel>
 
+        <CharacterBuilderCoordinator
+          open={activeOverlay === 'character-builder'}
+          returnFocusRef={characterBuilderButtonRef}
+          generationAvailable={Boolean(
+            availability.referenceImages && availability.referenceImageOptimizerAvailable,
+          )}
+          editAvailable={Boolean(availability.referenceImageEditAvailable)}
+          {...(characterBuilderSaveBlockedReason
+            ? { saveBlockedReason: characterBuilderSaveBlockedReason }
+            : {})}
+          legacyRepository={legacyRepository}
+          onSaveCharacter={saveBuiltCharacter}
+          onDismiss={() => setActiveOverlay(null)}
+        />
+
+        <OverlayPanel
+          open={activeOverlay === 'legacy-projects'}
+          onClose={() => setActiveOverlay(null)}
+          title="Legacy Projects"
+          description="Download or delete browser-local projects from the retired Guided experience."
+          placement="fullscreen"
+          size="wide"
+          bodyMode="scroll"
+          returnFocusRef={legacyManagerToggleRef}
+        >
+          <LegacyProjectManager
+            repository={legacyRepository}
+            storage={legacyStorage}
+            focusProjectId={initialOverlay?.focusProjectId ?? null}
+            onProjectCountChange={(count) => {
+              setLegacyProjectCount(count);
+              setLegacyStorage(legacyRepository.getStorageState());
+            }}
+          />
+        </OverlayPanel>
+
         <CreativeWorkspace
           panel={creativePanel}
           activeSessionMode={session.draft.mode}
@@ -882,6 +1267,7 @@ const StudioExperience = () => {
           shelfToggleRef={shelfToggleRef}
           dockToggleRef={dockToggleRef}
           takeToggleRef={takeToggleRef}
+          legacyManagerToggleRef={legacyManagerToggleRef}
           hasTake={Boolean(recording.presented)}
           onOpenDock={openDock}
           onOpenTake={openTake}
@@ -889,6 +1275,9 @@ const StudioExperience = () => {
           onToggleShelf={() =>
             setActiveOverlay((current) => (current === 'recipe-shelf' ? null : 'recipe-shelf'))
           }
+          legacyProjectCount={legacyProjectCount}
+          onOpenLegacyProjects={openLegacyProjects}
+          activeRecipe={activeRecipe}
           onClose={closeCreativePanel}
           onLibraryModeChange={changeLibraryMode}
           onWorkshopDraftChange={rememberWorkshopDraft}
@@ -909,52 +1298,28 @@ const StudioExperience = () => {
   );
 };
 
-export type CharacterFlowRollout = 'off' | 'opt-in' | 'all';
-
-export type StudioDestination =
-  | { kind: 'advanced' }
-  | { kind: 'guided'; projectId: string | null; resumeLatest: boolean }
-  | { kind: 'projects' };
-
-const characterFlowRollout = (value: unknown): CharacterFlowRollout => {
-  if (value === 'off' || value === 'opt-in' || value === 'all') return value;
-  return 'all';
-};
-
-export const resolveStudioDestination = (
-  location: Pick<Location, 'pathname' | 'search'>,
-  rollout = characterFlowRollout(import.meta.env.VITE_CHARACTER_FLOW_ROLLOUT),
-): StudioDestination => {
-  const pathname = location.pathname.replace(/\/+$/u, '') || '/';
-  const params = new URLSearchParams(location.search);
-
-  if (pathname === '/advanced') return { kind: 'advanced' };
-  if (rollout !== 'off' && pathname === '/projects') return { kind: 'projects' };
-
-  const explicitlyGuided = pathname === '/guided' || params.get('characterFlow') === 'guided';
-  if (rollout === 'all' || (rollout === 'opt-in' && explicitlyGuided)) {
-    return {
-      kind: 'guided',
-      projectId: params.get('project'),
-      resumeLatest: params.get('new') !== '1',
-    };
-  }
-
-  return { kind: 'advanced' };
-};
-
 const RoutedStudioExperience = () => {
-  const destination = resolveStudioDestination(window.location);
-  if (destination.kind === 'projects') return <GuidedExperience projectsOnly />;
-  if (destination.kind === 'guided') {
-    return (
-      <GuidedExperience
-        initialProjectId={destination.projectId}
-        resumeLatest={destination.resumeLatest}
-      />
-    );
-  }
-  return <StudioExperience />;
+  const telemetry = useMemo(() => createNoopStudioTelemetry(), []);
+  const viewedTrackedRef = useRef(false);
+  const [entry] = useState(() => {
+    const resolution = resolveLegacyEntry(window.location);
+    if (resolution.shouldReplace) {
+      window.history.replaceState(window.history.state, '', resolution.canonicalPath);
+    }
+    return resolution;
+  });
+  useEffect(() => {
+    if (viewedTrackedRef.current) return;
+    viewedTrackedRef.current = true;
+    telemetry.track({
+      type: 'studio-viewed',
+      canonicalPath: '/',
+      canonicalizedLegacyEntry: entry.shouldReplace,
+      initialOverlay: entry.initialOverlay?.kind ?? null,
+      timestamp: new Date().toISOString(),
+    });
+  }, [entry, telemetry]);
+  return <StudioExperience initialOverlay={entry.initialOverlay} />;
 };
 
 export const StudioApp = () => (

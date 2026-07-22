@@ -10,6 +10,7 @@ export type ProviderAvailability = {
   elevenLabs: boolean;
   elevenLabsModel: string | null;
   referenceImages?: boolean;
+  referenceImageEditAvailable?: boolean;
   referenceImageModel?: string | null;
   referenceImageSizes?: readonly ReferenceImageSize[];
   referenceImageOptimizerAvailable?: boolean;

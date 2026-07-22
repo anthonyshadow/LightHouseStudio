@@ -8,6 +8,7 @@ import {
   capabilitiesResponseSchema,
   characterPromptOptimizationResultSchema,
   createReferenceImageRequestSchema,
+  editReferenceImageRequestSchema,
   healthResponseSchema,
   importSharedVoiceRequestSchema,
   optimizeCharacterReferencePromptRequestSchema,
@@ -47,6 +48,7 @@ describe('health and capabilities contracts', () => {
         elevenLabs: { available: false, modelId: null },
         referenceImages: {
           available: true,
+          editAvailable: true,
           modelId: 'gpt-image-2',
           sizes: ['1024x1024', '1024x1536', '1536x1024'],
           quality: 'high',
@@ -62,6 +64,7 @@ describe('health and capabilities contracts', () => {
       elevenLabs: { available: false, modelId: null },
       referenceImages: {
         available: true,
+        editAvailable: true,
         modelId: 'gpt-image-2',
         sizes: ['1024x1024', '1024x1536', '1536x1024'],
         quality: 'high',
@@ -78,6 +81,7 @@ describe('health and capabilities contracts', () => {
         elevenLabs: { available: false, modelId: null },
         referenceImages: {
           available: false,
+          editAvailable: false,
           modelId: 'gpt-image-2',
           sizes: ['1024x1024', '1024x1536', '1536x1024'],
           quality: 'high',
@@ -202,6 +206,40 @@ describe('reference image contracts', () => {
     ).toBe(false);
   });
 
+  it('requires nonempty, bounded edit instructions and an enabled optimization', () => {
+    const request = {
+      requestId: 'cb6ab812-0ebd-455b-8fe1-3a3665daf158',
+      rawPrompt: 'A ceramic astronaut',
+      changeInstructions: '  Make the visor amber.  ',
+      options,
+      optimization: {
+        enabled: true as const,
+        result,
+        model: 'gpt-5.6',
+        version: 'lucy-character-reference-v1',
+        inputHash: 'b'.repeat(64),
+        manuallyEdited: false,
+      },
+    };
+
+    expect(editReferenceImageRequestSchema.parse(request).changeInstructions).toBe(
+      'Make the visor amber.',
+    );
+    expect(
+      editReferenceImageRequestSchema.safeParse({ ...request, changeInstructions: '   ' }).success,
+    ).toBe(false);
+    expect(
+      editReferenceImageRequestSchema.safeParse({
+        ...request,
+        optimization: { enabled: false },
+      }).success,
+    ).toBe(false);
+    expect(
+      editReferenceImageRequestSchema.safeParse({ ...request, sourceImageBytes: 'private' })
+        .success,
+    ).toBe(false);
+  });
+
   it('exposes owner-scoped prompt audit metadata but rejects internal storage/provider payloads', () => {
     const metadata = {
       assetId: '28d0b01f-70aa-4db6-ac65-379cdd916113',
@@ -234,6 +272,18 @@ describe('reference image contracts', () => {
     };
 
     expect(referenceImageAssetSchema.parse(metadata)).toEqual(metadata);
+    expect(
+      referenceImageAssetSchema.parse({
+        ...metadata,
+        derivation: {
+          kind: 'edit',
+          sourceAssetId: '7bf5e842-3cfe-4c5d-b945-a6ead02a3f01',
+        },
+      }).derivation,
+    ).toEqual({
+      kind: 'edit',
+      sourceAssetId: '7bf5e842-3cfe-4c5d-b945-a6ead02a3f01',
+    });
     expect(
       referenceImageAssetSchema.safeParse({ ...metadata, storageKey: 'private/image.jpg' }).success,
     ).toBe(false);
