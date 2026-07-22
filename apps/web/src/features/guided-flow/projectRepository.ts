@@ -1,11 +1,16 @@
 import {
-  GUIDED_CHOICE_KEYS,
+  sanitizeGuidedDesignV1,
   sanitizePromptBuilderDraft,
   type CharacterTransformDraft,
-  type GuidedChoiceKey,
-  type GuidedChoiceValue,
   type GuidedDesignV1,
 } from '@studio/domain';
+import {
+  abortTransaction,
+  browserIndexedDb,
+  openIndexedDatabase,
+  requestResult,
+  transactionComplete,
+} from '../../adapters/indexed-db/indexedDb';
 import {
   GUIDED_PROJECT_SCHEMA_VERSION,
   type CheckpointCommit,
@@ -119,30 +124,9 @@ const timestamp = (value: unknown): string | null => {
   return Number.isFinite(parsed.valueOf()) ? value : null;
 };
 
-const sanitizeChoice = (value: unknown): GuidedChoiceValue | null | undefined => {
-  if (value === null) return null;
-  if (!isRecord(value)) return undefined;
-  const optionId = limitedText(value.optionId, 128)?.trim();
-  if (!optionId) return undefined;
-  if (optionId !== 'custom') return { optionId };
-  const customValue = limitedText(value.customValue, 500);
-  return customValue?.trim() ? { optionId: 'custom', customValue } : undefined;
-};
-
 const sanitizeGuidedDesign = (value: unknown): GuidedDesignV1 | null | undefined => {
   if (value === null) return null;
-  if (!isRecord(value) || value.catalogVersion !== 1 || !isRecord(value.choices)) return undefined;
-  const starterId = nullableText(value.starterId, 128);
-  if (starterId === undefined || starterId?.trim() === '') return undefined;
-  const choices = {} as Record<GuidedChoiceKey, GuidedChoiceValue | null>;
-  for (const key of GUIDED_CHOICE_KEYS) {
-    const storedChoice = value.choices[key];
-    const choice =
-      key === 'skinTone' && storedChoice === undefined ? null : sanitizeChoice(storedChoice);
-    if (choice === undefined) return undefined;
-    choices[key] = choice;
-  }
-  return { catalogVersion: 1, starterId, choices };
+  return sanitizeGuidedDesignV1(value) ?? undefined;
 };
 
 const sanitizeCharacterDraft = (value: unknown): CharacterTransformDraft | null | undefined => {
@@ -596,39 +580,6 @@ class MemoryProjectBackend implements ProjectBackend {
   }
 }
 
-const requestResult = <T>(request: IDBRequest<T>): Promise<T> =>
-  new Promise((resolve, reject) => {
-    request.addEventListener('success', () => resolve(request.result), { once: true });
-    request.addEventListener(
-      'error',
-      () => reject(request.error ?? new Error('IndexedDB request failed.')),
-      { once: true },
-    );
-  });
-
-const transactionComplete = (transaction: IDBTransaction): Promise<void> =>
-  new Promise((resolve, reject) => {
-    transaction.addEventListener('complete', () => resolve(), { once: true });
-    transaction.addEventListener(
-      'abort',
-      () => reject(transaction.error ?? new Error('IndexedDB transaction was aborted.')),
-      { once: true },
-    );
-    transaction.addEventListener(
-      'error',
-      () => reject(transaction.error ?? new Error('IndexedDB transaction failed.')),
-      { once: true },
-    );
-  });
-
-const abortTransaction = (transaction: IDBTransaction) => {
-  try {
-    transaction.abort();
-  } catch {
-    // A completed or already-aborted transaction needs no further action.
-  }
-};
-
 const deleteProjectArtifacts = (artifacts: IDBObjectStore, projectId: string): Promise<void> =>
   new Promise((resolve, reject) => {
     const request = artifacts.index('by-project-id').openCursor(projectId);
@@ -925,47 +876,17 @@ class IndexedDbProjectBackend implements ProjectBackend {
 }
 
 const openProjectDatabase = (factory: IDBFactory, databaseName: string): Promise<IDBDatabase> =>
-  new Promise((resolve, reject) => {
-    const request = factory.open(databaseName, GUIDED_PROJECT_DATABASE_VERSION);
-    let settled = false;
-    request.addEventListener('upgradeneeded', () => {
-      const database = request.result;
-      if (!database.objectStoreNames.contains(GUIDED_PROJECTS_STORE)) {
-        database.createObjectStore(GUIDED_PROJECTS_STORE, { keyPath: 'id' });
-      }
-      if (!database.objectStoreNames.contains(GUIDED_PROJECT_ARTIFACTS_STORE)) {
-        const artifacts = database.createObjectStore(GUIDED_PROJECT_ARTIFACTS_STORE, {
-          keyPath: 'id',
-        });
-        artifacts.createIndex('by-project-id', 'projectId', { unique: false });
-      }
-    });
-    request.addEventListener('success', () => {
-      if (settled) {
-        request.result.close();
-        return;
-      }
-      settled = true;
-      resolve(request.result);
-    });
-    request.addEventListener('error', () => {
-      settled = true;
-      reject(request.error ?? new Error('IndexedDB could not be opened.'));
-    });
-    request.addEventListener('blocked', () => {
-      if (settled) return;
-      settled = true;
-      reject(new Error('IndexedDB is blocked by another open version.'));
-    });
+  openIndexedDatabase(factory, databaseName, GUIDED_PROJECT_DATABASE_VERSION, (database) => {
+    if (!database.objectStoreNames.contains(GUIDED_PROJECTS_STORE)) {
+      database.createObjectStore(GUIDED_PROJECTS_STORE, { keyPath: 'id' });
+    }
+    if (!database.objectStoreNames.contains(GUIDED_PROJECT_ARTIFACTS_STORE)) {
+      const artifacts = database.createObjectStore(GUIDED_PROJECT_ARTIFACTS_STORE, {
+        keyPath: 'id',
+      });
+      artifacts.createIndex('by-project-id', 'projectId', { unique: false });
+    }
   });
-
-const browserIndexedDb = (): IDBFactory | null => {
-  try {
-    return typeof indexedDB === 'undefined' ? null : indexedDB;
-  } catch {
-    return null;
-  }
-};
 
 const safeTimestamp = (now: () => Date) => {
   const value = now();
@@ -998,9 +919,15 @@ export const createLocalProjectRepository = (
         return state;
       }
       try {
-        backend = new IndexedDbProjectBackend(await openProjectDatabase(factory, databaseName));
+        const database = await openProjectDatabase(factory, databaseName);
+        if (closed) {
+          database.close();
+          throw new ProjectStorageError('closed', 'Project storage is closed.');
+        }
+        backend = new IndexedDbProjectBackend(database);
         state = READY_STATE;
-      } catch {
+      } catch (error) {
+        if (closed) throw error;
         backend = memoryFallback;
         state = SESSION_ONLY_STATE;
       }

@@ -12,27 +12,33 @@ export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_MODEL = 'gpt-5.6' as const;
 export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_REASONING = 'medium' as const;
 export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_VERSION = 'lucy-character-reference-v1' as const;
 
-export const characterReferenceFramingSchema = z.enum([
+export const CHARACTER_REFERENCE_FRAMINGS = [
   'head_and_shoulders',
   'waist_up',
   'full_body',
-]);
-export const characterReferenceOrientationSchema = z.enum([
+] as const;
+export const CHARACTER_REFERENCE_ORIENTATIONS = [
   'auto',
   'portrait_9_16',
   'landscape_16_9',
   'square',
-]);
-export const characterReferenceRenderingModeSchema = z.enum([
+] as const;
+export const CHARACTER_REFERENCE_RENDERING_MODES = [
   'photorealistic',
   'faithful_source_style',
-]);
-export const characterReferenceExpressionSchema = z.enum(['neutral', 'subtle_friendly']);
-export const characterReferenceBackgroundSchema = z.enum([
+] as const;
+export const CHARACTER_REFERENCE_EXPRESSIONS = ['neutral', 'subtle_friendly'] as const;
+export const CHARACTER_REFERENCE_BACKGROUNDS = [
   'neutral_gray',
   'off_white',
   'plain_custom',
-]);
+] as const;
+
+export const characterReferenceFramingSchema = z.enum(CHARACTER_REFERENCE_FRAMINGS);
+export const characterReferenceOrientationSchema = z.enum(CHARACTER_REFERENCE_ORIENTATIONS);
+export const characterReferenceRenderingModeSchema = z.enum(CHARACTER_REFERENCE_RENDERING_MODES);
+export const characterReferenceExpressionSchema = z.enum(CHARACTER_REFERENCE_EXPRESSIONS);
+export const characterReferenceBackgroundSchema = z.enum(CHARACTER_REFERENCE_BACKGROUNDS);
 
 const customBackgroundSchema = z.string().trim().min(1).max(200);
 

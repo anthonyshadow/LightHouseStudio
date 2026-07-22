@@ -1,19 +1,26 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
   importPublicVoice,
   listPublicVoices,
   listWorkspaceVoices,
 } from '../../adapters/api-client/voicesApi';
-import type { VoiceLibraryKind, VoicePage, VoiceSummary } from '../../application/types';
+import type {
+  PublicVoiceItem,
+  PublicVoicePage,
+  VoiceLibraryItem,
+  VoiceLibraryKind,
+  WorkspaceVoiceItem,
+  WorkspaceVoicePage,
+} from '../../application/types';
 
 export type VoiceLibraryClient = {
-  listWorkspaceVoices(
+  listWorkspaceVoices: (
     search: string,
     pageToken: string | null,
     signal: AbortSignal,
-  ): Promise<VoicePage>;
-  listPublicVoices(search: string, page: number, signal: AbortSignal): Promise<VoicePage>;
-  importPublicVoice(voice: VoiceSummary, signal: AbortSignal): Promise<string>;
+  ) => Promise<WorkspaceVoicePage>;
+  listPublicVoices: (search: string, page: number, signal: AbortSignal) => Promise<PublicVoicePage>;
+  importPublicVoice: (voice: PublicVoiceItem, signal: AbortSignal) => Promise<string>;
 };
 
 const defaultVoiceLibraryClient: VoiceLibraryClient = {
@@ -26,10 +33,11 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
   const [kind, setKind] = useState<VoiceLibraryKind>('workspace');
   const [query, setQuery] = useState('');
   const [search, setSearch] = useState('');
-  const [voices, setVoices] = useState<VoiceSummary[]>([]);
-  const [selected, setSelected] = useState<VoiceSummary | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [voices, setVoices] = useState<VoiceLibraryItem[]>([]);
+  const [selected, setSelected] = useState<VoiceLibraryItem | null>(null);
+  const [settledRequest, setSettledRequest] = useState<object | null>(null);
+  const [pageError, setPageError] = useState<{ request: object; message: string } | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [workspaceTokens, setWorkspaceTokens] = useState<Array<string | null>>([null]);
   const [workspaceIndex, setWorkspaceIndex] = useState(0);
@@ -39,37 +47,57 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
   const [importingVoiceKey, setImportingVoiceKey] = useState<string | null>(null);
   const [importSuccess, setImportSuccess] = useState<string | null>(null);
   const importAbortRef = useRef<AbortController | null>(null);
+  const request = useMemo(
+    () => ({
+      client,
+      kind,
+      publicPage,
+      revision,
+      search,
+      workspaceIndex,
+      workspacePageToken: workspaceTokens[workspaceIndex] ?? null,
+    }),
+    [client, kind, publicPage, revision, search, workspaceIndex, workspaceTokens],
+  );
+  const loading = settledRequest !== request;
+  const error = actionError ?? (pageError?.request === request ? pageError.message : null);
 
   useEffect(() => {
     const controller = new AbortController();
-    setLoading(true);
-    setError(null);
     const load = async () => {
       try {
         const page =
-          kind === 'workspace'
-            ? await client.listWorkspaceVoices(
-                search,
-                workspaceTokens[workspaceIndex] ?? null,
+          request.kind === 'workspace'
+            ? await request.client.listWorkspaceVoices(
+                request.search,
+                request.workspacePageToken,
                 controller.signal,
               )
-            : await client.listPublicVoices(search, publicPage, controller.signal);
+            : await request.client.listPublicVoices(
+                request.search,
+                request.publicPage,
+                controller.signal,
+              );
         setVoices(page.voices);
         setHasMore(page.hasMore);
         setNextToken(page.nextPageToken);
+        setPageError(null);
       } catch (caught) {
         if (caught instanceof DOMException && caught.name === 'AbortError') return;
         setVoices([]);
         setHasMore(false);
         setNextToken(null);
-        setError(caught instanceof Error ? caught.message : 'Voices could not be loaded.');
+        setPageError({
+          request,
+          message: caught instanceof Error ? caught.message : 'Voices could not be loaded.',
+        });
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        if (!controller.signal.aborted) setSettledRequest(request);
       }
     };
     void load();
     return () => controller.abort();
-  }, [client, kind, publicPage, revision, search, workspaceIndex, workspaceTokens]);
+  }, [request]);
 
   const submitSearch = (event: FormEvent) => {
     event.preventDefault();
@@ -104,19 +132,30 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
     else setPublicPage((value) => Math.max(0, value - 1));
   };
 
-  const importVoice = async (voice: VoiceSummary): Promise<VoiceSummary | null> => {
+  const importVoice = async (item: PublicVoiceItem): Promise<WorkspaceVoiceItem | null> => {
     importAbortRef.current?.abort();
     const controller = new AbortController();
-    const voiceKey = `${voice.publicOwnerId ?? 'public'}:${voice.voiceId}`;
+    const { voice } = item;
+    const voiceKey = `${voice.publicOwnerId}:${voice.voiceId}`;
     importAbortRef.current = controller;
     setImportingVoiceKey(voiceKey);
     setImportSuccess(null);
-    setError(null);
+    setActionError(null);
     try {
-      const voiceId = await client.importPublicVoice(voice, controller.signal);
+      const voiceId = await client.importPublicVoice(item, controller.signal);
       controller.signal.throwIfAborted();
       if (importAbortRef.current !== controller) return null;
-      const importedVoice = { ...voice, voiceId };
+      const importedVoice: WorkspaceVoiceItem = {
+        kind: 'workspace',
+        voice: {
+          voiceId,
+          name: voice.name,
+          category: voice.category,
+          description: voice.description,
+          labels: voice.labels,
+          previewAvailable: voice.previewAvailable,
+        },
+      };
       setSelected(importedVoice);
       setKind('workspace');
       setWorkspaceTokens([null]);
@@ -125,7 +164,7 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
       return importedVoice;
     } catch (caught) {
       if (caught instanceof DOMException && caught.name === 'AbortError') return null;
-      setError(
+      setActionError(
         caught instanceof Error ? caught.message : 'The public voice could not be imported.',
       );
       return null;
@@ -146,6 +185,10 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
   );
 
   const refresh = () => setRevision((value) => value + 1);
+  const clearError = (nextError: string | null) => {
+    setActionError(nextError);
+    if (nextError === null) setPageError(null);
+  };
 
   return {
     kind,
@@ -160,7 +203,7 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
     previousDisabled: kind === 'workspace' ? workspaceIndex === 0 : publicPage === 0,
     setQuery,
     setSelected,
-    setError,
+    setError: clearError,
     changeKind,
     submitSearch,
     next,

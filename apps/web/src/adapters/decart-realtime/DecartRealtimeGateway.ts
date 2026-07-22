@@ -10,8 +10,8 @@ export type RealtimeConnectionState =
   'connecting' | 'connected' | 'generating' | 'disconnected' | 'reconnecting';
 
 export type RealtimeSession = {
-  apply(snapshot: RealtimeSnapshot): Promise<void>;
-  disconnect(): void;
+  apply: (snapshot: RealtimeSnapshot) => Promise<void>;
+  disconnect: () => void;
 };
 
 export type ConnectRealtimeOptions = {
@@ -20,17 +20,17 @@ export type ConnectRealtimeOptions = {
   localStream: MediaStream;
   initial: RealtimeSnapshot;
   signal?: AbortSignal;
-  onRemoteStream(stream: MediaStream): void;
-  onConnectionChange(state: RealtimeConnectionState): void;
-  onGenerationTick(seconds: number): void;
-  onError(error: unknown): void;
+  onRemoteStream: (stream: MediaStream) => void;
+  onConnectionChange: (state: RealtimeConnectionState) => void;
+  onGenerationTick: (seconds: number) => void;
+  onError: (error: unknown) => void;
 };
 
 export type ModelRequirements = { width: number; height: number; frameRate: number };
 
 type DevelopmentRealtimeDriver = {
-  getModelRequirements?(model: ModelMode): Promise<ModelRequirements>;
-  connect?(options: ConnectRealtimeOptions): Promise<RealtimeSession>;
+  getModelRequirements?: (model: ModelMode) => Promise<ModelRequirements>;
+  connect?: (options: ConnectRealtimeOptions) => Promise<RealtimeSession>;
 };
 
 const developmentRealtimeDriver = (): DevelopmentRealtimeDriver | null => {

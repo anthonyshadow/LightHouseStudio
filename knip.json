@@ -1,0 +1,31 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "workspaces": {
+    ".": {
+      "entry": ["e2e/**/*.{spec,screenshots}.ts", "scripts/**/*.mjs"],
+      "project": ["*.{ts,mjs}", "e2e/**/*.ts", "scripts/**/*.mjs"],
+      "ignoreExportsUsedInFile": true
+    },
+    "apps/api": {
+      "entry": ["src/**/*.test.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreExportsUsedInFile": true
+    },
+    "apps/web": {
+      "entry": ["src/**/*.test.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}", "vite.config{,.test}.ts"],
+      "ignoreExportsUsedInFile": true
+    },
+    "packages/contracts": {
+      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts"],
+      "ignoreIssues": {
+        "src/reference-images.ts": ["duplicates"]
+      }
+    },
+    "packages/domain": {
+      "entry": ["src/index.ts", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts"]
+    }
+  }
+}

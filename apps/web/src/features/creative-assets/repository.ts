@@ -1,11 +1,11 @@
 import {
   ASSET_NAME_MAX_LENGTH,
+  AssetRuleError,
   canonicalPrompt,
   createSavedCharacterPrompt as createDomainCharacterPrompt,
   createSavedPrompt as createDomainSavedPrompt,
   deleteSavedCharacterPrompt as deleteDomainCharacterPrompt,
   deleteSavedPrompt as deleteDomainSavedPrompt,
-  DomainRuleError,
   enrichNewestMatchingRecentWithReferenceImage,
   parseCreativeAssetStore,
   normalizeWhitespace,
@@ -172,14 +172,8 @@ const loadInitialState = (
 
 const mapDomainError = (error: unknown): never => {
   if (error instanceof CreativeAssetError) throw error;
-  if (error instanceof DomainRuleError) {
-    const lower = error.message.toLocaleLowerCase();
-    const code: CreativeAssetErrorCode = lower.includes('not found')
-      ? 'not-found'
-      : lower.includes('prompt') && lower.includes('empty')
-        ? 'invalid-prompt'
-        : 'invalid-name';
-    throw new CreativeAssetError(code, error.message);
+  if (error instanceof AssetRuleError) {
+    throw new CreativeAssetError(error.reason, error.message, { cause: error });
   }
   throw error;
 };

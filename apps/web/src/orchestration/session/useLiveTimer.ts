@@ -2,8 +2,8 @@ import { useCallback, useEffect, useState } from 'react';
 
 export type LiveTimerController = {
   seconds: number;
-  start(): void;
-  reset(): void;
+  start: () => void;
+  reset: () => void;
 };
 
 export const useLiveTimer = (): LiveTimerController => {

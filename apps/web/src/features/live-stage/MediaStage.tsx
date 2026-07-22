@@ -1,7 +1,6 @@
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useTheme } from '@emotion/react';
 import { formatDuration } from '../recording/recordingHelpers';
-import type { RecordingArtifact } from '../recording/types';
 import { modeLabel, type SessionLifecycle, type StudioMode } from '../media-session';
 import {
   activityIndicatorStyles,
@@ -27,12 +26,9 @@ import {
 import { StageNoticeLayer } from './StageNoticeLayer';
 import type { StageNotice } from './stageNotices';
 import { useAudioLevel } from './useAudioLevel';
+import { describeStageMedia, type StagePresentation } from './stagePresentation';
 
-export type StagePresentation =
-  | { kind: 'idle'; mode: StudioMode }
-  | { kind: 'live'; stream: MediaStream; origin: 'local' | 'provider'; mirrored: boolean }
-  | { kind: 'finalizing'; retainedStream: MediaStream | null; startedAt: number }
-  | { kind: 'playback'; artifact: RecordingArtifact; controlsLocked: boolean };
+export type { StagePresentation } from './stagePresentation';
 
 export type MediaStageProps = {
   presentation: StagePresentation;
@@ -44,13 +40,6 @@ export type MediaStageProps = {
   recordingSeconds: number;
   notices?: readonly StageNotice[];
   onPlaybackError?: (message: string) => void;
-};
-
-type StreamDetails = {
-  hasLiveVideo: boolean;
-  resolution: string;
-  videoSource: string;
-  audioSource: string | null;
 };
 
 type LiveSnapshot = {
@@ -120,54 +109,6 @@ const lifecycleLabel = (lifecycle: SessionLifecycle): string =>
 
 const lifecycleTone = (lifecycle: SessionLifecycle): 'neutral' | 'accent' | 'recording' =>
   ['ready', 'connected', 'generating'].includes(lifecycle) ? 'accent' : 'neutral';
-
-const isFinitePositive = (value: number | undefined): value is number =>
-  typeof value === 'number' && Number.isFinite(value) && value > 0;
-
-const formatFrameRate = (frameRate: number): string =>
-  Number.isInteger(frameRate) ? String(frameRate) : frameRate.toFixed(2).replace(/0+$/, '');
-
-const trackSettings = (track: MediaStreamTrack): MediaTrackSettings => {
-  try {
-    return track.getSettings();
-  } catch {
-    return {};
-  }
-};
-
-const describeStream = (stream: MediaStream | null, transformed: boolean): StreamDetails => {
-  const videoTrack = stream?.getVideoTracks().find((track) => track.readyState === 'live') ?? null;
-  const audioTrack = stream?.getAudioTracks().find((track) => track.readyState === 'live') ?? null;
-
-  if (!videoTrack) {
-    return {
-      hasLiveVideo: false,
-      resolution: 'Video idle',
-      videoSource: transformed ? 'AI output unavailable' : 'Camera off',
-      audioSource: audioTrack?.label.trim() || (audioTrack ? 'Live audio' : null),
-    };
-  }
-
-  const settings = trackSettings(videoTrack);
-  const size =
-    isFinitePositive(settings.width) && isFinitePositive(settings.height)
-      ? `${Math.round(settings.width)} × ${Math.round(settings.height)}`
-      : 'Live video';
-  const resolution = isFinitePositive(settings.frameRate)
-    ? `${size} · ${formatFrameRate(settings.frameRate)} fps`
-    : size;
-
-  return {
-    hasLiveVideo: true,
-    resolution,
-    videoSource: transformed ? 'AI output' : videoTrack.label.trim() || 'Local camera',
-    audioSource: audioTrack
-      ? transformed
-        ? 'Provider audio'
-        : audioTrack.label.trim() || 'Microphone'
-      : null,
-  };
-};
 
 const emptyCopy = (mode: StudioMode): { title: string; description: string } => {
   if (mode === 'lucy-2.5') {
@@ -290,11 +231,25 @@ export const MediaStage = ({
   const boundKindRef = useRef<'idle' | 'stream' | 'playback'>('idle');
   const boundPlaybackUrlRef = useRef<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
-  const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [lastLiveSnapshot, setLastLiveSnapshot] = useState<LiveSnapshot | null>(null);
 
   const playbackArtifact = presentation.kind === 'playback' ? presentation.artifact : null;
   const playbackUrl = playbackArtifact?.objectUrl ?? null;
+  const playbackIdentity = playbackArtifact
+    ? `${playbackArtifact.id}\u0000${playbackArtifact.objectUrl}`
+    : null;
+  const [playbackFailure, setPlaybackFailure] = useState<{
+    identity: string | null;
+    message: string | null;
+  }>(() => ({ identity: playbackIdentity, message: null }));
+  if (playbackFailure.identity !== playbackIdentity) {
+    setPlaybackFailure({ identity: playbackIdentity, message: null });
+  }
+  const playbackError =
+    playbackFailure.identity === playbackIdentity ? playbackFailure.message : null;
+  const setPlaybackError = (message: string | null) => {
+    setPlaybackFailure({ identity: playbackIdentity, message });
+  };
   const livePresentation =
     presentation.kind === 'live'
       ? presentation
@@ -308,23 +263,7 @@ export const MediaStage = ({
         ? (presentation.retainedStream ?? lastLiveSnapshot?.stream ?? null)
         : null;
   const transformed = livePresentation?.origin === 'provider';
-  const streamDetails = describeStream(stream, transformed);
-  const details: StreamDetails =
-    presentation.kind === 'playback'
-      ? {
-          hasLiveVideo: true,
-          resolution: 'Recorded take',
-          videoSource: 'Recorded playback',
-          audioSource: null,
-        }
-      : presentation.kind === 'finalizing'
-        ? {
-            ...streamDetails,
-            hasLiveVideo: Boolean(stream),
-            resolution: 'Finalizing take',
-            videoSource: 'Last live frame',
-          }
-        : streamDetails;
+  const details = describeStageMedia(presentation, stream, transformed);
   const stageMode = presentation.kind === 'idle' ? presentation.mode : mode;
   const copy = emptyCopy(stageMode);
   const statusTone = presentation.kind === 'playback' ? 'accent' : lifecycleTone(lifecycle);
@@ -342,28 +281,21 @@ export const MediaStage = ({
   const currentLiveStream = presentation.kind === 'live' ? presentation.stream : null;
   const currentLiveOrigin = presentation.kind === 'live' ? presentation.origin : null;
   const currentLiveMirrored = presentation.kind === 'live' ? presentation.mirrored : false;
-
-  useEffect(() => {
-    if (!currentLiveStream || !currentLiveOrigin) return;
-    setLastLiveSnapshot((current) => {
-      if (
-        current?.stream === currentLiveStream &&
-        current.origin === currentLiveOrigin &&
-        current.mirrored === currentLiveMirrored
-      ) {
-        return current;
-      }
-      return {
-        stream: currentLiveStream,
-        origin: currentLiveOrigin,
-        mirrored: currentLiveMirrored,
-      };
+  if (
+    currentLiveStream &&
+    currentLiveOrigin &&
+    (lastLiveSnapshot?.stream !== currentLiveStream ||
+      lastLiveSnapshot.origin !== currentLiveOrigin ||
+      lastLiveSnapshot.mirrored !== currentLiveMirrored)
+  ) {
+    setLastLiveSnapshot({
+      stream: currentLiveStream,
+      origin: currentLiveOrigin,
+      mirrored: currentLiveMirrored,
     });
-  }, [currentLiveMirrored, currentLiveOrigin, currentLiveStream]);
-
-  useEffect(() => {
-    if (presentation.kind === 'idle') setLastLiveSnapshot(null);
-  }, [presentation.kind]);
+  } else if (presentation.kind === 'idle' && lastLiveSnapshot) {
+    setLastLiveSnapshot(null);
+  }
 
   const fullscreenSupported =
     typeof document !== 'undefined' &&
@@ -469,10 +401,6 @@ export const MediaStage = ({
     },
     [],
   );
-
-  useEffect(() => {
-    setPlaybackError(null);
-  }, [playbackArtifact?.id, playbackArtifact?.objectUrl]);
 
   useEffect(() => {
     if (!fullscreenSupported) return;

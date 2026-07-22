@@ -11,6 +11,7 @@ describe('safe errors', () => {
     ).toMatchObject({
       code: 'camera-denied',
       retryable: true,
+      recovery: 'Allow access in browser settings, then try again.',
     });
   });
 

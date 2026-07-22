@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   enumerateMediaDevices,
   readCaptureStreamSettings,
@@ -19,7 +19,7 @@ export const DEFAULT_CAPTURE_PREFERENCES: CapturePreferences = {
 
 export type UseCapturePreferencesOptions = {
   stream: MediaStream | null;
-  onApply(preferences: CapturePreferences): Promise<void>;
+  onApply: (preferences: CapturePreferences) => Promise<void>;
 };
 
 const deviceOptions = (
@@ -59,10 +59,22 @@ export const useCapturePreferences = ({
   const [applyError, setApplyError] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
+  const applyInFlightRef = useRef<Promise<boolean> | null>(null);
+  const applyOperationRef = useRef(0);
+  const mountedRef = useRef(true);
   const supportedProfiles = useMemo<LocalCaptureProfileId[]>(
     () => (supportsLocal1080pProfile() ? ['720p30', '1080p30'] : ['720p30']),
     [],
   );
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      applyOperationRef.current += 1;
+      applyInFlightRef.current = null;
+    };
+  }, []);
 
   const refreshDevices = useCallback(async (): Promise<void> => {
     if (refreshInFlightRef.current) return refreshInFlightRef.current;
@@ -106,22 +118,38 @@ export const useCapturePreferences = ({
     [supportedProfiles],
   );
 
-  const apply = useCallback(async (): Promise<boolean> => {
-    if (applying) return false;
-    if (samePreferences(draft, applied)) return true;
+  const apply = useCallback((): Promise<boolean> => {
+    if (applyInFlightRef.current) return applyInFlightRef.current;
+    if (samePreferences(draft, applied)) return Promise.resolve(true);
+
+    const operation = ++applyOperationRef.current;
+    const preferences = draft;
     setApplying(true);
     setApplyError(null);
-    try {
-      await onApply(draft);
-      setApplied(draft);
-      return true;
-    } catch {
-      setApplyError('Capture settings could not be applied. The current preview is still active.');
-      return false;
-    } finally {
-      setApplying(false);
-    }
-  }, [applied, applying, draft, onApply]);
+    const request = (async () => {
+      try {
+        await onApply(preferences);
+        if (mountedRef.current && applyOperationRef.current === operation) {
+          setApplied(preferences);
+        }
+        return true;
+      } catch {
+        if (mountedRef.current && applyOperationRef.current === operation) {
+          setApplyError(
+            'Capture settings could not be applied. The current preview is still active.',
+          );
+        }
+        return false;
+      } finally {
+        if (applyOperationRef.current === operation) {
+          applyInFlightRef.current = null;
+          if (mountedRef.current) setApplying(false);
+        }
+      }
+    })();
+    applyInFlightRef.current = request;
+    return request;
+  }, [applied, draft, onApply]);
 
   const discardPending = useCallback(() => {
     setApplyError(null);

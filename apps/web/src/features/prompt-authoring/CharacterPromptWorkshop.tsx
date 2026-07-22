@@ -6,7 +6,6 @@ import type {
 } from '@studio/contracts';
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Surface } from '../../ui';
-import { GeneratedPromptPreview } from './GeneratedPromptPreview';
 import {
   createPromptBuilderDraft,
   generateStructuredPrompt,
@@ -17,10 +16,13 @@ import {
   type PromptValidation,
   type ReferenceImageContext,
 } from './model';
-import { PromptFeedback } from './PromptFeedback';
-import { PromptIntentFields } from './PromptIntentFields';
 import { PromptWorkshopActions, type PromptSaveState } from './PromptWorkshopActions';
 import { PromptWorkshopHeader } from './PromptWorkshopHeader';
+import {
+  PromptWorkshopAccordion,
+  PromptWorkshopReview,
+  type PromptWorkshopReferenceGeneration,
+} from './PromptWorkshopSections';
 import type { ReferenceGenerationState, WorkshopReferenceImage } from './ReferenceImageGenerator';
 import {
   createOptimizerReferenceOptions,
@@ -33,21 +35,9 @@ import {
 } from './referenceOptimization';
 import { isSameCanonicalWorkshopPrompt } from './referencePromptHash';
 import {
-  accordionStyles,
-  chevronStyles,
   footerStyles,
   headerRegionStyles,
-  reviewColumnStyles,
-  reviewToggleStyles,
   scrollRegionStyles,
-  stepButtonStyles,
-  stepCopyStyles,
-  stepDescriptionStyles,
-  stepLabelStyles,
-  stepNumberStyles,
-  stepPanelStyles,
-  stepStyles,
-  stepSummaryStyles,
   workshopStyles,
   workshopSurfaceStyles,
 } from './CharacterPromptWorkshop.styles';
@@ -93,7 +83,8 @@ export interface CharacterPromptWorkshopProps {
   onSave?: ((action: SavePromptWorkshopAction) => void | Promise<void>) | undefined;
   onOptimizeReference?: OptimizeWorkshopReferencePrompt | undefined;
   onGenerateReference?:
-    ((input: WorkshopReferenceGenerationInput) => void | Promise<void>) | undefined;
+    | ((input: WorkshopReferenceGenerationInput, signal: AbortSignal) => void | Promise<void>)
+    | undefined;
   onDetachReference?: (() => void) | undefined;
   onRetryReferenceRestore?: (() => void) | undefined;
 }
@@ -147,6 +138,11 @@ type OptimizationRequest = {
   inputKey: string;
   controller: AbortController;
   promise: Promise<OptimizeCharacterReferencePromptResponse | null>;
+};
+
+type GenerationPipeline = {
+  controller: AbortController;
+  promise: Promise<void>;
 };
 
 const createReferenceOptimizationState = (): ReferenceOptimizationState => ({
@@ -214,11 +210,8 @@ export const CharacterPromptWorkshop = ({
   const [referencePreferences, setReferencePreferences] = useState<WorkshopReferencePreferences>(
     loadWorkshopReferencePreferences,
   );
-  const [optimization, setOptimization] = useState<ReferenceOptimizationState>(
-    createReferenceOptimizationState,
-  );
   const optimizationRequestRef = useRef<OptimizationRequest | null>(null);
-  const generationPipelineRef = useRef<Promise<void> | null>(null);
+  const generationPipelineRef = useRef<GenerationPipeline | null>(null);
 
   const draft = drafts[intent];
   const activeStep = activeSteps[intent];
@@ -271,6 +264,19 @@ export const CharacterPromptWorkshop = ({
       referenceOptions,
     ],
   );
+  const [optimization, setOptimization] = useState<ReferenceOptimizationState>(
+    createReferenceOptimizationState,
+  );
+  const [synchronizedOptimizationInputKey, setSynchronizedOptimizationInputKey] =
+    useState(optimizationInputKey);
+  if (synchronizedOptimizationInputKey !== optimizationInputKey) {
+    setSynchronizedOptimizationInputKey(optimizationInputKey);
+    setOptimization((current) =>
+      current.status === 'optimizing' || current.status === 'error'
+        ? settleOptimizationState(current)
+        : current,
+    );
+  }
   const optimizationInputKeyRef = useRef(optimizationInputKey);
   const optimizationStale = Boolean(
     optimization.response && optimization.responseInputKey !== optimizationInputKey,
@@ -299,22 +305,21 @@ export const CharacterPromptWorkshop = ({
   }, [optimizationInputKey]);
 
   useEffect(() => {
+    generationPipelineRef.current?.controller.abort();
+    generationPipelineRef.current = null;
     const request = optimizationRequestRef.current;
     if (request && request.inputKey !== optimizationInputKey) {
       request.controller.abort();
       optimizationRequestRef.current = null;
     }
-    setOptimization((current) =>
-      current.status === 'optimizing' || current.status === 'error'
-        ? settleOptimizationState(current)
-        : current,
-    );
   }, [optimizationInputKey]);
 
   useEffect(
     () => () => {
       optimizationRequestRef.current?.controller.abort();
       optimizationRequestRef.current = null;
+      generationPipelineRef.current?.controller.abort();
+      generationPipelineRef.current = null;
     },
     [],
   );
@@ -487,13 +492,18 @@ export const CharacterPromptWorkshop = ({
 
   const generateReference = () => {
     if (generationPipelineRef.current || !onGenerateReference) return;
+    const controller = new AbortController();
 
     const pipeline = (async () => {
       if (!referencePreferences.optimizePrompt) {
-        await onGenerateReference({
-          ...optimizationInput,
-          optimization: { enabled: false },
-        });
+        controller.signal.throwIfAborted();
+        await onGenerateReference(
+          {
+            ...optimizationInput,
+            optimization: { enabled: false },
+          },
+          controller.signal,
+        );
         return;
       }
 
@@ -506,6 +516,7 @@ export const CharacterPromptWorkshop = ({
           : null;
       const response = existingResponse ?? (await runOptimization());
       if (
+        controller.signal.aborted ||
         !response ||
         optimizationInputKeyRef.current !== optimizationInputKey ||
         !hasCompleteOptimizationResponse(response)
@@ -513,23 +524,32 @@ export const CharacterPromptWorkshop = ({
         return;
       }
 
-      await onGenerateReference({
-        ...optimizationInput,
-        optimization: {
-          enabled: true,
-          result: response.result,
-          model: response.model,
-          version: response.version,
-          inputHash: response.inputHash,
-          manuallyEdited: existingResponse ? optimization.manuallyEdited : false,
+      await onGenerateReference(
+        {
+          ...optimizationInput,
+          optimization: {
+            enabled: true,
+            result: response.result,
+            model: response.model,
+            version: response.version,
+            inputHash: response.inputHash,
+            manuallyEdited: existingResponse ? optimization.manuallyEdited : false,
+          },
         },
-      });
+        controller.signal,
+      );
     })().catch(() => undefined);
 
-    generationPipelineRef.current = pipeline;
-    void pipeline.finally(() => {
-      if (generationPipelineRef.current === pipeline) generationPipelineRef.current = null;
-    });
+    const operation = { controller, promise: pipeline };
+    generationPipelineRef.current = operation;
+    void pipeline.then(
+      () => {
+        if (generationPipelineRef.current === operation) generationPipelineRef.current = null;
+      },
+      () => {
+        if (generationPipelineRef.current === operation) generationPipelineRef.current = null;
+      },
+    );
   };
 
   const updateDraft = (nextDraft: PromptBuilderDraft) => {
@@ -601,117 +621,61 @@ export const CharacterPromptWorkshop = ({
         </div>
 
         <div css={scrollRegionStyles(theme)} data-scroll-region="character-workshop">
-          <div css={accordionStyles(theme)} aria-label="Prompt sections">
-            {steps.map((step, index) => {
-              const panelId = `${componentId}-${intent}-${step.id}-panel`;
-              const buttonId = `${componentId}-${intent}-${step.id}-button`;
-              const active = step.id === activeStep;
+          <PromptWorkshopAccordion
+            componentId={componentId}
+            intent={intent}
+            draft={draft}
+            validation={validation}
+            steps={steps}
+            activeStep={activeStep}
+            onActiveStepChange={(step) =>
+              setActiveSteps((current) => ({ ...current, [intent]: step }))
+            }
+            onDraftChange={updateDraft}
+          />
 
-              return (
-                <section key={step.id} css={stepStyles(theme, active)}>
-                  <button
-                    id={buttonId}
-                    type="button"
-                    aria-expanded={active}
-                    aria-controls={panelId}
-                    css={stepButtonStyles(theme, active)}
-                    onClick={() => setActiveSteps((current) => ({ ...current, [intent]: step.id }))}
-                  >
-                    <span aria-hidden="true" css={stepNumberStyles(theme, active)}>
-                      {index + 1}
-                    </span>
-                    <span css={stepCopyStyles()}>
-                      <span css={stepLabelStyles(theme)}>{step.label}</span>
-                      <span css={stepSummaryStyles(theme)} title={step.summary}>
-                        {step.summary}
-                      </span>
-                    </span>
-                    <span aria-hidden="true" css={chevronStyles(theme, active)}>
-                      ›
-                    </span>
-                  </button>
-
-                  <div
-                    id={panelId}
-                    role="region"
-                    aria-labelledby={buttonId}
-                    hidden={!active}
-                    css={active ? stepPanelStyles(theme) : undefined}
-                  >
-                    {active ? (
-                      <>
-                        <p css={stepDescriptionStyles(theme)}>{step.description}</p>
-                        <PromptIntentFields
-                          draft={draft}
-                          issues={validation.blocking}
-                          activeStep={activeStep}
-                          onChange={updateDraft}
-                        />
-                      </>
-                    ) : null}
-                  </div>
-                </section>
-              );
-            })}
-          </div>
-
-          <aside css={reviewColumnStyles(theme)} aria-label="Recipe review">
-            <button
-              type="button"
-              aria-expanded={showSummary}
-              aria-controls={`${componentId}-recipe-summary`}
-              css={reviewToggleStyles(theme)}
-              onClick={() => setShowSummary((visible) => !visible)}
-            >
-              <span>Generated recipe summary</span>
-              <span aria-hidden="true">{showSummary ? '−' : '+'}</span>
-            </button>
-            {showSummary ? (
-              <div id={`${componentId}-recipe-summary`}>
-                <GeneratedPromptPreview
-                  prompt={generatedPrompt}
-                  label={intent === 'character-transform' ? 'Original character recipe' : undefined}
-                  {...(intent === 'character-transform' && onGenerateReference && onDetachReference
-                    ? {
-                        referenceGeneration: {
-                          available: referenceImagesAvailable,
-                          disabled,
-                          generateDisabled: !canCommit || customBackgroundMissing,
-                          stale: referenceIsStale,
-                          referenceImage: generatedReferenceImage,
-                          generation: referenceGeneration,
-                          optimization: {
-                            enabled: referencePreferences.optimizePrompt,
-                            options: referenceOptions,
-                            status: optimization.status,
-                            stale: optimizationStale,
-                            optimizedImagePrompt:
-                              optimization.response?.result.optimizedImagePrompt ?? '',
-                            lucy25CharacterPrompt:
-                              optimization.response?.result.lucy25CharacterPrompt ?? '',
-                            warnings: optimization.response?.result.warnings ?? [],
-                            model: optimization.response?.model ?? null,
-                            version: optimization.response?.version ?? null,
-                            manuallyEdited: optimization.manuallyEdited,
-                            error: optimization.error,
-                          },
-                          onOptimizationEnabledChange: changeOptimizationEnabled,
-                          onReferenceOptionsChange: changeReferenceOptions,
-                          onOptimize: () => void runOptimization(),
-                          onOptimizedImagePromptChange: changeOptimizedImagePrompt,
-                          onGenerate: generateReference,
-                          onDetach: onDetachReference,
-                          ...(onRetryReferenceRestore
-                            ? { onRetryRestore: onRetryReferenceRestore }
-                            : {}),
-                        },
-                      }
-                    : {})}
-                />
-              </div>
-            ) : null}
-            <PromptFeedback validation={validation} />
-          </aside>
+          <PromptWorkshopReview
+            componentId={componentId}
+            intent={intent}
+            generatedPrompt={generatedPrompt}
+            validation={validation}
+            showSummary={showSummary}
+            {...(intent === 'character-transform' && onGenerateReference && onDetachReference
+              ? {
+                  referenceGeneration: {
+                    available: referenceImagesAvailable,
+                    disabled,
+                    generateDisabled: !canCommit || customBackgroundMissing,
+                    stale: referenceIsStale,
+                    referenceImage: generatedReferenceImage,
+                    generation: referenceGeneration,
+                    optimization: {
+                      enabled: referencePreferences.optimizePrompt,
+                      options: referenceOptions,
+                      status: optimization.status,
+                      stale: optimizationStale,
+                      optimizedImagePrompt:
+                        optimization.response?.result.optimizedImagePrompt ?? '',
+                      lucy25CharacterPrompt:
+                        optimization.response?.result.lucy25CharacterPrompt ?? '',
+                      warnings: optimization.response?.result.warnings ?? [],
+                      model: optimization.response?.model ?? null,
+                      version: optimization.response?.version ?? null,
+                      manuallyEdited: optimization.manuallyEdited,
+                      error: optimization.error,
+                    },
+                    onOptimizationEnabledChange: changeOptimizationEnabled,
+                    onReferenceOptionsChange: changeReferenceOptions,
+                    onOptimize: () => void runOptimization(),
+                    onOptimizedImagePromptChange: changeOptimizedImagePrompt,
+                    onGenerate: generateReference,
+                    onDetach: onDetachReference,
+                    ...(onRetryReferenceRestore ? { onRetryRestore: onRetryReferenceRestore } : {}),
+                  } satisfies PromptWorkshopReferenceGeneration,
+                }
+              : {})}
+            onToggleSummary={() => setShowSummary((visible) => !visible)}
+          />
         </div>
 
         <footer css={footerStyles(theme)}>

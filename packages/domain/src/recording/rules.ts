@@ -140,17 +140,3 @@ export const canUseVoiceEffects = (sidecar: AudioSidecar): boolean =>
 
 export const shouldRevokeRecordingObjectUrl = (reason: RecordingReleaseReason): boolean =>
   reason === 'discard' || reason === 'replacement' || reason === 'unmount';
-
-export type RecordingFinishAction =
-  'finalize-recording' | 'release-live-resources' | 'enter-recorded-review';
-
-/**
- * A finished take follows the same privacy boundary for every source mode:
- * finalize borrowed recorder data before releasing its live owners, then enter
- * review without reacquiring media.
- */
-export const recordingFinishOrder = (): readonly RecordingFinishAction[] => [
-  'finalize-recording',
-  'release-live-resources',
-  'enter-recorded-review',
-];

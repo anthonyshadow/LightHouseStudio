@@ -1,6 +1,5 @@
 // @vitest-environment jsdom
 
-import '@testing-library/jest-dom/vitest';
 import type { OptimizeCharacterReferencePromptRequest } from '@studio/contracts';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -12,6 +11,10 @@ import {
   type WorkshopReferenceGenerationInput,
 } from './CharacterPromptWorkshop';
 import { createPromptBuilderDraft, generateStructuredPrompt } from './model';
+
+type GenerateReferenceHandler = NonNullable<
+  React.ComponentProps<typeof CharacterPromptWorkshop>['onGenerateReference']
+>;
 
 const generatedReference = {
   assetId: '550e8400-e29b-41d4-a716-446655440000',
@@ -244,20 +247,15 @@ describe('CharacterPromptWorkshop', () => {
     await user.type(screen.getByLabelText('Hair color'), 'deep auburn');
     await user.click(screen.getByRole('button', { name: 'Use in working draft' }));
 
-    expect(onUse).toHaveBeenCalledWith(
-      expect.objectContaining({
-        prompt: expect.stringContaining('Body shape: athletic build.'),
-        draft: expect.objectContaining({
-          skinTone: 'medium brown',
-          bodyShape: 'athletic build',
-          hair: 'long waves',
-          hairColor: 'deep auburn',
-        }),
-      }),
-    );
-    expect(onUse.mock.calls[0]?.[0].prompt).toContain(
-      'Skin tone: medium brown. Hair: long waves, deep auburn.',
-    );
+    const action = onUse.mock.calls[0]?.[0];
+    expect(action?.prompt).toContain('Body shape: athletic build.');
+    expect(action?.prompt).toContain('Skin tone: medium brown. Hair: long waves, deep auburn.');
+    expect(action?.draft).toMatchObject({
+      skinTone: 'medium brown',
+      bodyShape: 'athletic build',
+      hair: 'long waves',
+      hairColor: 'deep auburn',
+    });
   });
 
   it('confirms before resetting a nonempty intent and leaves other intent drafts intact', async () => {
@@ -359,8 +357,9 @@ describe('CharacterPromptWorkshop', () => {
 
     await waitFor(() => expect(onGenerateReference).toHaveBeenCalledOnce());
     expect(events).toEqual(['optimize', 'generate']);
-    expect(onOptimizeReference.mock.calls[0]?.[0]).toMatchObject({
-      rawPrompt: expect.stringContaining('midnight botanist'),
+    const optimizationInput = onOptimizeReference.mock.calls[0]?.[0];
+    expect(optimizationInput?.rawPrompt).toContain('midnight botanist');
+    expect(optimizationInput).toMatchObject({
       options: {
         framing: 'full_body',
         orientation: 'auto',
@@ -371,9 +370,10 @@ describe('CharacterPromptWorkshop', () => {
       },
       generator: { provider: 'openai', model: 'gpt-image-2' },
     });
-    expect(onGenerateReference.mock.calls[0]?.[0]).toEqual({
-      rawPrompt: expect.stringContaining('midnight botanist'),
-      options: expect.objectContaining({ targetUse: 'lucy_2_5_character_reference' }),
+    const generationInput = onGenerateReference.mock.calls[0]?.[0];
+    expect(generationInput?.rawPrompt).toContain('midnight botanist');
+    expect(generationInput?.options.targetUse).toBe('lucy_2_5_character_reference');
+    expect(generationInput).toMatchObject({
       generator: { provider: 'openai', model: 'gpt-image-2' },
       optimization: {
         enabled: true,
@@ -447,7 +447,7 @@ describe('CharacterPromptWorkshop', () => {
       (_input: OptimizeCharacterReferencePromptRequest, _signal: AbortSignal) =>
         Promise.resolve(response),
     );
-    const onGenerateReference = vi.fn();
+    const onGenerateReference = vi.fn<GenerateReferenceHandler>();
     const sharedProps = {
       initialDraft: draft,
       referenceImagesAvailable: true,
@@ -488,7 +488,7 @@ describe('CharacterPromptWorkshop', () => {
       (_input: OptimizeCharacterReferencePromptRequest, _signal: AbortSignal) =>
         Promise.resolve(optimizerResponse()),
     );
-    const onGenerateReference = vi.fn();
+    const onGenerateReference = vi.fn<GenerateReferenceHandler>();
     renderWorkshop({
       initialDraft: populatedCharacterDraft('midnight botanist'),
       referenceImagesAvailable: true,
@@ -609,7 +609,7 @@ describe('CharacterPromptWorkshop', () => {
       )
       .mockRejectedValueOnce(new Error('Optimizer timed out.'))
       .mockResolvedValueOnce(optimizerResponse());
-    const onGenerateReference = vi.fn();
+    const onGenerateReference = vi.fn<GenerateReferenceHandler>();
     renderWorkshop({
       initialDraft: populatedCharacterDraft('midnight botanist'),
       referenceImagesAvailable: true,
@@ -636,7 +636,7 @@ describe('CharacterPromptWorkshop', () => {
       (_input: OptimizeCharacterReferencePromptRequest, _signal: AbortSignal) =>
         Promise.resolve(optimizerResponse()),
     );
-    const onGenerateReference = vi.fn();
+    const onGenerateReference = vi.fn<GenerateReferenceHandler>();
     renderWorkshop({
       initialDraft: populatedCharacterDraft('midnight botanist'),
       referenceImagesAvailable: true,
@@ -651,10 +651,63 @@ describe('CharacterPromptWorkshop', () => {
 
     await waitFor(() => expect(onGenerateReference).toHaveBeenCalledOnce());
     expect(onOptimizeReference).not.toHaveBeenCalled();
-    expect(onGenerateReference.mock.calls[0]?.[0]).toMatchObject({
-      rawPrompt: expect.stringContaining('midnight botanist'),
-      optimization: { enabled: false },
+    const generationInput = onGenerateReference.mock.calls[0]?.[0];
+    expect(generationInput?.rawPrompt).toContain('midnight botanist');
+    expect(generationInput?.optimization.enabled).toBe(false);
+  });
+
+  it('aborts an in-flight generation when the workshop unmounts', async () => {
+    const user = userEvent.setup();
+    let generationSignal: AbortSignal | null = null;
+    const pending = deferred<void>();
+    const view = renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      onGenerateReference: vi.fn(
+        (_input: WorkshopReferenceGenerationInput, signal: AbortSignal) => {
+          generationSignal = signal;
+          return pending.promise;
+        },
+      ),
+      onDetachReference: vi.fn(),
     });
+
+    await user.click(screen.getByLabelText(/Optimize prompt with GPT/));
+    await user.click(screen.getByRole('button', { name: 'Generate reference image' }));
+    await waitFor(() => expect(generationSignal).not.toBeNull());
+
+    view.unmount();
+
+    const generationWasAborted = () => generationSignal?.aborted ?? false;
+    expect(generationWasAborted()).toBe(true);
+    pending.resolve();
+  });
+
+  it('aborts generation when a changed recipe replaces its source input', async () => {
+    const user = userEvent.setup();
+    let generationSignal: AbortSignal | null = null;
+    const pending = deferred<void>();
+    renderWorkshop({
+      initialDraft: populatedCharacterDraft('midnight botanist'),
+      referenceImagesAvailable: true,
+      onGenerateReference: vi.fn(
+        (_input: WorkshopReferenceGenerationInput, signal: AbortSignal) => {
+          generationSignal = signal;
+          return pending.promise;
+        },
+      ),
+      onDetachReference: vi.fn(),
+    });
+
+    await user.click(screen.getByLabelText(/Optimize prompt with GPT/));
+    await user.click(screen.getByRole('button', { name: 'Generate reference image' }));
+    await waitFor(() => expect(generationSignal).not.toBeNull());
+    await user.clear(screen.getByLabelText('Character concept'));
+    await user.type(screen.getByLabelText('Character concept'), 'replacement botanist');
+
+    const generationWasAborted = () => generationSignal?.aborted ?? false;
+    await waitFor(() => expect(generationWasAborted()).toBe(true));
+    pending.resolve();
   });
 
   it('disables generation without capability and exposes an accessible loading skeleton', () => {

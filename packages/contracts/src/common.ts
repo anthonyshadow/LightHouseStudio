@@ -6,6 +6,7 @@ export const API_ERROR_CODES = [
   'forbidden_origin',
   'generation_in_progress',
   'incompatible_voice',
+  'internal_error',
   'invalid_audio',
   'invalid_provider_image',
   'moderation_blocked',

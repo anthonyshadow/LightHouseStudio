@@ -14,6 +14,21 @@ import type {
 } from '../../providers/elevenlabs/types.js';
 import { VoiceServiceError } from './voice-service-error.js';
 
+const runParallel = async <Left, Right>(
+  callerSignal: AbortSignal,
+  left: (signal: AbortSignal) => Promise<Left>,
+  right: (signal: AbortSignal) => Promise<Right>,
+): Promise<readonly [Left, Right]> => {
+  const siblingController = new AbortController();
+  const signal = AbortSignal.any([callerSignal, siblingController.signal]);
+  try {
+    return await Promise.all([left(signal), right(signal)]);
+  } catch (error) {
+    siblingController.abort('parallel-sibling-failed');
+    throw error;
+  }
+};
+
 const isProfessionalVoice = (voice: ProviderVoice): boolean =>
   voice.category?.trim().toLowerCase() === 'professional';
 
@@ -69,10 +84,11 @@ export class VoiceService {
     readonly nextPageToken: string | null;
     readonly signal: AbortSignal;
   }): Promise<WorkspaceVoicesResponse> {
-    const [page, model] = await Promise.all([
-      this.#provider.listWorkspaceVoices(input),
-      this.#conversionModel(input.signal),
-    ]);
+    const [page, model] = await runParallel(
+      input.signal,
+      (signal) => this.#provider.listWorkspaceVoices({ ...input, signal }),
+      (signal) => this.#conversionModel(signal),
+    );
     return {
       voices: page.voices.filter((voice) => isModelCompatible(voice, model)).map(summarizeVoice),
       hasMore: page.hasMore,
@@ -88,10 +104,11 @@ export class VoiceService {
     readonly page: number;
     readonly signal: AbortSignal;
   }): Promise<SharedVoicesResponse> {
-    const [result, model] = await Promise.all([
-      this.#provider.listSharedVoices(input),
-      this.#conversionModel(input.signal),
-    ]);
+    const [result, model] = await runParallel(
+      input.signal,
+      (signal) => this.#provider.listSharedVoices({ ...input, signal }),
+      (signal) => this.#conversionModel(signal),
+    );
     return {
       voices: result.voices
         .filter((voice) => voice.freeUsersAllowed && isModelCompatible(voice, model))
@@ -137,10 +154,11 @@ export class VoiceService {
   }
 
   async workspacePreview(voiceId: string, signal: AbortSignal): Promise<AudioStream> {
-    const [voice, model] = await Promise.all([
-      this.#provider.getWorkspaceVoice(voiceId, signal),
-      this.#conversionModel(signal),
-    ]);
+    const [voice, model] = await runParallel(
+      signal,
+      (operationSignal) => this.#provider.getWorkspaceVoice(voiceId, operationSignal),
+      (operationSignal) => this.#conversionModel(operationSignal),
+    );
     this.#assertVoiceCompatible(voice, model);
     if (voice.previewUrl === null) {
       throw new VoiceServiceError('preview-unavailable');
@@ -182,10 +200,11 @@ export class VoiceService {
     readonly mimeType: string;
     readonly signal: AbortSignal;
   }): Promise<AudioStream> {
-    const [voice, model] = await Promise.all([
-      this.#provider.getWorkspaceVoice(input.voiceId, input.signal),
-      this.#conversionModel(input.signal),
-    ]);
+    const [voice, model] = await runParallel(
+      input.signal,
+      (signal) => this.#provider.getWorkspaceVoice(input.voiceId, signal),
+      (signal) => this.#conversionModel(signal),
+    );
     this.#assertVoiceCompatible(voice, model);
     try {
       return await this.#provider.convertRecording(

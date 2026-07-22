@@ -83,7 +83,7 @@ const readTags = (value: unknown): readonly string[] =>
   );
 
 const sanitizeGuidedChoice = (value: unknown): GuidedChoiceValue | null | undefined => {
-  if (value == null) return null;
+  if (value === null) return null;
   if (!isRecord(value) || typeof value.optionId !== 'string') return undefined;
   const optionId = normalizeWhitespace(value.optionId, 128);
   if (!containsMeaningfulText(optionId)) return undefined;
@@ -93,7 +93,11 @@ const sanitizeGuidedChoice = (value: unknown): GuidedChoiceValue | null | undefi
   return containsMeaningfulText(customValue) ? { optionId, customValue } : undefined;
 };
 
-const sanitizeGuidedDesign = (value: unknown): GuidedDesignV1 | null => {
+/**
+ * Canonical allowlist parser for guided-design provenance persisted by every browser store.
+ * Missing `skinTone` is the sole legacy shape accepted; all other choices must be explicit.
+ */
+export const sanitizeGuidedDesignV1 = (value: unknown): GuidedDesignV1 | null => {
   if (!isRecord(value) || value.catalogVersion !== 1 || !isRecord(value.choices)) return null;
   const starterId = value.starterId == null ? null : normalizedId(value.starterId);
   if (value.starterId != null && !starterId) return null;
@@ -208,7 +212,7 @@ const sanitizeSavedCharacterPrompt = (
     value.builderDraft == null ? null : sanitizePromptBuilderDraft(value.builderDraft);
   const guidedDesign =
     includeGuidedDesign && value.guidedDesign != null
-      ? sanitizeGuidedDesign(value.guidedDesign)
+      ? sanitizeGuidedDesignV1(value.guidedDesign)
       : null;
   const persistedReferenceImageAssetId = includeReferenceImage
     ? referenceImageAssetId(value.referenceImageAssetId)

@@ -1,4 +1,9 @@
 import { expect, test, type Page } from '@playwright/test';
+import {
+  apiErrorResponseSchema,
+  VOICE_PROVIDER_INTENT_HEADER,
+  VOICE_PROVIDER_INTENT_VALUE,
+} from '@studio/contracts';
 
 const openRecipeDockWhenOverlaid = async (page: Page) => {
   const launcher = page.getByRole('button', { name: 'Dock' });
@@ -138,18 +143,27 @@ test('development proxy preserves exact Origin validation for provider mutations
       data: { model: 'unsupported-model' },
     }),
     request.post('/api/elevenlabs/shared-voices/import', {
-      headers: { Origin: origin },
+      headers: {
+        Origin: origin,
+        [VOICE_PROVIDER_INTENT_HEADER]: VOICE_PROVIDER_INTENT_VALUE,
+      },
       data: {},
     }),
     request.post('/api/elevenlabs/voice-changer/recording', {
-      headers: { Origin: origin, 'Content-Type': 'audio/webm' },
+      headers: {
+        Origin: origin,
+        'Content-Type': 'audio/webm',
+        [VOICE_PROVIDER_INTENT_HEADER]: VOICE_PROVIDER_INTENT_VALUE,
+      },
       data: 'invalid-without-a-voice-id',
     }),
   ];
 
   for (const response of await Promise.all(safeInvalidRequests)) {
     expect(response.status()).toBe(400);
-    expect((await response.json()).error.code).not.toBe('forbidden_origin');
+    expect(apiErrorResponseSchema.parse(await response.json()).error.code).not.toBe(
+      'forbidden_origin',
+    );
   }
 
   const mismatchedOrigin = await request.post('/api/realtime-token', {
@@ -157,5 +171,7 @@ test('development proxy preserves exact Origin validation for provider mutations
     data: { model: 'unsupported-model' },
   });
   expect(mismatchedOrigin.status()).toBe(403);
-  expect((await mismatchedOrigin.json()).error.code).toBe('forbidden_origin');
+  expect(apiErrorResponseSchema.parse(await mismatchedOrigin.json()).error.code).toBe(
+    'forbidden_origin',
+  );
 });

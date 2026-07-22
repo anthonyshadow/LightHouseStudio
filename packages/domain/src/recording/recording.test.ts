@@ -9,7 +9,6 @@ import {
   createRecordingFilename,
   formatDuration,
   formatFileSize,
-  recordingFinishOrder,
   selectRecordingMimeType,
   selectRecordingSource,
   shouldRevokeRecordingObjectUrl,
@@ -65,14 +64,6 @@ describe('recording source rules', () => {
         modelAudioLive: false,
       }),
     ).toMatchObject({ audioSource: 'local-microphone', hasLiveAudio: true });
-  });
-
-  it('finalizes every mode before releasing live resources and entering review', () => {
-    expect(recordingFinishOrder()).toEqual([
-      'finalize-recording',
-      'release-live-resources',
-      'enter-recorded-review',
-    ]);
   });
 });
 

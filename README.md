@@ -67,7 +67,7 @@ All provider credentials are read only by `apps/api`. Never place provider secre
 | `OPENAI_PROMPT_OPTIMIZER_VERSION`   | No                    | Version marker included in stale-result checks and saved asset metadata; defaults to `lucy-character-reference-v1`.                                                                                                                                                                               |
 | `OPENAI_REFERENCE_IMAGE_MODEL`      | No                    | Image-generation model; defaults to `gpt-image-2`.                                                                                                                                                                                                                                                |
 | `OPENAI_REFERENCE_IMAGE_QUALITY`    | No                    | Final reference quality, `high` or `medium`; defaults to `high`.                                                                                                                                                                                                                                  |
-| `LIGHTFRAME_DATA_DIR`               | No                    | Owner-only local storage for immutable generated reference images and metadata; defaults to `./.lightframe-data`.                                                                                                                                                                                 |
+| `LIGHTFRAME_DATA_DIR`               | No                    | Owner-only local storage for immutable generated reference images and metadata; defaults to repository-root `./.lightframe-data`. Absolute paths remain absolute. A known legacy API-relative directory is reused only when the canonical path is absent; data is never moved automatically.      |
 | `ELEVENLABS_API_KEY`                | Only for cloud voices | Server credential for voice discovery, proxied previews, public voice import, and speech-to-speech conversion.                                                                                                                                                                                    |
 | `ELEVENLABS_STS_MODEL_ID`           | No                    | Speech-to-speech model; defaults to `eleven_multilingual_sts_v2`.                                                                                                                                                                                                                                 |
 | `ELEVENLABS_ENABLE_LOGGING`         | No                    | Strict `true`/`false` sent to ElevenLabs conversion as `enable_logging`; omission defaults to privacy-first `false`. ElevenLabs currently restricts zero-retention mode to eligible enterprise accounts, so other accounts must deliberately set `true` after reviewing provider retention terms. |
@@ -87,10 +87,13 @@ npm run format:check  # verify Prettier formatting
 npm test              # deterministic domain, API, and component tests
 npm run test:coverage # local coverage report
 npm run test:e2e      # Playwright projects; install its browsers first
-npm run quality       # typecheck, lint, format check, tests, and build
+npm run test:visual   # the curated 27-state visual regression suite
+npm run check:dead-code # Knip entrypoint/export/dependency validation
+npm run check:modules # local import resolution, cycle, and boundary checks
+npm run quality       # types, lint, format, static checks, unit tests, and build
 ```
 
-Install Playwright browsers once with `npx playwright install`. End-to-end checks are separate from `npm run quality`, so run both before release.
+Install Playwright browsers once with `npx playwright install`. Coverage, end-to-end, and curated visual checks are independent CI gates; run all three in addition to `npm run quality` before release.
 
 Default automated tests use fakes and deny unexpected external HTTP and WebSockets; they do not require devices, provider credentials, paid requests, or external media services. Mocked browser journeys exercise successful Local, Lucy 2.5, and VTON 3 flows across Chromium, WebKit, and mobile. Live provider checks are deliberately manual and gated; see [live provider smoke testing](docs/LIVE_PROVIDER_SMOKE.md).
 
@@ -111,7 +114,7 @@ pure rules          runtime HTTP schemas
               Decart / ElevenLabs adapters
 ```
 
-The creator of a stream, recorder, timer, object URL, audio context, or provider client owns its cleanup. Domain rules and HTTP schemas are independent of React and provider payloads. A shared testing package declares the deny-external policy while feature-local suites provide focused fakes. The backend has no product database, account system, background jobs, or session history; its one durable responsibility is the owner-only local generated-reference asset store.
+The creator of a stream, recorder, timer, object URL, audio context, or provider client owns its cleanup. Domain rules and HTTP schemas are independent of React and provider payloads. The root test setup declares the deny-external policy while feature-local suites provide focused fakes. The backend has no product database, account system, background jobs, or session history; its one durable responsibility is the owner-only local generated-reference asset store.
 
 Production browser builds omit source maps and fail if the development-only realtime test seam survives executable tree-shaking. Browser session and recording adapters use the tested domain mode, lifecycle, source-selection, and artifact contracts rather than maintaining independent rule sets.
 
@@ -128,7 +131,7 @@ Read [architecture](docs/ARCHITECTURE.md), [privacy and temporary data](docs/PRI
 - Optimize, Re-optimize, Generate, and Regenerate may incur provider usage. A successful optimization is retained for a generation retry while its source prompt, settings, model, and optimizer version remain current; provider failures never silently fall back to the raw prompt.
 - Starting an AI session sends live camera media and the applied prompt/reference state to Decart and may incur provider usage. Finishing a model take finalizes the clip before releasing the model.
 - Studio AI sessions use the retained internal `advanced` five-minute policy identifier; every recording still warns at 4:30 and stops at 5:00. The retired Guided credential profile remains a compatibility detail and is not an application route.
-- Applying an ElevenLabs voice sends only the completed audio sidecar through the same-origin backend and may use credits. Browsing or selecting a voice does not upload the take. Importing a public voice changes the configured ElevenLabs workspace.
+- ElevenLabs browsing and click-to-play previews contact the provider only after the labeled disclosure/action and carry the Studio provider-intent header. Preview bytes use a short-lived, app-owned Blob URL that is aborted/revoked on replacement or unmount. Browsing, previewing, or selecting does not upload the take. Applying a voice sends only the completed audio sidecar and may use credits; importing a public voice changes the configured workspace.
 - The server accepts loopback hosts only. It is not designed for LAN, tunnel, or public hosting. Remote deployment requires authentication, authorization, CSRF analysis, abuse/rate controls, tenant isolation, secret management, and a new security review.
 
 ## Documentation

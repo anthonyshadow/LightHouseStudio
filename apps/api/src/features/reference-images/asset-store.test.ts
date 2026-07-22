@@ -1,4 +1,15 @@
-import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import {
+  chmod,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  rm,
+  stat,
+  utimes,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -8,6 +19,7 @@ const assetId = '6a7b3553-1e30-42cd-a809-750ebdd04460';
 const requestId = '85c85adf-bb1b-4664-bfef-5e955e67af62';
 const ownerId = 'a'.repeat(64);
 const otherOwnerId = 'b'.repeat(64);
+const digest = (value: string): string => createHash('sha256').update(value, 'utf8').digest('hex');
 
 describe('LocalReferenceImageAssetStore', () => {
   const directories: string[] = [];
@@ -75,6 +87,7 @@ describe('LocalReferenceImageAssetStore', () => {
 
   it('atomically persists immutable bytes, versioned private metadata, and an idempotency mapping', async () => {
     const { directory, store } = await setup();
+    await chmod(directory, 0o755);
     const stored = await store.store(input);
     const replayed = await store.store(input);
     const content = await store.getContent(ownerId, assetId);
@@ -96,7 +109,8 @@ describe('LocalReferenceImageAssetStore', () => {
     });
 
     const assetDirectory = path.join(directory, 'reference-images', 'v1', 'assets', assetId);
-    expect((await stat(directory)).mode & 0o777).toBe(0o700);
+    expect((await stat(directory)).mode & 0o777).toBe(0o755);
+    expect((await stat(path.join(directory, 'reference-images'))).mode & 0o777).toBe(0o700);
     expect((await stat(assetDirectory)).mode & 0o777).toBe(0o700);
     expect((await stat(path.join(assetDirectory, 'metadata.json'))).mode & 0o777).toBe(0o600);
     expect((await stat(path.join(assetDirectory, 'content.jpg'))).mode & 0o777).toBe(0o600);
@@ -116,6 +130,86 @@ describe('LocalReferenceImageAssetStore', () => {
     await expect(restarted.findByRequestId(ownerId, requestId)).resolves.toMatchObject({ assetId });
     await expect(restarted.getMetadata(otherOwnerId, assetId)).resolves.toBeNull();
     await expect(restarted.getContent(otherOwnerId, assetId)).resolves.toBeNull();
+  });
+
+  it('repairs malformed mappings while ignoring unrelated corrupt asset metadata', async () => {
+    const { directory, store } = await setup();
+    await store.store(input);
+    const mappingPath = path.join(
+      directory,
+      'reference-images',
+      'v1',
+      'idempotency',
+      digest(ownerId),
+      `${digest(requestId)}.json`,
+    );
+    await writeFile(mappingPath, '{ malformed mapping');
+    const corruptAsset = path.join(
+      directory,
+      'reference-images',
+      'v1',
+      'assets',
+      '00000000-0000-4000-8000-000000000000',
+    );
+    await mkdir(corruptAsset);
+    await writeFile(path.join(corruptAsset, 'metadata.json'), '{ malformed metadata');
+
+    const restarted = new LocalReferenceImageAssetStore(directory);
+    await expect(restarted.findByRequestId(ownerId, requestId)).resolves.toMatchObject({ assetId });
+    expect(JSON.parse(await readFile(mappingPath, 'utf8'))).toMatchObject({ assetId, requestId });
+  });
+
+  it('propagates filesystem metadata read failures instead of treating them as corruption', async () => {
+    const { directory, store } = await setup();
+    await store.store(input);
+    const mappingPath = path.join(
+      directory,
+      'reference-images',
+      'v1',
+      'idempotency',
+      digest(ownerId),
+      `${digest(requestId)}.json`,
+    );
+    const metadataPath = path.join(
+      directory,
+      'reference-images',
+      'v1',
+      'assets',
+      assetId,
+      'metadata.json',
+    );
+    await rm(mappingPath);
+    await rm(metadataPath);
+    await mkdir(metadataPath);
+
+    const restarted = new LocalReferenceImageAssetStore(directory);
+
+    await expect(restarted.findByRequestId(ownerId, requestId)).rejects.toMatchObject({
+      name: 'ReferenceImageStorageError',
+      message: 'Reference image metadata could not be read.',
+    });
+  });
+
+  it('removes only stale app-owned temporary asset directories during initialization', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-assets-cleanup-'));
+    directories.push(directory);
+    const assetsRoot = path.join(directory, 'reference-images', 'v1', 'assets');
+    const stale = path.join(assetsRoot, '.tmp-stale');
+    const recent = path.join(assetsRoot, '.tmp-recent');
+    await mkdir(stale, { recursive: true });
+    await mkdir(recent);
+    await utimes(stale, new Date('2026-07-01T00:00:00.000Z'), new Date('2026-07-01T00:00:00.000Z'));
+    await utimes(
+      recent,
+      new Date('2026-07-18T11:30:00.000Z'),
+      new Date('2026-07-18T11:30:00.000Z'),
+    );
+    const store = new LocalReferenceImageAssetStore(directory, {
+      now: () => new Date('2026-07-18T12:00:00.000Z'),
+    });
+
+    await expect(store.findByRequestId(ownerId, requestId)).resolves.toBeNull();
+    expect(await readdir(assetsRoot)).toEqual(['.tmp-recent']);
   });
 
   it('continues to read strict legacy v1 metadata without optimization audit fields', async () => {

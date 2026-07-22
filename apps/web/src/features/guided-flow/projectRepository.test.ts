@@ -166,6 +166,7 @@ class FakeTransaction extends FakeEventSource {
 }
 
 class FakeDatabase extends FakeEventSource {
+  closeCount = 0;
   readonly objectStoreNames = {
     contains: (name: string) => name === 'projects' || name === 'artifacts',
   } as unknown as DOMStringList;
@@ -178,7 +179,9 @@ class FakeDatabase extends FakeEventSource {
     return new FakeTransaction(this.state) as unknown as IDBTransaction;
   }
 
-  close() {}
+  close() {
+    this.closeCount += 1;
+  }
 }
 
 const fakeIndexedDb = (plannedOpenFailures: number) => {
@@ -201,6 +204,19 @@ const fakeIndexedDb = (plannedOpenFailures: number) => {
     failNextOpen: (count = 1) => {
       failuresRemaining += count;
     },
+  };
+};
+
+const delayedIndexedDb = () => {
+  const state: FakeDatabaseState = { projects: new Map(), artifacts: new Map() };
+  const database = new FakeDatabase(state);
+  const request = new FakeRequest<IDBDatabase>();
+  return {
+    database,
+    request,
+    factory: {
+      open: () => request as unknown as IDBOpenDBRequest,
+    } as unknown as IDBFactory,
   };
 };
 
@@ -229,11 +245,24 @@ const commit = (overrides: Partial<CheckpointCommit> = {}): CheckpointCommit => 
 describe('createLocalProjectRepository', () => {
   it('reports a truthful session-only fallback when IndexedDB is unavailable', async () => {
     const repository = fixture();
-    await expect(repository.initialize()).resolves.toEqual({
-      health: 'session-only',
-      durable: false,
-      notice: expect.stringContaining('this tab'),
+    const storage = await repository.initialize();
+    expect(storage).toMatchObject({ health: 'session-only', durable: false });
+    expect(storage.notice).toContain('this tab');
+  });
+
+  it('closes a database that opens after the repository has closed', async () => {
+    const indexedDb = delayedIndexedDb();
+    const repository = createLocalProjectRepository({
+      indexedDB: indexedDb.factory,
+      databaseName: 'late-open-project-test',
     });
+
+    const initialize = repository.initialize();
+    repository.close();
+    indexedDb.request.succeed(indexedDb.database as unknown as IDBDatabase);
+
+    await expect(initialize).rejects.toMatchObject({ code: 'closed' });
+    expect(indexedDb.database.closeCount).toBe(1);
   });
 
   it('atomically checkpoints metadata and byte-identical original media', async () => {
@@ -420,11 +449,9 @@ describe('createLocalProjectRepository', () => {
       }),
     );
 
-    await expect(repository.retryDurableStorage()).resolves.toEqual({
-      health: 'degraded',
-      durable: false,
-      notice: expect.stringContaining('remain available in this tab'),
-    });
+    const storage = await repository.retryDurableStorage();
+    expect(storage).toMatchObject({ health: 'degraded', durable: false });
+    expect(storage.notice).toContain('remain available in this tab');
     expect((await repository.load('project-1'))?.revision).toBe(1);
     await expect(
       (await repository.readArtifact('project-1', 'memory-video'))?.text(),

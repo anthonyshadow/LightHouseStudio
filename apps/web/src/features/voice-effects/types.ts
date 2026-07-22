@@ -1,6 +1,11 @@
 import type { LocalVoiceEffectId as DomainLocalVoiceEffectId } from '@studio/domain';
 
-export type { VoiceLibraryKind, VoicePage, VoiceSummary } from '../../application/types';
+export type {
+  PublicVoiceItem,
+  VoiceLibraryItem,
+  VoiceLibraryKind,
+  WorkspaceVoiceItem,
+} from '../../application/types';
 
 export type LocalVoiceEffectId = DomainLocalVoiceEffectId;
 
@@ -11,10 +16,10 @@ export type VoiceEffectSelection =
 
 export type VoiceProcessingController = {
   selection: VoiceEffectSelection;
-  applyLocal(effect: LocalVoiceEffectId): Promise<void>;
-  applyElevenLabs(voiceId: string, voiceName: string): Promise<void>;
-  restoreOriginal(): void;
-  cancel(): void;
+  applyLocal: (effect: LocalVoiceEffectId) => Promise<void>;
+  applyElevenLabs: (voiceId: string, voiceName: string) => Promise<void>;
+  restoreOriginal: () => void;
+  cancel: () => void;
 };
 
 export const LOCAL_EFFECTS: ReadonlyArray<{

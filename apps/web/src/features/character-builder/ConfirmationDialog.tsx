@@ -10,8 +10,8 @@ export interface ConfirmationDialogProps {
   danger?: boolean;
   busy?: boolean;
   returnFocusRef?: RefObject<HTMLElement | null>;
-  onCancel(): void;
-  onConfirm(): void;
+  onCancel: () => void;
+  onConfirm: () => void;
 }
 
 export const ConfirmationDialog = ({

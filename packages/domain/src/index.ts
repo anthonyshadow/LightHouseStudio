@@ -1,5 +1,3 @@
-export const DOMAIN_SCHEMA_VERSION = 1;
-
 export * from './assets';
 export * from './common/text';
 export * from './errors/safe-error';

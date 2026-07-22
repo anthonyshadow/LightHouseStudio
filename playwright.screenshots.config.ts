@@ -1,11 +1,14 @@
 import { defineConfig, devices } from '@playwright/test';
+import { env } from 'node:process';
+
+const runningInCi = Boolean((env as unknown as Readonly<Record<string, string | undefined>>).CI);
 
 export default defineConfig({
   testDir: './e2e',
   testMatch: /[/\\]e2e[/\\][^/\\]+\.screenshots\.ts$/,
   fullyParallel: false,
   workers: 1,
-  forbidOnly: Boolean(process.env.CI),
+  forbidOnly: runningInCi,
   retries: 0,
   reporter: 'list',
   use: {
@@ -37,7 +40,7 @@ export default defineConfig({
   webServer: {
     command: 'npm run build:packages && npm run dev --workspace @studio/web -- --strictPort',
     url: 'http://127.0.0.1:4173',
-    reuseExistingServer: !process.env.CI,
+    reuseExistingServer: !runningInCi,
     timeout: 120_000,
   },
 });

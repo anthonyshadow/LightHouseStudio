@@ -77,16 +77,16 @@ describe('Decart realtime gateway', () => {
       telemetry: false,
       logger: sdk.noopLogger,
     });
-    expect(sdk.connect).toHaveBeenCalledWith(
-      localStream,
-      expect.objectContaining({
-        model: expect.objectContaining({ id: 'lucy-2.5' }),
-        initialState: {
-          prompt: { text: 'An adult field host', enhance: true },
-          image: initialImage,
-        },
-      }),
-    );
+    expect(sdk.connect).toHaveBeenCalledWith(localStream, {
+      model: { id: 'lucy-2.5', width: 1_280, height: 720, fps: 30 },
+      mirror: 'auto',
+      initialState: {
+        prompt: { text: 'An adult field host', enhance: true },
+        image: initialImage,
+      },
+      onRemoteStream: callbacks.onRemoteStream,
+      onConnectionChange: callbacks.onConnectionChange,
+    });
 
     await session.apply({ prompt: 'Keep the expression calm', image: null, enhance: false });
 

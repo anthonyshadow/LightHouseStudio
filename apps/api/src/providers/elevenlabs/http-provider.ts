@@ -32,7 +32,7 @@ const workspaceVoiceSchema = z
 const workspaceVoicePageSchema = z
   .object({
     voices: z.array(workspaceVoiceSchema),
-    has_more: z.boolean().catch(false),
+    has_more: z.boolean(),
     next_page_token: z.string().nullish(),
   })
   .passthrough();
@@ -45,7 +45,7 @@ const sharedVoiceSchema = z
     category: z.string().nullish(),
     description: z.string().nullish(),
     preview_url: z.string().nullish(),
-    free_users_allowed: z.boolean().catch(false),
+    free_users_allowed: z.boolean(),
     accent: z.string().nullish(),
     gender: z.string().nullish(),
     age: z.string().nullish(),
@@ -56,14 +56,14 @@ const sharedVoiceSchema = z
   .passthrough();
 
 const sharedVoicePageSchema = z
-  .object({ voices: z.array(sharedVoiceSchema), has_more: z.boolean().catch(false) })
+  .object({ voices: z.array(sharedVoiceSchema), has_more: z.boolean() })
   .passthrough();
 
 const modelSchema = z
   .object({
     model_id: z.string().trim().min(1).max(200),
-    can_do_voice_conversion: z.boolean().catch(false),
-    serves_pro_voices: z.boolean().catch(false),
+    can_do_voice_conversion: z.boolean(),
+    serves_pro_voices: z.boolean(),
   })
   .passthrough();
 
@@ -123,12 +123,7 @@ const normalizeSharedVoice = (voice: z.infer<typeof sharedVoiceSchema>): Provide
     name: (voice.name?.trim() || 'Untitled voice').slice(0, 100),
     category: voice.category?.trim().slice(0, 100) || null,
     description: voice.description?.trim().slice(0, 500) || null,
-    labels: Object.fromEntries(
-      Object.entries(rawLabels).filter(
-        (entry): entry is [string, string] =>
-          typeof entry[1] === 'string' && entry[1].trim() !== '',
-      ),
-    ),
+    labels: normalizeLabels(rawLabels),
     previewUrl: voice.preview_url?.trim() || null,
     freeUsersAllowed: voice.free_users_allowed,
   };
@@ -247,11 +242,11 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
   }
 
   #audioResponse(response: Response, operation: ProviderOperation): AudioStream {
-    const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim() ?? '';
-    if (
-      response.body === null ||
-      (!contentType.startsWith('audio/') && contentType !== 'application/octet-stream')
-    ) {
+    const upstreamContentType =
+      response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+    const contentType =
+      upstreamContentType === 'application/octet-stream' ? 'audio/mpeg' : upstreamContentType;
+    if (response.body === null || !contentType.startsWith('audio/')) {
       void response.body?.cancel().catch(() => undefined);
       throw new ProviderError(operation, 'invalid-response', response.status);
     }

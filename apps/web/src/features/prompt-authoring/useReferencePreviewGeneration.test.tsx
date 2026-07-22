@@ -3,6 +3,9 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type {
   CharacterReferenceOptions,
+  CreateReferenceImageRequest,
+  EditReferenceImageRequest,
+  OptimizeCharacterReferencePromptRequest,
   OptimizeCharacterReferencePromptResponse,
   ReferenceImageAsset,
 } from '@studio/contracts';
@@ -13,9 +16,28 @@ import {
   type ReferencePreviewGenerationCallbacks,
 } from './useReferencePreviewGeneration';
 
-const createReferenceImage = vi.hoisted(() => vi.fn());
-const editReferenceImage = vi.hoisted(() => vi.fn());
-const optimizeCharacterReferencePrompt = vi.hoisted(() => vi.fn());
+const createReferenceImage = vi.hoisted(() =>
+  vi.fn<
+    (request: CreateReferenceImageRequest, signal?: AbortSignal) => Promise<ReferenceImageAsset>
+  >(),
+);
+const editReferenceImage = vi.hoisted(() =>
+  vi.fn<
+    (
+      sourceAssetId: string,
+      request: EditReferenceImageRequest,
+      signal?: AbortSignal,
+    ) => Promise<ReferenceImageAsset>
+  >(),
+);
+const optimizeCharacterReferencePrompt = vi.hoisted(() =>
+  vi.fn<
+    (
+      request: OptimizeCharacterReferencePromptRequest,
+      signal: AbortSignal,
+    ) => Promise<OptimizeCharacterReferencePromptResponse>
+  >(),
+);
 
 vi.mock('../../adapters/api-client/apiClient', () => ({
   createReferenceImage,
@@ -207,19 +229,18 @@ describe('useReferencePreviewGeneration', () => {
     });
 
     expect(createReferenceImage).not.toHaveBeenCalled();
-    expect(editReferenceImage).toHaveBeenCalledWith(
-      sourceAssetId,
-      expect.objectContaining({
-        rawPrompt,
-        options,
-        changeInstructions: 'Change the field coat to cobalt blue.',
-        optimization: expect.objectContaining({
-          enabled: true,
-          inputHash: optimization.inputHash,
-        }),
-      }),
-      expect.any(AbortSignal),
-    );
+    const editInput = editReferenceImage.mock.calls[0]?.[1];
+    expect(editReferenceImage.mock.calls[0]?.[0]).toBe(sourceAssetId);
+    expect(editReferenceImage.mock.calls[0]?.[2]).toBeInstanceOf(AbortSignal);
+    expect(editInput).toMatchObject({
+      rawPrompt,
+      options,
+      changeInstructions: 'Change the field coat to cobalt blue.',
+    });
+    expect(editInput?.optimization.enabled).toBe(true);
+    if (editInput?.optimization.enabled) {
+      expect(editInput.optimization.inputHash).toBe(optimization.inputHash);
+    }
     expect(vi.mocked(handlers.onPhase).mock.calls.map(([phase]) => phase)).toEqual([
       'optimizing',
       'regenerating',
@@ -284,6 +305,29 @@ describe('useReferencePreviewGeneration', () => {
     expect(handlers.onSuccess).not.toHaveBeenCalledWith(
       expect.objectContaining({ asset: firstAsset }),
     );
+    expect(handlers.onError).not.toHaveBeenCalled();
+  });
+
+  it('links an owning caller signal to the provider operation', async () => {
+    const generation = deferred<ReferenceImageAsset>();
+    createReferenceImage.mockImplementationOnce(() => generation.promise);
+    const handlers = callbacks();
+    const owner = new AbortController();
+    const { result } = renderHook(() => useReferencePreviewGeneration(handlers));
+
+    let operation!: Promise<void>;
+    act(() => {
+      operation = result.current.generate({ rawPrompt, options }, owner.signal);
+    });
+    await waitFor(() => expect(createReferenceImage).toHaveBeenCalledOnce());
+    const providerSignal = createReferenceImage.mock.calls[0]![1] as AbortSignal;
+
+    owner.abort();
+    expect(providerSignal.aborted).toBe(true);
+    generation.resolve(referenceAsset());
+    await act(async () => operation);
+
+    expect(handlers.onSuccess).not.toHaveBeenCalled();
     expect(handlers.onError).not.toHaveBeenCalled();
   });
 });

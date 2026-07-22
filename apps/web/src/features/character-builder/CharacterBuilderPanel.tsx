@@ -25,22 +25,22 @@ export interface CharacterBuilderPanelProps {
   autosaveMessage?: string | null;
   saveRecoveryPending?: boolean;
   canSave: boolean;
-  onChange(draft: CharacterTransformDraft, design: GuidedDesignV1): void;
-  onOptionsChange(options: CharacterReferenceOptions): void;
-  onGenerate(): void;
-  onRequestRegeneration(): void;
-  onRegenerate(changeInstructions: string): void;
-  onCancelRegeneration(): void;
-  onRequestReset(): void;
-  onConfirmReset(): void;
-  onCancelReset(): void;
-  onClose(): void;
-  onSave(): void;
+  onChange: (draft: CharacterTransformDraft, design: GuidedDesignV1) => void;
+  onOptionsChange: (options: CharacterReferenceOptions) => void;
+  onGenerate: () => void;
+  onRequestRegeneration: () => void;
+  onRegenerate: (changeInstructions: string) => void;
+  onCancelRegeneration: () => void;
+  onRequestReset: () => void;
+  onConfirmReset: () => void;
+  onCancelReset: () => void;
+  onClose: () => void;
+  onSave: () => void;
   discardCloseOpen?: boolean;
   discardCloseBusy?: boolean;
   resetBusy?: boolean;
-  onCancelDiscardClose?(): void;
-  onConfirmDiscardClose?(): void;
+  onCancelDiscardClose?: () => void;
+  onConfirmDiscardClose?: () => void;
 }
 
 const operationLabel = (state: CharacterBuilderState): string | null => {

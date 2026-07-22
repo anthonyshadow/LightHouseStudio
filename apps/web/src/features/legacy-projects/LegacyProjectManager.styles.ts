@@ -70,24 +70,3 @@ export const projectActionsStyles = (theme: Theme): CSSObject => ({
     '& button': { width: '100%' },
   },
 });
-
-export const confirmationStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gap: theme.space.md,
-  padding: theme.space.lg,
-  border: `1px solid ${theme.colors.danger}`,
-  borderRadius: theme.radii.large,
-  background: theme.colors.dangerSoft,
-  '& h3': { margin: 0 },
-  '& p': { margin: 0, color: theme.colors.textMuted, lineHeight: 1.5 },
-});
-
-export const confirmationActionsStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: theme.space.xs,
-  '@media (max-width: 30rem)': {
-    display: 'grid',
-    '& button': { width: '100%' },
-  },
-});

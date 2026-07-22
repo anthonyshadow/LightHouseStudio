@@ -3,7 +3,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { StrictMode, type PropsWithChildren } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RecordingSource } from '../../features/recording/types';
+import type { RecordingArtifact, RecordingSource } from '../../features/recording/types';
 import { useRecording } from './useRecording';
 
 const NativeBlob = Blob;
@@ -387,15 +387,15 @@ describe('useRecording recorder construction failures', () => {
 
     expect(result.current.lifecycle).toBe('recording');
 
-    let artifact = null;
+    const stoppedRecording: { artifact: RecordingArtifact | null } = {
+      artifact: null,
+    };
     await act(async () => {
-      artifact = await result.current.stop();
+      stoppedRecording.artifact = await result.current.stop();
     });
 
-    expect(artifact).toMatchObject({
-      mimeType: expect.stringContaining('video/'),
-      sourceModeId: 'local',
-    });
+    expect(stoppedRecording.artifact?.mimeType).toContain('video/');
+    expect(stoppedRecording.artifact?.sourceModeId).toBe('local');
     expect(result.current.lifecycle).toBe('recorded');
     expect(result.current.original?.media.size).toBeGreaterThan(0);
     expect(result.current.sidecar).toMatchObject({
@@ -585,10 +585,8 @@ describe('useRecording recorder construction failures', () => {
       await result.current.stop();
     });
 
-    expect(result.current.original).toMatchObject({
-      mimeType: 'video/mp4',
-      filename: expect.stringMatching(/\.mp4$/),
-    });
+    expect(result.current.original?.mimeType).toBe('video/mp4');
+    expect(result.current.original?.filename).toMatch(/\.mp4$/);
     expect(result.current.original?.media.type).toBe('video/mp4');
     unmount();
   });

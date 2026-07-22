@@ -3,7 +3,6 @@ import {
   hasPendingRealtimeChanges,
   isImageMimeType,
   markRealtimeStateApplied,
-  normalizeAuthoredPrompt,
   revertDraftToAppliedState,
   validateSessionDraft,
   type AppliedRealtimeState as DomainAppliedRealtimeState,
@@ -17,8 +16,6 @@ import type {
   SessionDraft,
   SessionReferenceImage,
 } from '../../features/media-session';
-
-export const normalizePrompt = normalizeAuthoredPrompt;
 
 const imageIds = new WeakMap<File, number>();
 let nextImageId = 0;

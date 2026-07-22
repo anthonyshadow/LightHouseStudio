@@ -6,6 +6,9 @@ import {
   providerIdSchema,
 } from './common';
 
+export const VOICE_PROVIDER_INTENT_HEADER = 'x-lightframe-provider-intent' as const;
+export const VOICE_PROVIDER_INTENT_VALUE = 'voice' as const;
+
 export const voiceLabelsSchema = z.record(z.string().max(80), z.string().max(200));
 
 export const voiceSummarySchema = z

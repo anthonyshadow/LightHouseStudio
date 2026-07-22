@@ -273,9 +273,3 @@ export const characterBuilderReducer = (
       return { ...state, phase: 'saved', operation: null, error: null };
   }
 };
-
-export const characterBuilderBusy = (state: CharacterBuilderState): boolean =>
-  ['optimizing', 'generating', 'regenerating', 'saving', 'closing'].includes(state.phase);
-
-export const characterBuilderHasDurableChanges = (state: CharacterBuilderState): boolean =>
-  state.revision <= state.durableRevision;

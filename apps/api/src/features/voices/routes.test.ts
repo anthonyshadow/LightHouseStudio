@@ -1,4 +1,9 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import {
+  VOICE_PROVIDER_INTENT_HEADER,
+  VOICE_PROVIDER_INTENT_VALUE,
+  type ApiErrorResponse,
+} from '@studio/contracts';
 import { createApp } from '../../app.js';
 import { ProviderError } from '../../providers/provider-error.js';
 import {
@@ -10,7 +15,12 @@ import {
 } from '../../test/fakes.js';
 import { MAX_RECORDING_AUDIO_BYTES } from './routes.js';
 
-const originHeaders = { origin: 'http://localhost:5173', host: 'localhost:5173' };
+const intentHeaders = { [VOICE_PROVIDER_INTENT_HEADER]: VOICE_PROVIDER_INTENT_VALUE };
+const originHeaders = {
+  ...intentHeaders,
+  origin: 'http://localhost:5173',
+  host: 'localhost:5173',
+};
 
 describe('ElevenLabs voice API', () => {
   const apps: ReturnType<typeof createApp>[] = [];
@@ -36,6 +46,7 @@ describe('ElevenLabs voice API', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/elevenlabs/voices?search=%20nova%20&pageSize=10&pageToken=current',
+      headers: intentHeaders,
     });
 
     expect(response.statusCode).toBe(200);
@@ -64,6 +75,7 @@ describe('ElevenLabs voice API', () => {
     const tooLarge = await app.inject({
       method: 'GET',
       url: '/api/elevenlabs/voices?pageSize=11',
+      headers: intentHeaders,
     });
     expect(tooLarge.statusCode).toBe(400);
     expect(provider.workspaceSearches).toHaveLength(1);
@@ -81,6 +93,7 @@ describe('ElevenLabs voice API', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/elevenlabs/shared-voices?search=%20warm%20&page=2&pageSize=8',
+      headers: intentHeaders,
     });
 
     expect(response.statusCode).toBe(200);
@@ -105,6 +118,7 @@ describe('ElevenLabs voice API', () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/elevenlabs/voices/voice-one/preview',
+      headers: intentHeaders,
     });
 
     expect(response.statusCode).toBe(200);
@@ -119,6 +133,7 @@ describe('ElevenLabs voice API', () => {
     const preview = await app.inject({
       method: 'GET',
       url: '/api/elevenlabs/shared-voices/owner-one/voice-one/preview',
+      headers: intentHeaders,
     });
     const missingOrigin = await app.inject({
       method: 'POST',
@@ -141,6 +156,24 @@ describe('ElevenLabs voice API', () => {
     ]);
   });
 
+  it('rejects every provider-backed read without explicit voice intent before provider contact', async () => {
+    const { app, provider } = setup();
+    const responses = await Promise.all([
+      app.inject({ method: 'GET', url: '/api/elevenlabs/voices' }),
+      app.inject({ method: 'GET', url: '/api/elevenlabs/voices/voice-one/preview' }),
+      app.inject({ method: 'GET', url: '/api/elevenlabs/shared-voices' }),
+      app.inject({
+        method: 'GET',
+        url: '/api/elevenlabs/shared-voices/owner-one/voice-one/preview',
+      }),
+    ]);
+
+    expect(responses.map((response) => response.statusCode)).toEqual([403, 403, 403, 403]);
+    expect(provider.workspaceSearches).toHaveLength(0);
+    expect(provider.sharedSearches).toHaveLength(0);
+    expect(provider.previewUrls).toHaveLength(0);
+  });
+
   it('rejects ineligible public voices even if the client submits their ids directly', async () => {
     const { app, provider } = setup();
     provider.sharedVoices = [sharedVoice({ freeUsersAllowed: false })];
@@ -152,7 +185,7 @@ describe('ElevenLabs voice API', () => {
     });
 
     expect(response.statusCode).toBe(403);
-    expect(response.json().error.code).toBe('provider_policy');
+    expect(response.json<ApiErrorResponse>().error.code).toBe('provider_policy');
     expect(provider.imports).toHaveLength(0);
   });
 
@@ -189,7 +222,7 @@ describe('ElevenLabs voice API', () => {
     });
 
     expect(response.statusCode).toBe(409);
-    expect(response.json().error.code).toBe('incompatible_voice');
+    expect(response.json<ApiErrorResponse>().error.code).toBe('incompatible_voice');
     expect(provider.conversions).toHaveLength(0);
   });
 
@@ -198,7 +231,7 @@ describe('ElevenLabs voice API', () => {
     const noOrigin = await app.inject({
       method: 'POST',
       url: '/api/elevenlabs/voice-changer/recording?voiceId=voice-one',
-      headers: { 'content-type': 'audio/webm' },
+      headers: { ...intentHeaders, 'content-type': 'audio/webm' },
       payload: Buffer.from('audio'),
     });
     const unsupported = await app.inject({
@@ -247,7 +280,11 @@ describe('ElevenLabs voice API', () => {
       }
     }
     const { app } = setup(new FailingProvider());
-    const response = await app.inject({ method: 'GET', url: '/api/elevenlabs/voices' });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/voices',
+      headers: intentHeaders,
+    });
 
     expect(response.statusCode).toBe(502);
     expect(response.json()).toEqual({
@@ -261,6 +298,38 @@ describe('ElevenLabs voice API', () => {
     expect(response.body).not.toContain('stack');
   });
 
+  it('cancels a stalled parallel provider branch when its sibling fails', async () => {
+    let siblingAborted = false;
+    class FailingProvider extends FakeElevenLabsProvider {
+      override listWorkspaceVoices(): Promise<never> {
+        return Promise.reject(new ProviderError('workspace-voices', 'upstream', 502));
+      }
+
+      override listModels(signal: AbortSignal): Promise<never> {
+        return new Promise((_resolve, reject) => {
+          signal.addEventListener(
+            'abort',
+            () => {
+              siblingAborted = true;
+              reject(new ProviderError('models', 'aborted'));
+            },
+            { once: true },
+          );
+        });
+      }
+    }
+    const { app } = setup(new FailingProvider());
+
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/voices',
+      headers: intentHeaders,
+    });
+
+    expect(response.statusCode).toBe(502);
+    expect(siblingAborted).toBe(true);
+  });
+
   it.each([
     ['quota' as const, 401, 'provider_quota'],
     ['rate-limit' as const, 429, 'rate_limited'],
@@ -271,7 +340,11 @@ describe('ElevenLabs voice API', () => {
       }
     }
     const { app } = setup(new LimitedProvider());
-    const response = await app.inject({ method: 'GET', url: '/api/elevenlabs/voices' });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/voices',
+      headers: intentHeaders,
+    });
 
     expect(response.statusCode).toBe(429);
     expect(response.json()).toMatchObject({
@@ -320,18 +393,22 @@ describe('ElevenLabs voice API', () => {
     });
 
     expect(response.statusCode).toBe(400);
-    expect(response.json().error.code).toBe('invalid_audio');
+    expect(response.json<ApiErrorResponse>().error.code).toBe('invalid_audio');
     expect(response.body).not.toContain('zero-retention');
   });
 
   it('returns an isolated 503 when ElevenLabs is not configured', async () => {
     const app = createApp({ config: testConfig(), elevenLabsProvider: null });
     apps.push(app);
-    const response = await app.inject({ method: 'GET', url: '/api/elevenlabs/voices' });
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/voices',
+      headers: intentHeaders,
+    });
     const health = await app.inject({ method: 'GET', url: '/api/health' });
 
     expect(response.statusCode).toBe(503);
-    expect(response.json().error.code).toBe('feature_unavailable');
+    expect(response.json<ApiErrorResponse>().error.code).toBe('feature_unavailable');
     expect(health.statusCode).toBe(200);
   });
 });

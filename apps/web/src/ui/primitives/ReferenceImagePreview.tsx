@@ -1,5 +1,5 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Button } from './Button';
 import { OverlayPanel } from './OverlayPanel';
 
@@ -63,7 +63,7 @@ const largePreviewStyles = (theme: Theme): CSSObject => ({
 });
 
 /** Stable local-asset thumbnail with a keyboard-accessible shared larger preview. */
-export const ReferenceImagePreview = ({
+const ReferenceImagePreviewForAsset = ({
   assetId,
   alt,
   label = 'Open larger reference preview',
@@ -75,12 +75,6 @@ export const ReferenceImagePreview = ({
   const [failed, setFailed] = useState(false);
   const [revision, setRevision] = useState(0);
   const contentUrl = `${referenceImageContentUrl(assetId)}?preview=${revision}`;
-
-  useEffect(() => {
-    setFailed(false);
-    setRevision(0);
-    setOpen(false);
-  }, [assetId]);
 
   const retry = () => {
     setFailed(false);
@@ -136,3 +130,7 @@ export const ReferenceImagePreview = ({
     </>
   );
 };
+
+export const ReferenceImagePreview = (props: ReferenceImagePreviewProps) => (
+  <ReferenceImagePreviewForAsset key={props.assetId} {...props} />
+);

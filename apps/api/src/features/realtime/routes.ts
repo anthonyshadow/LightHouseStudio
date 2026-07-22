@@ -1,12 +1,13 @@
-import { realtimeTokenRequestSchema, realtimeTokenResponseSchema } from '@studio/contracts';
+import {
+  realtimeTokenRequestSchema,
+  realtimeTokenResponseSchema,
+  SUPPORTED_MODEL_IDS,
+} from '@studio/contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/errors.js';
 import { requireTrustedOrigin } from '../../http/security.js';
 import { createRequestLifetime } from '../../http/streaming.js';
-import {
-  SUPPORTED_MODEL_IDS,
-  type DecartTokenProvider,
-} from '../../providers/decart/token-provider.js';
+import type { DecartTokenProvider } from '../../providers/decart/token-provider.js';
 
 const TOKEN_EXPIRY_SECONDS = 300;
 const ADVANCED_MAX_SESSION_DURATION_SECONDS = 300;

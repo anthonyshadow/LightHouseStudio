@@ -1,3 +1,4 @@
+import path from 'node:path';
 import { z } from 'zod';
 import {
   CHARACTER_PROMPT_OPTIMIZER_DEFAULT_MODEL,
@@ -96,6 +97,48 @@ export class EnvironmentValidationError extends Error {
     this.issues = issues;
   }
 }
+
+export interface ResolvedLightframeDataDirectory {
+  readonly path: string;
+  readonly usesLegacyApiRelativePath: boolean;
+}
+
+export class MissingProductionWebDistributionError extends Error {
+  constructor() {
+    super('The production web distribution is missing. Run the production build first.');
+    this.name = 'MissingProductionWebDistributionError';
+  }
+}
+
+export const resolveStaticRoot = (
+  nodeEnv: RuntimeConfig['nodeEnv'],
+  candidate: string,
+  pathExists: (path: string) => boolean,
+): string | undefined => {
+  if (pathExists(candidate)) return candidate;
+  if (nodeEnv === 'production') throw new MissingProductionWebDistributionError();
+  return undefined;
+};
+
+export const resolveLightframeDataDirectory = (
+  configuredPath: string,
+  options: {
+    readonly repositoryRoot: string;
+    readonly apiRoot: string;
+    readonly pathExists: (candidate: string) => boolean;
+  },
+): ResolvedLightframeDataDirectory => {
+  if (path.isAbsolute(configuredPath)) {
+    return { path: path.resolve(configuredPath), usesLegacyApiRelativePath: false };
+  }
+
+  const canonicalPath = path.resolve(options.repositoryRoot, configuredPath);
+  const legacyPath = path.resolve(options.apiRoot, configuredPath);
+  if (!options.pathExists(canonicalPath) && options.pathExists(legacyPath)) {
+    return { path: legacyPath, usesLegacyApiRelativePath: true };
+  }
+  return { path: canonicalPath, usesLegacyApiRelativePath: false };
+};
 
 export const parseEnvironment = (
   environment: Readonly<Record<string, string | undefined>>,

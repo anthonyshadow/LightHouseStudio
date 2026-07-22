@@ -81,7 +81,7 @@ describe('ElevenLabsHttpProvider', () => {
       Promise.resolve(
         new Response(Buffer.from('converted'), {
           status: 200,
-          headers: { 'content-type': 'audio/mpeg', 'content-length': '9' },
+          headers: { 'content-type': 'application/octet-stream', 'content-length': '9' },
         }),
       ),
     );
@@ -104,6 +104,26 @@ describe('ElevenLabsHttpProvider', () => {
     const form = init?.body as FormData;
     expect(form.get('model_id')).toBe('eleven_multilingual_sts_v2');
     expect(form.get('audio')).toBeInstanceOf(Blob);
+  });
+
+  it('rejects malformed provider booleans instead of silently changing capability truth', async () => {
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        jsonResponse([
+          {
+            model_id: 'eleven_multilingual_sts_v2',
+            can_do_voice_conversion: 'true',
+            serves_pro_voices: false,
+          },
+        ]),
+      ),
+    );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+
+    await expect(provider.listModels(signal())).rejects.toMatchObject({
+      reason: 'invalid-response',
+      operation: 'models',
+    });
   });
 
   it('does not expose raw upstream error bodies', async () => {

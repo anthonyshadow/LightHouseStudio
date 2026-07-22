@@ -2,10 +2,11 @@ import type {
   CharacterPromptOptimizationResult,
   OptimizeCharacterReferencePromptRequest,
 } from '@studio/contracts';
-import OpenAI, { APIConnectionError, APIConnectionTimeoutError } from 'openai';
+import OpenAI from 'openai';
 import { zodTextFormat } from 'openai/helpers/zod';
 import { characterPromptOptimizationResultSchema } from '@studio/contracts';
 import { CHARACTER_REFERENCE_OPTIMIZER_PROMPT } from './character-prompt-optimizer-prompt.js';
+import { classifyOpenAITransportFailure, openAIUpstreamStatus } from './transport-error.js';
 
 export type PromptOptimizerReasoningEffort =
   'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
@@ -15,11 +16,13 @@ export interface CharacterPromptOptimizer {
   readonly version: string;
   optimize(
     input: OptimizeCharacterReferencePromptRequest,
+    signal: AbortSignal,
   ): Promise<CharacterPromptOptimizationResult>;
 }
 
 export type CharacterPromptOptimizerFailureReason =
   | 'authentication'
+  | 'aborted'
   | 'connection'
   | 'failure'
   | 'invalid-response'
@@ -70,7 +73,10 @@ interface PromptOptimizerResponse {
 
 interface OpenAIResponsesClient {
   readonly responses: {
-    parse(parameters: OpenAICharacterPromptOptimizerParameters): Promise<PromptOptimizerResponse>;
+    parse(
+      parameters: OpenAICharacterPromptOptimizerParameters,
+      options?: { readonly signal?: AbortSignal },
+    ): Promise<PromptOptimizerResponse>;
   };
 }
 
@@ -80,27 +86,19 @@ type OpenAIClientFactory = (options: {
   readonly timeout: number;
 }) => OpenAIResponsesClient;
 
-const isOpenAIError = (
+const normalizeOpenAIError = (
   error: unknown,
-): error is Error & { readonly status?: number; readonly code?: string | null } =>
-  error instanceof Error;
-
-const normalizeOpenAIError = (error: unknown): CharacterPromptOptimizerError => {
+  signal: AbortSignal,
+): CharacterPromptOptimizerError => {
   if (error instanceof CharacterPromptOptimizerError) return error;
-  if (!isOpenAIError(error)) return new CharacterPromptOptimizerError('failure', { cause: error });
-
-  const status = typeof error.status === 'number' ? error.status : undefined;
+  const status = openAIUpstreamStatus(error);
   const options =
     status === undefined ? { cause: error } : { cause: error, upstreamStatus: status };
-  if (error instanceof APIConnectionTimeoutError || error.name === 'AbortError') {
-    return new CharacterPromptOptimizerError('timeout', options);
+  const transportFailure = classifyOpenAITransportFailure(error, signal);
+  if (transportFailure !== undefined) {
+    return new CharacterPromptOptimizerError(transportFailure.reason, options);
   }
-  if (error instanceof APIConnectionError) {
-    return new CharacterPromptOptimizerError('connection', options);
-  }
-  if (status === 401) return new CharacterPromptOptimizerError('authentication', options);
-  if (status === 429) return new CharacterPromptOptimizerError('rate-limit', options);
-  if (error.name === 'ZodError' || error instanceof SyntaxError) {
+  if (error instanceof Error && (error.name === 'ZodError' || error instanceof SyntaxError)) {
     return new CharacterPromptOptimizerError('invalid-response', options);
   }
   return new CharacterPromptOptimizerError('failure', options);
@@ -139,18 +137,22 @@ export class OpenAICharacterPromptOptimizer implements CharacterPromptOptimizer 
 
   async optimize(
     input: OptimizeCharacterReferencePromptRequest,
+    signal: AbortSignal,
   ): Promise<CharacterPromptOptimizationResult> {
     try {
-      const response = await this.#client.responses.parse({
-        model: this.model,
-        store: false,
-        input: [
-          { role: 'developer', content: CHARACTER_REFERENCE_OPTIMIZER_PROMPT },
-          { role: 'user', content: JSON.stringify(input) },
-        ],
-        reasoning: { effort: this.#reasoning },
-        text: { format: outputFormat },
-      });
+      const response = await this.#client.responses.parse(
+        {
+          model: this.model,
+          store: false,
+          input: [
+            { role: 'developer', content: CHARACTER_REFERENCE_OPTIMIZER_PROMPT },
+            { role: 'user', content: JSON.stringify(input) },
+          ],
+          reasoning: { effort: this.#reasoning },
+          text: { format: outputFormat },
+        },
+        { signal },
+      );
       if (response.output_parsed === null) {
         throw new CharacterPromptOptimizerError(
           containsRefusal(response) ? 'refusal' : 'invalid-response',
@@ -158,7 +160,7 @@ export class OpenAICharacterPromptOptimizer implements CharacterPromptOptimizer 
       }
       return characterPromptOptimizationResultSchema.parse(response.output_parsed);
     } catch (error) {
-      throw normalizeOpenAIError(error);
+      throw normalizeOpenAIError(error, signal);
     }
   }
 }

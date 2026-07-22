@@ -12,19 +12,6 @@ export type VoiceEffectSelection =
       readonly voiceName: string;
     };
 
-export interface VoiceSummary {
-  readonly voiceId: string;
-  readonly name: string;
-  readonly category: string | null;
-  readonly description: string | null;
-  readonly labels: Readonly<Record<string, string>>;
-  readonly previewAvailable: boolean;
-}
-
-export interface PublicVoiceSummary extends VoiceSummary {
-  readonly publicOwnerId: string;
-}
-
 export type VoiceProcessingState<TArtifact> =
   | {
       readonly status: 'idle';

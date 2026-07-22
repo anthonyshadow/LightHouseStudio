@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import { Button, OverlayPanel, StatusNotice, TextAreaField } from '../../ui';
 
 export interface RegenerationDialogProps {
@@ -6,8 +6,8 @@ export interface RegenerationDialogProps {
   busy?: boolean;
   editAvailable?: boolean;
   returnFocusRef?: RefObject<HTMLElement | null>;
-  onCancel(): void;
-  onSubmit(changeInstructions: string): void;
+  onCancel: () => void;
+  onSubmit: (changeInstructions: string) => void;
 }
 
 export const RegenerationDialog = ({
@@ -22,14 +22,21 @@ export const RegenerationDialog = ({
   const fieldRef = useRef<HTMLTextAreaElement>(null);
   const writtenEditUnavailable = Boolean(instructions.trim()) && !editAvailable;
 
-  useEffect(() => {
-    if (open) setInstructions('');
-  }, [open]);
+  const cancel = () => {
+    setInstructions('');
+    onCancel();
+  };
+
+  const submit = () => {
+    const changeInstructions = instructions;
+    setInstructions('');
+    onSubmit(changeInstructions);
+  };
 
   return (
     <OverlayPanel
       open={open}
-      onClose={onCancel}
+      onClose={cancel}
       title="Regenerate character preview"
       description="Optionally describe what should change. Leave this blank for a fresh image from the current character prompt."
       placement="bottom"
@@ -39,15 +46,10 @@ export const RegenerationDialog = ({
       {...(returnFocusRef ? { returnFocusRef } : {})}
       footer={
         <div css={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '.75rem' }}>
-          <Button disabled={busy} variant="quiet" onClick={onCancel}>
+          <Button disabled={busy} variant="quiet" onClick={cancel}>
             Cancel
           </Button>
-          <Button
-            busy={busy}
-            disabled={writtenEditUnavailable}
-            variant="primary"
-            onClick={() => onSubmit(instructions)}
-          >
+          <Button busy={busy} disabled={writtenEditUnavailable} variant="primary" onClick={submit}>
             Regenerate
           </Button>
         </div>

@@ -54,12 +54,12 @@ export interface ReferenceImageGeneratorProps {
   referenceImage: WorkshopReferenceImage | null;
   generation: ReferenceGenerationState;
   optimization: ReferencePromptOptimizationView;
-  onOptimizationEnabledChange(enabled: boolean): void;
-  onReferenceOptionsChange(options: WorkshopReferenceOptions): void;
-  onOptimize(): void;
-  onOptimizedImagePromptChange(prompt: string): void;
-  onGenerate(): void;
-  onDetach(): void;
+  onOptimizationEnabledChange: (enabled: boolean) => void;
+  onReferenceOptionsChange: (options: WorkshopReferenceOptions) => void;
+  onOptimize: () => void;
+  onOptimizedImagePromptChange: (prompt: string) => void;
+  onGenerate: () => void;
+  onDetach: () => void;
   onRetryRestore?: (() => void) | undefined;
 }
 

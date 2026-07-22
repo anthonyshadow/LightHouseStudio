@@ -48,7 +48,7 @@ export type CharacterBuilderFormProps = {
   previewSettings?: ReactNode;
   previewError?: ReactNode;
   disabled?: boolean;
-  onChange(draft: CharacterTransformDraft, design: GuidedDesignV1): void;
+  onChange: (draft: CharacterTransformDraft, design: GuidedDesignV1) => void;
 };
 
 const STARTER_MONTAGE_PROFILES = [

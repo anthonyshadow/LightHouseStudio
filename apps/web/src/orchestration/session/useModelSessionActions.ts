@@ -27,16 +27,16 @@ export type ModelSessionActionsOptions = {
   applying: boolean;
   setApplying: Dispatch<SetStateAction<boolean>>;
   setError: Dispatch<SetStateAction<SafeMediaError | null>>;
-  ensureMedia(
+  ensureMedia: (
     requirements: {
       width: number;
       height: number;
       frameRate: number;
     },
     operation: number,
-  ): Promise<MediaStream>;
+  ) => Promise<MediaStream>;
   localRef: RefObject<MediaStream | null>;
-  startLiveTimer(): void;
+  startLiveTimer: () => void;
   realtimeSessionProfile?: RealtimeSessionProfile;
   onPromptCommitted?: (
     mode: 'lucy-2.5' | 'lucy-vton-3',
@@ -48,9 +48,9 @@ export type ModelSessionActionsOptions = {
 export type ModelSessionActions = {
   remoteStream: MediaStream | null;
   generationSeconds: number;
-  disconnectRealtime(): void;
-  startModel(): Promise<void>;
-  applyChanges(): Promise<void>;
+  disconnectRealtime: () => void;
+  startModel: () => Promise<void>;
+  applyChanges: () => Promise<void>;
 };
 
 const disconnectError = (reason: RealtimeDisconnectReason): SafeMediaError =>

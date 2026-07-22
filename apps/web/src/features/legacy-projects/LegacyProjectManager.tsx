@@ -88,8 +88,24 @@ export const LegacyProjectManager = ({
   }, [repository]);
 
   useEffect(() => {
-    void refresh();
-  }, [refresh]);
+    let active = true;
+    void repository.list().then(
+      (loadedProjects) => {
+        if (!active) return;
+        setProjects(loadedProjects);
+        setLoading(false);
+        onProjectCountChangeRef.current?.(loadedProjects.length);
+      },
+      (caught: unknown) => {
+        if (!active) return;
+        setError(friendlyError(caught, 'Legacy projects could not be loaded.'));
+        setLoading(false);
+      },
+    );
+    return () => {
+      active = false;
+    };
+  }, [repository]);
 
   useEffect(() => {
     if (loading || !focusProjectId || focusedProjectIdRef.current === focusProjectId) return;

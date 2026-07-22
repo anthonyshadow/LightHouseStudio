@@ -1,6 +1,6 @@
 # Manual QA checklist
 
-Run `npm run quality` and `npm run test:e2e` first. Manual checks complement deterministic tests; they are required for physical devices, codec output, track cleanup, and live provider integrations.
+Run `npm run quality`, `npm run test:coverage`, `npm run test:e2e`, and `npm run test:visual` first. Manual checks complement deterministic tests; they are required for physical devices, codec output, track cleanup, and live provider integrations.
 
 Synthetic-media automation cannot certify physical camera/microphone indicators, the final browser/OS codec artifact, real Decart disconnect billing/lifecycle, or real ElevenLabs conversion. Complete those four checks with intended release browsers, physical devices, and explicitly authorized provider test accounts before release.
 
@@ -136,7 +136,7 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Before processing, seek the main-stage player to the middle. During processing confirm playback is paused and locked without replacing the video node. After success confirm the processed URL is active, prior time is restored up to the new duration, and playback remains paused.
 - Cancel mid-process; confirm original/last successful presentation and download remain recoverable.
 - Force decode, audio-encode, remux, or processed-object-URL creation failure; confirm the prior playable artifact remains and is not revoked.
-- With ElevenLabs configured, browse/search/page workspace and public voices, preview without uploading the take, explicitly import one eligible public voice, then select it without conversion.
+- With ElevenLabs configured, browse/search/page workspace and public voices, click Preview to fetch owned Blob audio without uploading the take, explicitly import one eligible public voice, then select it without conversion. Confirm the preview Blob URL is replaced/revoked when another preview starts or the panel closes.
 - Apply the selected cloud voice and confirm only then is the completed sidecar uploaded. During processing, playback/download must be locked; after success, the complete processed artifact appears.
 - Force auth, plan/credits, rate-limit, incompatible voice, invalid audio, timeout, and provider outage responses through fakes or a test environment. Confirm sanitized guidance and no raw body/key/URL.
 - Choose Original and confirm immediate restoration with no network request.

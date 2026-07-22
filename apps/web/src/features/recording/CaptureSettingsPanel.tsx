@@ -13,7 +13,7 @@ export type CaptureSettingsPanelProps = {
   mode: StudioMode;
   disabled?: boolean;
   disabledReason?: string;
-  onApplied?(): void;
+  onApplied?: () => void;
 };
 
 const panelStyles = (theme: Theme): CSSObject => ({

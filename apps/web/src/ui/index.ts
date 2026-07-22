@@ -7,7 +7,6 @@ export { StatusNotice, type NoticeTone } from './primitives/StatusNotice';
 export { SegmentedControl, type SegmentOption } from './primitives/SegmentedControl';
 export { VisuallyHidden } from './primitives/VisuallyHidden';
 export { IconButton, type IconButtonProps } from './primitives/IconButton';
-export { Tabs, type TabItem, type TabsProps } from './primitives/Tabs';
 export {
   OverlayPanel,
   type OverlayPanelPlacement,

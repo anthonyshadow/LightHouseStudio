@@ -20,6 +20,3 @@ export const recordingFileExtension = (mimeType: string): 'mp4' | 'webm' =>
 
 export const isAudioMimeType = (mimeType: string): boolean =>
   /^audio\/(?:aac|mp3|mp4|mpeg|ogg|wav|webm)(?:;|$)/iu.test(mimeType.trim());
-
-export const isSupportedVoiceSidecarMimeType = (mimeType: string): boolean =>
-  isAudioMimeType(mimeType);

@@ -1,48 +1,76 @@
 import {
   importSharedVoiceResponseSchema,
   sharedVoicesResponseSchema,
+  VOICE_PROVIDER_INTENT_HEADER,
+  VOICE_PROVIDER_INTENT_VALUE,
   workspaceVoicesResponseSchema,
 } from '@studio/contracts';
-import type { VoicePage, VoiceSummary } from '../../application/types';
+import type {
+  PublicVoiceItem,
+  PublicVoicePage,
+  VoiceLibraryItem,
+  WorkspaceVoicePage,
+} from '../../application/types';
 import { apiFetch } from './apiClient';
 
 const invalidResponse = (capability: string): Error =>
   new Error(`The ${capability} response was invalid. Refresh and try again.`);
 
+const providerIntentHeaders = (): Record<string, string> => ({
+  [VOICE_PROVIDER_INTENT_HEADER]: VOICE_PROVIDER_INTENT_VALUE,
+});
+
 export const listWorkspaceVoices = async (
   search: string,
   pageToken: string | null,
   signal: AbortSignal,
-): Promise<VoicePage> => {
+): Promise<WorkspaceVoicePage> => {
   const params = new URLSearchParams({ search: search.trim(), pageSize: '10' });
   if (pageToken) params.set('pageToken', pageToken);
-  const response = await apiFetch(`/api/elevenlabs/voices?${params}`, { signal });
+  const response = await apiFetch(`/api/elevenlabs/voices?${params}`, {
+    signal,
+    headers: providerIntentHeaders(),
+  });
   const parsed = workspaceVoicesResponseSchema.safeParse(await response.json());
   if (!parsed.success) throw invalidResponse('workspace voice');
-  return parsed.data;
+  return {
+    ...parsed.data,
+    voices: parsed.data.voices.map((voice) => ({ kind: 'workspace' as const, voice })),
+  };
 };
 
 export const listPublicVoices = async (
   search: string,
   page: number,
   signal: AbortSignal,
-): Promise<VoicePage> => {
+): Promise<PublicVoicePage> => {
   const params = new URLSearchParams({ search: search.trim(), page: String(page), pageSize: '10' });
-  const response = await apiFetch(`/api/elevenlabs/shared-voices?${params}`, { signal });
+  const response = await apiFetch(`/api/elevenlabs/shared-voices?${params}`, {
+    signal,
+    headers: providerIntentHeaders(),
+  });
   const parsed = sharedVoicesResponseSchema.safeParse(await response.json());
   if (!parsed.success) throw invalidResponse('public voice');
-  return parsed.data;
+  return {
+    hasMore: parsed.data.hasMore,
+    nextPageToken: parsed.data.nextPageToken,
+    total: parsed.data.total,
+    voices: parsed.data.voices.map((voice) => ({ kind: 'public' as const, voice })),
+  };
 };
 
 export const importPublicVoice = async (
-  voice: VoiceSummary,
+  item: PublicVoiceItem,
   signal: AbortSignal,
 ): Promise<string> => {
-  if (!voice.publicOwnerId) throw new Error('Public owner information is unavailable.');
+  const { voice } = item;
   const response = await apiFetch('/api/elevenlabs/shared-voices/import', {
     method: 'POST',
     signal,
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      ...providerIntentHeaders(),
+      'Content-Type': 'application/json',
+    },
     body: JSON.stringify({
       name: voice.name,
       publicOwnerId: voice.publicOwnerId,
@@ -52,6 +80,26 @@ export const importPublicVoice = async (
   const parsed = importSharedVoiceResponseSchema.safeParse(await response.json());
   if (!parsed.success) throw invalidResponse('voice import');
   return parsed.data.voiceId;
+};
+
+export const fetchVoicePreview = async (
+  item: VoiceLibraryItem,
+  signal: AbortSignal,
+): Promise<Blob> => {
+  const path =
+    item.kind === 'public'
+      ? `/api/elevenlabs/shared-voices/${encodeURIComponent(item.voice.publicOwnerId)}/${encodeURIComponent(item.voice.voiceId)}/preview`
+      : `/api/elevenlabs/voices/${encodeURIComponent(item.voice.voiceId)}/preview`;
+  const response = await apiFetch(path, {
+    signal,
+    cache: 'no-store',
+    headers: { ...providerIntentHeaders(), Accept: 'audio/*' },
+  });
+  const preview = await response.blob();
+  if (preview.size === 0 || !preview.type.startsWith('audio/')) {
+    throw invalidResponse('voice preview');
+  }
+  return preview;
 };
 
 export const convertRecordingVoice = async (
@@ -64,7 +112,10 @@ export const convertRecordingVoice = async (
     method: 'POST',
     signal,
     cache: 'no-store',
-    headers: { 'Content-Type': sidecar.type || 'application/octet-stream' },
+    headers: {
+      ...providerIntentHeaders(),
+      'Content-Type': sidecar.type || 'application/octet-stream',
+    },
     body: sidecar,
   });
   const converted = await response.blob();

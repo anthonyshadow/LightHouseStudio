@@ -2,9 +2,9 @@ import {
   capabilitiesResponseSchema,
   healthResponseSchema,
   REFERENCE_IMAGE_SIZES,
+  SUPPORTED_MODEL_IDS,
 } from '@studio/contracts';
 import type { FastifyInstance } from 'fastify';
-import { SUPPORTED_MODEL_IDS } from '../../providers/decart/token-provider.js';
 
 export interface CapabilityAvailability {
   readonly decartAvailable: boolean;

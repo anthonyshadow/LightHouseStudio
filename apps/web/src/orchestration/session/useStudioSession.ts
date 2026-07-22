@@ -63,7 +63,6 @@ export const useStudioSession = ({
     updatePrompt,
     updateEnhancement,
     updateReferenceImage,
-    updateImage,
   } = useSessionDraftState();
 
   const handleMicrophoneEnded = useCallback(() => {
@@ -348,7 +347,6 @@ export const useStudioSession = ({
       updatePrompt,
       updateEnhancement,
       updateReferenceImage,
-      updateImage,
       clearError,
     }),
     [
@@ -379,7 +377,6 @@ export const useStudioSession = ({
       updatePrompt,
       updateEnhancement,
       updateReferenceImage,
-      updateImage,
       clearError,
     ],
   );

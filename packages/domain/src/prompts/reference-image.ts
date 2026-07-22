@@ -8,7 +8,13 @@ import { canonicalPrompt } from '../common/text';
 export const CHARACTER_REFERENCE_PROMPT_TEMPLATE_VERSION =
   'lucy-2.5-character-reference-v2' as const;
 
-export type CharacterReferencePromptFraming = 'head_and_shoulders' | 'waist_up' | 'full_body';
+export const CHARACTER_REFERENCE_PROMPT_FRAMINGS = [
+  'head_and_shoulders',
+  'waist_up',
+  'full_body',
+] as const;
+
+export type CharacterReferencePromptFraming = (typeof CHARACTER_REFERENCE_PROMPT_FRAMINGS)[number];
 
 const compositionInstructions = `Create one production-ready character reference image optimized for Decart Lucy 2.5 realtime character transformation.
 

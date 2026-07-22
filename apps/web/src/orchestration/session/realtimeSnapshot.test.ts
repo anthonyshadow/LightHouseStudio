@@ -1,11 +1,11 @@
 // @vitest-environment jsdom
 
+import { normalizeAuthoredPrompt } from '@studio/domain';
 import { describe, expect, it } from 'vitest';
 import type { SessionDraft } from '../../features/media-session';
 import {
   hasPendingChanges,
   imageIdentity,
-  normalizePrompt,
   revertToAppliedDraft,
   toAppliedState,
   toProviderSnapshot,
@@ -36,7 +36,7 @@ describe('realtime state snapshots', () => {
   });
 
   it('trims prompt boundaries, preserves authored formatting, and emits one atomic payload', () => {
-    expect(normalizePrompt('  Keep   the  expression\ncalm  ')).toBe(
+    expect(normalizeAuthoredPrompt('  Keep   the  expression\ncalm  ')).toBe(
       'Keep   the  expression\ncalm',
     );
 
@@ -72,11 +72,10 @@ describe('realtime state snapshots', () => {
     const initial = draft({ referenceImage: ephemeral(portrait) });
     const applied = toAppliedState(initial);
 
-    expect(revertToAppliedDraft({ ...initial, prompt: 'pending edit' }, applied)).toMatchObject({
-      prompt: '',
-      referenceImage: expect.objectContaining({ file: portrait }),
-      enhance: false,
-    });
+    const reverted = revertToAppliedDraft({ ...initial, prompt: 'pending edit' }, applied);
+    expect(reverted.prompt).toBe('');
+    expect(reverted.referenceImage?.file).toBe(portrait);
+    expect(reverted.enhance).toBe(false);
   });
 
   it('does not invent prompt text for VTON image-only input', () => {

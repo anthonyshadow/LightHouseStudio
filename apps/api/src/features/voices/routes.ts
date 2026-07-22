@@ -15,7 +15,7 @@ import {
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AudioStream } from '../../application/audio-stream.js';
 import { AppError } from '../../http/errors.js';
-import { requireTrustedOrigin } from '../../http/security.js';
+import { requireTrustedOrigin, requireVoiceProviderIntent } from '../../http/security.js';
 import { createRequestLifetime, sendAudioStream } from '../../http/streaming.js';
 import type { VoiceService } from './voice-service.js';
 
@@ -38,6 +38,12 @@ const validationError = (message: string): AppError =>
 
 const verifyProviderOrigin = (request: FastifyRequest): Promise<void> => {
   requireTrustedOrigin(request);
+  requireVoiceProviderIntent(request);
+  return Promise.resolve();
+};
+
+const verifyProviderIntent = (request: FastifyRequest): Promise<void> => {
+  requireVoiceProviderIntent(request);
   return Promise.resolve();
 };
 
@@ -61,7 +67,7 @@ const contentTypeEssence = (request: FastifyRequest): string =>
   request.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase() ?? '';
 
 export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService | null): void => {
-  app.get('/api/elevenlabs/voices', async (request, reply) => {
+  app.get('/api/elevenlabs/voices', { onRequest: verifyProviderIntent }, async (request, reply) => {
     const parsed = workspaceVoicesQuerySchema.safeParse(request.query);
     if (!parsed.success) {
       throw validationError('Use a search up to 100 characters and a page size from 1 to 10.');
@@ -82,39 +88,48 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
     }
   });
 
-  app.get('/api/elevenlabs/voices/:voiceId/preview', async (request, reply) => {
-    const parsed = workspaceVoiceParamsSchema.safeParse(request.params);
-    if (!parsed.success) throw validationError('Choose a valid workspace voice.');
-    return streamProviderAudio(request, reply, (signal) =>
-      requireVoiceService(service).workspacePreview(parsed.data.voiceId, signal),
-    );
-  });
-
-  app.get('/api/elevenlabs/shared-voices', async (request, reply) => {
-    const parsed = sharedVoicesQuerySchema.safeParse(request.query);
-    if (!parsed.success) {
-      throw validationError(
-        'Use a search up to 100 characters, a zero-based page, and a page size from 1 to 10.',
+  app.get(
+    '/api/elevenlabs/voices/:voiceId/preview',
+    { onRequest: verifyProviderIntent },
+    async (request, reply) => {
+      const parsed = workspaceVoiceParamsSchema.safeParse(request.params);
+      if (!parsed.success) throw validationError('Choose a valid workspace voice.');
+      return streamProviderAudio(request, reply, (signal) =>
+        requireVoiceService(service).workspacePreview(parsed.data.voiceId, signal),
       );
-    }
+    },
+  );
 
-    const lifetime = createRequestLifetime(request, reply);
-    try {
-      return sharedVoicesResponseSchema.parse(
-        await requireVoiceService(service).listSharedVoices({
-          search: parsed.data.search,
-          pageSize: parsed.data.pageSize,
-          page: parsed.data.page,
-          signal: lifetime.signal,
-        }),
-      );
-    } finally {
-      lifetime.release();
-    }
-  });
+  app.get(
+    '/api/elevenlabs/shared-voices',
+    { onRequest: verifyProviderIntent },
+    async (request, reply) => {
+      const parsed = sharedVoicesQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        throw validationError(
+          'Use a search up to 100 characters, a zero-based page, and a page size from 1 to 10.',
+        );
+      }
+
+      const lifetime = createRequestLifetime(request, reply);
+      try {
+        return sharedVoicesResponseSchema.parse(
+          await requireVoiceService(service).listSharedVoices({
+            search: parsed.data.search,
+            pageSize: parsed.data.pageSize,
+            page: parsed.data.page,
+            signal: lifetime.signal,
+          }),
+        );
+      } finally {
+        lifetime.release();
+      }
+    },
+  );
 
   app.get(
     '/api/elevenlabs/shared-voices/:publicOwnerId/:voiceId/preview',
+    { onRequest: verifyProviderIntent },
     async (request, reply) => {
       const parsed = sharedVoicePreviewParamsSchema.safeParse(request.params);
       if (!parsed.success) throw validationError('Choose a valid public voice.');
@@ -132,7 +147,6 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
     '/api/elevenlabs/shared-voices/import',
     { bodyLimit: 16 * 1024, onRequest: verifyProviderOrigin },
     async (request, reply) => {
-      requireTrustedOrigin(request);
       const parsed = importSharedVoiceRequestSchema.safeParse(request.body);
       if (!parsed.success) {
         throw validationError('Provide a name, public owner id, and public voice id.');
@@ -158,7 +172,6 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
     '/api/elevenlabs/voice-changer/recording',
     { bodyLimit: MAX_RECORDING_AUDIO_BYTES, onRequest: verifyProviderOrigin },
     async (request, reply) => {
-      requireTrustedOrigin(request);
       const query = voiceChangerQuerySchema.safeParse(request.query);
       if (!query.success) throw validationError('Choose a valid workspace voice.');
 

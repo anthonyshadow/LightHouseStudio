@@ -43,7 +43,7 @@ export const registerReferenceImageRoutes = (
   app.post(
     '/api/reference-images/optimize',
     { bodyLimit: 64 * 1024, onRequest: verifyGenerationOrigin },
-    async (request) => {
+    async (request, reply) => {
       const parsed = optimizeCharacterReferencePromptRequestSchema.safeParse(request.body);
       if (!parsed.success) {
         throw new AppError(
@@ -52,9 +52,14 @@ export const registerReferenceImageRoutes = (
           'Provide a valid character description and reference-image options.',
         );
       }
-      return optimizeCharacterReferencePromptResponseSchema.parse(
-        await service.optimize(parsed.data),
-      );
+      const lifetime = createRequestLifetime(request, reply);
+      try {
+        return optimizeCharacterReferencePromptResponseSchema.parse(
+          await service.optimize(parsed.data, lifetime.signal),
+        );
+      } finally {
+        lifetime.release();
+      }
     },
   );
 

@@ -12,9 +12,9 @@ export type RealtimeDisconnectReason = 'provider-disconnected' | 'remote-ended';
 
 export type RealtimeResourceOptions = {
   operationRef: RefObject<number>;
-  onConnectionChange(state: RealtimeConnectionState): void;
-  onDisconnected(reason: RealtimeDisconnectReason): void;
-  onProviderError(): void;
+  onConnectionChange: (state: RealtimeConnectionState) => void;
+  onDisconnected: (reason: RealtimeDisconnectReason) => void;
+  onProviderError: () => void;
 };
 
 export type RealtimeConnectInput = {
@@ -29,10 +29,10 @@ export type RealtimeConnectInput = {
 export type RealtimeResource = {
   remoteStream: MediaStream | null;
   generationSeconds: number;
-  connect(input: RealtimeConnectInput): Promise<boolean>;
-  apply(snapshot: RealtimeSnapshot): Promise<void>;
-  disconnect(): void;
-  hasSession(): boolean;
+  connect: (input: RealtimeConnectInput) => Promise<boolean>;
+  apply: (snapshot: RealtimeSnapshot) => Promise<void>;
+  disconnect: () => void;
+  hasSession: () => boolean;
 };
 
 export const useRealtimeResource = ({

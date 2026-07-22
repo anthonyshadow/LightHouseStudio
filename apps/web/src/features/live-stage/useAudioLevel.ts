@@ -40,27 +40,32 @@ const measureLevel = (analyser: AnalyserNode, samples: Uint8Array<ArrayBuffer>):
  */
 export const useAudioLevel = (stream: MediaStream | null): AudioLevelState => {
   const audioTrack = stream?.getAudioTracks().find((track) => track.readyState === 'live') ?? null;
-  const [state, setState] = useState<AudioLevelState>(
-    audioTrack ? connectedWithoutMeterState : silentState,
-  );
+  const [measurement, setMeasurement] = useState<{
+    track: MediaStreamTrack | null;
+    state: AudioLevelState;
+  }>(() => ({
+    track: audioTrack,
+    state: audioTrack ? connectedWithoutMeterState : silentState,
+  }));
+  const state =
+    measurement.track === audioTrack
+      ? measurement.state
+      : audioTrack
+        ? connectedWithoutMeterState
+        : silentState;
 
   useEffect(() => {
-    if (!stream || !audioTrack) {
-      setState(silentState);
-      return;
-    }
+    if (!stream || !audioTrack) return;
 
     const Constructor = audioContextConstructor();
-    if (!Constructor) {
-      setState(connectedWithoutMeterState);
-      return;
-    }
+    if (!Constructor) return;
 
     let context: AudioContext | null = null;
     let source: MediaStreamAudioSourceNode | null = null;
     let analyser: AnalyserNode | null = null;
     let intervalId: number | null = null;
     let ended = false;
+    let active = true;
 
     const stopMeter = () => {
       if (intervalId !== null) window.clearInterval(intervalId);
@@ -87,36 +92,46 @@ export const useAudioLevel = (stream: MediaStream | null): AudioLevelState => {
       const sample = () => {
         if (document.visibilityState === 'hidden') return;
         if (audioTrack.readyState !== 'live') {
-          setState(silentState);
+          setMeasurement({ track: null, state: silentState });
           stopMeter();
           return;
         }
 
         const nextLevel = measureLevel(analyser!, samples);
         smoothedLevel = smoothedLevel * 0.58 + nextLevel * 0.42;
-        setState((current) => {
-          if (Math.abs(current.level - smoothedLevel) < 0.015 && current.metering) return current;
-          return { hasAudio: true, metering: true, level: smoothedLevel };
+        setMeasurement((current) => {
+          if (
+            current.track === audioTrack &&
+            Math.abs(current.state.level - smoothedLevel) < 0.015 &&
+            current.state.metering
+          ) {
+            return current;
+          }
+          return {
+            track: audioTrack,
+            state: { hasAudio: true, metering: true, level: smoothedLevel },
+          };
         });
       };
 
-      setState({ hasAudio: true, metering: true, level: 0 });
-      sample();
+      queueMicrotask(() => {
+        if (active) sample();
+      });
       intervalId = window.setInterval(sample, 80);
       if (context.state === 'suspended') void context.resume().catch(() => undefined);
     } catch {
       stopMeter();
-      setState(connectedWithoutMeterState);
     }
 
     const handleEnded = () => {
       ended = true;
-      setState(silentState);
+      setMeasurement({ track: null, state: silentState });
       stopMeter();
     };
     audioTrack.addEventListener('ended', handleEnded, { once: true });
 
     return () => {
+      active = false;
       if (!ended) audioTrack.removeEventListener('ended', handleEnded);
       stopMeter();
     };

@@ -205,6 +205,52 @@ describe('MediaStage', () => {
     expect(view.container.querySelector('video')).toBe(video);
   });
 
+  it('does not claim an audio-only stream has a retained final frame', () => {
+    const stream = new FakeStream([
+      new FakeTrack('audio', 'Desk microphone'),
+    ]) as unknown as MediaStream;
+    const view = render(
+      stage({
+        presentation: { kind: 'live', stream, origin: 'local', mirrored: false },
+        lifecycle: 'ready',
+      }),
+    );
+
+    view.rerender(
+      stage({
+        presentation: { kind: 'finalizing', retainedStream: stream, startedAt: 1 },
+        lifecycle: 'ready',
+      }),
+    );
+
+    expect(view.container.querySelector('video')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.getByText('Video idle')).toBeInTheDocument();
+    expect(screen.queryByText('Last live frame')).not.toBeInTheDocument();
+    expect(screen.getByText('Finalizing take…')).toBeInTheDocument();
+  });
+
+  it('does not describe an ended retained video track as live while finalizing', () => {
+    const track = new FakeTrack('video', 'Studio camera');
+    const stream = new FakeStream([track]) as unknown as MediaStream;
+    const view = render(
+      stage({
+        presentation: { kind: 'live', stream, origin: 'local', mirrored: false },
+        lifecycle: 'ready',
+      }),
+    );
+
+    act(() => track.end());
+    view.rerender(
+      stage({
+        presentation: { kind: 'finalizing', retainedStream: null, startedAt: 1 },
+        lifecycle: 'ready',
+      }),
+    );
+
+    expect(view.container.querySelector('video')).toHaveAttribute('aria-hidden', 'true');
+    expect(screen.queryByText('Last live frame')).not.toBeInTheDocument();
+  });
+
   it('exposes elapsed recording time as a queryable timer without live-region chatter', () => {
     render(
       stage({

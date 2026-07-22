@@ -1,3 +1,11 @@
+import {
+  abortTransaction,
+  browserIndexedDb,
+  openIndexedDatabase,
+  requestResult,
+  transactionComplete,
+} from '../../adapters/indexed-db/indexedDb';
+
 export const CHARACTER_BUILDER_DRAFT_SCHEMA_VERSION = 1 as const;
 export const CHARACTER_BUILDER_DRAFT_DATABASE_NAME = 'lightframe.character-builder';
 export const CHARACTER_BUILDER_DRAFT_DATABASE_VERSION = 1;
@@ -68,31 +76,35 @@ export interface LegacyCharacterDesignDraftCandidate<TDraft> {
 export interface LegacyCharacterDesignDraftMigration<TDraft> {
   /** Bump this stable ID when a materially different import should run once. */
   readonly id: string;
-  loadNewestCharacterDesign(): Promise<LegacyCharacterDesignDraftCandidate<TDraft> | null>;
+  loadNewestCharacterDesign: () => Promise<LegacyCharacterDesignDraftCandidate<TDraft> | null>;
 }
 
 export interface CharacterBuilderDraftRepository<TDraft> {
-  load(): Promise<CharacterBuilderDraftRecord<TDraft> | null>;
-  save(input: SaveCharacterBuilderDraftInput<TDraft>): Promise<CharacterBuilderDraftRecord<TDraft>>;
-  /** Writes without accepting the session-only fallback. Used by the save journal. */
-  saveDurably(
+  load: () => Promise<CharacterBuilderDraftRecord<TDraft> | null>;
+  save: (
     input: SaveCharacterBuilderDraftInput<TDraft>,
-  ): Promise<CharacterBuilderDraftRecord<TDraft>>;
-  reset(input: ResetCharacterBuilderDraftInput): Promise<void>;
+  ) => Promise<CharacterBuilderDraftRecord<TDraft>>;
+  /** Writes without accepting the session-only fallback. Used by the save journal. */
+  saveDurably: (
+    input: SaveCharacterBuilderDraftInput<TDraft>,
+  ) => Promise<CharacterBuilderDraftRecord<TDraft>>;
+  reset: (input: ResetCharacterBuilderDraftInput) => Promise<void>;
   /** Deletes without reporting success until IndexedDB has committed the deletion. */
-  resetDurably(input: ResetCharacterBuilderDraftInput): Promise<void>;
+  resetDurably: (input: ResetCharacterBuilderDraftInput) => Promise<void>;
   /** Clears the active draft and returns the exact record that was completed. */
-  complete(input: CompleteCharacterBuilderDraftInput): Promise<CharacterBuilderDraftRecord<TDraft>>;
-  /** Finalizes without reporting success until IndexedDB has committed the tombstone. */
-  completeDurably(
+  complete: (
     input: CompleteCharacterBuilderDraftInput,
-  ): Promise<CharacterBuilderDraftRecord<TDraft>>;
+  ) => Promise<CharacterBuilderDraftRecord<TDraft>>;
+  /** Finalizes without reporting success until IndexedDB has committed the tombstone. */
+  completeDurably: (
+    input: CompleteCharacterBuilderDraftInput,
+  ) => Promise<CharacterBuilderDraftRecord<TDraft>>;
   /** Explicitly replaces an unreadable envelope with an empty migration-marked tombstone. */
-  repairDurably(): Promise<void>;
-  getStorageState(): CharacterBuilderDraftStorageState;
+  repairDurably: () => Promise<void>;
+  getStorageState: () => CharacterBuilderDraftStorageState;
   /** Reopens IndexedDB and flushes the complete session snapshot when possible. */
-  retryDurableStorage(): Promise<CharacterBuilderDraftStorageState>;
-  close(): void;
+  retryDurableStorage: () => Promise<CharacterBuilderDraftStorageState>;
+  close: () => void;
 }
 
 export type CharacterBuilderDraftErrorCode =
@@ -328,44 +340,13 @@ class MemoryDraftBackend<TDraft> implements DraftBackend<TDraft> {
   close() {}
 }
 
-const requestResult = <T>(request: IDBRequest<T>): Promise<T> =>
-  new Promise((resolve, reject) => {
-    request.addEventListener('success', () => resolve(request.result), { once: true });
-    request.addEventListener(
-      'error',
-      () => reject(request.error ?? new Error('IndexedDB request failed.')),
-      { once: true },
-    );
-  });
-
-const transactionComplete = (transaction: IDBTransaction): Promise<void> =>
-  new Promise((resolve, reject) => {
-    transaction.addEventListener('complete', () => resolve(), { once: true });
-    transaction.addEventListener(
-      'abort',
-      () => reject(transaction.error ?? new Error('IndexedDB transaction was aborted.')),
-      { once: true },
-    );
-    transaction.addEventListener(
-      'error',
-      () => reject(transaction.error ?? new Error('IndexedDB transaction failed.')),
-      { once: true },
-    );
-  });
-
-const abortTransaction = (transaction: IDBTransaction) => {
-  try {
-    transaction.abort();
-  } catch {
-    // A completed or already-aborted transaction needs no further cleanup.
-  }
-};
-
 class IndexedDbDraftBackend<TDraft> implements DraftBackend<TDraft> {
   constructor(
     private readonly database: IDBDatabase,
     private readonly sanitizeDraft: (value: unknown) => TDraft | null,
-  ) {}
+  ) {
+    database.addEventListener('versionchange', () => database.close());
+  }
 
   private parse(raw: unknown): StoredDraftEnvelope<TDraft> {
     if (raw === undefined || raw === null) return emptyEnvelope<TDraft>();
@@ -453,40 +434,16 @@ class IndexedDbDraftBackend<TDraft> implements DraftBackend<TDraft> {
 }
 
 const openDraftDatabase = (factory: IDBFactory, databaseName: string): Promise<IDBDatabase> =>
-  new Promise((resolve, reject) => {
-    const request = factory.open(databaseName, CHARACTER_BUILDER_DRAFT_DATABASE_VERSION);
-    let settled = false;
-    request.addEventListener('upgradeneeded', () => {
-      if (!request.result.objectStoreNames.contains(CHARACTER_BUILDER_DRAFT_STORE)) {
-        request.result.createObjectStore(CHARACTER_BUILDER_DRAFT_STORE, { keyPath: 'id' });
+  openIndexedDatabase(
+    factory,
+    databaseName,
+    CHARACTER_BUILDER_DRAFT_DATABASE_VERSION,
+    (database) => {
+      if (!database.objectStoreNames.contains(CHARACTER_BUILDER_DRAFT_STORE)) {
+        database.createObjectStore(CHARACTER_BUILDER_DRAFT_STORE, { keyPath: 'id' });
       }
-    });
-    request.addEventListener('success', () => {
-      if (settled) {
-        request.result.close();
-        return;
-      }
-      settled = true;
-      resolve(request.result);
-    });
-    request.addEventListener('error', () => {
-      settled = true;
-      reject(request.error ?? new Error('IndexedDB could not be opened.'));
-    });
-    request.addEventListener('blocked', () => {
-      if (settled) return;
-      settled = true;
-      reject(new Error('IndexedDB is blocked by another open version.'));
-    });
-  });
-
-const browserIndexedDb = (): IDBFactory | null => {
-  try {
-    return typeof indexedDB === 'undefined' ? null : indexedDB;
-  } catch {
-    return null;
-  }
-};
+    },
+  );
 
 const cloneAndSanitizeDraft = <TDraft>(
   value: unknown,
@@ -545,12 +502,15 @@ export const createCharacterBuilderDraftRepository = <TDraft>(
         return;
       }
       try {
-        backend = new IndexedDbDraftBackend(
-          await openDraftDatabase(factory, databaseName),
-          options.sanitizeDraft,
-        );
+        const database = await openDraftDatabase(factory, databaseName);
+        if (closed) {
+          database.close();
+          throw new CharacterBuilderDraftError('closed', 'Character draft storage is closed.');
+        }
+        backend = new IndexedDbDraftBackend(database, options.sanitizeDraft);
         storageState = READY_STATE;
-      } catch {
+      } catch (error) {
+        if (closed) throw error;
         backend = memory;
         storageState = SESSION_ONLY_STATE;
       }
@@ -859,9 +819,14 @@ export const createCharacterBuilderDraftRepository = <TDraft>(
       return storageState;
     })();
     durableRetry = attempt;
-    void attempt.finally(() => {
-      if (durableRetry === attempt) durableRetry = null;
-    });
+    void attempt.then(
+      () => {
+        if (durableRetry === attempt) durableRetry = null;
+      },
+      () => {
+        if (durableRetry === attempt) durableRetry = null;
+      },
+    );
     return attempt;
   };
 

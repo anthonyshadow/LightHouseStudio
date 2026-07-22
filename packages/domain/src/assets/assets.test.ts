@@ -13,6 +13,7 @@ import {
   parseCreativeAssetStore,
   recordSuccessfulPromptUse,
   sanitizeCreativeAssetStore,
+  sanitizeGuidedDesignV1,
   searchCreativeAssets,
   updateSavedPrompt,
   updateSavedCharacterPrompt,
@@ -44,6 +45,48 @@ const guidedDesign = (): GuidedDesignV1 => ({
     style: { optionId: 'cinematic' },
     background: { optionId: 'studio' },
   },
+});
+
+describe('sanitizeGuidedDesignV1', () => {
+  it('normalizes the canonical limits and migrates a missing legacy skin tone', () => {
+    const design = guidedDesign();
+    const choices = { ...design.choices } as Record<string, unknown>;
+    delete choices.skinTone;
+
+    expect(
+      sanitizeGuidedDesignV1({
+        ...design,
+        starterId: '  documentary-presenter  ',
+        choices: {
+          ...choices,
+          hairColor: { optionId: 'custom', customValue: '  deep   auburn  ' },
+        },
+      }),
+    ).toMatchObject({
+      starterId: 'documentary-presenter',
+      choices: {
+        skinTone: null,
+        hairColor: { optionId: 'custom', customValue: 'deep auburn' },
+      },
+    });
+  });
+
+  it('rejects missing non-legacy choices and bounds identifiers to 128 characters', () => {
+    const design = guidedDesign();
+    const missingChoice = { ...design.choices } as Record<string, unknown>;
+    delete missingChoice.hair;
+
+    expect(sanitizeGuidedDesignV1({ ...design, choices: missingChoice })).toBeNull();
+    expect(
+      sanitizeGuidedDesignV1({ ...design, starterId: 'x'.repeat(129) })?.starterId,
+    ).toHaveLength(128);
+    expect(
+      sanitizeGuidedDesignV1({
+        ...design,
+        choices: { ...design.choices, hair: { optionId: 'x'.repeat(129) } },
+      })?.choices.hair?.optionId,
+    ).toHaveLength(128);
+  });
 });
 
 describe('creative asset CRUD and use', () => {

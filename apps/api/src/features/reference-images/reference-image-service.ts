@@ -1,17 +1,12 @@
-import { createHash } from 'node:crypto';
 import {
   CHARACTER_PROMPT_OPTIMIZER_DEFAULT_VERSION,
   optimizeCharacterReferencePromptResponseSchema,
-  referenceImageAssetSchema,
   REFERENCE_IMAGE_MODEL_ID,
   REFERENCE_IMAGE_QUALITY,
   type CharacterPromptOptimizationResult,
-  type CreateReferenceImageRequest,
-  type EditReferenceImageRequest,
   type OptimizeCharacterReferencePromptRequest,
   type OptimizeCharacterReferencePromptResponse,
   type ReferenceImageAsset,
-  type ReferenceImageSize,
 } from '@studio/contracts';
 import {
   type ReferenceImageAssetStore,
@@ -20,13 +15,7 @@ import {
   type StoredReferenceImageMetadata,
 } from './asset-store.js';
 import { InvalidReferenceImageError, validateReferenceImage } from './image-validation.js';
-import {
-  createReferenceImageEditPrompt,
-  createPromptOptimizationInputHash,
-  createWorkshopPromptHash,
-  REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION,
-  versionReferenceImagePrompt,
-} from './prompt.js';
+import { createReferenceImageEditPrompt, createPromptOptimizationInputHash } from './prompt.js';
 import {
   CharacterPromptOptimizerError,
   type CharacterPromptOptimizer,
@@ -35,228 +24,19 @@ import {
   type ReferenceImageProvider,
   ReferenceImageProviderError,
 } from '../../providers/openai/reference-image-provider.js';
-
-export type ReferenceImageGenerationStateErrorReason =
-  | 'edit-not-configured'
-  | 'generation-in-progress'
-  | 'request-id-conflict'
-  | 'source-asset-not-found'
-  | 'optimizer-not-configured'
-  | 'provider-not-configured'
-  | 'stale-optimization'
-  | 'invalid-optimization';
-
-export class ReferenceImageGenerationStateError extends Error {
-  readonly reason: ReferenceImageGenerationStateErrorReason;
-
-  constructor(reason: ReferenceImageGenerationStateErrorReason) {
-    super(`Reference image generation unavailable: ${reason}`);
-    this.name = 'ReferenceImageGenerationStateError';
-    this.reason = reason;
-  }
-}
-
-export interface GenerateReferenceImageInput extends CreateReferenceImageRequest {
-  readonly localOwnerId: string;
-  readonly signal?: AbortSignal;
-}
-
-export interface EditReferenceImageInput extends EditReferenceImageRequest {
-  readonly localOwnerId: string;
-  readonly sourceAssetId: string;
-  readonly signal?: AbortSignal;
-}
-
-interface PreparedReferenceImageGeneration {
-  readonly prompt: string;
-  readonly size: ReferenceImageSize;
-  readonly format: CharacterPromptOptimizationResult['recommendedSettings']['format'];
-  readonly promptHash: string;
-  readonly promptAudit: {
-    readonly optimizationEnabled: boolean;
-    readonly result: CharacterPromptOptimizationResult;
-    readonly options: CreateReferenceImageRequest['options'];
-    readonly requestedGenerator: NonNullable<CreateReferenceImageRequest['generator']> | null;
-    readonly optimizer: { readonly model: string; readonly version: string } | null;
-    readonly inputHash: string | null;
-    readonly manuallyEdited: boolean;
-  };
-}
-
-type ReferenceImageOptions = CreateReferenceImageRequest['options'];
-type RecommendedReferenceImageSettings = CharacterPromptOptimizationResult['recommendedSettings'];
-
-type ActiveReferenceImageOperation = {
-  readonly requestId: string;
-  readonly requestFingerprint: string;
-  readonly result: Promise<StoredReferenceImageMetadata>;
-};
-
-const sha256 = (value: string): string => createHash('sha256').update(value, 'utf8').digest('hex');
-
-const generationRequestFingerprint = (input: GenerateReferenceImageInput): string =>
-  sha256(
-    JSON.stringify({
-      kind: 'generate',
-      rawPrompt: input.rawPrompt,
-      options: input.options,
-      generator: input.generator ?? null,
-      optimization: input.optimization,
-    }),
-  );
-
-const editRequestFingerprint = (input: EditReferenceImageInput): string =>
-  sha256(
-    JSON.stringify({
-      kind: 'edit',
-      templateVersion: REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION,
-      sourceAssetId: input.sourceAssetId,
-      rawPrompt: input.rawPrompt,
-      changeInstructions: input.changeInstructions,
-      options: input.options,
-      generator: input.generator ?? null,
-      optimization: input.optimization,
-    }),
-  );
-
-const assertMatchingFingerprint = (
-  metadata: StoredReferenceImageMetadata,
-  requestFingerprint: string,
-): void => {
-  if (
-    metadata.requestFingerprint !== undefined &&
-    metadata.requestFingerprint !== requestFingerprint
-  ) {
-    throw new ReferenceImageGenerationStateError('request-id-conflict');
-  }
-};
-
-const ORIENTATION_DEFAULTS: Record<
-  ReferenceImageOptions['orientation'],
-  {
-    readonly orientation: RecommendedReferenceImageSettings['orientation'];
-    readonly size: ReferenceImageSize;
-  }
-> = {
-  auto: { orientation: 'landscape', size: '1536x1024' },
-  portrait_9_16: { orientation: 'portrait', size: '1024x1536' },
-  landscape_16_9: { orientation: 'landscape', size: '1536x1024' },
-  square: { orientation: 'square', size: '1024x1024' },
-};
-
-const LEGACY_REFERENCE_OPTIONS: ReferenceImageOptions = {
-  framing: 'head_and_shoulders',
-  orientation: 'square',
-  renderingMode: 'faithful_source_style',
-  expression: 'neutral',
-  background: 'neutral_gray',
-  targetUse: 'lucy_2_5_character_reference',
-};
-
-const formatForMimeType = (
-  mimeType: StoredReferenceImageMetadata['mimeType'],
-): CharacterPromptOptimizationResult['recommendedSettings']['format'] => {
-  if (mimeType === 'image/png') return 'png';
-  if (mimeType === 'image/webp') return 'webp';
-  return 'jpeg';
-};
-
-const recommendedSettingsForSize = (
-  size: ReferenceImageSize,
-  framing: CreateReferenceImageRequest['options']['framing'],
-  quality: 'high' | 'medium',
-  format: CharacterPromptOptimizationResult['recommendedSettings']['format'],
-): CharacterPromptOptimizationResult['recommendedSettings'] => {
-  switch (size) {
-    case '1024x1536':
-      return { framing, orientation: 'portrait', size, quality, format };
-    case '1536x1024':
-      return { framing, orientation: 'landscape', size, quality, format };
-    case '1024x1024':
-      return { framing, orientation: 'square', size, quality, format };
-  }
-};
-
-const requestedOrientationMatches = (
-  requested: ReferenceImageOptions['orientation'],
-  actual: RecommendedReferenceImageSettings['orientation'],
-): boolean => ORIENTATION_DEFAULTS[requested].orientation === actual;
-
-const settingsMatchOptions = (
-  result: CharacterPromptOptimizationResult,
-  options: CreateReferenceImageRequest['options'],
-  quality?: 'high' | 'medium',
-): boolean =>
-  result.recommendedSettings.framing === options.framing &&
-  requestedOrientationMatches(options.orientation, result.recommendedSettings.orientation) &&
-  (quality === undefined || result.recommendedSettings.quality === quality);
-
-const sizeForBypass = (orientation: ReferenceImageOptions['orientation']): ReferenceImageSize =>
-  ORIENTATION_DEFAULTS[orientation].size;
-
-const legacyResult = (
-  metadata: StoredReferenceImageMetadata,
-): CharacterPromptOptimizationResult => {
-  const size = metadata.size ?? '1024x1024';
-  return {
-    optimizedImagePrompt: metadata.derivedPrompt,
-    lucy25CharacterPrompt: metadata.originalPrompt,
-    normalizedCharacterDescription: metadata.originalPrompt,
-    preservedCharacterFacts: [],
-    technicalDefaultsAdded: [],
-    warnings: [],
-    recommendedSettings: recommendedSettingsForSize(
-      size,
-      'head_and_shoulders',
-      metadata.quality ?? REFERENCE_IMAGE_QUALITY,
-      formatForMimeType(metadata.mimeType),
-    ),
-  };
-};
-
-const safeMetadata = (metadata: StoredReferenceImageMetadata): ReferenceImageAsset => {
-  const audit = metadata.promptAudit;
-  const result = audit?.result ?? legacyResult(metadata);
-  return referenceImageAssetSchema.parse({
-    assetId: metadata.assetId,
-    mimeType: metadata.mimeType,
-    size: metadata.size ?? '1024x1024',
-    width: metadata.width,
-    height: metadata.height,
-    byteSize: metadata.byteSize,
-    source: metadata.source,
-    provider: metadata.provider,
-    model: metadata.model,
-    quality: metadata.quality ?? REFERENCE_IMAGE_QUALITY,
-    promptHash: metadata.promptHash,
-    optimizationEnabled: audit?.optimizationEnabled ?? false,
-    originalPrompt: metadata.originalPrompt,
-    optimizedImagePrompt: result.optimizedImagePrompt,
-    lucy25CharacterPrompt: result.lucy25CharacterPrompt,
-    normalizedCharacterDescription: result.normalizedCharacterDescription,
-    preservedCharacterFacts: result.preservedCharacterFacts,
-    technicalDefaultsAdded: result.technicalDefaultsAdded,
-    warnings: result.warnings,
-    options: audit?.options ?? LEGACY_REFERENCE_OPTIONS,
-    requestedGenerator: audit?.requestedGenerator ?? null,
-    optimizer: audit?.optimizer ?? null,
-    optimizationInputHash: audit?.inputHash ?? null,
-    manuallyEdited: audit?.manuallyEdited ?? false,
-    ...(metadata.derivation === undefined
-      ? {}
-      : metadata.derivation.kind === 'edit'
-        ? {
-            derivation: {
-              kind: 'edit' as const,
-              sourceAssetId: metadata.derivation.sourceAssetId,
-            },
-          }
-        : { derivation: { kind: 'generate' as const } }),
-    createdAt: metadata.createdAt,
-    updatedAt: metadata.updatedAt ?? metadata.createdAt,
-    contentUrl: `/api/reference-images/${metadata.assetId}/content`,
-  });
-};
+import { ReferenceImageGenerationStateError } from './reference-image-error.js';
+import { ReferenceImageOperationCoordinator } from './reference-image-operation-coordinator.js';
+import {
+  assertMatchingRequestFingerprint,
+  editRequestFingerprint,
+  type EditReferenceImageInput,
+  generationRequestFingerprint,
+  type GenerateReferenceImageInput,
+  hashReferenceImageEditInstructions,
+  prepareReferenceImageGeneration,
+  settingsMatchReferenceImageOptions,
+  toReferenceImageAsset,
+} from './reference-image-preparation.js';
 
 export class ReferenceImageService {
   readonly #provider: ReferenceImageProvider | null;
@@ -265,11 +45,7 @@ export class ReferenceImageService {
   readonly #imageModel: string;
   readonly #imageQuality: 'high' | 'medium';
   readonly #optimizerVersion: string;
-  readonly #activeOptimizations = new Map<
-    string,
-    Promise<OptimizeCharacterReferencePromptResponse>
-  >();
-  readonly #activeByOwner = new Map<string, ActiveReferenceImageOperation>();
+  readonly #operations = new ReferenceImageOperationCoordinator();
 
   constructor(
     provider: ReferenceImageProvider | null,
@@ -306,18 +82,16 @@ export class ReferenceImageService {
 
   async optimize(
     input: OptimizeCharacterReferencePromptRequest,
+    signal?: AbortSignal,
   ): Promise<OptimizeCharacterReferencePromptResponse> {
     if (this.#optimizer === null) {
       throw new ReferenceImageGenerationStateError('optimizer-not-configured');
     }
     const inputHash = createPromptOptimizationInputHash(input, this.#optimizerVersion);
-    const active = this.#activeOptimizations.get(inputHash);
-    if (active !== undefined) return active;
-
     const optimizer = this.#optimizer;
-    const result = (async () => {
-      const optimized = await optimizer.optimize(input);
-      if (!settingsMatchOptions(optimized, input.options)) {
+    return this.#operations.runOptimization(inputHash, signal, async (operationSignal) => {
+      const optimized = await optimizer.optimize(input, operationSignal);
+      if (!settingsMatchReferenceImageOptions(optimized, input.options)) {
         throw new CharacterPromptOptimizerError('invalid-response');
       }
       const normalizedResult: CharacterPromptOptimizationResult = {
@@ -333,170 +107,63 @@ export class ReferenceImageService {
         version: this.#optimizerVersion,
         inputHash,
       });
-    })();
-    this.#activeOptimizations.set(inputHash, result);
-    try {
-      return await result;
-    } finally {
-      if (this.#activeOptimizations.get(inputHash) === result) {
-        this.#activeOptimizations.delete(inputHash);
-      }
-    }
+    });
   }
 
   async generate(input: GenerateReferenceImageInput): Promise<ReferenceImageAsset> {
     const requestFingerprint = generationRequestFingerprint(input);
     const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
     if (persisted !== null) {
-      assertMatchingFingerprint(persisted, requestFingerprint);
-      return safeMetadata(persisted);
+      assertMatchingRequestFingerprint(persisted, requestFingerprint);
+      return toReferenceImageAsset(persisted);
     }
-
-    const active = this.#activeByOwner.get(input.localOwnerId);
-    if (active !== undefined) {
-      if (active.requestId === input.requestId) {
-        if (active.requestFingerprint !== requestFingerprint) {
-          throw new ReferenceImageGenerationStateError('request-id-conflict');
-        }
-        return safeMetadata(await active.result);
-      }
-      throw new ReferenceImageGenerationStateError('generation-in-progress');
-    }
-    if (this.#provider === null) {
-      throw new ReferenceImageGenerationStateError('provider-not-configured');
-    }
-
-    const result = this.#generateAndStore(this.#provider, input, requestFingerprint);
-    this.#activeByOwner.set(input.localOwnerId, {
+    const metadata = await this.#operations.runForOwner({
+      localOwnerId: input.localOwnerId,
       requestId: input.requestId,
       requestFingerprint,
-      result,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      start: (operationSignal) => {
+        const provider = this.#provider;
+        if (provider === null) {
+          throw new ReferenceImageGenerationStateError('provider-not-configured');
+        }
+        return this.#generateAndStore(
+          provider,
+          { ...input, signal: operationSignal },
+          requestFingerprint,
+        );
+      },
     });
-    try {
-      return safeMetadata(await result);
-    } finally {
-      if (this.#activeByOwner.get(input.localOwnerId)?.result === result) {
-        this.#activeByOwner.delete(input.localOwnerId);
-      }
-    }
+    return toReferenceImageAsset(metadata);
   }
 
   async edit(input: EditReferenceImageInput): Promise<ReferenceImageAsset> {
     const requestFingerprint = editRequestFingerprint(input);
     const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
     if (persisted !== null) {
-      assertMatchingFingerprint(persisted, requestFingerprint);
-      return safeMetadata(persisted);
+      assertMatchingRequestFingerprint(persisted, requestFingerprint);
+      return toReferenceImageAsset(persisted);
     }
-
-    const active = this.#activeByOwner.get(input.localOwnerId);
-    if (active !== undefined) {
-      if (active.requestId === input.requestId) {
-        if (active.requestFingerprint !== requestFingerprint) {
-          throw new ReferenceImageGenerationStateError('request-id-conflict');
-        }
-        return safeMetadata(await active.result);
-      }
-      throw new ReferenceImageGenerationStateError('generation-in-progress');
-    }
-    const editProvider = this.#provider?.edit;
-    if (editProvider === undefined || this.#provider === null) {
-      throw new ReferenceImageGenerationStateError('edit-not-configured');
-    }
-
-    const result = this.#editAndStore(this.#provider, editProvider, input, requestFingerprint);
-    this.#activeByOwner.set(input.localOwnerId, {
+    const metadata = await this.#operations.runForOwner({
+      localOwnerId: input.localOwnerId,
       requestId: input.requestId,
       requestFingerprint,
-      result,
-    });
-    try {
-      return safeMetadata(await result);
-    } finally {
-      if (this.#activeByOwner.get(input.localOwnerId)?.result === result) {
-        this.#activeByOwner.delete(input.localOwnerId);
-      }
-    }
-  }
-
-  #prepareGeneration(
-    input: GenerateReferenceImageInput | EditReferenceImageInput,
-  ): PreparedReferenceImageGeneration {
-    if (input.optimization.enabled) {
-      if (this.#optimizer === null) {
-        throw new ReferenceImageGenerationStateError('optimizer-not-configured');
-      }
-      if (input.optimization.version !== this.#optimizerVersion) {
-        throw new ReferenceImageGenerationStateError('stale-optimization');
-      }
-      if (input.optimization.model !== this.#optimizer.model) {
-        throw new ReferenceImageGenerationStateError('stale-optimization');
-      }
-      const expectedHash = createPromptOptimizationInputHash(
-        {
-          rawPrompt: input.rawPrompt,
-          options: input.options,
-          ...(input.generator === undefined ? {} : { generator: input.generator }),
-        },
-        this.#optimizerVersion,
-      );
-      if (input.optimization.inputHash !== expectedHash) {
-        throw new ReferenceImageGenerationStateError('stale-optimization');
-      }
-      if (!settingsMatchOptions(input.optimization.result, input.options, this.#imageQuality)) {
-        throw new ReferenceImageGenerationStateError('invalid-optimization');
-      }
-      return {
-        prompt: input.optimization.result.optimizedImagePrompt,
-        size: input.optimization.result.recommendedSettings.size,
-        format: input.optimization.result.recommendedSettings.format,
-        promptHash: createWorkshopPromptHash(input.rawPrompt),
-        promptAudit: {
-          optimizationEnabled: true,
-          result: input.optimization.result,
-          options: input.options,
-          requestedGenerator: input.generator ?? null,
-          optimizer: {
-            model: input.optimization.model,
-            version: input.optimization.version,
-          },
-          inputHash: expectedHash,
-          manuallyEdited: input.optimization.manuallyEdited,
-        },
-      };
-    }
-
-    const versioned = versionReferenceImagePrompt(input.rawPrompt, input.options.framing);
-    const size = sizeForBypass(input.options.orientation);
-    const result: CharacterPromptOptimizationResult = {
-      optimizedImagePrompt: versioned.derivedPrompt,
-      lucy25CharacterPrompt: input.rawPrompt,
-      normalizedCharacterDescription: input.rawPrompt,
-      preservedCharacterFacts: [],
-      technicalDefaultsAdded: ['Applied the existing deterministic reference-image wrapper.'],
-      warnings: [],
-      recommendedSettings: recommendedSettingsForSize(
-        size,
-        input.options.framing,
-        this.#imageQuality,
-        'jpeg',
-      ),
-    };
-    return {
-      prompt: versioned.derivedPrompt,
-      size,
-      format: 'jpeg',
-      promptHash: createWorkshopPromptHash(input.rawPrompt),
-      promptAudit: {
-        optimizationEnabled: false,
-        result,
-        options: input.options,
-        requestedGenerator: input.generator ?? null,
-        optimizer: null,
-        inputHash: null,
-        manuallyEdited: false,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      start: (operationSignal) => {
+        const provider = this.#provider;
+        const editProvider = provider?.edit;
+        if (editProvider === undefined || provider === null) {
+          throw new ReferenceImageGenerationStateError('edit-not-configured');
+        }
+        return this.#editAndStore(
+          provider,
+          editProvider,
+          { ...input, signal: operationSignal },
+          requestFingerprint,
+        );
       },
-    };
+    });
+    return toReferenceImageAsset(metadata);
   }
 
   async #generateAndStore(
@@ -504,7 +171,11 @@ export class ReferenceImageService {
     input: GenerateReferenceImageInput,
     requestFingerprint: string,
   ): Promise<StoredReferenceImageMetadata> {
-    const prepared = this.#prepareGeneration(input);
+    const prepared = prepareReferenceImageGeneration(input, {
+      optimizer: this.#optimizer,
+      optimizerVersion: this.#optimizerVersion,
+      imageQuality: this.#imageQuality,
+    });
     let generated: Awaited<ReturnType<ReferenceImageProvider['generate']>>;
     try {
       generated = await provider.generate({
@@ -551,7 +222,11 @@ export class ReferenceImageService {
       throw new ReferenceImageGenerationStateError('source-asset-not-found');
     }
 
-    const prepared = this.#prepareGeneration(input);
+    const prepared = prepareReferenceImageGeneration(input, {
+      optimizer: this.#optimizer,
+      optimizerVersion: this.#optimizerVersion,
+      imageQuality: this.#imageQuality,
+    });
     const providerPrompt = createReferenceImageEditPrompt(
       prepared.prompt,
       input.changeInstructions,
@@ -593,7 +268,7 @@ export class ReferenceImageService {
       derivation: {
         kind: 'edit',
         sourceAssetId: input.sourceAssetId,
-        changeInstructionsHash: sha256(input.changeInstructions),
+        changeInstructionsHash: hashReferenceImageEditInstructions(input.changeInstructions),
       },
       ...(edited.providerRequestId === undefined
         ? {}
@@ -603,7 +278,7 @@ export class ReferenceImageService {
 
   async getMetadata(localOwnerId: string, assetId: string): Promise<ReferenceImageAsset | null> {
     const metadata = await this.#store.getMetadata(localOwnerId, assetId);
-    return metadata === null ? null : safeMetadata(metadata);
+    return metadata === null ? null : toReferenceImageAsset(metadata);
   }
 
   getContent(localOwnerId: string, assetId: string): Promise<StoredReferenceImageContent | null> {
@@ -612,3 +287,11 @@ export class ReferenceImageService {
 }
 
 export { InvalidReferenceImageError, ReferenceImageStorageError };
+export {
+  ReferenceImageGenerationStateError,
+  type ReferenceImageGenerationStateErrorReason,
+} from './reference-image-error.js';
+export type {
+  EditReferenceImageInput,
+  GenerateReferenceImageInput,
+} from './reference-image-preparation.js';

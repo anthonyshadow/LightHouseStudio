@@ -8,8 +8,10 @@ import {
   LocalReferenceImageAssetStore,
   type ReferenceImageAssetStore,
 } from './features/reference-images/asset-store.js';
+import { translateReferenceImageError } from './features/reference-images/error-mapper.js';
 import { registerReferenceImageRoutes } from './features/reference-images/routes.js';
 import { ReferenceImageService } from './features/reference-images/reference-image-service.js';
+import { translateVoiceServiceError } from './features/voices/error-mapper.js';
 import { registerVoiceRoutes, SUPPORTED_AUDIO_CONTENT_TYPES } from './features/voices/routes.js';
 import { VoiceService } from './features/voices/voice-service.js';
 import { installErrorHandling } from './http/errors.js';
@@ -20,10 +22,12 @@ import {
 } from './providers/decart/token-provider.js';
 import { ElevenLabsHttpProvider } from './providers/elevenlabs/http-provider.js';
 import type { ElevenLabsProvider } from './providers/elevenlabs/types.js';
+import { translateProviderError } from './providers/error-mapper.js';
 import {
   OpenAICharacterPromptOptimizer,
   type CharacterPromptOptimizer,
 } from './providers/openai/character-prompt-optimizer.js';
+import { translateOpenAIError } from './providers/openai/error-mapper.js';
 import {
   OpenAIReferenceImageProvider,
   type ReferenceImageProvider,
@@ -164,7 +168,15 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   registerRealtimeRoutes(app, decartProvider);
   registerReferenceImageRoutes(app, referenceImageService);
   registerVoiceRoutes(app, voiceService);
-  installErrorHandling(app, { serveSpa: dependencies.staticRoot !== undefined });
+  installErrorHandling(app, {
+    serveSpa: dependencies.staticRoot !== undefined,
+    translators: [
+      translateReferenceImageError,
+      translateVoiceServiceError,
+      translateOpenAIError,
+      translateProviderError,
+    ],
+  });
 
   return app;
 };

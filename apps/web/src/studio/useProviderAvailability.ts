@@ -31,8 +31,6 @@ export const useProviderAvailability = () => {
     let active = true;
     let retryTimer: number | null = null;
     let controller: AbortController | null = null;
-    setState('loading');
-
     const check = (attempt: number) => {
       controller = new AbortController();
       fetchProviderAvailability(controller.signal)

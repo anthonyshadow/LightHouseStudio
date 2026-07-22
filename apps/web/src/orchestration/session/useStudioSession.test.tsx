@@ -485,7 +485,9 @@ describe('useStudioSession model lifecycle contract', () => {
       expect(result.current.selectMode(scenario.mode)).toBe(true);
       result.current.updatePrompt(scenario.prompt);
       result.current.updateEnhancement(scenario.enhance);
-      result.current.updateImage(image, null);
+      result.current.updateReferenceImage(
+        image ? { kind: 'ephemeral', file: image, previewUrl: `blob:${image.name}` } : null,
+      );
     });
     await act(async () => {
       await result.current.startModel();
@@ -506,11 +508,9 @@ describe('useStudioSession model lifecycle contract', () => {
         enhance: scenario.enhance,
       },
     });
-    expect(result.current.applied).toMatchObject({
-      prompt: scenario.prompt.trim(),
-      referenceImage: image ? expect.objectContaining({ file: image }) : null,
-      enhance: scenario.enhance,
-    });
+    expect(result.current.applied?.prompt).toBe(scenario.prompt.trim());
+    expect(result.current.applied?.referenceImage?.file ?? null).toBe(image);
+    expect(result.current.applied?.enhance).toBe(scenario.enhance);
     expect(result.current.pendingChanges).toBe(false);
     expect(result.current.lifecycle).toBe('generating');
     expect(result.current.generationSeconds).toBe(4);
@@ -650,10 +650,8 @@ describe('useStudioSession model lifecycle contract', () => {
 
     expect(result.current.displayStream).toBe(result.current.localStream);
     expect(result.current.lifecycle).toBe('disconnected');
-    expect(result.current.error).toMatchObject({
-      code: 'provider-disconnected',
-      recovery: expect.stringMatching(/reconnect AI|continue locally/i),
-    });
+    expect(result.current.error?.code).toBe('provider-disconnected');
+    expect(result.current.error?.recovery).toMatch(/reconnect AI|continue locally/i);
     unmount();
   });
 
@@ -716,7 +714,11 @@ describe('useStudioSession model lifecycle contract', () => {
     act(() => {
       result.current.selectMode('lucy-2.5');
       result.current.updatePrompt('Original live character');
-      result.current.updateImage(originalImage, null);
+      result.current.updateReferenceImage({
+        kind: 'ephemeral',
+        file: originalImage,
+        previewUrl: 'blob:portrait.png',
+      });
       result.current.updateEnhancement(true);
     });
     await act(async () => {
@@ -726,7 +728,7 @@ describe('useStudioSession model lifecycle contract', () => {
 
     act(() => {
       result.current.updatePrompt('  Revised live character  ');
-      result.current.updateImage(null, null);
+      result.current.updateReferenceImage(null);
       result.current.updateEnhancement(false);
     });
     expect(apply).not.toHaveBeenCalled();

@@ -1,8 +1,7 @@
 import { z } from 'zod';
-import { SUPPORTED_MODEL_IDS, type SupportedModelId } from '@studio/contracts';
+import type { SupportedModelId } from '@studio/contracts';
 import { ProviderError } from '../provider-error.js';
 
-export { SUPPORTED_MODEL_IDS };
 export type { SupportedModelId };
 
 export interface TokenRequestScope {

@@ -1,13 +1,15 @@
 // @vitest-environment jsdom
 
-import '@testing-library/jest-dom/vitest';
-import { createPromptBuilderDraft, type CharacterTransformDraft } from '@studio/domain';
+import {
+  createPromptBuilderDraft,
+  type CharacterTransformDraft,
+  type GuidedDesignV1,
+} from '@studio/domain';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
-import type { GuidedDesignV1 } from '@studio/domain';
 import { CharacterBuilderForm, createEmptyGuidedDesign } from './CharacterBuilderForm';
 
 type BuilderSnapshot = {

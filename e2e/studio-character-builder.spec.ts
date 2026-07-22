@@ -348,7 +348,10 @@ test('drafts survive close and reload, while Reset Draft starts fresh', async ({
     'Use a copper lapel pin.',
   );
   await page.getByRole('button', { name: 'Reset Draft' }).click();
-  await page.getByRole('button', { name: 'Reset Draft', exact: true }).last().click();
+  await page
+    .getByRole('dialog', { name: 'Reset this character draft?' })
+    .getByRole('button', { name: 'Reset Draft', exact: true })
+    .click();
   await expect(page.getByLabel('Optional Custom Constraints')).toHaveValue('');
   await expect(page.getByRole('button', { name: 'Save Character' })).toBeDisabled();
 });

@@ -92,12 +92,12 @@ export type CapturePreferencesController = {
   applying: boolean;
   hasPendingChanges: boolean;
   actualSettings: CaptureStreamSettings;
-  refreshDevices(): Promise<void>;
-  updateVideoDeviceId(deviceId: string | null): void;
-  updateAudioDeviceId(deviceId: string | null): void;
-  updateProfile(profile: LocalCaptureProfileId): void;
-  apply(): Promise<boolean>;
-  discardPending(): void;
+  refreshDevices: () => Promise<void>;
+  updateVideoDeviceId: (deviceId: string | null) => void;
+  updateAudioDeviceId: (deviceId: string | null) => void;
+  updateProfile: (profile: LocalCaptureProfileId) => void;
+  apply: () => Promise<boolean>;
+  discardPending: () => void;
 };
 
 export type RecordingController = {
@@ -113,16 +113,16 @@ export type RecordingController = {
   processingError: string | null;
   elapsedSeconds: number;
   downloaded: boolean;
-  start(source: RecordingSource, mode: StudioMode): Promise<void>;
-  stop(): Promise<RecordingArtifact | null>;
-  restorePersistedOriginal(input: RestorePersistedOriginalInput): RecordingArtifact;
-  discard(): void;
-  markDownloaded(): void;
-  beginProcessing(): void;
-  cancelProcessing(): void;
-  completeProcessing(blob: Blob, mimeType: string, label: string): RecordingArtifact;
-  failProcessing(message: string): void;
-  restoreOriginal(): void;
+  start: (source: RecordingSource, mode: StudioMode) => Promise<void>;
+  stop: () => Promise<RecordingArtifact | null>;
+  restorePersistedOriginal: (input: RestorePersistedOriginalInput) => RecordingArtifact;
+  discard: () => void;
+  markDownloaded: () => void;
+  beginProcessing: () => void;
+  cancelProcessing: () => void;
+  completeProcessing: (blob: Blob, mimeType: string, label: string) => RecordingArtifact;
+  failProcessing: (message: string) => void;
+  restoreOriginal: () => void;
 };
 
 export type AutomaticRecordingStopReason =
@@ -134,5 +134,5 @@ export type AutomaticRecordingStopEvent = {
 };
 
 export type UseRecordingOptions = {
-  onAutomaticStop?(event: AutomaticRecordingStopEvent): void;
+  onAutomaticStop?: (event: AutomaticRecordingStopEvent) => void;
 };

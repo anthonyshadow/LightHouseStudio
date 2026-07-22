@@ -43,7 +43,7 @@ export const CharacterOptionButton = ({
   profile: VisualProfile;
   selected: boolean;
   disabled?: boolean;
-  onSelect(): void;
+  onSelect: () => void;
 }) => {
   const theme = useTheme();
   const fullLength = option.category === 'bodyShape' || option.category === 'outfit';
@@ -75,7 +75,7 @@ export type CharacterVisualChoiceSectionProps = {
   profile: VisualProfile;
   choice: GuidedChoiceValue | null;
   disabled?: boolean;
-  onChange(choice: GuidedChoiceValue | null): void;
+  onChange: (choice: GuidedChoiceValue | null) => void;
 };
 
 export const CharacterVisualChoiceSection = ({

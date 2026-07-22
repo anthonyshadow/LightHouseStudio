@@ -57,6 +57,29 @@ const guidedDesign = (): GuidedDesignV1 => ({
 });
 
 describe('createCreativeAssetRepository', () => {
+  it('maps typed domain reasons without inspecting human-readable messages', () => {
+    const repository = repositoryFixture();
+
+    expect(() =>
+      repository.createSavedPrompt({
+        title: 'Valid title',
+        prompt: '   ',
+        modelModeId: 'lucy-2.5',
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'invalid-prompt',
+        message: 'A saved prompt cannot be empty.',
+      }),
+    );
+    expect(() => repository.renameSavedPrompt('missing', 'Still valid')).toThrow(
+      expect.objectContaining({
+        code: 'not-found',
+        message: 'Saved prompt was not found.',
+      }),
+    );
+  });
+
   it('supports CRUD, mode-scoped search, recent deduplication, usage tracking, and unlink-on-delete', () => {
     const repository = repositoryFixture();
     const saved = repository.createSavedPrompt({

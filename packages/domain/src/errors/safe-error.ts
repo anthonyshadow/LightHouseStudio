@@ -34,8 +34,8 @@ export interface SafeError {
 export class DomainRuleError extends Error {
   readonly code: SafeErrorCode;
 
-  constructor(code: SafeErrorCode, message: string) {
-    super(message);
+  constructor(code: SafeErrorCode, message: string, options?: ErrorOptions) {
+    super(message, options);
     this.name = 'DomainRuleError';
     this.code = code;
   }
@@ -51,7 +51,7 @@ const browserErrorMap: Readonly<Record<string, SafeError>> = {
     code: 'camera-denied',
     message: 'Camera or microphone access was not allowed.',
     retryable: true,
-    recovery: 'Allow camera and microphone access in your browser, then try again.',
+    recovery: 'Allow access in browser settings, then try again.',
   },
   NotFoundError: {
     code: 'device-missing',
@@ -59,7 +59,19 @@ const browserErrorMap: Readonly<Record<string, SafeError>> = {
     retryable: false,
     recovery: 'Connect a media device or choose another available input.',
   },
+  DevicesNotFoundError: {
+    code: 'device-missing',
+    message: 'A camera or microphone could not be found.',
+    retryable: false,
+    recovery: 'Connect a media device or choose another available input.',
+  },
   NotReadableError: {
+    code: 'device-busy',
+    message: 'The camera or microphone is unavailable or already in use.',
+    retryable: true,
+    recovery: 'Close other apps using the device, then try again.',
+  },
+  TrackStartError: {
     code: 'device-busy',
     message: 'The camera or microphone is unavailable or already in use.',
     retryable: true,

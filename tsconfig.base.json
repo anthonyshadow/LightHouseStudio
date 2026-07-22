@@ -18,8 +18,7 @@
     "ignoreDeprecations": "6.0",
     "paths": {
       "@studio/domain": ["packages/domain/src/index.ts"],
-      "@studio/contracts": ["packages/contracts/src/index.ts"],
-      "@studio/testing": ["packages/testing/src/index.ts"]
+      "@studio/contracts": ["packages/contracts/src/index.ts"]
     }
   }
 }

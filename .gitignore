@@ -12,3 +12,4 @@ apps/web/public/test-media/
 *.tsbuildinfo
 
 graphify-out/
+/config.toml

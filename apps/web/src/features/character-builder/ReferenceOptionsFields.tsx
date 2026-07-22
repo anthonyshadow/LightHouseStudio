@@ -21,7 +21,7 @@ export const DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS: CharacterReferenceOpti
 export interface ReferenceOptionsFieldsProps {
   options: CharacterReferenceOptions;
   disabled?: boolean;
-  onChange(options: CharacterReferenceOptions): void;
+  onChange: (options: CharacterReferenceOptions) => void;
 }
 
 export const ReferenceOptionsFields = ({

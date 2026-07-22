@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { ApiErrorResponse, RealtimeTokenResponse } from '@studio/contracts';
 import { createApp } from '../../app.js';
 import type {
   DecartTokenProvider,
@@ -97,7 +98,7 @@ describe('realtime token API', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().constraints.maxSessionDurationSeconds).toBe(420);
+    expect(response.json<RealtimeTokenResponse>().constraints?.maxSessionDurationSeconds).toBe(420);
     expect(scopes[0]).toMatchObject({
       expiresInSeconds: 300,
       maxSessionDurationSeconds: 420,
@@ -150,6 +151,6 @@ describe('realtime token API', () => {
 
     expect(health.statusCode).toBe(200);
     expect(token.statusCode).toBe(503);
-    expect(token.json().error.code).toBe('feature_unavailable');
+    expect(token.json<ApiErrorResponse>().error.code).toBe('feature_unavailable');
   });
 });

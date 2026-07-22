@@ -41,7 +41,6 @@ const createSession = (
   updatePrompt: vi.fn(),
   updateEnhancement: vi.fn(),
   updateReferenceImage: vi.fn(),
-  updateImage: vi.fn(),
   clearError: vi.fn(),
   ...overrides,
 });

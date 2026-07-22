@@ -20,7 +20,6 @@ export type {
   WorkshopReferenceImage,
 } from './ReferenceImageGenerator';
 export type { WorkshopReferenceOptions } from './referenceOptimization';
-export { hashWorkshopPrompt } from './referencePromptHash';
 export type {
   AdultAge,
   PromptBuilderDraft,

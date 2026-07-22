@@ -10,6 +10,7 @@ import type { VoiceProcessingController } from './types';
 import { StudioDesignProvider } from '../../ui';
 
 const voiceApi = vi.hoisted(() => ({
+  fetchVoicePreview: vi.fn(),
   importPublicVoice: vi.fn(),
   listPublicVoices: vi.fn(),
   listWorkspaceVoices: vi.fn(),
@@ -92,9 +93,13 @@ beforeEach(() => {
   vi.clearAllMocks();
   voiceApi.listWorkspaceVoices.mockResolvedValue(emptyPage);
   voiceApi.listPublicVoices.mockResolvedValue(emptyPage);
+  voiceApi.fetchVoicePreview.mockResolvedValue(new Blob(['preview'], { type: 'audio/mpeg' }));
 });
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.unstubAllGlobals();
+});
 
 describe('VoiceEffectsPanel', () => {
   it('does not browse voices until the user intentionally opens the stacked browser', async () => {
@@ -159,13 +164,16 @@ describe('VoiceLibrary accessibility', () => {
       ...emptyPage,
       voices: [
         {
-          voiceId: 'shared-voice',
-          name: 'Public Star',
-          category: 'featured',
-          description: 'Bright delivery',
-          labels: {},
-          previewAvailable: true,
-          publicOwnerId: 'owner-1',
+          kind: 'public',
+          voice: {
+            voiceId: 'shared-voice',
+            name: 'Public Star',
+            category: 'featured',
+            description: 'Bright delivery',
+            labels: {},
+            previewAvailable: true,
+            publicOwnerId: 'owner-1',
+          },
         },
       ],
       total: 1,
@@ -179,7 +187,14 @@ describe('VoiceLibrary accessibility', () => {
     const importButton = await screen.findByRole('button', {
       name: 'Import Public Star into workspace',
     });
-    expect(screen.getByLabelText('Listen to Public Star preview')).toBeInTheDocument();
+    vi.stubGlobal('URL', {
+      createObjectURL: vi.fn(() => 'blob:voice-preview'),
+      revokeObjectURL: vi.fn(),
+    });
+    await user.click(
+      screen.getByRole('button', { name: 'Load Public Star preview · contacts provider' }),
+    );
+    expect(await screen.findByLabelText('Listen to Public Star preview')).toBeInTheDocument();
 
     await user.click(importButton);
 
@@ -196,13 +211,16 @@ describe('VoiceLibrary accessibility', () => {
     const user = userEvent.setup();
     const onApply = vi.fn();
     const sharedVoice = {
-      voiceId: 'shared-voice',
-      name: 'Public Star',
-      category: 'featured',
-      description: 'Bright delivery',
-      labels: {},
-      previewAvailable: true,
-      publicOwnerId: 'owner-1',
+      kind: 'public' as const,
+      voice: {
+        voiceId: 'shared-voice',
+        name: 'Public Star',
+        category: 'featured',
+        description: 'Bright delivery',
+        labels: {},
+        previewAvailable: true,
+        publicOwnerId: 'owner-1',
+      },
     };
     voiceApi.listPublicVoices.mockResolvedValue({
       ...emptyPage,
@@ -223,7 +241,14 @@ describe('VoiceLibrary accessibility', () => {
     await user.click(screen.getByRole('button', { name: 'Add & Apply Public Star' }));
 
     await waitFor(() =>
-      expect(onApply).toHaveBeenCalledWith({ ...sharedVoice, voiceId: 'workspace-voice' }),
+      expect(onApply).toHaveBeenCalledWith({
+        voiceId: 'workspace-voice',
+        name: 'Public Star',
+        category: 'featured',
+        description: 'Bright delivery',
+        labels: {},
+        previewAvailable: true,
+      }),
     );
     expect(voiceApi.importPublicVoice).toHaveBeenCalledTimes(1);
   });

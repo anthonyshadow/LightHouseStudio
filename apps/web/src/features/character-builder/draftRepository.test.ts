@@ -128,6 +128,7 @@ class FakeTransaction extends FakeEventSource {
 
 class FakeDatabase extends FakeEventSource {
   private hasStore = false;
+  closeCount = 0;
   readonly objectStoreNames = {
     contains: (name: string) => this.hasStore && name === CHARACTER_BUILDER_DRAFT_STORE,
   } as unknown as DOMStringList;
@@ -146,7 +147,13 @@ class FakeDatabase extends FakeEventSource {
     return new FakeTransaction(this.values) as unknown as IDBTransaction;
   }
 
-  close() {}
+  close() {
+    this.closeCount += 1;
+  }
+
+  simulateVersionChange() {
+    this.emit('versionchange');
+  }
 }
 
 const fakeIndexedDb = (plannedOpenFailures = 0) => {
@@ -155,6 +162,7 @@ const fakeIndexedDb = (plannedOpenFailures = 0) => {
   let failuresRemaining = plannedOpenFailures;
   return {
     values,
+    database,
     factory: {
       open: () => {
         const request = new FakeRequest<IDBDatabase>();
@@ -174,6 +182,19 @@ const fakeIndexedDb = (plannedOpenFailures = 0) => {
         }
         return request as unknown as IDBOpenDBRequest;
       },
+    } as unknown as IDBFactory,
+  };
+};
+
+const delayedIndexedDb = () => {
+  const values = new Map<string, unknown>();
+  const database = new FakeDatabase(values);
+  const request = new FakeRequest<IDBDatabase>();
+  return {
+    database,
+    request,
+    factory: {
+      open: () => request as unknown as IDBOpenDBRequest,
     } as unknown as IDBFactory,
   };
 };
@@ -266,6 +287,36 @@ describe('createCharacterBuilderDraftRepository', () => {
     await expect(reset).resolves.toBeUndefined();
     await expect(reopened.load()).resolves.toBeNull();
     reopened.close();
+  });
+
+  it('closes a database that opens after the repository has closed', async () => {
+    const indexedDb = delayedIndexedDb();
+    const repository = createCharacterBuilderDraftRepository<TestDraft>({
+      indexedDB: indexedDb.factory,
+      databaseName: 'late-open-draft-test',
+      sanitizeDraft,
+    });
+
+    const load = repository.load();
+    repository.close();
+    indexedDb.request.succeed(indexedDb.database as unknown as IDBDatabase);
+
+    await expect(load).rejects.toMatchObject({ code: 'closed' });
+    expect(indexedDb.database.closeCount).toBe(1);
+  });
+
+  it('closes its durable database when another version is requested', async () => {
+    const indexedDb = fakeIndexedDb();
+    const repository = createCharacterBuilderDraftRepository<TestDraft>({
+      indexedDB: indexedDb.factory,
+      databaseName: 'versionchange-draft-test',
+      sanitizeDraft,
+    });
+
+    await repository.load();
+    indexedDb.database.simulateVersionChange();
+
+    expect(indexedDb.database.closeCount).toBe(1);
   });
 
   it('flushes the complete session draft when durable storage becomes available', async () => {

@@ -1,7 +1,7 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { Button } from '../../ui';
-import type { VoiceSummary } from './types';
-import type { VoiceLibraryKind } from './types';
+import type { PublicVoiceItem, VoiceLibraryItem, VoiceLibraryKind } from './types';
+import { VoicePreview } from './VoicePreview';
 
 const listStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -25,31 +25,22 @@ const voiceStyles = (theme: Theme, selected: boolean): CSSObject => ({
 });
 
 const voiceBodyStyles = (): CSSObject => ({ minWidth: 0 });
-const audioStyles = (): CSSObject => ({ width: '100%', maxWidth: '100%' });
 const voiceActionStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.xs,
   alignContent: 'start',
 });
 
-const previewUrl = (voice: VoiceSummary, kind: VoiceLibraryKind): string | null => {
-  if (!voice.previewAvailable) return null;
-  if (kind === 'public' && voice.publicOwnerId) {
-    return `/api/elevenlabs/shared-voices/${encodeURIComponent(voice.publicOwnerId)}/${encodeURIComponent(voice.voiceId)}/preview`;
-  }
-  return `/api/elevenlabs/voices/${encodeURIComponent(voice.voiceId)}/preview`;
-};
-
 type VoiceListProps = {
-  voices: readonly VoiceSummary[];
+  voices: readonly VoiceLibraryItem[];
   kind: VoiceLibraryKind;
-  selected: VoiceSummary | null;
+  selected: VoiceLibraryItem | null;
   loading: boolean;
   importingVoiceKey: string | null;
   collapsePublicImport?: boolean;
-  onSelect(voice: VoiceSummary): void;
-  onImport(voice: VoiceSummary): void;
-  onPreviewError(voice: VoiceSummary): void;
+  onSelect: (voice: VoiceLibraryItem) => void;
+  onImport: (voice: PublicVoiceItem) => void;
+  onPreviewError: (voice: VoiceLibraryItem) => void;
 };
 
 export const VoiceList = ({
@@ -66,25 +57,20 @@ export const VoiceList = ({
   const theme = useTheme();
   return (
     <ul aria-label="Available voices" aria-busy={loading} css={listStyles(theme)}>
-      {voices.map((voice) => {
-        const preview = previewUrl(voice, kind);
-        const voiceSelected = selected?.voiceId === voice.voiceId;
-        const voiceKey = `${voice.publicOwnerId ?? 'workspace'}:${voice.voiceId}`;
+      {voices.map((item) => {
+        const { voice } = item;
+        const voiceSelected =
+          selected?.kind === item.kind && selected.voice.voiceId === voice.voiceId;
+        const voiceKey =
+          item.kind === 'public'
+            ? `public:${item.voice.publicOwnerId}:${item.voice.voiceId}`
+            : `workspace:${voice.voiceId}`;
         return (
           <li key={voiceKey} css={voiceStyles(theme, voiceSelected)}>
             <div css={voiceBodyStyles()}>
               <h4>{voice.name}</h4>
               <p>{voice.description ?? voice.category ?? 'Voice preview'}</p>
-              {preview ? (
-                <audio
-                  controls
-                  preload="none"
-                  src={preview}
-                  aria-label={`Listen to ${voice.name} preview`}
-                  css={audioStyles()}
-                  onError={() => onPreviewError(voice)}
-                />
-              ) : null}
+              <VoicePreview item={item} onError={onPreviewError} />
             </div>
             <div css={voiceActionStyles(theme)}>
               <Button
@@ -92,17 +78,17 @@ export const VoiceList = ({
                 variant="quiet"
                 aria-label={`${voiceSelected ? 'Selected' : 'Select'} ${voice.name}`}
                 aria-pressed={voiceSelected}
-                onClick={() => onSelect(voice)}
+                onClick={() => onSelect(item)}
               >
                 {voiceSelected ? 'Selected' : 'Select'}
               </Button>
-              {kind === 'public' && !collapsePublicImport ? (
+              {kind === 'public' && item.kind === 'public' && !collapsePublicImport ? (
                 <Button
                   size="small"
                   busy={importingVoiceKey === voiceKey}
                   disabled={importingVoiceKey !== null}
                   aria-label={`Import ${voice.name} into workspace`}
-                  onClick={() => onImport(voice)}
+                  onClick={() => onImport(item)}
                 >
                   Import
                 </Button>

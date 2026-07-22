@@ -1,26 +1,30 @@
 import { useTheme } from '@emotion/react';
-import type { RefObject } from 'react';
+import type { ModelModeId } from '@studio/domain';
+import { lazy, Suspense, type RefObject } from 'react';
+import type {
+  ActiveRecipeIdentity,
+  RecipeSelection,
+} from '../features/creative-assets/RecipeShelf.types';
 import {
-  RecipeShelfView,
   useRecipeShelfController,
-  type CreativeAssetRepository,
-  type ActiveRecipeIdentity,
-  type RecipeSelection,
   type RecipeShelfController,
-  type SavedCharacterPrompt,
-} from '../features/creative-assets';
+} from '../features/creative-assets/useRecipeShelfController';
+import type {
+  CreativeAssetRepository,
+  SavedCharacterPrompt,
+} from '../features/creative-assets/types';
 import type { StudioMode } from '../features/media-session';
-import {
-  CharacterPromptWorkshop,
-  type OptimizeWorkshopReferencePrompt,
-  type PromptBuilderDraft,
-  type PromptIntent,
-  type PromptWorkshopAction,
-  type ReferenceGenerationState,
-  type SavePromptWorkshopAction,
-  type WorkshopReferenceImage,
-  type WorkshopReferenceGenerationInput,
-} from '../features/prompt-authoring';
+import type {
+  OptimizeWorkshopReferencePrompt,
+  PromptWorkshopAction,
+  SavePromptWorkshopAction,
+  WorkshopReferenceGenerationInput,
+} from '../features/prompt-authoring/CharacterPromptWorkshop';
+import type {
+  ReferenceGenerationState,
+  WorkshopReferenceImage,
+} from '../features/prompt-authoring/ReferenceImageGenerator';
+import type { PromptBuilderDraft, PromptIntent } from '../features/prompt-authoring/model';
 import { Button, OverlayPanel, SegmentedControl, StatusNotice } from '../ui';
 import {
   creativeOverlayContentStyles,
@@ -28,21 +32,32 @@ import {
   toolRailStyles,
 } from './StudioApp.styles';
 
+const CharacterPromptWorkshop = lazy(() =>
+  import('../features/prompt-authoring/CharacterPromptWorkshop').then((module) => ({
+    default: module.CharacterPromptWorkshop,
+  })),
+);
+const RecipeShelfView = lazy(() =>
+  import('../features/creative-assets/RecipeShelf').then((module) => ({
+    default: module.RecipeShelfView,
+  })),
+);
+const deferredWorkspaceFallback = <p role="status">Loading studio tool…</p>;
+
 export type AuxiliaryPanel = 'closed' | 'workshop' | 'shelf';
-export type ModelMode = 'lucy-2.5' | 'lucy-vton-3';
+export type ModelMode = ModelModeId;
 
 const libraryModeOptions = [
   { value: 'lucy-2.5', label: 'Character recipes', shortLabel: 'Character' },
   { value: 'lucy-vton-3', label: 'Try-on recipes', shortLabel: 'Try-On' },
 ] as const;
 
-type CreativeWorkspaceProps = {
+export type CreativeWorkspaceState = {
   panel: AuxiliaryPanel;
   activeSessionMode: StudioMode;
   libraryMode: ModelMode;
   workshopDraft?: PromptBuilderDraft | undefined;
   workshopDrafts: Partial<Record<PromptIntent, PromptBuilderDraft>>;
-  repository: CreativeAssetRepository;
   recordingActive: boolean;
   sessionModeLocked: boolean;
   recipeInsertionBlocked: boolean;
@@ -56,38 +71,56 @@ type CreativeWorkspaceProps = {
   referenceUsePending: boolean;
   referenceUseFailure: {
     message: string;
-    onRetry(): void;
-    onContinueWithoutReference(): void;
+    onRetry: () => void;
+    onContinueWithoutReference: () => void;
   } | null;
+  legacyProjectCount?: number | undefined;
+  activeRecipe?: ActiveRecipeIdentity | undefined;
+  hasTake: boolean;
+};
+
+export type CreativeWorkspaceActions = {
+  onOpenDock: () => void;
+  onOpenTake: () => void;
+  onOpenWorkshop: () => void;
+  onToggleShelf: () => void;
+  onClose: (source: Exclude<AuxiliaryPanel, 'closed'>) => void;
+  onLibraryModeChange: (mode: ModelMode) => void;
+  onWorkshopDraftChange: (draft: PromptBuilderDraft) => void;
+  onUseWorkshop: (action: PromptWorkshopAction) => void;
+  onSaveWorkshop: (action: SavePromptWorkshopAction) => void;
+  onOptimizeReference: OptimizeWorkshopReferencePrompt;
+  onGenerateReference: (
+    input: WorkshopReferenceGenerationInput,
+    signal: AbortSignal,
+  ) => void | Promise<void>;
+  onDetachReference: () => void;
+  onRetryReferenceRestore?: (() => void) | undefined;
+  onShelfDirtyChange: (dirty: boolean) => void;
+  onUseRecipe: (selection: RecipeSelection) => void;
+  onOpenSavedWorkshop: (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => void;
+  onOpenLegacyProjects?: (() => void) | undefined;
+};
+
+export type CreativeWorkspaceRefs = {
   workshopToggleRef: RefObject<HTMLButtonElement | null>;
   shelfToggleRef: RefObject<HTMLButtonElement | null>;
   dockToggleRef: RefObject<HTMLButtonElement | null>;
   takeToggleRef: RefObject<HTMLButtonElement | null>;
   legacyManagerToggleRef?: RefObject<HTMLButtonElement | null> | undefined;
-  legacyProjectCount?: number | undefined;
-  activeRecipe?: ActiveRecipeIdentity | undefined;
-  hasTake: boolean;
-  onOpenDock(): void;
-  onOpenTake(): void;
-  onOpenWorkshop(): void;
-  onToggleShelf(): void;
-  onClose(source: Exclude<AuxiliaryPanel, 'closed'>): void;
-  onLibraryModeChange(mode: ModelMode): void;
-  onWorkshopDraftChange(draft: PromptBuilderDraft): void;
-  onUseWorkshop(action: PromptWorkshopAction): void;
-  onSaveWorkshop(action: SavePromptWorkshopAction): void;
-  onOptimizeReference: OptimizeWorkshopReferencePrompt;
-  onGenerateReference(input: WorkshopReferenceGenerationInput): void | Promise<void>;
-  onDetachReference(): void;
-  onRetryReferenceRestore?: (() => void) | undefined;
-  onShelfDirtyChange(dirty: boolean): void;
-  onUseRecipe(selection: RecipeSelection): void;
-  onOpenSavedWorkshop(draft: PromptBuilderDraft, asset: SavedCharacterPrompt): void;
-  onOpenLegacyProjects?(): void;
+};
+
+type CreativeWorkspaceProps = {
+  repository: CreativeAssetRepository;
+  state: CreativeWorkspaceState;
+  actions: CreativeWorkspaceActions;
+  refs: CreativeWorkspaceRefs;
 };
 
 export type CreativePanelContentProps = Pick<
-  CreativeWorkspaceProps,
+  CreativeWorkspaceState &
+    CreativeWorkspaceActions &
+    CreativeWorkspaceRefs & { repository: CreativeAssetRepository },
   | 'libraryMode'
   | 'workshopDraft'
   | 'workshopDrafts'
@@ -174,25 +207,27 @@ export const CreativePanelContent = ({
       ]}
     >
       {panel === 'workshop' ? (
-        <CharacterPromptWorkshop
-          initialDraft={workshopDraft}
-          initialDrafts={workshopDrafts}
-          hasReferenceImage={hasReferenceImage}
-          generatedReferenceImage={workshopReferenceImage}
-          referenceGeneration={referenceGeneration}
-          referenceImagesAvailable={referenceImagesAvailable}
-          referenceImageModel={referenceImageModel}
-          optimizerModel={optimizerModel}
-          optimizerVersion={optimizerVersion}
-          disabled={recordingActive || referenceUsePending}
-          onDraftChange={onWorkshopDraftChange}
-          onUse={onUseWorkshop}
-          onSave={onSaveWorkshop}
-          onOptimizeReference={onOptimizeReference}
-          onGenerateReference={onGenerateReference}
-          onDetachReference={onDetachReference}
-          {...(onRetryReferenceRestore ? { onRetryReferenceRestore } : {})}
-        />
+        <Suspense fallback={deferredWorkspaceFallback}>
+          <CharacterPromptWorkshop
+            initialDraft={workshopDraft}
+            initialDrafts={workshopDrafts}
+            hasReferenceImage={hasReferenceImage}
+            generatedReferenceImage={workshopReferenceImage}
+            referenceGeneration={referenceGeneration}
+            referenceImagesAvailable={referenceImagesAvailable}
+            referenceImageModel={referenceImageModel}
+            optimizerModel={optimizerModel}
+            optimizerVersion={optimizerVersion}
+            disabled={recordingActive || referenceUsePending}
+            onDraftChange={onWorkshopDraftChange}
+            onUse={onUseWorkshop}
+            onSave={onSaveWorkshop}
+            onOptimizeReference={onOptimizeReference}
+            onGenerateReference={onGenerateReference}
+            onDetachReference={onDetachReference}
+            {...(onRetryReferenceRestore ? { onRetryReferenceRestore } : {})}
+          />
+        </Suspense>
       ) : (
         <>
           <div css={libraryModeStyles(theme)}>
@@ -220,17 +255,19 @@ export const CreativePanelContent = ({
               </Button>
             ) : null}
           </div>
-          <RecipeShelfView
-            activeMode={libraryMode}
-            embedded
-            promptUseDisabled={recipeInsertionBlocked || referenceUsePending}
-            repository={repository}
-            controller={shelfController}
-            {...(activeRecipe !== undefined ? { activeRecipe } : {})}
-            onDirtyChange={onShelfDirtyChange}
-            onUsePrompt={onUseRecipe}
-            onOpenCharacterWorkshop={onOpenSavedWorkshop}
-          />
+          <Suspense fallback={deferredWorkspaceFallback}>
+            <RecipeShelfView
+              activeMode={libraryMode}
+              embedded
+              promptUseDisabled={recipeInsertionBlocked || referenceUsePending}
+              repository={repository}
+              controller={shelfController}
+              {...(activeRecipe !== undefined ? { activeRecipe } : {})}
+              onDirtyChange={onShelfDirtyChange}
+              onUsePrompt={onUseRecipe}
+              onOpenCharacterWorkshop={onOpenSavedWorkshop}
+            />
+          </Suspense>
         </>
       )}
       {referenceUseFailure ? (
@@ -261,51 +298,55 @@ export const CreativePanelContent = ({
   );
 };
 
-export const CreativeWorkspace = ({
-  panel,
-  activeSessionMode,
-  libraryMode,
-  workshopDraft,
-  workshopDrafts,
-  repository,
-  recordingActive,
-  sessionModeLocked,
-  recipeInsertionBlocked,
-  hasReferenceImage,
-  workshopReferenceImage,
-  referenceGeneration,
-  referenceImagesAvailable,
-  referenceImageModel = null,
-  optimizerModel,
-  optimizerVersion,
-  referenceUsePending,
-  referenceUseFailure,
-  workshopToggleRef,
-  shelfToggleRef,
-  dockToggleRef,
-  takeToggleRef,
-  legacyManagerToggleRef,
-  legacyProjectCount = 0,
-  activeRecipe,
-  hasTake,
-  onOpenDock,
-  onOpenTake,
-  onOpenWorkshop,
-  onToggleShelf,
-  onClose,
-  onLibraryModeChange,
-  onWorkshopDraftChange,
-  onUseWorkshop,
-  onSaveWorkshop,
-  onOptimizeReference,
-  onGenerateReference,
-  onDetachReference,
-  onRetryReferenceRestore,
-  onShelfDirtyChange,
-  onUseRecipe,
-  onOpenSavedWorkshop,
-  onOpenLegacyProjects,
-}: CreativeWorkspaceProps) => {
+export const CreativeWorkspace = ({ repository, state, actions, refs }: CreativeWorkspaceProps) => {
+  const {
+    panel,
+    activeSessionMode,
+    libraryMode,
+    workshopDraft,
+    workshopDrafts,
+    recordingActive,
+    sessionModeLocked,
+    recipeInsertionBlocked,
+    hasReferenceImage,
+    workshopReferenceImage,
+    referenceGeneration,
+    referenceImagesAvailable,
+    referenceImageModel = null,
+    optimizerModel,
+    optimizerVersion,
+    referenceUsePending,
+    referenceUseFailure,
+    legacyProjectCount = 0,
+    activeRecipe,
+    hasTake,
+  } = state;
+  const {
+    onOpenDock,
+    onOpenTake,
+    onOpenWorkshop,
+    onToggleShelf,
+    onClose,
+    onLibraryModeChange,
+    onWorkshopDraftChange,
+    onUseWorkshop,
+    onSaveWorkshop,
+    onOptimizeReference,
+    onGenerateReference,
+    onDetachReference,
+    onRetryReferenceRestore,
+    onShelfDirtyChange,
+    onUseRecipe,
+    onOpenSavedWorkshop,
+    onOpenLegacyProjects,
+  } = actions;
+  const {
+    workshopToggleRef,
+    shelfToggleRef,
+    dockToggleRef,
+    takeToggleRef,
+    legacyManagerToggleRef,
+  } = refs;
   const theme = useTheme();
   const characterWorkshopBlocked =
     recordingActive || (activeSessionMode !== 'lucy-2.5' && sessionModeLocked);

@@ -42,7 +42,10 @@ const result: CharacterPromptOptimizationResult = {
 };
 
 const createOptimizer = (
-  parse: (parameters: OpenAICharacterPromptOptimizerParameters) => Promise<{
+  parse: (
+    parameters: OpenAICharacterPromptOptimizerParameters,
+    options?: { readonly signal?: AbortSignal },
+  ) => Promise<{
     output_parsed: CharacterPromptOptimizationResult | null;
     output?: readonly {
       readonly type?: string;
@@ -74,7 +77,8 @@ describe('OpenAICharacterPromptOptimizer', () => {
       return Promise.resolve({ output_parsed: result });
     });
 
-    await expect(optimizer.optimize(input)).resolves.toEqual(result);
+    const signal = new AbortController().signal;
+    await expect(optimizer.optimize(input, signal)).resolves.toEqual(result);
 
     expect(factory).toHaveBeenCalledWith({
       apiKey: 'server-secret',
@@ -117,9 +121,14 @@ describe('OpenAICharacterPromptOptimizer', () => {
       Promise.resolve({ output_parsed: { ...result, optimizedImagePrompt: '   ' } }),
     ).optimizer;
 
-    await expect(refusal.optimize(input)).rejects.toMatchObject({ reason: 'refusal' });
-    await expect(missing.optimize(input)).rejects.toMatchObject({ reason: 'invalid-response' });
-    await expect(malformed.optimize(input)).rejects.toMatchObject({ reason: 'invalid-response' });
+    const signal = new AbortController().signal;
+    await expect(refusal.optimize(input, signal)).rejects.toMatchObject({ reason: 'refusal' });
+    await expect(missing.optimize(input, signal)).rejects.toMatchObject({
+      reason: 'invalid-response',
+    });
+    await expect(malformed.optimize(input, signal)).rejects.toMatchObject({
+      reason: 'invalid-response',
+    });
   });
 
   it('normalizes connection, timeout, HTTP, and unknown failures', async () => {
@@ -139,10 +148,39 @@ describe('OpenAICharacterPromptOptimizer', () => {
 
     for (const failure of failures) {
       const optimizer = createOptimizer(() => Promise.reject(failure.error)).optimizer;
-      const error = await optimizer.optimize(input).catch((caught: unknown) => caught);
+      const error = await optimizer
+        .optimize(input, new AbortController().signal)
+        .catch((caught: unknown) => caught);
       expect(error).toBeInstanceOf(CharacterPromptOptimizerError);
       expect(error).toMatchObject({ reason: failure.reason });
     }
+  });
+
+  it('passes caller cancellation to Responses and classifies it separately from timeout', async () => {
+    const parse = vi.fn(
+      (
+        _parameters: OpenAICharacterPromptOptimizerParameters,
+        options?: { readonly signal?: AbortSignal },
+      ) =>
+        new Promise<{ readonly output_parsed: CharacterPromptOptimizationResult | null }>(
+          (_resolve, reject) => {
+            options?.signal?.addEventListener(
+              'abort',
+              () => reject(new DOMException('cancelled', 'AbortError')),
+              { once: true },
+            );
+          },
+        ),
+    );
+    const optimizer = createOptimizer(parse).optimizer;
+    const controller = new AbortController();
+
+    const pending = optimizer.optimize(input, controller.signal);
+    await vi.waitFor(() => expect(parse).toHaveBeenCalledOnce());
+    expect(parse.mock.calls[0]?.[1]).toEqual({ signal: controller.signal });
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ reason: 'aborted' });
   });
 
   it.each([
@@ -216,7 +254,10 @@ describe('OpenAICharacterPromptOptimizer', () => {
       Promise.resolve({ output_parsed: fixtureResult }),
     ).optimizer;
 
-    const optimized = await optimizer.optimize({ ...input, rawPrompt });
+    const optimized = await optimizer.optimize(
+      { ...input, rawPrompt },
+      new AbortController().signal,
+    );
     expect(optimized.preservedCharacterFacts).toEqual(facts);
     expect(optimized.warnings).toEqual(warnings);
     expect(optimized).toEqual(fixtureResult);

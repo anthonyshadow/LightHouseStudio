@@ -7,7 +7,7 @@ import {
   normalizeTags,
   normalizeWhitespace,
 } from '../common/text';
-import { DomainRuleError } from '../errors/safe-error';
+import { AssetRuleError, type AssetRuleErrorReason } from './errors';
 import type { ModelModeId } from '../session';
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
@@ -31,10 +31,14 @@ export const createEmptyCreativeAssetStore = (): CreativeAssetStore => ({
   savedCharacterPrompts: [],
 });
 
-const requireName = (value: string, label: string): string => {
+const requireName = (
+  value: string,
+  label: string,
+  reason: AssetRuleErrorReason = 'invalid-name',
+): string => {
   const name = normalizeWhitespace(value, ASSET_NAME_MAX_LENGTH);
   if (!containsMeaningfulText(name)) {
-    throw new DomainRuleError('invalid-input', `${label} needs a useful name.`);
+    throw new AssetRuleError(reason, `${label} needs a useful name.`);
   }
   return name;
 };
@@ -42,7 +46,7 @@ const requireName = (value: string, label: string): string => {
 const requirePrompt = (value: string): string => {
   const prompt = normalizeAuthoredPrompt(value);
   if (!containsMeaningfulText(prompt)) {
-    throw new DomainRuleError('invalid-input', 'A saved prompt cannot be empty.');
+    throw new AssetRuleError('invalid-prompt', 'A saved prompt cannot be empty.');
   }
   return prompt;
 };
@@ -51,7 +55,7 @@ const normalizeReferenceImageAssetId = (value: string | null | undefined): strin
   if (value == null) return null;
   const assetId = normalizeWhitespace(value, 128);
   if (!containsMeaningfulText(assetId)) {
-    throw new DomainRuleError('invalid-input', 'A reference image asset ID cannot be empty.');
+    throw new AssetRuleError('invalid-id', 'A reference image asset ID cannot be empty.');
   }
   return assetId;
 };
@@ -59,7 +63,7 @@ const normalizeReferenceImageAssetId = (value: string | null | undefined): strin
 const assertTimestamp = (value: string): string => {
   const date = new Date(value);
   if (!Number.isFinite(date.valueOf())) {
-    throw new DomainRuleError('invalid-input', 'A valid timestamp is required.');
+    throw new AssetRuleError('invalid-id', 'A valid timestamp is required.');
   }
   return date.toISOString();
 };
@@ -88,7 +92,7 @@ export const createSavedPrompt = (
 ): CreativeAssetStore => {
   const now = assertTimestamp(context.now);
   const asset: SavedPrompt = {
-    id: requireName(context.createId(), 'Asset'),
+    id: requireName(context.createId(), 'Asset', 'invalid-id'),
     title: requireName(input.title, 'Saved prompt'),
     prompt: requirePrompt(input.prompt),
     modelModeId: input.modelModeId,
@@ -137,7 +141,7 @@ export const updateSavedPrompt = (
       updatedAt: now,
     };
   });
-  if (!found) throw new DomainRuleError('invalid-input', 'Saved prompt was not found.');
+  if (!found) throw new AssetRuleError('not-found', 'Saved prompt was not found.');
   const updated = savedPrompts.find((asset) => asset.id === id);
   return {
     ...store,
@@ -167,7 +171,7 @@ export const useSavedPrompt = (
 ): { readonly store: CreativeAssetStore; readonly prompt: string } => {
   const now = assertTimestamp(nowValue);
   const asset = store.savedPrompts.find((candidate) => candidate.id === id);
-  if (!asset) throw new DomainRuleError('invalid-input', 'Saved prompt was not found.');
+  if (!asset) throw new AssetRuleError('not-found', 'Saved prompt was not found.');
   return {
     prompt: asset.prompt,
     store: {
@@ -218,7 +222,7 @@ export const recordSuccessfulPromptUse = (
       recent.referenceImageAssetId === referenceImageAssetId,
   );
   const recent: RecentPrompt = {
-    id: existingRecent?.id ?? requireName(context.createId(), 'Recent prompt'),
+    id: existingRecent?.id ?? requireName(context.createId(), 'Recent prompt', 'invalid-id'),
     prompt,
     modelModeId: input.modelModeId,
     ...(matchingSaved ? { savedPromptId: matchingSaved.id } : {}),
@@ -292,7 +296,7 @@ export const createSavedCharacterPrompt = (
 ): CreativeAssetStore => {
   const now = assertTimestamp(context.now);
   const asset: SavedCharacterPrompt = {
-    id: requireName(context.createId(), 'Character asset'),
+    id: requireName(context.createId(), 'Character asset', 'invalid-id'),
     name: requireName(input.name, 'Character prompt'),
     prompt: requirePrompt(input.prompt),
     source: input.source,
@@ -412,7 +416,7 @@ export const updateSavedCharacterPrompt = (
       updatedAt: now,
     };
   });
-  if (!found) throw new DomainRuleError('invalid-input', 'Character prompt was not found.');
+  if (!found) throw new AssetRuleError('not-found', 'Character prompt was not found.');
   return { ...store, savedCharacterPrompts };
 };
 
@@ -436,7 +440,7 @@ export const useSavedCharacterPrompt = (
 } => {
   const now = assertTimestamp(nowValue);
   const asset = store.savedCharacterPrompts.find((candidate) => candidate.id === id);
-  if (!asset) throw new DomainRuleError('invalid-input', 'Character prompt was not found.');
+  if (!asset) throw new AssetRuleError('not-found', 'Character prompt was not found.');
   return {
     prompt: asset.prompt,
     builderDraft: asset.builderDraft,

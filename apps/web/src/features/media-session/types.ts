@@ -61,24 +61,22 @@ export type StudioSessionController = {
   liveSeconds: number;
   generationSeconds: number;
   applying: boolean;
-  startLocal(): Promise<void>;
-  preflight(): Promise<void>;
-  startModel(): Promise<void>;
-  applyChanges(): Promise<void>;
-  revertDraft(): void;
-  stopModel(): void;
-  resetModel(): void;
-  stopCamera(): void;
-  releaseForRecordedReview(): Promise<void>;
-  selectMode(mode: StudioMode): boolean;
-  canReplaceRecipeDraft(mode: StudioMode): boolean;
-  replaceRecipeDraft(replacement: RecipeDraftReplacement): boolean;
-  updatePrompt(prompt: string): void;
-  updateEnhancement(enhance: boolean): void;
-  updateReferenceImage(referenceImage: SessionReferenceImage | null): void;
-  /** @deprecated Use updateReferenceImage with the discriminated reference shape. */
-  updateImage(image: File | null, previewUrl: string | null): void;
-  clearError(): void;
+  startLocal: () => Promise<void>;
+  preflight: () => Promise<void>;
+  startModel: () => Promise<void>;
+  applyChanges: () => Promise<void>;
+  revertDraft: () => void;
+  stopModel: () => void;
+  resetModel: () => void;
+  stopCamera: () => void;
+  releaseForRecordedReview: () => Promise<void>;
+  selectMode: (mode: StudioMode) => boolean;
+  canReplaceRecipeDraft: (mode: StudioMode) => boolean;
+  replaceRecipeDraft: (replacement: RecipeDraftReplacement) => boolean;
+  updatePrompt: (prompt: string) => void;
+  updateEnhancement: (enhance: boolean) => void;
+  updateReferenceImage: (referenceImage: SessionReferenceImage | null) => void;
+  clearError: () => void;
 };
 
 export const isModelMode = (mode: StudioMode): mode is ModelMode => mode !== 'local';
@@ -95,14 +93,6 @@ export const createEmptyDraft = (mode: StudioMode): SessionDraft => ({
   referenceImage: null,
   enhance: false,
 });
-
-export const referenceFile = (reference: SessionReferenceImage | null): File | null =>
-  reference?.file ?? null;
-
-export const referencePreviewUrl = (reference: SessionReferenceImage | null): string | null => {
-  if (!reference) return null;
-  return reference.kind === 'persisted' ? reference.contentUrl : reference.previewUrl;
-};
 
 export const persistedReferenceAssetId = (
   reference: SessionReferenceImage | null,

@@ -5,8 +5,12 @@ import path from 'node:path';
 import sharp from 'sharp';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
+  ApiErrorResponse,
+  CapabilitiesResponse,
   CharacterPromptOptimizationResult,
   CreateReferenceImageRequest,
+  CreateReferenceImageResponse,
+  EditReferenceImageResponse,
   OptimizeCharacterReferencePromptResponse,
 } from '@studio/contracts';
 import { createApp } from '../../app.js';
@@ -26,6 +30,13 @@ import { LocalReferenceImageAssetStore } from './asset-store.js';
 const localHeaders = { origin: 'http://localhost:5173', host: 'localhost:5173' };
 const requestId = '37d15fec-43a3-47b2-8330-7fb410698564';
 const secondRequestId = '5f43d16c-81b7-445a-a70e-35a64a597086';
+
+const record = (value: unknown): Record<string, unknown> => {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
+    throw new TypeError('Expected a JSON object.');
+  }
+  return value as Record<string, unknown>;
+};
 
 const options = {
   framing: 'head_and_shoulders',
@@ -145,7 +156,7 @@ describe('reference image API', () => {
       format: 'jpeg',
     });
     expect(providerInputs[0]?.signal).toBeInstanceOf(AbortSignal);
-    expect(generated.json().asset).toMatchObject({
+    expect(generated.json<CreateReferenceImageResponse>().asset).toMatchObject({
       optimizationEnabled: true,
       originalPrompt: 'A moss-covered guardian.',
       optimizedImagePrompt: optimizedResult.optimizedImagePrompt,
@@ -228,7 +239,7 @@ describe('reference image API', () => {
     };
     const app = await setup(provider, optimizer());
     const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
-    expect(capabilities.json().referenceImages.editAvailable).toBe(true);
+    expect(capabilities.json<CapabilitiesResponse>().referenceImages.editAvailable).toBe(true);
     const rawPrompt = 'A moss-covered guardian.';
     const optimized = await app.inject({
       method: 'POST',
@@ -248,7 +259,7 @@ describe('reference image API', () => {
         optimization: { enabled: true, ...optimization, manuallyEdited: false },
       },
     });
-    const sourceAssetId = sourceResponse.json().asset.assetId as string;
+    const sourceAssetId = sourceResponse.json<CreateReferenceImageResponse>().asset.assetId;
     const changeInstructions = 'Change only the coat to green.';
     const editPayload = {
       requestId: secondRequestId,
@@ -275,14 +286,14 @@ describe('reference image API', () => {
     expect(editInputs[0]?.source.bytes.byteLength).toBeGreaterThan(0);
     expect(editInputs[0]?.prompt).toContain(optimizedResult.optimizedImagePrompt.trim());
     expect(editInputs[0]?.prompt).toContain(changeInstructions);
-    expect(edited.json().asset).toMatchObject({
+    expect(edited.json<EditReferenceImageResponse>().asset).toMatchObject({
       derivation: { kind: 'edit', sourceAssetId },
       originalPrompt: rawPrompt,
       optimizedImagePrompt: optimizedResult.optimizedImagePrompt,
     });
     expect(edited.body).not.toContain(changeInstructions);
     expect(edited.body).not.toContain('provider-edit-one');
-    const editedAssetId = edited.json().asset.assetId as string;
+    const editedAssetId = edited.json<EditReferenceImageResponse>().asset.assetId;
     const dataDirectory = directories[0];
     expect(dataDirectory).toBeDefined();
     const storedMetadata = await readFile(
@@ -297,14 +308,12 @@ describe('reference image API', () => {
       'utf8',
     );
     expect(storedMetadata).not.toContain(changeInstructions);
-    expect(JSON.parse(storedMetadata)).toMatchObject({
-      requestFingerprint: expect.stringMatching(/^[a-f0-9]{64}$/u),
-      derivation: {
-        kind: 'edit',
-        sourceAssetId,
-        changeInstructionsHash: expect.stringMatching(/^[a-f0-9]{64}$/u),
-      },
-    });
+    const storedMetadataJson: unknown = JSON.parse(storedMetadata);
+    const storedMetadataRecord = record(storedMetadataJson);
+    const derivation = record(storedMetadataRecord.derivation);
+    expect(storedMetadataRecord.requestFingerprint).toMatch(/^[a-f0-9]{64}$/u);
+    expect(derivation).toMatchObject({ kind: 'edit', sourceAssetId });
+    expect(derivation.changeInstructionsHash).toMatch(/^[a-f0-9]{64}$/u);
 
     const replay = await app.inject({
       method: 'POST',
@@ -320,7 +329,7 @@ describe('reference image API', () => {
     });
     expect(replay.json()).toEqual(edited.json());
     expect(conflict.statusCode).toBe(409);
-    expect(conflict.json().error.code).toBe('request_id_conflict');
+    expect(conflict.json<ApiErrorResponse>().error.code).toBe('request_id_conflict');
 
     const otherOwner = await app.inject({
       method: 'POST',
@@ -332,7 +341,7 @@ describe('reference image API', () => {
       },
     });
     expect(otherOwner.statusCode).toBe(404);
-    expect(otherOwner.json().error).toMatchObject({
+    expect(otherOwner.json<ApiErrorResponse>().error).toMatchObject({
       code: 'not_found',
       message: 'That local reference image is unavailable.',
     });
@@ -358,7 +367,7 @@ describe('reference image API', () => {
     expect(generated.statusCode).toBe(200);
     expect(inputs[0]?.prompt).toContain('Exactly one character with one clearly visible face');
     expect(inputs[0]?.prompt).toContain('A clockwork character');
-    expect(generated.json().asset).toMatchObject({
+    expect(generated.json<CreateReferenceImageResponse>().asset).toMatchObject({
       optimizationEnabled: false,
       lucy25CharacterPrompt: 'A clockwork character',
       optimizer: null,
@@ -490,7 +499,9 @@ describe('reference image API', () => {
     });
 
     expect(response.statusCode).toBe(200);
-    expect(response.json().result.recommendedSettings).toMatchObject({
+    expect(
+      response.json<OptimizeCharacterReferencePromptResponse>().result.recommendedSettings,
+    ).toMatchObject({
       orientation: 'landscape',
       size: '1536x1024',
     });
@@ -540,7 +551,7 @@ describe('reference image API', () => {
     expect(duplicateResponse.json()).toEqual(firstResponse.json());
     expect(replay.json()).toEqual(firstResponse.json());
     expect(conflict.statusCode).toBe(409);
-    expect(conflict.json().error.code).toBe('request_id_conflict');
+    expect(conflict.json<ApiErrorResponse>().error.code).toBe('request_id_conflict');
     expect(generate).toHaveBeenCalledTimes(1);
   });
 
@@ -607,13 +618,17 @@ describe('reference image API', () => {
     });
 
     expect(failed.statusCode).toBe(502);
-    expect(failed.json().error).toMatchObject({ code: 'provider_failure', upstreamStatus: 502 });
+    expect(failed.json<ApiErrorResponse>().error).toMatchObject({
+      code: 'provider_failure',
+      upstreamStatus: 502,
+    });
     expect(retry.statusCode).toBe(200);
     expect(noOptimizer.statusCode).toBe(503);
-    expect(noOptimizer.json().error.code).toBe('provider_configuration');
+    expect(noOptimizer.json<ApiErrorResponse>().error.code).toBe('provider_configuration');
   });
 
   it.each([
+    ['aborted', 499, 'request_aborted'],
     ['authentication', 502, 'provider_authentication'],
     ['connection', 502, 'provider_failure'],
     ['rate-limit', 429, 'rate_limited'],
@@ -637,7 +652,7 @@ describe('reference image API', () => {
     });
 
     expect(response.statusCode).toBe(status);
-    expect(response.json().error.code).toBe(code);
+    expect(response.json<ApiErrorResponse>().error.code).toBe(code);
     expect(response.body).not.toContain('OpenAI character prompt optimization failed');
   });
 });

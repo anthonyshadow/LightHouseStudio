@@ -18,7 +18,7 @@ type StudioHeaderProps = {
   capabilityState: CapabilityState;
   characterBuilderButtonRef: RefObject<HTMLButtonElement | null>;
   characterBuilderDisabledReason?: string | undefined;
-  onBuildCharacter(): void;
+  onBuildCharacter: () => void;
 };
 
 const capabilityLabel = (

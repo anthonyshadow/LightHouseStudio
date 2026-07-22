@@ -3,6 +3,7 @@
   "compilerOptions": {
     "composite": true,
     "noEmit": true,
+    "lib": ["ES2023"],
     "types": ["vitest/globals"]
   },
   "include": ["src"]

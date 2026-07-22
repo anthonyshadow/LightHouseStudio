@@ -24,14 +24,13 @@ export type SessionDraftState = {
   applied: AppliedRealtimeState | null;
   setApplied: Dispatch<SetStateAction<AppliedRealtimeState | null>>;
   pendingChanges: boolean;
-  selectDraft(mode: StudioMode): void;
-  replaceRecipeDraft(replacement: RecipeDraftReplacement): void;
-  replaceWithEmptyDraft(mode: StudioMode): void;
-  revertDraft(): void;
-  updatePrompt(prompt: string): void;
-  updateEnhancement(enhance: boolean): void;
-  updateReferenceImage(referenceImage: SessionReferenceImage | null): void;
-  updateImage(image: File | null, previewUrl: string | null): void;
+  selectDraft: (mode: StudioMode) => void;
+  replaceRecipeDraft: (replacement: RecipeDraftReplacement) => void;
+  replaceWithEmptyDraft: (mode: StudioMode) => void;
+  revertDraft: () => void;
+  updatePrompt: (prompt: string) => void;
+  updateEnhancement: (enhance: boolean) => void;
+  updateReferenceImage: (referenceImage: SessionReferenceImage | null) => void;
 };
 
 const revokeReference = (referenceImage: SessionReferenceImage | null): void => {
@@ -146,23 +145,6 @@ export const useSessionDraftState = (): SessionDraftState => {
     });
   }, []);
 
-  const updateImage = useCallback(
-    (image: File | null, previewUrl: string | null) => {
-      updateReferenceImage(
-        image
-          ? {
-              kind: 'ephemeral',
-              file: image,
-              previewUrl:
-                previewUrl ??
-                (typeof URL.createObjectURL === 'function' ? URL.createObjectURL(image) : ''),
-            }
-          : null,
-      );
-    },
-    [updateReferenceImage],
-  );
-
   const revertDraft = useCallback(() => {
     if (!applied) return;
     const mode = activeModeRef.current;
@@ -211,7 +193,6 @@ export const useSessionDraftState = (): SessionDraftState => {
       updatePrompt,
       updateEnhancement,
       updateReferenceImage,
-      updateImage,
     }),
     [
       draft,
@@ -223,7 +204,6 @@ export const useSessionDraftState = (): SessionDraftState => {
       updatePrompt,
       updateEnhancement,
       updateReferenceImage,
-      updateImage,
     ],
   );
 };

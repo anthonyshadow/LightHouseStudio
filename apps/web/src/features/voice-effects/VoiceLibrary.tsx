@@ -1,14 +1,14 @@
 import { useEffect, useRef } from 'react';
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
+import type { VoiceSummary } from '@studio/contracts';
 import { Button, SegmentedControl, StatusNotice, TextField } from '../../ui';
 import { VoiceList } from './VoiceList';
-import type { VoiceSummary } from './types';
 import { useVoiceLibrary } from '../../orchestration/voice-library/useVoiceLibrary';
 
 export type VoiceLibraryProps = {
   disabled: boolean;
   collapsePublicImport?: boolean;
-  onApply(voice: VoiceSummary): void;
+  onApply: (voice: VoiceSummary) => void;
 };
 
 const stackStyles = (theme: Theme): CSSObject => ({ display: 'grid', gap: theme.space.sm });
@@ -45,12 +45,12 @@ export const VoiceLibrary = ({
 
   const applySelectedVoice = async () => {
     if (!library.selected) return;
-    if (collapsePublicImport && library.kind === 'public') {
+    if (collapsePublicImport && library.selected.kind === 'public') {
       const importedVoice = await library.importVoice(library.selected);
-      if (importedVoice) onApply(importedVoice);
+      if (importedVoice) onApply(importedVoice.voice);
       return;
     }
-    onApply(library.selected);
+    if (library.selected.kind === 'workspace') onApply(library.selected.voice);
   };
 
   return (
@@ -114,8 +114,8 @@ export const VoiceLibrary = ({
         collapsePublicImport={collapsePublicImport}
         onSelect={library.setSelected}
         onImport={(voice) => void library.importVoice(voice)}
-        onPreviewError={(voice) =>
-          library.setError(`The preview for ${voice.name} could not be played.`)
+        onPreviewError={(item) =>
+          library.setError(`The preview for ${item.voice.name} could not be played.`)
         }
       />
 
@@ -148,8 +148,8 @@ export const VoiceLibrary = ({
           onClick={() => void applySelectedVoice()}
         >
           {collapsePublicImport && library.kind === 'public'
-            ? `Add & Apply ${library.selected.name}`
-            : `Apply ${library.selected.name} to recorded audio`}
+            ? `Add & Apply ${library.selected.voice.name}`
+            : `Apply ${library.selected.voice.name} to recorded audio`}
         </Button>
       ) : null}
       {library.kind === 'public' ? (

@@ -2,10 +2,15 @@
 
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { VoicePage, VoiceSummary } from '../../application/types';
+import type {
+  PublicVoiceItem,
+  PublicVoicePage,
+  WorkspaceVoiceItem,
+  WorkspaceVoicePage,
+} from '../../application/types';
 import { useVoiceLibrary, type VoiceLibraryClient } from './useVoiceLibrary';
 
-const emptyPage = (overrides: Partial<VoicePage> = {}): VoicePage => ({
+const emptyWorkspacePage = (overrides: Partial<WorkspaceVoicePage> = {}): WorkspaceVoicePage => ({
   voices: [],
   hasMore: false,
   nextPageToken: null,
@@ -13,19 +18,30 @@ const emptyPage = (overrides: Partial<VoicePage> = {}): VoicePage => ({
   ...overrides,
 });
 
-const publicVoice: VoiceSummary = {
-  voiceId: 'public-voice',
-  publicOwnerId: 'public-owner',
-  name: 'Studio Narrator',
-  category: 'professional',
-  description: 'A measured narration voice.',
-  labels: { accent: 'neutral' },
-  previewAvailable: true,
+const emptyPublicPage = (overrides: Partial<PublicVoicePage> = {}): PublicVoicePage => ({
+  voices: [],
+  hasMore: false,
+  nextPageToken: null,
+  total: 0,
+  ...overrides,
+});
+
+const publicVoice: PublicVoiceItem = {
+  kind: 'public',
+  voice: {
+    voiceId: 'public-voice',
+    publicOwnerId: 'public-owner',
+    name: 'Studio Narrator',
+    category: 'professional',
+    description: 'A measured narration voice.',
+    labels: { accent: 'neutral' },
+    previewAvailable: true,
+  },
 };
 
 const createClient = (): VoiceLibraryClient => ({
-  listWorkspaceVoices: vi.fn().mockResolvedValue(emptyPage()),
-  listPublicVoices: vi.fn().mockResolvedValue(emptyPage()),
+  listWorkspaceVoices: vi.fn().mockResolvedValue(emptyWorkspacePage()),
+  listPublicVoices: vi.fn().mockResolvedValue(emptyPublicPage()),
   importPublicVoice: vi.fn().mockResolvedValue('workspace-voice'),
 });
 
@@ -51,21 +67,34 @@ describe('useVoiceLibrary', () => {
 
   it('imports a public voice explicitly, selects the workspace copy, and reports success', async () => {
     const client = createClient();
-    vi.mocked(client.listPublicVoices).mockResolvedValue(emptyPage({ voices: [publicVoice] }));
+    vi.mocked(client.listPublicVoices).mockResolvedValue(
+      emptyPublicPage({ voices: [publicVoice] }),
+    );
     const { result } = renderHook(() => useVoiceLibrary(client));
 
     act(() => result.current.changeKind('public'));
     await waitFor(() => expect(result.current.voices).toEqual([publicVoice]));
 
-    let importedVoice: VoiceSummary | null = null;
+    let importedVoice: WorkspaceVoiceItem | null = null;
     await act(async () => {
       importedVoice = await result.current.importVoice(publicVoice);
     });
 
     expect(client.importPublicVoice).toHaveBeenCalledWith(publicVoice, expect.any(AbortSignal));
-    expect(importedVoice).toEqual({ ...publicVoice, voiceId: 'workspace-voice' });
+    const workspaceVoice: WorkspaceVoiceItem = {
+      kind: 'workspace',
+      voice: {
+        voiceId: 'workspace-voice',
+        name: publicVoice.voice.name,
+        category: publicVoice.voice.category,
+        description: publicVoice.voice.description,
+        labels: publicVoice.voice.labels,
+        previewAvailable: publicVoice.voice.previewAvailable,
+      },
+    };
+    expect(importedVoice).toEqual(workspaceVoice);
     expect(result.current.kind).toBe('workspace');
-    expect(result.current.selected).toEqual({ ...publicVoice, voiceId: 'workspace-voice' });
+    expect(result.current.selected).toEqual(workspaceVoice);
     expect(result.current.importSuccess).toContain('imported and is selected');
   });
 
@@ -76,7 +105,7 @@ describe('useVoiceLibrary', () => {
 
     await waitFor(() => expect(result.current.loading).toBe(false));
 
-    let importedVoice: VoiceSummary | null = publicVoice;
+    let importedVoice: WorkspaceVoiceItem | null = null;
     await act(async () => {
       importedVoice = await result.current.importVoice(publicVoice);
     });
@@ -91,7 +120,7 @@ describe('useVoiceLibrary', () => {
     const client = createClient();
     vi.mocked(client.listWorkspaceVoices).mockImplementation((_search, _token, signal) => {
       requestSignal = signal;
-      return new Promise<VoicePage>(() => undefined);
+      return new Promise<WorkspaceVoicePage>(() => undefined);
     });
     const { unmount } = renderHook(() => useVoiceLibrary(client));
 

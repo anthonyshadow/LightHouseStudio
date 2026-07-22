@@ -63,6 +63,8 @@ export const useRecipeShelfController = ({
   const [createKey, setCreateKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
+  const activeRecipeKey = activeRecipe ? `${activeRecipe.origin}:${activeRecipe.assetId}` : null;
+  const [synchronizedActiveRecipeKey, setSynchronizedActiveRecipeKey] = useState(activeRecipeKey);
   const controlledSelection: SelectedRecipeState | null | undefined = activeRecipe
     ? {
         kind: activeRecipe.origin === 'character-prompt' ? 'character' : 'saved',
@@ -90,6 +92,8 @@ export const useRecipeShelfController = ({
   )
     .filter(Boolean)
     .sort((left, right) => left.localeCompare(right, undefined, { sensitivity: 'base' }));
+  const availableTagKey = availableTags.join('\u0000');
+  const [synchronizedAvailableTagKey, setSynchronizedAvailableTagKey] = useState(availableTagKey);
   const matchesTag = (tags: readonly string[]) =>
     !tagFilter ||
     tags.some((tag) => tag.localeCompare(tagFilter, undefined, { sensitivity: 'base' }) === 0);
@@ -114,20 +118,21 @@ export const useRecipeShelfController = ({
 
   useEffect(() => onDirtyChange?.(formDirty), [formDirty, onDirtyChange]);
   useEffect(() => () => onDirtyChange?.(false), [onDirtyChange]);
-  useEffect(() => {
+  if (synchronizedAvailableTagKey !== availableTagKey) {
+    setSynchronizedAvailableTagKey(availableTagKey);
     if (tagFilter && !availableTags.includes(tagFilter)) setTagFilter('');
-  }, [availableTags, tagFilter]);
+  }
 
-  useEffect(() => {
-    if (!activeRecipe) return;
-    setCategory(activeRecipe.origin === 'character-prompt' ? 'characters' : 'saved');
-    setQuery('');
-    setTagFilter('');
-  }, [activeRecipe]);
+  if (synchronizedActiveRecipeKey !== activeRecipeKey) {
+    setSynchronizedActiveRecipeKey(activeRecipeKey);
+    if (activeRecipe) {
+      setCategory(activeRecipe.origin === 'character-prompt' ? 'characters' : 'saved');
+      setQuery('');
+      setTagFilter('');
+    }
+  }
 
-  useEffect(() => {
-    if (!selectedRecipeRemainsVisible) setSelectedRecipe(null);
-  }, [selectedRecipeRemainsVisible]);
+  if (!selectedRecipeRemainsVisible && selectedRecipe) setSelectedRecipe(null);
 
   const canReplaceForm = () =>
     !formDirty ||

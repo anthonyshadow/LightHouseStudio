@@ -11,15 +11,15 @@ export type OwnedLocalMediaController = {
   stream: MediaStream | null;
   streamRef: RefObject<MediaStream | null>;
   currentRequirements: MediaRequirements | null;
-  ensure(requirements: MediaRequirements, operation: number): Promise<MediaStream>;
-  replace(requirements: MediaRequirements, operation: number): Promise<MediaStream>;
-  release(): void;
+  ensure: (requirements: MediaRequirements, operation: number) => Promise<MediaStream>;
+  replace: (requirements: MediaRequirements, operation: number) => Promise<MediaStream>;
+  release: () => void;
 };
 
 export type OwnedLocalMediaOptions = {
   operationRef: RefObject<number>;
-  onMicrophoneEnded(): void;
-  onRequiredTrackEnded(kind: 'audio' | 'video'): void;
+  onMicrophoneEnded: () => void;
+  onRequiredTrackEnded: (kind: 'audio' | 'video') => void;
 };
 
 const requestedDevicesMatch = (stream: MediaStream, requirements: MediaRequirements): boolean => {

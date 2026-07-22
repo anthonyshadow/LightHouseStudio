@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto';
+import { VOICE_PROVIDER_INTENT_HEADER, VOICE_PROVIDER_INTENT_VALUE } from '@studio/contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from './errors.js';
 
@@ -47,6 +48,16 @@ export const requireTrustedOrigin = (request: FastifyRequest): string => {
     );
   }
   return origin;
+};
+
+export const requireVoiceProviderIntent = (request: FastifyRequest): void => {
+  if (request.headers[VOICE_PROVIDER_INTENT_HEADER] !== VOICE_PROVIDER_INTENT_VALUE) {
+    throw new AppError(
+      403,
+      'forbidden_origin',
+      'This voice provider action requires explicit local Studio intent.',
+    );
+  }
 };
 
 /** Opaque, deterministic owner boundary for the exact local Host (including port). */

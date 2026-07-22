@@ -14,9 +14,9 @@ export type TakeDockProps = {
   elevenLabsAvailable: boolean;
   browserCapabilities?: VoiceBrowserCapabilities;
   view?: 'all' | 'take' | 'voice';
-  onCloseTake?(): void;
-  onOpenVoiceTreatments?(): void;
-  onBackToTake?(): void;
+  onCloseTake?: () => void;
+  onOpenVoiceTreatments?: () => void;
+  onBackToTake?: () => void;
 };
 
 const gridStyles = (theme: Theme, view: NonNullable<TakeDockProps['view']>): CSSObject => ({

@@ -12,8 +12,8 @@ export type RecordingControlsProps = {
   modelOutputReady: boolean;
   supported?: boolean;
   blockedReason?: string;
-  onOpenSettings?(): void;
-  onStop(): Promise<void>;
+  onOpenSettings?: () => void;
+  onStop: () => Promise<void>;
 };
 
 const captureSurfaceStyles = (theme: Theme): CSSObject => ({

@@ -1,6 +1,7 @@
 import '@testing-library/jest-dom/vitest';
-import { TEST_NETWORK_POLICY } from '@studio/testing';
 import { afterEach, beforeEach, vi } from 'vitest';
+
+const TEST_NETWORK_POLICY = 'deny-external';
 
 const blockedFetch: typeof fetch = (input, init) => {
   const target = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;

@@ -51,5 +51,3 @@ export const isModelModeId = (value: unknown): value is ModelModeId =>
 
 export const isSessionModeId = (value: unknown): value is SessionModeId =>
   value === LOCAL_MODE_ID || isModelModeId(value);
-
-export const getSessionMode = (id: SessionModeId): SessionMode => SESSION_MODES[id];

@@ -7,6 +7,8 @@ import {
   DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
   EnvironmentValidationError,
   parseEnvironment,
+  resolveLightframeDataDirectory,
+  resolveStaticRoot,
 } from './environment.js';
 
 describe('parseEnvironment', () => {
@@ -71,5 +73,62 @@ describe('parseEnvironment', () => {
     { OPENAI_REFERENCE_IMAGE_QUALITY: 'low' },
   ])('rejects invalid environment input %#', (environment) => {
     expect(() => parseEnvironment(environment)).toThrow(EnvironmentValidationError);
+  });
+});
+
+describe('resolveLightframeDataDirectory', () => {
+  const repositoryRoot = '/workspace/lightframe';
+  const apiRoot = '/workspace/lightframe/apps/api';
+
+  it('keeps absolute paths and resolves new relative paths from the repository root', () => {
+    expect(
+      resolveLightframeDataDirectory('/var/lib/lightframe', {
+        repositoryRoot,
+        apiRoot,
+        pathExists: () => false,
+      }),
+    ).toEqual({ path: '/var/lib/lightframe', usesLegacyApiRelativePath: false });
+    expect(
+      resolveLightframeDataDirectory('./data', {
+        repositoryRoot,
+        apiRoot,
+        pathExists: () => false,
+      }),
+    ).toEqual({ path: '/workspace/lightframe/data', usesLegacyApiRelativePath: false });
+  });
+
+  it('uses an existing legacy API-relative directory only when the canonical path is absent', () => {
+    const legacy = '/workspace/lightframe/apps/api/data';
+    expect(
+      resolveLightframeDataDirectory('./data', {
+        repositoryRoot,
+        apiRoot,
+        pathExists: (candidate) => candidate === legacy,
+      }),
+    ).toEqual({ path: legacy, usesLegacyApiRelativePath: true });
+
+    expect(
+      resolveLightframeDataDirectory('./data', {
+        repositoryRoot,
+        apiRoot,
+        pathExists: () => true,
+      }),
+    ).toEqual({ path: '/workspace/lightframe/data', usesLegacyApiRelativePath: false });
+  });
+});
+
+describe('resolveStaticRoot', () => {
+  it('requires built web assets in production', () => {
+    expect(() => resolveStaticRoot('production', '/workspace/web/dist', () => false)).toThrow(
+      'The production web distribution is missing',
+    );
+  });
+
+  it('allows explicit API-only development and test startup', () => {
+    expect(resolveStaticRoot('development', '/workspace/web/dist', () => false)).toBeUndefined();
+    expect(resolveStaticRoot('test', '/workspace/web/dist', () => false)).toBeUndefined();
+    expect(resolveStaticRoot('production', '/workspace/web/dist', () => true)).toBe(
+      '/workspace/web/dist',
+    );
   });
 });

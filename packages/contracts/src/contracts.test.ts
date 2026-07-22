@@ -4,6 +4,8 @@ import {
   PAGE_SIZE_LIMIT,
   SUPPORTED_MODEL_IDS,
   VOICE_CONVERSION_MAX_BYTES,
+  VOICE_PROVIDER_INTENT_HEADER,
+  VOICE_PROVIDER_INTENT_VALUE,
   apiErrorResponseSchema,
   capabilitiesResponseSchema,
   characterPromptOptimizationResultSchema,
@@ -412,6 +414,8 @@ describe('ElevenLabs contracts', () => {
     expect(voiceConversionContentTypeSchema.parse('audio/webm')).toBe('audio/webm');
     expect(voiceConversionContentTypeSchema.safeParse('video/webm').success).toBe(false);
     expect(VOICE_CONVERSION_MAX_BYTES).toBe(25 * 1024 * 1024);
+    expect(VOICE_PROVIDER_INTENT_HEADER).toBe('x-lightframe-provider-intent');
+    expect(VOICE_PROVIDER_INTENT_VALUE).toBe('voice');
   });
 });
 
@@ -426,6 +430,11 @@ describe('safe API errors', () => {
         },
       }),
     ).toMatchObject({ error: { upstreamStatus: 503 } });
+    expect(
+      apiErrorResponseSchema.parse({
+        error: { code: 'internal_error', message: 'The server could not complete the request.' },
+      }),
+    ).toMatchObject({ error: { code: 'internal_error' } });
     expect(
       apiErrorResponseSchema.safeParse({
         error: {

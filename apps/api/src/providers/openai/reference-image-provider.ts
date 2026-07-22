@@ -1,16 +1,11 @@
-import OpenAI, {
-  APIConnectionError,
-  APIConnectionTimeoutError,
-  APIUserAbortError,
-  toFile,
-  type Uploadable,
-} from 'openai';
+import OpenAI, { toFile, type Uploadable } from 'openai';
 import type { ImagesResponse } from 'openai/resources/images';
 import {
   REFERENCE_IMAGE_MODEL_ID,
   REFERENCE_IMAGE_QUALITY,
   type CharacterPromptOptimizationResult,
 } from '@studio/contracts';
+import { classifyOpenAITransportFailure, openAIUpstreamStatus } from './transport-error.js';
 
 export const OPENAI_REFERENCE_IMAGE_MODEL = REFERENCE_IMAGE_MODEL_ID;
 export const OPENAI_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
@@ -46,8 +41,8 @@ export interface EditReferenceImageProviderInput extends GenerateReferenceImageP
 }
 
 export interface ReferenceImageProvider {
-  generate(input: GenerateReferenceImageProviderInput): Promise<GeneratedReferenceImagePayload>;
-  edit?(input: EditReferenceImageProviderInput): Promise<GeneratedReferenceImagePayload>;
+  generate: (input: GenerateReferenceImageProviderInput) => Promise<GeneratedReferenceImagePayload>;
+  edit?: (input: EditReferenceImageProviderInput) => Promise<GeneratedReferenceImagePayload>;
 }
 
 export type ReferenceImageProviderFailureReason =
@@ -117,34 +112,19 @@ type OpenAIClientFactory = (options: {
   readonly timeout: number;
 }) => OpenAIImageClient;
 
-const isOpenAIError = (
-  error: unknown,
-): error is Error & { readonly code?: string | null; readonly status?: number } =>
-  error instanceof Error;
-
 const isModerationFailure = (error: Error & { readonly code?: string | null }): boolean =>
   error.code === 'moderation_blocked';
 
 const normalizeOpenAIError = (error: unknown): ReferenceImageProviderError => {
   if (error instanceof ReferenceImageProviderError) return error;
-  if (!isOpenAIError(error)) return new ReferenceImageProviderError('failure', { cause: error });
-
-  const status = typeof error.status === 'number' ? error.status : undefined;
+  const status = openAIUpstreamStatus(error);
   const options =
     status === undefined ? { cause: error } : { cause: error, upstreamStatus: status };
-
-  if (error instanceof APIUserAbortError || error.name === 'AbortError') {
-    return new ReferenceImageProviderError('aborted', options);
+  const transportFailure = classifyOpenAITransportFailure(error);
+  if (transportFailure !== undefined) {
+    return new ReferenceImageProviderError(transportFailure.reason, options);
   }
-  if (error instanceof APIConnectionTimeoutError) {
-    return new ReferenceImageProviderError('timeout', options);
-  }
-  if (error instanceof APIConnectionError) {
-    return new ReferenceImageProviderError('connection', options);
-  }
-  if (status === 401) return new ReferenceImageProviderError('authentication', options);
-  if (status === 429) return new ReferenceImageProviderError('rate-limit', options);
-  if ((status === 400 || status === 403) && isModerationFailure(error)) {
+  if (error instanceof Error && (status === 400 || status === 403) && isModerationFailure(error)) {
     return new ReferenceImageProviderError('moderation', options);
   }
   return new ReferenceImageProviderError('failure', options);
@@ -228,7 +208,7 @@ export class OpenAIReferenceImageProvider implements ReferenceImageProvider {
 
   async edit(input: EditReferenceImageProviderInput): Promise<GeneratedReferenceImagePayload> {
     try {
-      const edit = this.#client.images.edit;
+      const edit = this.#client.images.edit?.bind(this.#client.images);
       if (edit === undefined) throw new ReferenceImageProviderError('configuration');
       const source = await toFile(
         input.source.bytes,
@@ -250,8 +230,8 @@ export class OpenAIReferenceImageProvider implements ReferenceImageProvider {
       };
       const response =
         input.signal === undefined
-          ? await edit.call(this.#client.images, request)
-          : await edit.call(this.#client.images, request, { signal: input.signal });
+          ? await edit(request)
+          : await edit(request, { signal: input.signal });
       return imagePayload(response);
     } catch (error) {
       throw normalizeOpenAIError(error);

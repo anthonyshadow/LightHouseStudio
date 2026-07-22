@@ -1,55 +1,25 @@
 import { useTheme } from '@emotion/react';
-import type { CreateReferenceImageRequest, ReferenceImageAsset } from '@studio/contracts';
-import { canonicalPrompt } from '@studio/domain';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
-import {
-  ApiClientError,
-  createReferenceImage,
-  fetchReferenceImageMetadata,
-  hydrateReferenceImage,
-  optimizeCharacterReferencePrompt,
-} from '../adapters/api-client/apiClient';
-import {
-  createCreativeAssetRepository,
-  useCreativeAssetRepository,
-  type RecipeSelection,
-  type SavedCharacterPrompt,
-} from '../features/creative-assets';
-import {
-  CharacterBuilderCoordinator,
-  type CharacterSaveProgress,
-  type CharacterSaveSnapshot,
-  type CharacterSaveStage,
-} from '../features/character-builder';
+import { optimizeCharacterReferencePrompt } from '../adapters/api-client/apiClient';
+import { createCreativeAssetRepository } from '../features/creative-assets/repository';
+import { useCreativeAssetRepository } from '../features/creative-assets/useCreativeAssetRepository';
 import { createLocalProjectRepository } from '../features/guided-flow/projectRepository';
 import type { ProjectStorageState } from '../features/guided-flow/types';
-import { LegacyProjectManager } from '../features/legacy-projects';
-import { MediaStage, type StageNotice, type StagePresentation } from '../features/live-stage';
-import {
-  SessionComposer,
-  confirmModeReplacement,
-  type SessionReferenceImage,
-  type StudioMode,
-} from '../features/media-session';
-import type {
-  PromptBuilderDraft,
-  PromptIntent,
-  PromptWorkshopAction,
-  ReferenceGenerationState,
-  SavePromptWorkshopAction,
-  WorkshopReferenceGenerationInput,
-  WorkshopReferenceImage,
-} from '../features/prompt-authoring';
-import {
-  CaptureSettingsPanel,
-  hasSameRecordingTracks,
-  RecordingControls,
-} from '../features/recording';
-import { TakeDock } from '../features/take-review';
-import { useRecording, useRecordingSource } from '../orchestration/recording';
+import { MediaStage, type StageNotice } from '../features/live-stage';
+import { SessionComposer } from '../features/media-session';
+import { CaptureSettingsPanel, RecordingControls } from '../features/recording';
+import { useStrictModeSafeDisposable } from '../orchestration/lifecycle/useStrictModeSafeDisposable';
 import { useStudioSession } from '../orchestration/session';
-import { useVoiceProcessing } from '../orchestration/voice-processing';
 import { OverlayPanel, StudioDesignProvider } from '../ui';
 import {
   headerRegionStyles,
@@ -59,81 +29,39 @@ import {
   skipLinkStyles,
   stageColumnStyles,
 } from './StudioApp.styles';
-import { CreativeWorkspace, type AuxiliaryPanel, type ModelMode } from './CreativeWorkspace';
+import { CreativeWorkspace, type AuxiliaryPanel } from './CreativeWorkspace';
 import { StudioHeader } from './StudioHeader';
 import { resolveLegacyEntry, type StudioInitialOverlay } from './routeResolution';
-import { canReplaceDirtyLibraryMode, shouldFinalizeForUnusableModelOutput } from './studioPolicies';
 import { createNoopStudioTelemetry } from './telemetry';
 import { useProviderAvailability } from './useProviderAvailability';
+import {
+  useReferenceRecipeHandoff,
+  type PromptCommittedHandler,
+} from './useReferenceRecipeHandoff';
+import { useTakeReviewFlow } from './useTakeReviewFlow';
+import { useStudioOverlayController } from './useStudioOverlayController';
 
-type ActiveOverlay =
-  | 'recipe-dock'
-  | 'capture-settings'
-  | 'take-review'
-  | 'voice-treatments'
-  | 'workshop'
-  | 'recipe-shelf'
-  | 'character-builder'
-  | 'legacy-projects'
-  | null;
+const CharacterBuilderCoordinator = lazy(() =>
+  import('../features/character-builder/CharacterBuilderCoordinator').then((module) => ({
+    default: module.CharacterBuilderCoordinator,
+  })),
+);
+const LegacyProjectManager = lazy(() =>
+  import('../features/legacy-projects/LegacyProjectManager').then((module) => ({
+    default: module.LegacyProjectManager,
+  })),
+);
+const TakeDock = lazy(() =>
+  import('../features/take-review/TakeDock').then((module) => ({ default: module.TakeDock })),
+);
 
-export type ActiveStudioRecipe = {
-  origin: 'character-prompt' | 'saved-prompt';
-  assetId: string;
-} | null;
+const deferredPanelFallback = <p role="status">Loading studio tool…</p>;
 
 const REVIEW_LOCK_REASON =
   'Download and close or discard the recorded take before starting or changing media.';
 
 const FORM_ERROR_CODES = new Set(['model-input-required', 'apply-failed']);
-const EPHEMERAL_REFERENCE_IDENTITY = 'session:ephemeral-reference';
-
-type PendingReferenceUse = {
-  mode: ModelMode;
-  prompt: string;
-  referenceImageAssetId: string | null;
-  preserveCurrentReference: boolean;
-  builderDraft?: PromptBuilderDraft;
-  savedPromptId?: string;
-  savedCharacterPromptId?: string;
-  destination: 'shelf' | 'workshop';
-};
-
-const referenceGenerationError = (error: unknown): string => {
-  if (!(error instanceof ApiClientError)) {
-    return 'The local server could not create the reference. Check the connection and try again.';
-  }
-  switch (error.code) {
-    case 'moderation_blocked':
-      return 'OpenAI blocked this character request. Adjust the character description and try again.';
-    case 'rate_limited':
-    case 'provider_quota':
-      return 'OpenAI is temporarily limiting image generation. Wait a moment, then retry.';
-    case 'provider_configuration':
-    case 'provider_authentication':
-      return 'Reference generation is not configured correctly on this local server.';
-    case 'request_timeout':
-      return 'Generation timed out before a safe asset was stored. Retry with a new request.';
-    case 'invalid_provider_image':
-      return 'OpenAI returned an image that failed local validation. Retry the generation.';
-    case 'storage_failure':
-      return 'The image was created but could not be saved locally. Check the data directory and retry.';
-    case 'generation_in_progress':
-      return 'Another reference is already being created. Wait for it to finish, then retry.';
-    default:
-      return error.message || 'Reference generation failed before the current image could change.';
-  }
-};
-
-const referenceHydrationError = (error: unknown): string =>
-  error instanceof ApiClientError && error.code === 'not_found'
-    ? 'This local reference asset is no longer available. Retry after restoring the data directory, or continue without it.'
-    : 'The exact local reference could not be validated. Retry, or continue without the reference.';
-
-const toWorkshopReferenceImage = (
-  asset: ReferenceImageAsset,
-  generatedFromPrompt = asset.originalPrompt,
-): WorkshopReferenceImage => ({ ...asset, generatedFromPrompt });
+const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
 interface StudioExperienceProps {
   initialOverlay: StudioInitialOverlay;
@@ -143,55 +71,31 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   const theme = useTheme();
   const repository = useMemo(() => createCreativeAssetRepository(), []);
   const repositoryState = useCreativeAssetRepository(repository);
-  const legacyRepository = useMemo(() => createLocalProjectRepository(), []);
+  const legacyRepository = useStrictModeSafeDisposable(
+    useMemo(() => createLocalProjectRepository(), []),
+  );
   const browser = useMemo(() => detectBrowserCapabilities(), []);
   const {
     availability,
     state: capabilityState,
     retry: retryProviderAvailability,
   } = useProviderAvailability();
-  const [activeOverlay, setActiveOverlay] = useState<ActiveOverlay>(
+  const {
+    active: activeOverlay,
+    open: openOverlay,
+    openIfEmpty: openOverlayIfEmpty,
+    close: closeOverlay,
+    closeIf: closeOverlayIf,
+    toggle: toggleOverlay,
+  } = useStudioOverlayController(
     initialOverlay?.kind === 'legacy-projects' ? 'legacy-projects' : null,
   );
   const [legacyStorage, setLegacyStorage] = useState<ProjectStorageState>(() =>
     legacyRepository.getStorageState(),
   );
   const [legacyProjectCount, setLegacyProjectCount] = useState(0);
-  const [activeRecipe, setActiveRecipe] = useState<ActiveStudioRecipe>(null);
-  const [libraryMode, setLibraryMode] = useState<ModelMode>('lucy-2.5');
-  const [workshopDraft, setWorkshopDraft] = useState<PromptBuilderDraft | undefined>();
-  const [workshopDrafts, setWorkshopDrafts] = useState<
-    Partial<Record<PromptIntent, PromptBuilderDraft>>
-  >({});
-  const [workshopReferenceImage, setWorkshopReferenceImage] =
-    useState<WorkshopReferenceImage | null>(null);
-  const [referenceGeneration, setReferenceGeneration] = useState<ReferenceGenerationState>({
-    status: 'idle',
-    error: null,
-  });
-  const [referenceUsePending, setReferenceUsePending] = useState(false);
-  const [referenceUseFailureMessage, setReferenceUseFailureMessage] = useState<string | null>(null);
-  const generationRequestRef = useRef<string | null>(null);
-  const workshopRevisionRef = useRef(0);
-  const referenceRestoreRef = useRef<{ assetId: string; prompt: string } | null>(null);
-  const pendingReferenceUseRef = useRef<PendingReferenceUse | null>(null);
-  const referenceUsePendingRef = useRef(false);
-  const [shelfDirty, setShelfDirty] = useState(false);
-  const [reviewReady, setReviewReady] = useState(false);
-  const [finalizingStream, setFinalizingStream] = useState<MediaStream | null>(null);
-  const [finalizingStartedAt, setFinalizingStartedAt] = useState<number | null>(null);
   const [dismissedNotices, setDismissedNotices] = useState<ReadonlySet<string>>(new Set());
-  const finishPromiseRef = useRef<Promise<void> | null>(null);
-  const selectedSavedPrompt = useRef<string | undefined>(undefined);
-  const selectedCharacterPrompt = useRef<string | undefined>(undefined);
-  const workshopSourceRecipeRef = useRef<ActiveStudioRecipe>(null);
-  const activeRecipeFingerprintRef = useRef<{
-    mode: StudioMode;
-    prompt: string;
-    referenceImageAssetId: string | null;
-    assetPrompt: string;
-    assetReferenceImageAssetId: string | null;
-  } | null>(null);
+  const promptCommittedHandlerRef = useRef<PromptCommittedHandler>(noopPromptCommitted);
   const characterBuilderButtonRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
   const shelfToggleRef = useRef<HTMLButtonElement>(null);
@@ -213,142 +117,38 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     };
   }, [legacyRepository]);
 
-  const rememberWorkshopDraft = useCallback((draft: PromptBuilderDraft) => {
-    workshopRevisionRef.current += 1;
-    setWorkshopDraft(draft);
-    setWorkshopDrafts((current) => ({ ...current, [draft.intent]: draft }));
-  }, []);
-
-  const recordCommittedPrompt = useCallback(
-    (mode: ModelMode, prompt: string, referenceImageAssetId: string | null) => {
-      const activeFingerprint = activeRecipeFingerprintRef.current;
-      const activeRecipeStillMatches = Boolean(
-        activeFingerprint &&
-        activeFingerprint.mode === mode &&
-        canonicalPrompt(activeFingerprint.prompt) === canonicalPrompt(prompt) &&
-        activeFingerprint.referenceImageAssetId === referenceImageAssetId &&
-        activeFingerprint.referenceImageAssetId === activeFingerprint.assetReferenceImageAssetId,
-      );
-      const matchingGeneratedReference =
-        !activeRecipeStillMatches &&
-        mode === 'lucy-2.5' &&
-        referenceImageAssetId !== null &&
-        workshopReferenceImage?.assetId === referenceImageAssetId
-          ? workshopReferenceImage
-          : null;
-      const libraryPrompt = activeRecipeStillMatches
-        ? (activeFingerprint?.assetPrompt ?? prompt)
-        : matchingGeneratedReference &&
-            canonicalPrompt(prompt) ===
-              canonicalPrompt(matchingGeneratedReference.lucy25CharacterPrompt)
-          ? matchingGeneratedReference.originalPrompt
-          : prompt;
-      repository.recordSuccessfulPrompt({
-        prompt: libraryPrompt,
-        modelModeId: mode,
-        referenceImageAssetId,
-        ...(activeRecipeStillMatches && selectedSavedPrompt.current
-          ? { savedPromptId: selectedSavedPrompt.current }
-          : {}),
-        ...(activeRecipeStillMatches && selectedCharacterPrompt.current
-          ? { savedCharacterPromptId: selectedCharacterPrompt.current }
-          : {}),
-      });
-    },
-    [repository, workshopReferenceImage],
+  const handlePromptCommitted = useCallback<PromptCommittedHandler>(
+    (...args) => promptCommittedHandlerRef.current(...args),
+    [],
+  );
+  const session = useStudioSession({ availability, onPromptCommitted: handlePromptCommitted });
+  const handleReviewAvailable = useCallback(
+    () => openOverlayIfEmpty('take-review'),
+    [openOverlayIfEmpty],
+  );
+  const handleReviewPublished = useCallback(() => openOverlay('take-review'), [openOverlay]);
+  const handleReviewCleared = useCallback(
+    () => closeOverlayIf(['take-review', 'voice-treatments']),
+    [closeOverlayIf],
   );
 
-  const session = useStudioSession({ availability, onPromptCommitted: recordCommittedPrompt });
-
-  const generateWorkshopReference = useCallback(
-    async (input: WorkshopReferenceGenerationInput): Promise<void> => {
-      if (!availability.referenceImages || generationRequestRef.current) return;
-      const requestId = crypto.randomUUID();
-      const revision = workshopRevisionRef.current;
-      const request: CreateReferenceImageRequest = {
-        requestId,
-        ...input,
-      };
-      generationRequestRef.current = requestId;
-      setReferenceGeneration({ status: 'generating', error: null });
-
-      try {
-        const asset = await createReferenceImage(request);
-        if (workshopRevisionRef.current !== revision) return;
-        setWorkshopReferenceImage(toWorkshopReferenceImage(asset, input.rawPrompt));
-        setReferenceGeneration({ status: 'idle', error: null });
-        referenceRestoreRef.current = { assetId: asset.assetId, prompt: input.rawPrompt };
-        repository.enrichNewestMatchingRecent(input.rawPrompt, 'lucy-2.5', asset.assetId);
-      } catch (error: unknown) {
-        if (workshopRevisionRef.current !== revision) return;
-        setReferenceGeneration({
-          status: 'error',
-          error: referenceGenerationError(error),
-          errorKind: 'generation',
-        });
-      } finally {
-        if (generationRequestRef.current === requestId) {
-          generationRequestRef.current = null;
-          if (workshopRevisionRef.current !== revision) {
-            setReferenceGeneration({ status: 'idle', error: null });
-          }
-        }
-      }
-    },
-    [availability.referenceImages, repository],
-  );
-
-  const restoreWorkshopReference = useCallback(
-    (assetId: string, prompt: string) => {
-      const revision = workshopRevisionRef.current;
-      referenceRestoreRef.current = { assetId, prompt };
-      setReferenceGeneration({ status: 'restoring', error: null });
-      void fetchReferenceImageMetadata(assetId)
-        .then((asset) => {
-          if (workshopRevisionRef.current !== revision) return;
-          setWorkshopReferenceImage(toWorkshopReferenceImage(asset));
-          setReferenceGeneration({ status: 'idle', error: null });
-          repository.enrichNewestMatchingRecent(prompt, 'lucy-2.5', asset.assetId);
-        })
-        .catch((error: unknown) => {
-          if (workshopRevisionRef.current !== revision) return;
-          setWorkshopReferenceImage(null);
-          setReferenceGeneration({
-            status: 'error',
-            error: referenceHydrationError(error),
-            errorKind: 'restore',
-          });
-        });
-    },
-    [repository],
-  );
-
-  const detachWorkshopReference = useCallback(() => {
-    workshopRevisionRef.current += 1;
-    referenceRestoreRef.current = null;
-    setWorkshopReferenceImage(null);
-    setReferenceGeneration({ status: 'idle', error: null });
-  }, []);
-
-  const retryWorkshopReferenceRestore = useCallback(() => {
-    const restore = referenceRestoreRef.current;
-    if (restore) restoreWorkshopReference(restore.assetId, restore.prompt);
-  }, [restoreWorkshopReference]);
-  const automaticDisplayStream = session.displayStream;
-  const automaticReviewRelease = session.releaseForRecordedReview;
-  const handleAutomaticRecordingStop = useCallback(() => {
-    setFinalizingStream((current) => current ?? automaticDisplayStream);
-    setFinalizingStartedAt((current) => current ?? Date.now());
-    void automaticReviewRelease().then(() => {
-      setFinalizingStream(null);
-      setReviewReady(true);
-    });
-  }, [automaticDisplayStream, automaticReviewRelease]);
-  const recording = useRecording({ onAutomaticStop: handleAutomaticRecordingStop });
-  const processing = useVoiceProcessing(recording);
-  const recordingActive = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
-  const reviewLocked = Boolean(recording.presented);
-  const mediaLocked = recordingActive || reviewLocked;
+  const {
+    recording,
+    processing,
+    recordingActive,
+    reviewLocked,
+    mediaLocked,
+    recordingSource,
+    finalizingStartedAt,
+    finalizingStream,
+    finishTake,
+    stagePresentation,
+  } = useTakeReviewFlow({
+    session,
+    onReviewAvailable: handleReviewAvailable,
+    onReviewPublished: handleReviewPublished,
+    onReviewCleared: handleReviewCleared,
+  });
   const aiSessionActive = [
     'requesting-media',
     'requesting-token',
@@ -363,8 +163,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     aiSessionActive ||
     session.lifecycle === 'ready' ||
     session.lifecycle === 'disconnected';
-  const recipeInsertionBlocked =
-    mediaLocked || (sessionModeLocked && session.draft.mode !== libraryMode);
   const characterBuilderOpenBlockedReason = recordingActive
     ? 'Finish recording and finalization before building a character.'
     : finalizingStartedAt !== null || finalizingStream !== null
@@ -372,205 +170,64 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
       : reviewLocked
         ? 'Download and close or discard the current take before building a character.'
         : undefined;
-  const characterBuilderSaveBlockedReason =
-    characterBuilderOpenBlockedReason ??
-    (shelfDirty
-      ? 'Save or discard the unfinished Recipe Shelf changes before saving this character.'
-      : !session.canReplaceRecipeDraft('lucy-2.5')
-        ? 'Release the active camera or AI session before Studio can preload Lucy 2.5.'
-        : referenceUsePending
-          ? 'Wait for the current recipe handoff to finish before saving this character.'
-          : undefined);
-  const recordingSource = useRecordingSource(
-    session.draft.mode,
-    session.localStream,
-    session.transformedVideoUsable ? session.remoteStream : null,
-  );
-
-  useEffect(() => {
-    if (session.draft.mode !== 'local' && !shelfDirty) setLibraryMode(session.draft.mode);
-  }, [session.draft.mode, shelfDirty]);
-
-  const activeRecipeAsset = useMemo(() => {
-    if (!activeRecipe) return null;
-    return activeRecipe.origin === 'character-prompt'
-      ? (repositoryState.store.savedCharacterPrompts.find(
-          (candidate) => candidate.id === activeRecipe.assetId,
-        ) ?? null)
-      : (repositoryState.store.savedPrompts.find(
-          (candidate) => candidate.id === activeRecipe.assetId,
-        ) ?? null);
-  }, [
+  const openWorkshopOverlay = useCallback(() => openOverlay('workshop'), [openOverlay]);
+  const handoff = useReferenceRecipeHandoff({
+    repository,
+    store: repositoryState.store,
+    session,
+    referenceImagesAvailable: Boolean(availability.referenceImages),
+    mediaLocked,
+    recordingActive,
+    sessionModeLocked,
+    characterBuilderOpenBlockedReason,
+    openWorkshopOverlay,
+    closeOverlay,
+  });
+  const {
     activeRecipe,
-    repositoryState.store.savedCharacterPrompts,
-    repositoryState.store.savedPrompts,
-  ]);
-  const activeCharacterName =
-    activeRecipe?.origin === 'character-prompt'
-      ? repositoryState.store.savedCharacterPrompts.find(
-          (candidate) => candidate.id === activeRecipe.assetId,
-        )?.name
-      : undefined;
+    activeCharacterName,
+    libraryMode,
+    workshopDraft,
+    workshopDrafts,
+    workshopReferenceImage,
+    referenceGeneration,
+    referenceUsePending,
+    referenceUseFailureMessage,
+    shelfDirty,
+    recipeInsertionBlocked,
+    characterBuilderSaveBlockedReason,
+  } = handoff.state;
+  const {
+    recordCommittedPrompt,
+    changeLibraryMode,
+    rememberWorkshopDraft,
+    generateWorkshopReference,
+    detachWorkshopReference,
+    retryWorkshopReferenceRestore,
+    setShelfDirty,
+    useRecipe,
+    retryReferenceUse,
+    continueReferenceUseWithoutImage,
+    saveBuiltCharacter,
+    openSavedWorkshop,
+    applyWorkshopPrompt,
+    saveWorkshopPrompt,
+    openWorkshop,
+  } = handoff.actions;
 
-  useEffect(() => {
-    if (activeRecipe && !activeRecipeAsset) {
-      setActiveRecipe(null);
-      activeRecipeFingerprintRef.current = null;
-      selectedSavedPrompt.current = undefined;
-      selectedCharacterPrompt.current = undefined;
-    }
-  }, [activeRecipe, activeRecipeAsset]);
-
-  useEffect(() => {
-    const fingerprint = activeRecipeFingerprintRef.current;
-    if (!activeRecipe || !activeRecipeAsset || !fingerprint) return;
-    const currentReferenceId =
-      session.draft.referenceImage?.kind === 'persisted'
-        ? session.draft.referenceImage.assetId
-        : session.draft.referenceImage?.kind === 'ephemeral'
-          ? EPHEMERAL_REFERENCE_IDENTITY
-          : null;
-    const assetMode =
-      'modelModeId' in activeRecipeAsset ? activeRecipeAsset.modelModeId : 'lucy-2.5';
-    if (
-      session.draft.mode !== fingerprint.mode ||
-      canonicalPrompt(session.draft.prompt) !== canonicalPrompt(fingerprint.prompt) ||
-      currentReferenceId !== fingerprint.referenceImageAssetId ||
-      assetMode !== fingerprint.mode ||
-      canonicalPrompt(activeRecipeAsset.prompt) !== canonicalPrompt(fingerprint.assetPrompt) ||
-      activeRecipeAsset.referenceImageAssetId !== fingerprint.assetReferenceImageAssetId ||
-      fingerprint.referenceImageAssetId !== fingerprint.assetReferenceImageAssetId
-    ) {
-      activeRecipeFingerprintRef.current = null;
-      selectedSavedPrompt.current = undefined;
-      selectedCharacterPrompt.current = undefined;
-      setActiveRecipe(null);
-    }
-  }, [
-    activeRecipe,
-    activeRecipeAsset,
-    session.draft.mode,
-    session.draft.prompt,
-    session.draft.referenceImage,
-  ]);
-
-  useEffect(() => {
-    if (recording.lifecycle !== 'recorded' || !recording.presented || !reviewReady) return;
-    setFinalizingStartedAt(null);
-    setFinalizingStream(null);
-    setActiveOverlay((current) => current ?? 'take-review');
-  }, [recording.lifecycle, recording.presented, reviewReady]);
-
-  useEffect(() => {
-    if (recording.presented) return;
-    setReviewReady(false);
-    if (recording.lifecycle !== 'stopping') {
-      setFinalizingStartedAt(null);
-      setFinalizingStream(null);
-    }
-    setActiveOverlay((current) =>
-      current === 'take-review' || current === 'voice-treatments' ? null : current,
-    );
-  }, [recording.lifecycle, recording.presented]);
+  useLayoutEffect(() => {
+    promptCommittedHandlerRef.current = recordCommittedPrompt;
+    return () => {
+      if (promptCommittedHandlerRef.current === recordCommittedPrompt) {
+        promptCommittedHandlerRef.current = noopPromptCommitted;
+      }
+    };
+  }, [recordCommittedPrompt]);
 
   useEffect(() => {
     if (!session.error || FORM_ERROR_CODES.has(session.error.code)) return;
-    setActiveOverlay((current) =>
-      current === 'recipe-dock' || current === 'capture-settings' ? null : current,
-    );
-  }, [session.error]);
-
-  const stopRecording = recording.stop;
-  const releaseForRecordedReview = session.releaseForRecordedReview;
-  const currentDisplayStream = session.displayStream;
-  const finishTake = useCallback((): Promise<void> => {
-    if (finishPromiseRef.current) return finishPromiseRef.current;
-
-    setFinalizingStream(currentDisplayStream);
-    setFinalizingStartedAt(Date.now());
-    setReviewReady(false);
-
-    const finishPromise = (async () => {
-      let artifact = null;
-      try {
-        artifact = await stopRecording();
-      } finally {
-        await releaseForRecordedReview();
-        setFinalizingStream(null);
-      }
-
-      if (artifact) {
-        setReviewReady(true);
-        setActiveOverlay('take-review');
-      } else {
-        setReviewReady(false);
-        setFinalizingStartedAt(null);
-      }
-    })().finally(() => {
-      finishPromiseRef.current = null;
-    });
-
-    finishPromiseRef.current = finishPromise;
-    return finishPromise;
-  }, [currentDisplayStream, releaseForRecordedReview, stopRecording]);
-
-  useEffect(() => {
-    if (
-      !shouldFinalizeForUnusableModelOutput(
-        recording.lifecycle,
-        session.draft.mode,
-        session.transformedVideoUsable,
-      )
-    )
-      return;
-    void finishTake();
-  }, [finishTake, recording.lifecycle, session.draft.mode, session.transformedVideoUsable]);
-
-  useEffect(() => {
-    if (
-      recording.lifecycle === 'recording' &&
-      !hasSameRecordingTracks(recording.activeSource, recordingSource)
-    ) {
-      void finishTake();
-    }
-  }, [finishTake, recording.activeSource, recording.lifecycle, recordingSource]);
-
-  const stagePresentation = useMemo<StagePresentation>(() => {
-    if (reviewReady && recording.presented) {
-      return {
-        kind: 'playback',
-        artifact: recording.presented,
-        controlsLocked: recording.processingState === 'processing',
-      };
-    }
-    if (recording.lifecycle === 'stopping' || finalizingStartedAt !== null) {
-      return {
-        kind: 'finalizing',
-        retainedStream: finalizingStream ?? session.displayStream,
-        startedAt: finalizingStartedAt ?? 0,
-      };
-    }
-    if (session.displayStream) {
-      const provider = session.draft.mode !== 'local' && session.transformedVideoUsable;
-      return {
-        kind: 'live',
-        stream: session.displayStream,
-        origin: provider ? 'provider' : 'local',
-        mirrored: !provider,
-      };
-    }
-    return { kind: 'idle', mode: session.draft.mode };
-  }, [
-    finalizingStartedAt,
-    finalizingStream,
-    recording.lifecycle,
-    recording.presented,
-    recording.processingState,
-    reviewReady,
-    session.displayStream,
-    session.draft.mode,
-    session.transformedVideoUsable,
-  ]);
+    closeOverlayIf(['recipe-dock', 'capture-settings']);
+  }, [closeOverlayIf, session.error]);
 
   const dismissNotice = useCallback((id: string) => {
     setDismissedNotices((current) => new Set([...current, id]));
@@ -607,7 +264,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
         'permission-denied',
         'device-missing',
         'device-busy',
-        'constraints-unavailable',
+        'media-unavailable',
       ].includes(session.error.code);
       notices.push({
         id: `session-${session.error.code}`,
@@ -616,7 +273,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
         message: session.error.recovery ?? 'Review the setup and try again.',
         priority: 900,
         action: deviceError
-          ? { label: 'Capture settings', onAction: () => setActiveOverlay('capture-settings') }
+          ? { label: 'Capture settings', onAction: () => openOverlay('capture-settings') }
           : { label: 'Dismiss', onAction: session.clearError },
         onDismiss: session.clearError,
       });
@@ -659,405 +316,32 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     retryProviderAvailability,
     session.clearError,
     session.error,
+    openOverlay,
   ]);
 
-  const changeLibraryMode = (mode: ModelMode) => {
-    if (mode === libraryMode) return;
-    if (
-      !canReplaceDirtyLibraryMode(shelfDirty, () =>
-        window.confirm('Switch recipe models and discard the unsaved shelf form changes?'),
-      )
-    ) {
-      return;
-    }
-    setShelfDirty(false);
-    setLibraryMode(mode);
-  };
-
-  const selectModeWithDraftProtection = (mode: StudioMode): boolean =>
-    !mediaLocked &&
-    confirmModeReplacement(session.draft, mode, (message) => window.confirm(message)) &&
-    session.selectMode(mode);
-
-  const closeCreativePanel = useCallback(() => setActiveOverlay(null), []);
-
-  const commitReferenceUse = useCallback(
-    async (pending: PendingReferenceUse, continueWithoutReference = false): Promise<void> => {
-      if (mediaLocked || referenceUsePendingRef.current) return;
-      if (
-        pending.mode !== session.draft.mode &&
-        !confirmModeReplacement(session.draft, pending.mode, (message) => window.confirm(message))
-      ) {
-        return;
-      }
-
-      pendingReferenceUseRef.current = pending;
-      setReferenceUseFailureMessage(null);
-      referenceUsePendingRef.current = true;
-      setReferenceUsePending(true);
-      let referenceImage: SessionReferenceImage | null = null;
-      let referenceMetadata: WorkshopReferenceImage | null = null;
-      try {
-        if (pending.referenceImageAssetId && !continueWithoutReference) {
-          const storedReference = await fetchReferenceImageMetadata(pending.referenceImageAssetId);
-          referenceMetadata = toWorkshopReferenceImage(storedReference);
-          referenceImage = await hydrateReferenceImage(
-            pending.referenceImageAssetId,
-            referenceMetadata,
-          );
-        } else if (pending.preserveCurrentReference && !continueWithoutReference) {
-          referenceImage = session.draft.referenceImage;
-        }
-
-        const generatedLucyReference = pending.mode === 'lucy-2.5' && referenceMetadata !== null;
-        const appliedPrompt =
-          pending.mode === 'lucy-2.5' && referenceMetadata
-            ? referenceMetadata.lucy25CharacterPrompt
-            : pending.prompt;
-        const committed = session.replaceRecipeDraft({
-          mode: pending.mode,
-          prompt: appliedPrompt,
-          referenceImage,
-          enhance: generatedLucyReference,
-        });
-        if (!committed) {
-          setReferenceUseFailureMessage(
-            'Release the active camera or AI session, then retry this complete recipe handoff.',
-          );
-          return;
-        }
-
-        const repositorySnapshot = repository.getSnapshot().store;
-        const sourceAsset = pending.savedCharacterPromptId
-          ? repositorySnapshot.savedCharacterPrompts.find(
-              (candidate) => candidate.id === pending.savedCharacterPromptId,
-            )
-          : pending.savedPromptId
-            ? repositorySnapshot.savedPrompts.find(
-                (candidate) => candidate.id === pending.savedPromptId,
-              )
-            : null;
-        const sourceMode =
-          sourceAsset && 'modelModeId' in sourceAsset ? sourceAsset.modelModeId : 'lucy-2.5';
-        const appliedReferenceIdentity =
-          referenceImage?.kind === 'persisted'
-            ? referenceImage.assetId
-            : referenceImage?.kind === 'ephemeral'
-              ? EPHEMERAL_REFERENCE_IDENTITY
-              : null;
-        const referenceMatchesPendingPrompt =
-          !referenceMetadata ||
-          canonicalPrompt(referenceMetadata.originalPrompt) === canonicalPrompt(pending.prompt);
-        const sourceStillMatches = Boolean(
-          sourceAsset &&
-          sourceMode === pending.mode &&
-          canonicalPrompt(sourceAsset.prompt) === canonicalPrompt(pending.prompt) &&
-          sourceAsset.referenceImageAssetId === pending.referenceImageAssetId &&
-          appliedReferenceIdentity === sourceAsset.referenceImageAssetId &&
-          referenceMatchesPendingPrompt,
-        );
-        const exactSavedPromptId =
-          sourceStillMatches && pending.savedPromptId ? pending.savedPromptId : undefined;
-        const exactCharacterPromptId =
-          sourceStillMatches && pending.savedCharacterPromptId
-            ? pending.savedCharacterPromptId
-            : undefined;
-        selectedSavedPrompt.current = exactSavedPromptId;
-        selectedCharacterPrompt.current = exactCharacterPromptId;
-        const nextActiveRecipe: ActiveStudioRecipe = exactCharacterPromptId
-          ? { origin: 'character-prompt', assetId: exactCharacterPromptId }
-          : exactSavedPromptId
-            ? { origin: 'saved-prompt', assetId: exactSavedPromptId }
-            : null;
-        setActiveRecipe(nextActiveRecipe);
-        activeRecipeFingerprintRef.current = nextActiveRecipe
-          ? {
-              mode: pending.mode,
-              prompt: appliedPrompt,
-              referenceImageAssetId: appliedReferenceIdentity,
-              assetPrompt: sourceAsset?.prompt ?? pending.prompt,
-              assetReferenceImageAssetId: sourceAsset?.referenceImageAssetId ?? null,
-            }
-          : null;
-        if (pending.builderDraft) rememberWorkshopDraft(pending.builderDraft);
-        workshopRevisionRef.current += 1;
-        setWorkshopReferenceImage(referenceMetadata);
-        setReferenceGeneration({ status: 'idle', error: null });
-        referenceRestoreRef.current = referenceMetadata
-          ? { assetId: referenceMetadata.assetId, prompt: pending.prompt }
-          : null;
-        if (referenceMetadata && referenceMatchesPendingPrompt) {
-          repository.enrichNewestMatchingRecent(
-            pending.prompt,
-            pending.mode,
-            referenceMetadata.assetId,
-          );
-        }
-        if (pending.destination === 'workshop') workshopSourceRecipeRef.current = null;
-        pendingReferenceUseRef.current = null;
-        setReferenceUseFailureMessage(null);
-        setActiveOverlay(null);
-      } catch (error) {
-        setReferenceUseFailureMessage(referenceHydrationError(error));
-      } finally {
-        referenceUsePendingRef.current = false;
-        setReferenceUsePending(false);
-      }
-    },
-    [mediaLocked, rememberWorkshopDraft, repository, session],
-  );
-
-  const useRecipe = useCallback(
-    (selection: RecipeSelection) => {
-      const selectedReferenceAssetId = selection.referenceImageAssetId ?? null;
-      const linkedRecentPrompt =
-        selection.origin === 'recent-prompt' && selection.assetId
-          ? repository
-              .getSnapshot()
-              .store.savedPrompts.find(
-                (candidate) =>
-                  candidate.id === selection.assetId &&
-                  candidate.modelModeId === selection.modelModeId &&
-                  canonicalPrompt(candidate.prompt) === canonicalPrompt(selection.prompt) &&
-                  candidate.referenceImageAssetId === selectedReferenceAssetId,
-              )
-          : null;
-      const pending: PendingReferenceUse = {
-        mode: selection.modelModeId,
-        prompt: selection.prompt,
-        referenceImageAssetId: selectedReferenceAssetId,
-        preserveCurrentReference: false,
-        destination: 'shelf',
-        ...(selection.builderDraft ? { builderDraft: selection.builderDraft } : {}),
-        ...(selection.origin === 'saved-prompt' && selection.assetId
-          ? { savedPromptId: selection.assetId }
-          : {}),
-        ...(linkedRecentPrompt ? { savedPromptId: linkedRecentPrompt.id } : {}),
-        ...(selection.origin === 'character-prompt' && selection.assetId
-          ? { savedCharacterPromptId: selection.assetId }
-          : {}),
-      };
-      void commitReferenceUse(pending);
-    },
-    [commitReferenceUse, repository],
-  );
-
-  const retryReferenceUse = useCallback(() => {
-    const pending = pendingReferenceUseRef.current;
-    if (pending) void commitReferenceUse(pending);
-  }, [commitReferenceUse]);
-
-  const continueReferenceUseWithoutImage = useCallback(() => {
-    const pending = pendingReferenceUseRef.current;
-    if (pending) void commitReferenceUse(pending, true);
-  }, [commitReferenceUse]);
-
-  const saveBuiltCharacter = useCallback(
-    async (
-      snapshot: CharacterSaveSnapshot,
-      characterId: string,
-      stage: CharacterSaveStage,
-      progress: CharacterSaveProgress,
-    ): Promise<void> => {
-      if (characterBuilderSaveBlockedReason) {
-        throw new Error(characterBuilderSaveBlockedReason);
-      }
-      if (
-        session.draft.mode !== 'lucy-2.5' &&
-        !confirmModeReplacement(session.draft, 'lucy-2.5', (message) => window.confirm(message))
-      ) {
-        throw new Error('Character save was cancelled. The resumable draft is unchanged.');
-      }
-
-      const referenceMetadata = snapshot.referenceImage;
-      let hydratedReference: SessionReferenceImage | null = null;
-      if (referenceMetadata) {
-        hydratedReference = await hydrateReferenceImage(
-          referenceMetadata.assetId,
-          referenceMetadata,
-        );
-      }
-
-      const studioPrompt = referenceMetadata
-        ? referenceMetadata.lucy25CharacterPrompt
-        : snapshot.prompt;
-      const currentReferenceId =
-        session.draft.referenceImage?.kind === 'persisted'
-          ? session.draft.referenceImage.assetId
-          : session.draft.referenceImage?.kind === 'ephemeral'
-            ? EPHEMERAL_REFERENCE_IDENTITY
-            : null;
-      const incomingReferenceId = referenceMetadata?.assetId ?? null;
-      const hasCurrentLucyRecipe =
-        session.draft.mode === 'lucy-2.5' &&
-        (canonicalPrompt(session.draft.prompt).length > 0 || currentReferenceId !== null);
-      if (
-        hasCurrentLucyRecipe &&
-        (canonicalPrompt(session.draft.prompt) !== canonicalPrompt(studioPrompt) ||
-          currentReferenceId !== incomingReferenceId) &&
-        !window.confirm(
-          'Replace the current Lucy 2.5 recipe in the Dock with this saved character? Your current Dock values will be replaced.',
-        )
-      ) {
-        throw new Error('Character save was cancelled. The resumable draft is unchanged.');
-      }
-
-      repository.persistSavedCharacterPrompt({
-        id: characterId,
-        name: snapshot.name,
-        prompt: snapshot.prompt,
-        source: 'generator',
-        promptIntent: 'character-transform',
-        builderDraft: snapshot.draft,
-        guidedDesign: snapshot.design,
-        referenceImageStatus: referenceMetadata ? 'persisted-reference' : 'prompt-only',
-        referenceImageAssetId: referenceMetadata?.assetId ?? null,
-      });
-      if (stage === 'intent') {
-        await progress.markCharacterPersisted();
-      }
-
-      const preloaded = session.replaceRecipeDraft({
-        mode: 'lucy-2.5',
-        prompt: studioPrompt,
-        referenceImage: hydratedReference,
-        enhance: Boolean(referenceMetadata),
-      });
-      if (!preloaded) {
-        throw new Error(
-          'Release the active camera or AI session, then retry preloading this saved character.',
-        );
-      }
-
-      selectedSavedPrompt.current = undefined;
-      selectedCharacterPrompt.current = characterId;
-      setActiveRecipe({ origin: 'character-prompt', assetId: characterId });
-      activeRecipeFingerprintRef.current = {
-        mode: 'lucy-2.5',
-        prompt: studioPrompt,
-        referenceImageAssetId: referenceMetadata?.assetId ?? null,
-        assetPrompt: snapshot.prompt,
-        assetReferenceImageAssetId: referenceMetadata?.assetId ?? null,
-      };
-      setLibraryMode('lucy-2.5');
-      rememberWorkshopDraft(snapshot.draft);
-      workshopRevisionRef.current += 1;
-      setWorkshopReferenceImage(
-        referenceMetadata ? toWorkshopReferenceImage(referenceMetadata, snapshot.prompt) : null,
-      );
-      referenceRestoreRef.current = referenceMetadata
-        ? { assetId: referenceMetadata.assetId, prompt: snapshot.prompt }
-        : null;
-      setReferenceGeneration({ status: 'idle', error: null });
-      await progress.markStudioPreloaded();
-    },
-    [characterBuilderSaveBlockedReason, rememberWorkshopDraft, repository, session],
-  );
-
-  const openSavedWorkshop = (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => {
-    if (recordingActive) return;
-    if (session.draft.mode !== 'lucy-2.5' && !selectModeWithDraftProtection('lucy-2.5')) return;
-    workshopSourceRecipeRef.current = { origin: 'character-prompt', assetId: asset.id };
-    rememberWorkshopDraft(draft);
-    workshopRevisionRef.current += 1;
-    setWorkshopReferenceImage(null);
-    referenceRestoreRef.current = null;
-    setReferenceGeneration({ status: 'idle', error: null });
-    if (asset.referenceImageAssetId) {
-      restoreWorkshopReference(asset.referenceImageAssetId, asset.prompt);
-    }
-    setActiveOverlay('workshop');
-  };
-
-  const applyWorkshopPrompt = (action: PromptWorkshopAction) => {
-    const sourceRecipe = workshopSourceRecipeRef.current;
-    const sourceAsset = sourceRecipe
-      ? sourceRecipe.origin === 'character-prompt'
-        ? repository
-            .getSnapshot()
-            .store.savedCharacterPrompts.find((candidate) => candidate.id === sourceRecipe.assetId)
-        : repository
-            .getSnapshot()
-            .store.savedPrompts.find((candidate) => candidate.id === sourceRecipe.assetId)
-      : null;
-    const preserveCurrentReference =
-      action.referenceImageAssetId === null && session.draft.referenceImage?.kind === 'ephemeral';
-    const sourceStillMatches =
-      sourceAsset &&
-      !preserveCurrentReference &&
-      (sourceRecipe?.origin !== 'saved-prompt' ||
-        ('modelModeId' in sourceAsset && sourceAsset.modelModeId === 'lucy-2.5')) &&
-      canonicalPrompt(sourceAsset.prompt) === canonicalPrompt(action.prompt) &&
-      sourceAsset.referenceImageAssetId === action.referenceImageAssetId;
-    void commitReferenceUse({
-      mode: 'lucy-2.5',
-      prompt: action.prompt,
-      referenceImageAssetId: action.referenceImageAssetId,
-      preserveCurrentReference,
-      builderDraft: action.draft,
-      destination: 'workshop',
-      ...(sourceStillMatches && sourceRecipe?.origin === 'character-prompt'
-        ? { savedCharacterPromptId: sourceRecipe.assetId }
-        : {}),
-      ...(sourceStillMatches && sourceRecipe?.origin === 'saved-prompt'
-        ? { savedPromptId: sourceRecipe.assetId }
-        : {}),
-    });
-  };
-
-  const saveWorkshopPrompt = (action: SavePromptWorkshopAction) => {
-    const needsReference =
-      action.draft.intent === 'character-transform' && action.draft.matchReference;
-    const selectedReferenceAssetId = action.referenceImageAssetId;
-    repository.createSavedCharacterPrompt({
-      name: action.name,
-      prompt: action.prompt,
-      source: 'generator',
-      promptIntent: action.draft.intent,
-      builderDraft: action.draft,
-      referenceImageStatus: selectedReferenceAssetId
-        ? 'persisted-reference'
-        : session.draft.referenceImage?.kind === 'ephemeral'
-          ? 'session-portrait-not-saved'
-          : needsReference
-            ? 'portrait-required-not-saved'
-            : 'prompt-only',
-      referenceImageAssetId: selectedReferenceAssetId,
-    });
-  };
-
-  const openWorkshop = () => {
-    if (recordingActive) return;
-    if (session.draft.mode !== 'lucy-2.5' && !selectModeWithDraftProtection('lucy-2.5')) return;
-    workshopSourceRecipeRef.current = activeRecipe;
-    if (!workshopReferenceImage && session.draft.referenceImage?.kind === 'persisted') {
-      workshopRevisionRef.current += 1;
-      restoreWorkshopReference(session.draft.referenceImage.assetId, session.draft.prompt);
-    }
-    setActiveOverlay('workshop');
-  };
+  const closeCreativePanel = closeOverlay;
 
   const openDock = () => {
     if (recordingActive) return;
-    setActiveOverlay('recipe-dock');
+    openOverlay('recipe-dock');
   };
 
   const openTake = () => {
     if (!recording.presented || recordingActive) return;
-    setActiveOverlay('take-review');
+    openOverlay('take-review');
   };
 
   const openCaptureSettings = () => {
     if (recordingActive) return;
-    setActiveOverlay('capture-settings');
+    openOverlay('capture-settings');
   };
 
   const openCharacterBuilder = () => {
     if (characterBuilderOpenBlockedReason) return;
-    setActiveOverlay('character-builder');
+    openOverlay('character-builder');
   };
 
-  const openLegacyProjects = () => setActiveOverlay('legacy-projects');
+  const openLegacyProjects = () => openOverlay('legacy-projects');
 
   const creativePanel: AuxiliaryPanel =
     activeOverlay === 'workshop'
@@ -1119,7 +403,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
 
         <OverlayPanel
           open={activeOverlay === 'recipe-dock'}
-          onClose={() => setActiveOverlay(null)}
+          onClose={closeOverlay}
           title="Recipe Dock"
           description="Prepare freely. Camera and provider work begin only from explicit actions."
           placement="right"
@@ -1138,7 +422,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
 
         <OverlayPanel
           open={activeOverlay === 'capture-settings'}
-          onClose={() => setActiveOverlay(null)}
+          onClose={closeOverlay}
           title="Capture Settings"
           description="Choose session-only sources and a local capture target without starting media."
           placement="right"
@@ -1155,13 +439,13 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
                 : aiSessionActive
                   ? { disabledReason: 'Stop AI before changing camera or microphone sources.' }
                   : {})}
-            onApplied={() => setActiveOverlay(null)}
+            onApplied={closeOverlay}
           />
         </OverlayPanel>
 
         <OverlayPanel
           open={activeOverlay === 'take-review' && Boolean(recording.presented)}
-          onClose={() => setActiveOverlay(null)}
+          onClose={closeOverlay}
           title="Latest Take"
           description="Playback stays on the stage while you review this temporary in-memory recording."
           placement="bottom"
@@ -1169,20 +453,22 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
           bodyMode="contained"
           returnFocusRef={recording.presented ? takeToggleRef : dockToggleRef}
         >
-          <TakeDock
-            view="take"
-            recording={recording}
-            processing={processing}
-            elevenLabsAvailable={availability.elevenLabs}
-            browserCapabilities={browser}
-            onCloseTake={() => setActiveOverlay(null)}
-            onOpenVoiceTreatments={() => setActiveOverlay('voice-treatments')}
-          />
+          <Suspense fallback={deferredPanelFallback}>
+            <TakeDock
+              view="take"
+              recording={recording}
+              processing={processing}
+              elevenLabsAvailable={availability.elevenLabs}
+              browserCapabilities={browser}
+              onCloseTake={closeOverlay}
+              onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
+            />
+          </Suspense>
         </OverlayPanel>
 
         <OverlayPanel
           open={activeOverlay === 'voice-treatments' && Boolean(recording.presented)}
-          onClose={() => setActiveOverlay(null)}
+          onClose={closeOverlay}
           title="Voice Treatments"
           description="Every treatment starts from the immutable original audio."
           placement="bottom"
@@ -1190,34 +476,40 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
           bodyMode="contained"
           returnFocusRef={recording.presented ? takeToggleRef : dockToggleRef}
         >
-          <TakeDock
-            view="voice"
-            recording={recording}
-            processing={processing}
-            elevenLabsAvailable={availability.elevenLabs}
-            browserCapabilities={browser}
-            onBackToTake={() => setActiveOverlay('take-review')}
-          />
+          <Suspense fallback={deferredPanelFallback}>
+            <TakeDock
+              view="voice"
+              recording={recording}
+              processing={processing}
+              elevenLabsAvailable={availability.elevenLabs}
+              browserCapabilities={browser}
+              onBackToTake={() => openOverlay('take-review')}
+            />
+          </Suspense>
         </OverlayPanel>
 
-        <CharacterBuilderCoordinator
-          open={activeOverlay === 'character-builder'}
-          returnFocusRef={characterBuilderButtonRef}
-          generationAvailable={Boolean(
-            availability.referenceImages && availability.referenceImageOptimizerAvailable,
-          )}
-          editAvailable={Boolean(availability.referenceImageEditAvailable)}
-          {...(characterBuilderSaveBlockedReason
-            ? { saveBlockedReason: characterBuilderSaveBlockedReason }
-            : {})}
-          legacyRepository={legacyRepository}
-          onSaveCharacter={saveBuiltCharacter}
-          onDismiss={() => setActiveOverlay(null)}
-        />
+        {activeOverlay === 'character-builder' ? (
+          <Suspense fallback={deferredPanelFallback}>
+            <CharacterBuilderCoordinator
+              open
+              returnFocusRef={characterBuilderButtonRef}
+              generationAvailable={Boolean(
+                availability.referenceImages && availability.referenceImageOptimizerAvailable,
+              )}
+              editAvailable={Boolean(availability.referenceImageEditAvailable)}
+              {...(characterBuilderSaveBlockedReason
+                ? { saveBlockedReason: characterBuilderSaveBlockedReason }
+                : {})}
+              legacyRepository={legacyRepository}
+              onSaveCharacter={saveBuiltCharacter}
+              onDismiss={closeOverlay}
+            />
+          </Suspense>
+        ) : null}
 
         <OverlayPanel
           open={activeOverlay === 'legacy-projects'}
-          onClose={() => setActiveOverlay(null)}
+          onClose={closeOverlay}
           title="Legacy Projects"
           description="Download or delete browser-local projects from the retired Guided experience."
           placement="fullscreen"
@@ -1225,73 +517,78 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
           bodyMode="scroll"
           returnFocusRef={legacyManagerToggleRef}
         >
-          <LegacyProjectManager
-            repository={legacyRepository}
-            storage={legacyStorage}
-            focusProjectId={initialOverlay?.focusProjectId ?? null}
-            onProjectCountChange={(count) => {
-              setLegacyProjectCount(count);
-              setLegacyStorage(legacyRepository.getStorageState());
-            }}
-          />
+          <Suspense fallback={deferredPanelFallback}>
+            <LegacyProjectManager
+              repository={legacyRepository}
+              storage={legacyStorage}
+              focusProjectId={initialOverlay?.focusProjectId ?? null}
+              onProjectCountChange={(count) => {
+                setLegacyProjectCount(count);
+                setLegacyStorage(legacyRepository.getStorageState());
+              }}
+            />
+          </Suspense>
         </OverlayPanel>
 
         <CreativeWorkspace
-          panel={creativePanel}
-          activeSessionMode={session.draft.mode}
-          libraryMode={libraryMode}
-          workshopDraft={workshopDraft}
-          workshopDrafts={workshopDrafts}
           repository={repository}
-          recordingActive={recordingActive}
-          sessionModeLocked={sessionModeLocked}
-          recipeInsertionBlocked={recipeInsertionBlocked}
-          hasReferenceImage={Boolean(session.draft.referenceImage)}
-          workshopReferenceImage={workshopReferenceImage}
-          referenceGeneration={referenceGeneration}
-          referenceImagesAvailable={Boolean(availability.referenceImages)}
-          referenceImageModel={availability.referenceImageModel ?? null}
-          optimizerModel={availability.referenceImageOptimizerModel ?? null}
-          optimizerVersion={availability.referenceImageOptimizerVersion ?? null}
-          referenceUsePending={referenceUsePending}
-          referenceUseFailure={
-            referenceUseFailureMessage
+          state={{
+            panel: creativePanel,
+            activeSessionMode: session.draft.mode,
+            libraryMode,
+            workshopDraft,
+            workshopDrafts,
+            recordingActive,
+            sessionModeLocked,
+            recipeInsertionBlocked,
+            hasReferenceImage: Boolean(session.draft.referenceImage),
+            workshopReferenceImage,
+            referenceGeneration,
+            referenceImagesAvailable: Boolean(availability.referenceImages),
+            referenceImageModel: availability.referenceImageModel ?? null,
+            optimizerModel: availability.referenceImageOptimizerModel ?? null,
+            optimizerVersion: availability.referenceImageOptimizerVersion ?? null,
+            referenceUsePending,
+            referenceUseFailure: referenceUseFailureMessage
               ? {
                   message: referenceUseFailureMessage,
                   onRetry: retryReferenceUse,
                   onContinueWithoutReference: continueReferenceUseWithoutImage,
                 }
-              : null
-          }
-          workshopToggleRef={workshopToggleRef}
-          shelfToggleRef={shelfToggleRef}
-          dockToggleRef={dockToggleRef}
-          takeToggleRef={takeToggleRef}
-          legacyManagerToggleRef={legacyManagerToggleRef}
-          hasTake={Boolean(recording.presented)}
-          onOpenDock={openDock}
-          onOpenTake={openTake}
-          onOpenWorkshop={openWorkshop}
-          onToggleShelf={() =>
-            setActiveOverlay((current) => (current === 'recipe-shelf' ? null : 'recipe-shelf'))
-          }
-          legacyProjectCount={legacyProjectCount}
-          onOpenLegacyProjects={openLegacyProjects}
-          activeRecipe={activeRecipe}
-          onClose={closeCreativePanel}
-          onLibraryModeChange={changeLibraryMode}
-          onWorkshopDraftChange={rememberWorkshopDraft}
-          onUseWorkshop={applyWorkshopPrompt}
-          onSaveWorkshop={saveWorkshopPrompt}
-          onOptimizeReference={optimizeCharacterReferencePrompt}
-          onGenerateReference={generateWorkshopReference}
-          onDetachReference={detachWorkshopReference}
-          {...(referenceGeneration.status === 'error' && referenceGeneration.errorKind === 'restore'
-            ? { onRetryReferenceRestore: retryWorkshopReferenceRestore }
-            : {})}
-          onShelfDirtyChange={setShelfDirty}
-          onUseRecipe={useRecipe}
-          onOpenSavedWorkshop={openSavedWorkshop}
+              : null,
+            legacyProjectCount,
+            activeRecipe,
+            hasTake: Boolean(recording.presented),
+          }}
+          refs={{
+            workshopToggleRef,
+            shelfToggleRef,
+            dockToggleRef,
+            takeToggleRef,
+            legacyManagerToggleRef,
+          }}
+          actions={{
+            onOpenDock: openDock,
+            onOpenTake: openTake,
+            onOpenWorkshop: openWorkshop,
+            onToggleShelf: () => toggleOverlay('recipe-shelf'),
+            onOpenLegacyProjects: openLegacyProjects,
+            onClose: closeCreativePanel,
+            onLibraryModeChange: changeLibraryMode,
+            onWorkshopDraftChange: rememberWorkshopDraft,
+            onUseWorkshop: applyWorkshopPrompt,
+            onSaveWorkshop: saveWorkshopPrompt,
+            onOptimizeReference: optimizeCharacterReferencePrompt,
+            onGenerateReference: generateWorkshopReference,
+            onDetachReference: detachWorkshopReference,
+            ...(referenceGeneration.status === 'error' &&
+            referenceGeneration.errorKind === 'restore'
+              ? { onRetryReferenceRestore: retryWorkshopReferenceRestore }
+              : {}),
+            onShelfDirtyChange: setShelfDirty,
+            onUseRecipe: useRecipe,
+            onOpenSavedWorkshop: openSavedWorkshop,
+          }}
         />
       </div>
     </div>

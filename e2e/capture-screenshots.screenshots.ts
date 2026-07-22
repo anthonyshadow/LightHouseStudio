@@ -13,7 +13,9 @@ import {
 } from './support/studioHarness';
 
 const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
-const SCREENSHOT_ROOT = path.join(process.cwd(), 'screenshots');
+const SCREENSHOT_ROOT = path.resolve(
+  process.env.LIGHTFRAME_SCREENSHOT_ROOT ?? path.join(process.cwd(), 'test-results', 'captures'),
+);
 const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
 const FIXED_WEBP = Buffer.from(
   'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v3AgAA=',

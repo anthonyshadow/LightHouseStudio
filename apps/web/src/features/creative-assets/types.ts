@@ -4,8 +4,6 @@ import {
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   type CreativeAssetSearchResults as DomainCreativeAssetSearchResults,
   type CreativeAssetStore as DomainCreativeAssetStore,
-  type GuidedChoiceKey as DomainGuidedChoiceKey,
-  type GuidedChoiceValue as DomainGuidedChoiceValue,
   type GuidedDesignV1 as DomainGuidedDesignV1,
   type ModelModeId as DomainModelModeId,
   type RecentPrompt as DomainRecentPrompt,
@@ -14,7 +12,6 @@ import {
   type SavedPrompt as DomainSavedPrompt,
   type SavedPromptSource,
   type StorageHealth as DomainStorageHealth,
-  type VisualProfile as DomainVisualProfile,
 } from '@studio/domain';
 import type { PromptBuilderDraft, PromptIntent } from '../prompt-authoring';
 
@@ -31,9 +28,6 @@ export type ModelModeId = DomainModelModeId;
 export type AssetSource = SavedPromptSource;
 export type ReferenceImageStatus = DomainReferenceImageStatus;
 export type StorageHealth = DomainStorageHealth;
-export type VisualProfile = DomainVisualProfile;
-export type GuidedChoiceKey = DomainGuidedChoiceKey;
-export type GuidedChoiceValue = DomainGuidedChoiceValue;
 export type GuidedDesignV1 = DomainGuidedDesignV1;
 export type SavedPrompt = DomainSavedPrompt;
 export type RecentPrompt = DomainRecentPrompt;

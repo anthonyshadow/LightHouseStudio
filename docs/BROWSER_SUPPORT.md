@@ -23,7 +23,7 @@ Responsive behavior is range-based:
 - At `20rem` width or `36rem` height and below, tools become full-screen dialogs with visible Close and primary actions; operation must not depend on backdrop dismissal.
 - All breakpoints retain the fixed Record/Finish and Capture Settings actions. Mode, notice, recording, finalizing, playback, and overlay state must not resize the stage.
 
-The required visual regression sizes are `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`. At every size, document and body scroll width/height must stay within the viewport (allowing one pixel of browser rounding). Stage video uses `object-fit: contain` to preserve the whole frame, mirrors local preview only, and does not crop transformed output or recorded playback.
+The required visual regression sizes are `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`. The curated Linux Chromium gate stores exactly 27 baselines: idle, recording, and character-live at all five sizes, plus finalizing, error, VTON, workshop, capture, and review at desktop and small mobile. Animations are disabled and `maxDiffPixelRatio` is `0.005`. At every size, document and body scroll width/height must stay within the viewport (allowing one pixel of browser rounding). Stage video uses `object-fit: contain` to preserve the whole frame, mirrors local preview only, and does not crop transformed output or recorded playback.
 
 ## Capability matrix
 
@@ -39,6 +39,7 @@ The required visual regression sizes are `1440×960`, `1280×720`, `834×1112`, 
 | Local voice effects              | `AudioContext`, `OfflineAudioContext`, decode support                   | Original take remains downloadable                                                              |
 | Processed remux                  | Mediabunny input parsing plus browser AAC or Opus encoding              | Processing fails safely; original/last valid take remains                                       |
 | ElevenLabs conversion            | Audio sidecar, same-origin broker, provider account/model/voice support | Local effects and original remain available                                                     |
+| ElevenLabs preview               | Explicit voice-browser action, fetch/Blob URL/audio playback            | Preview exposes retry; selection and the valid take remain available                            |
 | Download                         | Blob URLs and browser download handling                                 | Mobile browsers may open/share instead of saving directly                                       |
 
 ## Recording formats

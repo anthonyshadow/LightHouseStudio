@@ -29,11 +29,28 @@ const safeProcessingMessage = (error: unknown): string => {
 };
 
 export const useVoiceProcessing = (recording: RecordingController): VoiceProcessingController => {
-  const [selection, setSelection] = useState<VoiceEffectSelection>({ kind: 'none' });
+  const [selectionState, setSelectionState] = useState<{
+    original: RecordingArtifact | null;
+    selection: VoiceEffectSelection;
+  }>(() => ({ original: recording.original, selection: { kind: 'none' } }));
+  if (selectionState.original !== recording.original) {
+    setSelectionState({ original: recording.original, selection: { kind: 'none' } });
+  }
+  const selection =
+    selectionState.original === recording.original
+      ? selectionState.selection
+      : ({ kind: 'none' } as const);
   const abortRef = useRef<AbortController | null>(null);
   const recordingRef = useRef(recording);
   const domainStateRef = useRef<DomainVoiceProcessingState<RecordingArtifact> | null>(null);
   const operationCounterRef = useRef(0);
+
+  const setSelection = useCallback((nextSelection: VoiceEffectSelection) => {
+    setSelectionState({
+      original: recordingRef.current.original,
+      selection: nextSelection,
+    });
+  }, []);
 
   useEffect(() => {
     recordingRef.current = recording;
@@ -79,7 +96,7 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
       domainStateRef.current = completed;
       if (completed.status === 'ready') setSelection(nextSelection);
     },
-    [],
+    [setSelection],
   );
 
   const failDomainOperation = useCallback((operationId: string, message: string) => {
@@ -174,13 +191,12 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
       domainStateRef.current = restoreOriginalVoice(domainStateRef.current);
     }
     setSelection({ kind: 'none' });
-  }, [cancel]);
+  }, [cancel, setSelection]);
 
   useEffect(() => {
     domainStateRef.current = recording.original
       ? createVoiceProcessingState(recording.original)
       : null;
-    setSelection({ kind: 'none' });
   }, [recording.original]);
 
   useEffect(() => cancel, [cancel]);
