@@ -27,6 +27,7 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
+      - run: npm run audit:prod
       - run: npm run typecheck
       - run: npm run lint -- --max-warnings 0
       - run: npm run format:check

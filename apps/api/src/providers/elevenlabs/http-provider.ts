@@ -1,5 +1,4 @@
 import { Readable } from 'node:stream';
-import type { ReadableStream as NodeReadableStream } from 'node:stream/web';
 import { z } from 'zod';
 import { ProviderError, type ProviderOperation } from '../provider-error.js';
 import type { AudioStream } from '../../application/audio-stream.js';
@@ -16,6 +15,9 @@ import type {
 const ELEVENLABS_API_ORIGIN = 'https://api.elevenlabs.io';
 const ALLOWED_PREVIEW_HOSTS = new Set(['storage.googleapis.com']);
 const providerIdSchema = z.string().trim().min(1).max(200);
+
+/** Bridges Fetch's web stream through its async iterator without unsafe type coercion. */
+const nodeReadableFromWeb = (body: ReadableStream<Uint8Array>): Readable => Readable.from(body);
 
 const labelsSchema = z.record(z.string(), z.unknown()).nullish();
 const workspaceVoiceSchema = z
@@ -253,7 +255,7 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
 
     const contentLength = parseContentLength(response.headers.get('content-length'));
     return {
-      body: Readable.fromWeb(response.body as unknown as NodeReadableStream),
+      body: nodeReadableFromWeb(response.body),
       contentType,
       ...(contentLength === undefined ? {} : { contentLength }),
     };

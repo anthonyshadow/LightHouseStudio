@@ -42,19 +42,50 @@ const readError = async (response: Response): Promise<ApiClientError> => {
   }
 };
 
+type JsonSchema<T> = {
+  safeParse(value: unknown): { success: true; data: T } | { success: false };
+};
+
+export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+  const response = await fetch(input, init);
+  if (!response.ok) throw await readError(response);
+  return response;
+};
+
+const invalidApiResponse = (message: string, code: string) => () =>
+  new ApiClientError(message, 502, code);
+
+/** Same-origin JSON transport with one error and runtime-validation contract. */
+export const requestJson = async <T>(
+  input: RequestInfo | URL,
+  init: RequestInit | undefined,
+  schema: JsonSchema<T>,
+  invalidResponse: () => Error,
+): Promise<T> => {
+  const response = await apiFetch(input, init);
+  let payload: unknown;
+  try {
+    payload = await response.json();
+  } catch {
+    throw invalidResponse();
+  }
+  const parsed = schema.safeParse(payload);
+  if (!parsed.success) throw invalidResponse();
+  return parsed.data;
+};
+
 export const fetchProviderAvailability = async (
   signal?: AbortSignal,
 ): Promise<ProviderAvailability> => {
-  const response = await fetch('/api/capabilities', {
-    ...(signal ? { signal } : {}),
-    headers: { Accept: 'application/json' },
-  });
-  if (!response.ok) throw await readError(response);
-  const parsed = capabilitiesResponseSchema.safeParse(await response.json());
-  if (!parsed.success) {
-    throw new ApiClientError('The capability response was invalid.', 502, 'invalid-response');
-  }
-  const payload = parsed.data;
+  const payload = await requestJson(
+    '/api/capabilities',
+    {
+      ...(signal ? { signal } : {}),
+      headers: { Accept: 'application/json' },
+    },
+    capabilitiesResponseSchema,
+    invalidApiResponse('The capability response was invalid.', 'invalid-response'),
+  );
   return {
     decart: payload.realtimeVideo.available,
     elevenLabs: payload.elevenLabs.available,
@@ -76,23 +107,19 @@ export const createReferenceImage = async (
   request: CreateReferenceImageRequest,
   signal?: AbortSignal,
 ): Promise<ReferenceImageAsset> => {
-  const response = await fetch('/api/reference-images', {
-    method: 'POST',
-    cache: 'no-store',
-    ...(signal ? { signal } : {}),
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(request),
-  });
-  if (!response.ok) throw await readError(response);
-  const parsed = createReferenceImageResponseSchema.safeParse(await response.json());
-  if (!parsed.success) {
-    throw new ApiClientError(
-      'The generated reference response was invalid.',
-      502,
-      'invalid_provider_image',
-    );
-  }
-  return parsed.data.asset;
+  const payload = await requestJson(
+    '/api/reference-images',
+    {
+      method: 'POST',
+      cache: 'no-store',
+      ...(signal ? { signal } : {}),
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(request),
+    },
+    createReferenceImageResponseSchema,
+    invalidApiResponse('The generated reference response was invalid.', 'invalid_provider_image'),
+  );
+  return payload.asset;
 };
 
 export const editReferenceImage = async (
@@ -100,63 +127,60 @@ export const editReferenceImage = async (
   request: EditReferenceImageRequest,
   signal?: AbortSignal,
 ): Promise<ReferenceImageAsset> => {
-  const response = await fetch(`/api/reference-images/${encodeURIComponent(sourceAssetId)}/edits`, {
-    method: 'POST',
-    cache: 'no-store',
-    ...(signal ? { signal } : {}),
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(request),
-  });
-  if (!response.ok) throw await readError(response);
-  const parsed = editReferenceImageResponseSchema.safeParse(await response.json());
-  if (!parsed.success) {
-    throw new ApiClientError(
-      'The edited reference response was invalid.',
-      502,
-      'invalid_provider_image',
-    );
-  }
-  return parsed.data.asset;
+  const payload = await requestJson(
+    `/api/reference-images/${encodeURIComponent(sourceAssetId)}/edits`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      ...(signal ? { signal } : {}),
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(request),
+    },
+    editReferenceImageResponseSchema,
+    invalidApiResponse('The edited reference response was invalid.', 'invalid_provider_image'),
+  );
+  return payload.asset;
 };
 
 export const optimizeCharacterReferencePrompt = async (
   request: OptimizeCharacterReferencePromptRequest,
   signal: AbortSignal,
 ): Promise<OptimizeCharacterReferencePromptResponse> => {
-  const response = await fetch('/api/reference-images/optimize', {
-    method: 'POST',
-    cache: 'no-store',
-    signal,
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(request),
-  });
-  if (!response.ok) throw await readError(response);
-  const parsed = optimizeCharacterReferencePromptResponseSchema.safeParse(await response.json());
-  if (!parsed.success) {
-    throw new ApiClientError(
+  return requestJson(
+    '/api/reference-images/optimize',
+    {
+      method: 'POST',
+      cache: 'no-store',
+      signal,
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(request),
+    },
+    optimizeCharacterReferencePromptResponseSchema,
+    invalidApiResponse(
       'The optimized character prompt response was invalid.',
-      502,
       'invalid-optimizer-response',
-    );
-  }
-  return parsed.data;
+    ),
+  );
 };
 
 export const fetchReferenceImageMetadata = async (
   assetId: string,
   signal?: AbortSignal,
 ): Promise<ReferenceImageAsset> => {
-  const response = await fetch(`/api/reference-images/${encodeURIComponent(assetId)}`, {
-    cache: 'no-store',
-    ...(signal ? { signal } : {}),
-    headers: { Accept: 'application/json' },
-  });
-  if (!response.ok) throw await readError(response);
-  const parsed = referenceImageMetadataResponseSchema.safeParse(await response.json());
-  if (!parsed.success || parsed.data.assetId !== assetId) {
+  const payload = await requestJson(
+    `/api/reference-images/${encodeURIComponent(assetId)}`,
+    {
+      cache: 'no-store',
+      ...(signal ? { signal } : {}),
+      headers: { Accept: 'application/json' },
+    },
+    referenceImageMetadataResponseSchema,
+    invalidApiResponse('The reference metadata was invalid.', 'invalid_provider_image'),
+  );
+  if (payload.assetId !== assetId) {
     throw new ApiClientError('The reference metadata was invalid.', 502, 'invalid_provider_image');
   }
-  return parsed.data;
+  return payload;
 };
 
 export type PersistedReferenceImage = {
@@ -239,23 +263,17 @@ export const requestRealtimeToken = async (
   signal: AbortSignal,
   sessionProfile?: RealtimeSessionProfile,
 ): Promise<{ apiKey: string; expiresAt: string }> => {
-  const response = await fetch('/api/realtime-token', {
-    method: 'POST',
-    signal,
-    cache: 'no-store',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify({ model, ...(sessionProfile ? { sessionProfile } : {}) }),
-  });
-  if (!response.ok) throw await readError(response);
-  const parsed = realtimeTokenResponseSchema.safeParse(await response.json());
-  if (!parsed.success) {
-    throw new ApiClientError('The realtime credential response was incomplete.', 502, 'bad-token');
-  }
-  return { apiKey: parsed.data.apiKey, expiresAt: parsed.data.expiresAt };
-};
-
-export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const response = await fetch(input, init);
-  if (!response.ok) throw await readError(response);
-  return response;
+  const payload = await requestJson(
+    '/api/realtime-token',
+    {
+      method: 'POST',
+      signal,
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify({ model, ...(sessionProfile ? { sessionProfile } : {}) }),
+    },
+    realtimeTokenResponseSchema,
+    invalidApiResponse('The realtime credential response was incomplete.', 'bad-token'),
+  );
+  return { apiKey: payload.apiKey, expiresAt: payload.expiresAt };
 };

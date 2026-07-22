@@ -38,6 +38,22 @@ afterEach(() => {
 });
 
 describe('voice API provider intent', () => {
+  it('uses the voice-specific invalid response for malformed success JSON', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('{not-json', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+
+    await expect(listWorkspaceVoices('', null, new AbortController().signal)).rejects.toThrow(
+      'The workspace voice response was invalid.',
+    );
+  });
+
   it('marks workspace and public list reads and preserves their discriminants', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()

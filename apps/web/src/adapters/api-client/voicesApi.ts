@@ -11,7 +11,7 @@ import type {
   VoiceLibraryItem,
   WorkspaceVoicePage,
 } from '../../application/types';
-import { apiFetch } from './apiClient';
+import { apiFetch, requestJson } from './apiClient';
 
 const invalidResponse = (capability: string): Error =>
   new Error(`The ${capability} response was invalid. Refresh and try again.`);
@@ -27,15 +27,15 @@ export const listWorkspaceVoices = async (
 ): Promise<WorkspaceVoicePage> => {
   const params = new URLSearchParams({ search: search.trim(), pageSize: '10' });
   if (pageToken) params.set('pageToken', pageToken);
-  const response = await apiFetch(`/api/elevenlabs/voices?${params}`, {
-    signal,
-    headers: providerIntentHeaders(),
-  });
-  const parsed = workspaceVoicesResponseSchema.safeParse(await response.json());
-  if (!parsed.success) throw invalidResponse('workspace voice');
+  const payload = await requestJson(
+    `/api/elevenlabs/voices?${params}`,
+    { signal, headers: providerIntentHeaders() },
+    workspaceVoicesResponseSchema,
+    () => invalidResponse('workspace voice'),
+  );
   return {
-    ...parsed.data,
-    voices: parsed.data.voices.map((voice) => ({ kind: 'workspace' as const, voice })),
+    ...payload,
+    voices: payload.voices.map((voice) => ({ kind: 'workspace' as const, voice })),
   };
 };
 
@@ -45,17 +45,17 @@ export const listPublicVoices = async (
   signal: AbortSignal,
 ): Promise<PublicVoicePage> => {
   const params = new URLSearchParams({ search: search.trim(), page: String(page), pageSize: '10' });
-  const response = await apiFetch(`/api/elevenlabs/shared-voices?${params}`, {
-    signal,
-    headers: providerIntentHeaders(),
-  });
-  const parsed = sharedVoicesResponseSchema.safeParse(await response.json());
-  if (!parsed.success) throw invalidResponse('public voice');
+  const payload = await requestJson(
+    `/api/elevenlabs/shared-voices?${params}`,
+    { signal, headers: providerIntentHeaders() },
+    sharedVoicesResponseSchema,
+    () => invalidResponse('public voice'),
+  );
   return {
-    hasMore: parsed.data.hasMore,
-    nextPageToken: parsed.data.nextPageToken,
-    total: parsed.data.total,
-    voices: parsed.data.voices.map((voice) => ({ kind: 'public' as const, voice })),
+    hasMore: payload.hasMore,
+    nextPageToken: payload.nextPageToken,
+    total: payload.total,
+    voices: payload.voices.map((voice) => ({ kind: 'public' as const, voice })),
   };
 };
 
@@ -64,22 +64,25 @@ export const importPublicVoice = async (
   signal: AbortSignal,
 ): Promise<string> => {
   const { voice } = item;
-  const response = await apiFetch('/api/elevenlabs/shared-voices/import', {
-    method: 'POST',
-    signal,
-    headers: {
-      ...providerIntentHeaders(),
-      'Content-Type': 'application/json',
+  const payload = await requestJson(
+    '/api/elevenlabs/shared-voices/import',
+    {
+      method: 'POST',
+      signal,
+      headers: {
+        ...providerIntentHeaders(),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: voice.name,
+        publicOwnerId: voice.publicOwnerId,
+        voiceId: voice.voiceId,
+      }),
     },
-    body: JSON.stringify({
-      name: voice.name,
-      publicOwnerId: voice.publicOwnerId,
-      voiceId: voice.voiceId,
-    }),
-  });
-  const parsed = importSharedVoiceResponseSchema.safeParse(await response.json());
-  if (!parsed.success) throw invalidResponse('voice import');
-  return parsed.data.voiceId;
+    importSharedVoiceResponseSchema,
+    () => invalidResponse('voice import'),
+  );
+  return payload.voiceId;
 };
 
 export const fetchVoicePreview = async (

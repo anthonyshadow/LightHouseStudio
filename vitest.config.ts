@@ -30,10 +30,10 @@ export default defineConfig({
       ],
       exclude: ['**/*.test.*', '**/*.d.ts', '**/dist/**', 'e2e/**'],
       thresholds: {
-        statements: 79,
-        branches: 68,
+        statements: 81,
+        branches: 69,
         functions: 82,
-        lines: 82,
+        lines: 83,
       },
     },
   },

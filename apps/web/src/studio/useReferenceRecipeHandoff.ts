@@ -12,7 +12,6 @@ import type {
   CreativeAssetRepository,
   CreativeAssetStore,
   SavedCharacterPrompt,
-  SavedPrompt,
 } from '../features/creative-assets/types';
 import type { RecipeSelection } from '../features/creative-assets/RecipeShelf.types';
 import type {
@@ -22,7 +21,6 @@ import type {
 } from '../features/character-builder/useCharacterBuilderController';
 import { confirmModeReplacement } from '../features/media-session/draftPolicy';
 import type {
-  SessionDraft,
   SessionReferenceImage,
   StudioMode,
   StudioSessionController,
@@ -38,11 +36,16 @@ import type {
   WorkshopReferenceImage,
 } from '../features/prompt-authoring/ReferenceImageGenerator';
 import { canReplaceDirtyLibraryMode } from './studioPolicies';
+import {
+  isExactActiveRecipe,
+  referenceIdentity,
+  type ActiveRecipeFingerprint,
+  type ActiveStudioRecipe,
+  type RecipeAsset,
+} from './referenceRecipeIdentity';
 
-export type ActiveStudioRecipe = {
-  origin: 'character-prompt' | 'saved-prompt';
-  assetId: string;
-} | null;
+export { isExactActiveRecipe } from './referenceRecipeIdentity';
+export type { ActiveStudioRecipe } from './referenceRecipeIdentity';
 
 export type PromptCommittedHandler = (
   mode: ModelMode,
@@ -59,49 +62,6 @@ type PendingReferenceUse = {
   savedPromptId?: string;
   savedCharacterPromptId?: string;
   destination: 'shelf' | 'workshop';
-};
-
-type ActiveRecipeFingerprint = {
-  mode: StudioMode;
-  prompt: string;
-  referenceImageAssetId: string | null;
-  assetPrompt: string;
-  assetReferenceImageAssetId: string | null;
-};
-
-type RecipeAsset = SavedCharacterPrompt | SavedPrompt;
-
-type ExactActiveRecipeInput = {
-  readonly fingerprint: ActiveRecipeFingerprint;
-  readonly asset: RecipeAsset;
-  readonly draft: Pick<SessionDraft, 'mode' | 'prompt' | 'referenceImage'>;
-};
-
-const EPHEMERAL_REFERENCE_IDENTITY = 'session:ephemeral-reference';
-
-const referenceIdentity = (reference: SessionReferenceImage | null): string | null =>
-  reference?.kind === 'persisted'
-    ? reference.assetId
-    : reference?.kind === 'ephemeral'
-      ? EPHEMERAL_REFERENCE_IDENTITY
-      : null;
-
-/** Active shelf identity is retained only while both the draft and stored asset remain exact. */
-export const isExactActiveRecipe = ({
-  fingerprint,
-  asset,
-  draft,
-}: ExactActiveRecipeInput): boolean => {
-  const assetMode = 'modelModeId' in asset ? asset.modelModeId : 'lucy-2.5';
-  return (
-    draft.mode === fingerprint.mode &&
-    canonicalPrompt(draft.prompt) === canonicalPrompt(fingerprint.prompt) &&
-    referenceIdentity(draft.referenceImage) === fingerprint.referenceImageAssetId &&
-    assetMode === fingerprint.mode &&
-    canonicalPrompt(asset.prompt) === canonicalPrompt(fingerprint.assetPrompt) &&
-    asset.referenceImageAssetId === fingerprint.assetReferenceImageAssetId &&
-    fingerprint.referenceImageAssetId === fingerprint.assetReferenceImageAssetId
-  );
 };
 
 const referenceGenerationError = (error: unknown): string => {
@@ -180,9 +140,8 @@ export const useReferenceRecipeHandoff = ({
   const [referenceUsePending, setReferenceUsePending] = useState(false);
   const [referenceUseFailureMessage, setReferenceUseFailureMessage] = useState<string | null>(null);
   const [shelfDirty, setShelfDirty] = useState(false);
-  if (session.draft.mode !== 'local' && !shelfDirty && libraryMode !== session.draft.mode) {
-    setLibraryMode(session.draft.mode);
-  }
+  const resolvedLibraryMode =
+    session.draft.mode !== 'local' && !shelfDirty ? session.draft.mode : libraryMode;
   const generationRequestRef = useRef<string | null>(null);
   const workshopRevisionRef = useRef(0);
   const referenceRestoreRef = useRef<{ assetId: string; prompt: string } | null>(null);
@@ -200,9 +159,35 @@ export const useReferenceRecipeHandoff = ({
     setWorkshopDrafts((current) => ({ ...current, [draft.intent]: draft }));
   }, []);
 
+  const activeRecipeAsset = useMemo<RecipeAsset | null>(() => {
+    if (!activeRecipe) return null;
+    const assets =
+      activeRecipe.origin === 'character-prompt' ? store.savedCharacterPrompts : store.savedPrompts;
+    return assets.find((candidate) => candidate.id === activeRecipe.assetId) ?? null;
+  }, [activeRecipe, store.savedCharacterPrompts, store.savedPrompts]);
+
+  const activeRecipeIsExact = Boolean(
+    activeRecipe &&
+    activeRecipeAsset &&
+    (!activeRecipeFingerprint ||
+      isExactActiveRecipe({
+        fingerprint: activeRecipeFingerprint,
+        asset: activeRecipeAsset,
+        draft: session.draft,
+      })),
+  );
+  const resolvedActiveRecipe = activeRecipeIsExact ? activeRecipe : null;
+  const resolvedActiveRecipeFingerprint = activeRecipeIsExact ? activeRecipeFingerprint : null;
+  const activeCharacterName =
+    resolvedActiveRecipe?.origin === 'character-prompt' &&
+    activeRecipeAsset &&
+    'name' in activeRecipeAsset
+      ? activeRecipeAsset.name
+      : undefined;
+
   const recordCommittedPrompt = useCallback<PromptCommittedHandler>(
     (mode, prompt, committedReferenceAssetId) => {
-      const activeFingerprint = activeRecipeFingerprint;
+      const activeFingerprint = resolvedActiveRecipeFingerprint;
       const activeRecipeStillMatches = Boolean(
         activeFingerprint &&
         activeFingerprint.mode === mode &&
@@ -239,7 +224,7 @@ export const useReferenceRecipeHandoff = ({
           : {}),
       });
     },
-    [activeRecipeFingerprint, repository, workshopReferenceImage],
+    [repository, resolvedActiveRecipeFingerprint, workshopReferenceImage],
   );
 
   const generateWorkshopReference = useCallback(
@@ -314,43 +299,15 @@ export const useReferenceRecipeHandoff = ({
     if (restore) restoreWorkshopReference(restore.assetId, restore.prompt);
   }, [restoreWorkshopReference]);
 
-  const activeRecipeAsset = useMemo<RecipeAsset | null>(() => {
-    if (!activeRecipe) return null;
-    return activeRecipe.origin === 'character-prompt'
-      ? (store.savedCharacterPrompts.find((candidate) => candidate.id === activeRecipe.assetId) ??
-          null)
-      : (store.savedPrompts.find((candidate) => candidate.id === activeRecipe.assetId) ?? null);
-  }, [activeRecipe, store.savedCharacterPrompts, store.savedPrompts]);
-
-  const activeCharacterName =
-    activeRecipe?.origin === 'character-prompt' && activeRecipeAsset && 'name' in activeRecipeAsset
-      ? activeRecipeAsset.name
-      : undefined;
-
-  const activeRecipeInvalid = Boolean(
-    activeRecipe &&
-    (!activeRecipeAsset ||
-      (activeRecipeFingerprint &&
-        !isExactActiveRecipe({
-          fingerprint: activeRecipeFingerprint,
-          asset: activeRecipeAsset,
-          draft: session.draft,
-        }))),
-  );
-  if (activeRecipeInvalid) {
-    setActiveRecipe(null);
-    setActiveRecipeFingerprint(null);
-  }
-
   useEffect(() => {
-    if (activeRecipe) return;
+    if (resolvedActiveRecipe) return;
     selectedSavedPrompt.current = undefined;
     selectedCharacterPrompt.current = undefined;
-  }, [activeRecipe]);
+  }, [resolvedActiveRecipe]);
 
   const changeLibraryMode = useCallback(
     (mode: ModelMode) => {
-      if (mode === libraryMode) return;
+      if (mode === resolvedLibraryMode) return;
       if (
         !canReplaceDirtyLibraryMode(shelfDirty, () =>
           window.confirm('Switch recipe models and discard the unsaved shelf form changes?'),
@@ -361,7 +318,7 @@ export const useReferenceRecipeHandoff = ({
       setShelfDirty(false);
       setLibraryMode(mode);
     },
-    [libraryMode, shelfDirty],
+    [resolvedLibraryMode, shelfDirty],
   );
 
   const selectModeWithDraftProtection = useCallback(
@@ -740,14 +697,14 @@ export const useReferenceRecipeHandoff = ({
   const openWorkshop = useCallback(() => {
     if (recordingActive) return;
     if (session.draft.mode !== 'lucy-2.5' && !selectModeWithDraftProtection('lucy-2.5')) return;
-    workshopSourceRecipeRef.current = activeRecipe;
+    workshopSourceRecipeRef.current = resolvedActiveRecipe;
     if (!workshopReferenceImage && session.draft.referenceImage?.kind === 'persisted') {
       workshopRevisionRef.current += 1;
       restoreWorkshopReference(session.draft.referenceImage.assetId, session.draft.prompt);
     }
     openWorkshopOverlay();
   }, [
-    activeRecipe,
+    resolvedActiveRecipe,
     openWorkshopOverlay,
     recordingActive,
     restoreWorkshopReference,
@@ -757,13 +714,13 @@ export const useReferenceRecipeHandoff = ({
   ]);
 
   const recipeInsertionBlocked =
-    mediaLocked || (sessionModeLocked && session.draft.mode !== libraryMode);
+    mediaLocked || (sessionModeLocked && session.draft.mode !== resolvedLibraryMode);
 
   return {
     state: {
-      activeRecipe,
+      activeRecipe: resolvedActiveRecipe,
       activeCharacterName,
-      libraryMode,
+      libraryMode: resolvedLibraryMode,
       workshopDraft,
       workshopDrafts,
       workshopReferenceImage,

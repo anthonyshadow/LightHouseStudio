@@ -86,6 +86,44 @@ afterEach(() => {
 });
 
 describe('reference image API client', () => {
+  it('normalizes malformed JSON through the endpoint invalid-response contract', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response('{not-json', {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+
+    await expect(fetchProviderAvailability()).rejects.toMatchObject({
+      code: 'invalid-response',
+      status: 502,
+    });
+  });
+
+  it('preserves normalized API errors and abort rejections', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValueOnce(
+        new Response(JSON.stringify({ error: { code: 'provider_quota', message: 'Try later.' } }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      ),
+    );
+    await expect(fetchProviderAvailability()).rejects.toMatchObject({
+      code: 'provider_quota',
+      message: 'Try later.',
+      status: 429,
+    });
+
+    const aborted = new DOMException('Aborted', 'AbortError');
+    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(aborted));
+    await expect(fetchProviderAvailability(new AbortController().signal)).rejects.toBe(aborted);
+  });
+
   it('maps generator and optimizer capability metadata for the workshop', async () => {
     vi.stubGlobal(
       'fetch',

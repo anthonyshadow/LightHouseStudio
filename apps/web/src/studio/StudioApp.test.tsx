@@ -319,7 +319,17 @@ vi.mock('./CreativeWorkspace', () => ({
         >
           Generate reference
         </button>
+        <button type="button" onClick={() => props.state.referenceUseFailure?.onRetry()}>
+          Retry reference handoff
+        </button>
+        <button
+          type="button"
+          onClick={() => props.state.referenceUseFailure?.onContinueWithoutReference()}
+        >
+          Continue reference handoff without image
+        </button>
         <output data-testid="generation-status">{props.state.referenceGeneration.status}</output>
+        <output data-testid="handoff-error">{props.state.referenceUseFailure?.message}</output>
       </div>
     );
   },
@@ -383,6 +393,43 @@ describe('StudioApp composition lifecycle', () => {
       'lucy-2.5',
       referenceAsset.assetId,
     );
+  });
+
+  it('retries the exact failed reference handoff', async () => {
+    harness.fetchReferenceImageMetadata
+      .mockRejectedValueOnce(new Error('missing'))
+      .mockResolvedValueOnce(referenceAsset);
+    render(<StudioApp />);
+    fireEvent.click(screen.getByRole('button', { name: 'Apply reference recipe' }));
+    await waitFor(() => expect(screen.getByTestId('handoff-error')).not.toBeEmptyDOMElement());
+
+    fireEvent.click(screen.getByRole('button', { name: 'Retry reference handoff' }));
+    await waitFor(() => expect(harness.session.replaceRecipeDraft).toHaveBeenCalledOnce());
+    expect(harness.fetchReferenceImageMetadata).toHaveBeenCalledTimes(2);
+    expect(harness.session.replaceRecipeDraft).toHaveBeenCalledWith({
+      mode: 'lucy-2.5',
+      prompt: referenceAsset.lucy25CharacterPrompt,
+      referenceImage: harness.hydratedReference,
+      enhance: true,
+    });
+  });
+
+  it('continues a failed handoff without silently retaining the missing reference', async () => {
+    harness.fetchReferenceImageMetadata.mockRejectedValueOnce(new Error('missing'));
+    render(<StudioApp />);
+    fireEvent.click(screen.getByRole('button', { name: 'Apply reference recipe' }));
+    await waitFor(() => expect(screen.getByTestId('handoff-error')).not.toBeEmptyDOMElement());
+
+    fireEvent.click(
+      screen.getByRole('button', { name: 'Continue reference handoff without image' }),
+    );
+    await waitFor(() => expect(harness.session.replaceRecipeDraft).toHaveBeenCalledOnce());
+    expect(harness.session.replaceRecipeDraft).toHaveBeenCalledWith({
+      mode: 'lucy-2.5',
+      prompt: referenceAsset.originalPrompt,
+      referenceImage: null,
+      enhance: false,
+    });
   });
 
   it('keeps repository prompt recording connected through the session callback bridge', () => {

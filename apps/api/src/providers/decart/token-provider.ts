@@ -50,6 +50,15 @@ interface DecartSdkModule {
   readonly noopLogger?: unknown;
 }
 
+const isRecord = (value: unknown): value is Record<PropertyKey, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const isDecartSdkModule = (value: unknown): value is DecartSdkModule =>
+  isRecord(value) && typeof value.createDecartClient === 'function';
+
+const isDecartSdkClient = (value: unknown): value is DecartSdkClient =>
+  isRecord(value) && isRecord(value.tokens) && typeof value.tokens.create === 'function';
+
 const normalizeExpiry = (value: string | number | Date): string => {
   const date = value instanceof Date ? value : new Date(value);
   if (Number.isNaN(date.getTime())) throw new ProviderError('token', 'invalid-response');
@@ -84,16 +93,19 @@ export class DecartSdkTokenProvider implements DecartTokenProvider {
 
     try {
       // Kept lazy so starting and recording a local session cannot load the Decart SDK.
-      const sdk = (await import('@decartai/sdk')) as unknown as DecartSdkModule;
-      if (typeof sdk.createDecartClient !== 'function') {
+      const loadedSdk: unknown = await import('@decartai/sdk');
+      if (!isDecartSdkModule(loadedSdk)) {
         throw new ProviderError('token', 'invalid-response');
       }
 
-      const client = sdk.createDecartClient({
+      const client = loadedSdk.createDecartClient({
         apiKey: this.#apiKey,
         telemetry: false,
-        ...(sdk.noopLogger === undefined ? {} : { logger: sdk.noopLogger }),
+        ...(loadedSdk.noopLogger === undefined ? {} : { logger: loadedSdk.noopLogger }),
       });
+      if (!isDecartSdkClient(client)) {
+        throw new ProviderError('token', 'invalid-response');
+      }
       const tokenPromise = client.tokens.create({
         expiresIn: scope.expiresInSeconds,
         allowedModels: [scope.model],

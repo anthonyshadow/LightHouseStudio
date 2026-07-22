@@ -64,6 +64,17 @@ describe('DecartSdkTokenProvider', () => {
     });
   });
 
+  it('rejects a malformed SDK client before attempting token issuance', async () => {
+    sdkMocks.createClient.mockReturnValue({ tokens: {} });
+    const provider = new DecartSdkTokenProvider('server-only-placeholder');
+
+    await expect(provider.createToken(scope())).rejects.toMatchObject({
+      operation: 'token',
+      reason: 'invalid-response',
+    });
+    expect(sdkMocks.createToken).not.toHaveBeenCalled();
+  });
+
   it('invalidates issuance when the caller aborts', async () => {
     sdkMocks.createToken.mockImplementation(() => new Promise(() => undefined));
     const provider = new DecartSdkTokenProvider('server-only-placeholder');
