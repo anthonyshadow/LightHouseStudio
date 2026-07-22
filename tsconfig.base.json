@@ -14,11 +14,9 @@
     "isolatedModules": true,
     "resolveJsonModule": true,
     "skipLibCheck": true,
-    "baseUrl": ".",
-    "ignoreDeprecations": "6.0",
     "paths": {
-      "@studio/domain": ["packages/domain/src/index.ts"],
-      "@studio/contracts": ["packages/contracts/src/index.ts"]
+      "@studio/domain": ["./packages/domain/src/index.ts"],
+      "@studio/contracts": ["./packages/contracts/src/index.ts"]
     }
   }
 }

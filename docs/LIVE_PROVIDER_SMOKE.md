@@ -4,7 +4,7 @@ Live smoke testing is manual, opt-in, cost-aware, and excluded from default test
 
 ## Provider assumptions verified for this build
 
-- `@decartai/sdk` is pinned to `0.1.14`. Its registry recognizes `lucy-2.5` and the user-approved exact `lucy-vton-3` id. Current Decart VTON examples may instead show the moving `lucy-vton-latest` alias; this product intentionally does not follow that alias silently.
+- `@decartai/sdk` is pinned to `0.1.15`. Its registry recognizes `lucy-2.5` and the user-approved exact `lucy-vton-3` id. Current Decart VTON examples may instead show the moving `lucy-vton-latest` alias; this product intentionally does not follow that alias silently.
 - Decart browser access uses a backend-minted client token, scoped to one model, the exact loopback origin, a five-minute issuance window, and a five-minute realtime-session limit.
 - ElevenLabs uses `/v2/voices`, `/v1/shared-voices`, `/v1/voices/add/:owner/:voice`, `/v1/models`, and `/v1/speech-to-speech/:voice`. Provider plans can change voice eligibility and conversion access.
 - `ELEVENLABS_ENABLE_LOGGING=false` requests zero-retention conversion, which ElevenLabs currently limits to eligible enterprise accounts. Set it to `true` only after an informed retention decision when testing a non-eligible account.

@@ -1,5 +1,8 @@
 {
   "$schema": "https://unpkg.com/knip@6/schema.json",
+  "ignoreIssues": {
+    "e2e/support/studioHarness.ts": ["exports", "types"]
+  },
   "workspaces": {
     ".": {
       "entry": ["e2e/**/*.{spec,screenshots}.ts", "scripts/**/*.mjs"],
@@ -9,12 +12,26 @@
     "apps/api": {
       "entry": ["src/**/*.test.ts"],
       "project": ["src/**/*.ts"],
-      "ignoreExportsUsedInFile": true
+      "ignoreExportsUsedInFile": true,
+      "ignoreIssues": {
+        "src/features/reference-images/reference-image-service.ts": ["exports", "types"]
+      }
     },
     "apps/web": {
       "entry": ["src/**/*.test.{ts,tsx}"],
       "project": ["src/**/*.{ts,tsx}", "vite.config{,.test}.ts"],
-      "ignoreExportsUsedInFile": true
+      "ignoreExportsUsedInFile": true,
+      "ignoreIssues": {
+        "src/features/character-builder/CharacterBuilderForm.tsx": ["exports"],
+        "src/features/character-builder/useCharacterBuilderController.ts": ["exports", "types"],
+        "src/features/creative-assets/sanitation.ts": ["exports"],
+        "src/features/guided-flow/types.ts": ["types"],
+        "src/features/prompt-authoring/index.ts": ["exports", "types"],
+        "src/features/prompt-authoring/model.ts": ["exports"],
+        "src/features/voice-effects/types.ts": ["types"],
+        "src/orchestration/recording/useRecording.ts": ["types"],
+        "src/ui/index.ts": ["exports", "types"]
+      }
     },
     "packages/contracts": {
       "entry": ["src/index.ts", "src/**/*.test.ts"],

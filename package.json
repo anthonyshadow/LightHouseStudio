@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "engines": {
-    "node": ">=22.13.0",
-    "npm": ">=10"
+    "node": ">=24 <25",
+    "npm": ">=11"
   },
   "workspaces": [
     "apps/*",
@@ -35,16 +35,17 @@
     "quality": "npm run typecheck && npm run lint && npm run format:check && npm run check:dead-code && npm run check:modules && npm run test && npm run build"
   },
   "devDependencies": {
+    "@typescript/native": "npm:typescript@7.0.2",
     "@axe-core/playwright": "4.12.1",
     "@eslint/js": "9.39.5",
     "@playwright/test": "1.61.1",
-    "@testing-library/jest-dom": "6.9.1",
+    "@testing-library/jest-dom": "7.0.0",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
-    "@types/node": "22.20.1",
+    "@types/node": "24.3.0",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
-    "@vitejs/plugin-react": "6.0.3",
+    "@vitejs/plugin-react": "6.0.4",
     "@vitest/coverage-v8": "4.1.10",
     "concurrently": "9.2.4",
     "esbuild": "0.28.1",
@@ -53,12 +54,12 @@
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.7.0",
     "jsdom": "29.1.1",
-    "knip": "6.27.0",
-    "prettier": "3.9.5",
+    "knip": "6.29.0",
+    "prettier": "3.9.6",
     "tsup": "8.5.1",
     "tsx": "4.23.1",
-    "typescript": "6.0.3",
-    "typescript-eslint": "8.64.0",
+    "typescript": "npm:@typescript/typescript6@6.0.2",
+    "typescript-eslint": "8.65.0",
     "vite": "8.1.5",
     "vitest": "4.1.10"
   }
