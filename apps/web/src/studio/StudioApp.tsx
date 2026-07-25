@@ -16,11 +16,16 @@ import { useCreativeAssetRepository } from '../features/creative-assets/useCreat
 import { createLocalProjectRepository } from '../features/guided-flow/projectRepository';
 import type { ProjectStorageState } from '../features/guided-flow/types';
 import { MediaStage, type StageNotice } from '../features/live-stage';
-import { SessionComposer } from '../features/media-session';
+import {
+  confirmModeReplacement,
+  hasDraftContent,
+  SessionComposer,
+  type StudioMode,
+} from '../features/media-session';
 import { CaptureSettingsPanel, RecordingControls } from '../features/recording';
 import { useStrictModeSafeDisposable } from '../orchestration/lifecycle/useStrictModeSafeDisposable';
 import { useStudioSession } from '../orchestration/session';
-import { OverlayPanel, StudioDesignProvider } from '../ui';
+import { Button, OverlayPanel, StudioDesignProvider } from '../ui';
 import {
   headerRegionStyles,
   mainGridStyles,
@@ -30,7 +35,9 @@ import {
   stageColumnStyles,
 } from './StudioApp.styles';
 import { CreativeWorkspace, type AuxiliaryPanel } from './CreativeWorkspace';
+import { AIExperienceChooser } from './AIExperienceChooser';
 import { StudioHeader } from './StudioHeader';
+import { StudioSessionControlBar } from './StudioSessionControlBar';
 import { resolveLegacyEntry, type StudioInitialOverlay } from './routeResolution';
 import { createNoopStudioTelemetry } from './telemetry';
 import { useProviderAvailability } from './useProviderAvailability';
@@ -83,7 +90,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   const {
     active: activeOverlay,
     open: openOverlay,
-    openIfEmpty: openOverlayIfEmpty,
     close: closeOverlay,
     closeIf: closeOverlayIf,
     toggle: toggleOverlay,
@@ -96,7 +102,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   const [legacyProjectCount, setLegacyProjectCount] = useState(0);
   const [dismissedNotices, setDismissedNotices] = useState<ReadonlySet<string>>(new Set());
   const promptCommittedHandlerRef = useRef<PromptCommittedHandler>(noopPromptCommitted);
-  const characterBuilderButtonRef = useRef<HTMLButtonElement>(null);
+  const characterSelectorRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
   const shelfToggleRef = useRef<HTMLButtonElement>(null);
   const legacyManagerToggleRef = useRef<HTMLButtonElement>(null);
@@ -122,11 +128,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     [],
   );
   const session = useStudioSession({ availability, onPromptCommitted: handlePromptCommitted });
-  const handleReviewAvailable = useCallback(
-    () => openOverlayIfEmpty('take-review'),
-    [openOverlayIfEmpty],
-  );
-  const handleReviewPublished = useCallback(() => openOverlay('take-review'), [openOverlay]);
   const handleReviewCleared = useCallback(
     () => closeOverlayIf(['take-review', 'voice-treatments']),
     [closeOverlayIf],
@@ -145,8 +146,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     stagePresentation,
   } = useTakeReviewFlow({
     session,
-    onReviewAvailable: handleReviewAvailable,
-    onReviewPublished: handleReviewPublished,
     onReviewCleared: handleReviewCleared,
   });
   const aiSessionActive = [
@@ -156,13 +155,10 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     'connected',
     'generating',
     'reconnecting',
+    'stopping-ai',
+    'stopping-media',
   ].includes(session.lifecycle);
-  const sessionModeLocked =
-    mediaLocked ||
-    Boolean(session.localStream) ||
-    aiSessionActive ||
-    session.lifecycle === 'ready' ||
-    session.lifecycle === 'disconnected';
+  const sessionModeLocked = mediaLocked || aiSessionActive || session.lifecycle === 'disconnected';
   const characterBuilderOpenBlockedReason = recordingActive
     ? 'Finish recording and finalization before building a character.'
     : finalizingStartedAt !== null || finalizingStream !== null
@@ -185,7 +181,9 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   });
   const {
     activeRecipe,
+    activeCharacter,
     activeCharacterName,
+    activeRecipeLabel,
     libraryMode,
     workshopDraft,
     workshopDrafts,
@@ -340,6 +338,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     if (characterBuilderOpenBlockedReason) return;
     openOverlay('character-builder');
   };
+  const openCharacterSelector = () => openOverlay('character-selector');
 
   const openLegacyProjects = () => openOverlay('legacy-projects');
 
@@ -354,6 +353,43 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     : shelfDirty
       ? 'Save or discard Recipe Shelf changes before recording.'
       : undefined;
+  const activeRecordingSource = recordingActive
+    ? recording.activeSource
+    : reviewLocked
+      ? null
+      : recordingSource;
+  const currentExperienceLabel =
+    activeCharacterName ??
+    (session.draft.mode === 'lucy-vton-3' && hasDraftContent(session.draft)
+      ? activeRecipeLabel
+        ? `Virtual Try-On · ${activeRecipeLabel}`
+        : 'Virtual Try-On'
+      : undefined);
+  const currentExperienceImageAssetId =
+    activeCharacter?.referenceImageAssetId ??
+    (session.draft.referenceImage?.kind === 'persisted'
+      ? session.draft.referenceImage.assetId
+      : null);
+  const selectExperienceMode = (mode: StudioMode): boolean => {
+    return (
+      confirmModeReplacement(session.draft, mode, (message) => window.confirm(message)) &&
+      session.selectMode(mode)
+    );
+  };
+  const openSavedRecipesFor = (mode: 'lucy-2.5' | 'lucy-vton-3') => {
+    changeLibraryMode(mode);
+    openOverlay('recipe-shelf');
+  };
+  const configureVirtualTryOn = () => {
+    if (!selectExperienceMode('lucy-vton-3')) return;
+    closeOverlay();
+    openOverlay('recipe-dock');
+  };
+  const startPreparedAi = (mode: 'lucy-2.5' | 'lucy-vton-3') => {
+    if (!selectExperienceMode(mode)) return;
+    closeOverlay();
+    void session.startModel();
+  };
 
   return (
     <div css={pageStyles(theme)}>
@@ -366,11 +402,10 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
             availability={availability}
             browser={browser}
             capabilityState={capabilityState}
-            characterBuilderButtonRef={characterBuilderButtonRef}
-            {...(characterBuilderOpenBlockedReason
-              ? { characterBuilderDisabledReason: characterBuilderOpenBlockedReason }
-              : {})}
-            onBuildCharacter={openCharacterBuilder}
+            characterSelectorRef={characterSelectorRef}
+            {...(activeCharacterName ? { activeCharacterName } : {})}
+            activeCharacterImageAssetId={activeCharacter?.referenceImageAssetId}
+            onOpenCharacterSelector={openCharacterSelector}
           />
         </div>
 
@@ -384,22 +419,105 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
               generationSeconds={session.generationSeconds}
               recording={recording.lifecycle === 'recording'}
               recordingSeconds={recording.elapsedSeconds}
+              {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}
+              controls={
+                <StudioSessionControlBar
+                  session={session}
+                  {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}
+                  experienceImageAssetId={currentExperienceImageAssetId}
+                  recording={recording}
+                  recordingSource={activeRecordingSource}
+                  recordingSupported={browser.mediaRecorder}
+                  {...(captureBlockedReason
+                    ? { recordingBlockedReason: captureBlockedReason }
+                    : {})}
+                  reviewingTake={stagePresentation.kind === 'playback'}
+                  controlsLocked={reviewLocked || finalizingStartedAt !== null}
+                  onStopRecording={finishTake}
+                  onCloseTakeReview={closeOverlay}
+                  onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
+                  onChooseAiExperience={() => openOverlay('ai-experience')}
+                  onChangeExperience={() => openOverlay('ai-experience')}
+                />
+              }
               notices={stageNotices}
             />
             <RecordingControls
               recording={recording}
-              source={
-                recordingActive ? recording.activeSource : reviewLocked ? null : recordingSource
-              }
+              source={activeRecordingSource}
               mode={session.draft.mode}
-              modelOutputReady={session.transformedVideoUsable}
-              supported={browser.mediaRecorder}
-              {...(captureBlockedReason ? { blockedReason: captureBlockedReason } : {})}
               onOpenSettings={openCaptureSettings}
-              onStop={finishTake}
             />
           </div>
         </main>
+
+        <OverlayPanel
+          open={activeOverlay === 'character-selector'}
+          onClose={closeOverlay}
+          title="Character"
+          description="Choose the character shown in the studio controls, or create a new one."
+          placement="right"
+          bodyMode="contained"
+          returnFocusRef={characterSelectorRef}
+        >
+          <div
+            css={{
+              display: 'grid',
+              gap: theme.space.sm,
+              alignContent: 'start',
+              '& p': { margin: 0, color: theme.colors.textMuted },
+            }}
+          >
+            <p>
+              {activeCharacterName
+                ? `${activeCharacterName} is currently selected.`
+                : 'No saved character is selected.'}
+            </p>
+            {activeCharacterName ? (
+              <Button
+                variant="secondary"
+                disabled={Boolean(characterBuilderOpenBlockedReason)}
+                title={characterBuilderOpenBlockedReason}
+                onClick={openWorkshop}
+              >
+                Edit {activeCharacterName}
+              </Button>
+            ) : null}
+            <Button
+              variant="primary"
+              disabled={Boolean(characterBuilderOpenBlockedReason)}
+              title={characterBuilderOpenBlockedReason}
+              onClick={openCharacterBuilder}
+            >
+              Create new character
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={recordingActive}
+              onClick={() => openSavedRecipesFor('lucy-2.5')}
+            >
+              Choose saved character
+            </Button>
+          </div>
+        </OverlayPanel>
+
+        <AIExperienceChooser
+          open={activeOverlay === 'ai-experience'}
+          {...(activeCharacterName ? { activeCharacterName } : {})}
+          characterReady={
+            Boolean(activeCharacterName) &&
+            session.draft.mode === 'lucy-2.5' &&
+            hasDraftContent(session.draft)
+          }
+          virtualTryOnReady={session.draft.mode === 'lucy-vton-3' && hasDraftContent(session.draft)}
+          onClose={closeOverlay}
+          onStartCharacter={() => startPreparedAi('lucy-2.5')}
+          onCreateCharacter={openCharacterBuilder}
+          onChooseSavedCharacter={() => openSavedRecipesFor('lucy-2.5')}
+          onStartVirtualTryOn={() => startPreparedAi('lucy-vton-3')}
+          onConfigureVirtualTryOn={configureVirtualTryOn}
+          onChooseSavedVirtualTryOn={() => openSavedRecipesFor('lucy-vton-3')}
+        />
 
         <OverlayPanel
           open={activeOverlay === 'recipe-dock'}
@@ -492,7 +610,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
           <Suspense fallback={deferredPanelFallback}>
             <CharacterBuilderCoordinator
               open
-              returnFocusRef={characterBuilderButtonRef}
+              returnFocusRef={characterSelectorRef}
               generationAvailable={Boolean(
                 availability.referenceImages && availability.referenceImageOptimizerAvailable,
               )}
@@ -534,6 +652,16 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
           repository={repository}
           state={{
             panel: creativePanel,
+            activeTool:
+              activeOverlay === 'recipe-dock'
+                ? 'dock'
+                : activeOverlay === 'take-review' || activeOverlay === 'voice-treatments'
+                  ? 'take'
+                  : activeOverlay === 'workshop'
+                    ? 'workshop'
+                    : activeOverlay === 'recipe-shelf'
+                      ? 'shelf'
+                      : null,
             activeSessionMode: session.draft.mode,
             libraryMode,
             workshopDraft,

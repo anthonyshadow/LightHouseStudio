@@ -54,6 +54,7 @@ const libraryModeOptions = [
 
 export type CreativeWorkspaceState = {
   panel: AuxiliaryPanel;
+  activeTool: 'dock' | 'take' | 'workshop' | 'shelf' | null;
   activeSessionMode: StudioMode;
   libraryMode: ModelMode;
   workshopDraft?: PromptBuilderDraft | undefined;
@@ -301,6 +302,7 @@ export const CreativePanelContent = ({
 export const CreativeWorkspace = ({ repository, state, actions, refs }: CreativeWorkspaceProps) => {
   const {
     panel,
+    activeTool,
     activeSessionMode,
     libraryMode,
     workshopDraft,
@@ -365,8 +367,9 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
       <nav css={toolRailStyles(theme)} aria-label="Creative workspace tools">
         <Button
           ref={dockToggleRef}
-          variant="secondary"
+          variant={activeTool === 'dock' ? 'primary' : 'secondary'}
           disabled={recordingActive}
+          aria-current={activeTool === 'dock' ? 'page' : undefined}
           aria-haspopup="dialog"
           onClick={onOpenDock}
         >
@@ -374,8 +377,9 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
         </Button>
         <Button
           ref={takeToggleRef}
-          variant="secondary"
+          variant={activeTool === 'take' ? 'primary' : 'secondary'}
           disabled={!hasTake || recordingActive}
+          aria-current={activeTool === 'take' ? 'page' : undefined}
           aria-haspopup="dialog"
           onClick={onOpenTake}
         >
@@ -383,7 +387,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
         </Button>
         <Button
           ref={workshopToggleRef}
-          variant={panel === 'workshop' ? 'primary' : 'secondary'}
+          variant={activeTool === 'workshop' ? 'primary' : 'secondary'}
           disabled={characterWorkshopBlocked}
           aria-expanded={panel === 'workshop'}
           aria-haspopup="dialog"
@@ -393,7 +397,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
         </Button>
         <Button
           ref={shelfToggleRef}
-          variant={panel === 'shelf' ? 'primary' : 'secondary'}
+          variant={activeTool === 'shelf' ? 'primary' : 'secondary'}
           disabled={recordingActive}
           aria-expanded={panel === 'shelf'}
           aria-haspopup="dialog"

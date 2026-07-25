@@ -47,10 +47,11 @@ export const SessionActions = ({
             ref={primaryActionRef}
             variant="danger"
             disabled={recording}
+            busy={session.lifecycle === 'stopping-media'}
             aria-describedby={recording ? reasonId : undefined}
-            onClick={session.stopCamera}
+            onClick={() => void session.stopCamera()}
           >
-            Stop camera
+            {session.lifecycle === 'stopping-media' ? 'Stopping camera…' : 'Stop camera'}
           </Button>
         ) : (
           <Button
@@ -111,11 +112,14 @@ export const SessionActions = ({
           ref={primaryActionRef}
           variant="secondary"
           disabled={recording}
-          onClick={session.stopModel}
+          busy={session.lifecycle === 'stopping-ai'}
+          onClick={() => void session.stopModel()}
         >
-          {['connected', 'generating', 'reconnecting'].includes(session.lifecycle)
-            ? 'Stop AI'
-            : 'Cancel AI start'}
+          {session.lifecycle === 'stopping-ai'
+            ? 'Stopping AI…'
+            : ['connected', 'generating', 'reconnecting'].includes(session.lifecycle)
+              ? 'Stop AI'
+              : 'Cancel AI start'}
         </Button>
         <Button key="model-reset" variant="danger" disabled={recording} onClick={onReset}>
           Reset AI
@@ -173,7 +177,7 @@ export const SessionActions = ({
           key="model-release-media"
           variant="danger"
           disabled={recording}
-          onClick={session.stopCamera}
+          onClick={() => void session.stopCamera()}
         >
           Release camera &amp; mic
         </Button>

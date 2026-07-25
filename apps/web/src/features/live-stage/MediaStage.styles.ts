@@ -1,4 +1,5 @@
 import type { CSSObject, Theme } from '@emotion/react';
+import { rotatingSpinnerAnimationStyles } from '../../ui/animationStyles';
 
 export const stageStyles = (theme: Theme, recording: boolean): CSSObject => ({
   position: 'relative',
@@ -250,38 +251,6 @@ export const guideCornerStyles = (position: 'tl' | 'tr' | 'bl' | 'br'): CSSObjec
   borderInlineEnd: position.includes('r') ? '2px solid currentColor' : undefined,
 });
 
-export const bottomOverlayStyles = (theme: Theme): CSSObject => ({
-  position: 'absolute',
-  zIndex: theme.layers.stageChrome,
-  insetInline: 'clamp(0.65rem, 1.4vw, 1rem)',
-  insetBlockEnd: 'clamp(0.65rem, 1.4vw, 1rem)',
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
-  minWidth: 0,
-  alignItems: 'end',
-  gap: theme.space.xs,
-  margin: 0,
-  pointerEvents: 'none',
-  '& > *': { pointerEvents: 'auto' },
-  '& > :first-of-type': {
-    maxWidth: 'min(16rem, 100%)',
-    justifySelf: 'start',
-  },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    gridTemplateColumns: 'minmax(0, 1fr) auto minmax(0, 1fr)',
-    gap: theme.space.xxs,
-    '& [data-live-timer]': { display: 'none' },
-  },
-});
-
-export const endStatusStyles: CSSObject = {
-  display: 'flex',
-  minWidth: 0,
-  justifyContent: 'flex-end',
-  alignItems: 'center',
-  gap: '0.5rem',
-};
-
 export const statusDotStyles = (
   theme: Theme,
   tone: 'neutral' | 'accent' | 'recording',
@@ -303,64 +272,6 @@ export const statusDotStyles = (
         ? `0 0 0 0.18rem ${theme.colors.accentSoft}`
         : 'none',
 });
-
-export const audioMeterStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: 'auto minmax(3.5rem, 7rem)',
-  minHeight: '2.25rem',
-  minWidth: 0,
-  alignItems: 'center',
-  gap: theme.space.xs,
-  padding: '0.38rem 0.65rem',
-  border: `1px solid ${theme.colors.borderStrong}`,
-  borderRadius: theme.radii.round,
-  color: theme.colors.textMuted,
-  background: theme.colors.overlaySurface,
-  boxShadow: theme.shadows.soft,
-  backdropFilter: 'blur(10px)',
-  fontSize: '0.7rem',
-  whiteSpace: 'nowrap',
-  '& svg': {
-    width: '1rem',
-    height: '1rem',
-    flex: '0 0 auto',
-  },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    gridTemplateColumns: 'auto minmax(2.75rem, 4rem)',
-    minHeight: '1.8rem',
-    padding: '0.28rem 0.5rem',
-  },
-});
-
-export const audioTrackStyles = (theme: Theme): CSSObject => ({
-  position: 'relative',
-  height: '0.34rem',
-  overflow: 'hidden',
-  borderRadius: theme.radii.round,
-  background: theme.colors.surfaceStrong,
-  '&::after': {
-    position: 'absolute',
-    inset: 0,
-    width: 'var(--audio-level, 0%)',
-    borderRadius: 'inherit',
-    background: `linear-gradient(90deg, ${theme.colors.accent}, ${theme.colors.violet})`,
-    boxShadow: `0 0 0.7rem ${theme.colors.accent}`,
-    content: '""',
-    transition: 'width 80ms linear',
-  },
-});
-
-export const visuallyHiddenTextStyles: CSSObject = {
-  position: 'absolute',
-  width: '1px',
-  height: '1px',
-  padding: 0,
-  margin: '-1px',
-  overflow: 'hidden',
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
-  border: 0,
-};
 
 export const blockingOverlayStyles = (
   theme: Theme,
@@ -410,14 +321,9 @@ export const activityIndicatorStyles = (theme: Theme): CSSObject => ({
   border: `2px solid ${theme.colors.borderStrong}`,
   borderBlockStartColor: theme.colors.accent,
   borderRadius: '50%',
-  animation: 'stage-activity-spin 780ms linear infinite',
-  '@keyframes stage-activity-spin': {
-    to: { transform: 'rotate(360deg)' },
-  },
-  '@media (prefers-reduced-motion: reduce)': {
-    animation: 'none',
+  ...rotatingSpinnerAnimationStyles('780ms', {
     borderColor: theme.colors.accent,
-  },
+  }),
 });
 
 export const noticeLayerStyles = (theme: Theme): CSSObject => ({

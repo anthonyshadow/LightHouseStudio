@@ -1,40 +1,11 @@
-import { keyframes, type CSSObject, type Theme } from '@emotion/react';
+import type { CSSObject, Theme } from '@emotion/react';
+import { overlayBackdropAnimationStyles, overlayPanelAnimationStyles } from '../animationStyles';
 import type {
   OverlayPanelBodyMode,
   OverlayPanelPlacement,
   OverlayPanelSize,
   OverlayPhase,
 } from './OverlayPanel.types';
-
-const fadeIn = keyframes({
-  from: { opacity: 0 },
-  to: { opacity: 1 },
-});
-
-const fadeOut = keyframes({
-  from: { opacity: 1 },
-  to: { opacity: 0 },
-});
-
-const slideInRight = keyframes({
-  from: { opacity: 0, transform: 'translateX(1rem)' },
-  to: { opacity: 1, transform: 'translateX(0)' },
-});
-
-const slideOutRight = keyframes({
-  from: { opacity: 1, transform: 'translateX(0)' },
-  to: { opacity: 0, transform: 'translateX(1rem)' },
-});
-
-const slideInBottom = keyframes({
-  from: { opacity: 0, transform: 'translateY(1rem)' },
-  to: { opacity: 1, transform: 'translateY(0)' },
-});
-
-const slideOutBottom = keyframes({
-  from: { opacity: 1, transform: 'translateY(0)' },
-  to: { opacity: 0, transform: 'translateY(1rem)' },
-});
 
 export const backdropStyles = (
   theme: Theme,
@@ -52,10 +23,7 @@ export const backdropStyles = (
   justifyContent: 'flex-end',
   overflow: 'hidden',
   background: theme.colors.scrim,
-  animation: `${phase === 'exiting' ? fadeOut : fadeIn} ${theme.motion.standard} both`,
-  '@media (prefers-reduced-motion: reduce)': {
-    animation: 'none',
-  },
+  ...overlayBackdropAnimationStyles(theme, phase === 'exiting'),
   '@media (min-width: 40rem) and (max-width: 63.99rem)':
     placement === 'right' && size === 'wide'
       ? { alignItems: 'flex-end', justifyContent: 'stretch' }
@@ -69,17 +37,6 @@ const panelWidth = (
 ): string => {
   if (placement !== 'right') return '100%';
   return size === 'wide' ? theme.layout.overlays.drawerWide : theme.layout.overlays.drawer;
-};
-
-const panelAnimation = (placement: OverlayPanelPlacement, phase: OverlayPhase) => {
-  switch (placement) {
-    case 'right':
-      return phase === 'exiting' ? slideOutRight : slideInRight;
-    case 'bottom':
-      return phase === 'exiting' ? slideOutBottom : slideInBottom;
-    case 'fullscreen':
-      return phase === 'exiting' ? fadeOut : fadeIn;
-  }
 };
 
 export const panelStyles = (
@@ -107,11 +64,7 @@ export const panelStyles = (
   color: theme.colors.text,
   background: theme.colors.overlaySurface,
   boxShadow: theme.shadows.lifted,
-  animation: `${panelAnimation(placement, phase)} ${theme.motion.standard} both`,
-  willChange: 'transform, opacity',
-  '@media (prefers-reduced-motion: reduce)': {
-    animation: 'none',
-  },
+  ...overlayPanelAnimationStyles(theme, placement, phase === 'exiting'),
   '@media (max-width: 80rem), (max-height: 48rem)': {
     width:
       placement === 'right' && size === 'wide'

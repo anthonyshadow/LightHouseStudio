@@ -4,7 +4,8 @@ import { installSuccessfulStudioHarness } from './support/studioHarness';
 const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
 
 const openBuilder = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: 'Build Your Character' }).click();
+  await page.getByRole('button', { name: /Open character options/u }).click();
+  await page.getByRole('button', { name: 'Create new character' }).click();
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
 };
 
@@ -28,7 +29,7 @@ test('retired entries canonicalize to the mounted Studio experience', async ({ p
     await page.goto(entry);
     await expect(page).toHaveURL(/\/$/u);
     await expect(page.getByRole('heading', { name: 'Lightframe Studio' })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Build Your Character' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Open character options/u })).toBeVisible();
   }
 });
 

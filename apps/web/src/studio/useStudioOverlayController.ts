@@ -8,6 +8,8 @@ export type ActiveOverlay =
   | 'workshop'
   | 'recipe-shelf'
   | 'character-builder'
+  | 'character-selector'
+  | 'ai-experience'
   | 'legacy-projects'
   | null;
 

@@ -74,6 +74,16 @@ export const SessionStatus = ({ session }: { session: StudioSessionController })
       title: `${label} AI stopped`,
       detail: 'The provider session has ended. Your working draft remains available.',
     },
+    'stopping-ai': {
+      tone: 'neutral',
+      title: `Stopping ${label} AI`,
+      detail: 'The provider session is closing while your local preview remains available.',
+    },
+    'stopping-media': {
+      tone: 'neutral',
+      title: 'Ending camera & microphone',
+      detail: 'Studio is releasing local tracks and closing the provider session.',
+    },
     error: {
       tone: 'danger',
       title: `${label} AI needs attention`,

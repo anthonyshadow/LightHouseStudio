@@ -1,4 +1,10 @@
 export { StudioDesignProvider } from './StudioDesignProvider';
+export {
+  fadingVisibilityAnimationStyles,
+  overlayBackdropAnimationStyles,
+  overlayPanelAnimationStyles,
+  rotatingSpinnerAnimationStyles,
+} from './animationStyles';
 export { studioTheme, type StudioTheme } from './theme';
 export { Button, type ButtonProps, type ButtonVariant } from './primitives/Button';
 export { Surface, type SurfaceProps } from './primitives/Surface';

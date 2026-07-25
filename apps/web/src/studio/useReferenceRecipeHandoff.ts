@@ -184,6 +184,20 @@ export const useReferenceRecipeHandoff = ({
     'name' in activeRecipeAsset
       ? activeRecipeAsset.name
       : undefined;
+  const activeCharacter =
+    activeCharacterName && activeRecipeAsset && 'name' in activeRecipeAsset
+      ? {
+          id: activeRecipeAsset.id,
+          name: activeCharacterName,
+          referenceImageAssetId: activeRecipeAsset.referenceImageAssetId,
+        }
+      : null;
+  const activeRecipeLabel =
+    resolvedActiveRecipe?.origin === 'saved-prompt' &&
+    activeRecipeAsset &&
+    'title' in activeRecipeAsset
+      ? activeRecipeAsset.title
+      : activeCharacterName;
 
   const recordCommittedPrompt = useCallback<PromptCommittedHandler>(
     (mode, prompt, committedReferenceAssetId) => {
@@ -719,7 +733,9 @@ export const useReferenceRecipeHandoff = ({
   return {
     state: {
       activeRecipe: resolvedActiveRecipe,
+      activeCharacter,
       activeCharacterName,
+      activeRecipeLabel,
       libraryMode: resolvedLibraryMode,
       workshopDraft,
       workshopDrafts,

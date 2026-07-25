@@ -1,18 +1,14 @@
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTheme } from '@emotion/react';
 import { formatDuration } from '../recording/recordingHelpers';
-import { modeLabel, type SessionLifecycle, type StudioMode } from '../media-session';
+import { type SessionLifecycle, type StudioMode } from '../media-session';
 import {
   activityIndicatorStyles,
-  audioMeterStyles,
-  audioTrackStyles,
   badgeStyles,
   blockingCardStyles,
   blockingOverlayStyles,
-  bottomOverlayStyles,
   emptyIconStyles,
   emptyStyles,
-  endStatusStyles,
   framingGuideStyles,
   guideCornerStyles,
   iconButtonStyles,
@@ -21,11 +17,9 @@ import {
   toolbarGroupStyles,
   topToolbarStyles,
   videoStyles,
-  visuallyHiddenTextStyles,
 } from './MediaStage.styles';
 import { StageNoticeLayer } from './StageNoticeLayer';
 import type { StageNotice } from './stageNotices';
-import { useAudioLevel } from './useAudioLevel';
 import { describeStageMedia, type StagePresentation } from './stagePresentation';
 
 export type { StagePresentation } from './stagePresentation';
@@ -38,6 +32,9 @@ export type MediaStageProps = {
   generationSeconds: number;
   recording: boolean;
   recordingSeconds: number;
+  controls?: ReactNode;
+  idleAction?: ReactNode;
+  experienceLabel?: string | undefined;
   notices?: readonly StageNotice[];
   onPlaybackError?: (message: string) => void;
 };
@@ -47,20 +44,6 @@ type LiveSnapshot = {
   origin: 'local' | 'provider';
   mirrored: boolean;
 };
-
-const CameraIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    <rect x="3.5" y="6.5" width="12" height="11" rx="2" stroke="currentColor" />
-    <path d="m15.5 10 4-2v8l-4-2" stroke="currentColor" strokeLinejoin="round" />
-  </svg>
-);
-
-const MicrophoneIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" />
-    <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6" stroke="currentColor" />
-  </svg>
-);
 
 const StageIcon = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
@@ -93,19 +76,23 @@ const FullscreenIcon = ({ active }: { active: boolean }) => (
   </svg>
 );
 
-const lifecycleLabel = (lifecycle: SessionLifecycle): string =>
-  ({
-    idle: 'Camera off',
-    'requesting-media': 'Requesting camera',
-    ready: 'Local preview',
-    'requesting-token': 'Securing AI session',
-    connecting: 'Connecting AI',
-    connected: 'AI connected',
-    generating: 'AI live',
-    reconnecting: 'Reconnecting — local fallback',
-    disconnected: 'AI disconnected — local fallback',
-    error: 'Needs attention',
-  })[lifecycle];
+const lifecycleLabel = (
+  lifecycle: SessionLifecycle,
+  mode: StudioMode,
+  experienceLabel?: string,
+): string => {
+  if (lifecycle === 'idle') return 'Studio idle';
+  if (lifecycle === 'requesting-media') return mode === 'local' ? 'Starting camera' : 'Starting AI';
+  if (lifecycle === 'ready') return 'Local preview';
+  if (lifecycle === 'requesting-token' || lifecycle === 'connecting') return 'Starting AI';
+  if (lifecycle === 'connected' || lifecycle === 'generating')
+    return `AI active${experienceLabel ? ` · ${experienceLabel}` : ''}`;
+  if (lifecycle === 'reconnecting') return 'Reconnecting AI · local preview';
+  if (lifecycle === 'disconnected') return 'AI stopped · local preview';
+  if (lifecycle === 'stopping-ai') return 'Stopping AI';
+  if (lifecycle === 'stopping-media') return 'Stopping session';
+  return 'Needs attention';
+};
 
 const lifecycleTone = (lifecycle: SessionLifecycle): 'neutral' | 'accent' | 'recording' =>
   ['ready', 'connected', 'generating'].includes(lifecycle) ? 'accent' : 'neutral';
@@ -172,56 +159,15 @@ const useTrackRevision = (stream: MediaStream | null): void => {
   }, [stream]);
 };
 
-const AudioLevelMeter = ({
-  stream,
-  sourceLabel,
-}: {
-  stream: MediaStream | null;
-  sourceLabel: string | null;
-}) => {
-  const theme = useTheme();
-  const { hasAudio, level, metering } = useAudioLevel(stream);
-  const percent = Math.round(level * 100);
-  const label = sourceLabel ?? (hasAudio ? 'Live audio' : 'No live audio track');
-  const meterProperties = { '--audio-level': `${percent}%` } as CSSProperties;
-
-  return (
-    <div
-      data-stage-audio="true"
-      css={audioMeterStyles(theme)}
-      title={label}
-      {...(metering
-        ? {
-            role: 'meter',
-            'aria-label': 'Live audio level',
-            'aria-valuemin': 0,
-            'aria-valuemax': 100,
-            'aria-valuenow': percent,
-            'aria-valuetext': `${percent}% — ${label}`,
-          }
-        : {})}
-    >
-      <MicrophoneIcon />
-      <span css={audioTrackStyles(theme)} style={meterProperties} aria-hidden="true" />
-      <span css={visuallyHiddenTextStyles}>
-        {hasAudio
-          ? metering
-            ? `Audio level ${percent}% from ${label}`
-            : `${label} connected`
-          : label}
-      </span>
-    </div>
-  );
-};
-
 export const MediaStage = ({
   presentation,
   mode,
   lifecycle,
-  liveSeconds,
-  generationSeconds,
   recording,
   recordingSeconds,
+  controls,
+  idleAction,
+  experienceLabel,
   notices = [],
   onPlaybackError,
 }: MediaStageProps) => {
@@ -459,7 +405,14 @@ export const MediaStage = ({
       ? 'Recorded take'
       : presentation.kind === 'finalizing'
         ? 'Finalizing take'
-        : lifecycleLabel(lifecycle);
+        : recording
+          ? `Recording ${formatDuration(recordingSeconds)}`
+          : presentation.kind === 'live' && !hasVisibleMedia
+            ? 'Camera unavailable'
+            : lifecycleLabel(lifecycle, mode, experienceLabel);
+  const statusToneResolved = recording ? 'recording' : statusTone;
+  const aiStarting =
+    mode !== 'local' && ['requesting-media', 'requesting-token', 'connecting'].includes(lifecycle);
 
   return (
     <figure
@@ -512,6 +465,7 @@ export const MediaStage = ({
           </span>
           <strong>{copy.title}</strong>
           <p>{copy.description}</p>
+          {idleAction ? <div>{idleAction}</div> : null}
         </div>
       ) : null}
 
@@ -527,33 +481,20 @@ export const MediaStage = ({
 
       <div css={topToolbarStyles(theme)}>
         <div css={toolbarGroupStyles(theme)}>
-          <span css={badgeStyles(theme)} title={`${details.resolution} — ${details.videoSource}`}>
-            <CameraIcon />
-            <span>{details.resolution}</span>
+          <span
+            role={recording ? 'timer' : 'status'}
+            aria-live={recording ? 'off' : 'polite'}
+            aria-label={
+              recording ? `Recording elapsed time ${formatDuration(recordingSeconds)}` : statusLabel
+            }
+            css={badgeStyles(theme, statusToneResolved)}
+          >
+            <span css={statusDotStyles(theme, statusToneResolved)} aria-hidden="true" />
+            <span>{statusLabel}</span>
           </span>
-          {recording ? (
-            <span
-              role="timer"
-              aria-live="off"
-              aria-label={`Recording elapsed time ${formatDuration(recordingSeconds)}`}
-              css={badgeStyles(theme, 'recording')}
-            >
-              <span css={statusDotStyles(theme, 'recording')} aria-hidden="true" />
-              <span>REC {formatDuration(recordingSeconds)}</span>
-            </span>
-          ) : null}
         </div>
 
         <div css={toolbarGroupStyles(theme)}>
-          {presentation.kind === 'playback' ? (
-            <span css={badgeStyles(theme, 'accent')}>
-              <span>Playback</span>
-            </span>
-          ) : mode !== 'local' && generationSeconds > 0 ? (
-            <span css={badgeStyles(theme, 'accent')}>
-              <span>AI {formatDuration(generationSeconds)}</span>
-            </span>
-          ) : null}
           {fullscreenSupported ? (
             <button
               type="button"
@@ -599,45 +540,24 @@ export const MediaStage = ({
         </div>
       ) : null}
 
+      {aiStarting ? (
+        <div
+          css={[blockingOverlayStyles(theme, 'processing'), { pointerEvents: 'none' }]}
+          role="status"
+          aria-live="polite"
+          aria-atomic="true"
+        >
+          <span css={blockingCardStyles(theme)}>
+            <span css={activityIndicatorStyles(theme)} aria-hidden="true" />
+            <strong>Connecting to AI…</strong>
+            <span>Preparing {experienceLabel ?? 'your selected experience'}</span>
+          </span>
+        </div>
+      ) : null}
+
       <StageNoticeLayer notices={effectiveNotices} />
 
-      {presentation.kind !== 'playback' ? (
-        <figcaption css={bottomOverlayStyles(theme)}>
-          <span css={badgeStyles(theme)} title={details.videoSource}>
-            <CameraIcon />
-            <span>
-              {mode === 'local'
-                ? 'Local Camera'
-                : transformed
-                  ? `${modeLabel(mode)} · AI output`
-                  : modeLabel(mode)}
-            </span>
-          </span>
-
-          <AudioLevelMeter stream={stream} sourceLabel={details.audioSource} />
-
-          <div css={endStatusStyles}>
-            {hasVisibleMedia ? (
-              <span
-                data-live-timer="true"
-                css={badgeStyles(theme)}
-                aria-label={`Live for ${formatDuration(liveSeconds)}`}
-              >
-                <span>Live {formatDuration(liveSeconds)}</span>
-              </span>
-            ) : null}
-            <span
-              role="status"
-              aria-live="polite"
-              aria-atomic="true"
-              css={badgeStyles(theme, statusTone)}
-            >
-              <span css={statusDotStyles(theme, statusTone)} aria-hidden="true" />
-              <span>{statusLabel}</span>
-            </span>
-          </div>
-        </figcaption>
-      ) : null}
+      {controls}
     </figure>
   );
 };

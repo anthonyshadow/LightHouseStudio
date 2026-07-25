@@ -38,7 +38,7 @@ export const SessionComposer = ({
   const [modeSwitchNotice, setModeSwitchNotice] = useState(false);
   const [modelFieldsRevision, setModelFieldsRevision] = useState(0);
   const model = session.draft.mode !== 'local';
-  const modeLocked = recording || isModelSessionActive(session) || Boolean(session.localStream);
+  const modeLocked = recording || isModelSessionActive(session);
   const formError =
     session.error && ['model-input-required', 'apply-failed'].includes(session.error.code)
       ? session.error

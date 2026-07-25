@@ -94,14 +94,6 @@ const expectNoAxeViolations = async (page: Page): Promise<void> => {
   ).toEqual([]);
 };
 
-const closeLatestTakeWhenOverlaid = async (page: Page): Promise<void> => {
-  const dialog = page.getByRole('dialog', { name: 'Latest Take' });
-  if (!(await dialog.isVisible())) return;
-
-  await page.keyboard.press('Escape');
-  await expect(dialog).toBeHidden();
-};
-
 const exactViewports = [
   { name: 'full desktop', width: 1_440, height: 960 },
   { name: 'compact desktop', width: 1_280, height: 720 },
@@ -120,6 +112,8 @@ for (const viewport of exactViewports) {
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/');
     await expectNoDocumentOverflow(page);
+    await expect(page.getByLabel('Studio session controls')).toBeVisible();
+    await expectActionInsideViewport(page, 'Start Camera + Mic');
     const stableStageRect = await readStageRect(page);
 
     await page.getByRole('button', { name: 'Workshop', exact: true }).click();
@@ -180,26 +174,25 @@ for (const viewport of exactViewports) {
     await expectStableStageVideo(page);
     expect((await readBrowserState(page)).cameraCalls).toBe(1);
 
-    await page.getByRole('button', { name: 'Record a take' }).click();
-    await expect(page.getByRole('button', { name: 'Finish take' })).toBeVisible();
-    await expectActionInsideViewport(page, 'Finish take');
+    await page.getByRole('button', { name: 'Record' }).click();
+    await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
+    await expectActionInsideViewport(page, 'Stop recording');
     await expectNoDocumentOverflow(page);
-    await page.getByRole('button', { name: 'Finish take' }).click();
+    await page.getByRole('button', { name: 'Stop recording' }).click();
 
     await expect(page.getByLabel('Recorded take playback')).toHaveCount(1);
     await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
       'data-stage-presentation',
       'playback',
     );
+    await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
     await expectStableStageRect(page, stableStageRect);
     await expectNoDocumentOverflow(page);
-    const takeScroll = await expectInternalScrollOwnership(
-      page,
-      '[data-scroll-region="take-review"]',
-    );
-    expect(takeScroll.scrollHeight).toBeGreaterThanOrEqual(takeScroll.clientHeight);
 
-    await page.getByRole('button', { name: 'Voice treatments' }).click();
+    await page
+      .getByRole('group', { name: 'Recorded take controls' })
+      .getByRole('button', { name: 'Voice' })
+      .click();
     await expect(page.getByRole('dialog', { name: 'Voice Treatments' })).toBeVisible();
     const voiceScroll = await expectInternalScrollOwnership(
       page,
@@ -209,7 +202,10 @@ for (const viewport of exactViewports) {
     await expectStableStageRect(page, stableStageRect);
     await page.getByRole('button', { name: 'Back to take review' }).click();
 
-    await page.getByRole('button', { name: 'Discard' }).click();
+    await page
+      .getByRole('dialog', { name: 'Latest Take' })
+      .getByRole('button', { name: 'Discard' })
+      .click();
     await openRecipeDockWhenOverlaid(page);
     await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
     await page.getByLabel('Character direction').fill('An adult cinematic field presenter');
@@ -235,7 +231,7 @@ for (const viewport of exactViewports) {
     await closeRecipeDockWhenOverlaid(page);
     await expectStableStageVideo(page);
     await expectNoDocumentOverflow(page);
-    await expectActionInsideViewport(page, 'Record a take');
+    await expectActionInsideViewport(page, 'Record');
 
     const browser = await readBrowserState(page);
     expect(browser.cameraCalls).toBe(3);
@@ -246,6 +242,61 @@ for (const viewport of exactViewports) {
     expectNoExternalProviderTraffic(network);
   });
 }
+
+test('persistent controls preserve local media across VTON choice, AI stop, track toggles, and full shutdown', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+
+  const controls = page.getByLabel('Studio session controls');
+  await controls.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+  await expect(controls.getByRole('button', { name: 'Start AI' })).toBeVisible();
+  expect((await readBrowserState(page)).cameraCalls).toBe(1);
+
+  await controls.getByRole('button', { name: 'Start AI' }).click();
+  const chooser = page.getByRole('dialog', { name: 'Choose AI experience' });
+  await expect(chooser.getByRole('heading', { name: 'Character Transformation' })).toBeVisible();
+  await expect(chooser.getByRole('heading', { name: 'Virtual Try-On' })).toBeVisible();
+  await expectNoDocumentOverflow(page);
+
+  await chooser.getByRole('button', { name: 'Configure Virtual Try-On' }).click();
+  const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
+  await expect(dock).toBeVisible();
+  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+  await page.getByLabel('Garment direction').fill('A structured amber field jacket');
+  await page.getByRole('button', { name: 'Start Virtual Try-On AI' }).click();
+  await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dock).toBeHidden();
+
+  await controls.getByRole('button', { name: 'Stop AI' }).click();
+  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+  expect((await readBrowserState(page)).cameraCalls).toBe(1);
+
+  await controls.getByRole('button', { name: 'Mute microphone' }).click();
+  await controls.getByRole('button', { name: 'Turn camera off' }).click();
+  const trackState = await page.getByLabel('Live local camera preview').evaluate((element) => {
+    const stream = (element as HTMLVideoElement).srcObject as MediaStream;
+    return {
+      microphoneEnabled: stream.getAudioTracks()[0]?.enabled,
+      cameraEnabled: stream.getVideoTracks()[0]?.enabled,
+    };
+  });
+  expect(trackState).toEqual({ microphoneEnabled: false, cameraEnabled: false });
+
+  await controls.getByRole('button', { name: 'Close' }).click();
+  await expect(page.getByText('Studio idle', { exact: true })).toBeVisible();
+  const browser = await readBrowserState(page);
+  expect(browser.cameraCalls).toBe(1);
+  expect(browser.connections.map((connection) => connection.model)).toEqual(['lucy-vton-3']);
+  expect(browser.lifecycleEvents).toContain('local-video-stopped');
+  expect(browser.lifecycleEvents).toContain('local-audio-stopped');
+  await expectNoDocumentOverflow(page);
+  expectNoExternalProviderTraffic(network);
+});
 
 test('Local Camera starts, records, and finalizes a playable take without provider work', async ({
   page,
@@ -265,24 +316,27 @@ test('Local Camera starts, records, and finalizes a playable take without provid
   await page.getByRole('button', { name: 'Start local preview' }).click();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
   await closeRecipeDockWhenOverlaid(page);
-  await expect(page.getByRole('button', { name: 'Workshop', exact: true })).toBeDisabled();
+  await expect(page.getByRole('button', { name: 'Workshop', exact: true })).toBeEnabled();
   await page.getByRole('button', { name: 'Shelf' }).click();
-  await expect(page.getByRole('button', { name: 'Use Local blocked recipe' })).toBeDisabled();
-  await expect(page.getByText(/release camera & mic before inserting/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Use Local blocked recipe' })).toBeEnabled();
+  await expect(page.getByText(/release camera & mic before inserting/i)).toHaveCount(0);
   await page.getByRole('button', { name: 'Close creative tool' }).click();
-  await expect(page.getByRole('button', { name: 'Record a take' })).toBeEnabled();
+  await expect(page.getByRole('button', { name: 'Record' })).toBeEnabled();
 
-  await page.getByRole('button', { name: 'Record a take' }).click();
-  await expect(page.getByRole('button', { name: 'Finish take' })).toBeVisible();
-  await page.getByRole('button', { name: 'Finish take' }).click();
+  await page.getByRole('button', { name: 'Record' }).click();
+  await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
+  await page.getByRole('button', { name: 'Stop recording' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Latest take', exact: true })).toBeVisible();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
-  await expect(page.getByRole('link', { name: 'Download take' })).toHaveAttribute('href', /^blob:/);
+  await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
+  const takeControls = page.getByRole('group', { name: 'Recorded take controls' });
+  await expect(takeControls.getByRole('link', { name: 'Download' })).toHaveAttribute(
+    'href',
+    /^blob:/,
+  );
   await expectNoAxeViolations(page);
-  await page.getByRole('button', { name: 'Discard' }).click();
-  await expect(page.getByRole('heading', { name: 'Latest take' })).toHaveCount(0);
-  await expect(page.getByRole('button', { name: 'Dock' })).toBeFocused();
+  await takeControls.getByRole('button', { name: 'Discard' }).click();
+  await expect(page.getByLabel('Recorded take playback')).toHaveCount(0);
 
   const browser = await readBrowserState(page);
   expect(browser.cameraCalls).toBe(1);
@@ -304,18 +358,19 @@ test('Download initiation enables Close and releases the reviewed take without r
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Start local preview' }).click();
   await closeRecipeDockWhenOverlaid(page);
-  await page.getByRole('button', { name: 'Record a take' }).click();
-  await page.getByRole('button', { name: 'Finish take' }).click();
+  await page.getByRole('button', { name: 'Record' }).click();
+  await page.getByRole('button', { name: 'Stop recording' }).click();
 
   const playback = page.getByLabel('Recorded take playback');
   await expect(playback).toBeVisible();
-  const closeTake = page.getByRole('button', { name: 'Close take' });
+  await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
+  const takeControls = page.getByRole('group', { name: 'Recorded take controls' });
+  const closeTake = takeControls.getByRole('button', { name: 'Close' });
   await expect(closeTake).toBeDisabled();
 
   const downloadStarted = page.waitForEvent('download');
-  await page.getByRole('link', { name: 'Download take' }).click();
+  await takeControls.getByRole('link', { name: 'Download' }).click();
   await downloadStarted;
-  await expect(page.getByText('A download was started.', { exact: false })).toBeVisible();
   await expect(closeTake).toBeEnabled();
   await closeTake.click();
 
@@ -374,7 +429,7 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
   await page.getByRole('button', { name: 'Start Character AI' }).click();
 
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
-  await expect(page.getByText('AI live', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^AI active/u)).toBeVisible();
 
   await page.getByLabel('Character direction').fill('An adult paper-cut science host');
   await expect(page.getByText('Changes are pending', { exact: true })).toBeVisible();
@@ -401,13 +456,13 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
   ]);
 
   await triggerProviderDisconnect(page);
-  await expect(page.getByText('AI disconnected — local fallback', { exact: true })).toBeVisible();
+  await expect(page.getByText('AI stopped · local preview', { exact: true })).toBeVisible();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Start Character AI' }).click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
-  await expect(page.getByText('AI live', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^AI active/u)).toBeVisible();
 
   await page.getByRole('button', { name: 'Reset AI' }).click();
   await expect(page.getByLabel('Character direction')).toHaveValue('');
@@ -439,18 +494,17 @@ test('a Lucy model take finalizes before the provider session is released', asyn
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
 
   await closeRecipeDockWhenOverlaid(page);
-  await page.getByRole('button', { name: 'Record a take' }).click();
-  await expect(page.getByRole('button', { name: 'Finish take' })).toBeVisible();
-  await page.getByRole('button', { name: 'Finish take' }).click();
+  await page.getByRole('button', { name: 'Record' }).click();
+  await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
+  await page.getByRole('button', { name: 'Stop recording' }).click();
 
-  await expect(page.getByRole('heading', { name: 'Latest take', exact: true })).toBeVisible();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
   await expect(page.getByLabel('Live local camera preview')).toHaveCount(0);
   await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
     'data-stage-presentation',
     'playback',
   );
-  await closeLatestTakeWhenOverlaid(page);
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
   await openRecipeDockWhenOverlaid(page);
   await expect(page.getByRole('button', { name: 'Start Character AI' })).toBeDisabled();
@@ -501,7 +555,7 @@ test('VTON 3 accepts a valid ephemeral garment image and starts with image-only 
 
   await page.getByRole('button', { name: 'Start Virtual Try-On AI' }).click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
-  await expect(page.getByText('AI live', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^AI active/u)).toBeVisible();
 
   const browser = await readBrowserState(page);
   expect(browser.cameraCalls).toBe(1);
@@ -546,7 +600,7 @@ test('Space records and finishes only outside editable controls', async ({ page 
 
   await page.getByRole('main').focus();
   await page.keyboard.press('Space');
-  await expect(page.getByRole('button', { name: 'Finish take' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
   expect((await readBrowserState(page)).recorderStarts).toBe(2);
 
   await page.getByRole('main').focus();

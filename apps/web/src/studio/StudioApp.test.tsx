@@ -110,6 +110,8 @@ const harness = vi.hoisted(() => {
     liveSeconds: 0,
     generationSeconds: 0,
     applying: false,
+    microphoneEnabled: true,
+    cameraEnabled: true,
     capturePreferences,
     startLocal: vi.fn(() => Promise.resolve()),
     preflight: vi.fn(() => Promise.resolve()),
@@ -120,6 +122,8 @@ const harness = vi.hoisted(() => {
     resetModel: vi.fn(),
     stopCamera: vi.fn(),
     releaseForRecordedReview: vi.fn(() => Promise.resolve()),
+    toggleMicrophone: vi.fn(),
+    toggleCamera: vi.fn(),
     selectMode: vi.fn(() => true),
     canReplaceRecipeDraft: vi.fn(() => true),
     replaceRecipeDraft: vi.fn(() => true),
@@ -213,8 +217,13 @@ vi.mock('../features/recording', () => ({
 }));
 
 vi.mock('../features/media-session', async () => {
-  const { confirmModeReplacement } = await import('../features/media-session/draftPolicy');
-  return { confirmModeReplacement, SessionComposer: () => <div>Recipe dock content</div> };
+  const { confirmModeReplacement, hasDraftContent } =
+    await import('../features/media-session/draftPolicy');
+  return {
+    confirmModeReplacement,
+    hasDraftContent,
+    SessionComposer: () => <div>Recipe dock content</div>,
+  };
 });
 
 vi.mock('../orchestration/session', () => ({
@@ -256,17 +265,19 @@ vi.mock('./useTakeReviewFlow', () => ({
 }));
 
 vi.mock('./StudioHeader', () => ({
-  StudioHeader: ({ onBuildCharacter }: { onBuildCharacter: () => void }) => (
-    <button type="button" onClick={onBuildCharacter}>
-      Build character
+  StudioHeader: ({ onOpenCharacterSelector }: { onOpenCharacterSelector: () => void }) => (
+    <button type="button" onClick={onOpenCharacterSelector}>
+      Character selector
     </button>
   ),
 }));
 
 vi.mock('../ui', async () => {
   const { StudioDesignProvider } = await import('../ui/StudioDesignProvider');
+  const { Button } = await import('../ui/primitives/Button');
   return {
     StudioDesignProvider,
+    Button,
     OverlayPanel: ({
       open,
       title,

@@ -1,5 +1,4 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { useCallback, useEffect, useRef } from 'react';
 import { Button, Surface } from '../../ui';
 import { formatDuration } from './recordingHelpers';
 import type { RecordingController, RecordingSource } from './types';
@@ -9,11 +8,7 @@ export type RecordingControlsProps = {
   recording: RecordingController;
   source: RecordingSource | null;
   mode: StudioMode;
-  modelOutputReady: boolean;
-  supported?: boolean;
-  blockedReason?: string;
   onOpenSettings?: () => void;
-  onStop: () => Promise<void>;
 };
 
 const captureSurfaceStyles = (theme: Theme): CSSObject => ({
@@ -21,89 +16,39 @@ const captureSurfaceStyles = (theme: Theme): CSSObject => ({
   minHeight: 0,
   height: '100%',
   display: 'grid',
-  gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
   alignItems: 'center',
-  gap: theme.space.md,
-  padding: theme.space.sm,
+  gap: theme.space.sm,
+  padding: `${theme.space.xs} ${theme.space.sm}`,
+  borderRadius: theme.radii.medium,
   overflow: 'hidden',
   '@media (max-width: 79.99rem), (max-height: 48rem)': {
     gap: theme.space.xs,
     padding: theme.space.xs,
   },
-  '@media (max-width: 39.99rem)': {
-    gridTemplateColumns: 'minmax(0, 1fr) auto',
-  },
+  '@media (max-width: 39.99rem)': { paddingInline: theme.space.xs },
 });
 
 const detailsStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: theme.space.xs,
   minWidth: 0,
   color: theme.colors.textMuted,
   fontSize: theme.fontSizes.caption,
-  '& > span': {
-    minWidth: 0,
-    padding: `${theme.space.xs} ${theme.space.sm}`,
-    border: `1px solid ${theme.colors.border}`,
-    borderRadius: theme.radii.medium,
-    background: theme.colors.surfaceSoft,
-    overflow: 'hidden',
-  },
-  '& strong': {
-    display: 'block',
-    marginBlockStart: '0.15rem',
-    color: theme.colors.text,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
-  },
-  '@media (max-width: 52rem), (max-height: 42rem)': {
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    '& > span:last-of-type': { display: 'none' },
-  },
-  '@media (max-width: 39.99rem)': { display: 'none' },
-});
-const headingStyles = (theme: Theme): CSSObject => ({
-  margin: 0,
-  color: theme.colors.textMuted,
-  fontSize: theme.fontSizes.caption,
-  fontWeight: 800,
-  letterSpacing: '0.08em',
-  textTransform: 'uppercase',
+  overflow: 'hidden',
+  textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
-  '@media (max-width: 39.99rem)': { display: 'none' },
+  '& strong': { color: theme.colors.text, fontWeight: 760 },
 });
-const actionRowStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  alignItems: 'center',
-  gap: theme.space.xs,
-  minWidth: 0,
-  '& > button:first-of-type': {
-    minWidth: 'clamp(8rem, 14vw, 11rem)',
-  },
-  '@media (max-width: 39.99rem)': {
-    '& > button:first-of-type': { minWidth: '6.5rem' },
-  },
+const headingStyles = (): CSSObject => ({
+  position: 'absolute',
+  width: '1px',
+  height: '1px',
+  margin: '-1px',
+  overflow: 'hidden',
+  clip: 'rect(0 0 0 0)',
 });
-
-const recordActionStyles = (theme: Theme, active: boolean): CSSObject => ({
-  minHeight: active ? '3.2rem' : '3.4rem',
-  borderRadius: theme.radii.round,
-  color: theme.colors.text,
-  borderColor: active ? theme.colors.recording : theme.colors.accent,
-  background: `linear-gradient(135deg, ${theme.colors.recording}, ${theme.colors.danger})`,
-  boxShadow: theme.shadows.recording,
-  whiteSpace: 'nowrap',
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    minHeight: '2.75rem',
-    paddingInline: theme.space.md,
-  },
-});
-
 const settingsActionStyles = (): CSSObject => ({
   whiteSpace: 'nowrap',
-  '@media (max-width: 52rem)': {
+  '@media (max-width: 39.99rem)': {
     width: '2.75rem',
     minWidth: '2.75rem',
     padding: 0,
@@ -112,54 +57,23 @@ const settingsActionStyles = (): CSSObject => ({
   },
 });
 
-const disabledReasonStyles = (): CSSObject => ({
-  position: 'absolute',
-  width: '1px',
-  height: '1px',
-  margin: '-1px',
-  padding: 0,
-  overflow: 'hidden',
-  border: 0,
-  clip: 'rect(0 0 0 0)',
-  whiteSpace: 'nowrap',
+const recordingStatusStyles = (theme: Theme): CSSObject => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  gap: theme.space.xs,
+  color: theme.colors.recording,
+  fontFamily: theme.type.mono,
+  fontWeight: 760,
+  '&::before': {
+    width: '0.5rem',
+    height: '0.5rem',
+    flex: '0 0 auto',
+    borderRadius: '50%',
+    background: theme.colors.recording,
+    boxShadow: `0 0 0 0.2rem ${theme.colors.recordingSoft}`,
+    content: '""',
+  },
 });
-
-type RecordingAvailability = Pick<
-  RecordingControlsProps,
-  'mode' | 'modelOutputReady' | 'source' | 'supported'
-> & {
-  blockedReason: string | undefined;
-  processing: boolean;
-};
-
-const recordingUnavailableReason = ({
-  supported,
-  processing,
-  blockedReason,
-  source,
-  mode,
-  modelOutputReady,
-}: RecordingAvailability): string | null => {
-  if (!supported) return 'Recording is unavailable in this browser.';
-  if (processing) return 'Finish or cancel voice processing before replacing this take.';
-  if (blockedReason) return blockedReason;
-
-  if (!source) {
-    switch (mode) {
-      case 'local':
-        return 'Start local preview to enable Record.';
-      case 'lucy-2.5':
-        return 'Start Character AI and wait for live output to enable Record.';
-      case 'lucy-vton-3':
-        return 'Start Virtual Try-On AI and wait for live output to enable Record.';
-    }
-  }
-
-  if (mode !== 'local' && !modelOutputReady) {
-    return 'Recording unlocks when transformed output has a live video track.';
-  }
-  return null;
-};
 
 const captureResolutionLabel = (
   mode: StudioMode,
@@ -176,88 +90,14 @@ export const RecordingControls = ({
   recording,
   source,
   mode,
-  modelOutputReady,
-  supported = 'MediaRecorder' in window,
-  blockedReason,
   onOpenSettings,
-  onStop,
 }: RecordingControlsProps) => {
   const theme = useTheme();
-  const actionRef = useRef<HTMLButtonElement>(null);
-  const previousLifecycleRef = useRef(recording.lifecycle);
   const active = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
-  const processing = recording.processingState === 'processing';
-  const unavailableReason = recordingUnavailableReason({
-    supported,
-    processing,
-    blockedReason,
-    source,
-    mode,
-    modelOutputReady,
-  });
-  const unavailable = unavailableReason !== null;
   const videoTrack = source?.stream.getVideoTracks?.()[0];
   const audioTrack = source?.stream.getAudioTracks?.()[0];
   const videoSettings = videoTrack?.getSettings?.();
   const resolution = captureResolutionLabel(mode, videoSettings);
-
-  useEffect(() => {
-    if (recording.lifecycle === previousLifecycleRef.current) return;
-    previousLifecycleRef.current = recording.lifecycle;
-    if (recording.lifecycle === 'recording') {
-      actionRef.current?.focus();
-    }
-  }, [recording.lifecycle]);
-
-  const start = useCallback(async () => {
-    if (!source) return;
-    if (recording.original && !recording.downloaded) {
-      const proceed = window.confirm(
-        'Starting another take replaces the current in-memory clip. Download it first if you want to keep it. Continue?',
-      );
-      if (!proceed) return;
-    }
-    if (recording.original) recording.discard();
-    await recording.start(source, mode);
-  }, [mode, recording, source]);
-
-  useEffect(() => {
-    const handleShortcut = (event: KeyboardEvent) => {
-      if (
-        event.code !== 'Space' ||
-        event.repeat ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        event.shiftKey ||
-        document.querySelector('[aria-modal="true"]')
-      ) {
-        return;
-      }
-
-      const target = event.target instanceof Element ? event.target : null;
-      if (
-        target?.closest(
-          'input, textarea, select, button, a[href], audio, video, summary, [contenteditable]:not([contenteditable="false"]), [role], [tabindex]:not([tabindex="-1"])',
-        )
-      ) {
-        return;
-      }
-
-      if (recording.lifecycle === 'recording') {
-        event.preventDefault();
-        void onStop();
-        return;
-      }
-      if (!active && !unavailable) {
-        event.preventDefault();
-        void start();
-      }
-    };
-
-    document.addEventListener('keydown', handleShortcut);
-    return () => document.removeEventListener('keydown', handleShortcut);
-  }, [active, onStop, recording.lifecycle, start, unavailable]);
 
   return (
     <Surface
@@ -266,92 +106,42 @@ export const RecordingControls = ({
       aria-labelledby="capture-heading"
       css={captureSurfaceStyles(theme)}
     >
-      <h2 id="capture-heading" css={headingStyles(theme)}>
-        {active ? 'Recording' : 'Capture controls'}
+      <h2 id="capture-heading" css={headingStyles()}>
+        Session and device information
       </h2>
-      {source ? (
-        <div css={detailsStyles(theme)}>
-          <span>
-            Microphone
-            <strong title={audioTrack?.label || source.audioSource}>
-              {audioTrack?.label || source.audioSource}
-            </strong>
-          </span>
-          <span>
-            Camera
-            <strong title={videoTrack?.label || source.videoSource}>
-              {videoTrack?.label || source.videoSource}
-            </strong>
-          </span>
-          <span>
-            {active ? 'Elapsed time' : 'Resolution'}
-            <strong title={active ? formatDuration(recording.elapsedSeconds) : resolution}>
-              {active ? formatDuration(recording.elapsedSeconds) : resolution}
-            </strong>
-          </span>
+      {active ? (
+        <div
+          role="timer"
+          aria-live="off"
+          aria-label={`Recording elapsed time ${formatDuration(recording.elapsedSeconds)}`}
+          css={[detailsStyles(theme), recordingStatusStyles(theme)]}
+        >
+          Recording {formatDuration(recording.elapsedSeconds)}
+        </div>
+      ) : source ? (
+        <div
+          css={detailsStyles(theme)}
+          title={`${videoTrack?.label || source.videoSource} · ${audioTrack?.label || source.audioSource} · ${resolution}`}
+        >
+          <strong>{videoTrack?.label || source.videoSource}</strong>
+          {' · '}
+          {audioTrack?.label || source.audioSource}
+          {' · '}
+          {resolution}
         </div>
       ) : (
-        <div css={detailsStyles(theme)}>
-          <span>
-            Microphone<strong>Not started</strong>
-          </span>
-          <span>
-            Camera<strong>Not started</strong>
-          </span>
-          <span>
-            Resolution<strong>720p target · 30fps</strong>
-          </span>
-        </div>
+        <div css={detailsStyles(theme)}>Camera and microphone are off</div>
       )}
-      <div css={actionRowStyles(theme)}>
-        {active ? (
-          <Button
-            ref={actionRef}
-            id="record-take-action"
-            variant="danger"
-            busy={recording.lifecycle === 'stopping'}
-            aria-keyshortcuts="Space"
-            css={recordActionStyles(theme, true)}
-            onClick={() => void onStop()}
-          >
-            Finish take
-          </Button>
-        ) : (
-          <Button
-            ref={actionRef}
-            id="record-take-action"
-            variant="danger"
-            disabled={unavailable}
-            aria-describedby={unavailableReason ? 'recording-disabled-reason' : undefined}
-            title={unavailableReason ?? undefined}
-            aria-keyshortcuts="Space"
-            css={recordActionStyles(theme, false)}
-            onClick={() => void start()}
-          >
-            Record a take
-          </Button>
-        )}
-        {onOpenSettings ? (
-          <Button
-            variant="secondary"
-            aria-label="Open capture settings"
-            css={settingsActionStyles()}
-            disabled={active}
-            onClick={onOpenSettings}
-          >
-            More settings
-          </Button>
-        ) : null}
-      </div>
-      {unavailableReason ? (
-        <p
-          id="recording-disabled-reason"
-          data-disabled-reason="true"
-          role="status"
-          css={disabledReasonStyles()}
+      {onOpenSettings ? (
+        <Button
+          variant="secondary"
+          aria-label="Open capture settings"
+          css={settingsActionStyles()}
+          disabled={active}
+          onClick={onOpenSettings}
         >
-          {unavailableReason}
-        </p>
+          Device settings
+        </Button>
       ) : null}
     </Surface>
   );

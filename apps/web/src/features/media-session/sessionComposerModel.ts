@@ -14,4 +14,6 @@ export const isModelSessionActive = (session: StudioSessionController): boolean 
     'connected',
     'generating',
     'reconnecting',
+    'stopping-ai',
+    'stopping-media',
   ].includes(session.lifecycle);

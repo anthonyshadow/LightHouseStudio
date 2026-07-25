@@ -224,7 +224,7 @@ const startCharacterAi = async (page: Page, closeDock = true): Promise<void> => 
   await page.getByLabel('Character direction').fill('An adult paper-cut travel host');
   await page.getByRole('button', { name: 'Start Character AI' }).click({ force: true });
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
-  await expect(page.getByText('AI live', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^AI active/u)).toBeVisible();
   if (closeDock) await closeRecipeDockWhenOverlaid(page);
 };
 
@@ -234,15 +234,15 @@ const startVirtualTryOnAi = async (page: Page, closeDock = true): Promise<void> 
   await page.getByLabel('Garment direction').fill('A structured amber field jacket');
   await page.getByRole('button', { name: 'Start Virtual Try-On AI' }).click({ force: true });
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
-  await expect(page.getByText('AI live', { exact: true })).toBeVisible();
+  await expect(page.getByText(/^AI active/u)).toBeVisible();
   if (closeDock) await closeRecipeDockWhenOverlaid(page);
 };
 
 const createLocalTake = async (page: Page): Promise<void> => {
   await startLocalPreview(page);
-  await page.getByRole('button', { name: 'Record a take' }).click();
-  await expect(page.getByRole('button', { name: 'Finish take' })).toBeVisible();
-  await page.getByRole('button', { name: 'Finish take' }).click();
+  await page.getByRole('button', { name: 'Record' }).click();
+  await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
+  await page.getByRole('button', { name: 'Stop recording' }).click();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeVisible();
 };
@@ -270,7 +270,7 @@ const SCENARIOS: readonly Scenario[] = [
     setup: async (page) => {
       await openRecipeDockWhenOverlaid(page);
       await expect(page.getByRole('button', { name: 'Start local preview' })).toBeVisible();
-      await expect(page.getByLabel('Studio media stage')).toContainText('Camera off');
+      await expect(page.getByLabel('Studio media stage')).toContainText('Studio idle');
     },
   },
   {
@@ -283,8 +283,8 @@ const SCENARIOS: readonly Scenario[] = [
     filename: 'local-recording.png',
     setup: async (page) => {
       await startLocalPreview(page);
-      await page.getByRole('button', { name: 'Record a take' }).click();
-      await expect(page.getByRole('button', { name: 'Finish take' })).toBeVisible();
+      await page.getByRole('button', { name: 'Record' }).click();
+      await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toHaveAttribute('data-recording', 'true');
     },
   },
@@ -293,15 +293,15 @@ const SCENARIOS: readonly Scenario[] = [
     filename: 'local-finalizing.png',
     setup: async (page) => {
       await startLocalPreview(page);
-      await page.getByRole('button', { name: 'Record a take' }).click();
-      await expect(page.getByRole('button', { name: 'Finish take' })).toBeVisible();
+      await page.getByRole('button', { name: 'Record' }).click();
+      await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
       await page.evaluate(() => {
         MediaRecorder.prototype.stop = function stopWithoutTerminalEvent() {
           if (this.state === 'inactive') return;
           Object.defineProperty(this, 'state', { configurable: true, value: 'inactive' });
         };
       });
-      await page.getByRole('button', { name: 'Finish take' }).click();
+      await page.getByRole('button', { name: 'Stop recording' }).click();
       await expect(page.getByText('Finalizing take…', { exact: true })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
         'data-stage-presentation',

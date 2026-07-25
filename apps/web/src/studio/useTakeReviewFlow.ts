@@ -56,8 +56,6 @@ export const deriveTakeStagePresentation = ({
 
 type UseTakeReviewFlowOptions = {
   readonly session: StudioSessionController;
-  readonly onReviewAvailable: () => void;
-  readonly onReviewPublished: () => void;
   readonly onReviewCleared: () => void;
 };
 
@@ -89,12 +87,7 @@ export const finalizeTakeForReview = async <T>({
   }
 };
 
-export const useTakeReviewFlow = ({
-  session,
-  onReviewAvailable,
-  onReviewPublished,
-  onReviewCleared,
-}: UseTakeReviewFlowOptions) => {
+export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlowOptions) => {
   const [reviewReady, setReviewReady] = useState(false);
   const [finalizingStream, setFinalizingStream] = useState<MediaStream | null>(null);
   const [finalizingStartedAt, setFinalizingStartedAt] = useState<number | null>(null);
@@ -109,9 +102,8 @@ export const useTakeReviewFlow = ({
       setFinalizingStream(null);
       setFinalizingStartedAt(null);
       setReviewReady(true);
-      onReviewAvailable();
     });
-  }, [automaticDisplayStream, automaticReviewRelease, onReviewAvailable]);
+  }, [automaticDisplayStream, automaticReviewRelease]);
 
   const recording = useRecording({ onAutomaticStop: handleAutomaticRecordingStop });
   const processing = useVoiceProcessing(recording);
@@ -149,8 +141,6 @@ export const useTakeReviewFlow = ({
         setFinalizingStartedAt(null);
         setFinalizingStream(null);
         setReviewReady(true);
-        onReviewAvailable();
-        onReviewPublished();
       },
       handleEmpty: () => {
         setReviewReady(false);
@@ -162,13 +152,7 @@ export const useTakeReviewFlow = ({
 
     finishPromiseRef.current = finishPromise;
     return finishPromise;
-  }, [
-    currentDisplayStream,
-    onReviewAvailable,
-    onReviewPublished,
-    releaseForRecordedReview,
-    stopRecording,
-  ]);
+  }, [currentDisplayStream, releaseForRecordedReview, stopRecording]);
 
   useEffect(() => {
     if (

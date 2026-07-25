@@ -194,5 +194,7 @@ describe('image and live-output rules', () => {
     ).toBe(false);
     expect(canSwitchMode('error', false, true)).toBe(false);
     expect(canSwitchMode('disconnected', false, false)).toBe(true);
+    expect(canSwitchMode('ready', false, true)).toBe(true);
+    expect(canSwitchMode('ready', true, true)).toBe(false);
   });
 });

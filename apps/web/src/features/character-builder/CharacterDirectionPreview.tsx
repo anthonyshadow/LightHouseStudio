@@ -1,5 +1,6 @@
 import { useTheme, type CSSObject } from '@emotion/react';
 import type { ReactNode } from 'react';
+import { rotatingSpinnerAnimationStyles } from '../../ui/animationStyles';
 import {
   heroPreviewStyles,
   previewLabelStyles,
@@ -135,15 +136,10 @@ export const CharacterDirectionPreview = ({
                   border: `3px solid ${theme.colors.borderStrong}`,
                   borderBlockStartColor: theme.colors.accent,
                   borderRadius: '50%',
-                  animation: 'character-preview-spin 0.9s linear infinite',
-                  '@keyframes character-preview-spin': {
-                    to: { transform: 'rotate(360deg)' },
-                  },
-                  '@media (prefers-reduced-motion: reduce)': {
-                    animation: 'none',
+                  ...rotatingSpinnerAnimationStyles('0.9s', {
                     borderBlockStartColor: theme.colors.borderStrong,
                     background: theme.colors.accent,
-                  },
+                  }),
                 }}
               />
               {status ?? 'Generating preview…'}

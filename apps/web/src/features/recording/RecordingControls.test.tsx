@@ -4,6 +4,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import type { ReactNode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
+import { RecordingAction } from './RecordingAction';
 import { RecordingControls } from './RecordingControls';
 import type { RecordingController, RecordingSource } from './types';
 
@@ -43,30 +44,25 @@ const createRecording = (
 
 const controls = (recording: RecordingController): ReactNode => (
   <StudioDesignProvider>
-    <RecordingControls
-      recording={recording}
-      source={source}
-      mode="local"
-      modelOutputReady={false}
-      supported
-      onStop={vi.fn().mockResolvedValue(undefined)}
-    />
+    <RecordingControls recording={recording} source={source} mode="local" />
   </StudioDesignProvider>
 );
 
 afterEach(cleanup);
 
 describe('RecordingControls accessibility', () => {
-  it('keeps lifecycle notices out of the fixed control strip and focuses Finish', async () => {
+  it('keeps recording actions out of the device information strip', () => {
     const view = render(controls(createRecording('idle')));
+    expect(screen.queryByRole('button', { name: 'Record' })).not.toBeInTheDocument();
 
     view.rerender(controls(createRecording('recording')));
-    await waitFor(() => expect(screen.getByRole('button', { name: 'Finish take' })).toHaveFocus());
+    expect(screen.getByRole('timer')).toHaveTextContent('Recording 0:03');
+    expect(screen.queryByRole('button', { name: 'Stop recording' })).not.toBeInTheDocument();
     expect(screen.queryByText('Recording in progress')).not.toBeInTheDocument();
 
     view.rerender(controls(createRecording('stopping')));
     expect(screen.queryByText('Finalizing your take…')).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Finish take' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Stop recording' })).not.toBeInTheDocument();
 
     view.rerender(controls(createRecording('recorded')));
     expect(screen.queryByText('Take ready')).not.toBeInTheDocument();
@@ -80,12 +76,12 @@ describe('RecordingControls accessibility', () => {
     expect(screen.queryByText('The video source ended unexpectedly.')).not.toBeInTheDocument();
   });
 
-  it('handles Space only from a safe non-editable page context', async () => {
+  it('keeps the moved action keyboard shortcut limited to a safe non-editable context', async () => {
     const recording = createRecording('idle');
     const onStop = vi.fn().mockResolvedValue(undefined);
     const view = render(
       <StudioDesignProvider>
-        <RecordingControls
+        <RecordingAction
           recording={recording}
           source={source}
           mode="local"
@@ -102,7 +98,7 @@ describe('RecordingControls accessibility', () => {
 
     view.rerender(
       <StudioDesignProvider>
-        <RecordingControls
+        <RecordingAction
           recording={createRecording('recording')}
           source={source}
           mode="local"

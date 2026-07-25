@@ -58,7 +58,7 @@ export const skipLinkStyles = (theme: Theme): CSSObject => ({
 
 export const headerStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns: 'minmax(15rem, 1fr) auto minmax(15rem, 1fr)',
+  gridTemplateColumns: 'minmax(12rem, 1fr) auto minmax(10rem, 1fr)',
   alignItems: 'center',
   gap: theme.space.lg,
   minWidth: 0,
@@ -70,19 +70,40 @@ export const headerStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 39.99rem)': {
     gridTemplateColumns: 'minmax(0, 1fr) auto',
     gridTemplateRows: 'auto auto',
-    alignContent: 'stretch',
+    alignContent: 'center',
   },
 });
 
-export const characterBuilderActionStyles = (): CSSObject => ({
+export const characterSelectorStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
   justifyContent: 'center',
   minWidth: 0,
-  '& > button': { minHeight: '2.75rem', whiteSpace: 'nowrap' },
+  '& > button': {
+    minWidth: 0,
+    maxWidth: '20rem',
+    minHeight: '2.55rem',
+    paddingBlock: theme.space.xxs,
+    whiteSpace: 'nowrap',
+  },
+  '& img, & [data-character-placeholder]': {
+    width: '1.65rem',
+    height: '1.65rem',
+    display: 'grid',
+    flex: '0 0 auto',
+    placeItems: 'center',
+    borderRadius: theme.radii.small,
+    background: theme.colors.surfaceSoft,
+    objectFit: 'cover',
+  },
+  '& [data-character-label]': {
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+  },
   '@media (max-width: 39.99rem)': {
     gridColumn: '1 / -1',
     gridRow: '2',
-    '& > button': { width: '100%', minHeight: '2.75rem' },
+    '& > button': { width: '100%', maxWidth: 'none', minHeight: '2.55rem' },
   },
 });
 
@@ -119,37 +140,90 @@ export const brandStyles = (theme: Theme): CSSObject => ({
 });
 
 export const capabilityStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  flexWrap: 'nowrap',
-  justifyContent: 'flex-end',
-  gap: theme.space.xs,
+  position: 'relative',
+  justifySelf: 'end',
   minWidth: 0,
-  overflow: 'hidden',
+  '& summary': {
+    minHeight: '2.45rem',
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: theme.space.xs,
+    padding: `0.38rem ${theme.space.sm}`,
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.radii.round,
+    color: theme.colors.textMuted,
+    background: theme.colors.canvasRaised,
+    fontSize: theme.fontSizes.caption,
+    fontWeight: 760,
+    whiteSpace: 'nowrap',
+    cursor: 'pointer',
+    listStyle: 'none',
+  },
+  '& summary::-webkit-details-marker': { display: 'none' },
+  '& summary:focus-visible': {
+    outline: `2px solid ${theme.colors.focus}`,
+    outlineOffset: '2px',
+  },
+  '&[open] summary': {
+    borderColor: theme.colors.accent,
+    color: theme.colors.text,
+  },
   '@media (max-width: 39.99rem)': {
     gridColumn: '2',
     gridRow: '1',
   },
 });
 
-export const capabilityPillStyles = (theme: Theme, available: boolean): CSSObject => ({
-  padding: '0.38rem 0.62rem',
-  border: `1px solid ${available ? theme.colors.borderStrong : theme.colors.border}`,
-  borderRadius: theme.radii.round,
-  color: available ? theme.colors.textMuted : theme.colors.textFaint,
-  background: theme.colors.canvasRaised,
-  fontSize: '0.72rem',
-  fontWeight: 720,
-  whiteSpace: 'nowrap',
-  overflow: 'hidden',
-  textOverflow: 'ellipsis',
+export const systemStatusDotStyles = (
+  theme: Theme,
+  state: 'ready' | 'loading' | 'limited',
+): CSSObject => ({
+  width: '0.48rem',
+  height: '0.48rem',
+  flex: '0 0 auto',
+  borderRadius: '50%',
+  background:
+    state === 'ready'
+      ? theme.colors.accent
+      : state === 'loading'
+        ? theme.colors.warning
+        : theme.colors.danger,
+  boxShadow: `0 0 0 0.18rem ${
+    state === 'ready'
+      ? theme.colors.accentSoft
+      : state === 'loading'
+        ? theme.colors.warningSoft
+        : theme.colors.dangerSoft
+  }`,
+});
+
+export const capabilityDetailStyles = (theme: Theme): CSSObject => ({
+  position: 'absolute',
+  zIndex: theme.layers.stageNotices,
+  insetBlockStart: 'calc(100% + 0.45rem)',
+  insetInlineEnd: 0,
+  width: 'min(18rem, calc(100vw - 1rem))',
+  display: 'grid',
+  gap: theme.space.xs,
+  padding: theme.space.sm,
+  border: `1px solid ${theme.colors.borderStrong}`,
+  borderRadius: theme.radii.medium,
+  background: theme.colors.overlaySurface,
+  boxShadow: theme.shadows.lifted,
+  backdropFilter: 'blur(14px)',
+  '& span': {
+    display: 'flex',
+    justifyContent: 'space-between',
+    gap: theme.space.md,
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSizes.caption,
+  },
+  '& strong': { color: theme.colors.text, fontWeight: 760 },
   '@media (max-width: 39.99rem)': {
-    width: '0.75rem',
-    height: '0.75rem',
-    minWidth: '0.75rem',
-    padding: 0,
-    borderColor: available ? theme.colors.accent : theme.colors.borderStrong,
-    background: available ? theme.colors.accent : theme.colors.surfaceStrong,
-    color: 'transparent',
+    position: 'fixed',
+    insetInline: theme.space.xs,
+    insetBlockStart: '4rem',
+    width: 'auto',
   },
 });
 
@@ -213,12 +287,11 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
   },
   '@media (max-width: 20rem), (max-height: 36rem)': {
     '& > button': {
-      width: '2.75rem',
-      minWidth: '2.75rem',
-      paddingInline: 0,
-      fontSize: 0,
+      width: 'auto',
+      minWidth: 0,
+      paddingInline: theme.space.xxs,
+      fontSize: '0.68rem',
     },
-    '& > button::first-letter': { fontSize: '1rem' },
   },
 });
 

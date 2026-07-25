@@ -97,6 +97,10 @@ export const useStudioSession = ({
     ensure: ensureMedia,
     replace: replaceMedia,
     currentRequirements,
+    microphoneEnabled,
+    cameraEnabled,
+    toggleMicrophone,
+    toggleCamera,
     release: releaseLocalMedia,
   } = useOwnedLocalMedia({
     operationRef,
@@ -220,13 +224,15 @@ export const useStudioSession = ({
     );
   }, [beginMedia, capturePreferences.applied, disconnectRealtime, setApplied]);
 
-  const stopModel = useCallback(() => {
+  const stopModel = useCallback(async () => {
+    setLifecycle('stopping-ai');
     ++operationRef.current;
     startAbortRef.current?.abort();
     startAbortRef.current = null;
     disconnectRealtime();
     setApplied(null);
     setApplying(false);
+    await Promise.resolve();
     setLifecycle(hasLiveVideo(localRef.current) ? 'ready' : 'idle');
   }, [disconnectRealtime, localRef, setApplied]);
 
@@ -243,7 +249,8 @@ export const useStudioSession = ({
     setLifecycle(hasLiveVideo(localRef.current) ? 'ready' : 'idle');
   }, [disconnectRealtime, draftRef, localRef, replaceWithEmptyDraft, setApplied]);
 
-  const stopCamera = useCallback(() => {
+  const stopCamera = useCallback(async () => {
+    setLifecycle('stopping-media');
     ++operationRef.current;
     startAbortRef.current?.abort();
     startAbortRef.current = null;
@@ -251,14 +258,14 @@ export const useStudioSession = ({
     releaseLocalMedia();
     setApplied(null);
     setApplying(false);
-    setLifecycle('idle');
     resetLiveTimer();
     setError(null);
+    await Promise.resolve();
+    setLifecycle('idle');
   }, [disconnectRealtime, releaseLocalMedia, resetLiveTimer, setApplied]);
 
-  const releaseForRecordedReview = useCallback((): Promise<void> => {
-    stopCamera();
-    return Promise.resolve();
+  const releaseForRecordedReview = useCallback(async (): Promise<void> => {
+    await stopCamera();
   }, [stopCamera]);
 
   const selectMode = useCallback(
@@ -331,6 +338,8 @@ export const useStudioSession = ({
       liveSeconds,
       generationSeconds,
       applying,
+      microphoneEnabled,
+      cameraEnabled,
       capturePreferences,
       startLocal,
       preflight: startLocal,
@@ -341,6 +350,8 @@ export const useStudioSession = ({
       resetModel,
       stopCamera,
       releaseForRecordedReview,
+      toggleMicrophone,
+      toggleCamera,
       selectMode,
       canReplaceRecipeDraft,
       replaceRecipeDraft,
@@ -362,6 +373,8 @@ export const useStudioSession = ({
       liveSeconds,
       generationSeconds,
       applying,
+      microphoneEnabled,
+      cameraEnabled,
       capturePreferences,
       startLocal,
       startModel,
@@ -371,6 +384,8 @@ export const useStudioSession = ({
       resetModel,
       stopCamera,
       releaseForRecordedReview,
+      toggleMicrophone,
+      toggleCamera,
       selectMode,
       canReplaceRecipeDraft,
       replaceRecipeDraft,

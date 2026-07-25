@@ -344,7 +344,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     unmount();
   });
 
-  it('requires an explicit media release before manually switching a ready session mode', async () => {
+  it('switches a prepared AI mode without releasing a ready local preview', async () => {
     const { result, unmount } = renderHook(() =>
       useStudioSession({
         availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
@@ -357,13 +357,41 @@ describe('useStudioSession explicit-start boundaries', () => {
     expect(result.current.lifecycle).toBe('ready');
 
     act(() => {
-      expect(result.current.selectMode('lucy-2.5')).toBe(false);
-      result.current.stopCamera();
-    });
-    act(() => {
       expect(result.current.selectMode('lucy-2.5')).toBe(true);
     });
     expect(result.current.draft.mode).toBe('lucy-2.5');
+    expect(result.current.localStream).not.toBeNull();
+    expect(adapters.acquireLocalMedia).toHaveBeenCalledOnce();
+    await act(async () => {
+      await result.current.stopCamera();
+    });
+    unmount();
+  });
+
+  it('toggles microphone and camera tracks without acquiring or ending the session', async () => {
+    const owned = fakeStream();
+    adapters.acquireLocalMedia.mockResolvedValueOnce(owned);
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    await act(async () => {
+      await result.current.startLocal();
+    });
+    act(() => {
+      result.current.toggleMicrophone();
+      result.current.toggleCamera();
+    });
+
+    expect(result.current.microphoneEnabled).toBe(false);
+    expect(result.current.cameraEnabled).toBe(false);
+    expect(owned.getAudioTracks()[0]?.enabled).toBe(false);
+    expect(owned.getVideoTracks()[0]?.enabled).toBe(false);
+    expect(adapters.acquireLocalMedia).toHaveBeenCalledOnce();
+    expect(result.current.localStream).toBe(owned);
+
     unmount();
   });
 
@@ -378,9 +406,11 @@ describe('useStudioSession explicit-start boundaries', () => {
     await act(async () => {
       await result.current.startLocal();
     });
-    expect(result.current.canReplaceRecipeDraft('lucy-2.5')).toBe(false);
+    expect(result.current.canReplaceRecipeDraft('lucy-2.5')).toBe(true);
 
-    act(() => result.current.stopCamera());
+    await act(async () => {
+      await result.current.stopCamera();
+    });
     expect(result.current.canReplaceRecipeDraft('lucy-2.5')).toBe(true);
     unmount();
   });
@@ -894,7 +924,7 @@ describe('useStudioSession model lifecycle contract', () => {
     expect(result.current.lifecycle).toBe('connecting');
 
     act(() => {
-      result.current[action]();
+      void result.current[action]();
       options?.onRemoteStream(lateRemote);
       options?.onConnectionChange('connected');
     });

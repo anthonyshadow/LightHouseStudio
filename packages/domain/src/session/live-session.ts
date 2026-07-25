@@ -11,6 +11,8 @@ export type SessionLifecycleStatus =
   | 'generating'
   | 'reconnecting'
   | 'disconnected'
+  | 'stopping-ai'
+  | 'stopping-media'
   | 'error';
 
 export interface MediaTrackDescriptor {
@@ -53,7 +55,8 @@ export const canSwitchMode = (
   status: SessionLifecycleStatus,
   recording: boolean,
   hasLiveLocalMedia = false,
-): boolean =>
-  !recording &&
-  !hasLiveLocalMedia &&
-  (status === 'idle' || status === 'disconnected' || status === 'error');
+): boolean => {
+  if (recording) return false;
+  if (hasLiveLocalMedia) return status === 'ready';
+  return status === 'idle' || status === 'disconnected' || status === 'error';
+};

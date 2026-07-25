@@ -7,6 +7,7 @@ import {
   VoiceEffectsPanel,
   type VoiceBrowserCapabilities,
 } from '../voice-effects/VoiceEffectsPanel';
+import { TakeReviewActions } from './TakeReviewActions';
 
 export type TakeDockProps = {
   recording: RecordingController;
@@ -48,14 +49,6 @@ const metadataStyles = (theme: Theme): CSSObject => ({
     background: theme.colors.surfaceStrong,
   },
 });
-const actionStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  flexWrap: 'wrap',
-  gap: theme.space.xs,
-  '& > *': { flex: '1 1 8rem' },
-  minWidth: 0,
-});
-
 const headingStyles = (theme: Theme): CSSObject => ({
   margin: 0,
   fontFamily: theme.type.display,
@@ -93,25 +86,6 @@ const reviewBodyStyles = (theme: Theme): CSSObject => ({
 
 const reviewDetailsStyles = (): CSSObject => ({
   minWidth: 0,
-});
-
-const downloadStyles = (theme: Theme, locked: boolean): CSSObject => ({
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: '2.85rem',
-  minWidth: '2.75rem',
-  borderRadius: theme.radii.medium,
-  color: theme.colors.canvas,
-  background: theme.colors.accent,
-  fontWeight: 760,
-  textDecoration: 'none',
-  pointerEvents: locked ? 'none' : 'auto',
-  opacity: locked ? 0.5 : 1,
-  '&:focus-visible': {
-    outline: `2px solid ${theme.colors.focus}`,
-    outlineOffset: '3px',
-  },
 });
 
 type MetadataChip = {
@@ -201,21 +175,9 @@ export const TakeDock = ({
 }: TakeDockProps) => {
   const theme = useTheme();
   const artifact = recording.presented;
-  const locked = recording.processingState === 'processing';
   const captureChips = captureMetadataChips(recording.metadata);
 
   if (!artifact) return null;
-
-  const discard = () => {
-    if (
-      !window.confirm(
-        'Discard this in-memory take? It cannot be recovered after the tab releases it.',
-      )
-    )
-      return;
-    recording.discard();
-    onCloseTake?.();
-  };
 
   return (
     <Surface
@@ -269,47 +231,11 @@ export const TakeDock = ({
                     </span>
                   ) : null}
                 </div>
-                <div css={actionStyles(theme)}>
-                  <a
-                    href={artifact.objectUrl}
-                    download={artifact.filename}
-                    aria-disabled={locked}
-                    tabIndex={locked ? -1 : undefined}
-                    css={downloadStyles(theme, locked)}
-                    onClick={(event) => {
-                      if (locked) {
-                        event.preventDefault();
-                        return;
-                      }
-                      recording.markDownloaded();
-                    }}
-                  >
-                    Download take
-                  </a>
-                  <Button variant="danger" disabled={locked} onClick={discard}>
-                    Discard
-                  </Button>
-                  {onOpenVoiceTreatments ? (
-                    <Button variant="secondary" disabled={locked} onClick={onOpenVoiceTreatments}>
-                      Voice treatments
-                    </Button>
-                  ) : null}
-                  <Button
-                    variant="secondary"
-                    disabled={locked || !recording.downloaded}
-                    title={
-                      recording.downloaded
-                        ? 'Release the temporary in-memory take.'
-                        : 'Start a download before closing this temporary take.'
-                    }
-                    onClick={() => {
-                      recording.discard();
-                      onCloseTake?.();
-                    }}
-                  >
-                    Close take
-                  </Button>
-                </div>
+                <TakeReviewActions
+                  recording={recording}
+                  {...(onCloseTake ? { onCloseTake } : {})}
+                  {...(onOpenVoiceTreatments ? { onOpenVoiceTreatments } : {})}
+                />
               </div>
             </div>
             {recording.downloaded ? (

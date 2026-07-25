@@ -121,7 +121,7 @@ describe('MediaStage', () => {
     expect(firstVideo?.srcObject).toBe(localStream);
     expect(firstVideo?.muted).toBe(true);
     expect(firstVideo?.controls).toBe(false);
-    expect(screen.getByText('1280 × 720 · 30 fps')).toBeInTheDocument();
+    expect(screen.getByRole('status', { name: 'Local preview' })).toBeInTheDocument();
 
     view.rerender(
       stage({
@@ -182,6 +182,21 @@ describe('MediaStage', () => {
     expect(screen.getByText('Your private creative stage.')).toBeInTheDocument();
   });
 
+  it('keeps supplied stage controls mounted over recorded playback', () => {
+    render(
+      stage({
+        presentation: {
+          kind: 'playback',
+          artifact: artifact('take-with-controls'),
+          controlsLocked: false,
+        },
+        controls: <button type="button">Review action</button>,
+      }),
+    );
+
+    expect(screen.getByRole('button', { name: 'Review action' })).toBeInTheDocument();
+  });
+
   it('reports an ended video track truthfully without removing the stable video node', () => {
     const track = new FakeTrack('video', 'Studio camera', {
       width: 640,
@@ -201,7 +216,7 @@ describe('MediaStage', () => {
     act(() => track.end());
 
     expect(video).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByText('Video idle')).toBeInTheDocument();
+    expect(screen.getByText('Camera unavailable')).toBeInTheDocument();
     expect(view.container.querySelector('video')).toBe(video);
   });
 
@@ -224,7 +239,7 @@ describe('MediaStage', () => {
     );
 
     expect(view.container.querySelector('video')).toHaveAttribute('aria-hidden', 'true');
-    expect(screen.getByText('Video idle')).toBeInTheDocument();
+    expect(screen.getByText('Finalizing take')).toBeInTheDocument();
     expect(screen.queryByText('Last live frame')).not.toBeInTheDocument();
     expect(screen.getByText('Finalizing take…')).toBeInTheDocument();
   });
@@ -264,7 +279,7 @@ describe('MediaStage', () => {
       'aria-live',
       'off',
     );
-    expect(screen.getByRole('status')).toHaveTextContent('Local preview');
+    expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
   it('uses concise, mode-specific private guidance without starting any media work', () => {

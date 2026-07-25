@@ -11,8 +11,12 @@ export type OwnedLocalMediaController = {
   stream: MediaStream | null;
   streamRef: RefObject<MediaStream | null>;
   currentRequirements: MediaRequirements | null;
+  microphoneEnabled: boolean;
+  cameraEnabled: boolean;
   ensure: (requirements: MediaRequirements, operation: number) => Promise<MediaStream>;
   replace: (requirements: MediaRequirements, operation: number) => Promise<MediaStream>;
+  toggleMicrophone: () => void;
+  toggleCamera: () => void;
   release: () => void;
 };
 
@@ -38,7 +42,11 @@ export const useOwnedLocalMedia = ({
 }: OwnedLocalMediaOptions): OwnedLocalMediaController => {
   const [stream, setStream] = useState<MediaStream | null>(null);
   const [currentRequirements, setCurrentRequirements] = useState<MediaRequirements | null>(null);
+  const [microphoneEnabled, setMicrophoneEnabled] = useState(true);
+  const [cameraEnabled, setCameraEnabled] = useState(true);
   const streamRef = useRef<MediaStream | null>(null);
+  const microphoneEnabledRef = useRef(true);
+  const cameraEnabledRef = useRef(true);
   const listenersRef = useRef(
     new Map<MediaStream, Array<{ track: MediaStreamTrack; listener: () => void }>>(),
   );
@@ -85,6 +93,12 @@ export const useOwnedLocalMedia = ({
   const commitReplacement = useCallback(
     (nextStream: MediaStream, requirements: MediaRequirements) => {
       const previous = streamRef.current;
+      nextStream.getAudioTracks().forEach((track) => {
+        track.enabled = microphoneEnabledRef.current;
+      });
+      nextStream.getVideoTracks().forEach((track) => {
+        track.enabled = cameraEnabledRef.current;
+      });
       streamRef.current = nextStream;
       setStream(nextStream);
       setCurrentRequirements(requirements);
@@ -147,11 +161,37 @@ export const useOwnedLocalMedia = ({
     [acquireReplacement],
   );
 
+  const toggleMicrophone = useCallback(() => {
+    const audioTracks = streamRef.current?.getAudioTracks() ?? [];
+    if (audioTracks.length === 0) return;
+    const enabled = !microphoneEnabledRef.current;
+    microphoneEnabledRef.current = enabled;
+    audioTracks.forEach((track) => {
+      track.enabled = enabled;
+    });
+    setMicrophoneEnabled(enabled);
+  }, []);
+
+  const toggleCamera = useCallback(() => {
+    const videoTracks = streamRef.current?.getVideoTracks() ?? [];
+    if (videoTracks.length === 0) return;
+    const enabled = !cameraEnabledRef.current;
+    cameraEnabledRef.current = enabled;
+    videoTracks.forEach((track) => {
+      track.enabled = enabled;
+    });
+    setCameraEnabled(enabled);
+  }, []);
+
   const release = useCallback(() => {
     const owned = streamRef.current;
     streamRef.current = null;
+    microphoneEnabledRef.current = true;
+    cameraEnabledRef.current = true;
     setStream(null);
     setCurrentRequirements(null);
+    setMicrophoneEnabled(true);
+    setCameraEnabled(true);
     if (owned) unobserve(owned);
     stopOwnedStream(owned);
   }, [unobserve]);
@@ -166,5 +206,16 @@ export const useOwnedLocalMedia = ({
     [unobserve],
   );
 
-  return { stream, streamRef, currentRequirements, ensure, replace, release };
+  return {
+    stream,
+    streamRef,
+    currentRequirements,
+    microphoneEnabled,
+    cameraEnabled,
+    ensure,
+    replace,
+    toggleMicrophone,
+    toggleCamera,
+    release,
+  };
 };

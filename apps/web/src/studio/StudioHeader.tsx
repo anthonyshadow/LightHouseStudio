@@ -1,13 +1,14 @@
 import { useTheme } from '@emotion/react';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
 import type { RefObject } from 'react';
-import { Button, VisuallyHidden } from '../ui';
+import { Button } from '../ui';
 import {
   brandStyles,
-  capabilityPillStyles,
+  capabilityDetailStyles,
   capabilityStyles,
-  characterBuilderActionStyles,
+  characterSelectorStyles,
   headerStyles,
+  systemStatusDotStyles,
 } from './StudioApp.styles';
 
 export type CapabilityState = 'loading' | 'ready' | 'error';
@@ -16,9 +17,10 @@ type StudioHeaderProps = {
   availability: ProviderAvailability;
   browser: BrowserCapabilities;
   capabilityState: CapabilityState;
-  characterBuilderButtonRef: RefObject<HTMLButtonElement | null>;
-  characterBuilderDisabledReason?: string | undefined;
-  onBuildCharacter: () => void;
+  characterSelectorRef: RefObject<HTMLButtonElement | null>;
+  activeCharacterName?: string | undefined;
+  activeCharacterImageAssetId?: string | null | undefined;
+  onOpenCharacterSelector: () => void;
 };
 
 const capabilityLabel = (
@@ -35,23 +37,39 @@ export const StudioHeader = ({
   availability,
   browser,
   capabilityState,
-  characterBuilderButtonRef,
-  characterBuilderDisabledReason,
-  onBuildCharacter,
+  characterSelectorRef,
+  activeCharacterName,
+  activeCharacterImageAssetId,
+  onOpenCharacterSelector,
 }: StudioHeaderProps) => {
   const theme = useTheme();
   const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
-  const localCaptureStatus = `Local capture ${localCaptureAvailable ? 'ready' : 'unavailable'}`;
-  const aiVideoStatus = `AI video ${capabilityLabel(
+  const localCaptureState = localCaptureAvailable ? 'ready' : 'unavailable';
+  const aiVideoState = capabilityLabel(
     capabilityState,
     availability.decart,
     'not configured',
-  )}`;
-  const voiceCloudStatus = `Voice cloud ${capabilityLabel(
+  );
+  const voiceCloudState = capabilityLabel(
     capabilityState,
     availability.elevenLabs,
     'optional',
-  )}`;
+  );
+  const systemState =
+    capabilityState === 'loading'
+      ? 'loading'
+      : localCaptureAvailable && availability.decart
+        ? 'ready'
+        : 'limited';
+  const systemLabel =
+    systemState === 'loading'
+      ? 'Checking systems'
+      : systemState === 'ready'
+        ? 'Systems ready'
+        : 'Systems limited';
+  const characterImageUrl = activeCharacterImageAssetId
+    ? `/api/reference-images/${encodeURIComponent(activeCharacterImageAssetId)}/content`
+    : null;
 
   return (
     <header css={headerStyles(theme)}>
@@ -62,57 +80,45 @@ export const StudioHeader = ({
           <span>Local-first creative camera</span>
         </div>
       </div>
-      <div css={characterBuilderActionStyles()}>
+      <div css={characterSelectorStyles(theme)}>
         <Button
-          ref={characterBuilderButtonRef}
-          variant="primary"
-          aria-disabled={Boolean(characterBuilderDisabledReason) || undefined}
+          ref={characterSelectorRef}
+          variant="secondary"
           aria-haspopup="dialog"
-          aria-describedby={
-            characterBuilderDisabledReason ? 'character-builder-lock-reason' : undefined
+          aria-label={
+            activeCharacterName
+              ? `Selected character: ${activeCharacterName}. Open character options`
+              : 'No character selected. Open character options'
           }
-          title={characterBuilderDisabledReason}
-          onClick={() => {
-            if (!characterBuilderDisabledReason) onBuildCharacter();
-          }}
+          onClick={onOpenCharacterSelector}
         >
-          Build Your Character
+          {characterImageUrl ? (
+            <img src={characterImageUrl} alt="" width="26" height="26" />
+          ) : (
+            <span data-character-placeholder aria-hidden="true">
+              ✦
+            </span>
+          )}
+          <span data-character-label>{activeCharacterName ?? 'Character: None Selected'}</span>
         </Button>
-        {characterBuilderDisabledReason ? (
-          <VisuallyHidden>
-            <span id="character-builder-lock-reason">{characterBuilderDisabledReason}</span>
-          </VisuallyHidden>
-        ) : null}
       </div>
-      <div
-        css={capabilityStyles(theme)}
-        aria-label="Integration availability"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        <span
-          css={capabilityPillStyles(theme, localCaptureAvailable)}
-          aria-label={localCaptureStatus}
-          title={localCaptureStatus}
-        >
-          {localCaptureStatus}
-        </span>
-        <span
-          css={capabilityPillStyles(theme, capabilityState === 'ready' && availability.decart)}
-          aria-label={aiVideoStatus}
-          title={aiVideoStatus}
-        >
-          {aiVideoStatus}
-        </span>
-        <span
-          css={capabilityPillStyles(theme, capabilityState === 'ready' && availability.elevenLabs)}
-          aria-label={voiceCloudStatus}
-          title={voiceCloudStatus}
-        >
-          {voiceCloudStatus}
-        </span>
-      </div>
+      <details css={capabilityStyles(theme)} aria-label="Integration availability">
+        <summary>
+          <span css={systemStatusDotStyles(theme, systemState)} aria-hidden="true" />
+          <span>{systemLabel}</span>
+        </summary>
+        <div css={capabilityDetailStyles(theme)}>
+          <span>
+            Local capture <strong>{localCaptureState}</strong>
+          </span>
+          <span>
+            AI video <strong>{aiVideoState}</strong>
+          </span>
+          <span>
+            Voice cloud <strong>{voiceCloudState}</strong>
+          </span>
+        </div>
+      </details>
     </header>
   );
 };
