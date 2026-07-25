@@ -87,6 +87,17 @@ export const translateProviderError: ErrorTranslator = (error) => {
   const options = upstreamOptions(status);
 
   if (error.operation === 'token') {
+    if (status === 401 || status === 403) {
+      return translate(
+        error,
+        new AppError(
+          502,
+          'provider_authentication',
+          'Decart rejected the configured server credential. Replace the expired or invalid DECART_API_KEY and restart the API.',
+          options,
+        ),
+      );
+    }
     return translate(
       error,
       new AppError(

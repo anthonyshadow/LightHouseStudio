@@ -244,6 +244,8 @@ const createLocalTake = async (page: Page): Promise<void> => {
   await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
   await page.getByRole('button', { name: 'Stop recording' }).click();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
+  await page.getByRole('button', { name: 'Take', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeVisible();
 };
 

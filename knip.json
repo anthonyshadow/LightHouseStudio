@@ -5,8 +5,19 @@
   },
   "workspaces": {
     ".": {
-      "entry": ["e2e/**/*.{spec,screenshots}.ts", "scripts/**/*.mjs"],
-      "project": ["*.{ts,mjs}", "e2e/**/*.ts", "scripts/**/*.mjs"],
+      "entry": [
+        "stories/**/*.stories.{ts,tsx}",
+        "stories/**/*.mdx",
+        "e2e/**/*.{spec,screenshots}.ts",
+        "scripts/**/*.mjs"
+      ],
+      "project": [
+        ".storybook/**/*.{ts,tsx}",
+        "stories/**/*.{ts,tsx,mdx}",
+        "*.{ts,mjs}",
+        "e2e/**/*.ts",
+        "scripts/**/*.mjs"
+      ],
       "ignoreExportsUsedInFile": true
     },
     "apps/api": {

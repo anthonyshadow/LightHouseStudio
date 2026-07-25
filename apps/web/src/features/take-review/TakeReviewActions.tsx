@@ -78,6 +78,11 @@ export const TakeReviewActions = ({
 
   if (!artifact) return null;
 
+  const closeTake = () => {
+    recording.discard();
+    onCloseTake?.();
+  };
+
   const discard = () => {
     if (
       !window.confirm(
@@ -86,8 +91,7 @@ export const TakeReviewActions = ({
     ) {
       return;
     }
-    recording.discard();
-    onCloseTake?.();
+    closeTake();
   };
 
   return (
@@ -128,10 +132,7 @@ export const TakeReviewActions = ({
             ? 'Release the temporary in-memory take.'
             : 'Start a download before closing this temporary take.'
         }
-        onClick={() => {
-          recording.discard();
-          onCloseTake?.();
-        }}
+        onClick={closeTake}
       >
         {compact ? 'Close' : 'Close take'}
       </Button>

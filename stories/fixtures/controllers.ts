@@ -1,0 +1,220 @@
+import { fn } from 'storybook/test';
+import {
+  createEmptyDraft,
+  type StudioMode,
+  type StudioSessionController,
+} from '@web/features/media-session';
+import type {
+  CapturePreferencesController,
+  RecordingArtifact,
+  RecordingController,
+  RecordingSource,
+} from '@web/features/recording';
+import type { VoiceProcessingController } from '@web/features/voice-effects/types';
+
+export const emptyMediaStream = (): MediaStream =>
+  ({
+    active: true,
+    id: 'storybook-stream',
+    getTracks: () => [],
+    getAudioTracks: () => [],
+    getVideoTracks: () => [],
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  }) as unknown as MediaStream;
+
+export const createTakeArtifact = (
+  overrides: Partial<RecordingArtifact> = {},
+): RecordingArtifact => {
+  const media = new Blob(['storybook-take'], { type: 'video/webm' });
+  return {
+    id: 'take-storybook',
+    media,
+    objectUrl: 'blob:storybook-take',
+    mimeType: media.type,
+    filename: 'lightframe-storybook-take.webm',
+    sourceModeId: 'local',
+    startedAt: '2026-07-25T14:00:00.000Z',
+    durationMs: 12_400,
+    sizeBytes: 3_482_624,
+    ...overrides,
+  };
+};
+
+export const createSessionController = (
+  mode: StudioMode = 'local',
+  overrides: Partial<StudioSessionController> = {},
+): StudioSessionController => ({
+  draft: createEmptyDraft(mode),
+  applied: null,
+  lifecycle: 'idle',
+  localStream: null,
+  remoteStream: null,
+  displayStream: null,
+  transformedVideoUsable: false,
+  pendingChanges: false,
+  error: null,
+  liveSeconds: 0,
+  generationSeconds: 0,
+  applying: false,
+  microphoneEnabled: true,
+  cameraEnabled: true,
+  startLocal: fn(() => Promise.resolve()),
+  preflight: fn(() => Promise.resolve()),
+  startModel: fn(() => Promise.resolve()),
+  applyChanges: fn(() => Promise.resolve()),
+  revertDraft: fn(),
+  stopModel: fn(() => Promise.resolve()),
+  resetModel: fn(),
+  stopCamera: fn(() => Promise.resolve()),
+  releaseForRecordedReview: fn(() => Promise.resolve()),
+  toggleMicrophone: fn(),
+  toggleCamera: fn(),
+  selectMode: fn(() => true),
+  canReplaceRecipeDraft: fn(() => true),
+  replaceRecipeDraft: fn(() => true),
+  updatePrompt: fn(),
+  updateEnhancement: fn(),
+  updateReferenceImage: fn(),
+  clearError: fn(),
+  ...overrides,
+});
+
+export const createRecordingSource = (): RecordingSource => ({
+  stream: emptyMediaStream(),
+  videoSource: 'local',
+  audioSource: 'microphone',
+});
+
+const restorePersistedOriginal: RecordingController['restorePersistedOriginal'] = (input) =>
+  createTakeArtifact({
+    media: input.blob,
+    ...input.artifactMetadata,
+    objectUrl: 'blob:restored-take',
+    sizeBytes: input.blob.size,
+  });
+
+const completeProcessing: RecordingController['completeProcessing'] = (blob, mimeType, label) =>
+  createTakeArtifact({
+    id: 'processed-storybook',
+    media: blob,
+    objectUrl: 'blob:processed-storybook',
+    mimeType,
+    filename: `${label}.webm`,
+    sizeBytes: blob.size,
+  });
+
+export const createRecordingController = (
+  overrides: Partial<RecordingController> = {},
+): RecordingController => ({
+  lifecycle: 'idle',
+  activeSource: null,
+  metadata: null,
+  original: null,
+  processed: null,
+  presented: null,
+  sidecar: { state: 'unavailable', blob: null, mimeType: null, error: null },
+  recordingError: null,
+  processingState: 'idle',
+  processingError: null,
+  elapsedSeconds: 0,
+  downloaded: false,
+  start: fn(() => Promise.resolve()),
+  stop: fn(() => Promise.resolve(null)),
+  restorePersistedOriginal: fn(restorePersistedOriginal),
+  discard: fn(),
+  markDownloaded: fn(),
+  beginProcessing: fn(),
+  cancelProcessing: fn(),
+  completeProcessing: fn(completeProcessing),
+  failProcessing: fn(),
+  restoreOriginal: fn(),
+  ...overrides,
+});
+
+export const createRecordedController = (
+  overrides: Partial<RecordingController> = {},
+): RecordingController => {
+  const original = createTakeArtifact();
+  return createRecordingController({
+    lifecycle: 'recorded',
+    metadata: {
+      mode: 'local',
+      startedAt: original.startedAt,
+      width: 1_920,
+      height: 1_080,
+      frameRate: 29.97,
+      videoSource: 'local',
+      audioSource: 'microphone',
+      videoSourceLabel: 'Studio Camera',
+      audioSourceLabel: 'Creator Microphone',
+    },
+    original,
+    presented: original,
+    sidecar: {
+      state: 'ready',
+      blob: new Blob(['storybook-audio'], { type: 'audio/webm' }),
+      mimeType: 'audio/webm',
+      error: null,
+    },
+    elapsedSeconds: 12,
+    ...overrides,
+  });
+};
+
+export const createVoiceProcessingController = (
+  overrides: Partial<VoiceProcessingController> = {},
+): VoiceProcessingController => ({
+  selection: { kind: 'local', effect: 'warm-studio' },
+  applyLocal: fn(() => Promise.resolve()),
+  applyElevenLabs: fn(() => Promise.resolve()),
+  restoreOriginal: fn(),
+  cancel: fn(),
+  ...overrides,
+});
+
+export const createCapturePreferencesController = (
+  overrides: Partial<CapturePreferencesController> = {},
+): CapturePreferencesController => ({
+  draft: {
+    videoDeviceId: 'camera-1',
+    audioDeviceId: 'microphone-1',
+    profile: '1080p30',
+  },
+  applied: {
+    videoDeviceId: 'camera-1',
+    audioDeviceId: 'microphone-1',
+    profile: '720p30',
+  },
+  cameraDevices: [
+    { deviceId: 'camera-1', label: 'Studio Camera' },
+    { deviceId: 'camera-2', label: 'Desk Camera' },
+  ],
+  microphoneDevices: [
+    { deviceId: 'microphone-1', label: 'Creator Microphone' },
+    { deviceId: 'microphone-2', label: 'Built-in Microphone' },
+  ],
+  supportedProfiles: ['720p30', '1080p30'],
+  devicesState: 'ready',
+  deviceError: null,
+  applyError: null,
+  applying: false,
+  hasPendingChanges: true,
+  actualSettings: {
+    video: {
+      label: 'Studio Camera',
+      deviceId: 'camera-1',
+      width: 1_920,
+      height: 1_080,
+      frameRate: 30,
+    },
+    audio: { label: 'Creator Microphone', deviceId: 'microphone-1' },
+  },
+  refreshDevices: fn(() => Promise.resolve()),
+  updateVideoDeviceId: fn(),
+  updateAudioDeviceId: fn(),
+  updateProfile: fn(),
+  apply: fn(() => Promise.resolve(true)),
+  discardPending: fn(),
+  ...overrides,
+});

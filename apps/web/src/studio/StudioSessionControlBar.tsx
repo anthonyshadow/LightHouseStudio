@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
+import { referenceImageContentUrl } from '../adapters/api-client/apiClient';
 import { Button } from '../ui';
 import { fadingVisibilityAnimationStyles } from '../ui/animationStyles';
 import type { StudioSessionController } from '../features/media-session';
@@ -191,9 +192,6 @@ const transitionLabel = (session: StudioSessionController): string | null => {
   return null;
 };
 
-const referenceImageUrl = (assetId: string) =>
-  `/api/reference-images/${encodeURIComponent(assetId)}/content`;
-
 export const StudioSessionControlBar = ({
   session,
   experienceLabel,
@@ -250,7 +248,11 @@ export const StudioSessionControlBar = ({
       }, SESSION_CONTROL_IDLE_TIMEOUT_MS);
     };
     const handleActivity = () => {
-      setVisibility({ context: autoHideContext, visible: true });
+      setVisibility((current) =>
+        current.context === autoHideContext && current.visible
+          ? current
+          : { context: autoHideContext, visible: true },
+      );
       scheduleHide();
     };
 
@@ -286,7 +288,7 @@ export const StudioSessionControlBar = ({
             <div css={identityStyles(theme)}>
               {experienceImageAssetId ? (
                 <img
-                  src={referenceImageUrl(experienceImageAssetId)}
+                  src={referenceImageContentUrl(experienceImageAssetId)}
                   alt=""
                   width="32"
                   height="32"

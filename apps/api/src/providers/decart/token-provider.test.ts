@@ -75,6 +75,22 @@ describe('DecartSdkTokenProvider', () => {
     expect(sdkMocks.createToken).not.toHaveBeenCalled();
   });
 
+  it('preserves the nested SDK status for safe authentication classification', async () => {
+    sdkMocks.createToken.mockRejectedValue({
+      code: 'TOKEN_CREATE_ERROR',
+      message: 'private provider response',
+      data: { status: 401 },
+    });
+    const provider = new DecartSdkTokenProvider('expired-server-placeholder');
+
+    await expect(provider.createToken(scope())).rejects.toMatchObject({
+      name: 'ProviderError',
+      operation: 'token',
+      reason: 'upstream',
+      upstreamStatus: 401,
+    });
+  });
+
   it('invalidates issuance when the caller aborts', async () => {
     sdkMocks.createToken.mockImplementation(() => new Promise(() => undefined));
     const provider = new DecartSdkTokenProvider('server-only-placeholder');

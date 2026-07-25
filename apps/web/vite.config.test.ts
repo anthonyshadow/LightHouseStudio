@@ -13,7 +13,7 @@ describe('development API proxy', () => {
       changeOrigin: false,
       proxyTimeout: DEVELOPMENT_API_PROXY_TIMEOUT_MS,
     });
-    expect(DEVELOPMENT_API_PROXY_TIMEOUT_MS).toBe(210_000);
+    expect(DEVELOPMENT_API_PROXY_TIMEOUT_MS).toBe(300_000);
   });
 });
 

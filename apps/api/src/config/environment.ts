@@ -12,7 +12,8 @@ export const DEFAULT_API_PORT = 4100;
 export const DEFAULT_ELEVENLABS_STS_MODEL_ID = 'eleven_multilingual_sts_v2';
 export const DEFAULT_LIGHTFRAME_DATA_DIR = './.lightframe-data';
 export const DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
-export const DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS = 30_000;
+export const DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS = 120_000;
+export const MAX_PROMPT_OPTIMIZER_TIMEOUT_MS = 180_000;
 
 const normalizeOptionalString = (value: unknown): unknown => {
   if (typeof value !== 'string') return value;
@@ -35,6 +36,11 @@ const portSchema = z.preprocess(
   z.coerce.number().int().min(1).max(65_535),
 );
 
+const promptOptimizerTimeoutSchema = z.preprocess(
+  (value) => (value === undefined || value === '' ? DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS : value),
+  z.coerce.number().int().min(10_000).max(MAX_PROMPT_OPTIMIZER_TIMEOUT_MS),
+);
+
 const strictBooleanSchema = z.preprocess((value) => {
   if (value === undefined || value === '') return false;
   if (value === 'true') return true;
@@ -53,6 +59,7 @@ const environmentSchema = z.object({
     z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
   ),
   OPENAI_PROMPT_OPTIMIZER_VERSION: optionalModelSchema,
+  OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: promptOptimizerTimeoutSchema,
   OPENAI_REFERENCE_IMAGE_MODEL: optionalModelSchema,
   OPENAI_REFERENCE_IMAGE_QUALITY: z.preprocess(
     normalizeOptionalString,
@@ -167,7 +174,7 @@ export const parseEnvironment = (
       result.data.OPENAI_PROMPT_OPTIMIZER_REASONING ?? CHARACTER_PROMPT_OPTIMIZER_DEFAULT_REASONING,
     openAiPromptOptimizerVersion:
       result.data.OPENAI_PROMPT_OPTIMIZER_VERSION ?? CHARACTER_PROMPT_OPTIMIZER_DEFAULT_VERSION,
-    openAiPromptOptimizerTimeoutMs: DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS,
+    openAiPromptOptimizerTimeoutMs: result.data.OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS,
     openAiReferenceImageModel: result.data.OPENAI_REFERENCE_IMAGE_MODEL ?? REFERENCE_IMAGE_MODEL_ID,
     openAiReferenceImageQuality:
       result.data.OPENAI_REFERENCE_IMAGE_QUALITY ?? REFERENCE_IMAGE_QUALITY,

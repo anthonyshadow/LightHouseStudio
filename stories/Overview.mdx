@@ -1,0 +1,20 @@
+import { Meta } from '@storybook/addon-docs/blocks';
+
+<Meta title="Foundations/Overview" />
+
+# Lightframe UI catalog
+
+This Storybook mirrors the production React/Vite studio without starting camera, microphone, or
+provider sessions. It is organized by maintenance boundary:
+
+- **Foundations** documents production theme tokens and global design rules.
+- **Primitives** isolates shared actions, fields, feedback, selection, media, accessibility, and
+  overlay behavior.
+- **Features** follows `apps/web/src/features` and renders meaningful idle, ready, live, error, and
+  completed states.
+- **Studio** documents shell chrome and cross-feature workspace compositions.
+- **Flows** links components into deterministic user journeys.
+
+Autodocs, controls, accessibility checks, interaction tests, and Chromium component tests are
+enabled globally. Stories that contain provider-facing actions use typed local doubles; a click
+never silently starts real media or spends provider credits.

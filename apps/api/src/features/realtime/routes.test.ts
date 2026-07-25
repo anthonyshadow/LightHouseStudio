@@ -5,6 +5,7 @@ import type {
   DecartTokenProvider,
   TokenRequestScope,
 } from '../../providers/decart/token-provider.js';
+import { ProviderError } from '../../providers/provider-error.js';
 import { testConfig } from '../../test/fakes.js';
 
 const localOriginHeaders = { origin: 'http://localhost:5173', host: 'localhost:5173' };
@@ -152,5 +153,28 @@ describe('realtime token API', () => {
     expect(health.statusCode).toBe(200);
     expect(token.statusCode).toBe(503);
     expect(token.json<ApiErrorResponse>().error.code).toBe('feature_unavailable');
+  });
+
+  it('reports an expired Decart credential as an authentication failure', async () => {
+    const provider: DecartTokenProvider = {
+      createToken: vi.fn(() => Promise.reject(new ProviderError('token', 'upstream', 401))),
+    };
+    const app = createApp({ config: testConfig(), decartProvider: provider });
+    apps.push(app);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/realtime-token',
+      headers: localOriginHeaders,
+      payload: { model: 'lucy-2.5' },
+    });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json<ApiErrorResponse>().error).toEqual({
+      code: 'provider_authentication',
+      message:
+        'Decart rejected the configured server credential. Replace the expired or invalid DECART_API_KEY and restart the API.',
+      upstreamStatus: 401,
+    });
   });
 });

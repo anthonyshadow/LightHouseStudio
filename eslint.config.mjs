@@ -12,7 +12,15 @@ const dynamicMediaWithoutCaptionSource = [
 ];
 
 export default tseslint.config(
-  { ignores: ['**/dist/**', '**/coverage/**', 'playwright-report/**', 'test-results/**'] },
+  {
+    ignores: [
+      '**/dist/**',
+      '**/coverage/**',
+      'playwright-report/**',
+      'test-results/**',
+      'storybook-static/**',
+    ],
+  },
   eslint.configs.recommended,
   ...tseslint.configs.recommendedTypeChecked.map((config) => ({
     ...config,
@@ -44,6 +52,28 @@ export default tseslint.config(
   {
     files: ['apps/web/src/**/*.{ts,tsx}'],
     languageOptions: { globals: globals.browser },
+  },
+  {
+    files: ['stories/**/*.{ts,tsx}', '.storybook/preview.tsx'],
+    languageOptions: {
+      globals: globals.browser,
+      parserOptions: {
+        projectService: false,
+        project: './tsconfig.storybook.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
+  },
+  {
+    files: ['.storybook/main.ts'],
+    languageOptions: {
+      globals: globals.node,
+      parserOptions: {
+        projectService: false,
+        project: './tsconfig.storybook.json',
+        tsconfigRootDir: import.meta.dirname,
+      },
+    },
   },
   {
     files: [

@@ -22,6 +22,8 @@ import {
   SessionComposer,
   type StudioMode,
 } from '../features/media-session';
+import { isModelSessionActive } from '../features/media-session/sessionComposerModel';
+import { persistedReferenceAssetId } from '../features/media-session/types';
 import { CaptureSettingsPanel, RecordingControls } from '../features/recording';
 import { useStrictModeSafeDisposable } from '../orchestration/lifecycle/useStrictModeSafeDisposable';
 import { useStudioSession } from '../orchestration/session';
@@ -34,7 +36,7 @@ import {
   skipLinkStyles,
   stageColumnStyles,
 } from './StudioApp.styles';
-import { CreativeWorkspace, type AuxiliaryPanel } from './CreativeWorkspace';
+import { CreativeWorkspace, type AuxiliaryPanel, type ModelMode } from './CreativeWorkspace';
 import { AIExperienceChooser } from './AIExperienceChooser';
 import { StudioHeader } from './StudioHeader';
 import { StudioSessionControlBar } from './StudioSessionControlBar';
@@ -148,16 +150,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     session,
     onReviewCleared: handleReviewCleared,
   });
-  const aiSessionActive = [
-    'requesting-media',
-    'requesting-token',
-    'connecting',
-    'connected',
-    'generating',
-    'reconnecting',
-    'stopping-ai',
-    'stopping-media',
-  ].includes(session.lifecycle);
+  const aiSessionActive = isModelSessionActive(session);
   const sessionModeLocked = mediaLocked || aiSessionActive || session.lifecycle === 'disconnected';
   const characterBuilderOpenBlockedReason = recordingActive
     ? 'Finish recording and finalization before building a character.'
@@ -348,6 +341,14 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
       : activeOverlay === 'recipe-shelf'
         ? 'shelf'
         : 'closed';
+  const activeCreativeTool =
+    activeOverlay === 'recipe-dock'
+      ? 'dock'
+      : activeOverlay === 'take-review' || activeOverlay === 'voice-treatments'
+        ? 'take'
+        : creativePanel === 'closed'
+          ? null
+          : creativePanel;
   const captureBlockedReason = reviewLocked
     ? REVIEW_LOCK_REASON
     : shelfDirty
@@ -367,25 +368,22 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
       : undefined);
   const currentExperienceImageAssetId =
     activeCharacter?.referenceImageAssetId ??
-    (session.draft.referenceImage?.kind === 'persisted'
-      ? session.draft.referenceImage.assetId
-      : null);
+    persistedReferenceAssetId(session.draft.referenceImage);
   const selectExperienceMode = (mode: StudioMode): boolean => {
     return (
       confirmModeReplacement(session.draft, mode, (message) => window.confirm(message)) &&
       session.selectMode(mode)
     );
   };
-  const openSavedRecipesFor = (mode: 'lucy-2.5' | 'lucy-vton-3') => {
+  const openSavedRecipesFor = (mode: ModelMode) => {
     changeLibraryMode(mode);
     openOverlay('recipe-shelf');
   };
   const configureVirtualTryOn = () => {
     if (!selectExperienceMode('lucy-vton-3')) return;
-    closeOverlay();
     openOverlay('recipe-dock');
   };
-  const startPreparedAi = (mode: 'lucy-2.5' | 'lucy-vton-3') => {
+  const startPreparedAi = (mode: ModelMode) => {
     if (!selectExperienceMode(mode)) return;
     closeOverlay();
     void session.startModel();
@@ -652,16 +650,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
           repository={repository}
           state={{
             panel: creativePanel,
-            activeTool:
-              activeOverlay === 'recipe-dock'
-                ? 'dock'
-                : activeOverlay === 'take-review' || activeOverlay === 'voice-treatments'
-                  ? 'take'
-                  : activeOverlay === 'workshop'
-                    ? 'workshop'
-                    : activeOverlay === 'recipe-shelf'
-                      ? 'shelf'
-                      : null,
+            activeTool: activeCreativeTool,
             activeSessionMode: session.draft.mode,
             libraryMode,
             workshopDraft,

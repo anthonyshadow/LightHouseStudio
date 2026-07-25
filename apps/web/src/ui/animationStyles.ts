@@ -48,18 +48,18 @@ export const overlayPanelAnimationStyles = (
   placement: OverlayMotionPlacement,
   exiting: boolean,
 ): CSSObject => {
-  const animation =
-    placement === 'right'
-      ? exiting
-        ? overlayPanelSlideOutRight
-        : overlayPanelSlideInRight
-      : placement === 'bottom'
-        ? exiting
-          ? overlayPanelSlideOutBottom
-          : overlayPanelSlideInBottom
-        : exiting
-          ? overlayBackdropFadeOut
-          : overlayBackdropFadeIn;
+  let animation;
+  switch (placement) {
+    case 'right':
+      animation = exiting ? overlayPanelSlideOutRight : overlayPanelSlideInRight;
+      break;
+    case 'bottom':
+      animation = exiting ? overlayPanelSlideOutBottom : overlayPanelSlideInBottom;
+      break;
+    case 'fullscreen':
+      animation = exiting ? overlayBackdropFadeOut : overlayBackdropFadeIn;
+      break;
+  }
 
   return {
     animation: `${animation} ${theme.motion.standard} both`,

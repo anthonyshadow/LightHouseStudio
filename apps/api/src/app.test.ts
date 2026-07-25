@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fileURLToPath } from 'node:url';
 import type { ApiErrorResponse } from '@studio/contracts';
-import { createApp, REFERENCE_IMAGE_CONNECTION_TIMEOUT_MARGIN_MS } from './app.js';
+import { createApp, OPENAI_CONNECTION_TIMEOUT_MARGIN_MS } from './app.js';
 import { ReferenceImageStorageError } from './features/reference-images/asset-store.js';
 import { ProviderError } from './providers/provider-error.js';
 import { FakeElevenLabsProvider, testConfig } from './test/fakes.js';
@@ -43,13 +43,16 @@ describe('API shell', () => {
     expect(capabilities.body).not.toContain('apiKey');
   });
 
-  it('keeps response sockets open beyond the configured image-generation timeout', () => {
-    const config = testConfig({ referenceImageTimeoutMs: 12_345 });
+  it('keeps response sockets open beyond the longest configured OpenAI timeout', () => {
+    const config = testConfig({
+      referenceImageTimeoutMs: 12_345,
+      openAiPromptOptimizerTimeoutMs: 23_456,
+    });
     const app = createApp({ config });
     apps.push(app);
 
     expect(app.server.timeout).toBe(
-      config.referenceImageTimeoutMs + REFERENCE_IMAGE_CONNECTION_TIMEOUT_MARGIN_MS,
+      config.openAiPromptOptimizerTimeoutMs + OPENAI_CONNECTION_TIMEOUT_MARGIN_MS,
     );
     expect(app.server.requestTimeout).toBe(100_000);
   });

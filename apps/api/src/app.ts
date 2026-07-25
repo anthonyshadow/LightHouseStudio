@@ -33,7 +33,7 @@ import {
   type ReferenceImageProvider,
 } from './providers/openai/reference-image-provider.js';
 
-export const REFERENCE_IMAGE_CONNECTION_TIMEOUT_MARGIN_MS = 100_000;
+export const OPENAI_CONNECTION_TIMEOUT_MARGIN_MS = 100_000;
 
 export interface AppDependencies {
   readonly config: RuntimeConfig;
@@ -61,10 +61,14 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     bodyLimit: 1024 * 1024,
     requestTimeout: 100_000,
     // Node's socket timeout also covers the quiet interval while a handler waits
-    // for OpenAI. It must outlive the provider timeout plus image validation and
-    // atomic storage, otherwise the client sees a 502 while the billable job keeps running.
+    // for OpenAI. It must outlive both provider timeouts plus image validation and
+    // atomic storage, otherwise the client loses the structured error response while
+    // upstream work may still be settling.
     connectionTimeout:
-      dependencies.config.referenceImageTimeoutMs + REFERENCE_IMAGE_CONNECTION_TIMEOUT_MARGIN_MS,
+      Math.max(
+        dependencies.config.referenceImageTimeoutMs,
+        dependencies.config.openAiPromptOptimizerTimeoutMs,
+      ) + OPENAI_CONNECTION_TIMEOUT_MARGIN_MS,
     keepAliveTimeout: 5_000,
     trustProxy: false,
   });

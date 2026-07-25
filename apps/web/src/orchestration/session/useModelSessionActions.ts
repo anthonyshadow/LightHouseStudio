@@ -1,7 +1,7 @@
 import { canApplyRealtimeChanges } from '@studio/domain';
 import type { RealtimeSessionProfile } from '@studio/contracts';
 import { useCallback, type Dispatch, type RefObject, type SetStateAction } from 'react';
-import { requestRealtimeToken } from '../../adapters/api-client/apiClient';
+import { ApiClientError, requestRealtimeToken } from '../../adapters/api-client/apiClient';
 import { getDecartModelRequirements } from '../../adapters/decart-realtime/DecartRealtimeGateway';
 import { hasLiveVideo } from '../../adapters/browser-media/browserMedia';
 import {
@@ -65,6 +65,20 @@ const disconnectError = (reason: RealtimeDisconnectReason): SafeMediaError =>
         message: 'The AI connection ended. Local preview is still available.',
         recovery: 'Reconnect AI, continue locally, or stop the camera.',
       };
+
+const realtimeStartError = (error: unknown): SafeMediaError => {
+  if (error instanceof ApiClientError && error.code === 'provider_authentication') {
+    return {
+      code: error.code,
+      message: error.message,
+      recovery: 'Replace DECART_API_KEY on the API server, restart it, then start AI again.',
+    };
+  }
+  return toSafeMediaError(
+    error,
+    'Realtime transformation could not be started. Local preview is safe.',
+  );
+};
 
 export const useModelSessionActions = ({
   decartAvailable,
@@ -185,12 +199,7 @@ export const useModelSessionActions = ({
       if (operationRef.current !== operation) return;
       realtime.disconnect();
       setLifecycle(hasLiveVideo(localRef.current) ? 'ready' : 'error');
-      setError(
-        toSafeMediaError(
-          caught,
-          'Realtime transformation could not be started. Local preview is safe.',
-        ),
-      );
+      setError(realtimeStartError(caught));
     }
   }, [
     decartAvailable,

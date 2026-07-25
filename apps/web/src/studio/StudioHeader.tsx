@@ -1,4 +1,5 @@
 import { useTheme } from '@emotion/react';
+import { referenceImageContentUrl } from '../adapters/api-client/apiClient';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
 import type { RefObject } from 'react';
 import { Button } from '../ui';
@@ -45,16 +46,8 @@ export const StudioHeader = ({
   const theme = useTheme();
   const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
   const localCaptureState = localCaptureAvailable ? 'ready' : 'unavailable';
-  const aiVideoState = capabilityLabel(
-    capabilityState,
-    availability.decart,
-    'not configured',
-  );
-  const voiceCloudState = capabilityLabel(
-    capabilityState,
-    availability.elevenLabs,
-    'optional',
-  );
+  const aiVideoState = capabilityLabel(capabilityState, availability.decart, 'not configured');
+  const voiceCloudState = capabilityLabel(capabilityState, availability.elevenLabs, 'optional');
   const systemState =
     capabilityState === 'loading'
       ? 'loading'
@@ -68,7 +61,7 @@ export const StudioHeader = ({
         ? 'Systems ready'
         : 'Systems limited';
   const characterImageUrl = activeCharacterImageAssetId
-    ? `/api/reference-images/${encodeURIComponent(activeCharacterImageAssetId)}/content`
+    ? referenceImageContentUrl(activeCharacterImageAssetId)
     : null;
 
   return (

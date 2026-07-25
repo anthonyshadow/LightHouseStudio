@@ -40,6 +40,7 @@ describe('parseEnvironment', () => {
         OPENAI_PROMPT_OPTIMIZER_MODEL: ' gpt-test-optimizer ',
         OPENAI_PROMPT_OPTIMIZER_REASONING: ' high ',
         OPENAI_PROMPT_OPTIMIZER_VERSION: ' optimizer-v2 ',
+        OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '95000',
         OPENAI_REFERENCE_IMAGE_MODEL: ' gpt-image-test ',
         OPENAI_REFERENCE_IMAGE_QUALITY: ' medium ',
         ELEVENLABS_API_KEY: '  eleven-placeholder  ',
@@ -55,6 +56,7 @@ describe('parseEnvironment', () => {
       openAiPromptOptimizerModel: 'gpt-test-optimizer',
       openAiPromptOptimizerReasoning: 'high',
       openAiPromptOptimizerVersion: 'optimizer-v2',
+      openAiPromptOptimizerTimeoutMs: 95_000,
       openAiReferenceImageModel: 'gpt-image-test',
       openAiReferenceImageQuality: 'medium',
       elevenLabsApiKey: 'eleven-placeholder',
@@ -70,6 +72,8 @@ describe('parseEnvironment', () => {
     { NODE_ENV: 'staging' },
     { ELEVENLABS_ENABLE_LOGGING: 'FALSE' },
     { OPENAI_PROMPT_OPTIMIZER_REASONING: 'extreme' },
+    { OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '9999' },
+    { OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '180001' },
     { OPENAI_REFERENCE_IMAGE_QUALITY: 'low' },
   ])('rejects invalid environment input %#', (environment) => {
     expect(() => parseEnvironment(environment)).toThrow(EnvironmentValidationError);

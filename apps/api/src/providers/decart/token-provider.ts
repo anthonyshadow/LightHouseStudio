@@ -66,12 +66,30 @@ const normalizeExpiry = (value: string | number | Date): string => {
 };
 
 const numericStatusFrom = (error: unknown): number | undefined => {
-  if (typeof error !== 'object' || error === null) return undefined;
-  const possible = error as { readonly status?: unknown; readonly statusCode?: unknown };
+  if (!isRecord(error)) return undefined;
+  const possible = error as {
+    readonly status?: unknown;
+    readonly statusCode?: unknown;
+    readonly data?: unknown;
+  };
   if (typeof possible.status === 'number') return possible.status;
   if (typeof possible.statusCode === 'number') return possible.statusCode;
+  if (isRecord(possible.data) && typeof possible.data.status === 'number') {
+    return possible.data.status;
+  }
   return undefined;
 };
+
+class DecartTokenRequestError extends Error {
+  readonly status?: number;
+
+  constructor(rejection: unknown) {
+    super('Decart token issuance failed.');
+    this.name = 'DecartTokenRequestError';
+    const status = numericStatusFrom(rejection);
+    if (status !== undefined) this.status = status;
+  }
+}
 
 export class DecartSdkTokenProvider implements DecartTokenProvider {
   readonly #apiKey: string;
@@ -129,7 +147,9 @@ export class DecartSdkTokenProvider implements DecartTokenProvider {
           },
           (error: unknown) => {
             effectiveSignal.removeEventListener('abort', onAbort);
-            reject(error instanceof Error ? error : new Error('Decart token issuance failed.'));
+            // The Decart SDK uses a typed object rather than an Error instance. Preserve only
+            // its status so the safe provider boundary can classify it without exposing details.
+            reject(error instanceof Error ? error : new DecartTokenRequestError(error));
           },
         );
       });

@@ -15,9 +15,24 @@ const adapters = vi.hoisted(() => ({
   connectDecartRealtime: vi.fn(),
 }));
 
-vi.mock('../../adapters/api-client/apiClient', () => ({
-  requestRealtimeToken: adapters.requestRealtimeToken,
-}));
+vi.mock('../../adapters/api-client/apiClient', () => {
+  class ApiClientError extends Error {
+    readonly status: number;
+    readonly code: string;
+
+    constructor(message: string, status: number, code = 'api-error') {
+      super(message);
+      this.name = 'ApiClientError';
+      this.status = status;
+      this.code = code;
+    }
+  }
+
+  return {
+    ApiClientError,
+    requestRealtimeToken: adapters.requestRealtimeToken,
+  };
+});
 
 vi.mock('../../adapters/browser-media/browserMedia', () => ({
   acquireLocalMedia: adapters.acquireLocalMedia,
@@ -47,6 +62,7 @@ vi.mock('../../adapters/decart-realtime/DecartRealtimeGateway', () => ({
 }));
 
 import { useStudioSession } from './useStudioSession';
+import { ApiClientError } from '../../adapters/api-client/apiClient';
 
 type Listener = () => void;
 type ControllableTrack = MediaStreamTrack & { endUnexpectedly(): void };
@@ -365,6 +381,80 @@ describe('useStudioSession explicit-start boundaries', () => {
     await act(async () => {
       await result.current.stopCamera();
     });
+    unmount();
+  });
+
+  it('starts AI with the already-live camera and microphone without reacquiring them', async () => {
+    const local = fakeStream();
+    adapters.acquireLocalMedia.mockResolvedValue(local);
+    let options: ConnectRealtimeOptions | undefined;
+    adapters.connectDecartRealtime.mockImplementation((nextOptions: ConnectRealtimeOptions) => {
+      options = nextOptions;
+      return Promise.resolve(fakeRealtimeSession());
+    });
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    await act(async () => {
+      await result.current.startLocal();
+    });
+    act(() => {
+      result.current.selectMode('lucy-2.5');
+      result.current.updatePrompt('An adult stop-motion astronomer');
+    });
+    await act(async () => {
+      await result.current.startModel();
+    });
+
+    expect(adapters.acquireLocalMedia).toHaveBeenCalledOnce();
+    expect(local.getVideoTracks()[0]?.applyConstraints).toHaveBeenCalledWith({
+      width: { ideal: 1_280 },
+      height: { ideal: 720 },
+      frameRate: { ideal: 30 },
+    });
+    expect(options?.localStream).toBe(local);
+    expect(adapters.requestRealtimeToken).toHaveBeenCalledWith('lucy-2.5', expect.any(AbortSignal));
+    unmount();
+  });
+
+  it('keeps local preview live and explains an expired Decart server credential', async () => {
+    const local = fakeStream();
+    adapters.acquireLocalMedia.mockResolvedValue(local);
+    adapters.requestRealtimeToken.mockRejectedValue(
+      new ApiClientError(
+        'Decart rejected the configured server credential.',
+        502,
+        'provider_authentication',
+      ),
+    );
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    await act(async () => {
+      await result.current.startLocal();
+    });
+    act(() => {
+      result.current.selectMode('lucy-vton-3');
+      result.current.updatePrompt('A tailored navy dinner jacket');
+    });
+    await act(async () => {
+      await result.current.startModel();
+    });
+
+    expect(result.current.lifecycle).toBe('ready');
+    expect(result.current.localStream).toBe(local);
+    expect(result.current.error).toEqual({
+      code: 'provider_authentication',
+      message: 'Decart rejected the configured server credential.',
+      recovery: 'Replace DECART_API_KEY on the API server, restart it, then start AI again.',
+    });
+    expect(adapters.connectDecartRealtime).not.toHaveBeenCalled();
     unmount();
   });
 
