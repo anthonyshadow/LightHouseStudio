@@ -10,9 +10,17 @@ import {
   useState,
 } from 'react';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
-import { optimizeCharacterReferencePrompt } from '../adapters/api-client/apiClient';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
+import type { SavedCharacterPrompt } from '../features/creative-assets/types';
 import { useCreativeAssetRepository } from '../features/creative-assets/useCreativeAssetRepository';
+import {
+  createCharacterEditDraftValue,
+  prepareCharacterBuilderLaunch,
+} from '../features/character-builder/characterBuilderLaunch';
+import type {
+  CharacterBuilderDraftValueV1,
+  CharacterBuilderTarget,
+} from '../features/character-builder/characterBuilderPersistence';
 import { createLocalProjectRepository } from '../features/guided-flow/projectRepository';
 import type { ProjectStorageState } from '../features/guided-flow/types';
 import { MediaStage, type StageNotice } from '../features/live-stage';
@@ -55,6 +63,11 @@ const CharacterBuilderCoordinator = lazy(() =>
     default: module.CharacterBuilderCoordinator,
   })),
 );
+const ConfirmationDialog = lazy(() =>
+  import('../features/character-builder/ConfirmationDialog').then((module) => ({
+    default: module.ConfirmationDialog,
+  })),
+);
 const LegacyProjectManager = lazy(() =>
   import('../features/legacy-projects/LegacyProjectManager').then((module) => ({
     default: module.LegacyProjectManager,
@@ -75,6 +88,11 @@ const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 interface StudioExperienceProps {
   initialOverlay: StudioInitialOverlay;
 }
+
+type CharacterBuilderLaunch = {
+  readonly target: CharacterBuilderTarget;
+  readonly initialValue?: CharacterBuilderDraftValueV1 | undefined;
+};
 
 const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   const theme = useTheme();
@@ -103,6 +121,17 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   );
   const [legacyProjectCount, setLegacyProjectCount] = useState(0);
   const [dismissedNotices, setDismissedNotices] = useState<ReadonlySet<string>>(new Set());
+  const [characterBuilderLaunch, setCharacterBuilderLaunch] = useState<CharacterBuilderLaunch>({
+    target: { kind: 'create' },
+  });
+  const [characterBuilderDiscardPrompt, setCharacterBuilderDiscardPrompt] = useState<string | null>(
+    null,
+  );
+  const [characterBuilderLaunchError, setCharacterBuilderLaunchError] = useState<string | null>(
+    null,
+  );
+  const characterBuilderDiscardResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
+  const characterBuilderLaunchPendingRef = useRef(false);
   const promptCommittedHandlerRef = useRef<PromptCommittedHandler>(noopPromptCommitted);
   const characterSelectorRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
@@ -114,6 +143,29 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     closeOverlay();
     window.requestAnimationFrame(() => dockToggleRef.current?.focus());
   }, [closeOverlay]);
+  const requestCharacterBuilderDraftDiscard = useCallback(
+    (message: string): Promise<boolean> =>
+      new Promise((resolve) => {
+        characterBuilderDiscardResolverRef.current?.(false);
+        characterBuilderDiscardResolverRef.current = resolve;
+        setCharacterBuilderDiscardPrompt(message);
+      }),
+    [],
+  );
+  const resolveCharacterBuilderDraftDiscard = useCallback((confirmed: boolean) => {
+    const resolve = characterBuilderDiscardResolverRef.current;
+    characterBuilderDiscardResolverRef.current = null;
+    setCharacterBuilderDiscardPrompt(null);
+    resolve?.(confirmed);
+  }, []);
+
+  useEffect(
+    () => () => {
+      characterBuilderDiscardResolverRef.current?.(false);
+      characterBuilderDiscardResolverRef.current = null;
+    },
+    [],
+  );
 
   useEffect(() => {
     let active = true;
@@ -168,7 +220,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     repository,
     store: repositoryState.store,
     session,
-    referenceImagesAvailable: Boolean(availability.referenceImages),
     mediaLocked,
     recordingActive,
     sessionModeLocked,
@@ -184,8 +235,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     libraryMode,
     workshopDraft,
     workshopDrafts,
-    workshopReferenceImage,
-    referenceGeneration,
     referenceUsePending,
     referenceUseFailureMessage,
     shelfDirty,
@@ -196,9 +245,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     recordCommittedPrompt,
     changeLibraryMode,
     rememberWorkshopDraft,
-    generateWorkshopReference,
-    detachWorkshopReference,
-    retryWorkshopReferenceRestore,
     setShelfDirty,
     useRecipe,
     retryReferenceUse,
@@ -254,6 +300,17 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
       });
     }
 
+    if (characterBuilderLaunchError) {
+      notices.push({
+        id: 'character-builder-launch',
+        severity: 'error',
+        title: 'Character Builder could not open',
+        message: characterBuilderLaunchError,
+        priority: 925,
+        onDismiss: () => setCharacterBuilderLaunchError(null),
+      });
+    }
+
     if (session.error && !FORM_ERROR_CODES.has(session.error.code)) {
       const deviceError = [
         'permission-denied',
@@ -303,6 +360,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     browser.mediaDevices,
     browser.secureContext,
     capabilityState,
+    characterBuilderLaunchError,
     dismissNotice,
     dismissedNotices,
     recording.recordingError,
@@ -331,10 +389,39 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     openOverlay('capture-settings');
   };
 
-  const openCharacterBuilder = () => {
-    if (characterBuilderOpenBlockedReason) return;
-    openOverlay('character-builder');
+  const launchCharacterBuilder = async (launch: CharacterBuilderLaunch) => {
+    if (characterBuilderOpenBlockedReason || characterBuilderLaunchPendingRef.current) return;
+    characterBuilderLaunchPendingRef.current = true;
+    setCharacterBuilderLaunchError(null);
+    try {
+      const ready = await prepareCharacterBuilderLaunch({
+        target: launch.target,
+        confirmDiscard: requestCharacterBuilderDraftDiscard,
+      });
+      if (!ready) return;
+      setCharacterBuilderLaunch(launch);
+      openOverlay('character-builder');
+    } catch (error) {
+      setCharacterBuilderLaunchError(
+        error instanceof Error
+          ? error.message
+          : 'The Character Builder draft could not be prepared. Try again.',
+      );
+    } finally {
+      characterBuilderLaunchPendingRef.current = false;
+    }
   };
+  const openCharacterBuilder = () => void launchCharacterBuilder({ target: { kind: 'create' } });
+  const editCharacter = (asset: SavedCharacterPrompt) =>
+    void launchCharacterBuilder({
+      target: {
+        kind: 'edit',
+        characterId: asset.id,
+        originalName: asset.name,
+        originalPrompt: asset.prompt,
+      },
+      initialValue: createCharacterEditDraftValue(asset),
+    });
   const openCharacterSelector = () => openOverlay('character-selector');
 
   const openLegacyProjects = () => openOverlay('legacy-projects');
@@ -373,6 +460,11 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   const currentExperienceImageAssetId =
     activeCharacter?.referenceImageAssetId ??
     persistedReferenceAssetId(session.draft.referenceImage);
+  const activeCharacterRecord = activeCharacter
+    ? repositoryState.store.savedCharacterPrompts.find(
+        (candidate) => candidate.id === activeCharacter.id,
+      )
+    : undefined;
   const selectExperienceMode = (mode: StudioMode): boolean => {
     return (
       confirmModeReplacement(session.draft, mode, (message) => window.confirm(message)) &&
@@ -478,7 +570,9 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
                 variant="secondary"
                 disabled={Boolean(characterBuilderOpenBlockedReason)}
                 title={characterBuilderOpenBlockedReason}
-                onClick={openWorkshop}
+                onClick={() => {
+                  if (activeCharacterRecord) editCharacter(activeCharacterRecord);
+                }}
               >
                 Edit {activeCharacterName}
               </Button>
@@ -610,6 +704,10 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
           <Suspense fallback={deferredPanelFallback}>
             <CharacterBuilderCoordinator
               open
+              target={characterBuilderLaunch.target}
+              {...(characterBuilderLaunch.initialValue
+                ? { initialValue: characterBuilderLaunch.initialValue }
+                : {})}
               returnFocusRef={characterSelectorRef}
               generationAvailable={Boolean(
                 availability.referenceImages && availability.referenceImageOptimizerAvailable,
@@ -624,6 +722,22 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
             />
           </Suspense>
         ) : null}
+
+        <Suspense fallback={null}>
+          <ConfirmationDialog
+            open={characterBuilderDiscardPrompt !== null}
+            title="Unfinished character draft"
+            description={
+              characterBuilderDiscardPrompt ??
+              'An unfinished character draft exists. Continue and discard it?'
+            }
+            confirmLabel="Continue"
+            cancelLabel="Cancel"
+            danger
+            onCancel={() => resolveCharacterBuilderDraftDiscard(false)}
+            onConfirm={() => resolveCharacterBuilderDraftDiscard(true)}
+          />
+        </Suspense>
 
         <OverlayPanel
           open={activeOverlay === 'legacy-projects'}
@@ -661,13 +775,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
             sessionModeLocked,
             recipeInsertionBlocked,
             hasReferenceImage: Boolean(session.draft.referenceImage),
-            workshopReferenceImage,
-            referenceGeneration,
-            referenceImagesAvailable: Boolean(availability.referenceImages),
-            referenceImageProvider: availability.referenceImageProvider ?? null,
-            referenceImageModel: availability.referenceImageModel ?? null,
-            optimizerModel: availability.referenceImageOptimizerModel ?? null,
-            optimizerVersion: availability.referenceImageOptimizerVersion ?? null,
             referenceUsePending,
             referenceUseFailure: referenceUseFailureMessage
               ? {
@@ -698,15 +805,10 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
             onWorkshopDraftChange: rememberWorkshopDraft,
             onUseWorkshop: applyWorkshopPrompt,
             onSaveWorkshop: saveWorkshopPrompt,
-            onOptimizeReference: optimizeCharacterReferencePrompt,
-            onGenerateReference: generateWorkshopReference,
-            onDetachReference: detachWorkshopReference,
-            ...(referenceGeneration.status === 'error' &&
-            referenceGeneration.errorKind === 'restore'
-              ? { onRetryReferenceRestore: retryWorkshopReferenceRestore }
-              : {}),
             onShelfDirtyChange: setShelfDirty,
             onUseRecipe: useRecipe,
+            onCreateCharacter: openCharacterBuilder,
+            onEditCharacter: editCharacter,
             onOpenSavedWorkshop: openSavedWorkshop,
           }}
         />

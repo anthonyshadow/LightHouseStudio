@@ -362,18 +362,6 @@ const SCENARIOS: readonly Scenario[] = [
   },
   {
     group: '03-character-workshop',
-    filename: 'transform-character.png',
-    preparationOnly: true,
-    setup: async (page) => {
-      await openWorkshop(page);
-      await page
-        .getByRole('textbox', { name: 'Character concept', exact: true })
-        .fill('documentary field presenter');
-      await page.getByLabel('Adult age direction').selectOption('adult');
-    },
-  },
-  {
-    group: '03-character-workshop',
     filename: 'add-one-object.png',
     preparationOnly: true,
     setup: async (page) => {
@@ -463,17 +451,13 @@ const SCENARIOS: readonly Scenario[] = [
   },
   {
     group: '04-recipe-shelf',
-    filename: 'new-character-recipe.png',
+    filename: 'new-character-builder.png',
     preparationOnly: true,
     setup: async (page) => {
       await openShelf(page);
       await page.getByRole('button', { name: 'New character recipe' }).click();
-      await expect(page.getByRole('heading', { name: 'New Character recipe' })).toBeVisible();
-      await page.getByRole('textbox', { name: /^Name/u }).fill('Copper Editorial Host');
-      await page.getByRole('textbox', { name: 'Tags', exact: true }).fill('editorial, copper');
-      await page
-        .getByLabel('Prompt text')
-        .fill('Transform the adult subject into an editorial host.');
+      await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
+      await page.getByRole('button', { name: 'Adult', exact: true }).click();
     },
   },
   {

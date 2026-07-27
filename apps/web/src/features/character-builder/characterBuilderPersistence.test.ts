@@ -47,6 +47,7 @@ describe('character builder persisted upload state', () => {
 
   it('accepts a consistent image-only save journal and rejects mismatched provenance', () => {
     const snapshot = {
+      saveKind: 'create' as const,
       name: 'Uploaded Character 01',
       prompt: '',
       draft: null,
@@ -83,6 +84,7 @@ describe('character builder persisted upload state', () => {
 
   it('includes upload provenance and final kind in the retry fingerprint', async () => {
     const base = {
+      saveKind: 'create' as const,
       name: 'Presenter',
       prompt: 'Transform the subject into a presenter.',
       draft: createPromptBuilderDraft('character-transform'),

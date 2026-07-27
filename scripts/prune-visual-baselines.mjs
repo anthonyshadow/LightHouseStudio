@@ -18,7 +18,7 @@ const focusedBaselines = [
   '01-studio/local-finalizing.png',
   '01-studio/stage-media-error.png',
   '01-studio/virtual-try-on-ai-live.png',
-  '03-character-workshop/transform-character.png',
+  '03-character-workshop/add-one-object.png',
   '05-capture-settings/local-before-preview.png',
   '06-take-review/latest-take.png',
 ];

@@ -2,9 +2,9 @@ import { useTheme } from '@emotion/react';
 import { GeneratedPromptPreview } from './GeneratedPromptPreview';
 import { PromptFeedback } from './PromptFeedback';
 import { PromptIntentFields } from './PromptIntentFields';
-import type { ReferenceImageGeneratorProps } from './ReferenceImageGenerator';
-import type { PromptBuilderDraft, PromptIntent, PromptValidation } from './model';
+import type { PromptValidation } from './model';
 import type { PromptWorkshopStep, PromptWorkshopStepId } from './workshopSteps';
+import type { WorkshopDraft, WorkshopIntent } from './workshopModel';
 import {
   accordionStyles,
   chevronStyles,
@@ -22,13 +22,13 @@ import {
 
 interface PromptWorkshopAccordionProps {
   readonly componentId: string;
-  readonly intent: PromptIntent;
-  readonly draft: PromptBuilderDraft;
+  readonly intent: WorkshopIntent;
+  readonly draft: WorkshopDraft;
   readonly validation: PromptValidation;
   readonly steps: readonly PromptWorkshopStep[];
   readonly activeStep: PromptWorkshopStepId;
   readonly onActiveStepChange: (step: PromptWorkshopStepId) => void;
-  readonly onDraftChange: (draft: PromptBuilderDraft) => void;
+  readonly onDraftChange: (draft: WorkshopDraft) => void;
 }
 
 export const PromptWorkshopAccordion = ({
@@ -100,25 +100,19 @@ export const PromptWorkshopAccordion = ({
   );
 };
 
-export type PromptWorkshopReferenceGeneration = Omit<ReferenceImageGeneratorProps, 'prompt'>;
-
 interface PromptWorkshopReviewProps {
   readonly componentId: string;
-  readonly intent: PromptIntent;
   readonly generatedPrompt: string;
   readonly validation: PromptValidation;
   readonly showSummary: boolean;
-  readonly referenceGeneration?: PromptWorkshopReferenceGeneration;
   readonly onToggleSummary: () => void;
 }
 
 export const PromptWorkshopReview = ({
   componentId,
-  intent,
   generatedPrompt,
   validation,
   showSummary,
-  referenceGeneration,
   onToggleSummary,
 }: PromptWorkshopReviewProps) => {
   const theme = useTheme();
@@ -138,11 +132,7 @@ export const PromptWorkshopReview = ({
       </button>
       {showSummary ? (
         <div id={summaryId}>
-          <GeneratedPromptPreview
-            prompt={generatedPrompt}
-            label={intent === 'character-transform' ? 'Original character recipe' : undefined}
-            {...(referenceGeneration ? { referenceGeneration } : {})}
-          />
+          <GeneratedPromptPreview prompt={generatedPrompt} />
         </div>
       ) : null}
       <PromptFeedback validation={validation} />

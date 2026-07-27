@@ -4,9 +4,6 @@ import {
   generateStructuredPrompt as generateDomainStructuredPrompt,
   normalizePromptBuilderDraft as normalizeDomainPromptBuilderDraft,
   validatePromptBuilderDraft as validateDomainPromptBuilderDraft,
-  type AdultAgeChoice,
-  type CharacterTransformDraft as DomainCharacterTransformDraft,
-  type CharacterGenderChoice,
   type PromptBuilderDraft as DomainPromptBuilderDraft,
   type PromptIntent as DomainPromptIntent,
   type PromptValidation as DomainPromptValidation,
@@ -16,10 +13,7 @@ import {
 export const PROMPT_DETAIL_LIMIT = BUILDER_DETAIL_MAX_LENGTH;
 
 export type PromptIntent = DomainPromptIntent;
-export type AdultAge = AdultAgeChoice;
-export type CharacterGender = CharacterGenderChoice;
 export type PromptBuilderDraft = DomainPromptBuilderDraft;
-export type CharacterTransformDraft = DomainCharacterTransformDraft;
 
 export interface PromptIssue {
   readonly code: string;

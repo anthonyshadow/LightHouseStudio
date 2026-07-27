@@ -1,13 +1,13 @@
-import { CharacterTransformFields } from './CharacterTransformFields';
-import type { PromptBuilderDraft, PromptIssue } from './model';
+import type { PromptIssue } from './model';
 import { SingleEditIntentFields } from './SingleEditIntentFields';
 import type { PromptWorkshopStepId } from './workshopSteps';
+import type { WorkshopDraft } from './workshopModel';
 
 interface PromptIntentFieldsProps {
-  draft: PromptBuilderDraft;
+  draft: WorkshopDraft;
   issues: readonly PromptIssue[];
   activeStep: PromptWorkshopStepId;
-  onChange: (draft: PromptBuilderDraft) => void;
+  onChange: (draft: WorkshopDraft) => void;
 }
 
 export const PromptIntentFields = ({
@@ -16,17 +16,6 @@ export const PromptIntentFields = ({
   activeStep,
   onChange,
 }: PromptIntentFieldsProps) => {
-  if (draft.intent === 'character-transform') {
-    return (
-      <CharacterTransformFields
-        draft={draft}
-        issues={issues}
-        activeStep={activeStep}
-        onChange={onChange}
-      />
-    );
-  }
-
   return (
     <SingleEditIntentFields
       draft={draft}

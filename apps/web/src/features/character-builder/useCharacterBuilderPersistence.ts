@@ -34,6 +34,7 @@ export interface UseCharacterBuilderPersistenceOptions {
   readonly stateRef: CharacterBuilderStateRef;
   readonly dispatch: Dispatch<CharacterBuilderAction>;
   readonly legacyRepository?: LocalProjectRepository | undefined;
+  readonly initialValue?: CharacterBuilderDraftValueV1 | undefined;
 }
 
 export interface CharacterBuilderPersistenceController {
@@ -105,11 +106,13 @@ export const useCharacterBuilderPersistence = ({
   stateRef,
   dispatch,
   legacyRepository,
+  initialValue,
 }: UseCharacterBuilderPersistenceOptions): CharacterBuilderPersistenceController => {
   const [autosaveMessage, setAutosaveMessage] = useState<string | null>(null);
   const [pendingSave, setPendingSave] = useState<PendingCharacterSave | null>(null);
   const pendingSaveRef = useRef(pendingSave);
   const recordRef = useRef<CharacterBuilderDraftRecord<CharacterBuilderDraftValueV1> | null>(null);
+  const targetRef = useRef(initialValue?.target ?? createFreshCharacterBuilderDraftValue().target);
   const writeQueueRef = useRef<Promise<unknown>>(Promise.resolve());
   const restoredRef = useRef(false);
 
@@ -132,6 +135,7 @@ export const useCharacterBuilderPersistence = ({
       source = stateRef.current,
       pending = pendingSaveRef.current,
     ): CharacterBuilderDraftValueV1 => ({
+      target: targetRef.current,
       draft: source.draft,
       design: source.design,
       options: source.options,
@@ -174,7 +178,8 @@ export const useCharacterBuilderPersistence = ({
       .then(async (record) => {
         if (!active) return;
         recordRef.current = record;
-        const value = record?.value ?? createFreshCharacterBuilderDraftValue();
+        const value = record?.value ?? initialValue ?? createFreshCharacterBuilderDraftValue();
+        targetRef.current = value.target;
         setPendingSave(value.pendingSave);
         let uploadedReference: CharacterBuilderState['uploadedReference'] = null;
         if (value.uploadedReference) {
@@ -258,7 +263,7 @@ export const useCharacterBuilderPersistence = ({
       active = false;
       controller.abort();
     };
-  }, [dispatch, repository]);
+  }, [dispatch, initialValue, repository]);
 
   useEffect(() => {
     if (

@@ -122,7 +122,7 @@ for (const viewport of exactViewports) {
     ).toBeVisible();
     const workshopScroll = await expectInternalScrollOwnership(
       page,
-      '[data-scroll-region="character-workshop"]',
+      '[data-scroll-region="prompt-workshop"]',
     );
     if (viewport.width <= 390) {
       expect(workshopScroll.scrollHeight).toBeGreaterThan(workshopScroll.clientHeight);
@@ -130,7 +130,7 @@ for (const viewport of exactViewports) {
     await expectNoDocumentOverflow(page);
     await expectStableStageRect(page, stableStageRect);
     await page.getByRole('button', { name: 'Close creative tool' }).click();
-    await expect(page.getByRole('dialog', { name: 'Character Workshop' })).toBeHidden();
+    await expect(page.getByRole('dialog', { name: 'Prompt Workshop' })).toBeHidden();
     await expectStableStageRect(page, stableStageRect);
 
     await page.getByRole('button', { name: 'Shelf', exact: true }).click();
@@ -306,9 +306,10 @@ test('Local Camera starts, records, and finalizes a playable take without provid
   await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
 
   await page.getByRole('button', { name: 'Shelf' }).click();
-  await page.getByRole('button', { name: 'New character recipe' }).click();
+  await page.getByRole('button', { name: 'Try-on recipes' }).click();
+  await page.getByRole('button', { name: 'New garment recipe' }).click();
   await page.getByLabel(/^Name/).fill('Local blocked recipe');
-  await page.getByLabel(/^Prompt text/).fill('Transform the adult subject into a field host.');
+  await page.getByLabel(/^Prompt text/).fill('Apply the field host linen overshirt.');
   await page.getByRole('button', { name: 'Save recipe' }).click();
   await page.getByRole('button', { name: 'Close creative tool' }).click();
 
@@ -399,18 +400,17 @@ test('ordinary Shelf closure and a breakpoint change preserve the unsaved recipe
   await page.goto('/');
 
   await page.getByRole('button', { name: 'Shelf' }).click();
-  await page.getByRole('button', { name: 'New character recipe' }).click();
-  await page.getByLabel(/^Name/).fill('Unsaved field host');
-  await page.getByLabel(/^Prompt text/).fill('An adult field host in soft studio light.');
+  await page.getByRole('button', { name: 'Try-on recipes' }).click();
+  await page.getByRole('button', { name: 'New garment recipe' }).click();
+  await page.getByLabel(/^Name/).fill('Unsaved field jacket');
+  await page.getByLabel(/^Prompt text/).fill('A field jacket in soft studio light.');
   await page.getByRole('button', { name: 'Close creative tool' }).click();
   await expect(page.getByRole('dialog', { name: 'Recipe Shelf' })).toBeHidden();
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole('button', { name: 'Shelf' }).click();
-  await expect(page.getByLabel(/^Name/)).toHaveValue('Unsaved field host');
-  await expect(page.getByLabel(/^Prompt text/)).toHaveValue(
-    'An adult field host in soft studio light.',
-  );
+  await expect(page.getByLabel(/^Name/)).toHaveValue('Unsaved field jacket');
+  await expect(page.getByLabel(/^Prompt text/)).toHaveValue('A field jacket in soft studio light.');
   await expectNoDocumentOverflow(page);
   expect((await readBrowserState(page)).cameraCalls).toBe(0);
   expectNoExternalProviderTraffic(network);
@@ -586,7 +586,8 @@ test('Space records and finishes only outside editable controls', async ({ page 
 
   const shelfLauncher = page.getByRole('button', { name: 'Shelf' });
   await shelfLauncher.click();
-  await page.getByRole('button', { name: 'New character recipe' }).click();
+  await page.getByRole('button', { name: 'Try-on recipes' }).click();
+  await page.getByRole('button', { name: 'New garment recipe' }).click();
   const nameInput = page.getByLabel(/^Name/);
   await nameInput.fill('Keyboard guard');
   await nameInput.press('Space');

@@ -18,7 +18,7 @@ Covered by: route canonicalization, history replacement, legacy-project focus, a
 
 ### One stable stage anchors the Studio overlay workspace
 
-Studio retains one permanently mounted media stage as its visual anchor. Recipe Dock, Capture Settings, Take Review, Voice Treatments, Character Workshop, Recipe Shelf, Character Builder, and Legacy Projects open as modal overlays that never participate in shell sizing or own media. Responsive rules change overlay placement, not the stage rectangle, video identity, source, or playback time.
+Studio retains one permanently mounted media stage as its visual anchor. Recipe Dock, Capture Settings, Take Review, Voice Treatments, Prompt Workshop, Recipe Shelf, Character Builder, and Legacy Projects open as modal overlays that never participate in shell sizing or own media. Responsive rules change overlay placement, not the stage rectangle, video identity, source, or playback time.
 
 Covered by: responsive/manual checks, semantic landmarks and labels, keyboard interaction, and component accessibility rules.
 
@@ -64,7 +64,7 @@ The fullscreen builder retains nine illustrated starter definitions for legacy h
 
 Why it fits: creators can make fast visual decisions without turning gender into a restriction or losing the precision of free-form direction.
 
-Covered by: schema migration, prompt generation, catalog cardinality, shared-choice, custom-value, gender-change preservation, and Character Workshop component tests.
+Covered by: schema migration, prompt generation, catalog cardinality, shared-choice, custom-value, gender-change preservation, Character Builder tests, and Prompt Workshop boundary tests.
 
 ### Reference uploads and generation are explicit, durable, and stale-safe
 
@@ -127,7 +127,7 @@ Covered by: revision-conflict, byte-integrity, sanitation, immutable-original, p
 
 ### Creative drafts survive navigation and blocked actions explain themselves
 
-Closing and reopening the Character Workshop or Recipe Shelf restores its current draft. The Character Builder additionally autosaves one active draft to IndexedDB after 400 ms, flushes pending work on close, resumes across reload, and exposes explicit Reset Draft. Save is single-flight and journals a stable character ID across strict Shelf persistence, draft completion, and Studio preload. Ordinary overlay closure is nondestructive; only explicit Reset, Clear, Delete, or Discard actions own data loss.
+Closing and reopening Prompt Workshop or Recipe Shelf restores its current draft. Character Builder additionally autosaves one targeted active draft to IndexedDB after 400 ms, flushes pending work on close, resumes across reload, and exposes explicit Reset Draft. Opening a different saved character asks before durably discarding that unfinished draft. Save is single-flight and journals a stable character ID across strict Shelf persistence, draft completion, and Studio preload; edit updates that ID in place. Ordinary overlay closure is nondestructive; only explicit Reset, Clear, Delete, or confirmed Discard actions own data loss.
 
 Changing recipe models now confirms and actually remounts a dirty form instead of silently retargeting its text. Search is paused while an inline edit is dirty so filtering cannot unmount unsaved work. Dynamic Clear, Save, and session-action controls hand focus to an intentional successor when the focused element disappears.
 

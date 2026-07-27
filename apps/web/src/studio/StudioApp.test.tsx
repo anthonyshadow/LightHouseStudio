@@ -144,8 +144,6 @@ const harness = vi.hoisted(() => {
     session,
     recording,
     latestWorkspace: null as WorkspaceHarnessProps | null,
-    generationController: null as AbortController | null,
-    createReferenceImage: vi.fn(),
     fetchReferenceImageMetadata: vi.fn(),
     hydrateReferenceImage: vi.fn(),
     hydratedReference: null as PersistedSessionReference | null,
@@ -181,10 +179,8 @@ vi.mock('../adapters/api-client/apiClient', () => ({
       this.name = 'ApiClientError';
     }
   },
-  createReferenceImage: harness.createReferenceImage,
   fetchReferenceImageMetadata: harness.fetchReferenceImageMetadata,
   hydrateReferenceImage: harness.hydrateReferenceImage,
-  optimizeCharacterReferencePrompt: vi.fn(),
 }));
 
 vi.mock('../features/creative-assets/repository', () => ({
@@ -311,23 +307,6 @@ vi.mock('./CreativeWorkspace', () => ({
         >
           Apply reference recipe
         </button>
-        <button
-          type="button"
-          onClick={() => {
-            const controller = new AbortController();
-            harness.generationController = controller;
-            void props.actions.onGenerateReference(
-              {
-                rawPrompt: referenceAsset.originalPrompt,
-                options: referenceAsset.options,
-                optimization: { enabled: false },
-              },
-              controller.signal,
-            );
-          }}
-        >
-          Generate reference
-        </button>
         <button type="button" onClick={() => props.state.referenceUseFailure?.onRetry()}>
           Retry reference handoff
         </button>
@@ -337,7 +316,6 @@ vi.mock('./CreativeWorkspace', () => ({
         >
           Continue reference handoff without image
         </button>
-        <output data-testid="generation-status">{props.state.referenceGeneration.status}</output>
         <output data-testid="handoff-error">{props.state.referenceUseFailure?.message}</output>
       </div>
     );
@@ -352,12 +330,10 @@ describe('StudioApp composition lifecycle', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/');
     harness.latestWorkspace = null;
-    harness.generationController = null;
     harness.promptCommitted = null;
     harness.session.replaceRecipeDraft.mockClear();
     harness.repository.recordSuccessfulPrompt.mockClear();
     harness.repository.enrichNewestMatchingRecent.mockClear();
-    harness.createReferenceImage.mockReset();
     harness.fetchReferenceImageMetadata.mockReset().mockResolvedValue(referenceAsset);
     harness.hydratedReference = {
       kind: 'persisted',
@@ -453,33 +429,5 @@ describe('StudioApp composition lifecycle', () => {
       modelModeId: 'lucy-2.5',
       referenceImageAssetId: null,
     });
-  });
-
-  it('forwards workshop ownership cancellation and clears generating state', async () => {
-    harness.createReferenceImage.mockImplementation(
-      (_request: unknown, signal: AbortSignal) =>
-        new Promise((_resolve, reject) => {
-          signal.addEventListener(
-            'abort',
-            () => reject(new DOMException('Aborted', 'AbortError')),
-            { once: true },
-          );
-        }),
-    );
-    render(<StudioApp />);
-
-    fireEvent.click(screen.getByRole('button', { name: 'Generate reference' }));
-    await waitFor(() =>
-      expect(screen.getByTestId('generation-status')).toHaveTextContent('generating'),
-    );
-    const signal = harness.generationController?.signal;
-    expect(signal).toBeDefined();
-    expect(harness.createReferenceImage).toHaveBeenCalledWith(
-      expect.objectContaining({ rawPrompt: referenceAsset.originalPrompt }),
-      signal,
-    );
-
-    harness.generationController?.abort();
-    await waitFor(() => expect(screen.getByTestId('generation-status')).toHaveTextContent('idle'));
   });
 });

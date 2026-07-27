@@ -427,6 +427,56 @@ describe('useCharacterBuilderController save transactions', () => {
     expect(memory.readActive()).toBeNull();
   });
 
+  it('freezes edit saves against the existing character ID and preserves a no-op prompt', async () => {
+    const memory = createMemoryDraftRepository();
+    draftRepositoryFactory.mockReturnValue(memory.repository);
+    const originalPrompt = 'A hand-tuned prompt that predates the current structured generator.';
+    const initialValue = {
+      ...createFreshCharacterBuilderDraftValue(),
+      target: {
+        kind: 'edit' as const,
+        characterId: 'existing-character',
+        originalName: 'Existing Character',
+        originalPrompt,
+      },
+      draft: {
+        ...createPromptBuilderDraft('character-transform'),
+        characterBase: 'documentary host',
+      } as CharacterTransformDraft,
+    };
+    const onDismiss = vi.fn();
+    const onSaveCharacter = vi.fn<SaveHandler>(async (snapshot, characterId, stage, progress) => {
+      expect(characterId).toBe('existing-character');
+      expect(stage).toBe('intent');
+      expect(snapshot).toMatchObject({
+        saveKind: 'edit',
+        name: 'Existing Character',
+        prompt: originalPrompt,
+        draft: { characterBase: 'documentary host' },
+      });
+      await progress.markCharacterPersisted();
+      await progress.markStudioPreloaded();
+    });
+    const rendered = renderHook(() =>
+      useCharacterBuilderController({
+        open: true,
+        generationAvailable: true,
+        editAvailable: true,
+        target: initialValue.target,
+        initialValue,
+        onSaveCharacter,
+        onDismiss,
+      }),
+    );
+
+    await waitFor(() => expect(rendered.result.current.state.phase).toBe('editing'));
+    await waitFor(() => expect(rendered.result.current.canSave).toBe(true));
+    act(() => rendered.result.current.onSave('Existing Character'));
+
+    await waitFor(() => expect(onDismiss).toHaveBeenCalledOnce());
+    expect(onSaveCharacter).toHaveBeenCalledOnce();
+  });
+
   it('rejects a same-turn double save before React publishes the saving phase', async () => {
     const memory = createMemoryDraftRepository();
     draftRepositoryFactory.mockReturnValue(memory.repository);

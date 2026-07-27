@@ -33,7 +33,7 @@ Baselines are platform-specific. The Darwin set currently contains all 29 cases;
 
 | Capability                       | Required browser API or condition                                       | Degradation                                                                                     |
 | -------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Prompt workshop and Recipe Shelf | React, `localStorage` for durability                                    | Falls back to in-memory session-only assets if storage fails                                    |
+| Prompt Workshop and Recipe Shelf | React, `localStorage` for durability                                    | Falls back to in-memory session-only assets if storage fails                                    |
 | Character drafts                 | IndexedDB                                                               | Keeps the current draft in memory, warns before unsafe close, and exposes retry or discard      |
 | Character Builder references     | Same-origin broker and writable `LIGHTFRAME_DATA_DIR`                   | Prompt-only drafting/save remains; upload/generation reports the storage failure                |
 | Legacy Guided projects           | IndexedDB with structured-clone `Blob` support                          | Keeps retained records available for manager download/delete when durable storage can be opened |

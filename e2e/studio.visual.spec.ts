@@ -209,16 +209,18 @@ const FOCUSED_SCENARIOS: readonly VisualScenario[] = [
   },
   {
     id: 'workshop-overlay',
-    baseline: ['03-character-workshop', 'transform-character.png'],
+    baseline: ['03-character-workshop', 'add-one-object.png'],
     setup: async (page) => {
       await page.getByRole('button', { name: 'Workshop', exact: true }).click();
       await expect(
         page.getByRole('heading', { name: 'Direct one clear visual change' }),
       ).toBeVisible();
       await page
-        .getByRole('textbox', { name: 'Character concept', exact: true })
-        .fill('documentary field presenter');
-      await page.getByLabel('Adult age direction').selectOption('adult');
+        .getByRole('textbox', { name: 'Object to add', exact: true })
+        .fill('a copper field notebook');
+      await page
+        .getByRole('textbox', { name: 'Specific placement', exact: true })
+        .fill('held at chest height');
     },
   },
   {

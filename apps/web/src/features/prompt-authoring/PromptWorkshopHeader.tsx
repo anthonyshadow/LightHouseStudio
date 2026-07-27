@@ -1,17 +1,16 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { Button, SegmentedControl } from '../../ui';
-import type { PromptIntent } from './model';
+import type { WorkshopIntent } from './workshopModel';
 
 interface PromptWorkshopHeaderProps {
-  intent: PromptIntent;
+  intent: WorkshopIntent;
   disabled: boolean;
   hasChanges: boolean;
-  onIntentChange: (intent: PromptIntent) => void;
+  onIntentChange: (intent: WorkshopIntent) => void;
   onReset: () => void;
 }
 
 const intentOptions = [
-  { value: 'character-transform', label: 'Transform character', shortLabel: 'Character' },
   { value: 'add-object', label: 'Add one object', shortLabel: 'Add' },
   { value: 'replace-object', label: 'Replace one object', shortLabel: 'Replace' },
   { value: 'change-attribute', label: 'Restyle one object', shortLabel: 'Restyle' },
@@ -99,7 +98,7 @@ export const PromptWorkshopHeader = ({
       <header css={headerStyles(theme)}>
         <div>
           <p css={eyebrowStyles(theme)}>Prompt workshop</p>
-          <h2 id="character-workshop-title" tabIndex={-1} css={titleStyles(theme)}>
+          <h2 id="prompt-workshop-title" tabIndex={-1} css={titleStyles(theme)}>
             Direct one clear visual change
           </h2>
           <p css={introStyles(theme)}>

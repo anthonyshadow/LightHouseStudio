@@ -36,7 +36,7 @@ The backend has no product database, accounts, or take/session history. It retai
 - **Start Character AI / Start Try-On AI** sends live camera media and the complete applied recipe to Decart after local media succeeds.
 - **Apply changes** sends the complete current model snapshot, including an explicit image clear when applicable.
 - **Optimize / Re-optimize reference prompt** sends the raw character recipe and selected framing, orientation, rendering, expression, and background settings through the loopback broker to the OpenAI Responses API with response storage disabled. The result remains separate from the raw recipe and can be edited before generation.
-- **Generate reference image** in Workshop retains its explicit optimization controls. The Character Builder requires a current successful optimization before Generate Preview and never silently falls back to a raw prompt after optimizer failure. Regenerate is another explicit, potentially billable action.
+- Character reference generation exists only in Character Builder. **Generate Preview**, **Generate Combined Preview**, and **Regenerate** require explicit actions, and Builder never silently falls back to a raw prompt after optimizer failure. Each may be billable. Prompt Workshop has no provider or reference-generation action.
 - **Browse ElevenLabs voices · contacts provider** requests workspace voice metadata only after the disclosure is opened; it does not send the take. Every provider-contacting voice request carries the explicit Studio voice-intent header, which the loopback broker requires before invoking ElevenLabs.
 - **Preview voice** is a labeled click-to-fetch action. It requests provider preview audio, owns and revokes the resulting Blob URL, and does not send the recording.
 - **Import voice** changes the configured ElevenLabs workspace and is an explicit action.
@@ -63,7 +63,7 @@ Legacy Guided projects may contain finalized original video, optional original-a
 
 Legacy Guided records keep their original immutable; no migration or route canonicalization automatically deletes or rewrites that media.
 
-Recipe Dock portrait/garment files and their object URLs are ephemeral. Text and enhancement drafts are retained independently while switching idle modes, but a departing Dock reference and preview URL are cleared and revoked. Workshop-generated and Character Builder uploaded/generated references are immutable local assets; saved prompts, Recents, saved characters, and active drafts retain only opaque asset IDs and fetch validated bytes when used. Resetting a draft, removing an upload, stale-preview Save, blank regeneration, or instructed regeneration does not delete older assets. Superseded assets may be unreferenced and remain on disk by design.
+Recipe Dock portrait/garment files and their object URLs are ephemeral. Text and enhancement drafts are retained independently while switching idle modes, but a departing Dock reference and preview URL are cleared and revoked. Character Builder uploaded/generated references are immutable local assets; saved prompts, Recents, saved characters, and active drafts retain only opaque asset IDs and fetch validated bytes when used. Resetting a draft, removing an upload, stale-preview Save, blank regeneration, or instructed regeneration does not delete older assets. Superseded assets may be unreferenced and remain on disk by design.
 
 ## Provider usage and cost
 

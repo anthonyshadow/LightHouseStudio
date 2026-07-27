@@ -8,11 +8,13 @@ A creator builds and saves a reusable Character AI direction without leaving or 
 
 `/` is the sole application route and opens Studio directly. Retired `/advanced` and `/guided` entries history-replace to `/`. Retired `/projects`, `/?project=…`, and `/guided?project=…` entries also canonicalize to `/` and open the Legacy Projects manager. Deprecated `new` and `characterFlow` query parameters are stripped.
 
-The Studio header exposes a character selector labelled **Character: None Selected** or with the selected character name. Open it and choose **Create new character**. That creation action is disabled while recording, finalization, or take review owns the workflow; the selector itself still exposes current/available choices. Creation opens the fullscreen **Build Your Character** modal while the stable Studio stage remains mounted and session, recording, and creative-repository state stays owned by Studio.
+The Studio header exposes a character selector labelled **Character: None Selected** or with the selected character name. Open it and choose **Create new character**. The Recipe Shelf’s **New character recipe** action opens the same Builder entry. **Edit character** in the header and **Edit** on a true character card open that exact saved record in Builder. These actions are disabled while recording, finalization, or take review owns the workflow; the selector itself still exposes current/available choices. Builder opens fullscreen while the stable Studio stage remains mounted and session, recording, and creative-repository state stays owned by Studio.
+
+Prompt Workshop never creates or edits a character. It owns only Add, Replace, and Restyle object recipes. Direct **Use** of a saved character remains an atomic Shelf-to-Dock preload and does not open Builder.
 
 ## Character-builder flow
 
-1. Open the header character selector and choose **Create new character**.
+1. Open any Builder-owned create or edit entry.
 2. Optionally upload a reference in the first **Reference image** drawer or build a direction from the identity and detailed visual controls. The retained demo-character catalog is not currently shown. **Ethnicity** is an optional self-described direction with representative portraits and custom text, independent of **Skin tone**.
 3. Choose a local-only save path (prompt-only, prompt plus uploaded image, or **Save & Use Image Only**) or select **Generate Preview**. With an upload, the action becomes **Generate Combined Preview**.
 4. Name and save the current valid character/reference combination.
@@ -22,7 +24,9 @@ The panel contains no journey stepper. Its DOM order is the full set of characte
 
 ## Draft persistence and reset
 
-The builder owns one active, versioned draft in the `lightframe.character-builder` IndexedDB database. Form, design, reference settings, uploaded-reference ID/display name, preview relationship, and save journal are autosaved after a short debounce. Transient provider requests, upload bytes, and regeneration instructions are never stored in IndexedDB; uploaded bytes live in the immutable filesystem reference store.
+The builder owns one active, versioned draft in the `lightframe.character-builder` IndexedDB database. The draft records whether it creates a new character or edits a specific saved character. Form, design, reference settings, uploaded-reference ID/display name, preview relationship, and save journal are autosaved after a short debounce. Transient provider requests, upload bytes, and regeneration instructions are never stored in IndexedDB; uploaded bytes live in the immutable filesystem reference store.
+
+Opening a different character for edit while another unfinished Builder draft exists shows **Unfinished character draft**. **Cancel** closes the prompt and leaves the draft and navigation unchanged. **Continue** durably discards the unfinished draft before hydrating the selected character. Reopening the same edit target resumes it without prompting.
 
 Closing the panel flushes pending autosave and preserves the draft. Reopening or reloading restores it. **Reset Draft** requires confirmation, aborts active work, deletes the active draft, and returns to a fresh form. If durable persistence fails during close, the panel explains that the latest changes are not reload-safe and requires an explicit choice to stay or discard.
 
@@ -72,7 +76,7 @@ Save is single-flight and uses a journaled, caller-supplied character ID:
 1. Freeze the exact builder snapshot and persist a save intent.
 2. Validate any image relationship and hydrate the selected immutable asset.
 3. Confirm Studio can safely replace the Lucy 2.5 draft.
-4. Durably write the character to Recipe Shelf before publishing repository state.
+4. Durably create the new character or update the edited character in place before publishing repository state. Edit preserves its character ID and unrelated Shelf metadata such as notes and tags.
 5. Preload and select Lucy 2.5 without starting or applying the provider.
 6. Mark the Studio preload stage complete in the builder journal.
 7. Complete and remove the builder journal, close the panel, and restore focus to the header character selector.

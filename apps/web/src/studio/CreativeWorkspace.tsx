@@ -15,15 +15,9 @@ import type {
 } from '../features/creative-assets/types';
 import type { StudioMode } from '../features/media-session';
 import type {
-  OptimizeWorkshopReferencePrompt,
   PromptWorkshopAction,
   SavePromptWorkshopAction,
-  WorkshopReferenceGenerationInput,
 } from '../features/prompt-authoring/CharacterPromptWorkshop';
-import type {
-  ReferenceGenerationState,
-  WorkshopReferenceImage,
-} from '../features/prompt-authoring/ReferenceImageGenerator';
 import type { PromptBuilderDraft, PromptIntent } from '../features/prompt-authoring/model';
 import { Button, OverlayPanel, SegmentedControl, StatusNotice } from '../ui';
 import {
@@ -63,13 +57,6 @@ export type CreativeWorkspaceState = {
   sessionModeLocked: boolean;
   recipeInsertionBlocked: boolean;
   hasReferenceImage: boolean;
-  workshopReferenceImage: WorkshopReferenceImage | null;
-  referenceGeneration: ReferenceGenerationState;
-  referenceImagesAvailable: boolean;
-  referenceImageProvider?: 'openai' | 'bfl' | 'wiro' | null;
-  referenceImageModel?: string | null;
-  optimizerModel: string | null;
-  optimizerVersion: string | null;
   referenceUsePending: boolean;
   referenceUseFailure: {
     message: string;
@@ -91,15 +78,10 @@ export type CreativeWorkspaceActions = {
   onWorkshopDraftChange: (draft: PromptBuilderDraft) => void;
   onUseWorkshop: (action: PromptWorkshopAction) => void;
   onSaveWorkshop: (action: SavePromptWorkshopAction) => void;
-  onOptimizeReference: OptimizeWorkshopReferencePrompt;
-  onGenerateReference: (
-    input: WorkshopReferenceGenerationInput,
-    signal: AbortSignal,
-  ) => void | Promise<void>;
-  onDetachReference: () => void;
-  onRetryReferenceRestore?: (() => void) | undefined;
   onShelfDirtyChange: (dirty: boolean) => void;
   onUseRecipe: (selection: RecipeSelection) => void;
+  onCreateCharacter?: (() => void) | undefined;
+  onEditCharacter?: ((asset: SavedCharacterPrompt) => void) | undefined;
   onOpenSavedWorkshop: (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => void;
   onOpenLegacyProjects?: (() => void) | undefined;
 };
@@ -131,13 +113,6 @@ export type CreativePanelContentProps = Pick<
   | 'sessionModeLocked'
   | 'recipeInsertionBlocked'
   | 'hasReferenceImage'
-  | 'workshopReferenceImage'
-  | 'referenceGeneration'
-  | 'referenceImagesAvailable'
-  | 'referenceImageProvider'
-  | 'referenceImageModel'
-  | 'optimizerModel'
-  | 'optimizerVersion'
   | 'referenceUsePending'
   | 'referenceUseFailure'
   | 'activeRecipe'
@@ -147,12 +122,10 @@ export type CreativePanelContentProps = Pick<
   | 'onWorkshopDraftChange'
   | 'onUseWorkshop'
   | 'onSaveWorkshop'
-  | 'onOptimizeReference'
-  | 'onGenerateReference'
-  | 'onDetachReference'
-  | 'onRetryReferenceRestore'
   | 'onShelfDirtyChange'
   | 'onUseRecipe'
+  | 'onCreateCharacter'
+  | 'onEditCharacter'
   | 'onOpenSavedWorkshop'
   | 'onOpenLegacyProjects'
 > & {
@@ -170,13 +143,6 @@ export const CreativePanelContent = ({
   sessionModeLocked,
   recipeInsertionBlocked,
   hasReferenceImage,
-  workshopReferenceImage,
-  referenceGeneration,
-  referenceImagesAvailable,
-  referenceImageProvider = null,
-  referenceImageModel = null,
-  optimizerModel,
-  optimizerVersion,
   referenceUsePending,
   referenceUseFailure,
   activeRecipe,
@@ -186,12 +152,10 @@ export const CreativePanelContent = ({
   onWorkshopDraftChange,
   onUseWorkshop,
   onSaveWorkshop,
-  onOptimizeReference,
-  onGenerateReference,
-  onDetachReference,
-  onRetryReferenceRestore,
   onShelfDirtyChange,
   onUseRecipe,
+  onCreateCharacter,
+  onEditCharacter,
   onOpenSavedWorkshop,
   onOpenLegacyProjects,
   shelfController,
@@ -216,21 +180,10 @@ export const CreativePanelContent = ({
             initialDraft={workshopDraft}
             initialDrafts={workshopDrafts}
             hasReferenceImage={hasReferenceImage}
-            generatedReferenceImage={workshopReferenceImage}
-            referenceGeneration={referenceGeneration}
-            referenceImagesAvailable={referenceImagesAvailable}
-            referenceImageProvider={referenceImageProvider}
-            referenceImageModel={referenceImageModel}
-            optimizerModel={optimizerModel}
-            optimizerVersion={optimizerVersion}
             disabled={recordingActive || referenceUsePending}
             onDraftChange={onWorkshopDraftChange}
             onUse={onUseWorkshop}
             onSave={onSaveWorkshop}
-            onOptimizeReference={onOptimizeReference}
-            onGenerateReference={onGenerateReference}
-            onDetachReference={onDetachReference}
-            {...(onRetryReferenceRestore ? { onRetryReferenceRestore } : {})}
           />
         </Suspense>
       ) : (
@@ -270,6 +223,8 @@ export const CreativePanelContent = ({
               {...(activeRecipe !== undefined ? { activeRecipe } : {})}
               onDirtyChange={onShelfDirtyChange}
               onUsePrompt={onUseRecipe}
+              {...(onCreateCharacter ? { onCreateCharacter } : {})}
+              {...(onEditCharacter ? { onEditCharacter } : {})}
               onOpenCharacterWorkshop={onOpenSavedWorkshop}
             />
           </Suspense>
@@ -315,13 +270,6 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     sessionModeLocked,
     recipeInsertionBlocked,
     hasReferenceImage,
-    workshopReferenceImage,
-    referenceGeneration,
-    referenceImagesAvailable,
-    referenceImageProvider = null,
-    referenceImageModel = null,
-    optimizerModel,
-    optimizerVersion,
     referenceUsePending,
     referenceUseFailure,
     legacyProjectCount = 0,
@@ -338,12 +286,10 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     onWorkshopDraftChange,
     onUseWorkshop,
     onSaveWorkshop,
-    onOptimizeReference,
-    onGenerateReference,
-    onDetachReference,
-    onRetryReferenceRestore,
     onShelfDirtyChange,
     onUseRecipe,
+    onCreateCharacter,
+    onEditCharacter,
     onOpenSavedWorkshop,
     onOpenLegacyProjects,
   } = actions;
@@ -362,6 +308,8 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     repository,
     activeMode: libraryMode,
     onUsePrompt: onUseRecipe,
+    ...(onCreateCharacter ? { onCreateCharacter } : {}),
+    ...(onEditCharacter ? { onEditCharacter } : {}),
     onOpenCharacterWorkshop: onOpenSavedWorkshop,
     onDirtyChange: onShelfDirtyChange,
     ...(activeRecipe !== undefined ? { activeRecipe } : {}),
@@ -420,10 +368,10 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
         onClose={() => {
           if (activePanel) onClose(activePanel);
         }}
-        title={panel === 'workshop' ? 'Character Workshop' : 'Recipe Shelf'}
+        title={panel === 'workshop' ? 'Prompt Workshop' : 'Recipe Shelf'}
         description={
           panel === 'workshop'
-            ? 'Build a clear character direction with the supported structured prompt fields.'
+            ? 'Build one clear Add, Replace, or Restyle direction.'
             : 'Browse and manage browser-local Character and Try-On recipes.'
         }
         placement={panel === 'shelf' ? 'bottom' : 'right'}
@@ -444,13 +392,6 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
             sessionModeLocked={sessionModeLocked}
             recipeInsertionBlocked={recipeInsertionBlocked}
             hasReferenceImage={hasReferenceImage}
-            workshopReferenceImage={workshopReferenceImage}
-            referenceGeneration={referenceGeneration}
-            referenceImagesAvailable={referenceImagesAvailable}
-            referenceImageProvider={referenceImageProvider}
-            referenceImageModel={referenceImageModel}
-            optimizerModel={optimizerModel}
-            optimizerVersion={optimizerVersion}
             referenceUsePending={referenceUsePending}
             referenceUseFailure={referenceUseFailure}
             {...(activeRecipe !== undefined ? { activeRecipe } : {})}
@@ -460,12 +401,10 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
             onWorkshopDraftChange={onWorkshopDraftChange}
             onUseWorkshop={onUseWorkshop}
             onSaveWorkshop={onSaveWorkshop}
-            onOptimizeReference={onOptimizeReference}
-            onGenerateReference={onGenerateReference}
-            onDetachReference={onDetachReference}
-            {...(onRetryReferenceRestore ? { onRetryReferenceRestore } : {})}
             onShelfDirtyChange={onShelfDirtyChange}
             onUseRecipe={onUseRecipe}
+            {...(onCreateCharacter ? { onCreateCharacter } : {})}
+            {...(onEditCharacter ? { onEditCharacter } : {})}
             onOpenSavedWorkshop={onOpenSavedWorkshop}
             {...(onOpenLegacyProjects ? { onOpenLegacyProjects } : {})}
             shelfController={shelfController}

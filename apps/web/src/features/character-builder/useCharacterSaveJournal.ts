@@ -19,6 +19,7 @@ import {
 import type { CharacterBuilderAction } from './machine';
 import {
   characterSaveSnapshotFingerprint,
+  type CharacterBuilderTarget,
   type CharacterSaveStage,
   type PendingCharacterSave,
   type PersistedCharacterSaveSnapshot,
@@ -40,6 +41,7 @@ export interface UseCharacterSaveJournalOptions {
   readonly saveBlockedReason?: string | undefined;
   readonly onSaveCharacter: SaveCharacterHandler;
   readonly onDismiss: () => void;
+  readonly target?: CharacterBuilderTarget | undefined;
 }
 
 export interface CharacterSaveJournalController {
@@ -55,6 +57,7 @@ export const useCharacterSaveJournal = ({
   saveBlockedReason,
   onSaveCharacter,
   onDismiss,
+  target = { kind: 'create' },
 }: UseCharacterSaveJournalOptions): CharacterSaveJournalController => {
   const completedHandoffRef = useRef<string | null>(null);
 
@@ -160,9 +163,19 @@ export const useCharacterSaveJournal = ({
           const uploadedReference = current.uploadedReference?.asset ?? null;
           const finalReference = attachPreview ?? uploadedReference;
           const finalReferenceKind = finalReference?.source ?? null;
+          const preserveLegacyPrompt =
+            target.kind === 'edit' &&
+            !current.revision &&
+            !current.preview?.stale &&
+            Boolean(target.originalPrompt);
           const snapshot: PersistedCharacterSaveSnapshot = {
+            saveKind: target.kind,
             name,
-            prompt: imageOnly ? '' : generated.prompt,
+            prompt: imageOnly
+              ? ''
+              : preserveLegacyPrompt
+                ? target.originalPrompt
+                : generated.prompt,
             draft: imageOnly ? null : current.draft,
             design: imageOnly ? null : current.design,
             referenceImageAssetId: finalReference?.assetId ?? null,
@@ -170,7 +183,7 @@ export const useCharacterSaveJournal = ({
             finalReferenceKind,
           };
           const nextPending: PendingCharacterSave = {
-            characterId: crypto.randomUUID(),
+            characterId: target.kind === 'edit' ? target.characterId : crypto.randomUUID(),
             snapshotHash: await characterSaveSnapshotFingerprint(snapshot),
             stage: 'intent',
             snapshot,
@@ -237,6 +250,7 @@ export const useCharacterSaveJournal = ({
       persistence,
       saveBlockedReason,
       stateRef,
+      target,
       updatePendingStage,
     ],
   );

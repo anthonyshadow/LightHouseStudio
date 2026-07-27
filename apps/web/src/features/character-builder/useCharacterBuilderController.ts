@@ -25,6 +25,10 @@ import { useCharacterReferenceGeneration } from './useCharacterReferenceGenerati
 import { useCharacterReferenceUpload } from './useCharacterReferenceUpload';
 import { useCharacterSaveJournal } from './useCharacterSaveJournal';
 import type { CharacterSaveStage } from './characterBuilderPersistence';
+import type {
+  CharacterBuilderDraftValueV1,
+  CharacterBuilderTarget,
+} from './characterBuilderPersistence';
 
 export {
   sanitizeCharacterBuilderDraftValue,
@@ -52,6 +56,8 @@ export interface UseCharacterBuilderControllerOptions {
     progress: CharacterSaveProgress,
   ) => Promise<void>;
   readonly onDismiss: () => void;
+  readonly target?: CharacterBuilderTarget | undefined;
+  readonly initialValue?: CharacterBuilderDraftValueV1 | undefined;
 }
 
 const editIsBlocked = (
@@ -74,11 +80,20 @@ export const useCharacterBuilderController = ({
   legacyRepository,
   onSaveCharacter,
   onDismiss,
+  target = { kind: 'create' },
+  initialValue,
 }: UseCharacterBuilderControllerOptions) => {
-  const initialValue = useMemo(() => createFreshCharacterBuilderDraftValue(), []);
+  const initialDraftValue = useMemo(
+    () => initialValue ?? createFreshCharacterBuilderDraftValue(),
+    [initialValue],
+  );
   const [state, dispatch] = useReducer(
     characterBuilderReducer,
-    createCharacterBuilderState(initialValue.draft, initialValue.design, initialValue.options),
+    createCharacterBuilderState(
+      initialDraftValue.draft,
+      initialDraftValue.design,
+      initialDraftValue.options,
+    ),
   );
   const [discardCloseOpen, setDiscardCloseOpen] = useState(false);
   const [discardCloseBusy, setDiscardCloseBusy] = useState(false);
@@ -95,6 +110,7 @@ export const useCharacterBuilderController = ({
     stateRef,
     dispatch,
     legacyRepository,
+    initialValue,
   });
   const {
     autosaveMessage,
@@ -137,6 +153,7 @@ export const useCharacterBuilderController = ({
     saveBlockedReason,
     onSaveCharacter,
     onDismiss,
+    target,
   });
 
   const changeDraft = useCallback(
@@ -319,9 +336,12 @@ export const useCharacterBuilderController = ({
     saveRecoveryPending: pendingSave !== null,
     canSave,
     canSaveImageOnly: Boolean(state.uploadedReference),
-    suggestedCharacterName: pendingSave?.snapshot.name ?? deriveCharacterName(state.design),
+    suggestedCharacterName:
+      pendingSave?.snapshot.name ??
+      (target.kind === 'edit' ? target.originalName : deriveCharacterName(state.design)),
     suggestedImageOnlyCharacterName: pendingSave?.snapshot.name ?? 'Uploaded Character 01',
     characterNameLocked: pendingSave !== null,
+    editingCharacterName: target.kind === 'edit' ? target.originalName : null,
     onChange: changeDraft,
     onOptionsChange: changeOptions,
     onGenerate: generatePreview,

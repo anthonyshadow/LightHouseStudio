@@ -256,6 +256,7 @@ export const CharacterPromptCard = ({
   onSelect,
   onUse,
   onOpenWorkshop,
+  onEditCharacter,
   onAction,
 }: {
   item: SavedCharacterPrompt;
@@ -264,6 +265,7 @@ export const CharacterPromptCard = ({
   onSelect: () => void;
   onUse: () => void;
   onOpenWorkshop?: (() => void) | undefined;
+  onEditCharacter?: (() => void) | undefined;
   onAction: (action: EditAction) => void;
 }) => {
   const theme = useTheme();
@@ -355,10 +357,11 @@ export const CharacterPromptCard = ({
           size="small"
           onClick={() => {
             onSelect();
-            onAction('edit');
+            if (onEditCharacter) onEditCharacter();
+            else onAction('edit');
           }}
         >
-          Edit
+          {onEditCharacter ? 'Edit in Builder' : 'Edit'}
         </Button>
         <Button
           aria-label={`Rename ${item.name}`}

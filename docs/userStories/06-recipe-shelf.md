@@ -15,10 +15,10 @@ As a creator, I want to manage reusable prompts and character recipes, so that I
 2. Use **Recipe model** to choose Character recipes or Try-On recipes. If an inline form is dirty, decide whether to discard its pending changes before changing the model.
 3. Choose **Saved**, **Recent**, or (for Character) **Characters**.
 4. Type in **Search this mode** to find by title/name, prompt, note, or tag. Optionally filter Saved recipes by tag.
-5. To create text from scratch, select **New character recipe** or **New garment recipe**, complete the recipe form, and save it.
-6. To preserve a structured character recipe, use the Workshop’s **Save to Recipe Shelf** action; later select **Open workshop** on its card to restore the structured draft.
+5. To create a character, select **New character recipe**; Character Builder opens and owns creation, optional reference work, save, and Studio preload. To create generic Try-On text, select **New garment recipe** and use the inline form.
+6. Select **Edit** on a true character card to open that exact record in Character Builder. Legacy structured Add, Replace, and Restyle records continue to expose **Open workshop** instead.
 7. On any card, select **Use** to put its prompt into the relevant working draft. Saved characters may be prompt-only, direct uploaded/image-only, or generated/composed; the saved record retains uploaded-source/final-reference provenance and applicable Recents retain the character name. If it has a persisted reference asset, wait while the app validates metadata and hydrates its bytes before committing the recipe.
-8. Use **Edit**, **Rename**, or **Delete** to maintain saved cards. Select **Save a copy** on an unlinked recent to preserve it as a saved recipe.
+8. Use Builder-owned **Edit**, or card-level **Rename** and **Delete**, to maintain saved characters. Generic saved prompts retain their inline Edit action. Select **Save a copy** on an unlinked recent to preserve it as a saved recipe.
 9. Close the Shelf normally to retain unsaved work; use an explicit Cancel/Delete/confirmation path for destructive changes.
 
 ## Failure and alternate paths

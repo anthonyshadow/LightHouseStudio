@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import { TextAreaField, TextField } from '../../ui';
-import type { PromptBuilderDraft, PromptIssue } from './model';
+import type { PromptIssue } from './model';
 import {
   promptFieldGridStyles,
   promptFullWidthStyles,
@@ -8,14 +8,13 @@ import {
   promptValueFrom,
 } from './promptFieldLayout';
 import type { PromptWorkshopStepId } from './workshopSteps';
-
-type SingleEditDraft = Exclude<PromptBuilderDraft, { intent: 'character-transform' }>;
+import type { WorkshopDraft } from './workshopModel';
 
 interface SingleEditIntentFieldsProps {
-  draft: SingleEditDraft;
+  draft: WorkshopDraft;
   issues: readonly PromptIssue[];
   activeStep: PromptWorkshopStepId;
-  onChange: (draft: PromptBuilderDraft) => void;
+  onChange: (draft: WorkshopDraft) => void;
 }
 
 export const SingleEditIntentFields = ({

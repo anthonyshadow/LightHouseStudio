@@ -28,6 +28,8 @@ export interface RecipeShelfProps {
   /** Studio-owned applied/preloaded recipe identity used for controlled highlighting. */
   activeRecipe?: ActiveRecipeIdentity;
   onUsePrompt: (selection: RecipeSelection) => void;
+  onCreateCharacter?: () => void;
+  onEditCharacter?: (asset: SavedCharacterPrompt) => void;
   onOpenCharacterWorkshop?: (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => void;
   onDirtyChange?: (dirty: boolean) => void;
 }

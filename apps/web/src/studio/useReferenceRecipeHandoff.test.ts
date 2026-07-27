@@ -219,7 +219,6 @@ describe('reference recipe handoff', () => {
         repository,
         store,
         session,
-        referenceImagesAvailable: true,
         mediaLocked: false,
         recordingActive: false,
         sessionModeLocked: false,

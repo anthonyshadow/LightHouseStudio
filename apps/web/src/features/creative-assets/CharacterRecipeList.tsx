@@ -2,7 +2,7 @@ import { useTheme } from '@emotion/react';
 import { CharacterPromptCard } from './RecipeCards';
 import { DeleteConfirmation, RecipeEditor, RenameForm, type RecipeFormValue } from './RecipeForms';
 import { listItemStyles, listStyles } from './RecipeShelf.styles';
-import type { SavedCharacterPrompt } from './types';
+import { isBuilderOwnedCharacter, type SavedCharacterPrompt } from './types';
 import type { RecipeShelfController } from './useRecipeShelfController';
 
 const updateCharacterRecipe = (
@@ -31,6 +31,7 @@ export const CharacterRecipeList = ({
   return (
     <ul css={listStyles(theme)} aria-label="Saved character recipes">
       {controller.results.savedCharacterPrompts.map((item) => {
+        const builderOwned = isBuilderOwnedCharacter(item);
         const editing =
           controller.editing?.kind === 'character' && controller.editing.id === item.id;
         if (!editing) {
@@ -42,8 +43,11 @@ export const CharacterRecipeList = ({
                 useDisabled={useDisabled}
                 onSelect={() => controller.selectRecipe({ kind: 'character', id: item.id })}
                 onUse={() => controller.selectCharacter(item)}
-                {...(item.builderDraft && controller.canOpenCharacterWorkshop
+                {...(!builderOwned && item.builderDraft && controller.canOpenCharacterWorkshop
                   ? { onOpenWorkshop: () => controller.openCharacterWorkshop(item) }
+                  : {})}
+                {...(builderOwned && controller.canEditCharacter
+                  ? { onEditCharacter: () => controller.editCharacter(item) }
                   : {})}
                 onAction={(action) =>
                   controller.startEditing(

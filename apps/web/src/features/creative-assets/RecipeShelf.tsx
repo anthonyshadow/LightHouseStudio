@@ -141,7 +141,11 @@ export const RecipeShelfView = ({
             aria-label={newRecipeLabel}
             variant="primary"
             size="small"
-            onClick={() => controller.openCreate()}
+            onClick={() =>
+              activeMode === 'lucy-2.5' && controller.canCreateCharacter
+                ? controller.createCharacter()
+                : controller.openCreate()
+            }
           >
             New recipe
           </Button>
@@ -157,6 +161,8 @@ export const RecipeShelf = (props: RecipeShelfProps) => {
     activeMode: props.activeMode,
     ...(props.activeRecipe !== undefined ? { activeRecipe: props.activeRecipe } : {}),
     onUsePrompt: props.onUsePrompt,
+    ...(props.onCreateCharacter ? { onCreateCharacter: props.onCreateCharacter } : {}),
+    ...(props.onEditCharacter ? { onEditCharacter: props.onEditCharacter } : {}),
     ...(props.onOpenCharacterWorkshop
       ? { onOpenCharacterWorkshop: props.onOpenCharacterWorkshop }
       : {}),

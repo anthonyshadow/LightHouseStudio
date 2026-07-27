@@ -12,7 +12,17 @@ import {
 
 export type CharacterSaveStage = 'intent' | 'character-persisted' | 'studio-preloaded';
 
+export type CharacterBuilderTarget =
+  | { readonly kind: 'create' }
+  | {
+      readonly kind: 'edit';
+      readonly characterId: string;
+      readonly originalName: string;
+      readonly originalPrompt: string;
+    };
+
 export interface PersistedCharacterSaveSnapshot {
+  readonly saveKind: CharacterBuilderTarget['kind'];
   readonly name: string;
   readonly prompt: string;
   readonly draft: CharacterTransformDraft | null;
@@ -36,6 +46,7 @@ export interface PersistedCharacterBuilderPreview {
 }
 
 export interface CharacterBuilderDraftValueV1 {
+  readonly target: CharacterBuilderTarget;
   readonly draft: CharacterTransformDraft;
   readonly design: GuidedDesignV1;
   readonly options: CharacterReferenceOptions;
@@ -49,6 +60,28 @@ export interface CharacterBuilderDraftValueV1 {
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
+
+const sanitizeTarget = (value: unknown): CharacterBuilderTarget | null => {
+  if (value === undefined || value === null) return { kind: 'create' };
+  if (!isRecord(value)) return null;
+  if (value.kind === 'create') return { kind: 'create' };
+  if (
+    value.kind !== 'edit' ||
+    typeof value.characterId !== 'string' ||
+    !value.characterId.trim() ||
+    typeof value.originalName !== 'string' ||
+    !value.originalName.trim() ||
+    typeof value.originalPrompt !== 'string'
+  ) {
+    return null;
+  }
+  return {
+    kind: 'edit',
+    characterId: value.characterId.trim().slice(0, 256),
+    originalName: value.originalName.trim().slice(0, 80),
+    originalPrompt: value.originalPrompt.trim().slice(0, 10_000),
+  };
+};
 
 const sanitizeSnapshot = (value: unknown): PersistedCharacterSaveSnapshot | null => {
   if (!isRecord(value)) return null;
@@ -98,6 +131,7 @@ const sanitizeSnapshot = (value: unknown): PersistedCharacterSaveSnapshot | null
     return null;
   }
   return {
+    saveKind: value.saveKind === 'edit' ? 'edit' : 'create',
     name: value.name.slice(0, 80),
     prompt,
     draft,
@@ -137,11 +171,13 @@ export const sanitizeCharacterBuilderDraftValue = (
   const draft = sanitizePromptBuilderDraft(value.draft);
   const design = sanitizeGuidedDesignV1(value.design);
   const options = characterReferenceOptionsSchema.safeParse(value.options);
+  const target = sanitizeTarget(value.target);
   const rawPendingSave = value.pendingSave ?? null;
   const pendingSave = sanitizePendingSave(rawPendingSave);
   if (
     draft?.intent !== 'character-transform' ||
     !design ||
+    !target ||
     !options.success ||
     (rawPendingSave !== null && pendingSave === null)
   ) {
@@ -182,7 +218,7 @@ export const sanitizeCharacterBuilderDraftValue = (
       displayName: value.uploadedReference.displayName.trim().slice(0, 180),
     };
   }
-  return { draft, design, options: options.data, preview, uploadedReference, pendingSave };
+  return { target, draft, design, options: options.data, preview, uploadedReference, pendingSave };
 };
 
 export const characterSaveSnapshotFingerprint = async (

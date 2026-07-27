@@ -7,6 +7,8 @@ import { StudioDesignProvider } from '../../ui';
 import { createPromptBuilderDraft } from '../prompt-authoring';
 import { RecipeShelf } from './RecipeShelf';
 import { createCreativeAssetRepository } from './repository';
+import type { SavedCharacterPrompt } from './types';
+import type { PromptBuilderDraft } from '../prompt-authoring';
 
 const createRepository = () => {
   let id = 0;
@@ -17,20 +19,33 @@ const createRepository = () => {
   });
 };
 
-const renderShelf = (repository = createRepository()) => {
+const renderShelf = (
+  repository = createRepository(),
+  { builderActions = true }: { builderActions?: boolean } = {},
+) => {
   const onUsePrompt = vi.fn();
-  const onOpenCharacterWorkshop = vi.fn();
+  const onOpenCharacterWorkshop =
+    vi.fn<(draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => void>();
+  const onCreateCharacter = vi.fn<() => void>();
+  const onEditCharacter = vi.fn<(asset: SavedCharacterPrompt) => void>();
   render(
     <StudioDesignProvider>
       <RecipeShelf
         repository={repository}
         activeMode="lucy-2.5"
         onUsePrompt={onUsePrompt}
+        {...(builderActions ? { onCreateCharacter, onEditCharacter } : {})}
         onOpenCharacterWorkshop={onOpenCharacterWorkshop}
       />
     </StudioDesignProvider>,
   );
-  return { repository, onUsePrompt, onOpenCharacterWorkshop };
+  return {
+    repository,
+    onUsePrompt,
+    onCreateCharacter,
+    onEditCharacter,
+    onOpenCharacterWorkshop,
+  };
 };
 
 afterEach(cleanup);
@@ -39,7 +54,7 @@ describe('RecipeShelf', () => {
   it('creates, searches, uses, renames, edits, and explicitly deletes a saved recipe offline', async () => {
     const user = userEvent.setup();
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
-    const { onUsePrompt } = renderShelf();
+    const { onUsePrompt } = renderShelf(undefined, { builderActions: false });
 
     expect(screen.getByText(/changes will last only until this tab closes/i)).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'New character recipe' }));
@@ -130,7 +145,7 @@ describe('RecipeShelf', () => {
     expect(screen.getByRole('heading', { name: 'Recipe Shelf' })).toHaveFocus();
   });
 
-  it('reopens saved structured character state while keeping portrait bytes out of the asset', async () => {
+  it('routes create and edit character actions through Character Builder', async () => {
     const user = userEvent.setup();
     const repository = createRepository();
     const draft = {
@@ -144,15 +159,50 @@ describe('RecipeShelf', () => {
       builderDraft: draft,
       referenceImageStatus: 'portrait-required-not-saved',
     });
-    const { onOpenCharacterWorkshop } = renderShelf(repository);
+    const { onCreateCharacter, onEditCharacter, onOpenCharacterWorkshop } = renderShelf(repository);
 
     await user.click(screen.getByRole('button', { name: /Characters/ }));
     expect(screen.getByText('Add a portrait when using')).toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Open Field explorer in workshop' }));
+    expect(
+      screen.queryByRole('button', { name: 'Open Field explorer in workshop' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Edit Field explorer' }));
+    expect(onEditCharacter).toHaveBeenCalledOnce();
+    const editedCharacter = onEditCharacter.mock.calls[0]?.[0];
+    expect(editedCharacter?.name).toBe('Field explorer');
+    expect(editedCharacter?.builderDraft).toMatchObject({
+      characterBase: 'botanical explorer',
+    });
+    expect(onOpenCharacterWorkshop).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'New character recipe' }));
+    expect(onCreateCharacter).toHaveBeenCalledOnce();
+  });
+
+  it('keeps legacy object-edit records in Prompt Workshop', async () => {
+    const user = userEvent.setup();
+    const repository = createRepository();
+    const draft = {
+      ...createPromptBuilderDraft('add-object'),
+      objectDescription: 'paper lantern',
+      placement: 'above the doorway',
+    };
+    repository.createSavedCharacterPrompt({
+      name: 'Doorway lantern',
+      prompt: 'Add a paper lantern above the doorway.',
+      promptIntent: 'add-object',
+      builderDraft: draft,
+      referenceImageStatus: 'prompt-only',
+    });
+    const { onEditCharacter, onOpenCharacterWorkshop } = renderShelf(repository);
+
+    await user.click(screen.getByRole('button', { name: /Characters/ }));
+    await user.click(screen.getByRole('button', { name: 'Open Doorway lantern in workshop' }));
     expect(onOpenCharacterWorkshop).toHaveBeenCalledWith(
-      expect.objectContaining({ characterBase: 'botanical explorer' }),
-      expect.objectContaining({ name: 'Field explorer' }),
+      expect.objectContaining({ intent: 'add-object' }),
+      expect.objectContaining({ name: 'Doorway lantern' }),
     );
+    expect(onEditCharacter).not.toHaveBeenCalled();
   });
 
   it('shows persisted reference thumbnails and carries exact assets through Use and Save a copy', async () => {

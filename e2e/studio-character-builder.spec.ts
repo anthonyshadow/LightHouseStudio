@@ -601,8 +601,11 @@ test('image-backed save preserves the exact generated asset and optimized Lucy p
 
   await dock.getByRole('button', { name: 'Close panel' }).click();
   await page.getByRole('button', { name: 'Workshop', exact: true }).click();
-  const workshop = page.getByRole('dialog', { name: 'Character Workshop' });
-  await workshop.getByRole('button', { name: 'Detach generated reference image' }).click();
+  const workshop = page.getByRole('dialog', { name: 'Prompt Workshop' });
+  await expect(workshop.getByRole('button', { name: 'Transform character' })).toHaveCount(0);
+  await expect(workshop.getByRole('button', { name: /Detach generated reference/u })).toHaveCount(
+    0,
+  );
   await workshop.getByRole('button', { name: 'Close creative tool' }).click();
 
   await page.getByRole('button', { name: 'Dock', exact: true }).click();
@@ -679,6 +682,59 @@ test('drafts survive close and reload, while Reset Draft starts fresh', async ({
   await expect(page.getByRole('button', { name: 'Save Character' })).toBeDisabled();
 });
 
+test('editing a character requires explicit discard of a different unfinished draft', async ({
+  page,
+}) => {
+  await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+
+  await openBuilder(page);
+  await chooseAdultCharacterDirection(page);
+  await page.getByRole('button', { name: 'Save Character', exact: true }).click();
+  await confirmCharacterName(page, 'Saved Field Host');
+  await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
+
+  await openBuilder(page);
+  await chooseAdultCharacterDirection(page);
+  await openConstraints(page);
+  await page.getByLabel('Optional Custom Constraints').fill('unfinished draft marker');
+  await page.getByRole('button', { name: 'Close character builder' }).click();
+
+  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
+  let shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
+  await shelf.getByRole('button', { name: /^Characters/u }).click();
+  await shelf.getByRole('button', { name: 'Edit Saved Field Host' }).click();
+
+  const discardPrompt = page.getByRole('dialog', { name: 'Unfinished character draft' });
+  await expect(discardPrompt).toContainText('An unfinished character draft exists');
+  await discardPrompt.getByRole('button', { name: 'Cancel' }).click();
+  await expect(discardPrompt).toBeHidden();
+  await expect(shelf).toBeVisible();
+
+  await shelf.getByRole('button', { name: 'New character recipe' }).click();
+  const resumedCreate = page.getByRole('dialog', { name: 'Build Your Character' });
+  await expect(resumedCreate).toBeVisible();
+  await openConstraints(page);
+  await expect(page.getByLabel('Optional Custom Constraints')).toHaveValue(
+    'unfinished draft marker',
+  );
+  await page.getByRole('button', { name: 'Close character builder' }).click();
+
+  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
+  shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
+  await shelf.getByRole('button', { name: /^Characters/u }).click();
+  await shelf.getByRole('button', { name: 'Edit Saved Field Host' }).click();
+  await page
+    .getByRole('dialog', { name: 'Unfinished character draft' })
+    .getByRole('button', { name: 'Continue' })
+    .click();
+
+  const editBuilder = page.getByRole('dialog', { name: 'Edit Saved Field Host' });
+  await expect(editBuilder).toBeVisible();
+  await openConstraints(page);
+  await expect(page.getByLabel('Optional Custom Constraints')).toHaveValue('');
+});
+
 test('unfinished Shelf edits block character Save without blocking builder editing', async ({
   page,
 }) => {
@@ -686,8 +742,9 @@ test('unfinished Shelf edits block character Save without blocking builder editi
   await page.goto('/');
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await shelf.getByRole('button', { name: 'New character recipe' }).click();
-  await shelf.getByLabel(/^Name/u).fill('Unfinished shelf character');
+  await shelf.getByRole('button', { name: 'Try-on recipes' }).click();
+  await shelf.getByRole('button', { name: 'New garment recipe' }).click();
+  await shelf.getByLabel(/^Name/u).fill('Unfinished garment recipe');
   await shelf.getByRole('button', { name: 'Close creative tool' }).click();
 
   await openBuilder(page);

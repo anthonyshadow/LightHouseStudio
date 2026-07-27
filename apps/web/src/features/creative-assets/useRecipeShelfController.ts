@@ -36,6 +36,8 @@ type ControllerOptions = Pick<
   | 'activeMode'
   | 'activeRecipe'
   | 'onUsePrompt'
+  | 'onCreateCharacter'
+  | 'onEditCharacter'
   | 'onOpenCharacterWorkshop'
   | 'onDirtyChange'
 >;
@@ -45,6 +47,8 @@ export const useRecipeShelfController = ({
   activeMode,
   activeRecipe,
   onUsePrompt,
+  onCreateCharacter,
+  onEditCharacter,
   onOpenCharacterWorkshop,
   onDirtyChange,
 }: ControllerOptions) => {
@@ -269,6 +273,16 @@ export const useRecipeShelfController = ({
     runAfterFormCheck(() => onOpenCharacterWorkshop(draft, item));
   };
 
+  const createCharacter = () => {
+    if (!onCreateCharacter) return;
+    runAfterFormCheck(onCreateCharacter);
+  };
+
+  const editCharacter = (item: SavedCharacterPrompt) => {
+    if (!onEditCharacter) return;
+    runAfterFormCheck(() => onEditCharacter(item));
+  };
+
   const chooseCategory = (next: ShelfCategory) =>
     runAfterFormCheck(() => {
       setCategory(next);
@@ -329,11 +343,15 @@ export const useRecipeShelfController = ({
     startEditing,
     closeEditor,
     createRecipe,
+    canCreateCharacter: Boolean(onCreateCharacter),
+    createCharacter,
     selectSaved,
     selectRecent,
     selectCharacter,
     canOpenCharacterWorkshop: Boolean(onOpenCharacterWorkshop),
     openCharacterWorkshop,
+    canEditCharacter: Boolean(onEditCharacter),
+    editCharacter,
     perform,
   };
 };

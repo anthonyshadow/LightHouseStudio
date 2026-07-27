@@ -37,6 +37,7 @@ export const createCharacterBuilderOperationLocks = (): CharacterBuilderOperatio
 });
 
 export const createFreshCharacterBuilderDraftValue = (): CharacterBuilderDraftValueV1 => ({
+  target: { kind: 'create' },
   draft: createPromptBuilderDraft('character-transform'),
   design: createEmptyGuidedDesign(),
   options: DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS,

@@ -9,11 +9,12 @@ import {
 const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
 const LEGACY_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
 
-const openCharacterWorkshop = async (page: Page, concept: string): Promise<void> => {
-  await page.getByRole('button', { name: 'Workshop', exact: true }).click();
-  await expect(page.getByRole('dialog', { name: 'Character Workshop' })).toBeVisible();
-  await page.getByRole('textbox', { name: 'Character concept', exact: true }).fill(concept);
-  await expect(page.getByRole('button', { name: 'Generate reference image' })).toBeEnabled();
+const openCharacterBuilder = async (page: Page): Promise<void> => {
+  await page.getByRole('button', { name: /Open character options/u }).click();
+  await page.getByRole('button', { name: 'Create new character' }).click();
+  await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
+  await page.getByRole('button', { name: 'Adult', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Generate Preview' })).toBeEnabled();
 };
 
 test('optimized reference hydrates its stored Lucy prompt atomically and survives refresh', async ({
@@ -22,10 +23,9 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
 
-  await openCharacterWorkshop(page, 'botanical field correspondent');
-  await page.getByRole('button', { name: 'Generate reference image' }).click();
-  await expect(page.getByText('Reference image attached', { exact: true })).toBeVisible();
-  await expect(page.getByAltText('Generated front-facing character reference')).toBeVisible();
+  await openCharacterBuilder(page);
+  await page.getByRole('button', { name: 'Generate Preview' }).click();
+  await expect(page.getByText('This preview matches the current character.')).toBeVisible();
   expect(network.referenceImageGenerations).toHaveLength(1);
   expect(network.referencePromptOptimizations).toHaveLength(1);
   expect(network.referenceWorkflowCalls).toEqual(['optimize', 'generate']);
@@ -54,9 +54,11 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
     size: '1536x1024',
   });
 
-  await page.getByRole('button', { name: 'Use in working draft' }).click();
-  await expect(page.getByRole('dialog', { name: 'Character Workshop' })).toBeHidden();
-  expect(network.referenceImageMetadataReads).toContain(generated.assetId);
+  await page.getByRole('button', { name: 'Save Character', exact: true }).click();
+  const nameDialog = page.getByRole('dialog', { name: 'Name your character' });
+  await nameDialog.getByRole('textbox', { name: /Character name/u }).fill('Field correspondent');
+  await nameDialog.getByRole('button', { name: 'Save Character', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
   expect(network.referenceImageContentReads).toContain(generated.assetId);
 
   await openRecipeDockWhenOverlaid(page);
@@ -122,40 +124,30 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
   expect(browser.applies).toEqual([]);
   expect(network.referenceImageGenerations).toHaveLength(1);
   expect(network.referenceWorkflowCalls).toEqual(['optimize', 'generate']);
-  expect(network.referenceImageMetadataReads.filter((id) => id === generated.assetId).length).toBe(
-    2,
-  );
+  expect(network.referenceImageMetadataReads).toContain(generated.assetId);
   expectNoExternalProviderTraffic(network);
 });
 
-test('saved character restores its original asset after workshop regeneration', async ({
+test('saved character opens in Builder and updates its original record after regeneration', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
 
-  await openCharacterWorkshop(page, 'paper-cut astronomy presenter');
-  await page.getByRole('button', { name: 'Generate reference image' }).click();
-  await expect(page.getByText('Reference image attached', { exact: true })).toBeVisible();
+  await openCharacterBuilder(page);
+  await page.getByRole('button', { name: 'Generate Preview' }).click();
+  await expect(page.getByText('This preview matches the current character.')).toBeVisible();
   const firstAssetId = network.referenceImageGenerations[0]?.assetId;
   expect(firstAssetId).toBeDefined();
   if (!firstAssetId) throw new Error('The first deterministic reference was not generated.');
 
-  await page.getByRole('button', { name: 'Save to Recipe Shelf' }).click();
-  await page.getByLabel('Recipe name').fill('Immutable astronomy host');
-  await page.getByRole('button', { name: 'Save recipe' }).click();
-
-  await page.getByRole('button', { name: 'Regenerate' }).click();
-  await expect.poll(() => network.referenceImageGenerations.length).toBe(2);
-  const secondAssetId = network.referenceImageGenerations[1]?.assetId;
-  expect(secondAssetId).toBeDefined();
-  if (!secondAssetId) throw new Error('The regenerated deterministic reference was not stored.');
-  expect(secondAssetId).not.toBe(firstAssetId);
-  await expect(page.getByText('Reference image attached', { exact: true })).toBeVisible();
-  await expect(page.getByAltText('Generated front-facing character reference')).toHaveAttribute(
-    'src',
-    new RegExp(secondAssetId, 'u'),
-  );
+  await page.getByRole('button', { name: 'Save Character', exact: true }).click();
+  const createNameDialog = page.getByRole('dialog', { name: 'Name your character' });
+  await createNameDialog
+    .getByRole('textbox', { name: /Character name/u })
+    .fill('Immutable astronomy host');
+  await createNameDialog.getByRole('button', { name: 'Save Character', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
 
   const persistedAssetId = await page.evaluate((storageKey) => {
     const serialized = localStorage.getItem(storageKey);
@@ -170,20 +162,61 @@ test('saved character restores its original asset after workshop regeneration', 
   }, CREATIVE_ASSET_STORAGE_KEY);
   expect(persistedAssetId).toBe(firstAssetId);
 
-  await page.getByRole('button', { name: 'Close creative tool' }).click();
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   await page.getByRole('button', { name: /^Characters\b/u }).click();
   await expect(page.getByAltText('Reference image for Immutable astronomy host')).toHaveAttribute(
     'src',
     new RegExp(firstAssetId, 'u'),
   );
-  await page.getByRole('button', { name: 'Open Immutable astronomy host in workshop' }).click();
-  await expect(page.getByRole('dialog', { name: 'Character Workshop' })).toBeVisible();
-  await expect(page.getByText('Reference image attached', { exact: true })).toBeVisible();
-  await expect(page.getByAltText('Generated front-facing character reference')).toHaveAttribute(
+  await page.getByRole('button', { name: 'Edit Immutable astronomy host' }).click();
+  const builder = page.getByRole('dialog', { name: 'Edit Immutable astronomy host' });
+  await expect(builder).toBeVisible();
+  await expect(builder.getByText('This preview matches the current character.')).toBeVisible();
+  await expect(builder.getByRole('img', { name: /direction preview/u })).toHaveAttribute(
     'src',
     new RegExp(firstAssetId, 'u'),
   );
+
+  await builder.getByRole('button', { name: 'Regenerate' }).click();
+  await page
+    .getByRole('dialog', { name: 'Regenerate character preview' })
+    .getByRole('button', { name: 'Regenerate', exact: true })
+    .click();
+  await expect.poll(() => network.referenceImageGenerations.length).toBe(2);
+  const secondAssetId = network.referenceImageGenerations[1]?.assetId;
+  expect(secondAssetId).toBeDefined();
+  if (!secondAssetId) throw new Error('The regenerated deterministic reference was not stored.');
+  expect(secondAssetId).not.toBe(firstAssetId);
+
+  await builder.getByRole('button', { name: 'Save Changes' }).click();
+  const editNameDialog = page.getByRole('dialog', { name: 'Name your character' });
+  await expect(editNameDialog.getByRole('textbox', { name: /Character name/u })).toHaveValue(
+    'Immutable astronomy host',
+  );
+  await editNameDialog.getByRole('button', { name: 'Save Character', exact: true }).click();
+  await expect(builder).toBeHidden();
+
+  const edited = await page.evaluate((storageKey) => {
+    const serialized = localStorage.getItem(storageKey);
+    if (!serialized) return null;
+    const store = JSON.parse(serialized) as {
+      savedCharacterPrompts?: Array<{
+        name?: string;
+        referenceImageAssetId?: string | null;
+      }>;
+    };
+    return {
+      count: store.savedCharacterPrompts?.length ?? 0,
+      character: store.savedCharacterPrompts?.[0] ?? null,
+    };
+  }, CREATIVE_ASSET_STORAGE_KEY);
+  expect(edited).toMatchObject({
+    count: 1,
+    character: {
+      name: 'Immutable astronomy host',
+      referenceImageAssetId: secondAssetId,
+    },
+  });
   expectNoExternalProviderTraffic(network);
 });
 

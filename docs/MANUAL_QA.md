@@ -18,7 +18,7 @@ Run idle, local-preview, recording, finalizing, main-stage playback, Character p
 | `390×844`  | Icon-first header and fixed capture/launcher rows. Every tool is a near-full-height bottom sheet with one internal scroller and sticky actions.                         |
 | `320×568`  | Short-brand header and icon-only launcher with accessible names. Every tool is full-screen with visible Close and primary actions; no backdrop dismissal is required.   |
 
-For the Recipe Dock, Character Workshop, Recipe Shelf, Capture Settings, and take overlay, confirm the element marked with the relevant `data-scroll-region` can reach its last control while the document dimensions remain unchanged. Repeat with a very long filename, recipe name, tag, prompt, and provider voice name: text may wrap or truncate with its title/accessible name intact, but no control or focus ring may create horizontal document overflow.
+For the Recipe Dock, Prompt Workshop, Recipe Shelf, Capture Settings, and take overlay, confirm the element marked with the relevant `data-scroll-region` can reach its last control while the document dimensions remain unchanged. Repeat with a very long filename, recipe name, tag, prompt, and provider voice name: text may wrap or truncate with its title/accessible name intact, but no control or focus ring may create horizontal document overflow.
 
 At `320×568` and `390×844`, repeat with browser chrome expanded/collapsed and the software keyboard open. Safe-area padding must keep the header, close control, primary action, and bottom rail reachable. At 150–200% text/zoom, dense tools may scroll internally; the document still must not scroll.
 
@@ -86,7 +86,7 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 
 ## Stable stage and panel independence
 
-- Before opening a tool, retain the stage figure/video nodes and current binding in DevTools. Open/close Recipe Dock, Capture Settings, Character Workshop, Recipe Shelf, Take Review, Voice Treatments, and ElevenLabs Voice Browser during live media and recorded playback. Confirm the nodes, stage rectangle, `srcObject`/`src`, live tracks, playback `currentTime`, and provider connection are unchanged. No overlay action may issue another `getUserMedia` call.
+- Before opening a tool, retain the stage figure/video nodes and current binding in DevTools. Open/close Recipe Dock, Capture Settings, Prompt Workshop, Recipe Shelf, Character Builder, Take Review, Voice Treatments, and ElevenLabs Voice Browser during live media and recorded playback. Confirm the nodes, stage rectangle, `srcObject`/`src`, live tracks, playback `currentTime`, and provider connection are unchanged. No overlay action may issue another `getUserMedia` call.
 - Confirm local preview has `data-mirrored="true"`, transformed output and recorded playback have `data-mirrored="false"`, and computed `object-fit` is `contain` in every media state. Test landscape and portrait sources; the whole frame must remain visible without subject-cropping.
 - Confirm the stage resolution/frame-rate badge reflects live track settings rather than a hard-coded target; long device labels remain contained. Verify the live status, source badge, framing guides, audio meter, and native fullscreen control where supported.
 - During provider connection, partial/audio-only remote streams must not replace local preview. Only a live transformed video track may become the stage and recording source; disconnect/end must restore local fallback.
@@ -94,12 +94,13 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 
 ## Structured prompt workshop and Recipe Shelf
 
-- Generate each intent: character transform, add object with placement, replace named object, and change an attribute.
-- Confirm required-field blocking, concise normalized output, advisory warnings, adult-only age choices, 500-character detail bounds, and no hidden traits.
+- Generate each Prompt Workshop intent: add object with placement, replace named object, and change an attribute. Confirm **Transform character** is absent.
+- Confirm required-field blocking, concise normalized output, advisory warnings, 500-character detail bounds, and no hidden traits.
 - Use generated text and confirm it changes only the draft—no media, token, or Apply.
-- For a completed character transform, confirm Generate is explicit, unavailable without the capability/prompt, prevents double clicks, shows an inline square loading state, and leaves the generated image attached after closing and reopening the workshop.
-- Edit the prompt after generation and confirm the stale warning appears without automatic regeneration. Confirm failed Regenerate keeps the previous image; successful Regenerate selects a new asset without changing an already saved character or populated Recent version.
-- Save and reopen a structured character prompt; confirm its exact generated reference ID and preview restore. Legacy/manual-image records still restore without durable image bytes.
+- Confirm Prompt Workshop exposes no character fields, optimizer settings, Generate/Regenerate/Detach reference actions, or provider traffic.
+- Create a character through the Shelf and edit it through both the Shelf card and active-character header action. Confirm each opens Character Builder, while direct **Use** remains an atomic preload.
+- With an unfinished Builder draft, choose Edit on a different character. Confirm **Cancel** leaves the draft and navigation unchanged; repeat and choose **Continue**, then confirm the old draft is durably discarded before the selected character is hydrated.
+- Regenerate and save an edited character. Confirm its existing ID, notes, tags, and use metadata remain and no duplicate character appears.
 - Close and reopen an unsaved structured workshop draft or Recipe Shelf editor; confirm each draft is restored. Ordinary overlay closure must not discard edits. Explicit Reset/Discard/Delete actions retain their destructive confirmation where applicable.
 - Create/search/use/edit/rename/delete character and try-on recipes. Confirm model scoping and case-insensitive metadata search.
 - Successfully Start/Apply a nonempty prompt and confirm it enters Recents; typing alone must not.
@@ -151,10 +152,9 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Press Escape and confirm only the topmost dialog closes. Focus must return to the exact Dock, Take, Workshop, Shelf, or settings launcher. Repeat with the close button and backdrop press.
 - Open Dock, Take, Workshop, Shelf, and Capture Settings in succession. Confirm only one major tool remains open and opening/closing it does not start or stop media/provider work.
 - Make a Recipe Shelf editor or capture-settings draft dirty, close the overlay, open another major tool, and reopen it. Ordinary closure must preserve the draft and focus return; only the tool's explicit Reset/Discard action may clear pending values.
-- Close and reopen the Character Workshop. Confirm the current draft for each supported intent remains in tab memory. Reset current intent must warn only when that intent has content and must not clear another intent's draft.
-- In the Character Workshop, confirm prompt optimization and full-body reference framing are enabled by default and the framing, orientation, rendering, expression, and background choices persist as browser preferences. Confirm Auto orientation produces the known landscape target size, while deliberate portrait, square, waist-up, and head-and-shoulders choices remain available. Optimize a valid character and verify the raw recipe, editable optimized reference-image prompt, separate Lucy 2.5 prompt, warnings, and optimizer model/version remain distinguishable.
-- Edit the optimized image prompt, confirm it is marked manually edited, and generate. Verify the exact edit reaches the image request. Change any raw character field or reference option and confirm the result becomes stale; Generate must re-optimize before generation. Force optimizer auth, rate-limit, timeout, refusal, and malformed-output failures and confirm image generation is blocked with Retry and no raw fallback.
-- Explicitly disable optimization and confirm direct generation is permitted and clearly indicated. Re-enable it and confirm the prior bypass cannot silently carry forward. After a generated reference is inserted, verify Lucy receives the saved compact prompt, image, and `enhance: true` in the same state replacement.
+- Close and reopen Prompt Workshop. Confirm the current Add, Replace, and Restyle draft remains in tab memory. Reset current intent must warn only when that intent has content and must not clear another intent's draft.
+- In Character Builder, confirm full-body reference framing is the default and framing, orientation, rendering, expression, and background choices are draft-persisted. Generate a valid character and verify optimizer/generator failures block generation with Retry and no raw fallback.
+- After a generated Builder reference is saved, verify Lucy receives the saved compact prompt, image, and `enhance: true` in the same state replacement.
 - Stack Voice Browser over Voice Treatments. Confirm the parent is inert/hidden from assistive technology until the child closes, Escape closes only the child, and focus then returns to the parent before the major overlay can close.
 - Begin closing an overlay and immediately pointer-down/click its backdrop above Record or a stage action. Confirm the exiting backdrop remains mounted for the animation, intercepts the event, and no underlying action fires. Repeat with reduced motion enabled.
 - Inspect modal scrolling at the five target viewports. Sticky modal headers/footers and primary actions must remain reachable, the focus ring must not be clipped, and Escape must still work after scrolling to the end.

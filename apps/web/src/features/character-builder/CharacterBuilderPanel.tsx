@@ -31,6 +31,7 @@ export interface CharacterBuilderPanelProps {
   suggestedCharacterName?: string;
   suggestedImageOnlyCharacterName?: string;
   characterNameLocked?: boolean;
+  editingCharacterName?: string | null;
   onChange: (draft: CharacterTransformDraft, design: GuidedDesignV1) => void;
   onOptionsChange: (options: CharacterReferenceOptions) => void;
   onGenerate: () => void;
@@ -88,6 +89,7 @@ export const CharacterBuilderPanel = ({
   suggestedCharacterName = 'New Character 01',
   suggestedImageOnlyCharacterName = 'Uploaded Character 01',
   characterNameLocked = false,
+  editingCharacterName = null,
   onChange,
   onOptionsChange,
   onGenerate,
@@ -139,8 +141,12 @@ export const CharacterBuilderPanel = ({
           setNamingMode(null);
           onClose();
         }}
-        title="Build Your Character"
-        description="Shape a reusable Lucy 2.5 character. Image generation is optional; your unfinished draft stays on this browser."
+        title={editingCharacterName ? `Edit ${editingCharacterName}` : 'Build Your Character'}
+        description={
+          editingCharacterName
+            ? 'Update this reusable Lucy 2.5 character. Image generation remains optional.'
+            : 'Shape a reusable Lucy 2.5 character. Image generation is optional; your unfinished draft stays on this browser.'
+        }
         placement="fullscreen"
         size="wide"
         bodyMode="contained"
@@ -197,7 +203,7 @@ export const CharacterBuilderPanel = ({
                 if (!saveBlockedReason) setNamingMode('default');
               }}
             >
-              {saveLabel}
+              {editingCharacterName ? 'Save Changes' : saveLabel}
             </Button>
           </div>
         }

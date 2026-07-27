@@ -6,7 +6,9 @@ import {
   type CharacterSaveProgress,
   type CharacterSaveSnapshot,
   type CharacterSaveStage,
+  type CharacterBuilderDraftValueV1,
 } from './useCharacterBuilderController';
+import type { CharacterBuilderTarget } from './characterBuilderPersistence';
 
 export interface CharacterBuilderCoordinatorProps {
   readonly open: boolean;
@@ -22,6 +24,8 @@ export interface CharacterBuilderCoordinatorProps {
     progress: CharacterSaveProgress,
   ) => Promise<void>;
   readonly onDismiss: () => void;
+  readonly target?: CharacterBuilderTarget | undefined;
+  readonly initialValue?: CharacterBuilderDraftValueV1 | undefined;
 }
 
 export const CharacterBuilderCoordinator = ({

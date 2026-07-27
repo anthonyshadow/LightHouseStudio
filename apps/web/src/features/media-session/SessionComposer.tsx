@@ -119,7 +119,7 @@ export const SessionComposer = ({
               disabled={modeLocked}
               title={
                 modeLocked
-                  ? 'Release camera and finish active work before opening Character Workshop.'
+                  ? 'Release camera and finish active work before opening Prompt Workshop.'
                   : undefined
               }
               onClick={onOpenWorkshop}

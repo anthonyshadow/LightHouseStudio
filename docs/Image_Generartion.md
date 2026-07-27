@@ -116,7 +116,7 @@ An optimized request's `optimization.result` must be the complete optimizer resu
 }
 ```
 
-`generator` remains optional. Optimization may instead be `{ "enabled": false }` for the Workshop's explicit non-optimized path. In that case the broker deterministically wraps the raw prompt, selects the size from `options.orientation`, and uses JPEG. Character Builder previews always use the optimized path.
+`generator` remains optional. The HTTP contract still accepts `{ "enabled": false }` for compatibility with older local clients; the broker then deterministically wraps the raw prompt, selects the size from `options.orientation`, and uses JPEG. The current application exposes character reference generation only through Character Builder, whose previews always use the optimized path.
 
 **Broker checks before OpenAI:** The optimizer model/version/hash must still be current, and the broker-produced canonical framing, orientation, size, and quality must match the request and configured quality. A stale or browser-altered contradictory result is rejected before any image call.
 

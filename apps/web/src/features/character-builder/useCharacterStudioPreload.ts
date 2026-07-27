@@ -80,19 +80,28 @@ export const useCharacterStudioPreload = ({
         throw new Error('Character save was cancelled. The resumable draft is unchanged.');
       }
 
-      repository.persistSavedCharacterPrompt({
-        id: characterId,
+      const characterValue = {
         name: snapshot.name,
         prompt: snapshot.prompt,
-        source: 'generator',
-        promptIntent: snapshot.draft ? 'character-transform' : null,
         builderDraft: snapshot.draft,
         guidedDesign: snapshot.design,
-        referenceImageStatus: referenceImage ? 'persisted-reference' : 'prompt-only',
+        referenceImageStatus: referenceImage
+          ? ('persisted-reference' as const)
+          : ('prompt-only' as const),
         referenceImageAssetId: referenceImage?.assetId ?? null,
         uploadedReferenceImageAssetId: snapshot.uploadedReferenceImageAssetId,
         finalReferenceKind: snapshot.finalReferenceKind,
-      });
+      };
+      if (snapshot.saveKind === 'edit') {
+        repository.updateSavedCharacterPrompt(characterId, characterValue);
+      } else {
+        repository.persistSavedCharacterPrompt({
+          id: characterId,
+          ...characterValue,
+          source: 'generator',
+          promptIntent: snapshot.draft ? 'character-transform' : null,
+        });
+      }
       if (stage === 'intent') await progress.markCharacterPersisted();
 
       const preloaded = session.replaceRecipeDraft({
