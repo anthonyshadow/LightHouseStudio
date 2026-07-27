@@ -9,6 +9,7 @@ import {
   AGE_DEFINITIONS,
   APPEARANCE_DEFINITIONS,
   BODY_SHAPE_DEFINITIONS,
+  ETHNICITY_DEFINITIONS,
   GENDER_DEFINITIONS,
   HAIR_COLOR_DEFINITIONS,
   HAIRSTYLE_DEFINITIONS,
@@ -99,7 +100,7 @@ const slugify = (value: string) =>
 const visualPath = (category: ProfileAssetCategory, profile: VisualProfile, slug: string) =>
   `/guided-character/${category}/${profile}/${slug}.webp`;
 
-const sharedVisualPath = (category: 'appearances' | 'skin-tones', slug: string) =>
+const sharedVisualPath = (category: 'appearances' | 'ethnicities' | 'skin-tones', slug: string) =>
   `/guided-character/${category}/shared/${slug}.webp`;
 
 const option = (
@@ -189,6 +190,12 @@ const hairColors = HAIR_COLOR_DEFINITIONS.map(([label, promptFragment, swatch]) 
 
 const sharedAppearances = shared('appearance', SHARED_APPEARANCE_DEFINITIONS, 'appearances');
 
+const ethnicities = ETHNICITY_DEFINITIONS.map(([label, promptFragment, slug]) =>
+  option('ethnicity', 'shared', label, promptFragment, {
+    imageSrc: sharedVisualPath('ethnicities', slug),
+  }),
+);
+
 const skinTones = SKIN_TONE_DEFINITIONS.map(([label, promptFragment, slug]) =>
   option('skinTone', 'shared', label, promptFragment, {
     imageSrc: sharedVisualPath('skin-tones', slug),
@@ -204,6 +211,7 @@ export const VISUAL_CATALOG: readonly VisualCatalogOption[] = [
   ...ages,
   ...appearances,
   ...sharedAppearances,
+  ...ethnicities,
   ...skinTones,
   ...bodyShapes,
   ...hairstyles,
@@ -267,6 +275,7 @@ const starter = (
     gender: null,
     adultAge: null,
     appearance: null,
+    ethnicity: null,
     skinTone: null,
     bodyShape: null,
     hair: null,

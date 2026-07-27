@@ -92,14 +92,9 @@ describe('CharacterBuilderForm', () => {
     render(<BuilderHarness disabled />);
     const before = readSnapshot();
 
-    const starter = within(sectionNamed('Try a demo character')).getByRole('button', {
-      name: /Documentary Presenter/,
-    });
     const adultAge = within(sectionNamed('Adult age')).getAllByRole('button')[0];
-    expect(starter).toBeDisabled();
     expect(adultAge).toBeDisabled();
 
-    await user.click(starter);
     if (adultAge) await user.click(adultAge);
 
     expect(readSnapshot()).toEqual(before);
@@ -110,10 +105,10 @@ describe('CharacterBuilderForm', () => {
     render(<BuilderHarness />);
 
     const categories = [
-      'Try a demo character',
       'Presentation',
       'Adult age',
       'Appearance',
+      'Ethnicity',
       'Skin tone',
       'Body shape',
       'Hairstyle',
@@ -143,19 +138,11 @@ describe('CharacterBuilderForm', () => {
     expect(hairDrawer).not.toHaveAttribute('open');
   });
 
-  it('renders all nine starters and six profile-aware suggestions', async () => {
+  it('hides demo characters and renders six profile-aware suggestions', async () => {
     const user = userEvent.setup();
     render(<BuilderHarness />);
 
-    const demos = within(sectionNamed('Try a demo character'));
-    expect(
-      demos.getByText('Optional: choose any of the nine demos for a complete, editable direction.'),
-    ).toBeInTheDocument();
-    const demoButtons = demos.getAllByRole('button');
-    expect(demoButtons).toHaveLength(9);
-    expect(demoButtons.every((button) => button.getAttribute('aria-pressed') === 'false')).toBe(
-      true,
-    );
+    expect(screen.queryByRole('heading', { name: 'Try a demo character' })).not.toBeInTheDocument();
     const unspecifiedHair = await openSection(user, 'Hairstyle');
     expect(
       unspecifiedHair
@@ -177,39 +164,21 @@ describe('CharacterBuilderForm', () => {
     expect(readSnapshot().draft.gender).toBe('woman');
   });
 
-  it('uses a diverse starter montage until presentation is explicitly selected', async () => {
+  it('uses a diverse preview montage until presentation is explicitly selected', async () => {
     const user = userEvent.setup();
     render(<BuilderHarness />);
 
-    const starters = within(sectionNamed('Try a demo character'));
-    const midnightHost = starters.getByRole('button', { name: /Midnight Host/ });
-    const montage = within(midnightHost).getByRole('img', {
-      name: /Midnight Host, diverse adult presentation montage/i,
+    const montage = screen.getByRole('img', {
+      name: /Character direction preview, diverse adult presentation montage/i,
     });
     expect(
       Array.from(montage.querySelectorAll('img'), (image) => image.getAttribute('src')),
     ).toEqual([
-      '/guided-character/starters/woman/midnight-host.webp',
-      '/guided-character/starters/man/midnight-host.webp',
-      '/guided-character/starters/non-binary/midnight-host.webp',
-      '/guided-character/starters/unspecified/midnight-host.webp',
+      '/guided-character/starters/woman/documentary-presenter.webp',
+      '/guided-character/starters/man/documentary-presenter.webp',
+      '/guided-character/starters/non-binary/documentary-presenter.webp',
+      '/guided-character/starters/unspecified/documentary-presenter.webp',
     ]);
-    expect(
-      screen.getByRole('img', {
-        name: /Character direction preview, diverse adult presentation montage/i,
-      }),
-    ).toContainHTML('/guided-character/starters/woman/documentary-presenter.webp');
-
-    await user.click(midnightHost);
-    expect(readSnapshot()).toMatchObject({
-      draft: { gender: null },
-      design: { choices: { gender: null } },
-    });
-    expect(
-      within(starters.getByRole('button', { name: /Midnight Host/ })).getByRole('img', {
-        name: /diverse adult presentation montage/i,
-      }),
-    ).toBeInTheDocument();
 
     const presentation = await openSection(user, 'Presentation');
     const notSpecified = presentation.getByRole('button', {
@@ -218,15 +187,9 @@ describe('CharacterBuilderForm', () => {
     expect(notSpecified).toHaveAttribute('aria-pressed', 'false');
     await user.click(notSpecified);
 
-    const unspecifiedRepresentative = within(
-      starters.getByRole('button', { name: /Midnight Host/ }),
-    ).getByRole('img', {
-      name: /Midnight Host, Not specified presentation representative adult/i,
-    });
-    expect(unspecifiedRepresentative.querySelectorAll('img')).toHaveLength(1);
-    expect(unspecifiedRepresentative.querySelector('img')).toHaveAttribute(
+    expect(screen.getByAltText('Character direction preview')).toHaveAttribute(
       'src',
-      '/guided-character/starters/unspecified/midnight-host.webp',
+      '/guided-character/starters/unspecified/documentary-presenter.webp',
     );
 
     await user.click(
@@ -235,13 +198,9 @@ describe('CharacterBuilderForm', () => {
       }),
     );
 
-    const representative = within(
-      starters.getByRole('button', { name: /Midnight Host/ }),
-    ).getByRole('img', { name: /Midnight Host, Woman presentation representative adult/i });
-    expect(representative.querySelectorAll('img')).toHaveLength(1);
-    expect(representative.querySelector('img')).toHaveAttribute(
+    expect(screen.getByAltText('Character direction preview')).toHaveAttribute(
       'src',
-      '/guided-character/starters/woman/midnight-host.webp',
+      '/guided-character/starters/woman/documentary-presenter.webp',
     );
   });
 
@@ -270,24 +229,9 @@ describe('CharacterBuilderForm', () => {
     ).toBeInTheDocument();
   });
 
-  it('unselects a starter, presentation, or visual option when it is clicked again', async () => {
+  it('unselects a presentation or visual option when it is clicked again', async () => {
     const user = userEvent.setup();
     render(<BuilderHarness />);
-
-    const starter = within(sectionNamed('Try a demo character')).getByRole('button', {
-      name: /Documentary Presenter/,
-    });
-    await user.click(starter);
-    expect(starter).toHaveAttribute('aria-pressed', 'true');
-    expect(readSnapshot().design.starterId).toBe('documentary-presenter');
-    const starterAdultAge = readSnapshot().design.choices.adultAge;
-
-    await user.click(starter);
-    expect(starter).toHaveAttribute('aria-pressed', 'false');
-    expect(readSnapshot().design).toMatchObject({
-      starterId: null,
-      choices: { adultAge: starterAdultAge },
-    });
 
     const presentation = await openSection(user, 'Presentation');
     const woman = presentation.getByRole('button', { name: /Woman representative/ });
@@ -302,6 +246,7 @@ describe('CharacterBuilderForm', () => {
 
     const appearance = await openSection(user, 'Appearance');
     const natural = appearance.getByRole('button', { name: /^Natural/u });
+    await user.click(natural);
     expect(natural).toHaveAttribute('aria-pressed', 'true');
     await user.click(natural);
     expect(natural).toHaveAttribute('aria-pressed', 'false');
@@ -394,6 +339,7 @@ describe('CharacterBuilderForm', () => {
     render(<BuilderHarness />);
     const categories = [
       ['Appearance', 'appearance', 'Describe the appearance you want'],
+      ['Ethnicity', 'ethnicity', 'Describe the ethnicity or heritage you want'],
       ['Skin tone', 'skinTone', 'Describe the skin tone you want'],
       ['Body shape', 'bodyShape', 'Describe the body shape you want'],
       ['Hairstyle', 'hair', 'Describe the hairstyle you want'],
@@ -419,12 +365,17 @@ describe('CharacterBuilderForm', () => {
     }
   }, 20_000);
 
-  it('stores skin tone independently from general appearance', async () => {
+  it('stores ethnicity and skin tone independently from general appearance', async () => {
     const user = userEvent.setup();
     render(<BuilderHarness />);
 
     await user.click(
       (await openSection(user, 'Appearance')).getByRole('button', { name: 'Natural' }),
+    );
+    await user.click(
+      (await openSection(user, 'Ethnicity')).getByRole('button', {
+        name: 'Black / African diaspora',
+      }),
     );
     await user.click(
       (await openSection(user, 'Skin tone')).getByRole('button', { name: 'Medium brown' }),
@@ -433,11 +384,13 @@ describe('CharacterBuilderForm', () => {
     expect(readSnapshot()).toMatchObject({
       draft: {
         appearance: 'natural adult appearance with understated grooming',
+        ethnicity: 'Black or African diaspora',
         skinTone: 'medium brown skin tone',
       },
       design: {
         choices: {
           appearance: { optionId: 'unspecified.appearance.natural' },
+          ethnicity: { optionId: 'shared.ethnicity.black-african-diaspora' },
           skinTone: { optionId: 'shared.skinTone.medium-brown' },
         },
       },

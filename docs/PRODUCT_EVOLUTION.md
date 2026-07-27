@@ -58,9 +58,9 @@ Covered by: realtime snapshot tests for normalization, image-only behavior, pend
 
 ### Character direction is visual, gender-aware, and still open-ended
 
-The structured Character transform gives Skin Tone, Body Shape, and Hair Color their own canonical fields alongside Gender, Adult Age, Appearance, Hair, Outfit, Accessories, Expression, and Mood. Studio exposes every field without removing the existing Workshop controls or presets.
+The structured Character transform gives Ethnicity, Skin Tone, Body Shape, and Hair Color their own canonical fields alongside Gender, Adult Age, Appearance, Hair, Outfit, Accessories, Expression, and Mood. Ethnicity is optional and self-described, uses representative portraits without defining complexion, and remains independent of Skin Tone. Studio exposes every field without removing the existing Workshop controls or presets.
 
-The fullscreen builder uses nine illustrated starters and presentation-aware visual catalogs for Woman, Man, Non-binary, and Not specified. Applicable categories show tailored suggestions, while fixed enums retain their true cardinality. Hair color remains independent of hairstyle, shared skin tones are never gender-filtered, Show All exposes cross-profile options, and Describe My Own preserves text outside the catalog. Changing presentation recomputes recommendations but pins an existing out-of-suggestion choice instead of deleting it.
+The fullscreen builder retains nine illustrated starter definitions for legacy hydration and preview fallback, but the demo picker is currently hidden. Presentation-aware visual catalogs remain available for Woman, Man, Non-binary, and Not specified. Applicable categories show tailored suggestions, while fixed enums retain their true cardinality. Hair color remains independent of hairstyle; shared ethnicity and skin-tone choices are never gender-filtered; Show All exposes the full catalog; and Describe My Own preserves text outside the catalog. Changing presentation recomputes recommendations but pins an existing out-of-suggestion choice instead of deleting it.
 
 Why it fits: creators can make fast visual decisions without turning gender into a restriction or losing the precision of free-form direction.
 

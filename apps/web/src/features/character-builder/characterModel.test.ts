@@ -11,6 +11,7 @@ describe('guided character model hydration', () => {
       adultAge: 'middle-aged-adult' as const,
       characterBase: 'Documentary Presenter, investigative host',
       appearance: 'freckled with a completely custom grooming direction',
+      ethnicity: 'Caribbean and East Asian mixed heritage',
       skinTone: 'warm umber with golden undertones',
       bodyShape: 'strong pear-shaped silhouette',
       hair: 'waist-length spiral curls with a side sweep',
@@ -31,6 +32,7 @@ describe('guided character model hydration', () => {
         gender: { optionId: 'shared.gender.woman' },
         adultAge: { optionId: 'shared.adultAge.middle-aged-adult' },
         appearance: { optionId: 'custom', customValue: draft.appearance },
+        ethnicity: { optionId: 'custom', customValue: draft.ethnicity },
         skinTone: { optionId: 'custom', customValue: draft.skinTone },
         bodyShape: { optionId: 'custom', customValue: draft.bodyShape },
         hair: { optionId: 'custom', customValue: draft.hair },
@@ -47,6 +49,7 @@ describe('guided character model hydration', () => {
 
     const roundTripped = buildCanonicalCharacterDraft(design, draft);
     expect(roundTripped).toMatchObject({
+      ethnicity: draft.ethnicity,
       skinTone: draft.skinTone,
       bodyShape: draft.bodyShape,
       hair: draft.hair,

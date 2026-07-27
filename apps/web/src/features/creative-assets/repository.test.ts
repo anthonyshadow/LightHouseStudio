@@ -43,6 +43,7 @@ const guidedDesign = (): GuidedDesignV1 => ({
     gender: { optionId: 'woman' },
     adultAge: { optionId: 'adult' },
     appearance: null,
+    ethnicity: null,
     skinTone: null,
     bodyShape: { optionId: 'woman-athletic' },
     hair: { optionId: 'woman-long-waves' },

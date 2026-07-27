@@ -35,6 +35,7 @@ const guidedDesign = (): GuidedDesignV1 => ({
     gender: { optionId: 'woman' },
     adultAge: { optionId: 'adult' },
     appearance: null,
+    ethnicity: null,
     skinTone: null,
     bodyShape: { optionId: 'woman-athletic' },
     hair: { optionId: 'woman-long-waves' },
@@ -50,9 +51,10 @@ const guidedDesign = (): GuidedDesignV1 => ({
 });
 
 describe('sanitizeGuidedDesignV1', () => {
-  it('normalizes the canonical limits and migrates a missing legacy skin tone', () => {
+  it('normalizes canonical limits and migrates missing legacy identity fields', () => {
     const design = guidedDesign();
     const choices = { ...design.choices } as Record<string, unknown>;
+    delete choices.ethnicity;
     delete choices.skinTone;
 
     expect(
@@ -67,6 +69,7 @@ describe('sanitizeGuidedDesignV1', () => {
     ).toMatchObject({
       starterId: 'documentary-presenter',
       choices: {
+        ethnicity: null,
         skinTone: null,
         hairColor: { optionId: 'custom', customValue: 'deep auburn' },
       },
@@ -688,6 +691,7 @@ describe('creative asset sanitation and recovery', () => {
       finalReferenceKind: 'generated',
       guidedDesign: null,
       builderDraft: {
+        ethnicity: '',
         skinTone: '',
         bodyShape: '',
         hair: 'long waves with black hair',

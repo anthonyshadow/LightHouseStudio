@@ -96,6 +96,7 @@ const SEEDED_SHELF = {
         characterBase: 'documentary field presenter',
         matchReference: false,
         appearance: 'natural editorial complexion',
+        ethnicity: '',
         skinTone: '',
         bodyShape: '',
         hair: '',

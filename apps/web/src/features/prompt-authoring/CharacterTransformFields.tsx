@@ -122,6 +122,13 @@ export const CharacterTransformFields = ({
             onChange={(event) => changeCharacter({ appearance: promptValueFrom(event) })}
           />
           <TextField
+            label="Ethnicity"
+            placeholder="Self-described ethnicity or heritage…"
+            value={draft.ethnicity}
+            maxLength={220}
+            onChange={(event) => changeCharacter({ ethnicity: promptValueFrom(event) })}
+          />
+          <TextField
             label="Skin tone"
             placeholder="Deep, medium brown, olive, light…"
             value={draft.skinTone}

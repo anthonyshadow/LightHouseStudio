@@ -96,7 +96,8 @@ const sanitizeGuidedChoice = (value: unknown): GuidedChoiceValue | null | undefi
 
 /**
  * Canonical allowlist parser for guided-design provenance persisted by every browser store.
- * Missing `skinTone` is the sole legacy shape accepted; all other choices must be explicit.
+ * Missing newly introduced first-class choices are accepted as unselected so older
+ * guided designs remain loadable.
  */
 export const sanitizeGuidedDesignV1 = (value: unknown): GuidedDesignV1 | null => {
   if (!isRecord(value) || value.catalogVersion !== 1 || !isRecord(value.choices)) return null;
@@ -107,7 +108,9 @@ export const sanitizeGuidedDesignV1 = (value: unknown): GuidedDesignV1 | null =>
   for (const key of GUIDED_CHOICE_KEYS) {
     const storedChoice = value.choices[key];
     const choice =
-      key === 'skinTone' && storedChoice === undefined ? null : sanitizeGuidedChoice(storedChoice);
+      (key === 'ethnicity' || key === 'skinTone') && storedChoice === undefined
+        ? null
+        : sanitizeGuidedChoice(storedChoice);
     if (choice === undefined) return null;
     choices[key] = choice;
   }

@@ -13,6 +13,7 @@ export type ProfileAssetCategory =
   | 'appearances'
   | 'backgrounds'
   | 'body-shapes'
+  | 'ethnicities'
   | 'expressions'
   | 'hairstyles'
   | 'moods'
@@ -238,6 +239,26 @@ export const SKIN_TONE_DEFINITIONS: readonly (readonly [
   ['Olive / tan', 'olive or tan skin tone', 'olive-tan'],
   ['Light-medium', 'light-medium skin tone', 'light-medium'],
   ['Light', 'light skin tone', 'light'],
+];
+
+export const ETHNICITY_DEFINITIONS: readonly (readonly [
+  label: string,
+  promptFragment: string,
+  slug: string,
+])[] = [
+  ['Black / African diaspora', 'Black or African diaspora', 'black-african-diaspora'],
+  ['East Asian', 'East Asian', 'east-asian'],
+  ['South Asian', 'South Asian', 'south-asian'],
+  ['Southeast Asian', 'Southeast Asian', 'southeast-asian'],
+  [
+    'Middle Eastern / North African',
+    'Middle Eastern or North African',
+    'middle-eastern-north-african',
+  ],
+  ['Latino / Hispanic', 'Latino or Hispanic', 'latino-hispanic'],
+  ['Indigenous', 'Indigenous', 'indigenous'],
+  ['White / European', 'White or European', 'white-european'],
+  ['Multiracial / mixed heritage', 'multiracial or mixed heritage', 'multiracial-mixed-heritage'],
 ];
 
 export const SHARED_SEMANTIC_DEFINITIONS: readonly (readonly [

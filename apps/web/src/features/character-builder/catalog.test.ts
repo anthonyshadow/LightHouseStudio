@@ -34,6 +34,7 @@ describe('guided character visual catalog', () => {
   it.each(profiles)('offers six suggestions for every open-ended category for %s', (profile) => {
     for (const category of [
       'appearance',
+      'ethnicity',
       'skinTone',
       'bodyShape',
       'hair',
@@ -56,6 +57,7 @@ describe('guided character visual catalog', () => {
       for (const category of [
         'adultAge',
         'appearance',
+        'ethnicity',
         'skinTone',
         'bodyShape',
         'hair',
@@ -151,6 +153,29 @@ describe('guided character visual catalog', () => {
       expect(choices.map((choice) => choice.label)).toEqual(expected);
       expect(choices.every((choice) => choice.profile === 'shared')).toBe(true);
       expect(choices.every((choice) => choice.imageSrc.endsWith('.webp'))).toBe(true);
+    }
+  });
+
+  it('offers nine shared ethnicity directions with local representative portraits', () => {
+    const expected = [
+      'Black / African diaspora',
+      'East Asian',
+      'South Asian',
+      'Southeast Asian',
+      'Middle Eastern / North African',
+      'Latino / Hispanic',
+      'Indigenous',
+      'White / European',
+      'Multiracial / mixed heritage',
+    ];
+    const choices = getAllOptionsGroupedByProfile('ethnicity').shared;
+    expect(choices.map((choice) => choice.label)).toEqual(expected);
+    expect(choices.every((choice) => choice.profile === 'shared')).toBe(true);
+    expect(
+      choices.every((choice) => choice.imageSrc.startsWith('/guided-character/ethnicities/')),
+    ).toBe(true);
+    for (const profile of profiles) {
+      expect(getSuggestedOptions('ethnicity', profile)).toEqual(choices.slice(0, 6));
     }
   });
 

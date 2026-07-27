@@ -20,6 +20,7 @@ describe('structured prompt generation', () => {
       characterBase: 'lunar cartographer',
       bodyShape: 'athletic build',
       matchReference: true,
+      ethnicity: 'South Asian',
       skinTone: 'medium brown',
       hair: 'long waves',
       hairColor: 'auburn',
@@ -29,7 +30,7 @@ describe('structured prompt generation', () => {
     const result = generateStructuredPrompt(draft, { hasReferenceImage: true });
     expect(result.validation.valid).toBe(true);
     expect(result.prompt).toBe(
-      'Substitute the character in the video with older adult woman lunar cartographer. Body shape: athletic build. Match the provided portrait reference. Skin tone: medium brown. Hair: long waves, auburn. Outfit: indigo utility suit. Preserve: hand gestures.',
+      'Substitute the character in the video with older adult woman lunar cartographer. Body shape: athletic build. Match the provided portrait reference. Ethnicity: South Asian. Skin tone: medium brown. Hair: long waves, auburn. Outfit: indigo utility suit. Preserve: hand gestures.',
     );
     expect(result.prompt).not.toContain('Appearance:');
   });
@@ -172,6 +173,7 @@ describe('structured prompt validation', () => {
     expect(sanitized).toMatchObject({
       intent: 'character-transform',
       characterBase: 'archivist',
+      ethnicity: '',
       skinTone: '',
       bodyShape: '',
       hair: 'short black hair',

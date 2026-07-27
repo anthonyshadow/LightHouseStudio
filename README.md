@@ -20,8 +20,8 @@ selects **Take**.
 - Separate `lucy-2.5` character and `lucy-vton-3` try-on sessions
 - Draft-versus-applied realtime recipes with atomic Apply, Revert, and Reset
 - JPEG, PNG, and WebP reference images up to and including 10 MiB; Character Builder uploads also enforce a 40-megapixel decoded-image limit
-- A four-intent structured character prompt workshop with adult-only age, gender, skin-tone, body-shape, hairstyle, and hair-color direction
-- Gender-aware visual suggestions, nine character starters, Show All catalogs, and custom text for directions outside the catalog
+- A four-intent structured character prompt workshop with adult-only age, gender, ethnicity, skin-tone, body-shape, hairstyle, and hair-color direction
+- Gender-aware visual suggestions, Show All catalogs, and custom text for directions outside the catalog; nine starter definitions remain available internally while the demo picker is hidden
 - Optional, automatically optimized OpenAI `gpt-image-2`, BFL `flux-2-pro`, or Wiro ByteDance `seedream-v5-lite-uncensored` previews, durable local uploads, source-image composition, and instructed editing
 - A versioned Recipe Shelf v4 for saved, recent, and restorable character prompts with reference provenance and optional guided-design provenance
 - Browser recording with transformed-video gating and provider-audio/microphone fallback

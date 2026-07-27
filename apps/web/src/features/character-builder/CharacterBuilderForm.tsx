@@ -68,6 +68,10 @@ const profileLabels: Readonly<Record<VisualProfile, string>> = {
   unspecified: 'Not specified',
 };
 
+// The demo-character picker is intentionally paused. Keep the implementation
+// wired so existing starter-backed drafts still hydrate and the section can be restored easily.
+const SHOW_DEMO_CHARACTERS = false;
+
 const starterArtworkStyles = (montage: boolean): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: montage ? 'repeat(2, minmax(0, 1fr))' : '1fr',
@@ -224,39 +228,41 @@ export const CharacterBuilderForm = ({
       >
         {referenceUpload}
       </CharacterChoiceDrawer>
-      <CharacterChoiceDrawer
-        id="character-starters"
-        title="Try a demo character"
-        description="Optional: choose any of the nine demos for a complete, editable direction."
-        currentLabel={selectedStarter?.label}
-        defaultOpen
-      >
-        <div css={starterGridStyles(theme)}>
-          {CHARACTER_STARTERS.map((starter) => {
-            const selected = starter.id === design.starterId;
-            return (
-              <button
-                key={starter.id}
-                type="button"
-                aria-pressed={selected}
-                disabled={disabled}
-                css={starterCardStyles(theme, selected)}
-                onClick={() => selectStarter(starter)}
-              >
-                <StarterArtwork
-                  starter={starter}
-                  profile={profile}
-                  hasExplicitPresentation={hasExplicitPresentation}
-                />
-                <span css={starterCopyStyles(theme)}>
-                  <strong>{starter.label}</strong>
-                  <span>{starter.description}</span>
-                </span>
-              </button>
-            );
-          })}
-        </div>
-      </CharacterChoiceDrawer>
+      {SHOW_DEMO_CHARACTERS ? (
+        <CharacterChoiceDrawer
+          id="character-starters"
+          title="Try a demo character"
+          description="Optional: choose any of the nine demos for a complete, editable direction."
+          currentLabel={selectedStarter?.label}
+          defaultOpen
+        >
+          <div css={starterGridStyles(theme)}>
+            {CHARACTER_STARTERS.map((starter) => {
+              const selected = starter.id === design.starterId;
+              return (
+                <button
+                  key={starter.id}
+                  type="button"
+                  aria-pressed={selected}
+                  disabled={disabled}
+                  css={starterCardStyles(theme, selected)}
+                  onClick={() => selectStarter(starter)}
+                >
+                  <StarterArtwork
+                    starter={starter}
+                    profile={profile}
+                    hasExplicitPresentation={hasExplicitPresentation}
+                  />
+                  <span css={starterCopyStyles(theme)}>
+                    <strong>{starter.label}</strong>
+                    <span>{starter.description}</span>
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </CharacterChoiceDrawer>
+      ) : null}
 
       <CharacterChoiceDrawer
         id="character-gender"

@@ -76,6 +76,13 @@ export const EDITABLE_CHARACTER_CATEGORIES: readonly {
     customLabel: 'Describe the appearance you want',
   },
   {
+    category: 'ethnicity',
+    title: 'Ethnicity',
+    description:
+      'Representative portraits are visual examples only. Identity is self-described and independent of skin tone.',
+    customLabel: 'Describe the ethnicity or heritage you want',
+  },
+  {
     category: 'skinTone',
     title: 'Skin tone',
     description: 'Shared visual suggestions remain available for every gender presentation.',
@@ -147,6 +154,7 @@ const emptyChoices = (): GuidedDesignV1['choices'] => ({
   gender: null,
   adultAge: null,
   appearance: null,
+  ethnicity: null,
   skinTone: null,
   bodyShape: null,
   hair: null,
@@ -233,6 +241,7 @@ export const createGuidedDesignFromDraft = (draft: CharacterTransformDraft): Gui
       },
       adultAge: ageChoiceFromDraft(draft.adultAge),
       appearance: choiceFromCanonicalText('appearance', profile, draft.appearance),
+      ethnicity: choiceFromCanonicalText('ethnicity', profile, draft.ethnicity),
       skinTone: choiceFromCanonicalText('skinTone', profile, draft.skinTone),
       bodyShape: choiceFromCanonicalText('bodyShape', profile, draft.bodyShape),
       hair: choiceFromCanonicalText('hair', profile, draft.hair),
@@ -332,6 +341,7 @@ export const buildCanonicalCharacterDraft = (
     gender,
     characterBase: [starter?.label, role].filter(Boolean).join(', '),
     appearance: choiceText(design, 'appearance', profile),
+    ethnicity: choiceText(design, 'ethnicity', profile),
     skinTone: choiceText(design, 'skinTone', profile),
     bodyShape: choiceText(design, 'bodyShape', profile),
     hair: choiceText(design, 'hair', profile),

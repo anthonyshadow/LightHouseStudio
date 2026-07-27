@@ -13,12 +13,14 @@ const openBuilder = async (page: Page): Promise<void> => {
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
 };
 
-const chooseDocumentaryPresenter = async (page: Page): Promise<void> => {
-  await page
-    .getByRole('button', { name: /Documentary Presenter/u })
-    .first()
-    .click();
-  await expect(page.getByRole('button', { name: 'Save Character' })).toBeEnabled();
+const chooseAdultCharacterDirection = async (
+  page: Page,
+  expectSaveEnabled = true,
+): Promise<void> => {
+  await page.getByRole('button', { name: 'Adult', exact: true }).click();
+  if (expectSaveEnabled) {
+    await expect(page.getByRole('button', { name: 'Save Character' })).toBeEnabled();
+  }
 };
 
 const confirmCharacterName = async (
@@ -112,26 +114,17 @@ test('direction preview is last on narrow screens and remains beside the form on
   expect(narrowPreview.top).toBeGreaterThanOrEqual(narrowFinal.bottom);
 });
 
-test('a demo character is optional for preview generation and save', async ({ page }) => {
+test('the hidden demo section is not required for preview generation and save', async ({
+  page,
+}) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
   await openBuilder(page);
 
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
-  const demos = dialog.locator('section[aria-labelledby="character-starters-heading"]');
-  await expect(demos.getByRole('heading', { name: 'Try a demo character' })).toBeVisible();
-  await expect(
-    demos.getByText('Optional: choose any of the nine demos for a complete, editable direction.'),
-  ).toBeVisible();
-  expect(
-    await demos
-      .getByRole('button')
-      .evaluateAll((buttons) =>
-        buttons.every((button) => button.getAttribute('aria-pressed') === 'false'),
-      ),
-  ).toBe(true);
+  await expect(dialog.getByRole('heading', { name: 'Try a demo character' })).toHaveCount(0);
 
-  await dialog.getByRole('button', { name: 'Adult', exact: true }).click();
+  await chooseAdultCharacterDirection(page);
   await expect(dialog.getByRole('button', { name: 'Save Character' })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Generate Preview' }).click();
   await expect(dialog.getByText('This preview matches the current character.')).toBeVisible();
@@ -166,7 +159,7 @@ test('prompt-only save performs no image request and immediately preloads the Do
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
   await openBuilder(page);
-  await chooseDocumentaryPresenter(page);
+  await chooseAdultCharacterDirection(page);
 
   await page.getByRole('button', { name: 'Save Character' }).evaluate((button) => {
     if (!(button instanceof HTMLButtonElement)) throw new Error('Save Character is not a button.');
@@ -227,7 +220,7 @@ test('using a saved character recipe selects it for the next Start AI action', a
   await installSuccessfulStudioHarness(page);
   await page.goto('/');
   await openBuilder(page);
-  await chooseDocumentaryPresenter(page);
+  await chooseAdultCharacterDirection(page);
   await page.getByRole('button', { name: 'Save Character', exact: true }).click();
   await confirmCharacterName(page, 'Shelf Field Host');
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
@@ -395,7 +388,7 @@ test('prompt plus upload saves the uploaded source directly with enhancement off
     buffer: REFERENCE_PNG,
   });
   await expect(dialog.getByAltText('Current uploaded character reference')).toBeVisible();
-  await chooseDocumentaryPresenter(page);
+  await chooseAdultCharacterDirection(page);
   await dialog.getByRole('button', { name: 'Save Character', exact: true }).click();
   await confirmCharacterName(page, 'Direct Source Presenter');
   await expect(dialog).toBeHidden();
@@ -494,7 +487,7 @@ test('combined preview composes from the immutable upload and preloads the gener
     buffer: REFERENCE_PNG,
   });
   await expect(dialog.getByAltText('Current uploaded character reference')).toBeVisible();
-  await chooseDocumentaryPresenter(page);
+  await chooseAdultCharacterDirection(page);
 
   await dialog.getByRole('button', { name: 'Generate Combined Preview' }).click();
   await expect(dialog.getByText('This preview matches the current character.')).toBeVisible();
@@ -536,7 +529,7 @@ test('Generate Preview always optimizes, and stale form edits detach the image f
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
   await openBuilder(page);
-  await chooseDocumentaryPresenter(page);
+  await chooseAdultCharacterDirection(page);
 
   await page.getByRole('button', { name: 'Generate Preview' }).click();
   await expect(page.getByText('This preview matches the current character.')).toBeVisible();
@@ -568,7 +561,7 @@ test('image-backed save preserves the exact generated asset and optimized Lucy p
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
   await openBuilder(page);
-  await chooseDocumentaryPresenter(page);
+  await chooseAdultCharacterDirection(page);
   await page.getByRole('button', { name: 'Generate Preview' }).click();
   await expect(page.getByText('This preview matches the current character.')).toBeVisible();
 
@@ -635,7 +628,7 @@ test('regeneration distinguishes a fresh image from an instructed source-image e
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
   await openBuilder(page);
-  await chooseDocumentaryPresenter(page);
+  await chooseAdultCharacterDirection(page);
   await page.getByRole('button', { name: 'Generate Preview' }).click();
   await expect(page.getByText('This preview matches the current character.')).toBeVisible();
   const originalAssetId = network.referenceImageGenerations[0]?.assetId;
@@ -666,7 +659,7 @@ test('drafts survive close and reload, while Reset Draft starts fresh', async ({
   await installSuccessfulStudioHarness(page);
   await page.goto('/');
   await openBuilder(page);
-  await chooseDocumentaryPresenter(page);
+  await chooseAdultCharacterDirection(page);
   await openConstraints(page);
   await page.getByLabel('Optional Custom Constraints').fill('Use a copper lapel pin.');
   await page.getByRole('button', { name: 'Close character builder' }).click();
@@ -698,10 +691,7 @@ test('unfinished Shelf edits block character Save without blocking builder editi
   await shelf.getByRole('button', { name: 'Close creative tool' }).click();
 
   await openBuilder(page);
-  await page
-    .getByRole('button', { name: /Documentary Presenter/u })
-    .first()
-    .click();
+  await chooseAdultCharacterDirection(page, false);
   const save = page.getByRole('button', { name: 'Save Character', exact: true });
   await expect(save).toHaveAttribute('aria-disabled', 'true');
   await expect(

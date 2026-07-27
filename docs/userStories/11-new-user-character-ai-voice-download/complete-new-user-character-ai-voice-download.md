@@ -13,7 +13,7 @@ The Studio header exposes a character selector labelled **Character: None Select
 ## Character-builder flow
 
 1. Open the header character selector and choose **Create new character**.
-2. Optionally upload a reference in the first **Reference image** drawer, try a demo character, or build a direction from the identity and detailed visual controls.
+2. Optionally upload a reference in the first **Reference image** drawer or build a direction from the identity and detailed visual controls. The retained demo-character catalog is not currently shown. **Ethnicity** is an optional self-described direction with representative portraits and custom text, independent of **Skin tone**.
 3. Choose a local-only save path (prompt-only, prompt plus uploaded image, or **Save & Use Image Only**) or select **Generate Preview**. With an upload, the action becomes **Generate Combined Preview**.
 4. Name and save the current valid character/reference combination.
 5. Continue in Studio with the character already selected and preloaded in Lucy 2.5.

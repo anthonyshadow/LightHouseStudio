@@ -24,6 +24,7 @@ export const GUIDED_CHOICE_KEYS = [
   'gender',
   'adultAge',
   'appearance',
+  'ethnicity',
   'skinTone',
   'bodyShape',
   'hair',

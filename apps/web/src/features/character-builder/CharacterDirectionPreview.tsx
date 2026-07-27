@@ -205,8 +205,8 @@ export const CharacterDirectionPreview = ({
           <dd>{starterLabel}</dd>
           <dt>Canonical fields</dt>
           <dd>
-            Role, appearance, skin tone, body shape, hair, color, outfit, expression, mood, and
-            constraints
+            Role, appearance, ethnicity, skin tone, body shape, hair, color, outfit, expression,
+            mood, and constraints
           </dd>
         </dl>
       </details>
