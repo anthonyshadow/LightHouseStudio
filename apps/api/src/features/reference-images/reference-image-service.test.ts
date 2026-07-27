@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import sharp from 'sharp';
 import type {
   CharacterPromptOptimizationResult,
   OptimizeCharacterReferencePromptRequest,
@@ -175,19 +176,19 @@ describe('ReferenceImageService prompt optimization', () => {
     expect(generate).toHaveBeenCalledOnce();
   });
 
-  it('rejects optimizer settings that contradict validated framing or orientation', async () => {
+  it('normalizes model-selected settings to validated app-owned options', async () => {
     const promptOptimizer: CharacterPromptOptimizer = {
-      model: 'gpt-5.6',
+      model: 'gpt-5-nano',
       version: 'lucy-character-reference-v1',
       optimize: () =>
         Promise.resolve({
           ...result,
           recommendedSettings: {
-            framing: 'full_body',
+            framing: 'head_and_shoulders',
             orientation: 'portrait',
             size: '1024x1536',
-            quality: 'high',
-            format: 'jpeg',
+            quality: 'medium',
+            format: 'webp',
           },
         }),
     };
@@ -195,9 +196,27 @@ describe('ReferenceImageService prompt optimization', () => {
       optimizer: promptOptimizer,
     });
 
-    await expect(service.optimize(input)).rejects.toMatchObject({
-      name: 'CharacterPromptOptimizerError',
-      reason: 'invalid-response',
+    await expect(
+      service.optimize({
+        ...input,
+        options: {
+          ...input.options,
+          framing: 'full_body',
+          orientation: 'auto',
+        },
+      }),
+    ).resolves.toMatchObject({
+      model: 'gpt-5-nano',
+      result: {
+        optimizedImagePrompt: result.optimizedImagePrompt,
+        recommendedSettings: {
+          framing: 'full_body',
+          orientation: 'landscape',
+          size: '1536x1024',
+          quality: 'high',
+          format: 'webp',
+        },
+      },
     });
   });
 
@@ -215,5 +234,61 @@ describe('ReferenceImageService prompt optimization', () => {
     await expect(service.optimize(input)).resolves.toMatchObject({
       result: { recommendedSettings: { quality: 'medium' } },
     });
+  });
+
+  it('runs provider artifact cleanup only after the local persistence attempt settles', async () => {
+    const generatedBytes = await sharp({
+      create: { width: 1024, height: 1024, channels: 3, background: '#49637a' },
+    })
+      .jpeg()
+      .toBuffer();
+    const cleanupRemoteArtifacts = vi.fn().mockResolvedValue(undefined);
+    let rejectStore: ((error: Error) => void) | undefined;
+    const store = vi.fn(
+      () =>
+        new Promise<never>((_resolve, reject) => {
+          rejectStore = reject;
+        }),
+    );
+    const service = new ReferenceImageService(
+      {
+        descriptor: {
+          providerId: 'wiro',
+          modelId: 'seedream-v5-lite-uncensored',
+          adapterVersion: 'wiro-seedream-v5-lite-v1',
+          effectiveSettings: {
+            owner: 'ByteDance',
+            resolution: '2k',
+            maxImages: 1,
+            watermark: false,
+          },
+        },
+        generate: () =>
+          Promise.resolve({
+            bytes: generatedBytes,
+            mimeType: 'image/jpeg',
+            providerId: 'wiro',
+            modelId: 'seedream-v5-lite-uncensored',
+            providerRequestId: 'task-one',
+            cleanupRemoteArtifacts,
+          }),
+      },
+      { ...unusedStore, store },
+    );
+
+    const pending = service.generate({
+      localOwnerId: 'a'.repeat(64),
+      requestId: '59014ddf-261a-4a80-b84b-53c65a21a285',
+      rawPrompt: 'A patient cartographer.',
+      options: input.options,
+      optimization: { enabled: false },
+    });
+    await vi.waitFor(() => expect(store).toHaveBeenCalledOnce());
+    expect(cleanupRemoteArtifacts).not.toHaveBeenCalled();
+
+    rejectStore?.(new Error('local store failed'));
+
+    await expect(pending).rejects.toThrow('local store failed');
+    expect(cleanupRemoteArtifacts).toHaveBeenCalledOnce();
   });
 });

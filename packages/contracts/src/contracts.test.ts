@@ -317,6 +317,13 @@ describe('reference image contracts', () => {
     expect(
       referenceImageAssetSchema.parse({
         ...metadata,
+        provider: 'wiro',
+        model: 'seedream-v5-lite-uncensored',
+      }),
+    ).toMatchObject({ provider: 'wiro', model: 'seedream-v5-lite-uncensored' });
+    expect(
+      referenceImageAssetSchema.parse({
+        ...metadata,
         derivation: {
           kind: 'edit',
           sourceAssetId: '7bf5e842-3cfe-4c5d-b945-a6ead02a3f01',

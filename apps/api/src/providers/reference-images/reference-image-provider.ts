@@ -1,6 +1,6 @@
 import type { CharacterPromptOptimizationResult, ReferenceImageSize } from '@studio/contracts';
 
-export type ReferenceImageProviderId = 'openai' | 'bfl';
+export type ReferenceImageProviderId = 'openai' | 'bfl' | 'wiro';
 export type ReferenceImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
 export type ReferenceImageProviderStage = 'submission' | 'polling' | 'download';
 
@@ -18,6 +18,11 @@ export interface GeneratedReferenceImagePayload {
   readonly modelId: string;
   readonly providerRequestId?: string;
   readonly safeUsage?: Readonly<Record<string, number>>;
+  /**
+   * Best-effort cleanup for provider-hosted input/output artifacts. The service
+   * invokes this only after the local persistence attempt has settled.
+   */
+  readonly cleanupRemoteArtifacts?: () => Promise<void>;
 }
 
 export interface GenerateReferenceImageProviderInput {

@@ -30,6 +30,8 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   bflSafetyTolerance: 4,
   bflDisablePromptUpsampling: true,
   bflReferenceImageTimeoutMs: 1_000,
+  wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
+  wiroReferenceImageTimeoutMs: 1_000,
   lightframeDataDir: './.lightframe-data-test',
   ...overrides,
 });

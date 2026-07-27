@@ -5,6 +5,7 @@ import {
   DEFAULT_LIGHTFRAME_DATA_DIR,
   DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS,
   DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
+  DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
   EnvironmentValidationError,
   parseEnvironment,
   resolveLightframeDataDirectory,
@@ -32,6 +33,8 @@ describe('parseEnvironment', () => {
       bflSafetyTolerance: 4,
       bflDisablePromptUpsampling: true,
       bflReferenceImageTimeoutMs: DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
+      wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
+      wiroReferenceImageTimeoutMs: DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
     });
   });
 
@@ -54,6 +57,10 @@ describe('parseEnvironment', () => {
         BFL_SAFETY_TOLERANCE: '3',
         BFL_DISABLE_PROMPT_UPSAMPLING: 'false',
         BFL_REFERENCE_IMAGE_TIMEOUT_MS: '140000',
+        WIRO_API_KEY: ' wiro-key-placeholder ',
+        WIRO_API_SECRET: ' wiro-secret-placeholder ',
+        WIRO_REFERENCE_IMAGE_MODEL: ' seedream-v5-lite-uncensored ',
+        WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '170000',
         ELEVENLABS_API_KEY: '  eleven-placeholder  ',
         ELEVENLABS_STS_MODEL_ID: ' custom-sts ',
         ELEVENLABS_ENABLE_LOGGING: 'false',
@@ -76,6 +83,10 @@ describe('parseEnvironment', () => {
       bflSafetyTolerance: 3,
       bflDisablePromptUpsampling: false,
       bflReferenceImageTimeoutMs: 140_000,
+      wiroApiKey: 'wiro-key-placeholder',
+      wiroApiSecret: 'wiro-secret-placeholder',
+      wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
+      wiroReferenceImageTimeoutMs: 170_000,
       referenceImageTimeoutMs: 140_000,
       elevenLabsApiKey: 'eleven-placeholder',
       elevenLabsModelId: 'custom-sts',
@@ -99,8 +110,29 @@ describe('parseEnvironment', () => {
     { BFL_DISABLE_PROMPT_UPSAMPLING: 'TRUE' },
     { BFL_REFERENCE_IMAGE_TIMEOUT_MS: '9999' },
     { BFL_REFERENCE_IMAGE_TIMEOUT_MS: '180001' },
+    { WIRO_REFERENCE_IMAGE_MODEL: 'seedream-v5-lite' },
+    { WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '9999' },
+    { WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '180001' },
   ])('rejects invalid environment input %#', (environment) => {
     expect(() => parseEnvironment(environment)).toThrow(EnvironmentValidationError);
+  });
+
+  it('selects Wiro independently and uses its timeout without requiring OpenAI image credentials', () => {
+    expect(
+      parseEnvironment({
+        REFERENCE_IMAGE_PROVIDER: 'wiro',
+        WIRO_API_KEY: ' wiro-key ',
+        WIRO_API_SECRET: ' wiro-secret ',
+        WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '175000',
+      }),
+    ).toMatchObject({
+      referenceImageProvider: 'wiro',
+      wiroApiKey: 'wiro-key',
+      wiroApiSecret: 'wiro-secret',
+      wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
+      wiroReferenceImageTimeoutMs: 175_000,
+      referenceImageTimeoutMs: 175_000,
+    });
   });
 });
 

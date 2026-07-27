@@ -103,6 +103,52 @@ describe('API shell', () => {
     });
   });
 
+  it('reports Wiro availability without coupling it to OpenAI prompt optimization', async () => {
+    const app = createApp({
+      config: testConfig({
+        referenceImageProvider: 'wiro',
+        wiroApiKey: 'wiro-key',
+        wiroApiSecret: 'wiro-secret',
+      }),
+    });
+    apps.push(app);
+
+    const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
+
+    expect(capabilities.json()).toMatchObject({
+      referenceImages: {
+        available: true,
+        editAvailable: false,
+        providerId: 'wiro',
+        modelId: 'seedream-v5-lite-uncensored',
+        optimizer: { available: false },
+      },
+    });
+  });
+
+  it('does not fall back when either selected Wiro signature credential is missing', async () => {
+    const app = createApp({
+      config: testConfig({
+        referenceImageProvider: 'wiro',
+        openAiApiKey: 'optimizer-secret',
+        wiroApiKey: 'wiro-key-without-secret',
+      }),
+    });
+    apps.push(app);
+
+    const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
+
+    expect(capabilities.json()).toMatchObject({
+      referenceImages: {
+        available: false,
+        editAvailable: false,
+        providerId: 'wiro',
+        modelId: 'seedream-v5-lite-uncensored',
+        optimizer: { available: true },
+      },
+    });
+  });
+
   it('returns consistent JSON for unknown routes and parser errors', async () => {
     const app = createApp({ config: testConfig() });
     apps.push(app);

@@ -26,10 +26,7 @@ import {
   createReferenceImageCompositionPrompt,
   createReferenceImageEditPrompt,
 } from './prompt.js';
-import {
-  CharacterPromptOptimizerError,
-  type CharacterPromptOptimizer,
-} from '../../providers/openai/character-prompt-optimizer.js';
+import type { CharacterPromptOptimizer } from '../../providers/openai/character-prompt-optimizer.js';
 import {
   type GeneratedReferenceImagePayload,
   type ReferenceImageProvider,
@@ -48,7 +45,7 @@ import {
   type GenerateReferenceImageInput,
   hashReferenceImageEditInstructions,
   prepareReferenceImageGeneration,
-  settingsMatchReferenceImageOptions,
+  recommendedSettingsForOptions,
   toReferenceImageAsset,
 } from './reference-image-preparation.js';
 
@@ -130,15 +127,13 @@ export class ReferenceImageService {
     const optimizer = this.#optimizer;
     return this.#operations.runOptimization(inputHash, signal, async (operationSignal) => {
       const optimized = await optimizer.optimize(input, operationSignal);
-      if (!settingsMatchReferenceImageOptions(optimized, input.options)) {
-        throw new CharacterPromptOptimizerError('invalid-response');
-      }
       const normalizedResult: CharacterPromptOptimizationResult = {
         ...optimized,
-        recommendedSettings: {
-          ...optimized.recommendedSettings,
-          quality: this.#imageQuality,
-        },
+        recommendedSettings: recommendedSettingsForOptions(
+          input.options,
+          this.#imageQuality,
+          optimized.recommendedSettings.format,
+        ),
       };
       return optimizeCharacterReferencePromptResponseSchema.parse({
         result: normalizedResult,
@@ -296,34 +291,36 @@ export class ReferenceImageService {
         ...(input.signal === undefined ? {} : { signal: input.signal }),
       }),
     );
-    this.#assertProviderResultMatchesSelection(generated);
-    const image = await validateReferenceImageBytes(
-      generated.bytes,
-      prepared.size,
-      generated.mimeType,
-    );
-    return this.#store.store({
-      localOwnerId: input.localOwnerId,
-      bytes: image.bytes,
-      mimeType: image.mimeType,
-      size: prepared.size,
-      width: image.width,
-      height: image.height,
-      provider: generated.providerId,
-      model: generated.modelId,
-      quality: this.#imageQuality,
-      originalPrompt: input.rawPrompt,
-      derivedPrompt: prepared.prompt,
-      promptAudit: prepared.promptAudit,
-      promptHash: prepared.promptHash,
-      requestId: input.requestId,
-      requestFingerprint,
-      requestFingerprintVersion: 2,
-      derivation: { kind: 'generate' },
-      ...(generated.providerRequestId === undefined
-        ? {}
-        : { providerRequestId: generated.providerRequestId }),
-      ...this.#storedProviderAudit(generated.safeUsage),
+    return this.#withRemoteArtifactCleanup(generated, async () => {
+      this.#assertProviderResultMatchesSelection(generated);
+      const image = await validateReferenceImageBytes(
+        generated.bytes,
+        prepared.size,
+        generated.mimeType,
+      );
+      return this.#store.store({
+        localOwnerId: input.localOwnerId,
+        bytes: image.bytes,
+        mimeType: image.mimeType,
+        size: prepared.size,
+        width: image.width,
+        height: image.height,
+        provider: generated.providerId,
+        model: generated.modelId,
+        quality: this.#imageQuality,
+        originalPrompt: input.rawPrompt,
+        derivedPrompt: prepared.prompt,
+        promptAudit: prepared.promptAudit,
+        promptHash: prepared.promptHash,
+        requestId: input.requestId,
+        requestFingerprint,
+        requestFingerprintVersion: 2,
+        derivation: { kind: 'generate' },
+        ...(generated.providerRequestId === undefined
+          ? {}
+          : { providerRequestId: generated.providerRequestId }),
+        ...this.#storedProviderAudit(generated.safeUsage),
+      });
     });
   }
 
@@ -360,35 +357,37 @@ export class ReferenceImageService {
       }),
     );
 
-    this.#assertProviderResultMatchesSelection(edited);
-    const image = await validateReferenceImageBytes(edited.bytes, prepared.size, edited.mimeType);
-    return this.#store.store({
-      localOwnerId: input.localOwnerId,
-      bytes: image.bytes,
-      mimeType: image.mimeType,
-      size: prepared.size,
-      width: image.width,
-      height: image.height,
-      provider: edited.providerId,
-      model: edited.modelId,
-      quality: this.#imageQuality,
-      originalPrompt: input.rawPrompt,
-      // The provider-only prompt contains the raw requested change and must not be persisted.
-      derivedPrompt: prepared.prompt,
-      promptAudit: prepared.promptAudit,
-      promptHash: prepared.promptHash,
-      requestId: input.requestId,
-      requestFingerprint,
-      requestFingerprintVersion: 2,
-      derivation: {
-        kind: 'edit',
-        sourceAssetId: input.sourceAssetId,
-        changeInstructionsHash: hashReferenceImageEditInstructions(input.changeInstructions),
-      },
-      ...(edited.providerRequestId === undefined
-        ? {}
-        : { providerRequestId: edited.providerRequestId }),
-      ...this.#storedProviderAudit(edited.safeUsage),
+    return this.#withRemoteArtifactCleanup(edited, async () => {
+      this.#assertProviderResultMatchesSelection(edited);
+      const image = await validateReferenceImageBytes(edited.bytes, prepared.size, edited.mimeType);
+      return this.#store.store({
+        localOwnerId: input.localOwnerId,
+        bytes: image.bytes,
+        mimeType: image.mimeType,
+        size: prepared.size,
+        width: image.width,
+        height: image.height,
+        provider: edited.providerId,
+        model: edited.modelId,
+        quality: this.#imageQuality,
+        originalPrompt: input.rawPrompt,
+        // The provider-only prompt contains the raw requested change and must not be persisted.
+        derivedPrompt: prepared.prompt,
+        promptAudit: prepared.promptAudit,
+        promptHash: prepared.promptHash,
+        requestId: input.requestId,
+        requestFingerprint,
+        requestFingerprintVersion: 2,
+        derivation: {
+          kind: 'edit',
+          sourceAssetId: input.sourceAssetId,
+          changeInstructionsHash: hashReferenceImageEditInstructions(input.changeInstructions),
+        },
+        ...(edited.providerRequestId === undefined
+          ? {}
+          : { providerRequestId: edited.providerRequestId }),
+        ...this.#storedProviderAudit(edited.safeUsage),
+      });
     });
   }
 
@@ -417,35 +416,48 @@ export class ReferenceImageService {
       }),
     );
 
-    this.#assertProviderResultMatchesSelection(composed);
-    const image = await validateReferenceImageBytes(
-      composed.bytes,
-      prepared.size,
-      composed.mimeType,
-    );
-    return this.#store.store({
-      localOwnerId: input.localOwnerId,
-      bytes: image.bytes,
-      mimeType: image.mimeType,
-      size: prepared.size,
-      width: image.width,
-      height: image.height,
-      provider: composed.providerId,
-      model: composed.modelId,
-      quality: this.#imageQuality,
-      originalPrompt: input.rawPrompt,
-      derivedPrompt: prepared.prompt,
-      promptAudit: prepared.promptAudit,
-      promptHash: prepared.promptHash,
-      requestId: input.requestId,
-      requestFingerprint,
-      requestFingerprintVersion: 2,
-      derivation: { kind: 'compose', sourceAssetId: input.sourceAssetId },
-      ...(composed.providerRequestId === undefined
-        ? {}
-        : { providerRequestId: composed.providerRequestId }),
-      ...this.#storedProviderAudit(composed.safeUsage),
+    return this.#withRemoteArtifactCleanup(composed, async () => {
+      this.#assertProviderResultMatchesSelection(composed);
+      const image = await validateReferenceImageBytes(
+        composed.bytes,
+        prepared.size,
+        composed.mimeType,
+      );
+      return this.#store.store({
+        localOwnerId: input.localOwnerId,
+        bytes: image.bytes,
+        mimeType: image.mimeType,
+        size: prepared.size,
+        width: image.width,
+        height: image.height,
+        provider: composed.providerId,
+        model: composed.modelId,
+        quality: this.#imageQuality,
+        originalPrompt: input.rawPrompt,
+        derivedPrompt: prepared.prompt,
+        promptAudit: prepared.promptAudit,
+        promptHash: prepared.promptHash,
+        requestId: input.requestId,
+        requestFingerprint,
+        requestFingerprintVersion: 2,
+        derivation: { kind: 'compose', sourceAssetId: input.sourceAssetId },
+        ...(composed.providerRequestId === undefined
+          ? {}
+          : { providerRequestId: composed.providerRequestId }),
+        ...this.#storedProviderAudit(composed.safeUsage),
+      });
     });
+  }
+
+  async #withRemoteArtifactCleanup<Result>(
+    generated: GeneratedReferenceImagePayload,
+    persist: () => Promise<Result>,
+  ): Promise<Result> {
+    try {
+      return await persist();
+    } finally {
+      await generated.cleanupRemoteArtifacts?.().catch(() => undefined);
+    }
   }
 
   async #callProvider<Result>(request: () => Promise<Result>): Promise<Result> {
@@ -475,16 +487,34 @@ export class ReferenceImageService {
   }
 
   #storedProviderAudit(safeUsage: Readonly<Record<string, number>> | undefined): {
-    readonly providerSettings?: {
-      readonly safetyTolerance: number;
-      readonly disablePromptUpsampling: boolean;
-    };
+    readonly providerSettings?:
+      | {
+          readonly safetyTolerance: number;
+          readonly disablePromptUpsampling: boolean;
+        }
+      | {
+          readonly owner: 'ByteDance';
+          readonly resolution: '2k';
+          readonly maxImages: 1;
+          readonly watermark: false;
+        };
     readonly providerUsage?: {
       readonly cost?: number;
       readonly inputMegapixels?: number;
       readonly outputMegapixels?: number;
     };
   } {
+    if (this.#providerDescriptor.providerId === 'wiro') {
+      const { owner, resolution, maxImages, watermark } =
+        this.#providerDescriptor.effectiveSettings;
+      if (owner !== 'ByteDance' || resolution !== '2k' || maxImages !== 1 || watermark !== false) {
+        throw new ReferenceImageProviderError('configuration', { providerId: 'wiro' });
+      }
+      return {
+        providerSettings: { owner, resolution, maxImages, watermark },
+        ...(typeof safeUsage?.cost === 'number' ? { providerUsage: { cost: safeUsage.cost } } : {}),
+      };
+    }
     if (this.#providerDescriptor.providerId !== 'bfl') return {};
     const safetyTolerance = this.#providerDescriptor.effectiveSettings.safetyTolerance;
     const disablePromptUpsampling =

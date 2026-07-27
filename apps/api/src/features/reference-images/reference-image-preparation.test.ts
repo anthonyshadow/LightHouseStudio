@@ -36,16 +36,31 @@ const bflDescriptor: ReferenceImageProviderDescriptor = {
   effectiveSettings: { safetyTolerance: 4, disablePromptUpsampling: true },
 };
 
+const wiroDescriptor: ReferenceImageProviderDescriptor = {
+  providerId: 'wiro',
+  modelId: 'seedream-v5-lite-uncensored',
+  adapterVersion: 'wiro-seedream-v5-lite-v1',
+  effectiveSettings: {
+    owner: 'ByteDance',
+    resolution: '2k',
+    maxImages: 1,
+    watermark: false,
+  },
+};
+
 describe('reference image request fingerprints', () => {
   it('binds idempotency to the authoritative provider, model, adapter, and settings', () => {
     const openAi = generationRequestFingerprint(input, openAiDescriptor);
     const bfl = generationRequestFingerprint(input, bflDescriptor);
+    const wiro = generationRequestFingerprint(input, wiroDescriptor);
     const saferBfl = generationRequestFingerprint(input, {
       ...bflDescriptor,
       effectiveSettings: { safetyTolerance: 3, disablePromptUpsampling: true },
     });
 
     expect(openAi).not.toBe(bfl);
+    expect(openAi).not.toBe(wiro);
+    expect(bfl).not.toBe(wiro);
     expect(bfl).not.toBe(saferBfl);
   });
 

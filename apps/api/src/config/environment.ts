@@ -12,9 +12,11 @@ export const DEFAULT_API_PORT = 4100;
 export const DEFAULT_ELEVENLABS_STS_MODEL_ID = 'eleven_multilingual_sts_v2';
 export const DEFAULT_LIGHTFRAME_DATA_DIR = './.lightframe-data';
 export const DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
+export const DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS = 180_000;
 export const DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS = 120_000;
 export const MAX_PROMPT_OPTIMIZER_TIMEOUT_MS = 180_000;
 export const BFL_REFERENCE_IMAGE_MODEL = 'flux-2-pro' as const;
+export const WIRO_REFERENCE_IMAGE_MODEL = 'seedream-v5-lite-uncensored' as const;
 export const DEFAULT_BFL_SAFETY_TOLERANCE = 4;
 export const DEFAULT_BFL_DISABLE_PROMPT_UPSAMPLING = true;
 
@@ -39,15 +41,11 @@ const portSchema = z.preprocess(
   z.coerce.number().int().min(1).max(65_535),
 );
 
-const promptOptimizerTimeoutSchema = z.preprocess(
-  (value) => (value === undefined || value === '' ? DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS : value),
-  z.coerce.number().int().min(10_000).max(MAX_PROMPT_OPTIMIZER_TIMEOUT_MS),
-);
-
-const referenceImageTimeoutSchema = z.preprocess(
-  (value) => (value === undefined || value === '' ? DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS : value),
-  z.coerce.number().int().min(10_000).max(MAX_PROMPT_OPTIMIZER_TIMEOUT_MS),
-);
+const timeoutSchema = (defaultValue: number) =>
+  z.preprocess(
+    (value) => (value === undefined || value === '' ? defaultValue : value),
+    z.coerce.number().int().min(10_000).max(MAX_PROMPT_OPTIMIZER_TIMEOUT_MS),
+  );
 
 const strictBooleanSchema = (defaultValue: boolean) =>
   z.preprocess((value) => {
@@ -68,7 +66,7 @@ const environmentSchema = z.object({
     z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
   ),
   OPENAI_PROMPT_OPTIMIZER_VERSION: optionalModelSchema,
-  OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: promptOptimizerTimeoutSchema,
+  OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: timeoutSchema(DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS),
   OPENAI_REFERENCE_IMAGE_MODEL: optionalModelSchema,
   OPENAI_REFERENCE_IMAGE_QUALITY: z.preprocess(
     normalizeOptionalString,
@@ -76,7 +74,7 @@ const environmentSchema = z.object({
   ),
   REFERENCE_IMAGE_PROVIDER: z.preprocess(
     normalizeOptionalString,
-    z.enum(['openai', 'bfl']).default('openai'),
+    z.enum(['openai', 'bfl', 'wiro']).default('openai'),
   ),
   BFL_API_KEY: optionalSecretSchema,
   BFL_REFERENCE_IMAGE_MODEL: z.preprocess(
@@ -88,7 +86,14 @@ const environmentSchema = z.object({
     z.coerce.number().int().min(0).max(5),
   ),
   BFL_DISABLE_PROMPT_UPSAMPLING: strictBooleanSchema(DEFAULT_BFL_DISABLE_PROMPT_UPSAMPLING),
-  BFL_REFERENCE_IMAGE_TIMEOUT_MS: referenceImageTimeoutSchema,
+  BFL_REFERENCE_IMAGE_TIMEOUT_MS: timeoutSchema(DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS),
+  WIRO_API_KEY: optionalSecretSchema,
+  WIRO_API_SECRET: optionalSecretSchema,
+  WIRO_REFERENCE_IMAGE_MODEL: z.preprocess(
+    normalizeOptionalString,
+    z.literal(WIRO_REFERENCE_IMAGE_MODEL).default(WIRO_REFERENCE_IMAGE_MODEL),
+  ),
+  WIRO_REFERENCE_IMAGE_TIMEOUT_MS: timeoutSchema(DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS),
   ELEVENLABS_API_KEY: optionalSecretSchema,
   ELEVENLABS_STS_MODEL_ID: optionalModelSchema,
   ELEVENLABS_ENABLE_LOGGING: strictBooleanSchema(false),
@@ -111,12 +116,16 @@ export interface RuntimeConfig {
   readonly openAiPromptOptimizerTimeoutMs: number;
   readonly openAiReferenceImageModel: string;
   readonly openAiReferenceImageQuality: 'high' | 'medium';
-  readonly referenceImageProvider: 'openai' | 'bfl';
+  readonly referenceImageProvider: 'openai' | 'bfl' | 'wiro';
   readonly bflApiKey?: string;
   readonly bflReferenceImageModel: typeof BFL_REFERENCE_IMAGE_MODEL;
   readonly bflSafetyTolerance: number;
   readonly bflDisablePromptUpsampling: boolean;
   readonly bflReferenceImageTimeoutMs: number;
+  readonly wiroApiKey?: string;
+  readonly wiroApiSecret?: string;
+  readonly wiroReferenceImageModel: typeof WIRO_REFERENCE_IMAGE_MODEL;
+  readonly wiroReferenceImageTimeoutMs: number;
   readonly elevenLabsApiKey?: string;
   readonly elevenLabsModelId: string;
   readonly elevenLabsEnableLogging: boolean;
@@ -177,6 +186,21 @@ export const resolveLightframeDataDirectory = (
   return { path: canonicalPath, usesLegacyApiRelativePath: false };
 };
 
+const referenceImageTimeout = (
+  provider: RuntimeConfig['referenceImageProvider'],
+  bflTimeoutMs: number,
+  wiroTimeoutMs: number,
+): number => {
+  switch (provider) {
+    case 'bfl':
+      return bflTimeoutMs;
+    case 'wiro':
+      return wiroTimeoutMs;
+    case 'openai':
+      return DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS;
+  }
+};
+
 export const parseEnvironment = (
   environment: Readonly<Record<string, string | undefined>>,
 ): RuntimeConfig => {
@@ -214,16 +238,23 @@ export const parseEnvironment = (
     bflSafetyTolerance: result.data.BFL_SAFETY_TOLERANCE,
     bflDisablePromptUpsampling: result.data.BFL_DISABLE_PROMPT_UPSAMPLING,
     bflReferenceImageTimeoutMs: result.data.BFL_REFERENCE_IMAGE_TIMEOUT_MS,
+    ...(result.data.WIRO_API_KEY === undefined ? {} : { wiroApiKey: result.data.WIRO_API_KEY }),
+    ...(result.data.WIRO_API_SECRET === undefined
+      ? {}
+      : { wiroApiSecret: result.data.WIRO_API_SECRET }),
+    wiroReferenceImageModel: result.data.WIRO_REFERENCE_IMAGE_MODEL,
+    wiroReferenceImageTimeoutMs: result.data.WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
     ...(result.data.ELEVENLABS_API_KEY === undefined
       ? {}
       : { elevenLabsApiKey: result.data.ELEVENLABS_API_KEY }),
     elevenLabsModelId: result.data.ELEVENLABS_STS_MODEL_ID ?? DEFAULT_ELEVENLABS_STS_MODEL_ID,
     elevenLabsEnableLogging: result.data.ELEVENLABS_ENABLE_LOGGING,
     providerTimeoutMs: 30_000,
-    referenceImageTimeoutMs:
-      result.data.REFERENCE_IMAGE_PROVIDER === 'bfl'
-        ? result.data.BFL_REFERENCE_IMAGE_TIMEOUT_MS
-        : DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
+    referenceImageTimeoutMs: referenceImageTimeout(
+      result.data.REFERENCE_IMAGE_PROVIDER,
+      result.data.BFL_REFERENCE_IMAGE_TIMEOUT_MS,
+      result.data.WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
+    ),
     lightframeDataDir: result.data.LIGHTFRAME_DATA_DIR,
   };
 };

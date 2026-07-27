@@ -225,6 +225,15 @@ const recommendedSettingsForSize = (
   }
 };
 
+export const recommendedSettingsForOptions = (
+  options: ReferenceImageOptions,
+  quality: 'high' | 'medium',
+  format: RecommendedSettings['format'],
+): RecommendedSettings => {
+  const defaults = ORIENTATION_DEFAULTS[options.orientation];
+  return recommendedSettingsForSize(defaults.size, options.framing, quality, format);
+};
+
 export const settingsMatchReferenceImageOptions = (
   result: CharacterPromptOptimizationResult,
   options: ReferenceImageOptions,

@@ -66,7 +66,7 @@ export type CreativeWorkspaceState = {
   workshopReferenceImage: WorkshopReferenceImage | null;
   referenceGeneration: ReferenceGenerationState;
   referenceImagesAvailable: boolean;
-  referenceImageProvider?: 'openai' | 'bfl' | null;
+  referenceImageProvider?: 'openai' | 'bfl' | 'wiro' | null;
   referenceImageModel?: string | null;
   optimizerModel: string | null;
   optimizerVersion: string | null;

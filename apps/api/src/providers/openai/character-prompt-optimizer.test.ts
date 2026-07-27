@@ -52,14 +52,18 @@ const createOptimizer = (
       readonly content?: readonly { readonly type?: string }[];
     }[];
   }>,
+  optimizerOptions: {
+    readonly model: string;
+    readonly reasoning: 'none' | 'minimal' | 'low' | 'medium' | 'high' | 'xhigh' | 'max';
+  } = { model: 'gpt-5.6', reasoning: 'medium' },
 ) => {
   const factory = vi.fn((options: unknown) => ({ responses: { parse }, options }));
   return {
     optimizer: new OpenAICharacterPromptOptimizer(
       'server-secret',
       {
-        model: 'gpt-5.6',
-        reasoning: 'medium',
+        model: optimizerOptions.model,
+        reasoning: optimizerOptions.reasoning,
         version: 'lucy-character-reference-v1',
         timeoutMs: 29_000,
       },
@@ -106,6 +110,31 @@ describe('OpenAICharacterPromptOptimizer', () => {
     expect(calls[0]?.input[1]).toEqual({
       role: 'user',
       content: JSON.stringify(input),
+    });
+  });
+
+  it('passes the configured GPT-5 nano model and minimal reasoning unchanged', async () => {
+    const calls: OpenAICharacterPromptOptimizerParameters[] = [];
+    const { optimizer } = createOptimizer(
+      (parameters) => {
+        calls.push(parameters);
+        return Promise.resolve({ output_parsed: result });
+      },
+      { model: 'gpt-5-nano', reasoning: 'minimal' },
+    );
+
+    await expect(optimizer.optimize(input, new AbortController().signal)).resolves.toEqual(result);
+    expect(calls).toHaveLength(1);
+    expect(calls[0]).toMatchObject({
+      model: 'gpt-5-nano',
+      reasoning: { effort: 'minimal' },
+      text: {
+        format: {
+          type: 'json_schema',
+          name: 'character_prompt_optimization',
+          strict: true,
+        },
+      },
     });
   });
 

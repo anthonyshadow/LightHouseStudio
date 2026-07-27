@@ -29,6 +29,7 @@ import {
   type CharacterPromptOptimizer,
 } from './providers/openai/character-prompt-optimizer.js';
 import { translateOpenAIError } from './providers/openai/error-mapper.js';
+import { translateWiroError } from './providers/wiro/error-mapper.js';
 import {
   configuredReferenceImageDescriptor,
   createConfiguredReferenceImageProvider,
@@ -147,6 +148,13 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
       observeBflLifecycle: (event) => {
         app.log.info(event, 'BFL reference image lifecycle');
       },
+      observeWiroLifecycle: (event) => {
+        if (event.stage === 'cleanup_failed') {
+          app.log.warn(event, 'Wiro remote artifact cleanup failed');
+          return;
+        }
+        app.log.info(event, 'Wiro reference image lifecycle');
+      },
     }),
   );
   const characterPromptOptimizer = resolveOptionalProvider(
@@ -199,6 +207,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
       translateReferenceImageError,
       translateVoiceServiceError,
       translateBflError,
+      translateWiroError,
       translateOpenAIError,
       translateProviderError,
     ],

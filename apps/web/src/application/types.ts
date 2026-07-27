@@ -17,7 +17,7 @@ export type ProviderAvailability = {
   elevenLabsModel: string | null;
   referenceImages?: boolean;
   referenceImageEditAvailable?: boolean;
-  referenceImageProvider?: 'openai' | 'bfl' | null;
+  referenceImageProvider?: 'openai' | 'bfl' | 'wiro' | null;
   referenceImageModel?: string | null;
   referenceImageSizes?: readonly ReferenceImageSize[];
   referenceImageOptimizerAvailable?: boolean;

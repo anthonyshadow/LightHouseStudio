@@ -256,6 +256,81 @@ describe('reference image API', () => {
     });
   });
 
+  it('persists authoritative Wiro provenance and performs post-store cleanup without exposing internals', async () => {
+    const cleanupRemoteArtifacts = vi.fn().mockResolvedValue(undefined);
+    const provider: ReferenceImageProvider = {
+      descriptor: {
+        providerId: 'wiro',
+        modelId: 'seedream-v5-lite-uncensored',
+        adapterVersion: 'wiro-seedream-v5-lite-v1',
+        effectiveSettings: {
+          owner: 'ByteDance',
+          resolution: '2k',
+          maxImages: 1,
+          watermark: false,
+        },
+      },
+      generate: vi.fn<ReferenceImageProvider['generate']>(
+        async (input: GenerateReferenceImageProviderInput) => ({
+          bytes: await createImage(input.size),
+          mimeType: 'image/jpeg',
+          providerId: 'wiro',
+          modelId: 'seedream-v5-lite-uncensored',
+          providerRequestId: 'wiro-task-one',
+          safeUsage: { cost: 0.035 },
+          cleanupRemoteArtifacts,
+        }),
+      ),
+    };
+    const app = await setup(provider);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images',
+      headers: localHeaders,
+      payload: bypassPayload('A Wiro-generated cartographer.'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const asset = response.json<CreateReferenceImageResponse>().asset;
+    expect(asset).toMatchObject({
+      source: 'generated',
+      provider: 'wiro',
+      model: 'seedream-v5-lite-uncensored',
+    });
+    expect(response.body).not.toContain('wiro-task-one');
+    expect(response.body).not.toContain('providerUsage');
+    expect(cleanupRemoteArtifacts).toHaveBeenCalledOnce();
+
+    const dataDirectory = directories.at(-1);
+    const stored = JSON.parse(
+      await readFile(
+        path.join(
+          dataDirectory ?? '',
+          'reference-images',
+          'v1',
+          'assets',
+          asset.assetId,
+          'metadata.json',
+        ),
+        'utf8',
+      ),
+    ) as Record<string, unknown>;
+    expect(stored).toMatchObject({
+      provider: 'wiro',
+      model: 'seedream-v5-lite-uncensored',
+      providerRequestId: 'wiro-task-one',
+      requestFingerprintVersion: 2,
+      providerSettings: {
+        owner: 'ByteDance',
+        resolution: '2k',
+        maxImages: 1,
+        watermark: false,
+      },
+      providerUsage: { cost: 0.035 },
+    });
+  });
+
   it('does not cancel a pending generation when a normal POST body finishes', async () => {
     const image = await createImage('1024x1024');
     let providerSignal: AbortSignal | undefined;

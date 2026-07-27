@@ -7,7 +7,7 @@ As a creator, I want to compose a complete character recipe and optionally creat
 ## Starting state
 
 - The Character Workshop is available because no recording is active and the current media state permits Character mode.
-- The server-selected OpenAI or BFL image capability is optional; OpenAI optimization and workshop drafting degrade independently, and drafting itself always works locally.
+- The server-selected OpenAI, BFL, or Wiro image capability is optional; OpenAI optimization and workshop drafting degrade independently, and drafting itself always works locally.
 
 ## End-to-end steps
 
@@ -30,7 +30,7 @@ files remain ephemeral.
 ## Failure and alternate paths
 
 - Prompt changes, reference settings, optimizer model/version, or toggling optimization make prior results stale. Regenerate rather than assuming the preview matches.
-- Optimization errors block generated-reference creation; no silent raw-prompt fallback occurs while optimization is enabled.
+- Optimization errors block generated-reference creation; no silent raw-prompt fallback occurs while optimization is enabled. Schema-valid optimizer output is canonicalized to the selected framing, orientation, size, and configured quality before it is returned, so a smaller configured model cannot override those app-owned settings.
 - Reference-generation errors are categorized for moderation, quota/rate limit, configuration, timeout, invalid image, storage, or concurrent generation.
 - The browser never selects the image provider. Capabilities show the startup-selected provider/model; missing selected credentials do not silently fall back.
 - If a saved generated asset cannot be restored later, select **Retry** or choose **Continue without reference** deliberately.

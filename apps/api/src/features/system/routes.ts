@@ -12,7 +12,7 @@ export interface CapabilityAvailability {
   readonly elevenLabsModelId: string;
   readonly referenceImagesAvailable: boolean;
   readonly referenceImageEditAvailable: boolean;
-  readonly referenceImageProviderId: 'openai' | 'bfl';
+  readonly referenceImageProviderId: 'openai' | 'bfl' | 'wiro';
   readonly referenceImageModelId: string;
   readonly referenceImageQuality: 'high' | 'medium';
   readonly promptOptimizerAvailable: boolean;

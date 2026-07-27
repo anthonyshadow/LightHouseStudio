@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { testConfig } from '../../test/fakes.js';
 import { BflFlux2ReferenceImageProvider } from '../bfl/flux2-reference-image-provider.js';
 import { OpenAIReferenceImageProvider } from '../openai/reference-image-provider.js';
+import { WiroSeedreamReferenceImageProvider } from '../wiro/seedream-reference-image-provider.js';
 import {
   configuredReferenceImageDescriptor,
   createConfiguredReferenceImageProvider,
@@ -42,6 +43,48 @@ describe('reference image provider factory', () => {
         testConfig({
           referenceImageProvider: 'bfl',
           openAiApiKey: 'optimizer-only-openai-secret',
+        }),
+      ),
+    ).toBeNull();
+  });
+
+  it('constructs only Wiro when both signature credentials exist', () => {
+    const config = testConfig({
+      referenceImageProvider: 'wiro',
+      openAiApiKey: 'optimizer-only-openai-secret',
+      bflApiKey: 'unused-bfl-secret',
+      wiroApiKey: 'wiro-key',
+      wiroApiSecret: 'wiro-secret',
+    });
+    expect(createConfiguredReferenceImageProvider(config)).toBeInstanceOf(
+      WiroSeedreamReferenceImageProvider,
+    );
+    expect(configuredReferenceImageDescriptor(config)).toEqual({
+      providerId: 'wiro',
+      modelId: 'seedream-v5-lite-uncensored',
+      adapterVersion: 'wiro-seedream-v5-lite-v1',
+      effectiveSettings: {
+        owner: 'ByteDance',
+        resolution: '2k',
+        maxImages: 1,
+        watermark: false,
+      },
+    });
+    expect(
+      createConfiguredReferenceImageProvider(
+        testConfig({
+          referenceImageProvider: 'wiro',
+          openAiApiKey: 'optimizer-only-openai-secret',
+          wiroApiKey: 'wiro-key-without-secret',
+        }),
+      ),
+    ).toBeNull();
+    expect(
+      createConfiguredReferenceImageProvider(
+        testConfig({
+          referenceImageProvider: 'wiro',
+          openAiApiKey: 'optimizer-only-openai-secret',
+          wiroApiSecret: 'wiro-secret-without-key',
         }),
       ),
     ).toBeNull();

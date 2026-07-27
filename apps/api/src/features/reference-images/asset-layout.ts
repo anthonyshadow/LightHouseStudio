@@ -89,7 +89,7 @@ const storedGeneratedReferenceImageMetadataSchema = z
       .positive()
       .max(REFERENCE_IMAGE_MAX_BYTES - 1),
     source: z.literal('generated'),
-    provider: z.enum(['openai', 'bfl']),
+    provider: z.enum(['openai', 'bfl', 'wiro']),
     model: z.string().trim().min(1).max(128),
     quality: z.enum(['high', 'medium']).optional(),
     originalPrompt: z.string().min(1).max(REFERENCE_IMAGE_PROMPT_MAX_LENGTH),
@@ -99,11 +99,22 @@ const storedGeneratedReferenceImageMetadataSchema = z
     derivation: internalDerivationSchema.optional(),
     providerRequestId: z.string().min(1).max(500).optional(),
     providerSettings: z
-      .object({
-        safetyTolerance: z.number().int().min(0).max(5),
-        disablePromptUpsampling: z.boolean(),
-      })
-      .strict()
+      .union([
+        z
+          .object({
+            safetyTolerance: z.number().int().min(0).max(5),
+            disablePromptUpsampling: z.boolean(),
+          })
+          .strict(),
+        z
+          .object({
+            owner: z.literal('ByteDance'),
+            resolution: z.literal('2k'),
+            maxImages: z.literal(1),
+            watermark: z.literal(false),
+          })
+          .strict(),
+      ])
       .optional(),
     providerUsage: z
       .object({
@@ -171,7 +182,7 @@ export interface StoreGeneratedReferenceImageInput {
   readonly size: ReferenceImageSize;
   readonly width: 1024 | 1536;
   readonly height: 1024 | 1536;
-  readonly provider?: 'openai' | 'bfl';
+  readonly provider?: 'openai' | 'bfl' | 'wiro';
   readonly model: string;
   readonly quality: 'high' | 'medium';
   readonly originalPrompt: string;
@@ -201,10 +212,17 @@ export interface StoreGeneratedReferenceImageInput {
         readonly sourceAssetId: string;
       };
   readonly providerRequestId?: string;
-  readonly providerSettings?: {
-    readonly safetyTolerance: number;
-    readonly disablePromptUpsampling: boolean;
-  };
+  readonly providerSettings?:
+    | {
+        readonly safetyTolerance: number;
+        readonly disablePromptUpsampling: boolean;
+      }
+    | {
+        readonly owner: 'ByteDance';
+        readonly resolution: '2k';
+        readonly maxImages: 1;
+        readonly watermark: false;
+      };
   readonly providerUsage?: {
     readonly cost?: number;
     readonly inputMegapixels?: number;

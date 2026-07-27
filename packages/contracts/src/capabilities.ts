@@ -20,7 +20,7 @@ export const capabilitiesResponseSchema = z
       .object({
         available: z.boolean(),
         editAvailable: z.boolean(),
-        providerId: z.enum(['openai', 'bfl']),
+        providerId: z.enum(['openai', 'bfl', 'wiro']),
         modelId: z.string().trim().min(1).max(128),
         sizes: z.array(z.enum(REFERENCE_IMAGE_SIZES)).length(REFERENCE_IMAGE_SIZES.length),
         quality: z.enum(['high', 'medium']),

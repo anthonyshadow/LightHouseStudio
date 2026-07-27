@@ -6,7 +6,7 @@ Live smoke testing is manual, opt-in, cost-aware, and excluded from default test
 
 - `@decartai/sdk` is pinned to `0.1.15`. Its registry recognizes `lucy-2.5` and the user-approved exact `lucy-vton-3` id. [Current Decart VTON examples](https://docs.platform.decart.ai/examples/use-cases) may instead show the moving `lucy-vton-latest` alias; this product intentionally does not follow that alias silently.
 - Decart browser access uses a [backend-minted client token](https://docs.platform.decart.ai/api-reference/create-client-token), scoped to one model, the exact loopback origin, a five-minute issuance window, and a five-minute realtime-session limit.
-- OpenAI uses the Responses API for prompt optimization and remains the default image provider with `gpt-image-2` at `high` quality. `REFERENCE_IMAGE_PROVIDER=bfl` instead selects the pinned US2 `https://api.us2.bfl.ai/v1/flux-2-pro` task API; there is no EU or provider fallback. Character Builder upload by itself is local storage work and does not contact either image provider.
+- OpenAI uses the Responses API for prompt optimization and remains the default image provider with `gpt-image-2` at `high` quality. `REFERENCE_IMAGE_PROVIDER=bfl` instead selects the pinned US2 `https://api.us2.bfl.ai/v1/flux-2-pro` task API. `REFERENCE_IMAGE_PROVIDER=wiro` selects the pinned `https://api.wiro.ai/v1/Run/ByteDance/seedream-v5-lite-uncensored` task API with signature authentication. There is no provider fallback. Character Builder upload by itself is local storage work and does not contact an image provider.
 - ElevenLabs uses `/v2/voices`, `/v1/shared-voices`, `/v1/voices/add/:owner/:voice`, `/v1/models`, and `/v1/speech-to-speech/:voice`. Provider plans can change voice eligibility and conversion access.
 - `ELEVENLABS_ENABLE_LOGGING=false` requests [Zero Retention Mode](https://elevenlabs.io/docs/eleven-api/resources/zero-retention-mode), which ElevenLabs currently limits to eligible enterprise accounts. Set it to `true` only after an informed retention decision when testing a non-eligible account.
 
@@ -15,7 +15,7 @@ Do not run live provider checks in CI, screenshots, stories, ordinary component 
 ## Before starting
 
 1. Run `npm run quality` and `npm run test:e2e` with deterministic fakes first.
-2. Review current Decart, OpenAI, BFL, and ElevenLabs pricing, quota, model availability, voice eligibility, content policy, and data-retention terms in the provider accounts.
+2. Review current Decart, OpenAI, BFL, Wiro, and ElevenLabs pricing, quota, model availability, voice eligibility, content policy, and data-retention terms in the provider accounts.
 3. Use dedicated least-privilege development keys. Put them only in local `.env`:
 
    ```dotenv
@@ -25,6 +25,10 @@ Do not run live provider checks in CI, screenshots, stories, ordinary component 
    # For a separate BFL pass, select bfl and configure:
    # BFL_API_KEY=your-local-secret
    # BFL_REFERENCE_IMAGE_MODEL=flux-2-pro
+   # For a separate Wiro pass, select wiro and configure:
+   # WIRO_API_KEY=your-local-project-key
+   # WIRO_API_SECRET=your-local-project-secret
+   # WIRO_REFERENCE_IMAGE_MODEL=seedream-v5-lite-uncensored
    ELEVENLABS_API_KEY=your-local-secret
    ELEVENLABS_STS_MODEL_ID=eleven_multilingual_sts_v2
    ELEVENLABS_ENABLE_LOGGING=false
@@ -69,7 +73,7 @@ ordering, owner-scoped source resolution, immutable results, correct direct/imag
 save behavior, sanitized errors, and no fallback to the raw prompt after an
 optimization failure.
 
-Run this section once with the default OpenAI image provider and once with BFL if that provider is release-enabled. For BFL, confirm capabilities report `providerId: "bfl"` and `modelId: "flux-2-pro"`, one initial task is created per explicit request, polling stays within the 150-second deadline, source-guided actions succeed without a public upload, and browser responses/log captures contain neither signed URLs nor source base64.
+Run this section once with the default OpenAI image provider and once for each task provider that is release-enabled. For BFL, confirm capabilities report `providerId: "bfl"` and `modelId: "flux-2-pro"`, one initial task is created per explicit request, polling stays within the configured deadline, source-guided actions succeed without a public upload, and browser responses/log captures contain neither signed URLs nor source base64. For Wiro, confirm capabilities report `providerId: "wiro"` and `modelId: "seedream-v5-lite-uncensored"`, one Run request is created per explicit action, all three output orientations are normalized to the advertised exact dimensions, source-guided actions use no public upload, and `InputOutputDelete` removes remote input/output files after local persistence. Logs may contain only the task ID, lifecycle stage, status, and delivery origin—never the task token, signature, nonce, prompt, or CDN path.
 
 ## ElevenLabs
 

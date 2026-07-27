@@ -74,7 +74,7 @@ export interface CharacterPromptWorkshopProps {
   generatedReferenceImage?: WorkshopReferenceImage | null | undefined;
   referenceGeneration?: ReferenceGenerationState | undefined;
   referenceImagesAvailable?: boolean | undefined;
-  referenceImageProvider?: 'openai' | 'bfl' | null | undefined;
+  referenceImageProvider?: 'openai' | 'bfl' | 'wiro' | null | undefined;
   referenceImageModel?: string | null | undefined;
   optimizerModel?: string | null | undefined;
   optimizerVersion?: string | null | undefined;
