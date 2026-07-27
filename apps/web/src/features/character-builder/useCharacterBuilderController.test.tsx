@@ -369,6 +369,52 @@ describe('useCharacterBuilderController save transactions', () => {
     expect(rendered.result.current.state.uploadedReference).toBeNull();
   });
 
+  it('surfaces upload validation and transport failures and permits a clean retry', async () => {
+    const memory = createMemoryDraftRepository();
+    draftRepositoryFactory.mockReturnValue(memory.repository);
+    const rendered = renderHook(() =>
+      useCharacterBuilderController({
+        open: true,
+        generationAvailable: true,
+        editAvailable: true,
+        onSaveCharacter: vi.fn(),
+        onDismiss: vi.fn(),
+      }),
+    );
+    await waitFor(() => expect(rendered.result.current.state.phase).toBe('editing'));
+    const invalid = new File(['invalid'], 'invalid.png', { type: 'image/png' });
+    validateReferenceImage.mockResolvedValueOnce({
+      blockingError: 'The image is too large.',
+      warnings: [],
+      width: null,
+      height: null,
+    });
+
+    act(() => rendered.result.current.onUploadReference(invalid));
+    await waitFor(() =>
+      expect(rendered.result.current.state.uploadError).toBe('The image is too large.'),
+    );
+    expect(uploadReferenceImage).not.toHaveBeenCalled();
+
+    uploadReferenceImage
+      .mockRejectedValueOnce(new Error('Upload transport failed.'))
+      .mockResolvedValueOnce(uploadedAsset);
+    const valid = new File(['valid'], 'portrait.png', { type: 'image/png' });
+    act(() => rendered.result.current.onUploadReference(valid));
+    await waitFor(() =>
+      expect(rendered.result.current.state.uploadError).toBe('Upload transport failed.'),
+    );
+
+    act(() => rendered.result.current.onUploadReference(valid));
+    await waitFor(() =>
+      expect(rendered.result.current.state.uploadedReference?.asset.assetId).toBe(
+        uploadedAsset.assetId,
+      ),
+    );
+    expect(rendered.result.current.state.uploadError).toBeNull();
+    expect(uploadReferenceImage).toHaveBeenCalledTimes(2);
+  });
+
   it('saves a manually detailed character without choosing a demo character', async () => {
     const memory = createMemoryDraftRepository();
     draftRepositoryFactory.mockReturnValue(memory.repository);
@@ -502,6 +548,20 @@ describe('useCharacterBuilderController save transactions', () => {
 
     await waitFor(() => expect(onSaveCharacter).toHaveBeenCalledOnce());
     expect(result.current.state.phase).toBe('saving');
+    const frozenDraft = result.current.state.draft;
+    const frozenOptions = result.current.state.options;
+    act(() => {
+      result.current.onChange(
+        { ...frozenDraft, characterBase: 'A late edit that must be ignored' },
+        result.current.state.design,
+      );
+      result.current.onOptionsChange({ ...frozenOptions, framing: 'head_and_shoulders' });
+      result.current.onRequestRegeneration();
+      result.current.onRequestReset();
+    });
+    expect(result.current.state.draft).toBe(frozenDraft);
+    expect(result.current.state.options).toBe(frozenOptions);
+    expect(result.current.state.phase).toBe('saving');
     saveGate.resolve();
 
     await waitFor(() => expect(onDismiss).toHaveBeenCalledOnce());
@@ -572,6 +632,32 @@ describe('useCharacterBuilderController save transactions', () => {
     expect(retry.result.current.state.phase).toBe('editing');
     expect(retry.result.current.canSave).toBe(false);
     expect(retry.result.current.saveRecoveryPending).toBe(false);
+  });
+
+  it('resets the durable draft in place and closes only after persistence settles', async () => {
+    const memory = createMemoryDraftRepository();
+    draftRepositoryFactory.mockReturnValue(memory.repository);
+    const first = await renderReadyController(vi.fn());
+
+    act(() => first.result.current.onRequestReset());
+    await waitFor(() => expect(first.result.current.state.phase).toBe('confirming-reset'));
+    act(() => first.result.current.onCancelReset());
+    await waitFor(() => expect(first.result.current.state.phase).toBe('editing'));
+
+    act(() => first.result.current.onRequestReset());
+    act(() => first.result.current.onConfirmReset());
+    await waitFor(() => expect(first.result.current.resetBusy).toBe(false));
+    expect(first.result.current.state.phase).toBe('editing');
+    expect(first.result.current.canSave).toBe(false);
+    expect(memory.readActive()).toBeNull();
+    expect(first.onDismiss).not.toHaveBeenCalled();
+    first.unmount();
+
+    const closeDismiss = vi.fn();
+    const second = await renderReadyController(vi.fn(), closeDismiss);
+    act(() => second.result.current.onClose());
+    await waitFor(() => expect(closeDismiss).toHaveBeenCalledOnce());
+    expect(second.result.current.state.phase).toBe('editing');
   });
 
   it('retries only draft finalization after the Studio handoff completed in this mount', async () => {

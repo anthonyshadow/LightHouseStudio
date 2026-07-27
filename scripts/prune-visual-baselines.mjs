@@ -1,82 +1,97 @@
 import { readdir, rm, rmdir } from 'node:fs/promises';
 import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { VISUAL_BASELINE_PATHS } from '../e2e/studioVisualMatrix.ts';
 
-const screenshotsRoot = path.resolve('screenshots');
-const viewportFolders = [
-  '01-full-desktop-1440x960',
-  '02-compact-desktop-1280x720',
-  '03-tablet-portrait-834x1112',
-  '04-mobile-portrait-390x844',
-  '05-small-mobile-320x568',
-];
-const coreBaselines = [
-  '01-studio/local-idle.png',
-  '01-studio/local-recording.png',
-  '01-studio/character-ai-live.png',
-];
-const focusedBaselines = [
-  '01-studio/local-finalizing.png',
-  '01-studio/stage-media-error.png',
-  '01-studio/virtual-try-on-ai-live.png',
-  '03-character-workshop/add-one-object.png',
-  '05-capture-settings/local-before-preview.png',
-  '06-take-review/latest-take.png',
-];
+const DEFAULT_SCREENSHOTS_ROOT = path.resolve('screenshots');
 
-const curatedBaselines = new Set(
-  viewportFolders.flatMap((viewport) => coreBaselines.map((baseline) => `${viewport}/${baseline}`)),
-);
-for (const viewport of [viewportFolders[0], viewportFolders[4]]) {
-  for (const baseline of focusedBaselines) curatedBaselines.add(`${viewport}/${baseline}`);
-}
-if (curatedBaselines.size !== 27) {
-  throw new Error(`Expected 27 curated baselines, got ${curatedBaselines.size}.`);
+export const curatedBaselines = new Set(VISUAL_BASELINE_PATHS);
+
+if (curatedBaselines.size !== 29) {
+  throw new Error(`Expected 29 curated baselines, got ${curatedBaselines.size}.`);
 }
 
-const platformFolders = (await readdir(screenshotsRoot, { withFileTypes: true }))
-  .filter((entry) => entry.isDirectory() && entry.name.startsWith('chromium-'))
-  .map((entry) => entry.name);
-if (platformFolders.length === 0) throw new Error('No platform-specific visual baselines found.');
-
-const retained = new Set(
-  platformFolders.flatMap((platformFolder) =>
-    [...curatedBaselines].map((baseline) => `${platformFolder}/${baseline}`),
-  ),
-);
-
-const files = [];
-const directories = [];
-const collect = async (directory) => {
-  directories.push(directory);
-  for (const entry of await readdir(directory, { withFileTypes: true })) {
-    const target = path.join(directory, entry.name);
-    if (entry.isDirectory()) await collect(target);
-    else if (entry.isFile()) files.push(target);
-  }
+const collectFiles = async (root) => {
+  const files = [];
+  const directories = [];
+  const collect = async (directory) => {
+    directories.push(directory);
+    for (const entry of await readdir(directory, { withFileTypes: true })) {
+      const target = path.join(directory, entry.name);
+      if (entry.isDirectory()) await collect(target);
+      else if (entry.isFile()) files.push(target);
+    }
+  };
+  await collect(root);
+  return { directories, files };
 };
-await collect(screenshotsRoot);
 
-const relativeFiles = new Set(files.map((file) => path.relative(screenshotsRoot, file)));
-const missing = [...retained].filter((file) => !relativeFiles.has(file));
-if (missing.length > 0) {
-  throw new Error(`Refusing to prune before all curated baselines exist:\n${missing.join('\n')}`);
-}
+export const inspectVisualBaselines = async (screenshotsRoot = DEFAULT_SCREENSHOTS_ROOT) => {
+  const platformFolders = (await readdir(screenshotsRoot, { withFileTypes: true }))
+    .filter((entry) => entry.isDirectory() && entry.name.startsWith('chromium-'))
+    .map((entry) => entry.name)
+    .sort();
+  if (platformFolders.length === 0) {
+    throw new Error('No platform-specific visual baselines found.');
+  }
 
-const removed = [];
-for (const file of files) {
-  const relative = path.relative(screenshotsRoot, file);
-  if (retained.has(relative)) continue;
-  await rm(file);
-  removed.push(relative);
-}
-for (const directory of directories.toReversed()) {
-  if (directory === screenshotsRoot) continue;
-  await rmdir(directory).catch((error) => {
-    if (error instanceof Error && 'code' in error && error.code === 'ENOTEMPTY') return;
-    throw error;
-  });
-}
+  const retained = new Set(
+    platformFolders.flatMap((platformFolder) =>
+      [...curatedBaselines].map((baseline) => `${platformFolder}/${baseline}`),
+    ),
+  );
+  const { directories, files } = await collectFiles(screenshotsRoot);
+  const relativeFiles = new Set(files.map((file) => path.relative(screenshotsRoot, file)));
 
-console.log(
-  `Retained ${retained.size} curated baselines across ${platformFolders.length} platforms and removed ${removed.length} broad captures.`,
-);
+  return {
+    directories,
+    files,
+    platformFolders,
+    retained,
+    missing: [...retained].filter((file) => !relativeFiles.has(file)),
+    removable: [...relativeFiles].filter((file) => !retained.has(file)),
+  };
+};
+
+export const pruneVisualBaselines = async (screenshotsRoot = DEFAULT_SCREENSHOTS_ROOT) => {
+  const inventory = await inspectVisualBaselines(screenshotsRoot);
+  if (inventory.missing.length > 0) {
+    throw new Error(
+      `Refusing to prune before all curated baselines exist:\n${inventory.missing.join('\n')}`,
+    );
+  }
+
+  for (const relative of inventory.removable) {
+    await rm(path.join(screenshotsRoot, relative));
+  }
+  for (const directory of inventory.directories.toReversed()) {
+    if (directory === screenshotsRoot) continue;
+    await rmdir(directory).catch((error) => {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOTEMPTY') return;
+      throw error;
+    });
+  }
+  return inventory;
+};
+
+const isDirectRun =
+  process.argv[1] !== undefined &&
+  import.meta.url === pathToFileURL(path.resolve(process.argv[1])).href;
+
+if (isDirectRun) {
+  const checkOnly = process.argv.includes('--check');
+  const inventory = await inspectVisualBaselines();
+  if (inventory.missing.length > 0) {
+    throw new Error(`Visual baseline inventory is incomplete:\n${inventory.missing.join('\n')}`);
+  }
+  if (checkOnly) {
+    console.log(
+      `Verified ${curatedBaselines.size} curated baselines across ${inventory.platformFolders.length} platforms; ${inventory.removable.length} non-curated files would be pruned.`,
+    );
+  } else {
+    await pruneVisualBaselines();
+    console.log(
+      `Retained ${inventory.retained.size} curated baselines across ${inventory.platformFolders.length} platforms and removed ${inventory.removable.length} broad captures.`,
+    );
+  }
+}

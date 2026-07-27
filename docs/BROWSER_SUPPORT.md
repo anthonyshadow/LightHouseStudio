@@ -27,7 +27,7 @@ Responsive behavior is range-based:
 
 The required visual regression sizes are `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`. The curated Chromium matrix defines exactly 29 cases: idle, recording, and character-live at all five sizes, plus AI experience choice, finalizing, error, VTON, workshop, capture, and review at desktop and small mobile. Animations are disabled and `maxDiffPixelRatio` is `0.005`. At every size, document and body scroll width/height must stay within the viewport (allowing one pixel of browser rounding). Stage video uses `object-fit: contain` to preserve the whole frame, mirrors local preview only, and does not crop transformed output or recorded playback.
 
-Baselines are platform-specific. The Darwin set currently contains all 29 cases; the checked-in Linux set used by CI lacks the two AI-experience-choice baselines, and the pruning script still describes the prior 27-case matrix. Treat Linux visual validation as incomplete until that dedicated test-asset update is made.
+The executable visual matrix and pruning inventory share exactly 29 cases. Darwin and Linux each contain all 29 reviewed assets. The complete suite passes on Darwin and in the Linux/amd64 Playwright runtime used to match CI architecture.
 
 ## Capability matrix
 

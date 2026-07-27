@@ -46,7 +46,7 @@ Commands used included:
 
 Lightframe Studio is architecturally healthy for its current local-first scope. It has explicit package direction, pure domain and contract packages, one composition root, app-owned runtime validation, disciplined provider boundaries, and unusually strong media/resource lifecycle tests. The 348-module dependency graph has 935 local edges and zero cycles. The cleanup roadmap should preserve that shape rather than introduce a router, global store, generic repository framework, or broad provider abstraction.
 
-The immediate risk is validation trust, not broken production architecture. One functional journey still exercises character editing in Prompt Workshop even though Character Builder now owns that flow. The visual suite has 15 stale Darwin snapshots and four absent Linux snapshots, while its pruning script retains only 27 of 29 intended cases. Aggregate coverage passes just above threshold while cost- and lifecycle-sensitive orchestration hooks have very weak direct coverage. These issues must be corrected before structural cleanup.
+The audit's immediate risk was validation trust, not broken production architecture. PHASE-001 has since resolved the stale functional journey, critical-hook coverage, and visual tooling/assets. The executable suite, pruning inventory, documentation, and both checked-in platform folders now agree on 29 cases; clean Darwin and Linux/amd64 runs each pass 29/29. Structural cleanup can proceed on that safety net.
 
 The highest-value implementation work after the safety phase is:
 
@@ -77,22 +77,22 @@ All implementation phases must preserve these properties.
 
 ## 4. Findings summary
 
-| Finding ID | Title                                                                  | Category                         | Severity | Confidence      | Status | Affected area                                                 | Recommended phase |
-| ---------- | ---------------------------------------------------------------------- | -------------------------------- | -------- | --------------- | ------ | ------------------------------------------------------------- | ----------------- |
-| TEST-001   | Aggregate coverage masks critical orchestration gaps                   | Tests                            | High     | Confirmed       | Open   | Recording review and Character Builder generation/controllers | PHASE-001         |
-| TEST-002   | Local-first E2E journey exercises a retired Workshop character flow    | Tests                            | High     | Confirmed       | Open   | `e2e/local-first-preparation.spec.ts`                         | PHASE-001         |
-| TOOL-001   | Visual matrix, baselines, pruning, and documentation disagree          | Tooling/tests                    | High     | Confirmed       | Open   | Visual Playwright suite and platform snapshots                | PHASE-001         |
-| DEAD-001   | Legacy Guided repository retains an unreachable write pipeline         | Dead/compatibility code          | Medium   | Confirmed       | Open   | Guided IndexedDB compatibility repository                     | PHASE-002         |
-| DEAD-002   | Disabled starter-picker presentation remains compiled                  | Dead UI code                     | Low      | Confirmed       | Open   | Character Builder form and styles                             | PHASE-002         |
-| DEAD-003   | Production telemetry is a no-op seam with no consumer                  | Dead service code                | Low      | Confirmed       | Open   | Studio telemetry and mount effect                             | PHASE-002         |
-| ARCH-001   | Shared confirmation dialog is owned by Character Builder               | Architecture/ownership           | Medium   | Confirmed       | Open   | Shared UI and Legacy Projects                                 | PHASE-003         |
-| ARCH-002   | Character generation remains owned by Prompt Workshop internals        | Architecture/ownership           | High     | Confirmed       | Open   | Character Builder, prompt-authoring, media-session helpers    | PHASE-003         |
-| DUP-001    | BFL and Wiro duplicate hardened task-download transport                | Duplication/security maintenance | High     | Confirmed       | Open   | API provider adapters                                         | PHASE-004         |
-| DUP-002    | Reference image service repeats asset finalization logic               | Duplication/service cohesion     | Medium   | High confidence | Open   | API reference-image service                                   | PHASE-005         |
-| DUP-003    | Reference-image fields duplicate file-picker/drop presentation         | Duplication/components           | Low      | Confirmed       | Open   | Character Builder and media-session UI                        | PHASE-006         |
-| COMP-001   | Studio composition root owns several independent lifecycle controllers | Component/orchestration          | Medium   | High confidence | Open   | `StudioApp.tsx`                                               | PHASE-007         |
-| STATE-001  | Recipe handoff facade mixes five stateful workflows                    | State/orchestration              | Medium   | Confirmed       | Open   | `useReferenceRecipeHandoff.ts`                                | PHASE-008         |
-| DOC-001    | Canonical image-generation document filename is misspelled             | Documentation                    | Low      | Confirmed       | Open   | README documentation map and image-generation doc             | PHASE-009         |
+| Finding ID | Title                                                                  | Category                         | Severity | Confidence      | Status   | Affected area                                                 | Recommended phase |
+| ---------- | ---------------------------------------------------------------------- | -------------------------------- | -------- | --------------- | -------- | ------------------------------------------------------------- | ----------------- |
+| TEST-001   | Aggregate coverage masks critical orchestration gaps                   | Tests                            | High     | Confirmed       | Resolved | Recording review and Character Builder generation/controllers | PHASE-001         |
+| TEST-002   | Local-first E2E journey exercises a retired Workshop character flow    | Tests                            | High     | Confirmed       | Resolved | `e2e/local-first-preparation.spec.ts`                         | PHASE-001         |
+| TOOL-001   | Visual matrix, baselines, pruning, and documentation disagree          | Tooling/tests                    | High     | Confirmed       | Resolved | Visual Playwright suite and platform snapshots                | PHASE-001         |
+| DEAD-001   | Legacy Guided repository retains an unreachable write pipeline         | Dead/compatibility code          | Medium   | Confirmed       | Open     | Guided IndexedDB compatibility repository                     | PHASE-002         |
+| DEAD-002   | Disabled starter-picker presentation remains compiled                  | Dead UI code                     | Low      | Confirmed       | Open     | Character Builder form and styles                             | PHASE-002         |
+| DEAD-003   | Production telemetry is a no-op seam with no consumer                  | Dead service code                | Low      | Confirmed       | Open     | Studio telemetry and mount effect                             | PHASE-002         |
+| ARCH-001   | Shared confirmation dialog is owned by Character Builder               | Architecture/ownership           | Medium   | Confirmed       | Open     | Shared UI and Legacy Projects                                 | PHASE-003         |
+| ARCH-002   | Character generation remains owned by Prompt Workshop internals        | Architecture/ownership           | High     | Confirmed       | Open     | Character Builder, prompt-authoring, media-session helpers    | PHASE-003         |
+| DUP-001    | BFL and Wiro duplicate hardened task-download transport                | Duplication/security maintenance | High     | Confirmed       | Open     | API provider adapters                                         | PHASE-004         |
+| DUP-002    | Reference image service repeats asset finalization logic               | Duplication/service cohesion     | Medium   | High confidence | Open     | API reference-image service                                   | PHASE-005         |
+| DUP-003    | Reference-image fields duplicate file-picker/drop presentation         | Duplication/components           | Low      | Confirmed       | Open     | Character Builder and media-session UI                        | PHASE-006         |
+| COMP-001   | Studio composition root owns several independent lifecycle controllers | Component/orchestration          | Medium   | High confidence | Open     | `StudioApp.tsx`                                               | PHASE-007         |
+| STATE-001  | Recipe handoff facade mixes five stateful workflows                    | State/orchestration              | Medium   | Confirmed       | Open     | `useReferenceRecipeHandoff.ts`                                | PHASE-008         |
+| DOC-001    | Canonical image-generation document filename is misspelled             | Documentation                    | Low      | Confirmed       | Open     | README documentation map and image-generation doc             | PHASE-009         |
 
 ## 5. Detailed findings
 
@@ -101,7 +101,7 @@ All implementation phases must preserve these properties.
 - **Category:** Tests and regression prevention
 - **Severity:** High
 - **Confidence:** Confirmed
-- **Status:** Open
+- **Status:** Resolved
 - **Affected files:** `apps/web/src/studio/useTakeReviewFlow.ts`; `apps/web/src/features/character-builder/useCharacterReferenceGeneration.ts`; `apps/web/src/features/character-builder/useCharacterBuilderController.ts`; their tests.
 - **Affected features or runtime flows:** Take finalization/review cleanup; upload/generate/edit/compose reference work; builder save/preload/locking.
 - **Evidence:** Aggregate coverage passes narrowly (81.31/70.22/82.79/83.89), but the generated report shows approximately 23.61% statements for `useTakeReviewFlow`, 16.66% for `useCharacterReferenceGeneration`, and 30.5% for `useCharacterBuilderController`. Existing take-review tests primarily exercise exported helpers; lower-level preview generation is tested, but the Builder adapter's validation, operation locking, stale-result, and error paths are not directly exercised.
@@ -117,13 +117,14 @@ All implementation phases must preserve these properties.
 - **Suggested implementation phase:** PHASE-001
 - **Estimated scope:** Medium
 - **Related findings:** TEST-002, ARCH-002, COMP-001, STATE-001
+- **PHASE-001 implementation evidence (2026-07-27):** Added direct hook tests for ordered/empty/rejected take finalization, automatic cleanup, generation validation, composition/edit source selection, same-turn locking, retry, cancellation, save-recovery blocking, and stale completion rejection. Expanded the Builder-controller suite for upload validation/transport retry, edit locking during save, reset/close settlement, the existing resumable preload failure, and durable-finalization retry. `npm run test:coverage` now passes 93 files / 706 tests at 82.79% statements, 71.55% branches, 84.19% functions, and 85.46% lines. Statement coverage changed from approximately 23.61% to 98.61% for `useTakeReviewFlow`, 16.66% to 86.66% for `useCharacterReferenceGeneration`, and 30.5% to 62.71% for `useCharacterBuilderController`; thresholds were not changed.
 
 ### [TEST-002] Local-first E2E journey exercises a retired Workshop character flow
 
 - **Category:** Tests
 - **Severity:** High
 - **Confidence:** Confirmed
-- **Status:** Open
+- **Status:** Resolved
 - **Affected files:** `e2e/local-first-preparation.spec.ts:76-134`; current behavior documented in `docs/userStories/README.md`.
 - **Affected features or runtime flows:** Keyboard-accessible, provider-free preparation.
 - **Evidence:** At lines 110-122 the test opens structured Prompt Workshop and waits for a `Character concept` textbox plus `Use in working draft`. The current Workshop owns only Add/Replace/Restyle. `npm run test:e2e` failed this locator in Chromium, WebKit, and mobile: 125 passed, 10 skipped, 3 failed.
@@ -139,28 +140,32 @@ All implementation phases must preserve these properties.
 - **Suggested implementation phase:** PHASE-001
 - **Estimated scope:** Small
 - **Related findings:** TEST-001, ARCH-002
+- **PHASE-001 implementation evidence (2026-07-27):** Replaced the retired Character-concept locator with the current Add-object Workshop path. The journey opens Workshop by keyboard, validates and applies an object/placement draft, reopens it by keyboard, proves tab-memory retention, and retains the zero-camera, capabilities-only API, no-token, and deny-external assertions. The targeted file passes 6/6 across Chromium, WebKit, and mobile; the full functional gate passes 128 with 10 intentional skips and no failures. No runtime feature code changed and the retired character form was not revived.
 
 ### [TOOL-001] Visual matrix, baselines, pruning, and documentation disagree
 
 - **Category:** Tooling, tests, and documentation
 - **Severity:** High
 - **Confidence:** Confirmed
-- **Status:** Open
+- **Status:** Resolved
 - **Affected files:** `e2e/studio.visual.spec.ts:254-280`; `scripts/prune-visual-baselines.mjs:4-34`; `screenshots/chromium-darwin/**`; `screenshots/chromium-linux/**`; `README.md:110-125`; `docs/BROWSER_SUPPORT.md:28-30`; `docs/ARCHITECTURE.md:158-164`.
 - **Affected features or runtime flows:** The 29-case cross-viewport visual release gate.
-- **Evidence:** The executable suite defines 29 cases. The pruning script deliberately retains 27 and omits AI-choice cases. Darwin contains 29 files; Linux contains 25, missing desktop/small-mobile AI-choice and Workshop files. README and Browser Support say only two Linux files are missing, while Architecture correctly says four. A current Darwin run passed 14 and failed 15; visible diffs include intentionally changed current controls (for example, recording moved into the stage control strip) rather than nondeterministic animation.
+- **Initial evidence:** The executable suite defines 29 cases. The pruning script deliberately retains 27 and omits AI-choice cases. Darwin contains 29 files; Linux contains 25, missing desktop/small-mobile AI-choice and Workshop files. README and Browser Support say only two Linux files are missing, while Architecture correctly says four. The initial Darwin run passed 14 and failed 15; visible diffs include intentionally changed current controls (for example, recording moved into the stage control strip) rather than nondeterministic animation.
 - **Graphify evidence:** Visual specs and scripts are tooling entry points rather than normal runtime imports; registration was verified through package scripts and Playwright configuration. Graphify did not classify snapshot assets, so filesystem inventory and test execution are authoritative here.
-- **Current behavior:** CI's Linux visual job cannot validate the complete declared matrix, local Darwin validation is red against stale images, and pruning can delete two legitimate cases.
+- **Current behavior:** The executable/pruning/documented matrix agrees on 29 cases; Darwin and Linux each contain 29 reviewed assets, both complete suites pass, and the pruning check reports no missing or removable files.
 - **Why this matters:** Visual regression is neither a reliable release gate nor a trustworthy record of responsive behavior.
 - **Root cause:** The Character Builder/control-layout evolution updated code and some documentation without one dedicated cross-platform baseline asset update; the pruning allowlist remained at its older count.
 - **Recommended change:** First inspect every current diff and obtain product approval that the rendered UI is intended; never bulk-approve blindly. Update valid Darwin baselines, generate the four missing Linux assets in the repository's supported Linux environment, add AI-choice to the pruning allowlist so it retains exactly 29, and reconcile all three canonical docs. If any diff is unintended, fix it in a separate behavior change before accepting snapshots.
 - **What should not change:** Exact viewport sizes, 0.5% threshold, platform-specific folders, animations-disabled behavior, external-traffic denial, or snapshots unrelated to reviewed intentional changes.
-- **Dependencies and prerequisites:** Human/owner review of rendered diffs; suitable Linux Playwright environment for Linux assets.
+- **Dependencies and prerequisites:** Cleared by explicit owner approval plus the isolated Linux/amd64 Playwright runtime.
 - **Regression risks:** Snapshot updates can conceal real UI regressions. The phase must document per-scenario review.
-- **Required validation:** `npm run test:visual` on Darwin and Linux, `npm run quality`, and pruning-script dry verification without running destructive pruning as part of unrelated work.
+- **Required validation:** Completed with `npm run test:visual` on Darwin and Linux/amd64, `npm run quality`, and pruning-script dry verification without running destructive pruning.
 - **Suggested implementation phase:** PHASE-001
 - **Estimated scope:** Medium; may be blocked on Linux environment/visual approval
 - **Related findings:** TEST-002
+- **PHASE-001 partial implementation evidence (2026-07-27):** `studioVisualMatrix.ts` is now the single executable 29-case inventory consumed by the visual spec and pruning script. A non-destructive inventory test covers exact-set equality plus retained/missing/removable classification; it passes 2/2. The real `--check` correctly reports only the four absent Linux files. README, Browser Support, and Architecture now state identical checked-in facts. Darwin was rerun after the tooling change and remains at the pre-existing 14 passed / 15 diffs; no threshold or snapshot was changed.
+- **Former precise blocker (cleared 2026-07-27):** At the partial checkpoint, product/design-owner approval had not been provided for the 15 Darwin diffs: recording at desktop, compact, tablet, mobile, and small mobile; character-live at tablet, mobile, and small mobile; idle at mobile and small mobile; AI experience choice at desktop and small mobile; and finalizing, media-error, and VTON-live at small mobile. The host also had no Linux container runtime. `TOOL-001` and PHASE-001 therefore remained blocked at that checkpoint and no unreviewed baseline was accepted.
+- **PHASE-001 resolution evidence (2026-07-27):** The owner explicitly approved completing the reviewed Darwin diffs and required real Linux generation/validation. All 15 Darwin baselines were updated and a clean Darwin run passed 29/29. A Colima Linux VM plus the Playwright `v1.61.1-noble` image provided an isolated Linux/amd64 runtime matching CI architecture. The complete Linux set was reviewed and refreshed for the current browser/UI; the four previously absent desktop/small-mobile AI-experience-choice and Add-object Workshop assets were force-written by Linux/amd64 and passed a focused 4/4 run. A subsequent clean Linux/amd64 run passed 29/29. `npm run screenshots:prune -- --check` verified 29 curated baselines on each of two platforms with zero missing or removable files. The viewport list, 0.5% threshold, platform folders, external-traffic denial, and production behavior were unchanged.
 
 ### [DEAD-001] Legacy Guided repository retains an unreachable write pipeline
 
@@ -440,17 +445,17 @@ No additional file was classified dead solely from text search. Knip passed, fra
 
 ## 8. Component and module hotspots
 
-| Hotspot                                    | Evidence                                                            | Why it is a hotspot                                                              | Direction                                      |
-| ------------------------------------------ | ------------------------------------------------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------- |
-| `StudioApp.tsx`                            | 848 lines; fan-out 38; 15 edits in sampled 80 commits               | Root plus multiple independent lifecycle controllers and overlay wiring          | COMP-001; keep composition root/stage topology |
-| `useReferenceRecipeHandoff.ts`             | 550 lines; fan-out 16; Graphify degree 15                           | Five stateful workflows and async reference coordination behind one facade       | STATE-001; preserve facade, split internals    |
-| `projectRepository.ts`                     | 1,106 lines; Graphify degree 65                                     | Compatibility reads mixed with retired authoring/revision machinery              | DEAD-001                                       |
-| `reference-image-service.ts`               | 559 lines; central to three operations and owner-scoped coordinator | Correctly central but repeats finalization and has high-impact persistence paths | DUP-002                                        |
-| BFL/Wiro adapters                          | Wiro provider 576 lines plus two ~230-line downloaders              | Security transport duplicated while provider protocols remain distinct           | DUP-001                                        |
-| `useTakeReviewFlow.ts`                     | Critical lifecycle hook with ~23.61% statement coverage             | Low direct safety for cleanup/finalization behavior                              | TEST-001                                       |
-| `useCharacterReferenceGeneration.ts`       | Critical provider-cost adapter with ~16.66% statement coverage      | Validation, locking, and failure handling are weakly isolated in tests           | TEST-001/ARCH-002                              |
-| `MediaStage.tsx`                           | 561 lines but stable cohesive ownership                             | Owns persistent media DOM and stage presentation; broad test protection          | Preserve; do not split by size alone           |
-| `packages/domain/src/assets/operations.ts` | 615 lines but pure/cohesive and highly tested                       | Related immutable asset/recipe operations share one domain aggregate             | Preserve pending a real change axis            |
+| Hotspot                                    | Evidence                                                            | Why it is a hotspot                                                                | Direction                                      |
+| ------------------------------------------ | ------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | ---------------------------------------------- |
+| `StudioApp.tsx`                            | 848 lines; fan-out 38; 15 edits in sampled 80 commits               | Root plus multiple independent lifecycle controllers and overlay wiring            | COMP-001; keep composition root/stage topology |
+| `useReferenceRecipeHandoff.ts`             | 550 lines; fan-out 16; Graphify degree 15                           | Five stateful workflows and async reference coordination behind one facade         | STATE-001; preserve facade, split internals    |
+| `projectRepository.ts`                     | 1,106 lines; Graphify degree 65                                     | Compatibility reads mixed with retired authoring/revision machinery                | DEAD-001                                       |
+| `reference-image-service.ts`               | 559 lines; central to three operations and owner-scoped coordinator | Correctly central but repeats finalization and has high-impact persistence paths   | DUP-002                                        |
+| BFL/Wiro adapters                          | Wiro provider 576 lines plus two ~230-line downloaders              | Security transport duplicated while provider protocols remain distinct             | DUP-001                                        |
+| `useTakeReviewFlow.ts`                     | Critical lifecycle hook now at 98.61% statement coverage            | Ordered settlement and cleanup behavior has direct focused protection              | TEST-001 resolved                              |
+| `useCharacterReferenceGeneration.ts`       | Critical provider-cost adapter now at 86.66% statement coverage     | Validation, locking, retry, cancellation, and stale boundaries are directly tested | TEST-001 resolved / ARCH-002 remains           |
+| `MediaStage.tsx`                           | 561 lines but stable cohesive ownership                             | Owns persistent media DOM and stage presentation; broad test protection            | Preserve; do not split by size alone           |
+| `packages/domain/src/assets/operations.ts` | 615 lines but pure/cohesive and highly tested                       | Related immutable asset/recipe operations share one domain aggregate               | Preserve pending a real change axis            |
 
 Barrel modules (`packages/domain/src/index.ts`, `packages/contracts/src/index.ts`, and shared UI index) have fan-in around 52 by design. They are public boundaries, not hotspots to dissolve.
 
@@ -482,6 +487,8 @@ The exact results are recorded in section 1. The baseline conclusion is:
 
 Build output warned about chunks above Vite's default 500 KB advisory threshold. This is not a failing gate and is intentionally deferred absent measurement.
 
+PHASE-001 completion supersedes only the failing test/visual conclusions above: functional E2E now passes 128 cases with 10 intentional skips, Darwin visual passes 29/29, Linux/amd64 visual passes 29/29, and the pruning inventory verifies all 58 platform assets. The original audit baseline is retained here as historical evidence.
+
 ## 11. Rejected or intentionally deferred suggestions
 
 | Suggestion                                        | Decision and evidence                                                                                                                                                        |
@@ -503,7 +510,7 @@ Build output warned about chunks above Vite's default 500 KB advisory threshold.
 
 ## 12. Recommended implementation order
 
-1. **PHASE-001:** Restore trustworthy validation (`TEST-001`, `TEST-002`, `TOOL-001`).
+1. **PHASE-001 (completed):** Restore trustworthy validation (`TEST-001`, `TEST-002`, `TOOL-001`).
 2. **PHASE-002:** Remove only confirmed retired/unreachable code while preserving persisted data (`DEAD-001`–`003`).
 3. **PHASE-003:** Correct shared/feature ownership after the Character Builder migration (`ARCH-001`, `ARCH-002`).
 4. **PHASE-004:** Consolidate duplicated provider-safe download primitives (`DUP-001`).
@@ -514,3 +521,14 @@ Build output warned about chunks above Vite's default 500 KB advisory threshold.
 9. **PHASE-009:** Reconcile canonical documentation and filename (`DOC-001`).
 
 This order deliberately establishes tests before risky changes, removes obsolete responsibilities before choosing boundaries, and defers orchestration decomposition until ownership and shared primitives are stable.
+
+## 13. PHASE-001 implementation record
+
+PHASE-001 is complete. Production runtime modules, contracts, persistence, provider adapters, and pixel thresholds were unchanged.
+
+- **Changed tests/tooling:** Current local-only Workshop E2E; direct take-review and reference-generation hook tests; expanded Builder-controller tests; shared visual-matrix registration; non-destructive pruning inventory test; pruning script exact-set consumption; reviewed Darwin and Linux platform snapshots.
+- **Validation:** `npm run quality` passed (93 files / 706 unit tests, 21 files / 53 Storybook tests, types, lint, format, Knip, module check, production/Storybook builds). `npm run test:coverage` passed at 82.79/71.55/84.19/85.46. `npm run test:e2e` passed 128 with 10 intentional skips. `npm run test:production` passed 1/1. The pruning unit test passed 2/2 and `npm run screenshots:prune -- --check` verified 29 curated baselines across both platforms with zero missing/removable files. Clean visual runs passed 29/29 on Darwin and 29/29 in Linux/amd64; the four new Linux assets also passed a focused 4/4 generation run.
+- **Visual review:** The 15 approved Darwin diffs and Linux refresh consistently show the current status header, stage control strip, modal copy, and responsive layout. The four new Linux assets cover desktop/small-mobile AI experience choice and Add-object Prompt Workshop. No threshold was raised and no unrelated visual case was accepted without review.
+- **Graphify:** `graphify update .` refreshed the code graph from 3,699 nodes / 8,342 edges to 3,726 / 8,404 at the partial checkpoint, then to 3,711 / 8,389 after the final assets, documentation reconciliation, and roadmap-section removal. Both refreshes repeated only the known non-source `hooks.json` zero-node warning. Direct path checks show one-hop focused-test imports to `useTakeReviewFlow`, `useCharacterReferenceGeneration`, and `useCharacterBuilderController`; `prune-visual-baselines.mjs` imports the shared `studioVisualMatrix.ts` inventory in one hop. Knip passes, and `npm run check:modules` reports 352 files / 947 local edges / zero cycles. No production runtime module was edited.
+- **Limitations:** `npm run audit:prod` was not run because the phase requires explicit authorization before sending dependency metadata externally. The Playwright image's bundled npm 11.13 rejected the existing lockfile while the repository-compatible npm 11.6.2 completed isolated Linux installs on both architectures; no dependency or lockfile normalization was folded into this visual/test phase.
+- **Plan status:** TEST-001, TEST-002, and TOOL-001 are resolved. PHASE-001 has self-removed from `projectCleanupImplementationPlan.md`; PHASE-002 is next.

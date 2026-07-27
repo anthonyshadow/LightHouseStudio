@@ -20,7 +20,7 @@ selects **Take**.
 - Separate `lucy-2.5` character and `lucy-vton-3` try-on sessions
 - Draft-versus-applied realtime recipes with atomic Apply, Revert, and Reset
 - JPEG, PNG, and WebP reference images up to and including 10 MiB; Character Builder uploads also enforce a 40-megapixel decoded-image limit
-- A four-intent structured character prompt workshop with adult-only age, gender, ethnicity, skin-tone, body-shape, hairstyle, and hair-color direction
+- A three-intent structured Prompt Workshop for focused Add, Replace, and Restyle object recipes; Character Builder exclusively owns character creation and editing
 - Gender-aware visual suggestions, Show All catalogs, and custom text for directions outside the catalog; nine starter definitions remain available internally while the demo picker is hidden
 - Optional, automatically optimized OpenAI `gpt-image-2`, BFL `flux-2-pro`, or Wiro ByteDance `seedream-v5-lite-uncensored` previews, durable local uploads, source-image composition, and instructed editing
 - A versioned Recipe Shelf v4 for saved, recent, and restorable character prompts with reference provenance and optional guided-design provenance
@@ -121,7 +121,7 @@ npm run quality       # types, Storybook, lint, format, static checks, tests, an
 
 Install Playwright browsers once with `npx playwright install`. Coverage, functional end-to-end, production smoke, curated visual, and production audit checks are independent of the local `quality` script; run all five before release. CI runs the core checks, Storybook type/interaction/build checks, the production static-serving smoke, and the separate coverage/browser/visual jobs.
 
-The executable visual matrix contains 29 cases. The checked-in Darwin set is complete, but the Linux set used by CI currently lacks the two AI-experience-choice baselines; baseline generation and the still-27-case pruning script require a dedicated test-asset change.
+The executable visual matrix and pruning inventory share exactly 29 cases. Darwin and Linux each contain all 29 reviewed assets. The complete suite passes on Darwin and in the Linux/amd64 Playwright runtime used to match CI architecture.
 
 Default automated tests use fakes and deny unexpected external HTTP and WebSockets; they do not require devices, provider credentials, paid requests, or external media services. Mocked browser journeys exercise successful Local, Lucy 2.5, and VTON 3 flows across Chromium, WebKit, and mobile. Live provider checks are deliberately manual and gated; see [live provider smoke testing](docs/LIVE_PROVIDER_SMOKE.md).
 

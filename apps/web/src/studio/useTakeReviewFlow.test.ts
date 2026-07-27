@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { useRecording } from '../orchestration/recording';
 import { deriveTakeStagePresentation, finalizeTakeForReview } from './useTakeReviewFlow';
 
@@ -114,5 +114,40 @@ describe('finalizeTakeForReview', () => {
       'release-live-resources',
       'enter-recorded-review',
     ]);
+  });
+
+  it('releases live resources and reports an empty finalization without entering review', async () => {
+    const events: string[] = [];
+
+    await finalizeTakeForReview({
+      finalize: () => {
+        events.push('finalize-recording');
+        return Promise.resolve(null);
+      },
+      releaseLiveResources: () => {
+        events.push('release-live-resources');
+        return Promise.resolve();
+      },
+      enterReview: () => events.push('enter-recorded-review'),
+      handleEmpty: () => events.push('empty'),
+    });
+
+    expect(events).toEqual(['finalize-recording', 'release-live-resources', 'empty']);
+  });
+
+  it('still releases live resources when recorder finalization rejects', async () => {
+    const failure = new Error('Recorder finalization failed.');
+    const releaseLiveResources = vi.fn(() => Promise.resolve());
+
+    await expect(
+      finalizeTakeForReview({
+        finalize: () => Promise.reject(failure),
+        releaseLiveResources,
+        enterReview: vi.fn(),
+        handleEmpty: vi.fn(),
+      }),
+    ).rejects.toBe(failure);
+
+    expect(releaseLiveResources).toHaveBeenCalledOnce();
   });
 });

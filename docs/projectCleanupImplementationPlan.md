@@ -2,17 +2,17 @@
 
 ## Current status
 
-| Item                    | Status                                                                                                                                                                                                                                             |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                   |
-| Date generated          | 2026-07-27                                                                                                                                                                                                                                         |
-| Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                            |
-| Open findings           | 14                                                                                                                                                                                                                                                 |
-| Remaining phases        | 9                                                                                                                                                                                                                                                  |
-| Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; complete PHASE-001 before structural work; obtain visual-owner review and a Linux Playwright environment for the full visual asset repair.            |
-| Known baseline failures | `npm run test:e2e`: 125 passed, 10 skipped, 3 stale Workshop-flow failures. `npm run test:visual`: 14 passed, 15 stale Darwin baseline failures; Linux also lacks four of 29 required baselines.                                                   |
-| Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Existing local `node_modules` reports extraneous optional WASM/platform artifacts; verify installs in a disposable fresh checkout with `npm ci`.          |
-| Graphify status         | Available. The audit started from 3,535 nodes / 8,180 links; the required post-document refresh completed at 3,699 nodes / 8,342 edges and warned only that non-source `hooks.json` produced zero nodes. Every phase must run `graphify update .`. |
+| Item                    | Status                                                                                                                                                                                                                                                            |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                  |
+| Date generated          | 2026-07-27                                                                                                                                                                                                                                                        |
+| Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                           |
+| Open findings           | 11 unresolved (11 open); TEST-001, TEST-002, and TOOL-001 resolved                                                                                                                                                                                                |
+| Remaining phases        | 8                                                                                                                                                                                                                                                                 |
+| Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                             |
+| Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                      |
+| Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted. |
+| Graphify status         | Final safety-net refresh completed at 3,711 nodes / 8,389 edges (from 3,699 / 8,342), with only the known non-source `hooks.json` zero-node warning. Direct paths connect all three target hooks to focused tests; module check remains cycle-free.               |
 
 ## Execution rules
 
@@ -30,115 +30,18 @@
 
 ## Remaining phases overview
 
-| Phase ID  | Title                                            | Finding IDs                  | Risk        | Dependencies                                                 | Expected outcome                                                                                                             |
-| --------- | ------------------------------------------------ | ---------------------------- | ----------- | ------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------- |
-| PHASE-001 | Restore a trustworthy cleanup safety net         | TEST-001, TEST-002, TOOL-001 | Medium      | Visual owner approval; Linux environment for full completion | Current journeys pass, critical hooks have focused coverage, and the declared 29-case visual matrix is internally consistent |
-| PHASE-002 | Remove confirmed retired and unreachable code    | DEAD-001, DEAD-002, DEAD-003 | Medium      | PHASE-001                                                    | Smaller compatibility repository and UI/root surface with legacy data preserved                                              |
-| PHASE-003 | Repair Character Builder and shared UI ownership | ARCH-001, ARCH-002           | Medium-high | PHASE-001, PHASE-002                                         | Feature imports match current product ownership; shared UI has a neutral home                                                |
-| PHASE-004 | Consolidate hardened provider download transport | DUP-001                      | High        | PHASE-003                                                    | One security-reviewed downloader policy with provider-specific protocols preserved                                           |
-| PHASE-005 | Consolidate reference-asset finalization         | DUP-002                      | Medium      | PHASE-004                                                    | One typed service-private persistence path for generate/edit/compose                                                         |
-| PHASE-006 | Share image-picker/drop presentation             | DUP-003                      | Low-medium  | PHASE-003                                                    | Shared accessible DOM behavior without merging storage/lifecycle policy                                                      |
-| PHASE-007 | Decompose independent Studio root controllers    | COMP-001                     | Medium-high | PHASE-002, PHASE-003, PHASE-006                              | Smaller composition root with identical stage/overlay topology                                                               |
-| PHASE-008 | Decompose recipe handoff internals               | STATE-001                    | High        | PHASE-003, PHASE-007                                         | Focused state workflows behind the unchanged Studio facade                                                                   |
-| PHASE-009 | Reconcile final documentation                    | DOC-001                      | Low         | PHASE-001 through PHASE-008                                  | Correct canonical filename/links and documentation aligned with implemented cleanup                                          |
+| Phase ID  | Title                                            | Finding IDs                  | Risk        | Dependencies                    | Expected outcome                                                                    |
+| --------- | ------------------------------------------------ | ---------------------------- | ----------- | ------------------------------- | ----------------------------------------------------------------------------------- |
+| PHASE-002 | Remove confirmed retired and unreachable code    | DEAD-001, DEAD-002, DEAD-003 | Medium      | None                            | Smaller compatibility repository and UI/root surface with legacy data preserved     |
+| PHASE-003 | Repair Character Builder and shared UI ownership | ARCH-001, ARCH-002           | Medium-high | PHASE-002                       | Feature imports match current product ownership; shared UI has a neutral home       |
+| PHASE-004 | Consolidate hardened provider download transport | DUP-001                      | High        | PHASE-003                       | One security-reviewed downloader policy with provider-specific protocols preserved  |
+| PHASE-005 | Consolidate reference-asset finalization         | DUP-002                      | Medium      | PHASE-004                       | One typed service-private persistence path for generate/edit/compose                |
+| PHASE-006 | Share image-picker/drop presentation             | DUP-003                      | Low-medium  | PHASE-003                       | Shared accessible DOM behavior without merging storage/lifecycle policy             |
+| PHASE-007 | Decompose independent Studio root controllers    | COMP-001                     | Medium-high | PHASE-002, PHASE-003, PHASE-006 | Smaller composition root with identical stage/overlay topology                      |
+| PHASE-008 | Decompose recipe handoff internals               | STATE-001                    | High        | PHASE-003, PHASE-007            | Focused state workflows behind the unchanged Studio facade                          |
+| PHASE-009 | Reconcile final documentation                    | DOC-001                      | Low         | PHASE-002 through PHASE-008     | Correct canonical filename/links and documentation aligned with implemented cleanup |
 
 ## Phase sections
-
-### PHASE-001: Restore a trustworthy cleanup safety net
-
-#### Objective
-
-Make the existing release gates accurately exercise current behavior before any production cleanup: replace the retired Workshop character journey, add risk-targeted orchestration tests, and reconcile the 29-case visual suite, assets, pruning script, and documentation.
-
-#### Findings resolved
-
-- `TEST-001`
-- `TEST-002`
-- `TOOL-001`
-
-#### Scope
-
-- `e2e/local-first-preparation.spec.ts` and current Workshop/Character Builder journey helpers.
-- Tests for `useTakeReviewFlow`, `useCharacterReferenceGeneration`, and `useCharacterBuilderController`.
-- `e2e/studio.visual.spec.ts`, `scripts/prune-visual-baselines.mjs`, reviewed Darwin/Linux snapshot assets.
-- Visual-matrix statements in `README.md`, `docs/BROWSER_SUPPORT.md`, and `docs/ARCHITECTURE.md`.
-
-#### Out of scope
-
-Production feature refactors; revival of Workshop character editing; unreviewed bulk snapshot acceptance; threshold inflation; live provider/device tests; dependency upgrades.
-
-#### Dependencies
-
-No prior phase. Full `TOOL-001` resolution requires product/design review of each current visual diff and a supported Linux Playwright environment. If either is unavailable, keep this phase in the plan and mark the precise remainder blocked.
-
-#### Risk assessment
-
-- **Regression risk:** Medium; test changes can encode the wrong product behavior.
-- **Architectural risk:** Low.
-- **Data/compatibility risk:** None.
-- **User-facing risk:** Low if tests only; potentially high if an unintended visual regression is discovered, which must be fixed separately with approval.
-- **Rollback difficulty:** Low for tests/scripts; snapshot review history should be retained in the PR.
-
-#### Implementation sequence
-
-1. Record baseline results and read current Workshop, Builder, take-review, reference-generation, visual, accessibility, and provider-cost documentation.
-2. Replace the obsolete E2E steps with one current keyboard-accessible local-only journey. Preserve the capabilities-only API assertion, zero camera calls, and zero provider/token work.
-3. Add focused behavioral tests for take finalization settlement/cleanup and Builder generation/upload/edit/compose validation, operation locking, retry, stale results, save and preload failures. Use existing injectable adapters/fakes.
-4. Review all 15 Darwin visual diffs against current approved UI. Fix unintended behavior separately; update only approved baselines.
-5. Generate the four absent Linux snapshots on Linux: desktop/small-mobile AI experience choice and Workshop.
-6. Update the pruning allowlist to retain exactly the executable 29 cases. Test its inventory logic without running the destructive pruning operation on unrelated assets.
-7. Reconcile the three matrix documents to the exact checked-in state.
-
-#### Graphify requirements
-
-Before changes, query/explain the three hooks and trace their callers/tests; inspect current Workshop/Builder paths and visual/script entry registration. After changes, run `graphify update .`, repeat impact queries, confirm tests reach the intended hooks, no runtime edge changed accidentally, no test helper is orphaned, and the module graph remains cycle-free. Snapshot assets require filesystem/test confirmation because Graphify does not model them.
-
-#### Acceptance criteria
-
-- No E2E locator or assertion references the retired Workshop character form.
-- The replacement journey proves current local-only behavior in Chromium, WebKit, and mobile.
-- Critical hook tests cover the documented success, error, cancellation/stale, locking, and cleanup boundaries; coverage improvement is documented without chasing arbitrary percentage.
-- Darwin's 29 reviewed cases pass; Linux contains and passes all 29 in Linux.
-- The pruning allowlist equals the executable case set and retains 29.
-- README, Architecture, and Browser Support report identical facts.
-
-#### Required validation
-
-`npm run quality`; `npm run test:coverage`; `npm run test:e2e`; `npm run test:visual` on Darwin and Linux; `npm run test:production`; `npm run audit:prod` only when explicitly authorized; targeted suites while iterating; `graphify update .`; post-change Graphify queries and `npm run check:modules`.
-
-#### Rollback strategy
-
-Revert test/script/doc/snapshot changes as one focused phase. Do not revert or overwrite unrelated baseline assets. If a production bug is found during review, leave this phase open and address the behavior in a separately authorized, documented change before snapshot acceptance.
-
-#### Documentation updates
-
-Resolve TEST-001/TEST-002/TOOL-001 in the findings with commands, counts, coverage changes, visual review, platform assets, and Graphify evidence. Update the three canonical matrix descriptions and applicable user journey.
-
-#### Standalone implementation prompt
-
-```text
-You are acting as an elite principal system architect and senior developer implementing PHASE-001 from the Lightframe Studio cleanup roadmap.
-
-Required reading: all applicable AGENTS.md/CLAUDE.md/package instructions; docs/projectCleanupFindings.md; docs/projectCleanupImplementationPlan.md; README.md; docs/ARCHITECTURE.md; docs/BROWSER_SUPPORT.md; docs/userStories/README.md and affected journeys; test/Playwright/Graphify configuration. Implement only “PHASE-001: Restore a trustworthy cleanup safety net” and resolve exactly TEST-001, TEST-002, and TOOL-001.
-
-Preserve all runtime behavior, contracts, persisted data, integrations, accessibility, responsiveness, and provider-cost boundaries. The approved behavioral correction is to make tests reflect the current rule that Character Builder owns character creation while Prompt Workshop owns only Add/Replace/Restyle. Do not revive retired UI, refactor production code, raise thresholds to hide gaps, update dependencies, or bulk-approve snapshots.
-
-Before editing, inspect branch/commit/status and protect unrelated user changes. Run practical baselines and record pre-existing failures separately. Read the installed Graphify instructions and use the actual CLI. Query/explain useTakeReviewFlow, useCharacterReferenceGeneration, useCharacterBuilderController, current Workshop/Builder entry paths, callers, exports, tests, fan-in/out, cycles, dynamic imports, and change impact. Confirm against source/config/routes/tests; document limitations.
-
-Required work:
-1. Rewrite the stale local-first E2E journey around current keyboard-accessible, local-only behavior while retaining zero camera calls, capabilities-only API traffic, and no provider/token work.
-2. Add focused behavioral tests for take-review finalization/cleanup and Builder generation/upload/edit/compose validation, locks, retries, stale results, save/preload failures. Reuse existing injection/fakes and test outcomes rather than internals.
-3. Review each of the 15 current Darwin diffs with the product/design owner. Fix unintended UI in a separately approved behavior change; update only approved baselines.
-4. Generate the four missing Linux assets in a supported Linux Playwright environment.
-5. Make the pruning inventory exactly match all 29 executable cases, validating its inventory without destructively pruning unrelated files.
-6. Reconcile README.md, docs/BROWSER_SUPPORT.md, docs/ARCHITECTURE.md, and affected journey docs.
-
-After changes run graphify update ., repeat the queries, compare edges, confirm no runtime dependency changed unintentionally, no consumers/tests are orphaned, and no cycles exist. Run targeted tests, npm run quality, npm run test:coverage, npm run test:e2e, npm run test:visual on Darwin and Linux, npm run test:production, and npm run audit:prod only if explicitly authorized. Do not declare completion while phase-caused failures remain. If visual approval/Linux execution is unavailable, keep the phase and mark the exact remainder blocked.
-
-After every criterion passes, mark TEST-001/TEST-002/TOOL-001 Resolved in docs/projectCleanupFindings.md and append what/files/validation/Graphify/limitations/PHASE-001; preserve original evidence. Add newly discovered unrelated issues under new stable IDs. Then remove this entire PHASE-001 section and its overview row from docs/projectCleanupImplementationPlan.md, update counts/prerequisites, and do not renumber phases. If anything remains, keep and revise the phase.
-
-Final response: findings resolved, files and tests changed, visual decisions/assets, validation results, Graphify before/after, pre-existing failures, new findings, documentation updates, whether PHASE-001 self-removed, and next phase.
-```
 
 ### PHASE-002: Remove confirmed retired and unreachable code
 
@@ -162,7 +65,7 @@ Changing IndexedDB schema/version/data; deleting starter catalog records/assets;
 
 #### Dependencies
 
-PHASE-001 must pass so current journeys and critical hooks are reliable.
+No remaining phase prerequisite. The completed safety-net work must remain passing so current journeys and critical hooks stay reliable.
 
 #### Risk assessment
 
@@ -206,7 +109,7 @@ Resolve DEAD-001–003 with exact deleted APIs/LOC, retained compatibility surfa
 ```text
 Implement only PHASE-002 (“Remove confirmed retired and unreachable code”) from the Lightframe Studio cleanup roadmap, resolving DEAD-001, DEAD-002, and DEAD-003.
 
-First read all repository instructions, docs/projectCleanupFindings.md, docs/projectCleanupImplementationPlan.md, architecture/privacy/product-evolution documents, and Guided/Character Builder user journeys. Inspect branch/commit/status; never reset, clean, overwrite, or discard user work. PHASE-001 must be complete and passing.
+First read all repository instructions, docs/projectCleanupFindings.md, docs/projectCleanupImplementationPlan.md, architecture/privacy/product-evolution documents, and Guided/Character Builder user journeys. Inspect branch/commit/status; never reset, clean, overwrite, or discard user work. Confirm the completed safety-net gates remain passing.
 
 Preserve public behavior, persisted browser data, accessibility, responsiveness, and integrations. In particular, preserve the exact IndexedDB database/store/schema/version and legacy list/sanitize/read/download/delete/migrate behavior. Never delete or rewrite user records. Retain all starter catalog records/assets used by legacy hydration. Do not add telemetry or refactor unrelated Studio code.
 
@@ -242,7 +145,7 @@ Changing generation/provider behavior; extracting the shared drop-zone (PHASE-00
 
 #### Dependencies
 
-PHASE-001 and PHASE-002.
+PHASE-002.
 
 #### Risk assessment
 
@@ -284,7 +187,7 @@ Resolve ARCH-001/002 with before/after paths and ownership decision; update Arch
 #### Standalone implementation prompt
 
 ```text
-Implement only PHASE-003 (“Repair Character Builder and shared UI ownership”), resolving ARCH-001 and ARCH-002. Read all instructions, docs/projectCleanupFindings.md, docs/projectCleanupImplementationPlan.md, Architecture and Workshop/Builder/reference journeys. Confirm PHASE-001/002 completion, inspect branch/commit/status, and preserve unrelated user changes.
+Implement only PHASE-003 (“Repair Character Builder and shared UI ownership”), resolving ARCH-001 and ARCH-002. Read all instructions, docs/projectCleanupFindings.md, docs/projectCleanupImplementationPlan.md, Architecture and Workshop/Builder/reference journeys. Confirm PHASE-002 completion and that the safety-net gates remain passing; inspect branch/commit/status and preserve unrelated user changes.
 
 Preserve all visible behavior, APIs, persisted assets/data, provider requests/cost disclosure, cancellation/locks, source identity, accessibility, responsiveness and OverlayPanel/MediaStage topology. Do not redesign Workshop, create a modal framework, extract the PHASE-006 drop-zone, decompose Studio/handoff, or perform unrelated cleanup.
 
@@ -699,7 +602,7 @@ New production cleanup, rewriting historical rationale, claiming the project is 
 
 #### Dependencies
 
-PHASE-001 through PHASE-008.
+PHASE-002 through PHASE-008.
 
 #### Risk assessment
 
@@ -740,7 +643,7 @@ Resolve DOC-001. Ensure findings history remains; when this is the final complet
 #### Standalone implementation prompt
 
 ```text
-Implement only PHASE-009 (“Reconcile final documentation”), resolving DOC-001 and finalizing the documented cleanup queue. Read all instructions, docs/projectCleanupFindings.md, docs/projectCleanupImplementationPlan.md, README documentation map, Architecture, image-generation/privacy/live-smoke/user-journey docs. Confirm PHASE-001 through PHASE-008 are complete; inspect branch/commit/status and preserve user changes.
+Implement only PHASE-009 (“Reconcile final documentation”), resolving DOC-001 and finalizing the documented cleanup queue. Read all instructions, docs/projectCleanupFindings.md, docs/projectCleanupImplementationPlan.md, README documentation map, Architecture, image-generation/privacy/live-smoke/user-journey docs. Confirm PHASE-002 through PHASE-008 are complete and the safety-net gates remain passing; inspect branch/commit/status and preserve user changes.
 
 Do not implement new cleanup, rewrite historical rationale, change behavior/contracts/data, update dependencies or claim the project is defect-free. Preserve external bookmarks where the actual documentation host has a supported redirect mechanism; do not keep duplicate divergent canonical documents.
 

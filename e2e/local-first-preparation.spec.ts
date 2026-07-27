@@ -73,7 +73,7 @@ test.beforeEach(async ({ page }) => {
   });
 });
 
-test('prepares a character recipe accessibly without camera or provider work', async ({ page }) => {
+test('prepares an object recipe accessibly without camera or provider work', async ({ page }) => {
   const apiRequests: string[] = [];
   page.on('request', (request) => {
     const url = new URL(request.url());
@@ -107,18 +107,32 @@ test('prepares a character recipe accessibly without camera or provider work', a
     'true',
   );
   await page.getByLabel('Character direction').fill('  An adult documentary photographer  ');
-  await page.getByRole('button', { name: 'Open structured prompt workshop' }).click();
+  const workshopLauncher = page.getByRole('button', {
+    name: 'Open structured prompt workshop',
+  });
+  await workshopLauncher.focus();
+  await expect(workshopLauncher).toBeFocused();
+  await page.keyboard.press('Enter');
 
   await expect(page.getByRole('heading', { name: 'Direct one clear visual change' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Use in working draft' })).toBeDisabled();
+  await page.getByRole('textbox', { name: 'Object to add', exact: true }).fill('a copper notebook');
   await page
-    .getByRole('textbox', { name: 'Character concept', exact: true })
-    .fill('botanical field host');
+    .getByRole('textbox', { name: 'Specific placement', exact: true })
+    .fill('held at chest height');
   await expect(page.getByRole('button', { name: 'Use in working draft' })).toBeEnabled();
-  await page.getByRole('button', { name: 'Close creative tool' }).click();
-  await page.getByRole('button', { name: 'Workshop', exact: true }).click();
-  await expect(page.getByRole('textbox', { name: 'Character concept', exact: true })).toHaveValue(
-    'botanical field host',
+  await page.getByRole('button', { name: 'Use in working draft' }).click();
+  await expect(page.getByRole('dialog', { name: 'Prompt Workshop' })).toBeHidden();
+
+  const workshopTool = page.getByRole('button', { name: 'Workshop', exact: true });
+  await workshopTool.focus();
+  await expect(workshopTool).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.getByRole('textbox', { name: 'Object to add', exact: true })).toHaveValue(
+    'a copper notebook',
+  );
+  await expect(page.getByRole('textbox', { name: 'Specific placement', exact: true })).toHaveValue(
+    'held at chest height',
   );
 
   const cameraCalls = await page.evaluate(() => {

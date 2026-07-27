@@ -10,26 +10,19 @@ import {
   startVirtualTryOnAi,
   type NetworkJourneyState,
 } from './support/studioHarness';
+import { VISUAL_CASE_MATRIX, type VisualScenarioId } from './studioVisualMatrix';
 
 const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
 
-const VIEWPORTS = [
-  { id: 'desktop', folder: '01-full-desktop-1440x960', width: 1_440, height: 960 },
-  { id: 'compact', folder: '02-compact-desktop-1280x720', width: 1_280, height: 720 },
-  { id: 'tablet', folder: '03-tablet-portrait-834x1112', width: 834, height: 1_112 },
-  { id: 'mobile', folder: '04-mobile-portrait-390x844', width: 390, height: 844 },
-  { id: 'small-mobile', folder: '05-small-mobile-320x568', width: 320, height: 568 },
-] as const;
-
 type VisualScenario = {
-  id: string;
-  baseline: readonly [group: string, filename: string];
+  id: VisualScenarioId;
   setup(page: Page): Promise<void>;
 };
 
 type VisualCase = {
-  viewport: (typeof VIEWPORTS)[number];
+  viewport: (typeof VISUAL_CASE_MATRIX)[number]['viewport'];
   scenario: VisualScenario;
+  baseline: string;
 };
 
 const settlePage = async (page: Page): Promise<void> => {
@@ -126,19 +119,17 @@ const prepareVisualPage = async (page: Page): Promise<NetworkJourneyState> => {
   return network;
 };
 
-const CORE_SCENARIOS: readonly VisualScenario[] = [
-  {
+const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
+  idle: {
     id: 'idle',
-    baseline: ['01-studio', 'local-idle.png'],
     setup: async (page) => {
       await openRecipeDockWhenOverlaid(page);
       await expect(page.getByRole('button', { name: 'Start local preview' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toContainText('Studio idle');
     },
   },
-  {
+  recording: {
     id: 'recording',
-    baseline: ['01-studio', 'local-recording.png'],
     setup: async (page) => {
       await startLocalPreview(page);
       await page.getByRole('button', { name: 'Record' }).click();
@@ -146,17 +137,12 @@ const CORE_SCENARIOS: readonly VisualScenario[] = [
       await expect(page.getByLabel('Studio media stage')).toHaveAttribute('data-recording', 'true');
     },
   },
-  {
+  'character-live': {
     id: 'character-live',
-    baseline: ['01-studio', 'character-ai-live.png'],
     setup: startCharacterAi,
   },
-];
-
-const FOCUSED_SCENARIOS: readonly VisualScenario[] = [
-  {
+  'ai-experience-choice': {
     id: 'ai-experience-choice',
-    baseline: ['01-studio', 'ai-experience-choice.png'],
     setup: async (page) => {
       const controls = page.getByLabel('Studio session controls');
       await controls.getByRole('button', { name: 'Start Camera + Mic' }).click();
@@ -165,9 +151,8 @@ const FOCUSED_SCENARIOS: readonly VisualScenario[] = [
       await expect(page.getByRole('dialog', { name: 'Choose AI experience' })).toBeVisible();
     },
   },
-  {
+  finalizing: {
     id: 'finalizing',
-    baseline: ['01-studio', 'local-finalizing.png'],
     setup: async (page) => {
       await startLocalPreview(page);
       await page.getByRole('button', { name: 'Record' }).click();
@@ -182,9 +167,8 @@ const FOCUSED_SCENARIOS: readonly VisualScenario[] = [
       await expect(page.getByText('Finalizing take…', { exact: true })).toBeVisible();
     },
   },
-  {
+  'media-error': {
     id: 'media-error',
-    baseline: ['01-studio', 'stage-media-error.png'],
     setup: async (page) => {
       await page.evaluate(() => {
         Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
@@ -202,14 +186,12 @@ const FOCUSED_SCENARIOS: readonly VisualScenario[] = [
       ).toBeVisible();
     },
   },
-  {
+  'vton-live': {
     id: 'vton-live',
-    baseline: ['01-studio', 'virtual-try-on-ai-live.png'],
     setup: startVirtualTryOnAi,
   },
-  {
+  'workshop-overlay': {
     id: 'workshop-overlay',
-    baseline: ['03-character-workshop', 'add-one-object.png'],
     setup: async (page) => {
       await page.getByRole('button', { name: 'Workshop', exact: true }).click();
       await expect(
@@ -223,9 +205,8 @@ const FOCUSED_SCENARIOS: readonly VisualScenario[] = [
         .fill('held at chest height');
     },
   },
-  {
+  'capture-overlay': {
     id: 'capture-overlay',
-    baseline: ['05-capture-settings', 'local-before-preview.png'],
     setup: async (page) => {
       await page.getByRole('button', { name: 'Open capture settings' }).click();
       await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
@@ -236,30 +217,21 @@ const FOCUSED_SCENARIOS: readonly VisualScenario[] = [
       await expect(page.getByText('Available after preview starts')).toBeVisible();
     },
   },
-  {
+  'review-overlay': {
     id: 'review-overlay',
-    baseline: ['06-take-review', 'latest-take.png'],
     setup: createLocalTake,
   },
-];
+};
 
-const FOCUSED_VIEWPORTS = [VIEWPORTS[0], VIEWPORTS[4]] as const;
-const VISUAL_CASES: readonly VisualCase[] = [
-  ...VIEWPORTS.flatMap((viewport) => CORE_SCENARIOS.map((scenario) => ({ viewport, scenario }))),
-  ...FOCUSED_VIEWPORTS.flatMap((viewport) =>
-    FOCUSED_SCENARIOS.map((scenario) => ({ viewport, scenario })),
-  ),
-];
-
-if (VISUAL_CASES.length !== 29) {
-  throw new Error(
-    `The curated visual suite must contain exactly 29 cases, got ${VISUAL_CASES.length}.`,
-  );
-}
+const VISUAL_CASES: readonly VisualCase[] = VISUAL_CASE_MATRIX.map(({ viewport, scenario }) => ({
+  viewport,
+  scenario: VISUAL_SCENARIOS[scenario.id],
+  baseline: scenario.baseline,
+}));
 
 test.describe('curated Studio visual regression', () => {
   for (const visualCase of VISUAL_CASES) {
-    const { viewport, scenario } = visualCase;
+    const { viewport, scenario, baseline } = visualCase;
     test(`${viewport.id} / ${scenario.id}`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       const network = await prepareVisualPage(page);
@@ -269,15 +241,12 @@ test.describe('curated Studio visual regression', () => {
       await expectNoDocumentOverflow(page);
       expectNoExternalProviderTraffic(network);
 
-      await expect(page).toHaveScreenshot(
-        [viewport.folder, scenario.baseline[0], scenario.baseline[1]],
-        {
-          animations: 'disabled',
-          fullPage: false,
-          maxDiffPixelRatio: 0.005,
-          scale: 'css',
-        },
-      );
+      await expect(page).toHaveScreenshot([viewport.folder, ...baseline.split('/')], {
+        animations: 'disabled',
+        fullPage: false,
+        maxDiffPixelRatio: 0.005,
+        scale: 'css',
+      });
     });
   }
 });
