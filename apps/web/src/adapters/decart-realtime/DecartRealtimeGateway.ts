@@ -22,7 +22,6 @@ export type ConnectRealtimeOptions = {
   signal?: AbortSignal;
   onRemoteStream: (stream: MediaStream) => void;
   onConnectionChange: (state: RealtimeConnectionState) => void;
-  onGenerationTick: (seconds: number) => void;
   onError: (error: unknown) => void;
 };
 
@@ -138,9 +137,7 @@ export const connectDecartRealtime = async (
     if (abortConnection) options.signal?.removeEventListener('abort', abortConnection);
   }
 
-  const tickListener = ({ seconds }: { seconds: number }) => options.onGenerationTick(seconds);
   const errorListener = (error: unknown) => options.onError(error);
-  realtime.on('generationTick', tickListener);
   realtime.on('error', errorListener);
 
   let disconnected = false;
@@ -156,7 +153,6 @@ export const connectDecartRealtime = async (
     disconnect() {
       if (disconnected) return;
       disconnected = true;
-      realtime.off('generationTick', tickListener);
       realtime.off('error', errorListener);
       realtime.disconnect();
       stopProviderInput();

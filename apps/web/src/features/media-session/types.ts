@@ -58,8 +58,6 @@ export type StudioSessionController = {
   transformedVideoUsable: boolean;
   pendingChanges: boolean;
   error: SafeMediaError | null;
-  liveSeconds: number;
-  generationSeconds: number;
   applying: boolean;
   microphoneEnabled: boolean;
   cameraEnabled: boolean;

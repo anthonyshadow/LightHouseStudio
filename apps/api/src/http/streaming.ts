@@ -28,6 +28,20 @@ export const createRequestLifetime = (
   };
 };
 
+/** Runs a buffered JSON handler with request-abort propagation and deterministic listener cleanup. */
+export const withRequestLifetime = async <Result>(
+  request: FastifyRequest,
+  reply: FastifyReply,
+  handler: (signal: AbortSignal) => Promise<Result>,
+): Promise<Result> => {
+  const lifetime = createRequestLifetime(request, reply);
+  try {
+    return await handler(lifetime.signal);
+  } finally {
+    lifetime.release();
+  }
+};
+
 export const sendAudioStream = (reply: FastifyReply, audio: AudioStream): FastifyReply => {
   void reply.type(audio.contentType);
   void reply.header('Content-Disposition', 'inline');

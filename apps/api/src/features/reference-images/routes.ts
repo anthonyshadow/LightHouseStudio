@@ -18,7 +18,7 @@ import {
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/errors.js';
 import { localOwnerIdForRequest, requireTrustedOrigin } from '../../http/security.js';
-import { createRequestLifetime } from '../../http/streaming.js';
+import { withRequestLifetime } from '../../http/streaming.js';
 import type { ReferenceImageService } from './reference-image-service.js';
 
 const verifyGenerationOrigin = (request: FastifyRequest): Promise<void> => {
@@ -79,14 +79,11 @@ export const registerReferenceImageRoutes = (
           'Provide a valid character description and reference-image options.',
         );
       }
-      const lifetime = createRequestLifetime(request, reply);
-      try {
+      return withRequestLifetime(request, reply, async (signal) => {
         return optimizeCharacterReferencePromptResponseSchema.parse(
-          await service.optimize(parsed.data, lifetime.signal),
+          await service.optimize(parsed.data, signal),
         );
-      } finally {
-        lifetime.release();
-      }
+      });
     },
   );
 
@@ -102,17 +99,14 @@ export const registerReferenceImageRoutes = (
           'Provide a valid reference generation request and a new request ID.',
         );
       }
-      const lifetime = createRequestLifetime(request, reply);
-      try {
+      return withRequestLifetime(request, reply, async (signal) => {
         const asset = await service.generate({
           localOwnerId: localOwnerIdForRequest(request),
-          signal: lifetime.signal,
+          signal,
           ...parsed.data,
         });
         return createReferenceImageResponseSchema.parse({ asset });
-      } finally {
-        lifetime.release();
-      }
+      });
     },
   );
 
@@ -125,22 +119,20 @@ export const registerReferenceImageRoutes = (
     async (request, reply) => {
       const requestId = requireUploadRequestId(request.headers);
       const mimeType = requireUploadMimeType(request.headers);
-      if (!Buffer.isBuffer(request.body)) {
+      const bytes = request.body;
+      if (!Buffer.isBuffer(bytes)) {
         throw new AppError(400, 'validation_error', 'Provide image bytes in the request body.');
       }
-      const lifetime = createRequestLifetime(request, reply);
-      try {
+      return withRequestLifetime(request, reply, async (signal) => {
         const asset = await service.upload({
           localOwnerId: localOwnerIdForRequest(request),
           requestId,
-          bytes: request.body,
+          bytes,
           mimeType,
-          signal: lifetime.signal,
+          signal,
         });
         return uploadReferenceImageResponseSchema.parse({ asset });
-      } finally {
-        lifetime.release();
-      }
+      });
     },
   );
 
@@ -157,18 +149,15 @@ export const registerReferenceImageRoutes = (
           'Provide a valid reference edit request, change instructions, and a new request ID.',
         );
       }
-      const lifetime = createRequestLifetime(request, reply);
-      try {
+      return withRequestLifetime(request, reply, async (signal) => {
         const asset = await service.edit({
           localOwnerId: localOwnerIdForRequest(request),
           sourceAssetId,
-          signal: lifetime.signal,
+          signal,
           ...parsed.data,
         });
         return editReferenceImageResponseSchema.parse({ asset });
-      } finally {
-        lifetime.release();
-      }
+      });
     },
   );
 
@@ -185,18 +174,15 @@ export const registerReferenceImageRoutes = (
           'Provide a valid reference composition request and a new request ID.',
         );
       }
-      const lifetime = createRequestLifetime(request, reply);
-      try {
+      return withRequestLifetime(request, reply, async (signal) => {
         const asset = await service.compose({
           localOwnerId: localOwnerIdForRequest(request),
           sourceAssetId,
-          signal: lifetime.signal,
+          signal,
           ...parsed.data,
         });
         return composeReferenceImageResponseSchema.parse({ asset });
-      } finally {
-        lifetime.release();
-      }
+      });
     },
   );
 

@@ -36,7 +36,6 @@ export type ModelSessionActionsOptions = {
     operation: number,
   ) => Promise<MediaStream>;
   localRef: RefObject<MediaStream | null>;
-  startLiveTimer: () => void;
   realtimeSessionProfile?: RealtimeSessionProfile;
   onPromptCommitted?: (
     mode: 'lucy-2.5' | 'lucy-vton-3',
@@ -47,7 +46,6 @@ export type ModelSessionActionsOptions = {
 
 export type ModelSessionActions = {
   remoteStream: MediaStream | null;
-  generationSeconds: number;
   disconnectRealtime: () => void;
   startModel: () => Promise<void>;
   applyChanges: () => Promise<void>;
@@ -93,7 +91,6 @@ export const useModelSessionActions = ({
   setError,
   ensureMedia,
   localRef,
-  startLiveTimer,
   realtimeSessionProfile,
   onPromptCommitted,
 }: ModelSessionActionsOptions): ModelSessionActions => {
@@ -162,8 +159,6 @@ export const useModelSessionActions = ({
       setLifecycle('requesting-media');
       const stream = await ensureMedia(requirements, operation);
       if (operationRef.current !== operation) return;
-      startLiveTimer();
-
       setLifecycle('requesting-token');
       const controller = new AbortController();
       startAbortRef.current = controller;
@@ -211,7 +206,6 @@ export const useModelSessionActions = ({
     setError,
     setLifecycle,
     startAbortRef,
-    startLiveTimer,
   ]);
 
   const applyChanges = useCallback(async () => {
@@ -269,7 +263,6 @@ export const useModelSessionActions = ({
 
   return {
     remoteStream: realtime.remoteStream,
-    generationSeconds: realtime.generationSeconds,
     disconnectRealtime: realtime.disconnect,
     startModel,
     applyChanges,

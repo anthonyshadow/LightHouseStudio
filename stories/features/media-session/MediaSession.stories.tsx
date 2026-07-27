@@ -84,8 +84,6 @@ export const LiveAppliedRecipe: Story = {
       remoteStream: emptyMediaStream(),
       displayStream: emptyMediaStream(),
       transformedVideoUsable: true,
-      liveSeconds: 42,
-      generationSeconds: 38,
     }),
     recording: false,
     onOpenWorkshop: fn(),

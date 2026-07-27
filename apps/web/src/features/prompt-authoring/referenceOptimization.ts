@@ -1,3 +1,4 @@
+import { normalizeWhitespace } from '@studio/domain';
 import type {
   CharacterReferenceBackground,
   CharacterReferenceExpression,
@@ -59,8 +60,6 @@ export const DEFAULT_WORKSHOP_REFERENCE_PREFERENCES: WorkshopReferencePreference
 };
 
 type PreferenceStorage = Pick<Storage, 'getItem' | 'setItem'>;
-
-const normalizeWhitespace = (value: string): string => value.replace(/\s+/gu, ' ').trim();
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);

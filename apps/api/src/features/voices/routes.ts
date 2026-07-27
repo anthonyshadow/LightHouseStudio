@@ -16,7 +16,11 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AudioStream } from '../../application/audio-stream.js';
 import { AppError } from '../../http/errors.js';
 import { requireTrustedOrigin, requireVoiceProviderIntent } from '../../http/security.js';
-import { createRequestLifetime, sendAudioStream } from '../../http/streaming.js';
+import {
+  createRequestLifetime,
+  sendAudioStream,
+  withRequestLifetime,
+} from '../../http/streaming.js';
 import type { VoiceService } from './voice-service.js';
 
 export const MAX_RECORDING_AUDIO_BYTES = VOICE_CONVERSION_MAX_BYTES;
@@ -73,19 +77,16 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
       throw validationError('Use a search up to 100 characters and a page size from 1 to 10.');
     }
 
-    const lifetime = createRequestLifetime(request, reply);
-    try {
-      return workspaceVoicesResponseSchema.parse(
+    return withRequestLifetime(request, reply, async (signal) =>
+      workspaceVoicesResponseSchema.parse(
         await requireVoiceService(service).listWorkspaceVoices({
           search: parsed.data.search,
           pageSize: parsed.data.pageSize,
           nextPageToken: parsed.data.pageToken ?? null,
-          signal: lifetime.signal,
+          signal,
         }),
-      );
-    } finally {
-      lifetime.release();
-    }
+      ),
+    );
   });
 
   app.get(
@@ -111,19 +112,16 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
         );
       }
 
-      const lifetime = createRequestLifetime(request, reply);
-      try {
-        return sharedVoicesResponseSchema.parse(
+      return withRequestLifetime(request, reply, async (signal) =>
+        sharedVoicesResponseSchema.parse(
           await requireVoiceService(service).listSharedVoices({
             search: parsed.data.search,
             pageSize: parsed.data.pageSize,
             page: parsed.data.page,
-            signal: lifetime.signal,
+            signal,
           }),
-        );
-      } finally {
-        lifetime.release();
-      }
+        ),
+      );
     },
   );
 
@@ -152,19 +150,16 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
         throw validationError('Provide a name, public owner id, and public voice id.');
       }
 
-      const lifetime = createRequestLifetime(request, reply);
-      try {
-        return importSharedVoiceResponseSchema.parse(
+      return withRequestLifetime(request, reply, async (signal) =>
+        importSharedVoiceResponseSchema.parse(
           await requireVoiceService(service).importSharedVoice(
             parsed.data.publicOwnerId,
             parsed.data.voiceId,
             parsed.data.name,
-            lifetime.signal,
+            signal,
           ),
-        );
-      } finally {
-        lifetime.release();
-      }
+        ),
+      );
     },
   );
 

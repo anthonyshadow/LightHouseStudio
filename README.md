@@ -96,6 +96,7 @@ npm test              # deterministic domain, API, and component tests
 npm run test:watch    # interactive Vitest watch mode
 npm run test:coverage # local coverage report
 npm run test:e2e      # Playwright projects; install its browsers first
+npm run test:production # built Fastify static-serving browser smoke (run build first)
 npm run test:visual   # the curated 29-case Chromium visual suite
 npm run storybook     # local component catalog on port 6006
 npm run storybook:typecheck # type-check stories and Storybook configuration
@@ -103,11 +104,12 @@ npm run storybook:test # Chromium-backed Storybook interaction/a11y tests
 npm run storybook:build # static Storybook build
 npm run check:dead-code # Knip entrypoint/export/dependency validation
 npm run check:modules # local import resolution, cycle, and boundary checks
+npm run recording:memory:estimate -- --duration-seconds 300 --main-mib-per-minute 12 # planning estimate from a measured take
 npm run audit:prod    # high-severity production dependency audit
 npm run quality       # types, Storybook, lint, format, static checks, tests, and builds
 ```
 
-Install Playwright browsers once with `npx playwright install`. Coverage, end-to-end, curated visual, and production audit checks are independent of the local `quality` script; run all four before release. The GitHub `quality` job runs the production audit and core checks directly rather than invoking the root script, and currently omits the Storybook checks that local `quality` includes.
+Install Playwright browsers once with `npx playwright install`. Coverage, functional end-to-end, production smoke, curated visual, and production audit checks are independent of the local `quality` script; run all five before release. CI runs the core checks, Storybook type/interaction/build checks, the production static-serving smoke, and the separate coverage/browser/visual jobs.
 
 The executable visual matrix contains 29 cases. The checked-in Darwin set is complete, but the Linux set used by CI currently lacks the two AI-experience-choice baselines; baseline generation and the still-27-case pruning script require a dedicated test-asset change.
 
@@ -156,6 +158,7 @@ Read [architecture](docs/ARCHITECTURE.md), [privacy and temporary data](docs/PRI
 - [Privacy, retention, and provider cost](docs/PRIVACY_AND_TEMPORARY_DATA.md)
 - [Product evolution and changed flows](docs/PRODUCT_EVOLUTION.md)
 - [Browser support](docs/BROWSER_SUPPORT.md)
+- [Recording memory policy](docs/RECORDING_MEMORY_POLICY.md)
 - [Manual QA checklist](docs/MANUAL_QA.md)
 - [Live provider smoke test](docs/LIVE_PROVIDER_SMOKE.md)
 - [Implemented user journeys](docs/userStories/README.md)

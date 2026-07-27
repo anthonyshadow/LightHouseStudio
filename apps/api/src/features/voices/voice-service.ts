@@ -5,6 +5,7 @@ import type {
   WorkspaceVoicesResponse,
 } from '@studio/contracts';
 import type { AudioStream } from '../../application/audio-stream.js';
+import { createSharedOperation, type SharedOperation } from '../../application/shared-operation.js';
 import { ProviderError } from '../../providers/provider-error.js';
 import type {
   ElevenLabsModel,
@@ -13,6 +14,8 @@ import type {
   ProviderVoice,
 } from '../../providers/elevenlabs/types.js';
 import { VoiceServiceError } from './voice-service-error.js';
+
+export const VOICE_MODEL_CACHE_TTL_MS = 30_000;
 
 const runParallel = async <Left, Right>(
   callerSignal: AbortSignal,
@@ -53,6 +56,9 @@ export class VoiceService {
   readonly #provider: ElevenLabsProvider;
   readonly #modelId: string;
   readonly #enableLogging: boolean;
+  #cachedConversionModel: { readonly model: ElevenLabsModel; readonly expiresAt: number } | null =
+    null;
+  #activeConversionModel: SharedOperation<ElevenLabsModel> | null = null;
 
   constructor(provider: ElevenLabsProvider, modelId: string, enableLogging: boolean) {
     this.#provider = provider;
@@ -61,15 +67,37 @@ export class VoiceService {
   }
 
   async #conversionModel(signal: AbortSignal): Promise<ElevenLabsModel> {
-    const models = await this.#provider.listModels(signal);
-    const model = models.find((candidate) => candidate.modelId === this.#modelId);
-    if (model === undefined) {
-      throw new VoiceServiceError('configured-model-unavailable');
+    const cached = this.#cachedConversionModel;
+    if (cached && cached.expiresAt > Date.now()) return cached.model;
+
+    const active = this.#activeConversionModel;
+    if (active?.acceptingSubscribers) {
+      return active.subscribe(signal, () => new ProviderError('models', 'aborted'));
     }
-    if (!model.canDoVoiceConversion) {
-      throw new VoiceServiceError('configured-model-incompatible');
-    }
-    return model;
+
+    const operation = createSharedOperation(async (operationSignal) => {
+      const models = await this.#provider.listModels(operationSignal);
+      const model = models.find((candidate) => candidate.modelId === this.#modelId);
+      if (model === undefined) {
+        throw new VoiceServiceError('configured-model-unavailable');
+      }
+      if (!model.canDoVoiceConversion) {
+        throw new VoiceServiceError('configured-model-incompatible');
+      }
+      return model;
+    });
+    this.#activeConversionModel = operation;
+    const release = (): void => {
+      if (this.#activeConversionModel === operation) this.#activeConversionModel = null;
+    };
+    void operation.result.then((model) => {
+      this.#cachedConversionModel = {
+        model,
+        expiresAt: Date.now() + VOICE_MODEL_CACHE_TTL_MS,
+      };
+      release();
+    }, release);
+    return operation.subscribe(signal, () => new ProviderError('models', 'aborted'));
   }
 
   #assertVoiceCompatible(voice: ProviderVoice, model: ElevenLabsModel): void {

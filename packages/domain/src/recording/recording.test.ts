@@ -145,6 +145,7 @@ describe('recording helpers and ownership', () => {
       'virtual-try-on-take-20260714T123456Z.mp4',
     );
     expect(formatDuration(3_661_000)).toBe('1:01:01');
+    expect(formatFileSize(20 * 1024)).toBe('20 KiB');
     expect(formatFileSize(10 * 1024 * 1024)).toBe('10.0 MiB');
   });
 

@@ -5,7 +5,7 @@ const runningInCi = Boolean((env as unknown as Readonly<Record<string, string | 
 
 export default defineConfig({
   testDir: './e2e',
-  testIgnore: ['**/*.visual.spec.ts'],
+  testIgnore: ['**/*.visual.spec.ts', '**/*.production.spec.ts'],
   fullyParallel: true,
   // Axe plus synthetic audio/video contexts are intentionally resource-heavy; cap concurrency so
   // the local dev server remains stable on laptops and CI runners.

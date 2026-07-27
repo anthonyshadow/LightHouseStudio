@@ -1,10 +1,6 @@
 import type { RecordingLifecycle } from '../features/recording';
 import type { StudioMode } from '../features/media-session';
-
-export const canReplaceDirtyLibraryMode = (
-  dirty: boolean,
-  confirmDiscard: () => boolean,
-): boolean => !dirty || confirmDiscard();
+export { canReplaceDirtyLibraryMode } from '../features/creative-assets/useRecipeLibraryMode';
 
 export const shouldFinalizeForUnusableModelOutput = (
   lifecycle: RecordingLifecycle,

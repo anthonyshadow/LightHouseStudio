@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   VOICE_PROVIDER_INTENT_HEADER,
   VOICE_PROVIDER_INTENT_VALUE,
@@ -14,6 +14,7 @@ import {
   voice,
 } from '../../test/fakes.js';
 import { MAX_RECORDING_AUDIO_BYTES } from './routes.js';
+import { VOICE_MODEL_CACHE_TTL_MS } from './voice-service.js';
 
 const intentHeaders = { [VOICE_PROVIDER_INTENT_HEADER]: VOICE_PROVIDER_INTENT_VALUE };
 const originHeaders = {
@@ -25,6 +26,7 @@ const originHeaders = {
 describe('ElevenLabs voice API', () => {
   const apps: ReturnType<typeof createApp>[] = [];
   afterEach(async () => {
+    vi.useRealTimers();
     await Promise.all(apps.splice(0).map(async (app) => app.close()));
   });
 
@@ -111,6 +113,25 @@ describe('ElevenLabs voice API', () => {
       total: null,
     });
     expect(provider.sharedSearches[0]).toMatchObject({ search: 'warm', page: 2, pageSize: 8 });
+  });
+
+  it('shares configured-model discovery briefly, then refreshes it after the bounded TTL', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-26T12:00:00.000Z'));
+    const { app, provider } = setup();
+    const listModels = vi.spyOn(provider, 'listModels');
+
+    await app.inject({ method: 'GET', url: '/api/elevenlabs/voices', headers: intentHeaders });
+    await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/shared-voices',
+      headers: intentHeaders,
+    });
+    expect(listModels).toHaveBeenCalledOnce();
+
+    vi.setSystemTime(Date.now() + VOICE_MODEL_CACHE_TTL_MS);
+    await app.inject({ method: 'GET', url: '/api/elevenlabs/voices', headers: intentHeaders });
+    expect(listModels).toHaveBeenCalledTimes(2);
   });
 
   it('proxies workspace previews without exposing the upstream URL', async () => {

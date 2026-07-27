@@ -65,6 +65,37 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  storybook:
+    name: Storybook type, interaction, and static build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run storybook:typecheck
+      - run: npm run storybook:test
+      - run: npm run storybook:build
+
+  production-smoke:
+    name: Production static-serving smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run test:production
+
   e2e:
     name: Browser journeys
     runs-on: ubuntu-latest

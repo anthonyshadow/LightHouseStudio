@@ -36,3 +36,41 @@ export const closeRecipeDockWhenOverlaid = async (page: Page): Promise<void> => 
   await page.keyboard.press('Escape');
   await expect(dialog).toBeHidden();
 };
+
+export const startLocalPreview = async (page: Page, closeDock = true): Promise<void> => {
+  await openRecipeDockWhenOverlaid(page);
+  await page.getByRole('button', { name: 'Start local preview' }).click({ force: true });
+  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+  if (closeDock) await closeRecipeDockWhenOverlaid(page);
+};
+
+export const startCharacterAi = async (page: Page, closeDock = true): Promise<void> => {
+  await openRecipeDockWhenOverlaid(page);
+  await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
+  await page.getByLabel('Character direction').fill('An adult paper-cut travel host');
+  await page.getByRole('button', { name: 'Start Character AI' }).click({ force: true });
+  await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
+  await expect(page.getByText(/^AI active/u)).toBeVisible();
+  if (closeDock) await closeRecipeDockWhenOverlaid(page);
+};
+
+export const startVirtualTryOnAi = async (page: Page, closeDock = true): Promise<void> => {
+  await openRecipeDockWhenOverlaid(page);
+  await page.getByRole('button', { name: 'Virtual Try-On · VTON 3' }).click();
+  await page.getByLabel('Garment direction').fill('A structured amber field jacket');
+  await page.getByRole('button', { name: 'Start Virtual Try-On AI' }).click({ force: true });
+  await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
+  await expect(page.getByText(/^AI active/u)).toBeVisible();
+  if (closeDock) await closeRecipeDockWhenOverlaid(page);
+};
+
+export const createLocalTake = async (page: Page): Promise<void> => {
+  await startLocalPreview(page);
+  await page.getByRole('button', { name: 'Record' }).click();
+  await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
+  await page.getByRole('button', { name: 'Stop recording' }).click();
+  await expect(page.getByLabel('Recorded take playback')).toBeVisible();
+  await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
+  await page.getByRole('button', { name: 'Take', exact: true }).click();
+  await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeVisible();
+};

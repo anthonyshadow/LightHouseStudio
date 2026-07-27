@@ -13,9 +13,13 @@ export const installSuccessfulStudioHarness = async (
 
 export {
   closeRecipeDockWhenOverlaid,
+  createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   openRecipeDockWhenOverlaid,
+  startCharacterAi,
+  startLocalPreview,
+  startVirtualTryOnAi,
 } from './studioHarness.actions.js';
 export {
   FIXED_WEBM_BASE64,

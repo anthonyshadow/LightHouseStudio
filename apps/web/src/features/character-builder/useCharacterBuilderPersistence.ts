@@ -168,6 +168,7 @@ export const useCharacterBuilderPersistence = ({
 
   useEffect(() => {
     let active = true;
+    const controller = new AbortController();
     void repository
       .load()
       .then(async (record) => {
@@ -178,7 +179,10 @@ export const useCharacterBuilderPersistence = ({
         let uploadedReference: CharacterBuilderState['uploadedReference'] = null;
         if (value.uploadedReference) {
           try {
-            const asset = await fetchReferenceImageMetadata(value.uploadedReference.assetId);
+            const asset = await fetchReferenceImageMetadata(
+              value.uploadedReference.assetId,
+              controller.signal,
+            );
             if (!active) return;
             if (asset.source !== 'uploaded') {
               throw new Error('The saved upload no longer points to an uploaded asset.');
@@ -196,7 +200,10 @@ export const useCharacterBuilderPersistence = ({
         let preview: CharacterBuilderState['preview'] = null;
         if (value.preview) {
           try {
-            const asset = await fetchReferenceImageMetadata(value.preview.assetId);
+            const asset = await fetchReferenceImageMetadata(
+              value.preview.assetId,
+              controller.signal,
+            );
             if (!active) return;
             if (asset.source !== 'generated') {
               throw new Error('The saved preview no longer points to a generated asset.');
@@ -249,6 +256,7 @@ export const useCharacterBuilderPersistence = ({
       });
     return () => {
       active = false;
+      controller.abort();
     };
   }, [dispatch, repository]);
 

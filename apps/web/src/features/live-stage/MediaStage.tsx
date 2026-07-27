@@ -28,8 +28,6 @@ export type MediaStageProps = {
   presentation: StagePresentation;
   mode: StudioMode;
   lifecycle: SessionLifecycle;
-  liveSeconds: number;
-  generationSeconds: number;
   recording: boolean;
   recordingSeconds: number;
   controls?: ReactNode;

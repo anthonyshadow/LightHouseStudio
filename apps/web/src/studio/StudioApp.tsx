@@ -417,8 +417,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
               presentation={stagePresentation}
               mode={session.draft.mode}
               lifecycle={session.lifecycle}
-              liveSeconds={session.liveSeconds}
-              generationSeconds={session.generationSeconds}
               recording={recording.lifecycle === 'recording'}
               recordingSeconds={recording.elapsedSeconds}
               {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}

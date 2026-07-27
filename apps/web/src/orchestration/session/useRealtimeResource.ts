@@ -28,7 +28,6 @@ export type RealtimeConnectInput = {
 
 export type RealtimeResource = {
   remoteStream: MediaStream | null;
-  generationSeconds: number;
   connect: (input: RealtimeConnectInput) => Promise<boolean>;
   apply: (snapshot: RealtimeSnapshot) => Promise<void>;
   disconnect: () => void;
@@ -42,7 +41,6 @@ export const useRealtimeResource = ({
   onProviderError,
 }: RealtimeResourceOptions): RealtimeResource => {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
-  const [generationSeconds, setGenerationSeconds] = useState(0);
   const remoteRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<RealtimeSession | null>(null);
   const videoEndListenersRef = useRef(new Map<MediaStreamTrack, EventListener>());
@@ -74,7 +72,6 @@ export const useRealtimeResource = ({
     sessionRef.current = null;
     current?.disconnect();
     clearRemote();
-    setGenerationSeconds(0);
   }, [clearRemote]);
 
   const connect = useCallback(
@@ -122,9 +119,6 @@ export const useRealtimeResource = ({
           disconnect();
           onDisconnected('provider-disconnected');
         },
-        onGenerationTick: (seconds) => {
-          if (operationRef.current === input.operation) setGenerationSeconds(seconds);
-        },
         onError: () => {
           if (operationRef.current === input.operation) onProviderError();
         },
@@ -166,5 +160,5 @@ export const useRealtimeResource = ({
     [clearRemote],
   );
 
-  return { remoteStream, generationSeconds, connect, apply, disconnect, hasSession };
+  return { remoteStream, connect, apply, disconnect, hasSession };
 };

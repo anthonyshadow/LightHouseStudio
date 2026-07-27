@@ -22,6 +22,7 @@ import type {
 
 const draftRepositoryFactory = vi.hoisted(() => vi.fn());
 const uploadReferenceImage = vi.hoisted(() => vi.fn());
+const fetchReferenceImageMetadata = vi.hoisted(() => vi.fn());
 const validateReferenceImage = vi.hoisted(() => vi.fn());
 const MockCharacterBuilderDraftError = vi.hoisted(
   () =>
@@ -41,7 +42,7 @@ vi.mock('./draftRepository', () => ({
 }));
 vi.mock('../../adapters/api-client/apiClient', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, uploadReferenceImage };
+  return { ...actual, fetchReferenceImageMetadata, uploadReferenceImage };
 });
 vi.mock('../media-session/imageValidation', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -49,6 +50,7 @@ vi.mock('../media-session/imageValidation', async (importOriginal) => {
 });
 
 import { useCharacterBuilderController } from './useCharacterBuilderController';
+import { createFreshCharacterBuilderDraftValue } from './characterBuilderControllerSupport';
 
 type Deferred<T> = {
   readonly promise: Promise<T>;
@@ -148,6 +150,17 @@ const createMemoryDraftRepository = () => {
   return {
     repository,
     readActive: () => (active ? clone(active) : null),
+    seed: (value: CharacterBuilderDraftValueV1) => {
+      active = {
+        schemaVersion: 1,
+        id: 'active',
+        revision: 1,
+        value: clone(value),
+        origin: { kind: 'native' },
+        createdAt: now,
+        updatedAt: now,
+      };
+    },
     failNextComplete: () => {
       completeFailuresRemaining += 1;
     },
@@ -204,6 +217,7 @@ beforeEach(() => {
   draftRepositoryFactory.mockReset();
   uploadReferenceImage.mockReset();
   uploadReferenceImage.mockResolvedValue(uploadedAsset);
+  fetchReferenceImageMetadata.mockReset();
   validateReferenceImage.mockReset();
   validateReferenceImage.mockResolvedValue({
     blockingError: null,
@@ -219,6 +233,38 @@ afterEach(() => {
 });
 
 describe('useCharacterBuilderController save transactions', () => {
+  it('cancels persisted-reference restoration when the builder unmounts', async () => {
+    const memory = createMemoryDraftRepository();
+    memory.seed({
+      ...createFreshCharacterBuilderDraftValue(),
+      uploadedReference: {
+        assetId: uploadedAsset.assetId,
+        displayName: 'portrait.png',
+      },
+    });
+    const pendingMetadata = deferred<UploadedReferenceImageAsset>();
+    fetchReferenceImageMetadata.mockReturnValue(pendingMetadata.promise);
+    draftRepositoryFactory.mockReturnValue(memory.repository);
+
+    const rendered = renderHook(() =>
+      useCharacterBuilderController({
+        open: true,
+        generationAvailable: true,
+        editAvailable: true,
+        onSaveCharacter: vi.fn(),
+        onDismiss: vi.fn(),
+      }),
+    );
+
+    await waitFor(() => expect(fetchReferenceImageMetadata).toHaveBeenCalledOnce());
+    const signal = fetchReferenceImageMetadata.mock.calls[0]?.[1] as AbortSignal;
+    expect(signal.aborted).toBe(false);
+
+    rendered.unmount();
+
+    expect(signal.aborted).toBe(true);
+  });
+
   it('uploads immediately and freezes an image-only save journal without prompt provenance', async () => {
     const memory = createMemoryDraftRepository();
     draftRepositoryFactory.mockReturnValue(memory.repository);

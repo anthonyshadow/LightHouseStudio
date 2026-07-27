@@ -1,4 +1,5 @@
 import { useTheme } from '@emotion/react';
+import { formatFileSize } from '@studio/domain';
 import { useId, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { Button, StatusNotice } from '../../ui';
 import {
@@ -9,12 +10,6 @@ import {
   referencePreviewStyles,
 } from '../media-session/SessionComposer.styles';
 import type { CharacterBuilderUploadedReference } from './machine';
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1_024) return `${bytes} B`;
-  if (bytes < 1_024 * 1_024) return `${(bytes / 1_024).toFixed(1)} KiB`;
-  return `${(bytes / (1_024 * 1_024)).toFixed(1)} MiB`;
-};
 
 export const BuilderReferenceImageField = ({
   reference,

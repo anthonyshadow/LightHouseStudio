@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
 import { useTheme } from '@emotion/react';
+import { formatFileSize } from '@studio/domain';
 import { Button, StatusNotice } from '../../ui';
 import { validateReferenceImage } from './imageValidation';
 import {
@@ -25,12 +26,6 @@ interface ImageFeedback {
 }
 
 const emptyFeedback = (): ImageFeedback => ({ messages: [], blocking: false });
-
-const formatFileSize = (bytes: number): string => {
-  if (bytes < 1_024) return `${bytes} B`;
-  if (bytes < 1_024 * 1_024) return `${(bytes / 1_024).toFixed(1)} KiB`;
-  return `${(bytes / (1_024 * 1_024)).toFixed(1)} MiB`;
-};
 
 export const ReferenceImageField = ({
   mode,

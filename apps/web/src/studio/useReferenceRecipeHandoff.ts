@@ -1,13 +1,8 @@
-import type {
-  CreateReferenceImageRequest,
-  GeneratedReferenceImageAsset,
-  ReferenceImageAsset,
-} from '@studio/contracts';
+import type { ReferenceImageAsset } from '@studio/contracts';
 import { canonicalPrompt } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ApiClientError,
-  createReferenceImage,
   fetchReferenceImageMetadata,
   hydrateReferenceImage,
 } from '../adapters/api-client/apiClient';
@@ -18,11 +13,11 @@ import type {
   SavedCharacterPrompt,
 } from '../features/creative-assets/types';
 import type { RecipeSelection } from '../features/creative-assets/RecipeShelf.types';
-import type {
-  CharacterSaveProgress,
-  CharacterSaveSnapshot,
-  CharacterSaveStage,
-} from '../features/character-builder/useCharacterBuilderController';
+import { useRecipeLibraryMode } from '../features/creative-assets/useRecipeLibraryMode';
+import {
+  useCharacterStudioPreload,
+  type PreloadedCharacter,
+} from '../features/character-builder/useCharacterStudioPreload';
 import { confirmModeReplacement } from '../features/media-session/draftPolicy';
 import type {
   SessionReferenceImage,
@@ -32,14 +27,13 @@ import type {
 import type {
   PromptWorkshopAction,
   SavePromptWorkshopAction,
-  WorkshopReferenceGenerationInput,
 } from '../features/prompt-authoring/CharacterPromptWorkshop';
-import type { PromptBuilderDraft, PromptIntent } from '../features/prompt-authoring/model';
-import type {
-  ReferenceGenerationState,
-  WorkshopReferenceImage,
-} from '../features/prompt-authoring/ReferenceImageGenerator';
-import { canReplaceDirtyLibraryMode } from './studioPolicies';
+import type { PromptBuilderDraft } from '../features/prompt-authoring/model';
+import type { WorkshopReferenceImage } from '../features/prompt-authoring/ReferenceImageGenerator';
+import {
+  toWorkshopReferenceImage,
+  useWorkshopReference,
+} from '../features/prompt-authoring/useWorkshopReference';
 import {
   isExactActiveRecipe,
   referenceIdentity,
@@ -69,41 +63,10 @@ type PendingReferenceUse = {
   destination: 'shelf' | 'workshop';
 };
 
-const referenceGenerationError = (error: unknown): string => {
-  if (!(error instanceof ApiClientError)) {
-    return 'The local server could not create the reference. Check the connection and try again.';
-  }
-  switch (error.code) {
-    case 'moderation_blocked':
-      return 'OpenAI blocked the reference image or character description. Try another image or adjust the description.';
-    case 'rate_limited':
-    case 'provider_quota':
-      return 'OpenAI is temporarily limiting image generation. Wait a moment, then retry.';
-    case 'provider_configuration':
-    case 'provider_authentication':
-      return 'Reference generation is not configured correctly on this local server.';
-    case 'request_timeout':
-      return 'Generation timed out before a safe asset was stored. Retry with a new request.';
-    case 'invalid_provider_image':
-      return 'OpenAI returned an image that failed local validation. Retry the generation.';
-    case 'storage_failure':
-      return 'The image was created but could not be saved locally. Check the data directory and retry.';
-    case 'generation_in_progress':
-      return 'Another reference is already being created. Wait for it to finish, then retry.';
-    default:
-      return error.message || 'Reference generation failed before the current image could change.';
-  }
-};
-
 const referenceHydrationError = (error: unknown): string =>
   error instanceof ApiClientError && error.code === 'not_found'
     ? 'This local reference asset is no longer available. Retry after restoring the data directory, or continue without it.'
     : 'The exact local reference could not be validated. Retry, or continue without the reference.';
-
-const toWorkshopReferenceImage = (
-  asset: GeneratedReferenceImageAsset,
-  generatedFromPrompt = asset.originalPrompt,
-): WorkshopReferenceImage => ({ ...asset, generatedFromPrompt });
 
 type UseReferenceRecipeHandoffOptions = {
   readonly repository: CreativeAssetRepository;
@@ -131,25 +94,10 @@ export const useReferenceRecipeHandoff = ({
   closeOverlay,
 }: UseReferenceRecipeHandoffOptions) => {
   const [activeRecipe, setActiveRecipe] = useState<ActiveStudioRecipe>(null);
-  const [libraryMode, setLibraryMode] = useState<ModelMode>('lucy-2.5');
-  const [workshopDraft, setWorkshopDraft] = useState<PromptBuilderDraft | undefined>();
-  const [workshopDrafts, setWorkshopDrafts] = useState<
-    Partial<Record<PromptIntent, PromptBuilderDraft>>
-  >({});
-  const [workshopReferenceImage, setWorkshopReferenceImage] =
-    useState<WorkshopReferenceImage | null>(null);
-  const [referenceGeneration, setReferenceGeneration] = useState<ReferenceGenerationState>({
-    status: 'idle',
-    error: null,
-  });
   const [referenceUsePending, setReferenceUsePending] = useState(false);
   const [referenceUseFailureMessage, setReferenceUseFailureMessage] = useState<string | null>(null);
-  const [shelfDirty, setShelfDirty] = useState(false);
-  const resolvedLibraryMode =
-    session.draft.mode !== 'local' && !shelfDirty ? session.draft.mode : libraryMode;
-  const generationRequestRef = useRef<string | null>(null);
-  const workshopRevisionRef = useRef(0);
-  const referenceRestoreRef = useRef<{ assetId: string; prompt: string } | null>(null);
+  const library = useRecipeLibraryMode(session.draft.mode);
+  const { mode: resolvedLibraryMode, dirty: shelfDirty } = library;
   const pendingReferenceUseRef = useRef<PendingReferenceUse | null>(null);
   const referenceUsePendingRef = useRef(false);
   const selectedSavedPrompt = useRef<string | undefined>(undefined);
@@ -164,11 +112,7 @@ export const useReferenceRecipeHandoff = ({
   const [activeRecipeFingerprint, setActiveRecipeFingerprint] =
     useState<ActiveRecipeFingerprint | null>(null);
 
-  const rememberWorkshopDraft = useCallback((draft: PromptBuilderDraft) => {
-    workshopRevisionRef.current += 1;
-    setWorkshopDraft(draft);
-    setWorkshopDrafts((current) => ({ ...current, [draft.intent]: draft }));
-  }, []);
+  const workshop = useWorkshopReference({ repository, referenceImagesAvailable });
 
   const activeRecipeAsset = useMemo<RecipeAsset | null>(() => {
     if (!activeRecipe) return null;
@@ -224,8 +168,8 @@ export const useReferenceRecipeHandoff = ({
         !activeRecipeStillMatches &&
         mode === 'lucy-2.5' &&
         committedReferenceAssetId !== null &&
-        workshopReferenceImage?.assetId === committedReferenceAssetId
-          ? workshopReferenceImage
+        workshop.referenceImage?.assetId === committedReferenceAssetId
+          ? workshop.referenceImage
           : null;
       const standaloneRecentCharacter =
         standaloneRecentCharacterRef.current?.mode === mode &&
@@ -260,110 +204,14 @@ export const useReferenceRecipeHandoff = ({
             : {}),
       });
     },
-    [activeCharacterName, repository, resolvedActiveRecipeFingerprint, workshopReferenceImage],
+    [activeCharacterName, repository, resolvedActiveRecipeFingerprint, workshop.referenceImage],
   );
-
-  const generateWorkshopReference = useCallback(
-    async (input: WorkshopReferenceGenerationInput, signal: AbortSignal): Promise<void> => {
-      if (!referenceImagesAvailable || generationRequestRef.current) return;
-      const requestId = crypto.randomUUID();
-      const revision = workshopRevisionRef.current;
-      const request: CreateReferenceImageRequest = { requestId, ...input };
-      generationRequestRef.current = requestId;
-      setReferenceGeneration({ status: 'generating', error: null });
-
-      try {
-        const asset = await createReferenceImage(request, signal);
-        if (workshopRevisionRef.current !== revision) return;
-        if (asset.source !== 'generated') {
-          throw new Error('The generated reference response did not contain a generated asset.');
-        }
-        setWorkshopReferenceImage(toWorkshopReferenceImage(asset, input.rawPrompt));
-        setReferenceGeneration({ status: 'idle', error: null });
-        referenceRestoreRef.current = { assetId: asset.assetId, prompt: input.rawPrompt };
-        repository.enrichNewestMatchingRecent(input.rawPrompt, 'lucy-2.5', asset.assetId);
-      } catch (error: unknown) {
-        if (signal.aborted || workshopRevisionRef.current !== revision) return;
-        setReferenceGeneration({
-          status: 'error',
-          error: referenceGenerationError(error),
-          errorKind: 'generation',
-        });
-      } finally {
-        if (generationRequestRef.current === requestId) {
-          generationRequestRef.current = null;
-          if (signal.aborted || workshopRevisionRef.current !== revision) {
-            setReferenceGeneration({ status: 'idle', error: null });
-          }
-        }
-      }
-    },
-    [referenceImagesAvailable, repository],
-  );
-
-  const restoreWorkshopReference = useCallback(
-    (assetId: string, prompt: string) => {
-      const revision = workshopRevisionRef.current;
-      referenceRestoreRef.current = { assetId, prompt };
-      setReferenceGeneration({ status: 'restoring', error: null });
-      void fetchReferenceImageMetadata(assetId)
-        .then((asset) => {
-          if (workshopRevisionRef.current !== revision) return;
-          if (asset.source !== 'generated') {
-            setWorkshopReferenceImage(null);
-            setReferenceGeneration({ status: 'idle', error: null });
-            return;
-          }
-          setWorkshopReferenceImage(toWorkshopReferenceImage(asset));
-          setReferenceGeneration({ status: 'idle', error: null });
-          repository.enrichNewestMatchingRecent(prompt, 'lucy-2.5', asset.assetId);
-        })
-        .catch((error: unknown) => {
-          if (workshopRevisionRef.current !== revision) return;
-          setWorkshopReferenceImage(null);
-          setReferenceGeneration({
-            status: 'error',
-            error: referenceHydrationError(error),
-            errorKind: 'restore',
-          });
-        });
-    },
-    [repository],
-  );
-
-  const detachWorkshopReference = useCallback(() => {
-    workshopRevisionRef.current += 1;
-    referenceRestoreRef.current = null;
-    setWorkshopReferenceImage(null);
-    setReferenceGeneration({ status: 'idle', error: null });
-  }, []);
-
-  const retryWorkshopReferenceRestore = useCallback(() => {
-    const restore = referenceRestoreRef.current;
-    if (restore) restoreWorkshopReference(restore.assetId, restore.prompt);
-  }, [restoreWorkshopReference]);
 
   useEffect(() => {
     if (resolvedActiveRecipe) return;
     selectedSavedPrompt.current = undefined;
     selectedCharacterPrompt.current = undefined;
   }, [resolvedActiveRecipe]);
-
-  const changeLibraryMode = useCallback(
-    (mode: ModelMode) => {
-      if (mode === resolvedLibraryMode) return;
-      if (
-        !canReplaceDirtyLibraryMode(shelfDirty, () =>
-          window.confirm('Switch recipe models and discard the unsaved shelf form changes?'),
-        )
-      ) {
-        return;
-      }
-      setShelfDirty(false);
-      setLibraryMode(mode);
-    },
-    [resolvedLibraryMode, shelfDirty],
-  );
 
   const selectModeWithDraftProtection = useCallback(
     (mode: StudioMode): boolean =>
@@ -483,13 +331,8 @@ export const useReferenceRecipeHandoff = ({
               }
             : null,
         );
-        if (pending.builderDraft) rememberWorkshopDraft(pending.builderDraft);
-        workshopRevisionRef.current += 1;
-        setWorkshopReferenceImage(referenceMetadata);
-        setReferenceGeneration({ status: 'idle', error: null });
-        referenceRestoreRef.current = referenceMetadata
-          ? { assetId: referenceMetadata.assetId, prompt: pending.prompt }
-          : null;
+        if (pending.builderDraft) workshop.rememberDraft(pending.builderDraft);
+        workshop.synchronizeReference(referenceMetadata, pending.prompt);
         if (referenceMetadata && referenceMatchesPendingPrompt) {
           repository.enrichNewestMatchingRecent(
             pending.prompt,
@@ -508,7 +351,7 @@ export const useReferenceRecipeHandoff = ({
         setReferenceUsePending(false);
       }
     },
-    [closeOverlay, mediaLocked, rememberWorkshopDraft, repository, session],
+    [closeOverlay, mediaLocked, repository, session, workshop],
   );
 
   const useRecipe = useCallback(
@@ -582,80 +425,8 @@ export const useReferenceRecipeHandoff = ({
       : undefined;
   })();
 
-  const saveBuiltCharacter = useCallback(
-    async (
-      snapshot: CharacterSaveSnapshot,
-      characterId: string,
-      stage: CharacterSaveStage,
-      progress: CharacterSaveProgress,
-    ): Promise<void> => {
-      if (characterBuilderSaveBlockedReason) {
-        throw new Error(characterBuilderSaveBlockedReason);
-      }
-      if (
-        session.draft.mode !== 'lucy-2.5' &&
-        !confirmModeReplacement(session.draft, 'lucy-2.5', (message) => window.confirm(message))
-      ) {
-        throw new Error('Character save was cancelled. The resumable draft is unchanged.');
-      }
-
-      const referenceMetadata = snapshot.referenceImage;
-      let hydratedReference: SessionReferenceImage | null = null;
-      if (referenceMetadata) {
-        hydratedReference = await hydrateReferenceImage(
-          referenceMetadata.assetId,
-          referenceMetadata,
-        );
-      }
-
-      const studioPrompt = referenceMetadata
-        ? referenceMetadata.source === 'generated'
-          ? referenceMetadata.lucy25CharacterPrompt
-          : snapshot.prompt
-        : snapshot.prompt;
-      const currentReferenceId = referenceIdentity(session.draft.referenceImage);
-      const incomingReferenceId = referenceMetadata?.assetId ?? null;
-      const hasCurrentLucyRecipe =
-        session.draft.mode === 'lucy-2.5' &&
-        (canonicalPrompt(session.draft.prompt).length > 0 || currentReferenceId !== null);
-      if (
-        hasCurrentLucyRecipe &&
-        (canonicalPrompt(session.draft.prompt) !== canonicalPrompt(studioPrompt) ||
-          currentReferenceId !== incomingReferenceId) &&
-        !window.confirm(
-          'Replace the current Lucy 2.5 recipe in the Dock with this saved character? Your current Dock values will be replaced.',
-        )
-      ) {
-        throw new Error('Character save was cancelled. The resumable draft is unchanged.');
-      }
-
-      repository.persistSavedCharacterPrompt({
-        id: characterId,
-        name: snapshot.name,
-        prompt: snapshot.prompt,
-        source: 'generator',
-        promptIntent: snapshot.draft ? 'character-transform' : null,
-        builderDraft: snapshot.draft,
-        guidedDesign: snapshot.design,
-        referenceImageStatus: referenceMetadata ? 'persisted-reference' : 'prompt-only',
-        referenceImageAssetId: referenceMetadata?.assetId ?? null,
-        uploadedReferenceImageAssetId: snapshot.uploadedReferenceImageAssetId,
-        finalReferenceKind: snapshot.finalReferenceKind,
-      });
-      if (stage === 'intent') await progress.markCharacterPersisted();
-
-      const preloaded = session.replaceRecipeDraft({
-        mode: 'lucy-2.5',
-        prompt: studioPrompt,
-        referenceImage: hydratedReference,
-        enhance: referenceMetadata?.source === 'generated',
-      });
-      if (!preloaded) {
-        throw new Error(
-          'Release the active camera or AI session, then retry preloading this saved character.',
-        );
-      }
-
+  const rememberPreloadedCharacter = useCallback(
+    ({ characterId, snapshot, studioPrompt, referenceImage }: PreloadedCharacter) => {
       selectedSavedPrompt.current = undefined;
       selectedCharacterPrompt.current = characterId;
       standaloneRecentCharacterRef.current = null;
@@ -663,48 +434,43 @@ export const useReferenceRecipeHandoff = ({
       setActiveRecipeFingerprint({
         mode: 'lucy-2.5',
         prompt: studioPrompt,
-        referenceImageAssetId: referenceMetadata?.assetId ?? null,
+        referenceImageAssetId: referenceImage?.assetId ?? null,
         assetPrompt: snapshot.prompt,
-        assetReferenceImageAssetId: referenceMetadata?.assetId ?? null,
+        assetReferenceImageAssetId: referenceImage?.assetId ?? null,
       });
-      setLibraryMode('lucy-2.5');
-      if (snapshot.draft) rememberWorkshopDraft(snapshot.draft);
-      workshopRevisionRef.current += 1;
-      setWorkshopReferenceImage(
-        referenceMetadata?.source === 'generated'
-          ? toWorkshopReferenceImage(referenceMetadata, snapshot.prompt)
+      if (snapshot.draft) workshop.rememberDraft(snapshot.draft);
+      workshop.synchronizeReference(
+        referenceImage?.source === 'generated'
+          ? toWorkshopReferenceImage(referenceImage, snapshot.prompt)
           : null,
+        snapshot.prompt,
       );
-      referenceRestoreRef.current =
-        referenceMetadata?.source === 'generated'
-          ? { assetId: referenceMetadata.assetId, prompt: snapshot.prompt }
-          : null;
-      setReferenceGeneration({ status: 'idle', error: null });
-      await progress.markStudioPreloaded();
     },
-    [characterBuilderSaveBlockedReason, rememberWorkshopDraft, repository, session],
+    [workshop],
   );
+  const saveBuiltCharacter = useCharacterStudioPreload({
+    repository,
+    session,
+    saveBlockedReason: characterBuilderSaveBlockedReason,
+    onStudioPreloaded: rememberPreloadedCharacter,
+  });
 
   const openSavedWorkshop = useCallback(
     (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => {
       if (recordingActive) return;
       if (session.draft.mode !== 'lucy-2.5' && !selectModeWithDraftProtection('lucy-2.5')) return;
       workshopSourceRecipeRef.current = { origin: 'character-prompt', assetId: asset.id };
-      rememberWorkshopDraft(draft);
-      workshopRevisionRef.current += 1;
-      setWorkshopReferenceImage(null);
-      referenceRestoreRef.current = null;
-      setReferenceGeneration({ status: 'idle', error: null });
+      workshop.rememberDraft(draft);
+      workshop.detach();
       if (asset.referenceImageAssetId) {
-        restoreWorkshopReference(asset.referenceImageAssetId, asset.prompt);
+        workshop.restore(asset.referenceImageAssetId, asset.prompt);
       }
       openWorkshopOverlay();
     },
     [
       openWorkshopOverlay,
       recordingActive,
-      rememberWorkshopDraft,
-      restoreWorkshopReference,
+      workshop,
       selectModeWithDraftProtection,
       session.draft.mode,
     ],
@@ -778,19 +544,17 @@ export const useReferenceRecipeHandoff = ({
     if (recordingActive) return;
     if (session.draft.mode !== 'lucy-2.5' && !selectModeWithDraftProtection('lucy-2.5')) return;
     workshopSourceRecipeRef.current = resolvedActiveRecipe;
-    if (!workshopReferenceImage && session.draft.referenceImage?.kind === 'persisted') {
-      workshopRevisionRef.current += 1;
-      restoreWorkshopReference(session.draft.referenceImage.assetId, session.draft.prompt);
+    if (!workshop.referenceImage && session.draft.referenceImage?.kind === 'persisted') {
+      workshop.restore(session.draft.referenceImage.assetId, session.draft.prompt);
     }
     openWorkshopOverlay();
   }, [
     resolvedActiveRecipe,
     openWorkshopOverlay,
     recordingActive,
-    restoreWorkshopReference,
+    workshop,
     selectModeWithDraftProtection,
     session.draft,
-    workshopReferenceImage,
   ]);
 
   const recipeInsertionBlocked =
@@ -803,10 +567,10 @@ export const useReferenceRecipeHandoff = ({
       activeCharacterName,
       activeRecipeLabel,
       libraryMode: resolvedLibraryMode,
-      workshopDraft,
-      workshopDrafts,
-      workshopReferenceImage,
-      referenceGeneration,
+      workshopDraft: workshop.draft,
+      workshopDrafts: workshop.drafts,
+      workshopReferenceImage: workshop.referenceImage,
+      referenceGeneration: workshop.generation,
       referenceUsePending,
       referenceUseFailureMessage,
       shelfDirty,
@@ -815,12 +579,12 @@ export const useReferenceRecipeHandoff = ({
     },
     actions: {
       recordCommittedPrompt,
-      changeLibraryMode,
-      rememberWorkshopDraft,
-      generateWorkshopReference,
-      detachWorkshopReference,
-      retryWorkshopReferenceRestore,
-      setShelfDirty,
+      changeLibraryMode: library.changeMode,
+      rememberWorkshopDraft: workshop.rememberDraft,
+      generateWorkshopReference: workshop.generate,
+      detachWorkshopReference: workshop.detach,
+      retryWorkshopReferenceRestore: workshop.retryRestore,
+      setShelfDirty: library.setDirty,
       useRecipe,
       retryReferenceUse,
       continueReferenceUseWithoutImage,

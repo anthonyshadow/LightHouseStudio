@@ -61,7 +61,7 @@ Codec claims from `MediaRecorder.isTypeSupported` are necessary but not sufficie
 - Mobile browsers may stop camera tracks when the tab backgrounds, the screen locks, a call arrives, or another app claims the camera.
 - Multiple cameras/microphones, Bluetooth handoff, privacy switches, and virtual devices can end tracks unexpectedly.
 - Enterprise policies, browser extensions, VPN/firewall rules, NAT, and provider outages can block WebRTC while local capture still works.
-- Long recordings and audio remuxing are memory-intensive because current Studio artifacts are held in the tab. Connection-start credentials expire after five minutes, the broker's default AI active-session scope is five minutes, and the ElevenLabs UI limits conversion to takes no longer than five minutes. Ordinary recording has no matching warning or forced-stop timer.
+- Long recordings and audio remuxing are memory-intensive because current Studio artifacts are held in the tab. The [recording memory policy](RECORDING_MEMORY_POLICY.md) defines the required target-device measurements and release decision process. Connection-start credentials expire after five minutes, the broker's default AI active-session scope is five minutes, and the ElevenLabs UI limits conversion to takes no longer than five minutes. Ordinary recording has no matching warning or forced-stop timer.
 - Reduced-power/mobile devices may not render offline audio or remux quickly enough for a comfortable workflow.
 
 ## Release browser matrix

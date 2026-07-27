@@ -19,7 +19,6 @@ import {
 import type { CapturePreferencesController } from '../../features/recording';
 import { LOCAL_MEDIA_REQUIREMENTS, localMediaRequirements } from './mediaRequirements';
 import { useCapturePreferences } from './useCapturePreferences';
-import { useLiveTimer } from './useLiveTimer';
 import { useModelSessionActions } from './useModelSessionActions';
 import { useOwnedLocalMedia } from './useOwnedLocalMedia';
 import { useSessionDraftState } from './useSessionDraftState';
@@ -49,7 +48,6 @@ export const useStudioSession = ({
   const operationRef = useRef(0);
   const startAbortRef = useRef<AbortController | null>(null);
   const disconnectRealtimeRef = useRef<() => void>(() => undefined);
-  const { seconds: liveSeconds, start: startLiveTimer, reset: resetLiveTimer } = useLiveTimer();
   const {
     draft,
     draftRef,
@@ -73,23 +71,19 @@ export const useStudioSession = ({
     });
   }, []);
 
-  const handleRequiredTrackEnded = useCallback(
-    (kind: 'audio' | 'video') => {
-      ++operationRef.current;
-      startAbortRef.current?.abort();
-      startAbortRef.current = null;
-      setLifecycle('error');
-      setApplying(false);
-      resetLiveTimer();
-      setError({
-        code: 'device-ended',
-        message: `${kind === 'video' ? 'Camera' : 'Microphone'} access ended unexpectedly.`,
-        recovery: 'Reconnect the device and start again.',
-      });
-      disconnectRealtimeRef.current();
-    },
-    [resetLiveTimer],
-  );
+  const handleRequiredTrackEnded = useCallback((kind: 'audio' | 'video') => {
+    ++operationRef.current;
+    startAbortRef.current?.abort();
+    startAbortRef.current = null;
+    setLifecycle('error');
+    setApplying(false);
+    setError({
+      code: 'device-ended',
+      message: `${kind === 'video' ? 'Camera' : 'Microphone'} access ended unexpectedly.`,
+      recovery: 'Reconnect the device and start again.',
+    });
+    disconnectRealtimeRef.current();
+  }, []);
 
   const {
     stream: localStream,
@@ -164,24 +158,22 @@ export const useStudioSession = ({
     [capturePreferences.applied, ensureMedia],
   );
 
-  const { remoteStream, generationSeconds, disconnectRealtime, startModel, applyChanges } =
-    useModelSessionActions({
-      decartAvailable: availability.decart,
-      operationRef,
-      startAbortRef,
-      draftRef,
-      lifecycle,
-      setLifecycle,
-      setApplied,
-      applying,
-      setApplying,
-      setError,
-      ensureMedia: ensurePreferredMedia,
-      localRef,
-      startLiveTimer,
-      ...(realtimeSessionProfile ? { realtimeSessionProfile } : {}),
-      ...(onPromptCommitted ? { onPromptCommitted } : {}),
-    });
+  const { remoteStream, disconnectRealtime, startModel, applyChanges } = useModelSessionActions({
+    decartAvailable: availability.decart,
+    operationRef,
+    startAbortRef,
+    draftRef,
+    lifecycle,
+    setLifecycle,
+    setApplied,
+    applying,
+    setApplying,
+    setError,
+    ensureMedia: ensurePreferredMedia,
+    localRef,
+    ...(realtimeSessionProfile ? { realtimeSessionProfile } : {}),
+    ...(onPromptCommitted ? { onPromptCommitted } : {}),
+  });
 
   useEffect(() => {
     disconnectRealtimeRef.current = disconnectRealtime;
@@ -196,7 +188,6 @@ export const useStudioSession = ({
         const stream = await ensureMedia(requirements, operation);
         if (operationRef.current !== operation) return null;
         setLifecycle('ready');
-        startLiveTimer();
         return stream;
       } catch (caught) {
         if (operationRef.current !== operation) return null;
@@ -208,7 +199,7 @@ export const useStudioSession = ({
         return null;
       }
     },
-    [ensureMedia, startLiveTimer],
+    [ensureMedia],
   );
 
   const startLocal = useCallback(async () => {
@@ -258,11 +249,10 @@ export const useStudioSession = ({
     releaseLocalMedia();
     setApplied(null);
     setApplying(false);
-    resetLiveTimer();
     setError(null);
     await Promise.resolve();
     setLifecycle('idle');
-  }, [disconnectRealtime, releaseLocalMedia, resetLiveTimer, setApplied]);
+  }, [disconnectRealtime, releaseLocalMedia, setApplied]);
 
   const releaseForRecordedReview = useCallback(async (): Promise<void> => {
     await stopCamera();
@@ -335,8 +325,6 @@ export const useStudioSession = ({
       transformedVideoUsable,
       pendingChanges,
       error,
-      liveSeconds,
-      generationSeconds,
       applying,
       microphoneEnabled,
       cameraEnabled,
@@ -370,8 +358,6 @@ export const useStudioSession = ({
       transformedVideoUsable,
       pendingChanges,
       error,
-      liveSeconds,
-      generationSeconds,
       applying,
       microphoneEnabled,
       cameraEnabled,

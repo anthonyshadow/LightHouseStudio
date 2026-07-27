@@ -51,8 +51,6 @@ const defaultProps: MediaStageProps = {
   presentation: idlePresentation,
   mode: 'local',
   lifecycle: 'idle',
-  liveSeconds: 0,
-  generationSeconds: 0,
   recording: false,
   recordingSeconds: 0,
 };
@@ -111,7 +109,6 @@ describe('MediaStage', () => {
           mirrored: true,
         },
         lifecycle: 'ready',
-        liveSeconds: 7,
       }),
     );
 

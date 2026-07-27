@@ -27,8 +27,6 @@ const createSession = (
   transformedVideoUsable: false,
   pendingChanges: false,
   error: null,
-  liveSeconds: 0,
-  generationSeconds: 0,
   applying: false,
   microphoneEnabled: true,
   cameraEnabled: true,

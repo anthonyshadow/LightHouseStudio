@@ -59,7 +59,6 @@ describe('Decart realtime gateway', () => {
     const callbacks = {
       onRemoteStream: vi.fn(),
       onConnectionChange: vi.fn(),
-      onGenerationTick: vi.fn(),
       onError: vi.fn(),
     };
     const initialImage = new File(['portrait'], 'portrait.webp', { type: 'image/webp' });
@@ -108,15 +107,14 @@ describe('Decart realtime gateway', () => {
       initial: { prompt: '', image: new File(['garment'], 'top.png'), enhance: false },
       onRemoteStream: vi.fn(),
       onConnectionChange: vi.fn(),
-      onGenerationTick: vi.fn(),
       onError: vi.fn(),
     });
 
     session.disconnect();
     session.disconnect();
 
-    expect(sdk.on).toHaveBeenCalledTimes(2);
-    expect(sdk.off).toHaveBeenCalledTimes(2);
+    expect(sdk.on).toHaveBeenCalledOnce();
+    expect(sdk.off).toHaveBeenCalledOnce();
     expect(sdk.disconnect).toHaveBeenCalledOnce();
     await expect(session.apply({ prompt: 'late', image: null, enhance: false })).rejects.toThrow(
       'Realtime session is disconnected.',
@@ -157,7 +155,6 @@ describe('Decart realtime gateway', () => {
       signal: controller.signal,
       onRemoteStream: vi.fn(),
       onConnectionChange: vi.fn(),
-      onGenerationTick: vi.fn(),
       onError: vi.fn(),
     });
     const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' });

@@ -532,8 +532,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     unmount();
   });
 
-  it('resets the live timer when the local video ends unexpectedly', async () => {
-    vi.useFakeTimers();
+  it('releases local media when the local video ends unexpectedly', async () => {
     const local = fakeStream();
     adapters.acquireLocalMedia.mockResolvedValue(local);
     const { result, unmount } = renderHook(() =>
@@ -545,18 +544,11 @@ describe('useStudioSession explicit-start boundaries', () => {
     await act(async () => {
       await result.current.startLocal();
     });
-    await act(async () => {
-      vi.advanceTimersByTime(2_100);
-      await Promise.resolve();
-    });
-    expect(result.current.liveSeconds).toBeGreaterThanOrEqual(2);
-
     act(() => {
       (local.getVideoTracks()[0] as ControllableTrack).endUnexpectedly();
     });
 
     expect(result.current.localStream).toBeNull();
-    expect(result.current.liveSeconds).toBe(0);
     expect(result.current.lifecycle).toBe('error');
     unmount();
   });
@@ -591,7 +583,6 @@ describe('useStudioSession model lifecycle contract', () => {
       nextOptions.onConnectionChange('connected');
       nextOptions.onRemoteStream(remote);
       nextOptions.onConnectionChange('generating');
-      nextOptions.onGenerationTick(4);
       return Promise.resolve(session);
     });
     const { result, unmount } = renderHook(() =>
@@ -633,7 +624,6 @@ describe('useStudioSession model lifecycle contract', () => {
     expect(result.current.applied?.enhance).toBe(scenario.enhance);
     expect(result.current.pendingChanges).toBe(false);
     expect(result.current.lifecycle).toBe('generating');
-    expect(result.current.generationSeconds).toBe(4);
     expect(result.current.transformedVideoUsable).toBe(true);
     expect(result.current.displayStream).toBe(remote);
     expect(onPromptCommitted).toHaveBeenCalledOnce();
@@ -966,7 +956,6 @@ describe('useStudioSession model lifecycle contract', () => {
   });
 
   it('releases local and provider resources for recorded review without clearing the draft', async () => {
-    vi.useFakeTimers();
     const local = fakeStream();
     const remote = fakeStream();
     const realtimeSession = fakeRealtimeSession();
@@ -991,11 +980,7 @@ describe('useStudioSession model lifecycle contract', () => {
     await act(async () => {
       await result.current.startModel();
     });
-    act(() => {
-      vi.advanceTimersByTime(2_100);
-    });
     expect(result.current.displayStream).toBe(remote);
-    expect(result.current.liveSeconds).toBeGreaterThanOrEqual(2);
 
     await act(async () => {
       await result.current.releaseForRecordedReview();
@@ -1013,7 +998,6 @@ describe('useStudioSession model lifecycle contract', () => {
     expect(result.current.displayStream).toBeNull();
     expect(result.current.lifecycle).toBe('idle');
     expect(result.current.applied).toBeNull();
-    expect(result.current.liveSeconds).toBe(0);
     expect(result.current.error).toBeNull();
     expect(result.current.draft).toMatchObject({
       mode: 'lucy-2.5',

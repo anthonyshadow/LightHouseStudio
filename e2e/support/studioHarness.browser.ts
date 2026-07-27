@@ -24,7 +24,6 @@ export const installSyntheticBrowserMedia = async (
         initial: TestSnapshot;
         onRemoteStream(stream: MediaStream): void;
         onConnectionChange(state: string): void;
-        onGenerationTick(seconds: number): void;
       };
 
       const state: BrowserJourneyState & {
@@ -151,7 +150,6 @@ export const installSyntheticBrowserMedia = async (
             options.onConnectionChange('connected');
             if (realtimeProvidesVideo) options.onRemoteStream(remote);
             options.onConnectionChange('generating');
-            options.onGenerationTick(1);
           });
           return Promise.resolve({
             apply(snapshot: TestSnapshot) {

@@ -60,8 +60,6 @@ const CaptureFlowHarness = () => {
           presentation={{ kind: 'idle', mode: 'local' }}
           mode="local"
           lifecycle={step === 'idle' ? 'idle' : 'ready'}
-          liveSeconds={0}
-          generationSeconds={0}
           recording={false}
           recordingSeconds={0}
           idleAction={
