@@ -3,6 +3,7 @@ import {
   referenceImageAssetSchema,
   REFERENCE_IMAGE_QUALITY,
   type CharacterPromptOptimizationResult,
+  type ComposeReferenceImageRequest,
   type CreateReferenceImageRequest,
   type EditReferenceImageRequest,
   type ReferenceImageAsset,
@@ -14,6 +15,7 @@ import { ReferenceImageGenerationStateError } from './reference-image-error.js';
 import {
   createPromptOptimizationInputHash,
   createWorkshopPromptHash,
+  REFERENCE_IMAGE_COMPOSITION_PROMPT_TEMPLATE_VERSION,
   REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION,
   versionReferenceImagePrompt,
 } from './prompt.js';
@@ -24,6 +26,12 @@ export interface GenerateReferenceImageInput extends CreateReferenceImageRequest
 }
 
 export interface EditReferenceImageInput extends EditReferenceImageRequest {
+  readonly localOwnerId: string;
+  readonly sourceAssetId: string;
+  readonly signal?: AbortSignal;
+}
+
+export interface ComposeReferenceImageInput extends ComposeReferenceImageRequest {
   readonly localOwnerId: string;
   readonly sourceAssetId: string;
   readonly signal?: AbortSignal;
@@ -69,6 +77,19 @@ export const editRequestFingerprint = (input: EditReferenceImageInput): string =
       sourceAssetId: input.sourceAssetId,
       rawPrompt: input.rawPrompt,
       changeInstructions: input.changeInstructions,
+      options: input.options,
+      generator: input.generator ?? null,
+      optimization: input.optimization,
+    }),
+  );
+
+export const compositionRequestFingerprint = (input: ComposeReferenceImageInput): string =>
+  sha256(
+    JSON.stringify({
+      kind: 'compose',
+      templateVersion: REFERENCE_IMAGE_COMPOSITION_PROMPT_TEMPLATE_VERSION,
+      sourceAssetId: input.sourceAssetId,
+      rawPrompt: input.rawPrompt,
       options: input.options,
       generator: input.generator ?? null,
       optimization: input.optimization,
@@ -144,7 +165,7 @@ export const settingsMatchReferenceImageOptions = (
   (quality === undefined || result.recommendedSettings.quality === quality);
 
 export const prepareReferenceImageGeneration = (
-  input: GenerateReferenceImageInput | EditReferenceImageInput,
+  input: GenerateReferenceImageInput | EditReferenceImageInput | ComposeReferenceImageInput,
   options: {
     readonly optimizer: Pick<CharacterPromptOptimizer, 'model'> | null;
     readonly optimizerVersion: string;
@@ -232,7 +253,7 @@ export const prepareReferenceImageGeneration = (
 };
 
 const legacyOptimizationResult = (
-  metadata: StoredReferenceImageMetadata,
+  metadata: Extract<StoredReferenceImageMetadata, { source: 'generated' }>,
 ): CharacterPromptOptimizationResult => {
   const size = metadata.size ?? '1024x1024';
   return {
@@ -254,6 +275,19 @@ const legacyOptimizationResult = (
 export const toReferenceImageAsset = (
   metadata: StoredReferenceImageMetadata,
 ): ReferenceImageAsset => {
+  if (metadata.source === 'uploaded') {
+    return referenceImageAssetSchema.parse({
+      assetId: metadata.assetId,
+      mimeType: metadata.mimeType,
+      width: metadata.width,
+      height: metadata.height,
+      byteSize: metadata.byteSize,
+      source: metadata.source,
+      createdAt: metadata.createdAt,
+      updatedAt: metadata.updatedAt ?? metadata.createdAt,
+      contentUrl: `/api/reference-images/${metadata.assetId}/content`,
+    });
+  }
   const audit = metadata.promptAudit;
   const result = audit?.result ?? legacyOptimizationResult(metadata);
   return referenceImageAssetSchema.parse({
@@ -290,7 +324,14 @@ export const toReferenceImageAsset = (
               sourceAssetId: metadata.derivation.sourceAssetId,
             },
           }
-        : { derivation: { kind: 'generate' as const } }),
+        : metadata.derivation.kind === 'compose'
+          ? {
+              derivation: {
+                kind: 'compose' as const,
+                sourceAssetId: metadata.derivation.sourceAssetId,
+              },
+            }
+          : { derivation: { kind: 'generate' as const } }),
     createdAt: metadata.createdAt,
     updatedAt: metadata.updatedAt ?? metadata.createdAt,
     contentUrl: `/api/reference-images/${metadata.assetId}/content`,

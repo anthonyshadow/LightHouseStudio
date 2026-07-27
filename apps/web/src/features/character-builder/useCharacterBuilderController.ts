@@ -11,6 +11,7 @@ import {
   characterBuilderOperationError,
   createCharacterBuilderOperationLocks,
   createFreshCharacterBuilderDraftValue,
+  deriveCharacterName,
   type CharacterSaveProgress,
   type CharacterSaveSnapshot,
 } from './characterBuilderControllerSupport';
@@ -21,6 +22,7 @@ import {
 } from './machine';
 import { useCharacterBuilderPersistence } from './useCharacterBuilderPersistence';
 import { useCharacterReferenceGeneration } from './useCharacterReferenceGeneration';
+import { useCharacterReferenceUpload } from './useCharacterReferenceUpload';
 import { useCharacterSaveJournal } from './useCharacterSaveJournal';
 import type { CharacterSaveStage } from './characterBuilderPersistence';
 
@@ -119,6 +121,14 @@ export const useCharacterBuilderController = ({
     dispatch,
     hasPendingSave,
   });
+  const upload = useCharacterReferenceUpload({
+    open,
+    stateRef,
+    locksRef,
+    dispatch,
+    cancelGeneration,
+    hasPendingSave,
+  });
   const { save: saveCharacter, clear: clearSaveJournal } = useCharacterSaveJournal({
     stateRef,
     locksRef,
@@ -137,6 +147,7 @@ export const useCharacterBuilderController = ({
       const sourceKey = createReferencePreviewSourceKey(
         generateStructuredPrompt(draft).prompt,
         current.options,
+        current.uploadedReference?.asset.assetId,
       );
       dispatch({ type: 'edited', draft, design, sourceKey });
     },
@@ -151,6 +162,7 @@ export const useCharacterBuilderController = ({
       const sourceKey = createReferencePreviewSourceKey(
         generateStructuredPrompt(current.draft).prompt,
         options,
+        current.uploadedReference?.asset.assetId,
       );
       dispatch({ type: 'options-changed', options, sourceKey });
     },
@@ -170,6 +182,7 @@ export const useCharacterBuilderController = ({
     }
     locksRef.current.close = true;
     cancelGeneration();
+    upload.cancel();
     dispatch({ type: 'closing' });
     const current = stateRef.current;
     void persistForClose(current)
@@ -191,13 +204,21 @@ export const useCharacterBuilderController = ({
       .finally(() => {
         locksRef.current.close = false;
       });
-  }, [cancelGeneration, onDismiss, persistForClose, reportPersistenceError, setAutosaveMessage]);
+  }, [
+    cancelGeneration,
+    onDismiss,
+    persistForClose,
+    reportPersistenceError,
+    setAutosaveMessage,
+    upload,
+  ]);
 
   const confirmDiscardClose = useCallback(() => {
     if (locksRef.current.discard || locksRef.current.reset || locksRef.current.save) return;
     locksRef.current.discard = true;
     setDiscardCloseBusy(true);
     cancelGeneration();
+    upload.cancel();
     void (async () => {
       let discarded = false;
       try {
@@ -232,6 +253,7 @@ export const useCharacterBuilderController = ({
     reportPersistenceError,
     resetStoredDraft,
     waitForWrites,
+    upload,
   ]);
 
   const confirmReset = useCallback(() => {
@@ -246,6 +268,7 @@ export const useCharacterBuilderController = ({
     locksRef.current.reset = true;
     setResetBusy(true);
     cancelGeneration();
+    upload.cancel();
     void (async () => {
       try {
         await waitForWrites();
@@ -270,7 +293,14 @@ export const useCharacterBuilderController = ({
         setResetBusy(false);
       }
     })();
-  }, [cancelGeneration, clearSaveJournal, resetStoredDraft, setAutosaveMessage, waitForWrites]);
+  }, [
+    cancelGeneration,
+    clearSaveJournal,
+    resetStoredDraft,
+    setAutosaveMessage,
+    upload,
+    waitForWrites,
+  ]);
 
   const generated = generateStructuredPrompt(state.draft);
   const canSave = Boolean(
@@ -288,9 +318,15 @@ export const useCharacterBuilderController = ({
     resetBusy,
     saveRecoveryPending: pendingSave !== null,
     canSave,
+    canSaveImageOnly: Boolean(state.uploadedReference),
+    suggestedCharacterName: pendingSave?.snapshot.name ?? deriveCharacterName(state.design),
+    suggestedImageOnlyCharacterName: pendingSave?.snapshot.name ?? 'Uploaded Character 01',
+    characterNameLocked: pendingSave !== null,
     onChange: changeDraft,
     onOptionsChange: changeOptions,
     onGenerate: generatePreview,
+    onUploadReference: (file: File) => void upload.select(file),
+    onRemoveUpload: upload.remove,
     onRequestRegeneration: () => {
       if (
         !locksRef.current.generation &&
@@ -321,7 +357,8 @@ export const useCharacterBuilderController = ({
       if (!locksRef.current.reset) dispatch({ type: 'cancel-reset' });
     },
     onClose: requestClose,
-    onSave: () => void saveCharacter(),
+    onSave: (name: string) => void saveCharacter('default', name),
+    onSaveImageOnly: (name: string) => void saveCharacter('image-only', name),
     onCancelDiscardClose: () => {
       if (locksRef.current.discard) return;
       setDiscardCloseOpen(false);

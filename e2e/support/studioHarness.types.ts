@@ -1,12 +1,14 @@
 import type {
+  ComposeReferenceImageRequest,
   CreateReferenceImageRequest,
   EditReferenceImageRequest,
+  GeneratedReferenceImageAsset,
   OptimizeCharacterReferencePromptRequest,
   OptimizeCharacterReferencePromptResponse,
-  ReferenceImageAsset,
+  UploadedReferenceImageAsset,
 } from '@studio/contracts';
 
-export type MockReferenceImageAsset = ReferenceImageAsset;
+export type MockReferenceImageAsset = GeneratedReferenceImageAsset | UploadedReferenceImageAsset;
 
 export type ModelId = 'lucy-2.5' | 'lucy-vton-3';
 
@@ -31,7 +33,13 @@ export type BrowserJourneyState = {
 
 export type NetworkJourneyState = {
   apiRequests: Array<{ path: string; model: ModelId | null }>;
-  referenceWorkflowCalls: Array<'optimize' | 'generate' | 'edit'>;
+  referenceWorkflowCalls: Array<'upload' | 'optimize' | 'generate' | 'compose' | 'edit'>;
+  referenceImageUploads: Array<{
+    requestId: string;
+    assetId: string;
+    byteSize: number;
+    mimeType: string;
+  }>;
   referencePromptOptimizations: Array<{
     request: OptimizeCharacterReferencePromptRequest;
     response: OptimizeCharacterReferencePromptResponse;
@@ -41,6 +49,13 @@ export type NetworkJourneyState = {
   >;
   referenceImageEdits: Array<
     EditReferenceImageRequest & {
+      sourceAssetId: string;
+      assetId: string;
+      imagePromptSentToProvider: string;
+    }
+  >;
+  referenceImageCompositions: Array<
+    ComposeReferenceImageRequest & {
       sourceAssetId: string;
       assetId: string;
       imagePromptSentToProvider: string;

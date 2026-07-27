@@ -1,6 +1,6 @@
 import { normalizeAuthoredPrompt } from '../common/text';
 import type { EphemeralImageDescriptor } from './image';
-import { CHARACTER_MODEL_ID, LOCAL_MODE_ID, type ModelModeId, type SessionModeId } from './modes';
+import { LOCAL_MODE_ID, type ModelModeId, type SessionModeId } from './modes';
 
 export interface SessionDraft {
   readonly modeId: SessionModeId;
@@ -54,10 +54,7 @@ export const buildRealtimeStateSnapshot = (draft: SessionDraft): RealtimeStateSn
   const normalizedPrompt = normalizeAuthoredPrompt(draft.prompt);
   return {
     modeId: draft.modeId,
-    prompt:
-      draft.modeId === CHARACTER_MODEL_ID && !normalizedPrompt && draft.image
-        ? CHARACTER_IMAGE_ONLY_INSTRUCTION
-        : normalizedPrompt,
+    prompt: normalizedPrompt,
     imageId: draft.image?.id ?? null,
     enhancePrompt: draft.enhancePrompt,
   };

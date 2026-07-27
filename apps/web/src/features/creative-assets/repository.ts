@@ -1,7 +1,6 @@
 import {
   ASSET_NAME_MAX_LENGTH,
   AssetRuleError,
-  canonicalPrompt,
   createSavedCharacterPrompt as createDomainCharacterPrompt,
   createSavedPrompt as createDomainSavedPrompt,
   deleteSavedCharacterPrompt as deleteDomainCharacterPrompt,
@@ -13,7 +12,6 @@ import {
   searchCreativeAssets,
   updateSavedCharacterPrompt as updateDomainCharacterPrompt,
   updateSavedPrompt as updateDomainSavedPrompt,
-  useSavedCharacterPrompt as markSavedCharacterPromptUsed,
   type AssetMutationContext,
   type CreativeAssetStore,
 } from '@studio/domain';
@@ -22,6 +20,8 @@ import {
   CREATIVE_ASSET_STORAGE_KEY,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   LEGACY_CREATIVE_ASSET_STORAGE_KEY,
+  OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
+  OLDER_CREATIVE_ASSET_STORAGE_KEY,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
   type CreateSavedCharacterPromptInput,
@@ -103,6 +103,7 @@ const isSupportedLegacyPayload = (serialized: string): boolean => {
       value !== null &&
       'schemaVersion' in value &&
       (value.schemaVersion === LEGACY_CREATIVE_ASSET_SCHEMA_VERSION ||
+        value.schemaVersion === OLDER_CREATIVE_ASSET_SCHEMA_VERSION ||
         value.schemaVersion === PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION)
     );
   } catch {
@@ -185,7 +186,11 @@ export const createCreativeAssetRepository = (
   const legacyStorageKeys =
     options.legacyStorageKey === undefined
       ? options.storageKey === undefined
-        ? [PREVIOUS_CREATIVE_ASSET_STORAGE_KEY, LEGACY_CREATIVE_ASSET_STORAGE_KEY]
+        ? [
+            PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
+            OLDER_CREATIVE_ASSET_STORAGE_KEY,
+            LEGACY_CREATIVE_ASSET_STORAGE_KEY,
+          ]
         : []
       : options.legacyStorageKey === null
         ? []
@@ -292,6 +297,8 @@ export const createCreativeAssetRepository = (
     JSON.stringify(existing.guidedDesign) === JSON.stringify(candidate.guidedDesign) &&
     existing.referenceImageStatus === candidate.referenceImageStatus &&
     existing.referenceImageAssetId === candidate.referenceImageAssetId &&
+    existing.uploadedReferenceImageAssetId === candidate.uploadedReferenceImageAssetId &&
+    existing.finalReferenceKind === candidate.finalReferenceKind &&
     existing.notes === candidate.notes &&
     JSON.stringify(existing.tags) === JSON.stringify(candidate.tags);
 
@@ -322,6 +329,10 @@ export const createCreativeAssetRepository = (
             guidedDesign: input.guidedDesign ?? null,
             referenceImageStatus: input.referenceImageStatus ?? 'prompt-only',
             referenceImageAssetId: input.referenceImageAssetId ?? null,
+            uploadedReferenceImageAssetId: input.uploadedReferenceImageAssetId ?? null,
+            ...(input.finalReferenceKind === undefined
+              ? {}
+              : { finalReferenceKind: input.finalReferenceKind }),
             notes: input.notes ?? '',
             tags: input.tags ?? [],
           },
@@ -406,6 +417,10 @@ export const createCreativeAssetRepository = (
           guidedDesign: input.guidedDesign ?? null,
           referenceImageStatus: input.referenceImageStatus ?? 'prompt-only',
           referenceImageAssetId: input.referenceImageAssetId ?? null,
+          uploadedReferenceImageAssetId: input.uploadedReferenceImageAssetId ?? null,
+          ...(input.finalReferenceKind === undefined
+            ? {}
+            : { finalReferenceKind: input.finalReferenceKind }),
           notes: input.notes ?? '',
           tags: input.tags ?? [],
         },
@@ -456,6 +471,10 @@ export const createCreativeAssetRepository = (
           guidedDesign: input.guidedDesign ?? null,
           referenceImageStatus: input.referenceImageStatus ?? 'prompt-only',
           referenceImageAssetId: input.referenceImageAssetId ?? null,
+          uploadedReferenceImageAssetId: input.uploadedReferenceImageAssetId ?? null,
+          ...(input.finalReferenceKind === undefined
+            ? {}
+            : { finalReferenceKind: input.finalReferenceKind }),
           notes: input.notes ?? '',
           tags: input.tags ?? [],
         },
@@ -487,6 +506,12 @@ export const createCreativeAssetRepository = (
           ...(input.referenceImageAssetId === undefined
             ? {}
             : { referenceImageAssetId: input.referenceImageAssetId }),
+          ...(input.uploadedReferenceImageAssetId === undefined
+            ? {}
+            : { uploadedReferenceImageAssetId: input.uploadedReferenceImageAssetId }),
+          ...(input.finalReferenceKind === undefined
+            ? {}
+            : { finalReferenceKind: input.finalReferenceKind }),
           ...(input.notes === undefined ? {} : { notes: input.notes }),
           ...(input.tags === undefined ? {} : { tags: input.tags }),
         },
@@ -512,25 +537,20 @@ export const createCreativeAssetRepository = (
 
   const recordSuccessfulPrompt = (input: RecordSuccessfulPromptInput) => {
     const context = mutationContext();
-    let next = recordSuccessfulPromptUse(
+    const next = recordSuccessfulPromptUse(
       state.store,
       {
         prompt: input.prompt,
         modelModeId: input.modelModeId,
         ...(input.savedPromptId ? { savedPromptId: input.savedPromptId } : {}),
+        ...(input.savedCharacterPromptId
+          ? { savedCharacterPromptId: input.savedCharacterPromptId }
+          : {}),
+        ...(input.characterName ? { characterName: input.characterName } : {}),
         referenceImageAssetId: input.referenceImageAssetId ?? null,
       },
       context,
     );
-    if (input.modelModeId === 'lucy-2.5' && input.savedCharacterPromptId) {
-      const character = next.savedCharacterPrompts.find(
-        (item) =>
-          item.id === input.savedCharacterPromptId &&
-          canonicalPrompt(item.prompt) === canonicalPrompt(input.prompt) &&
-          item.referenceImageAssetId === (input.referenceImageAssetId ?? null),
-      );
-      if (character) next = markSavedCharacterPromptUsed(next, character.id, context.now).store;
-    }
     if (next !== state.store) commit(next);
   };
 

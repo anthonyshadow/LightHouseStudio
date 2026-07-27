@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CHARACTER_IMAGE_ONLY_INSTRUCTION,
   CHARACTER_MODEL_ID,
   MAX_IMAGE_BYTES,
   RECOMMENDED_IMAGE_BYTES,
@@ -49,7 +48,7 @@ describe('session modes and drafts', () => {
 });
 
 describe('atomic realtime state', () => {
-  it('adds the character substitution instruction for image-only Character input', () => {
+  it('preserves an empty prompt for image-only Character input', () => {
     const snapshot = buildRealtimeStateSnapshot({
       modeId: CHARACTER_MODEL_ID,
       prompt: '  ',
@@ -58,7 +57,7 @@ describe('atomic realtime state', () => {
     });
     expect(snapshot).toEqual({
       modeId: 'lucy-2.5',
-      prompt: CHARACTER_IMAGE_ONLY_INSTRUCTION,
+      prompt: '',
       imageId: 'session-image-1',
       enhancePrompt: false,
     });

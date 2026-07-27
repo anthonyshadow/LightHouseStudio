@@ -5,6 +5,7 @@ import {
   CREATIVE_ASSET_SCHEMA_VERSION,
   CREATIVE_ASSET_STORAGE_KEY,
   LEGACY_CREATIVE_ASSET_STORAGE_KEY,
+  OLDER_CREATIVE_ASSET_STORAGE_KEY,
   PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
   type GuidedDesignV1,
   type StorageLike,
@@ -224,6 +225,71 @@ describe('createCreativeAssetRepository', () => {
     ).toBe(1);
   });
 
+  it('persists image-only characters and retains their standalone Recent recipe after deletion', () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFixture(storage);
+    const character = repository.createSavedCharacterPrompt({
+      name: 'Uploaded Character 01',
+      prompt: '',
+      promptIntent: null,
+      builderDraft: null,
+      guidedDesign: null,
+      referenceImageStatus: 'persisted-reference',
+      referenceImageAssetId: 'uploaded-asset',
+      uploadedReferenceImageAssetId: 'uploaded-asset',
+      finalReferenceKind: 'uploaded',
+    });
+
+    expect(repository.getSnapshot().store.recentPrompts).toEqual([]);
+    expect(repositoryFixture(storage).getSnapshot().store.savedCharacterPrompts[0]).toMatchObject({
+      id: character.id,
+      prompt: '',
+      referenceImageAssetId: 'uploaded-asset',
+      uploadedReferenceImageAssetId: 'uploaded-asset',
+      finalReferenceKind: 'uploaded',
+    });
+
+    repository.recordSuccessfulPrompt({
+      prompt: '',
+      modelModeId: 'lucy-2.5',
+      savedCharacterPromptId: character.id,
+      characterName: character.name,
+      referenceImageAssetId: 'uploaded-asset',
+    });
+
+    expect(repository.getSnapshot().store).toMatchObject({
+      recentPrompts: [
+        {
+          prompt: '',
+          savedCharacterPromptId: character.id,
+          characterName: character.name,
+          referenceImageAssetId: 'uploaded-asset',
+        },
+      ],
+      savedCharacterPrompts: [
+        expect.objectContaining({
+          id: character.id,
+          useCount: 1,
+        }),
+      ],
+    });
+
+    repository.deleteSavedCharacterPrompt(character.id);
+    expect(repositoryFixture(storage).getSnapshot().store).toMatchObject({
+      savedCharacterPrompts: [],
+      recentPrompts: [
+        {
+          prompt: '',
+          characterName: character.name,
+          referenceImageAssetId: 'uploaded-asset',
+        },
+      ],
+    });
+    expect(repository.getSnapshot().store.recentPrompts[0]).not.toHaveProperty(
+      'savedCharacterPromptId',
+    );
+  });
+
   it('enriches the newest matching text-only recent without replacing an image version', () => {
     const repository = repositoryFixture();
     repository.recordSuccessfulPrompt({
@@ -245,7 +311,7 @@ describe('createCreativeAssetRepository', () => {
     ]);
   });
 
-  it('migrates the legacy v1 key to v3 and hydrates null references after refresh', () => {
+  it('migrates the legacy v1 key to v4 and hydrates null references after refresh', () => {
     const storage = new MemoryStorage();
     storage.records.set(
       LEGACY_CREATIVE_ASSET_STORAGE_KEY,
@@ -287,7 +353,7 @@ describe('createCreativeAssetRepository', () => {
   it('prefers and migrates the v2 key while preserving reference identities', () => {
     const storage = new MemoryStorage();
     storage.records.set(
-      PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
+      OLDER_CREATIVE_ASSET_STORAGE_KEY,
       JSON.stringify({
         schemaVersion: 2,
         savedPrompts: [],
@@ -334,6 +400,49 @@ describe('createCreativeAssetRepository', () => {
           },
         ],
       },
+    });
+    expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
+  });
+
+  it('prefers and migrates the v3 key with generated reference provenance', () => {
+    const storage = new MemoryStorage();
+    storage.records.set(
+      PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: 3,
+        savedPrompts: [],
+        recentPrompts: [],
+        savedCharacterPrompts: [
+          {
+            id: 'v3-character',
+            name: 'V3 character',
+            prompt: 'Substitute the character with an adult presenter.',
+            source: 'generator',
+            promptIntent: 'character-transform',
+            builderDraft: createPromptBuilderDraft('character-transform'),
+            guidedDesign: guidedDesign(),
+            referenceImageStatus: 'persisted-reference',
+            referenceImageAssetId: 'v3-reference',
+            notes: '',
+            tags: [],
+            createdAt: '2026-07-14T12:00:00.000Z',
+            updatedAt: '2026-07-14T12:00:00.000Z',
+            lastUsedAt: null,
+            useCount: 0,
+          },
+        ],
+      }),
+    );
+
+    expect(createCreativeAssetRepository({ storage }).getSnapshot().store).toMatchObject({
+      schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+      savedCharacterPrompts: [
+        expect.objectContaining({
+          referenceImageAssetId: 'v3-reference',
+          uploadedReferenceImageAssetId: null,
+          finalReferenceKind: 'generated',
+        }),
+      ],
     });
     expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
   });

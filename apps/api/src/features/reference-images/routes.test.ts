@@ -8,10 +8,12 @@ import type {
   ApiErrorResponse,
   CapabilitiesResponse,
   CharacterPromptOptimizationResult,
+  ComposeReferenceImageResponse,
   CreateReferenceImageRequest,
   CreateReferenceImageResponse,
   EditReferenceImageResponse,
   OptimizeCharacterReferencePromptResponse,
+  UploadReferenceImageResponse,
 } from '@studio/contracts';
 import { createApp } from '../../app.js';
 import {
@@ -346,6 +348,187 @@ describe('reference image API', () => {
       message: 'That local reference image is unavailable.',
     });
     expect(provider.edit).toHaveBeenCalledTimes(1);
+  });
+
+  it('stores validated uploads immutably and replays only identical idempotent requests', async () => {
+    const app = await setup(null);
+    const bytes = await sharp({
+      create: { width: 320, height: 480, channels: 3, background: '#234f61' },
+    })
+      .png()
+      .toBuffer();
+    const headers = {
+      ...localHeaders,
+      'content-type': 'image/png',
+      'idempotency-key': requestId,
+    };
+
+    const uploaded = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/uploads',
+      headers,
+      payload: bytes,
+    });
+    const replay = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/uploads',
+      headers,
+      payload: bytes,
+    });
+    const conflict = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/uploads',
+      headers,
+      payload: await sharp(bytes).jpeg().toBuffer(),
+    });
+    const uploadedAsset = uploaded.json<UploadReferenceImageResponse>().asset;
+    const content = await app.inject({
+      method: 'GET',
+      url: uploadedAsset.contentUrl,
+      headers: localHeaders,
+    });
+    const otherOwner = await app.inject({
+      method: 'GET',
+      url: uploadedAsset.contentUrl,
+      headers: { origin: 'http://127.0.0.1:5173', host: '127.0.0.1:5173' },
+    });
+
+    expect(uploaded.statusCode).toBe(200);
+    expect(uploadedAsset).toMatchObject({
+      source: 'uploaded',
+      mimeType: 'image/png',
+      width: 320,
+      height: 480,
+      byteSize: bytes.byteLength,
+    });
+    expect(uploaded.body).not.toContain('provider');
+    expect(uploaded.body).not.toContain('originalPrompt');
+    expect(replay.json()).toEqual(uploaded.json());
+    expect(conflict.statusCode).toBe(409);
+    expect(conflict.json<ApiErrorResponse>().error.code).toBe('request_id_conflict');
+    expect(content.statusCode).toBe(200);
+    expect(content.headers['content-type']).toBe('image/png');
+    expect(content.rawPayload).toEqual(bytes);
+    expect(otherOwner.statusCode).toBe(404);
+  });
+
+  it('rejects invalid upload bytes and requires trusted, typed, idempotent requests', async () => {
+    const app = await setup(null);
+    const invalid = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/uploads',
+      headers: {
+        ...localHeaders,
+        'content-type': 'image/png',
+        'idempotency-key': requestId,
+      },
+      payload: Buffer.from('not an image'),
+    });
+    const missingKey = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/uploads',
+      headers: { ...localHeaders, 'content-type': 'image/png' },
+      payload: Buffer.from('not an image'),
+    });
+    const untrusted = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/uploads',
+      headers: {
+        origin: 'https://example.com',
+        host: 'localhost:5173',
+        'content-type': 'image/png',
+        'idempotency-key': secondRequestId,
+      },
+      payload: Buffer.from('not an image'),
+    });
+    const unsupportedMime = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/uploads',
+      headers: {
+        ...localHeaders,
+        'content-type': 'image/gif',
+        'idempotency-key': secondRequestId,
+      },
+      payload: Buffer.from('GIF89a'),
+    });
+    const oversized = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/uploads',
+      headers: {
+        ...localHeaders,
+        'content-type': 'image/png',
+        'idempotency-key': secondRequestId,
+      },
+      payload: Buffer.alloc(10 * 1024 * 1024 + 1),
+    });
+
+    expect(invalid.statusCode).toBe(400);
+    expect(invalid.json<ApiErrorResponse>().error.code).toBe('invalid_image_upload');
+    expect(missingKey.statusCode).toBe(400);
+    expect(untrusted.statusCode).toBe(403);
+    expect(unsupportedMime.statusCode).toBe(415);
+    expect(oversized.statusCode).toBe(413);
+  });
+
+  it('composes a generated preview from an uploaded source and records source provenance', async () => {
+    const editInputs: EditReferenceImageProviderInput[] = [];
+    const provider: ReferenceImageProvider = {
+      generate: vi.fn(),
+      edit: vi.fn(async (input: EditReferenceImageProviderInput) => {
+        editInputs.push(input);
+        return { base64: (await createImage(input.size)).toString('base64') };
+      }),
+    };
+    const app = await setup(provider, optimizer());
+    const sourceBytes = await sharp({
+      create: { width: 480, height: 640, channels: 3, background: '#594233' },
+    })
+      .webp()
+      .toBuffer();
+    const upload = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/uploads',
+      headers: {
+        ...localHeaders,
+        'content-type': 'image/webp',
+        'idempotency-key': requestId,
+      },
+      payload: sourceBytes,
+    });
+    const sourceAssetId = upload.json<UploadReferenceImageResponse>().asset.assetId;
+    const rawPrompt = 'A moss-covered guardian.';
+    const optimized = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/optimize',
+      headers: localHeaders,
+      payload: { rawPrompt, options },
+    });
+    const optimization = optimized.json<OptimizeCharacterReferencePromptResponse>();
+    const composed = await app.inject({
+      method: 'POST',
+      url: `/api/reference-images/${sourceAssetId}/compositions`,
+      headers: localHeaders,
+      payload: {
+        requestId: secondRequestId,
+        rawPrompt,
+        options,
+        optimization: { enabled: true, ...optimization, manuallyEdited: false },
+      },
+    });
+
+    expect(composed.statusCode).toBe(200);
+    expect(editInputs).toHaveLength(1);
+    expect(editInputs[0]).toMatchObject({
+      source: { mimeType: 'image/webp' },
+      size: '1024x1024',
+    });
+    expect(editInputs[0]?.source.bytes).toEqual(sourceBytes);
+    expect(editInputs[0]?.prompt).toContain('Preserve the recognizable person or character');
+    expect(composed.json<ComposeReferenceImageResponse>().asset).toMatchObject({
+      source: 'generated',
+      derivation: { kind: 'compose', sourceAssetId },
+      originalPrompt: rawPrompt,
+    });
   });
 
   it('keeps the explicit disabled branch and existing deterministic wrapper', async () => {

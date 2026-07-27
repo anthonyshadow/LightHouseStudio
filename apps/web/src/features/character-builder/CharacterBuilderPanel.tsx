@@ -1,9 +1,11 @@
 import { useTheme } from '@emotion/react';
 import type { CharacterReferenceOptions } from '@studio/contracts';
 import type { CharacterTransformDraft, GuidedDesignV1 } from '@studio/domain';
-import { useRef, type RefObject } from 'react';
+import { useRef, useState, type RefObject } from 'react';
 import { Button, OverlayPanel, StatusNotice } from '../../ui';
+import { BuilderReferenceImageField } from './BuilderReferenceImageField';
 import { CharacterBuilderForm } from './CharacterBuilderForm';
+import { CharacterNameDialog } from './CharacterNameDialog';
 import { ConfirmationDialog } from './ConfirmationDialog';
 import type { CharacterBuilderState } from './machine';
 import { ReferenceOptionsFields } from './ReferenceOptionsFields';
@@ -25,9 +27,15 @@ export interface CharacterBuilderPanelProps {
   autosaveMessage?: string | null;
   saveRecoveryPending?: boolean;
   canSave: boolean;
+  canSaveImageOnly?: boolean;
+  suggestedCharacterName?: string;
+  suggestedImageOnlyCharacterName?: string;
+  characterNameLocked?: boolean;
   onChange: (draft: CharacterTransformDraft, design: GuidedDesignV1) => void;
   onOptionsChange: (options: CharacterReferenceOptions) => void;
   onGenerate: () => void;
+  onUploadReference?: (file: File) => void;
+  onRemoveUpload?: () => void;
   onRequestRegeneration: () => void;
   onRegenerate: (changeInstructions: string) => void;
   onCancelRegeneration: () => void;
@@ -35,7 +43,8 @@ export interface CharacterBuilderPanelProps {
   onConfirmReset: () => void;
   onCancelReset: () => void;
   onClose: () => void;
-  onSave: () => void;
+  onSave: (name: string) => void;
+  onSaveImageOnly?: (name: string) => void;
   discardCloseOpen?: boolean;
   discardCloseBusy?: boolean;
   resetBusy?: boolean;
@@ -75,9 +84,15 @@ export const CharacterBuilderPanel = ({
   autosaveMessage = null,
   saveRecoveryPending = false,
   canSave,
+  canSaveImageOnly = false,
+  suggestedCharacterName = 'New Character 01',
+  suggestedImageOnlyCharacterName = 'Uploaded Character 01',
+  characterNameLocked = false,
   onChange,
   onOptionsChange,
   onGenerate,
+  onUploadReference = () => undefined,
+  onRemoveUpload = () => undefined,
   onRequestRegeneration,
   onRegenerate,
   onCancelRegeneration,
@@ -86,6 +101,7 @@ export const CharacterBuilderPanel = ({
   onCancelReset,
   onClose,
   onSave,
+  onSaveImageOnly = () => undefined,
   discardCloseOpen = false,
   discardCloseBusy = false,
   resetBusy = false,
@@ -95,6 +111,9 @@ export const CharacterBuilderPanel = ({
   const theme = useTheme();
   const resetButtonRef = useRef<HTMLButtonElement>(null);
   const regenerateButtonRef = useRef<HTMLButtonElement>(null);
+  const saveButtonRef = useRef<HTMLButtonElement>(null);
+  const imageOnlySaveButtonRef = useRef<HTMLButtonElement>(null);
+  const [namingMode, setNamingMode] = useState<'default' | 'image-only' | null>(null);
   const status = operationLabel(state);
   const generationBusy = isGenerationBusy(state);
   const saving = state.phase === 'saving';
@@ -102,14 +121,24 @@ export const CharacterBuilderPanel = ({
   const operationLocked = saving || closing;
   const formLocked = operationLocked || state.phase === 'restoring' || saveRecoveryPending;
   const previewIsUsable = Boolean(state.preview && !state.preview.stale);
+  const uploadedReference = state.uploadedReference;
+  const previewCapabilityAvailable = generationAvailable && (!uploadedReference || editAvailable);
+  const heroReference = state.preview?.asset ?? uploadedReference?.asset ?? null;
   const saveLabel =
-    state.preview && state.preview.stale ? 'Save Character (prompt only)' : 'Save Character';
+    state.preview?.stale && uploadedReference
+      ? 'Save Character (uploaded image)'
+      : state.preview?.stale
+        ? 'Save Character (prompt only)'
+        : 'Save Character';
 
   return (
     <>
       <OverlayPanel
         open={open}
-        onClose={onClose}
+        onClose={() => {
+          setNamingMode(null);
+          onClose();
+        }}
         title="Build Your Character"
         description="Shape a reusable Lucy 2.5 character. Image generation is optional; your unfinished draft stays on this browser."
         placement="fullscreen"
@@ -136,16 +165,36 @@ export const CharacterBuilderPanel = ({
             >
               Reset Draft
             </Button>
+            {uploadedReference ? (
+              <Button
+                ref={imageOnlySaveButtonRef}
+                variant="secondary"
+                busy={saving}
+                disabled={
+                  !canSaveImageOnly || state.uploadPending || generationBusy || operationLocked
+                }
+                aria-disabled={Boolean(saveBlockedReason) || undefined}
+                aria-describedby={
+                  saveBlockedReason ? 'character-builder-save-blocked-reason' : undefined
+                }
+                onClick={() => {
+                  if (!saveBlockedReason) setNamingMode('image-only');
+                }}
+              >
+                Save &amp; Use Image Only
+              </Button>
+            ) : null}
             <Button
+              ref={saveButtonRef}
               variant="primary"
               busy={saving}
-              disabled={!canSave || generationBusy || operationLocked}
+              disabled={!canSave || state.uploadPending || generationBusy || operationLocked}
               aria-disabled={Boolean(saveBlockedReason) || undefined}
               aria-describedby={
                 saveBlockedReason ? 'character-builder-save-blocked-reason' : undefined
               }
               onClick={() => {
-                if (!saveBlockedReason) onSave();
+                if (!saveBlockedReason) setNamingMode('default');
               }}
             >
               {saveLabel}
@@ -169,8 +218,20 @@ export const CharacterBuilderPanel = ({
             draft={state.draft}
             design={state.design}
             disabled={formLocked}
-            referenceImageUrl={state.preview?.asset.contentUrl ?? null}
+            referenceImageUrl={heroReference?.contentUrl ?? null}
+            referenceImageGenerated={Boolean(state.preview)}
+            referenceImageUploadedFallback={Boolean(!state.preview && uploadedReference)}
             referenceImageStale={state.preview?.stale ?? false}
+            referenceUpload={
+              <BuilderReferenceImageField
+                reference={uploadedReference}
+                pending={state.uploadPending}
+                error={state.uploadError}
+                disabled={formLocked}
+                onSelect={onUploadReference}
+                onRemove={onRemoveUpload}
+              />
+            }
             previewBusy={generationBusy}
             previewStatus={status}
             previewError={
@@ -186,13 +247,15 @@ export const CharacterBuilderPanel = ({
                   <Button
                     ref={regenerateButtonRef}
                     variant="secondary"
-                    disabled={generationBusy || formLocked}
-                    aria-disabled={!generationAvailable || undefined}
+                    disabled={state.uploadPending || generationBusy || formLocked}
+                    aria-disabled={!previewCapabilityAvailable || undefined}
                     aria-describedby={
-                      !generationAvailable ? 'character-builder-generation-unavailable' : undefined
+                      !previewCapabilityAvailable
+                        ? 'character-builder-generation-unavailable'
+                        : undefined
                     }
                     onClick={() => {
-                      if (generationAvailable) onRequestRegeneration();
+                      if (previewCapabilityAvailable) onRequestRegeneration();
                     }}
                   >
                     Regenerate
@@ -200,29 +263,34 @@ export const CharacterBuilderPanel = ({
                 ) : (
                   <Button
                     variant="primary"
-                    disabled={generationBusy || formLocked}
-                    aria-disabled={!generationAvailable || undefined}
+                    disabled={state.uploadPending || generationBusy || formLocked}
+                    aria-disabled={!previewCapabilityAvailable || undefined}
                     aria-describedby={
-                      !generationAvailable ? 'character-builder-generation-unavailable' : undefined
+                      !previewCapabilityAvailable
+                        ? 'character-builder-generation-unavailable'
+                        : undefined
                     }
                     onClick={() => {
-                      if (generationAvailable) onGenerate();
+                      if (previewCapabilityAvailable) onGenerate();
                     }}
                   >
-                    Generate Preview
+                    {uploadedReference ? 'Generate Combined Preview' : 'Generate Preview'}
                   </Button>
                 )}
                 {state.preview?.stale ? (
                   <span role="status">
-                    Regenerate to attach an image, or save this version as prompt-only.
+                    {uploadedReference
+                      ? 'Regenerate to attach a combined image, or save with the uploaded reference.'
+                      : 'Regenerate to attach an image, or save this version as prompt-only.'}
                   </span>
                 ) : previewIsUsable ? (
                   <span role="status">This preview matches the current character.</span>
                 ) : null}
-                {!generationAvailable ? (
+                {!previewCapabilityAvailable ? (
                   <span id="character-builder-generation-unavailable" role="status">
-                    Reference image generation is unavailable. You can still save this character
-                    without an image.
+                    {uploadedReference
+                      ? 'Combined preview generation is unavailable. You can still save and use the uploaded image directly.'
+                      : 'Reference image generation is unavailable. You can still save this character without an image.'}
                   </span>
                 ) : null}
               </div>
@@ -238,6 +306,24 @@ export const CharacterBuilderPanel = ({
           />
         </div>
       </OverlayPanel>
+
+      <CharacterNameDialog
+        key={`${namingMode ?? 'closed'}:${characterNameLocked ? 'locked' : 'editable'}`}
+        open={open && namingMode !== null}
+        initialName={
+          namingMode === 'image-only' ? suggestedImageOnlyCharacterName : suggestedCharacterName
+        }
+        imageOnly={namingMode === 'image-only'}
+        locked={characterNameLocked}
+        returnFocusRef={namingMode === 'image-only' ? imageOnlySaveButtonRef : saveButtonRef}
+        onCancel={() => setNamingMode(null)}
+        onSubmit={(name) => {
+          const requestedMode = namingMode;
+          setNamingMode(null);
+          if (requestedMode === 'image-only') onSaveImageOnly(name);
+          else if (requestedMode === 'default') onSave(name);
+        }}
+      />
 
       <RegenerationDialog
         open={state.phase === 'requesting-regeneration'}

@@ -6,7 +6,7 @@ import {
   readBrowserState,
 } from './support/studioHarness';
 
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
 const LEGACY_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
 
 const openCharacterWorkshop = async (page: Page, concept: string): Promise<void> => {
@@ -198,7 +198,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
       localStorage.setItem(
         storageKey,
         JSON.stringify({
-          schemaVersion: 3,
+          schemaVersion: 4,
           savedPrompts: [],
           recentPrompts: [
             {
@@ -244,7 +244,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
   expectNoExternalProviderTraffic(network);
 });
 
-test('legacy v1 text-only shelf migrates to v3 with null reference identities', async ({
+test('legacy v1 text-only shelf migrates to v4 with null reference identities', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page, {
@@ -298,7 +298,7 @@ test('legacy v1 text-only shelf migrates to v3 with null reference identities', 
       recentPrompts: Array<{ referenceImageAssetId?: string | null }>;
     };
   }, CREATIVE_ASSET_STORAGE_KEY);
-  expect(migrated?.schemaVersion).toBe(3);
+  expect(migrated?.schemaVersion).toBe(4);
   expect(migrated?.savedPrompts[0]?.referenceImageAssetId).toBeNull();
   expect(migrated?.recentPrompts[0]?.referenceImageAssetId).toBeNull();
   expect(network.referenceImageGenerations).toEqual([]);

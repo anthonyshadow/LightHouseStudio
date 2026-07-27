@@ -15,6 +15,7 @@ import {
   CREATIVE_ASSET_SCHEMA_VERSION,
   GUIDED_CHOICE_KEYS,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
+  OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   RECENT_PROMPT_LIMIT,
   SAVED_CHARACTER_PROMPT_LIMIT,
@@ -161,6 +162,7 @@ const sanitizeSavedPrompt = (
 const sanitizeRecentPrompt = (
   value: unknown,
   includeReferenceImage: boolean,
+  includeCharacterIdentity: boolean,
 ): RecentPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
@@ -171,12 +173,32 @@ const sanitizeRecentPrompt = (
   const usedAt = validDate(value.usedAt);
   const savedPromptId =
     value.savedPromptId === undefined ? null : normalizedId(value.savedPromptId);
+  const savedCharacterPromptId =
+    includeCharacterIdentity && value.savedCharacterPromptId !== undefined
+      ? normalizedId(value.savedCharacterPromptId)
+      : null;
+  const characterName =
+    includeCharacterIdentity && typeof value.characterName === 'string'
+      ? normalizeWhitespace(value.characterName, ASSET_NAME_MAX_LENGTH)
+      : '';
+  const persistedReferenceImageAssetId = includeReferenceImage
+    ? referenceImageAssetId(value.referenceImageAssetId)
+    : null;
+  const hasPrompt = containsMeaningfulText(prompt);
+  const validImageOnlyCharacter =
+    !hasPrompt &&
+    modelModeId === 'lucy-2.5' &&
+    persistedReferenceImageAssetId !== null &&
+    containsMeaningfulText(characterName);
   if (
     !id ||
-    !containsMeaningfulText(prompt) ||
+    (!hasPrompt && !validImageOnlyCharacter) ||
     !modelModeId ||
     !usedAt ||
-    (value.savedPromptId !== undefined && !savedPromptId)
+    (value.savedPromptId !== undefined && !savedPromptId) ||
+    (includeCharacterIdentity &&
+      value.savedCharacterPromptId !== undefined &&
+      !savedCharacterPromptId)
   ) {
     return null;
   }
@@ -185,9 +207,9 @@ const sanitizeRecentPrompt = (
     prompt,
     modelModeId,
     ...(savedPromptId ? { savedPromptId } : {}),
-    referenceImageAssetId: includeReferenceImage
-      ? referenceImageAssetId(value.referenceImageAssetId)
-      : null,
+    ...(savedCharacterPromptId ? { savedCharacterPromptId } : {}),
+    ...(containsMeaningfulText(characterName) ? { characterName } : {}),
+    referenceImageAssetId: persistedReferenceImageAssetId,
     usedAt,
   };
 };
@@ -196,6 +218,7 @@ const sanitizeSavedCharacterPrompt = (
   value: unknown,
   includeReferenceImage: boolean,
   includeGuidedDesign: boolean,
+  includeReferenceProvenance: boolean,
 ): SavedCharacterPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
@@ -217,10 +240,35 @@ const sanitizeSavedCharacterPrompt = (
   const persistedReferenceImageAssetId = includeReferenceImage
     ? referenceImageAssetId(value.referenceImageAssetId)
     : null;
+  const uploadedReferenceImageAssetId = includeReferenceProvenance
+    ? referenceImageAssetId(value.uploadedReferenceImageAssetId)
+    : null;
+  const finalReferenceKind = includeReferenceProvenance
+    ? value.finalReferenceKind === 'uploaded' || value.finalReferenceKind === 'generated'
+      ? value.finalReferenceKind
+      : value.finalReferenceKind === null
+        ? null
+        : value.finalReferenceKind === undefined
+          ? persistedReferenceImageAssetId
+            ? ('generated' as const)
+            : null
+          : undefined
+    : persistedReferenceImageAssetId
+      ? ('generated' as const)
+      : null;
+  const validReferenceProvenance =
+    finalReferenceKind !== undefined &&
+    ((finalReferenceKind === null &&
+      persistedReferenceImageAssetId === null &&
+      uploadedReferenceImageAssetId === null) ||
+      (finalReferenceKind === 'generated' && persistedReferenceImageAssetId !== null) ||
+      (finalReferenceKind === 'uploaded' &&
+        persistedReferenceImageAssetId !== null &&
+        uploadedReferenceImageAssetId === persistedReferenceImageAssetId));
+  const hasPrompt = containsMeaningfulText(prompt);
   if (
     !id ||
     !containsMeaningfulText(name) ||
-    !containsMeaningfulText(prompt) ||
     !source ||
     (value.promptIntent != null && !intent) ||
     !status ||
@@ -228,7 +276,10 @@ const sanitizeSavedCharacterPrompt = (
     !updatedAt ||
     (value.lastUsedAt != null && !lastUsedAt) ||
     (value.builderDraft != null && !builderDraft) ||
-    (includeGuidedDesign && value.guidedDesign != null && !guidedDesign)
+    (includeGuidedDesign && value.guidedDesign != null && !guidedDesign) ||
+    !validReferenceProvenance ||
+    (!hasPrompt &&
+      (finalReferenceKind !== 'uploaded' || builderDraft !== null || guidedDesign !== null))
   ) {
     return null;
   }
@@ -249,6 +300,8 @@ const sanitizeSavedCharacterPrompt = (
         ? 'prompt-only'
         : status,
     referenceImageAssetId: persistedReferenceImageAssetId,
+    uploadedReferenceImageAssetId,
+    finalReferenceKind,
     notes:
       typeof value.notes === 'string'
         ? normalizeWhitespace(value.notes, CHARACTER_NOTES_MAX_LENGTH)
@@ -286,39 +339,73 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
     !isRecord(value) ||
     (value.schemaVersion !== CREATIVE_ASSET_SCHEMA_VERSION &&
       value.schemaVersion !== PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION &&
+      value.schemaVersion !== OLDER_CREATIVE_ASSET_SCHEMA_VERSION &&
       value.schemaVersion !== LEGACY_CREATIVE_ASSET_SCHEMA_VERSION)
   ) {
     return { store: createEmptyCreativeAssetStore(), recovered: true, droppedRecords: 0 };
   }
 
   const includeReferenceImages = value.schemaVersion !== LEGACY_CREATIVE_ASSET_SCHEMA_VERSION;
-  const includeGuidedDesign = value.schemaVersion === CREATIVE_ASSET_SCHEMA_VERSION;
+  const includeGuidedDesign =
+    value.schemaVersion === CREATIVE_ASSET_SCHEMA_VERSION ||
+    value.schemaVersion === PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION;
+  const includeReferenceProvenance = value.schemaVersion === CREATIVE_ASSET_SCHEMA_VERSION;
   const savedInput = sanitizeArray(value.savedPrompts, (record) =>
     sanitizeSavedPrompt(record, includeReferenceImages),
   );
   const recentInput = sanitizeArray(value.recentPrompts, (record) =>
-    sanitizeRecentPrompt(record, includeReferenceImages),
+    sanitizeRecentPrompt(record, includeReferenceImages, includeReferenceProvenance),
   );
   const characterInput = sanitizeArray(value.savedCharacterPrompts, (record) =>
-    sanitizeSavedCharacterPrompt(record, includeReferenceImages, includeGuidedDesign),
+    sanitizeSavedCharacterPrompt(
+      record,
+      includeReferenceImages,
+      includeGuidedDesign,
+      includeReferenceProvenance,
+    ),
   );
 
   const savedPrompts = uniqueById(
     [...savedInput.records].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
   ).slice(0, SAVED_PROMPT_LIMIT);
   const savedById = new Map(savedPrompts.map((saved) => [saved.id, saved]));
+  const savedCharacterPrompts = uniqueById(
+    [...characterInput.records].sort((left, right) =>
+      right.updatedAt.localeCompare(left.updatedAt),
+    ),
+  ).slice(0, SAVED_CHARACTER_PROMPT_LIMIT);
+  const charactersById = new Map(savedCharacterPrompts.map((saved) => [saved.id, saved]));
 
   const recentKeys = new Set<string>();
   const recentPrompts = [...recentInput.records]
     .sort((left, right) => right.usedAt.localeCompare(left.usedAt))
     .filter((recent) => {
-      const key = `${recent.modelModeId}\u0000${canonicalPrompt(recent.prompt)}\u0000${recent.referenceImageAssetId ?? ''}`;
+      const key = `${recent.modelModeId}\u0000${canonicalPrompt(recent.prompt)}\u0000${recent.referenceImageAssetId ?? ''}\u0000${recent.savedCharacterPromptId ?? recent.characterName ?? ''}`;
       if (recentKeys.has(key)) return false;
       recentKeys.add(key);
       return true;
     })
     .slice(0, RECENT_PROMPT_LIMIT)
     .map((recent): RecentPrompt => {
+      if (recent.savedCharacterPromptId) {
+        const character = charactersById.get(recent.savedCharacterPromptId);
+        if (
+          character &&
+          recent.modelModeId === 'lucy-2.5' &&
+          canonicalPrompt(character.prompt) === canonicalPrompt(recent.prompt) &&
+          character.referenceImageAssetId === recent.referenceImageAssetId
+        ) {
+          return { ...recent, characterName: character.name };
+        }
+        return {
+          id: recent.id,
+          prompt: recent.prompt,
+          modelModeId: recent.modelModeId,
+          referenceImageAssetId: recent.referenceImageAssetId,
+          ...(recent.characterName ? { characterName: recent.characterName } : {}),
+          usedAt: recent.usedAt,
+        };
+      }
       if (!recent.savedPromptId) return recent;
       const saved = savedById.get(recent.savedPromptId);
       if (
@@ -333,15 +420,10 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
         prompt: recent.prompt,
         modelModeId: recent.modelModeId,
         referenceImageAssetId: recent.referenceImageAssetId,
+        ...(recent.characterName ? { characterName: recent.characterName } : {}),
         usedAt: recent.usedAt,
       };
     });
-
-  const savedCharacterPrompts = uniqueById(
-    [...characterInput.records].sort((left, right) =>
-      right.updatedAt.localeCompare(left.updatedAt),
-    ),
-  ).slice(0, SAVED_CHARACTER_PROMPT_LIMIT);
 
   const keptCount = savedPrompts.length + recentPrompts.length + savedCharacterPrompts.length;
   const inputCount = savedInput.inputCount + recentInput.inputCount + characterInput.inputCount;

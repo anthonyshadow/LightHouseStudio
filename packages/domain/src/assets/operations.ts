@@ -60,6 +60,52 @@ const normalizeReferenceImageAssetId = (value: string | null | undefined): strin
   return assetId;
 };
 
+const normalizeCharacterReference = (input: {
+  readonly referenceImageAssetId?: string | null;
+  readonly uploadedReferenceImageAssetId?: string | null;
+  readonly finalReferenceKind?: 'uploaded' | 'generated' | null;
+}) => {
+  const referenceImageAssetId = normalizeReferenceImageAssetId(input.referenceImageAssetId);
+  const uploadedReferenceImageAssetId = normalizeReferenceImageAssetId(
+    input.uploadedReferenceImageAssetId,
+  );
+  const finalReferenceKind =
+    input.finalReferenceKind === undefined
+      ? referenceImageAssetId
+        ? 'generated'
+        : null
+      : input.finalReferenceKind;
+  const valid =
+    (finalReferenceKind === null &&
+      referenceImageAssetId === null &&
+      uploadedReferenceImageAssetId === null) ||
+    (finalReferenceKind === 'generated' && referenceImageAssetId !== null) ||
+    (finalReferenceKind === 'uploaded' &&
+      referenceImageAssetId !== null &&
+      uploadedReferenceImageAssetId === referenceImageAssetId);
+  if (!valid) {
+    throw new AssetRuleError(
+      'invalid-id',
+      'The final and uploaded reference-image identities are inconsistent.',
+    );
+  }
+  return { referenceImageAssetId, uploadedReferenceImageAssetId, finalReferenceKind };
+};
+
+const normalizeCharacterPrompt = (
+  value: string,
+  reference: ReturnType<typeof normalizeCharacterReference>,
+): string => {
+  const prompt = normalizeAuthoredPrompt(value);
+  if (!containsMeaningfulText(prompt) && reference.finalReferenceKind !== 'uploaded') {
+    throw new AssetRuleError(
+      'invalid-prompt',
+      'An image-only character requires an uploaded reference image.',
+    );
+  }
+  return prompt;
+};
+
 const assertTimestamp = (value: string): string => {
   const date = new Date(value);
   if (!Number.isFinite(date.valueOf())) {
@@ -80,6 +126,22 @@ const unlinkRecentPrompt = (recent: RecentPrompt, savedPromptId: string): Recent
     id: recent.id,
     prompt: recent.prompt,
     modelModeId: recent.modelModeId,
+    referenceImageAssetId: recent.referenceImageAssetId,
+    usedAt: recent.usedAt,
+  };
+};
+
+const unlinkRecentCharacter = (
+  recent: RecentPrompt,
+  savedCharacterPromptId: string,
+): RecentPrompt => {
+  if (recent.savedCharacterPromptId !== savedCharacterPromptId) return recent;
+  return {
+    id: recent.id,
+    prompt: recent.prompt,
+    modelModeId: recent.modelModeId,
+    ...(recent.savedPromptId ? { savedPromptId: recent.savedPromptId } : {}),
+    ...(recent.characterName ? { characterName: recent.characterName } : {}),
     referenceImageAssetId: recent.referenceImageAssetId,
     usedAt: recent.usedAt,
   };
@@ -192,40 +254,67 @@ export const recordSuccessfulPromptUse = (
     readonly prompt: string;
     readonly modelModeId: ModelModeId;
     readonly savedPromptId?: string;
+    readonly savedCharacterPromptId?: string;
+    readonly characterName?: string;
     readonly referenceImageAssetId?: string | null;
   },
   context: AssetMutationContext,
 ): CreativeAssetStore => {
   const prompt = normalizeAuthoredPrompt(input.prompt);
-  if (!containsMeaningfulText(prompt)) return store;
   const now = assertTimestamp(context.now);
   const promptKey = canonicalPrompt(prompt);
   const referenceImageAssetId = normalizeReferenceImageAssetId(input.referenceImageAssetId);
-  const matchingSaved =
-    store.savedPrompts.find(
-      (asset) =>
-        asset.modelModeId === input.modelModeId &&
-        asset.id === input.savedPromptId &&
-        canonicalPrompt(asset.prompt) === promptKey &&
-        asset.referenceImageAssetId === referenceImageAssetId,
-    ) ??
-    store.savedPrompts.find(
-      (asset) =>
-        asset.modelModeId === input.modelModeId &&
-        canonicalPrompt(asset.prompt) === promptKey &&
-        asset.referenceImageAssetId === referenceImageAssetId,
-    );
+  const matchingCharacter =
+    input.modelModeId === 'lucy-2.5' && input.savedCharacterPromptId
+      ? store.savedCharacterPrompts.find(
+          (asset) =>
+            asset.id === input.savedCharacterPromptId &&
+            canonicalPrompt(asset.prompt) === promptKey &&
+            asset.referenceImageAssetId === referenceImageAssetId,
+        )
+      : undefined;
+  const characterName = matchingCharacter?.name ?? input.characterName;
+  const hasPrompt = containsMeaningfulText(prompt);
+  if (
+    !hasPrompt &&
+    (!referenceImageAssetId ||
+      input.modelModeId !== 'lucy-2.5' ||
+      !characterName ||
+      !containsMeaningfulText(characterName))
+  ) {
+    return store;
+  }
+  const matchingSaved = hasPrompt
+    ? (store.savedPrompts.find(
+        (asset) =>
+          asset.modelModeId === input.modelModeId &&
+          asset.id === input.savedPromptId &&
+          canonicalPrompt(asset.prompt) === promptKey &&
+          asset.referenceImageAssetId === referenceImageAssetId,
+      ) ??
+      store.savedPrompts.find(
+        (asset) =>
+          asset.modelModeId === input.modelModeId &&
+          canonicalPrompt(asset.prompt) === promptKey &&
+          asset.referenceImageAssetId === referenceImageAssetId,
+      ))
+    : undefined;
   const existingRecent = store.recentPrompts.find(
     (recent) =>
       recent.modelModeId === input.modelModeId &&
       canonicalPrompt(recent.prompt) === promptKey &&
-      recent.referenceImageAssetId === referenceImageAssetId,
+      recent.referenceImageAssetId === referenceImageAssetId &&
+      (matchingCharacter
+        ? recent.savedCharacterPromptId === matchingCharacter.id
+        : recent.characterName === characterName),
   );
   const recent: RecentPrompt = {
     id: existingRecent?.id ?? requireName(context.createId(), 'Recent prompt', 'invalid-id'),
     prompt,
     modelModeId: input.modelModeId,
     ...(matchingSaved ? { savedPromptId: matchingSaved.id } : {}),
+    ...(matchingCharacter ? { savedCharacterPromptId: matchingCharacter.id } : {}),
+    ...(characterName ? { characterName: requireName(characterName, 'Character') } : {}),
     referenceImageAssetId,
     usedAt: now,
   };
@@ -236,7 +325,10 @@ export const recordSuccessfulPromptUse = (
         !(
           candidate.modelModeId === input.modelModeId &&
           canonicalPrompt(candidate.prompt) === promptKey &&
-          candidate.referenceImageAssetId === referenceImageAssetId
+          candidate.referenceImageAssetId === referenceImageAssetId &&
+          (matchingCharacter
+            ? candidate.savedCharacterPromptId === matchingCharacter.id
+            : candidate.characterName === characterName)
         ),
     ),
   ].slice(0, RECENT_PROMPT_LIMIT);
@@ -251,6 +343,13 @@ export const recordSuccessfulPromptUse = (
             : asset,
         )
       : store.savedPrompts,
+    savedCharacterPrompts: matchingCharacter
+      ? store.savedCharacterPrompts.map((asset) =>
+          asset.id === matchingCharacter.id
+            ? { ...asset, useCount: asset.useCount + 1, lastUsedAt: now }
+            : asset,
+        )
+      : store.savedCharacterPrompts,
   };
 };
 
@@ -295,24 +394,33 @@ export const createSavedCharacterPrompt = (
   context: AssetMutationContext,
 ): CreativeAssetStore => {
   const now = assertTimestamp(context.now);
+  const reference = normalizeCharacterReference(input);
+  const prompt = normalizeCharacterPrompt(input.prompt, reference);
+  if (!containsMeaningfulText(prompt) && (input.builderDraft || input.guidedDesign)) {
+    throw new AssetRuleError(
+      'invalid-prompt',
+      'Image-only characters cannot retain prompt-builder provenance.',
+    );
+  }
   const asset: SavedCharacterPrompt = {
     id: requireName(context.createId(), 'Character asset', 'invalid-id'),
     name: requireName(input.name, 'Character prompt'),
-    prompt: requirePrompt(input.prompt),
+    prompt,
     source: input.source,
     promptIntent: input.promptIntent,
-    builderDraft: input.builderDraft ?? null,
+    builderDraft: containsMeaningfulText(prompt) ? (input.builderDraft ?? null) : null,
     guidedDesign:
+      containsMeaningfulText(prompt) &&
       input.promptIntent === 'character-transform' &&
       input.builderDraft?.intent === 'character-transform'
         ? (input.guidedDesign ?? null)
         : null,
-    referenceImageStatus: input.referenceImageAssetId
+    referenceImageStatus: reference.referenceImageAssetId
       ? 'persisted-reference'
       : input.referenceImageStatus === 'persisted-reference'
         ? 'prompt-only'
         : input.referenceImageStatus,
-    referenceImageAssetId: normalizeReferenceImageAssetId(input.referenceImageAssetId),
+    ...reference,
     notes: normalizeWhitespace(input.notes ?? '', CHARACTER_NOTES_MAX_LENGTH),
     tags: normalizeTags(input.tags ?? []),
     createdAt: now,
@@ -343,6 +451,8 @@ export const updateSavedCharacterPrompt = (
       | 'guidedDesign'
       | 'referenceImageStatus'
       | 'referenceImageAssetId'
+      | 'uploadedReferenceImageAssetId'
+      | 'finalReferenceKind'
       | 'notes'
       | 'tags'
     >
@@ -354,9 +464,9 @@ export const updateSavedCharacterPrompt = (
   const savedCharacterPrompts = store.savedCharacterPrompts.map((asset) => {
     if (asset.id !== id) return asset;
     found = true;
-    const nextPrompt = patch.prompt === undefined ? asset.prompt : requirePrompt(patch.prompt);
+    const rawNextPrompt = patch.prompt === undefined ? asset.prompt : patch.prompt;
     const promptWasManuallyEdited =
-      nextPrompt !== asset.prompt &&
+      normalizeAuthoredPrompt(rawNextPrompt) !== asset.prompt &&
       patch.source === undefined &&
       patch.promptIntent === undefined &&
       patch.builderDraft === undefined &&
@@ -381,16 +491,35 @@ export const updateSavedCharacterPrompt = (
       nextBuilderDraft?.intent === 'character-transform'
         ? requestedGuidedDesign
         : null;
-    const promptChanged = canonicalPrompt(nextPrompt) !== canonicalPrompt(asset.prompt);
-    const nextReferenceImageAssetId =
+    const promptChanged =
+      canonicalPrompt(normalizeAuthoredPrompt(rawNextPrompt)) !== canonicalPrompt(asset.prompt);
+    const requestedReferenceImageAssetId =
       patch.referenceImageAssetId === undefined
         ? promptChanged
-          ? null
+          ? asset.uploadedReferenceImageAssetId
           : asset.referenceImageAssetId
         : normalizeReferenceImageAssetId(patch.referenceImageAssetId);
+    const requestedUploadedReferenceImageAssetId =
+      patch.uploadedReferenceImageAssetId === undefined
+        ? asset.uploadedReferenceImageAssetId
+        : normalizeReferenceImageAssetId(patch.uploadedReferenceImageAssetId);
+    const requestedFinalReferenceKind =
+      patch.finalReferenceKind === undefined
+        ? promptChanged
+          ? requestedReferenceImageAssetId
+            ? 'uploaded'
+            : null
+          : asset.finalReferenceKind
+        : patch.finalReferenceKind;
+    const reference = normalizeCharacterReference({
+      referenceImageAssetId: requestedReferenceImageAssetId,
+      uploadedReferenceImageAssetId: requestedUploadedReferenceImageAssetId,
+      finalReferenceKind: requestedFinalReferenceKind,
+    });
+    const nextPrompt = normalizeCharacterPrompt(rawNextPrompt, reference);
     const requestedReferenceStatus = patch.referenceImageStatus ?? asset.referenceImageStatus;
     const nextReferenceImageStatus: SavedCharacterPrompt['referenceImageStatus'] =
-      nextReferenceImageAssetId
+      reference.referenceImageAssetId
         ? 'persisted-reference'
         : requestedReferenceStatus === 'persisted-reference'
           ? 'prompt-only'
@@ -408,7 +537,7 @@ export const updateSavedCharacterPrompt = (
       builderDraft: nextBuilderDraft,
       guidedDesign: nextGuidedDesign,
       referenceImageStatus: nextReferenceImageStatus,
-      referenceImageAssetId: nextReferenceImageAssetId,
+      ...reference,
       ...(patch.notes === undefined
         ? {}
         : { notes: normalizeWhitespace(patch.notes, CHARACTER_NOTES_MAX_LENGTH) }),
@@ -426,6 +555,7 @@ export const deleteSavedCharacterPrompt = (
 ): CreativeAssetStore => ({
   ...store,
   savedCharacterPrompts: store.savedCharacterPrompts.filter((asset) => asset.id !== id),
+  recentPrompts: store.recentPrompts.map((recent) => unlinkRecentCharacter(recent, id)),
 });
 
 export const useSavedCharacterPrompt = (
@@ -471,7 +601,9 @@ export const searchCreativeAssets = (
         matches([asset.title, asset.prompt, ...asset.tags]),
     ),
     recentPrompts: store.recentPrompts.filter(
-      (recent) => (!modelModeId || recent.modelModeId === modelModeId) && matches([recent.prompt]),
+      (recent) =>
+        (!modelModeId || recent.modelModeId === modelModeId) &&
+        matches([recent.prompt, recent.characterName ?? '']),
     ),
     savedCharacterPrompts:
       modelModeId === 'lucy-vton-3'

@@ -3,6 +3,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type {
   CharacterReferenceOptions,
+  ComposeReferenceImageRequest,
   CreateReferenceImageRequest,
   EditReferenceImageRequest,
   OptimizeCharacterReferencePromptRequest,
@@ -30,6 +31,15 @@ const editReferenceImage = vi.hoisted(() =>
     ) => Promise<ReferenceImageAsset>
   >(),
 );
+const composeReferenceImage = vi.hoisted(() =>
+  vi.fn<
+    (
+      sourceAssetId: string,
+      request: ComposeReferenceImageRequest,
+      signal?: AbortSignal,
+    ) => Promise<ReferenceImageAsset>
+  >(),
+);
 const optimizeCharacterReferencePrompt = vi.hoisted(() =>
   vi.fn<
     (
@@ -40,6 +50,7 @@ const optimizeCharacterReferencePrompt = vi.hoisted(() =>
 );
 
 vi.mock('../../adapters/api-client/apiClient', () => ({
+  composeReferenceImage,
   createReferenceImage,
   editReferenceImage,
   optimizeCharacterReferencePrompt,
@@ -125,10 +136,12 @@ const deferred = <T,>() => {
 
 beforeEach(() => {
   createReferenceImage.mockReset();
+  composeReferenceImage.mockReset();
   editReferenceImage.mockReset();
   optimizeCharacterReferencePrompt.mockReset();
   optimizeCharacterReferencePrompt.mockResolvedValue(optimization);
   createReferenceImage.mockResolvedValue(referenceAsset());
+  composeReferenceImage.mockResolvedValue(referenceAsset());
   editReferenceImage.mockResolvedValue(referenceAsset());
 });
 
@@ -247,22 +260,30 @@ describe('useReferencePreviewGeneration', () => {
     ]);
   });
 
-  it('treats blank regeneration instructions as fresh generation without a source asset', async () => {
+  it('routes a source image without edit instructions through composition', async () => {
     const handlers = callbacks();
     const { result } = renderHook(() => useReferencePreviewGeneration(handlers));
+    const sourceAssetId = '550e8400-e29b-41d4-a716-446655440001';
 
     await act(async () => {
       await result.current.generate({
         rawPrompt,
         options,
-        sourceAssetId: '550e8400-e29b-41d4-a716-446655440001',
+        sourceAssetId,
         changeInstructions: '   \n  ',
       });
     });
 
     expect(editReferenceImage).not.toHaveBeenCalled();
-    expect(createReferenceImage).toHaveBeenCalledOnce();
-    expect(createReferenceImage.mock.calls[0]![0]).not.toHaveProperty('sourceAssetId');
+    expect(createReferenceImage).not.toHaveBeenCalled();
+    expect(composeReferenceImage).toHaveBeenCalledOnce();
+    const [composedSourceId, composedRequest, composedSignal] =
+      composeReferenceImage.mock.calls[0]!;
+    expect(composedSourceId).toBe(sourceAssetId);
+    expect(composedRequest.rawPrompt).toBe(rawPrompt);
+    expect(composedRequest.options).toEqual(options);
+    expect(composedRequest.optimization).toMatchObject({ enabled: true });
+    expect(composedSignal).toBeInstanceOf(AbortSignal);
     expect(vi.mocked(handlers.onPhase).mock.calls.map(([phase]) => phase)).toEqual([
       'optimizing',
       'generating',

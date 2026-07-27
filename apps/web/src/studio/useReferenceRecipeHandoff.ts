@@ -1,4 +1,8 @@
-import type { CreateReferenceImageRequest, ReferenceImageAsset } from '@studio/contracts';
+import type {
+  CreateReferenceImageRequest,
+  GeneratedReferenceImageAsset,
+  ReferenceImageAsset,
+} from '@studio/contracts';
 import { canonicalPrompt } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -61,6 +65,7 @@ type PendingReferenceUse = {
   builderDraft?: PromptBuilderDraft;
   savedPromptId?: string;
   savedCharacterPromptId?: string;
+  characterName?: string;
   destination: 'shelf' | 'workshop';
 };
 
@@ -70,7 +75,7 @@ const referenceGenerationError = (error: unknown): string => {
   }
   switch (error.code) {
     case 'moderation_blocked':
-      return 'OpenAI blocked this character request. Adjust the character description and try again.';
+      return 'OpenAI blocked the reference image or character description. Try another image or adjust the description.';
     case 'rate_limited':
     case 'provider_quota':
       return 'OpenAI is temporarily limiting image generation. Wait a moment, then retry.';
@@ -96,7 +101,7 @@ const referenceHydrationError = (error: unknown): string =>
     : 'The exact local reference could not be validated. Retry, or continue without the reference.';
 
 const toWorkshopReferenceImage = (
-  asset: ReferenceImageAsset,
+  asset: GeneratedReferenceImageAsset,
   generatedFromPrompt = asset.originalPrompt,
 ): WorkshopReferenceImage => ({ ...asset, generatedFromPrompt });
 
@@ -149,6 +154,12 @@ export const useReferenceRecipeHandoff = ({
   const referenceUsePendingRef = useRef(false);
   const selectedSavedPrompt = useRef<string | undefined>(undefined);
   const selectedCharacterPrompt = useRef<string | undefined>(undefined);
+  const standaloneRecentCharacterRef = useRef<{
+    mode: ModelMode;
+    prompt: string;
+    referenceImageAssetId: string | null;
+    characterName: string;
+  } | null>(null);
   const workshopSourceRecipeRef = useRef<ActiveStudioRecipe>(null);
   const [activeRecipeFingerprint, setActiveRecipeFingerprint] =
     useState<ActiveRecipeFingerprint | null>(null);
@@ -216,6 +227,12 @@ export const useReferenceRecipeHandoff = ({
         workshopReferenceImage?.assetId === committedReferenceAssetId
           ? workshopReferenceImage
           : null;
+      const standaloneRecentCharacter =
+        standaloneRecentCharacterRef.current?.mode === mode &&
+        canonicalPrompt(standaloneRecentCharacterRef.current.prompt) === canonicalPrompt(prompt) &&
+        standaloneRecentCharacterRef.current.referenceImageAssetId === committedReferenceAssetId
+          ? standaloneRecentCharacterRef.current
+          : null;
       let libraryPrompt = prompt;
       if (activeRecipeStillMatches && activeFingerprint) {
         libraryPrompt = activeFingerprint.assetPrompt;
@@ -236,9 +253,14 @@ export const useReferenceRecipeHandoff = ({
         ...(activeRecipeStillMatches && selectedCharacterPrompt.current
           ? { savedCharacterPromptId: selectedCharacterPrompt.current }
           : {}),
+        ...(activeRecipeStillMatches && activeCharacterName
+          ? { characterName: activeCharacterName }
+          : standaloneRecentCharacter
+            ? { characterName: standaloneRecentCharacter.characterName }
+            : {}),
       });
     },
-    [repository, resolvedActiveRecipeFingerprint, workshopReferenceImage],
+    [activeCharacterName, repository, resolvedActiveRecipeFingerprint, workshopReferenceImage],
   );
 
   const generateWorkshopReference = useCallback(
@@ -253,6 +275,9 @@ export const useReferenceRecipeHandoff = ({
       try {
         const asset = await createReferenceImage(request, signal);
         if (workshopRevisionRef.current !== revision) return;
+        if (asset.source !== 'generated') {
+          throw new Error('The generated reference response did not contain a generated asset.');
+        }
         setWorkshopReferenceImage(toWorkshopReferenceImage(asset, input.rawPrompt));
         setReferenceGeneration({ status: 'idle', error: null });
         referenceRestoreRef.current = { assetId: asset.assetId, prompt: input.rawPrompt };
@@ -284,6 +309,11 @@ export const useReferenceRecipeHandoff = ({
       void fetchReferenceImageMetadata(assetId)
         .then((asset) => {
           if (workshopRevisionRef.current !== revision) return;
+          if (asset.source !== 'generated') {
+            setWorkshopReferenceImage(null);
+            setReferenceGeneration({ status: 'idle', error: null });
+            return;
+          }
           setWorkshopReferenceImage(toWorkshopReferenceImage(asset));
           setReferenceGeneration({ status: 'idle', error: null });
           repository.enrichNewestMatchingRecent(prompt, 'lucy-2.5', asset.assetId);
@@ -358,23 +388,29 @@ export const useReferenceRecipeHandoff = ({
       referenceUsePendingRef.current = true;
       setReferenceUsePending(true);
       let referenceImage: SessionReferenceImage | null = null;
+      let storedReferenceMetadata: ReferenceImageAsset | null = null;
       let referenceMetadata: WorkshopReferenceImage | null = null;
       try {
         if (pending.referenceImageAssetId && !continueWithoutReference) {
           const storedReference = await fetchReferenceImageMetadata(pending.referenceImageAssetId);
-          referenceMetadata = toWorkshopReferenceImage(storedReference);
+          storedReferenceMetadata = storedReference;
+          referenceMetadata =
+            storedReference.source === 'generated'
+              ? toWorkshopReferenceImage(storedReference)
+              : null;
           referenceImage = await hydrateReferenceImage(
             pending.referenceImageAssetId,
-            referenceMetadata,
+            storedReference,
           );
         } else if (pending.preserveCurrentReference && !continueWithoutReference) {
           referenceImage = session.draft.referenceImage;
         }
 
-        const generatedLucyReference = pending.mode === 'lucy-2.5' && referenceMetadata !== null;
+        const generatedLucyReference =
+          pending.mode === 'lucy-2.5' && storedReferenceMetadata?.source === 'generated';
         const appliedPrompt =
-          pending.mode === 'lucy-2.5' && referenceMetadata
-            ? referenceMetadata.lucy25CharacterPrompt
+          pending.mode === 'lucy-2.5' && storedReferenceMetadata?.source === 'generated'
+            ? storedReferenceMetadata.lucy25CharacterPrompt
             : pending.prompt;
         const committed = session.replaceRecipeDraft({
           mode: pending.mode,
@@ -403,15 +439,15 @@ export const useReferenceRecipeHandoff = ({
           sourceAsset && 'modelModeId' in sourceAsset ? sourceAsset.modelModeId : 'lucy-2.5';
         const appliedReferenceIdentity = referenceIdentity(referenceImage);
         const referenceMatchesPendingPrompt =
-          !referenceMetadata ||
-          canonicalPrompt(referenceMetadata.originalPrompt) === canonicalPrompt(pending.prompt);
+          storedReferenceMetadata?.source !== 'generated' ||
+          canonicalPrompt(storedReferenceMetadata.originalPrompt) ===
+            canonicalPrompt(pending.prompt);
         const sourceStillMatches = Boolean(
           sourceAsset &&
           sourceMode === pending.mode &&
           canonicalPrompt(sourceAsset.prompt) === canonicalPrompt(pending.prompt) &&
           sourceAsset.referenceImageAssetId === pending.referenceImageAssetId &&
-          appliedReferenceIdentity === sourceAsset.referenceImageAssetId &&
-          referenceMatchesPendingPrompt,
+          appliedReferenceIdentity === sourceAsset.referenceImageAssetId,
         );
         const exactSavedPromptId =
           sourceStillMatches && pending.savedPromptId ? pending.savedPromptId : undefined;
@@ -421,6 +457,15 @@ export const useReferenceRecipeHandoff = ({
             : undefined;
         selectedSavedPrompt.current = exactSavedPromptId;
         selectedCharacterPrompt.current = exactCharacterPromptId;
+        standaloneRecentCharacterRef.current =
+          !exactCharacterPromptId && pending.characterName
+            ? {
+                mode: pending.mode,
+                prompt: appliedPrompt,
+                referenceImageAssetId: appliedReferenceIdentity,
+                characterName: pending.characterName,
+              }
+            : null;
         const nextActiveRecipe: ActiveStudioRecipe = exactCharacterPromptId
           ? { origin: 'character-prompt', assetId: exactCharacterPromptId }
           : exactSavedPromptId
@@ -481,6 +526,17 @@ export const useReferenceRecipeHandoff = ({
                   candidate.referenceImageAssetId === selectedReferenceAssetId,
               )
           : null;
+      const linkedRecentCharacter =
+        selection.origin === 'recent-prompt' && selection.savedCharacterPromptId
+          ? repository
+              .getSnapshot()
+              .store.savedCharacterPrompts.find(
+                (candidate) =>
+                  candidate.id === selection.savedCharacterPromptId &&
+                  canonicalPrompt(candidate.prompt) === canonicalPrompt(selection.prompt) &&
+                  candidate.referenceImageAssetId === selectedReferenceAssetId,
+              )
+          : null;
       const pending: PendingReferenceUse = {
         mode: selection.modelModeId,
         prompt: selection.prompt,
@@ -488,10 +544,12 @@ export const useReferenceRecipeHandoff = ({
         preserveCurrentReference: false,
         destination: 'shelf',
         ...(selection.builderDraft ? { builderDraft: selection.builderDraft } : {}),
+        ...(selection.characterName ? { characterName: selection.characterName } : {}),
         ...(selection.origin === 'saved-prompt' && selection.assetId
           ? { savedPromptId: selection.assetId }
           : {}),
         ...(linkedRecentPrompt ? { savedPromptId: linkedRecentPrompt.id } : {}),
+        ...(linkedRecentCharacter ? { savedCharacterPromptId: linkedRecentCharacter.id } : {}),
         ...(selection.origin === 'character-prompt' && selection.assetId
           ? { savedCharacterPromptId: selection.assetId }
           : {}),
@@ -551,7 +609,9 @@ export const useReferenceRecipeHandoff = ({
       }
 
       const studioPrompt = referenceMetadata
-        ? referenceMetadata.lucy25CharacterPrompt
+        ? referenceMetadata.source === 'generated'
+          ? referenceMetadata.lucy25CharacterPrompt
+          : snapshot.prompt
         : snapshot.prompt;
       const currentReferenceId = referenceIdentity(session.draft.referenceImage);
       const incomingReferenceId = referenceMetadata?.assetId ?? null;
@@ -574,11 +634,13 @@ export const useReferenceRecipeHandoff = ({
         name: snapshot.name,
         prompt: snapshot.prompt,
         source: 'generator',
-        promptIntent: 'character-transform',
+        promptIntent: snapshot.draft ? 'character-transform' : null,
         builderDraft: snapshot.draft,
         guidedDesign: snapshot.design,
         referenceImageStatus: referenceMetadata ? 'persisted-reference' : 'prompt-only',
         referenceImageAssetId: referenceMetadata?.assetId ?? null,
+        uploadedReferenceImageAssetId: snapshot.uploadedReferenceImageAssetId,
+        finalReferenceKind: snapshot.finalReferenceKind,
       });
       if (stage === 'intent') await progress.markCharacterPersisted();
 
@@ -586,7 +648,7 @@ export const useReferenceRecipeHandoff = ({
         mode: 'lucy-2.5',
         prompt: studioPrompt,
         referenceImage: hydratedReference,
-        enhance: Boolean(referenceMetadata),
+        enhance: referenceMetadata?.source === 'generated',
       });
       if (!preloaded) {
         throw new Error(
@@ -596,6 +658,7 @@ export const useReferenceRecipeHandoff = ({
 
       selectedSavedPrompt.current = undefined;
       selectedCharacterPrompt.current = characterId;
+      standaloneRecentCharacterRef.current = null;
       setActiveRecipe({ origin: 'character-prompt', assetId: characterId });
       setActiveRecipeFingerprint({
         mode: 'lucy-2.5',
@@ -605,14 +668,17 @@ export const useReferenceRecipeHandoff = ({
         assetReferenceImageAssetId: referenceMetadata?.assetId ?? null,
       });
       setLibraryMode('lucy-2.5');
-      rememberWorkshopDraft(snapshot.draft);
+      if (snapshot.draft) rememberWorkshopDraft(snapshot.draft);
       workshopRevisionRef.current += 1;
       setWorkshopReferenceImage(
-        referenceMetadata ? toWorkshopReferenceImage(referenceMetadata, snapshot.prompt) : null,
+        referenceMetadata?.source === 'generated'
+          ? toWorkshopReferenceImage(referenceMetadata, snapshot.prompt)
+          : null,
       );
-      referenceRestoreRef.current = referenceMetadata
-        ? { assetId: referenceMetadata.assetId, prompt: snapshot.prompt }
-        : null;
+      referenceRestoreRef.current =
+        referenceMetadata?.source === 'generated'
+          ? { assetId: referenceMetadata.assetId, prompt: snapshot.prompt }
+          : null;
       setReferenceGeneration({ status: 'idle', error: null });
       await progress.markStudioPreloaded();
     },

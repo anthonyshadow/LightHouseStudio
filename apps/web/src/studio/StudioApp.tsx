@@ -110,6 +110,10 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   const legacyManagerToggleRef = useRef<HTMLButtonElement>(null);
   const dockToggleRef = useRef<HTMLButtonElement>(null);
   const takeToggleRef = useRef<HTMLButtonElement>(null);
+  const closeTakeReview = useCallback(() => {
+    closeOverlay();
+    window.requestAnimationFrame(() => dockToggleRef.current?.focus());
+  }, [closeOverlay]);
 
   useEffect(() => {
     let active = true;
@@ -432,7 +436,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
                   reviewingTake={stagePresentation.kind === 'playback'}
                   controlsLocked={reviewLocked || finalizingStartedAt !== null}
                   onStopRecording={finishTake}
-                  onCloseTakeReview={closeOverlay}
+                  onCloseTakeReview={closeTakeReview}
                   onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
                   onChooseAiExperience={() => openOverlay('ai-experience')}
                   onChangeExperience={() => openOverlay('ai-experience')}

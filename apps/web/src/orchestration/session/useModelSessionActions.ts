@@ -187,12 +187,9 @@ export const useModelSessionActions = ({
       setApplied(toAppliedState(currentDraft));
       setLifecycle((value) => (value === 'connecting' ? 'connected' : value));
       const committedPrompt = currentDraft.prompt.trim();
-      if (committedPrompt) {
-        onPromptCommitted?.(
-          currentDraft.mode,
-          committedPrompt,
-          persistedReferenceAssetId(currentDraft.referenceImage),
-        );
+      const committedReferenceAssetId = persistedReferenceAssetId(currentDraft.referenceImage);
+      if (committedPrompt || committedReferenceAssetId) {
+        onPromptCommitted?.(currentDraft.mode, committedPrompt, committedReferenceAssetId);
       }
     } catch (caught) {
       if (operationRef.current === operation) startAbortRef.current = null;
@@ -244,12 +241,9 @@ export const useModelSessionActions = ({
       if (operationRef.current !== operation) return;
       setApplied(toAppliedState(currentDraft));
       const committedPrompt = currentDraft.prompt.trim();
-      if (committedPrompt) {
-        onPromptCommitted?.(
-          currentDraft.mode,
-          committedPrompt,
-          persistedReferenceAssetId(currentDraft.referenceImage),
-        );
+      const committedReferenceAssetId = persistedReferenceAssetId(currentDraft.referenceImage);
+      if (committedPrompt || committedReferenceAssetId) {
+        onPromptCommitted?.(currentDraft.mode, committedPrompt, committedReferenceAssetId);
       }
     } catch {
       if (operationRef.current !== operation) return;

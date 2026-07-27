@@ -925,6 +925,46 @@ describe('useStudioSession model lifecycle contract', () => {
     unmount();
   });
 
+  it('commits an image-only persisted character only after Start succeeds', async () => {
+    const onPromptCommitted = vi.fn();
+    const session = fakeRealtimeSession();
+    adapters.connectDecartRealtime.mockResolvedValueOnce(session);
+    const reference = {
+      kind: 'persisted' as const,
+      assetId: '8f45ea24-c274-41a5-a988-aa0602115191',
+      file: new File(['image'], 'uploaded-character.png', { type: 'image/png' }),
+      contentUrl: '/api/reference-images/8f45ea24-c274-41a5-a988-aa0602115191/content',
+    };
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+        onPromptCommitted,
+      }),
+    );
+
+    act(() => {
+      result.current.selectMode('lucy-2.5');
+      result.current.updatePrompt('');
+      result.current.updateReferenceImage(reference);
+      result.current.updateEnhancement(false);
+    });
+    expect(onPromptCommitted).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.startModel();
+    });
+
+    expect(result.current.applied).toMatchObject({
+      prompt: '',
+      referenceImage: reference,
+      enhance: false,
+    });
+    expect(onPromptCommitted).toHaveBeenCalledOnce();
+    expect(onPromptCommitted).toHaveBeenCalledWith('lucy-2.5', '', reference.assetId);
+
+    unmount();
+  });
+
   it('releases local and provider resources for recorded review without clearing the draft', async () => {
     vi.useFakeTimers();
     const local = fakeStream();

@@ -1,8 +1,9 @@
 import type { PromptBuilderDraft, PromptIntent } from '../prompts';
 import type { ModelModeId } from '../session';
 
-export const CREATIVE_ASSET_SCHEMA_VERSION = 3 as const;
-export const PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION = 2 as const;
+export const CREATIVE_ASSET_SCHEMA_VERSION = 4 as const;
+export const PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION = 3 as const;
+export const OLDER_CREATIVE_ASSET_SCHEMA_VERSION = 2 as const;
 export const LEGACY_CREATIVE_ASSET_SCHEMA_VERSION = 1 as const;
 export const SAVED_PROMPT_LIMIT = 100;
 export const RECENT_PROMPT_LIMIT = 30;
@@ -66,6 +67,8 @@ export interface RecentPrompt {
   readonly prompt: string;
   readonly modelModeId: ModelModeId;
   readonly savedPromptId?: string;
+  readonly savedCharacterPromptId?: string;
+  readonly characterName?: string;
   readonly referenceImageAssetId: string | null;
   readonly usedAt: string;
 }
@@ -83,6 +86,8 @@ export interface SavedCharacterPrompt {
   readonly referenceImageStatus: ReferenceImageStatus;
   /** Opaque local asset identity. Image bytes and storage details are not persisted here. */
   readonly referenceImageAssetId: string | null;
+  readonly uploadedReferenceImageAssetId: string | null;
+  readonly finalReferenceKind: 'uploaded' | 'generated' | null;
   readonly notes: string;
   readonly tags: readonly string[];
   readonly createdAt: string;
@@ -116,6 +121,8 @@ export interface SavedCharacterPromptInput {
   readonly guidedDesign?: GuidedDesignV1 | null;
   readonly referenceImageStatus: ReferenceImageStatus;
   readonly referenceImageAssetId?: string | null;
+  readonly uploadedReferenceImageAssetId?: string | null;
+  readonly finalReferenceKind?: 'uploaded' | 'generated' | null;
   readonly notes?: string;
   readonly tags?: readonly string[];
 }

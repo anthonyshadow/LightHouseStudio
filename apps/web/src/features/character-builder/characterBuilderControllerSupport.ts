@@ -16,6 +16,7 @@ export interface CharacterBuilderOperationLocks {
   discard: boolean;
   reset: boolean;
   generation: boolean;
+  upload: boolean;
 }
 
 export interface CharacterBuilderOperationLocksRef {
@@ -32,6 +33,7 @@ export const createCharacterBuilderOperationLocks = (): CharacterBuilderOperatio
   discard: false,
   reset: false,
   generation: false,
+  upload: false,
 });
 
 export const createFreshCharacterBuilderDraftValue = (): CharacterBuilderDraftValueV1 => ({
@@ -39,6 +41,7 @@ export const createFreshCharacterBuilderDraftValue = (): CharacterBuilderDraftVa
   design: createEmptyGuidedDesign(),
   options: DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS,
   preview: null,
+  uploadedReference: null,
   pendingSave: null,
 });
 
@@ -50,6 +53,16 @@ export const toPersistedCharacterBuilderPreview = (
         assetId: state.preview.asset.assetId,
         sourceKey: state.preview.sourceKey,
         stale: state.preview.stale,
+      }
+    : null;
+
+export const toPersistedCharacterBuilderUpload = (
+  state: CharacterBuilderState,
+): Exclude<CharacterBuilderDraftValueV1['uploadedReference'], undefined> =>
+  state.uploadedReference
+    ? {
+        assetId: state.uploadedReference.asset.assetId,
+        displayName: state.uploadedReference.displayName,
       }
     : null;
 
@@ -66,7 +79,7 @@ export const characterBuilderOperationError = (error: unknown): string => {
   if (error instanceof ApiClientError) {
     switch (error.code) {
       case 'moderation_blocked':
-        return 'The provider could not accept this character direction. Adjust it and try again.';
+        return 'The provider could not accept the uploaded image or character direction. Try another image or adjust the direction.';
       case 'generation_in_progress':
         return 'Another reference request is still finishing. Wait a moment, then retry.';
       case 'request_timeout':

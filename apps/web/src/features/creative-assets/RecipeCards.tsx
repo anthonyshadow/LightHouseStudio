@@ -169,6 +169,8 @@ export const RecentPromptCard = ({
   onSave: () => void;
 }) => {
   const theme = useTheme();
+  const imageOnly = !item.prompt.trim() && Boolean(item.referenceImageAssetId);
+  const title = item.characterName ?? 'Recent direction';
   return (
     <article css={cardStyles(theme, selected)} data-selected={selected || undefined}>
       <header css={cardHeaderStyles(theme)}>
@@ -176,15 +178,17 @@ export const RecentPromptCard = ({
           <button
             type="button"
             aria-pressed={selected}
-            title="Select recent direction"
+            title={`Select ${title}`}
             css={cardSelectButtonStyles(theme)}
             onClick={onSelect}
           >
-            Recent direction
+            {title}
           </button>
         </h3>
         <div css={cardBadgeGroupStyles(theme)}>
           {selected ? <span css={badgeStyles(theme, 'accent')}>Selected</span> : null}
+          {item.characterName ? <span css={badgeStyles(theme, 'accent')}>Character</span> : null}
+          {imageOnly ? <span css={badgeStyles(theme, 'signal')}>Image only</span> : null}
           <span css={badgeStyles(theme)}>Used {formatDate(item.usedAt)}</span>
         </div>
       </header>
@@ -192,7 +196,11 @@ export const RecentPromptCard = ({
         <span>{modeName(item.modelModeId)}</span>
         <span>
           {item.referenceImageAssetId
-            ? 'Reference image attached'
+            ? imageOnly
+              ? item.savedCharacterPromptId
+                ? 'Linked to saved character'
+                : 'Image-only character'
+              : 'Reference image attached'
             : item.savedPromptId
               ? 'Linked to saved recipe'
               : 'Recent text only'}
@@ -204,12 +212,12 @@ export const RecentPromptCard = ({
           alt="Recent character reference"
         />
       ) : null}
-      <p title={item.prompt} css={promptStyles(theme)}>
-        {item.prompt}
+      <p title={item.prompt || 'Image-only character'} css={promptStyles(theme)}>
+        {item.prompt || 'Image-only character'}
       </p>
       <div css={actionStyles(theme)}>
         <Button
-          aria-label={`Use recent prompt: ${item.prompt}`}
+          aria-label={`Use recent ${imageOnly ? `character: ${title}` : `prompt: ${item.prompt}`}`}
           variant="primary"
           size="small"
           disabled={useDisabled}
@@ -223,7 +231,7 @@ export const RecentPromptCard = ({
         >
           Use
         </Button>
-        {!item.savedPromptId ? (
+        {!item.savedPromptId && !item.savedCharacterPromptId && !imageOnly ? (
           <Button
             aria-label={`Save a copy of recent prompt: ${item.prompt}`}
             variant="quiet"
@@ -298,8 +306,8 @@ export const CharacterPromptCard = ({
         />
       ) : null}
       <div>
-        <p title={item.prompt} css={promptStyles(theme)}>
-          {item.prompt}
+        <p title={item.prompt || 'Image-only character'} css={promptStyles(theme)}>
+          {item.prompt || 'Image-only character'}
         </p>
         {item.notes ? (
           <p title={item.notes} css={notesStyles(theme)}>

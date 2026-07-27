@@ -1,4 +1,4 @@
-import type { ReferenceImageAsset } from '@studio/contracts';
+import type { ReferenceImageAsset, UploadedReferenceImageAsset } from '@studio/contracts';
 import { createPromptBuilderDraft } from '@studio/domain';
 import { describe, expect, it } from 'vitest';
 import { createEmptyGuidedDesign } from './CharacterBuilderForm';
@@ -40,6 +40,18 @@ const asset: ReferenceImageAsset = {
   createdAt: '2026-01-01T00:00:00.000Z',
   updatedAt: '2026-01-01T00:00:00.000Z',
   contentUrl: '/api/reference-images/bfc07aa9-8510-4687-bfab-92b05dc31a1d/content',
+};
+
+const uploadedAsset: UploadedReferenceImageAsset = {
+  assetId: 'a0b031c0-8105-43a1-a9a5-6bccf6cff947',
+  mimeType: 'image/png',
+  byteSize: 200,
+  source: 'uploaded',
+  width: 800,
+  height: 1200,
+  createdAt: '2026-01-01T00:00:00.000Z',
+  updatedAt: '2026-01-01T00:00:00.000Z',
+  contentUrl: '/api/reference-images/a0b031c0-8105-43a1-a9a5-6bccf6cff947/content',
 };
 
 const initial = () =>
@@ -197,5 +209,88 @@ describe('characterBuilderReducer', () => {
     expect(confirming.phase).toBe('confirming-reset');
     expect(confirming.operation).toBeNull();
     expect(late).toBe(confirming);
+  });
+
+  it('replaces uploaded references atomically and marks dependent previews stale', () => {
+    const currentUpload = {
+      asset: uploadedAsset,
+      displayName: 'original.png',
+    };
+    const withUpload = characterBuilderReducer(initial(), {
+      type: 'upload-succeeded',
+      uploadedReference: currentUpload,
+      sourceKey: 'source-with-original-upload',
+    });
+    const withPreview = {
+      ...withUpload,
+      preview: {
+        asset,
+        sourceKey: 'source-with-original-upload',
+        stale: false,
+      },
+    };
+    const pendingReplacement = characterBuilderReducer(withPreview, { type: 'upload-started' });
+    expect(pendingReplacement.uploadedReference).toEqual(currentUpload);
+    expect(pendingReplacement.uploadPending).toBe(true);
+
+    const failedReplacement = characterBuilderReducer(pendingReplacement, {
+      type: 'upload-failed',
+      message: 'The replacement could not be decoded.',
+    });
+    expect(failedReplacement.uploadedReference).toEqual(currentUpload);
+    expect(failedReplacement.preview?.stale).toBe(false);
+    expect(failedReplacement.uploadError).toBe('The replacement could not be decoded.');
+
+    const replacement = {
+      asset: { ...uploadedAsset, assetId: 'f34fb77c-822a-4d50-821c-ae58918340f4' },
+      displayName: 'replacement.png',
+    };
+    const replaced = characterBuilderReducer(pendingReplacement, {
+      type: 'upload-succeeded',
+      uploadedReference: replacement,
+      sourceKey: 'source-with-replacement-upload',
+    });
+    expect(replaced.uploadedReference).toEqual(replacement);
+    expect(replaced.preview?.stale).toBe(true);
+    expect(replaced.revision).toBe(withPreview.revision + 1);
+  });
+
+  it('invalidates active preview generation as soon as a source upload starts', () => {
+    const generating = characterBuilderReducer(initial(), {
+      type: 'operation-started',
+      phase: 'generating',
+      operation,
+    });
+    const uploading = characterBuilderReducer(generating, { type: 'upload-started' });
+    const latePreview = characterBuilderReducer(uploading, {
+      type: 'preview-succeeded',
+      operationId: operation.id,
+      sourceKey: operation.sourceKey,
+      asset,
+    });
+
+    expect(uploading).toMatchObject({
+      phase: 'editing',
+      uploadPending: true,
+      operation: null,
+    });
+    expect(latePreview.preview).toBeNull();
+  });
+
+  it('detaches an upload without deleting the generated preview', () => {
+    const ready = {
+      ...initial(),
+      preview: { asset, sourceKey: 'source-with-upload', stale: false },
+      uploadedReference: { asset: uploadedAsset, displayName: 'reference.png' },
+    };
+
+    const removed = characterBuilderReducer(ready, {
+      type: 'upload-removed',
+      sourceKey: 'source-without-upload',
+    });
+
+    expect(removed.uploadedReference).toBeNull();
+    expect(removed.preview).toMatchObject({ asset, stale: true });
+    expect(removed.uploadError).toBeNull();
   });
 });

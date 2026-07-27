@@ -112,6 +112,7 @@ describe('OpenAIReferenceImageProvider', () => {
     const [parameters, requestOptions] = edit.mock.calls[0] ?? [];
     expect(parameters).toMatchObject({
       model: 'gpt-image-2',
+      moderation: 'low',
       n: 1,
       background: 'opaque',
       quality: 'high',
@@ -122,7 +123,6 @@ describe('OpenAIReferenceImageProvider', () => {
       image: { name: 'reference.webp', type: 'image/webp', size: 3 },
     });
     expect(parameters).not.toHaveProperty('input_fidelity');
-    expect(parameters).not.toHaveProperty('moderation');
     expect(parameters).not.toHaveProperty('user');
     expect(requestOptions).toEqual({ signal: controller.signal });
   });

@@ -15,9 +15,11 @@ export type CharacterSaveStage = 'intent' | 'character-persisted' | 'studio-prel
 export interface PersistedCharacterSaveSnapshot {
   readonly name: string;
   readonly prompt: string;
-  readonly draft: CharacterTransformDraft;
-  readonly design: GuidedDesignV1;
+  readonly draft: CharacterTransformDraft | null;
+  readonly design: GuidedDesignV1 | null;
   readonly referenceImageAssetId: string | null;
+  readonly uploadedReferenceImageAssetId: string | null;
+  readonly finalReferenceKind: 'uploaded' | 'generated' | null;
 }
 
 export interface PendingCharacterSave {
@@ -38,6 +40,10 @@ export interface CharacterBuilderDraftValueV1 {
   readonly design: GuidedDesignV1;
   readonly options: CharacterReferenceOptions;
   readonly preview: PersistedCharacterBuilderPreview | null;
+  readonly uploadedReference?: {
+    readonly assetId: string;
+    readonly displayName: string;
+  } | null;
   readonly pendingSave: PendingCharacterSave | null;
 }
 
@@ -46,29 +52,59 @@ const isRecord = (value: unknown): value is Record<string, unknown> =>
 
 const sanitizeSnapshot = (value: unknown): PersistedCharacterSaveSnapshot | null => {
   if (!isRecord(value)) return null;
-  const draft = sanitizePromptBuilderDraft(value.draft);
-  const design = sanitizeGuidedDesignV1(value.design);
+  const draft = value.draft == null ? null : sanitizePromptBuilderDraft(value.draft);
+  const design = value.design == null ? null : sanitizeGuidedDesignV1(value.design);
   const reference =
     value.referenceImageAssetId === null
       ? null
       : referenceImageAssetIdSchema.safeParse(value.referenceImageAssetId);
+  const uploadedReference =
+    value.uploadedReferenceImageAssetId == null
+      ? null
+      : referenceImageAssetIdSchema.safeParse(value.uploadedReferenceImageAssetId);
+  const finalReferenceKind =
+    value.finalReferenceKind === 'uploaded' || value.finalReferenceKind === 'generated'
+      ? value.finalReferenceKind
+      : value.finalReferenceKind == null
+        ? reference === null
+          ? null
+          : 'generated'
+        : undefined;
+  const prompt = typeof value.prompt === 'string' ? value.prompt.trim().slice(0, 10_000) : '';
+  const referenceImageAssetId =
+    reference === null ? null : reference.success ? reference.data : null;
+  const uploadedReferenceImageAssetId =
+    uploadedReference === null ? null : uploadedReference.success ? uploadedReference.data : null;
+  const validProvenance =
+    finalReferenceKind !== undefined &&
+    ((finalReferenceKind === null &&
+      referenceImageAssetId === null &&
+      uploadedReferenceImageAssetId === null) ||
+      (finalReferenceKind === 'generated' && referenceImageAssetId !== null) ||
+      (finalReferenceKind === 'uploaded' &&
+        referenceImageAssetId !== null &&
+        referenceImageAssetId === uploadedReferenceImageAssetId));
   if (
-    draft?.intent !== 'character-transform' ||
-    !design ||
+    (draft !== null && draft.intent !== 'character-transform') ||
+    (draft === null) !== (design === null) ||
     typeof value.name !== 'string' ||
     !value.name.trim() ||
     typeof value.prompt !== 'string' ||
-    !value.prompt.trim() ||
-    (reference !== null && !reference.success)
+    (reference !== null && !reference.success) ||
+    (uploadedReference !== null && !uploadedReference.success) ||
+    !validProvenance ||
+    (!prompt && (finalReferenceKind !== 'uploaded' || draft !== null || design !== null))
   ) {
     return null;
   }
   return {
     name: value.name.slice(0, 80),
-    prompt: value.prompt.slice(0, 10_000),
+    prompt,
     draft,
     design,
-    referenceImageAssetId: reference === null ? null : reference.data,
+    referenceImageAssetId,
+    uploadedReferenceImageAssetId,
+    finalReferenceKind,
   };
 };
 
@@ -130,7 +166,23 @@ export const sanitizeCharacterBuilderDraftValue = (
       stale: value.preview.stale,
     };
   }
-  return { draft, design, options: options.data, preview, pendingSave };
+  let uploadedReference: CharacterBuilderDraftValueV1['uploadedReference'] = null;
+  if (value.uploadedReference !== null && value.uploadedReference !== undefined) {
+    if (!isRecord(value.uploadedReference)) return null;
+    const assetId = referenceImageAssetIdSchema.safeParse(value.uploadedReference.assetId);
+    if (
+      !assetId.success ||
+      typeof value.uploadedReference.displayName !== 'string' ||
+      !value.uploadedReference.displayName.trim()
+    ) {
+      return null;
+    }
+    uploadedReference = {
+      assetId: assetId.data,
+      displayName: value.uploadedReference.displayName.trim().slice(0, 180),
+    };
+  }
+  return { draft, design, options: options.data, preview, uploadedReference, pendingSave };
 };
 
 export const characterSaveSnapshotFingerprint = async (

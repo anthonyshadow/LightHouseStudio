@@ -93,6 +93,7 @@ interface OpenAIImageClient {
       parameters: {
         readonly image: Uploadable;
         readonly model: string;
+        readonly moderation: 'low';
         readonly n: 1;
         readonly background: 'opaque';
         readonly output_compression?: number;
@@ -218,6 +219,7 @@ export class OpenAIReferenceImageProvider implements ReferenceImageProvider {
       const request = {
         image: source,
         model: this.#model,
+        moderation: OPENAI_REFERENCE_IMAGE_PARAMETERS.moderation,
         n: 1 as const,
         background: 'opaque' as const,
         quality: this.#quality,

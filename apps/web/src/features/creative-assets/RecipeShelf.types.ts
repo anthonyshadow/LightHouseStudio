@@ -9,6 +9,9 @@ export interface RecipeSelection {
   referenceImageAssetId?: string | null;
   /** Recipe record identity used for usage tracking. */
   assetId?: string;
+  /** Exact saved-character identity retained by an image-only or character Recent item. */
+  savedCharacterPromptId?: string;
+  characterName?: string;
   builderDraft?: PromptBuilderDraft;
 }
 

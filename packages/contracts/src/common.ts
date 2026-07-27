@@ -9,6 +9,7 @@ export const API_ERROR_CODES = [
   'internal_error',
   'invalid_audio',
   'invalid_provider_image',
+  'invalid_image_upload',
   'moderation_blocked',
   'not_found',
   'payload_too_large',

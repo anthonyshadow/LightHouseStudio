@@ -40,6 +40,7 @@ export interface CharacterDirectionPreviewProps {
   readonly montageSources: readonly string[];
   readonly showMontage: boolean;
   readonly generated: boolean;
+  readonly uploadedFallback?: boolean;
   readonly stale: boolean;
   readonly busy: boolean;
   readonly status?: string | null;
@@ -58,6 +59,7 @@ export const CharacterDirectionPreview = ({
   montageSources,
   showMontage,
   generated,
+  uploadedFallback = false,
   stale,
   busy,
   status,
@@ -110,7 +112,9 @@ export const CharacterDirectionPreview = ({
             ? stale
               ? 'Previous reference — changes need a new image'
               : 'Generated reference image'
-            : 'Direction artwork — not an exact composite'}
+            : uploadedFallback
+              ? 'Uploaded reference — no generated preview'
+              : 'Direction artwork — not an exact composite'}
         </span>
         {busy ? (
           <div

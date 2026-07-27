@@ -7,6 +7,7 @@ import type {
 import { useCallback, useEffect, useRef } from 'react';
 import {
   createReferenceImage,
+  composeReferenceImage,
   editReferenceImage,
   optimizeCharacterReferencePrompt,
 } from '../../adapters/api-client/apiClient';
@@ -39,7 +40,13 @@ const normalizedInstructions = (value: string | undefined) => value?.trim() ?? '
 export const createReferencePreviewSourceKey = (
   rawPrompt: string,
   options: CharacterReferenceOptions,
-): string => JSON.stringify({ rawPrompt: rawPrompt.replace(/\s+/gu, ' ').trim(), options });
+  sourceAssetId?: string | null,
+): string =>
+  JSON.stringify({
+    rawPrompt: rawPrompt.replace(/\s+/gu, ' ').trim(),
+    options,
+    sourceAssetId: sourceAssetId ?? null,
+  });
 
 /**
  * Shared single-flight optimizer/generator used by Studio-owned character builders.
@@ -72,7 +79,11 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
       if (activeRef.current) return;
       if (ownerSignal?.aborted) return;
       const operationId = crypto.randomUUID();
-      const sourceKey = createReferencePreviewSourceKey(input.rawPrompt, input.options);
+      const sourceKey = createReferencePreviewSourceKey(
+        input.rawPrompt,
+        input.options,
+        input.sourceAssetId,
+      );
       const controller = new AbortController();
       const abortFromOwner = () => controller.abort();
       ownerSignal?.addEventListener('abort', abortFromOwner, { once: true });
@@ -103,11 +114,12 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
 
         const changeInstructions = normalizedInstructions(input.changeInstructions);
         const edit = Boolean(changeInstructions && input.sourceAssetId);
+        const compose = Boolean(!changeInstructions && input.sourceAssetId);
         callbacksRef.current.onPhase(edit ? 'regenerating' : 'generating', operationId, sourceKey);
 
         requestFingerprint = JSON.stringify({
-          kind: edit ? 'edit' : 'generate',
-          sourceAssetId: edit ? input.sourceAssetId : null,
+          kind: edit ? 'edit' : compose ? 'compose' : 'generate',
+          sourceAssetId: edit || compose ? input.sourceAssetId : null,
           sourceKey,
           changeInstructions,
           optimizationInputHash: optimization.inputHash,
@@ -138,15 +150,26 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
                 },
                 controller.signal,
               )
-            : await createReferenceImage(
-                {
-                  requestId: providerRequestId,
-                  rawPrompt: input.rawPrompt,
-                  options: input.options,
-                  optimization: enabledOptimization,
-                },
-                controller.signal,
-              );
+            : compose && input.sourceAssetId
+              ? await composeReferenceImage(
+                  input.sourceAssetId,
+                  {
+                    requestId: providerRequestId,
+                    rawPrompt: input.rawPrompt,
+                    options: input.options,
+                    optimization: enabledOptimization,
+                  },
+                  controller.signal,
+                )
+              : await createReferenceImage(
+                  {
+                    requestId: providerRequestId,
+                    rawPrompt: input.rawPrompt,
+                    options: input.options,
+                    optimization: enabledOptimization,
+                  },
+                  controller.signal,
+                );
         if (!stillCurrent()) return;
         failedRequestRef.current = null;
         callbacksRef.current.onSuccess({

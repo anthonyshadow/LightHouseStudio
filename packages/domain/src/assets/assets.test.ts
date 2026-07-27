@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import { createPromptBuilderDraft } from '../prompts';
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
+  OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   RECENT_PROMPT_LIMIT,
   SAVED_PROMPT_LIMIT,
   createEmptyCreativeAssetStore,
   createSavedCharacterPrompt,
   createSavedPrompt,
+  deleteSavedCharacterPrompt,
   deleteSavedPrompt,
   enrichNewestMatchingRecentWithReferenceImage,
   parseCreativeAssetStore,
@@ -378,6 +380,108 @@ describe('creative asset CRUD and use', () => {
     expect(JSON.stringify(store)).not.toMatch(/(?:imageData|objectUrl|portrait\.jpg)/u);
   });
 
+  it('stores image-only characters, records them only after successful use, and unlinks recents on delete', () => {
+    let store = createSavedCharacterPrompt(
+      createEmptyCreativeAssetStore(),
+      {
+        name: 'Uploaded Character 01',
+        prompt: '',
+        source: 'generator',
+        promptIntent: null,
+        builderDraft: null,
+        guidedDesign: null,
+        referenceImageStatus: 'persisted-reference',
+        referenceImageAssetId: 'uploaded-asset-1',
+        uploadedReferenceImageAssetId: 'uploaded-asset-1',
+        finalReferenceKind: 'uploaded',
+      },
+      context('character-image-only'),
+    );
+
+    expect(store.recentPrompts).toEqual([]);
+    expect(store.savedCharacterPrompts[0]).toMatchObject({
+      prompt: '',
+      promptIntent: null,
+      builderDraft: null,
+      guidedDesign: null,
+      referenceImageAssetId: 'uploaded-asset-1',
+      uploadedReferenceImageAssetId: 'uploaded-asset-1',
+      finalReferenceKind: 'uploaded',
+    });
+
+    store = recordSuccessfulPromptUse(
+      store,
+      {
+        prompt: '',
+        modelModeId: 'lucy-2.5',
+        savedCharacterPromptId: 'character-image-only',
+        characterName: 'Uploaded Character 01',
+        referenceImageAssetId: 'uploaded-asset-1',
+      },
+      context('recent-image-only', 1),
+    );
+
+    expect(store.recentPrompts).toEqual([
+      expect.objectContaining({
+        prompt: '',
+        characterName: 'Uploaded Character 01',
+        savedCharacterPromptId: 'character-image-only',
+        referenceImageAssetId: 'uploaded-asset-1',
+      }),
+    ]);
+    expect(store.savedCharacterPrompts[0]).toMatchObject({
+      useCount: 1,
+      lastUsedAt: timestamp(1),
+    });
+
+    store = deleteSavedCharacterPrompt(store, 'character-image-only');
+    expect(store.savedCharacterPrompts).toEqual([]);
+    expect(store.recentPrompts).toEqual([
+      expect.objectContaining({
+        prompt: '',
+        characterName: 'Uploaded Character 01',
+        referenceImageAssetId: 'uploaded-asset-1',
+      }),
+    ]);
+    expect(store.recentPrompts[0]).not.toHaveProperty('savedCharacterPromptId');
+  });
+
+  it('rejects empty character prompts without a consistent uploaded final reference', () => {
+    expect(() =>
+      createSavedCharacterPrompt(
+        createEmptyCreativeAssetStore(),
+        {
+          name: 'Invalid image-only character',
+          prompt: '',
+          source: 'generator',
+          promptIntent: null,
+          referenceImageStatus: 'persisted-reference',
+          referenceImageAssetId: 'generated-asset',
+          uploadedReferenceImageAssetId: 'uploaded-source',
+          finalReferenceKind: 'generated',
+        },
+        context('invalid-image-only'),
+      ),
+    ).toThrow('An image-only character requires an uploaded reference image.');
+
+    expect(() =>
+      createSavedCharacterPrompt(
+        createEmptyCreativeAssetStore(),
+        {
+          name: 'Invalid provenance',
+          prompt: 'Transform the subject.',
+          source: 'generator',
+          promptIntent: 'character-transform',
+          referenceImageStatus: 'persisted-reference',
+          referenceImageAssetId: 'uploaded-final',
+          uploadedReferenceImageAssetId: 'different-source',
+          finalReferenceKind: 'uploaded',
+        },
+        context('invalid-provenance'),
+      ),
+    ).toThrow('The final and uploaded reference-image identities are inconsistent.');
+  });
+
   it('drops guided provenance when a generated prompt is manually edited', () => {
     const builderDraft = {
       ...createPromptBuilderDraft('character-transform'),
@@ -538,7 +642,7 @@ describe('creative asset sanitation and recovery', () => {
 
   it('migrates v2 records, preserving references while defaulting new draft fields and provenance', () => {
     const result = sanitizeCreativeAssetStore({
-      schemaVersion: PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+      schemaVersion: OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [
@@ -580,6 +684,8 @@ describe('creative asset sanitation and recovery', () => {
     expect(result.store.savedCharacterPrompts[0]).toMatchObject({
       referenceImageStatus: 'persisted-reference',
       referenceImageAssetId: 'reference-v2',
+      uploadedReferenceImageAssetId: null,
+      finalReferenceKind: 'generated',
       guidedDesign: null,
       builderDraft: {
         skinTone: '',
@@ -588,6 +694,69 @@ describe('creative asset sanitation and recovery', () => {
         hairColor: '',
       },
     });
+  });
+
+  it('migrates v3 image-backed characters as generated references', () => {
+    const result = sanitizeCreativeAssetStore({
+      schemaVersion: PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+      savedPrompts: [],
+      recentPrompts: [],
+      savedCharacterPrompts: [
+        {
+          id: 'v3-character',
+          name: 'V3 presenter',
+          prompt: 'Substitute the character with a presenter.',
+          source: 'generator',
+          promptIntent: 'character-transform',
+          builderDraft: createPromptBuilderDraft('character-transform'),
+          guidedDesign: guidedDesign(),
+          referenceImageStatus: 'persisted-reference',
+          referenceImageAssetId: 'reference-v3',
+          notes: '',
+          tags: [],
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+          lastUsedAt: null,
+          useCount: 0,
+        },
+      ],
+    });
+
+    expect(result.recovered).toBe(true);
+    expect(result.store.savedCharacterPrompts[0]).toMatchObject({
+      referenceImageAssetId: 'reference-v3',
+      uploadedReferenceImageAssetId: null,
+      finalReferenceKind: 'generated',
+    });
+  });
+
+  it('sanitizes valid image-only recents and removes broken character links without losing the recipe', () => {
+    const result = sanitizeCreativeAssetStore({
+      schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+      savedPrompts: [],
+      savedCharacterPrompts: [],
+      recentPrompts: [
+        {
+          id: 'image-only-recent',
+          prompt: '',
+          modelModeId: 'lucy-2.5',
+          savedCharacterPromptId: 'deleted-character',
+          characterName: 'Uploaded Character 01',
+          referenceImageAssetId: 'uploaded-asset-1',
+          usedAt: timestamp(),
+        },
+      ],
+    });
+
+    expect(result.store.recentPrompts).toEqual([
+      expect.objectContaining({
+        id: 'image-only-recent',
+        prompt: '',
+        characterName: 'Uploaded Character 01',
+        referenceImageAssetId: 'uploaded-asset-1',
+      }),
+    ]);
+    expect(result.store.recentPrompts[0]).not.toHaveProperty('savedCharacterPromptId');
   });
 
   it('allowlists and normalizes guided catalog provenance', () => {

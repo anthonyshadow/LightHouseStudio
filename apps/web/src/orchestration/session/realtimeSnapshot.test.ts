@@ -53,21 +53,20 @@ describe('realtime state snapshots', () => {
     expect(Object.keys(snapshot).sort()).toEqual(['enhance', 'image', 'prompt']);
   });
 
-  it('adds the functional Lucy 2.5 instruction for portrait-only input', () => {
+  it('preserves the empty Lucy 2.5 prompt for portrait-only input', () => {
     const portrait = new File(['portrait'], 'portrait.webp', {
       type: 'image/webp',
       lastModified: 1_720_955_200_000,
     });
 
     expect(toProviderSnapshot('lucy-2.5', draft({ referenceImage: ephemeral(portrait) }))).toEqual({
-      prompt:
-        'Transform the subject using the provided portrait as the character identity while preserving recognizable facial features.',
+      prompt: '',
       image: portrait,
       enhance: false,
     });
   });
 
-  it('reverts a portrait-only provider instruction to the empty authored prompt', () => {
+  it('reverts a portrait-only applied state to the empty authored prompt', () => {
     const portrait = new File(['portrait'], 'portrait.webp', { type: 'image/webp' });
     const initial = draft({ referenceImage: ephemeral(portrait) });
     const applied = toAppliedState(initial);

@@ -5,7 +5,7 @@ import type {
   CharacterReferenceFraming,
   CharacterReferenceOrientation,
   CharacterReferenceRenderingMode,
-  ReferenceImageAsset,
+  GeneratedReferenceImageAsset,
 } from '@studio/contracts';
 import { REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH } from '@studio/contracts';
 import {
@@ -24,7 +24,7 @@ export type ReferenceGenerationState = {
   errorKind?: 'generation' | 'restore';
 };
 
-export type WorkshopReferenceImage = ReferenceImageAsset & {
+export type WorkshopReferenceImage = GeneratedReferenceImageAsset & {
   /** In-memory only; helps stale detection immediately after generation. */
   generatedFromPrompt?: string;
 };

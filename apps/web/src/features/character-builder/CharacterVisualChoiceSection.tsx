@@ -99,7 +99,7 @@ export const CharacterVisualChoiceSection = ({
   const currentLabel = resolved.customValue ?? resolved.option?.label ?? null;
 
   const select = (option: VisualCatalogOption) => {
-    onChange({ optionId: option.id });
+    onChange(choice?.optionId === option.id ? null : { optionId: option.id });
     setCustomOpen(false);
   };
 

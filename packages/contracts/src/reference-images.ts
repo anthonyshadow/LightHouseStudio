@@ -4,6 +4,8 @@ export const REFERENCE_IMAGE_MODEL_ID = 'gpt-image-2' as const;
 export const REFERENCE_IMAGE_QUALITY = 'high' as const;
 export const REFERENCE_IMAGE_SIZES = ['1024x1024', '1024x1536', '1536x1024'] as const;
 export const REFERENCE_IMAGE_MAX_BYTES = 5 * 1024 * 1024;
+export const REFERENCE_IMAGE_UPLOAD_MAX_BYTES = 10 * 1024 * 1024;
+export const REFERENCE_IMAGE_UPLOAD_MAX_PIXELS = 40_000_000;
 export const REFERENCE_IMAGE_PROMPT_MAX_LENGTH = 4_000;
 export const REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH = 32_000;
 export const REFERENCE_IMAGE_CHANGE_INSTRUCTIONS_MAX_LENGTH = 2_000;
@@ -201,6 +203,16 @@ export const editReferenceImageRequestSchema = z
   })
   .strict();
 
+export const composeReferenceImageRequestSchema = z
+  .object({
+    requestId: referenceImageRequestIdSchema,
+    rawPrompt: rawCharacterPromptSchema,
+    options: characterReferenceOptionsSchema,
+    generator: characterReferenceGeneratorSchema.optional(),
+    optimization: enabledReferenceImageOptimizationSchema,
+  })
+  .strict();
+
 export const referenceImageAssetParamsSchema = z
   .object({
     assetId: referenceImageAssetIdSchema,
@@ -221,6 +233,12 @@ export const referenceImageDerivationSchema = z.discriminatedUnion('kind', [
       sourceAssetId: referenceImageAssetIdSchema,
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal('compose'),
+      sourceAssetId: referenceImageAssetIdSchema,
+    })
+    .strict(),
 ]);
 
 const referenceImageOptimizerAuditSchema = z
@@ -230,7 +248,7 @@ const referenceImageOptimizerAuditSchema = z
   })
   .strict();
 
-const referenceImageAssetCommonShape = {
+const generatedReferenceImageAssetCommonShape = {
   assetId: referenceImageAssetIdSchema,
   mimeType: referenceImageMimeTypeSchema,
   byteSize: z
@@ -263,10 +281,10 @@ const referenceImageAssetCommonShape = {
 } as const;
 
 /** Owner-scoped immutable asset metadata; internal storage keys and provider payloads stay hidden. */
-export const referenceImageAssetSchema = z.discriminatedUnion('size', [
+export const generatedReferenceImageAssetSchema = z.discriminatedUnion('size', [
   z
     .object({
-      ...referenceImageAssetCommonShape,
+      ...generatedReferenceImageAssetCommonShape,
       size: z.literal('1024x1024'),
       width: z.literal(1024),
       height: z.literal(1024),
@@ -274,7 +292,7 @@ export const referenceImageAssetSchema = z.discriminatedUnion('size', [
     .strict(),
   z
     .object({
-      ...referenceImageAssetCommonShape,
+      ...generatedReferenceImageAssetCommonShape,
       size: z.literal('1024x1536'),
       width: z.literal(1024),
       height: z.literal(1536),
@@ -282,12 +300,41 @@ export const referenceImageAssetSchema = z.discriminatedUnion('size', [
     .strict(),
   z
     .object({
-      ...referenceImageAssetCommonShape,
+      ...generatedReferenceImageAssetCommonShape,
       size: z.literal('1536x1024'),
       width: z.literal(1536),
       height: z.literal(1024),
     })
     .strict(),
+]);
+
+export const uploadedReferenceImageAssetSchema = z
+  .object({
+    assetId: referenceImageAssetIdSchema,
+    mimeType: referenceImageMimeTypeSchema,
+    byteSize: z.number().int().positive().max(REFERENCE_IMAGE_UPLOAD_MAX_BYTES),
+    source: z.literal('uploaded'),
+    derivation: z.never().optional(),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    createdAt: z.iso.datetime({ offset: true }),
+    updatedAt: z.iso.datetime({ offset: true }),
+    contentUrl: z.string().regex(/^\/api\/reference-images\/[0-9a-f-]+\/content$/u),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.width * value.height > REFERENCE_IMAGE_UPLOAD_MAX_PIXELS) {
+      context.addIssue({
+        code: 'custom',
+        path: ['width'],
+        message: 'Uploaded reference image exceeds the decoded-pixel limit.',
+      });
+    }
+  });
+
+export const referenceImageAssetSchema = z.union([
+  generatedReferenceImageAssetSchema,
+  uploadedReferenceImageAssetSchema,
 ]);
 
 export const createReferenceImageResponseSchema = z
@@ -297,6 +344,12 @@ export const createReferenceImageResponseSchema = z
   .strict();
 
 export const editReferenceImageResponseSchema = createReferenceImageResponseSchema;
+export const composeReferenceImageResponseSchema = z
+  .object({ asset: generatedReferenceImageAssetSchema })
+  .strict();
+export const uploadReferenceImageResponseSchema = z
+  .object({ asset: uploadedReferenceImageAssetSchema })
+  .strict();
 
 export const referenceImageMetadataResponseSchema = referenceImageAssetSchema;
 
@@ -320,10 +373,15 @@ export type ReferenceImageOptimization = z.infer<typeof referenceImageOptimizati
 export type ReferenceImageSize = z.infer<typeof referenceImageSizeSchema>;
 export type CreateReferenceImageRequest = z.infer<typeof createReferenceImageRequestSchema>;
 export type EditReferenceImageRequest = z.infer<typeof editReferenceImageRequestSchema>;
+export type ComposeReferenceImageRequest = z.infer<typeof composeReferenceImageRequestSchema>;
 export type ReferenceImageAssetParams = z.infer<typeof referenceImageAssetParamsSchema>;
 export type EditReferenceImageParams = z.infer<typeof editReferenceImageParamsSchema>;
 export type ReferenceImageDerivation = z.infer<typeof referenceImageDerivationSchema>;
+export type GeneratedReferenceImageAsset = z.infer<typeof generatedReferenceImageAssetSchema>;
+export type UploadedReferenceImageAsset = z.infer<typeof uploadedReferenceImageAssetSchema>;
 export type ReferenceImageAsset = z.infer<typeof referenceImageAssetSchema>;
 export type ReferenceImageMetadataResponse = z.infer<typeof referenceImageMetadataResponseSchema>;
 export type CreateReferenceImageResponse = z.infer<typeof createReferenceImageResponseSchema>;
 export type EditReferenceImageResponse = z.infer<typeof editReferenceImageResponseSchema>;
+export type ComposeReferenceImageResponse = z.infer<typeof composeReferenceImageResponseSchema>;
+export type UploadReferenceImageResponse = z.infer<typeof uploadReferenceImageResponseSchema>;

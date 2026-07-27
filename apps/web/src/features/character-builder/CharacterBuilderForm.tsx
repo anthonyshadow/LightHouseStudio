@@ -41,7 +41,10 @@ export type CharacterBuilderFormProps = {
   draft: CharacterTransformDraft;
   design: GuidedDesignV1;
   referenceImageUrl?: string | null;
+  referenceImageGenerated?: boolean;
+  referenceImageUploadedFallback?: boolean;
   referenceImageStale?: boolean;
+  referenceUpload?: ReactNode;
   previewBusy?: boolean;
   previewStatus?: string | null;
   previewActions?: ReactNode;
@@ -116,7 +119,10 @@ export const CharacterBuilderForm = ({
   draft,
   design,
   referenceImageUrl,
+  referenceImageGenerated = Boolean(referenceImageUrl),
+  referenceImageUploadedFallback = false,
   referenceImageStale = false,
+  referenceUpload,
   previewBusy = false,
   previewStatus = null,
   previewActions,
@@ -141,14 +147,19 @@ export const CharacterBuilderForm = ({
       nextProfile === 'unspecified'
         ? 'shared.gender.not-specified'
         : `shared.gender.${nextProfile}`;
+    const selected = design.choices.gender?.optionId === optionId;
     const next = {
       ...design,
       choices: {
         ...design.choices,
-        gender: { optionId },
+        gender: selected ? null : { optionId },
       },
     };
-    if (design.choices.gender?.optionId !== optionId) {
+    if (selected) {
+      setPresentationAnnouncement(
+        'Presentation selection cleared. Visual suggestions returned to the default profile. Existing choices were kept.',
+      );
+    } else {
       setPresentationAnnouncement(
         `${profileLabels[nextProfile]} presentation selected. Visual suggestions refreshed. Existing choices were kept.`,
       );
@@ -156,6 +167,10 @@ export const CharacterBuilderForm = ({
     updateDesign(next);
   };
   const selectStarter = (starter: CharacterStarter) => {
+    if (starter.id === design.starterId) {
+      updateDesign({ ...design, starterId: null });
+      return;
+    }
     const next = starterDefaults(starter, gender);
     updateDesign(
       hasExplicitPresentation ? next : { ...next, choices: { ...next.choices, gender: null } },
@@ -200,6 +215,15 @@ export const CharacterBuilderForm = ({
           {presentationAnnouncement}
         </span>
       </VisuallyHidden>
+      <CharacterChoiceDrawer
+        id="character-reference-image"
+        title="Reference image"
+        description="Optional: upload an image to use directly or combine with this character direction."
+        currentLabel={referenceImageUploadedFallback ? 'Uploaded reference ready' : undefined}
+        defaultOpen
+      >
+        {referenceUpload}
+      </CharacterChoiceDrawer>
       <CharacterChoiceDrawer
         id="character-starters"
         title="Try a demo character"
@@ -360,7 +384,8 @@ export const CharacterBuilderForm = ({
             : []
         }
         showMontage={!referenceImageUrl && !hasExplicitPresentation && Boolean(previewStarter)}
-        generated={Boolean(referenceImageUrl)}
+        generated={referenceImageGenerated}
+        uploadedFallback={referenceImageUploadedFallback}
         stale={referenceImageStale}
         busy={previewBusy}
         status={previewStatus}

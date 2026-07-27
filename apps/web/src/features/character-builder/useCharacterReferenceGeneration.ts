@@ -38,6 +38,7 @@ const generationIsBlocked = (
   saveRecoveryPending: boolean,
 ) =>
   locksRef.current.generation ||
+  locksRef.current.upload ||
   locksRef.current.save ||
   locksRef.current.close ||
   locksRef.current.reset ||
@@ -123,6 +124,15 @@ export const useCharacterReferenceGeneration = ({
       });
       return;
     }
+    if (current.uploadedReference && !editAvailable) {
+      dispatch({
+        type: 'validation-failed',
+        kind: 'generation',
+        message:
+          'Combined preview generation is unavailable. You can still save and use the uploaded image directly.',
+      });
+      return;
+    }
     if (!generated.validation.valid || !generated.prompt) {
       dispatch({
         type: 'validation-failed',
@@ -143,11 +153,25 @@ export const useCharacterReferenceGeneration = ({
     }
     locksRef.current.generation = true;
     void generation
-      .generate({ rawPrompt: generated.prompt, options: parsedOptions.data })
+      .generate({
+        rawPrompt: generated.prompt,
+        options: parsedOptions.data,
+        ...(current.uploadedReference
+          ? { sourceAssetId: current.uploadedReference.asset.assetId }
+          : {}),
+      })
       .finally(() => {
         locksRef.current.generation = false;
       });
-  }, [dispatch, generation, generationAvailable, hasPendingSave, locksRef, stateRef]);
+  }, [
+    dispatch,
+    editAvailable,
+    generation,
+    generationAvailable,
+    hasPendingSave,
+    locksRef,
+    stateRef,
+  ]);
 
   const regenerate = useCallback(
     (changeInstructions: string) => {
@@ -166,14 +190,27 @@ export const useCharacterReferenceGeneration = ({
         return;
       }
       const generated = generateStructuredPrompt(current.draft);
+      const sourceAssetId = instructions
+        ? preview.stale && current.uploadedReference
+          ? current.uploadedReference.asset.assetId
+          : preview.asset.assetId
+        : current.uploadedReference?.asset.assetId;
+      if (!instructions && sourceAssetId && !editAvailable) {
+        dispatch({
+          type: 'validation-failed',
+          kind: 'generation',
+          message:
+            'Combined preview generation is unavailable. You can still save and use the uploaded image directly.',
+        });
+        return;
+      }
       locksRef.current.generation = true;
       void generation
         .generate({
           rawPrompt: generated.prompt,
           options: current.options,
-          ...(instructions
-            ? { sourceAssetId: preview.asset.assetId, changeInstructions: instructions }
-            : {}),
+          ...(sourceAssetId ? { sourceAssetId } : {}),
+          ...(instructions ? { changeInstructions: instructions } : {}),
         })
         .finally(() => {
           locksRef.current.generation = false;

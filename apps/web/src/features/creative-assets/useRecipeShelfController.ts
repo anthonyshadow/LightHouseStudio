@@ -242,6 +242,10 @@ export const useRecipeShelfController = ({
         prompt: item.prompt,
         modelModeId: item.modelModeId,
         ...(item.savedPromptId ? { assetId: item.savedPromptId } : {}),
+        ...(item.savedCharacterPromptId
+          ? { savedCharacterPromptId: item.savedCharacterPromptId }
+          : {}),
+        ...(item.characterName ? { characterName: item.characterName } : {}),
         referenceImageAssetId: item.referenceImageAssetId,
       }),
     );
@@ -253,6 +257,7 @@ export const useRecipeShelfController = ({
         prompt: item.prompt,
         modelModeId: 'lucy-2.5',
         assetId: item.id,
+        characterName: item.name,
         referenceImageAssetId: item.referenceImageAssetId,
         ...(item.builderDraft ? { builderDraft: item.builderDraft } : {}),
       }),

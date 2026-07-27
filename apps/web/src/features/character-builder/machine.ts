@@ -2,6 +2,7 @@ import type {
   CharacterReferenceOptions,
   OptimizeCharacterReferencePromptResponse,
   ReferenceImageAsset,
+  UploadedReferenceImageAsset,
 } from '@studio/contracts';
 import type { CharacterTransformDraft, GuidedDesignV1 } from '@studio/domain';
 
@@ -26,6 +27,11 @@ export interface CharacterPreviewState {
   stale: boolean;
 }
 
+export interface CharacterBuilderUploadedReference {
+  asset: UploadedReferenceImageAsset;
+  displayName: string;
+}
+
 export interface CharacterBuilderOperation {
   id: string;
   requestId?: string;
@@ -41,6 +47,9 @@ export interface CharacterBuilderState {
   revision: number;
   durableRevision: number;
   preview: CharacterPreviewState | null;
+  uploadedReference: CharacterBuilderUploadedReference | null;
+  uploadPending: boolean;
+  uploadError: string | null;
   optimization: OptimizeCharacterReferencePromptResponse | null;
   optimizationKey: string | null;
   operation: CharacterBuilderOperation | null;
@@ -55,6 +64,7 @@ export type CharacterBuilderAction =
       options: CharacterReferenceOptions;
       revision: number;
       preview: CharacterPreviewState | null;
+      uploadedReference?: CharacterBuilderUploadedReference | null;
     }
   | {
       type: 'edited';
@@ -63,6 +73,14 @@ export type CharacterBuilderAction =
       sourceKey: string;
     }
   | { type: 'options-changed'; options: CharacterReferenceOptions; sourceKey: string }
+  | { type: 'upload-started' }
+  | {
+      type: 'upload-succeeded';
+      uploadedReference: CharacterBuilderUploadedReference;
+      sourceKey: string;
+    }
+  | { type: 'upload-failed'; message: string }
+  | { type: 'upload-removed'; sourceKey: string }
   | { type: 'autosaved'; revision: number }
   | {
       type: 'operation-started';
@@ -121,6 +139,9 @@ export const createCharacterBuilderState = (
   revision: 0,
   durableRevision: 0,
   preview: null,
+  uploadedReference: null,
+  uploadPending: false,
+  uploadError: null,
   optimization: null,
   optimizationKey: null,
   operation: null,
@@ -147,6 +168,9 @@ export const characterBuilderReducer = (
         revision: action.revision,
         durableRevision: action.revision,
         preview: action.preview,
+        uploadedReference: action.uploadedReference ?? null,
+        uploadPending: false,
+        uploadError: null,
         operation: null,
         error: null,
       };
@@ -187,6 +211,52 @@ export const characterBuilderReducer = (
         preview,
         operation: null,
         error: null,
+      };
+    }
+    case 'upload-started':
+      return {
+        ...state,
+        phase: 'editing',
+        uploadPending: true,
+        uploadError: null,
+        operation: null,
+      };
+    case 'upload-succeeded': {
+      const preview = state.preview
+        ? {
+            ...state.preview,
+            stale: state.preview.stale || state.preview.sourceKey !== action.sourceKey,
+          }
+        : null;
+      return {
+        ...state,
+        phase: 'editing',
+        revision: state.revision + 1,
+        uploadedReference: action.uploadedReference,
+        uploadPending: false,
+        uploadError: null,
+        preview,
+        operation: null,
+      };
+    }
+    case 'upload-failed':
+      return { ...state, uploadPending: false, uploadError: action.message };
+    case 'upload-removed': {
+      const preview = state.preview
+        ? {
+            ...state.preview,
+            stale: state.preview.stale || state.preview.sourceKey !== action.sourceKey,
+          }
+        : null;
+      return {
+        ...state,
+        phase: 'editing',
+        revision: state.revision + 1,
+        uploadedReference: null,
+        uploadPending: false,
+        uploadError: null,
+        preview,
+        operation: null,
       };
     }
     case 'autosaved':

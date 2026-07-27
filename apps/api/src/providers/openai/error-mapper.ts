@@ -32,7 +32,7 @@ const mapReferenceImageError = (
         return new AppError(
           400,
           'moderation_blocked',
-          'OpenAI could not generate this reference under its safety checks. Revise the character description and try again.',
+          'OpenAI blocked the prompt, source image, or generated result under its safety checks. Try another source image or revise the character description.',
           options,
         );
       case 'rate-limit':

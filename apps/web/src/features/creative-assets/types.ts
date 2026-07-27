@@ -1,6 +1,7 @@
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
+  OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   type CreativeAssetSearchResults as DomainCreativeAssetSearchResults,
   type CreativeAssetStore as DomainCreativeAssetStore,
@@ -18,10 +19,12 @@ import type { PromptBuilderDraft, PromptIntent } from '../prompt-authoring';
 export {
   CREATIVE_ASSET_SCHEMA_VERSION,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
+  OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
 };
-export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
-export const PREVIOUS_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
+export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
+export const PREVIOUS_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
+export const OLDER_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
 export const LEGACY_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
 
 export type ModelModeId = DomainModelModeId;
@@ -61,11 +64,13 @@ export interface CreateSavedCharacterPromptInput {
   readonly name: string;
   readonly prompt: string;
   readonly source?: 'manual' | 'generator';
-  readonly promptIntent: PromptIntent;
+  readonly promptIntent: PromptIntent | null;
   readonly builderDraft?: PromptBuilderDraft | null;
   readonly guidedDesign?: DomainGuidedDesignV1 | null;
   readonly referenceImageStatus?: ReferenceImageStatus;
   readonly referenceImageAssetId?: string | null;
+  readonly uploadedReferenceImageAssetId?: string | null;
+  readonly finalReferenceKind?: 'uploaded' | 'generated' | null;
   readonly notes?: string;
   readonly tags?: readonly string[];
 }
@@ -85,6 +90,8 @@ export interface UpdateSavedCharacterPromptInput {
   readonly guidedDesign?: DomainGuidedDesignV1 | null;
   readonly referenceImageStatus?: ReferenceImageStatus;
   readonly referenceImageAssetId?: string | null;
+  readonly uploadedReferenceImageAssetId?: string | null;
+  readonly finalReferenceKind?: 'uploaded' | 'generated' | null;
   readonly notes?: string;
   readonly tags?: readonly string[];
 }
@@ -94,6 +101,7 @@ export interface RecordSuccessfulPromptInput {
   readonly modelModeId: ModelModeId;
   readonly savedPromptId?: string;
   readonly savedCharacterPromptId?: string;
+  readonly characterName?: string;
   readonly referenceImageAssetId?: string | null;
 }
 

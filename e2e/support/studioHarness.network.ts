@@ -1,10 +1,13 @@
 import { createHash } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import type {
+  ComposeReferenceImageRequest,
   CreateReferenceImageRequest,
   EditReferenceImageRequest,
+  GeneratedReferenceImageAsset,
   OptimizeCharacterReferencePromptRequest,
   OptimizeCharacterReferencePromptResponse,
+  UploadedReferenceImageAsset,
 } from '@studio/contracts';
 import type {
   MockReferenceImageAsset,
@@ -73,7 +76,7 @@ const IMAGE_DIMENSIONS_BY_SIZE = {
 const createMockReferenceAsset = (
   sequence: number,
   request: CreateReferenceImageRequest,
-): MockReferenceImageAsset => {
+): GeneratedReferenceImageAsset => {
   const assetId = assetIdForSequence(sequence);
   const optimization = request.optimization;
   const generationPrompt = optimization.enabled
@@ -162,9 +165,11 @@ export const installProviderNetworkDriver = async (
   const network: NetworkJourneyState = {
     apiRequests: [],
     referenceWorkflowCalls: [],
+    referenceImageUploads: [],
     referencePromptOptimizations: [],
     referenceImageGenerations: [],
     referenceImageEdits: [],
+    referenceImageCompositions: [],
     referenceImageMetadataReads: [],
     referenceImageContentReads: [],
     blockedExternalRequests: [],
@@ -174,7 +179,8 @@ export const installProviderNetworkDriver = async (
     },
   };
   const assets = new Map<string, MockReferenceImageAsset>();
-  const assetsByRequestId = new Map<string, MockReferenceImageAsset>();
+  const generatedAssetsByRequestId = new Map<string, GeneratedReferenceImageAsset>();
+  const uploadedAssetsByRequestId = new Map<string, UploadedReferenceImageAsset>();
   let assetSequence = 0;
 
   await page.routeWebSocket(
@@ -253,13 +259,54 @@ export const installProviderNetworkDriver = async (
       return;
     }
 
+    if (
+      requestUrl.pathname === '/api/reference-images/uploads' &&
+      route.request().method() === 'POST'
+    ) {
+      const requestId = route.request().headers()['idempotency-key'] ?? '';
+      const bytes = route.request().postDataBuffer() ?? Buffer.alloc(0);
+      const uploadedByteSize = Math.max(bytes.byteLength, REFERENCE_PNG.byteLength);
+      let asset = uploadedAssetsByRequestId.get(requestId);
+      if (!asset) {
+        assetSequence += 1;
+        const assetId = assetIdForSequence(assetSequence);
+        asset = {
+          assetId,
+          mimeType: 'image/png',
+          byteSize: uploadedByteSize,
+          source: 'uploaded',
+          width: 1536,
+          height: 1024,
+          createdAt: '2030-01-01T00:00:00.000Z',
+          updatedAt: '2030-01-01T00:00:00.000Z',
+          contentUrl: `/api/reference-images/${assetId}/content`,
+        };
+        uploadedAssetsByRequestId.set(requestId, asset);
+        assets.set(asset.assetId, asset);
+      }
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.referenceWorkflowCalls.push('upload');
+      network.referenceImageUploads.push({
+        requestId,
+        assetId: asset.assetId,
+        byteSize: uploadedByteSize,
+        mimeType: route.request().headers()['content-type'] ?? '',
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ asset }),
+      });
+      return;
+    }
+
     if (requestUrl.pathname === '/api/reference-images' && route.request().method() === 'POST') {
       const payload = route.request().postDataJSON() as CreateReferenceImageRequest;
-      let asset = assetsByRequestId.get(payload.requestId);
+      let asset = generatedAssetsByRequestId.get(payload.requestId);
       if (!asset) {
         assetSequence += 1;
         asset = createMockReferenceAsset(assetSequence, payload);
-        assetsByRequestId.set(payload.requestId, asset);
+        generatedAssetsByRequestId.set(payload.requestId, asset);
         assets.set(asset.assetId, asset);
       }
       network.apiRequests.push({ path: requestUrl.pathname, model: null });
@@ -271,6 +318,49 @@ export const installProviderNetworkDriver = async (
       });
       await route.fulfill({
         status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ asset }),
+      });
+      return;
+    }
+
+    const compositionMatch = requestUrl.pathname.match(
+      /^\/api\/reference-images\/([0-9a-f-]+)\/compositions$/u,
+    );
+    if (compositionMatch && route.request().method() === 'POST') {
+      const sourceAssetId = compositionMatch[1] ?? '';
+      const payload = route.request().postDataJSON() as ComposeReferenceImageRequest;
+      const source = assets.get(sourceAssetId);
+      if (!source) {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: { code: 'not_found', message: 'That local reference image is unavailable.' },
+          }),
+        });
+        return;
+      }
+      let asset = generatedAssetsByRequestId.get(payload.requestId);
+      if (!asset) {
+        assetSequence += 1;
+        asset = {
+          ...createMockReferenceAsset(assetSequence, payload),
+          derivation: { kind: 'compose', sourceAssetId },
+        };
+        generatedAssetsByRequestId.set(payload.requestId, asset);
+        assets.set(asset.assetId, asset);
+      }
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.referenceWorkflowCalls.push('compose');
+      network.referenceImageCompositions.push({
+        ...payload,
+        sourceAssetId,
+        assetId: asset.assetId,
+        imagePromptSentToProvider: asset.optimizedImagePrompt,
+      });
+      await route.fulfill({
+        status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ asset }),
       });
@@ -292,14 +382,14 @@ export const installProviderNetworkDriver = async (
         });
         return;
       }
-      let asset = assetsByRequestId.get(payload.requestId);
+      let asset = generatedAssetsByRequestId.get(payload.requestId);
       if (!asset) {
         assetSequence += 1;
         asset = {
           ...createMockReferenceAsset(assetSequence, payload),
           derivation: { kind: 'edit', sourceAssetId },
         };
-        assetsByRequestId.set(payload.requestId, asset);
+        generatedAssetsByRequestId.set(payload.requestId, asset);
         assets.set(asset.assetId, asset);
       }
       network.apiRequests.push({ path: requestUrl.pathname, model: null });

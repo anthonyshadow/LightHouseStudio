@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
+import type { UploadedReferenceImageAsset } from '@studio/contracts';
 import { createPromptBuilderDraft, type CharacterTransformDraft } from '@studio/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyGuidedDesign } from './CharacterBuilderForm';
@@ -20,6 +21,8 @@ import type {
 } from './useCharacterBuilderController';
 
 const draftRepositoryFactory = vi.hoisted(() => vi.fn());
+const uploadReferenceImage = vi.hoisted(() => vi.fn());
+const validateReferenceImage = vi.hoisted(() => vi.fn());
 const MockCharacterBuilderDraftError = vi.hoisted(
   () =>
     class CharacterBuilderDraftError extends Error {
@@ -36,6 +39,14 @@ vi.mock('./draftRepository', () => ({
   CharacterBuilderDraftError: MockCharacterBuilderDraftError,
   createCharacterBuilderDraftRepository: draftRepositoryFactory,
 }));
+vi.mock('../../adapters/api-client/apiClient', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return { ...actual, uploadReferenceImage };
+});
+vi.mock('../media-session/imageValidation', async (importOriginal) => {
+  const actual = await importOriginal<Record<string, unknown>>();
+  return { ...actual, validateReferenceImage };
+});
 
 import { useCharacterBuilderController } from './useCharacterBuilderController';
 
@@ -159,6 +170,18 @@ const readyCharacter = (): {
   },
 });
 
+const uploadedAsset: UploadedReferenceImageAsset = {
+  assetId: '8f45ea24-c274-41a5-a988-aa0602115191',
+  mimeType: 'image/png',
+  byteSize: 5,
+  source: 'uploaded',
+  width: 800,
+  height: 1200,
+  createdAt: '2026-07-21T12:00:00.000Z',
+  updatedAt: '2026-07-21T12:00:00.000Z',
+  contentUrl: '/api/reference-images/8f45ea24-c274-41a5-a988-aa0602115191/content',
+};
+
 const renderReadyController = async (onSaveCharacter: SaveHandler, onDismiss = vi.fn()) => {
   const rendered = renderHook(() =>
     useCharacterBuilderController({
@@ -179,6 +202,15 @@ const renderReadyController = async (onSaveCharacter: SaveHandler, onDismiss = v
 
 beforeEach(() => {
   draftRepositoryFactory.mockReset();
+  uploadReferenceImage.mockReset();
+  uploadReferenceImage.mockResolvedValue(uploadedAsset);
+  validateReferenceImage.mockReset();
+  validateReferenceImage.mockResolvedValue({
+    blockingError: null,
+    warnings: [],
+    width: uploadedAsset.width,
+    height: uploadedAsset.height,
+  });
 });
 
 afterEach(() => {
@@ -187,6 +219,110 @@ afterEach(() => {
 });
 
 describe('useCharacterBuilderController save transactions', () => {
+  it('uploads immediately and freezes an image-only save journal without prompt provenance', async () => {
+    const memory = createMemoryDraftRepository();
+    draftRepositoryFactory.mockReturnValue(memory.repository);
+    const onDismiss = vi.fn();
+    const onSaveCharacter = vi.fn<SaveHandler>(
+      async (
+        snapshot: CharacterSaveSnapshot,
+        _characterId: string,
+        _stage: CharacterSaveStage,
+        progress: SaveProgress,
+      ) => {
+        expect(snapshot).toMatchObject({
+          name: 'Portrait Coach',
+          prompt: '',
+          draft: null,
+          design: null,
+          referenceImage: uploadedAsset,
+          referenceImageAssetId: uploadedAsset.assetId,
+          uploadedReferenceImageAssetId: uploadedAsset.assetId,
+          finalReferenceKind: 'uploaded',
+        });
+        await progress.markCharacterPersisted();
+        await progress.markStudioPreloaded();
+      },
+    );
+    const rendered = renderHook(() =>
+      useCharacterBuilderController({
+        open: true,
+        generationAvailable: false,
+        editAvailable: false,
+        onSaveCharacter,
+        onDismiss,
+      }),
+    );
+    await waitFor(() => expect(rendered.result.current.state.phase).toBe('editing'));
+    const file = new File(['image'], '  portrait.png  ', { type: 'image/png' });
+
+    act(() => rendered.result.current.onUploadReference(file));
+    await waitFor(() => expect(rendered.result.current.canSaveImageOnly).toBe(true));
+
+    expect(uploadReferenceImage).toHaveBeenCalledWith(
+      file,
+      expect.any(String),
+      expect.any(AbortSignal),
+    );
+    expect(rendered.result.current.state.uploadedReference).toMatchObject({
+      asset: uploadedAsset,
+      displayName: 'portrait.png',
+    });
+    expect(rendered.result.current.canSave).toBe(false);
+
+    act(() => rendered.result.current.onSaveImageOnly('  Portrait   Coach  '));
+    await waitFor(() => expect(onDismiss).toHaveBeenCalledOnce());
+    expect(onSaveCharacter).toHaveBeenCalledOnce();
+    expect(memory.readActive()).toBeNull();
+  });
+
+  it('keeps the current upload during replacement and ignores a late result after removal', async () => {
+    const memory = createMemoryDraftRepository();
+    draftRepositoryFactory.mockReturnValue(memory.repository);
+    const rendered = renderHook(() =>
+      useCharacterBuilderController({
+        open: true,
+        generationAvailable: true,
+        editAvailable: true,
+        onSaveCharacter: vi.fn(),
+        onDismiss: vi.fn(),
+      }),
+    );
+    await waitFor(() => expect(rendered.result.current.state.phase).toBe('editing'));
+
+    act(() =>
+      rendered.result.current.onUploadReference(
+        new File(['first'], 'first.png', { type: 'image/png' }),
+      ),
+    );
+    await waitFor(() =>
+      expect(rendered.result.current.state.uploadedReference?.displayName).toBe('first.png'),
+    );
+
+    const replacement = deferred<UploadedReferenceImageAsset>();
+    uploadReferenceImage.mockImplementationOnce(() => replacement.promise);
+    act(() =>
+      rendered.result.current.onUploadReference(
+        new File(['second'], 'second.png', { type: 'image/png' }),
+      ),
+    );
+    await waitFor(() => expect(rendered.result.current.state.uploadPending).toBe(true));
+    expect(rendered.result.current.state.uploadedReference?.displayName).toBe('first.png');
+
+    act(() => rendered.result.current.onRemoveUpload());
+    expect(rendered.result.current.state.uploadedReference).toBeNull();
+
+    await act(async () => {
+      replacement.resolve({
+        ...uploadedAsset,
+        assetId: '37f302df-b78d-48a6-bd42-3df738da7066',
+        contentUrl: '/api/reference-images/37f302df-b78d-48a6-bd42-3df738da7066/content',
+      });
+      await replacement.promise;
+    });
+    expect(rendered.result.current.state.uploadedReference).toBeNull();
+  });
+
   it('saves a manually detailed character without choosing a demo character', async () => {
     const memory = createMemoryDraftRepository();
     draftRepositoryFactory.mockReturnValue(memory.repository);
@@ -199,7 +335,7 @@ describe('useCharacterBuilderController save transactions', () => {
         progress: SaveProgress,
       ) => {
         expect(snapshot).toMatchObject({
-          name: 'New Character 01',
+          name: 'Freckled Guide',
           draft: { presetId: null, appearance: 'freckled' },
           design: { starterId: null },
         });
@@ -238,7 +374,7 @@ describe('useCharacterBuilderController save transactions', () => {
     await waitFor(() => expect(rendered.result.current.canSave).toBe(true));
     expect(rendered.result.current.state.design.starterId).toBeNull();
 
-    act(() => rendered.result.current.onSave());
+    act(() => rendered.result.current.onSave('Freckled Guide'));
 
     await waitFor(() => expect(onDismiss).toHaveBeenCalledOnce());
     expect(onSaveCharacter).toHaveBeenCalledOnce();
@@ -264,8 +400,8 @@ describe('useCharacterBuilderController save transactions', () => {
     const { result, onDismiss } = await renderReadyController(onSaveCharacter);
 
     act(() => {
-      result.current.onSave();
-      result.current.onSave();
+      result.current.onSave('Documentary Lead');
+      result.current.onSave('Documentary Lead');
     });
 
     await waitFor(() => expect(onSaveCharacter).toHaveBeenCalledOnce());
@@ -304,7 +440,7 @@ describe('useCharacterBuilderController save transactions', () => {
     );
     const first = await renderReadyController(onSaveCharacter);
 
-    act(() => first.result.current.onSave());
+    act(() => first.result.current.onSave('Documentary Lead'));
     await waitFor(() => expect(first.result.current.state.phase).toBe('save-failed'));
 
     const failedJournal = memory.readActive()?.value.pendingSave;
@@ -325,7 +461,9 @@ describe('useCharacterBuilderController save transactions', () => {
     await waitFor(() => expect(retry.result.current.state.phase).toBe('editing'));
     expect(retry.result.current.saveRecoveryPending).toBe(true);
 
-    act(() => retry.result.current.onSave());
+    expect(retry.result.current.suggestedCharacterName).toBe('Documentary Lead');
+    expect(retry.result.current.characterNameLocked).toBe(true);
+    act(() => retry.result.current.onSave('Documentary Lead'));
     await waitFor(() => expect(retryDismiss).toHaveBeenCalledOnce());
 
     expect(onSaveCharacter).toHaveBeenCalledTimes(2);
@@ -357,12 +495,12 @@ describe('useCharacterBuilderController save transactions', () => {
     );
     const rendered = await renderReadyController(onSaveCharacter);
 
-    act(() => rendered.result.current.onSave());
+    act(() => rendered.result.current.onSave('Documentary Lead'));
     await waitFor(() => expect(rendered.result.current.state.phase).toBe('save-failed'));
     expect(memory.readActive()?.value.pendingSave?.stage).toBe('studio-preloaded');
     expect(onSaveCharacter).toHaveBeenCalledOnce();
 
-    act(() => rendered.result.current.onSave());
+    act(() => rendered.result.current.onSave('Documentary Lead'));
     await waitFor(() => expect(rendered.onDismiss).toHaveBeenCalledOnce());
     expect(onSaveCharacter).toHaveBeenCalledOnce();
     expect(memory.readActive()).toBeNull();

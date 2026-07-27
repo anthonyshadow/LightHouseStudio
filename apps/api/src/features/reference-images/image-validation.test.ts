@@ -1,10 +1,12 @@
 import sharp from 'sharp';
 import { describe, expect, it } from 'vitest';
-import { REFERENCE_IMAGE_MAX_BYTES } from '@studio/contracts';
+import { REFERENCE_IMAGE_MAX_BYTES, REFERENCE_IMAGE_UPLOAD_MAX_BYTES } from '@studio/contracts';
 import {
   InvalidReferenceImageError,
+  InvalidReferenceImageUploadError,
   decodeStrictBase64,
   validateReferenceImage,
+  validateUploadedReferenceImage,
 } from './image-validation.js';
 
 const imageBase64 = async (
@@ -86,5 +88,51 @@ describe('reference image validation', () => {
       width: 1024,
       height: 1024,
     });
+  });
+});
+
+describe('uploaded reference image validation', () => {
+  it.each(['jpeg', 'png', 'webp'] as const)(
+    'preserves fully decoded %s upload bytes and metadata',
+    async (format) => {
+      const bytes = Buffer.from(await imageBase64(800, 1200, format), 'base64');
+      const result = await validateUploadedReferenceImage(bytes, `image/${format}`);
+
+      expect(result).toEqual({
+        bytes,
+        width: 800,
+        height: 1200,
+        mimeType: `image/${format}`,
+      });
+    },
+  );
+
+  it('rejects declared and decoded MIME mismatches and corrupt bytes', async () => {
+    const jpeg = Buffer.from(await imageBase64(800, 1200, 'jpeg'), 'base64');
+
+    await expect(validateUploadedReferenceImage(jpeg, 'image/png')).rejects.toThrow(
+      /do(?:es)? not match/u,
+    );
+    await expect(
+      validateUploadedReferenceImage(Buffer.from('not an image'), 'image/png'),
+    ).rejects.toBeInstanceOf(InvalidReferenceImageUploadError);
+  });
+
+  it('rejects uploads above the byte and decoded-pixel safety limits', async () => {
+    await expect(
+      validateUploadedReferenceImage(
+        Buffer.alloc(REFERENCE_IMAGE_UPLOAD_MAX_BYTES + 1),
+        'image/png',
+      ),
+    ).rejects.toThrow('10 MiB');
+
+    const tooManyPixels = await sharp({
+      create: { width: 8_000, height: 5_001, channels: 3, background: '#345678' },
+    })
+      .png({ compressionLevel: 9 })
+      .toBuffer();
+    await expect(validateUploadedReferenceImage(tooManyPixels, 'image/png')).rejects.toThrow(
+      '40-megapixel',
+    );
   });
 });

@@ -8,6 +8,7 @@ import {
   characterBuilderOperationError,
   createFreshCharacterBuilderDraftValue,
   toPersistedCharacterBuilderPreview,
+  toPersistedCharacterBuilderUpload,
   type CharacterBuilderStateRef,
 } from './characterBuilderControllerSupport';
 import { createGuidedDesignFromDraft } from './characterModel';
@@ -83,6 +84,7 @@ export const createCharacterBuilderLegacyMigration = (
                     stale: record.data.referenceImageStale,
                   }
                 : null,
+              uploadedReference: null,
               pendingSave: null,
             });
             if (!value) continue;
@@ -134,6 +136,7 @@ export const useCharacterBuilderPersistence = ({
       design: source.design,
       options: source.options,
       preview: toPersistedCharacterBuilderPreview(source),
+      uploadedReference: toPersistedCharacterBuilderUpload(source),
       pendingSave: pending,
     }),
     [stateRef],
@@ -172,11 +175,32 @@ export const useCharacterBuilderPersistence = ({
         recordRef.current = record;
         const value = record?.value ?? createFreshCharacterBuilderDraftValue();
         setPendingSave(value.pendingSave);
+        let uploadedReference: CharacterBuilderState['uploadedReference'] = null;
+        if (value.uploadedReference) {
+          try {
+            const asset = await fetchReferenceImageMetadata(value.uploadedReference.assetId);
+            if (!active) return;
+            if (asset.source !== 'uploaded') {
+              throw new Error('The saved upload no longer points to an uploaded asset.');
+            }
+            uploadedReference = {
+              asset,
+              displayName: value.uploadedReference.displayName,
+            };
+          } catch {
+            setAutosaveMessage(
+              'The saved draft was restored, but its uploaded reference is no longer available.',
+            );
+          }
+        }
         let preview: CharacterBuilderState['preview'] = null;
         if (value.preview) {
           try {
             const asset = await fetchReferenceImageMetadata(value.preview.assetId);
             if (!active) return;
+            if (asset.source !== 'generated') {
+              throw new Error('The saved preview no longer points to a generated asset.');
+            }
             preview = {
               asset,
               sourceKey: value.preview.sourceKey,
@@ -186,6 +210,7 @@ export const useCharacterBuilderPersistence = ({
                   createReferencePreviewSourceKey(
                     generateStructuredPrompt(value.draft).prompt,
                     value.options,
+                    uploadedReference?.asset.assetId,
                   ),
             };
           } catch {
@@ -202,6 +227,7 @@ export const useCharacterBuilderPersistence = ({
           options: value.options,
           revision: 0,
           preview,
+          uploadedReference,
         });
         const storage = repository.getStorageState();
         if (!storage.durable) setAutosaveMessage(storage.notice);
@@ -218,6 +244,7 @@ export const useCharacterBuilderPersistence = ({
           options: fresh.options,
           revision: 0,
           preview: null,
+          uploadedReference: null,
         });
       });
     return () => {

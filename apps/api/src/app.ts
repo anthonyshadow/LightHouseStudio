@@ -34,6 +34,11 @@ import {
 } from './providers/openai/reference-image-provider.js';
 
 export const OPENAI_CONNECTION_TIMEOUT_MARGIN_MS = 100_000;
+export const SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES = [
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+] as const;
 
 export interface AppDependencies {
   readonly config: RuntimeConfig;
@@ -93,6 +98,16 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     [...SUPPORTED_AUDIO_CONTENT_TYPES],
     { parseAs: 'buffer' },
     (_request, body, done) => done(null, body),
+  );
+  app.addContentTypeParser(
+    [...SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES],
+    { parseAs: 'buffer' },
+    (_request, body, done) => done(null, body),
+  );
+  // Let the upload route return its image-specific 415 response for unsupported
+  // image declarations instead of Fastify's generic content-parser error.
+  app.addContentTypeParser(/^image\//u, { parseAs: 'buffer' }, (_request, body, done) =>
+    done(null, body),
   );
 
   installLocalSecurityBoundary(app);

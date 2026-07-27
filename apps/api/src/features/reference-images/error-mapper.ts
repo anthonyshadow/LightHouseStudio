@@ -1,7 +1,10 @@
 import { AppError } from '../../http/app-error.js';
 import type { ErrorTranslation, ErrorTranslator } from '../../http/errors.js';
 import { ReferenceImageStorageError } from './asset-store.js';
-import { InvalidReferenceImageError } from './image-validation.js';
+import {
+  InvalidReferenceImageError,
+  InvalidReferenceImageUploadError,
+} from './image-validation.js';
 import { ReferenceImageGenerationStateError } from './reference-image-error.js';
 
 const translation = (
@@ -14,6 +17,12 @@ const translation = (
 });
 
 export const translateReferenceImageError: ErrorTranslator = (error) => {
+  if (error instanceof InvalidReferenceImageUploadError) {
+    return translation(
+      'InvalidReferenceImageUploadError',
+      new AppError(400, 'invalid_image_upload', error.message),
+    );
+  }
   if (error instanceof InvalidReferenceImageError) {
     return translation(
       'InvalidReferenceImageError',

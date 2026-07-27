@@ -1,12 +1,16 @@
 import {
   apiErrorResponseSchema,
   capabilitiesResponseSchema,
+  composeReferenceImageResponseSchema,
   createReferenceImageResponseSchema,
   editReferenceImageResponseSchema,
   optimizeCharacterReferencePromptResponseSchema,
   referenceImageMetadataResponseSchema,
   realtimeTokenResponseSchema,
   REFERENCE_IMAGE_MAX_BYTES,
+  REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
+  uploadReferenceImageResponseSchema,
+  type ComposeReferenceImageRequest,
   type CreateReferenceImageRequest,
   type EditReferenceImageRequest,
   type OptimizeCharacterReferencePromptRequest,
@@ -142,6 +146,50 @@ export const editReferenceImage = async (
   return payload.asset;
 };
 
+export const composeReferenceImage = async (
+  sourceAssetId: string,
+  request: ComposeReferenceImageRequest,
+  signal?: AbortSignal,
+): Promise<ReferenceImageAsset> => {
+  const payload = await requestJson(
+    `/api/reference-images/${encodeURIComponent(sourceAssetId)}/compositions`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      ...(signal ? { signal } : {}),
+      headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+      body: JSON.stringify(request),
+    },
+    composeReferenceImageResponseSchema,
+    invalidApiResponse('The composed reference response was invalid.', 'invalid_provider_image'),
+  );
+  return payload.asset;
+};
+
+export const uploadReferenceImage = async (
+  file: File,
+  requestId: string,
+  signal?: AbortSignal,
+): Promise<ReferenceImageAsset> => {
+  const payload = await requestJson(
+    '/api/reference-images/uploads',
+    {
+      method: 'POST',
+      cache: 'no-store',
+      ...(signal ? { signal } : {}),
+      headers: {
+        'Content-Type': file.type,
+        Accept: 'application/json',
+        'Idempotency-Key': requestId,
+      },
+      body: file,
+    },
+    uploadReferenceImageResponseSchema,
+    invalidApiResponse('The uploaded reference response was invalid.', 'invalid_image_upload'),
+  );
+  return payload.asset;
+};
+
 export const optimizeCharacterReferencePrompt = async (
   request: OptimizeCharacterReferencePromptRequest,
   signal: AbortSignal,
@@ -227,11 +275,15 @@ export const hydrateReferenceImage = async (
     );
   }
   const blob = await response.blob();
+  const maximumBytes =
+    metadata.source === 'uploaded'
+      ? REFERENCE_IMAGE_UPLOAD_MAX_BYTES
+      : REFERENCE_IMAGE_MAX_BYTES - 1;
   if (
     blob.type !== metadata.mimeType ||
     blob.size !== metadata.byteSize ||
     blob.size <= 0 ||
-    blob.size >= REFERENCE_IMAGE_MAX_BYTES
+    blob.size > maximumBytes
   ) {
     throw new ApiClientError(
       'The stored reference failed integrity checks.',

@@ -1,4 +1,6 @@
 import {
+  composeReferenceImageRequestSchema,
+  composeReferenceImageResponseSchema,
   createReferenceImageRequestSchema,
   createReferenceImageResponseSchema,
   editReferenceImageParamsSchema,
@@ -8,6 +10,10 @@ import {
   optimizeCharacterReferencePromptResponseSchema,
   referenceImageAssetParamsSchema,
   referenceImageMetadataResponseSchema,
+  REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
+  referenceImageMimeTypeSchema,
+  referenceImageRequestIdSchema,
+  uploadReferenceImageResponseSchema,
 } from '@studio/contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/errors.js';
@@ -34,6 +40,27 @@ const requireSourceAssetId = (params: unknown): string => {
     throw new AppError(400, 'validation_error', 'Choose a valid source reference image.');
   }
   return parsed.data.sourceAssetId;
+};
+
+const requireUploadRequestId = (headers: FastifyRequest['headers']): string => {
+  const parsed = referenceImageRequestIdSchema.safeParse(headers['idempotency-key']);
+  if (!parsed.success) {
+    throw new AppError(
+      400,
+      'validation_error',
+      'Provide a UUID Idempotency-Key for this image upload.',
+    );
+  }
+  return parsed.data;
+};
+
+const requireUploadMimeType = (headers: FastifyRequest['headers']) => {
+  const contentType = headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase();
+  const parsed = referenceImageMimeTypeSchema.safeParse(contentType);
+  if (!parsed.success) {
+    throw new AppError(415, 'unsupported_media_type', 'Upload a JPEG, PNG, or WebP image.');
+  }
+  return parsed.data;
 };
 
 export const registerReferenceImageRoutes = (
@@ -90,6 +117,34 @@ export const registerReferenceImageRoutes = (
   );
 
   app.post(
+    '/api/reference-images/uploads',
+    {
+      bodyLimit: REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
+      onRequest: verifyGenerationOrigin,
+    },
+    async (request, reply) => {
+      const requestId = requireUploadRequestId(request.headers);
+      const mimeType = requireUploadMimeType(request.headers);
+      if (!Buffer.isBuffer(request.body)) {
+        throw new AppError(400, 'validation_error', 'Provide image bytes in the request body.');
+      }
+      const lifetime = createRequestLifetime(request, reply);
+      try {
+        const asset = await service.upload({
+          localOwnerId: localOwnerIdForRequest(request),
+          requestId,
+          bytes: request.body,
+          mimeType,
+          signal: lifetime.signal,
+        });
+        return uploadReferenceImageResponseSchema.parse({ asset });
+      } finally {
+        lifetime.release();
+      }
+    },
+  );
+
+  app.post(
     '/api/reference-images/:sourceAssetId/edits',
     { bodyLimit: 256 * 1024, onRequest: verifyGenerationOrigin },
     async (request, reply) => {
@@ -111,6 +166,34 @@ export const registerReferenceImageRoutes = (
           ...parsed.data,
         });
         return editReferenceImageResponseSchema.parse({ asset });
+      } finally {
+        lifetime.release();
+      }
+    },
+  );
+
+  app.post(
+    '/api/reference-images/:sourceAssetId/compositions',
+    { bodyLimit: 256 * 1024, onRequest: verifyGenerationOrigin },
+    async (request, reply) => {
+      const sourceAssetId = requireSourceAssetId(request.params);
+      const parsed = composeReferenceImageRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw new AppError(
+          400,
+          'validation_error',
+          'Provide a valid reference composition request and a new request ID.',
+        );
+      }
+      const lifetime = createRequestLifetime(request, reply);
+      try {
+        const asset = await service.compose({
+          localOwnerId: localOwnerIdForRequest(request),
+          sourceAssetId,
+          signal: lifetime.signal,
+          ...parsed.data,
+        });
+        return composeReferenceImageResponseSchema.parse({ asset });
       } finally {
         lifetime.release();
       }

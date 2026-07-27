@@ -42,6 +42,8 @@ export const createPromptOptimizationInputHash = (
 
 export const REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION =
   'lucy-character-reference-edit-v1' as const;
+export const REFERENCE_IMAGE_COMPOSITION_PROMPT_TEMPLATE_VERSION =
+  'lucy-character-reference-compose-v1' as const;
 
 /**
  * Builds the provider-only edit instruction. Callers persist the optimized character
@@ -59,6 +61,16 @@ export const createReferenceImageEditPrompt = (
     REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH - prefix.length - suffix.length,
   );
   return `${prefix}${optimizedCharacterPrompt.slice(0, availablePromptLength)}${suffix}`;
+};
+
+/** Builds the provider-only first composition instruction for a user-uploaded source image. */
+export const createReferenceImageCompositionPrompt = (optimizedCharacterPrompt: string): string => {
+  const prefix =
+    'Create a polished Lucy 2.5 character reference from the supplied source image. Preserve the recognizable person or character identity, face, body traits, and useful source-image details. Apply the following character direction to role, outfit, styling, expression, framing, lighting, and background. Explicit identity changes in the direction are authoritative.\n\nCharacter direction:\n';
+  return `${prefix}${optimizedCharacterPrompt.slice(
+    0,
+    Math.max(0, REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH - prefix.length),
+  )}`;
 };
 
 export interface ReferenceImagePromptVersion {

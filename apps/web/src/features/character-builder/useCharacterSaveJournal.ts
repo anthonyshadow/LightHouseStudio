@@ -1,12 +1,16 @@
 import { type ReferenceImageAsset } from '@studio/contracts';
-import { generateStructuredPrompt } from '@studio/domain';
+import {
+  ASSET_NAME_MAX_LENGTH,
+  containsMeaningfulText,
+  generateStructuredPrompt,
+  normalizeWhitespace,
+} from '@studio/domain';
 import { useCallback, useRef, type Dispatch } from 'react';
 import { fetchReferenceImageMetadata } from '../../adapters/api-client/apiClient';
 import { createReferencePreviewSourceKey } from '../prompt-authoring/useReferencePreviewGeneration';
 import {
   characterBuilderOperationError,
   createFreshCharacterBuilderDraftValue,
-  deriveCharacterName,
   type CharacterBuilderOperationLocksRef,
   type CharacterSaveProgress,
   type CharacterSaveSnapshot,
@@ -39,7 +43,7 @@ export interface UseCharacterSaveJournalOptions {
 }
 
 export interface CharacterSaveJournalController {
-  readonly save: () => Promise<void>;
+  readonly save: (mode: 'default' | 'image-only', name: string) => Promise<void>;
   readonly clear: () => void;
 }
 
@@ -79,125 +83,163 @@ export const useCharacterSaveJournal = ({
     completedHandoffRef.current = null;
   }, [persistence]);
 
-  const save = useCallback(async () => {
-    const current = stateRef.current;
-    if (
-      locksRef.current.save ||
-      locksRef.current.close ||
-      locksRef.current.reset ||
-      locksRef.current.discard ||
-      locksRef.current.generation ||
-      current.operation ||
-      ['restoring', 'saving', 'closing', 'saved'].includes(current.phase) ||
-      saveBlockedReason
-    ) {
-      return;
-    }
-    const generated = generateStructuredPrompt(current.draft);
-    if (!generated.validation.valid || !generated.prompt) {
-      dispatch({
-        type: 'validation-failed',
-        kind: 'save',
-        message:
-          generated.validation.blockingIssues[0]?.message ??
-          'Choose at least one character detail before saving.',
-      });
-      return;
-    }
-    locksRef.current.save = true;
-
-    const operationId = crypto.randomUUID();
-    const operationSourceKey = createReferencePreviewSourceKey(generated.prompt, current.options);
-    dispatch({
-      type: 'operation-started',
-      phase: 'saving',
-      operation: {
-        id: operationId,
-        sourceRevision: current.revision,
-        sourceKey: operationSourceKey,
-      },
-    });
-
-    try {
-      await persistence.waitForWrites();
-      let pending = persistence.getPendingSave();
-      if (!pending) {
-        const attachPreview =
-          current.preview && !current.preview.stale ? current.preview.asset : null;
-        const snapshot: PersistedCharacterSaveSnapshot = {
-          name: deriveCharacterName(current.design),
-          prompt: generated.prompt,
-          draft: current.draft,
-          design: current.design,
-          referenceImageAssetId: attachPreview?.assetId ?? null,
-        };
-        const nextPending: PendingCharacterSave = {
-          characterId: crypto.randomUUID(),
-          snapshotHash: await characterSaveSnapshotFingerprint(snapshot),
-          stage: 'intent',
-          snapshot,
-        };
-        await persistence.persistPendingSave(nextPending, current);
-        completedHandoffRef.current = null;
-        pending = nextPending;
+  const save = useCallback(
+    async (mode: 'default' | 'image-only', requestedName: string) => {
+      const current = stateRef.current;
+      if (
+        locksRef.current.save ||
+        locksRef.current.close ||
+        locksRef.current.reset ||
+        locksRef.current.discard ||
+        locksRef.current.generation ||
+        locksRef.current.upload ||
+        current.operation ||
+        ['restoring', 'saving', 'closing', 'saved'].includes(current.phase) ||
+        saveBlockedReason
+      ) {
+        return;
       }
-
-      if ((await characterSaveSnapshotFingerprint(pending.snapshot)) !== pending.snapshotHash) {
-        throw new Error(
-          'The resumable character save journal no longer matches its frozen snapshot. Reset the draft and try again.',
-        );
-      }
-
-      let referenceImage: ReferenceImageAsset | null = null;
-      if (pending.snapshot.referenceImageAssetId) {
-        referenceImage =
-          current.preview?.asset.assetId === pending.snapshot.referenceImageAssetId
-            ? current.preview.asset
-            : await fetchReferenceImageMetadata(pending.snapshot.referenceImageAssetId);
-      }
-      const snapshot: CharacterSaveSnapshot = { ...pending.snapshot, referenceImage };
-      const handoffKey = `${pending.characterId}:${pending.snapshotHash}`;
-      if (pending.stage !== 'studio-preloaded' || completedHandoffRef.current !== handoffKey) {
-        await onSaveCharacter(snapshot, pending.characterId, pending.stage, {
-          markCharacterPersisted: () => updatePendingStage(pending, 'character-persisted'),
-          markStudioPreloaded: () => updatePendingStage(pending, 'studio-preloaded'),
+      const name = normalizeWhitespace(requestedName, ASSET_NAME_MAX_LENGTH);
+      if (!containsMeaningfulText(name)) {
+        dispatch({
+          type: 'validation-failed',
+          kind: 'save',
+          message: 'Enter a useful character name before saving.',
         });
-        completedHandoffRef.current = handoffKey;
+        return;
       }
-      await persistence.waitForWrites();
-      await persistence.completeDraftDurably();
-      clear();
-      dispatch({ type: 'saved' });
-      const fresh = createFreshCharacterBuilderDraftValue();
+      const generated = generateStructuredPrompt(current.draft);
+      const imageOnly = mode === 'image-only';
+      if (imageOnly && !current.uploadedReference) {
+        dispatch({
+          type: 'validation-failed',
+          kind: 'save',
+          message: 'Upload a reference image before saving an image-only character.',
+        });
+        return;
+      }
+      if (!imageOnly && (!generated.validation.valid || !generated.prompt)) {
+        dispatch({
+          type: 'validation-failed',
+          kind: 'save',
+          message:
+            generated.validation.blockingIssues[0]?.message ??
+            'Choose at least one character detail before saving.',
+        });
+        return;
+      }
+      locksRef.current.save = true;
+
+      const operationId = crypto.randomUUID();
+      const operationSourceKey = createReferencePreviewSourceKey(
+        generated.prompt,
+        current.options,
+        current.uploadedReference?.asset.assetId,
+      );
       dispatch({
-        type: 'reset',
-        draft: fresh.draft,
-        design: fresh.design,
-        options: fresh.options,
+        type: 'operation-started',
+        phase: 'saving',
+        operation: {
+          id: operationId,
+          sourceRevision: current.revision,
+          sourceKey: operationSourceKey,
+        },
       });
-      onDismiss();
-    } catch (error: unknown) {
-      dispatch({
-        type: 'operation-failed',
-        operationId,
-        sourceKey: operationSourceKey,
-        kind: 'save',
-        message: characterBuilderOperationError(error),
-      });
-    } finally {
-      locksRef.current.save = false;
-    }
-  }, [
-    clear,
-    dispatch,
-    locksRef,
-    onDismiss,
-    onSaveCharacter,
-    persistence,
-    saveBlockedReason,
-    stateRef,
-    updatePendingStage,
-  ]);
+
+      try {
+        await persistence.waitForWrites();
+        let pending = persistence.getPendingSave();
+        if (pending && pending.snapshot.name !== name) {
+          throw new Error(
+            `This resumable save is already named “${pending.snapshot.name}”. Resume with that name or reset the draft.`,
+          );
+        }
+        if (!pending) {
+          const attachPreview =
+            !imageOnly && current.preview && !current.preview.stale ? current.preview.asset : null;
+          const uploadedReference = current.uploadedReference?.asset ?? null;
+          const finalReference = attachPreview ?? uploadedReference;
+          const finalReferenceKind = finalReference?.source ?? null;
+          const snapshot: PersistedCharacterSaveSnapshot = {
+            name,
+            prompt: imageOnly ? '' : generated.prompt,
+            draft: imageOnly ? null : current.draft,
+            design: imageOnly ? null : current.design,
+            referenceImageAssetId: finalReference?.assetId ?? null,
+            uploadedReferenceImageAssetId: uploadedReference?.assetId ?? null,
+            finalReferenceKind,
+          };
+          const nextPending: PendingCharacterSave = {
+            characterId: crypto.randomUUID(),
+            snapshotHash: await characterSaveSnapshotFingerprint(snapshot),
+            stage: 'intent',
+            snapshot,
+          };
+          await persistence.persistPendingSave(nextPending, current);
+          completedHandoffRef.current = null;
+          pending = nextPending;
+        }
+
+        if ((await characterSaveSnapshotFingerprint(pending.snapshot)) !== pending.snapshotHash) {
+          throw new Error(
+            'The resumable character save journal no longer matches its frozen snapshot. Reset the draft and try again.',
+          );
+        }
+
+        let referenceImage: ReferenceImageAsset | null = null;
+        if (pending.snapshot.referenceImageAssetId) {
+          referenceImage =
+            current.preview?.asset.assetId === pending.snapshot.referenceImageAssetId
+              ? current.preview.asset
+              : current.uploadedReference?.asset.assetId === pending.snapshot.referenceImageAssetId
+                ? current.uploadedReference.asset
+                : await fetchReferenceImageMetadata(pending.snapshot.referenceImageAssetId);
+        }
+        const snapshot: CharacterSaveSnapshot = { ...pending.snapshot, referenceImage };
+        const handoffKey = `${pending.characterId}:${pending.snapshotHash}`;
+        if (pending.stage !== 'studio-preloaded' || completedHandoffRef.current !== handoffKey) {
+          await onSaveCharacter(snapshot, pending.characterId, pending.stage, {
+            markCharacterPersisted: () => updatePendingStage(pending, 'character-persisted'),
+            markStudioPreloaded: () => updatePendingStage(pending, 'studio-preloaded'),
+          });
+          completedHandoffRef.current = handoffKey;
+        }
+        await persistence.waitForWrites();
+        await persistence.completeDraftDurably();
+        clear();
+        dispatch({ type: 'saved' });
+        const fresh = createFreshCharacterBuilderDraftValue();
+        dispatch({
+          type: 'reset',
+          draft: fresh.draft,
+          design: fresh.design,
+          options: fresh.options,
+        });
+        onDismiss();
+      } catch (error: unknown) {
+        dispatch({
+          type: 'operation-failed',
+          operationId,
+          sourceKey: operationSourceKey,
+          kind: 'save',
+          message: characterBuilderOperationError(error),
+        });
+      } finally {
+        locksRef.current.save = false;
+      }
+    },
+    [
+      clear,
+      dispatch,
+      locksRef,
+      onDismiss,
+      onSaveCharacter,
+      persistence,
+      saveBlockedReason,
+      stateRef,
+      updatePendingStage,
+    ],
+  );
 
   return { save, clear };
 };

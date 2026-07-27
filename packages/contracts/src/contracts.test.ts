@@ -9,6 +9,7 @@ import {
   apiErrorResponseSchema,
   capabilitiesResponseSchema,
   characterPromptOptimizationResultSchema,
+  composeReferenceImageRequestSchema,
   createReferenceImageRequestSchema,
   editReferenceImageRequestSchema,
   healthResponseSchema,
@@ -18,6 +19,7 @@ import {
   realtimeTokenRequestSchema,
   realtimeTokenResponseSchema,
   referenceImageAssetSchema,
+  uploadReferenceImageResponseSchema,
   sharedVoicePreviewParamsSchema,
   sharedVoicesQuerySchema,
   sharedVoicesResponseSchema,
@@ -242,6 +244,34 @@ describe('reference image contracts', () => {
     ).toBe(false);
   });
 
+  it('requires enabled optimization for source-image composition', () => {
+    const request = {
+      requestId: 'cb6ab812-0ebd-455b-8fe1-3a3665daf158',
+      rawPrompt: 'A ceramic astronaut',
+      options,
+      optimization: {
+        enabled: true as const,
+        result,
+        model: 'gpt-5.6',
+        version: 'lucy-character-reference-v1',
+        inputHash: 'b'.repeat(64),
+        manuallyEdited: false,
+      },
+    };
+
+    expect(composeReferenceImageRequestSchema.parse(request)).toEqual(request);
+    expect(
+      composeReferenceImageRequestSchema.safeParse({
+        ...request,
+        optimization: { enabled: false },
+      }).success,
+    ).toBe(false);
+    expect(
+      composeReferenceImageRequestSchema.safeParse({ ...request, sourceImageBytes: 'private' })
+        .success,
+    ).toBe(false);
+  });
+
   it('exposes owner-scoped prompt audit metadata but rejects internal storage/provider payloads', () => {
     const metadata = {
       assetId: '28d0b01f-70aa-4db6-ac65-379cdd916113',
@@ -300,6 +330,28 @@ describe('reference image contracts', () => {
         width: 1536,
         height: 1536,
       }).success,
+    ).toBe(false);
+
+    const uploaded = {
+      assetId: '7bf5e842-3cfe-4c5d-b945-a6ead02a3f01',
+      mimeType: 'image/webp',
+      byteSize: 456_789,
+      source: 'uploaded',
+      width: 2000,
+      height: 3000,
+      createdAt: '2026-07-18T12:00:00.000Z',
+      updatedAt: '2026-07-18T12:00:00.000Z',
+      contentUrl: '/api/reference-images/7bf5e842-3cfe-4c5d-b945-a6ead02a3f01/content',
+    } as const;
+    expect(referenceImageAssetSchema.parse(uploaded)).toEqual(uploaded);
+    expect(uploadReferenceImageResponseSchema.parse({ asset: uploaded }).asset.source).toBe(
+      'uploaded',
+    );
+    expect(referenceImageAssetSchema.safeParse({ ...uploaded, provider: 'openai' }).success).toBe(
+      false,
+    );
+    expect(
+      referenceImageAssetSchema.safeParse({ ...uploaded, width: 8000, height: 6000 }).success,
     ).toBe(false);
   });
 });

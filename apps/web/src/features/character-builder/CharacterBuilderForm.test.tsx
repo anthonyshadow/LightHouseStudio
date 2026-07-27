@@ -66,6 +66,18 @@ const openSection = async (user: ReturnType<typeof userEvent.setup>, name: strin
 afterEach(cleanup);
 
 describe('CharacterBuilderForm', () => {
+  it('places the Reference image drawer first and opens it by default', () => {
+    render(<BuilderHarness />);
+
+    const referenceSection = sectionNamed('Reference image');
+    const sections = Array.from(referenceSection.parentElement?.children ?? []).filter(
+      (element): element is HTMLElement =>
+        element instanceof HTMLElement && element.tagName === 'SECTION',
+    );
+    expect(sections[0]).toBe(referenceSection);
+    expect(referenceSection.querySelector('details')).toHaveAttribute('open');
+  });
+
   it('places the direction preview last in the single-column reading order', () => {
     render(<BuilderHarness />);
 
@@ -256,6 +268,47 @@ describe('CharacterBuilderForm', () => {
     expect(
       (await openSection(user, 'Hairstyle')).getByRole('button', { name: 'Fade' }),
     ).toBeInTheDocument();
+  });
+
+  it('unselects a starter, presentation, or visual option when it is clicked again', async () => {
+    const user = userEvent.setup();
+    render(<BuilderHarness />);
+
+    const starter = within(sectionNamed('Try a demo character')).getByRole('button', {
+      name: /Documentary Presenter/,
+    });
+    await user.click(starter);
+    expect(starter).toHaveAttribute('aria-pressed', 'true');
+    expect(readSnapshot().design.starterId).toBe('documentary-presenter');
+    const starterAdultAge = readSnapshot().design.choices.adultAge;
+
+    await user.click(starter);
+    expect(starter).toHaveAttribute('aria-pressed', 'false');
+    expect(readSnapshot().design).toMatchObject({
+      starterId: null,
+      choices: { adultAge: starterAdultAge },
+    });
+
+    const presentation = await openSection(user, 'Presentation');
+    const woman = presentation.getByRole('button', { name: /Woman representative/ });
+    await user.click(woman);
+    expect(woman).toHaveAttribute('aria-pressed', 'true');
+    await user.click(woman);
+    expect(woman).toHaveAttribute('aria-pressed', 'false');
+    expect(readSnapshot()).toMatchObject({
+      draft: { gender: null },
+      design: { choices: { gender: null } },
+    });
+
+    const appearance = await openSection(user, 'Appearance');
+    const natural = appearance.getByRole('button', { name: /^Natural/u });
+    expect(natural).toHaveAttribute('aria-pressed', 'true');
+    await user.click(natural);
+    expect(natural).toHaveAttribute('aria-pressed', 'false');
+    expect(readSnapshot()).toMatchObject({
+      draft: { appearance: '' },
+      design: { choices: { appearance: null } },
+    });
   });
 
   it('keeps hairstyle and hair color independent and preserves an outside choice on gender change', async () => {

@@ -2,17 +2,21 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type {
+  ComposeReferenceImageRequest,
   CreateReferenceImageRequest,
   EditReferenceImageRequest,
   OptimizeCharacterReferencePromptResponse,
   ReferenceImageAsset,
+  UploadedReferenceImageAsset,
 } from '@studio/contracts';
 import {
+  composeReferenceImage,
   createReferenceImage,
   editReferenceImage,
   fetchProviderAvailability,
   hydrateReferenceImage,
   optimizeCharacterReferencePrompt,
+  uploadReferenceImage,
 } from './apiClient';
 
 const jpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0xff, 0xd9]);
@@ -78,6 +82,17 @@ const optimizationResponse: OptimizeCharacterReferencePromptResponse = {
   model: 'gpt-5.6',
   version: 'lucy-character-reference-v1',
   inputHash: 'b'.repeat(64),
+};
+const uploadedAsset: UploadedReferenceImageAsset = {
+  assetId: '033aa515-7ac4-4d7b-8222-ecff83757ca9',
+  mimeType: 'image/png',
+  byteSize: 4,
+  source: 'uploaded',
+  width: 800,
+  height: 1200,
+  createdAt: '2026-07-18T12:00:00.000Z',
+  updatedAt: '2026-07-18T12:00:00.000Z',
+  contentUrl: '/api/reference-images/033aa515-7ac4-4d7b-8222-ecff83757ca9/content',
 };
 
 afterEach(() => {
@@ -255,6 +270,68 @@ describe('reference image API client', () => {
     );
     expect(JSON.stringify(request)).not.toContain('sourceImage');
     expect(JSON.stringify(request)).not.toContain('base64');
+  });
+
+  it('uploads immutable source bytes with a retry-stable idempotency key', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ asset: uploadedAsset }), {
+        status: 201,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const file = new File([new Uint8Array([1, 2, 3, 4])], 'portrait.png', {
+      type: 'image/png',
+      lastModified: 1,
+    });
+    const requestId = '96701f87-aeb6-41b6-ab76-2cbe3275714e';
+
+    await expect(uploadReferenceImage(file, requestId)).resolves.toEqual(uploadedAsset);
+    expect(fetchMock).toHaveBeenCalledOnce();
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe('/api/reference-images/uploads');
+    expect(init.method).toBe('POST');
+    expect(init.body).toBe(file);
+    expect(new Headers(init.headers).get('Content-Type')).toBe('image/png');
+    expect(new Headers(init.headers).get('Idempotency-Key')).toBe(requestId);
+  });
+
+  it('composes a generated asset from an opaque uploaded source identity', async () => {
+    const composedAsset: ReferenceImageAsset = {
+      ...asset,
+      assetId: '48ea3acf-9ef5-4237-bcc7-961d81842569',
+      derivation: { kind: 'compose', sourceAssetId: uploadedAsset.assetId },
+      contentUrl: '/api/reference-images/48ea3acf-9ef5-4237-bcc7-961d81842569/content',
+    };
+    const fetchMock = vi.fn().mockResolvedValue(
+      new Response(JSON.stringify({ asset: composedAsset }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      }),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    const request: ComposeReferenceImageRequest = {
+      requestId: 'caa39308-f797-4542-84bc-9a14f99afdcf',
+      rawPrompt,
+      options,
+      optimization: {
+        enabled: true,
+        ...optimizationResponse,
+        manuallyEdited: false,
+      },
+    };
+
+    await expect(composeReferenceImage(uploadedAsset.assetId, request)).resolves.toEqual(
+      composedAsset,
+    );
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/reference-images/${uploadedAsset.assetId}/compositions`,
+      expect.objectContaining({
+        method: 'POST',
+        body: JSON.stringify(request),
+      }),
+    );
+    expect(JSON.stringify(request)).not.toContain('sourceImage');
   });
 
   it('hydrates a persisted reference from its stable URL and validates exact integrity', async () => {

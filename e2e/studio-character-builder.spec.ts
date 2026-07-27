@@ -1,7 +1,11 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { installSuccessfulStudioHarness } from './support/studioHarness';
+import { installSuccessfulStudioHarness, readBrowserState } from './support/studioHarness';
 
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
+const REFERENCE_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
 
 const openBuilder = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: /Open character options/u }).click();
@@ -15,6 +19,17 @@ const chooseDocumentaryPresenter = async (page: Page): Promise<void> => {
     .first()
     .click();
   await expect(page.getByRole('button', { name: 'Save Character' })).toBeEnabled();
+};
+
+const confirmCharacterName = async (
+  page: Page,
+  name: string,
+  submitLabel: 'Save Character' | 'Save & Use Character' = 'Save Character',
+): Promise<void> => {
+  const dialog = page.getByRole('dialog', { name: 'Name your character' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('textbox', { name: /Character name/u }).fill(name);
+  await dialog.getByRole('button', { name: submitLabel, exact: true }).click();
 };
 
 const openConstraints = async (page: Page): Promise<void> => {
@@ -70,7 +85,9 @@ test('direction preview is last on narrow screens and remains beside the form on
   const preview = dialog.getByRole('complementary', {
     name: 'Character Direction Preview',
   });
-  const firstSection = dialog.locator('section[aria-labelledby="character-starters-heading"]');
+  const firstSection = dialog.locator(
+    'section[aria-labelledby="character-reference-image-heading"]',
+  );
   const finalSection = dialog.locator('section[aria-labelledby="character-preserve-heading"]');
   const rect = (locator: Locator) =>
     locator.evaluate((element) => {
@@ -121,6 +138,7 @@ test('a demo character is optional for preview generation and save', async ({ pa
   expect(network.referenceWorkflowCalls).toEqual(['optimize', 'generate']);
 
   await dialog.getByRole('button', { name: 'Save Character', exact: true }).click();
+  await confirmCharacterName(page, 'Adult Guide');
   await expect(dialog).toBeHidden();
 
   const saved = await page.evaluate((storageKey) => {
@@ -136,7 +154,7 @@ test('a demo character is optional for preview generation and save', async ({ pa
     return store.savedCharacterPrompts?.[0] ?? null;
   }, CREATIVE_ASSET_STORAGE_KEY);
   expect(saved).toMatchObject({
-    name: 'New Character 01',
+    name: 'Adult Guide',
     builderDraft: { presetId: null, adultAge: 'adult' },
     guidedDesign: { starterId: null },
   });
@@ -155,12 +173,13 @@ test('prompt-only save performs no image request and immediately preloads the Do
     button.click();
     button.click();
   });
+  await confirmCharacterName(page, 'Field Presenter');
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
   expect(network.referenceWorkflowCalls).toEqual([]);
   expect(network.referenceImageGenerations).toEqual([]);
 
   await page.getByRole('button', { name: 'Dock', exact: true }).click();
-  await expect(page.getByText('Documentary Presenter 01 is preloaded.')).toBeVisible();
+  await expect(page.getByText('Field Presenter is preloaded.')).toBeVisible();
   const saved = await page.evaluate((storageKey) => {
     const payload = localStorage.getItem(storageKey);
     if (!payload) return null;
@@ -179,7 +198,7 @@ test('prompt-only save performs no image request and immediately preloads the Do
   expect(saved).toMatchObject({
     count: 1,
     character: {
-      name: 'Documentary Presenter 01',
+      name: 'Field Presenter',
       referenceImageStatus: 'prompt-only',
       useCount: 0,
     },
@@ -190,9 +209,10 @@ test('prompt-only save performs no image request and immediately preloads the Do
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
   await shelf.getByRole('button', { name: /^Characters/u }).click();
-  await expect(
-    shelf.getByRole('button', { name: 'Documentary Presenter 01', exact: true }),
-  ).toHaveAttribute('aria-pressed', 'true');
+  await expect(shelf.getByRole('button', { name: 'Field Presenter', exact: true })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await shelf.getByRole('button', { name: 'Close creative tool' }).click();
 
   await openBuilder(page);
@@ -201,6 +221,313 @@ test('prompt-only save performs no image request and immediately preloads the Do
       .getByRole('dialog', { name: 'Build Your Character' })
       .getByRole('button', { name: 'Save Character', exact: true }),
   ).toBeDisabled();
+});
+
+test('using a saved character recipe selects it for the next Start AI action', async ({ page }) => {
+  await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+  await openBuilder(page);
+  await chooseDocumentaryPresenter(page);
+  await page.getByRole('button', { name: 'Save Character', exact: true }).click();
+  await confirmCharacterName(page, 'Shelf Field Host');
+  await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
+
+  const savedPrompt = await page.evaluate((storageKey) => {
+    const payload = localStorage.getItem(storageKey);
+    if (!payload) return null;
+    const store = JSON.parse(payload) as {
+      savedCharacterPrompts?: Array<{ prompt?: string }>;
+    };
+    return store.savedCharacterPrompts?.[0]?.prompt ?? null;
+  }, CREATIVE_ASSET_STORAGE_KEY);
+  expect(savedPrompt).toBeTruthy();
+
+  await page.reload();
+  await expect(
+    page.getByRole('button', { name: 'No character selected. Open character options' }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
+  const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
+  await shelf.getByRole('button', { name: /^Characters/u }).click();
+  await shelf.getByRole('button', { name: 'Use Shelf Field Host' }).click();
+
+  await expect(shelf).toBeHidden();
+  await expect(
+    page.getByRole('button', {
+      name: 'Selected character: Shelf Field Host. Open character options',
+    }),
+  ).toBeVisible();
+  await page.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await expect(page.getByLabel('Local camera preview')).toBeVisible();
+  await page.getByRole('button', { name: 'Start AI', exact: true }).click();
+  const chooser = page.getByRole('dialog', { name: 'Choose AI experience' });
+  await chooser.getByRole('button', { name: 'Start with Shelf Field Host' }).click();
+  await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
+
+  expect((await readBrowserState(page)).connections).toEqual([
+    {
+      model: 'lucy-2.5',
+      initial: {
+        prompt: savedPrompt,
+        imageName: null,
+        enhance: false,
+      },
+    },
+  ]);
+});
+
+test('image-only upload saves and preloads without starting AI, then appears in Recent after Start', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+  await openBuilder(page);
+  const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
+  await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
+    name: 'portrait.png',
+    mimeType: 'image/png',
+    buffer: REFERENCE_PNG,
+  });
+
+  await expect(dialog.getByAltText('Current uploaded character reference')).toBeVisible();
+  await expect(dialog.getByText('portrait.png', { exact: true })).toBeVisible();
+  await expect(
+    dialog.getByText('Uploaded reference — no generated preview', { exact: true }),
+  ).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Save & Use Image Only' })).toBeEnabled();
+  expect(network.referenceWorkflowCalls).toEqual(['upload']);
+  const uploaded = network.referenceImageUploads[0];
+  expect(uploaded).toBeDefined();
+
+  await dialog.getByRole('button', { name: 'Save & Use Image Only' }).click();
+  await confirmCharacterName(page, 'Portrait Coach', 'Save & Use Character');
+  await expect(dialog).toBeHidden();
+  expect((await readBrowserState(page)).connections).toEqual([]);
+
+  const beforeStart = await page.evaluate((storageKey) => {
+    const payload = localStorage.getItem(storageKey);
+    if (!payload) return null;
+    const store = JSON.parse(payload) as {
+      recentPrompts?: unknown[];
+      savedCharacterPrompts?: Array<{
+        id?: string;
+        name?: string;
+        prompt?: string;
+        referenceImageAssetId?: string | null;
+        uploadedReferenceImageAssetId?: string | null;
+        finalReferenceKind?: string | null;
+        builderDraft?: unknown;
+        guidedDesign?: unknown;
+      }>;
+    };
+    return {
+      recentCount: store.recentPrompts?.length ?? 0,
+      character: store.savedCharacterPrompts?.[0] ?? null,
+    };
+  }, CREATIVE_ASSET_STORAGE_KEY);
+  expect(beforeStart).toMatchObject({
+    recentCount: 0,
+    character: {
+      name: 'Portrait Coach',
+      prompt: '',
+      referenceImageAssetId: uploaded?.assetId,
+      uploadedReferenceImageAssetId: uploaded?.assetId,
+      finalReferenceKind: 'uploaded',
+      builderDraft: null,
+      guidedDesign: null,
+    },
+  });
+
+  await page.getByRole('button', { name: 'Dock', exact: true }).click();
+  const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
+  await expect(dock.getByLabel('Character direction')).toHaveValue('');
+  await expect(dock.getByAltText('Current persisted reference preview')).toBeVisible();
+  await expect(dock.getByRole('checkbox')).not.toBeChecked();
+  await dock.getByRole('button', { name: 'Start Character AI' }).click();
+  await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
+
+  expect((await readBrowserState(page)).connections).toEqual([
+    {
+      model: 'lucy-2.5',
+      initial: {
+        prompt: '',
+        imageName: `reference-${uploaded?.assetId}.png`,
+        enhance: false,
+      },
+    },
+  ]);
+  const recent = await page.evaluate((storageKey) => {
+    const payload = localStorage.getItem(storageKey);
+    if (!payload) return null;
+    const store = JSON.parse(payload) as {
+      recentPrompts?: Array<Record<string, unknown>>;
+    };
+    return store.recentPrompts?.[0] ?? null;
+  }, CREATIVE_ASSET_STORAGE_KEY);
+  expect(recent).toMatchObject({
+    prompt: '',
+    characterName: 'Portrait Coach',
+    referenceImageAssetId: uploaded?.assetId,
+    savedCharacterPromptId: beforeStart?.character?.id,
+  });
+
+  await dock.getByRole('button', { name: 'Stop AI' }).click();
+  await expect(dock.getByRole('button', { name: 'Start Character AI' })).toBeVisible();
+  await dock.getByRole('button', { name: 'Close panel' }).click();
+  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
+  const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
+  await shelf.getByRole('button', { name: /^Recent\b/u }).click();
+  await expect(shelf.getByText('Portrait Coach', { exact: true })).toBeVisible();
+  await expect(shelf.getByText('Image only', { exact: true })).toBeVisible();
+  await expect(shelf.getByAltText('Recent character reference')).toBeVisible();
+});
+
+test('prompt plus upload saves the uploaded source directly with enhancement off', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+  await openBuilder(page);
+  const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
+  await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
+    name: 'direct-source.png',
+    mimeType: 'image/png',
+    buffer: REFERENCE_PNG,
+  });
+  await expect(dialog.getByAltText('Current uploaded character reference')).toBeVisible();
+  await chooseDocumentaryPresenter(page);
+  await dialog.getByRole('button', { name: 'Save Character', exact: true }).click();
+  await confirmCharacterName(page, 'Direct Source Presenter');
+  await expect(dialog).toBeHidden();
+
+  expect(network.referenceWorkflowCalls).toEqual(['upload']);
+  const uploaded = network.referenceImageUploads[0];
+  const saved = await page.evaluate((storageKey) => {
+    const payload = localStorage.getItem(storageKey);
+    if (!payload) return null;
+    const store = JSON.parse(payload) as {
+      savedCharacterPrompts?: Array<Record<string, unknown>>;
+    };
+    return store.savedCharacterPrompts?.[0] ?? null;
+  }, CREATIVE_ASSET_STORAGE_KEY);
+  expect(saved).toMatchObject({
+    referenceImageAssetId: uploaded?.assetId,
+    uploadedReferenceImageAssetId: uploaded?.assetId,
+    finalReferenceKind: 'uploaded',
+  });
+
+  await page.getByRole('button', { name: 'Dock', exact: true }).click();
+  const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
+  await expect(dock.getByLabel('Character direction')).toHaveValue(
+    /Substitute the character in the video with/u,
+  );
+  await expect(dock.getByAltText('Current persisted reference preview')).toBeVisible();
+  await expect(dock.getByRole('checkbox')).not.toBeChecked();
+  expect((await readBrowserState(page)).connections).toEqual([]);
+});
+
+test('uploaded draft references restore across reload and Remove only detaches them', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+  await openBuilder(page);
+  let dialog = page.getByRole('dialog', { name: 'Build Your Character' });
+  await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
+    name: 'restorable-source.png',
+    mimeType: 'image/png',
+    buffer: REFERENCE_PNG,
+  });
+  await expect(dialog.getByAltText('Current uploaded character reference')).toBeVisible();
+  await dialog.getByRole('button', { name: 'Close character builder' }).click();
+  await expect(dialog).toBeHidden();
+
+  await page.reload();
+  await openBuilder(page);
+  dialog = page.getByRole('dialog', { name: 'Build Your Character' });
+  await expect(dialog.getByText('restorable-source.png', { exact: true })).toBeVisible();
+  await expect(dialog.getByAltText('Current uploaded character reference')).toBeVisible();
+  expect(network.referenceImageMetadataReads).toContain(
+    network.referenceImageUploads[0]?.assetId ?? '',
+  );
+
+  await dialog.getByRole('button', { name: 'Remove uploaded character reference' }).click();
+  await expect(dialog.getByAltText('Current uploaded character reference')).toHaveCount(0);
+  await expect(dialog.getByRole('button', { name: 'Save & Use Image Only' })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Close character builder' }).click();
+  await page.reload();
+  await openBuilder(page);
+  await expect(
+    page
+      .getByRole('dialog', { name: 'Build Your Character' })
+      .getByAltText('Current uploaded character reference'),
+  ).toHaveCount(0);
+  expect(network.referenceWorkflowCalls).toEqual(['upload']);
+});
+
+test('invalid device files fail accessibly before any upload request', async ({ page }) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+  await openBuilder(page);
+  const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
+  await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
+    name: 'not-an-image.txt',
+    mimeType: 'text/plain',
+    buffer: Buffer.from('not an image'),
+  });
+
+  await expect(dialog.getByRole('alert')).toContainText(/JPEG, PNG, or WebP/u);
+  await expect(dialog.getByAltText('Current uploaded character reference')).toHaveCount(0);
+  expect(network.referenceWorkflowCalls).toEqual([]);
+});
+
+test('combined preview composes from the immutable upload and preloads the generated recipe', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+  await openBuilder(page);
+  const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
+  await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
+    name: 'source.png',
+    mimeType: 'image/png',
+    buffer: REFERENCE_PNG,
+  });
+  await expect(dialog.getByAltText('Current uploaded character reference')).toBeVisible();
+  await chooseDocumentaryPresenter(page);
+
+  await dialog.getByRole('button', { name: 'Generate Combined Preview' }).click();
+  await expect(dialog.getByText('This preview matches the current character.')).toBeVisible();
+  expect(network.referenceWorkflowCalls).toEqual(['upload', 'optimize', 'compose']);
+  expect(network.referenceImageCompositions[0]).toMatchObject({
+    sourceAssetId: network.referenceImageUploads[0]?.assetId,
+  });
+
+  await dialog.getByRole('button', { name: 'Save Character', exact: true }).click();
+  await confirmCharacterName(page, 'Combined Presenter');
+  await expect(dialog).toBeHidden();
+  const composition = network.referenceImageCompositions[0];
+  const saved = await page.evaluate((storageKey) => {
+    const payload = localStorage.getItem(storageKey);
+    if (!payload) return null;
+    const store = JSON.parse(payload) as {
+      savedCharacterPrompts?: Array<Record<string, unknown>>;
+    };
+    return store.savedCharacterPrompts?.[0] ?? null;
+  }, CREATIVE_ASSET_STORAGE_KEY);
+  expect(saved).toMatchObject({
+    referenceImageAssetId: composition?.assetId,
+    uploadedReferenceImageAssetId: network.referenceImageUploads[0]?.assetId,
+    finalReferenceKind: 'generated',
+  });
+
+  await page.getByRole('button', { name: 'Dock', exact: true }).click();
+  const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
+  await expect(dock.getByLabel('Character direction')).toHaveValue(
+    network.referencePromptOptimizations[0]?.response.result.lucy25CharacterPrompt ?? '',
+  );
+  await expect(dock.getByRole('checkbox')).toBeChecked();
+  expect((await readBrowserState(page)).connections).toEqual([]);
 });
 
 test('Generate Preview always optimizes, and stale form edits detach the image from Save', async ({
@@ -221,6 +548,7 @@ test('Generate Preview always optimizes, and stale form edits detach the image f
   await expect(page.getByText(/Regenerate to attach an image/u)).toBeVisible();
   await expect(page.getByRole('button', { name: 'Save Character (prompt only)' })).toBeEnabled();
   await page.getByRole('button', { name: 'Save Character (prompt only)' }).click();
+  await confirmCharacterName(page, 'Copper Presenter');
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
 
   const savedReferenceId = await page.evaluate((storageKey) => {
@@ -249,6 +577,7 @@ test('image-backed save preserves the exact generated asset and optimized Lucy p
   expect(generated).toBeDefined();
   expect(optimized).toBeDefined();
   await page.getByRole('button', { name: 'Save Character', exact: true }).click();
+  await confirmCharacterName(page, 'Generated Presenter');
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
 
   const saved = await page.evaluate((storageKey) => {

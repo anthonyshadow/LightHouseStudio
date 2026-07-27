@@ -11,6 +11,8 @@ import {
   REFERENCE_IMAGE_MODEL_ID,
   REFERENCE_IMAGE_PROMPT_MAX_LENGTH,
   REFERENCE_IMAGE_QUALITY,
+  REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
+  REFERENCE_IMAGE_UPLOAD_MAX_PIXELS,
   referenceImageSizeSchema,
   type CharacterPromptOptimizationResult,
   type CharacterReferenceGenerator,
@@ -51,15 +53,32 @@ const internalDerivationSchema = z.discriminatedUnion('kind', [
       changeInstructionsHash: z.string().regex(/^[a-f0-9]{64}$/u),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal('compose'),
+      sourceAssetId: z.uuid(),
+    })
+    .strict(),
 ]);
 
-const storedReferenceImageMetadataSchema = z
+const storedMetadataCommonShape = {
+  schemaVersion: z.literal(REFERENCE_IMAGE_LAYOUT_VERSION),
+  assetId: z.uuid(),
+  localOwnerId: z.string().regex(/^[a-f0-9]{64}$/u),
+  storageKey: z.string().min(1),
+  mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  requestId: z.uuid(),
+  requestFingerprint: z
+    .string()
+    .regex(/^[a-f0-9]{64}$/u)
+    .optional(),
+  createdAt: z.iso.datetime({ offset: true }),
+  updatedAt: z.iso.datetime({ offset: true }).optional(),
+} as const;
+
+const storedGeneratedReferenceImageMetadataSchema = z
   .object({
-    schemaVersion: z.literal(REFERENCE_IMAGE_LAYOUT_VERSION),
-    assetId: z.uuid(),
-    localOwnerId: z.string().regex(/^[a-f0-9]{64}$/u),
-    storageKey: z.string().min(1),
-    mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+    ...storedMetadataCommonShape,
     size: referenceImageSizeSchema.optional(),
     width: z.union([z.literal(1024), z.literal(1536)]),
     height: z.union([z.literal(1024), z.literal(1536)]),
@@ -76,15 +95,8 @@ const storedReferenceImageMetadataSchema = z
     derivedPrompt: z.string().min(1).max(REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH),
     promptAudit: promptAuditSchema.optional(),
     promptHash: z.string().regex(/^[a-f0-9]{64}$/u),
-    requestId: z.uuid(),
-    requestFingerprint: z
-      .string()
-      .regex(/^[a-f0-9]{64}$/u)
-      .optional(),
     derivation: internalDerivationSchema.optional(),
     providerRequestId: z.string().min(1).max(500).optional(),
-    createdAt: z.iso.datetime({ offset: true }),
-    updatedAt: z.iso.datetime({ offset: true }).optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -100,6 +112,29 @@ const storedReferenceImageMetadataSchema = z
     }
   });
 
+const storedUploadedReferenceImageMetadataSchema = z
+  .object({
+    ...storedMetadataCommonShape,
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    byteSize: z.number().int().positive().max(REFERENCE_IMAGE_UPLOAD_MAX_BYTES),
+    source: z.literal('uploaded'),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.width * value.height > REFERENCE_IMAGE_UPLOAD_MAX_PIXELS) {
+      context.addIssue({
+        code: 'custom',
+        message: 'Stored uploaded image exceeds the decoded-pixel limit.',
+      });
+    }
+  });
+
+const storedReferenceImageMetadataSchema = z.union([
+  storedGeneratedReferenceImageMetadataSchema,
+  storedUploadedReferenceImageMetadataSchema,
+]);
+
 const idempotencyMappingSchema = z
   .object({
     schemaVersion: z.literal(REFERENCE_IMAGE_LAYOUT_VERSION),
@@ -112,10 +147,11 @@ const idempotencyMappingSchema = z
 export type StoredReferenceImageMetadata = z.infer<typeof storedReferenceImageMetadataSchema>;
 export type ReferenceImageIdempotencyMapping = z.infer<typeof idempotencyMappingSchema>;
 
-export interface StoreReferenceImageInput {
+export interface StoreGeneratedReferenceImageInput {
   readonly localOwnerId: string;
   readonly bytes: Buffer;
   readonly mimeType: ValidReferenceImageMimeType;
+  readonly source?: 'generated';
   readonly size: ReferenceImageSize;
   readonly width: 1024 | 1536;
   readonly height: 1024 | 1536;
@@ -141,9 +177,27 @@ export interface StoreReferenceImageInput {
         readonly kind: 'edit';
         readonly sourceAssetId: string;
         readonly changeInstructionsHash: string;
+      }
+    | {
+        readonly kind: 'compose';
+        readonly sourceAssetId: string;
       };
   readonly providerRequestId?: string;
 }
+
+export interface StoreUploadedReferenceImageInput {
+  readonly localOwnerId: string;
+  readonly bytes: Buffer;
+  readonly mimeType: ValidReferenceImageMimeType;
+  readonly source: 'uploaded';
+  readonly width: number;
+  readonly height: number;
+  readonly requestId: string;
+  readonly requestFingerprint: string;
+}
+
+export type StoreReferenceImageInput =
+  StoreGeneratedReferenceImageInput | StoreUploadedReferenceImageInput;
 
 export interface ReferenceImageLayout {
   readonly root: string;
@@ -223,17 +277,29 @@ export const createStoredReferenceImageMetadata = (
   input: StoreReferenceImageInput,
   assetId: string,
   timestamp: string,
-): StoredReferenceImageMetadata =>
-  storedReferenceImageMetadataSchema.parse({
+): StoredReferenceImageMetadata => {
+  const common = {
     schemaVersion: REFERENCE_IMAGE_LAYOUT_VERSION,
     assetId,
     localOwnerId: input.localOwnerId,
     storageKey: referenceImageStorageKey(assetId, input.mimeType),
     mimeType: input.mimeType,
-    size: input.size,
     width: input.width,
     height: input.height,
     byteSize: input.bytes.byteLength,
+    requestId: input.requestId,
+    ...(input.requestFingerprint === undefined
+      ? {}
+      : { requestFingerprint: input.requestFingerprint }),
+    createdAt: timestamp,
+    updatedAt: timestamp,
+  } as const;
+  if (input.source === 'uploaded') {
+    return storedReferenceImageMetadataSchema.parse({ ...common, source: 'uploaded' });
+  }
+  return storedReferenceImageMetadataSchema.parse({
+    ...common,
+    size: input.size,
     source: 'generated',
     provider: 'openai',
     model: input.model || REFERENCE_IMAGE_MODEL_ID,
@@ -242,17 +308,12 @@ export const createStoredReferenceImageMetadata = (
     derivedPrompt: input.derivedPrompt,
     promptAudit: input.promptAudit,
     promptHash: input.promptHash,
-    requestId: input.requestId,
-    ...(input.requestFingerprint === undefined
-      ? {}
-      : { requestFingerprint: input.requestFingerprint }),
     ...(input.derivation === undefined ? {} : { derivation: input.derivation }),
     ...(input.providerRequestId === undefined
       ? {}
       : { providerRequestId: input.providerRequestId }),
-    createdAt: timestamp,
-    updatedAt: timestamp,
   });
+};
 
 export const serializeStoredReferenceImageMetadata = (
   metadata: StoredReferenceImageMetadata,

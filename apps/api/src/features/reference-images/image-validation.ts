@@ -1,4 +1,9 @@
-import { REFERENCE_IMAGE_MAX_BYTES, type ReferenceImageSize } from '@studio/contracts';
+import {
+  REFERENCE_IMAGE_MAX_BYTES,
+  REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
+  REFERENCE_IMAGE_UPLOAD_MAX_PIXELS,
+  type ReferenceImageSize,
+} from '@studio/contracts';
 import sharp from 'sharp';
 
 const MAX_PROVIDER_IMAGE_BYTES = 32 * 1024 * 1024;
@@ -26,10 +31,24 @@ export interface ValidatedReferenceImage {
   readonly height: 1024 | 1536;
 }
 
+export interface ValidatedUploadedReferenceImage {
+  readonly bytes: Buffer;
+  readonly mimeType: ValidReferenceImageMimeType;
+  readonly width: number;
+  readonly height: number;
+}
+
 export class InvalidReferenceImageError extends Error {
   constructor(message: string, options?: { readonly cause?: unknown }) {
     super(message, options?.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'InvalidReferenceImageError';
+  }
+}
+
+export class InvalidReferenceImageUploadError extends Error {
+  constructor(message: string, options?: { readonly cause?: unknown }) {
+    super(message, options?.cause === undefined ? undefined : { cause: options.cause });
+    this.name = 'InvalidReferenceImageUploadError';
   }
 }
 
@@ -155,4 +174,57 @@ export const validateReferenceImage = async (
     width: dimensions.width,
     height: dimensions.height,
   };
+};
+
+export const validateUploadedReferenceImage = async (
+  bytes: Buffer,
+  declaredMimeType: ValidReferenceImageMimeType,
+): Promise<ValidatedUploadedReferenceImage> => {
+  if (bytes.byteLength === 0) {
+    throw new InvalidReferenceImageUploadError('Choose a non-empty image file.');
+  }
+  if (bytes.byteLength > REFERENCE_IMAGE_UPLOAD_MAX_BYTES) {
+    throw new InvalidReferenceImageUploadError('The image exceeds the 10 MiB upload limit.');
+  }
+
+  try {
+    const metadataImage = sharp(bytes, {
+      failOn: 'error',
+      // Header inspection is bounded by the upload byte limit. Check the declared
+      // decoded dimensions before allowing Sharp to allocate the pixel payload.
+      limitInputPixels: false,
+    });
+    const metadata = await metadataImage.metadata();
+    const mimeType = mimeTypeForFormat(metadata.format);
+    const width = metadata.width;
+    const height = metadata.height;
+    if (!width || !height || width * height > REFERENCE_IMAGE_UPLOAD_MAX_PIXELS) {
+      throw new InvalidReferenceImageUploadError(
+        'The image exceeds the 40-megapixel decoded-image limit.',
+      );
+    }
+    if (mimeType !== declaredMimeType) {
+      throw new InvalidReferenceImageUploadError(
+        'The image contents do not match the declared JPEG, PNG, or WebP media type.',
+      );
+    }
+    // Sharp stats walks the full pixel payload and rejects truncated/corrupt files.
+    await sharp(bytes, {
+      failOn: 'error',
+      limitInputPixels: REFERENCE_IMAGE_UPLOAD_MAX_PIXELS,
+    }).stats();
+    return { bytes, mimeType, width, height };
+  } catch (error) {
+    if (error instanceof InvalidReferenceImageUploadError) throw error;
+    if (error instanceof InvalidReferenceImageError) {
+      throw new InvalidReferenceImageUploadError(
+        'The file is not a decodable JPEG, PNG, or WebP image.',
+        { cause: error },
+      );
+    }
+    throw new InvalidReferenceImageUploadError(
+      'The file is not a decodable JPEG, PNG, or WebP image within the pixel limit.',
+      { cause: error },
+    );
+  }
 };

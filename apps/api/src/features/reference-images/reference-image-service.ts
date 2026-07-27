@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import {
   CHARACTER_PROMPT_OPTIMIZER_DEFAULT_VERSION,
   optimizeCharacterReferencePromptResponseSchema,
@@ -14,8 +15,17 @@ import {
   type StoredReferenceImageContent,
   type StoredReferenceImageMetadata,
 } from './asset-store.js';
-import { InvalidReferenceImageError, validateReferenceImage } from './image-validation.js';
-import { createReferenceImageEditPrompt, createPromptOptimizationInputHash } from './prompt.js';
+import {
+  InvalidReferenceImageError,
+  type ValidReferenceImageMimeType,
+  validateReferenceImage,
+  validateUploadedReferenceImage,
+} from './image-validation.js';
+import {
+  createPromptOptimizationInputHash,
+  createReferenceImageCompositionPrompt,
+  createReferenceImageEditPrompt,
+} from './prompt.js';
 import {
   CharacterPromptOptimizerError,
   type CharacterPromptOptimizer,
@@ -28,6 +38,8 @@ import { ReferenceImageGenerationStateError } from './reference-image-error.js';
 import { ReferenceImageOperationCoordinator } from './reference-image-operation-coordinator.js';
 import {
   assertMatchingRequestFingerprint,
+  type ComposeReferenceImageInput,
+  compositionRequestFingerprint,
   editRequestFingerprint,
   type EditReferenceImageInput,
   generationRequestFingerprint,
@@ -37,6 +49,22 @@ import {
   settingsMatchReferenceImageOptions,
   toReferenceImageAsset,
 } from './reference-image-preparation.js';
+
+export interface UploadReferenceImageInput {
+  readonly localOwnerId: string;
+  readonly requestId: string;
+  readonly bytes: Buffer;
+  readonly mimeType: ValidReferenceImageMimeType;
+  readonly signal?: AbortSignal;
+}
+
+const uploadRequestFingerprint = (input: UploadReferenceImageInput): string =>
+  createHash('sha256')
+    .update('upload\0', 'utf8')
+    .update(input.mimeType, 'utf8')
+    .update('\0', 'utf8')
+    .update(input.bytes)
+    .digest('hex');
 
 export class ReferenceImageService {
   readonly #provider: ReferenceImageProvider | null;
@@ -137,6 +165,35 @@ export class ReferenceImageService {
     return toReferenceImageAsset(metadata);
   }
 
+  async upload(input: UploadReferenceImageInput): Promise<ReferenceImageAsset> {
+    const requestFingerprint = uploadRequestFingerprint(input);
+    const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
+    if (persisted !== null) {
+      assertMatchingRequestFingerprint(persisted, requestFingerprint);
+      return toReferenceImageAsset(persisted);
+    }
+    const metadata = await this.#operations.runForOwner({
+      localOwnerId: input.localOwnerId,
+      requestId: input.requestId,
+      requestFingerprint,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      start: async () => {
+        const image = await validateUploadedReferenceImage(input.bytes, input.mimeType);
+        return this.#store.store({
+          localOwnerId: input.localOwnerId,
+          bytes: image.bytes,
+          mimeType: image.mimeType,
+          source: 'uploaded',
+          width: image.width,
+          height: image.height,
+          requestId: input.requestId,
+          requestFingerprint,
+        });
+      },
+    });
+    return toReferenceImageAsset(metadata);
+  }
+
   async edit(input: EditReferenceImageInput): Promise<ReferenceImageAsset> {
     const requestFingerprint = editRequestFingerprint(input);
     const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
@@ -156,6 +213,35 @@ export class ReferenceImageService {
           throw new ReferenceImageGenerationStateError('edit-not-configured');
         }
         return this.#editAndStore(
+          provider,
+          editProvider,
+          { ...input, signal: operationSignal },
+          requestFingerprint,
+        );
+      },
+    });
+    return toReferenceImageAsset(metadata);
+  }
+
+  async compose(input: ComposeReferenceImageInput): Promise<ReferenceImageAsset> {
+    const requestFingerprint = compositionRequestFingerprint(input);
+    const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
+    if (persisted !== null) {
+      assertMatchingRequestFingerprint(persisted, requestFingerprint);
+      return toReferenceImageAsset(persisted);
+    }
+    const metadata = await this.#operations.runForOwner({
+      localOwnerId: input.localOwnerId,
+      requestId: input.requestId,
+      requestFingerprint,
+      ...(input.signal === undefined ? {} : { signal: input.signal }),
+      start: (operationSignal) => {
+        const provider = this.#provider;
+        const editProvider = provider?.edit;
+        if (editProvider === undefined || provider === null) {
+          throw new ReferenceImageGenerationStateError('edit-not-configured');
+        }
+        return this.#composeAndStore(
           provider,
           editProvider,
           { ...input, signal: operationSignal },
@@ -276,6 +362,58 @@ export class ReferenceImageService {
     });
   }
 
+  async #composeAndStore(
+    provider: ReferenceImageProvider,
+    editProvider: NonNullable<ReferenceImageProvider['edit']>,
+    input: ComposeReferenceImageInput,
+    requestFingerprint: string,
+  ): Promise<StoredReferenceImageMetadata> {
+    const source = await this.#store.getContent(input.localOwnerId, input.sourceAssetId);
+    if (source === null) {
+      throw new ReferenceImageGenerationStateError('source-asset-not-found');
+    }
+    const prepared = prepareReferenceImageGeneration(input, {
+      optimizer: this.#optimizer,
+      optimizerVersion: this.#optimizerVersion,
+      imageQuality: this.#imageQuality,
+    });
+    let composed: Awaited<ReturnType<NonNullable<ReferenceImageProvider['edit']>>>;
+    try {
+      composed = await editProvider.call(provider, {
+        prompt: createReferenceImageCompositionPrompt(prepared.prompt),
+        size: prepared.size,
+        format: prepared.format,
+        source: { bytes: source.bytes, mimeType: source.metadata.mimeType },
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
+      });
+    } catch (error) {
+      if (error instanceof ReferenceImageProviderError) throw error;
+      throw new ReferenceImageProviderError('failure', { cause: error });
+    }
+
+    const image = await validateReferenceImage(composed.base64, prepared.size);
+    return this.#store.store({
+      localOwnerId: input.localOwnerId,
+      bytes: image.bytes,
+      mimeType: image.mimeType,
+      size: prepared.size,
+      width: image.width,
+      height: image.height,
+      model: this.#imageModel,
+      quality: this.#imageQuality,
+      originalPrompt: input.rawPrompt,
+      derivedPrompt: prepared.prompt,
+      promptAudit: prepared.promptAudit,
+      promptHash: prepared.promptHash,
+      requestId: input.requestId,
+      requestFingerprint,
+      derivation: { kind: 'compose', sourceAssetId: input.sourceAssetId },
+      ...(composed.providerRequestId === undefined
+        ? {}
+        : { providerRequestId: composed.providerRequestId }),
+    });
+  }
+
   async getMetadata(localOwnerId: string, assetId: string): Promise<ReferenceImageAsset | null> {
     const metadata = await this.#store.getMetadata(localOwnerId, assetId);
     return metadata === null ? null : toReferenceImageAsset(metadata);
@@ -292,6 +430,7 @@ export {
   type ReferenceImageGenerationStateErrorReason,
 } from './reference-image-error.js';
 export type {
+  ComposeReferenceImageInput,
   EditReferenceImageInput,
   GenerateReferenceImageInput,
 } from './reference-image-preparation.js';

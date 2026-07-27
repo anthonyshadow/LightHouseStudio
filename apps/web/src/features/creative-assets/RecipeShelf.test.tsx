@@ -200,6 +200,14 @@ describe('RecipeShelf', () => {
       'src',
       expect.stringContaining('/api/reference-images/character-reference-1/content'),
     );
+    await user.click(screen.getByRole('button', { name: 'Use Orbital cartographer' }));
+    expect(onUsePrompt).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        origin: 'character-prompt',
+        characterName: 'Orbital cartographer',
+        referenceImageAssetId: 'character-reference-1',
+      }),
+    );
   });
 
   it('derives tag filters from local recipes and exposes an accessible selected-card state', async () => {
