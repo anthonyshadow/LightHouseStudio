@@ -91,6 +91,7 @@ export type CharacterBuilderAction =
       type: 'optimization-succeeded';
       operationId: string;
       optimization: OptimizeCharacterReferencePromptResponse;
+      sourceKey: string;
       optimizationKey: string;
     }
   | {
@@ -269,7 +270,7 @@ export const characterBuilderReducer = (
       }
       return { ...state, phase: action.phase, operation: action.operation, error: null };
     case 'optimization-succeeded':
-      if (!matchesOperation(state, action.operationId, action.optimizationKey)) return state;
+      if (!matchesOperation(state, action.operationId, action.sourceKey)) return state;
       return {
         ...state,
         optimization: action.optimization,

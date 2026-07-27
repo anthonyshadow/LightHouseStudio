@@ -664,6 +664,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
             workshopReferenceImage,
             referenceGeneration,
             referenceImagesAvailable: Boolean(availability.referenceImages),
+            referenceImageProvider: availability.referenceImageProvider ?? null,
             referenceImageModel: availability.referenceImageModel ?? null,
             optimizerModel: availability.referenceImageOptimizerModel ?? null,
             optimizerVersion: availability.referenceImageOptimizerVersion ?? null,

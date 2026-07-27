@@ -30,6 +30,7 @@ describe('API shell', () => {
       referenceImages: {
         available: false,
         editAvailable: false,
+        providerId: 'openai',
         modelId: 'gpt-image-2',
         sizes: ['1024x1024', '1024x1536', '1536x1024'],
         quality: 'high',
@@ -55,6 +56,51 @@ describe('API shell', () => {
       config.openAiPromptOptimizerTimeoutMs + OPENAI_CONNECTION_TIMEOUT_MARGIN_MS,
     );
     expect(app.server.requestTimeout).toBe(100_000);
+  });
+
+  it('reports the selected BFL image provider while keeping OpenAI optimization independent', async () => {
+    const app = createApp({
+      config: testConfig({
+        referenceImageProvider: 'bfl',
+        bflApiKey: 'bfl-secret',
+        openAiApiKey: 'optimizer-secret',
+      }),
+    });
+    apps.push(app);
+
+    const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
+
+    expect(capabilities.json()).toMatchObject({
+      referenceImages: {
+        available: true,
+        editAvailable: true,
+        providerId: 'bfl',
+        modelId: 'flux-2-pro',
+        optimizer: { available: true, model: 'gpt-5.6' },
+      },
+    });
+  });
+
+  it('does not fall back to OpenAI images when selected BFL credentials are missing', async () => {
+    const app = createApp({
+      config: testConfig({
+        referenceImageProvider: 'bfl',
+        openAiApiKey: 'optimizer-secret',
+      }),
+    });
+    apps.push(app);
+
+    const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
+
+    expect(capabilities.json()).toMatchObject({
+      referenceImages: {
+        available: false,
+        editAvailable: false,
+        providerId: 'bfl',
+        modelId: 'flux-2-pro',
+        optimizer: { available: true },
+      },
+    });
   });
 
   it('returns consistent JSON for unknown routes and parser errors', async () => {

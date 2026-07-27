@@ -5,8 +5,8 @@ import {
   type ReferenceImageSize,
 } from '@studio/contracts';
 import sharp from 'sharp';
+import { MAX_PROVIDER_IMAGE_BYTES } from '../../providers/reference-images/reference-image-provider.js';
 
-const MAX_PROVIDER_IMAGE_BYTES = 32 * 1024 * 1024;
 const MAX_EDGE_LENGTH = 1536;
 
 const dimensionsForSize = (
@@ -138,12 +138,21 @@ const inspectImage = async (
   }
 };
 
-export const validateReferenceImage = async (
-  encoded: string,
+export const validateReferenceImageBytes = async (
+  providerBytes: Uint8Array,
   expectedSize: ReferenceImageSize = '1024x1024',
+  declaredMimeType?: ValidReferenceImageMimeType,
 ): Promise<ValidatedReferenceImage> => {
-  let bytes = decodeStrictBase64(encoded);
+  let bytes = Buffer.from(providerBytes);
+  if (bytes.byteLength === 0 || bytes.byteLength > MAX_PROVIDER_IMAGE_BYTES) {
+    throw new InvalidReferenceImageError('The provider image exceeds the raw response limit.');
+  }
   let inspected = await inspectImage(bytes, expectedSize);
+  if (declaredMimeType !== undefined && inspected.mimeType !== declaredMimeType) {
+    throw new InvalidReferenceImageError(
+      'The provider image contents do not match the declared media type.',
+    );
+  }
 
   if (bytes.byteLength >= REFERENCE_IMAGE_MAX_BYTES) {
     try {
@@ -175,6 +184,12 @@ export const validateReferenceImage = async (
     height: dimensions.height,
   };
 };
+
+export const validateReferenceImage = async (
+  encoded: string,
+  expectedSize: ReferenceImageSize = '1024x1024',
+): Promise<ValidatedReferenceImage> =>
+  validateReferenceImageBytes(decodeStrictBase64(encoded), expectedSize);
 
 export const validateUploadedReferenceImage = async (
   bytes: Buffer,

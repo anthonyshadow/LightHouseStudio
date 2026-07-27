@@ -53,6 +53,7 @@ describe('health and capabilities contracts', () => {
         referenceImages: {
           available: true,
           editAvailable: true,
+          providerId: 'openai',
           modelId: 'gpt-image-2',
           sizes: ['1024x1024', '1024x1536', '1536x1024'],
           quality: 'high',
@@ -69,6 +70,7 @@ describe('health and capabilities contracts', () => {
       referenceImages: {
         available: true,
         editAvailable: true,
+        providerId: 'openai',
         modelId: 'gpt-image-2',
         sizes: ['1024x1024', '1024x1536', '1536x1024'],
         quality: 'high',
@@ -86,6 +88,7 @@ describe('health and capabilities contracts', () => {
         referenceImages: {
           available: false,
           editAvailable: false,
+          providerId: 'openai',
           modelId: 'gpt-image-2',
           sizes: ['1024x1024', '1024x1536', '1536x1024'],
           quality: 'high',
@@ -307,6 +310,13 @@ describe('reference image contracts', () => {
     expect(
       referenceImageAssetSchema.parse({
         ...metadata,
+        provider: 'bfl',
+        model: 'flux-2-pro',
+      }),
+    ).toMatchObject({ provider: 'bfl', model: 'flux-2-pro' });
+    expect(
+      referenceImageAssetSchema.parse({
+        ...metadata,
         derivation: {
           kind: 'edit',
           sourceAssetId: '7bf5e842-3cfe-4c5d-b945-a6ead02a3f01',
@@ -322,6 +332,12 @@ describe('reference image contracts', () => {
     expect(
       referenceImageAssetSchema.safeParse({ ...metadata, providerRequestId: 'private-request' })
         .success,
+    ).toBe(false);
+    expect(
+      referenceImageAssetSchema.safeParse({
+        ...metadata,
+        providerSettings: { safetyTolerance: 4 },
+      }).success,
     ).toBe(false);
     expect(
       referenceImageAssetSchema.safeParse({

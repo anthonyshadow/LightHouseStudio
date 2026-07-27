@@ -67,6 +67,7 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
             referenceImages: {
               available: false,
               editAvailable: false,
+              providerId: 'openai',
               modelId: 'gpt-image-2',
               sizes: ['1024x1024', '1024x1536', '1536x1024'],
               quality: 'high',

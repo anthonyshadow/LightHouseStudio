@@ -41,10 +41,14 @@ detaches the draft relationship but does not delete the stored asset.
 Prompt-only, prompt+uploaded-image, and **Save & Use Image Only** paths make no
 OpenAI optimizer or image-model request.
 
-**Generate Preview** always performs two phases:
+The first **Generate Preview** attempt performs two phases:
 
 1. Optimize the current structured direction.
 2. Generate a new immutable reference asset from that optimized prompt.
+
+If optimization succeeds but image generation fails, selecting **Generate Preview**
+again reuses the successful optimization while the normalized raw direction and
+reference options remain unchanged. Editing either input requires a new optimization.
 
 When an upload is attached, **Generate Combined Preview** replaces that action:
 it optimizes the current structured direction and sends the owner-scoped source

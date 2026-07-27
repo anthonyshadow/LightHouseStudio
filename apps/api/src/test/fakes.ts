@@ -25,6 +25,11 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   openAiPromptOptimizerTimeoutMs: 1_000,
   openAiReferenceImageModel: 'gpt-image-2',
   openAiReferenceImageQuality: 'high',
+  referenceImageProvider: 'openai',
+  bflReferenceImageModel: 'flux-2-pro',
+  bflSafetyTolerance: 4,
+  bflDisablePromptUpsampling: true,
+  bflReferenceImageTimeoutMs: 1_000,
   lightframeDataDir: './.lightframe-data-test',
   ...overrides,
 });

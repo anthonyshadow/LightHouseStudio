@@ -1,11 +1,25 @@
 import OpenAI, { toFile, type Uploadable } from 'openai';
 import type { ImagesResponse } from 'openai/resources/images';
+import { REFERENCE_IMAGE_MODEL_ID, REFERENCE_IMAGE_QUALITY } from '@studio/contracts';
 import {
-  REFERENCE_IMAGE_MODEL_ID,
-  REFERENCE_IMAGE_QUALITY,
-  type CharacterPromptOptimizationResult,
-} from '@studio/contracts';
+  decodeProviderBase64,
+  mimeTypeForReferenceImageFormat,
+  type EditReferenceImageProviderInput,
+  type GenerateReferenceImageProviderInput,
+  type GeneratedReferenceImagePayload,
+  type ReferenceImageProvider,
+  ReferenceImageProviderError,
+} from '../reference-images/reference-image-provider.js';
 import { classifyOpenAITransportFailure, openAIUpstreamStatus } from './transport-error.js';
+
+export {
+  type EditReferenceImageProviderInput,
+  type GenerateReferenceImageProviderInput,
+  type GeneratedReferenceImagePayload,
+  type ReferenceImageProvider,
+  type ReferenceImageProviderFailureReason,
+  ReferenceImageProviderError,
+} from '../reference-images/reference-image-provider.js';
 
 export const OPENAI_REFERENCE_IMAGE_MODEL = REFERENCE_IMAGE_MODEL_ID;
 export const OPENAI_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
@@ -20,58 +34,6 @@ export const OPENAI_REFERENCE_IMAGE_PARAMETERS = {
   background: 'opaque',
   moderation: 'low',
 } as const;
-
-export interface GeneratedReferenceImagePayload {
-  readonly base64: string;
-  readonly providerRequestId?: string;
-}
-
-export interface GenerateReferenceImageProviderInput {
-  readonly prompt: string;
-  readonly size: CharacterPromptOptimizationResult['recommendedSettings']['size'];
-  readonly format: CharacterPromptOptimizationResult['recommendedSettings']['format'];
-  readonly signal?: AbortSignal;
-}
-
-export interface EditReferenceImageProviderInput extends GenerateReferenceImageProviderInput {
-  readonly source: {
-    readonly bytes: Uint8Array;
-    readonly mimeType: 'image/jpeg' | 'image/png' | 'image/webp';
-  };
-}
-
-export interface ReferenceImageProvider {
-  generate: (input: GenerateReferenceImageProviderInput) => Promise<GeneratedReferenceImagePayload>;
-  edit?: (input: EditReferenceImageProviderInput) => Promise<GeneratedReferenceImagePayload>;
-}
-
-export type ReferenceImageProviderFailureReason =
-  | 'authentication'
-  | 'aborted'
-  | 'configuration'
-  | 'connection'
-  | 'failure'
-  | 'invalid-response'
-  | 'moderation'
-  | 'rate-limit'
-  | 'timeout';
-
-export class ReferenceImageProviderError extends Error {
-  readonly reason: ReferenceImageProviderFailureReason;
-  readonly upstreamStatus?: number;
-
-  constructor(
-    reason: ReferenceImageProviderFailureReason,
-    options?: { readonly upstreamStatus?: number; readonly cause?: unknown },
-  ) {
-    super(`OpenAI reference image request failed: ${reason}`, {
-      cause: options?.cause,
-    });
-    this.name = 'ReferenceImageProviderError';
-    this.reason = reason;
-    if (options?.upstreamStatus !== undefined) this.upstreamStatus = options.upstreamStatus;
-  }
-}
 
 interface OpenAIImageClient {
   readonly images: {
@@ -141,7 +103,11 @@ const extensionForMimeType = (
   return 'jpg';
 };
 
-const imagePayload = (response: ImagesResponse): GeneratedReferenceImagePayload => {
+const imagePayload = (
+  response: ImagesResponse,
+  format: GenerateReferenceImageProviderInput['format'],
+  modelId: string,
+): GeneratedReferenceImagePayload => {
   const base64 = response.data?.[0]?.b64_json;
   if (typeof base64 !== 'string' || base64.length === 0) {
     throw new ReferenceImageProviderError('invalid-response');
@@ -149,7 +115,10 @@ const imagePayload = (response: ImagesResponse): GeneratedReferenceImagePayload 
   const providerRequestId = (response as ImagesResponse & { readonly _request_id?: unknown })
     ._request_id;
   return {
-    base64,
+    bytes: decodeProviderBase64(base64, 'openai'),
+    mimeType: mimeTypeForReferenceImageFormat(format),
+    providerId: 'openai',
+    modelId,
     ...(typeof providerRequestId === 'string' && providerRequestId.length > 0
       ? { providerRequestId }
       : {}),
@@ -157,6 +126,7 @@ const imagePayload = (response: ImagesResponse): GeneratedReferenceImagePayload 
 };
 
 export class OpenAIReferenceImageProvider implements ReferenceImageProvider {
+  readonly descriptor;
   readonly #client: OpenAIImageClient;
   readonly #model: string;
   readonly #quality: 'high' | 'medium';
@@ -172,6 +142,17 @@ export class OpenAIReferenceImageProvider implements ReferenceImageProvider {
   ) {
     this.#model = options.model ?? OPENAI_REFERENCE_IMAGE_MODEL;
     this.#quality = options.quality ?? REFERENCE_IMAGE_QUALITY;
+    this.descriptor = {
+      providerId: 'openai' as const,
+      modelId: this.#model,
+      adapterVersion: 'openai-gpt-image-v1',
+      effectiveSettings: {
+        quality: this.#quality,
+        background: OPENAI_REFERENCE_IMAGE_PARAMETERS.background,
+        moderation: OPENAI_REFERENCE_IMAGE_PARAMETERS.moderation,
+        outputCompression: OPENAI_REFERENCE_IMAGE_PARAMETERS.output_compression,
+      },
+    };
     this.#client = clientFactory({
       apiKey,
       maxRetries: 0,
@@ -201,7 +182,7 @@ export class OpenAIReferenceImageProvider implements ReferenceImageProvider {
         input.signal === undefined
           ? await this.#client.images.generate(request)
           : await this.#client.images.generate(request, { signal: input.signal });
-      return imagePayload(response);
+      return imagePayload(response, input.format, this.#model);
     } catch (error) {
       throw normalizeOpenAIError(error);
     }
@@ -234,7 +215,7 @@ export class OpenAIReferenceImageProvider implements ReferenceImageProvider {
         input.signal === undefined
           ? await edit(request)
           : await edit(request, { signal: input.signal });
-      return imagePayload(response);
+      return imagePayload(response, input.format, this.#model);
     } catch (error) {
       throw normalizeOpenAIError(error);
     }

@@ -1,7 +1,8 @@
 import type { OptimizeCharacterReferencePromptResponse } from '@studio/contracts';
 import { createSharedOperation, type SharedOperation } from '../../application/shared-operation.js';
 import { CharacterPromptOptimizerError } from '../../providers/openai/character-prompt-optimizer.js';
-import { ReferenceImageProviderError } from '../../providers/openai/reference-image-provider.js';
+import { ReferenceImageProviderError } from '../../providers/reference-images/reference-image-provider.js';
+import type { ReferenceImageProviderId } from '../../providers/reference-images/reference-image-provider.js';
 import type { StoredReferenceImageMetadata } from './asset-store.js';
 import { ReferenceImageGenerationStateError } from './reference-image-error.js';
 
@@ -44,6 +45,7 @@ export class ReferenceImageOperationCoordinator {
     readonly localOwnerId: string;
     readonly requestId: string;
     readonly requestFingerprint: string;
+    readonly providerId?: ReferenceImageProviderId;
     readonly signal?: AbortSignal;
     readonly start: (signal: AbortSignal) => Promise<StoredReferenceImageMetadata>;
   }): Promise<StoredReferenceImageMetadata> {
@@ -60,7 +62,10 @@ export class ReferenceImageOperationCoordinator {
       }
       return active.operation.subscribe(
         input.signal,
-        () => new ReferenceImageProviderError('aborted'),
+        () =>
+          new ReferenceImageProviderError('aborted', {
+            ...(input.providerId === undefined ? {} : { providerId: input.providerId }),
+          }),
       );
     }
 
@@ -76,6 +81,12 @@ export class ReferenceImageOperationCoordinator {
       }
     };
     void operation.result.then(release, release);
-    return operation.subscribe(input.signal, () => new ReferenceImageProviderError('aborted'));
+    return operation.subscribe(
+      input.signal,
+      () =>
+        new ReferenceImageProviderError('aborted', {
+          ...(input.providerId === undefined ? {} : { providerId: input.providerId }),
+        }),
+    );
   }
 }

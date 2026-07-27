@@ -66,6 +66,7 @@ export type CreativeWorkspaceState = {
   workshopReferenceImage: WorkshopReferenceImage | null;
   referenceGeneration: ReferenceGenerationState;
   referenceImagesAvailable: boolean;
+  referenceImageProvider?: 'openai' | 'bfl' | null;
   referenceImageModel?: string | null;
   optimizerModel: string | null;
   optimizerVersion: string | null;
@@ -133,6 +134,7 @@ export type CreativePanelContentProps = Pick<
   | 'workshopReferenceImage'
   | 'referenceGeneration'
   | 'referenceImagesAvailable'
+  | 'referenceImageProvider'
   | 'referenceImageModel'
   | 'optimizerModel'
   | 'optimizerVersion'
@@ -171,6 +173,7 @@ export const CreativePanelContent = ({
   workshopReferenceImage,
   referenceGeneration,
   referenceImagesAvailable,
+  referenceImageProvider = null,
   referenceImageModel = null,
   optimizerModel,
   optimizerVersion,
@@ -216,6 +219,7 @@ export const CreativePanelContent = ({
             generatedReferenceImage={workshopReferenceImage}
             referenceGeneration={referenceGeneration}
             referenceImagesAvailable={referenceImagesAvailable}
+            referenceImageProvider={referenceImageProvider}
             referenceImageModel={referenceImageModel}
             optimizerModel={optimizerModel}
             optimizerVersion={optimizerVersion}
@@ -314,6 +318,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     workshopReferenceImage,
     referenceGeneration,
     referenceImagesAvailable,
+    referenceImageProvider = null,
     referenceImageModel = null,
     optimizerModel,
     optimizerVersion,
@@ -442,6 +447,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
             workshopReferenceImage={workshopReferenceImage}
             referenceGeneration={referenceGeneration}
             referenceImagesAvailable={referenceImagesAvailable}
+            referenceImageProvider={referenceImageProvider}
             referenceImageModel={referenceImageModel}
             optimizerModel={optimizerModel}
             optimizerVersion={optimizerVersion}

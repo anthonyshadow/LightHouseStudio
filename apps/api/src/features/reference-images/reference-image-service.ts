@@ -18,7 +18,7 @@ import {
 import {
   InvalidReferenceImageError,
   type ValidReferenceImageMimeType,
-  validateReferenceImage,
+  validateReferenceImageBytes,
   validateUploadedReferenceImage,
 } from './image-validation.js';
 import {
@@ -31,9 +31,11 @@ import {
   type CharacterPromptOptimizer,
 } from '../../providers/openai/character-prompt-optimizer.js';
 import {
+  type GeneratedReferenceImagePayload,
   type ReferenceImageProvider,
+  type ReferenceImageProviderDescriptor,
   ReferenceImageProviderError,
-} from '../../providers/openai/reference-image-provider.js';
+} from '../../providers/reference-images/reference-image-provider.js';
 import { ReferenceImageGenerationStateError } from './reference-image-error.js';
 import { ReferenceImageOperationCoordinator } from './reference-image-operation-coordinator.js';
 import {
@@ -70,6 +72,7 @@ export class ReferenceImageService {
   readonly #provider: ReferenceImageProvider | null;
   readonly #optimizer: CharacterPromptOptimizer | null;
   readonly #store: ReferenceImageAssetStore;
+  readonly #providerDescriptor: ReferenceImageProviderDescriptor;
   readonly #imageModel: string;
   readonly #imageQuality: 'high' | 'medium';
   readonly #optimizerVersion: string;
@@ -80,6 +83,7 @@ export class ReferenceImageService {
     store: ReferenceImageAssetStore,
     options: {
       readonly optimizer?: CharacterPromptOptimizer | null;
+      readonly providerDescriptor?: ReferenceImageProviderDescriptor;
       readonly imageModel?: string;
       readonly imageQuality?: 'high' | 'medium';
       readonly optimizerVersion?: string;
@@ -90,6 +94,13 @@ export class ReferenceImageService {
     this.#store = store;
     this.#imageModel = options.imageModel ?? REFERENCE_IMAGE_MODEL_ID;
     this.#imageQuality = options.imageQuality ?? REFERENCE_IMAGE_QUALITY;
+    this.#providerDescriptor = provider?.descriptor ??
+      options.providerDescriptor ?? {
+        providerId: 'openai',
+        modelId: this.#imageModel,
+        adapterVersion: 'legacy-injected-v1',
+        effectiveSettings: { quality: this.#imageQuality },
+      };
     this.#optimizerVersion =
       options.optimizerVersion ??
       this.#optimizer?.version ??
@@ -139,16 +150,21 @@ export class ReferenceImageService {
   }
 
   async generate(input: GenerateReferenceImageInput): Promise<ReferenceImageAsset> {
-    const requestFingerprint = generationRequestFingerprint(input);
+    const requestFingerprint = generationRequestFingerprint(input, this.#providerDescriptor);
+    const legacyFingerprint = generationRequestFingerprint(input);
     const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
     if (persisted !== null) {
-      assertMatchingRequestFingerprint(persisted, requestFingerprint);
+      assertMatchingRequestFingerprint(persisted, requestFingerprint, {
+        legacyFingerprint,
+        descriptor: this.#providerDescriptor,
+      });
       return toReferenceImageAsset(persisted);
     }
     const metadata = await this.#operations.runForOwner({
       localOwnerId: input.localOwnerId,
       requestId: input.requestId,
       requestFingerprint,
+      providerId: this.#providerDescriptor.providerId,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       start: (operationSignal) => {
         const provider = this.#provider;
@@ -195,16 +211,21 @@ export class ReferenceImageService {
   }
 
   async edit(input: EditReferenceImageInput): Promise<ReferenceImageAsset> {
-    const requestFingerprint = editRequestFingerprint(input);
+    const requestFingerprint = editRequestFingerprint(input, this.#providerDescriptor);
+    const legacyFingerprint = editRequestFingerprint(input);
     const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
     if (persisted !== null) {
-      assertMatchingRequestFingerprint(persisted, requestFingerprint);
+      assertMatchingRequestFingerprint(persisted, requestFingerprint, {
+        legacyFingerprint,
+        descriptor: this.#providerDescriptor,
+      });
       return toReferenceImageAsset(persisted);
     }
     const metadata = await this.#operations.runForOwner({
       localOwnerId: input.localOwnerId,
       requestId: input.requestId,
       requestFingerprint,
+      providerId: this.#providerDescriptor.providerId,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       start: (operationSignal) => {
         const provider = this.#provider;
@@ -224,16 +245,21 @@ export class ReferenceImageService {
   }
 
   async compose(input: ComposeReferenceImageInput): Promise<ReferenceImageAsset> {
-    const requestFingerprint = compositionRequestFingerprint(input);
+    const requestFingerprint = compositionRequestFingerprint(input, this.#providerDescriptor);
+    const legacyFingerprint = compositionRequestFingerprint(input);
     const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
     if (persisted !== null) {
-      assertMatchingRequestFingerprint(persisted, requestFingerprint);
+      assertMatchingRequestFingerprint(persisted, requestFingerprint, {
+        legacyFingerprint,
+        descriptor: this.#providerDescriptor,
+      });
       return toReferenceImageAsset(persisted);
     }
     const metadata = await this.#operations.runForOwner({
       localOwnerId: input.localOwnerId,
       requestId: input.requestId,
       requestFingerprint,
+      providerId: this.#providerDescriptor.providerId,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
       start: (operationSignal) => {
         const provider = this.#provider;
@@ -262,19 +288,20 @@ export class ReferenceImageService {
       optimizerVersion: this.#optimizerVersion,
       imageQuality: this.#imageQuality,
     });
-    let generated: Awaited<ReturnType<ReferenceImageProvider['generate']>>;
-    try {
-      generated = await provider.generate({
+    const generated = await this.#callProvider(() =>
+      provider.generate({
         prompt: prepared.prompt,
         size: prepared.size,
         format: prepared.format,
         ...(input.signal === undefined ? {} : { signal: input.signal }),
-      });
-    } catch (error) {
-      if (error instanceof ReferenceImageProviderError) throw error;
-      throw new ReferenceImageProviderError('failure', { cause: error });
-    }
-    const image = await validateReferenceImage(generated.base64, prepared.size);
+      }),
+    );
+    this.#assertProviderResultMatchesSelection(generated);
+    const image = await validateReferenceImageBytes(
+      generated.bytes,
+      prepared.size,
+      generated.mimeType,
+    );
     return this.#store.store({
       localOwnerId: input.localOwnerId,
       bytes: image.bytes,
@@ -282,7 +309,8 @@ export class ReferenceImageService {
       size: prepared.size,
       width: image.width,
       height: image.height,
-      model: this.#imageModel,
+      provider: generated.providerId,
+      model: generated.modelId,
       quality: this.#imageQuality,
       originalPrompt: input.rawPrompt,
       derivedPrompt: prepared.prompt,
@@ -290,10 +318,12 @@ export class ReferenceImageService {
       promptHash: prepared.promptHash,
       requestId: input.requestId,
       requestFingerprint,
+      requestFingerprintVersion: 2,
       derivation: { kind: 'generate' },
       ...(generated.providerRequestId === undefined
         ? {}
         : { providerRequestId: generated.providerRequestId }),
+      ...this.#storedProviderAudit(generated.safeUsage),
     });
   }
 
@@ -317,9 +347,8 @@ export class ReferenceImageService {
       prepared.prompt,
       input.changeInstructions,
     );
-    let edited: Awaited<ReturnType<NonNullable<ReferenceImageProvider['edit']>>>;
-    try {
-      edited = await editProvider.call(provider, {
+    const edited = await this.#callProvider(() =>
+      editProvider.call(provider, {
         prompt: providerPrompt,
         size: prepared.size,
         format: prepared.format,
@@ -328,13 +357,11 @@ export class ReferenceImageService {
           mimeType: source.metadata.mimeType,
         },
         ...(input.signal === undefined ? {} : { signal: input.signal }),
-      });
-    } catch (error) {
-      if (error instanceof ReferenceImageProviderError) throw error;
-      throw new ReferenceImageProviderError('failure', { cause: error });
-    }
+      }),
+    );
 
-    const image = await validateReferenceImage(edited.base64, prepared.size);
+    this.#assertProviderResultMatchesSelection(edited);
+    const image = await validateReferenceImageBytes(edited.bytes, prepared.size, edited.mimeType);
     return this.#store.store({
       localOwnerId: input.localOwnerId,
       bytes: image.bytes,
@@ -342,7 +369,8 @@ export class ReferenceImageService {
       size: prepared.size,
       width: image.width,
       height: image.height,
-      model: this.#imageModel,
+      provider: edited.providerId,
+      model: edited.modelId,
       quality: this.#imageQuality,
       originalPrompt: input.rawPrompt,
       // The provider-only prompt contains the raw requested change and must not be persisted.
@@ -351,6 +379,7 @@ export class ReferenceImageService {
       promptHash: prepared.promptHash,
       requestId: input.requestId,
       requestFingerprint,
+      requestFingerprintVersion: 2,
       derivation: {
         kind: 'edit',
         sourceAssetId: input.sourceAssetId,
@@ -359,6 +388,7 @@ export class ReferenceImageService {
       ...(edited.providerRequestId === undefined
         ? {}
         : { providerRequestId: edited.providerRequestId }),
+      ...this.#storedProviderAudit(edited.safeUsage),
     });
   }
 
@@ -377,21 +407,22 @@ export class ReferenceImageService {
       optimizerVersion: this.#optimizerVersion,
       imageQuality: this.#imageQuality,
     });
-    let composed: Awaited<ReturnType<NonNullable<ReferenceImageProvider['edit']>>>;
-    try {
-      composed = await editProvider.call(provider, {
+    const composed = await this.#callProvider(() =>
+      editProvider.call(provider, {
         prompt: createReferenceImageCompositionPrompt(prepared.prompt),
         size: prepared.size,
         format: prepared.format,
         source: { bytes: source.bytes, mimeType: source.metadata.mimeType },
         ...(input.signal === undefined ? {} : { signal: input.signal }),
-      });
-    } catch (error) {
-      if (error instanceof ReferenceImageProviderError) throw error;
-      throw new ReferenceImageProviderError('failure', { cause: error });
-    }
+      }),
+    );
 
-    const image = await validateReferenceImage(composed.base64, prepared.size);
+    this.#assertProviderResultMatchesSelection(composed);
+    const image = await validateReferenceImageBytes(
+      composed.bytes,
+      prepared.size,
+      composed.mimeType,
+    );
     return this.#store.store({
       localOwnerId: input.localOwnerId,
       bytes: image.bytes,
@@ -399,7 +430,8 @@ export class ReferenceImageService {
       size: prepared.size,
       width: image.width,
       height: image.height,
-      model: this.#imageModel,
+      provider: composed.providerId,
+      model: composed.modelId,
       quality: this.#imageQuality,
       originalPrompt: input.rawPrompt,
       derivedPrompt: prepared.prompt,
@@ -407,11 +439,72 @@ export class ReferenceImageService {
       promptHash: prepared.promptHash,
       requestId: input.requestId,
       requestFingerprint,
+      requestFingerprintVersion: 2,
       derivation: { kind: 'compose', sourceAssetId: input.sourceAssetId },
       ...(composed.providerRequestId === undefined
         ? {}
         : { providerRequestId: composed.providerRequestId }),
+      ...this.#storedProviderAudit(composed.safeUsage),
     });
+  }
+
+  async #callProvider<Result>(request: () => Promise<Result>): Promise<Result> {
+    try {
+      return await request();
+    } catch (error) {
+      if (error instanceof ReferenceImageProviderError) throw error;
+      throw new ReferenceImageProviderError('failure', {
+        providerId: this.#providerDescriptor.providerId,
+        cause: error,
+      });
+    }
+  }
+
+  #assertProviderResultMatchesSelection(result: GeneratedReferenceImagePayload): void {
+    if (
+      result.providerId !== this.#providerDescriptor.providerId ||
+      result.modelId !== this.#providerDescriptor.modelId
+    ) {
+      throw new ReferenceImageProviderError('invalid-response', {
+        providerId: this.#providerDescriptor.providerId,
+        ...(result.providerRequestId === undefined
+          ? {}
+          : { providerRequestId: result.providerRequestId }),
+      });
+    }
+  }
+
+  #storedProviderAudit(safeUsage: Readonly<Record<string, number>> | undefined): {
+    readonly providerSettings?: {
+      readonly safetyTolerance: number;
+      readonly disablePromptUpsampling: boolean;
+    };
+    readonly providerUsage?: {
+      readonly cost?: number;
+      readonly inputMegapixels?: number;
+      readonly outputMegapixels?: number;
+    };
+  } {
+    if (this.#providerDescriptor.providerId !== 'bfl') return {};
+    const safetyTolerance = this.#providerDescriptor.effectiveSettings.safetyTolerance;
+    const disablePromptUpsampling =
+      this.#providerDescriptor.effectiveSettings.disablePromptUpsampling;
+    if (typeof safetyTolerance !== 'number' || typeof disablePromptUpsampling !== 'boolean') {
+      throw new ReferenceImageProviderError('configuration', { providerId: 'bfl' });
+    }
+    const providerUsage = {
+      ...(typeof safeUsage?.cost === 'number' ? { cost: safeUsage.cost } : {}),
+      ...(typeof safeUsage?.inputMegapixels === 'number'
+        ? { inputMegapixels: safeUsage.inputMegapixels }
+        : {}),
+      ...(typeof safeUsage?.outputMegapixels === 'number'
+        ? { outputMegapixels: safeUsage.outputMegapixels }
+        : {}),
+    };
+    return {
+      providerSettings: { safetyTolerance, disablePromptUpsampling },
+      ...(Object.keys(providerUsage).length === 0 ? {} : { providerUsage }),
+    };
   }
 
   async getMetadata(localOwnerId: string, assetId: string): Promise<ReferenceImageAsset | null> {

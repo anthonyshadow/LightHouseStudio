@@ -29,7 +29,7 @@ export const translateReferenceImageError: ErrorTranslator = (error) => {
       new AppError(
         502,
         'invalid_provider_image',
-        'OpenAI returned an image that does not match the requested dimensions or supported JPEG, PNG, and WebP limits.',
+        'The configured image provider returned an image that does not match the requested dimensions or supported JPEG, PNG, and WebP limits.',
       ),
     );
   }
@@ -71,7 +71,7 @@ export const translateReferenceImageError: ErrorTranslator = (error) => {
         return new AppError(
           503,
           'provider_configuration',
-          'Reference generation is unavailable until OPENAI_API_KEY is configured on the server.',
+          'Reference generation is unavailable until the selected image provider credential is configured on the server.',
         );
       case 'optimizer-not-configured':
         return new AppError(

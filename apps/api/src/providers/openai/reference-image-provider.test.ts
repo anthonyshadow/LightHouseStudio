@@ -35,7 +35,10 @@ describe('OpenAIReferenceImageProvider', () => {
         format: 'webp',
       }),
     ).resolves.toEqual({
-      base64: 'aW1hZ2U=',
+      bytes: Buffer.from('image'),
+      mimeType: 'image/webp',
+      providerId: 'openai',
+      modelId: 'gpt-image-configured',
       providerRequestId: 'openai-request-one',
     });
     expect(factory).toHaveBeenCalledWith({
@@ -104,7 +107,10 @@ describe('OpenAIReferenceImageProvider', () => {
         signal: controller.signal,
       }),
     ).resolves.toEqual({
-      base64: 'ZWRpdGVk',
+      bytes: Buffer.from('edited'),
+      mimeType: 'image/webp',
+      providerId: 'openai',
+      modelId: 'gpt-image-2',
       providerRequestId: 'openai-edit-one',
     });
 

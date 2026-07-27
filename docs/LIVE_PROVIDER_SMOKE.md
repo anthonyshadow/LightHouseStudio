@@ -6,7 +6,7 @@ Live smoke testing is manual, opt-in, cost-aware, and excluded from default test
 
 - `@decartai/sdk` is pinned to `0.1.15`. Its registry recognizes `lucy-2.5` and the user-approved exact `lucy-vton-3` id. [Current Decart VTON examples](https://docs.platform.decart.ai/examples/use-cases) may instead show the moving `lucy-vton-latest` alias; this product intentionally does not follow that alias silently.
 - Decart browser access uses a [backend-minted client token](https://docs.platform.decart.ai/api-reference/create-client-token), scoped to one model, the exact loopback origin, a five-minute issuance window, and a five-minute realtime-session limit.
-- OpenAI uses the Responses API for prompt optimization and the configured image model for generation, composition, and editing. Defaults are `gpt-5.6` with `medium` reasoning and `gpt-image-2` at `high` quality. Character Builder upload by itself is local storage work and does not contact OpenAI.
+- OpenAI uses the Responses API for prompt optimization and remains the default image provider with `gpt-image-2` at `high` quality. `REFERENCE_IMAGE_PROVIDER=bfl` instead selects the pinned US2 `https://api.us2.bfl.ai/v1/flux-2-pro` task API; there is no EU or provider fallback. Character Builder upload by itself is local storage work and does not contact either image provider.
 - ElevenLabs uses `/v2/voices`, `/v1/shared-voices`, `/v1/voices/add/:owner/:voice`, `/v1/models`, and `/v1/speech-to-speech/:voice`. Provider plans can change voice eligibility and conversion access.
 - `ELEVENLABS_ENABLE_LOGGING=false` requests [Zero Retention Mode](https://elevenlabs.io/docs/eleven-api/resources/zero-retention-mode), which ElevenLabs currently limits to eligible enterprise accounts. Set it to `true` only after an informed retention decision when testing a non-eligible account.
 
@@ -15,12 +15,16 @@ Do not run live provider checks in CI, screenshots, stories, ordinary component 
 ## Before starting
 
 1. Run `npm run quality` and `npm run test:e2e` with deterministic fakes first.
-2. Review current Decart, OpenAI, and ElevenLabs pricing, quota, model availability, voice eligibility, content policy, and data-retention terms in the provider accounts.
+2. Review current Decart, OpenAI, BFL, and ElevenLabs pricing, quota, model availability, voice eligibility, content policy, and data-retention terms in the provider accounts.
 3. Use dedicated least-privilege development keys. Put them only in local `.env`:
 
    ```dotenv
    DECART_API_KEY=your-local-secret
    OPENAI_API_KEY=your-local-secret
+   REFERENCE_IMAGE_PROVIDER=openai
+   # For a separate BFL pass, select bfl and configure:
+   # BFL_API_KEY=your-local-secret
+   # BFL_REFERENCE_IMAGE_MODEL=flux-2-pro
    ELEVENLABS_API_KEY=your-local-secret
    ELEVENLABS_STS_MODEL_ID=eleven_multilingual_sts_v2
    ELEVENLABS_ENABLE_LOGGING=false
@@ -48,14 +52,14 @@ Pass requires correct model scope, explicit action ordering, usable output gatin
 4. Wait for usable remote video, make one atomic live Apply, record a short take, and select **Stop recording**.
 5. Confirm the take remains playable/downloadable, provider usage ends, recorded playback remains on the stage, and no local preview is reacquired.
 
-## OpenAI character references
+## Selected-provider character references
 
 Release any prior take first. Use non-sensitive, disposable character directions
 and images. Watch only the app-owned `/api/reference-images` requests; do not
 capture provider authorization or raw image payloads.
 
 1. Open the header character selector, choose **Create new character**, enter a harmless direction, and select **Generate Preview**. Confirm the app performs optimization before generation and creates one immutable local result only after the explicit action.
-2. In fresh drafts, upload a JPEG, PNG, or WebP source. Confirm `POST /api/reference-images/uploads` stores it locally and no OpenAI request occurs. Exercise direct prompt+image save and **Save & Use Image Only** in separate drafts because either successful Save closes and resets the builder; confirm neither path generates or edits an image.
+2. In fresh drafts, upload a JPEG, PNG, or WebP source. Confirm `POST /api/reference-images/uploads` stores it locally and no external provider request occurs. Exercise direct prompt+image save and **Save & Use Image Only** in separate drafts because either successful Save closes and resets the builder; confirm neither path generates or edits an image.
 3. Start another fresh uploaded draft with a character direction, then select **Generate Combined Preview**. Confirm the direction is optimized and the owner-scoped uploaded bytes are sent to the composition operation only after that action.
 4. Regenerate once with blank instructions and confirm the uploaded source is composed again. Regenerate once with written instructions and confirm an owner-scoped edit creates a new immutable child rather than mutating the source.
 5. Make the form stale and force one controlled provider failure. Confirm the previous preview stays visible but cannot be saved as a matching generated result until regeneration succeeds; prompt-only or direct-upload save remains available where valid.
@@ -64,6 +68,8 @@ Pass requires local-only upload, explicit billable actions, optimize-before-imag
 ordering, owner-scoped source resolution, immutable results, correct direct/image-only
 save behavior, sanitized errors, and no fallback to the raw prompt after an
 optimization failure.
+
+Run this section once with the default OpenAI image provider and once with BFL if that provider is release-enabled. For BFL, confirm capabilities report `providerId: "bfl"` and `modelId: "flux-2-pro"`, one initial task is created per explicit request, polling stays within the 150-second deadline, source-guided actions succeed without a public upload, and browser responses/log captures contain neither signed URLs nor source base64.
 
 ## ElevenLabs
 

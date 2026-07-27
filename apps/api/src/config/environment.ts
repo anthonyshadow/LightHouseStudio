@@ -14,6 +14,9 @@ export const DEFAULT_LIGHTFRAME_DATA_DIR = './.lightframe-data';
 export const DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
 export const DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS = 120_000;
 export const MAX_PROMPT_OPTIMIZER_TIMEOUT_MS = 180_000;
+export const BFL_REFERENCE_IMAGE_MODEL = 'flux-2-pro' as const;
+export const DEFAULT_BFL_SAFETY_TOLERANCE = 4;
+export const DEFAULT_BFL_DISABLE_PROMPT_UPSAMPLING = true;
 
 const normalizeOptionalString = (value: unknown): unknown => {
   if (typeof value !== 'string') return value;
@@ -41,12 +44,18 @@ const promptOptimizerTimeoutSchema = z.preprocess(
   z.coerce.number().int().min(10_000).max(MAX_PROMPT_OPTIMIZER_TIMEOUT_MS),
 );
 
-const strictBooleanSchema = z.preprocess((value) => {
-  if (value === undefined || value === '') return false;
-  if (value === 'true') return true;
-  if (value === 'false') return false;
-  return value;
-}, z.boolean());
+const referenceImageTimeoutSchema = z.preprocess(
+  (value) => (value === undefined || value === '' ? DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS : value),
+  z.coerce.number().int().min(10_000).max(MAX_PROMPT_OPTIMIZER_TIMEOUT_MS),
+);
+
+const strictBooleanSchema = (defaultValue: boolean) =>
+  z.preprocess((value) => {
+    if (value === undefined || value === '') return defaultValue;
+    if (value === 'true') return true;
+    if (value === 'false') return false;
+    return value;
+  }, z.boolean());
 
 const environmentSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -65,9 +74,24 @@ const environmentSchema = z.object({
     normalizeOptionalString,
     z.enum(['high', 'medium']).optional(),
   ),
+  REFERENCE_IMAGE_PROVIDER: z.preprocess(
+    normalizeOptionalString,
+    z.enum(['openai', 'bfl']).default('openai'),
+  ),
+  BFL_API_KEY: optionalSecretSchema,
+  BFL_REFERENCE_IMAGE_MODEL: z.preprocess(
+    normalizeOptionalString,
+    z.literal(BFL_REFERENCE_IMAGE_MODEL).default(BFL_REFERENCE_IMAGE_MODEL),
+  ),
+  BFL_SAFETY_TOLERANCE: z.preprocess(
+    (value) => (value === undefined || value === '' ? DEFAULT_BFL_SAFETY_TOLERANCE : value),
+    z.coerce.number().int().min(0).max(5),
+  ),
+  BFL_DISABLE_PROMPT_UPSAMPLING: strictBooleanSchema(DEFAULT_BFL_DISABLE_PROMPT_UPSAMPLING),
+  BFL_REFERENCE_IMAGE_TIMEOUT_MS: referenceImageTimeoutSchema,
   ELEVENLABS_API_KEY: optionalSecretSchema,
   ELEVENLABS_STS_MODEL_ID: optionalModelSchema,
-  ELEVENLABS_ENABLE_LOGGING: strictBooleanSchema,
+  ELEVENLABS_ENABLE_LOGGING: strictBooleanSchema(false),
   LIGHTFRAME_DATA_DIR: z.preprocess(
     (value) => (value === undefined || value === '' ? DEFAULT_LIGHTFRAME_DATA_DIR : value),
     z.string().trim().min(1),
@@ -87,6 +111,12 @@ export interface RuntimeConfig {
   readonly openAiPromptOptimizerTimeoutMs: number;
   readonly openAiReferenceImageModel: string;
   readonly openAiReferenceImageQuality: 'high' | 'medium';
+  readonly referenceImageProvider: 'openai' | 'bfl';
+  readonly bflApiKey?: string;
+  readonly bflReferenceImageModel: typeof BFL_REFERENCE_IMAGE_MODEL;
+  readonly bflSafetyTolerance: number;
+  readonly bflDisablePromptUpsampling: boolean;
+  readonly bflReferenceImageTimeoutMs: number;
   readonly elevenLabsApiKey?: string;
   readonly elevenLabsModelId: string;
   readonly elevenLabsEnableLogging: boolean;
@@ -178,13 +208,22 @@ export const parseEnvironment = (
     openAiReferenceImageModel: result.data.OPENAI_REFERENCE_IMAGE_MODEL ?? REFERENCE_IMAGE_MODEL_ID,
     openAiReferenceImageQuality:
       result.data.OPENAI_REFERENCE_IMAGE_QUALITY ?? REFERENCE_IMAGE_QUALITY,
+    referenceImageProvider: result.data.REFERENCE_IMAGE_PROVIDER,
+    ...(result.data.BFL_API_KEY === undefined ? {} : { bflApiKey: result.data.BFL_API_KEY }),
+    bflReferenceImageModel: result.data.BFL_REFERENCE_IMAGE_MODEL,
+    bflSafetyTolerance: result.data.BFL_SAFETY_TOLERANCE,
+    bflDisablePromptUpsampling: result.data.BFL_DISABLE_PROMPT_UPSAMPLING,
+    bflReferenceImageTimeoutMs: result.data.BFL_REFERENCE_IMAGE_TIMEOUT_MS,
     ...(result.data.ELEVENLABS_API_KEY === undefined
       ? {}
       : { elevenLabsApiKey: result.data.ELEVENLABS_API_KEY }),
     elevenLabsModelId: result.data.ELEVENLABS_STS_MODEL_ID ?? DEFAULT_ELEVENLABS_STS_MODEL_ID,
     elevenLabsEnableLogging: result.data.ELEVENLABS_ENABLE_LOGGING,
     providerTimeoutMs: 30_000,
-    referenceImageTimeoutMs: DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
+    referenceImageTimeoutMs:
+      result.data.REFERENCE_IMAGE_PROVIDER === 'bfl'
+        ? result.data.BFL_REFERENCE_IMAGE_TIMEOUT_MS
+        : DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
     lightframeDataDir: result.data.LIGHTFRAME_DATA_DIR,
   };
 };

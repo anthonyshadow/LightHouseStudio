@@ -344,7 +344,8 @@ describe('CharacterPromptWorkshop', () => {
     renderWorkshop({
       initialDraft: populatedCharacterDraft('midnight botanist'),
       referenceImagesAvailable: true,
-      referenceImageModel: 'gpt-image-2',
+      referenceImageProvider: 'bfl',
+      referenceImageModel: 'flux-2-pro',
       optimizerModel: response.model,
       optimizerVersion: response.version,
       onOptimizeReference,
@@ -368,13 +369,13 @@ describe('CharacterPromptWorkshop', () => {
         background: 'neutral_gray',
         targetUse: 'lucy_2_5_character_reference',
       },
-      generator: { provider: 'openai', model: 'gpt-image-2' },
+      generator: { provider: 'bfl', model: 'flux-2-pro' },
     });
     const generationInput = onGenerateReference.mock.calls[0]?.[0];
     expect(generationInput?.rawPrompt).toContain('midnight botanist');
     expect(generationInput?.options.targetUse).toBe('lucy_2_5_character_reference');
     expect(generationInput).toMatchObject({
-      generator: { provider: 'openai', model: 'gpt-image-2' },
+      generator: { provider: 'bfl', model: 'flux-2-pro' },
       optimization: {
         enabled: true,
         result: response.result,

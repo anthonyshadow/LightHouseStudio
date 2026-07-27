@@ -23,15 +23,17 @@ import {
 import { ElevenLabsHttpProvider } from './providers/elevenlabs/http-provider.js';
 import type { ElevenLabsProvider } from './providers/elevenlabs/types.js';
 import { translateProviderError } from './providers/error-mapper.js';
+import { translateBflError } from './providers/bfl/error-mapper.js';
 import {
   OpenAICharacterPromptOptimizer,
   type CharacterPromptOptimizer,
 } from './providers/openai/character-prompt-optimizer.js';
 import { translateOpenAIError } from './providers/openai/error-mapper.js';
 import {
-  OpenAIReferenceImageProvider,
-  type ReferenceImageProvider,
-} from './providers/openai/reference-image-provider.js';
+  configuredReferenceImageDescriptor,
+  createConfiguredReferenceImageProvider,
+} from './providers/reference-images/provider-factory.js';
+import { type ReferenceImageProvider } from './providers/reference-images/reference-image-provider.js';
 
 export const OPENAI_CONNECTION_TIMEOUT_MARGIN_MS = 100_000;
 export const SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES = [
@@ -138,13 +140,14 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
         );
 
   const referenceImageProvider = resolveOptionalProvider(dependencies.referenceImageProvider, () =>
-    dependencies.config.openAiApiKey === undefined
-      ? null
-      : new OpenAIReferenceImageProvider(dependencies.config.openAiApiKey, {
-          model: dependencies.config.openAiReferenceImageModel,
-          quality: dependencies.config.openAiReferenceImageQuality,
-          timeoutMs: dependencies.config.referenceImageTimeoutMs,
-        }),
+    createConfiguredReferenceImageProvider(dependencies.config, {
+      ...(dependencies.fetchImplementation === undefined
+        ? {}
+        : { fetchImplementation: dependencies.fetchImplementation }),
+      observeBflLifecycle: (event) => {
+        app.log.info(event, 'BFL reference image lifecycle');
+      },
+    }),
   );
   const characterPromptOptimizer = resolveOptionalProvider(
     dependencies.characterPromptOptimizer,
@@ -161,12 +164,14 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   const referenceImageAssetStore =
     dependencies.referenceImageAssetStore ??
     new LocalReferenceImageAssetStore(dependencies.config.lightframeDataDir);
+  const configuredReferenceImage = configuredReferenceImageDescriptor(dependencies.config);
   const referenceImageService = new ReferenceImageService(
     referenceImageProvider,
     referenceImageAssetStore,
     {
       optimizer: characterPromptOptimizer,
-      imageModel: dependencies.config.openAiReferenceImageModel,
+      providerDescriptor: configuredReferenceImage,
+      imageModel: configuredReferenceImage.modelId,
       imageQuality: dependencies.config.openAiReferenceImageQuality,
       optimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
     },
@@ -178,7 +183,8 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     elevenLabsModelId: dependencies.config.elevenLabsModelId,
     referenceImagesAvailable: referenceImageService.generationAvailable,
     referenceImageEditAvailable: referenceImageService.editAvailable,
-    referenceImageModelId: dependencies.config.openAiReferenceImageModel,
+    referenceImageProviderId: configuredReferenceImage.providerId,
+    referenceImageModelId: configuredReferenceImage.modelId,
     referenceImageQuality: dependencies.config.openAiReferenceImageQuality,
     promptOptimizerAvailable: referenceImageService.optimizationAvailable,
     promptOptimizerModel: dependencies.config.openAiPromptOptimizerModel,
@@ -192,6 +198,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     translators: [
       translateReferenceImageError,
       translateVoiceServiceError,
+      translateBflError,
       translateOpenAIError,
       translateProviderError,
     ],

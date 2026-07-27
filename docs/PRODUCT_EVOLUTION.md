@@ -165,11 +165,17 @@ Covered by: voice rules and processing tests plus local/network-isolation and fa
 
 The header capability strip reports local, AI-video, and cloud-voice
 availability. Reference availability appears where it is used in Workshop and
-Character Builder. Missing Decart disables only realtime video; missing OpenAI
-disables optimization/generation/editing but leaves text drafting and direct
-uploaded/image-only character use; missing ElevenLabs disables only its
-library/conversion. Local capture, assets, recording, and local effects remain
-usable. Errors are actionable and sanitized.
+Character Builder. Image generation now has one startup-selected server
+provider: the existing OpenAI path remains the default, while the pinned BFL
+FLUX.2 Pro task adapter is the explicit alternative. There is no browser
+selector or automatic fallback, and provider-aware idempotency prevents an
+OpenAI result from being replayed after switching to BFL. OpenAI Responses
+optimization remains separately configurable. Missing Decart disables only
+realtime video; missing selected image credentials disables image generation
+and editing but leaves text drafting and direct uploaded/image-only character
+use; missing OpenAI optimizer credentials disables optimization independently;
+missing ElevenLabs disables only its library/conversion. Local capture, assets,
+recording, and local effects remain usable. Errors are actionable and sanitized.
 
 Covered by: capability/API tests, optional `503` cases, and no-key manual QA.
 

@@ -49,6 +49,13 @@ const mapReferenceImageError = (
           'OpenAI rejected the configured server credential. Check OPENAI_API_KEY.',
           options,
         );
+      case 'credits':
+        return new AppError(
+          502,
+          'provider_failure',
+          'OpenAI could not complete reference image generation because the account is unavailable for billing.',
+          options,
+        );
       case 'configuration':
         return new AppError(
           503,
@@ -61,6 +68,13 @@ const mapReferenceImageError = (
           502,
           'provider_failure',
           'The API server lost its connection to OpenAI during reference image generation. Check the Recent Shelf, then verify server network, DNS, TLS, and proxy access before deliberately trying again.',
+          options,
+        );
+      case 'invalid-request':
+        return new AppError(
+          400,
+          'validation_error',
+          'OpenAI rejected the reference image request or source image.',
           options,
         );
       case 'timeout':
@@ -157,7 +171,7 @@ const mapPromptOptimizerError = (
 };
 
 export const translateOpenAIError: ErrorTranslator = (error) => {
-  if (error instanceof ReferenceImageProviderError) {
+  if (error instanceof ReferenceImageProviderError && error.providerId === 'openai') {
     return mapReferenceImageError(error, error.reason);
   }
   if (error instanceof CharacterPromptOptimizerError) {

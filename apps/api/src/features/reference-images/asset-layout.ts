@@ -72,6 +72,7 @@ const storedMetadataCommonShape = {
     .string()
     .regex(/^[a-f0-9]{64}$/u)
     .optional(),
+  requestFingerprintVersion: z.literal(2).optional(),
   createdAt: z.iso.datetime({ offset: true }),
   updatedAt: z.iso.datetime({ offset: true }).optional(),
 } as const;
@@ -88,7 +89,7 @@ const storedGeneratedReferenceImageMetadataSchema = z
       .positive()
       .max(REFERENCE_IMAGE_MAX_BYTES - 1),
     source: z.literal('generated'),
-    provider: z.literal('openai'),
+    provider: z.enum(['openai', 'bfl']),
     model: z.string().trim().min(1).max(128),
     quality: z.enum(['high', 'medium']).optional(),
     originalPrompt: z.string().min(1).max(REFERENCE_IMAGE_PROMPT_MAX_LENGTH),
@@ -97,6 +98,21 @@ const storedGeneratedReferenceImageMetadataSchema = z
     promptHash: z.string().regex(/^[a-f0-9]{64}$/u),
     derivation: internalDerivationSchema.optional(),
     providerRequestId: z.string().min(1).max(500).optional(),
+    providerSettings: z
+      .object({
+        safetyTolerance: z.number().int().min(0).max(5),
+        disablePromptUpsampling: z.boolean(),
+      })
+      .strict()
+      .optional(),
+    providerUsage: z
+      .object({
+        cost: z.number().finite().nonnegative().optional(),
+        inputMegapixels: z.number().finite().nonnegative().optional(),
+        outputMegapixels: z.number().finite().nonnegative().optional(),
+      })
+      .strict()
+      .optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -155,6 +171,7 @@ export interface StoreGeneratedReferenceImageInput {
   readonly size: ReferenceImageSize;
   readonly width: 1024 | 1536;
   readonly height: 1024 | 1536;
+  readonly provider?: 'openai' | 'bfl';
   readonly model: string;
   readonly quality: 'high' | 'medium';
   readonly originalPrompt: string;
@@ -171,6 +188,7 @@ export interface StoreGeneratedReferenceImageInput {
   readonly promptHash: string;
   readonly requestId: string;
   readonly requestFingerprint?: string;
+  readonly requestFingerprintVersion?: 2;
   readonly derivation?:
     | { readonly kind: 'generate' }
     | {
@@ -183,6 +201,15 @@ export interface StoreGeneratedReferenceImageInput {
         readonly sourceAssetId: string;
       };
   readonly providerRequestId?: string;
+  readonly providerSettings?: {
+    readonly safetyTolerance: number;
+    readonly disablePromptUpsampling: boolean;
+  };
+  readonly providerUsage?: {
+    readonly cost?: number;
+    readonly inputMegapixels?: number;
+    readonly outputMegapixels?: number;
+  };
 }
 
 export interface StoreUploadedReferenceImageInput {
@@ -291,6 +318,9 @@ export const createStoredReferenceImageMetadata = (
     ...(input.requestFingerprint === undefined
       ? {}
       : { requestFingerprint: input.requestFingerprint }),
+    ...(input.source === 'uploaded' || input.requestFingerprintVersion === undefined
+      ? {}
+      : { requestFingerprintVersion: input.requestFingerprintVersion }),
     createdAt: timestamp,
     updatedAt: timestamp,
   } as const;
@@ -301,7 +331,7 @@ export const createStoredReferenceImageMetadata = (
     ...common,
     size: input.size,
     source: 'generated',
-    provider: 'openai',
+    provider: input.provider ?? 'openai',
     model: input.model || REFERENCE_IMAGE_MODEL_ID,
     quality: input.quality || REFERENCE_IMAGE_QUALITY,
     originalPrompt: input.originalPrompt,
@@ -312,6 +342,8 @@ export const createStoredReferenceImageMetadata = (
     ...(input.providerRequestId === undefined
       ? {}
       : { providerRequestId: input.providerRequestId }),
+    ...(input.providerSettings === undefined ? {} : { providerSettings: input.providerSettings }),
+    ...(input.providerUsage === undefined ? {} : { providerUsage: input.providerUsage }),
   });
 };
 

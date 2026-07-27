@@ -78,13 +78,16 @@ export const useCharacterReferenceGeneration = ({
         operation,
       });
     },
-    onSuccess: (result: ReferencePreviewGenerationResult) => {
+    onOptimizationSuccess: (optimization, operationId, sourceKey, optimizationKey) => {
       dispatch({
         type: 'optimization-succeeded',
-        operationId: result.operationId,
-        optimization: result.optimization,
-        optimizationKey: result.sourceKey,
+        operationId,
+        optimization,
+        sourceKey,
+        optimizationKey,
       });
+    },
+    onSuccess: (result: ReferencePreviewGenerationResult) => {
       dispatch({
         type: 'preview-succeeded',
         operationId: result.operationId,

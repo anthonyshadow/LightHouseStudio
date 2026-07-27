@@ -49,7 +49,7 @@ describe('ReferenceImageField focus recovery', () => {
     );
 
     expect(screen.getByText(image.name)).toHaveAttribute('title', image.name);
-    expect(screen.getByText('1.5 MiB')).toBeInTheDocument();
+    expect(screen.getByText('1.50 MiB')).toBeInTheDocument();
     expect(screen.getByText(/stays in memory and is never saved/u)).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Clear image' })).toHaveTextContent('Remove');
   });

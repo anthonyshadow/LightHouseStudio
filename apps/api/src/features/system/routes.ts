@@ -12,6 +12,7 @@ export interface CapabilityAvailability {
   readonly elevenLabsModelId: string;
   readonly referenceImagesAvailable: boolean;
   readonly referenceImageEditAvailable: boolean;
+  readonly referenceImageProviderId: 'openai' | 'bfl';
   readonly referenceImageModelId: string;
   readonly referenceImageQuality: 'high' | 'medium';
   readonly promptOptimizerAvailable: boolean;
@@ -38,6 +39,7 @@ export const registerSystemRoutes = (
       referenceImages: {
         available: availability.referenceImagesAvailable,
         editAvailable: availability.referenceImageEditAvailable,
+        providerId: availability.referenceImageProviderId,
         modelId: availability.referenceImageModelId,
         sizes: [...REFERENCE_IMAGE_SIZES],
         quality: availability.referenceImageQuality,

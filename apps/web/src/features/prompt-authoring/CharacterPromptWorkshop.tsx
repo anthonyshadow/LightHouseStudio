@@ -74,6 +74,7 @@ export interface CharacterPromptWorkshopProps {
   generatedReferenceImage?: WorkshopReferenceImage | null | undefined;
   referenceGeneration?: ReferenceGenerationState | undefined;
   referenceImagesAvailable?: boolean | undefined;
+  referenceImageProvider?: 'openai' | 'bfl' | null | undefined;
   referenceImageModel?: string | null | undefined;
   optimizerModel?: string | null | undefined;
   optimizerVersion?: string | null | undefined;
@@ -186,6 +187,7 @@ export const CharacterPromptWorkshop = ({
   generatedReferenceImage = null,
   referenceGeneration = { status: 'idle', error: null },
   referenceImagesAvailable = false,
+  referenceImageProvider = null,
   referenceImageModel = null,
   optimizerModel = null,
   optimizerVersion = null,
@@ -242,10 +244,12 @@ export const CharacterPromptWorkshop = ({
       rawPrompt: generatedPrompt,
       options: createOptimizerReferenceOptions(referenceOptions),
       ...(referenceImageModel
-        ? { generator: { provider: 'openai', model: referenceImageModel } }
+        ? {
+            generator: { provider: referenceImageProvider ?? 'openai', model: referenceImageModel },
+          }
         : {}),
     }),
-    [generatedPrompt, referenceImageModel, referenceOptions],
+    [generatedPrompt, referenceImageModel, referenceImageProvider, referenceOptions],
   );
   const optimizationInputKey = useMemo(
     () =>

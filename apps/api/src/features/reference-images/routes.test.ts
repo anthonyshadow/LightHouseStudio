@@ -23,6 +23,7 @@ import {
 import type {
   EditReferenceImageProviderInput,
   GenerateReferenceImageProviderInput,
+  GeneratedReferenceImagePayload,
   ReferenceImageProvider,
 } from '../../providers/openai/reference-image-provider.js';
 import { ReferenceImageProviderError } from '../../providers/openai/reference-image-provider.js';
@@ -88,6 +89,18 @@ const createImage = async (size: GenerateReferenceImageProviderInput['size']): P
     .toBuffer();
 };
 
+const providerImage = (
+  bytes: Uint8Array,
+  format: GenerateReferenceImageProviderInput['format'] = 'jpeg',
+  providerRequestId?: string,
+): GeneratedReferenceImagePayload => ({
+  bytes,
+  mimeType: format === 'png' ? 'image/png' : format === 'webp' ? 'image/webp' : 'image/jpeg',
+  providerId: 'openai',
+  modelId: 'gpt-image-2',
+  ...(providerRequestId === undefined ? {} : { providerRequestId }),
+});
+
 describe('reference image API', () => {
   const apps: ReturnType<typeof createApp>[] = [];
   const directories: string[] = [];
@@ -117,7 +130,7 @@ describe('reference image API', () => {
     const provider: ReferenceImageProvider = {
       generate: vi.fn(async (input: GenerateReferenceImageProviderInput) => {
         providerInputs.push(input);
-        return { base64: (await createImage(input.size)).toString('base64') };
+        return providerImage(await createImage(input.size), input.format);
       }),
     };
     const app = await setup(provider, optimizer());
@@ -175,15 +188,83 @@ describe('reference image API', () => {
     expect(generated.body).not.toContain('base64');
   });
 
+  it('persists authoritative BFL provenance without exposing task or usage internals', async () => {
+    const provider: ReferenceImageProvider = {
+      descriptor: {
+        providerId: 'bfl',
+        modelId: 'flux-2-pro',
+        adapterVersion: 'bfl-flux-2-pro-v1',
+        effectiveSettings: {
+          safetyTolerance: 4,
+          disablePromptUpsampling: true,
+        },
+      },
+      generate: vi.fn<ReferenceImageProvider['generate']>(
+        async (input: GenerateReferenceImageProviderInput) => ({
+          bytes: await createImage(input.size),
+          mimeType: 'image/jpeg',
+          providerId: 'bfl',
+          modelId: 'flux-2-pro',
+          providerRequestId: 'bfl-task-one',
+          safeUsage: { cost: 0.05, inputMegapixels: 0, outputMegapixels: 1 },
+        }),
+      ),
+    };
+    const app = await setup(provider);
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images',
+      headers: localHeaders,
+      payload: bypassPayload('A BFL-generated cartographer.'),
+    });
+
+    expect(response.statusCode).toBe(200);
+    const asset = response.json<CreateReferenceImageResponse>().asset;
+    expect(asset).toMatchObject({
+      source: 'generated',
+      provider: 'bfl',
+      model: 'flux-2-pro',
+    });
+    expect(response.body).not.toContain('bfl-task-one');
+    expect(response.body).not.toContain('providerUsage');
+
+    const dataDirectory = directories.at(-1);
+    const stored = JSON.parse(
+      await readFile(
+        path.join(
+          dataDirectory ?? '',
+          'reference-images',
+          'v1',
+          'assets',
+          asset.assetId,
+          'metadata.json',
+        ),
+        'utf8',
+      ),
+    ) as Record<string, unknown>;
+    expect(stored).toMatchObject({
+      provider: 'bfl',
+      model: 'flux-2-pro',
+      providerRequestId: 'bfl-task-one',
+      requestFingerprintVersion: 2,
+      providerSettings: {
+        safetyTolerance: 4,
+        disablePromptUpsampling: true,
+      },
+      providerUsage: { cost: 0.05, inputMegapixels: 0, outputMegapixels: 1 },
+    });
+  });
+
   it('does not cancel a pending generation when a normal POST body finishes', async () => {
     const image = await createImage('1024x1024');
     let providerSignal: AbortSignal | undefined;
     const provider: ReferenceImageProvider = {
       generate: vi.fn(
         (input: GenerateReferenceImageProviderInput) =>
-          new Promise<{ readonly base64: string }>((resolve, reject) => {
+          new Promise<GeneratedReferenceImagePayload>((resolve, reject) => {
             providerSignal = input.signal;
-            const timer = setTimeout(() => resolve({ base64: image.toString('base64') }), 50);
+            const timer = setTimeout(() => resolve(providerImage(image, input.format)), 50);
             const abort = () => {
               clearTimeout(timer);
               reject(new ReferenceImageProviderError('aborted'));
@@ -229,14 +310,11 @@ describe('reference image API', () => {
     const editInputs: EditReferenceImageProviderInput[] = [];
     const provider: ReferenceImageProvider = {
       generate: vi.fn(async (input: GenerateReferenceImageProviderInput) => ({
-        base64: (await createImage(input.size)).toString('base64'),
+        ...providerImage(await createImage(input.size), input.format),
       })),
       edit: vi.fn(async (input: EditReferenceImageProviderInput) => {
         editInputs.push(input);
-        return {
-          base64: (await createImage(input.size)).toString('base64'),
-          providerRequestId: 'provider-edit-one',
-        };
+        return providerImage(await createImage(input.size), input.format, 'provider-edit-one');
       }),
     };
     const app = await setup(provider, optimizer());
@@ -476,7 +554,7 @@ describe('reference image API', () => {
       generate: vi.fn(),
       edit: vi.fn(async (input: EditReferenceImageProviderInput) => {
         editInputs.push(input);
-        return { base64: (await createImage(input.size)).toString('base64') };
+        return providerImage(await createImage(input.size), input.format);
       }),
     };
     const app = await setup(provider, optimizer());
@@ -536,7 +614,7 @@ describe('reference image API', () => {
     const app = await setup({
       generate: vi.fn(async (input: GenerateReferenceImageProviderInput) => {
         inputs.push(input);
-        return { base64: (await createImage(input.size)).toString('base64') };
+        return providerImage(await createImage(input.size), input.format);
       }),
     });
 
@@ -562,7 +640,7 @@ describe('reference image API', () => {
     const app = await setup({
       generate: vi.fn(async (input: GenerateReferenceImageProviderInput) => {
         inputs.push(input);
-        return { base64: (await createImage(input.size)).toString('base64') };
+        return providerImage(await createImage(input.size), input.format);
       }),
     });
 
@@ -692,10 +770,10 @@ describe('reference image API', () => {
 
   it('persistently replays a request ID and coalesces a duplicate in flight', async () => {
     const image = await createImage('1024x1024');
-    let finish: ((payload: { readonly base64: string }) => void) | undefined;
+    let finish: ((payload: GeneratedReferenceImagePayload) => void) | undefined;
     const generate = vi.fn(
       (_input: GenerateReferenceImageProviderInput) =>
-        new Promise<{ readonly base64: string }>((resolve) => {
+        new Promise<GeneratedReferenceImagePayload>((resolve) => {
           finish = resolve;
         }),
     );
@@ -714,7 +792,7 @@ describe('reference image API', () => {
       headers: localHeaders,
       payload,
     });
-    finish?.({ base64: image.toString('base64') });
+    finish?.(providerImage(image));
     const firstResponse = await first;
     const duplicateResponse = await duplicate;
     const replay = await app.inject({
@@ -740,16 +818,16 @@ describe('reference image API', () => {
 
   it('serializes operations per owner without blocking a different local owner', async () => {
     const image = await createImage('1024x1024');
-    let finishFirst: ((payload: { readonly base64: string }) => void) | undefined;
+    let finishFirst: ((payload: GeneratedReferenceImagePayload) => void) | undefined;
     const generate = vi
       .fn<ReferenceImageProvider['generate']>()
       .mockImplementationOnce(
         () =>
-          new Promise<{ readonly base64: string }>((resolve) => {
+          new Promise<GeneratedReferenceImagePayload>((resolve) => {
             finishFirst = resolve;
           }),
       )
-      .mockResolvedValueOnce({ base64: image.toString('base64') });
+      .mockResolvedValueOnce(providerImage(image));
     const app = await setup({ generate });
     const first = app.inject({
       method: 'POST',
@@ -768,7 +846,7 @@ describe('reference image API', () => {
 
     expect(otherOwner.statusCode).toBe(200);
     expect(generate).toHaveBeenCalledTimes(2);
-    finishFirst?.({ base64: image.toString('base64') });
+    finishFirst?.(providerImage(image));
     await expect(first).resolves.toMatchObject({ statusCode: 200 });
   });
 
@@ -777,7 +855,7 @@ describe('reference image API', () => {
     const generate = vi
       .fn<ReferenceImageProvider['generate']>()
       .mockRejectedValueOnce(new ReferenceImageProviderError('failure', { upstreamStatus: 502 }))
-      .mockResolvedValueOnce({ base64: image.toString('base64') });
+      .mockResolvedValueOnce(providerImage(image));
     const app = await setup({ generate });
 
     const failed = await app.inject({

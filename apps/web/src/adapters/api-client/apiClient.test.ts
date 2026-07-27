@@ -150,6 +150,7 @@ describe('reference image API client', () => {
             referenceImages: {
               available: true,
               editAvailable: true,
+              providerId: 'openai',
               modelId: 'gpt-image-2',
               sizes: ['1024x1024', '1024x1536', '1536x1024'],
               quality: 'high',
@@ -168,6 +169,7 @@ describe('reference image API client', () => {
     await expect(fetchProviderAvailability()).resolves.toMatchObject({
       referenceImages: true,
       referenceImageEditAvailable: true,
+      referenceImageProvider: 'openai',
       referenceImageModel: 'gpt-image-2',
       referenceImageSizes: ['1024x1024', '1024x1536', '1536x1024'],
       referenceImageOptimizerAvailable: true,

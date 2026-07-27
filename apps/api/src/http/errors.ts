@@ -13,6 +13,9 @@ export { AppError } from './app-error.js';
 export interface ErrorDiagnostic {
   readonly errorClass: string;
   readonly reason?: string;
+  readonly providerId?: string;
+  readonly providerRequestId?: string;
+  readonly providerStage?: string;
 }
 
 export interface ErrorTranslation {
@@ -128,6 +131,13 @@ export const installErrorHandling = (
             code: safeError.code,
             errorClass: diagnostic.errorClass,
             ...(diagnostic.reason === undefined ? {} : { reason: diagnostic.reason }),
+            ...(diagnostic.providerId === undefined ? {} : { providerId: diagnostic.providerId }),
+            ...(diagnostic.providerRequestId === undefined
+              ? {}
+              : { providerRequestId: diagnostic.providerRequestId }),
+            ...(diagnostic.providerStage === undefined
+              ? {}
+              : { providerStage: diagnostic.providerStage }),
             ...(safeError.upstreamStatus === undefined
               ? {}
               : { upstreamStatus: safeError.upstreamStatus }),

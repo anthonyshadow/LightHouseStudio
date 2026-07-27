@@ -27,6 +27,11 @@ describe('parseEnvironment', () => {
       openAiPromptOptimizerTimeoutMs: DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS,
       openAiReferenceImageModel: 'gpt-image-2',
       openAiReferenceImageQuality: 'high',
+      referenceImageProvider: 'openai',
+      bflReferenceImageModel: 'flux-2-pro',
+      bflSafetyTolerance: 4,
+      bflDisablePromptUpsampling: true,
+      bflReferenceImageTimeoutMs: DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
     });
   });
 
@@ -43,6 +48,12 @@ describe('parseEnvironment', () => {
         OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '95000',
         OPENAI_REFERENCE_IMAGE_MODEL: ' gpt-image-test ',
         OPENAI_REFERENCE_IMAGE_QUALITY: ' medium ',
+        REFERENCE_IMAGE_PROVIDER: ' bfl ',
+        BFL_API_KEY: ' bfl-placeholder ',
+        BFL_REFERENCE_IMAGE_MODEL: ' flux-2-pro ',
+        BFL_SAFETY_TOLERANCE: '3',
+        BFL_DISABLE_PROMPT_UPSAMPLING: 'false',
+        BFL_REFERENCE_IMAGE_TIMEOUT_MS: '140000',
         ELEVENLABS_API_KEY: '  eleven-placeholder  ',
         ELEVENLABS_STS_MODEL_ID: ' custom-sts ',
         ELEVENLABS_ENABLE_LOGGING: 'false',
@@ -59,6 +70,13 @@ describe('parseEnvironment', () => {
       openAiPromptOptimizerTimeoutMs: 95_000,
       openAiReferenceImageModel: 'gpt-image-test',
       openAiReferenceImageQuality: 'medium',
+      referenceImageProvider: 'bfl',
+      bflApiKey: 'bfl-placeholder',
+      bflReferenceImageModel: 'flux-2-pro',
+      bflSafetyTolerance: 3,
+      bflDisablePromptUpsampling: false,
+      bflReferenceImageTimeoutMs: 140_000,
+      referenceImageTimeoutMs: 140_000,
       elevenLabsApiKey: 'eleven-placeholder',
       elevenLabsModelId: 'custom-sts',
       elevenLabsEnableLogging: false,
@@ -75,6 +93,12 @@ describe('parseEnvironment', () => {
     { OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '9999' },
     { OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '180001' },
     { OPENAI_REFERENCE_IMAGE_QUALITY: 'low' },
+    { REFERENCE_IMAGE_PROVIDER: 'automatic' },
+    { BFL_REFERENCE_IMAGE_MODEL: 'flux-2-pro-preview' },
+    { BFL_SAFETY_TOLERANCE: '6' },
+    { BFL_DISABLE_PROMPT_UPSAMPLING: 'TRUE' },
+    { BFL_REFERENCE_IMAGE_TIMEOUT_MS: '9999' },
+    { BFL_REFERENCE_IMAGE_TIMEOUT_MS: '180001' },
   ])('rejects invalid environment input %#', (environment) => {
     expect(() => parseEnvironment(environment)).toThrow(EnvironmentValidationError);
   });

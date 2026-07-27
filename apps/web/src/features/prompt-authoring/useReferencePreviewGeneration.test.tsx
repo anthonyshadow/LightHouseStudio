@@ -12,6 +12,7 @@ import type {
 } from '@studio/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
+  createReferencePromptOptimizationKey,
   createReferencePreviewSourceKey,
   useReferencePreviewGeneration,
   type ReferencePreviewGenerationCallbacks,
@@ -120,6 +121,7 @@ const referenceAsset = (assetId = '550e8400-e29b-41d4-a716-446655440000'): Refer
 
 const callbacks = (): ReferencePreviewGenerationCallbacks => ({
   onPhase: vi.fn(),
+  onOptimizationSuccess: vi.fn(),
   onSuccess: vi.fn(),
   onError: vi.fn(),
 });
@@ -191,13 +193,19 @@ describe('useReferencePreviewGeneration', () => {
       }),
       expect.any(AbortSignal),
     );
+    expect(handlers.onOptimizationSuccess).toHaveBeenCalledWith(
+      optimization,
+      operationId,
+      sourceKey,
+      createReferencePromptOptimizationKey(rawPrompt, options),
+    );
     expect(handlers.onSuccess).toHaveBeenCalledWith(
       expect.objectContaining({ asset: referenceAsset(), optimization, sourceKey, operationId }),
     );
     expect(handlers.onError).not.toHaveBeenCalled();
   });
 
-  it('retries an identical failed generation with its request ID and cached optimization', async () => {
+  it('reuses a successful optimization when the user retries a failed image generation', async () => {
     const generationError = new Error('Provider unavailable');
     createReferenceImage
       .mockRejectedValueOnce(generationError)
@@ -221,10 +229,57 @@ describe('useReferencePreviewGeneration', () => {
       createReferencePreviewSourceKey(rawPrompt, options),
     );
     expect(optimizeCharacterReferencePrompt).toHaveBeenCalledOnce();
+    expect(handlers.onOptimizationSuccess).toHaveBeenCalledOnce();
     expect(createReferenceImage).toHaveBeenCalledTimes(2);
     expect(retriedRequest.requestId).toBe(firstRequest.requestId);
     expect(retriedRequest.optimization).toEqual(firstRequest.optimization);
     expect(handlers.onSuccess).toHaveBeenCalledOnce();
+  });
+
+  it('reuses the optimization when only the generation source changes', async () => {
+    const handlers = callbacks();
+    const { result } = renderHook(() => useReferencePreviewGeneration(handlers));
+
+    await act(async () => {
+      await result.current.generate({ rawPrompt, options });
+      await result.current.generate({
+        rawPrompt,
+        options,
+        sourceAssetId: '550e8400-e29b-41d4-a716-446655440001',
+      });
+    });
+
+    expect(createReferencePromptOptimizationKey(rawPrompt, options)).toBe(
+      createReferencePromptOptimizationKey(rawPrompt, { ...options }),
+    );
+    expect(optimizeCharacterReferencePrompt).toHaveBeenCalledOnce();
+    expect(createReferenceImage).toHaveBeenCalledOnce();
+    expect(composeReferenceImage).toHaveBeenCalledOnce();
+    expect(vi.mocked(handlers.onPhase).mock.calls.map(([phase]) => phase)).toEqual([
+      'optimizing',
+      'generating',
+      'generating',
+    ]);
+  });
+
+  it('re-optimizes when optimization-relevant settings change', async () => {
+    const handlers = callbacks();
+    const { result } = renderHook(() => useReferencePreviewGeneration(handlers));
+    const changedOptions: CharacterReferenceOptions = {
+      ...options,
+      framing: 'full_body',
+    };
+
+    await act(async () => {
+      await result.current.generate({ rawPrompt, options });
+      await result.current.generate({ rawPrompt, options: changedOptions });
+    });
+
+    expect(optimizeCharacterReferencePrompt).toHaveBeenCalledTimes(2);
+    expect(optimizeCharacterReferencePrompt).toHaveBeenLastCalledWith(
+      { rawPrompt, options: changedOptions },
+      expect.any(AbortSignal),
+    );
   });
 
   it('routes instructed regeneration to edit with the source asset and trimmed instructions', async () => {

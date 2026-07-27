@@ -7,11 +7,11 @@ As a creator, I want to understand what is available and how to recover from una
 ## Starting state
 
 - The creator opens the studio in a supported or partially supported environment.
-- Optional Decart, OpenAI, and ElevenLabs credentials may or may not be configured.
+- Optional Decart, OpenAI, BFL, and ElevenLabs credentials may or may not be configured.
 
 ## End-to-end steps
 
-1. On startup, read the header status. Local capture readiness comes from browser feature detection. Decart and ElevenLabs availability comes from the loopback `/api/capabilities` check; that check also reports OpenAI reference availability inside the relevant tools. It does not contact any provider and reports configured availability, not live provider health.
+1. On startup, read the header status. Local capture readiness comes from browser feature detection. Decart and ElevenLabs availability comes from the loopback `/api/capabilities` check; that check also reports the server-selected OpenAI/BFL image provider and independent OpenAI optimizer availability inside the relevant tools. It does not contact any provider and reports configured availability, not live provider health.
 2. If Local Camera is available, prepare prompts, manage the Recipe Shelf, stage capture settings, preview/record locally, and use local voice processing without provider credentials.
 3. If AI video is available, use the Character AI or Virtual Try-On workflows. If unavailable, use local preparation/capture and read the availability explanation rather than attempting to start AI.
 4. Reference availability appears inside Workshop and Character Builder. If generation/editing is available, follow the explicit optimization/generation or composition steps. If unavailable, still build and save text-only characters or upload/save/use a reference directly, including an image-only character.
@@ -32,7 +32,7 @@ As a creator, I want to understand what is available and how to recover from una
 - If the local capability check fails, select **Retry check**. Continue local preparation while availability remains unknown.
 - If browser device access fails, use the stage notice to open **Capture settings**, resolve the named issue, then retry the explicit start action.
 - If a provider capability is absent, use the related local/text-only alternative rather than expecting another configured provider to enable it.
-- If a stored reference, recording treatment, or provider conversion fails, retry the named operation or retain the existing text/original artifact; the app does not silently replace it. An unavailable OpenAI capability does not disable local reference upload/direct use.
+- If a stored reference, recording treatment, or provider conversion fails, retry the named operation or retain the existing text/original artifact; the app does not silently replace it. An unavailable selected image provider does not disable local reference upload/direct use, and the server never falls back to another image provider.
 
 ## Completion criteria
 

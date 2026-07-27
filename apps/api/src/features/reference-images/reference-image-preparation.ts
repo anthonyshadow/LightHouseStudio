@@ -10,6 +10,7 @@ import {
   type ReferenceImageSize,
 } from '@studio/contracts';
 import type { CharacterPromptOptimizer } from '../../providers/openai/character-prompt-optimizer.js';
+import type { ReferenceImageProviderDescriptor } from '../../providers/reference-images/reference-image-provider.js';
 import type { StoredReferenceImageMetadata } from './asset-store.js';
 import { ReferenceImageGenerationStateError } from './reference-image-error.js';
 import {
@@ -57,44 +58,99 @@ type ReferenceImageOptions = CreateReferenceImageRequest['options'];
 type RecommendedSettings = CharacterPromptOptimizationResult['recommendedSettings'];
 
 const sha256 = (value: string): string => createHash('sha256').update(value, 'utf8').digest('hex');
+const jsonFingerprint = (value: unknown): string => sha256(JSON.stringify(value));
 
-export const generationRequestFingerprint = (input: GenerateReferenceImageInput): string =>
-  sha256(
-    JSON.stringify({
-      kind: 'generate',
-      rawPrompt: input.rawPrompt,
-      options: input.options,
-      generator: input.generator ?? null,
-      optimization: input.optimization,
-    }),
-  );
+const legacyGenerationRequestFingerprint = (input: GenerateReferenceImageInput): string =>
+  jsonFingerprint({
+    kind: 'generate',
+    rawPrompt: input.rawPrompt,
+    options: input.options,
+    generator: input.generator ?? null,
+    optimization: input.optimization,
+  });
 
-export const editRequestFingerprint = (input: EditReferenceImageInput): string =>
-  sha256(
-    JSON.stringify({
-      kind: 'edit',
-      templateVersion: REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION,
-      sourceAssetId: input.sourceAssetId,
-      rawPrompt: input.rawPrompt,
-      changeInstructions: input.changeInstructions,
-      options: input.options,
-      generator: input.generator ?? null,
-      optimization: input.optimization,
-    }),
-  );
+const legacyEditRequestFingerprint = (input: EditReferenceImageInput): string =>
+  jsonFingerprint({
+    kind: 'edit',
+    templateVersion: REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION,
+    sourceAssetId: input.sourceAssetId,
+    rawPrompt: input.rawPrompt,
+    changeInstructions: input.changeInstructions,
+    options: input.options,
+    generator: input.generator ?? null,
+    optimization: input.optimization,
+  });
 
-export const compositionRequestFingerprint = (input: ComposeReferenceImageInput): string =>
-  sha256(
-    JSON.stringify({
-      kind: 'compose',
-      templateVersion: REFERENCE_IMAGE_COMPOSITION_PROMPT_TEMPLATE_VERSION,
-      sourceAssetId: input.sourceAssetId,
-      rawPrompt: input.rawPrompt,
-      options: input.options,
-      generator: input.generator ?? null,
-      optimization: input.optimization,
-    }),
-  );
+const legacyCompositionRequestFingerprint = (input: ComposeReferenceImageInput): string =>
+  jsonFingerprint({
+    kind: 'compose',
+    templateVersion: REFERENCE_IMAGE_COMPOSITION_PROMPT_TEMPLATE_VERSION,
+    sourceAssetId: input.sourceAssetId,
+    rawPrompt: input.rawPrompt,
+    options: input.options,
+    generator: input.generator ?? null,
+    optimization: input.optimization,
+  });
+
+const providerFingerprint = (descriptor: ReferenceImageProviderDescriptor) => ({
+  providerId: descriptor.providerId,
+  modelId: descriptor.modelId,
+  adapterVersion: descriptor.adapterVersion,
+  effectiveSettings: descriptor.effectiveSettings,
+});
+
+export const generationRequestFingerprint = (
+  input: GenerateReferenceImageInput,
+  descriptor?: ReferenceImageProviderDescriptor,
+): string =>
+  descriptor === undefined
+    ? legacyGenerationRequestFingerprint(input)
+    : jsonFingerprint({
+        version: 2,
+        kind: 'generate',
+        provider: providerFingerprint(descriptor),
+        rawPrompt: input.rawPrompt,
+        options: input.options,
+        generator: input.generator ?? null,
+        optimization: input.optimization,
+      });
+
+export const editRequestFingerprint = (
+  input: EditReferenceImageInput,
+  descriptor?: ReferenceImageProviderDescriptor,
+): string =>
+  descriptor === undefined
+    ? legacyEditRequestFingerprint(input)
+    : jsonFingerprint({
+        version: 2,
+        kind: 'edit',
+        provider: providerFingerprint(descriptor),
+        templateVersion: REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION,
+        sourceAssetId: input.sourceAssetId,
+        rawPrompt: input.rawPrompt,
+        changeInstructions: input.changeInstructions,
+        options: input.options,
+        generator: input.generator ?? null,
+        optimization: input.optimization,
+      });
+
+export const compositionRequestFingerprint = (
+  input: ComposeReferenceImageInput,
+  descriptor?: ReferenceImageProviderDescriptor,
+): string =>
+  descriptor === undefined
+    ? legacyCompositionRequestFingerprint(input)
+    : jsonFingerprint({
+        version: 2,
+        kind: 'compose',
+        provider: providerFingerprint(descriptor),
+        templateVersion: REFERENCE_IMAGE_COMPOSITION_PROMPT_TEMPLATE_VERSION,
+        sourceAssetId: input.sourceAssetId,
+        rawPrompt: input.rawPrompt,
+        options: input.options,
+        generator: input.generator ?? null,
+        optimization: input.optimization,
+      });
 
 export const hashReferenceImageEditInstructions = (instructions: string): string =>
   sha256(instructions);
@@ -102,13 +158,28 @@ export const hashReferenceImageEditInstructions = (instructions: string): string
 export const assertMatchingRequestFingerprint = (
   metadata: StoredReferenceImageMetadata,
   requestFingerprint: string,
+  compatibility?: {
+    readonly legacyFingerprint: string;
+    readonly descriptor: ReferenceImageProviderDescriptor;
+  },
 ): void => {
   if (
-    metadata.requestFingerprint !== undefined &&
-    metadata.requestFingerprint !== requestFingerprint
+    metadata.requestFingerprint === undefined ||
+    metadata.requestFingerprint === requestFingerprint
   ) {
-    throw new ReferenceImageGenerationStateError('request-id-conflict');
+    return;
   }
+  if (
+    compatibility !== undefined &&
+    metadata.requestFingerprintVersion === undefined &&
+    metadata.source === 'generated' &&
+    metadata.provider === compatibility.descriptor.providerId &&
+    metadata.model === compatibility.descriptor.modelId &&
+    metadata.requestFingerprint === compatibility.legacyFingerprint
+  ) {
+    return;
+  }
+  throw new ReferenceImageGenerationStateError('request-id-conflict');
 };
 
 const ORIENTATION_DEFAULTS: Record<

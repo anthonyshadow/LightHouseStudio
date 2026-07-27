@@ -257,7 +257,7 @@ const generatedReferenceImageAssetCommonShape = {
     .positive()
     .max(REFERENCE_IMAGE_MAX_BYTES - 1),
   source: z.literal('generated'),
-  provider: z.literal('openai'),
+  provider: z.enum(['openai', 'bfl']),
   model: z.string().trim().min(1).max(128),
   quality: z.enum(['high', 'medium']),
   promptHash: referenceImagePromptHashSchema,

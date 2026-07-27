@@ -96,6 +96,7 @@ export const fetchProviderAvailability = async (
     elevenLabsModel: payload.elevenLabs.modelId ?? null,
     referenceImages: payload.referenceImages.available,
     referenceImageEditAvailable: payload.referenceImages.editAvailable,
+    referenceImageProvider: payload.referenceImages.providerId,
     referenceImageModel: payload.referenceImages.modelId,
     referenceImageSizes: payload.referenceImages.sizes,
     referenceImageOptimizerAvailable: payload.referenceImages.optimizer.available,
