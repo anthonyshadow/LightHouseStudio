@@ -11,16 +11,19 @@ As a creator, I want to preview a Lucy VTON 3 garment transformation, so that I 
 
 ## End-to-end steps
 
-1. Open **Dock** and select **Virtual Try-On · Lucy VTON 3**. Confirm discarding/replacing a dirty prior draft when prompted.
-2. In **Try-On recipe**, type a garment direction such as the replacement garment and visible qualities.
-3. Optionally attach a garment reference image. Verify the temporary preview appears; use **Clear image** to remove it before starting.
-4. Decide whether to enable **Prompt enhancement**. It is off by default and only changes the applied Decart prompt after an explicit Apply/Start.
-5. Optional: select **Check camera & mic** to solve permission/device issues before contacting Decart.
-6. Select **Start Virtual Try-On AI**. The start control remains unavailable until a direction or reference image exists.
-7. Grant browser media access if needed, then wait through local acquisition, short-lived credential issuance, and the provider connection.
-8. Confirm that live transformed video is present on stage. Before a usable transformed video track exists, recording stays unavailable and local fallback is retained.
-9. Update garment text, image, or enhancement as needed. Select **Apply changes** to commit the complete draft, or **Revert draft** to restore the current applied snapshot.
-10. Stop/reset the AI session or record the transformed output, then complete take review.
+1. Optionally prepare a garment recipe in the Recipe Dock or choose one from the Recipe Shelf.
+2. Select **Start Camera + Mic**, grant permission, and confirm a healthy local preview.
+3. Select **Start AI**, then choose **Virtual Try-On** in **Choose AI experience**.
+4. If the current VTON draft is ready, select **Start Virtual Try-On**. Otherwise select **Configure Virtual Try-On** to open the Dock, or **Choose Saved Try-On** to use the Shelf.
+5. In **Try-On recipe**, provide a garment direction, attach a temporary garment image, or both. Prompt enhancement is optional and off by default. Start stays unavailable until text or an image exists.
+6. Start the configured experience and wait through short-lived credential issuance and the provider connection.
+7. Confirm that live transformed video is present on stage. Before a usable transformed video track exists, recording stays unavailable and local fallback is retained.
+8. Update garment text, image, or enhancement as needed. Select **Apply changes** to commit the complete draft, or **Revert draft** to restore the current applied snapshot.
+9. Use **Change**, **Stop AI**, or Dock **Reset AI** deliberately. To capture the result, select **Record**, then **Stop recording**, and complete take review.
+
+The Dock remains an alternate direct path: select **Virtual Try-On · VTON 3**,
+optionally **Check camera & mic**, and choose **Start Virtual Try-On AI** after
+the draft is valid. The implementation model ID remains `lucy-vton-3`.
 
 ## Failure and alternate paths
 

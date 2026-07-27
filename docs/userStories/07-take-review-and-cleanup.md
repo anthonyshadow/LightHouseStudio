@@ -11,15 +11,15 @@ As a creator, I want to finalize, inspect, download, and deliberately release my
 
 ## End-to-end steps
 
-1. Confirm that **Record a take** is enabled. Local capture uses local camera/microphone; AI capture requires usable transformed video and uses provider audio when live or microphone fallback otherwise.
-2. Select **Record a take** and verify it becomes **Finish take**. The app pins the selected video/audio track identities and snapshots source metadata for this take.
-3. Select **Finish take**. Do not start another media action while the stage reports finalization.
+1. Confirm that **Record** is enabled. Local capture uses local camera/microphone; AI capture requires usable transformed video and uses provider audio when live or microphone fallback otherwise.
+2. Select **Record** and verify it becomes **Stop recording**. The app pins the selected video/audio track identities and snapshots source metadata for this take.
+3. Select **Stop recording**. Do not start another media action while the stage reports finalization.
 4. Wait for main video and optional audio-sidecar recorders to settle. The app creates the original Blob, URL, filename, metadata, and duration before it releases local/provider resources.
-5. Confirm that the stage displays **Recorded take playback** and **Latest take** opens. Review mode, video/audio source, start time, dimensions/frame rate, duration, size, and MIME information.
-6. Play the take on the main stage. If desired, select **Voice treatments** before download; processing temporarily locks playback/download until a complete replacement exists.
-7. Select **Download take**. This tells the browser to begin a download and changes the panel state to **A download was started**.
-8. After download initiation, select **Close take**. The app revokes original/processed URLs, clears the take, closes review, and returns to private idle.
-9. Or select **Discard**, read the irreversible confirmation, and confirm. This removes the temporary take without initiating a download.
+5. Confirm that the stage displays **Recorded take playback** with compact Download, Discard, Voice, and Close actions. Latest Take must still be closed.
+6. Select **Take** to open Latest Take and review mode, video/audio source, start time, dimensions/frame rate, duration, size, and MIME information. The overlay does not create a second player.
+7. Play the take on the main stage. If desired, select **Voice** on the stage or **Voice treatments** in Latest Take; processing temporarily locks playback/download until a complete replacement exists.
+8. Select **Download** on the stage or **Download take** in the panel. This tells the browser to begin a download and changes the panel state to **A download was started**.
+9. After download initiation, select **Close** or **Close take**. The app revokes original/processed URLs, clears the take, closes review, and returns to private idle. Or select **Discard**, read the irreversible confirmation, and confirm removal without a download.
 
 ## Failure and alternate paths
 

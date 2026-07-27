@@ -23,6 +23,10 @@ As a creator, I want to compose a complete character recipe and optionally creat
 10. Wait for the generated local immutable asset. Confirm the preview is attached; select **Regenerate** for a new explicit request or **Detach** to remove its relationship from the current workshop.
 11. Select **Use in working draft**. The app hydrates the asset, uses its stored Lucy character prompt, attaches the image, and enables enhancement atomically for Character AI.
 
+This Workshop flow creates generated reference assets. Character Builder has a
+separate durable user-upload and composition flow; ordinary Recipe Dock portrait
+files remain ephemeral.
+
 ## Failure and alternate paths
 
 - Prompt changes, reference settings, optimizer model/version, or toggling optimization make prior results stale. Regenerate rather than assuming the preview matches.

@@ -1,8 +1,15 @@
 # Lightframe Studio
 
-Lightframe Studio is a local-first browser camera studio for recording ordinary webcam takes, realtime AI character transformations, and virtual garment try-ons. `/` is the sole Studio entry. Character creation opens as a fullscreen Studio-owned panel, so streams, recording state, the Recipe Dock, and the Recipe Shelf remain mounted beneath it.
+Lightframe Studio is a local-first browser camera studio for recording ordinary webcam takes, realtime AI character transformations, and virtual garment try-ons. `/` is the sole Studio entry. Character creation opens as a fullscreen Studio-owned panel; the stable stage, streams, recording/session state, and creative repositories/controllers remain owned by Studio while individual tool surfaces may unmount.
 
 Provider contact is always explicit. Local Camera works without provider credentials and does not request a realtime token, open a provider connection, or send camera media to Decart. Character preview generation and ElevenLabs voice work begin only after their labeled user actions.
+
+The primary stage flow is **Start Camera + Mic**, then **Start AI** and a
+fullscreen experience choice when AI is wanted. The Recipe Dock remains the
+direct-control path for editing and starting a specific model recipe. Recording
+uses **Record** and **Stop recording**. A finalized take replaces live media on
+the same stage; the detailed Latest Take panel opens only when the creator
+selects **Take**.
 
 > Product-contract update: the rebuild guide names Lucy 2.1. The user explicitly approved **Lucy 2.5**, so the implemented character model is `lucy-2.5`. Virtual try-on remains `lucy-vton-3`. This is an intentional source-of-truth update, not an accidental compatibility drift.
 
@@ -12,11 +19,11 @@ Provider contact is always explicit. Local Camera works without provider credent
 - A fullscreen character builder with resumable IndexedDB autosave and explicit Reset Draft
 - Separate `lucy-2.5` character and `lucy-vton-3` try-on sessions
 - Draft-versus-applied realtime recipes with atomic Apply, Revert, and Reset
-- JPEG, PNG, and WebP reference images up to and including 10 MiB
+- JPEG, PNG, and WebP reference images up to and including 10 MiB; Character Builder uploads also enforce a 40-megapixel decoded-image limit
 - A four-intent structured character prompt workshop with adult-only age, gender, skin-tone, body-shape, hairstyle, and hair-color direction
 - Gender-aware visual suggestions, nine character starters, Show All catalogs, and custom text for directions outside the catalog
-- Optional, automatically optimized `gpt-image-2` previews plus source-image editing for instructed regeneration
-- A versioned Recipe Shelf v3 for saved, recent, and restorable character prompts with optional guided-design provenance
+- Optional, automatically optimized `gpt-image-2` previews, durable local uploads, source-image composition, and instructed editing
+- A versioned Recipe Shelf v4 for saved, recent, and restorable character prompts with reference provenance and optional guided-design provenance
 - Browser recording with transformed-video gating and provider-audio/microphone fallback
 - Temporary take review plus a Studio legacy manager for downloading or deleting retired Guided projects
 - Browser-local warm, clear, and robot voice treatments from immutable source audio
@@ -25,11 +32,11 @@ Provider contact is always explicit. Local Camera works without provider credent
 
 ## Requirements
 
-- Node.js 22.12 or newer
-- npm 10 or newer
+- Node.js 24 (`>=24 <25`); `.nvmrc` pins the repository default to `24.18.0`
+- npm 11 or newer
 - A current browser with a secure context, `getUserMedia`, and `MediaRecorder`
 - A camera and microphone for live capture
-- Optional provider credentials for AI video and cloud voice conversion
+- Optional, independent provider credentials for AI video, OpenAI reference work, and cloud voice conversion
 
 For the fullest media and remuxing support, begin with a current desktop Chromium browser. See [browser support](docs/BROWSER_SUPPORT.md) before relying on Safari, iOS, or a particular recording codec.
 
@@ -41,7 +48,7 @@ cp .env.example .env
 npm run dev
 ```
 
-Open <http://127.0.0.1:4173> for Studio. Retired `/advanced`, `/guided`, and `/projects` entries history-replace to `/`; project-oriented entries open the legacy-project manager. The web dev server proxies `/api` to the Fastify server on `127.0.0.1:4100`.
+Open <http://127.0.0.1:4173> for Studio. Retired `/advanced`, `/guided`, and `/projects` entries history-replace to `/`; project-oriented entries open the legacy-project manager. The web dev server proxies `/api` to the Fastify server on `127.0.0.1:4100`. Keep `PORT=4100` for the normal `npm run dev` and functional Playwright paths because the Vite proxy is currently fixed to that port.
 
 No keys are needed for local preview, local recording, the prompt workshop, the Recipe Shelf, or local voice treatments. Keep the key fields empty to exercise the no-provider path.
 
@@ -49,33 +56,33 @@ For a production-style local build:
 
 ```bash
 npm run build
-npm start
+NODE_ENV=production npm start
 ```
 
-Open <http://127.0.0.1:4100>. The API serves the built client from the same loopback origin.
+Open <http://127.0.0.1:4100>. `npm start` starts the API, which serves the built client from the same loopback origin. Production startup fails if `apps/web/dist` is absent. This is a same-machine production-mode smoke, not a supported remote deployment.
 
 ## Configuration
 
 All provider credentials are read only by `apps/api`. Never place provider secrets in `VITE_*` variables.
 
-| Variable                             | Required              | Purpose                                                                                                                                                                                                                                                                                           |
-| ------------------------------------ | --------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DECART_API_KEY`                     | Only for AI video     | Server credential used to mint short-lived, origin-bound, single-model browser credentials. Credential start TTL is distinct from the active-session duration.                                                                                                                                    |
-| `OPENAI_API_KEY`                     | Only for references   | Server-only credential used for prompt optimization and reference-image generation.                                                                                                                                                                                                               |
-| `OPENAI_PROMPT_OPTIMIZER_MODEL`      | No                    | Responses API text model used by the optimizer; defaults to `gpt-5.6`.                                                                                                                                                                                                                            |
-| `OPENAI_PROMPT_OPTIMIZER_REASONING`  | No                    | Optimizer reasoning effort; defaults to `medium`.                                                                                                                                                                                                                                                 |
-| `OPENAI_PROMPT_OPTIMIZER_VERSION`    | No                    | Version marker included in stale-result checks and saved asset metadata; defaults to `lucy-character-reference-v1`.                                                                                                                                                                               |
-| `OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS` | No                    | Optimizer request timeout in milliseconds, from `10000` through `180000`; defaults to `120000`.                                                                                                                                                                                                   |
-| `OPENAI_REFERENCE_IMAGE_MODEL`       | No                    | Image-generation model; defaults to `gpt-image-2`.                                                                                                                                                                                                                                                |
-| `OPENAI_REFERENCE_IMAGE_QUALITY`     | No                    | Final reference quality, `high` or `medium`; defaults to `high`.                                                                                                                                                                                                                                  |
-| `LIGHTFRAME_DATA_DIR`                | No                    | Owner-only local storage for immutable generated reference images and metadata; defaults to repository-root `./.lightframe-data`. Absolute paths remain absolute. A known legacy API-relative directory is reused only when the canonical path is absent; data is never moved automatically.      |
-| `ELEVENLABS_API_KEY`                 | Only for cloud voices | Server credential for voice discovery, proxied previews, public voice import, and speech-to-speech conversion.                                                                                                                                                                                    |
-| `ELEVENLABS_STS_MODEL_ID`            | No                    | Speech-to-speech model; defaults to `eleven_multilingual_sts_v2`.                                                                                                                                                                                                                                 |
-| `ELEVENLABS_ENABLE_LOGGING`          | No                    | Strict `true`/`false` sent to ElevenLabs conversion as `enable_logging`; omission defaults to privacy-first `false`. ElevenLabs currently restricts zero-retention mode to eligible enterprise accounts, so other accounts must deliberately set `true` after reviewing provider retention terms. |
-| `PORT`                               | No                    | Loopback API port; defaults to `4100`.                                                                                                                                                                                                                                                            |
-| `NODE_ENV`                           | No                    | One of `development`, `test`, or `production`.                                                                                                                                                                                                                                                    |
+| Variable                             | Required              | Purpose                                                                                                                                                                                                                                                                                                                                  |
+| ------------------------------------ | --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DECART_API_KEY`                     | Only for AI video     | Server credential used to mint short-lived, origin-bound, single-model browser credentials. Credential start TTL is distinct from the active-session duration.                                                                                                                                                                           |
+| `OPENAI_API_KEY`                     | Only for references   | Server-only credential used for prompt optimization and reference-image generation, composition, and editing.                                                                                                                                                                                                                            |
+| `OPENAI_PROMPT_OPTIMIZER_MODEL`      | No                    | Responses API text model used by the optimizer; defaults to `gpt-5.6`.                                                                                                                                                                                                                                                                   |
+| `OPENAI_PROMPT_OPTIMIZER_REASONING`  | No                    | Optimizer reasoning effort; defaults to `medium`.                                                                                                                                                                                                                                                                                        |
+| `OPENAI_PROMPT_OPTIMIZER_VERSION`    | No                    | Version marker included in stale-result checks and saved asset metadata; defaults to `lucy-character-reference-v1`.                                                                                                                                                                                                                      |
+| `OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS` | No                    | Optimizer request timeout in milliseconds, from `10000` through `180000`; defaults to `120000`.                                                                                                                                                                                                                                          |
+| `OPENAI_REFERENCE_IMAGE_MODEL`       | No                    | Image-generation model; defaults to `gpt-image-2`.                                                                                                                                                                                                                                                                                       |
+| `OPENAI_REFERENCE_IMAGE_QUALITY`     | No                    | Final reference quality, `high` or `medium`; defaults to `high`.                                                                                                                                                                                                                                                                         |
+| `LIGHTFRAME_DATA_DIR`                | No                    | Owner-only local storage for immutable uploaded, generated, edited, and composed Character Builder references and metadata; defaults to repository-root `./.lightframe-data`. Absolute paths remain absolute. A known legacy API-relative directory is reused only when the canonical path is absent; data is never moved automatically. |
+| `ELEVENLABS_API_KEY`                 | Only for cloud voices | Server credential for voice discovery, proxied previews, public voice import, and speech-to-speech conversion.                                                                                                                                                                                                                           |
+| `ELEVENLABS_STS_MODEL_ID`            | No                    | Speech-to-speech model; defaults to `eleven_multilingual_sts_v2`.                                                                                                                                                                                                                                                                        |
+| `ELEVENLABS_ENABLE_LOGGING`          | No                    | Strict `true`/`false` sent to ElevenLabs conversion as `enable_logging`; omission defaults to privacy-first `false`. ElevenLabs currently restricts zero-retention mode to eligible enterprise accounts, so other accounts must deliberately set `true` after reviewing provider retention terms.                                        |
+| `PORT`                               | No                    | Loopback API port; defaults to `4100`.                                                                                                                                                                                                                                                                                                   |
+| `NODE_ENV`                           | No                    | One of `development`, `test`, or `production`.                                                                                                                                                                                                                                                                                           |
 
-Provider availability is reported by `GET /api/capabilities`; missing optional configuration degrades only that capability. Environment values are validated at startup. `.env` is ignored by Git.
+Provider availability is reported by `GET /api/capabilities`; it reports configuration presence and does not probe provider reachability, quota, or entitlement. Missing optional configuration degrades only that capability. Environment values are validated at startup. `.env` is ignored by Git.
 
 ## Commands
 
@@ -86,15 +93,23 @@ npm run typecheck     # strict TypeScript checks in every workspace and E2E suit
 npm run lint          # ESLint, React hooks, and accessibility rules
 npm run format:check  # verify Prettier formatting
 npm test              # deterministic domain, API, and component tests
+npm run test:watch    # interactive Vitest watch mode
 npm run test:coverage # local coverage report
 npm run test:e2e      # Playwright projects; install its browsers first
-npm run test:visual   # the curated 27-state visual regression suite
+npm run test:visual   # the curated 29-case Chromium visual suite
+npm run storybook     # local component catalog on port 6006
+npm run storybook:typecheck # type-check stories and Storybook configuration
+npm run storybook:test # Chromium-backed Storybook interaction/a11y tests
+npm run storybook:build # static Storybook build
 npm run check:dead-code # Knip entrypoint/export/dependency validation
 npm run check:modules # local import resolution, cycle, and boundary checks
-npm run quality       # types, lint, format, static checks, unit tests, and build
+npm run audit:prod    # high-severity production dependency audit
+npm run quality       # types, Storybook, lint, format, static checks, tests, and builds
 ```
 
-Install Playwright browsers once with `npx playwright install`. Coverage, end-to-end, and curated visual checks are independent CI gates; run all three in addition to `npm run quality` before release.
+Install Playwright browsers once with `npx playwright install`. Coverage, end-to-end, curated visual, and production audit checks are independent of the local `quality` script; run all four before release. The GitHub `quality` job runs the production audit and core checks directly rather than invoking the root script, and currently omits the Storybook checks that local `quality` includes.
+
+The executable visual matrix contains 29 cases. The checked-in Darwin set is complete, but the Linux set used by CI currently lacks the two AI-experience-choice baselines; baseline generation and the still-27-case pruning script require a dedicated test-asset change.
 
 Default automated tests use fakes and deny unexpected external HTTP and WebSockets; they do not require devices, provider credentials, paid requests, or external media services. Mocked browser journeys exercise successful Local, Lucy 2.5, and VTON 3 flows across Chromium, WebKit, and mobile. Live provider checks are deliberately manual and gated; see [live provider smoke testing](docs/LIVE_PROVIDER_SMOKE.md).
 
@@ -112,10 +127,10 @@ pure rules          runtime HTTP schemas
                          │
                   apps/api Fastify routes
                          │
-              Decart / ElevenLabs adapters
+          Decart / OpenAI / ElevenLabs adapters
 ```
 
-The creator of a stream, recorder, timer, object URL, audio context, or provider client owns its cleanup. Domain rules and HTTP schemas are independent of React and provider payloads. The root test setup declares the deny-external policy while feature-local suites provide focused fakes. The backend has no product database, account system, background jobs, or session history; its one durable responsibility is the owner-only local generated-reference asset store.
+The creator of a stream, recorder, timer, object URL, audio context, or provider client owns its cleanup. Domain rules and HTTP schemas are independent of React and provider payloads. The root test setup declares the deny-external policy while feature-local suites provide focused fakes. The backend has no product database, account system, background jobs, or session history; its one durable responsibility is the owner-only local reference-asset store.
 
 Production browser builds omit source maps and fail if the development-only realtime test seam survives executable tree-shaking. Browser session and recording adapters use the tested domain mode, lifecycle, source-selection, and artifact contracts rather than maintaining independent rule sets.
 
@@ -123,15 +138,15 @@ Read [architecture](docs/ARCHITECTURE.md), [privacy and temporary data](docs/PRI
 
 ## Important operating boundaries
 
-- Recordings, sidecars, processed media, object URLs, tokens, voice selections, streams, device identifiers, and manually uploaded images are temporary and disappear on discard, replacement, unmount, or tab closure as applicable. Media in legacy Guided projects remains checkpointed in this browser profile's IndexedDB until explicit deletion, browser eviction, or site-data clearing.
-- Generated character references are immutable local assets under `LIGHTFRAME_DATA_DIR`; Recipe Shelf v3 stores only allowlisted metadata, guided-design provenance, and opaque asset IDs in this browser profile.
+- Recordings, sidecars, processed media, object URLs, tokens, voice selections, streams, device identifiers, and Recipe Dock portrait/garment files are temporary and disappear on discard, replacement, unmount, or tab closure as applicable. Media in legacy Guided projects remains checkpointed in this browser profile's IndexedDB until explicit deletion, browser eviction, or site-data clearing.
+- Character Builder uploads and generated, edited, or composed references are immutable local assets under `LIGHTFRAME_DATA_DIR`. Recipe Shelf v4 stores only allowlisted metadata, reference/guided provenance, and opaque asset IDs in this browser profile.
 - Saving a character never generates an image implicitly. Prompt-only Save makes no optimizer or image request. `Generate Preview` always optimizes the current direction before generating; a stale preview remains visible but is detached from Save until regenerated.
-- Blank regeneration creates a fresh immutable asset without sending the prior image. Written feedback uses the prior owner-scoped asset as a server-resolved image-edit source. Superseded and discarded generated assets remain immutable and may become unreferenced.
+- Uploading a Builder reference stores it locally without contacting OpenAI. It can be saved directly with a prompt or through **Save & Use Image Only**. **Generate Combined Preview** optimizes the direction and sends the uploaded source to OpenAI for composition. Without an uploaded source, blank regeneration creates a fresh asset without the prior generated image; with an uploaded source, it composes from that source again. Written feedback uses the current owner-scoped source as an image-edit input. Removing or superseding a reference detaches it but does not delete the immutable asset.
 - Workshop reference generation retains its existing advanced optimization controls. The Studio character builder uses automatic optimization for every generated preview.
-- Reference generation defaults to the complete full-body silhouette whenever the character's anatomy permits it, with safe margin for hands, feet, clothing, and defining features. Head-and-shoulders and waist-up remain deliberate crop choices. Orientation choices are automatic, portrait 9:16, landscape 16:9, and square; automatic follows the app's known landscape 16:9 target stream. Rendering can be photorealistic or faithful to source style, with neutral or subtly friendly expression and a neutral gray, off-white, or custom plain background.
+- Reference generation defaults to the complete full-body silhouette whenever the character's anatomy permits it, with safe margin for hands, feet, clothing, and defining features. Head-and-shoulders and waist-up remain deliberate crop choices. Orientation controls are automatic, portrait, landscape, and square; the image provider maps those choices to `1024x1536`, `1536x1024`, and `1024x1024`, and automatic follows the app's landscape target stream. Rendering can be photorealistic or faithful to source style, with neutral or subtly friendly expression and a neutral gray, off-white, or custom plain background.
 - Optimize, Re-optimize, Generate, and Regenerate may incur provider usage. A successful optimization is retained for a generation retry while its source prompt, settings, model, and optimizer version remain current; provider failures never silently fall back to the raw prompt.
 - Starting an AI session sends live camera media and the applied prompt/reference state to Decart and may incur provider usage. Finishing a model take finalizes the clip before releasing the model.
-- Studio AI sessions use the retained internal `advanced` five-minute policy identifier; every recording still warns at 4:30 and stops at 5:00. The retired Guided credential profile remains a compatibility detail and is not an application route.
+- Studio omits the compatibility profile identifier, so the broker applies its default five-minute AI active-session scope. The retired Guided credential profile remains a compatibility detail and is not an application route; ordinary recording has no corresponding five-minute warning or forced-stop timer.
 - ElevenLabs browsing and click-to-play previews contact the provider only after the labeled disclosure/action and carry the Studio provider-intent header. Preview bytes use a short-lived, app-owned Blob URL that is aborted/revoked on replacement or unmount. Browsing, previewing, or selecting does not upload the take. Applying a voice sends only the completed audio sidecar and may use credits; importing a public voice changes the configured workspace.
 - The server accepts loopback hosts only. It is not designed for LAN, tunnel, or public hosting. Remote deployment requires authentication, authorization, CSRF analysis, abuse/rate controls, tenant isolation, secret management, and a new security review.
 
@@ -143,11 +158,15 @@ Read [architecture](docs/ARCHITECTURE.md), [privacy and temporary data](docs/PRI
 - [Browser support](docs/BROWSER_SUPPORT.md)
 - [Manual QA checklist](docs/MANUAL_QA.md)
 - [Live provider smoke test](docs/LIVE_PROVIDER_SMOKE.md)
+- [Implemented user journeys](docs/userStories/README.md)
+- [Storybook catalog](stories/README.md)
+- [Engineering lessons](LESSONS.md)
+- [Coding-agent working guide](AGENTS.md)
 
 ## Known external limitations
 
-Automated checks cannot prove real camera/microphone behavior, device-driver stability, browser codec availability, provider account entitlements, available ElevenLabs models/voices, provider billing status, realtime output quality, or live WebRTC reachability. Those require a supported physical device, browser permission, network access, and optional provider credentials. The product preserves local preparation and capture when either integration is unavailable.
+Automated checks cannot prove real camera/microphone behavior, device-driver stability, browser codec availability, provider account entitlements, available models/voices, provider billing status, realtime output quality, or live WebRTC reachability. Those require a supported physical device, browser permission, network access, and optional provider credentials. The product preserves local preparation and capture when any optional integration is unavailable.
 
-Decart SDK `0.1.14` does not expose an abort signal for client-token creation. The broker returns promptly on browser cancellation or its timeout and ignores any late result, but the SDK's already-started upstream request may still finish and mint an unused short-lived token. Realtime browser connection cancellation is likewise best-effort until the SDK promise resolves; cloned provider input is stopped immediately and a late connection is disconnected as soon as it becomes available.
+Decart SDK `0.1.15` does not expose an abort signal for client-token creation. The broker returns promptly on browser cancellation or its timeout and ignores any late result, but the SDK's already-started upstream request may still finish and mint an unused short-lived token. Realtime browser connection cancellation is likewise best-effort until the SDK promise resolves; cloned provider input is stopped immediately and a late connection is disconnected as soon as it becomes available.
 
 The build intentionally pins the user-approved `lucy-vton-3` identifier even though current Decart examples may show the moving `lucy-vton-latest` alias. The installed SDK recognizes the pinned id; the configured account must still be entitled to it.

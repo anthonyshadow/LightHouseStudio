@@ -22,11 +22,27 @@ Studio retains one permanently mounted media stage as its visual anchor. Recipe 
 
 Covered by: responsive/manual checks, semantic landmarks and labels, keyboard interaction, and component accessibility rules.
 
+### Stage controls lead into a deliberate AI choice
+
+The primary journey now starts local media through **Start Camera + Mic**. Once
+the local stage is healthy, **Start AI** opens a fullscreen chooser for
+Character Transformation or Virtual Try-On and offers the relevant
+create/configure, saved-choice, or start-with-selected action. The Recipe Dock
+remains the direct-control surface for model-specific recipes, preflight,
+Apply/Revert/Reset, and direct Start.
+
+Why it fits: local device consent is visible before the creator chooses a paid
+realtime experience, while advanced controls remain available without a second
+runtime.
+
+Covered by: session-control, experience-chooser, Studio composition, responsive,
+and successful-journey tests.
+
 ### Preparation is separated from provider execution
 
 Prompt editing, structured generation, image validation, and recipe management work before camera access. A model draft is rejected before any media or token request when empty. An optional camera/mic preflight lets the operator resolve permission/device problems without starting AI.
 
-Once preflight media is live, mode switching is locked until the operator explicitly releases the camera and microphone. This prevents a working stream from silently crossing mode boundaries and makes device ownership visible.
+A ready local preflight remains reusable across mode/recipe changes and can be atomically replaced through Capture Settings. Incompatible changes lock only once AI is starting/live, while recording, or during take review; those boundaries prevent active provider or recorder ownership from silently crossing modes.
 
 Why it fits: creators can prepare safely, understand consent, and avoid spending provider time while drafting.
 
@@ -50,13 +66,30 @@ Why it fits: creators can make fast visual decisions without turning gender into
 
 Covered by: schema migration, prompt generation, catalog cardinality, shared-choice, custom-value, gender-change preservation, and Character Workshop component tests.
 
-### Reference generation is optional, automatic when requested, and stale-safe
+### Reference uploads and generation are explicit, durable, and stale-safe
 
-Save Character validates and compiles the design but never generates an image. `Generate Preview` automatically optimizes the current character and then creates one immutable reference. Existing framing/output controls live in a disclosure. Any later character or setting edit marks the visible preview stale and excludes it from Save; prompt-only Save remains available. Regenerate always asks for optional feedback: blank feedback creates a fresh image without the old asset, while written feedback uses the owner-scoped prior asset through the image-edit endpoint.
+Save Character validates and compiles the design but never generates an image. A
+Character Builder upload is validated and stored as an immutable local asset
+without contacting OpenAI. It can be saved with a prompt, or through **Save &
+Use Image Only**. `Generate Preview` automatically optimizes the current
+character and creates one immutable reference. With an uploaded source,
+**Generate Combined Preview** optimizes and composes from that source.
 
-Why it fits: saving a reusable character no longer implies a potentially billable image request, while generated references remain available when visual consistency matters.
+Any later character or setting edit marks the visible preview stale and excludes
+it from generated-image Save; prompt-only or direct-upload Save remains
+available where valid. Regenerate always asks for optional feedback. Blank
+feedback creates a fresh image when there is no upload, or composes from the
+uploaded source again. Written feedback uses an owner-scoped source through the
+image-edit endpoint. Remove/detach changes only the browser relationship;
+immutable source and result assets may remain on disk.
 
-Covered by: prompt-only no-request, optimize→generate, blank regeneration, instructed edit, stale-reference detachment, and recovery tests.
+Why it fits: uploading or saving a reusable character no longer implies a
+potentially billable image request, while generated/composed references remain
+available when visual consistency matters.
+
+Covered by: upload validation/restore, direct and image-only save,
+optimize→generate/compose, blank regeneration, instructed edit, provenance,
+stale-reference fallback, and recovery tests.
 
 ### Local fallback remains on stage until transformed video is truly usable
 
@@ -68,9 +101,15 @@ Covered by: track-selection/source-composition tests and manual disconnect/track
 
 ### Recipe Shelf adds resilient, scoped creative memory
 
-Saved recipes, successful recents, and restorable structured character prompts share a searchable model-scoped shelf. Recents are recorded only after successful Start/Apply. Corrupt storage is sanitized; failed storage falls back to a session-only repository with a visible notice. Reference-image status makes it explicit that no portrait is saved.
+Saved recipes, successful recents, and restorable structured character prompts share a searchable model-scoped shelf. Recents are recorded only after successful Start/Apply. Corrupt storage is sanitized; failed storage falls back to a session-only repository with a visible notice. Reference-image status distinguishes missing, uploaded, and generated relationships without storing image bytes in the Shelf.
 
-Recipe Shelf v3 adds the complete canonical character draft and optional versioned guided provenance. It migrates v2/v1 records with empty new fields and null provenance rather than guessing body shape, skin tone, or hair color from legacy text.
+Recipe Shelf v3 historically added the complete canonical character draft and
+optional versioned guided provenance. The current v4 payload adds the uploaded
+source relationship, whether the final reference is uploaded or generated, and
+the character name on applicable Recents. It migrates v1, v2, and v3 records
+with validated defaults: a legacy persisted reference becomes a generated final
+reference, its uploaded-source relationship remains null, and missing structured
+traits receive their schema defaults.
 
 Why it fits: repeated creative work becomes faster without accounts, sync, or cloud storage; Recipe Shelf itself still stores no image or recording bytes.
 
@@ -98,11 +137,11 @@ Covered by: Recipe Shelf dirty-state/focus component tests and Playwright checks
 
 ### Take finalization is a first-class handoff
 
-Finishing any recording waits for the main recorder and sidecar to settle and publishes the immutable artifact before releasing Decart, remote/cloned tracks, owned camera/microphone tracks, listeners, analysers, and timers. The artifact then replaces live media in the same persistent stage. The studio does not return to or reacquire local preview, and new media work remains locked until the operator closes or discards the take.
+Selecting **Stop recording** waits for the main recorder and sidecar to settle and publishes the immutable artifact before releasing Decart, remote/cloned tracks, owned camera/microphone tracks, listeners, analysers, and timers. The artifact then replaces live media in the same persistent stage. The studio does not return to or reacquire local preview, and new media work remains locked until the operator closes or discards the take. Compact take actions remain on the stage; the detailed Latest Take overlay opens only when the operator selects **Take**.
 
 The video recorder is authoritative and the audio sidecar is optional: if sidecar construction, start, error handling, or finalization fails, a valid main video still becomes the latest take with an audio-specific recovery notice. This closes a subtle clip-loss path without hiding that voice treatment is unavailable.
 
-Automatic source-ended, spontaneous-stop, recorder-error, and finalization-timeout paths also notify session orchestration exactly once, so live resources are released even when the operator did not click Finish. Browser-default recordings take their MIME type and extension from emitted chunks before recorder fallbacks, preserving native MP4 output where applicable. Recording lifecycle changes are announced and focus moves to the replacement action/status instead of disappearing.
+Automatic source-ended, spontaneous-stop, recorder-error, and finalization-timeout paths also notify session orchestration exactly once, so live resources are released even when the operator did not select Stop recording. Browser-default recordings take their MIME type and extension from emitted chunks before recorder fallbacks, preserving native MP4 output where applicable. Recording lifecycle changes are announced and focus moves to the replacement action/status instead of disappearing.
 
 Download dispatch leaves main-stage playback available and enables Close; the app truthfully does not claim browser download completion. Close revokes take URLs and returns to private idle. Confirmed Discard performs the same cleanup without download. A before-unload warning and explicit discard confirmation reduce accidental loss.
 
@@ -124,7 +163,13 @@ Covered by: voice rules and processing tests plus local/network-isolation and fa
 
 ### Optional providers degrade independently
 
-A capability strip reports local, AI, and cloud-voice availability. Missing Decart disables only realtime video; missing ElevenLabs disables only its library/conversion. Local capture, assets, recording, and local effects remain usable. Errors are actionable and sanitized.
+The header capability strip reports local, AI-video, and cloud-voice
+availability. Reference availability appears where it is used in Workshop and
+Character Builder. Missing Decart disables only realtime video; missing OpenAI
+disables optimization/generation/editing but leaves text drafting and direct
+uploaded/image-only character use; missing ElevenLabs disables only its
+library/conversion. Local capture, assets, recording, and local effects remain
+usable. Errors are actionable and sanitized.
 
 Covered by: capability/API tests, optional `503` cases, and no-key manual QA.
 
@@ -140,4 +185,4 @@ Covered by: voice-panel loading/cancel tests, strict HTTP/WebSocket guards, capa
 
 ## Scope guardrails
 
-The build deliberately excludes accounts, remote/cloud projects, server-side take history, collaboration, live distribution, network analytics, payments, social publishing, and speculative AI features. Character drafts and legacy projects are intentionally scoped to one origin/profile and remain subject to explicit deletion, site-data clearing, private-session lifetime, and browser eviction. Broader persistence would change the privacy/security category and require a new design.
+The build deliberately excludes accounts, remote/cloud projects, server-side take history, collaboration, live distribution, network analytics, payments, social publishing, and speculative AI features. Character drafts and legacy projects are intentionally scoped to one origin/profile and remain subject to explicit deletion, site-data clearing, private-session lifetime, and browser eviction. Immutable uploaded/generated reference assets are separately owner-scoped by the loopback host and retained under `LIGHTFRAME_DATA_DIR`; detached or orphaned assets have no in-app deletion/garbage-collection flow. Broader persistence would change the privacy/security category and require a new design.

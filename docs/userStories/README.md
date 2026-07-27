@@ -31,9 +31,10 @@ Use the documents to run usability sessions or journey walkthroughs: ask partici
 Shared product rules:
 
 - The app is a single-operator, loopback-only Studio. It has no accounts or cloud project history. `/` is the sole application route; retired entries canonicalize there without remounting the Studio runtime.
-- The fullscreen character builder is opened from Studio, autosaves one active draft to IndexedDB, and exposes an explicit Reset Draft action. Existing Guided projects remain downloadable or deletable through the temporary Legacy Projects manager, but cannot be reopened.
+- The primary session path is **Start Camera + Mic**, then **Start AI** and the fullscreen experience chooser. The Recipe Dock remains the detailed/direct path for model recipes and lifecycle controls.
+- The fullscreen character builder opens from the header character selector through **Create new character**, autosaves one active draft to IndexedDB, and exposes an explicit Reset Draft action. Existing Guided projects remain downloadable or deletable through the temporary Legacy Projects manager, but cannot be reopened.
 - Camera/microphone access, provider contact, and billable work begin only through explicit actions.
-- Saving a character does not imply image generation: prompt-only, new reference, and compatible existing reference are separate choices.
+- Saving a character does not imply image generation: prompt-only, direct uploaded-image, image-only, generated, and uploaded-source combined references are separate choices. Builder uploads are immutable local assets; Recipe Dock portrait/garment files remain tab-ephemeral.
 - Character visual suggestions adapt to Woman, Man, Non-binary, or Not specified without deleting an existing selection; shared choices and custom text remain available.
 - The Studio stage remains mounted while overlays are open; closing the character builder preserves its durably autosaved draft.
-- Studio keeps one temporary take and locks new capture work until the operator downloads and closes it or confirms discard. Legacy Guided project media remains in its existing browser-local repository until explicit deletion.
+- Recording uses **Record** and **Stop recording**. Studio keeps one temporary take and locks new capture work until the operator downloads and closes it or confirms discard. Playback appears on the persistent stage; the detailed Latest Take panel opens only after **Take** is selected. Legacy Guided project media remains in its existing browser-local repository until explicit deletion.

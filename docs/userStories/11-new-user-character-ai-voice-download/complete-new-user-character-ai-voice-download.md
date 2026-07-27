@@ -8,21 +8,21 @@ A creator builds and saves a reusable Character AI direction without leaving or 
 
 `/` is the sole application route and opens Studio directly. Retired `/advanced` and `/guided` entries history-replace to `/`. Retired `/projects`, `/?project=…`, and `/guided?project=…` entries also canonicalize to `/` and open the Legacy Projects manager. Deprecated `new` and `characterFlow` query parameters are stripped.
 
-The Studio header exposes **Build Your Character**. The action is disabled while recording, finalization, or take review owns the workflow. Otherwise it opens a fullscreen modal panel while the Studio stage, session, recording state, and creative repository remain mounted beneath it.
+The Studio header exposes a character selector labelled **Character: None Selected** or with the selected character name. Open it and choose **Create new character**. That creation action is disabled while recording, finalization, or take review owns the workflow; the selector itself still exposes current/available choices. Creation opens the fullscreen **Build Your Character** modal while the stable Studio stage remains mounted and session, recording, and creative-repository state stays owned by Studio.
 
 ## Character-builder flow
 
-1. Open **Build Your Character**.
-2. Optionally try a demo character, or build a direction from the identity and detailed visual controls.
-3. Optionally expand the reference settings and select **Generate Preview**.
-4. Save a prompt-only or matching image-backed character.
+1. Open the header character selector and choose **Create new character**.
+2. Optionally upload a reference in the first **Reference image** drawer, try a demo character, or build a direction from the identity and detailed visual controls.
+3. Choose a local-only save path (prompt-only, prompt plus uploaded image, or **Save & Use Image Only**) or select **Generate Preview**. With an upload, the action becomes **Generate Combined Preview**.
+4. Name and save the current valid character/reference combination.
 5. Continue in Studio with the character already selected and preloaded in Lucy 2.5.
 
 The panel contains no journey stepper. Its DOM order is the full set of character choices and constraints followed by the preview. On wide layouts the preview is pinned as a sticky rail beside the form; on narrow layouts it follows the final control as the last item in the single-column flow. The preview keeps a stable 4:5 frame while provider work runs.
 
 ## Draft persistence and reset
 
-The builder owns one active, versioned draft in the `lightframe.character-builder` IndexedDB database. Form, design, reference settings, preview relationship, and save journal are autosaved after a short debounce. Transient provider requests and regeneration instructions are never persisted.
+The builder owns one active, versioned draft in the `lightframe.character-builder` IndexedDB database. Form, design, reference settings, uploaded-reference ID/display name, preview relationship, and save journal are autosaved after a short debounce. Transient provider requests, upload bytes, and regeneration instructions are never stored in IndexedDB; uploaded bytes live in the immutable filesystem reference store.
 
 Closing the panel flushes pending autosave and preserves the draft. Reopening or reloading restores it. **Reset Draft** requires confirmation, aborts active work, deletes the active draft, and returns to a fresh form. If durable persistence fails during close, the panel explains that the latest changes are not reload-safe and requires an explicit choice to stay or discard.
 
@@ -30,25 +30,36 @@ On first initialization, the newest valid legacy `character-design` checkpoint m
 
 After a successful Save Character, the draft is finalized and removed best-effort. A completed marker prevents accidental resume if deletion fails, so the next open starts a fresh character.
 
-## Optional preview generation
+## Reference upload and optional preview generation
 
-Image generation is never required to save a character. A prompt-only save makes no optimizer or image request.
+Image generation is never required to save a character. The Reference image
+field accepts validated JPEG, PNG, or WebP up to 10 MiB and 40 megapixels. An
+upload is written immediately as an immutable owner-scoped local asset and
+restores by opaque ID after reload. It does not contact OpenAI. **Remove**
+detaches the draft relationship but does not delete the stored asset.
+
+Prompt-only, prompt+uploaded-image, and **Save & Use Image Only** paths make no
+OpenAI optimizer or image-model request.
 
 **Generate Preview** always performs two phases:
 
 1. Optimize the current structured direction.
 2. Generate a new immutable reference asset from that optimized prompt.
 
+When an upload is attached, **Generate Combined Preview** replaces that action:
+it optimizes the current structured direction and sends the owner-scoped source
+bytes to the composition endpoint, which creates a new immutable result.
+
 The preview announces `Optimizing prompt…` and `Generating preview…` without fake percentages. The current image remains in the stable frame during loading or failure.
 
-Editing a character input after generation marks the preview stale. The prior image remains visible, but it is detached from Save until a matching preview is regenerated. Prompt-only Save remains available.
+Editing a character input after generation marks the preview stale. The prior image remains visible, but it is detached from generated-image Save until a matching preview is regenerated. Prompt-only Save remains available; when an upload is still current, direct-upload or image-only Save remains available too.
 
 **Regenerate** always opens a dialog for optional change instructions:
 
-- Blank instructions perform fresh generation and do not send the prior asset.
-- Written instructions send the prior opaque asset ID, the current optimized direction, and the requested change to the owner-scoped edit endpoint. The server resolves the prior bytes and creates a new immutable child asset.
+- Blank instructions perform fresh generation without a prior generated asset when there is no upload. With an upload, they compose from that uploaded source again.
+- Written instructions send the current owner-scoped source ID, optimized direction, and requested change to the edit endpoint. That source is the matching preview, or the current upload when the visible preview is stale and an upload remains available. The server resolves those bytes and creates a new immutable child asset.
 
-Generated, edited, discarded, and superseded assets are not promoted or mutated. Assets that are no longer referenced may remain in server storage.
+Uploaded, generated, composed, edited, removed, discarded, and superseded assets are not promoted or mutated. Assets that are no longer referenced may remain in server storage; there is no in-app asset deletion/garbage-collection flow.
 
 ## Save and Studio preload
 
@@ -58,11 +69,11 @@ Save is single-flight and uses a journaled, caller-supplied character ID:
 2. Validate any image relationship and hydrate the selected immutable asset.
 3. Confirm Studio can safely replace the Lucy 2.5 draft.
 4. Durably write the character to Recipe Shelf before publishing repository state.
-5. Finalize the builder journal.
-6. Preload Lucy 2.5 without starting or applying the provider.
-7. Select the character in the Dock and Shelf, close the panel, and restore focus to the header action.
+5. Preload and select Lucy 2.5 without starting or applying the provider.
+6. Mark the Studio preload stage complete in the builder journal.
+7. Complete and remove the builder journal, close the panel, and restore focus to the header character selector.
 
-Prompt-only preload uses the structured prompt with no reference and enhancement disabled. Image-backed preload uses the stored Lucy prompt and hydrated persisted file with enhancement enabled.
+Prompt-only preload uses the structured prompt with no reference and enhancement disabled. Direct-upload and image-only preload use the uploaded reference with enhancement disabled. A generated/composed preload uses its stored Lucy prompt and hydrated persisted file with enhancement enabled. Recipe Shelf v4 records the uploaded source relationship and whether the final reference is uploaded or generated.
 
 Save does not create a Recent item or increment use count. Those changes remain tied to a successful Start or Apply boundary.
 
@@ -79,17 +90,19 @@ It never displays Reopen and never enters the retired Guided runtime. No legacy 
 
 ## Failure and recovery behavior
 
-| Failure point                      | Required behavior                                                                                   |
-| ---------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Invalid or incomplete character    | Keep every choice visible, identify the first incomplete field, and leave Save unavailable.         |
-| Draft persistence failure          | Preserve the tab copy, expose retry, and require explicit discard before unsafe close.              |
-| Optimization or generation failure | Keep form state and the previous preview; expose a targeted retry.                                  |
-| Instructed edit unavailable        | Explain the provider capability boundary; blank regeneration and prompt-only Save remain available. |
-| Stale preview                      | Keep it visible but exclude it from image-backed Save.                                              |
-| Durable Shelf write failure        | Keep the panel open and do not publish in-memory success.                                           |
-| Draft finalization failure         | Retain the saved ID and retry only finalization.                                                    |
-| Studio preload failure             | Keep the saved character and retry preload without duplicating it.                                  |
-| Missing legacy media               | Keep the project record visible and report that the selected bytes are unavailable.                 |
+| Failure point                      | Required behavior                                                                                                      |
+| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Invalid/incomplete save input      | Keep every choice visible and leave the affected Save unavailable; a valid upload alone still permits image-only save. |
+| Upload validation/storage failure  | Reject unsupported, over-10-MiB, or over-40-megapixel input; preserve the prior valid draft/reference and allow retry. |
+| Draft persistence failure          | Preserve the tab copy, expose retry, and require explicit discard before unsafe close.                                 |
+| Optimization or generation failure | Keep form state and the previous preview; expose a targeted retry.                                                     |
+| Generation/edit unavailable        | Explain the provider boundary; prompt-only and direct-upload/image-only Save remain available where valid.             |
+| Stale preview                      | Keep it visible but exclude it from generated-image Save; retain the valid prompt/upload fallback.                     |
+| Missing stored reference           | Keep recoverable character text available and expose the applicable retry, clear, or continue-without-reference path.  |
+| Durable Shelf write failure        | Keep the panel open and do not publish in-memory success.                                                              |
+| Draft finalization failure         | Retain the saved ID and retry only finalization.                                                                       |
+| Studio preload failure             | Keep the saved character and retry preload without duplicating it.                                                     |
+| Missing legacy media               | Keep the project record visible and report that the selected bytes are unavailable.                                    |
 
 ## Accessibility and responsive behavior
 
@@ -98,14 +111,14 @@ It never displays Reopen and never enters the retired Guided runtime. No legacy 
 - Provider phases use a polite atomic status region; failures use an alert.
 - Preview and Save regions expose busy state, and conflicting controls are disabled while work is active.
 - The footer remains reachable through internal scrolling and safe-area padding.
-- The exact **Build Your Character** label remains visible at mobile widths with at least a 44px touch target.
+- The header character selector retains its full accessible name and an approximately 44px touch target at mobile widths. The fullscreen dialog retains the exact **Build Your Character** title.
 - Keyboard, screen-reader, reduced-motion, 200% zoom, short-height, portrait, landscape, and notched-safe-area layouts must remain operable.
 
 ## Completion criteria
 
 - The URL remains `/` and Studio never remounts.
 - The new character is durably saved exactly once.
-- Lucy 2.5 is preloaded with the correct prompt/reference relationship.
+- Lucy 2.5 is preloaded with the correct prompt/reference relationship, and the saved record has the matching v4 provenance.
 - Dock and Shelf immediately show the active character.
 - The builder closes and restores focus.
 - No provider Start/Apply, Recent entry, or use-count increment occurs until the creator explicitly starts or applies the session.

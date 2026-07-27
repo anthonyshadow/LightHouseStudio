@@ -7,26 +7,24 @@ As a creator, I want to preview and record my camera locally, so that I can prod
 ## Starting state
 
 - The studio is open in a secure, supported browser with a camera, microphone, and MediaRecorder.
-- **Local Camera** is selected in the Recipe Dock.
 - There is no recording and no take in review.
 
 ## End-to-end steps
 
-1. Open **Dock** if the Recipe Dock is closed and confirm **Local Camera** is selected.
-2. Optionally open **Capture settings** and stage the desired sources/quality. Return to the Dock.
-3. Select **Start local preview**.
-4. Respond to the browser camera/microphone permission prompt. If granted, verify that the main stage changes from its idle Local Camera message to a mirrored **Live local camera preview**.
-5. Check framing and microphone readiness on the stage. The creative tools remain available for browsing, but Character Workshop and cross-model recipe insertion are disabled until camera and microphone are released.
-6. Select **Record a take** in the capture control strip. Alternatively, press Space only while focus is outside a text field, select, editor, or overlay control.
-7. Confirm the control changes to **Finish take** and the recording timer advances.
-8. Perform the take, then select **Finish take**.
-9. Wait on the finalizing stage state. The app stops the main recorder and optional audio sidecar, receives final chunks, creates the take, and only then releases live device tracks.
-10. Verify that the same persistent stage becomes **Recorded take playback** and the **Latest take** panel opens. Continue with [Take review and cleanup](07-take-review-and-cleanup.md).
+1. Optionally open **Device settings** and stage the desired sources/quality.
+2. Select **Start Camera + Mic** on the stage. The Recipe Dock’s **Local Camera** → **Start local preview** action is an equivalent direct-control entry.
+3. Respond to the browser camera/microphone permission prompt. If granted, verify that the main stage changes from its idle Local Camera message to a mirrored **Live local camera preview**.
+4. Check framing and microphone readiness on the stage. Creative tools and cross-model recipe insertion remain available because a ready local preview can be reused across modes. Use the stage mic/camera toggles if needed; incompatible changes lock only after AI starts connecting, during recording, or while a take is under review.
+5. Select **Record**. Alternatively, press Space only while focus is outside a text field, select, editor, or overlay control.
+6. Confirm the control changes to **Stop recording** and the recording timer advances.
+7. Perform the take, then select **Stop recording**.
+8. Wait on the finalizing stage state. The app stops the main recorder and optional audio sidecar, receives final chunks, creates the take, and only then releases live device tracks.
+9. Verify that the same persistent stage becomes **Recorded take playback** with compact Download, Discard, Voice, and Close actions. Latest Take must remain closed until **Take** is selected; open it for details, then continue with [Take review and cleanup](07-take-review-and-cleanup.md).
 
 ## Failure and alternate paths
 
 - If permission is denied, busy, missing, or cannot meet requested constraints, the stage displays a sanitized explanation and a **Capture settings** recovery action. No provider work starts.
-- Select **Stop camera** before recording to release local tracks and return to private idle.
+- Select **Close** before recording to release local tracks and return to private idle.
 - If recording cannot create a valid artifact, the studio releases live resources and returns to idle with an error instead of leaving a partially live state.
 
 ## Completion criteria
@@ -36,5 +34,5 @@ A playable latest take is visible, or local tracks have been deliberately stoppe
 ## UX investigation cues
 
 - Time permission prompt → confident preview → recording start.
-- Whether the difference between **Stop camera**, **Finish take**, and take-review **Close take** is clear.
+- Whether the difference between live-session **Close**, **Stop recording**, and take-review **Close take** is clear.
 - Whether the local-only guarantee is visible at the decision point, rather than only in documentation.

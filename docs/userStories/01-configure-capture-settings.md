@@ -12,7 +12,7 @@ As a creator, I want to choose the camera, microphone, and local quality target 
 
 ## End-to-end steps
 
-1. Locate the capture control strip below the stage and select **Capture settings**.
+1. Locate the capture controls below the stage and select **Device settings** (accessible name: **Open capture settings**).
 2. Read the panel description: device discovery is session-only and does not start camera or microphone capture.
 3. Wait for the initial device scan, or select **Refresh** to scan again. The browser may show generic labels until a prior camera permission exists.
 4. In **Camera**, keep **Default camera** or choose a specific available camera.
@@ -21,6 +21,10 @@ As a creator, I want to choose the camera, microphone, and local quality target 
 7. Review **Active capture**. Before a preview it says Not started; after a preview it reports negotiated camera, microphone, and resolution.
 8. Select **Apply settings**.
 9. If no preview is running, close the panel; the choices will be used only on the next explicit camera start. If a Local Camera preview is running, wait for the replacement stream to become healthy before the prior stream is released.
+
+The live-stage mic and camera on/off controls affect the current session
+immediately. They are separate from Capture Settings, which owns source/profile
+selection and atomic stream replacement.
 
 ## Failure and alternate paths
 
