@@ -188,9 +188,10 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Test a screen reader on idle, requesting permission, pending Apply, recording, processing, error, and success states.
 - Test exactly `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`, then one intermediate width on each side of the 1024 px and 640 px layout changes. Also test portrait/landscape, 200% zoom, large text, touch targets, and reduced motion.
 - In live and playback states, wait three seconds for the session control bar to hide, then verify
-  keyboard and mouse activity restore it. Explicitly verify touch/pointer and focus recovery on
-  every named physical touch target; the current implementation has no dedicated activity listener
-  for those inputs, so this is a pilot stop condition until fixed.
+  keyboard and mouse-pointer activity restore it and restart the full timeout. Explicitly verify
+  touch/pointer and focus recovery on every named physical touch target. While recording, wait
+  beyond the same timeout and confirm the dominant **Stop recording** action never hides, becomes
+  inert, loses visible focus, or falls outside the viewport/safe area, including at 200% text.
 - At narrow sizes confirm status pills retain complete accessible names when visible text becomes dots, More settings retains its accessible label when icon-only, and truncated metadata exposes its full value through a title or accessible name.
 - In Studio, confirm no horizontal or vertical document overflow. In the fullscreen character builder, confirm controlled internal scrolling and no document overflow. Confirm no clipped critical action/focus ring, hover-only function, unexpected multi-line button, or stage content covering controls. Every touch action must remain approximately 44×44 CSS px or larger.
 

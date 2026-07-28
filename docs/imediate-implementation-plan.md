@@ -151,6 +151,10 @@ qualification, cleanup rehearsal, and dated evidence remain gates in their later
 
 **Findings:** `UX-001`, `TEST-001`; the Stop-dominance portion of `UX-006`; `PROD-017`
 
+**Status (2026-07-28):** runtime implementation, automated evidence, and maintained-platform visual
+review complete; named physical touch/browser/device and assistive-technology evidence pending.
+This wave is not release-complete and its findings remain open until that evidence passes.
+
 Implement in this order:
 
 1. Put pointer/touch/focus activity detection on the persistent stage boundary, outside the
@@ -169,6 +173,22 @@ Required evidence:
   touch/pointer action, and completes a recovered action;
 - recording-state tests proving Stop never becomes hidden or inert; and
 - physical touch checks on every named target.
+
+Implemented automated evidence:
+
+- `MediaStage` owns the only activity timer and the stage-bound pointer, touch, and focus listeners;
+  keyboard recovery remains global to the active Studio task without a second timer;
+- component tests cover timeout/reset, all recovery inputs, context transition, listener
+  de-duplication, unmount cleanup, and recording's never-hidden/non-inert Stop invariant;
+- a mobile touch-context E2E waits through the real timeout in live and playback, performs recovered
+  actions, and waits beyond the timeout while recording at 200% text; and
+- the existing full journey keeps Stop inside all five canonical Chromium viewports, and the five
+  intentional recording-state baselines were regenerated and reviewed on Darwin and Linux.
+
+Remaining evidence:
+
+- execute and record the manual protocol on every named physical target and applicable browser;
+- complete the relevant VoiceOver, TalkBack, and desktop screen-reader/focus-visible checks.
 
 **Regression guard:** do not remount `MediaStage`, move state into a duplicate mobile control, or
 change recording ownership.

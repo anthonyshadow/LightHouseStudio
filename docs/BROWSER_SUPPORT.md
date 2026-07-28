@@ -28,11 +28,13 @@ The fullscreen character builder owns one internal vertical scroller because its
 
 The in-stage session control bar owns **Start Camera + Mic**, **Start AI**, mic/camera toggles,
 **Record**/**Stop recording**, AI Change/Stop, and compact take actions. In live and playback states
-it hides after three seconds of inactivity and returns on mouse movement or keyboard activity.
-Explicit touch/pointer recovery is a release blocker for the required touch/mobile pilot, so no
-touch target may be declared supported until `UX-001` in the
-[audit findings](project-audit-findings.md) is resolved and physically verified. The AI experience
-chooser is a fullscreen responsive overlay.
+it hides after three seconds of inactivity and returns when the persistent stage receives
+pointer/mouse, touch, or focus activity, or when keyboard activity occurs. These inputs share one
+timer owner. During recording the bar collapses to the dominant **Stop recording** action, which
+does not auto-hide. Physical verification remains a release blocker, so no touch target may be
+declared supported until the named matrix completes `UX-001` evidence in the
+[audit findings](project-audit-findings.md). The AI experience chooser is a fullscreen responsive
+overlay.
 
 Responsive behavior is range-based:
 

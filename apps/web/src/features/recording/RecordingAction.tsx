@@ -93,7 +93,7 @@ export const RecordingAction = ({
 }: RecordingActionProps) => {
   const theme = useTheme();
   const actionRef = useRef<HTMLButtonElement>(null);
-  const previousLifecycleRef = useRef(recording.lifecycle);
+  const previousLifecycleRef = useRef<RecordingController['lifecycle'] | null>(null);
   const active = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
   const unavailableReason = recordingUnavailableReason({
     supported,

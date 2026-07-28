@@ -1,4 +1,3 @@
-import { useEffect, useRef, useState } from 'react';
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { referenceImageContentUrl } from '../adapters/api-client/apiClient';
 import { Button } from '../ui';
@@ -20,6 +19,7 @@ type StudioSessionControlBarProps = {
   recordingSupported: boolean;
   recordingBlockedReason?: string | undefined;
   reviewingTake: boolean;
+  visible?: boolean;
   controlsLocked?: boolean;
   onStopRecording: () => Promise<void>;
   onCloseTakeReview: () => void;
@@ -27,8 +27,6 @@ type StudioSessionControlBarProps = {
   onChooseAiExperience: () => void;
   onChangeExperience: () => void;
 };
-
-export const SESSION_CONTROL_IDLE_TIMEOUT_MS = 3_000;
 
 const MicrophoneIcon = ({ muted }: { muted: boolean }) => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
@@ -65,9 +63,10 @@ const StopIcon = () => (
 const barStyles = (theme: Theme, visible: boolean): CSSObject => ({
   position: 'absolute',
   zIndex: theme.layers.stageChrome,
-  insetInlineStart: '50%',
+  insetInline: 0,
   insetBlockEnd: 'clamp(0.65rem, 1.4vw, 1rem)',
   width: 'min(48rem, calc(100% - 1.3rem))',
+  marginInline: 'auto',
   display: 'grid',
   gap: theme.space.xs,
   padding: theme.space.xs,
@@ -76,12 +75,7 @@ const barStyles = (theme: Theme, visible: boolean): CSSObject => ({
   background: `color-mix(in srgb, ${theme.colors.overlaySurface} 92%, transparent)`,
   boxShadow: theme.shadows.lifted,
   backdropFilter: 'blur(16px)',
-  ...fadingVisibilityAnimationStyles(
-    theme,
-    visible,
-    'translateX(-50%) translateY(0)',
-    'translateX(-50%) translateY(0.75rem)',
-  ),
+  ...fadingVisibilityAnimationStyles(theme, visible, 'translateY(0)', 'translateY(0.75rem)'),
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
     width: 'calc(100% - 0.8rem)',
     insetBlockEnd: '0.4rem',
@@ -171,6 +165,17 @@ const actionRowStyles = (theme: Theme): CSSObject => ({
   },
 });
 
+const recordingRowStyles = (theme: Theme): CSSObject => ({
+  ...actionRowStyles(theme),
+  '& [data-secondary-label]': {
+    position: 'static',
+    width: 'auto',
+    height: 'auto',
+    overflow: 'visible',
+    clip: 'auto',
+  },
+});
+
 const idleRowStyles = (theme: Theme): CSSObject => ({
   ...actionRowStyles(theme),
   '& > button:first-of-type': {
@@ -201,6 +206,7 @@ export const StudioSessionControlBar = ({
   recordingSupported,
   recordingBlockedReason,
   reviewingTake,
+  visible = true,
   controlsLocked = false,
   onStopRecording,
   onCloseTakeReview,
@@ -217,61 +223,15 @@ export const StudioSessionControlBar = ({
   const localActive = Boolean(session.localStream);
   const recordingActive = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
   const takeReviewActive = reviewingTake && Boolean(recording.presented);
-  const autoHideContext = takeReviewActive ? 'playback' : localActive ? 'live' : null;
+  const controlsVisible = visible || recordingActive;
   const endDisabled = controlsLocked || recordingActive || aiStarting || Boolean(transition);
   const stopAiDisabled = controlsLocked || recordingActive;
-  const [visibility, setVisibility] = useState({
-    context: autoHideContext,
-    visible: true,
-  });
-  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  if (visibility.context !== autoHideContext) {
-    setVisibility({ context: autoHideContext, visible: true });
-  }
-
-  const controlsVisible = autoHideContext === null || visibility.visible;
-
-  useEffect(() => {
-    if (autoHideContext === null) return;
-
-    const clearIdleTimer = () => {
-      if (idleTimerRef.current === null) return;
-      clearTimeout(idleTimerRef.current);
-      idleTimerRef.current = null;
-    };
-    const scheduleHide = () => {
-      clearIdleTimer();
-      idleTimerRef.current = setTimeout(() => {
-        idleTimerRef.current = null;
-        setVisibility({ context: autoHideContext, visible: false });
-      }, SESSION_CONTROL_IDLE_TIMEOUT_MS);
-    };
-    const handleActivity = () => {
-      setVisibility((current) =>
-        current.context === autoHideContext && current.visible
-          ? current
-          : { context: autoHideContext, visible: true },
-      );
-      scheduleHide();
-    };
-
-    scheduleHide();
-    window.addEventListener('mousemove', handleActivity, { passive: true });
-    window.addEventListener('keydown', handleActivity);
-
-    return () => {
-      clearIdleTimer();
-      window.removeEventListener('mousemove', handleActivity);
-      window.removeEventListener('keydown', handleActivity);
-    };
-  }, [autoHideContext]);
 
   return (
     <section
       css={barStyles(theme, controlsVisible)}
       aria-label="Studio session controls"
-      aria-hidden={!controlsVisible}
+      aria-hidden={controlsVisible ? undefined : true}
       data-control-visibility={controlsVisible ? 'visible' : 'hidden'}
       inert={!controlsVisible}
     >
@@ -284,7 +244,7 @@ export const StudioSessionControlBar = ({
         />
       ) : (
         <>
-          {experienceLabel && localActive ? (
+          {experienceLabel && localActive && !recordingActive ? (
             <div css={identityStyles(theme)}>
               {experienceImageAssetId ? (
                 <img
@@ -323,6 +283,18 @@ export const StudioSessionControlBar = ({
               <Button variant="secondary" busy>
                 {transition}
               </Button>
+            </div>
+          ) : recordingActive ? (
+            <div css={recordingRowStyles(theme)} data-recording-controls="dominant">
+              <RecordingAction
+                recording={recording}
+                source={recordingSource}
+                mode={session.draft.mode}
+                modelOutputReady={session.transformedVideoUsable}
+                supported={recordingSupported}
+                {...(recordingBlockedReason ? { blockedReason: recordingBlockedReason } : {})}
+                onStop={onStopRecording}
+              />
             </div>
           ) : (
             <div css={actionRowStyles(theme)}>

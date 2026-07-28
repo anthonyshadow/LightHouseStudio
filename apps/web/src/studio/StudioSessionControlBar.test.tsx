@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyDraft, type StudioSessionController } from '../features/media-session';
@@ -10,10 +10,7 @@ import type {
   RecordingSource,
 } from '../features/recording';
 import { StudioDesignProvider } from '../ui';
-import {
-  SESSION_CONTROL_IDLE_TIMEOUT_MS,
-  StudioSessionControlBar,
-} from './StudioSessionControlBar';
+import { StudioSessionControlBar } from './StudioSessionControlBar';
 
 const createSession = (
   overrides: Partial<StudioSessionController> = {},
@@ -237,7 +234,9 @@ describe('StudioSessionControlBar', () => {
       </StudioDesignProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Stop recording' }));
+    const stopRecording = screen.getByRole('button', { name: 'Stop recording' });
+    expect(stopRecording).toHaveFocus();
+    await user.click(stopRecording);
     expect(onStopRecording).toHaveBeenCalledOnce();
   });
 
@@ -326,86 +325,82 @@ describe('StudioSessionControlBar', () => {
     expect(screen.queryByRole('group', { name: 'Recorded take controls' })).not.toBeInTheDocument();
   });
 
-  it('hides after three idle seconds and returns on mouse or keyboard activity', () => {
-    vi.useFakeTimers();
+  it('renders the stage-owned visibility state with matching inert semantics', () => {
     const session = createSession({ lifecycle: 'ready', localStream: stream });
-    renderBar(session);
-    const controls = screen.getByRole('region', { name: 'Studio session controls' });
+    const view = render(
+      <StudioDesignProvider>
+        <StudioSessionControlBar
+          session={session}
+          recording={createRecording()}
+          recordingSource={recordingSource}
+          recordingSupported
+          reviewingTake={false}
+          visible={false}
+          onStopRecording={vi.fn().mockResolvedValue(undefined)}
+          onCloseTakeReview={vi.fn()}
+          onOpenVoiceTreatments={vi.fn()}
+          onChooseAiExperience={vi.fn()}
+          onChangeExperience={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+    const controls = view.container.querySelector('[aria-label="Studio session controls"]');
 
-    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
-
-    act(() => {
-      vi.advanceTimersByTime(SESSION_CONTROL_IDLE_TIMEOUT_MS - 1);
-    });
-    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
-
-    act(() => {
-      vi.advanceTimersByTime(1);
-    });
     expect(controls).toHaveAttribute('data-control-visibility', 'hidden');
     expect(controls).toHaveAttribute('aria-hidden', 'true');
+    expect(controls).toHaveAttribute('inert');
 
-    fireEvent.mouseMove(window);
+    view.rerender(
+      <StudioDesignProvider>
+        <StudioSessionControlBar
+          session={session}
+          recording={createRecording()}
+          recordingSource={recordingSource}
+          recordingSupported
+          reviewingTake={false}
+          visible
+          onStopRecording={vi.fn().mockResolvedValue(undefined)}
+          onCloseTakeReview={vi.fn()}
+          onOpenVoiceTreatments={vi.fn()}
+          onChooseAiExperience={vi.fn()}
+          onChangeExperience={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
     expect(controls).toHaveAttribute('data-control-visibility', 'visible');
-    expect(controls).not.toHaveAttribute('aria-hidden', 'true');
-
-    act(() => {
-      vi.advanceTimersByTime(SESSION_CONTROL_IDLE_TIMEOUT_MS);
-    });
-    expect(controls).toHaveAttribute('data-control-visibility', 'hidden');
-
-    fireEvent.keyDown(window, { key: 'Tab' });
-    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
-
-    act(() => {
-      vi.advanceTimersByTime(SESSION_CONTROL_IDLE_TIMEOUT_MS);
-    });
-    expect(controls).toHaveAttribute('data-control-visibility', 'hidden');
+    expect(controls).not.toHaveAttribute('aria-hidden');
+    expect(controls).not.toHaveAttribute('inert');
   });
 
-  it('applies the same idle visibility behavior to recorded playback controls', () => {
-    vi.useFakeTimers();
-    const artifact = takeArtifact();
-    renderBar(
-      createSession(),
-      vi.fn(),
-      createRecording('recorded', {
-        original: artifact,
-        presented: artifact,
-      }),
-      vi.fn().mockResolvedValue(undefined),
-      true,
+  it('keeps Stop recording visible and dominant if a stale owner state requests hiding', () => {
+    render(
+      <StudioDesignProvider>
+        <StudioSessionControlBar
+          session={createSession({ lifecycle: 'ready', localStream: stream })}
+          recording={createRecording('recording', { activeSource: recordingSource })}
+          recordingSource={recordingSource}
+          recordingSupported
+          reviewingTake={false}
+          visible={false}
+          onStopRecording={vi.fn().mockResolvedValue(undefined)}
+          onCloseTakeReview={vi.fn()}
+          onOpenVoiceTreatments={vi.fn()}
+          onChooseAiExperience={vi.fn()}
+          onChangeExperience={vi.fn()}
+        />
+      </StudioDesignProvider>,
     );
     const controls = screen.getByRole('region', { name: 'Studio session controls' });
 
     expect(controls).toHaveAttribute('data-control-visibility', 'visible');
-
-    act(() => {
-      vi.advanceTimersByTime(SESSION_CONTROL_IDLE_TIMEOUT_MS);
-    });
-    expect(controls).toHaveAttribute('data-control-visibility', 'hidden');
-
-    fireEvent.mouseMove(window);
-    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
-
-    act(() => {
-      vi.advanceTimersByTime(SESSION_CONTROL_IDLE_TIMEOUT_MS);
-    });
-    expect(controls).toHaveAttribute('data-control-visibility', 'hidden');
-
-    fireEvent.keyDown(window, { key: 'Tab' });
-    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
-  });
-
-  it('stays visible while the camera is not running', () => {
-    vi.useFakeTimers();
-    renderBar(createSession());
-    const controls = screen.getByRole('region', { name: 'Studio session controls' });
-
-    act(() => {
-      vi.advanceTimersByTime(SESSION_CONTROL_IDLE_TIMEOUT_MS * 2);
-    });
-
-    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+    expect(controls).not.toHaveAttribute('aria-hidden');
+    expect(controls).not.toHaveAttribute('inert');
+    expect(screen.getByRole('button', { name: 'Stop recording' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start AI' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Mute microphone' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Turn camera off' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
+    expect(controls.querySelector('[data-recording-controls="dominant"]')).not.toBeNull();
   });
 });

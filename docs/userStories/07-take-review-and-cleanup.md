@@ -12,10 +12,14 @@ As a creator, I want to finalize, inspect, download, and deliberately release my
 ## End-to-end steps
 
 1. Confirm that **Record** is enabled. Local capture uses local camera/microphone; AI capture requires usable transformed video and uses provider audio when live or microphone fallback otherwise.
-2. Select **Record** and verify it becomes **Stop recording**. The app pins the selected video/audio track identities and snapshots source metadata for this take.
+2. Select **Record** and verify the stage controls collapse to the sole **Stop recording** action,
+   which remains visible and receives focus. The app pins the selected video/audio track identities
+   and snapshots source metadata for this take.
 3. Select **Stop recording**. Do not start another media action while the stage reports finalization.
 4. Wait for main video and optional audio-sidecar recorders to settle. The app creates the original Blob, URL, filename, metadata, and duration before it releases local/provider resources.
-5. Confirm that the stage displays **Recorded take playback** with compact Download, Discard, Voice, and Close actions. Latest Take must still be closed.
+5. Confirm that the stage displays **Recorded take playback** with compact Download, Discard,
+   Voice, and Close actions. After those controls time out, pointer/touch/focus/keyboard activity on
+   the persistent stage restores them and resets the idle timer. Latest Take must still be closed.
 6. Select **Take** to open Latest Take and review mode, video/audio source, start time, dimensions/frame rate, duration, size, and MIME information. The overlay does not create a second player.
 7. Play the take on the main stage. If desired, select **Voice** on the stage or **Voice treatments** in Latest Take; processing temporarily locks playback/download until a complete replacement exists.
 8. Select **Download** on the stage or **Download take** in the panel. This tells the browser to begin a download and changes the panel state to **A download was started**.

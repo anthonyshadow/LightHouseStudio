@@ -4,7 +4,13 @@ import { act, cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import type { RecordingArtifact } from '../recording/types';
-import { MediaStage, type MediaStageProps, type StagePresentation } from './MediaStage';
+import {
+  MediaStage,
+  STAGE_CONTROLS_IDLE_TIMEOUT_MS,
+  type MediaStageProps,
+  type StageControlVisibility,
+  type StagePresentation,
+} from './MediaStage';
 
 class FakeTrack extends EventTarget {
   public readyState: MediaStreamTrackState = 'live';
@@ -73,7 +79,19 @@ const stage = (props: Partial<MediaStageProps> = {}) => (
   </StudioDesignProvider>
 );
 
+const controlProbe = ({ visible }: StageControlVisibility) => (
+  <section
+    aria-label="Test stage controls"
+    aria-hidden={visible ? undefined : true}
+    data-control-visibility={visible ? 'visible' : 'hidden'}
+    inert={!visible}
+  >
+    <button type="button">Recovered action</button>
+  </section>
+);
+
 beforeEach(() => {
+  vi.useRealTimers();
   vi.spyOn(HTMLMediaElement.prototype, 'play').mockResolvedValue();
   vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
   vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
@@ -81,6 +99,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.restoreAllMocks();
 });
 
@@ -192,6 +211,139 @@ describe('MediaStage', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Review action' })).toBeInTheDocument();
+  });
+
+  it('owns the idle timeout and restores controls from pointer, touch, focus, and keyboard activity', () => {
+    vi.useFakeTimers();
+    const localStream = new FakeStream([
+      new FakeTrack('video', 'Studio camera'),
+    ]) as unknown as MediaStream;
+    const view = render(
+      stage({
+        presentation: {
+          kind: 'live',
+          stream: localStream,
+          origin: 'local',
+          mirrored: true,
+        },
+        lifecycle: 'ready',
+        controls: controlProbe,
+      }),
+    );
+    const mediaStage = screen.getByRole('figure', { name: 'Studio media stage' });
+    const controls = view.container.querySelector('[aria-label="Test stage controls"]');
+
+    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+
+    act(() => {
+      vi.advanceTimersByTime(STAGE_CONTROLS_IDLE_TIMEOUT_MS - 1);
+    });
+    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+
+    fireEvent.pointerMove(mediaStage);
+    act(() => {
+      vi.advanceTimersByTime(STAGE_CONTROLS_IDLE_TIMEOUT_MS - 1);
+    });
+    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+    expect(controls).toHaveAttribute('data-control-visibility', 'hidden');
+    expect(controls).toHaveAttribute('aria-hidden', 'true');
+    expect(controls).toHaveAttribute('inert');
+
+    fireEvent.pointerDown(mediaStage, { pointerType: 'touch' });
+    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+    act(() => {
+      vi.advanceTimersByTime(STAGE_CONTROLS_IDLE_TIMEOUT_MS);
+    });
+
+    fireEvent.touchStart(mediaStage);
+    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+    act(() => {
+      vi.advanceTimersByTime(STAGE_CONTROLS_IDLE_TIMEOUT_MS);
+    });
+
+    fireEvent.focusIn(mediaStage);
+    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+    act(() => {
+      vi.advanceTimersByTime(STAGE_CONTROLS_IDLE_TIMEOUT_MS);
+    });
+
+    fireEvent.keyDown(window, { key: 'Tab' });
+    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+    expect(controls).not.toHaveAttribute('aria-hidden');
+    expect(controls).not.toHaveAttribute('inert');
+  });
+
+  it('keeps one activity-listener set, cleans it up, and never schedules hiding while recording', () => {
+    vi.useFakeTimers();
+    const addEventListener = vi.spyOn(EventTarget.prototype, 'addEventListener');
+    const removeEventListener = vi.spyOn(EventTarget.prototype, 'removeEventListener');
+    const windowAddEventListener = vi.spyOn(window, 'addEventListener');
+    const windowRemoveEventListener = vi.spyOn(window, 'removeEventListener');
+    const localStream = new FakeStream([
+      new FakeTrack('video', 'Studio camera'),
+    ]) as unknown as MediaStream;
+    const props: Partial<MediaStageProps> = {
+      presentation: {
+        kind: 'live',
+        stream: localStream,
+        origin: 'local',
+        mirrored: true,
+      },
+      lifecycle: 'ready',
+      recording: true,
+      controls: controlProbe,
+    };
+    const view = render(stage(props));
+    const mediaStage = screen.getByRole('figure', { name: 'Studio media stage' });
+    const controls = view.container.querySelector('[aria-label="Test stage controls"]');
+
+    act(() => {
+      vi.advanceTimersByTime(STAGE_CONTROLS_IDLE_TIMEOUT_MS * 2);
+    });
+    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+
+    view.rerender(stage({ ...props, recording: false }));
+    const stageListenerCalls = addEventListener.mock.calls
+      .map((call, index) => ({ call, target: addEventListener.mock.instances[index] }))
+      .filter(({ target }) => target === mediaStage)
+      .map(({ call }) => call[0])
+      .filter((type) =>
+        ['pointermove', 'pointerdown', 'touchstart', 'focusin'].includes(String(type)),
+      );
+    expect(stageListenerCalls).toEqual(['pointermove', 'pointerdown', 'touchstart', 'focusin']);
+    const windowKeydownCalls = windowAddEventListener.mock.calls.filter(
+      (call) => call[0] === 'keydown',
+    );
+    expect(windowKeydownCalls).toHaveLength(1);
+
+    view.rerender(stage({ ...props, recording: false }));
+    const repeatedStageListenerCalls = addEventListener.mock.calls
+      .map((call, index) => ({ call, target: addEventListener.mock.instances[index] }))
+      .filter(({ target }) => target === mediaStage)
+      .map(({ call }) => call[0])
+      .filter((type) =>
+        ['pointermove', 'pointerdown', 'touchstart', 'focusin'].includes(String(type)),
+      );
+    expect(repeatedStageListenerCalls).toEqual(stageListenerCalls);
+    expect(windowAddEventListener.mock.calls.filter((call) => call[0] === 'keydown')).toHaveLength(
+      1,
+    );
+
+    view.unmount();
+    const removedStageListeners = removeEventListener.mock.calls
+      .map((call, index) => ({ call, target: removeEventListener.mock.instances[index] }))
+      .filter(({ target }) => target === mediaStage)
+      .map(({ call }) => call[0])
+      .filter((type) =>
+        ['pointermove', 'pointerdown', 'touchstart', 'focusin'].includes(String(type)),
+      );
+    expect(removedStageListeners).toEqual(stageListenerCalls);
+    expect(
+      windowRemoveEventListener.mock.calls.filter((call) => call[0] === 'keydown'),
+    ).toHaveLength(1);
   });
 
   it('reports an ended video track truthfully without removing the stable video node', () => {

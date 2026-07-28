@@ -16,8 +16,12 @@ As a creator, I want to preview and record my camera locally, so that I can prod
 3. Respond to the browser camera/microphone permission prompt. If granted, verify that the main stage changes from its idle Local Camera message to a mirrored **Live local camera preview**.
 4. Check framing and microphone readiness on the stage. Creative tools and cross-model recipe insertion remain available because a ready local preview can be reused across modes. Use the stage mic/camera toggles if needed; incompatible changes lock only after AI starts connecting, during recording, or while a take is under review.
 5. Select **Record**. Alternatively, press Space only while focus is outside a text field, select, editor, or overlay control.
-6. Confirm the control changes to **Stop recording** and the recording timer advances.
-7. Perform the take, then select **Stop recording**.
+6. Confirm the controls collapse to the dominant **Stop recording** action and the recording timer
+   advances. Stop remains visible, focusable, and operable for the entire recording rather than
+   participating in live/playback auto-hide.
+7. Perform the take, then select **Stop recording**. Outside recording, stage pointer, touch,
+   focus, mouse-pointer, or keyboard activity restores timed-out live controls and restarts their
+   single idle timer.
 8. Wait on the finalizing stage state. The app stops the main recorder and optional audio sidecar, receives final chunks, creates the take, and only then releases live device tracks.
 9. Verify that the same persistent stage becomes **Recorded take playback** with compact Download, Discard, Voice, and Close actions. Latest Take must remain closed until **Take** is selected; open it for details, then continue with [Take review and cleanup](07-take-review-and-cleanup.md).
 

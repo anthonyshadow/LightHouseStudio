@@ -41,10 +41,11 @@ The controlled-pilot gaps are narrower than a rewrite:
 5. `ARCH-002`: Decart errors are safely flattened, but too aggressively for
    useful recovery.
 6. The cross-specialist review also confirmed three architecture-adjacent
-   release issues: touch-only controls can become inaccessible (`UX-001`),
-   saved-character entry opens the wrong Shelf category (`UX-002`), and direct
-   Character/VTO Start lacks the Decart disclosure shown in Recipe Dock
-   (`PROD-003`).
+   release issues: touch-only controls could become inaccessible (`UX-001`; its
+   runtime/automated correction landed 2026-07-28 while physical evidence
+   remains open), saved-character entry opens the wrong Shelf category
+   (`UX-002`), and direct Character/VTO Start lacks the Decart disclosure shown
+   in Recipe Dock (`PROD-003`).
 
 The recommended release decision is:
 
@@ -358,12 +359,12 @@ Known lifecycle gaps:
   preserve local preview.
 - Capability presence is configuration, not active provider health.
 
-The touch-control issue is adjacent to lifecycle safety. The control bar may
-auto-hide and become `inert`; current recovery listens to mouse/keyboard only.
-The preferred correction is one stage-scoped activity owner using pointer
-activity plus existing mouse/keyboard behavior and the same timer. The bar
-should never auto-hide while recording, so Stop Recording remains accessible.
-This is required before any touch support claim and is prudent before any pilot.
+The touch-control issue is adjacent to lifecycle safety. As implemented on
+2026-07-28, the persistent stage owns one control timer plus pointer, touch,
+focus, and keyboard recovery; the control subtree renders the resulting
+visible/inert state. Recording suspends auto-hide and collapses the bar to Stop.
+Named physical touch/browser evidence is still required before any support
+claim.
 
 ## 7. Recording lifecycle
 
@@ -692,7 +693,7 @@ single-operator.
 | `SYS-TEST-002` / `TEST-005`   | High                            | Physical-target recording-memory evidence is absent                                       | Required for every support claim                               |
 | `SYS-TEST-003` / `TEST-006`   | Medium                          | No negative tests for oversized successful provider audio                                 | Required with `PERF-002`                                       |
 | `DOC-001` / `TEST-007`        | High release-evidence risk      | Included provider paths lack live account/device qualification                            | Required for the controlled pilot                              |
-| `UX-001` / `TEST-001`         | Critical interaction risk       | Auto-hidden controls lack explicit touch/pointer recovery; Stop can hide                  | Unconditional controlled-pilot gate                            |
+| `UX-001` / `TEST-001`         | Critical interaction risk       | Runtime/automated recovery is complete; named physical and assistive evidence is pending  | Unconditional controlled-pilot gate until physical evidence    |
 | `UX-002` / `TEST-002`         | High journey risk               | Saved-character entry opens generic Saved, not Characters                                 | Required for the default Character pilot                       |
 | `PROD-003`                    | High trust risk                 | Direct Decart Start omits the Dock’s provider/data/session disclosure                     | Controlled-pilot gate                                          |
 | `UI-TEST-VISUAL` / `TEST-003` | High sign-off risk              | Curated visual states can be semantically wrong or unsettled                              | Required for visual/mobile sign-off                            |
@@ -1104,16 +1105,15 @@ single-operator.
 - **Regression risk:** None for evidence; high for silent model migration or
   fallback.
 
-### UX-001 / TEST-001 — Auto-hidden controls lack explicit touch recovery
+### UX-001 / TEST-001 — Touch recovery implementation; physical evidence pending
 
 - **Category:** Accessibility / interaction architecture.
 - **Severity:** Critical. Touch/mobile creation is an approved pilot
   requirement.
-- **Evidence:** **Code-confirmed:** the live/playback control bar hides after an
-  idle timeout, then becomes `aria-hidden` and `inert`; recovery listeners cover
-  mouse movement and keyboard, not explicit pointer/touch. Stop Recording lives
-  inside the bar. Unit tests cover mouse/keyboard recovery only. A physical
-  cross-engine reproduction remains **unverified**.
+- **Audit-time evidence:** the live/playback control bar hid after an idle
+  timeout, then became `aria-hidden` and `inert`; recovery covered mouse
+  movement and keyboard, not explicit pointer/touch. Stop Recording lived
+  inside the bar. A physical cross-engine reproduction remains **unverified**.
 - **Affected files:** `StudioSessionControlBar.tsx` and tests, persistent stage
   activity boundary, E2E touch coverage.
 - **User or developer impact:** A touch-only user may be unable to recover
@@ -1127,6 +1127,11 @@ single-operator.
 - **Dependencies:** Supported device/browser declaration and real-device smoke.
 - **Regression risk:** Low to medium; event/timer ownership can cause flicker or
   competing timers if duplicated.
+- **Implementation status (2026-07-28):** corrected in `MediaStage` and
+  `StudioSessionControlBar` with one timer owner, stage-bound pointer/touch/focus
+  recovery, keyboard recovery, dominant never-hidden Stop, component lifecycle
+  coverage, and a real-time mobile touch E2E. Physical matrix and
+  assistive-technology evidence remain open.
 
 ### UX-002 / TEST-002 — Saved-character entry loses category intent
 

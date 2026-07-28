@@ -23,6 +23,13 @@ adding new capability.
 
 **Findings:** `UX-001`, `UX-002`, `UX-011`, `PROD-003`, `PROD-013`, `TEST-001`, `TEST-002`
 
+**Progress (2026-07-28):** the Wave 1 `UX-001`/`TEST-001` runtime and automated work is complete:
+`MediaStage` owns the single activity timer/listener set, live/playback controls recover from
+pointer/touch/focus/keyboard activity, and recording renders a never-hidden dominant Stop action.
+The named physical matrix is still pending, so those findings and this phase remain open. The
+saved-character, permission-recovery, direct-disclosure, and capability-truth work is scheduled in
+Wave 2 and is also still open.
+
 | Field          | Plan                                                                                                                                                                                                                                                                                                    |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Scope          | Stage-level touch/pointer control reveal; never-hidden Stop Recording; one-shot Shelf entry intent to Characters; camera-denial recovery classification; direct-Decart disclosure; “configured” capability copy.                                                                                        |

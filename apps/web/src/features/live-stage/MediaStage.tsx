@@ -30,12 +30,18 @@ export type MediaStageProps = {
   lifecycle: SessionLifecycle;
   recording: boolean;
   recordingSeconds: number;
-  controls?: ReactNode;
+  controls?: ReactNode | ((state: StageControlVisibility) => ReactNode);
   idleAction?: ReactNode;
   experienceLabel?: string | undefined;
   notices?: readonly StageNotice[];
   onPlaybackError?: (message: string) => void;
 };
+
+export type StageControlVisibility = {
+  visible: boolean;
+};
+
+export const STAGE_CONTROLS_IDLE_TIMEOUT_MS = 3_000;
 
 type LiveSnapshot = {
   stream: MediaStream;
@@ -176,6 +182,7 @@ export const MediaStage = ({
   const boundPlaybackUrlRef = useRef<string | null>(null);
   const [fullscreen, setFullscreen] = useState(false);
   const [lastLiveSnapshot, setLastLiveSnapshot] = useState<LiveSnapshot | null>(null);
+  const stageControlsIdleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const playbackArtifact = presentation.kind === 'playback' ? presentation.artifact : null;
   const playbackUrl = playbackArtifact?.objectUrl ?? null;
@@ -220,6 +227,16 @@ export const MediaStage = ({
   const playbackLocked = presentation.kind === 'playback' && presentation.controlsLocked;
   const isFinalizing = presentation.kind === 'finalizing';
   const hasVisibleMedia = details.hasLiveVideo;
+  const controlsAutoHideContext =
+    presentation.kind === 'live' || presentation.kind === 'playback' ? presentation.kind : null;
+  const stageControlsVisibilityContext = recording ? null : controlsAutoHideContext;
+  const [stageControlsVisibility, setStageControlsVisibility] = useState({
+    context: stageControlsVisibilityContext,
+    visible: true,
+  });
+  if (stageControlsVisibility.context !== stageControlsVisibilityContext) {
+    setStageControlsVisibility({ context: stageControlsVisibilityContext, visible: true });
+  }
   useTrackRevision(stream);
 
   const currentLiveStream = presentation.kind === 'live' ? presentation.stream : null;
@@ -353,6 +370,54 @@ export const MediaStage = ({
     return () => document.removeEventListener('fullscreenchange', update);
   }, [fullscreenSupported]);
 
+  useEffect(() => {
+    const clearIdleTimer = () => {
+      if (stageControlsIdleTimerRef.current === null) return;
+      clearTimeout(stageControlsIdleTimerRef.current);
+      stageControlsIdleTimerRef.current = null;
+    };
+
+    if (stageControlsVisibilityContext === null) {
+      return clearIdleTimer;
+    }
+
+    const scheduleHide = () => {
+      clearIdleTimer();
+      stageControlsIdleTimerRef.current = setTimeout(() => {
+        stageControlsIdleTimerRef.current = null;
+        setStageControlsVisibility((current) =>
+          current.context === stageControlsVisibilityContext
+            ? { context: stageControlsVisibilityContext, visible: false }
+            : current,
+        );
+      }, STAGE_CONTROLS_IDLE_TIMEOUT_MS);
+    };
+    const revealControls = () => {
+      setStageControlsVisibility({
+        context: stageControlsVisibilityContext,
+        visible: true,
+      });
+      scheduleHide();
+    };
+    const stage = figureRef.current;
+
+    scheduleHide();
+    stage?.addEventListener('pointermove', revealControls, { passive: true });
+    stage?.addEventListener('pointerdown', revealControls, { passive: true });
+    stage?.addEventListener('touchstart', revealControls, { passive: true });
+    stage?.addEventListener('focusin', revealControls);
+    window.addEventListener('keydown', revealControls);
+
+    return () => {
+      clearIdleTimer();
+      stage?.removeEventListener('pointermove', revealControls);
+      stage?.removeEventListener('pointerdown', revealControls);
+      stage?.removeEventListener('touchstart', revealControls);
+      stage?.removeEventListener('focusin', revealControls);
+      window.removeEventListener('keydown', revealControls);
+    };
+  }, [stageControlsVisibilityContext]);
+
   const toggleFullscreen = () => {
     const stage = figureRef.current;
     if (!stage) return;
@@ -411,6 +476,10 @@ export const MediaStage = ({
   const statusToneResolved = recording ? 'recording' : statusTone;
   const aiStarting =
     mode !== 'local' && ['requesting-media', 'requesting-token', 'connecting'].includes(lifecycle);
+  const resolvedStageControlsVisible =
+    stageControlsVisibilityContext === null || stageControlsVisibility.visible;
+  const renderedControls =
+    typeof controls === 'function' ? controls({ visible: resolvedStageControlsVisible }) : controls;
 
   return (
     <figure
@@ -555,7 +624,7 @@ export const MediaStage = ({
 
       <StageNoticeLayer notices={effectiveNotices} />
 
-      {controls}
+      {renderedControls}
     </figure>
   );
 };

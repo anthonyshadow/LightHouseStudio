@@ -38,7 +38,13 @@ The shell is deliberately viewport-bound:
 
 `MediaStage` is mounted once in the stable stage region and owns one persistent `<video>` element. A discriminated `StagePresentation` selects idle, live, finalizing, or playback presentation without keying or replacing that node. Live media is attached imperatively with `srcObject`, muted and inline; finalized playback uses `src`, native controls, and audio. The unused source is cleared before each source-kind switch. Finalization retains the last live binding/frame under a blocking stage layer until playback is ready. Opening or closing any tool overlay must not recreate the stage, change its source, alter playback time, or restart a provider controller. Video uses `object-fit: contain`; only local preview is mirrored. Provider output and recorded playback use native orientation, and local video remains the fallback until a transformed live video track is usable.
 
-The live/playback control bar uses **Record** and **Stop recording**. Playback exposes compact take actions on the stage; the Latest Take detail overlay is opened explicitly through **Take** and never appears automatically after finalization.
+The persistent `MediaStage` boundary owns the single live/playback control-visibility timer. Native
+stage `pointermove`, `pointerdown`, `touchstart`, and `focusin` activity plus keyboard activity
+reveal the controls and reset that timer; the control subtree only renders the resulting
+visible/inert state. Recording suspends auto-hide, and `StudioSessionControlBar` independently
+keeps the sole **Stop recording** action visible as a safety invariant. Playback exposes compact
+take actions on the stage; the Latest Take detail overlay is opened explicitly through **Take**
+and never appears automatically after finalization.
 
 `OverlayPanel` is the shared portal primitive for drawers, sheets, fullscreen panels, and stacked dialogs. It keeps its backdrop present through the exit transition, intercepts a backdrop-targeted pointer-down before it can click through, and dismisses only the topmost overlay. It locks body overflow, labels the modal, makes the application root and covered dialogs inert/hidden from assistive technology, excludes hidden, disabled, and inert descendants from focus trapping, and centralizes initial/return focus. Its close guard disables Escape and the close button during the atomic part of character Save. Ordinary builder closure first flushes autosave; an unsafe storage failure requires explicit discard.
 

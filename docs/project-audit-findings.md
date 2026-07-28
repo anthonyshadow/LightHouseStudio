@@ -140,11 +140,18 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
 
 - **Severity/timing:** High; unconditional controlled-pilot stop-ship because touch/mobile creation
   is in scope.
-- **Evidence:** `StudioSessionControlBar.tsx` hides after three seconds and restores only on
-  `mousemove`/`keydown`; the hidden subtree is inert. Existing tests cover mouse/keyboard only.
-- **Impact:** Stop recording, close, mic/camera, and take controls can become unreachable.
-- **Correction:** add a stage-owned pointer/touch reveal target outside the inert subtree, reset the
-  timer on supported activity, and never auto-hide the only Stop Recording action.
+- **Implementation status (2026-07-28):** the persistent `MediaStage` now owns one idle timer and
+  stage-bound pointer/touch/focus listeners, while keyboard recovery remains available.
+  `StudioSessionControlBar` renders the stage-owned visible/inert state and collapses recording to
+  the dominant, never-hidden Stop action.
+- **Automated evidence:** component coverage exercises the full timeout, timer reset,
+  pointer/touch/focus/keyboard recovery, context changes, listener de-duplication, and unmount
+  cleanup. A mobile touch-context E2E waits through the real timeout in live and playback,
+  completes recovered actions, and proves Stop remains visible/non-inert beyond the timeout at
+  200% text. The five canonical Chromium viewport journeys keep Stop viewport-bound, and the
+  intentional recording baselines were regenerated and reviewed on Darwin and Linux.
+- **Remaining evidence:** named physical touch/browser/device qualification and assistive-
+  technology checks. The finding remains a pilot stop-ship until those records pass.
 - **Regression risk:** Medium.
 - **Details:** [UI/UX current state](ui-ux-current-state.md).
 
@@ -220,8 +227,9 @@ preview controls. Validate 320×568, 390×844, tablet, and 200% text.
 ### UX-004 / UX-005 / UX-006 — First-use hierarchy, vocabulary, and recording density
 
 Keep Dock/Shelf/Workshop for now, add action-first subtitles, subordinate advanced tools during
-first success, and make Stop Recording dominant. Do not mechanically rename Dock to “AI Setup”
-because it also owns Local Camera.
+first success, and keep Stop Recording dominant. The recording branch now shows the sole Stop
+action; broader first-use hierarchy, vocabulary, physical-device, and 200% reflow evidence remain.
+Do not mechanically rename Dock to “AI Setup” because it also owns Local Camera.
 
 ### ARCH-002 — Decart errors are safely but excessively flattened
 
@@ -276,19 +284,19 @@ trust only an authenticated ingestion record, not a client-supplied number.
 
 The independent specialist reports reused `TEST-###`; the canonical plan uses this allocation:
 
-| ID         | Test obligation                                                                        |
-| ---------- | -------------------------------------------------------------------------------------- |
-| `TEST-001` | Touch/pointer control recovery and never-hidden Stop behavior for `UX-001`.            |
-| `TEST-002` | Complete saved-character entry-intent → Use → Start journey for `UX-002`.              |
-| `TEST-003` | State-driven curated visual matrix and semantic readiness invariants.                  |
-| `TEST-004` | Decart cap/tick/end/typed-error behavior for `ARCH-001`/`ARCH-002`.                    |
-| `TEST-005` | Physical-device recording-memory/finalization/cleanup evidence for `PERF-001`.         |
-| `TEST-006` | Declared/chunked successful ElevenLabs output bounds for `PERF-002`.                   |
-| `TEST-007` | Gated live provider/device entitlement and full included-provider journeys.            |
-| `TEST-008` | Risk-based dynamic-state axe/focus/screen-reader coverage.                             |
-| `TEST-009` | Outcome-based Character Builder responsive/reflow coverage.                            |
-| `TEST-010` | Shared semantic scenario/readiness model for curated and broad capture when justified. |
-| `TEST-011` | Focused WebKit/touch/media interaction smoke without cross-browser pixel baselines.    |
+| ID         | Test obligation                                                                                                                           |
+| ---------- | ----------------------------------------------------------------------------------------------------------------------------------------- |
+| `TEST-001` | Touch/pointer control recovery and never-hidden Stop behavior for `UX-001`; automated coverage complete, named physical evidence pending. |
+| `TEST-002` | Complete saved-character entry-intent → Use → Start journey for `UX-002`.                                                                 |
+| `TEST-003` | State-driven curated visual matrix and semantic readiness invariants.                                                                     |
+| `TEST-004` | Decart cap/tick/end/typed-error behavior for `ARCH-001`/`ARCH-002`.                                                                       |
+| `TEST-005` | Physical-device recording-memory/finalization/cleanup evidence for `PERF-001`.                                                            |
+| `TEST-006` | Declared/chunked successful ElevenLabs output bounds for `PERF-002`.                                                                      |
+| `TEST-007` | Gated live provider/device entitlement and full included-provider journeys.                                                               |
+| `TEST-008` | Risk-based dynamic-state axe/focus/screen-reader coverage.                                                                                |
+| `TEST-009` | Outcome-based Character Builder responsive/reflow coverage.                                                                               |
+| `TEST-010` | Shared semantic scenario/readiness model for curated and broad capture when justified.                                                    |
+| `TEST-011` | Focused WebKit/touch/media interaction smoke without cross-browser pixel baselines.                                                       |
 
 ## Test modernization status
 

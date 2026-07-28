@@ -36,7 +36,8 @@ Provider contact is deliberate and cost-sensitive:
 1. Select **Start Camera + Mic** for a provider-free local preview.
 2. Optionally create or choose a reusable character.
 3. Select **Start AI** for Character Transformation or secondary Virtual Try-On.
-4. Select **Record**, perform a short take, then **Stop recording**.
+4. Select **Record**, perform a short take, then **Stop recording**. While recording, Stop is the
+   sole stage action and does not auto-hide.
 5. Review playback on the same persistent stage.
 6. Optionally apply a local or saved ElevenLabs voice, then **Download**.
 7. Close/release or explicitly discard the temporary take.

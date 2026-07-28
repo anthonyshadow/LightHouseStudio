@@ -435,6 +435,11 @@ the UI/UX, architecture, security, performance, test, and documentation audits.
 | Pilot cost and safety policy         | Provider access, request/time limits, failed-request handling, moderation/refusal rules, and escalation/support are assigned.                                                             | PROD-007, SEC-002, SEC-005                            |
 | Trustworthy test evidence            | Critical functional journeys and the risk-based 29-case visual budget represent semantically ready states; loading fallbacks and false identity fixtures cannot pass as release evidence. | UX-TEST-001, UX-TEST-002, test-modernization findings |
 
+Implementation note (2026-07-28): the runtime and automated portion of **Safe touch/mobile
+recording controls** now passes component, real-time mobile touch-context, 200%-text, and five
+canonical viewport checks. The capability remains incomplete until the named physical
+browser/device and assistive-technology evidence passes.
+
 ### Required before an unassisted local beta
 
 - lightweight in-context first-use guidance based on observed hesitation points;

@@ -46,16 +46,22 @@ const expectStableStageRect = async (page: Page, expected: StageRect): Promise<v
 };
 
 const expectActionInsideViewport = async (page: Page, name: string): Promise<void> => {
-  const box = await page.getByRole('button', { name }).boundingBox();
-  expect(box).not.toBeNull();
-  if (!box) return;
-  const viewport = page.viewportSize();
-  expect(viewport).not.toBeNull();
-  if (!viewport) return;
-  expect(box.x).toBeGreaterThanOrEqual(-1);
-  expect(box.y).toBeGreaterThanOrEqual(-1);
-  expect(box.x + box.width).toBeLessThanOrEqual(viewport.width + 1);
-  expect(box.y + box.height).toBeLessThanOrEqual(viewport.height + 1);
+  await expect
+    .poll(
+      async () => {
+        const box = await page.getByRole('button', { name }).boundingBox();
+        const viewport = page.viewportSize();
+        if (!box || !viewport) return false;
+        return (
+          box.x >= -1 &&
+          box.y >= -1 &&
+          box.x + box.width <= viewport.width + 1 &&
+          box.y + box.height <= viewport.height + 1
+        );
+      },
+      { message: `${name} should settle fully inside the viewport` },
+    )
+    .toBe(true);
 };
 
 const expectInternalScrollOwnership = async (
@@ -101,6 +107,8 @@ const exactViewports = [
   { name: 'mobile portrait', width: 390, height: 844 },
   { name: 'small mobile', width: 320, height: 568 },
 ] as const;
+
+const STAGE_CONTROLS_IDLE_TIMEOUT_MS = 3_000;
 
 for (const viewport of exactViewports) {
   test(`${viewport.name} keeps every live/capture/review state viewport-bound`, async ({
@@ -242,6 +250,61 @@ for (const viewport of exactViewports) {
     expectNoExternalProviderTraffic(network);
   });
 }
+
+test('touch recovers timed-out live and playback controls while recording Stop never hides', async ({
+  page,
+}, testInfo) => {
+  test.setTimeout(45_000);
+  test.skip(testInfo.project.name !== 'mobile', 'This interaction requires a touch context.');
+  const network = await installSuccessfulStudioHarness(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/');
+
+  const mediaStage = page.getByLabel('Studio media stage');
+  const controls = page.locator('[aria-label="Studio session controls"]');
+  await controls.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+
+  await expect(controls).toHaveAttribute('data-control-visibility', 'hidden', {
+    timeout: STAGE_CONTROLS_IDLE_TIMEOUT_MS + 2_000,
+  });
+  await mediaStage.tap({ position: { x: 24, y: 96 } });
+  await expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+  await controls.getByRole('button', { name: 'Record' }).click();
+
+  const stopRecording = controls.getByRole('button', { name: 'Stop recording' });
+  await expect(stopRecording).toBeVisible();
+  await page.waitForTimeout(STAGE_CONTROLS_IDLE_TIMEOUT_MS + 250);
+  await expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+  await expect(controls).not.toHaveAttribute('aria-hidden');
+  await expect(controls).not.toHaveAttribute('inert');
+  await expect(stopRecording).toBeVisible();
+  await expectActionInsideViewport(page, 'Stop recording');
+
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%';
+  });
+  await expect(stopRecording).toBeVisible();
+  await expectActionInsideViewport(page, 'Stop recording');
+  await expectNoDocumentOverflow(page);
+  await stopRecording.click();
+
+  await expect(page.getByLabel('Recorded take playback')).toBeVisible();
+  await expect(controls).toHaveAttribute('data-control-visibility', 'hidden', {
+    timeout: STAGE_CONTROLS_IDLE_TIMEOUT_MS + 2_000,
+  });
+  await mediaStage.tap({ position: { x: 24, y: 96 } });
+  await expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+  const dismissPlaybackError = page.getByRole('button', { name: 'Dismiss Playback unavailable' });
+  if (await dismissPlaybackError.isVisible()) await dismissPlaybackError.click();
+  await controls
+    .getByRole('group', { name: 'Recorded take controls' })
+    .getByRole('button', { name: 'Voice' })
+    .click();
+  await expect(page.getByRole('dialog', { name: 'Voice Treatments' })).toBeVisible();
+
+  expectNoExternalProviderTraffic(network);
+});
 
 test('persistent controls preserve local media across VTON choice, AI stop, track toggles, and full shutdown', async ({
   page,

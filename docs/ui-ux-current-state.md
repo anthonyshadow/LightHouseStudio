@@ -19,7 +19,9 @@ Lightframe Studio has a strong interaction foundation: one persistent media stag
 
 Four areas prevent an unqualified MVP-readiness claim:
 
-1. **Code-confirmed:** live and playback controls auto-hide after three seconds, but only mouse movement and keyboard activity restore them. A touch-only user can lose the controls once the bar is `inert`.
+1. **Manual/device unknown:** the code now restores timed-out live/playback controls from
+   stage-owned pointer, touch, focus, and keyboard activity, and recording Stop never auto-hides.
+   The named physical touch/browser matrix and assistive-technology protocol have not passed.
 2. **Code-confirmed:** “Choose saved character” opens Recipe Shelf without setting the `Characters` category. In a clean session the Shelf defaults to generic `Saved` recipes.
 3. **Code-confirmed:** the direct “Start with [character]” decision does not contain the Decart/provider disclosure shown in Recipe Dock, and the enforced five-minute AI-session cap is not carried into the browser UI.
 4. **Code-confirmed risk:** recording is memory-buffered and does not enforce the approved 300-second maximum. The cap and physical-device evidence are still missing.
@@ -88,25 +90,25 @@ Use plain verbs in first-success guidance: Start camera, choose a character, set
 
 ## 5. Surface-by-surface review
 
-| Surface               | Hierarchy, feedback, and states                                                           | Overlay/stage behavior                           | Main issue                                                           |
-| --------------------- | ----------------------------------------------------------------------------------------- | ------------------------------------------------ | -------------------------------------------------------------------- |
-| Header                | Selected character is a useful return anchor; integration details are collapsible         | Persistent and compact                           | Capability label overstates configuration as readiness               |
-| Media Stage           | Clear idle/live/provider/playback/finalizing states; contextual alerts; contain-fit media | Persistent; not remounted by drawers             | Physical-device media quality remains manual                         |
-| Session control bar   | Keeps primary live controls on the stage                                                  | Auto-hides during live/playback                  | Touch reveal defect; recording state is crowded                      |
-| Recording controls    | Source/device summary and settings entry                                                  | Does not replace stage                           | Good                                                                 |
-| Character selector    | Selected/none state, create/edit/choose                                                   | Right drawer; mobile full-screen                 | Saved-character action lands in wrong category                       |
-| AI chooser            | Clear Character versus VTO choice                                                         | Full-screen while local media remains active     | Missing direct provider/session disclosure; VTO wording is technical |
-| Recipe Dock           | Complete prepare/apply/revert/reset/start/stop states                                     | Drawer/full-screen mobile; stage remains mounted | Expert density and metaphor learning                                 |
-| Capture Settings      | Devices, quality, active/provider-managed state                                           | Internal scrolling; responsive drawer            | Good                                                                 |
-| Prompt Workshop       | Constrained Add/Replace/Restyle authoring                                                 | Wide drawer → tablet bottom → mobile full-screen | Secondary tool has equal rail weight                                 |
-| Recipe Shelf          | Saved/Recent/Characters, search/tags, use/edit/rename/delete                              | Bottom sheet/full-screen mobile                  | Entry intent and category taxonomy                                   |
-| Character Builder     | Upload, presentation, choices, constraints, generation, save                              | Full-screen; desktop sticky preview              | Mobile preview/generate follows every form section                   |
-| Builder confirmations | Name, regenerate, reset, discard                                                          | Topmost nested dialogs                           | Good destructive protection                                          |
-| Take Review           | Playback metadata and actions                                                             | Bottom sheet while playback remains in stage     | Release wording after download can be clearer                        |
-| Voice Treatments      | Local choices, progress, cancellation, errors                                             | Bottom sheet over playback                       | Technical compatibility copy is dense                                |
-| Voice Browser         | Explicit provider contact, loading/search/empty/error/paging                              | Nested right drawer                              | Deep layer stack; usage context can improve                          |
-| Stage notices         | Permission/provider/recording/sidecar recovery                                            | Overlay within stable stage                      | Good                                                                 |
-| Legacy Projects       | Compatibility recovery only                                                               | Full-screen                                      | Keep out of primary IA                                               |
+| Surface               | Hierarchy, feedback, and states                                                           | Overlay/stage behavior                                      | Main issue                                                           |
+| --------------------- | ----------------------------------------------------------------------------------------- | ----------------------------------------------------------- | -------------------------------------------------------------------- |
+| Header                | Selected character is a useful return anchor; integration details are collapsible         | Persistent and compact                                      | Capability label overstates configuration as readiness               |
+| Media Stage           | Clear idle/live/provider/playback/finalizing states; contextual alerts; contain-fit media | Persistent; not remounted by drawers                        | Physical-device media quality remains manual                         |
+| Session control bar   | Keeps primary live controls on the stage; recording collapses to dominant Stop            | Auto-hides during live/playback; stage activity restores it | Physical touch/assistive-technology evidence pending                 |
+| Recording controls    | Source/device summary and settings entry                                                  | Does not replace stage                                      | Good                                                                 |
+| Character selector    | Selected/none state, create/edit/choose                                                   | Right drawer; mobile full-screen                            | Saved-character action lands in wrong category                       |
+| AI chooser            | Clear Character versus VTO choice                                                         | Full-screen while local media remains active                | Missing direct provider/session disclosure; VTO wording is technical |
+| Recipe Dock           | Complete prepare/apply/revert/reset/start/stop states                                     | Drawer/full-screen mobile; stage remains mounted            | Expert density and metaphor learning                                 |
+| Capture Settings      | Devices, quality, active/provider-managed state                                           | Internal scrolling; responsive drawer                       | Good                                                                 |
+| Prompt Workshop       | Constrained Add/Replace/Restyle authoring                                                 | Wide drawer → tablet bottom → mobile full-screen            | Secondary tool has equal rail weight                                 |
+| Recipe Shelf          | Saved/Recent/Characters, search/tags, use/edit/rename/delete                              | Bottom sheet/full-screen mobile                             | Entry intent and category taxonomy                                   |
+| Character Builder     | Upload, presentation, choices, constraints, generation, save                              | Full-screen; desktop sticky preview                         | Mobile preview/generate follows every form section                   |
+| Builder confirmations | Name, regenerate, reset, discard                                                          | Topmost nested dialogs                                      | Good destructive protection                                          |
+| Take Review           | Playback metadata and actions                                                             | Bottom sheet while playback remains in stage                | Release wording after download can be clearer                        |
+| Voice Treatments      | Local choices, progress, cancellation, errors                                             | Bottom sheet over playback                                  | Technical compatibility copy is dense                                |
+| Voice Browser         | Explicit provider contact, loading/search/empty/error/paging                              | Nested right drawer                                         | Deep layer stack; usage context can improve                          |
+| Stage notices         | Permission/provider/recording/sidecar recovery                                            | Overlay within stable stage                                 | Good                                                                 |
+| Legacy Projects       | Compatibility recovery only                                                               | Full-screen                                                 | Keep out of primary IA                                               |
 
 ## 6. Responsive review
 
@@ -117,7 +119,8 @@ Use plain verbs in first-success guidance: Start camera, choose a character, set
 - The stage remains the visual center.
 - Wide drawers preserve context rather than navigating away.
 - Character Builder uses a two-column layout with a sticky preview.
-- Keyboard and mouse can restore auto-hidden controls.
+- Pointer, touch, focus, and keyboard activity restore auto-hidden controls through the persistent
+  stage boundary.
 
 **Risks**
 
@@ -139,16 +142,21 @@ Wide right drawers become bottom panels while standard drawers remain narrower. 
 - Overlay panels become full-screen.
 - Safe-area insets and internal scrolling are used.
 - Builder collapses to one column and places preview/generation after the final configuration section.
-- The control bar can hide and become `inert` without a touch reveal listener.
+- The persistent stage owns pointer/touch/focus recovery outside the control subtree; recording
+  suspends auto-hide and exposes only Stop.
 
 **Visually observed risks**
 
-- Recording controls are dense at 320px and previously clipped a Start AI label.
+- The recording state is now a single Stop action; its updated Darwin/Linux baselines are reviewed,
+  while named physical-device rendering still requires qualification.
 - Full-screen tools completely cover the stage, which is expected, but the close action and task context must remain obvious.
 
 **Release position**
 
-Touch/mobile creation is required for the controlled pilot. Fix control recovery and physically verify the named device/browser matrix before claiming support. Responsive screenshots do not prove camera, recording, remux, memory, battery, or background/foreground support on a real mobile browser.
+Touch/mobile creation is required for the controlled pilot. Control recovery is implemented and
+automated at the canonical viewports, but the named device/browser matrix must still pass before
+support is claimed. Responsive screenshots do not prove camera, recording, remux, memory, battery,
+or background/foreground support on a real mobile browser.
 
 ## 7. Accessibility review
 
@@ -163,9 +171,12 @@ Touch/mobile creation is required for the controlled pilot. Fix control recovery
 - Safe-area padding, internal scroll ownership, and document-overflow checks.
 - Axe checks across all five viewports for the preparation/Workshop path.
 
-### Code-confirmed defect
+### Code-confirmed control recovery
 
-`UX-001`: touch activity cannot restore the hidden control bar. The hiding semantics are sound; the reveal input model is incomplete.
+`MediaStage` owns one three-second timer and stage-bound pointer, touch, and focus listeners;
+keyboard activity is handled by the same owner. The hidden control subtree remains correctly
+`aria-hidden`/`inert`, while recording bypasses auto-hide and `StudioSessionControlBar` enforces a
+visible dominant Stop action. Component and touch-context E2E coverage verify those outcomes.
 
 ### Manual/device unknowns
 
@@ -192,13 +203,15 @@ Automated axe results do not settle those questions.
 
 ## 9. Weakest design decisions
 
-1. Auto-hide was designed around mouse/keyboard activity rather than input-agnostic stage activity.
+1. Physical-device and assistive-technology qualification still trails the now input-agnostic
+   stage activity implementation.
 2. Shelf category state is generic even when the entry action explicitly asks for a character.
 3. The direct primary AI Start decision omits the fuller provider trust contract.
 4. The enforced AI-session limit is invisible.
 5. First-run surfaces expose expert tools and metaphor vocabulary before the core loop is established.
 6. Character Builder prioritizes source order over narrow-screen generate/review access.
-7. Recording retains unrelated disabled controls instead of focusing the high-consequence Stop state.
+7. Recording now focuses a sole high-consequence Stop state, but physical-device evidence remains
+   pending.
 8. Retained reference bytes and browser-level detach/delete are not distinguished close enough to the action.
 9. Recording duration support is not a visible or evidence-backed product contract.
 
@@ -220,7 +233,7 @@ Automated axe results do not settle those questions.
 - Choosing Character AI through multiple overlapping preparation paths.
 - Discovering that saved characters live under a separate Shelf category.
 - Scrolling through the complete mobile Builder before reaching preview/generation.
-- Recovering controls on touch after idle.
+- Confirming timed-out control recovery on each named physical touch/browser target.
 - Distinguishing configured integration from currently connected provider.
 - Understanding when external usage begins and when the five-minute session will end.
 - Understanding that upload removal or character deletion does not erase immutable local bytes.
@@ -253,22 +266,22 @@ Automated axe results do not settle those questions.
 
 Priority meanings: **P0** blocks the stated release condition; **P1** is recommended before unassisted MVP; **P2** is post-MVP refinement. Effort is XS/S/M/L. Risk is implementation regression risk.
 
-| ID     | Problem                                                                                         | User impact                                                              | Evidence                                                                  | Recommendation                                                                                                                                                                   | Priority                                | Effort              | Risk              | MVP classification                                 |
-| ------ | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------- | ----------------- | -------------------------------------------------- |
-| UX-001 | Auto-hidden live/playback controls listen only for `mousemove` and `keydown` and become `inert` | Touch-only users can lose every session/take action                      | `StudioSessionControlBar.tsx:220-277`; mouse/keyboard-only tests          | Add a stage-owned pointer/touch reveal gesture outside the inert subtree; never hide Stop Recording; test after timeout on every named physical touch target                     | P0                                      | S                   | Medium            | Unconditional controlled-MVP stop-ship             |
-| UX-002 | Saved-character actions open Shelf without selecting Characters                                 | Users land in generic prompts and may believe their character is missing | `StudioApp.tsx:329-332, 443-468`; Shelf default category `saved`          | Pass entry intent/category into the existing Shelf; test both entry actions through use and AI start                                                                             | P0                                      | S–M                 | Low               | Required before controlled MVP                     |
-| UX-003 | Mobile Builder preview/generate appears after every form section                                | Generation and result feedback are hard to discover                      | `CharacterBuilderForm.tsx:146-299`; responsive test codifies preview-last | Keep one DOM; add anchored Review & Generate/compact status or a Configure → Review step; verify 320/tablet/200% text                                                            | P1                                      | M                   | Medium            | Before touch/unassisted MVP                        |
-| UX-004 | First entry exposes expert tools without a primary sequence                                     | Higher time-to-first-preview/download and support dependency             | Studio shell/tool rail; no onboarding state                               | For moderated pilot use task guidance; before unassisted use add dismissible in-context first-success guidance, not a new route/tour                                             | P1                                      | M                   | Low–Medium        | Pilot-measure, then MVP                            |
-| UX-005 | Metaphor and state vocabulary overlap                                                           | Users must learn product jargon before success                           | Dock/Shelf/Workshop/recipe/draft/applied copy                             | Add action-first subtitles and plain verbs; test labels before wholesale rename                                                                                                  | P1                                      | S–M                 | Low               | Incremental before MVP                             |
-| UX-006 | Recording keeps unrelated disabled controls visible                                             | Stop competes at 320px; state feels noisy                                | Control-bar rendering and reviewed 320 recording image                    | Make Stop dominant and always visible; hide/collapse unavailable actions; test long labels and 200% text                                                                         | P1                                      | S                   | Low               | Before mobile/unassisted MVP                       |
-| UX-007 | Capability summary implies readiness and chooser lacks contextual availability                  | Users enter unavailable branches or misread failures                     | Header capability derivation; chooser receives no availability            | Use configured/limited language; annotate unavailable cards with plain reason and recovery                                                                                       | P1                                      | S–M                 | Low               | Before unassisted MVP                              |
-| UX-008 | Voice workflow nests dense technical/provider copy                                              | Users lose context and cannot predict local/provider work                | Voice Treatments and Voice Browser surfaces                               | Keep trust disclosure; move compatibility details behind help; strengthen breadcrumb and one-line outcome/usage context                                                          | P1                                      | M                   | Medium            | Required because Voice/ElevenLabs are included     |
-| UX-009 | Post-download Close does not explain temporary-artifact release                                 | Users may not understand what Close removes                              | Take Review actions/copy                                                  | Keep the safety gate; use “Close and release” or equivalent post-download copy; retain confirmed Discard                                                                         | P2                                      | XS–S                | Low               | Post-MVP refinement                                |
-| UX-010 | Simplification could create parallel routes/media/modal/storage systems                         | Fixes could damage the strongest architecture                            | `StudioApp`, `MediaStage`, `OverlayPanel`, repositories                   | Treat one stage, one route, shared overlays, and existing repositories as design constraints                                                                                     | Constraint                              | N/A                 | High if ignored   | Always                                             |
-| UX-011 | Direct Character Start omits the fuller Decart disclosure                                       | External media/usage can surprise a returning user                       | `AIExperienceChooser.tsx` versus Recipe Dock disclosure                   | Put concise “what is sent / external AI / usage / stop” text at the actual Start action; details may expand; avoid repeated legal modal                                          | P0 for external pilot                   | S                   | Low               | Required before external controlled MVP            |
-| UX-012 | Enforced five-minute AI cap is not represented in browser UI                                    | Expected expiry can look like a crash; no planning signal                | API returns cap; browser drops constraints; no timer                      | Preserve cap, start app monotonic timer after connect, optionally reconcile provider ticks, warn near expiry, normalize expected stop, preserve local preview                    | P0                                      | M                   | Medium            | Required before AI pilot                           |
-| UX-013 | Detach/delete UI does not erase immutable local reference bytes                                 | Personal images may remain contrary to user expectation                  | Asset store/privacy docs; no ordinary delete route                        | Pilot: disclose at upload/detach/delete, isolate data directories, verify operator cleanup. Later add coherent erase-all/relationship-aware deletion, not unsafe orphan deletion | P0 disclosure; later deletion P1/public | S–M pilot; L public | High for deletion | Disclosure/cleanup required; full manager deferred |
-| UX-014 | Recording does not enforce the approved 300-second maximum                                      | Long takes can exhaust memory and be lost                                | Memory-buffered recorder and recording memory policy; no target results   | Add accessible remaining-time warning and safe automatic Stop/finalize at 300 seconds; measure finalization, local/ElevenLabs voice, and cleanup on every named target           | P0                                      | M                   | Medium            | Required before controlled MVP                     |
+| ID     | Problem                                                                                     | User impact                                                              | Evidence                                                                     | Recommendation                                                                                                                                                                   | Priority                                | Effort              | Risk              | MVP classification                                             |
+| ------ | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- | ------------------- | ----------------- | -------------------------------------------------------------- |
+| UX-001 | Runtime input recovery is implemented; physical touch/browser/assistive evidence is pending | An unqualified target could still fail the critical session/take actions | `MediaStage` timer/listeners; control-bar invariant; component/mobile E2E    | Run the real timeout/recovery/Stop protocol on every named physical target and retain content-free evidence                                                                      | P0                                      | S                   | Medium            | Unconditional controlled-MVP stop-ship until physical evidence |
+| UX-002 | Saved-character actions open Shelf without selecting Characters                             | Users land in generic prompts and may believe their character is missing | `StudioApp.tsx:329-332, 443-468`; Shelf default category `saved`             | Pass entry intent/category into the existing Shelf; test both entry actions through use and AI start                                                                             | P0                                      | S–M                 | Low               | Required before controlled MVP                                 |
+| UX-003 | Mobile Builder preview/generate appears after every form section                            | Generation and result feedback are hard to discover                      | `CharacterBuilderForm.tsx:146-299`; responsive test codifies preview-last    | Keep one DOM; add anchored Review & Generate/compact status or a Configure → Review step; verify 320/tablet/200% text                                                            | P1                                      | M                   | Medium            | Before touch/unassisted MVP                                    |
+| UX-004 | First entry exposes expert tools without a primary sequence                                 | Higher time-to-first-preview/download and support dependency             | Studio shell/tool rail; no onboarding state                                  | For moderated pilot use task guidance; before unassisted use add dismissible in-context first-success guidance, not a new route/tour                                             | P1                                      | M                   | Low–Medium        | Pilot-measure, then MVP                                        |
+| UX-005 | Metaphor and state vocabulary overlap                                                       | Users must learn product jargon before success                           | Dock/Shelf/Workshop/recipe/draft/applied copy                                | Add action-first subtitles and plain verbs; test labels before wholesale rename                                                                                                  | P1                                      | S–M                 | Low               | Incremental before MVP                                         |
+| UX-006 | Recording now collapses to Stop; broader long-label/reflow and physical evidence is pending | Unqualified text/device combinations could still compromise reachability | Control-bar rendering; 200%-text mobile E2E; reviewed Darwin/Linux baselines | Finish physical long-label, safe-area, and 200% checks                                                                                                                           | P1                                      | S                   | Low               | Before mobile/unassisted MVP                                   |
+| UX-007 | Capability summary implies readiness and chooser lacks contextual availability              | Users enter unavailable branches or misread failures                     | Header capability derivation; chooser receives no availability               | Use configured/limited language; annotate unavailable cards with plain reason and recovery                                                                                       | P1                                      | S–M                 | Low               | Before unassisted MVP                                          |
+| UX-008 | Voice workflow nests dense technical/provider copy                                          | Users lose context and cannot predict local/provider work                | Voice Treatments and Voice Browser surfaces                                  | Keep trust disclosure; move compatibility details behind help; strengthen breadcrumb and one-line outcome/usage context                                                          | P1                                      | M                   | Medium            | Required because Voice/ElevenLabs are included                 |
+| UX-009 | Post-download Close does not explain temporary-artifact release                             | Users may not understand what Close removes                              | Take Review actions/copy                                                     | Keep the safety gate; use “Close and release” or equivalent post-download copy; retain confirmed Discard                                                                         | P2                                      | XS–S                | Low               | Post-MVP refinement                                            |
+| UX-010 | Simplification could create parallel routes/media/modal/storage systems                     | Fixes could damage the strongest architecture                            | `StudioApp`, `MediaStage`, `OverlayPanel`, repositories                      | Treat one stage, one route, shared overlays, and existing repositories as design constraints                                                                                     | Constraint                              | N/A                 | High if ignored   | Always                                                         |
+| UX-011 | Direct Character Start omits the fuller Decart disclosure                                   | External media/usage can surprise a returning user                       | `AIExperienceChooser.tsx` versus Recipe Dock disclosure                      | Put concise “what is sent / external AI / usage / stop” text at the actual Start action; details may expand; avoid repeated legal modal                                          | P0 for external pilot                   | S                   | Low               | Required before external controlled MVP                        |
+| UX-012 | Enforced five-minute AI cap is not represented in browser UI                                | Expected expiry can look like a crash; no planning signal                | API returns cap; browser drops constraints; no timer                         | Preserve cap, start app monotonic timer after connect, optionally reconcile provider ticks, warn near expiry, normalize expected stop, preserve local preview                    | P0                                      | M                   | Medium            | Required before AI pilot                                       |
+| UX-013 | Detach/delete UI does not erase immutable local reference bytes                             | Personal images may remain contrary to user expectation                  | Asset store/privacy docs; no ordinary delete route                           | Pilot: disclose at upload/detach/delete, isolate data directories, verify operator cleanup. Later add coherent erase-all/relationship-aware deletion, not unsafe orphan deletion | P0 disclosure; later deletion P1/public | S–M pilot; L public | High for deletion | Disclosure/cleanup required; full manager deferred             |
+| UX-014 | Recording does not enforce the approved 300-second maximum                                  | Long takes can exhaust memory and be lost                                | Memory-buffered recorder and recording memory policy; no target results      | Add accessible remaining-time warning and safe automatic Stop/finalize at 300 seconds; measure finalization, local/ElevenLabs voice, and cleanup on every named target           | P0                                      | M                   | Medium            | Required before controlled MVP                                 |
 
 ## 14. Priority ranking
 
@@ -312,7 +325,8 @@ The future Studio should remain one route and one stage:
 4. Start AI opens a chooser with Character primary, VTO secondary/beta, contextual capability state, provider disclosure, and the session maximum.
 5. Character Builder keeps the desktop sidecar and gives narrow screens an explicit Configure → Review & Generate progression.
 6. Live stage shows compact recording elapsed/remaining and secondary AI-session remaining without crowding controls.
-7. Touch/mouse/keyboard activity reliably reveals controls; Stop Recording never disappears.
+7. Touch/pointer/focus/keyboard activity reliably reveals controls; Stop Recording never
+   disappears.
 8. Playback remains on the same stage; Take Review makes Download, Voice, Close/release, and Discard consequences unambiguous.
 9. Local storage and provider contact are disclosed at the action that creates them, with details available but not repeated as modal friction.
 
@@ -347,27 +361,30 @@ Audit evidence from the superseded matrix remains relevant:
 - The old 320px `latest-take.png` showed `Loading studio tool…`.
 - The old 320px recording image showed cramped controls and a clipped Start AI label.
 
-The new scenario definitions and readiness assertions address the first three test-state problems in code. This document does **not** claim that all new platform baselines have been generated, reviewed, and accepted; baseline inventory and visual approval remain release-gate work. UX-003 and UX-006 are product issues, not fixed merely by capturing a new screenshot.
+The new scenario definitions and readiness assertions address the first three test-state problems
+in code. The intentional Wave 1 recording-state changes were regenerated and reviewed across all
+five Darwin and Linux baseline viewports. UX-003 remains product work, and the physical/reflow
+evidence portion of UX-006 is not fixed merely by accepting those screenshots.
 
 ## 18. Evidence from specific components or routes
 
-| Evidence area                     | Primary files                                                                                                                 |
-| --------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Single route/composition          | `apps/web/src/studio/StudioApp.tsx`, `apps/web/src/studio/routeResolution.ts`                                                 |
-| Overlay ownership                 | `apps/web/src/studio/useStudioOverlayController.ts`, `apps/web/src/ui/primitives/OverlayPanel.tsx`, `OverlayPanel.styles.ts`  |
-| Persistent media                  | `apps/web/src/features/live-stage/MediaStage.tsx`, `MediaStage.styles.ts`                                                     |
-| Session controls/touch defect     | `apps/web/src/studio/StudioSessionControlBar.tsx`, `StudioSessionControlBar.test.tsx`                                         |
-| Header/capability state           | `apps/web/src/studio/StudioHeader.tsx`                                                                                        |
-| AI chooser/disclosure path        | `apps/web/src/studio/AIExperienceChooser.tsx`, `apps/web/src/studio/StudioApp.tsx`                                            |
-| Creative rail                     | `apps/web/src/studio/CreativeWorkspace.tsx`                                                                                   |
-| Shelf intent/category             | `apps/web/src/features/creative-assets/useRecipeShelfController.ts`, Recipe Shelf components                                  |
-| Character Builder                 | `apps/web/src/features/character-builder/CharacterBuilderForm.tsx`, `CharacterBuilderPanel.tsx`, `formStyles.ts`              |
-| Capture                           | Capture Settings and recording-control components under `apps/web/src`                                                        |
-| Take/voice                        | Take Review, `VoiceEffectsPanel.tsx`, Voice Library/List/Preview, `useTakeReviewFlow.ts`                                      |
-| Recording memory                  | `apps/web/src/orchestration/recording/recordingAttempt.ts`, `recordingArtifacts.ts`, `docs/RECORDING_MEMORY_POLICY.md`        |
-| AI session cap                    | `apps/api/src/features/realtime/routes.ts`, Decart token provider, browser API client/realtime adapter                        |
-| Retained assets                   | reference-image asset store/routes, `docs/PRIVACY_AND_TEMPORARY_DATA.md`, `docs/ARCHITECTURE.md`                              |
-| Responsive/accessibility journeys | `e2e/accessibility-responsive.spec.ts`, `e2e/successful-studio-journeys.spec.ts`, `e2e/studio-character-builder.spec.ts`      |
-| Visual matrix/harness             | `e2e/studioVisualMatrix.ts`, `e2e/studio.visual.spec.ts`, `playwright.visual.config.ts`, `scripts/prune-visual-baselines.mjs` |
+| Evidence area                     | Primary files                                                                                                                                                   |
+| --------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Single route/composition          | `apps/web/src/studio/StudioApp.tsx`, `apps/web/src/studio/routeResolution.ts`                                                                                   |
+| Overlay ownership                 | `apps/web/src/studio/useStudioOverlayController.ts`, `apps/web/src/ui/primitives/OverlayPanel.tsx`, `OverlayPanel.styles.ts`                                    |
+| Persistent media                  | `apps/web/src/features/live-stage/MediaStage.tsx`, `MediaStage.styles.ts`                                                                                       |
+| Session controls/touch recovery   | `apps/web/src/features/live-stage/MediaStage.tsx`, `MediaStage.test.tsx`, `apps/web/src/studio/StudioSessionControlBar.tsx`, `StudioSessionControlBar.test.tsx` |
+| Header/capability state           | `apps/web/src/studio/StudioHeader.tsx`                                                                                                                          |
+| AI chooser/disclosure path        | `apps/web/src/studio/AIExperienceChooser.tsx`, `apps/web/src/studio/StudioApp.tsx`                                                                              |
+| Creative rail                     | `apps/web/src/studio/CreativeWorkspace.tsx`                                                                                                                     |
+| Shelf intent/category             | `apps/web/src/features/creative-assets/useRecipeShelfController.ts`, Recipe Shelf components                                                                    |
+| Character Builder                 | `apps/web/src/features/character-builder/CharacterBuilderForm.tsx`, `CharacterBuilderPanel.tsx`, `formStyles.ts`                                                |
+| Capture                           | Capture Settings and recording-control components under `apps/web/src`                                                                                          |
+| Take/voice                        | Take Review, `VoiceEffectsPanel.tsx`, Voice Library/List/Preview, `useTakeReviewFlow.ts`                                                                        |
+| Recording memory                  | `apps/web/src/orchestration/recording/recordingAttempt.ts`, `recordingArtifacts.ts`, `docs/RECORDING_MEMORY_POLICY.md`                                          |
+| AI session cap                    | `apps/api/src/features/realtime/routes.ts`, Decart token provider, browser API client/realtime adapter                                                          |
+| Retained assets                   | reference-image asset store/routes, `docs/PRIVACY_AND_TEMPORARY_DATA.md`, `docs/ARCHITECTURE.md`                                                                |
+| Responsive/accessibility journeys | `e2e/accessibility-responsive.spec.ts`, `e2e/successful-studio-journeys.spec.ts`, `e2e/studio-character-builder.spec.ts`                                        |
+| Visual matrix/harness             | `e2e/studioVisualMatrix.ts`, `e2e/studio.visual.spec.ts`, `playwright.visual.config.ts`, `scripts/prune-visual-baselines.mjs`                                   |
 
 Canonical observable journeys remain under `docs/userStories/`. This document should be updated when behavior, terminology, supported devices, session/recording limits, persistence consequences, or the screenshot matrix changes.

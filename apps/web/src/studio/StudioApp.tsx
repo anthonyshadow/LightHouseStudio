@@ -367,7 +367,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
               recording={recording.lifecycle === 'recording'}
               recordingSeconds={recording.elapsedSeconds}
               {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}
-              controls={
+              controls={({ visible }) => (
                 <StudioSessionControlBar
                   session={session}
                   {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}
@@ -379,6 +379,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
                     ? { recordingBlockedReason: captureBlockedReason }
                     : {})}
                   reviewingTake={stagePresentation.kind === 'playback'}
+                  visible={visible}
                   controlsLocked={reviewLocked || finalizingStartedAt !== null}
                   onStopRecording={finishTake}
                   onCloseTakeReview={closeTakeReview}
@@ -386,7 +387,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
                   onChooseAiExperience={() => openOverlay('ai-experience')}
                   onChangeExperience={() => openOverlay('ai-experience')}
                 />
-              }
+              )}
               notices={stageNotices}
             />
             <RecordingControls
