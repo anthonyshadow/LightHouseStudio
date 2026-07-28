@@ -4,7 +4,11 @@ Browser media behavior depends on browser version, operating system, hardware, p
 
 ## Recommended baseline
 
-Use the current stable desktop Chrome or Edge on macOS or Windows for the broadest expected combination of camera capture, WebRTC, WebM/Opus recording, Web Audio, and local remuxing. Current Firefox and Safari are targets, not assumed equivalents. iOS/iPadOS should be treated as constrained targets until tested on the intended OS/device matrix.
+Use the current stable desktop Chrome or Edge on macOS or Windows for the broadest expected
+combination of camera capture, WebRTC, WebM/Opus recording, Web Audio, and local remuxing. Current
+Firefox and Safari are targets, not assumed equivalents. Touch/mobile creation is required for the
+pilot, but no mobile browser/device is supported until the product owner names the exact physical
+matrix and that matrix passes the checks in this document.
 
 The studio must run in a secure context. Loopback HTTP (`127.0.0.1`/`localhost`) is appropriate for local development; any non-loopback deployment needs HTTPS and a separate server security design.
 
@@ -14,7 +18,13 @@ Studio is a viewport-bound workspace rather than a scrolling document. `html`, `
 
 The fullscreen character builder owns one internal vertical scroller because its independently collapsible choice drawers can contain many visual options. It never creates document overflow and keeps its header, 4:5 preview, controls, focus rings, footer actions, and safe-area padding within the available width and height. The Studio stage remains mounted and inert beneath the panel.
 
-The in-stage session control bar owns **Start Camera + Mic**, **Start AI**, mic/camera toggles, **Record**/**Stop recording**, AI Change/Stop, and compact take actions. In live and playback states it hides after three seconds of inactivity and returns on mouse movement or keyboard activity. The AI experience chooser is a fullscreen responsive overlay.
+The in-stage session control bar owns **Start Camera + Mic**, **Start AI**, mic/camera toggles,
+**Record**/**Stop recording**, AI Change/Stop, and compact take actions. In live and playback states
+it hides after three seconds of inactivity and returns on mouse movement or keyboard activity.
+Explicit touch/pointer recovery is a release blocker for the required touch/mobile pilot, so no
+touch target may be declared supported until `UX-001` in the
+[audit findings](project-audit-findings.md) is resolved and physically verified. The AI experience
+chooser is a fullscreen responsive overlay.
 
 Responsive behavior is range-based:
 
@@ -25,9 +35,9 @@ Responsive behavior is range-based:
 - At `20rem` width or `36rem` height and below, tools become full-screen dialogs with visible Close and primary actions; operation must not depend on backdrop dismissal.
 - All breakpoints retain reachable **Record**/**Stop recording** and **Device settings** actions. Mode, notice, recording, finalizing, playback, and overlay state must not resize the stage.
 
-The required visual regression sizes are `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`. The curated Chromium matrix defines exactly 29 cases: idle, recording, and character-live at all five sizes, plus AI experience choice, finalizing, error, VTON, workshop, capture, and review at desktop and small mobile. Animations are disabled and `maxDiffPixelRatio` is `0.005`. At every size, document and body scroll width/height must stay within the viewport (allowing one pixel of browser rounding). Stage video uses `object-fit: contain` to preserve the whole frame, mirrors local preview only, and does not crop transformed output or recorded playback.
+The required visual regression sizes are `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`. The current curated Chromium matrix uses its 29-case review budget for closed initial Studio, local live, and recording at all five sizes; AI choice, selected-character live, Character Builder combined-ready, saved-character selection, and settled Take Review at desktop and small mobile; desktop VTO preparation and Voice Browser; and small-mobile finalizing and permission error. Semantic readiness and required state/viewport pairs are the correctness rules; the count is a cost budget. Animations are disabled and `maxDiffPixelRatio` is `0.005`. At every size, document and body scroll width/height must stay within the viewport (allowing one pixel of browser rounding). Stage video uses `object-fit: contain` to preserve the whole frame, mirrors local preview only, and does not crop transformed output or recorded playback.
 
-The executable visual matrix and pruning inventory share exactly 29 cases. Darwin and Linux each contain all 29 reviewed assets. The complete suite passes on Darwin and in the Linux/amd64 Playwright runtime used to match CI architecture.
+The executable visual matrix and pruning inventory share the same case paths. Darwin and Linux baselines are host-specific because font rasterization differs. See the [screenshot coverage manifest](screenshot-test-coverage.md).
 
 ## Capability matrix
 
@@ -61,12 +71,19 @@ Codec claims from `MediaRecorder.isTypeSupported` are necessary but not sufficie
 - Mobile browsers may stop camera tracks when the tab backgrounds, the screen locks, a call arrives, or another app claims the camera.
 - Multiple cameras/microphones, Bluetooth handoff, privacy switches, and virtual devices can end tracks unexpectedly.
 - Enterprise policies, browser extensions, VPN/firewall rules, NAT, and provider outages can block WebRTC while local capture still works.
-- Long recordings and audio remuxing are memory-intensive because current Studio artifacts are held in the tab. The [recording memory policy](RECORDING_MEMORY_POLICY.md) defines the required target-device measurements and release decision process. Connection-start credentials expire after five minutes, the broker's default AI active-session scope is five minutes, and the ElevenLabs UI limits conversion to takes no longer than five minutes. Ordinary recording has no matching warning or forced-stop timer.
+- Long recordings and audio remuxing are memory-intensive because current Studio artifacts are
+  held in the tab. The [recording memory policy](RECORDING_MEMORY_POLICY.md) defines the required
+  target-device measurements. The approved take maximum is 300 seconds, but ordinary recording
+  does not yet warn or safely auto-finalize at that boundary. Connection-start credentials, the
+  broker's default AI active-session scope, and ElevenLabs conversion also use five-minute
+  boundaries, but those provider contracts do not replace the app-owned recording cap.
 - Reduced-power/mobile devices may not render offline audio or remux quickly enough for a comfortable workflow.
 
-## Release browser matrix
+## Provisional release browser matrix
 
-Before declaring support, run [manual QA](MANUAL_QA.md) on at least:
+The product owner has not yet selected exact OS versions and device models. The following is the
+minimum candidate matrix, not a support claim. Name and approve the exact physical targets, then
+run [manual QA](MANUAL_QA.md) on at least:
 
 - current Chrome and Edge desktop;
 - current Firefox desktop;
@@ -75,4 +92,10 @@ Before declaring support, run [manual QA](MANUAL_QA.md) on at least:
 - one Android Chromium device;
 - at least one external/USB or Bluetooth input configuration if relevant.
 
-For each desktop engine, cover the five required CSS viewports where the browser permits. On physical phone/tablet targets, cover the closest portrait sizes plus landscape, safe areas, browser chrome expansion/collapse, and the software keyboard. Test camera/mic allow and deny, source replacement, local and model recording, downloaded playback, local processing, permission revocation, background/foreground transitions, 200% zoom/large text, keyboard operation, overlay focus, and cleanup indicators. Provider modes also require live credentials and account entitlement.
+For each desktop engine, cover the five required CSS viewports where the browser permits. On
+physical phone/tablet targets, cover the closest portrait sizes plus landscape, safe areas, browser
+chrome expansion/collapse, and the software keyboard. Test camera/mic allow and deny, source
+replacement, local and model recording through the 300-second cap, downloaded playback, local and
+ElevenLabs processing, permission revocation, background/foreground transitions, 200% zoom/large
+text, keyboard and touch operation, overlay focus, and cleanup indicators. Provider modes also
+require live credentials, account entitlement, and the approved content/retention policy.

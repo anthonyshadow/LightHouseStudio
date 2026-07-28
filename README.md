@@ -1,34 +1,77 @@
 # Lightframe Studio
 
-Lightframe Studio is a local-first browser camera studio for recording ordinary webcam takes, realtime AI character transformations, and virtual garment try-ons. `/` is the sole Studio entry. Character creation opens as a fullscreen Studio-owned panel; the stable stage, streams, recording/session state, and creative repositories/controllers remain owned by Studio while individual tool surfaces may unmount.
+Lightframe Studio is a local-first browser camera studio for creating short webcam performances
+with reusable characters. A creator can work entirely with local camera, microphone, recording, and
+voice effects, or explicitly start provider-backed character transformation, virtual try-on,
+reference-image generation, and saved-voice conversion.
 
-Provider contact is always explicit. Local Camera works without provider credentials and does not request a realtime token, open a provider connection, or send camera media to Decart. Character preview generation and ElevenLabs voice work begin only after their labeled user actions.
+The product is designed for technically comfortable solo creators, creative technologists, and
+design partners working on one machine. It is not currently an account-based cloud editor or a
+supported public multi-user service.
 
-The primary stage flow is **Start Camera + Mic**, then **Start AI** and a
-fullscreen experience choice when AI is wanted. The Recipe Dock remains the
-direct-control path for editing and starting a specific model recipe. Recording
-uses **Record** and **Stop recording**. A finalized take replaces live media on
-the same stage; the detailed Latest Take panel opens only when the creator
-selects **Take**.
+## Current status
 
-> Product-contract update: the rebuild guide names Lucy 2.1. The user explicitly approved **Lucy 2.5**, so the implemented character model is `lucy-2.5`. Virtual try-on remains `lucy-vton-3`. This is an intentional source-of-truth update, not an accidental compatibility drift.
+The architecture and core workflow are coherent and well tested. The July 2026 project audit
+recommends a **moderated, touch/mobile-inclusive, loopback-only design-partner pilot after the
+documented trust, control-recovery, 300-second recording, physical-device, provider-qualification,
+and retained-data gates are closed**. It is not ready for the pilot yet or for remote/public
+hosting. See the [unified findings](docs/project-audit-findings.md) and
+[active implementation plan](docs/project-audit-implementation-plan.md).
 
-## What is included
+Provider contact is deliberate and cost-sensitive:
 
-- Local webcam and microphone preview and recording
-- A fullscreen character builder with resumable IndexedDB autosave and explicit Reset Draft
-- Separate `lucy-2.5` character and `lucy-vton-3` try-on sessions
-- Draft-versus-applied realtime recipes with atomic Apply, Revert, and Reset
-- JPEG, PNG, and WebP reference images up to and including 10 MiB; Character Builder uploads also enforce a 40-megapixel decoded-image limit
-- A three-intent structured Prompt Workshop for focused Add, Replace, and Restyle object recipes; Character Builder exclusively owns character creation and editing
-- Gender-aware visual suggestions, Show All catalogs, and custom text for directions outside the catalog; nine starter definitions remain available internally while the demo picker is hidden
-- Optional, automatically optimized OpenAI `gpt-image-2`, BFL `flux-2-pro`, or Wiro ByteDance `seedream-v5-lite-uncensored` previews, durable local uploads, source-image composition, and instructed editing
-- A versioned Recipe Shelf v4 for saved, recent, and restorable character prompts with reference provenance and optional guided-design provenance
-- Browser recording with transformed-video gating and provider-audio/microphone fallback
-- Temporary take review plus a Studio legacy manager for downloading or deleting retired Guided projects
-- Browser-local warm, clear, and robot voice treatments from immutable source audio
-- Optional ElevenLabs saved-library discovery, preview, and explicit post-recording conversion
-- A loopback-only TypeScript integration broker with runtime schemas and sanitized errors
+- **Local Camera** requires no provider credentials, token, SDK load, or external media traffic.
+- **Character AI** sends live camera media and the applied prompt/reference to Decart only after
+  explicit Start.
+- **Reference generation** contacts the configured optimizer/image provider only after a labeled
+  Generate, Combined, Regenerate, or Edit action; upload and prompt-only save stay local.
+- **ElevenLabs** browsing begins from a labeled provider-contact action, and Apply sends only the
+  immutable original audio sidecar.
+
+## How the product works
+
+1. Select **Start Camera + Mic** for a provider-free local preview.
+2. Optionally create or choose a reusable character.
+3. Select **Start AI** for Character Transformation or secondary Virtual Try-On.
+4. Select **Record**, perform a short take, then **Stop recording**.
+5. Review playback on the same persistent stage.
+6. Optionally apply a local or saved ElevenLabs voice, then **Download**.
+7. Close/release or explicitly discard the temporary take.
+
+`/` is the only application route. Character Builder and the other creative tools open over the
+same mounted Studio; they do not create parallel media players or sessions.
+
+## Main capabilities
+
+- Local webcam/microphone preview, capture settings, recording, finalization, playback, download,
+  close, and confirmed discard
+- Fullscreen Character Builder with resumable IndexedDB draft, prompt-only/image-only/combined
+  paths, optional generation, and durable browser-local character metadata
+- `lucy-2.5` realtime Character Transformation with complete atomic Apply/Revert/Reset snapshots
+- Pinned `lucy-vton-3` Virtual Try-On using prompt, ephemeral garment image, or both
+- Structured Add/Replace/Restyle Prompt Workshop and Recipe Shelf v4 for saved/recent/character
+  reuse
+- JPEG/PNG/WebP Builder references up to 10 MiB and 40 megapixels, stored as immutable local assets
+- Optional OpenAI `gpt-image-2`, BFL `flux-2-pro`, or Wiro
+  `seedream-v5-lite-uncensored` reference work, selected once at server startup with no fallback
+- Local warm/clear/robot voice treatments and optional saved-library ElevenLabs Voice Changer
+- Loopback-only Fastify integration broker with runtime schemas, server-only keys, and sanitized
+  errors
+
+## Integrations
+
+- [Decart Lucy 2.5](https://docs.platform.decart.ai/models/realtime/lucy-2.5) provides realtime
+  text/reference-guided character transformation.
+- [Decart Virtual Try-On](https://docs.platform.decart.ai/models/realtime/virtual-try-on) provides
+  realtime garment transformation. The product deliberately pins `lucy-vton-3`; changing to the
+  moving `lucy-vton-latest` alias requires explicit compatibility evidence.
+- [ElevenLabs Voice Changer](https://elevenlabs.io/docs/overview/capabilities/voice-changer)
+  converts the completed audio sidecar using a voice already saved in the configured account.
+- OpenAI, Black Forest Labs, or Wiro can optimize/generate/edit character references through
+  isolated server adapters.
+
+The [screenshot coverage manifest](docs/screenshot-test-coverage.md) shows the current protected
+desktop, tablet, mobile, and product states without depending on live provider output.
 
 ## Requirements
 
@@ -118,7 +161,7 @@ npm run test:watch    # interactive Vitest watch mode
 npm run test:coverage # local coverage report
 npm run test:e2e      # Playwright projects; install its browsers first
 npm run test:production # built Fastify static-serving browser smoke (run build first)
-npm run test:visual   # the curated 29-case Chromium visual suite
+npm run test:visual   # curated state-driven Chromium visual suite (29-case review budget)
 npm run storybook     # local component catalog on port 6006
 npm run storybook:typecheck # type-check stories and Storybook configuration
 npm run storybook:test # Chromium-backed Storybook interaction/a11y tests
@@ -132,7 +175,9 @@ npm run quality       # types, Storybook, lint, format, static checks, tests, an
 
 Install Playwright browsers once with `npx playwright install`. Coverage, functional end-to-end, production smoke, curated visual, and production audit checks are independent of the local `quality` script; run all five before release. CI runs the core checks, Storybook type/interaction/build checks, the production static-serving smoke, and the separate coverage/browser/visual jobs.
 
-The executable visual matrix and pruning inventory share exactly 29 cases. Darwin and Linux each contain all 29 reviewed assets. The complete suite passes on Darwin and in the Linux/amd64 Playwright runtime used to match CI architecture.
+The executable visual matrix and pruning inventory share the same semantic case paths. Required
+core state/viewport pairs and readiness assertions define correctness; 29 is the current review
+budget. Darwin and Linux baselines remain separate because host font rasterization differs.
 
 Default automated tests use fakes and deny unexpected external HTTP and WebSockets; they do not require devices, provider credentials, paid requests, or external media services. Mocked browser journeys exercise successful Local, Lucy 2.5, and VTON 3 flows across Chromium, WebKit, and mobile. Live provider checks are deliberately manual and gated; see [live provider smoke testing](docs/LIVE_PROVIDER_SMOKE.md).
 
@@ -169,24 +214,37 @@ Read [architecture](docs/ARCHITECTURE.md), [privacy and temporary data](docs/PRI
 - Reference generation defaults to the complete full-body silhouette whenever the character's anatomy permits it, with safe margin for hands, feet, clothing, and defining features. Head-and-shoulders and waist-up remain deliberate crop choices. Orientation controls are automatic, portrait, landscape, and square; the image provider maps those choices to `1024x1536`, `1536x1024`, and `1024x1024`, and automatic follows the app's landscape target stream. Rendering can be photorealistic or faithful to source style, with neutral or subtly friendly expression and a neutral gray, off-white, or custom plain background.
 - Generate Preview, Generate Combined Preview, and Regenerate may incur provider usage. A successful optimization is retained for a generation retry while its source prompt, settings, model, and optimizer version remain current; provider failures never silently fall back to the raw prompt.
 - Starting an AI session sends live camera media and the applied prompt/reference state to Decart and may incur provider usage. Finishing a model take finalizes the clip before releasing the model.
-- Studio omits the compatibility profile identifier, so the broker applies its default five-minute AI active-session scope. The retired Guided credential profile remains a compatibility detail and is not an application route; ordinary recording has no corresponding five-minute warning or forced-stop timer.
+- Studio omits the compatibility profile identifier, so the broker applies its default five-minute
+  AI active-session scope. The retired Guided credential profile remains a compatibility detail
+  and is not an application route. The approved take maximum is 300 seconds, but the current
+  recorder does not yet warn or safely auto-finalize at that boundary; this is a pilot blocker,
+  separate from provider credential/session limits.
 - ElevenLabs saved-library browsing and click-to-play previews contact the provider only after the labeled disclosure/action and carry the Studio provider-intent header. Preview bytes use a short-lived, app-owned Blob URL that is aborted/revoked on replacement or unmount. Browsing, previewing, or selecting does not upload the take. Applying a saved voice sends only the completed audio sidecar and may use credits. Library membership is managed only in ElevenLabs.
 - The server accepts loopback hosts only. It is not designed for LAN, tunnel, or public hosting. Remote deployment requires authentication, authorization, CSRF analysis, abuse/rate controls, tenant isolation, secret management, and a new security review.
 
 ## Documentation
 
+Start with the [documentation map](docs/README.md), which identifies the authoritative source and
+update trigger for every retained document. The most frequently needed references are:
+
 - [Architecture and ownership](docs/ARCHITECTURE.md)
 - [Privacy, retention, and provider cost](docs/PRIVACY_AND_TEMPORARY_DATA.md)
-- [Image generation API flow](docs/Image_Generation.md)
-- [Product evolution and changed flows](docs/PRODUCT_EVOLUTION.md)
-- [Browser support](docs/BROWSER_SUPPORT.md)
-- [Recording memory policy](docs/RECORDING_MEMORY_POLICY.md)
-- [Manual QA checklist](docs/MANUAL_QA.md)
-- [Live provider smoke test](docs/LIVE_PROVIDER_SMOKE.md)
 - [Implemented user journeys](docs/userStories/README.md)
-- [Storybook catalog](stories/README.md)
-- [Engineering lessons](LESSONS.md)
+- [Browser support](docs/BROWSER_SUPPORT.md)
+- [Manual QA](docs/MANUAL_QA.md) and [gated live provider smoke](docs/LIVE_PROVIDER_SMOKE.md)
+- [Project audit findings](docs/project-audit-findings.md)
 - [Coding-agent working guide](AGENTS.md)
+
+## Contributing
+
+Read [AGENTS.md](AGENTS.md) before changing behavior. Trace the owning feature, controller,
+domain/contract rule, provider boundary, and observable journey; preserve the dependency direction
+and persistent-stage ownership. Use focused changes, update the canonical document and affected
+user story, and run `npm run quality` plus the release-specific gates relevant to the change.
+
+Never put provider secrets in browser code, `VITE_*` variables, screenshots, traces, logs, or
+committed environment files. Do not run live paid provider checks from CI or ordinary automated
+tests.
 
 ## Known external limitations
 
@@ -195,3 +253,11 @@ Automated checks cannot prove real camera/microphone behavior, device-driver sta
 Decart SDK `0.1.15` does not expose an abort signal for client-token creation. The broker returns promptly on browser cancellation or its timeout and ignores any late result, but the SDK's already-started upstream request may still finish and mint an unused short-lived token. Realtime browser connection cancellation is likewise best-effort until the SDK promise resolves; cloned provider input is stopped immediately and a late connection is disconnected as soon as it becomes available.
 
 The build intentionally pins the user-approved `lucy-vton-3` identifier even though current Decart examples may show the moving `lucy-vton-latest` alias. The installed SDK recognizes the pinned id; the configured account must still be entitled to it.
+
+## Future direction
+
+Near-term work is a focused reliability/trust pass, followed by a moderated pilot. Backend
+identity, tenant ownership, cloud libraries, usage enforcement, credits/subscriptions, and
+collaboration are deliberately deferred until value and provider cost per usable download are
+measured. The [active plan](docs/project-audit-implementation-plan.md) keeps those stages separate
+so future infrastructure does not become an accidental current-MVP requirement.

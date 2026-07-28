@@ -7,8 +7,10 @@ const DEFAULT_SCREENSHOTS_ROOT = path.resolve('screenshots');
 
 export const curatedBaselines = new Set(VISUAL_BASELINE_PATHS);
 
-if (curatedBaselines.size !== 29) {
-  throw new Error(`Expected 29 curated baselines, got ${curatedBaselines.size}.`);
+if (curatedBaselines.size !== VISUAL_BASELINE_PATHS.length) {
+  throw new Error(
+    `Expected ${VISUAL_BASELINE_PATHS.length} unique curated baselines, got ${curatedBaselines.size}.`,
+  );
 }
 
 const collectFiles = async (root) => {

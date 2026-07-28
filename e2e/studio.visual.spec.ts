@@ -1,18 +1,68 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { CreativeAssetStore } from '@studio/domain';
 import {
+  closeRecipeDockWhenOverlaid,
   createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
   openRecipeDockWhenOverlaid,
-  startCharacterAi,
   startLocalPreview,
-  startVirtualTryOnAi,
   type NetworkJourneyState,
 } from './support/studioHarness';
 import { VISUAL_CASE_MATRIX, type VisualScenarioId } from './studioVisualMatrix';
 
 const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
+const REFERENCE_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
+const SEEDED_CHARACTER_STORE = {
+  schemaVersion: 4,
+  savedPrompts: [],
+  recentPrompts: [],
+  savedCharacterPrompts: [
+    {
+      id: 'character-cinematic-presenter',
+      name: 'Cinematic Field Presenter',
+      prompt: 'Transform the adult subject into a cinematic documentary field presenter.',
+      source: 'generator',
+      promptIntent: 'character-transform',
+      builderDraft: {
+        intent: 'character-transform',
+        presetId: null,
+        customDetails: '',
+        adultAge: 'adult',
+        gender: null,
+        characterBase: 'documentary field presenter',
+        matchReference: false,
+        appearance: 'natural editorial complexion',
+        ethnicity: '',
+        skinTone: '',
+        bodyShape: '',
+        hair: '',
+        hairColor: '',
+        outfit: 'structured amber field jacket',
+        accessories: '',
+        expression: 'focused half-smile',
+        mood: 'grounded and cinematic',
+        preserve: 'camera framing',
+      },
+      guidedDesign: null,
+      referenceImageStatus: 'prompt-only',
+      referenceImageAssetId: null,
+      uploadedReferenceImageAssetId: null,
+      finalReferenceKind: null,
+      notes: 'A grounded host treatment for field stories.',
+      tags: ['host', 'editorial'],
+      createdAt: '2026-07-16T14:30:00.000Z',
+      updatedAt: '2026-07-18T12:30:00.000Z',
+      lastUsedAt: '2026-07-18T12:30:00.000Z',
+      useCount: 4,
+    },
+  ],
+} satisfies CreativeAssetStore;
 
 type VisualScenario = {
   id: VisualScenarioId;
@@ -91,13 +141,22 @@ const stabilizeActiveStageVideo = async (page: Page): Promise<void> => {
 const prepareVisualPage = async (page: Page): Promise<NetworkJourneyState> => {
   await page.clock.setFixedTime(CAPTURE_TIME);
   await page.emulateMedia({ reducedMotion: 'reduce' });
-  const network = await installSuccessfulStudioHarness(page, { stubMediaPlayback: false });
+  const network = await installSuccessfulStudioHarness(page, {
+    elevenLabsAvailable: true,
+    stubMediaPlayback: false,
+  });
   await page.addInitScript(() => {
     Object.defineProperty(window.performance, 'now', {
       configurable: true,
       value: () => 0,
     });
   });
+  await page.addInitScript(
+    ({ storageKey, store }) => {
+      window.localStorage.setItem(storageKey, JSON.stringify(store));
+    },
+    { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: SEEDED_CHARACTER_STORE },
+  );
 
   await page.goto('/');
   await expect(page.getByRole('main')).toBeVisible();
@@ -119,27 +178,62 @@ const prepareVisualPage = async (page: Page): Promise<NetworkJourneyState> => {
   return network;
 };
 
+const openCharacterBuilder = async (page: Page): Promise<void> => {
+  await page.getByRole('button', { name: /Open character options/u }).click();
+  await page.getByRole('button', { name: 'Create new character' }).click();
+  await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
+};
+
+const openSavedCharacters = async (page: Page): Promise<void> => {
+  await page.getByRole('button', { name: /Open character options/u }).click();
+  await page.getByRole('button', { name: 'Choose saved character' }).click();
+  const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
+  await expect(shelf).toBeVisible();
+  const characters = shelf.getByRole('button', { name: /^Characters/u });
+  if ((await characters.getAttribute('aria-pressed')) !== 'true') await characters.click();
+  await expect(shelf.getByRole('list', { name: 'Saved character recipes' })).toBeVisible();
+};
+
+const selectSeededCharacter = async (page: Page): Promise<void> => {
+  await openSavedCharacters(page);
+  await page.getByRole('button', { name: 'Use Cinematic Field Presenter' }).click();
+  await expect(
+    page.getByRole('button', {
+      name: 'Selected character: Cinematic Field Presenter. Open character options',
+    }),
+  ).toBeVisible();
+};
+
 const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
-  idle: {
-    id: 'idle',
+  'studio-initial-closed': {
+    id: 'studio-initial-closed',
     setup: async (page) => {
-      await openRecipeDockWhenOverlaid(page);
-      await expect(page.getByRole('button', { name: 'Start local preview' })).toBeVisible();
+      await expect(page.getByRole('dialog')).toHaveCount(0);
+      await expect(
+        page.getByRole('button', { name: 'Start Camera + Mic', exact: true }),
+      ).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toContainText('Studio idle');
     },
   },
-  recording: {
-    id: 'recording',
+  'local-camera-live': {
+    id: 'local-camera-live',
+    setup: async (page) => {
+      await startLocalPreview(page);
+      await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+      await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
+        'data-stage-presentation',
+        'live',
+      );
+    },
+  },
+  'recording-active': {
+    id: 'recording-active',
     setup: async (page) => {
       await startLocalPreview(page);
       await page.getByRole('button', { name: 'Record' }).click();
       await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toHaveAttribute('data-recording', 'true');
     },
-  },
-  'character-live': {
-    id: 'character-live',
-    setup: startCharacterAi,
   },
   'ai-experience-choice': {
     id: 'ai-experience-choice',
@@ -151,8 +245,103 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await expect(page.getByRole('dialog', { name: 'Choose AI experience' })).toBeVisible();
     },
   },
-  finalizing: {
-    id: 'finalizing',
+  'selected-character-ai-live': {
+    id: 'selected-character-ai-live',
+    setup: async (page) => {
+      await selectSeededCharacter(page);
+      await page
+        .getByRole('button', { name: 'Start Camera + Mic', exact: true })
+        .click({ force: true });
+      await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+      await closeRecipeDockWhenOverlaid(page);
+      const controls = page.getByLabel('Studio session controls');
+      await controls.getByRole('button', { name: 'Start AI' }).click();
+      await page.getByRole('button', { name: 'Start with Cinematic Field Presenter' }).click();
+      await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
+      await expect(page.getByText(/^AI active/u)).toBeVisible();
+    },
+  },
+  'character-builder-combined-ready': {
+    id: 'character-builder-combined-ready',
+    setup: async (page) => {
+      await openCharacterBuilder(page);
+      const builder = page.getByRole('dialog', { name: 'Build Your Character' });
+      await builder.locator('input[type="file"][accept*="image/png"]').setInputFiles({
+        name: 'source.png',
+        mimeType: 'image/png',
+        buffer: REFERENCE_PNG,
+      });
+      await expect(builder.getByAltText('Current uploaded character reference')).toBeVisible();
+      await builder.getByRole('button', { name: 'Adult', exact: true }).click();
+      await builder.getByRole('button', { name: 'Generate Combined Preview' }).click();
+      await expect(builder.getByText('This preview matches the current character.')).toBeVisible();
+      const preview = builder.getByRole('complementary', {
+        name: 'Character Direction Preview',
+      });
+      await preview.scrollIntoViewIfNeeded();
+      await expect(preview).toBeVisible();
+      await expect(builder.getByRole('button', { name: 'Save Character' })).toBeEnabled();
+    },
+  },
+  'saved-character-selection': {
+    id: 'saved-character-selection',
+    setup: async (page) => {
+      await openSavedCharacters(page);
+      await expect(page.getByTitle('Select Cinematic Field Presenter')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Characters 1', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+    },
+  },
+  'take-playback-review-settled': {
+    id: 'take-playback-review-settled',
+    setup: async (page) => {
+      await createLocalTake(page);
+      const review = page.getByRole('dialog', { name: 'Latest Take' });
+      await expect(review.getByRole('heading', { name: 'Latest take', exact: true })).toBeVisible();
+      await expect(review.getByRole('link', { name: 'Download take' })).toBeVisible();
+      await expect(review.getByText('Loading studio tool…', { exact: true })).toHaveCount(0);
+    },
+  },
+  'vton-prepared-with-reference': {
+    id: 'vton-prepared-with-reference',
+    setup: async (page) => {
+      await openRecipeDockWhenOverlaid(page);
+      const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
+      await dock.getByRole('button', { name: 'Virtual Try-On · VTON 3' }).click();
+      await dock.getByLabel('Garment direction').fill('A tailored linen travel overshirt');
+      await dock.getByLabel('Garment reference image').setInputFiles({
+        name: 'linen-overshirt.png',
+        mimeType: 'image/png',
+        buffer: REFERENCE_PNG,
+      });
+      await expect(dock.getByAltText('Current ephemeral reference preview')).toBeVisible();
+      await expect(dock.getByRole('button', { name: 'Start Virtual Try-On AI' })).toBeEnabled();
+    },
+  },
+  'voice-browser-loaded': {
+    id: 'voice-browser-loaded',
+    setup: async (page) => {
+      await createLocalTake(page);
+      await page.getByRole('button', { name: 'Voice treatments' }).click();
+      const treatments = page.getByRole('dialog', { name: 'Voice Treatments' });
+      await expect(
+        treatments.getByRole('heading', { name: 'Voice treatment', exact: true }),
+      ).toBeVisible();
+      await treatments
+        .getByRole('button', {
+          name: 'Browse saved ElevenLabs voices · contacts provider',
+        })
+        .click();
+      const browser = page.getByRole('dialog', { name: 'Voice Browser' });
+      await expect(browser).toBeVisible();
+      await expect(browser.getByText('Northstar Narrator', { exact: true })).toBeVisible();
+      await expect(browser.getByText('Loading voices…', { exact: true })).toHaveCount(0);
+    },
+  },
+  'take-finalizing': {
+    id: 'take-finalizing',
     setup: async (page) => {
       await startLocalPreview(page);
       await page.getByRole('button', { name: 'Record' }).click();
@@ -167,8 +356,8 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await expect(page.getByText('Finalizing take…', { exact: true })).toBeVisible();
     },
   },
-  'media-error': {
-    id: 'media-error',
+  'media-permission-error': {
+    id: 'media-permission-error',
     setup: async (page) => {
       await page.evaluate(() => {
         Object.defineProperty(navigator.mediaDevices, 'getUserMedia', {
@@ -185,41 +374,6 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         page.getByRole('alert').filter({ hasText: 'Camera or microphone access was not allowed.' }),
       ).toBeVisible();
     },
-  },
-  'vton-live': {
-    id: 'vton-live',
-    setup: startVirtualTryOnAi,
-  },
-  'workshop-overlay': {
-    id: 'workshop-overlay',
-    setup: async (page) => {
-      await page.getByRole('button', { name: 'Workshop', exact: true }).click();
-      await expect(
-        page.getByRole('heading', { name: 'Direct one clear visual change' }),
-      ).toBeVisible();
-      await page
-        .getByRole('textbox', { name: 'Object to add', exact: true })
-        .fill('a copper field notebook');
-      await page
-        .getByRole('textbox', { name: 'Specific placement', exact: true })
-        .fill('held at chest height');
-    },
-  },
-  'capture-overlay': {
-    id: 'capture-overlay',
-    setup: async (page) => {
-      await page.getByRole('button', { name: 'Open capture settings' }).click();
-      await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
-      await expect(page.getByText('Looking for available cameras…', { exact: true })).toBeHidden();
-      await expect(
-        page.getByText('Looking for available microphones…', { exact: true }),
-      ).toBeHidden();
-      await expect(page.getByText('Available after preview starts')).toBeVisible();
-    },
-  },
-  'review-overlay': {
-    id: 'review-overlay',
-    setup: createLocalTake,
   },
 };
 
@@ -238,6 +392,7 @@ test.describe('curated Studio visual regression', () => {
       await scenario.setup(page);
       await settlePage(page);
       await stabilizeActiveStageVideo(page);
+      await expect(page.getByText('Loading studio tool…', { exact: true })).toHaveCount(0);
       await expectNoDocumentOverflow(page);
       expectNoExternalProviderTraffic(network);
 

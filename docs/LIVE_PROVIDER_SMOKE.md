@@ -1,11 +1,20 @@
 # Gated live provider smoke test
 
-Live smoke testing is manual, opt-in, cost-aware, and excluded from default test and quality commands. Run it only with authorized test credentials, a supported camera/microphone, an account whose quota and retention settings are understood, and permission to incur provider usage.
+Live smoke testing is manual, opt-in, cost-aware, and excluded from default test and quality
+commands. Character, VTO, ElevenLabs, OpenAI, BFL, and Wiro are all included in the intended pilot,
+so each path needs its own qualified pass. Run a pass only with authorized test credentials, a
+supported camera/microphone, an account whose quota and retention settings are understood, and
+permission to incur provider usage.
+
+The owner for live-smoke credentials, billing authorization, and the evidence record remains TBD.
+Release qualification cannot be signed off until that owner and the external-participant provider
+settings/content policy are approved. In particular, do not qualify Wiro's uncensored model for
+participant use merely because a technical smoke succeeds.
 
 ## Provider assumptions verified for this build
 
-- `@decartai/sdk` is pinned to `0.1.15`. Its registry recognizes `lucy-2.5` and the user-approved exact `lucy-vton-3` id. [Current Decart VTON examples](https://docs.platform.decart.ai/examples/use-cases) may instead show the moving `lucy-vton-latest` alias; this product intentionally does not follow that alias silently.
-- Decart browser access uses a [backend-minted client token](https://docs.platform.decart.ai/api-reference/create-client-token), scoped to one model, the exact loopback origin, a five-minute issuance window, and a five-minute realtime-session limit.
+- `@decartai/sdk` is pinned to `0.1.15`. Its registry recognizes `lucy-2.5` and the user-approved exact `lucy-vton-3` id. [Current Decart Virtual Try-On documentation](https://docs.platform.decart.ai/models/realtime/virtual-try-on) may instead show the moving `lucy-vton-latest` alias; this product intentionally does not follow that alias silently.
+- Decart browser access uses a [backend-minted client token](https://docs.platform.decart.ai/getting-started/client-tokens), scoped to one model, the exact loopback origin, a five-minute issuance window, and a five-minute realtime-session limit.
 - OpenAI uses the Responses API for prompt optimization and remains the default image provider with `gpt-image-2` at `high` quality. `REFERENCE_IMAGE_PROVIDER=bfl` instead selects the pinned US2 `https://api.us2.bfl.ai/v1/flux-2-pro` task API. `REFERENCE_IMAGE_PROVIDER=wiro` selects the pinned `https://api.wiro.ai/v1/Run/ByteDance/seedream-v5-lite-uncensored` task API with signature authentication. There is no provider fallback. Character Builder upload by itself is local storage work and does not contact an image provider.
 - ElevenLabs uses `/v2/voices` with `voice_type=saved`, `/v1/models`, and `/v1/speech-to-speech/:voice`. Preview and conversion revalidate voice membership through the saved filter. The project has no shared-library discovery or voice-add mutation. Provider plans can change voice eligibility and conversion access.
 - `ELEVENLABS_ENABLE_LOGGING=false` requests [Zero Retention Mode](https://elevenlabs.io/docs/eleven-api/resources/zero-retention-mode), which ElevenLabs currently limits to eligible enterprise accounts. Set it to `true` only after an informed retention decision when testing a non-eligible account.
@@ -15,7 +24,9 @@ Do not run live provider checks in CI, screenshots, stories, ordinary component 
 ## Before starting
 
 1. Run `npm run quality` and `npm run test:e2e` with deterministic fakes first.
-2. Review current Decart, OpenAI, BFL, Wiro, and ElevenLabs pricing, quota, model availability, voice eligibility, content policy, and data-retention terms in the provider accounts.
+2. Confirm the assigned credential/billing/evidence owner has authorized the pass. Review current
+   Decart, OpenAI, BFL, Wiro, and ElevenLabs pricing, quota, model availability, voice eligibility,
+   content policy, and data-retention terms in the provider accounts.
 3. Use dedicated least-privilege development keys. Put them only in local `.env`:
 
    ```dotenv
@@ -36,7 +47,9 @@ Do not run live provider checks in CI, screenshots, stories, ordinary component 
    ```
 
 4. Restart the API; verify `GET /api/capabilities` reports configured availability for each integration. This endpoint checks configuration presence, not live reachability, quota, or entitlement.
-5. Use non-sensitive test visuals and speech. Close other camera apps. Keep each realtime connection and sample take as short as practical; never exceed the five-minute session constraint.
+5. Use non-sensitive test visuals and speech. Close other camera apps. Keep each realtime
+   connection and sample take as short as practical; never exceed the 300-second application and
+   provider-session constraints.
 
 ## Decart Lucy 2.5
 
@@ -74,7 +87,17 @@ ordering, owner-scoped source resolution, immutable results, correct direct/imag
 save behavior, sanitized errors, and no fallback to the raw prompt after an
 optimization failure.
 
-Run this section once with the default OpenAI image provider and once for each task provider that is release-enabled. For BFL, confirm capabilities report `providerId: "bfl"` and `modelId: "flux-2-pro"`, one initial task is created per explicit request, polling stays within the configured deadline, source-guided actions succeed without a public upload, and browser responses/log captures contain neither signed URLs nor source base64. For Wiro, confirm capabilities report `providerId: "wiro"` and `modelId: "seedream-v5-lite-uncensored"`, one Run request is created per explicit action, all three output orientations are normalized to the advertised exact dimensions, source-guided actions use no public upload, and `InputOutputDelete` removes remote input/output files after local persistence. Logs may contain only the task ID, lifecycle stage, status, and delivery origin—never the task token, signature, nonce, prompt, or CDN path.
+Run this section in three separate server configurations: OpenAI, BFL, and Wiro. All three are
+included in the pilot; the app still selects exactly one at startup and never falls back. For BFL,
+confirm capabilities report `providerId: "bfl"` and `modelId: "flux-2-pro"`, one initial task is
+created per explicit request, polling stays within the configured deadline, source-guided actions
+succeed without a public upload, and browser responses/log captures contain neither signed URLs
+nor source base64. For Wiro, confirm capabilities report `providerId: "wiro"` and
+`modelId: "seedream-v5-lite-uncensored"`, one Run request is created per explicit action, all three
+output orientations are normalized to the advertised exact dimensions, source-guided actions use
+no public upload, and `InputOutputDelete` removes remote input/output files after local persistence.
+Logs may contain only the task ID, lifecycle stage, status, and delivery origin—never the task
+token, signature, nonce, prompt, or CDN path.
 
 ## ElevenLabs
 

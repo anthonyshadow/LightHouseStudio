@@ -6,6 +6,14 @@ Synthetic-media automation cannot certify physical camera/microphone indicators,
 
 Record the date, browser/OS/version, device names, commit, configured capabilities, and downloaded sample MIME types. Never attach credentials, tokens, personal media, or raw provider responses to a report.
 
+Touch/mobile creation is a required pilot target, but the exact physical browser/OS/device matrix
+is still TBD. The pilot cannot be signed off from responsive emulation alone. Character, VTO, local
+Voice, ElevenLabs, OpenAI, BFL, and Wiro are included; run image-provider checks in separate
+startup configurations. The approved take maximum is 300 seconds, but the current recorder does
+not yet enforce it. After implementation, every named physical target must pass the warning,
+automatic Stop/finalization, playback, processing, download, background/foreground, and cleanup
+checks at that boundary.
+
 ## Viewport-bound shell and scroll ownership
 
 Run idle, local-preview, recording, finalizing, main-stage playback, Character prepared/live, Try-On prepared/live, stage-error, and open-overlay states at each exact viewport below. At every checkpoint inspect `window.innerWidth/innerHeight`, `document.documentElement.scrollWidth/scrollHeight`, and `document.body.scrollWidth/scrollHeight`. Both document and body dimensions must be no greater than the viewport plus one CSS pixel for browser rounding. Scrolling the wheel/trackpad over the stage or page background must not move the document.
@@ -38,7 +46,8 @@ Enter through `/projects`, `/?project=…`, and `/guided?project=…`; confirm e
 
 ## No-key and local guarantee
 
-1. Leave `DECART_API_KEY`, `OPENAI_API_KEY`, and `ELEVENLABS_API_KEY` empty, restart `npm run dev`, and open a private browser window.
+1. Leave all Decart, OpenAI, BFL, Wiro, and ElevenLabs credential variables empty, restart
+   `npm run dev`, and open a private browser window.
 2. Confirm the header reports local ready, **AI video not configured**, and **Voice cloud optional**, while Character Builder reports reference generation unavailable. `/api/capabilities` must not contact any provider.
 3. Before Start, edit prompts, open the workshop, save/search/edit/delete a recipe, and attach then clear a valid image. Confirm no camera permission prompt appears.
 4. Open DevTools Network, preserve the log, and filter for `realtime-token`, `reference-images`, `elevenlabs`, `decart`, and provider/WebSocket traffic.
@@ -120,6 +129,12 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 
 ## Recording and take safety
 
+- After the 300-second cap is implemented, exercise the warning threshold and let a take reach the
+  cap without manually selecting Stop. Confirm the app coalesces any concurrent Stop, finalizes the
+  main recording and optional sidecar before releasing live/provider resources, publishes one
+  playable original, reports why recording ended, and never silently drops chunks. Repeat locally
+  and with Character/VTO on every named physical target; run local and ElevenLabs processing from
+  the resulting five-minute original.
 - Local: verify local video plus microphone and independent live/recording timers. On **Stop recording**, verify recorder finalization settles before owned camera/microphone tracks stop; local preview must not remain or be reacquired.
 - Model: verify Record is unavailable before transformed live video; provider audio is preferred and microphone is fallback.
 - Stop Character and Try-On recordings. Confirm final recorder data and artifact publication happen first; provider disconnect, listener removal, remote/cloned-input track stops, owned camera/mic stops, analyser/timer cleanup, and playback handoff happen afterward. No local or provider session may automatically reacquire.
@@ -165,7 +180,10 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Confirm visible focus, logical order, field labels, fieldset/segmented-control semantics, status announcements, and associated validation.
 - Test a screen reader on idle, requesting permission, pending Apply, recording, processing, error, and success states.
 - Test exactly `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`, then one intermediate width on each side of the 1024 px and 640 px layout changes. Also test portrait/landscape, 200% zoom, large text, touch targets, and reduced motion.
-- In live and playback states, wait three seconds for the session control bar to hide, then verify keyboard and mouse activity restore it. Explicitly verify touch/pointer and focus recovery on physical touch targets; the implementation has no dedicated activity listener for those inputs.
+- In live and playback states, wait three seconds for the session control bar to hide, then verify
+  keyboard and mouse activity restore it. Explicitly verify touch/pointer and focus recovery on
+  every named physical touch target; the current implementation has no dedicated activity listener
+  for those inputs, so this is a pilot stop condition until fixed.
 - At narrow sizes confirm status pills retain complete accessible names when visible text becomes dots, More settings retains its accessible label when icon-only, and truncated metadata exposes its full value through a title or accessible name.
 - In Studio, confirm no horizontal or vertical document overflow. In the fullscreen character builder, confirm controlled internal scrolling and no document overflow. Confirm no clipped critical action/focus ring, hover-only function, unexpected multi-line button, or stage content covering controls. Every touch action must remain approximately 44×44 CSS px or larger.
 

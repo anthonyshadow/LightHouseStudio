@@ -2,6 +2,11 @@
 
 Lightframe Studio is local-first, not offline-only. Local capture stays in the browser; explicitly started AI and voice actions intentionally use external providers.
 
+The external-participant retention, detach, deletion, and whole-dataset cleanup promise remains a
+product-owner TBD. The current behavior documented below is implementation truth, not that future
+promise. Do not admit participant reference data to a controlled pilot until the promise, provider
+retention settings, and operator cleanup procedure are approved.
+
 ## Data inventory
 
 | Data                                                                                                                   | Location and lifetime                                                                                                               | External recipient                                                                                                                                                     |

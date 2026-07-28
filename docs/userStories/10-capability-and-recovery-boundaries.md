@@ -17,7 +17,7 @@ As a creator, I want to understand what is available and how to recover from una
 4. Reference availability appears inside Character Builder. If generation/editing is available, follow the explicit optimization/generation or composition steps. If unavailable, still build and save text-only characters or upload/save/use a reference directly, including an image-only character.
 5. If ElevenLabs is available, complete a take then open the explicit voice-browser disclosure. If unavailable, use Original/local treatments where browser support allows.
 6. When the integration broker cannot be reached, use the stage notice’s **Retry check** action. Local preparation remains possible, but provider availability cannot be reliably shown until it succeeds.
-7. When a camera/device error occurs, read the stage notice and choose **Capture settings** or resolve browser permission/device state before retrying Start.
+7. When a camera/device error occurs, read the stage notice and choose **Capture settings** where offered, or resolve browser permission/device state before retrying Start. The current permission-denial code path shows **Dismiss** rather than **Capture settings**; see `UX-011` in the [audit findings](../project-audit-findings.md).
 8. When any persisted uploaded/generated reference cannot be restored, decide between **Retry** and **Continue without reference** where offered. When a voice/recording operation fails, preserve/review the current original take before trying again.
 
 ## What never happens automatically
@@ -30,7 +30,7 @@ As a creator, I want to understand what is available and how to recover from una
 ## Failure and alternate paths
 
 - If the local capability check fails, select **Retry check**. Continue local preparation while availability remains unknown.
-- If browser device access fails, use the stage notice to open **Capture settings**, resolve the named issue, then retry the explicit start action.
+- If browser device access fails, use **Capture settings** when the notice offers it, resolve the named issue, then retry the explicit start action. Permission denial currently requires dismissing the notice and opening settings separately.
 - If a provider capability is absent, use the related local/text-only alternative rather than expecting another configured provider to enable it.
 - If a stored reference, recording treatment, or provider conversion fails, retry the named operation or retain the existing text/original artifact; the app does not silently replace it. An unavailable selected image provider does not disable local reference upload/direct use, and the server never falls back to another image provider.
 

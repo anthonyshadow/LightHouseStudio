@@ -14,19 +14,19 @@ Each story is written as an observable end-to-end journey:
 
 Use the documents to run usability sessions or journey walkthroughs: ask participants to attempt the primary flow without help, note where they pause or mispredict the result, then compare that behavior with the documented guardrails and recovery paths.
 
-| Flow                                                           | Document                                                                                                                |
-| -------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Configure camera, microphone, and local quality                | [01 Configure capture settings](01-configure-capture-settings.md)                                                       |
-| Preview and record without provider work                       | [02 Local camera capture](02-local-camera-capture.md)                                                                   |
-| Create and control a live Character AI session                 | [03 Character AI session](03-character-ai-session.md)                                                                   |
-| Create and control a virtual try-on session                    | [04 Virtual try-on session](04-virtual-try-on-session.md)                                                               |
-| Build a character prompt and generate a reference              | [05 Character workshop and reference generation](05-character-workshop-and-reference-generation.md)                     |
-| Save, find, and reuse creative recipes                         | [06 Recipe Shelf](06-recipe-shelf.md)                                                                                   |
-| Finalize, review, download, or discard a take                  | [07 Take review and cleanup](07-take-review-and-cleanup.md)                                                             |
-| Apply a browser-local voice treatment                          | [08 Local voice treatments](08-local-voice-treatments.md)                                                               |
-| Preview and apply a saved ElevenLabs library voice             | [09 ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                                                         |
-| Work safely when providers or browser features are unavailable | [10 Capability and recovery boundaries](10-capability-and-recovery-boundaries.md)                                       |
-| Build, preview, save, and preload a reusable Studio character  | [11 Studio character builder](11-new-user-character-ai-voice-download/complete-new-user-character-ai-voice-download.md) |
+| Flow                                                           | Document                                                                                            |
+| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
+| Configure camera, microphone, and local quality                | [01 Configure capture settings](01-configure-capture-settings.md)                                   |
+| Preview and record without provider work                       | [02 Local camera capture](02-local-camera-capture.md)                                               |
+| Create and control a live Character AI session                 | [03 Character AI session](03-character-ai-session.md)                                               |
+| Create and control a virtual try-on session                    | [04 Virtual try-on session](04-virtual-try-on-session.md)                                           |
+| Build a character prompt and generate a reference              | [05 Character workshop and reference generation](05-character-workshop-and-reference-generation.md) |
+| Save, find, and reuse creative recipes                         | [06 Recipe Shelf](06-recipe-shelf.md)                                                               |
+| Finalize, review, download, or discard a take                  | [07 Take review and cleanup](07-take-review-and-cleanup.md)                                         |
+| Apply a browser-local voice treatment                          | [08 Local voice treatments](08-local-voice-treatments.md)                                           |
+| Preview and apply a saved ElevenLabs library voice             | [09 ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                                     |
+| Work safely when providers or browser features are unavailable | [10 Capability and recovery boundaries](10-capability-and-recovery-boundaries.md)                   |
+| Build, preview, save, and preload a reusable Studio character  | [11 Studio character builder](11-studio-character-builder.md)                                       |
 
 Shared product rules:
 

@@ -23,7 +23,7 @@ As a creator, I want to preview and record my camera locally, so that I can prod
 
 ## Failure and alternate paths
 
-- If permission is denied, busy, missing, or cannot meet requested constraints, the stage displays a sanitized explanation and a **Capture settings** recovery action. No provider work starts.
+- If a device is busy, missing, or cannot meet requested constraints, the stage displays a sanitized explanation and a **Capture settings** recovery action. A permission `NotAllowedError` currently maps to `camera-denied`, which is omitted from the notice's device-error set, so that specific notice shows **Dismiss** instead of the intended settings action. This is tracked as `UX-011` in the [audit findings](../project-audit-findings.md). No provider work starts.
 - Select **Close** before recording to release local tracks and return to private idle.
 - If recording cannot create a valid artifact, the studio releases live resources and returns to idle with an error instead of leaving a partially live state.
 
