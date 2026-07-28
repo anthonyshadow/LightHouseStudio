@@ -5,7 +5,7 @@ import { createPromptBuilderDraft } from '@studio/domain';
 import { describe, expect, it, vi } from 'vitest';
 import { createCreativeAssetRepository } from '../creative-assets/repository';
 import type { StudioSessionController } from '../media-session';
-import { createEmptyGuidedDesign } from './CharacterBuilderForm';
+import { createEmptyGuidedDesign } from './characterModel';
 import { useCharacterStudioPreload } from './useCharacterStudioPreload';
 
 describe('useCharacterStudioPreload', () => {

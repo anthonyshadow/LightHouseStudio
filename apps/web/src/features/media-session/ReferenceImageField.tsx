@@ -2,14 +2,17 @@ import { useEffect, useId, useRef, useState, type ChangeEvent, type DragEvent } 
 import { useTheme } from '@emotion/react';
 import { formatFileSize } from '@studio/domain';
 import { Button, StatusNotice } from '../../ui';
-import { validateReferenceImage } from './imageValidation';
+import {
+  REFERENCE_IMAGE_ACCEPT,
+  validateReferenceImage,
+} from '../../adapters/browser-media/imageValidation';
 import {
   referenceFieldStyles,
   referenceFileAreaStyles,
   referenceGuidanceStyles,
   referencePickerStyles,
   referencePreviewStyles,
-} from './SessionComposer.styles';
+} from '../../ui/primitives/ReferenceImageField.styles';
 import type { ModelMode } from './types';
 import type { SessionReferenceImage } from './types';
 
@@ -147,7 +150,7 @@ export const ReferenceImageField = ({
           id={inputId}
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept={REFERENCE_IMAGE_ACCEPT}
           disabled={disabled}
           aria-invalid={feedback.blocking}
           aria-describedby={

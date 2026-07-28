@@ -8,7 +8,7 @@ import type {
 } from '@studio/contracts';
 import { createPromptBuilderDraft } from '@studio/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ReferencePreviewGenerationCallbacks } from '../prompt-authoring/useReferencePreviewGeneration';
+import type { ReferencePreviewGenerationCallbacks } from './useReferencePreviewGeneration';
 import {
   createCharacterBuilderOperationLocks,
   createFreshCharacterBuilderDraftValue,
@@ -23,7 +23,7 @@ const cancel = vi.hoisted(() => vi.fn());
 const generate = vi.hoisted(() => vi.fn());
 let generationCallbacks: ReferencePreviewGenerationCallbacks;
 
-vi.mock('../prompt-authoring/useReferencePreviewGeneration', () => ({
+vi.mock('./useReferencePreviewGeneration', () => ({
   useReferencePreviewGeneration: (callbacks: ReferencePreviewGenerationCallbacks) => {
     generationCallbacks = callbacks;
     return { cancel, generate };

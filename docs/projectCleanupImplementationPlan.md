@@ -7,12 +7,12 @@
 | Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                  |
 | Date generated          | 2026-07-27                                                                                                                                                                                                                                                        |
 | Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                           |
-| Open findings           | 8 unresolved (8 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, and DEAD-003 resolved                                                                                                                                                                    |
-| Remaining phases        | 7                                                                                                                                                                                                                                                                 |
+| Open findings           | 6 unresolved (6 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, DEAD-003, ARCH-001, and ARCH-002 resolved                                                                                                                                                |
+| Remaining phases        | 6                                                                                                                                                                                                                                                                 |
 | Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                             |
 | Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                      |
 | Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted. |
-| Graphify status         | PHASE-002 refresh completed at 3,659 nodes / 8,245 edges (from 3,711 / 8,389), with only the known non-source `hooks.json` zero-node warning. Removed authoring, starter-picker, and telemetry symbols are absent; retained compatibility paths remain connected. |
+| Graphify status         | PHASE-003 refresh completed at 3,663 nodes / 8,260 edges (from 3,659 / 8,245), with only the known non-source `hooks.json` zero-node warning. Dialog, generation, identity, validation, and shared-style ownership now resolve through their intended boundaries. |
 
 ## Execution rules
 
@@ -30,95 +30,16 @@
 
 ## Remaining phases overview
 
-| Phase ID  | Title                                            | Finding IDs        | Risk        | Dependencies                | Expected outcome                                                                    |
-| --------- | ------------------------------------------------ | ------------------ | ----------- | --------------------------- | ----------------------------------------------------------------------------------- |
-| PHASE-003 | Repair Character Builder and shared UI ownership | ARCH-001, ARCH-002 | Medium-high | None                        | Feature imports match current product ownership; shared UI has a neutral home       |
-| PHASE-004 | Consolidate hardened provider download transport | DUP-001            | High        | PHASE-003                   | One security-reviewed downloader policy with provider-specific protocols preserved  |
-| PHASE-005 | Consolidate reference-asset finalization         | DUP-002            | Medium      | PHASE-004                   | One typed service-private persistence path for generate/edit/compose                |
-| PHASE-006 | Share image-picker/drop presentation             | DUP-003            | Low-medium  | PHASE-003                   | Shared accessible DOM behavior without merging storage/lifecycle policy             |
-| PHASE-007 | Decompose independent Studio root controllers    | COMP-001           | Medium-high | PHASE-003, PHASE-006        | Smaller composition root with identical stage/overlay topology                      |
-| PHASE-008 | Decompose recipe handoff internals               | STATE-001          | High        | PHASE-003, PHASE-007        | Focused state workflows behind the unchanged Studio facade                          |
-| PHASE-009 | Reconcile final documentation                    | DOC-001            | Low         | PHASE-003 through PHASE-008 | Correct canonical filename/links and documentation aligned with implemented cleanup |
+| Phase ID  | Title                                            | Finding IDs | Risk        | Dependencies                | Expected outcome                                                                    |
+| --------- | ------------------------------------------------ | ----------- | ----------- | --------------------------- | ----------------------------------------------------------------------------------- |
+| PHASE-004 | Consolidate hardened provider download transport | DUP-001     | High        | None                        | One security-reviewed downloader policy with provider-specific protocols preserved  |
+| PHASE-005 | Consolidate reference-asset finalization         | DUP-002     | Medium      | PHASE-004                   | One typed service-private persistence path for generate/edit/compose                |
+| PHASE-006 | Share image-picker/drop presentation             | DUP-003     | Low-medium  | None                        | Shared accessible DOM behavior without merging storage/lifecycle policy             |
+| PHASE-007 | Decompose independent Studio root controllers    | COMP-001    | Medium-high | PHASE-006                   | Smaller composition root with identical stage/overlay topology                      |
+| PHASE-008 | Decompose recipe handoff internals               | STATE-001   | High        | PHASE-007                   | Focused state workflows behind the unchanged Studio facade                          |
+| PHASE-009 | Reconcile final documentation                    | DOC-001     | Low         | PHASE-004 through PHASE-008 | Correct canonical filename/links and documentation aligned with implemented cleanup |
 
 ## Phase sections
-
-### PHASE-003: Repair Character Builder and shared UI ownership
-
-#### Objective
-
-Align physical module ownership with the current product: Character Builder owns character generation, generic confirmation UI is shared, and components no longer expose model constructors or import unrelated feature internals.
-
-#### Findings resolved
-
-- `ARCH-001`
-- `ARCH-002`
-
-#### Scope
-
-Confirmation dialog and shared UI export; reference-generation hook/source-key helpers; neutral image validation/file constants; Builder imports; direct `characterModel` constructor imports; affected tests/stories/docs.
-
-#### Out of scope
-
-Changing generation/provider behavior; extracting the shared drop-zone (PHASE-006); decomposing recipe handoff/Studio; generic modal/service frameworks; Prompt Workshop Add/Replace/Restyle redesign.
-
-#### Dependencies
-
-None.
-
-#### Risk assessment
-
-- **Regression risk:** Medium-high.
-- **Architectural risk:** Medium.
-- **Data/compatibility risk:** Medium for asset/source identity.
-- **User-facing risk:** Medium for generation and dialogs.
-- **Rollback difficulty:** Low-medium; primarily moves/import rewrites.
-
-#### Implementation sequence
-
-1. Pin existing dialog focus/stack behavior and generation/source-identity/cancellation/provider-request behavior with tests.
-2. Move `ConfirmationDialog` to the existing neutral shared UI/primitive boundary and update narrow exports/consumers.
-3. Move character-specific preview generation and source identity from prompt-authoring into Character Builder or a proven focused reference workflow; keep Prompt Workshop object operations local.
-4. Move only genuinely shared image validation/file-input constants to a neutral browser/UI boundary.
-5. Replace component re-exports of `createEmptyGuidedDesign` with direct model imports.
-6. Remove obsolete cross-feature exports/imports and update ownership documentation.
-
-#### Graphify requirements
-
-Before: paths from Studio/Legacy Manager to dialog and Builder to prompt-authoring/media-session; fan-in/out, exports, tests, dynamic imports. After: update; confirm cross-feature edges are removed/redirected, no cycles, no orphan prompt-generation code, shared primitives have only justified consumers, and runtime entry paths are unchanged.
-
-#### Acceptance criteria
-
-No non-Builder feature imports Builder's generic dialog. Builder generation does not depend on prompt-authoring character internals or media-session internals. Model constructors are imported from model modules. All requests, state transitions, a11y, focus, identity, and saved assets remain byte/contract compatible where observable.
-
-#### Required validation
-
-Targeted dialog, generation, Builder, Workshop and reference tests; Storybook a11y; `npm run quality`; `npm run test:coverage`; `npm run test:e2e`; `npm run test:visual`; Graphify/module checks.
-
-#### Rollback strategy
-
-Revert moves and import/export edits as one phase. Do not keep duplicate compatibility re-exports unless a verified external consumer requires a temporary migration path documented as a new finding.
-
-#### Documentation updates
-
-Resolve ARCH-001/002 with before/after paths and ownership decision; update Architecture and relevant user stories if paths/names are described.
-
-#### Standalone implementation prompt
-
-```text
-Implement only PHASE-003 (“Repair Character Builder and shared UI ownership”), resolving ARCH-001 and ARCH-002. Read all instructions, docs/projectCleanupFindings.md, docs/projectCleanupImplementationPlan.md, Architecture and Workshop/Builder/reference journeys. Confirm PHASE-002 completion and that the safety-net gates remain passing; inspect branch/commit/status and preserve unrelated user changes.
-
-Preserve all visible behavior, APIs, persisted assets/data, provider requests/cost disclosure, cancellation/locks, source identity, accessibility, responsiveness and OverlayPanel/MediaStage topology. Do not redesign Workshop, create a modal framework, extract the PHASE-006 drop-zone, decompose Studio/handoff, or perform unrelated cleanup.
-
-Run baselines. Read/use installed Graphify before editing: path LegacyProjectManager and Studio to ConfirmationDialog; path useCharacterReferenceGeneration to useReferencePreviewGeneration; map Builder imports from prompt-authoring/media-session, exports, dynamic imports, callers/tests, fan-in/out, cycles and change impact. Confirm with source/config/runtime.
-
-Add/strengthen regression tests where needed. Move generic ConfirmationDialog to the existing neutral shared UI/primitive boundary with the same DOM/focus/stack/dismissal contract. Move character-specific generation/source-key implementation into Character Builder or a narrowly proven reference workflow. Move only genuinely shared image validation/file constants to a neutral boundary. Import createEmptyGuidedDesign from characterModel rather than through a presentation component. Remove obsolete cross-feature exports and update affected tests/docs. Keep Prompt Workshop Add/Replace/Restyle and provider/service contracts unchanged.
-
-Afterward run graphify update ., repeat paths and compare the graph. Verify old cross-feature edges are gone, new shared edges are justified, no cycles/orphans/runtime break occur, and fan-in/out changed as intended. Run targeted suites, Storybook a11y, npm run quality, npm run test:coverage, npm run test:e2e and npm run test:visual; record pre-existing failures separately.
-
-When every criterion passes, mark ARCH-001/002 Resolved with implementation/files/validation/Graphify/limitations/PHASE-003, preserving history. Add new unrelated issues with new IDs. Remove PHASE-003 and its overview row, update counts/prerequisites without renumbering. Otherwise keep the phase.
-
-Report ownership decisions, moves/exports, tests, validation, graph diff, failures/new findings, docs, self-removal, and next phase.
-```
 
 ### PHASE-004: Consolidate hardened provider download transport
 
@@ -140,7 +61,7 @@ Unifying provider clients/task state machines, prompts, errors, polling URLs, re
 
 #### Dependencies
 
-PHASE-003.
+None.
 
 #### Risk assessment
 
@@ -291,7 +212,7 @@ Validation/persistence consolidation, object-URL ownership changes, Builder gene
 
 #### Dependencies
 
-PHASE-003.
+None.
 
 #### Risk assessment
 
@@ -367,7 +288,7 @@ Global state/context/router; moving `MediaStage`; handoff internals (PHASE-008);
 
 #### Dependencies
 
-PHASE-003, PHASE-006.
+PHASE-006.
 
 #### Risk assessment
 
@@ -444,7 +365,7 @@ Changing public facade semantics; adding a global store/cache; provider/API chan
 
 #### Dependencies
 
-PHASE-003 and PHASE-007.
+PHASE-007.
 
 #### Risk assessment
 
@@ -520,7 +441,7 @@ New production cleanup, rewriting historical rationale, claiming the project is 
 
 #### Dependencies
 
-PHASE-003 through PHASE-008.
+PHASE-004 through PHASE-008.
 
 #### Risk assessment
 

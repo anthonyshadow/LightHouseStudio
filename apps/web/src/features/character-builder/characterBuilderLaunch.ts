@@ -1,6 +1,6 @@
 import { generateStructuredPrompt, type CharacterTransformDraft } from '@studio/domain';
 import type { SavedCharacterPrompt } from '../creative-assets/types';
-import { createReferencePreviewSourceKey } from '../prompt-authoring/useReferencePreviewGeneration';
+import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import { createFreshCharacterBuilderDraftValue } from './characterBuilderControllerSupport';
 import { createGuidedDesignFromDraft } from './characterModel';
 import {

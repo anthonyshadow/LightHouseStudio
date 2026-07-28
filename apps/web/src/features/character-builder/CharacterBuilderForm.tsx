@@ -29,8 +29,6 @@ import {
   GENDER_OPTIONS,
 } from './characterModel';
 
-export { buildCanonicalCharacterDraft, createEmptyGuidedDesign } from './characterModel';
-
 export type CharacterBuilderFormProps = {
   draft: CharacterTransformDraft;
   design: GuidedDesignV1;

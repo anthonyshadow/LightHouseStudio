@@ -1,7 +1,7 @@
 import type { ReferenceImageAsset, UploadedReferenceImageAsset } from '@studio/contracts';
 import { createPromptBuilderDraft } from '@studio/domain';
 import { describe, expect, it } from 'vitest';
-import { createEmptyGuidedDesign } from './CharacterBuilderForm';
+import { createEmptyGuidedDesign } from './characterModel';
 import { DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS } from './ReferenceOptionsFields';
 import { characterBuilderReducer, createCharacterBuilderState } from './machine';
 

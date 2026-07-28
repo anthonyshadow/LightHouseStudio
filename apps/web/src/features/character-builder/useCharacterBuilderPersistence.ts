@@ -3,7 +3,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch } from
 import { fetchReferenceImageMetadata } from '../../adapters/api-client/apiClient';
 import { useStrictModeSafeDisposable } from '../../orchestration/lifecycle/useStrictModeSafeDisposable';
 import type { LocalProjectRepository } from '../guided-flow/types';
-import { createReferencePreviewSourceKey } from '../prompt-authoring/useReferencePreviewGeneration';
+import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import {
   characterBuilderOperationError,
   createFreshCharacterBuilderDraftValue,

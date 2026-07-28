@@ -7,6 +7,8 @@ import {
 
 export { MAX_IMAGE_BYTES };
 
+export const REFERENCE_IMAGE_ACCEPT = 'image/jpeg,image/png,image/webp';
+
 export type ImageValidation = {
   blockingError: string | null;
   warnings: string[];

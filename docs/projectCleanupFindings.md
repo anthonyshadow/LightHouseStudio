@@ -85,8 +85,8 @@ All implementation phases must preserve these properties.
 | DEAD-001   | Legacy Guided repository retains an unreachable write pipeline         | Dead/compatibility code          | Medium   | Confirmed       | Resolved | Guided IndexedDB compatibility repository                     | PHASE-002         |
 | DEAD-002   | Disabled starter-picker presentation remains compiled                  | Dead UI code                     | Low      | Confirmed       | Resolved | Character Builder form and styles                             | PHASE-002         |
 | DEAD-003   | Production telemetry is a no-op seam with no consumer                  | Dead service code                | Low      | Confirmed       | Resolved | Studio telemetry and mount effect                             | PHASE-002         |
-| ARCH-001   | Shared confirmation dialog is owned by Character Builder               | Architecture/ownership           | Medium   | Confirmed       | Open     | Shared UI and Legacy Projects                                 | PHASE-003         |
-| ARCH-002   | Character generation remains owned by Prompt Workshop internals        | Architecture/ownership           | High     | Confirmed       | Open     | Character Builder, prompt-authoring, media-session helpers    | PHASE-003         |
+| ARCH-001   | Shared confirmation dialog is owned by Character Builder               | Architecture/ownership           | Medium   | Confirmed       | Resolved | Shared UI and Legacy Projects                                 | PHASE-003         |
+| ARCH-002   | Character generation remains owned by Prompt Workshop internals        | Architecture/ownership           | High     | Confirmed       | Resolved | Character Builder, prompt-authoring, media-session helpers    | PHASE-003         |
 | DUP-001    | BFL and Wiro duplicate hardened task-download transport                | Duplication/security maintenance | High     | Confirmed       | Open     | API provider adapters                                         | PHASE-004         |
 | DUP-002    | Reference image service repeats asset finalization logic               | Duplication/service cohesion     | Medium   | High confidence | Open     | API reference-image service                                   | PHASE-005         |
 | DUP-003    | Reference-image fields duplicate file-picker/drop presentation         | Duplication/components           | Low      | Confirmed       | Open     | Character Builder and media-session UI                        | PHASE-006         |
@@ -241,7 +241,7 @@ All implementation phases must preserve these properties.
 - **Category:** Architecture and feature ownership
 - **Severity:** Medium
 - **Confidence:** Confirmed
-- **Status:** Open
+- **Status:** Resolved
 - **Affected files:** `apps/web/src/features/character-builder/ConfirmationDialog.tsx`; imports from `apps/web/src/features/legacy-projects/LegacyProjectManager.tsx` and `StudioApp.tsx`; shared UI exports.
 - **Affected features or runtime flows:** Character draft discard, legacy project deletion, and other confirmation overlays.
 - **Evidence:** The component is generic and is imported across feature boundaries by Legacy Projects and Studio composition. It contains no Character Builder policy.
@@ -257,13 +257,15 @@ All implementation phases must preserve these properties.
 - **Suggested implementation phase:** PHASE-003
 - **Estimated scope:** Small
 - **Related findings:** ARCH-002, COMP-001
+- **PHASE-003 resolution evidence (2026-07-27):** Moved the unchanged generic component to `apps/web/src/ui/primitives/ConfirmationDialog.tsx`, exported it through the neutral UI barrel, and redirected Character Builder, Legacy Projects, Studio's lazy import, and the Storybook consumer. Added a focused stacked-dialog regression test covering initial cancel focus, topmost-only Escape dismissal, parent inert/assistive-technology isolation, and exact invoker focus restoration. The existing `OverlayPanel` remains the only modal/focus/stack implementation; no compatibility re-export or parallel modal system remains.
+- **PHASE-003 validation and Graphify evidence (2026-07-27):** The focused ownership suite passes 57/57, `npm run quality` passes 93 files / 701 unit tests plus 21 Storybook files / 53 interaction-a11y tests and both builds, functional E2E passes 128 with 10 intentional skips, and Darwin visual regression passes 29/29. Graphify refreshed from 3,659 nodes / 8,245 edges to 3,663 / 8,260 with only the known non-source `hooks.json` zero-node warning. The Legacy Manager path now resolves to the neutral dialog, the old Builder-owned source is absent, and the module check reports 353 files / 952 local edges / zero cycles.
 
 ### [ARCH-002] Character generation remains owned by Prompt Workshop internals
 
 - **Category:** Architecture and feature ownership
 - **Severity:** High
 - **Confidence:** Confirmed
-- **Status:** Open
+- **Status:** Resolved
 - **Affected files:** `apps/web/src/features/prompt-authoring/useReferencePreviewGeneration.ts`; Character Builder generation/controller/form files; `apps/web/src/features/media-session/imageValidation.ts`; `SessionComposer`/reference-field styles; re-export of `createEmptyGuidedDesign`.
 - **Affected features or runtime flows:** Character reference upload, optimization, generate/edit/compose, and save.
 - **Evidence:** Documentation and runtime say Character Builder exclusively owns character generation, yet Builder's `useCharacterReferenceGeneration` calls a hook in `prompt-authoring`. Six Builder modules import its source-key helper. Builder file validation imports media-session internals, and a Builder presentation component re-exports `createEmptyGuidedDesign` even though `characterModel` is canonical.
@@ -279,6 +281,8 @@ All implementation phases must preserve these properties.
 - **Suggested implementation phase:** PHASE-003
 - **Estimated scope:** Medium
 - **Related findings:** TEST-001, DEAD-002, DUP-003, STATE-001
+- **PHASE-003 resolution evidence (2026-07-27):** Moved `useReferencePreviewGeneration` and its complete request/cancellation/optimization-reuse tests into Character Builder, separated its pure source/optimization keys into Builder-owned `characterReferenceIdentity.ts`, and redirected upload, generation, persistence, launch, controller, and save-journal consumers. Moved decoded-image validation plus the accepted file-input media-type constant to the neutral browser-media adapter, and moved only the two existing reference fields' shared styles to the neutral UI primitive boundary; their duplicated DOM, validation effects, persistence, and object-URL policy remain feature-owned for PHASE-006. Removed `imageValidation` from the media-session barrel and removed the presentation-layer `CharacterBuilderForm` model re-exports; every `createEmptyGuidedDesign` consumer now imports `characterModel` directly.
+- **PHASE-003 validation and Graphify evidence (2026-07-27):** Existing provider requests, retry UUID reuse, source identity, cancellation/late-result rejection, locking, upload validation, save/preload behavior, Prompt Workshop's local-only Add/Replace/Restyle boundary, and observable layout remain covered by the passing 701-unit/53-Storybook/128-functional/29-visual gates. `npm run test:coverage` passes at 83.37% statements, 71.99% branches, 85.19% functions, and 86.05% lines. Graphify places the generation hook and identity helpers under `features/character-builder`, validation under `adapters/browser-media`, and dialog/styles under `ui/primitives`; the retired prompt-authoring generation and media-session validation sources are absent. Source/module checks find no Builder imports of Prompt Workshop generation, media-session image validation, or media-session reference styles, and no cycles. The intentional Builder preload dependency on media-session draft policy/types remains because it is the explicit Studio handoff boundary, not generation ownership.
 
 ### [DUP-001] BFL and Wiro duplicate hardened task-download transport
 
@@ -456,7 +460,7 @@ No additional file was classified dead solely from text search. Knip passed, fra
 | `reference-image-service.ts`               | 559 lines; central to three operations and owner-scoped coordinator | Correctly central but repeats finalization and has high-impact persistence paths   | DUP-002                                        |
 | BFL/Wiro adapters                          | Wiro provider 576 lines plus two ~230-line downloaders              | Security transport duplicated while provider protocols remain distinct             | DUP-001                                        |
 | `useTakeReviewFlow.ts`                     | Critical lifecycle hook now at 98.61% statement coverage            | Ordered settlement and cleanup behavior has direct focused protection              | TEST-001 resolved                              |
-| `useCharacterReferenceGeneration.ts`       | Critical provider-cost adapter now at 86.66% statement coverage     | Validation, locking, retry, cancellation, and stale boundaries are directly tested | TEST-001 resolved / ARCH-002 remains           |
+| `useCharacterReferenceGeneration.ts`       | Critical provider-cost adapter now at 86.66% statement coverage     | Validation, locking, retry, cancellation, and stale boundaries are directly tested | TEST-001 and ARCH-002 resolved                 |
 | `MediaStage.tsx`                           | 561 lines but stable cohesive ownership                             | Owns persistent media DOM and stage presentation; broad test protection            | Preserve; do not split by size alone           |
 | `packages/domain/src/assets/operations.ts` | 615 lines but pure/cohesive and highly tested                       | Related immutable asset/recipe operations share one domain aggregate               | Preserve pending a real change axis            |
 
@@ -464,10 +468,10 @@ Barrel modules (`packages/domain/src/index.ts`, `packages/contracts/src/index.ts
 
 ## 9. Dependency and architecture observations
 
-- **Cycles:** `npm run check:modules` analyzed 348 files and 935 local edges with zero cycles.
-- **Layering:** No React/provider dependency was found in domain/contracts. The actionable violations are feature ownership, not package-direction violations (`ARCH-001`, `ARCH-002`).
+- **Cycles:** The PHASE-003 `npm run check:modules` refresh analyzed 353 files and 952 local edges with zero cycles.
+- **Layering:** No React/provider dependency was found in domain/contracts. The audited feature-ownership violations (`ARCH-001`, `ARCH-002`) are resolved.
 - **Critical shared modules:** Contract and domain barrels have high fan-in; `StudioApp` has high fan-out. Changes to contracts/domain must remain backwards compatible across web/API tests.
-- **Cross-feature path:** Legacy Projects imports a dialog from Character Builder; Character Builder imports generation from prompt-authoring and image helpers/styles from media-session.
+- **Cross-feature path:** Legacy Projects, Studio, and Builder now consume confirmation UI from `ui/primitives`; Builder owns generation/source identity and consumes neutral browser-image validation plus neutral shared reference-field styles. The intentionally separate picker DOM/effects remain tracked by `DUP-003`.
 - **Runtime shape:** There is one web route and one server composition path. No hidden router, global store, DI container, background job registry, or product database was found.
 - **Dynamic imports:** Rare panels and provider SDKs are intentional lazy boundaries. They were included in reachability checks, so no lazy module was labeled dead.
 - **Type/data flow:** Strict TypeScript and Zod runtime schemas are used at trust boundaries. No credible broad `any`/unsafe-cast cleanup finding was identified.
@@ -515,7 +519,7 @@ PHASE-001 completion supersedes only the failing test/visual conclusions above: 
 
 1. **PHASE-001 (completed):** Restore trustworthy validation (`TEST-001`, `TEST-002`, `TOOL-001`).
 2. **PHASE-002 (completed):** Remove only confirmed retired/unreachable code while preserving persisted data (`DEAD-001`–`003`).
-3. **PHASE-003:** Correct shared/feature ownership after the Character Builder migration (`ARCH-001`, `ARCH-002`).
+3. **PHASE-003 (completed):** Correct shared/feature ownership after the Character Builder migration (`ARCH-001`, `ARCH-002`).
 4. **PHASE-004:** Consolidate duplicated provider-safe download primitives (`DUP-001`).
 5. **PHASE-005:** Consolidate service-private reference asset finalization (`DUP-002`).
 6. **PHASE-006:** Extract the narrow image-picker/drop presentation seam if its API stays focused (`DUP-003`).
@@ -546,4 +550,19 @@ PHASE-002 is complete. The IndexedDB database name, version, store/index schema,
 - **Graphify:** Pre-change queries showed runtime reachability only through Studio initialization/state, Legacy Manager list/load/read/delete, and Character Builder migration. The final `graphify update .` refresh moved 3,711 nodes / 8,389 edges to 3,659 / 8,245 after roadmap self-removal and read-only fallback preservation, repeating only the known non-source `hooks.json` zero-node warning. Direct graph/source inspection finds no authoring, flush, retention, hidden-picker, starter-default, or telemetry code nodes. Retained paths still connect Studio to the compatibility repository and Legacy Manager, migration to project list/load, and migration/model hydration to `CHARACTER_STARTERS`. Knip passes; `npm run check:modules` reports 350 files / 945 local edges / zero cycles.
 - **Documentation:** Architecture, Manual QA, Product Evolution, this findings history, and the live implementation plan now describe the reduced compatibility boundary and retired picker accurately. No current user journey changed.
 - **Limitations/new findings:** Live browser data was not mutated for validation; deterministic raw IndexedDB fixtures protect the exact compatibility contract without risking user records. No new cleanup finding was discovered. Production dependency audit and visual snapshots were outside this phase's required validation and were not changed.
-- **Plan status:** DEAD-001, DEAD-002, and DEAD-003 are resolved. PHASE-002 has self-removed from `projectCleanupImplementationPlan.md`; PHASE-003 is next.
+- **Plan status:** DEAD-001, DEAD-002, and DEAD-003 are resolved. PHASE-002 has self-removed from `projectCleanupImplementationPlan.md`; PHASE-003 was next.
+
+## 15. PHASE-003 implementation record
+
+PHASE-003 is complete. Provider requests, persisted asset/data shapes, source
+identity values, optimization reuse, retry IDs, cancellation and lock behavior,
+Prompt Workshop intents, `OverlayPanel`/`MediaStage` topology, reference-picker
+DOM, and visible layout were unchanged.
+
+- **Changed ownership:** `ConfirmationDialog` moved from Character Builder to `ui/primitives` with a narrow shared UI export and Studio lazy import. Preview generation plus source/optimization identity moved from Prompt Workshop internals to Character Builder. Decoded-image validation and accepted input types moved from media-session to the neutral browser-media adapter. Existing reference-field styles moved to `ui/primitives`; picker policy/effects remain in their two features for PHASE-006. `CharacterBuilderForm` no longer re-exports model functions, and all empty-design consumers import `characterModel` directly.
+- **Tests:** The moved preview-generation suite continues to cover request shape, optimization reuse, retry UUID reuse, edit/compose routing, owner abort, cancellation, and stale completion. A new focused shared-dialog test pins stacked focus/isolation, topmost-only Escape dismissal, and exact return focus. The focused ownership set passes 57/57.
+- **Validation:** `npm run quality` passes outside the restrictive sandbox: 93 files / 701 unit tests, 21 files / 53 Storybook interaction-a11y tests, types, lint, format, Knip, 353-file/952-edge module checks with zero cycles, production build, and Storybook build. `npm run test:coverage` passes at 83.37% statements, 71.99% branches, 85.19% functions, and 86.05% lines. Functional E2E passes 128 with 10 intentional skips across Chromium, WebKit, and mobile. Darwin visual regression passes 29/29. The first sandboxed quality run reached the unit suite but its loopback listener received the already-characterized `EPERM`; the authorized rerun passed.
+- **Graphify:** Pre-change paths showed Legacy Manager importing a Builder-owned dialog and Builder calling the Prompt Workshop-owned generation hook directly. `graphify update .` refreshed 3,659 nodes / 8,245 edges to 3,663 / 8,260 and repeated only the known non-source `hooks.json` zero-node warning. The graph now locates dialog/styles in neutral UI, generation/identity in Builder, and validation in browser-media. Obsolete source paths are absent; source and module checks find no Builder dependency on Prompt Workshop generation or media-session validation/styles, and no orphan compatibility export remains.
+- **Documentation:** Architecture and the canonical image-generation implementation map now name the new physical owners. The current user journeys already described the correct observable Builder/Workshop behavior and required no behavioral rewrite. ARCH-001 and ARCH-002 retain their original evidence and now include resolution records.
+- **Limitations/new findings:** No new cleanup finding was discovered. Live provider/device checks remain manual and gated; no paid traffic ran. `npm run audit:prod` remains outside the authorized scope, matching the existing plan limitation.
+- **Plan status:** ARCH-001 and ARCH-002 are resolved. PHASE-003 has self-removed from `projectCleanupImplementationPlan.md`; PHASE-004 is next.

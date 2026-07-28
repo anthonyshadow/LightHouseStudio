@@ -1,5 +1,6 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import { Button, OverlayPanel } from '../../ui';
+import { Button } from './Button';
+import { OverlayPanel } from './OverlayPanel';
 
 export interface ConfirmationDialogProps {
   open: boolean;

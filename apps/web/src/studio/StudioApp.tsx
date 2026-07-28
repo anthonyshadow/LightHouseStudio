@@ -63,7 +63,7 @@ const CharacterBuilderCoordinator = lazy(() =>
   })),
 );
 const ConfirmationDialog = lazy(() =>
-  import('../features/character-builder/ConfirmationDialog').then((module) => ({
+  import('../ui/primitives/ConfirmationDialog').then((module) => ({
     default: module.ConfirmationDialog,
   })),
 );

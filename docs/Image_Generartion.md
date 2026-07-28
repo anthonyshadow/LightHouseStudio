@@ -226,7 +226,7 @@ Check capabilities (local configuration only)
 ## Implementation sources
 
 - Browser API client: `apps/web/src/adapters/api-client/apiClient.ts`
-- Preview orchestration: `apps/web/src/features/prompt-authoring/useReferencePreviewGeneration.ts`
+- Preview orchestration: `apps/web/src/features/character-builder/useReferencePreviewGeneration.ts`
 - HTTP validation and routes: `apps/api/src/features/reference-images/routes.ts`
 - Service, idempotency, source resolution, validation, and storage: `apps/api/src/features/reference-images/reference-image-service.ts`
 - Request schemas: `packages/contracts/src/reference-images.ts`

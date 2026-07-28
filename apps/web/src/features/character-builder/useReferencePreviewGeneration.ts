@@ -11,6 +11,10 @@ import {
   editReferenceImage,
   optimizeCharacterReferencePrompt,
 } from '../../adapters/api-client/apiClient';
+import {
+  createReferencePromptOptimizationKey,
+  createReferencePreviewSourceKey,
+} from './characterReferenceIdentity';
 
 export type ReferencePreviewPhase = 'optimizing' | 'generating' | 'regenerating';
 
@@ -42,30 +46,9 @@ export interface ReferencePreviewGenerationCallbacks {
 }
 
 const normalizedInstructions = (value: string | undefined) => value?.trim() ?? '';
-const normalizedRawPrompt = (value: string) => value.replace(/\s+/gu, ' ').trim();
-
-export const createReferencePromptOptimizationKey = (
-  rawPrompt: string,
-  options: CharacterReferenceOptions,
-): string =>
-  JSON.stringify({
-    rawPrompt: normalizedRawPrompt(rawPrompt),
-    options,
-  });
-
-export const createReferencePreviewSourceKey = (
-  rawPrompt: string,
-  options: CharacterReferenceOptions,
-  sourceAssetId?: string | null,
-): string =>
-  JSON.stringify({
-    rawPrompt: normalizedRawPrompt(rawPrompt),
-    options,
-    sourceAssetId: sourceAssetId ?? null,
-  });
 
 /**
- * Shared single-flight optimizer/generator used by Studio-owned character builders.
+ * Character Builder-owned single-flight optimizer/generator.
  * It owns provider cancellation, optimization reuse, retry request IDs, and late-result rejection.
  */
 export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerationCallbacks) => {

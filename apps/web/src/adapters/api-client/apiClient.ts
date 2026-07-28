@@ -19,7 +19,7 @@ import {
   type RealtimeSessionProfile,
 } from '@studio/contracts';
 import type { ModelMode, ProviderAvailability } from '../../application/types';
-import { validateReferenceImage } from '../../features/media-session/imageValidation';
+import { validateReferenceImage } from '../browser-media/imageValidation';
 
 export class ApiClientError extends Error {
   readonly status: number;

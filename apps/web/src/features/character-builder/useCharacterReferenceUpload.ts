@@ -1,8 +1,8 @@
 import { generateStructuredPrompt } from '@studio/domain';
 import { useCallback, useEffect, useRef } from 'react';
 import { uploadReferenceImage, type ApiClientError } from '../../adapters/api-client/apiClient';
-import { validateReferenceImage } from '../media-session/imageValidation';
-import { createReferencePreviewSourceKey } from '../prompt-authoring/useReferencePreviewGeneration';
+import { validateReferenceImage } from '../../adapters/browser-media/imageValidation';
+import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import {
   characterBuilderOperationError,
   type CharacterBuilderOperationLocksRef,

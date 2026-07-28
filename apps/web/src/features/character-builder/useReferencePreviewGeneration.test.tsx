@@ -12,11 +12,13 @@ import type {
 } from '@studio/contracts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
-  createReferencePromptOptimizationKey,
-  createReferencePreviewSourceKey,
   useReferencePreviewGeneration,
   type ReferencePreviewGenerationCallbacks,
 } from './useReferencePreviewGeneration';
+import {
+  createReferencePromptOptimizationKey,
+  createReferencePreviewSourceKey,
+} from './characterReferenceIdentity';
 
 const createReferenceImage = vi.hoisted(() =>
   vi.fn<

@@ -4,7 +4,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import type { UploadedReferenceImageAsset } from '@studio/contracts';
 import { createPromptBuilderDraft, type CharacterTransformDraft } from '@studio/domain';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createEmptyGuidedDesign } from './CharacterBuilderForm';
+import { createEmptyGuidedDesign } from './characterModel';
 import type {
   CharacterBuilderDraftRecord,
   CharacterBuilderDraftRepository,
@@ -44,7 +44,7 @@ vi.mock('../../adapters/api-client/apiClient', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, fetchReferenceImageMetadata, uploadReferenceImage };
 });
-vi.mock('../media-session/imageValidation', async (importOriginal) => {
+vi.mock('../../adapters/browser-media/imageValidation', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
   return { ...actual, validateReferenceImage };
 });

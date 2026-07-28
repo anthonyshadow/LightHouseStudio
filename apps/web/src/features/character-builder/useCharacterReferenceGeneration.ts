@@ -4,7 +4,7 @@ import { useCallback, useEffect, type Dispatch } from 'react';
 import {
   useReferencePreviewGeneration,
   type ReferencePreviewGenerationResult,
-} from '../prompt-authoring/useReferencePreviewGeneration';
+} from './useReferencePreviewGeneration';
 import {
   characterBuilderOperationError,
   type CharacterBuilderOperationLocksRef,

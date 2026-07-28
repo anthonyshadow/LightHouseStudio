@@ -2,10 +2,8 @@ import { useMemo, useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';
 import { createPromptBuilderDraft } from '@studio/domain';
-import {
-  CharacterBuilderForm,
-  createEmptyGuidedDesign,
-} from '@web/features/character-builder/CharacterBuilderForm';
+import { CharacterBuilderForm } from '@web/features/character-builder/CharacterBuilderForm';
+import { createEmptyGuidedDesign } from '@web/features/character-builder/characterModel';
 import { RecipeShelf } from '@web/features/creative-assets/RecipeShelf';
 import { Button, StatusNotice } from '@web/ui';
 import { createSeededCreativeAssetRepository } from '../fixtures/creativeAssets';

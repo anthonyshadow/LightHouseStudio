@@ -2,10 +2,8 @@ import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';
 import { createPromptBuilderDraft } from '@studio/domain';
-import {
-  CharacterBuilderForm,
-  createEmptyGuidedDesign,
-} from '@web/features/character-builder/CharacterBuilderForm';
+import { CharacterBuilderForm } from '@web/features/character-builder/CharacterBuilderForm';
+import { createEmptyGuidedDesign } from '@web/features/character-builder/characterModel';
 import { CharacterBuilderCoordinator } from '@web/features/character-builder/CharacterBuilderCoordinator';
 import { CharacterBuilderPanel } from '@web/features/character-builder/CharacterBuilderPanel';
 import { CharacterChoiceDrawer } from '@web/features/character-builder/CharacterChoiceDrawer';
@@ -13,7 +11,6 @@ import {
   CharacterDirectionPreview,
   type CharacterDirectionPreviewSelection,
 } from '@web/features/character-builder/CharacterDirectionPreview';
-import { ConfirmationDialog } from '@web/features/character-builder/ConfirmationDialog';
 import {
   DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS,
   ReferenceOptionsFields,
@@ -24,7 +21,7 @@ import {
   CharacterVisualChoiceSection,
 } from '@web/features/character-builder/CharacterVisualChoiceSection';
 import { createCharacterBuilderState } from '@web/features/character-builder/machine';
-import { Button, StatusNotice } from '@web/ui';
+import { Button, ConfirmationDialog, StatusNotice } from '@web/ui';
 import { StoryColumn, StorySection } from '../../support/StoryLayout';
 
 const meta = {

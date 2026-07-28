@@ -1,6 +1,7 @@
 import { useTheme } from '@emotion/react';
 import { formatFileSize } from '@studio/domain';
 import { useId, useRef, useState, type ChangeEvent, type DragEvent } from 'react';
+import { REFERENCE_IMAGE_ACCEPT } from '../../adapters/browser-media/imageValidation';
 import { Button, StatusNotice } from '../../ui';
 import {
   referenceFieldStyles,
@@ -8,7 +9,7 @@ import {
   referenceGuidanceStyles,
   referencePickerStyles,
   referencePreviewStyles,
-} from '../media-session/SessionComposer.styles';
+} from '../../ui/primitives/ReferenceImageField.styles';
 import type { CharacterBuilderUploadedReference } from './machine';
 
 export const BuilderReferenceImageField = ({
@@ -84,7 +85,7 @@ export const BuilderReferenceImageField = ({
           id={inputId}
           ref={inputRef}
           type="file"
-          accept="image/jpeg,image/png,image/webp"
+          accept={REFERENCE_IMAGE_ACCEPT}
           disabled={pickerDisabled}
           aria-invalid={Boolean(error)}
           aria-describedby={error ? `${guidanceId} ${errorId}` : guidanceId}

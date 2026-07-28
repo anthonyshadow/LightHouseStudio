@@ -7,7 +7,7 @@ import {
 } from '@studio/domain';
 import { useCallback, useRef, type Dispatch } from 'react';
 import { fetchReferenceImageMetadata } from '../../adapters/api-client/apiClient';
-import { createReferencePreviewSourceKey } from '../prompt-authoring/useReferencePreviewGeneration';
+import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import {
   characterBuilderOperationError,
   createFreshCharacterBuilderDraftValue,

@@ -10,7 +10,8 @@ import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
-import { CharacterBuilderForm, createEmptyGuidedDesign } from './CharacterBuilderForm';
+import { CharacterBuilderForm } from './CharacterBuilderForm';
+import { createEmptyGuidedDesign } from './characterModel';
 
 type BuilderSnapshot = {
   draft: CharacterTransformDraft;

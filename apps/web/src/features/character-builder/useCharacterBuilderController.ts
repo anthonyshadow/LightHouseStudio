@@ -6,7 +6,7 @@ import {
 } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import type { LocalProjectRepository } from '../guided-flow/types';
-import { createReferencePreviewSourceKey } from '../prompt-authoring/useReferencePreviewGeneration';
+import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import {
   characterBuilderOperationError,
   createCharacterBuilderOperationLocks,

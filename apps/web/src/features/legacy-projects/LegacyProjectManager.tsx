@@ -5,8 +5,7 @@ import type {
   ProjectStorageState,
   ProjectSummary,
 } from '../guided-flow/types';
-import { Button, StatusNotice } from '../../ui';
-import { ConfirmationDialog } from '../character-builder/ConfirmationDialog';
+import { Button, ConfirmationDialog, StatusNotice } from '../../ui';
 import {
   managerHeaderStyles,
   managerStyles,

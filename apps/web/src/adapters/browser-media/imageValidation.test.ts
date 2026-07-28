@@ -16,7 +16,7 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe('reference image validation', () => {
+describe('browser reference image validation', () => {
   it.each([
     ['image/jpeg', 'portrait.jpg'],
     ['image/png', 'portrait.png'],

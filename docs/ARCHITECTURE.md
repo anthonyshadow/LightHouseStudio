@@ -42,6 +42,14 @@ The live/playback control bar uses **Record** and **Stop recording**. Playback e
 
 `OverlayPanel` is the shared portal primitive for drawers, sheets, fullscreen panels, and stacked dialogs. It keeps its backdrop present through the exit transition, intercepts a backdrop-targeted pointer-down before it can click through, and dismisses only the topmost overlay. It locks body overflow, labels the modal, makes the application root and covered dialogs inert/hidden from assistive technology, excludes hidden, disabled, and inert descendants from focus trapping, and centralizes initial/return focus. Its close guard disables Escape and the close button during the atomic part of character Save. Ordinary builder closure first flushes autosave; an unsafe storage failure requires explicit discard.
 
+The policy-free `ConfirmationDialog` is owned beside `OverlayPanel` in the neutral
+UI primitive boundary and is shared by Builder, Studio, and Legacy Projects.
+Browser image decoding/validation and the accepted file-input media types live in
+the neutral browser-media adapter. The two current reference fields share only
+their neutral presentation styles; each feature still owns its picker DOM,
+validation effects, persistence, and object-URL lifecycle until the separately
+tracked drop-zone extraction is resolved.
+
 ## Session data flow
 
 1. The user edits a mode-specific `SessionDraft`. `useSessionDraftState` keeps one in-memory draft for Local, Lucy 2.5, and VTON 3. Text and enhancement choices survive idle mode switches independently; the departing mode's `File` and preview URL are always cleared and revoked. Text assets and the structured workshop may be used without media access.
@@ -61,6 +69,11 @@ The guide's Lucy 2.1 character identifier was intentionally superseded by the us
 ### Character reference prompt pipeline
 
 Character Builder owns the entire character lifecycle: create/edit launch, canonical character fields, optional upload, reference optimization/generation/editing, draft persistence, save journaling, durable Shelf create-or-update, and atomic Lucy 2.5 preload. A Builder draft carries an explicit create target or saved-character edit target. Opening a different edit target requires an accessible confirmation and durably deletes the unfinished draft before the selected record is hydrated. Edit save reuses the saved character ID and preserves unrelated Shelf metadata.
+
+The Character Builder feature also physically owns its single-flight preview
+generation hook and the source/optimization identity helpers used by upload,
+persistence, save, launch, and generation. Prompt Workshop has no import or
+re-export of that provider-contacting implementation.
 
 Prompt Workshop owns only the three non-character structured intents: Add object, Replace object, and Restyle object. Its tab-memory controller retains those drafts and has no character form, image-generation state, optimizer, reference persistence, or provider contact. Historical records stored in the character collection with one of those three structured intents remain Workshop-owned for compatibility; true character records route Edit through Builder. Direct Use remains a separate atomic Recipe Shelf handoff and does not enter Builder.
 

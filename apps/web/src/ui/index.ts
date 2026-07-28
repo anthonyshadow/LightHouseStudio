@@ -13,6 +13,7 @@ export { StatusNotice, type NoticeTone } from './primitives/StatusNotice';
 export { SegmentedControl, type SegmentOption } from './primitives/SegmentedControl';
 export { VisuallyHidden } from './primitives/VisuallyHidden';
 export { IconButton, type IconButtonProps } from './primitives/IconButton';
+export { ConfirmationDialog, type ConfirmationDialogProps } from './primitives/ConfirmationDialog';
 export {
   OverlayPanel,
   type OverlayPanelPlacement,
