@@ -1,11 +1,6 @@
 import type { LocalVoiceEffectId as DomainLocalVoiceEffectId } from '@studio/domain';
 
-export type {
-  PublicVoiceItem,
-  VoiceLibraryItem,
-  VoiceLibraryKind,
-  WorkspaceVoiceItem,
-} from '../../application/types';
+export type { VoiceLibraryItem, WorkspaceVoiceItem } from '../../application/types';
 
 export type LocalVoiceEffectId = DomainLocalVoiceEffectId;
 

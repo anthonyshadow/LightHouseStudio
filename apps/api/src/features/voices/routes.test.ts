@@ -6,13 +6,7 @@ import {
 } from '@studio/contracts';
 import { createApp } from '../../app.js';
 import { ProviderError } from '../../providers/provider-error.js';
-import {
-  FakeElevenLabsProvider,
-  sharedVoice,
-  standardModel,
-  testConfig,
-  voice,
-} from '../../test/fakes.js';
+import { FakeElevenLabsProvider, standardModel, testConfig, voice } from '../../test/fakes.js';
 import { MAX_RECORDING_AUDIO_BYTES } from './routes.js';
 import { VOICE_MODEL_CACHE_TTL_MS } from './voice-service.js';
 
@@ -83,38 +77,6 @@ describe('ElevenLabs voice API', () => {
     expect(provider.workspaceSearches).toHaveLength(1);
   });
 
-  it('exposes only free-user eligible and model-compatible public voices', async () => {
-    const { app, provider } = setup();
-    provider.sharedVoices = [
-      sharedVoice(),
-      sharedVoice({ voiceId: 'paid-only', freeUsersAllowed: false }),
-      sharedVoice({ voiceId: 'professional-one', category: 'professional' }),
-    ];
-    provider.sharedHasMore = true;
-
-    const response = await app.inject({
-      method: 'GET',
-      url: '/api/elevenlabs/shared-voices?search=%20warm%20&page=2&pageSize=8',
-      headers: intentHeaders,
-    });
-
-    expect(response.statusCode).toBe(200);
-    expect(response.json()).toMatchObject({
-      voices: [
-        {
-          voiceId: 'voice-one',
-          publicOwnerId: 'owner-one',
-          previewAvailable: true,
-        },
-      ],
-      hasMore: true,
-      page: 2,
-      nextPageToken: null,
-      total: null,
-    });
-    expect(provider.sharedSearches[0]).toMatchObject({ search: 'warm', page: 2, pageSize: 8 });
-  });
-
   it('shares configured-model discovery briefly, then refreshes it after the bounded TTL', async () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2026-07-26T12:00:00.000Z'));
@@ -124,7 +86,7 @@ describe('ElevenLabs voice API', () => {
     await app.inject({ method: 'GET', url: '/api/elevenlabs/voices', headers: intentHeaders });
     await app.inject({
       method: 'GET',
-      url: '/api/elevenlabs/shared-voices',
+      url: '/api/elevenlabs/voices/voice-one/preview',
       headers: intentHeaders,
     });
     expect(listModels).toHaveBeenCalledOnce();
@@ -149,65 +111,54 @@ describe('ElevenLabs voice API', () => {
     expect(response.body).not.toContain('storage.googleapis.com');
   });
 
-  it('revalidates public eligibility before preview and explicit import', async () => {
-    const { app, provider } = setup();
-    const preview = await app.inject({
-      method: 'GET',
-      url: '/api/elevenlabs/shared-voices/owner-one/voice-one/preview',
-      headers: intentHeaders,
-    });
-    const missingOrigin = await app.inject({
-      method: 'POST',
-      url: '/api/elevenlabs/shared-voices/import',
-      payload: { publicOwnerId: 'owner-one', voiceId: 'voice-one', name: 'My Nova' },
-    });
-    const imported = await app.inject({
-      method: 'POST',
-      url: '/api/elevenlabs/shared-voices/import',
-      headers: originHeaders,
-      payload: { publicOwnerId: 'owner-one', voiceId: 'voice-one', name: '  My Nova  ' },
-    });
-
-    expect(preview.statusCode).toBe(200);
-    expect(missingOrigin.statusCode).toBe(403);
-    expect(imported.statusCode).toBe(200);
-    expect(imported.json()).toEqual({ voiceId: 'imported-voice' });
-    expect(provider.imports).toEqual([
-      { publicOwnerId: 'owner-one', voiceId: 'voice-one', name: 'My Nova' },
-    ]);
-  });
-
   it('rejects every provider-backed read without explicit voice intent before provider contact', async () => {
     const { app, provider } = setup();
     const responses = await Promise.all([
       app.inject({ method: 'GET', url: '/api/elevenlabs/voices' }),
       app.inject({ method: 'GET', url: '/api/elevenlabs/voices/voice-one/preview' }),
-      app.inject({ method: 'GET', url: '/api/elevenlabs/shared-voices' }),
-      app.inject({
-        method: 'GET',
-        url: '/api/elevenlabs/shared-voices/owner-one/voice-one/preview',
-      }),
     ]);
 
-    expect(responses.map((response) => response.statusCode)).toEqual([403, 403, 403, 403]);
+    expect(responses.map((response) => response.statusCode)).toEqual([403, 403]);
     expect(provider.workspaceSearches).toHaveLength(0);
-    expect(provider.sharedSearches).toHaveLength(0);
     expect(provider.previewUrls).toHaveLength(0);
   });
 
-  it('rejects ineligible public voices even if the client submits their ids directly', async () => {
+  it('does not expose public discovery or voice-import routes', async () => {
     const { app, provider } = setup();
-    provider.sharedVoices = [sharedVoice({ freeUsersAllowed: false })];
-    const response = await app.inject({
+    const sharedList = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/shared-voices',
+      headers: intentHeaders,
+    });
+    const importVoice = await app.inject({
       method: 'POST',
       url: '/api/elevenlabs/shared-voices/import',
       headers: originHeaders,
       payload: { publicOwnerId: 'owner-one', voiceId: 'voice-one', name: 'My Nova' },
     });
 
-    expect(response.statusCode).toBe(403);
-    expect(response.json<ApiErrorResponse>().error.code).toBe('provider_policy');
-    expect(provider.imports).toHaveLength(0);
+    expect(sharedList.statusCode).toBe(404);
+    expect(importVoice.statusCode).toBe(404);
+    expect(provider.workspaceSearches).toHaveLength(0);
+  });
+
+  it('rejects a voice that is not in the saved library even if its id is submitted directly', async () => {
+    const { app, provider } = setup();
+    provider.workspaceVoices = [];
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/elevenlabs/voice-changer/recording?voiceId=voice-one',
+      headers: { ...originHeaders, 'content-type': 'audio/webm' },
+      payload: Buffer.from('original-sidecar'),
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(response.json<ApiErrorResponse>().error).toEqual({
+      code: 'not_found',
+      message:
+        'That voice is no longer in your ElevenLabs library. Refresh the library and choose another.',
+    });
+    expect(provider.conversions).toHaveLength(0);
   });
 
   it('converts only explicit nonempty audio from an immutable sidecar request', async () => {

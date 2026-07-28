@@ -13,16 +13,12 @@ import {
   createReferenceImageRequestSchema,
   editReferenceImageRequestSchema,
   healthResponseSchema,
-  importSharedVoiceRequestSchema,
   optimizeCharacterReferencePromptRequestSchema,
   optimizeCharacterReferencePromptResponseSchema,
   realtimeTokenRequestSchema,
   realtimeTokenResponseSchema,
   referenceImageAssetSchema,
   uploadReferenceImageResponseSchema,
-  sharedVoicePreviewParamsSchema,
-  sharedVoicesQuerySchema,
-  sharedVoicesResponseSchema,
   supportedModelIdSchema,
   voiceChangerQuerySchema,
   voiceConversionContentTypeSchema,
@@ -431,28 +427,6 @@ describe('ElevenLabs contracts', () => {
     expect(workspaceVoicesQuerySchema.safeParse({ pageSize: 11 }).success).toBe(false);
   });
 
-  it('supports zero-based shared pages and strict public preview/import identifiers', () => {
-    expect(sharedVoicesQuerySchema.parse({ page: '0', pageSize: '10' })).toEqual({
-      search: '',
-      page: 0,
-      pageSize: 10,
-    });
-    expect(sharedVoicesQuerySchema.safeParse({ page: -1 }).success).toBe(false);
-    expect(
-      sharedVoicePreviewParamsSchema.parse({
-        publicOwnerId: ' owner ',
-        voiceId: ' voice ',
-      }),
-    ).toEqual({ publicOwnerId: 'owner', voiceId: 'voice' });
-    expect(
-      importSharedVoiceRequestSchema.parse({
-        name: '  Studio voice ',
-        publicOwnerId: 'owner',
-        voiceId: 'voice',
-      }),
-    ).toEqual({ name: 'Studio voice', publicOwnerId: 'owner', voiceId: 'voice' });
-  });
-
   it('models filtered totals honestly and keeps provider previews app-owned', () => {
     expect(
       workspaceVoicesResponseSchema.parse({
@@ -462,15 +436,6 @@ describe('ElevenLabs contracts', () => {
         total: null,
       }),
     ).toMatchObject({ total: null });
-    expect(
-      sharedVoicesResponseSchema.parse({
-        voices: [{ ...voice, publicOwnerId: 'owner' }],
-        page: 0,
-        hasMore: true,
-        nextPageToken: 'opaque',
-        total: null,
-      }),
-    ).toMatchObject({ page: 0, total: null });
     expect(
       workspaceVoicesResponseSchema.safeParse({
         voices: [{ ...voice, previewUrl: 'https://provider.example/audio' }],

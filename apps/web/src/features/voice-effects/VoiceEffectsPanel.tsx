@@ -164,13 +164,13 @@ export const VoiceEffectsPanel = ({
               variant="secondary"
               onClick={() => setVoiceLibraryOpen(true)}
             >
-              Browse ElevenLabs voices · contacts provider
+              Browse saved ElevenLabs voices · contacts provider
             </Button>
             <OverlayPanel
               open={voiceLibraryOpen}
               onClose={() => setVoiceLibraryOpen(false)}
               title="Voice Browser"
-              description="Previewing voices does not upload this take. Applying a workspace voice sends only the immutable original audio sidecar."
+              description="Previewing saved library voices does not upload this take. Applying one sends only the immutable original audio sidecar."
               placement="right"
               size="wide"
               bodyMode="scroll"

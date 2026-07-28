@@ -2,14 +2,8 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VOICE_PROVIDER_INTENT_HEADER, VOICE_PROVIDER_INTENT_VALUE } from '@studio/contracts';
-import type { PublicVoiceItem, WorkspaceVoiceItem } from '../../application/types';
-import {
-  convertRecordingVoice,
-  fetchVoicePreview,
-  importPublicVoice,
-  listPublicVoices,
-  listWorkspaceVoices,
-} from './voicesApi';
+import type { WorkspaceVoiceItem } from '../../application/types';
+import { convertRecordingVoice, fetchVoicePreview, listWorkspaceVoices } from './voicesApi';
 
 const workspaceVoice: WorkspaceVoiceItem = {
   kind: 'workspace',
@@ -20,15 +14,6 @@ const workspaceVoice: WorkspaceVoiceItem = {
     description: null,
     labels: {},
     previewAvailable: true,
-  },
-};
-
-const publicVoice: PublicVoiceItem = {
-  kind: 'public',
-  voice: {
-    ...workspaceVoice.voice,
-    voiceId: 'public-voice',
-    publicOwnerId: 'public-owner',
   },
 };
 
@@ -50,44 +35,27 @@ describe('voice API provider intent', () => {
     );
 
     await expect(listWorkspaceVoices('', null, new AbortController().signal)).rejects.toThrow(
-      'The workspace voice response was invalid.',
+      'The saved voice library response was invalid.',
     );
   });
 
-  it('marks workspace and public list reads and preserves their discriminants', async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            voices: [workspaceVoice.voice],
-            hasMore: false,
-            nextPageToken: null,
-            total: 1,
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({
-            voices: [publicVoice.voice],
-            page: 0,
-            hasMore: false,
-            nextPageToken: null,
-            total: 1,
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      );
+  it('marks saved-library reads and preserves the workspace discriminant', async () => {
+    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
+      new Response(
+        JSON.stringify({
+          voices: [workspaceVoice.voice],
+          hasMore: false,
+          nextPageToken: null,
+          total: 1,
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      ),
+    );
     vi.stubGlobal('fetch', fetchMock);
     const signal = new AbortController().signal;
 
     await expect(listWorkspaceVoices('', null, signal)).resolves.toMatchObject({
       voices: [workspaceVoice],
-    });
-    await expect(listPublicVoices('', 0, signal)).resolves.toMatchObject({
-      voices: [publicVoice],
     });
 
     for (const [, init] of fetchMock.mock.calls) {
@@ -97,19 +65,13 @@ describe('voice API provider intent', () => {
     }
   });
 
-  it('marks preview, import, and conversion requests', async () => {
+  it('marks preview and conversion requests', async () => {
     const fetchMock = vi
       .fn<typeof fetch>()
       .mockResolvedValueOnce(
         new Response('preview', {
           status: 200,
           headers: { 'Content-Type': 'audio/mpeg' },
-        }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ voiceId: 'imported-voice' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
         }),
       )
       .mockResolvedValueOnce(
@@ -121,10 +83,9 @@ describe('voice API provider intent', () => {
     vi.stubGlobal('fetch', fetchMock);
     const signal = new AbortController().signal;
 
-    await expect(fetchVoicePreview(publicVoice, signal)).resolves.toMatchObject({
+    await expect(fetchVoicePreview(workspaceVoice, signal)).resolves.toMatchObject({
       type: 'audio/mpeg',
     });
-    await expect(importPublicVoice(publicVoice, signal)).resolves.toBe('imported-voice');
     await expect(
       convertRecordingVoice(
         'workspace-voice',

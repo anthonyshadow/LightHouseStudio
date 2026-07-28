@@ -1,16 +1,10 @@
-import type {
-  PublicVoiceSummary,
-  SharedVoicesResponse,
-  VoiceSummary,
-  WorkspaceVoicesResponse,
-} from '@studio/contracts';
+import type { VoiceSummary, WorkspaceVoicesResponse } from '@studio/contracts';
 import type { AudioStream } from '../../application/audio-stream.js';
 import { createSharedOperation, type SharedOperation } from '../../application/shared-operation.js';
 import { ProviderError } from '../../providers/provider-error.js';
 import type {
   ElevenLabsModel,
   ElevenLabsProvider,
-  ProviderSharedVoice,
   ProviderVoice,
 } from '../../providers/elevenlabs/types.js';
 import { VoiceServiceError } from './voice-service-error.js';
@@ -45,11 +39,6 @@ const summarizeVoice = (voice: ProviderVoice): VoiceSummary => ({
   description: voice.description,
   labels: voice.labels,
   previewAvailable: voice.previewUrl !== null,
-});
-
-const summarizePublicVoice = (voice: ProviderSharedVoice): PublicVoiceSummary => ({
-  ...summarizeVoice(voice),
-  publicOwnerId: voice.publicOwnerId,
 });
 
 export class VoiceService {
@@ -106,6 +95,11 @@ export class VoiceService {
     }
   }
 
+  #requireLibraryVoice(voice: ProviderVoice | null): ProviderVoice {
+    if (voice === null) throw new VoiceServiceError('library-voice-not-found');
+    return voice;
+  }
+
   async listWorkspaceVoices(input: {
     readonly search: string;
     readonly pageSize: number;
@@ -126,100 +120,18 @@ export class VoiceService {
     };
   }
 
-  async listSharedVoices(input: {
-    readonly search: string;
-    readonly pageSize: number;
-    readonly page: number;
-    readonly signal: AbortSignal;
-  }): Promise<SharedVoicesResponse> {
-    const [result, model] = await runParallel(
-      input.signal,
-      (signal) => this.#provider.listSharedVoices({ ...input, signal }),
-      (signal) => this.#conversionModel(signal),
-    );
-    return {
-      voices: result.voices
-        .filter((voice) => voice.freeUsersAllowed && isModelCompatible(voice, model))
-        .map(summarizePublicVoice),
-      hasMore: result.hasMore,
-      page: input.page,
-      nextPageToken: null,
-      total: null,
-    };
-  }
-
-  async #findEligibleSharedVoice(
-    publicOwnerId: string,
-    voiceId: string,
-    signal: AbortSignal,
-  ): Promise<{ readonly voice: ProviderSharedVoice; readonly model: ElevenLabsModel }> {
-    const model = await this.#conversionModel(signal);
-    let page = 0;
-
-    while (page < 10) {
-      const result = await this.#provider.listSharedVoices({
-        search: '',
-        pageSize: 100,
-        page,
-        publicOwnerId,
-        signal,
-      });
-      const voice = result.voices.find(
-        (candidate) => candidate.publicOwnerId === publicOwnerId && candidate.voiceId === voiceId,
-      );
-      if (voice !== undefined) {
-        if (!voice.freeUsersAllowed) {
-          throw new VoiceServiceError('shared-voice-ineligible');
-        }
-        this.#assertVoiceCompatible(voice, model);
-        return { voice, model };
-      }
-      if (!result.hasMore) break;
-      page += 1;
-    }
-
-    throw new VoiceServiceError('shared-voice-not-found');
-  }
-
   async workspacePreview(voiceId: string, signal: AbortSignal): Promise<AudioStream> {
-    const [voice, model] = await runParallel(
+    const [candidate, model] = await runParallel(
       signal,
       (operationSignal) => this.#provider.getWorkspaceVoice(voiceId, operationSignal),
       (operationSignal) => this.#conversionModel(operationSignal),
     );
+    const voice = this.#requireLibraryVoice(candidate);
     this.#assertVoiceCompatible(voice, model);
     if (voice.previewUrl === null) {
       throw new VoiceServiceError('preview-unavailable');
     }
     return this.#provider.fetchPreview(voice.previewUrl, signal);
-  }
-
-  async sharedPreview(
-    publicOwnerId: string,
-    voiceId: string,
-    signal: AbortSignal,
-  ): Promise<AudioStream> {
-    const { voice } = await this.#findEligibleSharedVoice(publicOwnerId, voiceId, signal);
-    if (voice.previewUrl === null) {
-      throw new VoiceServiceError('preview-unavailable');
-    }
-    return this.#provider.fetchPreview(voice.previewUrl, signal);
-  }
-
-  async importSharedVoice(
-    publicOwnerId: string,
-    voiceId: string,
-    name: string,
-    signal: AbortSignal,
-  ): Promise<{ readonly voiceId: string }> {
-    await this.#findEligibleSharedVoice(publicOwnerId, voiceId, signal);
-    const importedVoiceId = await this.#provider.importSharedVoice(
-      publicOwnerId,
-      voiceId,
-      name,
-      signal,
-    );
-    return { voiceId: importedVoiceId };
   }
 
   async convertRecording(input: {
@@ -228,11 +140,12 @@ export class VoiceService {
     readonly mimeType: string;
     readonly signal: AbortSignal;
   }): Promise<AudioStream> {
-    const [voice, model] = await runParallel(
+    const [candidate, model] = await runParallel(
       input.signal,
       (signal) => this.#provider.getWorkspaceVoice(input.voiceId, signal),
       (signal) => this.#conversionModel(signal),
     );
+    const voice = this.#requireLibraryVoice(candidate);
     this.#assertVoiceCompatible(voice, model);
     try {
       return await this.#provider.convertRecording(

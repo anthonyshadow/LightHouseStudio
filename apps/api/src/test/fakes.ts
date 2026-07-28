@@ -4,8 +4,6 @@ import type { AudioStream } from '../application/audio-stream.js';
 import type {
   ElevenLabsModel,
   ElevenLabsProvider,
-  ProviderSharedVoice,
-  ProviderSharedVoicePage,
   ProviderVoice,
   ProviderWorkspaceVoicePage,
   VoiceSearchInput,
@@ -52,21 +50,11 @@ export const voice = (overrides: Partial<ProviderVoice> = {}): ProviderVoice => 
   ...overrides,
 });
 
-export const sharedVoice = (overrides: Partial<ProviderSharedVoice> = {}): ProviderSharedVoice => ({
-  ...voice(),
-  publicOwnerId: 'owner-one',
-  freeUsersAllowed: true,
-  ...overrides,
-});
-
 export class FakeElevenLabsProvider implements ElevenLabsProvider {
   models: readonly ElevenLabsModel[] = [standardModel];
   workspaceVoices: readonly ProviderVoice[] = [voice()];
-  sharedVoices: readonly ProviderSharedVoice[] = [sharedVoice()];
   workspaceHasMore = false;
   workspaceNextPageToken: string | null = null;
-  sharedHasMore = false;
-  importedVoiceId = 'imported-voice';
   previewBytes = Buffer.from('preview-audio');
   convertedBytes = Buffer.from('converted-audio');
   previewContentType = 'audio/mpeg';
@@ -74,14 +62,6 @@ export class FakeElevenLabsProvider implements ElevenLabsProvider {
 
   readonly workspaceSearches: Array<VoiceSearchInput & { readonly nextPageToken: string | null }> =
     [];
-  readonly sharedSearches: Array<
-    VoiceSearchInput & { readonly page: number; readonly publicOwnerId?: string }
-  > = [];
-  readonly imports: Array<{
-    readonly publicOwnerId: string;
-    readonly voiceId: string;
-    readonly name: string;
-  }> = [];
   readonly conversions: Array<{
     readonly voiceId: string;
     readonly modelId: string;
@@ -106,32 +86,9 @@ export class FakeElevenLabsProvider implements ElevenLabsProvider {
     });
   }
 
-  getWorkspaceVoice(voiceId: string, _signal: AbortSignal): Promise<ProviderVoice> {
+  getWorkspaceVoice(voiceId: string, _signal: AbortSignal): Promise<ProviderVoice | null> {
     const result = this.workspaceVoices.find((candidate) => candidate.voiceId === voiceId);
-    return Promise.resolve(result ?? voice({ voiceId }));
-  }
-
-  listSharedVoices(
-    input: VoiceSearchInput & { readonly page: number; readonly publicOwnerId?: string },
-  ): Promise<ProviderSharedVoicePage> {
-    this.sharedSearches.push(input);
-    return Promise.resolve({
-      voices: this.sharedVoices.filter(
-        (candidate) =>
-          input.publicOwnerId === undefined || candidate.publicOwnerId === input.publicOwnerId,
-      ),
-      hasMore: this.sharedHasMore,
-    });
-  }
-
-  importSharedVoice(
-    publicOwnerId: string,
-    voiceId: string,
-    name: string,
-    _signal: AbortSignal,
-  ): Promise<string> {
-    this.imports.push({ publicOwnerId, voiceId, name });
-    return Promise.resolve(this.importedVoiceId);
+    return Promise.resolve(result ?? null);
   }
 
   fetchPreview(url: string, _signal: AbortSignal): Promise<AudioStream> {

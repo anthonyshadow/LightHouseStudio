@@ -27,7 +27,7 @@ selects **Take**.
 - Browser recording with transformed-video gating and provider-audio/microphone fallback
 - Temporary take review plus a Studio legacy manager for downloading or deleting retired Guided projects
 - Browser-local warm, clear, and robot voice treatments from immutable source audio
-- Optional ElevenLabs workspace/public voice discovery, preview, import, and explicit post-recording conversion
+- Optional ElevenLabs saved-library discovery, preview, and explicit post-recording conversion
 - A loopback-only TypeScript integration broker with runtime schemas and sanitized errors
 
 ## Requirements
@@ -43,6 +43,7 @@ For the fullest media and remuxing support, begin with a current desktop Chromiu
 ## Run locally
 
 ```bash
+nvm use
 npm install
 cp .env.example .env
 npm run dev
@@ -86,13 +87,23 @@ All provider credentials are read only by `apps/api`. Never place provider secre
 | `WIRO_REFERENCE_IMAGE_MODEL`         | No                                     | Pinned Wiro model; only `seedream-v5-lite-uncensored` is accepted.                                                                                                                                                                                                                                                                       |
 | `WIRO_REFERENCE_IMAGE_TIMEOUT_MS`    | No                                     | One Wiro submit/poll/download/normalize deadline from `10000` through `180000` milliseconds; defaults to `180000`.                                                                                                                                                                                                                       |
 | `LIGHTFRAME_DATA_DIR`                | No                                     | Owner-only local storage for immutable uploaded, generated, edited, and composed Character Builder references and metadata; defaults to repository-root `./.lightframe-data`. Absolute paths remain absolute. A known legacy API-relative directory is reused only when the canonical path is absent; data is never moved automatically. |
-| `ELEVENLABS_API_KEY`                 | Only for cloud voices                  | Server credential for voice discovery, proxied previews, public voice import, and speech-to-speech conversion.                                                                                                                                                                                                                           |
+| `ELEVENLABS_API_KEY`                 | Only for cloud voices                  | Server credential for saved-library discovery, proxied previews, saved-membership revalidation, and speech-to-speech conversion.                                                                                                                                                                                                         |
 | `ELEVENLABS_STS_MODEL_ID`            | No                                     | Speech-to-speech model; defaults to `eleven_multilingual_sts_v2`.                                                                                                                                                                                                                                                                        |
 | `ELEVENLABS_ENABLE_LOGGING`          | No                                     | Strict `true`/`false` sent to ElevenLabs conversion as `enable_logging`; omission defaults to privacy-first `false`. ElevenLabs currently restricts zero-retention mode to eligible enterprise accounts, so other accounts must deliberately set `true` after reviewing provider retention terms.                                        |
 | `PORT`                               | No                                     | Loopback API port; defaults to `4100`.                                                                                                                                                                                                                                                                                                   |
 | `NODE_ENV`                           | No                                     | One of `development`, `test`, or `production`.                                                                                                                                                                                                                                                                                           |
 
 Provider availability is reported by `GET /api/capabilities`; it reports configuration presence and does not probe provider reachability, quota, or entitlement. Missing optional configuration degrades only that capability. Environment values are validated at startup. `.env` is ignored by Git.
+
+### ElevenLabs setup
+
+The project talks to ElevenLabs through its server-side HTTPS adapter; no ElevenLabs npm package is required. Create a dedicated [restricted API key](https://elevenlabs.io/docs/api-reference/authentication), allow the voice-list/read and speech-to-speech (Voice Changer) features, give it an intentional credit limit, and store it only as `ELEVENLABS_API_KEY` in the repository-root `.env`.
+
+The browser queries `GET /v2/voices` with `voice_type=saved`, so the selector contains only voices currently in the configured account's saved collection. Add, remove, or organize voices in ElevenLabs, then select **Refresh voices** in Studio. The project exposes no shared-library discovery or add/import endpoint.
+
+`ELEVENLABS_STS_MODEL_ID` must identify a model returned by `GET /v1/models` with `can_do_voice_conversion: true`; the documented default is `eleven_multilingual_sts_v2`. Preview and conversion revalidate the selected ID against the saved library, and professional voices are hidden when the configured model reports that it cannot serve them.
+
+`ELEVENLABS_ENABLE_LOGGING=false` requests zero-retention mode. ElevenLabs currently limits that mode to eligible enterprise accounts. If the account is not eligible, review the provider's retention terms and deliberately set the value to `true`; otherwise conversion will be rejected even when the key, voice, and model are valid.
 
 ## Commands
 
@@ -159,7 +170,7 @@ Read [architecture](docs/ARCHITECTURE.md), [privacy and temporary data](docs/PRI
 - Generate Preview, Generate Combined Preview, and Regenerate may incur provider usage. A successful optimization is retained for a generation retry while its source prompt, settings, model, and optimizer version remain current; provider failures never silently fall back to the raw prompt.
 - Starting an AI session sends live camera media and the applied prompt/reference state to Decart and may incur provider usage. Finishing a model take finalizes the clip before releasing the model.
 - Studio omits the compatibility profile identifier, so the broker applies its default five-minute AI active-session scope. The retired Guided credential profile remains a compatibility detail and is not an application route; ordinary recording has no corresponding five-minute warning or forced-stop timer.
-- ElevenLabs browsing and click-to-play previews contact the provider only after the labeled disclosure/action and carry the Studio provider-intent header. Preview bytes use a short-lived, app-owned Blob URL that is aborted/revoked on replacement or unmount. Browsing, previewing, or selecting does not upload the take. Applying a voice sends only the completed audio sidecar and may use credits; importing a public voice changes the configured workspace.
+- ElevenLabs saved-library browsing and click-to-play previews contact the provider only after the labeled disclosure/action and carry the Studio provider-intent header. Preview bytes use a short-lived, app-owned Blob URL that is aborted/revoked on replacement or unmount. Browsing, previewing, or selecting does not upload the take. Applying a saved voice sends only the completed audio sidecar and may use credits. Library membership is managed only in ElevenLabs.
 - The server accepts loopback hosts only. It is not designed for LAN, tunnel, or public hosting. Remote deployment requires authentication, authorization, CSRF analysis, abuse/rate controls, tenant isolation, secret management, and a new security review.
 
 ## Documentation

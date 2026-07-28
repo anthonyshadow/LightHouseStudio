@@ -24,7 +24,7 @@ Use the documents to run usability sessions or journey walkthroughs: ask partici
 | Save, find, and reuse creative recipes                         | [06 Recipe Shelf](06-recipe-shelf.md)                                                                                   |
 | Finalize, review, download, or discard a take                  | [07 Take review and cleanup](07-take-review-and-cleanup.md)                                                             |
 | Apply a browser-local voice treatment                          | [08 Local voice treatments](08-local-voice-treatments.md)                                                               |
-| Discover, import, and apply an ElevenLabs voice                | [09 ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                                                         |
+| Preview and apply a saved ElevenLabs library voice             | [09 ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                                                         |
 | Work safely when providers or browser features are unavailable | [10 Capability and recovery boundaries](10-capability-and-recovery-boundaries.md)                                       |
 | Build, preview, save, and preload a reusable Studio character  | [11 Studio character builder](11-new-user-character-ai-voice-download/complete-new-user-character-ai-voice-download.md) |
 

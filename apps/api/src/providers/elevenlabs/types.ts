@@ -15,20 +15,10 @@ export interface ProviderVoice {
   readonly previewUrl: string | null;
 }
 
-export interface ProviderSharedVoice extends ProviderVoice {
-  readonly publicOwnerId: string;
-  readonly freeUsersAllowed: boolean;
-}
-
 export interface ProviderWorkspaceVoicePage {
   readonly voices: readonly ProviderVoice[];
   readonly hasMore: boolean;
   readonly nextPageToken: string | null;
-}
-
-export interface ProviderSharedVoicePage {
-  readonly voices: readonly ProviderSharedVoice[];
-  readonly hasMore: boolean;
 }
 
 export interface VoiceSearchInput {
@@ -42,19 +32,7 @@ export interface ElevenLabsProvider {
   listWorkspaceVoices(
     input: VoiceSearchInput & { readonly nextPageToken: string | null },
   ): Promise<ProviderWorkspaceVoicePage>;
-  getWorkspaceVoice(voiceId: string, signal: AbortSignal): Promise<ProviderVoice>;
-  listSharedVoices(
-    input: VoiceSearchInput & {
-      readonly page: number;
-      readonly publicOwnerId?: string;
-    },
-  ): Promise<ProviderSharedVoicePage>;
-  importSharedVoice(
-    publicOwnerId: string,
-    voiceId: string,
-    name: string,
-    signal: AbortSignal,
-  ): Promise<string>;
+  getWorkspaceVoice(voiceId: string, signal: AbortSignal): Promise<ProviderVoice | null>;
   fetchPreview(url: string, signal: AbortSignal): Promise<AudioStream>;
   convertRecording(
     voiceId: string,

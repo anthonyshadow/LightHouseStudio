@@ -2,8 +2,7 @@ export type VoiceServiceFailureReason =
   | 'configured-model-unavailable'
   | 'configured-model-incompatible'
   | 'voice-incompatible'
-  | 'shared-voice-ineligible'
-  | 'shared-voice-not-found'
+  | 'library-voice-not-found'
   | 'preview-unavailable'
   | 'zero-retention-required';
 

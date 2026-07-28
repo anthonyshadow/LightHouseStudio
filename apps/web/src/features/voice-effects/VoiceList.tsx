@@ -1,6 +1,6 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { Button } from '../../ui';
-import type { PublicVoiceItem, VoiceLibraryItem, VoiceLibraryKind } from './types';
+import type { VoiceLibraryItem } from './types';
 import { VoicePreview } from './VoicePreview';
 
 const listStyles = (theme: Theme): CSSObject => ({
@@ -33,25 +33,17 @@ const voiceActionStyles = (theme: Theme): CSSObject => ({
 
 type VoiceListProps = {
   voices: readonly VoiceLibraryItem[];
-  kind: VoiceLibraryKind;
   selected: VoiceLibraryItem | null;
   loading: boolean;
-  importingVoiceKey: string | null;
-  collapsePublicImport?: boolean;
   onSelect: (voice: VoiceLibraryItem) => void;
-  onImport: (voice: PublicVoiceItem) => void;
   onPreviewError: (voice: VoiceLibraryItem) => void;
 };
 
 export const VoiceList = ({
   voices,
-  kind,
   selected,
   loading,
-  importingVoiceKey,
-  collapsePublicImport = false,
   onSelect,
-  onImport,
   onPreviewError,
 }: VoiceListProps) => {
   const theme = useTheme();
@@ -61,10 +53,7 @@ export const VoiceList = ({
         const { voice } = item;
         const voiceSelected =
           selected?.kind === item.kind && selected.voice.voiceId === voice.voiceId;
-        const voiceKey =
-          item.kind === 'public'
-            ? `public:${item.voice.publicOwnerId}:${item.voice.voiceId}`
-            : `workspace:${voice.voiceId}`;
+        const voiceKey = `workspace:${voice.voiceId}`;
         return (
           <li key={voiceKey} css={voiceStyles(theme, voiceSelected)}>
             <div css={voiceBodyStyles()}>
@@ -82,17 +71,6 @@ export const VoiceList = ({
               >
                 {voiceSelected ? 'Selected' : 'Select'}
               </Button>
-              {kind === 'public' && item.kind === 'public' && !collapsePublicImport ? (
-                <Button
-                  size="small"
-                  busy={importingVoiceKey === voiceKey}
-                  disabled={importingVoiceKey !== null}
-                  aria-label={`Import ${voice.name} into workspace`}
-                  onClick={() => onImport(item)}
-                >
-                  Import
-                </Button>
-              ) : null}
             </div>
           </li>
         );

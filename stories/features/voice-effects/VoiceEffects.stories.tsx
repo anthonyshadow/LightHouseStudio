@@ -35,7 +35,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Voice treatments keep restoration, local effects, cloud conversion, browser capability warnings, cancellation, voice browsing, preview, selection, import, and apply states explicit around the recorded take.',
+          'Voice treatments keep restoration, local effects, cloud conversion, browser capability warnings, cancellation, saved-library browsing, preview, selection, and apply states explicit around the recorded take.',
       },
     },
   },
@@ -75,16 +75,13 @@ export const BrowserCapabilityWarning: Story = {
 export const VoiceListSelection: Story = {
   render: () => (
     <StoryColumn width="42rem">
-      <StorySection title="Workspace voices">
+      <StorySection title="Saved library voices">
         <h3 css={{ margin: 0 }}>Available voices</h3>
         <VoiceList
           voices={[workspaceVoice]}
-          kind="workspace"
           selected={workspaceVoice}
           loading={false}
-          importingVoiceKey={null}
           onSelect={fn()}
-          onImport={fn()}
           onPreviewError={fn()}
         />
       </StorySection>

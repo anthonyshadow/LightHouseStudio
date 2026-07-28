@@ -16,7 +16,7 @@ const requestedUrl = (input: RequestInfo | URL | undefined): string => {
 };
 
 describe('ElevenLabsHttpProvider', () => {
-  it('normalizes workspace voices and sends only provider-required query/header values', async () => {
+  it('normalizes saved-library voices and sends only provider-required query/header values', async () => {
     const fetchMock = vi.fn<typeof fetch>(() =>
       Promise.resolve(
         jsonResponse({
@@ -63,7 +63,30 @@ describe('ElevenLabsHttpProvider', () => {
     expect(requestedUrl(url)).toContain('/v2/voices?');
     expect(requestedUrl(url)).toContain('page_size=8');
     expect(requestedUrl(url)).toContain('search=warm+voice');
+    expect(requestedUrl(url)).toContain('voice_type=saved');
     expect(new Headers(init?.headers).get('xi-api-key')).toBe('server-only-placeholder');
+  });
+
+  it('revalidates a submitted voice id against the saved library', async () => {
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        jsonResponse({
+          voices: [],
+          has_more: false,
+          next_page_token: null,
+        }),
+      ),
+    );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+
+    await expect(provider.getWorkspaceVoice('not-saved', signal())).resolves.toBeNull();
+
+    const [url] = fetchMock.mock.calls[0] ?? [];
+    const request = new URL(requestedUrl(url));
+    expect(request.pathname).toBe('/v2/voices');
+    expect(request.searchParams.get('voice_type')).toBe('saved');
+    expect(request.searchParams.get('voice_ids')).toBe('not-saved');
+    expect(request.searchParams.get('page_size')).toBe('1');
   });
 
   it('refuses untrusted provider preview URLs before making a fetch', async () => {

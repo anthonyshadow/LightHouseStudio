@@ -157,13 +157,6 @@ test('development proxy preserves exact Origin validation for provider mutations
       headers: { Origin: origin },
       data: { model: 'unsupported-model' },
     }),
-    request.post('/api/elevenlabs/shared-voices/import', {
-      headers: {
-        Origin: origin,
-        [VOICE_PROVIDER_INTENT_HEADER]: VOICE_PROVIDER_INTENT_VALUE,
-      },
-      data: {},
-    }),
     request.post('/api/elevenlabs/voice-changer/recording', {
       headers: {
         Origin: origin,

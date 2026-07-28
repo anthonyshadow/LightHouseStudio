@@ -143,7 +143,7 @@ export const translateProviderError: ErrorTranslator = (error) => {
         return new AppError(
           409,
           'incompatible_voice',
-          'That voice is already present or cannot be imported in its current state.',
+          'That saved voice cannot be used in its current state.',
           options,
         );
       case 429:

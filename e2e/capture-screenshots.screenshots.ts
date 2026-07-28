@@ -184,34 +184,6 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
       });
     },
   );
-
-  await page.route(
-    (url) => url.pathname === '/api/elevenlabs/shared-voices',
-    async (route) => {
-      network.apiRequests.push({ path: '/api/elevenlabs/shared-voices', model: null });
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify({
-          voices: [
-            {
-              voiceId: 'public-copper-atlas',
-              publicOwnerId: 'owner-copper-atlas',
-              name: 'Copper Atlas',
-              category: 'narration',
-              description: 'Textured editorial voice with a calm cadence',
-              labels: { accent: 'North American', style: 'editorial' },
-              previewAvailable: false,
-            },
-          ],
-          page: 0,
-          hasMore: false,
-          nextPageToken: null,
-          total: 1,
-        }),
-      });
-    },
-  );
 };
 
 const openShelf = async (page: Page): Promise<void> => {
@@ -515,7 +487,9 @@ const SCENARIOS: readonly Scenario[] = [
     elevenLabs: true,
     setup: async (page) => {
       await showVoiceTreatment(page);
-      await page.getByText('Browse ElevenLabs voices · contacts provider', { exact: true }).click();
+      await page
+        .getByText('Browse saved ElevenLabs voices · contacts provider', { exact: true })
+        .click();
       const voice = page.getByRole('heading', { name: 'Northstar Narrator' });
       await expect(voice).toBeVisible();
       await voice.scrollIntoViewIfNeeded();
@@ -523,16 +497,17 @@ const SCENARIOS: readonly Scenario[] = [
   },
   {
     group: '06-take-review',
-    filename: 'elevenlabs-public-voices.png',
+    filename: 'elevenlabs-saved-voice-search.png',
     elevenLabs: true,
     setup: async (page) => {
       await showVoiceTreatment(page);
-      await page.getByText('Browse ElevenLabs voices · contacts provider', { exact: true }).click();
+      await page
+        .getByText('Browse saved ElevenLabs voices · contacts provider', { exact: true })
+        .click();
       await expect(page.getByRole('heading', { name: 'Northstar Narrator' })).toBeVisible();
-      await page.getByRole('button', { name: 'Public library' }).click();
-      const voice = page.getByRole('heading', { name: 'Copper Atlas' });
-      await expect(voice).toBeVisible();
-      await voice.scrollIntoViewIfNeeded();
+      await page.getByRole('textbox', { name: 'Search voices' }).fill('Northstar');
+      await page.getByRole('button', { name: 'Search', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Northstar Narrator' })).toBeVisible();
     },
   },
 ];

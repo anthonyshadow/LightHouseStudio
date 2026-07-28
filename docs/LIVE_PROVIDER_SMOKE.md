@@ -7,7 +7,7 @@ Live smoke testing is manual, opt-in, cost-aware, and excluded from default test
 - `@decartai/sdk` is pinned to `0.1.15`. Its registry recognizes `lucy-2.5` and the user-approved exact `lucy-vton-3` id. [Current Decart VTON examples](https://docs.platform.decart.ai/examples/use-cases) may instead show the moving `lucy-vton-latest` alias; this product intentionally does not follow that alias silently.
 - Decart browser access uses a [backend-minted client token](https://docs.platform.decart.ai/api-reference/create-client-token), scoped to one model, the exact loopback origin, a five-minute issuance window, and a five-minute realtime-session limit.
 - OpenAI uses the Responses API for prompt optimization and remains the default image provider with `gpt-image-2` at `high` quality. `REFERENCE_IMAGE_PROVIDER=bfl` instead selects the pinned US2 `https://api.us2.bfl.ai/v1/flux-2-pro` task API. `REFERENCE_IMAGE_PROVIDER=wiro` selects the pinned `https://api.wiro.ai/v1/Run/ByteDance/seedream-v5-lite-uncensored` task API with signature authentication. There is no provider fallback. Character Builder upload by itself is local storage work and does not contact an image provider.
-- ElevenLabs uses `/v2/voices`, `/v1/shared-voices`, `/v1/voices/add/:owner/:voice`, `/v1/models`, and `/v1/speech-to-speech/:voice`. Provider plans can change voice eligibility and conversion access.
+- ElevenLabs uses `/v2/voices` with `voice_type=saved`, `/v1/models`, and `/v1/speech-to-speech/:voice`. Preview and conversion revalidate voice membership through the saved filter. The project has no shared-library discovery or voice-add mutation. Provider plans can change voice eligibility and conversion access.
 - `ELEVENLABS_ENABLE_LOGGING=false` requests [Zero Retention Mode](https://elevenlabs.io/docs/eleven-api/resources/zero-retention-mode), which ElevenLabs currently limits to eligible enterprise accounts. Set it to `true` only after an informed retention decision when testing a non-eligible account.
 
 Do not run live provider checks in CI, screenshots, stories, ordinary component tests, or shared environments. Never print or capture `.env`, request authorization headers, permanent keys, temporary credentials, raw provider bodies, personal media, or full network archives.
@@ -29,6 +29,7 @@ Do not run live provider checks in CI, screenshots, stories, ordinary component 
    # WIRO_API_KEY=your-local-project-key
    # WIRO_API_SECRET=your-local-project-secret
    # WIRO_REFERENCE_IMAGE_MODEL=seedream-v5-lite-uncensored
+   # Restricted server key with voice-read and speech-to-speech access:
    ELEVENLABS_API_KEY=your-local-secret
    ELEVENLABS_STS_MODEL_ID=eleven_multilingual_sts_v2
    ELEVENLABS_ENABLE_LOGGING=false
@@ -78,13 +79,14 @@ Run this section once with the default OpenAI image provider and once for each t
 ## ElevenLabs
 
 1. Record a short local take with clearly audible non-sensitive speech.
-2. Open the voice library. Search/page workspace and public results and play a preview. Confirm no recording audio is uploaded.
-3. If workspace mutation is authorized, explicitly import one eligible test voice and record its resulting workspace id in the private test log. Otherwise skip import.
-4. Select a compatible workspace voice. Confirm selection alone does not call the conversion route.
-5. Apply once. Confirm only the audio sidecar is sent to `/api/elevenlabs/voice-changer/recording`, processing locks incomplete playback/download, and the final remux preserves video.
-6. Restore Original and confirm no provider request. Run one controlled failure if the test account permits and confirm the original/last valid take survives with sanitized guidance.
+2. In ElevenLabs account controls, record the IDs of one saved and one unsaved disposable voice without copying credentials into the test log.
+3. Open the Studio voice library. Search/page saved results and play a preview. Confirm the saved ID can appear, the unsaved ID cannot appear, no add/import control exists, and no recording audio is uploaded.
+4. Select a compatible saved voice. Confirm selection alone does not call the conversion route.
+5. Apply once. Confirm the server revalidates saved membership and only the audio sidecar is sent to `/api/elevenlabs/voice-changer/recording`; processing locks incomplete playback/download and the final remux preserves video.
+6. Remove the disposable voice from the saved library in ElevenLabs, refresh Studio, and confirm it disappears. If a stale direct conversion request is exercised, confirm it returns the safe library-not-found response before conversion.
+7. Restore Original and confirm no provider request. Run one controlled failure if the test account permits and confirm the original/last valid take survives with sanitized guidance.
 
-Pass requires proxied previews, eligibility/model filtering, explicit import, explicit conversion, audio-only upload, immutable-original processing, safe replacement, and no leaked key/upstream URL/body.
+Pass requires saved-only listing and revalidation, absent public/import surfaces, proxied previews, model filtering, explicit conversion, audio-only upload, immutable-original processing, safe replacement, and no leaked key/upstream URL/body.
 
 ## Evidence and cleanup
 
@@ -95,7 +97,7 @@ Record only:
 - action timestamps, safe HTTP status/code, output MIME type, and pass/fail notes;
 - approximate connection and clip duration for cost review.
 
-Then Stop AI, stop the camera, discard/download test takes as appropriate, close the tab, verify camera/mic indicators and WebRTC sessions are gone, remove keys from `.env` when no longer needed, restart to confirm optional integrations disable cleanly, and delete any imported test voice from ElevenLabs using provider account controls if required.
+Then Stop AI, stop the camera, discard/download test takes as appropriate, close the tab, verify camera/mic indicators and WebRTC sessions are gone, remove keys from `.env` when no longer needed, and restart to confirm optional integrations disable cleanly. Restore any temporary ElevenLabs library membership only through provider account controls.
 
 Uploaded and generated test references remain immutable under
 `LIGHTFRAME_DATA_DIR`; the app has no asset-delete action. For a disposable

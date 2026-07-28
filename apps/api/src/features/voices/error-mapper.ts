@@ -39,22 +39,13 @@ export const translateVoiceServiceError: ErrorTranslator = (error) => {
           'This professional voice cannot be used by the configured speech-to-speech model.',
         ),
       );
-    case 'shared-voice-ineligible':
-      return translate(
-        error,
-        new AppError(
-          403,
-          'provider_policy',
-          'This public voice is not eligible for use by this Studio workflow.',
-        ),
-      );
-    case 'shared-voice-not-found':
+    case 'library-voice-not-found':
       return translate(
         error,
         new AppError(
           404,
           'not_found',
-          'That public voice is no longer available. Refresh the library and choose another.',
+          'That voice is no longer in your ElevenLabs library. Refresh the library and choose another.',
         ),
       );
     case 'preview-unavailable':

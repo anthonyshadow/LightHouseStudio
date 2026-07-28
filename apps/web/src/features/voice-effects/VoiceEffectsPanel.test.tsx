@@ -11,8 +11,6 @@ import { StudioDesignProvider } from '../../ui';
 
 const voiceApi = vi.hoisted(() => ({
   fetchVoicePreview: vi.fn(),
-  importPublicVoice: vi.fn(),
-  listPublicVoices: vi.fn(),
   listWorkspaceVoices: vi.fn(),
 }));
 
@@ -92,7 +90,6 @@ const renderWithTheme = (component: ReactNode) =>
 beforeEach(() => {
   vi.clearAllMocks();
   voiceApi.listWorkspaceVoices.mockResolvedValue(emptyPage);
-  voiceApi.listPublicVoices.mockResolvedValue(emptyPage);
   voiceApi.fetchVoicePreview.mockResolvedValue(new Blob(['preview'], { type: 'audio/mpeg' }));
 });
 
@@ -114,9 +111,7 @@ describe('VoiceEffectsPanel', () => {
     );
 
     expect(voiceApi.listWorkspaceVoices).not.toHaveBeenCalled();
-    expect(voiceApi.listPublicVoices).not.toHaveBeenCalled();
-
-    await user.click(screen.getByText(/Browse ElevenLabs voices/));
+    await user.click(screen.getByText(/Browse saved ElevenLabs voices/));
 
     expect(screen.getByRole('dialog', { name: 'Voice Browser' })).toBeInTheDocument();
     await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
@@ -157,99 +152,49 @@ describe('VoiceEffectsPanel', () => {
 });
 
 describe('VoiceLibrary accessibility', () => {
-  it('uses item-specific import and preview names, then announces and focuses a successful import', async () => {
+  it('previews and applies only a voice returned by the saved library endpoint', async () => {
     const user = userEvent.setup();
     const onApply = vi.fn();
-    voiceApi.listPublicVoices.mockResolvedValue({
+    voiceApi.listWorkspaceVoices.mockResolvedValue({
       ...emptyPage,
       voices: [
         {
-          kind: 'public',
+          kind: 'workspace',
           voice: {
-            voiceId: 'shared-voice',
-            name: 'Public Star',
+            voiceId: 'saved-voice',
+            name: 'Saved Star',
             category: 'featured',
             description: 'Bright delivery',
             labels: {},
             previewAvailable: true,
-            publicOwnerId: 'owner-1',
           },
         },
       ],
       total: 1,
     });
-    voiceApi.importPublicVoice.mockResolvedValue('workspace-voice');
 
     renderWithTheme(<VoiceLibrary disabled={false} onApply={onApply} />);
     await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
 
-    await user.click(screen.getByRole('button', { name: 'Public library' }));
-    const importButton = await screen.findByRole('button', {
-      name: 'Import Public Star into workspace',
-    });
     vi.stubGlobal('URL', {
       createObjectURL: vi.fn(() => 'blob:voice-preview'),
       revokeObjectURL: vi.fn(),
     });
     await user.click(
-      screen.getByRole('button', { name: 'Load Public Star preview · contacts provider' }),
+      screen.getByRole('button', { name: 'Load Saved Star preview · contacts provider' }),
     );
-    expect(await screen.findByLabelText('Listen to Public Star preview')).toBeInTheDocument();
+    expect(await screen.findByLabelText('Listen to Saved Star preview')).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Select Saved Star' }));
+    await user.click(screen.getByRole('button', { name: 'Apply Saved Star to recorded audio' }));
 
-    await user.click(importButton);
-
-    expect(
-      await screen.findByText('Public Star was imported and is selected for this take.'),
-    ).toBeInTheDocument();
-    expect(
-      screen.getByRole('button', { name: 'Apply Public Star to recorded audio' }),
-    ).toHaveFocus();
-    expect(onApply).not.toHaveBeenCalled();
-  });
-
-  it('can collapse public import and application into one explicit Add & Apply action', async () => {
-    const user = userEvent.setup();
-    const onApply = vi.fn();
-    const sharedVoice = {
-      kind: 'public' as const,
-      voice: {
-        voiceId: 'shared-voice',
-        name: 'Public Star',
-        category: 'featured',
-        description: 'Bright delivery',
-        labels: {},
-        previewAvailable: true,
-        publicOwnerId: 'owner-1',
-      },
-    };
-    voiceApi.listPublicVoices.mockResolvedValue({
-      ...emptyPage,
-      voices: [sharedVoice],
-      total: 1,
+    expect(onApply).toHaveBeenCalledWith({
+      voiceId: 'saved-voice',
+      name: 'Saved Star',
+      category: 'featured',
+      description: 'Bright delivery',
+      labels: {},
+      previewAvailable: true,
     });
-    voiceApi.importPublicVoice.mockResolvedValue('workspace-voice');
-
-    renderWithTheme(<VoiceLibrary disabled={false} collapsePublicImport onApply={onApply} />);
-    await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
-
-    await user.click(screen.getByRole('button', { name: 'Public library' }));
-    await user.click(await screen.findByRole('button', { name: 'Select Public Star' }));
-
-    expect(
-      screen.queryByRole('button', { name: 'Import Public Star into workspace' }),
-    ).not.toBeInTheDocument();
-    await user.click(screen.getByRole('button', { name: 'Add & Apply Public Star' }));
-
-    await waitFor(() =>
-      expect(onApply).toHaveBeenCalledWith({
-        voiceId: 'workspace-voice',
-        name: 'Public Star',
-        category: 'featured',
-        description: 'Bright delivery',
-        labels: {},
-        previewAvailable: true,
-      }),
-    );
-    expect(voiceApi.importPublicVoice).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText(/public library|import|add & apply/i)).not.toBeInTheDocument();
   });
 });

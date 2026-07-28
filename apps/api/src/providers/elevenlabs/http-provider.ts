@@ -5,8 +5,6 @@ import type { AudioStream } from '../../application/audio-stream.js';
 import type {
   ElevenLabsModel,
   ElevenLabsProvider,
-  ProviderSharedVoice,
-  ProviderSharedVoicePage,
   ProviderVoice,
   ProviderWorkspaceVoicePage,
   VoiceSearchInput,
@@ -39,28 +37,6 @@ const workspaceVoicePageSchema = z
   })
   .passthrough();
 
-const sharedVoiceSchema = z
-  .object({
-    public_owner_id: providerIdSchema,
-    voice_id: providerIdSchema,
-    name: z.string().nullish(),
-    category: z.string().nullish(),
-    description: z.string().nullish(),
-    preview_url: z.string().nullish(),
-    free_users_allowed: z.boolean(),
-    accent: z.string().nullish(),
-    gender: z.string().nullish(),
-    age: z.string().nullish(),
-    descriptive: z.string().nullish(),
-    use_case: z.string().nullish(),
-    language: z.string().nullish(),
-  })
-  .passthrough();
-
-const sharedVoicePageSchema = z
-  .object({ voices: z.array(sharedVoiceSchema), has_more: z.boolean() })
-  .passthrough();
-
 const modelSchema = z
   .object({
     model_id: z.string().trim().min(1).max(200),
@@ -69,7 +45,6 @@ const modelSchema = z
   })
   .passthrough();
 
-const importResponseSchema = z.object({ voice_id: providerIdSchema }).passthrough();
 const providerFailureSchema = z.object({
   detail: z.object({
     type: z.string().max(100).optional(),
@@ -108,28 +83,6 @@ const normalizeWorkspaceVoice = (voice: z.infer<typeof workspaceVoiceSchema>): P
   labels: normalizeLabels(voice.labels),
   previewUrl: voice.preview_url?.trim() || null,
 });
-
-const normalizeSharedVoice = (voice: z.infer<typeof sharedVoiceSchema>): ProviderSharedVoice => {
-  const rawLabels = {
-    accent: voice.accent,
-    gender: voice.gender,
-    age: voice.age,
-    descriptive: voice.descriptive,
-    useCase: voice.use_case,
-    language: voice.language,
-  };
-
-  return {
-    voiceId: voice.voice_id,
-    publicOwnerId: voice.public_owner_id,
-    name: (voice.name?.trim() || 'Untitled voice').slice(0, 100),
-    category: voice.category?.trim().slice(0, 100) || null,
-    description: voice.description?.trim().slice(0, 500) || null,
-    labels: normalizeLabels(rawLabels),
-    previewUrl: voice.preview_url?.trim() || null,
-    freeUsersAllowed: voice.free_users_allowed,
-  };
-};
 
 const parseContentLength = (header: string | null): number | undefined => {
   if (header === null) return undefined;
@@ -278,6 +231,7 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
     const url = new URL('/v2/voices', ELEVENLABS_API_ORIGIN);
     url.searchParams.set('page_size', String(input.pageSize));
     url.searchParams.set('include_total_count', 'false');
+    url.searchParams.set('voice_type', 'saved');
     if (input.search !== '') url.searchParams.set('search', input.search);
     if (input.nextPageToken !== null) {
       url.searchParams.set('next_page_token', input.nextPageToken);
@@ -296,57 +250,20 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
     };
   }
 
-  async getWorkspaceVoice(voiceId: string, signal: AbortSignal): Promise<ProviderVoice> {
+  async getWorkspaceVoice(voiceId: string, signal: AbortSignal): Promise<ProviderVoice | null> {
+    const url = new URL('/v2/voices', ELEVENLABS_API_ORIGIN);
+    url.searchParams.set('page_size', '1');
+    url.searchParams.set('include_total_count', 'false');
+    url.searchParams.set('voice_type', 'saved');
+    url.searchParams.set('voice_ids', voiceId);
     const data = await this.#json(
-      this.#request(`/v1/voices/${encodeURIComponent(voiceId)}`, 'workspace-voice', signal),
+      this.#request(url.pathname + url.search, 'workspace-voice', signal),
       'workspace-voice',
     );
-    const parsed = workspaceVoiceSchema.safeParse(data);
+    const parsed = workspaceVoicePageSchema.safeParse(data);
     if (!parsed.success) throw new ProviderError('workspace-voice', 'invalid-response');
-    return normalizeWorkspaceVoice(parsed.data);
-  }
-
-  async listSharedVoices(
-    input: VoiceSearchInput & { readonly page: number; readonly publicOwnerId?: string },
-  ): Promise<ProviderSharedVoicePage> {
-    const url = new URL('/v1/shared-voices', ELEVENLABS_API_ORIGIN);
-    url.searchParams.set('page_size', String(input.pageSize));
-    url.searchParams.set('page', String(input.page));
-    if (input.search !== '') url.searchParams.set('search', input.search);
-    if (input.publicOwnerId !== undefined) {
-      url.searchParams.set('owner_id', input.publicOwnerId);
-    }
-
-    const data = await this.#json(
-      this.#request(url.pathname + url.search, 'shared-voices', input.signal),
-      'shared-voices',
-    );
-    const parsed = sharedVoicePageSchema.safeParse(data);
-    if (!parsed.success) throw new ProviderError('shared-voices', 'invalid-response');
-    return {
-      voices: parsed.data.voices.map(normalizeSharedVoice),
-      hasMore: parsed.data.has_more,
-    };
-  }
-
-  async importSharedVoice(
-    publicOwnerId: string,
-    voiceId: string,
-    name: string,
-    signal: AbortSignal,
-  ): Promise<string> {
-    const path = `/v1/voices/add/${encodeURIComponent(publicOwnerId)}/${encodeURIComponent(voiceId)}`;
-    const data = await this.#json(
-      this.#request(path, 'import', signal, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ new_name: name, bookmarked: true }),
-      }),
-      'import',
-    );
-    const parsed = importResponseSchema.safeParse(data);
-    if (!parsed.success) throw new ProviderError('import', 'invalid-response');
-    return parsed.data.voice_id;
+    const voice = parsed.data.voices.find((candidate) => candidate.voice_id === voiceId);
+    return voice === undefined ? null : normalizeWorkspaceVoice(voice);
   }
 
   async fetchPreview(rawUrl: string, signal: AbortSignal): Promise<AudioStream> {

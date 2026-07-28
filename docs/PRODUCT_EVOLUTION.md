@@ -181,7 +181,9 @@ Covered by: capability/API tests, optional `503` cases, and no-key manual QA.
 
 ### Voice discovery is an explicit provider boundary
 
-The public/workspace voice browser is mounted only after the operator opens a disclosure labelled as contacting the provider. Merely completing a take does not fetch voice metadata. Preview, public import, and conversion remain separate explicit actions; only conversion receives the original audio sidecar.
+The first voice browser exposed workspace and public sources, with preview, public import, and conversion as separate explicit actions. That established the provider-contact and audio-only conversion boundaries, but it also offered voices that were not yet usable by the project.
+
+The current browser is mounted only after the operator opens a disclosure labelled as contacting the provider and lists `voice_type=saved` results only. Merely completing a take does not fetch voice metadata. Public discovery and import were removed from the UI, browser client, app contracts, local API, and provider adapter. Preview and conversion revalidate saved membership; only conversion receives the original audio sidecar. Library changes now belong exclusively to ElevenLabs account controls.
 
 Browser capability notices distinguish missing MediaRecorder, Web Audio replacement, offline rendering, and runtime encoder/remux compatibility. Unsupported post-processing never makes the original take unavailable.
 

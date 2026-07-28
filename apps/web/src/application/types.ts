@@ -1,10 +1,4 @@
-import type {
-  PublicVoiceSummary,
-  ReferenceImageSize,
-  SharedVoicesResponse,
-  VoiceSummary,
-  WorkspaceVoicesResponse,
-} from '@studio/contracts';
+import type { ReferenceImageSize, VoiceSummary, WorkspaceVoicesResponse } from '@studio/contracts';
 import type { ModelModeId, SessionLifecycleStatus, SessionModeId } from '@studio/domain';
 
 export type StudioMode = SessionModeId;
@@ -65,15 +59,8 @@ export type CaptureStreamSettings = {
 };
 
 export type WorkspaceVoiceItem = { readonly kind: 'workspace'; readonly voice: VoiceSummary };
-export type PublicVoiceItem = { readonly kind: 'public'; readonly voice: PublicVoiceSummary };
-export type VoiceLibraryItem = WorkspaceVoiceItem | PublicVoiceItem;
+export type VoiceLibraryItem = WorkspaceVoiceItem;
 
 export type WorkspaceVoicePage = Omit<WorkspaceVoicesResponse, 'voices'> & {
   voices: WorkspaceVoiceItem[];
 };
-
-export type PublicVoicePage = Pick<SharedVoicesResponse, 'hasMore' | 'nextPageToken' | 'total'> & {
-  voices: PublicVoiceItem[];
-};
-
-export type VoiceLibraryKind = 'workspace' | 'public';

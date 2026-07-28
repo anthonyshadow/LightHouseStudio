@@ -1,9 +1,4 @@
 import {
-  importSharedVoiceRequestSchema,
-  importSharedVoiceResponseSchema,
-  sharedVoicePreviewParamsSchema,
-  sharedVoicesQuerySchema,
-  sharedVoicesResponseSchema,
   voiceChangerQuerySchema,
   voiceConversionContentTypeSchema,
   VOICE_CONVERSION_CONTENT_TYPES,
@@ -94,71 +89,9 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
     { onRequest: verifyProviderIntent },
     async (request, reply) => {
       const parsed = workspaceVoiceParamsSchema.safeParse(request.params);
-      if (!parsed.success) throw validationError('Choose a valid workspace voice.');
+      if (!parsed.success) throw validationError('Choose a valid saved-library voice.');
       return streamProviderAudio(request, reply, (signal) =>
         requireVoiceService(service).workspacePreview(parsed.data.voiceId, signal),
-      );
-    },
-  );
-
-  app.get(
-    '/api/elevenlabs/shared-voices',
-    { onRequest: verifyProviderIntent },
-    async (request, reply) => {
-      const parsed = sharedVoicesQuerySchema.safeParse(request.query);
-      if (!parsed.success) {
-        throw validationError(
-          'Use a search up to 100 characters, a zero-based page, and a page size from 1 to 10.',
-        );
-      }
-
-      return withRequestLifetime(request, reply, async (signal) =>
-        sharedVoicesResponseSchema.parse(
-          await requireVoiceService(service).listSharedVoices({
-            search: parsed.data.search,
-            pageSize: parsed.data.pageSize,
-            page: parsed.data.page,
-            signal,
-          }),
-        ),
-      );
-    },
-  );
-
-  app.get(
-    '/api/elevenlabs/shared-voices/:publicOwnerId/:voiceId/preview',
-    { onRequest: verifyProviderIntent },
-    async (request, reply) => {
-      const parsed = sharedVoicePreviewParamsSchema.safeParse(request.params);
-      if (!parsed.success) throw validationError('Choose a valid public voice.');
-      return streamProviderAudio(request, reply, (signal) =>
-        requireVoiceService(service).sharedPreview(
-          parsed.data.publicOwnerId,
-          parsed.data.voiceId,
-          signal,
-        ),
-      );
-    },
-  );
-
-  app.post(
-    '/api/elevenlabs/shared-voices/import',
-    { bodyLimit: 16 * 1024, onRequest: verifyProviderOrigin },
-    async (request, reply) => {
-      const parsed = importSharedVoiceRequestSchema.safeParse(request.body);
-      if (!parsed.success) {
-        throw validationError('Provide a name, public owner id, and public voice id.');
-      }
-
-      return withRequestLifetime(request, reply, async (signal) =>
-        importSharedVoiceResponseSchema.parse(
-          await requireVoiceService(service).importSharedVoice(
-            parsed.data.publicOwnerId,
-            parsed.data.voiceId,
-            parsed.data.name,
-            signal,
-          ),
-        ),
       );
     },
   );
@@ -168,7 +101,7 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
     { bodyLimit: MAX_RECORDING_AUDIO_BYTES, onRequest: verifyProviderOrigin },
     async (request, reply) => {
       const query = voiceChangerQuerySchema.safeParse(request.query);
-      if (!query.success) throw validationError('Choose a valid workspace voice.');
+      if (!query.success) throw validationError('Choose a valid saved-library voice.');
 
       const mimeType = contentTypeEssence(request);
       const parsedContentType = voiceConversionContentTypeSchema.safeParse(mimeType);
