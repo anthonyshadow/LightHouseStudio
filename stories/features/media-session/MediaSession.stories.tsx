@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { fn } from 'storybook/test';
+import { expect, fn, userEvent, waitFor, within } from 'storybook/test';
 import { SessionComposer } from '@web/features/media-session/SessionComposer';
 import { ModelRecipeFields } from '@web/features/media-session/ModelRecipeFields';
 import { ReferenceImageField } from '@web/features/media-session/ReferenceImageField';
@@ -89,4 +89,37 @@ export const LiveAppliedRecipe: Story = {
     onOpenWorkshop: fn(),
   },
   render: (args) => frame(<SessionComposer {...args} />),
+};
+
+const ephemeralPortrait = new File(['portrait'], 'portrait.webp', { type: 'image/webp' });
+
+export const EphemeralReferenceInteraction: Story = {
+  args: {
+    session: createSessionController('lucy-2.5', {
+      draft: {
+        mode: 'lucy-2.5',
+        prompt: '',
+        referenceImage: {
+          kind: 'ephemeral',
+          file: ephemeralPortrait,
+          previewUrl: 'data:image/webp;base64,UklGRg==',
+        },
+        enhance: false,
+      },
+    }),
+    recording: false,
+    onOpenWorkshop: fn(),
+  },
+  render: (args) => frame(<SessionComposer {...args} />),
+  play: async ({ canvasElement, args }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByLabelText('Optional portrait reference');
+
+    await expect(input).toHaveAccessibleName(
+      'Optional portrait reference Replace image Drag & drop or choose a file',
+    );
+    await userEvent.click(canvas.getByRole('button', { name: 'Clear image' }));
+    await expect(args.session.updateReferenceImage).toHaveBeenCalledWith(null);
+    await waitFor(() => expect(input).toHaveFocus());
+  },
 };

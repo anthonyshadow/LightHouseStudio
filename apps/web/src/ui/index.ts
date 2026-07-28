@@ -25,3 +25,11 @@ export {
   ReferenceImagePreview,
   type ReferenceImagePreviewProps,
 } from './primitives/ReferenceImagePreview';
+export {
+  ImagePickerDropField,
+  type ImagePickerDropFeedback,
+  type ImagePickerDropFieldProps,
+  type ImagePickerDropGuidance,
+  type ImagePickerDropPicker,
+  type ImagePickerDropPreview,
+} from './primitives/ImagePickerDropField';

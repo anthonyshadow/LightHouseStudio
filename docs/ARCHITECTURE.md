@@ -45,10 +45,12 @@ The live/playback control bar uses **Record** and **Stop recording**. Playback e
 The policy-free `ConfirmationDialog` is owned beside `OverlayPanel` in the neutral
 UI primitive boundary and is shared by Builder, Studio, and Legacy Projects.
 Browser image decoding/validation and the accepted file-input media types live in
-the neutral browser-media adapter. The two current reference fields share only
-their neutral presentation styles; each feature still owns its picker DOM,
-validation effects, persistence, and object-URL lifecycle until the separately
-tracked drop-zone extraction is resolved.
+the neutral browser-media adapter. The neutral `ImagePickerDropField` owns the
+two current reference fields' hidden input, drag depth, drop/preview/remove/focus
+presentation, feedback wiring, and responsive styles. Builder and media-session
+remain thin adapters with separate labels and policy: Builder owns immutable
+upload/persistence effects, while media-session owns browser validation and its
+tab-ephemeral object-URL lifecycle.
 
 ## Session data flow
 

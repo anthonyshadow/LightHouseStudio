@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { fn } from 'storybook/test';
+import { expect, fn, userEvent, within } from 'storybook/test';
 import { createPromptBuilderDraft } from '@studio/domain';
+import { BuilderReferenceImageField } from '@web/features/character-builder/BuilderReferenceImageField';
 import { CharacterBuilderForm } from '@web/features/character-builder/CharacterBuilderForm';
 import { createEmptyGuidedDesign } from '@web/features/character-builder/characterModel';
 import { CharacterBuilderCoordinator } from '@web/features/character-builder/CharacterBuilderCoordinator';
@@ -35,6 +36,7 @@ const meta = {
     RegenerationDialog,
     CharacterBuilderPanel,
     CharacterBuilderCoordinator,
+    BuilderReferenceImageField,
     CharacterOptionButton,
     CharacterVisualChoiceSection,
   },
@@ -118,6 +120,34 @@ export const FullscreenBuilderPanel: Story = {
       onSave={fn()}
     />
   ),
+};
+
+const onReferenceSelect = fn();
+
+export const ReferenceUploadInteraction: Story = {
+  render: () => (
+    <StoryColumn width="42rem">
+      <BuilderReferenceImageField
+        reference={null}
+        pending={false}
+        error={null}
+        disabled={false}
+        onSelect={onReferenceSelect}
+        onRemove={fn()}
+      />
+    </StoryColumn>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByLabelText('Upload imageDrag & drop or choose a file');
+    const file = new File(['portrait'], 'portrait.png', { type: 'image/png' });
+
+    onReferenceSelect.mockClear();
+    await expect(input).toHaveAccessibleName('Upload image Drag & drop or choose a file');
+    await userEvent.upload(input, file);
+    await expect(onReferenceSelect).toHaveBeenCalledWith(file);
+    await expect(canvas.getByText('Optional character reference')).toBeVisible();
+  },
 };
 
 const previewSelections: CharacterDirectionPreviewSelection[] = [

@@ -13,6 +13,40 @@ afterEach(() => {
 });
 
 describe('ReferenceImageField focus recovery', () => {
+  it('preserves its exact mode-specific picker names, accepted types, guidance, and tab focus', async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <StudioDesignProvider>
+        <ReferenceImageField mode="lucy-2.5" referenceImage={null} onChange={vi.fn()} />
+      </StudioDesignProvider>,
+    );
+
+    const portraitInput = screen.getByLabelText('Optional portrait reference');
+    expect(portraitInput).toHaveAccessibleName(
+      'Optional portrait reference Upload imageDrag & drop or choose a file',
+    );
+    expect(portraitInput).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');
+    expect(portraitInput).toHaveAccessibleDescription(
+      'Optional portrait referenceJPEG, PNG, or WebP up to 10 MiB. Use a clear, well-lit portrait for the most consistent character.',
+    );
+    await user.tab();
+    expect(portraitInput).toHaveFocus();
+
+    rerender(
+      <StudioDesignProvider>
+        <ReferenceImageField mode="lucy-vton-3" referenceImage={null} onChange={vi.fn()} />
+      </StudioDesignProvider>,
+    );
+
+    const garmentInput = screen.getByLabelText('Garment reference image');
+    expect(garmentInput).toHaveAccessibleName(
+      'Garment reference image Upload imageDrag & drop or choose a file',
+    );
+    expect(garmentInput).toHaveAccessibleDescription(
+      'Garment reference imageJPEG, PNG, or WebP up to 10 MiB. Use one clearly visible, centered garment on a simple background.',
+    );
+  });
+
   it('returns focus to the file input after its Clear image button unmounts', async () => {
     const user = userEvent.setup();
     const image = new File(['portrait'], 'portrait.webp', { type: 'image/webp' });
@@ -85,6 +119,40 @@ describe('ReferenceImageField focus recovery', () => {
         previewUrl: 'blob:dropped-garment',
       }),
     );
+  });
+
+  it('keeps nested drag depth active, exposes validation guidance, and blocks invalid drops', async () => {
+    const onChange = vi.fn();
+    render(
+      <StudioDesignProvider>
+        <ReferenceImageField mode="lucy-vton-3" referenceImage={null} onChange={onChange} />
+      </StudioDesignProvider>,
+    );
+
+    const input = screen.getByLabelText('Garment reference image');
+    const dropTarget = input.parentElement;
+    expect(dropTarget).not.toBeNull();
+    if (!dropTarget) return;
+
+    fireEvent.dragEnter(dropTarget);
+    fireEvent.dragEnter(dropTarget);
+    expect(screen.getByText('Drop image here')).toBeInTheDocument();
+    expect(screen.getByText('Release to validate the file')).toBeInTheDocument();
+
+    fireEvent.dragLeave(dropTarget);
+    expect(screen.getByText('Drop image here')).toBeInTheDocument();
+    fireEvent.dragLeave(dropTarget);
+    expect(screen.getByText('Upload image')).toBeInTheDocument();
+
+    const invalid = new File(['gif'], 'garment.gif', { type: 'image/gif' });
+    fireEvent.drop(dropTarget, { dataTransfer: { files: [invalid] } });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Choose a JPEG, PNG, or WebP image.',
+    );
+    expect(input).toHaveAttribute('aria-invalid', 'true');
+    expect(input).toHaveAccessibleDescription(/Choose a JPEG, PNG, or WebP image/u);
+    expect(onChange).not.toHaveBeenCalled();
   });
 
   it('disables replacement and removal while the enclosing session is recording', () => {

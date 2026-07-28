@@ -2,17 +2,17 @@
 
 ## Current status
 
-| Item                    | Status                                                                                                                                                                                                                                                                                                              |
-| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                                                                    |
-| Date generated          | 2026-07-27                                                                                                                                                                                                                                                                                                          |
-| Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                                                                             |
-| Open findings           | 4 unresolved (4 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, DEAD-003, ARCH-001, ARCH-002, DUP-001, and DUP-002 resolved                                                                                                                                                                                |
-| Remaining phases        | 4                                                                                                                                                                                                                                                                                                                   |
-| Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                                                                               |
-| Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                                                                        |
-| Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted.                                                   |
-| Graphify status         | PHASE-005 final refresh completed at 3,662 nodes / 8,294 edges (from 3,674 / 8,296 after roadmap self-removal), with only the known non-source `hooks.json` zero-node warning. Generate/edit/compose retain their public route/provider/coordinator paths and converge only at one typed service-private finalizer. |
+| Item                    | Status                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                                                                                                                                                                            |
+| Date generated          | 2026-07-27                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                                                                                                                                                                                     |
+| Open findings           | 3 unresolved (3 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, DEAD-003, ARCH-001, ARCH-002, DUP-001, DUP-002, and DUP-003 resolved                                                                                                                                                                                                                                                                               |
+| Remaining phases        | 3                                                                                                                                                                                                                                                                                                                                                                                                                           |
+| Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                                                                                                                                                                                       |
+| Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                                                                                                                                                                                |
+| Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted.                                                                                                                                                           |
+| Graphify status         | PHASE-006 moved the graph from 3,662 nodes / 8,294 edges to a 3,674 / 8,305 code checkpoint, then to 3,662 / 8,293 after roadmap self-removal and final test strengthening, with only the known non-source `hooks.json` zero-node warning. Builder and Recipe Dock now consume one neutral `ImagePickerDropField`; immutable upload policy and tab-ephemeral validation/object-URL policy remain on separate feature paths. |
 
 ## Execution rules
 
@@ -32,88 +32,11 @@
 
 | Phase ID  | Title                                         | Finding IDs | Risk        | Dependencies                | Expected outcome                                                                    |
 | --------- | --------------------------------------------- | ----------- | ----------- | --------------------------- | ----------------------------------------------------------------------------------- |
-| PHASE-006 | Share image-picker/drop presentation          | DUP-003     | Low-medium  | None                        | Shared accessible DOM behavior without merging storage/lifecycle policy             |
-| PHASE-007 | Decompose independent Studio root controllers | COMP-001    | Medium-high | PHASE-006                   | Smaller composition root with identical stage/overlay topology                      |
+| PHASE-007 | Decompose independent Studio root controllers | COMP-001    | Medium-high | None                        | Smaller composition root with identical stage/overlay topology                      |
 | PHASE-008 | Decompose recipe handoff internals            | STATE-001   | High        | PHASE-007                   | Focused state workflows behind the unchanged Studio facade                          |
-| PHASE-009 | Reconcile final documentation                 | DOC-001     | Low         | PHASE-006 through PHASE-008 | Correct canonical filename/links and documentation aligned with implemented cleanup |
+| PHASE-009 | Reconcile final documentation                 | DOC-001     | Low         | PHASE-007 through PHASE-008 | Correct canonical filename/links and documentation aligned with implemented cleanup |
 
 ## Phase sections
-
-### PHASE-006: Share image-picker/drop presentation
-
-#### Objective
-
-Remove duplicated drag/drop/file-input accessibility presentation only if a narrow controlled primitive can preserve each feature's different data lifecycle.
-
-#### Findings resolved
-
-- `DUP-003`
-
-#### Scope
-
-Builder and media-session reference image fields, a neutral shared UI primitive, styles, tests and stories.
-
-#### Out of scope
-
-Validation/persistence consolidation, object-URL ownership changes, Builder generation, Recipe Dock policy, generic form frameworks, or visual redesign.
-
-#### Dependencies
-
-None.
-
-#### Risk assessment
-
-- **Regression risk:** Low-medium.
-- **Architectural risk:** Medium if the primitive becomes broad.
-- **Data/compatibility risk:** Low.
-- **User-facing risk:** Medium for keyboard/drop/file behavior.
-- **Rollback difficulty:** Low.
-
-#### Implementation sequence
-
-1. Compare DOM, labels, drag depth, events, preview/actions, focus and responsive styles; list lifecycle/policy differences.
-2. Pin both components with interaction/a11y tests.
-3. Design a controlled primitive owning only input/drop/preview/action presentation.
-4. Keep validation, errors, persistence, URLs and feature messages in adapters.
-5. If the API needs feature-policy flags or excessive props, do not extract; document `Accepted as intentional`.
-
-#### Graphify requirements
-
-Map both leaf fields, parents, validation/storage/URL dependencies and tests. After update, verify both consume one neutral primitive while feature policy edges remain separate; no reverse feature dependency/cycle or orphan styles.
-
-#### Acceptance criteria
-
-Same accessible names, keyboard/click/drop/replace/remove behavior, error text, preview, focus and responsive layout; Builder remains persistent/immutable and Recipe Dock ephemeral; primitive has one coherent presentation responsibility and at least two genuine consumers.
-
-#### Required validation
-
-Both component/Storybook interaction/a11y suites, upload E2E, visual suite, `npm run quality`, Graphify/module checks.
-
-#### Rollback strategy
-
-Revert extraction to two local fields. If the abstraction proves broader/less clear, mark DUP-003 `Accepted as intentional` with evidence and remove the phase only after validation/documentation.
-
-#### Documentation updates
-
-Resolve or accept DUP-003 with the final API/decision and graph evidence.
-
-#### Standalone implementation prompt
-
-```text
-Implement only PHASE-006 (“Share image-picker/drop presentation”), resolving DUP-003 or marking it Accepted as intentional if a narrow safe API is disproven. Read all instructions, findings/plan, Architecture/privacy and affected Builder/Recipe Dock journeys. Verify PHASE-003; inspect status and protect user changes.
-
-Preserve exact accessible names, focus, click/keyboard/drop/replace/remove behavior, validation/error text, responsive visuals and lifecycle differences. Builder uploads remain immutable/persistent; Recipe Dock files remain tab-ephemeral with current object-URL ownership. Do not consolidate storage/validation/generation policy or redesign UI.
-
-Run baselines. Use Graphify to map both fields, parents, tests, styles, validation/storage/URL dependencies, exports, fan-in/out and cycles. Confirm DOM/behavior differences in source and tests.
-
-Add interaction/a11y regression tests first. Extract only a controlled neutral image-picker/drop primitive that owns input/drag-depth/preview/action presentation; leave all feature policy/effects in thin adapters. If a clear API requires many feature flags, surprising callbacks, lifecycle knowledge or a generic form framework, stop the extraction, preserve duplication, and document why DUP-003 is Accepted as intentional.
-
-Run graphify update . and confirm both consumers share only the presentation node, feature policy paths remain separate, no reverse dependency/cycle/orphan style exists. Run both component and Storybook interaction/a11y suites, relevant upload E2E, npm run test:visual and npm run quality.
-
-When criteria pass, mark DUP-003 Resolved (or Accepted as intentional with evidence), append implementation/validation/Graphify/limitations/PHASE-006, preserve history, and add new issues under new IDs. Remove PHASE-006 and its overview row, update counts without renumbering; keep it if incomplete.
-
-Report the API or intentional-duplication decision, behavior/lifecycles preserved, tests/visual/graph validation, failures/new findings, docs, self-removal and next phase.
-```
 
 ### PHASE-007: Decompose independent Studio root controllers
 
@@ -135,7 +58,7 @@ Global state/context/router; moving `MediaStage`; handoff internals (PHASE-008);
 
 #### Dependencies
 
-PHASE-006.
+None.
 
 #### Risk assessment
 
@@ -288,7 +211,7 @@ New production cleanup, rewriting historical rationale, claiming the project is 
 
 #### Dependencies
 
-PHASE-006 through PHASE-008. PHASE-004 and PHASE-005 are complete.
+PHASE-007 through PHASE-008. PHASE-004 through PHASE-006 are complete.
 
 #### Risk assessment
 

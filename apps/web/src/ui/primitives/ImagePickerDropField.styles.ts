@@ -1,12 +1,12 @@
 import type { CSSObject, Theme } from '@emotion/react';
 
-export const referenceFieldStyles = (theme: Theme): CSSObject => ({
+export const imagePickerDropFieldStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   display: 'grid',
   gap: theme.space.xs,
 });
 
-export const referenceFileAreaStyles = (
+export const imagePickerDropFileAreaStyles = (
   theme: Theme,
   dragging = false,
   disabled = false,
@@ -39,7 +39,7 @@ export const referenceFileAreaStyles = (
   },
 });
 
-export const referencePickerStyles = (theme: Theme, disabled = false): CSSObject => ({
+export const imagePickerDropLabelStyles = (theme: Theme, disabled = false): CSSObject => ({
   minWidth: 0,
   minHeight: '6.25rem',
   display: 'grid',
@@ -52,7 +52,7 @@ export const referencePickerStyles = (theme: Theme, disabled = false): CSSObject
   '& span': { color: theme.colors.textMuted, fontSize: theme.fontSizes.caption, lineHeight: 1.4 },
 });
 
-export const referenceGuidanceStyles = (theme: Theme): CSSObject => ({
+export const imagePickerDropGuidanceStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   display: 'grid',
   gap: theme.space.xxs,
@@ -65,7 +65,7 @@ export const referenceGuidanceStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-export const referencePreviewStyles = (theme: Theme): CSSObject => ({
+export const imagePickerDropPreviewStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   display: 'grid',
   gridTemplateColumns: '4rem minmax(0, 1fr) auto',
