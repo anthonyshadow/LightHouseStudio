@@ -1,9 +1,12 @@
 import { useId } from 'react';
 import { useTheme } from '@emotion/react';
+import { formatDuration as formatDomainDuration } from '@studio/domain';
 import { StatusNotice } from '../../ui';
 import { sessionSummaryStyles } from './SessionComposer.styles';
 import { isModelSessionActive } from './sessionComposerModel';
 import { modeLabel, type StudioSessionController } from './types';
+
+const formatSeconds = (seconds: number): string => formatDomainDuration(seconds * 1_000);
 
 export const SessionStatus = ({ session }: { session: StudioSessionController }) => {
   const model = session.draft.mode !== 'local';
@@ -91,10 +94,22 @@ export const SessionStatus = ({ session }: { session: StudioSessionController })
     },
   };
   const status = statuses[session.lifecycle];
+  const timing = session.realtimeSessionTiming;
+  if (timing?.status === 'completed') {
+    return (
+      <StatusNotice tone="success" title={`${label} AI session completed`} role="status">
+        The expected {formatSeconds(timing.maximumSeconds)} provider session ended. Local preview
+        and the working recipe remain available.
+      </StatusNotice>
+    );
+  }
 
   return (
     <StatusNotice tone={status.tone} title={status.title} role="status">
       {status.detail}
+      {timing?.status === 'active'
+        ? ` Maximum ${formatSeconds(timing.maximumSeconds)}. The stage timer shows elapsed and remaining time.`
+        : ''}
     </StatusNotice>
   );
 };

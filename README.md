@@ -223,9 +223,14 @@ Read [architecture](docs/ARCHITECTURE.md), [privacy and temporary data](docs/PRI
 - Starting an AI session sends live camera media and the applied prompt/reference state to Decart and may incur provider usage. Finishing a model take finalizes the clip before releasing the model.
 - Studio omits the compatibility profile identifier, so the broker applies its default five-minute
   AI active-session scope. The retired Guided credential profile remains a compatibility detail
-  and is not an application route. The approved take maximum is 300 seconds, but the current
-  recorder does not yet warn or safely auto-finalize at that boundary; this is a pilot blocker,
-  separate from provider credential/session limits.
+  and is not an application route. After a healthy AI connection commits, Studio shows the
+  authoritative maximum plus app-owned elapsed/remaining time, announces the final 30-second
+  warning, and treats the expected limit as completion rather than a crash. SDK generation ticks
+  can move the display forward but never reset or replace the monotonic budget. If the limit lands
+  during recording, the take finalizes before provider/local resources release; otherwise local
+  preview and the working recipe remain available. The approved take maximum is also 300 seconds,
+  but the current recorder does not yet warn or safely auto-finalize from that independent
+  recording policy; this remains a separate pilot blocker.
 - ElevenLabs saved-library browsing and click-to-play previews contact the provider only after the labeled disclosure/action and carry the Studio provider-intent header. Preview bytes use a short-lived, app-owned Blob URL that is aborted/revoked on replacement or unmount. Browsing, previewing, or selecting does not upload the take. Applying a saved voice sends only the completed audio sidecar and may use credits. Library membership is managed only in ElevenLabs.
 - The server accepts loopback hosts only. It is not designed for LAN, tunnel, or public hosting. Remote deployment requires authentication, authorization, CSRF analysis, abuse/rate controls, tenant isolation, secret management, and a new security review.
 

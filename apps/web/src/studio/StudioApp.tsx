@@ -235,9 +235,9 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     openOverlay('capture-settings');
   }, [clearSessionError, openOverlay]);
 
-  const stageNotices = useMemo(
-    () =>
-      deriveStudioStageNotices({
+  const stageNotices = useMemo(() => {
+    const notices = [
+      ...deriveStudioStageNotices({
         localCaptureAvailable: browser.mediaDevices && browser.secureContext,
         capabilityState,
         dismissedNoticeIds: dismissedNotices,
@@ -251,23 +251,45 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
         onClearSessionError: clearSessionError,
         onDismissNotice: dismissNotice,
       }),
-    [
-      browser.mediaDevices,
-      browser.secureContext,
-      capabilityState,
-      characterBuilderLaunchError,
-      dismissCharacterBuilderLaunchError,
-      dismissNotice,
-      dismissedNotices,
-      clearSessionError,
-      openCaptureSettingsForRecovery,
-      recording.recordingError,
-      recording.sidecar.error,
-      recording.sidecar.state,
-      retryProviderAvailability,
-      session.error,
-    ],
-  );
+    ];
+    const timing = session.realtimeSessionTiming;
+    if (timing?.warning) {
+      notices.push({
+        id: 'realtime-session-warning',
+        severity: 'warning',
+        title: 'AI session ending soon',
+        message:
+          '30 seconds or less remain. This provider limit is independent of the take limit; an active take will finalize safely at the boundary.',
+        priority: 875,
+      });
+    } else if (timing?.status === 'limit-reached' || timing?.status === 'completed') {
+      notices.push({
+        id: 'realtime-session-complete',
+        severity: 'info',
+        title: 'AI session maximum reached',
+        message:
+          'The expected provider session completed. Local preview and the current recipe remain available.',
+        priority: 850,
+      });
+    }
+    return notices;
+  }, [
+    browser.mediaDevices,
+    browser.secureContext,
+    capabilityState,
+    characterBuilderLaunchError,
+    dismissCharacterBuilderLaunchError,
+    dismissNotice,
+    dismissedNotices,
+    clearSessionError,
+    openCaptureSettingsForRecovery,
+    recording.recordingError,
+    recording.sidecar.error,
+    recording.sidecar.state,
+    retryProviderAvailability,
+    session.error,
+    session.realtimeSessionTiming,
+  ]);
 
   const closeCreativePanel = closeOverlay;
 
@@ -392,6 +414,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
               lifecycle={session.lifecycle}
               recording={recording.lifecycle === 'recording'}
               recordingSeconds={recording.elapsedSeconds}
+              realtimeSessionTiming={session.realtimeSessionTiming}
               {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}
               controls={({ visible }) => (
                 <StudioSessionControlBar

@@ -133,12 +133,11 @@ beforeEach(() => {
     height: 720,
     frameRate: 30,
   });
-  adapters.requestRealtimeToken.mockImplementation((model: ModelMode) =>
+  adapters.requestRealtimeToken.mockImplementation((_model: ModelMode) =>
     Promise.resolve({
       apiKey: 'ephemeral-browser-token',
       expiresAt: '2026-07-14T12:05:00.000Z',
-      model,
-      constraints: { maxSessionDurationSeconds: 300 },
+      maxSessionDurationSeconds: 300,
     }),
   );
   adapters.connectDecartRealtime.mockResolvedValue(fakeRealtimeSession());
@@ -555,6 +554,110 @@ describe('useStudioSession explicit-start boundaries', () => {
 });
 
 describe('useStudioSession model lifecycle contract', () => {
+  it('preserves the authoritative budget, warns, and completes expected expiry as local fallback', async () => {
+    const local = fakeStream();
+    const remote = fakeStream();
+    const realtimeSession = fakeRealtimeSession();
+    let options: ConnectRealtimeOptions | undefined;
+    adapters.acquireLocalMedia.mockResolvedValue(local);
+    adapters.connectDecartRealtime.mockImplementation((nextOptions: ConnectRealtimeOptions) => {
+      options = nextOptions;
+      nextOptions.onConnectionChange('connected');
+      nextOptions.onRemoteStream(remote);
+      nextOptions.onConnectionChange('generating');
+      return Promise.resolve(realtimeSession);
+    });
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    act(() => {
+      result.current.selectMode('lucy-2.5');
+      result.current.updatePrompt('An adult documentary presenter');
+    });
+    await act(async () => {
+      await result.current.startModel();
+    });
+
+    expect(result.current.realtimeSessionTiming).toEqual({
+      status: 'active',
+      maximumSeconds: 300,
+      elapsedSeconds: 0,
+      remainingSeconds: 300,
+      warning: false,
+    });
+
+    act(() => options?.onConnectionChange('reconnecting'));
+    act(() => options?.onGenerationTick({ elapsedSeconds: 270 }));
+    expect(result.current.realtimeSessionTiming).toMatchObject({
+      status: 'active',
+      elapsedSeconds: 270,
+      remainingSeconds: 30,
+      warning: true,
+    });
+
+    act(() => options?.onConnectionChange('generating'));
+    expect(result.current.realtimeSessionTiming?.elapsedSeconds).toBe(270);
+
+    act(() => options?.onGenerationEnded({ elapsedSeconds: 299 }));
+    expect(result.current.lifecycle).toBe('stopping-ai');
+    expect(result.current.error).toBeNull();
+    expect(result.current.realtimeSessionTiming?.status).toBe('limit-reached');
+    expect(result.current.displayStream).toBe(local);
+
+    await act(async () => {
+      await result.current.completeExpectedModelSession();
+    });
+
+    expect(realtimeSession.disconnect).toHaveBeenCalledOnce();
+    expect(result.current.lifecycle).toBe('disconnected');
+    expect(result.current.error).toBeNull();
+    expect(result.current.localStream).toBe(local);
+    expect(result.current.applied).toBeNull();
+    expect(result.current.draft.prompt).toBe('An adult documentary presenter');
+    expect(result.current.realtimeSessionTiming).toMatchObject({
+      status: 'completed',
+      elapsedSeconds: 300,
+      remainingSeconds: 0,
+    });
+    unmount();
+  });
+
+  it('treats an early generation end as an unexpected safe error', async () => {
+    let options: ConnectRealtimeOptions | undefined;
+    const realtimeSession = fakeRealtimeSession();
+    adapters.connectDecartRealtime.mockImplementation((nextOptions: ConnectRealtimeOptions) => {
+      options = nextOptions;
+      return Promise.resolve(realtimeSession);
+    });
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    act(() => {
+      result.current.selectMode('lucy-vton-3');
+      result.current.updatePrompt('A tailored navy field jacket');
+    });
+    await act(async () => {
+      await result.current.startModel();
+    });
+    act(() => options?.onGenerationEnded({ elapsedSeconds: 120 }));
+
+    expect(realtimeSession.disconnect).toHaveBeenCalledOnce();
+    expect(result.current.lifecycle).toBe('disconnected');
+    expect(result.current.error).toEqual({
+      code: 'generation-ended',
+      message: 'The AI generation ended before the session maximum.',
+      recovery: 'Your local preview and working recipe are safe. Start AI again when ready.',
+    });
+    expect(result.current.realtimeSessionTiming).toBeNull();
+    unmount();
+  });
+
   it.each([
     {
       mode: 'lucy-2.5' as const,

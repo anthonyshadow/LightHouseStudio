@@ -90,13 +90,18 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
   Decart, possible provider usage, the 300-second maximum, and Stop/finalization boundary.
 - **Regression risk:** Low.
 
-### ARCH-001 — The browser drops the Decart active-session constraint
+### ARCH-001 — Decart active-session runtime is implemented; live qualification remains
 
 - **Severity/timing:** High; required before a Decart pilot.
-- **Evidence:** `apps/api/src/features/realtime/routes.ts` returns
-  `constraints.maxSessionDurationSeconds`; `apiClient.ts` returns only `apiKey` and `expiresAt`.
-  `DecartRealtimeGateway.ts` does not expose duration events. The normal Studio cap is 300 seconds.
-- **Impact:** The user sees no cap/countdown/warning and expected expiry can look like failure.
+- **Evidence:** `apiClient.ts` now rejects missing/model-mismatched constraints and returns the
+  app-owned maximum. `realtimeSessionClock.ts` owns post-commit monotonic elapsed/remaining state;
+  `DecartRealtimeGateway.ts` allowlists tick/end seconds while withholding raw reasons; session
+  orchestration distinguishes early end/disconnect from expected completion. The stage exposes
+  the independent timer/static 30-second warning, and deterministic controller/browser tests cover
+  warning, reconnect budget, expected/early end, cleanup, and finalization-before-release.
+- **Impact:** The runtime planning/recovery gap is closed. The remaining High gate is dated live
+  proof that both claimed Decart model/account configurations emit compatible duration/end
+  behavior at the paid five-minute boundary on qualified devices.
 - **Correction:** Retain the authoritative constraint in app-owned types, start a monotonic timer
   only after connection, warn near expiry, distinguish expected completion from disconnect, and
   preserve local fallback. Provider generation ticks may reconcile usage but are not the only UX
@@ -302,7 +307,7 @@ The independent specialist reports reused `TEST-###`; the canonical plan uses th
 | `TEST-001` | Touch/pointer control recovery and never-hidden Stop behavior for `UX-001`; automated coverage complete, named physical evidence pending. |
 | `TEST-002` | Complete saved-character entry-intent → Use → Start journey for `UX-002`.                                                                 |
 | `TEST-003` | State-driven curated visual matrix and semantic readiness invariants.                                                                     |
-| `TEST-004` | Decart cap/tick/end/typed-error behavior for `ARCH-001`/`ARCH-002`.                                                                       |
+| `TEST-004` | Decart cap/tick/end behavior for `ARCH-001` is automated; typed-error breadth for `ARCH-002` and live boundary evidence remain.           |
 | `TEST-005` | Physical-device recording-memory/finalization/cleanup evidence for `PERF-001`.                                                            |
 | `TEST-006` | Declared/chunked successful ElevenLabs output bounds for `PERF-002`.                                                                      |
 | `TEST-007` | Gated live provider/device entitlement and full included-provider journeys.                                                               |

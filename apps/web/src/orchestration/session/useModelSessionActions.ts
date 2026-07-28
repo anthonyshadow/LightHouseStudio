@@ -15,6 +15,7 @@ import {
 } from '../../features/media-session';
 import { toAppliedState, toProviderSnapshot, validateModelDraft } from './realtimeSnapshot';
 import { useRealtimeResource, type RealtimeDisconnectReason } from './useRealtimeResource';
+import type { RealtimeSessionTiming } from './realtimeSessionClock';
 
 export type ModelSessionActionsOptions = {
   decartAvailable: boolean;
@@ -46,7 +47,9 @@ export type ModelSessionActionsOptions = {
 
 export type ModelSessionActions = {
   remoteStream: MediaStream | null;
+  sessionTiming: RealtimeSessionTiming | null;
   disconnectRealtime: () => void;
+  completeExpectedRealtime: () => void;
   startModel: () => Promise<void>;
   applyChanges: () => Promise<void>;
 };
@@ -58,11 +61,17 @@ const disconnectError = (reason: RealtimeDisconnectReason): SafeMediaError =>
         message: 'The transformed video ended. Local preview is still available.',
         recovery: 'Reconnect AI, continue locally, or stop the camera.',
       }
-    : {
-        code: 'provider-disconnected',
-        message: 'The AI connection ended. Local preview is still available.',
-        recovery: 'Reconnect AI, continue locally, or stop the camera.',
-      };
+    : reason === 'generation-ended'
+      ? {
+          code: 'generation-ended',
+          message: 'The AI generation ended before the session maximum.',
+          recovery: 'Your local preview and working recipe are safe. Start AI again when ready.',
+        }
+      : {
+          code: 'provider-disconnected',
+          message: 'The AI connection ended. Local preview is still available.',
+          recovery: 'Reconnect AI, continue locally, or stop the camera.',
+        };
 
 const realtimeStartError = (error: unknown): SafeMediaError => {
   if (error instanceof ApiClientError && error.code === 'provider_authentication') {
@@ -112,10 +121,17 @@ export const useModelSessionActions = ({
     });
   }, [setError]);
 
+  const handleSessionLimitReached = useCallback(() => {
+    setApplying(false);
+    setError(null);
+    setLifecycle('stopping-ai');
+  }, [setApplying, setError, setLifecycle]);
+
   const realtime = useRealtimeResource({
     operationRef,
     onConnectionChange: setLifecycle,
     onDisconnected: handleDisconnected,
+    onSessionLimitReached: handleSessionLimitReached,
     onProviderError: handleProviderError,
   });
 
@@ -171,6 +187,7 @@ export const useModelSessionActions = ({
       const connected = await realtime.connect({
         operation,
         apiKey: token.apiKey,
+        maxSessionDurationSeconds: token.maxSessionDurationSeconds,
         model: currentDraft.mode,
         localStream: stream,
         initial: toProviderSnapshot(currentDraft.mode, currentDraft),
@@ -263,7 +280,9 @@ export const useModelSessionActions = ({
 
   return {
     remoteStream: realtime.remoteStream,
+    sessionTiming: realtime.sessionTiming,
     disconnectRealtime: realtime.disconnect,
+    completeExpectedRealtime: realtime.completeExpectedSession,
     startModel,
     applyChanges,
   };

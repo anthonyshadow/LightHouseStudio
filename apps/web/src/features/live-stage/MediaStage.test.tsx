@@ -431,6 +431,30 @@ describe('MediaStage', () => {
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
   });
 
+  it('shows the independent AI maximum and remaining time while recording', () => {
+    render(
+      stage({
+        lifecycle: 'generating',
+        recording: true,
+        recordingSeconds: 65,
+        realtimeSessionTiming: {
+          status: 'active',
+          maximumSeconds: 300,
+          elapsedSeconds: 270,
+          remainingSeconds: 30,
+          warning: true,
+        },
+      }),
+    );
+
+    expect(screen.getByRole('timer', { name: 'Recording elapsed time 1:05' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('timer', {
+        name: 'AI session maximum 5:00, elapsed 4:30, 0:30 remaining',
+      }),
+    ).toHaveTextContent('AI 4:30 / 5:00 · 0:30 left');
+  });
+
   it('uses concise, mode-specific private guidance without starting any media work', () => {
     const play = vi.mocked(HTMLMediaElement.prototype.play);
     const view = render(

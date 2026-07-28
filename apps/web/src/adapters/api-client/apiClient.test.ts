@@ -16,6 +16,7 @@ import {
   fetchProviderAvailability,
   hydrateReferenceImage,
   optimizeCharacterReferencePrompt,
+  requestRealtimeToken,
   uploadReferenceImage,
 } from './apiClient';
 
@@ -98,6 +99,69 @@ const uploadedAsset: UploadedReferenceImageAsset = {
 afterEach(() => {
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
+});
+
+describe('realtime API client', () => {
+  it('preserves the app-owned active-session maximum from the validated token response', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            apiKey: 'short-lived-browser-token',
+            expiresAt: '2030-01-01T00:00:00.000Z',
+            constraints: {
+              model: 'lucy-2.5',
+              maxSessionDurationSeconds: 300,
+            },
+          }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+
+    await expect(requestRealtimeToken('lucy-2.5', new AbortController().signal)).resolves.toEqual({
+      apiKey: 'short-lived-browser-token',
+      expiresAt: '2030-01-01T00:00:00.000Z',
+      maxSessionDurationSeconds: 300,
+    });
+  });
+
+  it('rejects a missing or mismatched active-session constraint', async () => {
+    const response = (body: unknown) =>
+      new Response(JSON.stringify(body), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    vi.stubGlobal(
+      'fetch',
+      vi
+        .fn()
+        .mockResolvedValueOnce(
+          response({
+            apiKey: 'short-lived-browser-token',
+            expiresAt: '2030-01-01T00:00:00.000Z',
+          }),
+        )
+        .mockResolvedValueOnce(
+          response({
+            apiKey: 'short-lived-browser-token',
+            expiresAt: '2030-01-01T00:00:00.000Z',
+            constraints: {
+              model: 'lucy-vton-3',
+              maxSessionDurationSeconds: 300,
+            },
+          }),
+        ),
+    );
+
+    await expect(
+      requestRealtimeToken('lucy-2.5', new AbortController().signal),
+    ).rejects.toMatchObject({ code: 'bad-token', status: 502 });
+    await expect(
+      requestRealtimeToken('lucy-2.5', new AbortController().signal),
+    ).rejects.toMatchObject({ code: 'bad-token', status: 502 });
+  });
 });
 
 describe('reference image API client', () => {

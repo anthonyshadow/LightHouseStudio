@@ -315,7 +315,11 @@ export const requestRealtimeToken = async (
   model: ModelMode,
   signal: AbortSignal,
   sessionProfile?: RealtimeSessionProfile,
-): Promise<{ apiKey: string; expiresAt: string }> => {
+): Promise<{
+  apiKey: string;
+  expiresAt: string;
+  maxSessionDurationSeconds: number;
+}> => {
   const payload = await requestJson(
     '/api/realtime-token',
     {
@@ -328,5 +332,12 @@ export const requestRealtimeToken = async (
     realtimeTokenResponseSchema,
     invalidApiResponse('The realtime credential response was incomplete.', 'bad-token'),
   );
-  return { apiKey: payload.apiKey, expiresAt: payload.expiresAt };
+  if (!payload.constraints || payload.constraints.model !== model) {
+    throw new ApiClientError('The realtime credential response was incomplete.', 502, 'bad-token');
+  }
+  return {
+    apiKey: payload.apiKey,
+    expiresAt: payload.expiresAt,
+    maxSessionDurationSeconds: payload.constraints.maxSessionDurationSeconds,
+  };
 };

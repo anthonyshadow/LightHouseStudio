@@ -24,6 +24,8 @@ export const installSyntheticBrowserMedia = async (
         initial: TestSnapshot;
         onRemoteStream(stream: MediaStream): void;
         onConnectionChange(state: string): void;
+        onGenerationTick(event: { elapsedSeconds: number }): void;
+        onGenerationEnded(event: { elapsedSeconds: number }): void;
       };
 
       const state: BrowserJourneyState & {
@@ -170,6 +172,12 @@ export const installSyntheticBrowserMedia = async (
         triggerProviderDisconnect() {
           state.activeConnection?.onConnectionChange('disconnected');
         },
+        triggerGenerationTick(elapsedSeconds: number) {
+          state.activeConnection?.onGenerationTick({ elapsedSeconds });
+        },
+        triggerGenerationEnded(elapsedSeconds: number) {
+          state.activeConnection?.onGenerationEnded({ elapsedSeconds });
+        },
       };
 
       Object.defineProperty(window, '__lightframeE2EJourneyState', {
@@ -272,3 +280,27 @@ export const triggerProviderDisconnect = (page: Page): Promise<void> =>
     ).__lightframeDevelopmentRealtimeDriver;
     driver.triggerProviderDisconnect();
   });
+
+export const triggerGenerationTick = (page: Page, elapsedSeconds: number): Promise<void> =>
+  page.evaluate((seconds) => {
+    const driver = (
+      window as typeof window & {
+        __lightframeDevelopmentRealtimeDriver: {
+          triggerGenerationTick(value: number): void;
+        };
+      }
+    ).__lightframeDevelopmentRealtimeDriver;
+    driver.triggerGenerationTick(seconds);
+  }, elapsedSeconds);
+
+export const triggerGenerationEnded = (page: Page, elapsedSeconds: number): Promise<void> =>
+  page.evaluate((seconds) => {
+    const driver = (
+      window as typeof window & {
+        __lightframeDevelopmentRealtimeDriver: {
+          triggerGenerationEnded(value: number): void;
+        };
+      }
+    ).__lightframeDevelopmentRealtimeDriver;
+    driver.triggerGenerationEnded(seconds);
+  }, elapsedSeconds);

@@ -14,6 +14,8 @@ export type RealtimeSession = {
   disconnect: () => void;
 };
 
+export type RealtimeGenerationEvent = Readonly<{ elapsedSeconds: number }>;
+
 export type ConnectRealtimeOptions = {
   apiKey: string;
   model: ModelMode;
@@ -22,6 +24,8 @@ export type ConnectRealtimeOptions = {
   signal?: AbortSignal;
   onRemoteStream: (stream: MediaStream) => void;
   onConnectionChange: (state: RealtimeConnectionState) => void;
+  onGenerationTick: (event: RealtimeGenerationEvent) => void;
+  onGenerationEnded: (event: RealtimeGenerationEvent) => void;
   onError: (error: unknown) => void;
 };
 
@@ -138,7 +142,13 @@ export const connectDecartRealtime = async (
   }
 
   const errorListener = (error: unknown) => options.onError(error);
+  const generationTickListener = (event: { seconds: number }) =>
+    options.onGenerationTick({ elapsedSeconds: event.seconds });
+  const generationEndedListener = (event: { seconds: number }) =>
+    options.onGenerationEnded({ elapsedSeconds: event.seconds });
   realtime.on('error', errorListener);
+  realtime.on('generationTick', generationTickListener);
+  realtime.on('generationEnded', generationEndedListener);
 
   let disconnected = false;
   return {
@@ -154,6 +164,8 @@ export const connectDecartRealtime = async (
       if (disconnected) return;
       disconnected = true;
       realtime.off('error', errorListener);
+      realtime.off('generationTick', generationTickListener);
+      realtime.off('generationEnded', generationEndedListener);
       realtime.disconnect();
       stopProviderInput();
     },

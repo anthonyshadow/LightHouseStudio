@@ -1,10 +1,16 @@
-import type { ModelMode, SessionLifecycle, StudioMode } from '../../application/types';
+import type {
+  ModelMode,
+  RealtimeSessionTiming,
+  SessionLifecycle,
+  StudioMode,
+} from '../../application/types';
 import type { SafeMediaError } from './errors';
 
 export type {
   BrowserCapabilities,
   ModelMode,
   ProviderAvailability,
+  RealtimeSessionTiming,
   SessionLifecycle,
   StudioMode,
 } from '../../application/types';
@@ -56,6 +62,7 @@ export type StudioSessionController = {
   remoteStream: MediaStream | null;
   displayStream: MediaStream | null;
   transformedVideoUsable: boolean;
+  realtimeSessionTiming: RealtimeSessionTiming | null;
   pendingChanges: boolean;
   error: SafeMediaError | null;
   applying: boolean;
@@ -67,6 +74,7 @@ export type StudioSessionController = {
   applyChanges: () => Promise<void>;
   revertDraft: () => void;
   stopModel: () => Promise<void>;
+  completeExpectedModelSession: () => Promise<void>;
   resetModel: () => void;
   stopCamera: () => Promise<void>;
   releaseForRecordedReview: () => Promise<void>;

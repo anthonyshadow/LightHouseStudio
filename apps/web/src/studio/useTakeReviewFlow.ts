@@ -176,6 +176,23 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
     }
   }, [finishTake, recording.activeSource, recording.lifecycle, recordingSource]);
 
+  const realtimeSessionStatus = session.realtimeSessionTiming?.status;
+  const completeExpectedModelSession = session.completeExpectedModelSession;
+  useEffect(() => {
+    if (realtimeSessionStatus !== 'limit-reached') return;
+    if (recordingActive || finalizingStartedAt !== null) {
+      void finishTake();
+      return;
+    }
+    void completeExpectedModelSession();
+  }, [
+    completeExpectedModelSession,
+    finalizingStartedAt,
+    finishTake,
+    realtimeSessionStatus,
+    recordingActive,
+  ]);
+
   const stagePresentation = deriveTakeStagePresentation({
     reviewReady,
     recording,

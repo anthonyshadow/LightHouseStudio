@@ -254,6 +254,15 @@ decision point, and configuration is never represented as live entitlement or he
 
 **Findings:** `ARCH-001`, `PROD-004`, `UX-012`, High portion of `TEST-004`
 
+**Status (2026-07-28):** runtime implementation and deterministic automated evidence complete.
+The validated maximum now survives the browser API boundary; one post-commit monotonic clock owns
+elapsed/remaining state; SDK tick/end events are allowlisted, sanitized, and cleaned up; the stage
+shows the independent timer and static 30-second warning; expected completion preserves local
+fallback/current recipe and finalizes an active take before resource release. The focused
+maximum-duration journey passes in Chromium, WebKit, and the mobile project. This wave remains
+release-incomplete until the gated paid maximum-duration live smoke passes for both claimed Decart
+configurations; no live credential or paid call was authorized for this implementation.
+
 Implement in this order:
 
 1. Preserve `constraints.maxSessionDurationSeconds` through app-owned browser contracts. Keep

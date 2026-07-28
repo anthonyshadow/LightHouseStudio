@@ -84,9 +84,11 @@ Codec claims from `MediaRecorder.isTypeSupported` are necessary but not sufficie
 - Long recordings and audio remuxing are memory-intensive because current Studio artifacts are
   held in the tab. The [recording memory policy](RECORDING_MEMORY_POLICY.md) defines the required
   target-device measurements. The approved take maximum is 300 seconds, but ordinary recording
-  does not yet warn or safely auto-finalize at that boundary. Connection-start credentials, the
-  broker's default AI active-session scope, and ElevenLabs conversion also use five-minute
-  boundaries, but those provider contracts do not replace the app-owned recording cap.
+  does not yet warn or safely auto-finalize from the recording policy at that boundary.
+  Connection-start credentials, the broker's default AI active-session scope, and ElevenLabs
+  conversion also use five-minute boundaries. The AI scope is now exposed through an app-owned
+  monotonic timer with a 30-second warning and ordered expected completion; it still does not
+  replace the independent app-owned recording cap.
 - Reduced-power/mobile devices may not render offline audio or remux quickly enough for a comfortable workflow.
 
 ## Approved qualification matrix

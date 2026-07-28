@@ -5,6 +5,14 @@ export type StudioMode = SessionModeId;
 export type ModelMode = ModelModeId;
 export type SessionLifecycle = SessionLifecycleStatus;
 
+export type RealtimeSessionTiming = Readonly<{
+  status: 'active' | 'limit-reached' | 'completed';
+  maximumSeconds: number;
+  elapsedSeconds: number;
+  remainingSeconds: number;
+  warning: boolean;
+}>;
+
 export type ProviderAvailability = {
   decart: boolean;
   elevenLabs: boolean;

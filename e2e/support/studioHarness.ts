@@ -24,6 +24,8 @@ export {
 export {
   FIXED_WEBM_BASE64,
   readBrowserState,
+  triggerGenerationEnded,
+  triggerGenerationTick,
   triggerProviderDisconnect,
 } from './studioHarness.browser.js';
 export type {

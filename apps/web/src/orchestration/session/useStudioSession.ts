@@ -158,7 +158,14 @@ export const useStudioSession = ({
     [capturePreferences.applied, ensureMedia],
   );
 
-  const { remoteStream, disconnectRealtime, startModel, applyChanges } = useModelSessionActions({
+  const {
+    remoteStream,
+    sessionTiming: realtimeSessionTiming,
+    disconnectRealtime,
+    completeExpectedRealtime,
+    startModel,
+    applyChanges,
+  } = useModelSessionActions({
     decartAvailable: availability.decart,
     operationRef,
     startAbortRef,
@@ -226,6 +233,16 @@ export const useStudioSession = ({
     await Promise.resolve();
     setLifecycle(hasLiveVideo(localRef.current) ? 'ready' : 'idle');
   }, [disconnectRealtime, localRef, setApplied]);
+
+  const completeExpectedModelSession = useCallback(async () => {
+    if (realtimeSessionTiming?.status !== 'limit-reached') return;
+    completeExpectedRealtime();
+    setApplied(null);
+    setApplying(false);
+    setError(null);
+    await Promise.resolve();
+    setLifecycle(hasLiveVideo(localRef.current) ? 'disconnected' : 'idle');
+  }, [completeExpectedRealtime, localRef, realtimeSessionTiming?.status, setApplied]);
 
   const resetModel = useCallback(() => {
     const mode = draftRef.current.mode;
@@ -323,6 +340,7 @@ export const useStudioSession = ({
       remoteStream,
       displayStream,
       transformedVideoUsable,
+      realtimeSessionTiming,
       pendingChanges,
       error,
       applying,
@@ -335,6 +353,7 @@ export const useStudioSession = ({
       applyChanges,
       revertDraft,
       stopModel,
+      completeExpectedModelSession,
       resetModel,
       stopCamera,
       releaseForRecordedReview,
@@ -356,6 +375,7 @@ export const useStudioSession = ({
       remoteStream,
       displayStream,
       transformedVideoUsable,
+      realtimeSessionTiming,
       pendingChanges,
       error,
       applying,
@@ -367,6 +387,7 @@ export const useStudioSession = ({
       applyChanges,
       revertDraft,
       stopModel,
+      completeExpectedModelSession,
       resetModel,
       stopCamera,
       releaseForRecordedReview,

@@ -27,9 +27,9 @@ reverse-proxy, or public deployment remains blocked by `SEC-001` through
 
 The controlled-pilot gaps are narrower than a rewrite:
 
-1. `ARCH-001`: the API returns the authoritative Decart active-session limit,
-   but the browser discards it and cannot present a reliable countdown or
-   expected-limit outcome.
+1. `ARCH-001`: runtime implementation now preserves the authoritative Decart active-session
+   limit, presents a monotonic countdown/warning, and orders expected completion safely; the paid
+   maximum-duration live qualification remains open.
 2. `PERF-001` and `SYS-TEST-002` / consolidated `TEST-005`: recording and
    optional voice processing retain multiple in-memory artifacts without a
    supported-duration decision or checked-in physical-target measurements.
@@ -674,29 +674,29 @@ single-operator.
 
 ### Findings summary
 
-| ID                            | Severity                        | Finding                                                                                   | Release classification                                         |
-| ----------------------------- | ------------------------------- | ----------------------------------------------------------------------------------------- | -------------------------------------------------------------- |
-| `ARCH-001`                    | High                            | Browser discards Decart active-session constraints and does not expose duration/end state | Controlled-pilot gate                                          |
-| `ARCH-002`                    | Medium                          | Decart errors are flattened beyond useful recovery                                        | Recommended before wider local release                         |
-| `ARCH-003`                    | High for public scale           | Coordinator, storage, and owner model are single-process/single-operator                  | Safe to defer; public-launch blocker                           |
-| `SEC-001`                     | Critical for remote exposure    | No public authentication, authorization, or tenant boundary                               | Safe to defer locally; public-launch blocker                   |
-| `SEC-002`                     | High for remote exposure        | No rate, entitlement, concurrency, or provider-cost enforcement                           | Safe to defer locally; public-launch blocker                   |
-| `SEC-003`                     | High for public deployment      | CSP/COEP disabled for provider-origin compatibility                                       | Safe to defer locally; public-launch blocker                   |
-| `SEC-004`                     | High for external personal data | Immutable reference media has no ordinary deletion/retention lifecycle                    | Disclosure/cleanup gate; full fix deferred                     |
-| `SEC-005`                     | High                            | Provider settings are not an application moderation policy                                | Operational pilot gate; full public system deferred            |
-| `SEC-006`                     | Medium                          | ElevenLabs five-minute duration is enforced only by UI                                    | Safe locally; public-backend requirement                       |
-| `SEC-007`                     | Medium repository/tooling risk  | Development-only lint/build dependencies have unresolved high-severity advisories         | Maintain before broader contributor/CI exposure                |
-| `PERF-001`                    | High                            | Recording and processing memory grow with take size                                       | Controlled-pilot evidence gate                                 |
-| `PERF-002`                    | Medium                          | Successful ElevenLabs audio has no output-byte ceiling                                    | Recommended pilot hardening; required before self-serve/public |
-| `PERF-003`                    | Medium at scale, Low locally    | Reference idempotency repair scans retained assets                                        | Safe to defer                                                  |
-| `SYS-TEST-001` / `TEST-004`   | Medium                          | Missing browser coverage for Decart cap/tick/end/error                                    | Required with `ARCH-001`; recommended with `ARCH-002`          |
-| `SYS-TEST-002` / `TEST-005`   | High                            | Physical-target recording-memory evidence is absent                                       | Required for every support claim                               |
-| `SYS-TEST-003` / `TEST-006`   | Medium                          | No negative tests for oversized successful provider audio                                 | Required with `PERF-002`                                       |
-| `DOC-001` / `TEST-007`        | High release-evidence risk      | Included provider paths lack live account/device qualification                            | Required for the controlled pilot                              |
-| `UX-001` / `TEST-001`         | Critical interaction risk       | Runtime/automated recovery is complete; named physical and assistive evidence is pending  | Unconditional controlled-pilot gate until physical evidence    |
-| `UX-002` / `TEST-002`         | High journey risk               | Saved-character entry opens generic Saved, not Characters                                 | Required for the default Character pilot                       |
-| `PROD-003`                    | High trust risk                 | Direct Decart Start omits the Dock’s provider/data/session disclosure                     | Controlled-pilot gate                                          |
-| `UI-TEST-VISUAL` / `TEST-003` | High sign-off risk              | Curated visual states can be semantically wrong or unsettled                              | Required for visual/mobile sign-off                            |
+| ID                            | Severity                        | Finding                                                                                             | Release classification                                            |
+| ----------------------------- | ------------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- |
+| `ARCH-001`                    | High                            | Runtime cap/tick/end boundary implemented; paid live maximum-duration qualification pending         | Controlled-pilot evidence gate                                    |
+| `ARCH-002`                    | Medium                          | Decart errors are flattened beyond useful recovery                                                  | Recommended before wider local release                            |
+| `ARCH-003`                    | High for public scale           | Coordinator, storage, and owner model are single-process/single-operator                            | Safe to defer; public-launch blocker                              |
+| `SEC-001`                     | Critical for remote exposure    | No public authentication, authorization, or tenant boundary                                         | Safe to defer locally; public-launch blocker                      |
+| `SEC-002`                     | High for remote exposure        | No rate, entitlement, concurrency, or provider-cost enforcement                                     | Safe to defer locally; public-launch blocker                      |
+| `SEC-003`                     | High for public deployment      | CSP/COEP disabled for provider-origin compatibility                                                 | Safe to defer locally; public-launch blocker                      |
+| `SEC-004`                     | High for external personal data | Immutable reference media has no ordinary deletion/retention lifecycle                              | Disclosure/cleanup gate; full fix deferred                        |
+| `SEC-005`                     | High                            | Provider settings are not an application moderation policy                                          | Operational pilot gate; full public system deferred               |
+| `SEC-006`                     | Medium                          | ElevenLabs five-minute duration is enforced only by UI                                              | Safe locally; public-backend requirement                          |
+| `SEC-007`                     | Medium repository/tooling risk  | Development-only lint/build dependencies have unresolved high-severity advisories                   | Maintain before broader contributor/CI exposure                   |
+| `PERF-001`                    | High                            | Recording and processing memory grow with take size                                                 | Controlled-pilot evidence gate                                    |
+| `PERF-002`                    | Medium                          | Successful ElevenLabs audio has no output-byte ceiling                                              | Recommended pilot hardening; required before self-serve/public    |
+| `PERF-003`                    | Medium at scale, Low locally    | Reference idempotency repair scans retained assets                                                  | Safe to defer                                                     |
+| `SYS-TEST-001` / `TEST-004`   | Medium                          | Cap/tick/end automated coverage implemented; live boundary and broader typed-error evidence pending | Live required with `ARCH-001`; errors recommended with `ARCH-002` |
+| `SYS-TEST-002` / `TEST-005`   | High                            | Physical-target recording-memory evidence is absent                                                 | Required for every support claim                                  |
+| `SYS-TEST-003` / `TEST-006`   | Medium                          | No negative tests for oversized successful provider audio                                           | Required with `PERF-002`                                          |
+| `DOC-001` / `TEST-007`        | High release-evidence risk      | Included provider paths lack live account/device qualification                                      | Required for the controlled pilot                                 |
+| `UX-001` / `TEST-001`         | Critical interaction risk       | Runtime/automated recovery is complete; named physical and assistive evidence is pending            | Unconditional controlled-pilot gate until physical evidence       |
+| `UX-002` / `TEST-002`         | High journey risk               | Saved-character entry opens generic Saved, not Characters                                           | Required for the default Character pilot                          |
+| `PROD-003`                    | High trust risk                 | Direct Decart Start omits the Dock’s provider/data/session disclosure                               | Controlled-pilot gate                                             |
+| `UI-TEST-VISUAL` / `TEST-003` | High sign-off risk              | Curated visual states can be semantically wrong or unsettled                                        | Required for visual/mobile sign-off                               |
 
 ### ARCH-001 — Browser drops Decart active-session constraints
 
@@ -1019,6 +1019,16 @@ single-operator.
 - **Dependencies:** `ARCH-003` storage migration.
 - **Regression risk:** Medium during migration.
 
+**Implementation update (2026-07-28):** the browser now preserves and validates the app-owned
+maximum, starts one monotonic clock only after session commit, exposes maximum/elapsed/remaining
+with a static 30-second warning, reconciles allowlisted SDK tick/end seconds without exposing raw
+reasons, retains reconnect budget, distinguishes early end/disconnect from expected completion,
+and preserves local fallback/current recipe. Expected expiry during recording routes through the
+existing finalize-before-release owner. Deterministic unit/controller and focused Chromium
+coverage pass, as do the matching WebKit and mobile-project journeys. The finding remains a
+controlled-pilot evidence gate until both claimed Decart configurations pass the gated paid
+maximum-duration smoke on the supported physical matrix.
+
 ### SYS-TEST-001 / TEST-004 — Decart lifecycle behavior is not covered
 
 - **Category:** Testing / provider lifecycle.
@@ -1038,6 +1048,13 @@ single-operator.
 - **MVP timing:** **Required with `ARCH-001`; recommended with `ARCH-002`.**
 - **Dependencies:** App-owned session usage/error types.
 - **Regression risk:** Low.
+
+**Implementation update (2026-07-28):** automated coverage now includes API constraint
+preservation/rejection, accelerated monotonic boundary and warning, forward-only provider
+reconciliation, reconnect-budget retention, expected and early generation ends, listener cleanup,
+late/cancel/unmount owners, raw-reason non-leakage, and expiry-during-recording ordering. The
+remaining `TEST-004` work is live maximum-duration evidence plus the broader safe typed-error
+classes tracked with `ARCH-002`.
 
 ### SYS-TEST-002 / TEST-005 — Physical recording evidence is absent
 

@@ -114,7 +114,7 @@ export const emptyIconStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-export const topToolbarStyles = (theme: Theme): CSSObject => ({
+export const topToolbarStyles = (theme: Theme, stacked = false): CSSObject => ({
   position: 'absolute',
   zIndex: theme.layers.stageChrome,
   insetBlockStart: 'clamp(0.65rem, 1.4vw, 1rem)',
@@ -125,19 +125,34 @@ export const topToolbarStyles = (theme: Theme): CSSObject => ({
   justifyContent: 'space-between',
   gap: theme.space.xs,
   pointerEvents: 'none',
+  ...(stacked
+    ? {
+        '@media (max-width: 39.99rem), (max-height: 36rem)': {
+          alignItems: 'flex-start',
+        },
+      }
+    : {}),
 });
 
-export const toolbarGroupStyles = (theme: Theme): CSSObject => ({
+export const toolbarGroupStyles = (theme: Theme, stacked = false): CSSObject => ({
   display: 'flex',
   minWidth: 0,
   alignItems: 'center',
   gap: theme.space.xs,
   pointerEvents: 'auto',
+  ...(stacked
+    ? {
+        '@media (max-width: 39.99rem), (max-height: 36rem)': {
+          flexDirection: 'column',
+          alignItems: 'flex-start',
+        },
+      }
+    : {}),
 });
 
 export const badgeStyles = (
   theme: Theme,
-  tone: 'neutral' | 'accent' | 'recording' = 'neutral',
+  tone: 'neutral' | 'accent' | 'recording' | 'warning' = 'neutral',
 ): CSSObject => ({
   display: 'inline-flex',
   minWidth: 0,
@@ -146,20 +161,32 @@ export const badgeStyles = (
   gap: theme.space.xxs,
   padding: '0.38rem 0.68rem',
   overflow: 'hidden',
-  border: `1px solid ${tone === 'recording' ? theme.colors.recording : tone === 'accent' ? theme.colors.accent : theme.colors.borderStrong}`,
+  border: `1px solid ${
+    tone === 'recording'
+      ? theme.colors.recording
+      : tone === 'accent'
+        ? theme.colors.accent
+        : tone === 'warning'
+          ? theme.colors.warning
+          : theme.colors.borderStrong
+  }`,
   borderRadius: theme.radii.round,
   color:
     tone === 'recording'
       ? theme.colors.recording
       : tone === 'accent'
         ? theme.colors.accentStrong
-        : theme.colors.text,
+        : tone === 'warning'
+          ? theme.colors.warning
+          : theme.colors.text,
   background:
     tone === 'recording'
       ? theme.colors.recordingSoft
       : tone === 'accent'
         ? theme.colors.accentSoft
-        : theme.colors.overlaySurface,
+        : tone === 'warning'
+          ? theme.colors.warningSoft
+          : theme.colors.overlaySurface,
   boxShadow: tone === 'recording' ? theme.shadows.recording : theme.shadows.soft,
   backdropFilter: 'blur(10px)',
   fontFamily: tone === 'recording' ? theme.type.mono : theme.type.sans,
@@ -253,7 +280,7 @@ export const guideCornerStyles = (position: 'tl' | 'tr' | 'bl' | 'br'): CSSObjec
 
 export const statusDotStyles = (
   theme: Theme,
-  tone: 'neutral' | 'accent' | 'recording',
+  tone: 'neutral' | 'accent' | 'recording' | 'warning',
 ): CSSObject => ({
   width: '0.5rem',
   height: '0.5rem',
@@ -264,13 +291,17 @@ export const statusDotStyles = (
       ? theme.colors.recording
       : tone === 'accent'
         ? theme.colors.accent
-        : theme.colors.textFaint,
+        : tone === 'warning'
+          ? theme.colors.warning
+          : theme.colors.textFaint,
   boxShadow:
     tone === 'recording'
       ? `0 0 0 0.22rem ${theme.colors.recordingSoft}`
       : tone === 'accent'
         ? `0 0 0 0.18rem ${theme.colors.accentSoft}`
-        : 'none',
+        : tone === 'warning'
+          ? `0 0 0 0.18rem ${theme.colors.warningSoft}`
+          : 'none',
 });
 
 export const blockingOverlayStyles = (

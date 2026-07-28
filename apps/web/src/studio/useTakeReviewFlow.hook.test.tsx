@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup, renderHook } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { useRecording as useRecordingHook } from '../orchestration/recording';
 
@@ -44,14 +44,18 @@ const createRecording = (
 const createSession = (
   releaseForRecordedReview: FlowOptions['session']['releaseForRecordedReview'],
   displayStream: MediaStream,
+  overrides: Partial<FlowOptions['session']> = {},
 ): FlowOptions['session'] =>
   ({
     displayStream,
     draft: { mode: 'local' },
     localStream: displayStream,
+    realtimeSessionTiming: null,
+    completeExpectedModelSession: vi.fn().mockResolvedValue(undefined),
     releaseForRecordedReview,
     remoteStream: null,
     transformedVideoUsable: false,
+    ...overrides,
   }) as FlowOptions['session'];
 
 beforeEach(() => {
@@ -158,6 +162,55 @@ describe('useTakeReviewFlow finalization ownership', () => {
     expect(result.current.recording.presented).toBe(artifact);
     expect(result.current.finalizingStartedAt).toBeNull();
     expect(result.current.finalizingStream).toBeNull();
+  });
+
+  it('finalizes an active take before releasing an AI session that reaches its limit', async () => {
+    const artifact = { id: 'take-at-ai-limit' } as NonNullable<RecordingController['presented']>;
+    const finalization = deferred<RecordingController['presented']>();
+    const events: string[] = [];
+    const stop = vi.fn(() => {
+      events.push('recorder-stop');
+      return finalization.promise;
+    }) as RecordingController['stop'];
+    const recording = createRecording(stop);
+    useRecording.mockReturnValue(recording);
+    const releaseForRecordedReview = vi.fn(() => {
+      events.push('live-release');
+      return Promise.resolve();
+    });
+    const session = createSession(releaseForRecordedReview, {} as MediaStream, {
+      draft: { mode: 'lucy-2.5' } as FlowOptions['session']['draft'],
+      realtimeSessionTiming: {
+        status: 'limit-reached',
+        maximumSeconds: 300,
+        elapsedSeconds: 300,
+        remainingSeconds: 0,
+        warning: false,
+      },
+    });
+
+    const { rerender } = renderHook(() =>
+      useTakeReviewFlow({
+        session,
+        onReviewCleared: vi.fn(),
+      }),
+    );
+
+    expect(stop).toHaveBeenCalledOnce();
+    expect(releaseForRecordedReview).not.toHaveBeenCalled();
+
+    act(() => {
+      recording.lifecycle = 'recorded';
+      recording.presented = artifact;
+      session.realtimeSessionTiming = null;
+      finalization.resolve(artifact);
+      rerender();
+    });
+    await waitFor(() => expect(releaseForRecordedReview).toHaveBeenCalledOnce());
+
+    expect(events).toEqual(['recorder-stop', 'live-release']);
+    expect(releaseForRecordedReview).toHaveBeenCalledOnce();
+    expect(session.completeExpectedModelSession).not.toHaveBeenCalled();
   });
 });
 

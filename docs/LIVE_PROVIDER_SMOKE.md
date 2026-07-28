@@ -79,6 +79,32 @@ Pass requires correct model scope, explicit action ordering, usable output gatin
 4. Wait for usable remote video, make one atomic live Apply, record a short take, and select **Stop recording**.
 5. Confirm the take remains playable/downloadable, provider usage ends, recorded playback remains on the stage, and no local preview is reacquired.
 
+## Decart maximum-duration qualification
+
+Run this paid five-minute boundary pass only after the short Lucy/VTON checks above pass and the
+Billing Authorizer approves the additional duration. Run once for each Decart model/account
+configuration claimed for the pilot; use non-sensitive synthetic or disposable media and record
+only the final 10–15 seconds.
+
+1. Start the model and verify the stage timer appears only after the healthy connection commits.
+   Record the displayed **5:00 maximum** without capturing the temporary credential or media.
+2. Allow one SDK-managed reconnect if it occurs naturally; confirm elapsed/remaining time does not
+   reset. Provider ticks may move the display forward but must not move it backward.
+3. At 30 seconds remaining, verify the static **AI session ending soon** status is announced once
+   and does not displace **Record** or **Stop recording**.
+4. Start a 10–15 second take before the boundary and do not manually stop it. At expected
+   completion, verify both recorder outputs finalize before provider/local track release, recorded
+   playback remains usable, and no crash/error notice or automatic reconnect appears.
+5. Repeat without recording. Verify expected completion returns to local preview, retains the
+   current recipe, labels the session completed, and permits a later deliberate Start with a fresh
+   full budget.
+6. Record only content-free evidence: date/time, model, SDK/app commit, browser/device, account
+   configuration identifier, warning observed, expected-end classification, ordering result, and
+   owner initials. Do not record raw SDK reasons, provider bodies, URLs, credentials, or media.
+
+Any early end, timer reset, missing warning, raw provider leakage, take loss, cleanup inversion, or
+automatic reconnect after the maximum fails the pass and follows the escalation procedure.
+
 ## Selected-provider character references
 
 Release any prior take first. Use non-sensitive, disposable character directions

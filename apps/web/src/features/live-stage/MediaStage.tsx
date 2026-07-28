@@ -1,7 +1,11 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTheme } from '@emotion/react';
 import { formatDuration } from '../recording/recordingHelpers';
-import { type SessionLifecycle, type StudioMode } from '../media-session';
+import {
+  type RealtimeSessionTiming,
+  type SessionLifecycle,
+  type StudioMode,
+} from '../media-session';
 import {
   activityIndicatorStyles,
   badgeStyles,
@@ -30,6 +34,7 @@ export type MediaStageProps = {
   lifecycle: SessionLifecycle;
   recording: boolean;
   recordingSeconds: number;
+  realtimeSessionTiming?: RealtimeSessionTiming | null;
   controls?: ReactNode | ((state: StageControlVisibility) => ReactNode);
   idleAction?: ReactNode;
   experienceLabel?: string | undefined;
@@ -169,6 +174,7 @@ export const MediaStage = ({
   lifecycle,
   recording,
   recordingSeconds,
+  realtimeSessionTiming = null,
   controls,
   idleAction,
   experienceLabel,
@@ -480,6 +486,23 @@ export const MediaStage = ({
     stageControlsVisibilityContext === null || stageControlsVisibility.visible;
   const renderedControls =
     typeof controls === 'function' ? controls({ visible: resolvedStageControlsVisible }) : controls;
+  const showRealtimeTiming =
+    realtimeSessionTiming !== null &&
+    presentation.kind !== 'playback' &&
+    presentation.kind !== 'finalizing';
+  const realtimeTimingLabel = realtimeSessionTiming
+    ? realtimeSessionTiming.status === 'completed'
+      ? `AI ${formatDuration(realtimeSessionTiming.maximumSeconds)} / ${formatDuration(
+          realtimeSessionTiming.maximumSeconds,
+        )} · complete`
+      : `AI ${formatDuration(realtimeSessionTiming.elapsedSeconds)} / ${formatDuration(
+          realtimeSessionTiming.maximumSeconds,
+        )} · ${formatDuration(realtimeSessionTiming.remainingSeconds)} left`
+    : null;
+  const realtimeTimingTone =
+    realtimeSessionTiming?.warning || realtimeSessionTiming?.status === 'limit-reached'
+      ? 'warning'
+      : 'accent';
 
   return (
     <figure
@@ -546,8 +569,8 @@ export const MediaStage = ({
         <span css={guideCornerStyles('br')} />
       </div>
 
-      <div css={topToolbarStyles(theme)}>
-        <div css={toolbarGroupStyles(theme)}>
+      <div css={topToolbarStyles(theme, showRealtimeTiming)}>
+        <div css={toolbarGroupStyles(theme, showRealtimeTiming)}>
           <span
             role={recording ? 'timer' : 'status'}
             aria-live={recording ? 'off' : 'polite'}
@@ -559,6 +582,22 @@ export const MediaStage = ({
             <span css={statusDotStyles(theme, statusToneResolved)} aria-hidden="true" />
             <span>{statusLabel}</span>
           </span>
+          {showRealtimeTiming && realtimeSessionTiming && realtimeTimingLabel ? (
+            <span
+              role="timer"
+              aria-live="off"
+              aria-label={`AI session maximum ${formatDuration(
+                realtimeSessionTiming.maximumSeconds,
+              )}, elapsed ${formatDuration(
+                realtimeSessionTiming.elapsedSeconds,
+              )}, ${formatDuration(realtimeSessionTiming.remainingSeconds)} remaining`}
+              css={badgeStyles(theme, realtimeTimingTone)}
+              data-realtime-session-status={realtimeSessionTiming.status}
+            >
+              <span css={statusDotStyles(theme, realtimeTimingTone)} aria-hidden="true" />
+              <span>{realtimeTimingLabel}</span>
+            </span>
+          ) : null}
         </div>
 
         <div css={toolbarGroupStyles(theme)}>

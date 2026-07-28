@@ -19,9 +19,14 @@ As a creator, I want to preview a Lucy VTON 3 garment transformation, so that I 
    open the Dock, or **Choose Saved Try-On** to use the Shelf.
 5. In **Try-On recipe**, provide a garment direction, attach a temporary garment image, or both. Prompt enhancement is optional and off by default. Start stays unavailable until text or an image exists.
 6. Start the configured experience and wait through short-lived credential issuance and the provider connection.
-7. Confirm that live transformed video is present on stage. Before a usable transformed video track exists, recording stays unavailable and local fallback is retained.
+7. Confirm that live transformed video is present on stage. Before a usable transformed video
+   track exists, recording stays unavailable and local fallback is retained. After connection, the
+   stage shows the authoritative **5:00 maximum** and elapsed/remaining time.
 8. Update garment text, image, or enhancement as needed. Select **Apply changes** to commit the complete draft, or **Revert draft** to restore the current applied snapshot.
 9. Use **Change**, **Stop AI**, or Dock **Reset AI** deliberately. To capture the result, select **Record**, then **Stop recording**, and complete take review.
+10. At 30 seconds remaining, read the accessible **AI session ending soon** warning. Expected
+    completion preserves the current garment recipe and local preview; an active take finalizes
+    before provider/local resources release.
 
 The Dock remains an alternate direct path: select **Virtual Try-On · VTON 3**,
 optionally **Check camera & mic**, and choose **Start Virtual Try-On AI** after
@@ -33,6 +38,8 @@ the draft is valid. The implementation model ID remains `lucy-vton-3`.
 - Empty recipe input disables Start before camera access and token issuance.
 - Clearing a manual image revokes its ephemeral browser preview; it is not stored in Recipe Shelf.
 - If provider video fails, ends, or disconnects, return to the local preview and retry/stop deliberately.
+- An expected maximum-duration completion is shown as completion, not as a provider crash. An early
+  generation end remains a distinct safe recovery state.
 
 ## Completion criteria
 

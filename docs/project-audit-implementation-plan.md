@@ -64,6 +64,14 @@ establish release evidence for every included capability.
 
 **Findings:** `ARCH-001`, `PROD-004`, `DOC-001`, `TEST-004`, `TEST-007`
 
+**Implementation status (2026-07-28):** the `ARCH-001`/`PROD-004` runtime and High `TEST-004`
+automated portion is implemented: validated constraint preservation, connected-time monotonic
+budget, allowlisted tick/end reconciliation, warning/expected completion, local fallback, and
+recording-finalization ordering all have deterministic coverage plus a focused Chromium journey.
+The maximum-duration journey also passes in WebKit and the mobile project. The phase remains active
+because the paid maximum-duration Decart live passes, the rest of `DOC-001`/`TEST-007` provider
+qualification, named physical-device evidence, and dated evidence record are still pending.
+
 | Field          | Plan                                                                                                                                                                                                                                                                    |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Scope          | Preserve token constraints in browser types; app-owned session clock/events; warning and expected-expiry outcome; local fallback; gated live evidence for Lucy, exact VTO, ElevenLabs, and separate OpenAI/BFL/Wiro configurations.                                     |

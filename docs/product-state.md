@@ -440,6 +440,13 @@ recording controls** now passes component, real-time mobile touch-context, 200%-
 canonical viewport checks. The capability remains incomplete until the named physical
 browser/device and assistive-technology evidence passes.
 
+Implementation note (2026-07-28): the runtime and automated portion of **Visible AI time
+boundary** now preserves the validated server maximum, starts one monotonic post-commit budget,
+shows elapsed/remaining time plus a static 30-second warning, distinguishes expected from early
+end/disconnect, and finalizes a boundary-crossing take before resource release. The capability
+remains a pilot gate until the paid five-minute live smoke passes for both claimed Decart
+configurations on the qualified physical matrix.
+
 ### Required before an unassisted local beta
 
 - lightweight in-context first-use guidance based on observed hesitation points;

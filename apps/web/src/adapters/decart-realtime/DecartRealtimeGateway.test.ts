@@ -59,6 +59,8 @@ describe('Decart realtime gateway', () => {
     const callbacks = {
       onRemoteStream: vi.fn(),
       onConnectionChange: vi.fn(),
+      onGenerationTick: vi.fn(),
+      onGenerationEnded: vi.fn(),
       onError: vi.fn(),
     };
     const initialImage = new File(['portrait'], 'portrait.webp', { type: 'image/webp' });
@@ -107,18 +109,50 @@ describe('Decart realtime gateway', () => {
       initial: { prompt: '', image: new File(['garment'], 'top.png'), enhance: false },
       onRemoteStream: vi.fn(),
       onConnectionChange: vi.fn(),
+      onGenerationTick: vi.fn(),
+      onGenerationEnded: vi.fn(),
       onError: vi.fn(),
     });
 
     session.disconnect();
     session.disconnect();
 
-    expect(sdk.on).toHaveBeenCalledOnce();
-    expect(sdk.off).toHaveBeenCalledOnce();
+    expect(sdk.on).toHaveBeenCalledTimes(3);
+    expect(sdk.off).toHaveBeenCalledTimes(3);
     expect(sdk.disconnect).toHaveBeenCalledOnce();
     await expect(session.apply({ prompt: 'late', image: null, enhance: false })).rejects.toThrow(
       'Realtime session is disconnected.',
     );
+  });
+
+  it('forwards allowlisted lifecycle seconds without exposing the provider end reason', async () => {
+    const onGenerationTick = vi.fn();
+    const onGenerationEnded = vi.fn();
+    const session = await connectDecartRealtime({
+      apiKey: 'browser-scoped-token',
+      model: 'lucy-2.5',
+      localStream: {} as MediaStream,
+      initial: { prompt: 'Adult field host', image: null, enhance: false },
+      onRemoteStream: vi.fn(),
+      onConnectionChange: vi.fn(),
+      onGenerationTick,
+      onGenerationEnded,
+      onError: vi.fn(),
+    });
+    const listenerFor = (event: string) =>
+      sdk.on.mock.calls.find(([registeredEvent]) => registeredEvent === event)?.[1] as
+        ((value: unknown) => void) | undefined;
+
+    listenerFor('generationTick')?.({ seconds: 42, providerDetail: 'private tick detail' });
+    listenerFor('generationEnded')?.({
+      seconds: 299,
+      reason: 'raw provider reason must remain private',
+    });
+
+    expect(onGenerationTick).toHaveBeenCalledWith({ elapsedSeconds: 42 });
+    expect(onGenerationEnded).toHaveBeenCalledWith({ elapsedSeconds: 299 });
+    expect(JSON.stringify(onGenerationEnded.mock.calls)).not.toContain('raw provider reason');
+    session.disconnect();
   });
 
   it('stops only its cloned provider input and disconnects a client that resolves after abort', async () => {
@@ -155,6 +189,8 @@ describe('Decart realtime gateway', () => {
       signal: controller.signal,
       onRemoteStream: vi.fn(),
       onConnectionChange: vi.fn(),
+      onGenerationTick: vi.fn(),
+      onGenerationEnded: vi.fn(),
       onError: vi.fn(),
     });
     const rejection = expect(pending).rejects.toMatchObject({ name: 'AbortError' });

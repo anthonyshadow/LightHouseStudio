@@ -7,19 +7,27 @@ import {
 } from '../../adapters/decart-realtime/DecartRealtimeGateway';
 import { hasLiveVideo } from '../../adapters/browser-media/browserMedia';
 import type { ModelMode } from '../../features/media-session';
+import {
+  createRealtimeSessionClock,
+  type RealtimeSessionClock,
+  type RealtimeSessionTiming,
+} from './realtimeSessionClock';
 
-export type RealtimeDisconnectReason = 'provider-disconnected' | 'remote-ended';
+export type RealtimeDisconnectReason =
+  'provider-disconnected' | 'remote-ended' | 'generation-ended';
 
 export type RealtimeResourceOptions = {
   operationRef: RefObject<number>;
   onConnectionChange: (state: RealtimeConnectionState) => void;
   onDisconnected: (reason: RealtimeDisconnectReason) => void;
+  onSessionLimitReached: () => void;
   onProviderError: () => void;
 };
 
 export type RealtimeConnectInput = {
   operation: number;
   apiKey: string;
+  maxSessionDurationSeconds: number;
   model: ModelMode;
   localStream: MediaStream;
   initial: RealtimeSnapshot;
@@ -28,9 +36,11 @@ export type RealtimeConnectInput = {
 
 export type RealtimeResource = {
   remoteStream: MediaStream | null;
+  sessionTiming: RealtimeSessionTiming | null;
   connect: (input: RealtimeConnectInput) => Promise<boolean>;
   apply: (snapshot: RealtimeSnapshot) => Promise<void>;
   disconnect: () => void;
+  completeExpectedSession: () => void;
   hasSession: () => boolean;
 };
 
@@ -38,11 +48,14 @@ export const useRealtimeResource = ({
   operationRef,
   onConnectionChange,
   onDisconnected,
+  onSessionLimitReached,
   onProviderError,
 }: RealtimeResourceOptions): RealtimeResource => {
   const [remoteStream, setRemoteStream] = useState<MediaStream | null>(null);
+  const [sessionTiming, setSessionTiming] = useState<RealtimeSessionTiming | null>(null);
   const remoteRef = useRef<MediaStream | null>(null);
   const sessionRef = useRef<RealtimeSession | null>(null);
+  const clockRef = useRef<RealtimeSessionClock | null>(null);
   const videoEndListenersRef = useRef(new Map<MediaStreamTrack, EventListener>());
 
   const releaseRemoteTracks = useCallback(
@@ -68,10 +81,24 @@ export const useRealtimeResource = ({
   }, [releaseRemoteTracks]);
 
   const disconnect = useCallback(() => {
+    clockRef.current?.dispose();
+    clockRef.current = null;
+    setSessionTiming(null);
     const current = sessionRef.current;
     sessionRef.current = null;
     current?.disconnect();
     clearRemote();
+  }, [clearRemote]);
+
+  const completeExpectedSession = useCallback(() => {
+    const clock = clockRef.current;
+    if (!clock?.hasReachedLimit()) return;
+    clockRef.current = null;
+    const current = sessionRef.current;
+    sessionRef.current = null;
+    current?.disconnect();
+    clearRemote();
+    clock.complete();
   }, [clearRemote]);
 
   const connect = useCallback(
@@ -101,6 +128,7 @@ export const useRealtimeResource = ({
               const onEnded = () => {
                 videoEndListenersRef.current.delete(videoTrack);
                 if (!remoteRef.current?.getVideoTracks().includes(videoTrack)) return;
+                if (clockRef.current?.hasReachedLimit()) return;
                 ++operationRef.current;
                 disconnect();
                 onDisconnected('remote-ended');
@@ -111,6 +139,7 @@ export const useRealtimeResource = ({
         },
         onConnectionChange: (next) => {
           if (operationRef.current !== input.operation) return;
+          if (next === 'disconnected' && clockRef.current?.hasReachedLimit()) return;
           onConnectionChange(next);
           if (next !== 'disconnected') return;
 
@@ -118,6 +147,17 @@ export const useRealtimeResource = ({
           ++operationRef.current;
           disconnect();
           onDisconnected('provider-disconnected');
+        },
+        onGenerationTick: ({ elapsedSeconds }) => {
+          if (operationRef.current !== input.operation) return;
+          clockRef.current?.reconcileProviderElapsed(elapsedSeconds);
+        },
+        onGenerationEnded: ({ elapsedSeconds }) => {
+          if (operationRef.current !== input.operation) return;
+          if (clockRef.current?.handleProviderEnd(elapsedSeconds)) return;
+          ++operationRef.current;
+          disconnect();
+          onDisconnected('generation-ended');
         },
         onError: () => {
           if (operationRef.current === input.operation) onProviderError();
@@ -130,6 +170,13 @@ export const useRealtimeResource = ({
         return false;
       }
       sessionRef.current = session;
+      clockRef.current = createRealtimeSessionClock({
+        maximumSeconds: input.maxSessionDurationSeconds,
+        onTimingChange: setSessionTiming,
+        onLimitReached: () => {
+          if (operationRef.current === input.operation) onSessionLimitReached();
+        },
+      });
       return true;
     },
     [
@@ -138,6 +185,7 @@ export const useRealtimeResource = ({
       onConnectionChange,
       onDisconnected,
       onProviderError,
+      onSessionLimitReached,
       operationRef,
       releaseRemoteTracks,
     ],
@@ -155,10 +203,20 @@ export const useRealtimeResource = ({
     () => () => {
       sessionRef.current?.disconnect();
       sessionRef.current = null;
+      clockRef.current?.dispose();
+      clockRef.current = null;
       clearRemote();
     },
     [clearRemote],
   );
 
-  return { remoteStream, connect, apply, disconnect, hasSession };
+  return {
+    remoteStream,
+    sessionTiming,
+    connect,
+    apply,
+    disconnect,
+    completeExpectedSession,
+    hasSession,
+  };
 };

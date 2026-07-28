@@ -73,11 +73,21 @@ tab-ephemeral object-URL lifecycle.
 2. Model input is validated before camera access. Local mode needs no AI input.
 3. Explicit Start obtains or reuses local media. The primary surface starts local media first and then opens the AI experience chooser; the Dock may start a validated model directly. A model start resolves the selected model's camera requirements only after validation.
 4. After healthy local video exists, the browser requests a short-lived credential from the loopback broker.
-5. The broker validates Host, an Origin with the exact same loopback host and port, the body, the optional session profile, and the model allowlist. It then asks Decart for an origin/model-scoped credential with a five-minute connection-start TTL. Studio omits the compatibility profile identifier, so the API applies its default five-minute active-session scope; the retired Guided profile remains an internal compatibility contract rather than a UI route.
-6. The browser dynamically imports the official Decart SDK and connects a cloned provider-input stream derived from the owned local tracks. Local preview remains independently owned and available as the display fallback until a live transformed video track exists.
-7. Start or Apply sends one complete prompt/image/enhancement snapshot. `image: null` is meaningful: it clears provider image state.
-8. The last successful snapshot becomes `AppliedRealtimeState`. Further edits stay pending until Apply; Revert restores the working draft.
-9. Stop/Reset invalidates the operation generation, aborts the browser token request, disconnects provider resources, and disposes late results. Reset also clears the ephemeral reference and applied state.
+5. The broker validates Host, an Origin with the exact same loopback host and port, the body, the optional session profile, and the model allowlist. It then asks Decart for an origin/model-scoped credential with a five-minute connection-start TTL and returns the separately enforced `constraints.maxSessionDurationSeconds`. Studio omits the compatibility profile identifier, so the API applies its default five-minute active-session scope; the retired Guided profile remains an internal compatibility contract rather than a UI route.
+6. The browser validates the response, rejects a missing or model-mismatched constraint, and maps it into an app-owned credential result without exposing provider payloads to presentation/domain types.
+7. The browser dynamically imports the official Decart SDK and connects a cloned provider-input stream derived from the owned local tracks. Local preview remains independently owned and available as the display fallback until a live transformed video track exists.
+8. Only after the connected session commits does `useRealtimeResource` start one monotonic active-session clock. The stage exposes the authoritative maximum and non-live-region elapsed/remaining timer. A static accessible warning appears at 30 seconds remaining. Allowlisted SDK `generationTick` seconds can reconcile the display forward across reconnects; they never move it backward, reset the budget, or represent billing truth.
+9. The adapter subscribes only to `generationTick`, `generationEnded`, and the existing safe error event. It maps lifecycle seconds into app-owned events, keeps the unrestricted provider end reason private, and removes every listener on disconnect. An end at the app boundary is expected completion; an early generation end or disconnect remains a safe unexpected outcome.
+10. Start or Apply sends one complete prompt/image/enhancement snapshot. `image: null` is meaningful: it clears provider image state.
+11. The last successful snapshot becomes `AppliedRealtimeState`. Further edits stay pending until Apply; Revert restores the working draft.
+12. Stop/Reset invalidates the operation generation, aborts the browser token request, disconnects provider resources, disposes late results, and clears the active timer. Reset also clears the ephemeral reference and applied state.
+
+At the expected active-session boundary, orchestration enters `stopping-ai` without presenting an
+error. With no recording, it closes the provider session and returns to local preview while
+preserving the working recipe. With an active take, `useTakeReviewFlow` first coalesces Stop,
+settles main and sidecar recorder data, and only then calls the existing recorded-review release
+boundary. The numerically equal recording maximum is a separate Wave 4 policy and never derives
+from this Decart clock.
 
 Safe camera/device failures remain app-owned session errors. `camera-denied`,
 `permission-denied`, missing, busy, and unavailable device classes receive the shared **Capture

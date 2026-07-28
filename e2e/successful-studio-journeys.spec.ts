@@ -7,6 +7,8 @@ import {
   installSuccessfulStudioHarness,
   openRecipeDockWhenOverlaid,
   readBrowserState,
+  triggerGenerationEnded,
+  triggerGenerationTick,
   triggerProviderDisconnect,
 } from './support/studioHarness';
 
@@ -596,6 +598,45 @@ test('a Lucy model take finalizes before the provider session is released', asyn
   expect(browser.lifecycleEvents).toContain('provider-disconnected');
   expect(browser.lifecycleEvents).toContain('local-video-stopped');
   expect(browser.lifecycleEvents).toContain('local-audio-stopped');
+  expectNoExternalProviderTraffic(network);
+});
+
+test('the Decart maximum warns and finalizes an active take before expected release', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+
+  await openRecipeDockWhenOverlaid(page);
+  await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
+  await page.getByLabel('Character direction').fill('An adult collage field presenter');
+  await page.getByRole('button', { name: 'Start Character AI' }).click();
+  await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
+  await closeRecipeDockWhenOverlaid(page);
+  await expect(
+    page.getByRole('timer', {
+      name: /AI session maximum 5:00, elapsed \d:\d{2}, \d:\d{2} remaining/u,
+    }),
+  ).toBeVisible();
+
+  await triggerGenerationTick(page, 270);
+  await expect(page.getByText('AI session ending soon', { exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Record' }).click();
+  await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
+
+  await triggerGenerationEnded(page, 299);
+  await expect(page.getByLabel('Recorded take playback')).toBeVisible();
+
+  const browser = await readBrowserState(page);
+  const finalizationIndexes = browser.lifecycleEvents.flatMap((event, index) =>
+    event === 'recorder-finalized' ? [index] : [],
+  );
+  const releaseIndexes = browser.lifecycleEvents.flatMap((event, index) =>
+    event === 'provider-disconnected' || event.endsWith('-stopped') ? [index] : [],
+  );
+  expect(finalizationIndexes).toHaveLength(2);
+  expect(Math.min(...releaseIndexes)).toBeGreaterThan(Math.max(...finalizationIndexes));
+  expect(browser.disconnectCalls).toBe(1);
   expectNoExternalProviderTraffic(network);
 });
 
