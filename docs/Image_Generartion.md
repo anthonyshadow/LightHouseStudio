@@ -137,7 +137,7 @@ The client deliberately omits `response_format` because GPT Image returns base64
 
 **Wiro image call:** When Wiro is selected, the broker signs each fixed-origin request with `HMAC-SHA256(key=WIRO_API_KEY, message=WIRO_API_SECRET + nonce)`. It submits exactly one billable Run request with `resolution: "2k"`, `maxImages: 1`, `watermark: "false"`, and aspect ratio `1:1`, `2:3`, or `3:2`. Prompt-only generation uses JSON. Source-guided editing and composition use multipart form data with one owner-scoped `inputImage`; no public temporary upload is created. The broker polls only `POST /Task/Detail`, treats interim `task_error` as a log state rather than failure, waits for `task_postprocess_end`, requires `pexit: "0"` and exactly one supported image output, and never automatically retries the Run request.
 
-**Result handling:** OpenAI requires and strictly decodes `data[0].b64_json`. BFL and Wiro download their result with HTTPS-only, redirect, DNS/private-network, media-type, and byte limits without forwarding provider credentials. Wiro additionally verifies the documented aspect ratio and uses Sharp to normalize 2k output to exactly `1024x1024`, `1024x1536`, or `1536x1024` in the requested JPEG/PNG/WebP encoding. All paths then use the same exact-dimension and immutable-storage validation. After the Wiro local persistence attempt settles, the adapter calls the idempotent `POST /Task/InputOutputDelete` endpoint with the private task token; cleanup failure is safely logged and does not discard an already-stored local asset. Provider/model provenance is authoritative; task/request IDs and allowlisted settings/usage remain private metadata.
+**Result handling:** OpenAI requires and strictly decodes `data[0].b64_json`. Thin BFL and Wiro wrappers use one API-internal downloader and policy for HTTPS-only URLs, per-hop redirect and DNS/private-network rejection, pinned addresses, accepted media types, and byte limits without forwarding provider credentials. Wiro additionally verifies the documented aspect ratio and uses Sharp to normalize 2k output to exactly `1024x1024`, `1024x1536`, or `1536x1024` in the requested JPEG/PNG/WebP encoding. All paths then use the same exact-dimension and immutable-storage validation. After the Wiro local persistence attempt settles, the adapter calls the idempotent `POST /Task/InputOutputDelete` endpoint with the private task token; cleanup failure is safely logged and does not discard an already-stored local asset. Provider/model provenance is authoritative; task/request IDs and allowlisted settings/usage remain private metadata.
 
 ### 4. Upload a source image — `POST /api/reference-images/uploads`
 
@@ -233,5 +233,6 @@ Check capabilities (local configuration only)
 - OpenAI Responses adapter: `apps/api/src/providers/openai/character-prompt-optimizer.ts`
 - OpenAI Images adapter: `apps/api/src/providers/openai/reference-image-provider.ts`
 - Provider factory/interface: `apps/api/src/providers/reference-images/`
-- BFL FLUX.2 Pro adapter and safe downloader: `apps/api/src/providers/bfl/`
-- Wiro Seedream adapter, output normalization, safe downloader, and error mapping: `apps/api/src/providers/wiro/`
+- Shared hardened remote-image and bounded/deadline transport: `apps/api/src/providers/transport/`
+- BFL FLUX.2 Pro adapter, thin downloader wrapper, and error mapping: `apps/api/src/providers/bfl/`
+- Wiro Seedream adapter, output normalization, thin downloader wrapper, and error mapping: `apps/api/src/providers/wiro/`

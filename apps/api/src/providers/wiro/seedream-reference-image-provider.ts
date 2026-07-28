@@ -8,6 +8,11 @@ import {
   type ReferenceImageProvider,
   ReferenceImageProviderError,
 } from '../reference-images/reference-image-provider.js';
+import {
+  abortableDelay,
+  createProviderOperationDeadline,
+  readBoundedJson,
+} from '../transport/bounded-provider-transport.js';
 import { normalizeWiroImage } from './normalize-image.js';
 import { SafeWiroImageDownloader, type DownloadedWiroImage } from './safe-image-downloader.js';
 
@@ -20,7 +25,6 @@ export const WIRO_TASK_DELETE_ENDPOINT = 'https://api.wiro.ai/v1/Task/InputOutpu
 export const WIRO_REFERENCE_IMAGE_TIMEOUT_MS = 180_000;
 
 const WIRO_CLEANUP_TIMEOUT_MS = 10_000;
-const MAX_WIRO_JSON_BYTES = 1024 * 1024;
 const INITIAL_POLL_DELAY_MS = 1_000;
 const MAX_POLL_DELAY_MS = 5_000;
 const MAX_CONSECUTIVE_POLL_FAILURES = 3;
@@ -97,48 +101,8 @@ const providerError = (
 ): ReferenceImageProviderError =>
   new ReferenceImageProviderError(reason, { providerId: 'wiro', ...options });
 
-const abortableDelay = (milliseconds: number, signal: AbortSignal): Promise<void> =>
-  new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(new DOMException('Aborted', 'AbortError'));
-      return;
-    }
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(new DOMException('Aborted', 'AbortError'));
-    };
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort);
-      resolve();
-    }, milliseconds);
-    signal.addEventListener('abort', onAbort, { once: true });
-  });
-
-const readLimitedJson = async (response: Response): Promise<unknown> => {
-  const declaredLength = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_WIRO_JSON_BYTES) {
-    throw providerError('invalid-response', { upstreamStatus: response.status });
-  }
-  if (response.body === null) throw providerError('invalid-response');
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let byteLength = 0;
-  while (true) {
-    const next = await reader.read();
-    if (next.done) break;
-    byteLength += next.value.byteLength;
-    if (byteLength > MAX_WIRO_JSON_BYTES) {
-      await reader.cancel();
-      throw providerError('invalid-response', { upstreamStatus: response.status });
-    }
-    chunks.push(next.value);
-  }
-  try {
-    return JSON.parse(Buffer.concat(chunks, byteLength).toString('utf8')) as unknown;
-  } catch (error) {
-    throw providerError('invalid-response', { upstreamStatus: response.status, cause: error });
-  }
-};
+const readLimitedJson = (response: Response): Promise<unknown> =>
+  readBoundedJson(response, (options) => providerError('invalid-response', options));
 
 const errorText = (errors: readonly unknown[]): string =>
   errors
@@ -299,22 +263,14 @@ export class WiroSeedreamReferenceImageProvider implements ReferenceImageProvide
     input: GenerateReferenceImageProviderInput,
     multipartBody?: FormData,
   ): Promise<GeneratedReferenceImagePayload> {
-    const deadlineController = new AbortController();
-    let deadlineExpired = false;
+    const deadline = createProviderOperationDeadline(input.signal, this.#timeoutMs);
     let cleanupAcceptedTask: (() => Promise<void>) | undefined;
-    const onCallerAbort = () => deadlineController.abort(input.signal?.reason);
-    input.signal?.addEventListener('abort', onCallerAbort, { once: true });
-    if (input.signal?.aborted === true) deadlineController.abort(input.signal.reason);
-    const deadlineTimer = setTimeout(() => {
-      deadlineExpired = true;
-      deadlineController.abort();
-    }, this.#timeoutMs);
 
     try {
       return await this.#submitPollDownloadAndNormalize(
         input,
         multipartBody,
-        deadlineController.signal,
+        deadline.signal,
         (taskId, taskToken) => {
           cleanupAcceptedTask = () => this.#cleanupRemoteArtifacts(taskId, taskToken);
         },
@@ -322,12 +278,11 @@ export class WiroSeedreamReferenceImageProvider implements ReferenceImageProvide
     } catch (error) {
       await cleanupAcceptedTask?.();
       if (error instanceof ReferenceImageProviderError) throw error;
-      if (deadlineExpired) throw providerError('timeout', { cause: error });
+      if (deadline.didExpire()) throw providerError('timeout', { cause: error });
       if (input.signal?.aborted === true) throw providerError('aborted', { cause: error });
       throw providerError('connection', { cause: error });
     } finally {
-      clearTimeout(deadlineTimer);
-      input.signal?.removeEventListener('abort', onCallerAbort);
+      deadline.dispose();
     }
   }
 

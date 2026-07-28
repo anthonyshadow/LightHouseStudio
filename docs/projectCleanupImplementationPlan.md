@@ -2,17 +2,17 @@
 
 ## Current status
 
-| Item                    | Status                                                                                                                                                                                                                                                            |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                  |
-| Date generated          | 2026-07-27                                                                                                                                                                                                                                                        |
-| Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                           |
-| Open findings           | 6 unresolved (6 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, DEAD-003, ARCH-001, and ARCH-002 resolved                                                                                                                                                |
-| Remaining phases        | 6                                                                                                                                                                                                                                                                 |
-| Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                             |
-| Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                      |
-| Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted. |
-| Graphify status         | PHASE-003 refresh completed at 3,663 nodes / 8,260 edges (from 3,659 / 8,245), with only the known non-source `hooks.json` zero-node warning. Dialog, generation, identity, validation, and shared-style ownership now resolve through their intended boundaries. |
+| Item                    | Status                                                                                                                                                                                                                                                                                                              |
+| ----------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                                                                    |
+| Date generated          | 2026-07-27                                                                                                                                                                                                                                                                                                          |
+| Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                                                                             |
+| Open findings           | 5 unresolved (5 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, DEAD-003, ARCH-001, ARCH-002, and DUP-001 resolved                                                                                                                                                                                         |
+| Remaining phases        | 5                                                                                                                                                                                                                                                                                                                   |
+| Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                                                                               |
+| Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                                                                        |
+| Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted.                                                   |
+| Graphify status         | PHASE-004 refresh completed at 3,674 nodes / 8,296 edges (from 3,663 / 8,260), with only the known non-source `hooks.json` zero-node warning. BFL and Wiro retain separate protocol paths and converge through their thin wrappers only at the shared hardened transport and identical bounded/deadline primitives. |
 
 ## Execution rules
 
@@ -30,92 +30,15 @@
 
 ## Remaining phases overview
 
-| Phase ID  | Title                                            | Finding IDs | Risk        | Dependencies                | Expected outcome                                                                    |
-| --------- | ------------------------------------------------ | ----------- | ----------- | --------------------------- | ----------------------------------------------------------------------------------- |
-| PHASE-004 | Consolidate hardened provider download transport | DUP-001     | High        | None                        | One security-reviewed downloader policy with provider-specific protocols preserved  |
-| PHASE-005 | Consolidate reference-asset finalization         | DUP-002     | Medium      | PHASE-004                   | One typed service-private persistence path for generate/edit/compose                |
-| PHASE-006 | Share image-picker/drop presentation             | DUP-003     | Low-medium  | None                        | Shared accessible DOM behavior without merging storage/lifecycle policy             |
-| PHASE-007 | Decompose independent Studio root controllers    | COMP-001    | Medium-high | PHASE-006                   | Smaller composition root with identical stage/overlay topology                      |
-| PHASE-008 | Decompose recipe handoff internals               | STATE-001   | High        | PHASE-007                   | Focused state workflows behind the unchanged Studio facade                          |
-| PHASE-009 | Reconcile final documentation                    | DOC-001     | Low         | PHASE-004 through PHASE-008 | Correct canonical filename/links and documentation aligned with implemented cleanup |
+| Phase ID  | Title                                         | Finding IDs | Risk        | Dependencies                | Expected outcome                                                                    |
+| --------- | --------------------------------------------- | ----------- | ----------- | --------------------------- | ----------------------------------------------------------------------------------- |
+| PHASE-005 | Consolidate reference-asset finalization      | DUP-002     | Medium      | None                        | One typed service-private persistence path for generate/edit/compose                |
+| PHASE-006 | Share image-picker/drop presentation          | DUP-003     | Low-medium  | None                        | Shared accessible DOM behavior without merging storage/lifecycle policy             |
+| PHASE-007 | Decompose independent Studio root controllers | COMP-001    | Medium-high | PHASE-006                   | Smaller composition root with identical stage/overlay topology                      |
+| PHASE-008 | Decompose recipe handoff internals            | STATE-001   | High        | PHASE-007                   | Focused state workflows behind the unchanged Studio facade                          |
+| PHASE-009 | Reconcile final documentation                 | DOC-001     | Low         | PHASE-005 through PHASE-008 | Correct canonical filename/links and documentation aligned with implemented cleanup |
 
 ## Phase sections
-
-### PHASE-004: Consolidate hardened provider download transport
-
-#### Objective
-
-Create one narrowly scoped, security-reviewed implementation of safe remote-image download/bounded response behavior while keeping BFL and Wiro protocols and error semantics independent.
-
-#### Findings resolved
-
-- `DUP-001`
-
-#### Scope
-
-BFL/Wiro safe-image downloaders, repeated bounded byte/JSON and abortable deadline helpers where behavior is demonstrably identical, provider wrappers, and adversarial tests.
-
-#### Out of scope
-
-Unifying provider clients/task state machines, prompts, errors, polling URLs, retries, cleanup, dimension normalization, credentials, routes, or reference service finalization.
-
-#### Dependencies
-
-None.
-
-#### Risk assessment
-
-- **Regression risk:** High.
-- **Architectural risk:** Medium.
-- **Data/compatibility risk:** Low.
-- **User-facing/security risk:** High if SSRF, abort, MIME, or size policy changes.
-- **Rollback difficulty:** Medium.
-
-#### Implementation sequence
-
-1. Create a shared behavior matrix from both downloader test suites: scheme/host parsing, DNS results, private/reserved addresses, redirect revalidation, pinned connection, byte/MIME limits, abort and deadline.
-2. Reconcile any existing behavioral difference explicitly; preserve stricter behavior.
-3. Extract an API-internal downloader with narrow dependency injection and policy inputs; keep provider wrappers translating errors/context.
-4. Share only aligned bounded-response/delay primitives.
-5. Retain separate submission/polling/status/file-cleanup flows and tests, plus a common adversarial contract executed against both wrappers.
-
-#### Graphify requirements
-
-Before/after map both providers through factory/service/routes and downloader/test dependencies. Confirm the two duplicated implementations consolidate into one appropriately consumed node, provider-specific paths remain distinct, no cycle/cross-package violation appears, and no public API changes.
-
-#### Acceptance criteria
-
-Every previous adversarial case passes for both providers; redirect/DNS/private-network checks happen at every hop; deadlines/abort/byte/MIME behavior is unchanged or stricter; BFL/Wiro task protocols/errors/cleanup remain separate; duplicated security implementation is removed.
-
-#### Required validation
-
-Both complete provider suites and reference route/service integration; `npm run quality`; `npm run test:coverage`; `npm run test:production`; `npm run test:e2e`; Graphify/module checks. Live provider smoke remains manual/gated.
-
-#### Rollback strategy
-
-Revert the shared module and restore provider-local implementations/tests. Avoid a staged compatibility layer that leaves two security sources of truth.
-
-#### Documentation updates
-
-Resolve DUP-001 with the exact policy/API and graph consolidation. Update Architecture/LIVE_PROVIDER_SMOKE only if implementation ownership descriptions change.
-
-#### Standalone implementation prompt
-
-```text
-Implement only PHASE-004 (“Consolidate hardened provider download transport”), resolving DUP-001. Read all repository instructions, findings/plan, Architecture, privacy and live-provider smoke docs, plus complete BFL/Wiro source and tests. Verify PHASE-003 completion; inspect branch/commit/status and protect user work.
-
-Preserve public contracts and all current or stricter security behavior: URL/scheme rules, DNS/private/reserved rejection on every redirect, address pinning, byte/media limits, abort and one-deadline behavior. Preserve BFL trusted polling URL, Wiro pinned Task API, provider-specific submission/status/errors, Wiro normalization/file cleanup, and no silent fallback. Do not create a generic provider client or change retries/prompts/routes.
-
-Run baselines. Read Graphify instructions and map BFL/Wiro provider factory→service→route paths, downloader callers/tests, fan-in/out, exports and cycles. Confirm textual/behavior duplication from source and build an explicit adversarial behavior matrix before moving code.
-
-Extract one narrow API-internal safe remote-image downloader with explicit dependencies/policy and thin provider wrappers. Share bounded byte/JSON/deadline primitives only where contracts are identical. Execute a common adversarial contract against both wrappers while retaining provider-specific tests. Remove duplicate implementations completely.
-
-Run graphify update . and verify the two security paths converge only at the intended transport, provider protocols remain distinct, consumers/exports are intact, and no cycles/layer violations occur. Run full BFL/Wiro/reference integration tests, npm run quality, npm run test:coverage, npm run test:production and npm run test:e2e. Live provider checks remain manual unless explicitly authorized.
-
-Only after all security/validation criteria pass, mark DUP-001 Resolved with changes/files/tests/Graphify/limitations/PHASE-004. Preserve history; add new findings under new IDs. Remove PHASE-004 and its overview row, update counts/dependencies, never renumber. Keep it if any behavior is unresolved.
-
-Report security invariants, consolidation, provider-specific behavior retained, validation/graph diff, failures/new findings, docs, self-removal and next phase.
-```
 
 ### PHASE-005: Consolidate reference-asset finalization
 
@@ -137,7 +60,7 @@ Provider transport, public routes/contracts, prompts, idempotency/coalescing red
 
 #### Dependencies
 
-PHASE-004.
+None. PHASE-004 is complete.
 
 #### Risk assessment
 
@@ -441,7 +364,7 @@ New production cleanup, rewriting historical rationale, claiming the project is 
 
 #### Dependencies
 
-PHASE-004 through PHASE-008.
+PHASE-005 through PHASE-008. PHASE-004 is complete.
 
 #### Risk assessment
 

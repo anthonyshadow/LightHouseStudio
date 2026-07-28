@@ -7,13 +7,17 @@ import {
   type ReferenceImageProvider,
   ReferenceImageProviderError,
 } from '../reference-images/reference-image-provider.js';
+import {
+  abortableDelay,
+  createProviderOperationDeadline,
+  readBoundedJson,
+} from '../transport/bounded-provider-transport.js';
 import { SafeBflImageDownloader, type DownloadedProviderImage } from './safe-image-downloader.js';
 
 export const BFL_FLUX_2_PRO_MODEL = 'flux-2-pro' as const;
 export const BFL_FLUX_2_PRO_ENDPOINT = 'https://api.us2.bfl.ai/v1/flux-2-pro';
 export const BFL_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
 const BFL_API_HOSTNAME_PATTERN = /^api(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*\.bfl\.ai$/u;
-const MAX_BFL_JSON_BYTES = 1024 * 1024;
 const INITIAL_POLL_DELAY_MS = 500;
 const MAX_POLL_DELAY_MS = 5_000;
 const MAX_CONSECUTIVE_POLL_FAILURES = 3;
@@ -64,32 +68,8 @@ const providerError = (
 ): ReferenceImageProviderError =>
   new ReferenceImageProviderError(reason, { providerId: 'bfl', ...options });
 
-const readLimitedJson = async (response: Response): Promise<unknown> => {
-  const declaredLength = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declaredLength) && declaredLength > MAX_BFL_JSON_BYTES) {
-    throw providerError('invalid-response', { upstreamStatus: response.status });
-  }
-  if (response.body === null) throw providerError('invalid-response');
-  const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
-  let byteLength = 0;
-  while (true) {
-    const next = await reader.read();
-    if (next.done) break;
-    byteLength += next.value.byteLength;
-    if (byteLength > MAX_BFL_JSON_BYTES) {
-      await reader.cancel();
-      throw providerError('invalid-response', { upstreamStatus: response.status });
-    }
-    chunks.push(next.value);
-  }
-  try {
-    const bytes = Buffer.concat(chunks, byteLength);
-    return JSON.parse(bytes.toString('utf8')) as unknown;
-  } catch (error) {
-    throw providerError('invalid-response', { upstreamStatus: response.status, cause: error });
-  }
-};
+const readLimitedJson = (response: Response): Promise<unknown> =>
+  readBoundedJson(response, (options) => providerError('invalid-response', options));
 
 const failureForHttpStatus = (
   status: number,
@@ -107,23 +87,6 @@ const failureForHttpStatus = (
   if (status === 429) return providerError('rate-limit', options);
   return providerError('failure', options);
 };
-
-const abortableDelay = (milliseconds: number, signal: AbortSignal): Promise<void> =>
-  new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(new DOMException('Aborted', 'AbortError'));
-      return;
-    }
-    const onAbort = () => {
-      clearTimeout(timer);
-      reject(new DOMException('Aborted', 'AbortError'));
-    };
-    const timer = setTimeout(() => {
-      signal.removeEventListener('abort', onAbort);
-      resolve();
-    }, milliseconds);
-    signal.addEventListener('abort', onAbort, { once: true });
-  });
 
 const safeUsage = (response: BflSubmitResponse): Readonly<Record<string, number>> | undefined => {
   const usage = {
@@ -209,26 +172,17 @@ export class BflFlux2ReferenceImageProvider implements ReferenceImageProvider {
     input: GenerateReferenceImageProviderInput,
     inputImage?: string,
   ): Promise<GeneratedReferenceImagePayload> {
-    const deadlineController = new AbortController();
-    let deadlineExpired = false;
-    const onCallerAbort = () => deadlineController.abort(input.signal?.reason);
-    input.signal?.addEventListener('abort', onCallerAbort, { once: true });
-    if (input.signal?.aborted === true) deadlineController.abort(input.signal.reason);
-    const deadlineTimer = setTimeout(() => {
-      deadlineExpired = true;
-      deadlineController.abort();
-    }, this.#timeoutMs);
+    const deadline = createProviderOperationDeadline(input.signal, this.#timeoutMs);
 
     try {
-      return await this.#submitPollAndDownload(input, inputImage, deadlineController.signal);
+      return await this.#submitPollAndDownload(input, inputImage, deadline.signal);
     } catch (error) {
       if (error instanceof ReferenceImageProviderError) throw error;
-      if (deadlineExpired) throw providerError('timeout', { cause: error });
+      if (deadline.didExpire()) throw providerError('timeout', { cause: error });
       if (input.signal?.aborted === true) throw providerError('aborted', { cause: error });
       throw providerError('connection', { cause: error });
     } finally {
-      clearTimeout(deadlineTimer);
-      input.signal?.removeEventListener('abort', onCallerAbort);
+      deadline.dispose();
     }
   }
 
