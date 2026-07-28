@@ -347,14 +347,17 @@ describe('StudioApp composition lifecycle', () => {
   it('keeps the mounted stage node stable while overlays change', () => {
     render(<StudioApp />);
     const stage = screen.getByTestId('media-stage');
+    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Open dock' }));
     expect(screen.getByRole('region', { name: 'Recipe Dock' })).toBeInTheDocument();
     expect(screen.getByTestId('media-stage')).toBe(stage);
+    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
 
     fireEvent.click(screen.getByRole('button', { name: 'Toggle shelf' }));
     expect(screen.getByTestId('creative-panel')).toHaveTextContent('shelf');
     expect(screen.getByTestId('media-stage')).toBe(stage);
+    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
   });
 
   it('hydrates and atomically hands a saved reference recipe to the session', async () => {

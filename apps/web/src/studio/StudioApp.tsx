@@ -11,19 +11,8 @@ import {
 } from 'react';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
-import type { SavedCharacterPrompt } from '../features/creative-assets/types';
 import { useCreativeAssetRepository } from '../features/creative-assets/useCreativeAssetRepository';
-import {
-  createCharacterEditDraftValue,
-  prepareCharacterBuilderLaunch,
-} from '../features/character-builder/characterBuilderLaunch';
-import type {
-  CharacterBuilderDraftValueV1,
-  CharacterBuilderTarget,
-} from '../features/character-builder/characterBuilderPersistence';
-import { createLocalProjectRepository } from '../features/guided-flow/projectRepository';
-import type { ProjectStorageState } from '../features/guided-flow/types';
-import { MediaStage, type StageNotice } from '../features/live-stage';
+import { MediaStage } from '../features/live-stage';
 import {
   confirmModeReplacement,
   hasDraftContent,
@@ -33,7 +22,6 @@ import {
 import { isModelSessionActive } from '../features/media-session/sessionComposerModel';
 import { persistedReferenceAssetId } from '../features/media-session/types';
 import { CaptureSettingsPanel, RecordingControls } from '../features/recording';
-import { useStrictModeSafeDisposable } from '../orchestration/lifecycle/useStrictModeSafeDisposable';
 import { useStudioSession } from '../orchestration/session';
 import { Button, OverlayPanel, StudioDesignProvider } from '../ui';
 import {
@@ -49,6 +37,9 @@ import { AIExperienceChooser } from './AIExperienceChooser';
 import { StudioHeader } from './StudioHeader';
 import { StudioSessionControlBar } from './StudioSessionControlBar';
 import { resolveLegacyEntry, type StudioInitialOverlay } from './routeResolution';
+import { deriveStudioStageNotices, isStudioFormError } from './studioStageNotices';
+import { useCharacterBuilderLaunchController } from './useCharacterBuilderLaunchController';
+import { useLegacyProjectAvailability } from './useLegacyProjectAvailability';
 import { useProviderAvailability } from './useProviderAvailability';
 import {
   useReferenceRecipeHandoff,
@@ -81,25 +72,22 @@ const deferredPanelFallback = <p role="status">Loading studio tool…</p>;
 const REVIEW_LOCK_REASON =
   'Download and close or discard the recorded take before starting or changing media.';
 
-const FORM_ERROR_CODES = new Set(['model-input-required', 'apply-failed']);
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
 interface StudioExperienceProps {
   initialOverlay: StudioInitialOverlay;
 }
 
-type CharacterBuilderLaunch = {
-  readonly target: CharacterBuilderTarget;
-  readonly initialValue?: CharacterBuilderDraftValueV1 | undefined;
-};
-
 const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   const theme = useTheme();
   const repository = useMemo(() => createCreativeAssetRepository(), []);
   const repositoryState = useCreativeAssetRepository(repository);
-  const legacyRepository = useStrictModeSafeDisposable(
-    useMemo(() => createLocalProjectRepository(), []),
-  );
+  const {
+    repository: legacyRepository,
+    storage: legacyStorage,
+    projectCount: legacyProjectCount,
+    synchronizeProjectCount: synchronizeLegacyProjectCount,
+  } = useLegacyProjectAvailability();
   const browser = useMemo(() => detectBrowserCapabilities(), []);
   const {
     availability,
@@ -115,22 +103,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   } = useStudioOverlayController(
     initialOverlay?.kind === 'legacy-projects' ? 'legacy-projects' : null,
   );
-  const [legacyStorage, setLegacyStorage] = useState<ProjectStorageState>(() =>
-    legacyRepository.getStorageState(),
-  );
-  const [legacyProjectCount, setLegacyProjectCount] = useState(0);
   const [dismissedNotices, setDismissedNotices] = useState<ReadonlySet<string>>(new Set());
-  const [characterBuilderLaunch, setCharacterBuilderLaunch] = useState<CharacterBuilderLaunch>({
-    target: { kind: 'create' },
-  });
-  const [characterBuilderDiscardPrompt, setCharacterBuilderDiscardPrompt] = useState<string | null>(
-    null,
-  );
-  const [characterBuilderLaunchError, setCharacterBuilderLaunchError] = useState<string | null>(
-    null,
-  );
-  const characterBuilderDiscardResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
-  const characterBuilderLaunchPendingRef = useRef(false);
   const promptCommittedHandlerRef = useRef<PromptCommittedHandler>(noopPromptCommitted);
   const characterSelectorRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
@@ -142,44 +115,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     closeOverlay();
     window.requestAnimationFrame(() => dockToggleRef.current?.focus());
   }, [closeOverlay]);
-  const requestCharacterBuilderDraftDiscard = useCallback(
-    (message: string): Promise<boolean> =>
-      new Promise((resolve) => {
-        characterBuilderDiscardResolverRef.current?.(false);
-        characterBuilderDiscardResolverRef.current = resolve;
-        setCharacterBuilderDiscardPrompt(message);
-      }),
-    [],
-  );
-  const resolveCharacterBuilderDraftDiscard = useCallback((confirmed: boolean) => {
-    const resolve = characterBuilderDiscardResolverRef.current;
-    characterBuilderDiscardResolverRef.current = null;
-    setCharacterBuilderDiscardPrompt(null);
-    resolve?.(confirmed);
-  }, []);
-
-  useEffect(
-    () => () => {
-      characterBuilderDiscardResolverRef.current?.(false);
-      characterBuilderDiscardResolverRef.current = null;
-    },
-    [],
-  );
-
-  useEffect(() => {
-    let active = true;
-    void legacyRepository.initialize().then((storage) => {
-      if (!active) return;
-      setLegacyStorage(storage);
-      void legacyRepository.list().then((projects) => {
-        if (active) setLegacyProjectCount(projects.length);
-      });
-    });
-    return () => {
-      active = false;
-    };
-  }, [legacyRepository]);
-
   const handlePromptCommitted = useCallback<PromptCommittedHandler>(
     (...args) => promptCommittedHandlerRef.current(...args),
     [],
@@ -214,6 +149,24 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
       : reviewLocked
         ? 'Download and close or discard the current take before building a character.'
         : undefined;
+  const openCharacterBuilderOverlay = useCallback(
+    () => openOverlay('character-builder'),
+    [openOverlay],
+  );
+  const {
+    launch: characterBuilderLaunch,
+    discardPrompt: characterBuilderDiscardPrompt,
+    launchError: characterBuilderLaunchError,
+    openNewCharacter: openCharacterBuilder,
+    editCharacter,
+    resolveDiscard: resolveCharacterBuilderDraftDiscard,
+    dismissLaunchError: dismissCharacterBuilderLaunchError,
+  } = useCharacterBuilderLaunchController({
+    ...(characterBuilderOpenBlockedReason
+      ? { blockedReason: characterBuilderOpenBlockedReason }
+      : {}),
+    onOpen: openCharacterBuilderOverlay,
+  });
   const openWorkshopOverlay = useCallback(() => openOverlay('workshop'), [openOverlay]);
   const handoff = useReferenceRecipeHandoff({
     repository,
@@ -265,7 +218,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   }, [recordCommittedPrompt]);
 
   useEffect(() => {
-    if (!session.error || FORM_ERROR_CODES.has(session.error.code)) return;
+    if (!session.error || isStudioFormError(session.error)) return;
     closeOverlayIf(['recipe-dock', 'capture-settings']);
   }, [closeOverlayIf, session.error]);
 
@@ -273,103 +226,39 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     setDismissedNotices((current) => new Set([...current, id]));
   }, []);
 
-  const stageNotices = useMemo<readonly StageNotice[]>(() => {
-    const notices: StageNotice[] = [];
-    const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
-
-    if (!localCaptureAvailable) {
-      notices.push({
-        id: 'local-capture-unavailable',
-        severity: 'error',
-        title: 'Camera capture needs a secure supported browser',
-        message:
-          'Open the studio on localhost or HTTPS in a current browser with camera and microphone APIs.',
-        priority: 950,
-      });
-    }
-
-    if (capabilityState === 'error' && !dismissedNotices.has('provider-broker')) {
-      notices.push({
-        id: 'provider-broker',
-        severity: 'warning',
-        title: 'Integration broker is unreachable',
-        message: 'Local preparation still works, but provider availability could not be checked.',
-        action: { label: 'Retry check', onAction: retryProviderAvailability },
-        onDismiss: () => dismissNotice('provider-broker'),
-      });
-    }
-
-    if (characterBuilderLaunchError) {
-      notices.push({
-        id: 'character-builder-launch',
-        severity: 'error',
-        title: 'Character Builder could not open',
-        message: characterBuilderLaunchError,
-        priority: 925,
-        onDismiss: () => setCharacterBuilderLaunchError(null),
-      });
-    }
-
-    if (session.error && !FORM_ERROR_CODES.has(session.error.code)) {
-      const deviceError = [
-        'permission-denied',
-        'device-missing',
-        'device-busy',
-        'media-unavailable',
-      ].includes(session.error.code);
-      notices.push({
-        id: `session-${session.error.code}`,
-        severity: 'error',
-        title: session.error.message,
-        message: session.error.recovery ?? 'Review the setup and try again.',
-        priority: 900,
-        action: deviceError
-          ? { label: 'Capture settings', onAction: () => openOverlay('capture-settings') }
-          : { label: 'Dismiss', onAction: session.clearError },
-        onDismiss: session.clearError,
-      });
-    }
-
-    if (recording.recordingError) {
-      notices.push({
-        id: 'recording-error',
-        severity: 'error',
-        title: 'Recording stopped',
-        message: recording.recordingError,
-        priority: 1_000,
-      });
-    }
-
-    if (
-      recording.sidecar.state === 'error' &&
-      recording.sidecar.error &&
-      !dismissedNotices.has('recording-sidecar')
-    ) {
-      notices.push({
-        id: 'recording-sidecar',
-        severity: 'warning',
-        title: 'Video preserved without separate voice audio',
-        message: recording.sidecar.error,
-        onDismiss: () => dismissNotice('recording-sidecar'),
-      });
-    }
-
-    return notices;
-  }, [
-    browser.mediaDevices,
-    browser.secureContext,
-    capabilityState,
-    characterBuilderLaunchError,
-    dismissNotice,
-    dismissedNotices,
-    recording.recordingError,
-    recording.sidecar.error,
-    recording.sidecar.state,
-    retryProviderAvailability,
-    session.clearError,
-    session.error,
-    openOverlay,
-  ]);
+  const stageNotices = useMemo(
+    () =>
+      deriveStudioStageNotices({
+        localCaptureAvailable: browser.mediaDevices && browser.secureContext,
+        capabilityState,
+        dismissedNoticeIds: dismissedNotices,
+        characterBuilderLaunchError,
+        sessionError: session.error,
+        recordingError: recording.recordingError,
+        sidecarError: recording.sidecar.state === 'error' ? recording.sidecar.error : null,
+        onRetryProviderAvailability: retryProviderAvailability,
+        onDismissCharacterBuilderLaunchError: dismissCharacterBuilderLaunchError,
+        onOpenCaptureSettings: () => openOverlay('capture-settings'),
+        onClearSessionError: session.clearError,
+        onDismissNotice: dismissNotice,
+      }),
+    [
+      browser.mediaDevices,
+      browser.secureContext,
+      capabilityState,
+      characterBuilderLaunchError,
+      dismissCharacterBuilderLaunchError,
+      dismissNotice,
+      dismissedNotices,
+      openOverlay,
+      recording.recordingError,
+      recording.sidecar.error,
+      recording.sidecar.state,
+      retryProviderAvailability,
+      session.clearError,
+      session.error,
+    ],
+  );
 
   const closeCreativePanel = closeOverlay;
 
@@ -388,39 +277,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     openOverlay('capture-settings');
   };
 
-  const launchCharacterBuilder = async (launch: CharacterBuilderLaunch) => {
-    if (characterBuilderOpenBlockedReason || characterBuilderLaunchPendingRef.current) return;
-    characterBuilderLaunchPendingRef.current = true;
-    setCharacterBuilderLaunchError(null);
-    try {
-      const ready = await prepareCharacterBuilderLaunch({
-        target: launch.target,
-        confirmDiscard: requestCharacterBuilderDraftDiscard,
-      });
-      if (!ready) return;
-      setCharacterBuilderLaunch(launch);
-      openOverlay('character-builder');
-    } catch (error) {
-      setCharacterBuilderLaunchError(
-        error instanceof Error
-          ? error.message
-          : 'The Character Builder draft could not be prepared. Try again.',
-      );
-    } finally {
-      characterBuilderLaunchPendingRef.current = false;
-    }
-  };
-  const openCharacterBuilder = () => void launchCharacterBuilder({ target: { kind: 'create' } });
-  const editCharacter = (asset: SavedCharacterPrompt) =>
-    void launchCharacterBuilder({
-      target: {
-        kind: 'edit',
-        characterId: asset.id,
-        originalName: asset.name,
-        originalPrompt: asset.prompt,
-      },
-      initialValue: createCharacterEditDraftValue(asset),
-    });
   const openCharacterSelector = () => openOverlay('character-selector');
 
   const openLegacyProjects = () => openOverlay('legacy-projects');
@@ -753,10 +609,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
               repository={legacyRepository}
               storage={legacyStorage}
               focusProjectId={initialOverlay?.focusProjectId ?? null}
-              onProjectCountChange={(count) => {
-                setLegacyProjectCount(count);
-                setLegacyStorage(legacyRepository.getStorageState());
-              }}
+              onProjectCountChange={synchronizeLegacyProjectCount}
             />
           </Suspense>
         </OverlayPanel>

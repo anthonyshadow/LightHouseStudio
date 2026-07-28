@@ -2,17 +2,17 @@
 
 ## Current status
 
-| Item                    | Status                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                                                                                                                                                                            |
-| Date generated          | 2026-07-27                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                                                                                                                                                                                     |
-| Open findings           | 3 unresolved (3 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, DEAD-003, ARCH-001, ARCH-002, DUP-001, DUP-002, and DUP-003 resolved                                                                                                                                                                                                                                                                               |
-| Remaining phases        | 3                                                                                                                                                                                                                                                                                                                                                                                                                           |
-| Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                                                                                                                                                                                       |
-| Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                                                                                                                                                                                |
-| Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted.                                                                                                                                                           |
-| Graphify status         | PHASE-006 moved the graph from 3,662 nodes / 8,294 edges to a 3,674 / 8,305 code checkpoint, then to 3,662 / 8,293 after roadmap self-removal and final test strengthening, with only the known non-source `hooks.json` zero-node warning. Builder and Recipe Dock now consume one neutral `ImagePickerDropField`; immutable upload policy and tab-ephemeral validation/object-URL policy remain on separate feature paths. |
+| Item                    | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                |
+| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Date generated          | 2026-07-27                                                                                                                                                                                                                                                                                                                                                                                                                                            |
+| Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                                                                                                                                                                                                               |
+| Open findings           | 2 unresolved (2 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, DEAD-003, ARCH-001, ARCH-002, DUP-001, DUP-002, DUP-003, and COMP-001 resolved                                                                                                                                                                                                                                                                                               |
+| Remaining phases        | 2                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
+| Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                                                                                                                                                                                                                 |
+| Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                                                                                                                                                                                                          |
+| Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted.                                                                                                                                                                                     |
+| Graphify status         | PHASE-007 moved the graph from 3,662 nodes / 8,293 edges to a 3,686 / 8,346 code checkpoint and 3,673 / 8,333 after roadmap self-removal, with only the known non-source `hooks.json` zero-node warning. `StudioApp` degree fell 83→73 and `StudioExperience` 26→24; the entrypoint still reaches one `MediaStage` in two hops, and notice, legacy availability, and Builder launch/discard responsibilities now reach focused directly tested units. |
 
 ## Execution rules
 
@@ -30,90 +30,12 @@
 
 ## Remaining phases overview
 
-| Phase ID  | Title                                         | Finding IDs | Risk        | Dependencies                | Expected outcome                                                                    |
-| --------- | --------------------------------------------- | ----------- | ----------- | --------------------------- | ----------------------------------------------------------------------------------- |
-| PHASE-007 | Decompose independent Studio root controllers | COMP-001    | Medium-high | None                        | Smaller composition root with identical stage/overlay topology                      |
-| PHASE-008 | Decompose recipe handoff internals            | STATE-001   | High        | PHASE-007                   | Focused state workflows behind the unchanged Studio facade                          |
-| PHASE-009 | Reconcile final documentation                 | DOC-001     | Low         | PHASE-007 through PHASE-008 | Correct canonical filename/links and documentation aligned with implemented cleanup |
+| Phase ID  | Title                              | Finding IDs | Risk | Dependencies | Expected outcome                                                                    |
+| --------- | ---------------------------------- | ----------- | ---- | ------------ | ----------------------------------------------------------------------------------- |
+| PHASE-008 | Decompose recipe handoff internals | STATE-001   | High | None         | Focused state workflows behind the unchanged Studio facade                          |
+| PHASE-009 | Reconcile final documentation      | DOC-001     | Low  | PHASE-008    | Correct canonical filename/links and documentation aligned with implemented cleanup |
 
 ## Phase sections
-
-### PHASE-007: Decompose independent Studio root controllers
-
-#### Objective
-
-Keep `StudioApp` as the explicit composition boundary and one persistent stage while extracting stable, independently testable lifecycle controllers and pure notice policy.
-
-#### Findings resolved
-
-- `COMP-001`
-
-#### Scope
-
-Legacy-project availability controller, Character Builder launch/discard coordination, stage-notice derivation, and narrowly typed overlay composition where justified.
-
-#### Out of scope
-
-Global state/context/router; moving `MediaStage`; handoff internals (PHASE-008); UI redesign; command/provider/recording policy changes.
-
-#### Dependencies
-
-None.
-
-#### Risk assessment
-
-- **Regression risk:** Medium-high.
-- **Architectural risk:** Medium-high.
-- **Data/compatibility risk:** Medium.
-- **User-facing risk:** High if stage remount/focus/notice ordering changes.
-- **Rollback difficulty:** Medium.
-
-#### Implementation sequence
-
-1. Characterize render/mount topology, stage identity, overlay focus, pending launch promises, notice priority, and legacy state with tests.
-2. Extract pure stage-notice derivation.
-3. Extract legacy availability/init/count/storage controller around the already narrowed compatibility repository.
-4. Extract Builder launch/discard-confirmation controller with explicit settlement/cancellation.
-5. Extract overlay composition only where props remain cohesive; leave resource/session ownership visible at root.
-6. Verify render topology and runtime side-effect order.
-
-#### Graphify requirements
-
-Explain StudioApp and impact paths before/after. Confirm fan-out/responsibility edges move to focused controllers, app entry still mounts one root/stage, no new global/singleton/cycle/feature reversal, and new units have direct tests.
-
-#### Acceptance criteria
-
-One persistent `MediaStage` and existing overlay system remain at identical topology; stage/player continuity and exact geometry pass; notice priority, legacy count/errors, Builder launch/discard settlement and focus are unchanged; root has clearly fewer lifecycle responsibilities without prop-bag indirection.
-
-#### Required validation
-
-New controller/pure tests; Studio composition/Storybook; `npm run quality`; `npm run test:coverage`; `npm run test:e2e`; `npm run test:visual`; `npm run test:production`; Graphify/module checks.
-
-#### Rollback strategy
-
-Re-inline focused hooks/components by reverting the phase. No persisted-data or API migration.
-
-#### Documentation updates
-
-Resolve COMP-001 with responsibility/fan-out/topology evidence; update Architecture only if ownership wording changes.
-
-#### Standalone implementation prompt
-
-```text
-Implement only PHASE-007 (“Decompose independent Studio root controllers”), resolving COMP-001. Read instructions, findings/plan, Architecture, all affected Studio/legacy/Builder/media/overlay journeys and tests. Verify PHASE-002/003/006; inspect branch/commit/status and protect user changes.
-
-Preserve the sole route, StudioApp composition role, exactly one persistent MediaStage/video/player, resource/session ownership, OverlayPanel system/focus, provider consent, command behavior, notice priority, responsive geometry, legacy compatibility and Builder launch/discard semantics. Do not introduce global state/context/router, move the stage, decompose recipe handoff, redesign UI or hide effects in generic utilities.
-
-Run baselines and add characterization tests for mount identity, pending promise settlement, notice priority, legacy availability/errors and overlay focus. Use Graphify before editing to explain StudioApp, callers/entrypoint, fan-out, dynamic panels, hooks/adapters/tests and change-impact paths; verify source/render topology.
-
-Extract: (1) pure stage-notice derivation, (2) a focused legacy availability/init/count/storage controller over the narrowed compatibility repository, and (3) a focused Character Builder launch/discard-confirmation controller with explicit settlement/cancellation. Extract overlay JSX only when it forms a narrow typed composition unit. Keep media/realtime/recording ownership visible at Studio root and avoid prop-bag indirection.
-
-Run graphify update . and compare fan-out/edges. Confirm the entrypoint still mounts one root/stage, responsibilities moved to tested units, and no cycle/global/singleton/reverse-feature edge appears. Run controller/pure tests, Studio/Storybook suites, npm run quality, npm run test:coverage, npm run test:e2e, npm run test:visual and npm run test:production.
-
-Only after all behavior/topology criteria pass, mark COMP-001 Resolved with files/tests/Graphify before-after/limitations/PHASE-007; preserve history and add new IDs. Remove PHASE-007/overview row, update counts/dependencies without renumbering. Keep it if any validation fails.
-
-Report responsibilities extracted, topology invariants, tests/validation, graph changes, failures/new findings, docs, self-removal and next phase.
-```
 
 ### PHASE-008: Decompose recipe handoff internals
 
@@ -135,7 +57,7 @@ Changing public facade semantics; adding a global store/cache; provider/API chan
 
 #### Dependencies
 
-PHASE-007.
+None. PHASE-007 is complete.
 
 #### Risk assessment
 
@@ -211,7 +133,7 @@ New production cleanup, rewriting historical rationale, claiming the project is 
 
 #### Dependencies
 
-PHASE-007 through PHASE-008. PHASE-004 through PHASE-006 are complete.
+PHASE-008. PHASE-004 through PHASE-007 are complete.
 
 #### Risk assessment
 

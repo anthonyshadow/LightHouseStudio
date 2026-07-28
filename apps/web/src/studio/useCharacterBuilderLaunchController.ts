@@ -1,0 +1,136 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { SavedCharacterPrompt } from '../features/creative-assets/types';
+import {
+  createCharacterEditDraftValue,
+  prepareCharacterBuilderLaunch,
+  type PrepareCharacterBuilderLaunchOptions,
+} from '../features/character-builder/characterBuilderLaunch';
+import type {
+  CharacterBuilderDraftValueV1,
+  CharacterBuilderTarget,
+} from '../features/character-builder/characterBuilderPersistence';
+
+export type CharacterBuilderLaunch = Readonly<{
+  target: CharacterBuilderTarget;
+  initialValue?: CharacterBuilderDraftValueV1;
+}>;
+
+export type CharacterBuilderLaunchPreparer = (
+  options: PrepareCharacterBuilderLaunchOptions,
+) => Promise<boolean>;
+
+export type CharacterBuilderLaunchControllerOptions = Readonly<{
+  blockedReason?: string;
+  onOpen: () => void;
+  prepareLaunch?: CharacterBuilderLaunchPreparer;
+}>;
+
+const fallbackLaunchError = 'The Character Builder draft could not be prepared. Try again.';
+
+export const useCharacterBuilderLaunchController = ({
+  blockedReason,
+  onOpen,
+  prepareLaunch = prepareCharacterBuilderLaunch,
+}: CharacterBuilderLaunchControllerOptions) => {
+  const [launch, setLaunch] = useState<CharacterBuilderLaunch>({
+    target: { kind: 'create' },
+  });
+  const [discardPrompt, setDiscardPrompt] = useState<string | null>(null);
+  const [launchError, setLaunchError] = useState<string | null>(null);
+  const discardResolverRef = useRef<((confirmed: boolean) => void) | null>(null);
+  const launchPendingRef = useRef(false);
+  const operationGenerationRef = useRef(0);
+  const mountedRef = useRef(true);
+
+  const settleDiscard = useCallback((confirmed: boolean) => {
+    const resolve = discardResolverRef.current;
+    discardResolverRef.current = null;
+    setDiscardPrompt(null);
+    resolve?.(confirmed);
+  }, []);
+
+  const requestDiscard = useCallback((message: string): Promise<boolean> => {
+    if (!mountedRef.current) return Promise.resolve(false);
+    return new Promise((resolve) => {
+      discardResolverRef.current?.(false);
+      discardResolverRef.current = resolve;
+      setDiscardPrompt(message);
+    });
+  }, []);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      operationGenerationRef.current += 1;
+      launchPendingRef.current = false;
+      discardResolverRef.current?.(false);
+      discardResolverRef.current = null;
+    };
+  }, []);
+
+  const launchCharacterBuilder = useCallback(
+    async (nextLaunch: CharacterBuilderLaunch): Promise<void> => {
+      if (blockedReason || launchPendingRef.current) return;
+      launchPendingRef.current = true;
+      const operationGeneration = ++operationGenerationRef.current;
+      setLaunchError(null);
+      try {
+        const ready = await prepareLaunch({
+          target: nextLaunch.target,
+          confirmDiscard: requestDiscard,
+        });
+        if (
+          !ready ||
+          !mountedRef.current ||
+          operationGenerationRef.current !== operationGeneration
+        ) {
+          return;
+        }
+        setLaunch(nextLaunch);
+        onOpen();
+      } catch (error) {
+        if (mountedRef.current && operationGenerationRef.current === operationGeneration) {
+          setLaunchError(error instanceof Error ? error.message : fallbackLaunchError);
+        }
+      } finally {
+        if (operationGenerationRef.current === operationGeneration) {
+          launchPendingRef.current = false;
+        }
+      }
+    },
+    [blockedReason, onOpen, prepareLaunch, requestDiscard],
+  );
+
+  const openNewCharacter = useCallback(() => {
+    void launchCharacterBuilder({ target: { kind: 'create' } });
+  }, [launchCharacterBuilder]);
+
+  const editCharacter = useCallback(
+    (asset: SavedCharacterPrompt) => {
+      void launchCharacterBuilder({
+        target: {
+          kind: 'edit',
+          characterId: asset.id,
+          originalName: asset.name,
+          originalPrompt: asset.prompt,
+        },
+        initialValue: createCharacterEditDraftValue(asset),
+      });
+    },
+    [launchCharacterBuilder],
+  );
+
+  const dismissLaunchError = useCallback(() => setLaunchError(null), []);
+
+  return {
+    launch,
+    discardPrompt,
+    launchError,
+    launchCharacterBuilder,
+    openNewCharacter,
+    editCharacter,
+    resolveDiscard: settleDiscard,
+    dismissLaunchError,
+  } as const;
+};
