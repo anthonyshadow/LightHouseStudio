@@ -657,7 +657,9 @@ for (const viewport of VIEWPORTS) {
 
       await page.goto('/');
       await expect(page.getByRole('main')).toBeVisible();
-      await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
+      await expect(page.getByLabel('Integration availability')).toContainText(
+        'AI video configured',
+      );
       await page.addStyleTag({
         content: `
           *, *::before, *::after {

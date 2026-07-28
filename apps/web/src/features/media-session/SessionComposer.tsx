@@ -11,8 +11,8 @@ import {
   composerHeaderStyles,
   composerHeadingStyles,
   composerShellStyles,
-  providerDisclosureStyles,
 } from './SessionComposer.styles';
+import { DecartStartDisclosure } from './DecartStartDisclosure';
 import { isModelSessionActive, studioModeOptions } from './sessionComposerModel';
 import { AppliedRecipeSummary, SessionStatus } from './SessionStatus';
 import type { StudioMode } from './types';
@@ -145,12 +145,7 @@ export const SessionComposer = ({
             </StatusNotice>
           ) : null}
 
-          {model ? (
-            <p css={providerDisclosureStyles(theme)}>
-              Starting AI sends live camera, the applied recipe, and optional reference to Decart
-              while connected. Provider usage ends when you stop or finish a model take.
-            </p>
-          ) : null}
+          {model ? <DecartStartDisclosure /> : null}
         </div>
 
         <footer css={composerFooterStyles(theme)}>

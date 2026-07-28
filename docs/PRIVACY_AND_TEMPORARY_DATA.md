@@ -72,7 +72,10 @@ provider-side deletion.
 - **Start Camera + Mic**, **Check camera & mic**, or a valid direct **Start Character/Try-On AI** is the first possible camera/microphone permission request. Editing prompts and recipes does not open devices.
 - **Apply capture settings** stores selected devices/quality for this tab. With no preview it does not start media; with a local preview it atomically acquires a replacement before releasing the current stream.
 - **Check camera & mic** starts only the local preview; provider activation remains a separate action.
-- **Start Character AI / Start Try-On AI** sends live camera media and the complete applied recipe to Decart after local media succeeds.
+- **Start Character AI / Start Try-On AI** surfaces the same decision-point disclosure in the
+  chooser and Dock, then sends live camera/microphone media, the complete applied recipe, and any
+  reference to Decart after local media succeeds. Provider usage may begin for at most 300 active
+  seconds. **Stop AI** ends usage; an active model recording finalizes before resource release.
 - **Apply changes** sends the complete current model snapshot, including an explicit image clear when applicable.
 - **Optimize / Re-optimize reference prompt** sends the raw character recipe and selected framing, orientation, rendering, expression, and background settings through the loopback broker to the OpenAI Responses API with response storage disabled. The result remains separate from the raw recipe and can be edited before generation.
 - Character reference generation exists only in Character Builder. **Generate Preview**, **Generate Combined Preview**, and **Regenerate** require explicit actions, and Builder never silently falls back to a raw prompt after optimizer failure. Each may be billable. Prompt Workshop has no provider or reference-generation action.

@@ -12,17 +12,18 @@ export const useRecipeLibraryMode = (sessionMode: StudioMode) => {
   const mode = sessionMode !== 'local' && !dirty ? sessionMode : selectedMode;
 
   const changeMode = useCallback(
-    (nextMode: ModelMode) => {
-      if (nextMode === mode) return;
+    (nextMode: ModelMode): boolean => {
+      if (nextMode === mode) return true;
       if (
         !canReplaceDirtyLibraryMode(dirty, () =>
           window.confirm('Switch recipe models and discard the unsaved shelf form changes?'),
         )
       ) {
-        return;
+        return false;
       }
       setDirty(false);
       setSelectedMode(nextMode);
+      return true;
     },
     [dirty, mode],
   );

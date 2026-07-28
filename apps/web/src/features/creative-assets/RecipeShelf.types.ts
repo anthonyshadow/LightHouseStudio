@@ -1,6 +1,13 @@
 import type { PromptBuilderDraft } from '../prompt-authoring';
 import type { CreativeAssetRepository, ModelModeId, SavedCharacterPrompt } from './types';
 
+export type RecipeShelfCategory = 'saved' | 'recent' | 'characters';
+
+export type RecipeShelfEntryIntent = Readonly<{
+  id: number;
+  category: RecipeShelfCategory;
+}>;
+
 export interface RecipeSelection {
   origin: 'saved-prompt' | 'recent-prompt' | 'character-prompt';
   prompt: string;
@@ -27,6 +34,9 @@ export interface RecipeShelfProps {
   embedded?: boolean;
   /** Studio-owned applied/preloaded recipe identity used for controlled highlighting. */
   activeRecipe?: ActiveRecipeIdentity;
+  /** App-owned, one-shot category request. It is navigation intent, not selected recipe state. */
+  entryIntent?: RecipeShelfEntryIntent | null;
+  onEntryIntentConsumed?: (id: number) => void;
   onUsePrompt: (selection: RecipeSelection) => void;
   onCreateCharacter?: () => void;
   onEditCharacter?: (asset: SavedCharacterPrompt) => void;

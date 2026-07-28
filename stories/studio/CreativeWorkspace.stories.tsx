@@ -49,6 +49,7 @@ const WorkspaceHarness = () => {
     referenceUsePending: false,
     referenceUseFailure: null,
     legacyProjectCount: 2,
+    recipeShelfEntryIntent: null,
     hasTake: true,
   };
   const actions: CreativeWorkspaceActions = {
@@ -62,6 +63,7 @@ const WorkspaceHarness = () => {
     onUseWorkshop: fn(),
     onSaveWorkshop: fn(),
     onShelfDirtyChange: fn(),
+    onRecipeShelfEntryIntentConsumed: fn(),
     onUseRecipe: fn(),
     onOpenSavedWorkshop: fn(),
     onOpenLegacyProjects: fn(),

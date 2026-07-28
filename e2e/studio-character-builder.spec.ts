@@ -212,8 +212,10 @@ test('prompt-only save performs no image request and immediately preloads the Do
   ).toBeDisabled();
 });
 
-test('using a saved character recipe selects it for the next Start AI action', async ({ page }) => {
-  await installSuccessfulStudioHarness(page);
+test('both saved-character entries open Characters and complete Use through Start', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
@@ -235,9 +237,24 @@ test('using a saved character recipe selects it for the next Start AI action', a
   await expect(
     page.getByRole('button', { name: 'No character selected. Open character options' }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
-  await shelf.getByRole('button', { name: /^Characters/u }).click();
+  await page.getByRole('button', { name: /Open character options/u }).click();
+  await page.getByRole('button', { name: 'Choose saved character' }).click();
+  let shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
+  await expect(shelf.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.keyboard.press('Escape');
+  await expect(shelf).toBeHidden();
+  await expect(page.getByRole('button', { name: 'Shelf', exact: true })).toBeFocused();
+
+  await page.getByRole('button', { name: /Open character options/u }).click();
+  await page.getByRole('button', { name: 'Choose saved character' }).click();
+  shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
+  await expect(shelf.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
   await shelf.getByRole('button', { name: 'Use Shelf Field Host' }).click();
 
   await expect(shelf).toBeHidden();
@@ -249,7 +266,9 @@ test('using a saved character recipe selects it for the next Start AI action', a
   await page.getByRole('button', { name: 'Start Camera + Mic' }).click();
   await expect(page.getByLabel('Local camera preview')).toBeVisible();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
-  const chooser = page.getByRole('dialog', { name: 'Choose AI experience' });
+  let chooser = page.getByRole('dialog', { name: 'Choose AI experience' });
+  await expect(chooser.getByLabel('Decart start disclosure')).toContainText('at most 300 seconds');
+  expect(network.apiRequests.filter(({ path }) => path === '/api/realtime-token')).toHaveLength(0);
   await chooser.getByRole('button', { name: 'Start with Shelf Field Host' }).click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
 
@@ -263,6 +282,25 @@ test('using a saved character recipe selects it for the next Start AI action', a
       },
     },
   ]);
+
+  await page.reload();
+  await page.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await expect(page.getByLabel('Local camera preview')).toBeVisible();
+  await page.getByRole('button', { name: 'Start AI', exact: true }).click();
+  chooser = page.getByRole('dialog', { name: 'Choose AI experience' });
+  await chooser.getByRole('button', { name: 'Choose Saved Character' }).click();
+  shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
+  await expect(shelf.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await shelf.getByRole('button', { name: 'Use Shelf Field Host' }).click();
+  await page.getByRole('button', { name: 'Start AI', exact: true }).click();
+  chooser = page.getByRole('dialog', { name: 'Choose AI experience' });
+  await expect(chooser.getByLabel('Decart start disclosure')).toContainText('Stop AI ends usage');
+  await chooser.getByRole('button', { name: 'Start with Shelf Field Host' }).click();
+  await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
+  expect((await readBrowserState(page)).connections[0]?.model).toBe('lucy-2.5');
 });
 
 test('image-only upload saves and preloads without starting AI, then appears in Recent after Start', async ({

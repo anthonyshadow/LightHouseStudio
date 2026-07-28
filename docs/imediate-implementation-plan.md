@@ -201,6 +201,14 @@ change recording ownership.
 **Findings:** `UX-002`, `TEST-002`, `PROD-012`; canonical `UX-011` camera-permission recovery;
 `PROD-003`; `PROD-013` / `UX-007`
 
+**Status (2026-07-28):** runtime implementation, automated evidence, and maintained-platform
+visual review complete. Both saved-character entries now deliver a consumable `Characters` intent
+to the existing Shelf; camera denial opens Capture Settings, clears the handled error, and permits
+explicit retry without provider work; the chooser and Dock share the same Decart
+transfer/usage/300-second/Stop disclosure; and the header reports
+configured/limited/available-to-try states rather than health. The active audit phase remains open
+because Wave 1 physical touch/device and assistive-technology evidence is still pending.
+
 Use separate, small changes in this order:
 
 1. **Saved-character intent:** pass one-shot `Characters` entry intent into the existing Recipe
@@ -222,6 +230,22 @@ Required evidence:
 - disclosure assertions at every provider Start surface;
 - no-key/local-only tests and unavailable-provider explanations; and
 - intentional visual review only for changed recovery/copy states.
+
+Implemented evidence:
+
+- controller/composition tests cover clean and returning category state, one-shot consumption,
+  dirty-form cancellation, and overlay focus return;
+- the Character Builder browser journey exercises header and AI-chooser entry through
+  **Characters → Use → Start** in Chromium, WebKit, and the mobile project;
+- camera-denial tests exercise **Capture settings**, close, explicit retry, and prove that no
+  realtime token/provider request occurs;
+- component tests assert the shared disclosure at Character, VTO, and Dock Start surfaces; and
+- header tests cover configured integrations, the no-key local-only path, and an unreachable
+  configuration check without health or entitlement claims; and
+- the two changed Darwin baselines (small-mobile selected-character live header and permission
+  recovery) were regenerated and inspected for truthful copy, containment, and action
+  reachability; the pinned Linux/amd64 suite also passed all 29 curated cases without a
+  threshold-exceeding platform diff.
 
 **Exit gate:** primary actions lead where they promise, provider contact is disclosed at the
 decision point, and configuration is never represented as live entitlement or health.

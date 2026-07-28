@@ -85,6 +85,9 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
 - **Correction:** Add concise inline disclosure or a linked detail at every direct Decart Start.
   Do not add a recurring legal modal.
 - **Dependencies:** `ARCH-001`; pilot cost/retention policy.
+- **Implementation status (2026-07-28):** corrected. Character, VTO, and Dock Start surfaces use
+  one app-owned disclosure stating the live camera/microphone and recipe/reference transfer to
+  Decart, possible provider usage, the 300-second maximum, and Stop/finalization boundary.
 - **Regression risk:** Low.
 
 ### ARCH-001 — The browser drops the Decart active-session constraint
@@ -163,6 +166,9 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
 - **Impact:** an explicit character action lands on the wrong library category.
 - **Correction:** pass one-shot entry intent to the existing Shelf controller. Do not create a
   second picker or store.
+- **Implementation status (2026-07-28):** corrected. Both header and AI-chooser entries deliver a
+  consumable `Characters` intent; later ordinary Shelf browsing retains controller-owned category
+  state, and dirty hidden edits require confirmation before replacement.
 - **Regression risk:** Low.
 
 ### UX-011 — Permission denial exposes the wrong recovery action
@@ -176,6 +182,9 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
   surface.
 - **Correction:** align the app-owned safe code and notice classification, then update the
   deterministic recovery test and intentional baseline.
+- **Implementation status (2026-07-28):** corrected. `camera-denied` is a device recovery class;
+  **Capture settings** acknowledges the handled error, opens the existing settings overlay, and
+  leaves retry explicit. Browser evidence proves retry does not request a provider token.
 - **Regression risk:** Low.
 
 ### SEC-005 — Provider settings are not a product moderation policy
@@ -217,6 +226,10 @@ guidance inside the current route/stage; do not add an onboarding route or tour.
 
 `/api/capabilities` reports configuration, not provider health, entitlement, or quota. Prefer
 “Integrations configured/limited”; show active health only during a real connection.
+
+**Implementation status (2026-07-28):** the header now uses **Studio available to try**,
+**Studio limited**, or **Integration status unavailable**, with provider details described as
+configured/not configured. Session state remains the only active connection-health surface.
 
 ### UX-003 — Builder generation/review is too far down on narrow screens
 

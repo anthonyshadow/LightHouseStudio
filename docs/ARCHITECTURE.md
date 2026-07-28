@@ -28,6 +28,15 @@ Imports should point inward toward pure rules and contracts. The web app does no
 
 `StudioHeader` exposes the active-character selector; **Create new character** inside that selector opens the builder. `StudioSessionControlBar` is the primary session surface: idle starts with **Start Camera + Mic**, live local media exposes **Start AI**, and `AIExperienceChooser` selects Character Transformation or Virtual Try-On. The Recipe Dock remains the detailed/direct path for editing, Apply/Revert/Reset, preflight, and model-specific Start.
 
+`StudioHeader` treats `/api/capabilities` as configuration presence only: it says configured,
+limited, available to try, or configuration unavailable, never provider health or entitlement.
+Every Character/VTO Start surface shares one app-owned Decart disclosure covering live
+camera/microphone media, the complete recipe/reference snapshot, possible usage, the 300-second
+active-session maximum, Stop, and recording-finalization ordering. A saved-character action sets
+an app-owned one-shot Shelf entry intent; the existing persistent Shelf controller consumes it,
+selects `Characters`, clears it, and retains ordinary browse/category ownership afterward. The
+intent is not active-recipe state or persisted navigation.
+
 The shell is deliberately viewport-bound:
 
 - `StudioDesignProvider.tsx` gives `html`, `body`, and `#root` a full viewport size and `overflow: hidden`.
@@ -69,6 +78,12 @@ tab-ephemeral object-URL lifecycle.
 7. Start or Apply sends one complete prompt/image/enhancement snapshot. `image: null` is meaningful: it clears provider image state.
 8. The last successful snapshot becomes `AppliedRealtimeState`. Further edits stay pending until Apply; Revert restores the working draft.
 9. Stop/Reset invalidates the operation generation, aborts the browser token request, disconnects provider resources, and disposes late results. Reset also clears the ephemeral reference and applied state.
+
+Safe camera/device failures remain app-owned session errors. `camera-denied`,
+`permission-denied`, missing, busy, and unavailable device classes receive the shared **Capture
+settings** action. Studio clears the handled error as that action opens the existing overlay so a
+later explicit Start can retry; neither the recovery action nor settings enumeration requests a
+Decart token.
 
 Capture preferences are a separate tab-memory controller, not part of a prompt or recipe. The draft/applied pair contains selected camera id, microphone id, and the local `720p30`/`1080p30` target. Device enumeration does not call `getUserMedia`, and no device id is persisted. Apply without a live stream only stages the selection for the next explicit Start. Apply during a local preview acquires and validates a complete replacement stream before committing it and stopping the previous owned stream; on failure the current preview remains active. Source changes are blocked while recording or while AI is starting/live. Model capture dimensions remain provider-required, while the chosen devices still apply.
 

@@ -3,6 +3,7 @@ import type { CapabilityState } from './StudioHeader';
 
 const formErrorCodes = new Set(['model-input-required', 'apply-failed']);
 const deviceErrorCodes = new Set([
+  'camera-denied',
   'permission-denied',
   'device-missing',
   'device-busy',

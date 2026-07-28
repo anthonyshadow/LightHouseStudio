@@ -30,8 +30,8 @@ const capabilityLabel = (
   unavailableLabel: string,
 ): string => {
   if (state === 'loading') return 'checking';
-  if (state === 'error') return 'status unavailable';
-  return available ? 'available' : unavailableLabel;
+  if (state === 'error') return 'configuration unavailable';
+  return available ? 'configured' : unavailableLabel;
 };
 
 export const StudioHeader = ({
@@ -45,9 +45,13 @@ export const StudioHeader = ({
 }: StudioHeaderProps) => {
   const theme = useTheme();
   const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
-  const localCaptureState = localCaptureAvailable ? 'ready' : 'unavailable';
+  const localCaptureState = localCaptureAvailable ? 'available' : 'unavailable';
   const aiVideoState = capabilityLabel(capabilityState, availability.decart, 'not configured');
-  const voiceCloudState = capabilityLabel(capabilityState, availability.elevenLabs, 'optional');
+  const voiceCloudState = capabilityLabel(
+    capabilityState,
+    availability.elevenLabs,
+    'not configured (optional)',
+  );
   const systemState =
     capabilityState === 'loading'
       ? 'loading'
@@ -56,10 +60,12 @@ export const StudioHeader = ({
         : 'limited';
   const systemLabel =
     systemState === 'loading'
-      ? 'Checking systems'
-      : systemState === 'ready'
-        ? 'Systems ready'
-        : 'Systems limited';
+      ? 'Checking integrations'
+      : capabilityState === 'error'
+        ? 'Integration status unavailable'
+        : systemState === 'ready'
+          ? 'Studio available to try'
+          : 'Studio limited';
   const characterImageUrl = activeCharacterImageAssetId
     ? referenceImageContentUrl(activeCharacterImageAssetId)
     : null;

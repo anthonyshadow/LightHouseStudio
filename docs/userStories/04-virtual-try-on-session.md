@@ -6,7 +6,7 @@ As a creator, I want to preview a Lucy VTON 3 garment transformation, so that I 
 
 ## Starting state
 
-- AI video is available and no media, recording, or reviewed take is active.
+- AI video is configured (not health-checked) and no media, recording, or reviewed take is active.
 - The creator has a garment description, a valid JPEG/PNG/WebP garment image no larger than 10 MiB, or both.
 
 ## End-to-end steps
@@ -14,7 +14,9 @@ As a creator, I want to preview a Lucy VTON 3 garment transformation, so that I 
 1. Optionally prepare a garment recipe in the Recipe Dock or choose one from the Recipe Shelf.
 2. Select **Start Camera + Mic**, grant permission, and confirm a healthy local preview.
 3. Select **Start AI**, then choose **Virtual Try-On** in **Choose AI experience**.
-4. If the current VTON draft is ready, select **Start Virtual Try-On**. Otherwise select **Configure Virtual Try-On** to open the Dock, or **Choose Saved Try-On** to use the Shelf.
+4. If the current VTON draft is ready, review the inline Decart transfer/usage/300-second/Stop
+   disclosure and select **Start Virtual Try-On**. Otherwise select **Configure Virtual Try-On** to
+   open the Dock, or **Choose Saved Try-On** to use the Shelf.
 5. In **Try-On recipe**, provide a garment direction, attach a temporary garment image, or both. Prompt enhancement is optional and off by default. Start stays unavailable until text or an image exists.
 6. Start the configured experience and wait through short-lived credential issuance and the provider connection.
 7. Confirm that live transformed video is present on stage. Before a usable transformed video track exists, recording stays unavailable and local fallback is retained.

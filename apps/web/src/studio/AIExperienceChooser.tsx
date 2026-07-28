@@ -1,4 +1,5 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
+import { DecartStartDisclosure } from '../features/media-session';
 import { Button, OverlayPanel } from '../ui';
 
 type AIExperienceChooserProps = {
@@ -100,9 +101,12 @@ export const AIExperienceChooser = ({
           </header>
           <div>
             {characterReady ? (
-              <Button variant="primary" onClick={onStartCharacter}>
-                Start with {activeCharacterName}
-              </Button>
+              <>
+                <Button variant="primary" onClick={onStartCharacter}>
+                  Start with {activeCharacterName}
+                </Button>
+                <DecartStartDisclosure />
+              </>
             ) : (
               <>
                 <Button variant="primary" onClick={onCreateCharacter}>
@@ -126,9 +130,12 @@ export const AIExperienceChooser = ({
           </header>
           <div>
             {virtualTryOnReady ? (
-              <Button variant="primary" onClick={onStartVirtualTryOn}>
-                Start Virtual Try-On
-              </Button>
+              <>
+                <Button variant="primary" onClick={onStartVirtualTryOn}>
+                  Start Virtual Try-On
+                </Button>
+                <DecartStartDisclosure />
+              </>
             ) : (
               <Button variant="primary" onClick={onConfigureVirtualTryOn}>
                 Configure Virtual Try-On

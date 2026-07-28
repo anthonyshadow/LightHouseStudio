@@ -11,13 +11,21 @@ As a creator, I want to understand what is available and how to recover from una
 
 ## End-to-end steps
 
-1. On startup, read the header status. Local capture readiness comes from browser feature detection. Decart and ElevenLabs availability comes from the loopback `/api/capabilities` check; that check also reports the server-selected OpenAI/BFL/Wiro image provider and independent OpenAI optimizer availability inside the relevant tools. It does not contact any provider and reports configured availability, not live provider health.
+1. On startup, read the header status: **Studio available to try**, **Studio limited**, or
+   **Integration status unavailable**. Local capture availability comes from browser feature
+   detection. Decart and ElevenLabs configuration comes from the loopback `/api/capabilities`
+   check; that check also reports the server-selected OpenAI/BFL/Wiro image provider and
+   independent OpenAI optimizer availability inside the relevant tools. It does not contact any
+   provider and reports configured/not-configured state, not live health, entitlement, or quota.
 2. If Local Camera is available, prepare prompts, manage the Recipe Shelf, stage capture settings, preview/record locally, and use local voice processing without provider credentials.
 3. If AI video is available, use the Character AI or Virtual Try-On workflows. If unavailable, use local preparation/capture and read the availability explanation rather than attempting to start AI.
 4. Reference availability appears inside Character Builder. If generation/editing is available, follow the explicit optimization/generation or composition steps. If unavailable, still build and save text-only characters or upload/save/use a reference directly, including an image-only character.
 5. If ElevenLabs is available, complete a take then open the explicit voice-browser disclosure. If unavailable, use Original/local treatments where browser support allows.
 6. When the integration broker cannot be reached, use the stage notice’s **Retry check** action. Local preparation remains possible, but provider availability cannot be reliably shown until it succeeds.
-7. When a camera/device error occurs, read the stage notice and choose **Capture settings** where offered, or resolve browser permission/device state before retrying Start. The current permission-denial code path shows **Dismiss** rather than **Capture settings**; see `UX-011` in the [audit findings](../project-audit-findings.md).
+7. When a camera/device error occurs, read the stage notice and choose **Capture settings**. The
+   action acknowledges the handled error and opens the existing settings overlay; resolve browser
+   permission/device state, close settings, and retry an explicit Start. This recovery never
+   requests a provider token.
 8. When any persisted uploaded/generated reference cannot be restored, decide between **Retry** and **Continue without reference** where offered. When a voice/recording operation fails, preserve/review the current original take before trying again.
 
 ## What never happens automatically
@@ -30,7 +38,8 @@ As a creator, I want to understand what is available and how to recover from una
 ## Failure and alternate paths
 
 - If the local capability check fails, select **Retry check**. Continue local preparation while availability remains unknown.
-- If browser device access fails, use **Capture settings** when the notice offers it, resolve the named issue, then retry the explicit start action. Permission denial currently requires dismissing the notice and opening settings separately.
+- If browser device access fails, use **Capture settings**, resolve the named issue, then retry the
+  explicit Start action.
 - If a provider capability is absent, use the related local/text-only alternative rather than expecting another configured provider to enable it.
 - If a stored reference, recording treatment, or provider conversion fails, retry the named operation or retain the existing text/original artifact; the app does not silently replace it. An unavailable selected image provider does not disable local reference upload/direct use, and the server never falls back to another image provider.
 

@@ -26,6 +26,7 @@ import type { RecipeShelfProps } from './RecipeShelf.types';
 import { useRecipeShelfController, type RecipeShelfController } from './useRecipeShelfController';
 
 export type { ActiveRecipeIdentity, RecipeSelection, RecipeShelfProps } from './RecipeShelf.types';
+export type { RecipeShelfCategory, RecipeShelfEntryIntent } from './RecipeShelf.types';
 
 export type RecipeShelfViewProps = RecipeShelfProps & {
   controller: RecipeShelfController;
@@ -160,6 +161,8 @@ export const RecipeShelf = (props: RecipeShelfProps) => {
     repository: props.repository,
     activeMode: props.activeMode,
     ...(props.activeRecipe !== undefined ? { activeRecipe: props.activeRecipe } : {}),
+    ...(props.entryIntent !== undefined ? { entryIntent: props.entryIntent } : {}),
+    ...(props.onEntryIntentConsumed ? { onEntryIntentConsumed: props.onEntryIntentConsumed } : {}),
     onUsePrompt: props.onUsePrompt,
     ...(props.onCreateCharacter ? { onCreateCharacter: props.onCreateCharacter } : {}),
     ...(props.onEditCharacter ? { onEditCharacter: props.onEditCharacter } : {}),

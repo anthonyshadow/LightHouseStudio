@@ -160,7 +160,7 @@ const prepareVisualPage = async (page: Page): Promise<NetworkJourneyState> => {
 
   await page.goto('/');
   await expect(page.getByRole('main')).toBeVisible();
-  await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
+  await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
   await page.addStyleTag({
     content: `
       *, *::before, *::after {
@@ -190,7 +190,7 @@ const openSavedCharacters = async (page: Page): Promise<void> => {
   const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
   await expect(shelf).toBeVisible();
   const characters = shelf.getByRole('button', { name: /^Characters/u });
-  if ((await characters.getAttribute('aria-pressed')) !== 'true') await characters.click();
+  await expect(characters).toHaveAttribute('aria-pressed', 'true');
   await expect(shelf.getByRole('list', { name: 'Saved character recipes' })).toBeVisible();
 };
 

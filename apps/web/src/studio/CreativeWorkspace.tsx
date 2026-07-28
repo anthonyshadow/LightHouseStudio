@@ -3,6 +3,7 @@ import type { ModelModeId } from '@studio/domain';
 import { lazy, Suspense, type RefObject } from 'react';
 import type {
   ActiveRecipeIdentity,
+  RecipeShelfEntryIntent,
   RecipeSelection,
 } from '../features/creative-assets/RecipeShelf.types';
 import {
@@ -65,6 +66,7 @@ export type CreativeWorkspaceState = {
   } | null;
   legacyProjectCount?: number | undefined;
   activeRecipe?: ActiveRecipeIdentity | undefined;
+  recipeShelfEntryIntent: RecipeShelfEntryIntent | null;
   hasTake: boolean;
 };
 
@@ -79,6 +81,7 @@ export type CreativeWorkspaceActions = {
   onUseWorkshop: (action: PromptWorkshopAction) => void;
   onSaveWorkshop: (action: SavePromptWorkshopAction) => void;
   onShelfDirtyChange: (dirty: boolean) => void;
+  onRecipeShelfEntryIntentConsumed: (id: number) => void;
   onUseRecipe: (selection: RecipeSelection) => void;
   onCreateCharacter?: (() => void) | undefined;
   onEditCharacter?: ((asset: SavedCharacterPrompt) => void) | undefined;
@@ -274,6 +277,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     referenceUseFailure,
     legacyProjectCount = 0,
     activeRecipe,
+    recipeShelfEntryIntent,
     hasTake,
   } = state;
   const {
@@ -287,6 +291,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     onUseWorkshop,
     onSaveWorkshop,
     onShelfDirtyChange,
+    onRecipeShelfEntryIntentConsumed,
     onUseRecipe,
     onCreateCharacter,
     onEditCharacter,
@@ -313,6 +318,8 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     onOpenCharacterWorkshop: onOpenSavedWorkshop,
     onDirtyChange: onShelfDirtyChange,
     ...(activeRecipe !== undefined ? { activeRecipe } : {}),
+    entryIntent: recipeShelfEntryIntent,
+    onEntryIntentConsumed: onRecipeShelfEntryIntentConsumed,
   });
 
   return (

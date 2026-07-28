@@ -54,6 +54,16 @@ describe('AIExperienceChooser', () => {
       virtualTryOnReady: true,
     });
 
+    const disclosures = screen.getAllByLabelText('Decart start disclosure');
+    expect(disclosures).toHaveLength(2);
+    for (const disclosure of disclosures) {
+      expect(disclosure).toHaveTextContent('live camera and microphone media');
+      expect(disclosure).toHaveTextContent('complete applied recipe');
+      expect(disclosure).toHaveTextContent('Decart');
+      expect(disclosure).toHaveTextContent('at most 300 seconds');
+      expect(disclosure).toHaveTextContent('Stop AI ends usage');
+    }
+
     await user.click(screen.getByRole('button', { name: 'Start with Neon Samurai' }));
     await user.click(screen.getByRole('button', { name: 'Start Virtual Try-On' }));
 

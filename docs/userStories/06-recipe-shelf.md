@@ -11,7 +11,8 @@ As a creator, I want to manage reusable prompts and character recipes, so that I
 
 ## End-to-end steps
 
-1. Select **Shelf** from the tool rail.
+1. Select **Shelf** from the tool rail. Alternatively, **Choose saved character** from the header
+   or AI chooser sends a one-shot entry request that opens this same Shelf on **Characters**.
 2. Use **Recipe model** to choose Character recipes or Try-On recipes. If an inline form is dirty, decide whether to discard its pending changes before changing the model.
 3. Choose **Saved**, **Recent**, or (for Character) **Characters**.
 4. Type in **Search this mode** to find by title/name, prompt, note, or tag. Optionally filter Saved recipes by tag.
@@ -24,6 +25,8 @@ As a creator, I want to manage reusable prompts and character recipes, so that I
 ## Failure and alternate paths
 
 - Search/filter controls pause while a form is dirty, preventing a filter from unmounting unsaved edits.
+- A saved-character entry never becomes persisted navigation or selected-recipe state. If hidden
+  Shelf edits are dirty, confirm or cancel their replacement before the entry request proceeds.
 - The repository repairs usable data from corrupt/outdated `localStorage` where possible. If storage is unavailable, it continues in **session-only** mode and explains the persistence limit.
 - Insertion is blocked during recording or take review. Cross-model insertion is also blocked while AI is starting/live, but a ready local preview can be reused across modes. Browsing and editing remain available.
 - A missing persisted reference asset pauses the handoff with **Retry** and **Continue without reference** instead of silently substituting a text-only recipe.

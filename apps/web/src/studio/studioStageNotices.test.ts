@@ -93,4 +93,30 @@ describe('deriveStudioStageNotices', () => {
       ['recording-sidecar'],
     ]);
   });
+
+  it('routes the app-owned camera-denied code to Capture Settings', () => {
+    const handlers = callbacks();
+    const [notice] = deriveStudioStageNotices({
+      localCaptureAvailable: true,
+      capabilityState: 'ready',
+      dismissedNoticeIds: new Set(),
+      characterBuilderLaunchError: null,
+      sessionError: {
+        code: 'camera-denied',
+        message: 'Camera or microphone access was not allowed.',
+        recovery: 'Allow access in browser settings, then try again.',
+      },
+      recordingError: null,
+      sidecarError: null,
+      ...handlers,
+    });
+
+    expect(notice).toMatchObject({
+      id: 'session-camera-denied',
+      action: { label: 'Capture settings' },
+    });
+    notice?.action?.onAction();
+    expect(handlers.onOpenCaptureSettings).toHaveBeenCalledOnce();
+    expect(handlers.onClearSessionError).not.toHaveBeenCalled();
+  });
 });

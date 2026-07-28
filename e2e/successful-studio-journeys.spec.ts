@@ -366,7 +366,7 @@ test('Local Camera starts, records, and finalizes a playable take without provid
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
-  await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
+  await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
 
   await page.getByRole('button', { name: 'Shelf' }).click();
   await page.getByRole('button', { name: 'Try-on recipes' }).click();
@@ -484,7 +484,7 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
-  await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
+  await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
@@ -604,7 +604,7 @@ test('VTON 3 accepts a valid ephemeral garment image and starts with image-only 
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
-  await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
+  await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Virtual Try-On · VTON 3' }).click();

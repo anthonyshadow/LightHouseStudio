@@ -26,9 +26,11 @@ adding new capability.
 **Progress (2026-07-28):** the Wave 1 `UX-001`/`TEST-001` runtime and automated work is complete:
 `MediaStage` owns the single activity timer/listener set, live/playback controls recover from
 pointer/touch/focus/keyboard activity, and recording renders a never-hidden dominant Stop action.
-The named physical matrix is still pending, so those findings and this phase remain open. The
-saved-character, permission-recovery, direct-disclosure, and capability-truth work is scheduled in
-Wave 2 and is also still open.
+Wave 2 runtime, automated work, and maintained-platform visual review are also complete:
+saved-character entry intent, permission recovery/retry, shared direct-Decart disclosure, and
+truthful configuration copy are implemented and tested. The named physical matrix and
+assistive-technology evidence are still pending, so this phase and the Wave 1 findings remain
+open.
 
 | Field          | Plan                                                                                                                                                                                                                                                                                                    |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

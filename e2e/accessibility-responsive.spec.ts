@@ -175,7 +175,7 @@ for (const viewport of representativeViewports) {
     await page.goto('/');
 
     await expect(page.getByRole('main')).toBeVisible();
-    await expect(page.getByLabel('Integration availability')).toContainText('AI video available');
+    await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
 
     const skipLink = page.getByRole('link', { name: 'Skip to studio' });
     await skipLink.focus();
@@ -315,7 +315,18 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
   await expect(alert).toContainText('Camera or microphone access was not allowed.');
   await expect(alert).toContainText('Allow access in browser settings, then try again.');
   await expect(alert).not.toContainText('Mocked camera permission denial.');
+  await expect(alert.getByRole('button', { name: 'Capture settings' })).toBeVisible();
   expect(await cameraCalls(page)).toBe(1);
+  expect(network.apiRequests).not.toContain('/api/realtime-token');
+
+  await alert.getByRole('button', { name: 'Capture settings' }).click();
+  await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
+  await page.getByRole('button', { name: 'Close panel' }).click();
+  await page.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await expect(page.getByRole('alert')).toContainText(
+    'Camera or microphone access was not allowed.',
+  );
+  expect(await cameraCalls(page)).toBe(2);
   expect(network.apiRequests).not.toContain('/api/realtime-token');
   expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
   expect(network.blockedExternalRequests).toEqual([]);

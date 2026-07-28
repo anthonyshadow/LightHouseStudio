@@ -364,4 +364,69 @@ describe('RecipeShelf', () => {
     expect(screen.getByText('Virtual Try-On recipes')).toBeInTheDocument();
     expect(screen.queryByText(/favorites|team library|public library|import recipe/i)).toBeNull();
   });
+
+  it('consumes one-shot category intent without persisting it as selection state', async () => {
+    const user = userEvent.setup();
+    const repository = createRepository();
+    repository.createSavedPrompt({
+      title: 'Editorial host',
+      prompt: 'Give the presenter an editorial wardrobe.',
+      modelModeId: 'lucy-2.5',
+    });
+    repository.createSavedCharacterPrompt({
+      name: 'Field correspondent',
+      prompt: 'Transform the subject into an adult field correspondent.',
+      promptIntent: 'character-transform',
+      referenceImageStatus: 'prompt-only',
+    });
+    const onEntryIntentConsumed = vi.fn();
+    const props = {
+      repository,
+      activeMode: 'lucy-2.5' as const,
+      onUsePrompt: vi.fn(),
+      onEntryIntentConsumed,
+    };
+    const view = render(
+      <StudioDesignProvider>
+        <RecipeShelf {...props} entryIntent={{ id: 1, category: 'characters' }} />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(onEntryIntentConsumed).toHaveBeenCalledWith(1);
+
+    await user.click(screen.getByRole('button', { name: /^Saved/u }));
+    expect(screen.getByRole('button', { name: /^Saved/u })).toHaveAttribute('aria-pressed', 'true');
+
+    await user.click(screen.getByRole('button', { name: 'Edit Editorial host' }));
+    await user.type(screen.getByLabelText(/^Prompt text/u), ' Keep the lighting soft.');
+    view.rerender(
+      <StudioDesignProvider>
+        <RecipeShelf {...props} entryIntent={{ id: 2, category: 'characters' }} />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.queryByRole('heading', { name: 'Edit Editorial host' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(onEntryIntentConsumed).toHaveBeenCalledWith(2);
+
+    await user.click(screen.getByRole('button', { name: /^Saved/u }));
+    view.rerender(
+      <StudioDesignProvider>
+        <RecipeShelf {...props} entryIntent={{ id: 3, category: 'characters' }} />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(onEntryIntentConsumed).toHaveBeenLastCalledWith(3);
+  });
 });

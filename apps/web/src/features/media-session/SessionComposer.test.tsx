@@ -97,6 +97,21 @@ describe('SessionComposer', () => {
     expect(session.startModel).not.toHaveBeenCalled();
   });
 
+  it('shares the complete Decart disclosure beside direct Dock Start', () => {
+    renderComposer(
+      createSession('lucy-2.5', {
+        draft: { ...createEmptyDraft('lucy-2.5'), prompt: 'Adult field host' },
+      }),
+    );
+
+    const disclosure = screen.getByLabelText('Decart start disclosure');
+    expect(disclosure).toHaveTextContent('live camera and microphone media');
+    expect(disclosure).toHaveTextContent('complete applied recipe');
+    expect(disclosure).toHaveTextContent('Decart');
+    expect(disclosure).toHaveTextContent('at most 300 seconds');
+    expect(disclosure).toHaveTextContent('Stop AI ends usage');
+  });
+
   it('communicates real preflight and live provider state without changing controllers', () => {
     const applied = {
       mode: 'lucy-2.5' as const,

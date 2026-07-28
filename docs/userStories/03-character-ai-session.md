@@ -6,7 +6,8 @@ As a creator, I want to turn my live camera into a Lucy 2.5 character performanc
 
 ## Starting state
 
-- The capability strip reports AI video available.
+- The capability strip reports AI video configured; this is not a live health, entitlement, or
+  quota check.
 - No local preview, AI session, recording, or take review is active.
 - The creator has a saved/selected character, or is ready to create or choose one.
 
@@ -15,7 +16,10 @@ As a creator, I want to turn my live camera into a Lucy 2.5 character performanc
 1. Use the header character selector to choose a saved character, or choose **Create new character** and save one. The selected name appears in the header.
 2. Select **Start Camera + Mic**, grant permission, and confirm a healthy local preview.
 3. Select **Start AI**, then choose **Character Transformation** in **Choose AI experience**.
-4. If the selected character is ready, choose **Start with [character name]**. Otherwise choose **Create Character** or **Choose Saved Character** and complete that path first.
+4. If the selected character is ready, review the inline Decart disclosure and choose **Start with
+   [character name]**. Otherwise choose **Create Character** or **Choose Saved Character**; the
+   latter opens the existing Shelf directly on **Characters**, then complete **Use** and return to
+   Start.
 5. Wait while the app validates the loaded recipe, requests a short-lived loopback credential, and connects a Decart session using cloned local input tracks.
 6. Continue watching the local fallback until the stage displays transformed video and **AI live**. The local preview remains the recovery source if transformed video is missing or ends.
 7. Open the Recipe Dock to refine the recipe. The Dock displays **Changes are pending**; no live state changes yet.
@@ -26,7 +30,9 @@ As a creator, I want to turn my live camera into a Lucy 2.5 character performanc
 For direct recipe work, the Dock remains an alternate entry: select **Character ·
 Lucy 2.5**, enter prompt/image/enhancement, optionally **Check camera & mic**,
 then select **Start Character AI**. Empty input blocks before camera or token
-work.
+work. The Dock uses the same disclosure: live camera/microphone media, the complete applied recipe,
+and any reference go to Decart; provider usage may begin for at most 300 seconds, and **Stop AI**
+ends usage after any active recording finalizes.
 
 ## Failure and alternate paths
 

@@ -293,6 +293,9 @@ vi.mock('./CreativeWorkspace', () => ({
         <button type="button" onClick={props.actions.onToggleShelf}>
           Toggle shelf
         </button>
+        <button type="button" onClick={() => props.actions.onShelfDirtyChange(true)}>
+          Mark shelf dirty
+        </button>
         <button
           type="button"
           onClick={() =>
@@ -436,5 +439,21 @@ describe('StudioApp composition lifecycle', () => {
       modelModeId: 'lucy-2.5',
       referenceImageAssetId: null,
     });
+  });
+
+  it('cancels saved-character entry before replacing hidden Shelf edits', () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(false);
+    render(<StudioApp />);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Mark shelf dirty' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Character selector' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Choose saved character' }));
+
+    expect(window.confirm).toHaveBeenCalledWith(
+      'Discard the unsaved Recipe Shelf changes and open saved characters?',
+    );
+    expect(screen.getByRole('region', { name: 'Character' })).toBeInTheDocument();
+    expect(harness.latestWorkspace?.state.panel).toBe('closed');
+    expect(harness.latestWorkspace?.state.recipeShelfEntryIntent).toBeNull();
   });
 });

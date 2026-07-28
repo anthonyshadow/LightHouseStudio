@@ -35,6 +35,8 @@ type ControllerOptions = Pick<
   | 'repository'
   | 'activeMode'
   | 'activeRecipe'
+  | 'entryIntent'
+  | 'onEntryIntentConsumed'
   | 'onUsePrompt'
   | 'onCreateCharacter'
   | 'onEditCharacter'
@@ -46,6 +48,8 @@ export const useRecipeShelfController = ({
   repository,
   activeMode,
   activeRecipe,
+  entryIntent,
+  onEntryIntentConsumed,
   onUsePrompt,
   onCreateCharacter,
   onEditCharacter,
@@ -67,6 +71,7 @@ export const useRecipeShelfController = ({
   const [createKey, setCreateKey] = useState(0);
   const [actionError, setActionError] = useState<string | null>(null);
   const [formDirty, setFormDirty] = useState(false);
+  const [synchronizedEntryIntentId, setSynchronizedEntryIntentId] = useState<number | null>(null);
   const activeRecipeKey = activeRecipe ? `${activeRecipe.origin}:${activeRecipe.assetId}` : null;
   const [synchronizedActiveRecipeKey, setSynchronizedActiveRecipeKey] = useState(activeRecipeKey);
   const controlledSelection: SelectedRecipeState | null | undefined = activeRecipe
@@ -150,6 +155,26 @@ export const useRecipeShelfController = ({
     setEditorDraft(null);
     setRenameDraft(null);
   };
+
+  if (entryIntent && synchronizedEntryIntentId !== entryIntent.id) {
+    setSynchronizedEntryIntentId(entryIntent.id);
+    leaveForm();
+    setCategory(
+      activeMode === 'lucy-vton-3' && entryIntent.category === 'characters'
+        ? 'saved'
+        : entryIntent.category,
+    );
+    setQuery('');
+    setTagFilter('');
+    setSelectedRecipe(null);
+    setActionError(null);
+  }
+
+  useEffect(() => {
+    if (entryIntent && synchronizedEntryIntentId === entryIntent.id) {
+      onEntryIntentConsumed?.(entryIntent.id);
+    }
+  }, [entryIntent, onEntryIntentConsumed, synchronizedEntryIntentId]);
 
   const runAfterFormCheck = (action: () => void) => {
     if (!canReplaceForm()) return;

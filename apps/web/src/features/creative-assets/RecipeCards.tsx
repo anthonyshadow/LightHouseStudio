@@ -17,9 +17,10 @@ import {
   tagsStyles,
   tagStyles,
 } from './RecipeShelf.styles';
+import type { RecipeShelfCategory } from './RecipeShelf.types';
 import type { ModelModeId, RecentPrompt, SavedCharacterPrompt, SavedPrompt } from './types';
 
-export type ShelfCategory = 'saved' | 'recent' | 'characters';
+export type ShelfCategory = RecipeShelfCategory;
 export type EditAction = 'edit' | 'rename' | 'delete';
 
 export const modeName = (mode: ModelModeId) =>

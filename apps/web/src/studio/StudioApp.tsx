@@ -11,6 +11,7 @@ import {
 } from 'react';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
+import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
 import { useCreativeAssetRepository } from '../features/creative-assets/useCreativeAssetRepository';
 import { MediaStage } from '../features/live-stage';
 import {
@@ -104,6 +105,9 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     initialOverlay?.kind === 'legacy-projects' ? 'legacy-projects' : null,
   );
   const [dismissedNotices, setDismissedNotices] = useState<ReadonlySet<string>>(new Set());
+  const [recipeShelfEntryIntent, setRecipeShelfEntryIntent] =
+    useState<RecipeShelfEntryIntent | null>(null);
+  const nextRecipeShelfEntryIntentIdRef = useRef(0);
   const promptCommittedHandlerRef = useRef<PromptCommittedHandler>(noopPromptCommitted);
   const characterSelectorRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
@@ -222,9 +226,14 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     closeOverlayIf(['recipe-dock', 'capture-settings']);
   }, [closeOverlayIf, session.error]);
 
+  const clearSessionError = session.clearError;
   const dismissNotice = useCallback((id: string) => {
     setDismissedNotices((current) => new Set([...current, id]));
   }, []);
+  const openCaptureSettingsForRecovery = useCallback(() => {
+    clearSessionError();
+    openOverlay('capture-settings');
+  }, [clearSessionError, openOverlay]);
 
   const stageNotices = useMemo(
     () =>
@@ -238,8 +247,8 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
         sidecarError: recording.sidecar.state === 'error' ? recording.sidecar.error : null,
         onRetryProviderAvailability: retryProviderAvailability,
         onDismissCharacterBuilderLaunchError: dismissCharacterBuilderLaunchError,
-        onOpenCaptureSettings: () => openOverlay('capture-settings'),
-        onClearSessionError: session.clearError,
+        onOpenCaptureSettings: openCaptureSettingsForRecovery,
+        onClearSessionError: clearSessionError,
         onDismissNotice: dismissNotice,
       }),
     [
@@ -250,12 +259,12 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
       dismissCharacterBuilderLaunchError,
       dismissNotice,
       dismissedNotices,
-      openOverlay,
+      clearSessionError,
+      openCaptureSettingsForRecovery,
       recording.recordingError,
       recording.sidecar.error,
       recording.sidecar.state,
       retryProviderAvailability,
-      session.clearError,
       session.error,
     ],
   );
@@ -327,9 +336,26 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     );
   };
   const openSavedRecipesFor = (mode: ModelMode) => {
-    changeLibraryMode(mode);
+    if (
+      mode === libraryMode &&
+      shelfDirty &&
+      !window.confirm('Discard the unsaved Recipe Shelf changes and open saved characters?')
+    ) {
+      return;
+    }
+    if (!changeLibraryMode(mode)) return;
+    if (mode === 'lucy-2.5') {
+      nextRecipeShelfEntryIntentIdRef.current += 1;
+      setRecipeShelfEntryIntent({
+        id: nextRecipeShelfEntryIntentIdRef.current,
+        category: 'characters',
+      });
+    }
     openOverlay('recipe-shelf');
   };
+  const consumeRecipeShelfEntryIntent = useCallback((id: number) => {
+    setRecipeShelfEntryIntent((current) => (current?.id === id ? null : current));
+  }, []);
   const configureVirtualTryOn = () => {
     if (!selectExperienceMode('lucy-vton-3')) return;
     openOverlay('recipe-dock');
@@ -638,6 +664,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
               : null,
             legacyProjectCount,
             activeRecipe,
+            recipeShelfEntryIntent,
             hasTake: Boolean(recording.presented),
           }}
           refs={{
@@ -659,6 +686,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
             onUseWorkshop: applyWorkshopPrompt,
             onSaveWorkshop: saveWorkshopPrompt,
             onShelfDirtyChange: setShelfDirty,
+            onRecipeShelfEntryIntentConsumed: consumeRecipeShelfEntryIntent,
             onUseRecipe: useRecipe,
             onCreateCharacter: openCharacterBuilder,
             onEditCharacter: editCharacter,
