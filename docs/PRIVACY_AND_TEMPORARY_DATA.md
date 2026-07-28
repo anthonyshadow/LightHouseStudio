@@ -2,10 +2,12 @@
 
 Lightframe Studio is local-first, not offline-only. Local capture stays in the browser; explicitly started AI and voice actions intentionally use external providers.
 
-The external-participant retention, detach, deletion, and whole-dataset cleanup promise remains a
-product-owner TBD. The current behavior documented below is implementation truth, not that future
-promise. Do not admit participant reference data to a controlled pilot until the promise, provider
-retention settings, and operator cleanup procedure are approved.
+The product owner approved the external-participant retention, detach, deletion, and whole-dataset
+cleanup promise in the
+[controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) on 2026-07-28. The
+current behavior documented below remains implementation truth. Participant data must not be
+admitted until the later disclosure/cleanup implementation wave passes and the approved procedure
+has been rehearsed on a disposable environment.
 
 ## Data inventory
 
@@ -28,6 +30,39 @@ retention settings, and operator cleanup procedure are approved.
 | Provider preview audio                                                                                                 | Fetched through the broker into one short-lived browser Blob URL; aborted/revoked on replacement or unmount and never persisted     | ElevenLabs/provider preview storage                                                                                                                                    |
 
 The backend has no product database, accounts, or take/session history. It retains uploaded/generated/edited/composed character-reference bytes, applicable original/optimized/Lucy prompts, bounded optimizer metadata and settings, prompt hashes, safe image metadata, operation lineage, local owner ID, and idempotency mapping in the private local asset directory. Generated records also retain authoritative provider/model, an optional provider task/request ID, and allowlisted numeric provider settings/usage. Polling URLs, signed result URLs, raw provider payloads, credentials, and source base64 are never retained. For instructed edits it stores only a hash of the change instructions, never their raw text. Owner-scoped browser responses include the prompts and settings needed to review a reference and apply its Lucy prompt; image bytes are served from a separate immutable content route. Internal storage keys, provider secrets, task/request IDs, and provider-specific settings are never returned to the browser.
+
+## Approved controlled-pilot data lifecycle
+
+- Give every participant a fresh browser profile and a dedicated, explicitly resolved
+  `LIGHTFRAME_DATA_DIR`. Never share a participant environment or use a repository, home
+  directory, cloud-synced folder, or unresolved path as the data root.
+- Use a random participant code with no name, email, device identifier, or provider ID.
+- Retain the isolated local dataset only through the participant's scheduled engagement, including
+  at most one planned seven-day return.
+- Retire the whole local dataset within 24 hours after the final scheduled session, withdrawal, or
+  cancellation, and no later than eight days after the first session.
+- Explain before first upload/save that Remove, Detach, draft reset, and character deletion remove
+  relationships but do not delete immutable reference bytes. The pilot promises deletion only
+  through whole-environment retirement.
+- At retirement, stop the API and media/provider work, clear all site data for the exact loopback
+  origin, remove the dedicated browser profile, move only the reviewed participant data-directory
+  leaf to the operating-system Trash, verify the asset IDs fail against a fresh disposable
+  environment, reconcile provider cleanup, obtain Evidence Recorder and Support & Escalation Owner
+  initials, then permanently remove that reviewed leaf.
+- Never use a recursive deletion command with an unresolved variable, broad glob, shared root,
+  home directory, repository, or provider credential directory. Any ambiguity fails closed and
+  blocks the next participant.
+- Downloaded participant copies are the participant's durable handoff and are outside the
+  operator's Lightframe dataset. Operator-created test downloads are retired with the environment.
+- Aggregate content-free metrics at cohort close and delete row-level participant codes with the
+  environment. Content, raw provider data, credentials, URLs, device IDs, and network archives are
+  never evidence.
+
+Provider-side retention is a separate disclosed boundary. Before participant contact, the
+Credential Custodian and Billing Authorizer must review the exact account setting and current
+terms. Wiro is operator-only and requires successful `InputOutputDelete`; participant ElevenLabs
+conversion requires confirmed zero-retention eligibility. Local cleanup is never represented as
+provider-side deletion.
 
 ## Explicit consent points
 
@@ -74,7 +109,7 @@ Recipe Dock portrait/garment files and their object URLs are ephemeral. Text and
 - OpenAI text-model usage begins after Optimize/Re-optimize or when Generate/Combined Preview must refresh a stale optimization. Image usage begins only after Generate, Generate Combined Preview, or Regenerate reaches the selected OpenAI/BFL/Wiro image stage. Upload, direct-upload save, and image-only save make no external image request. OpenAI defaults to one high-quality `gpt-image-2` result; BFL uses one `flux-2-pro` task and Wiro uses one ByteDance `seedream-v5-lite-uncensored` task. Neither task provider automatically retries its initial billable POST. Client/server idempotency and provider-aware fingerprints suppress duplicate submission and cross-provider replay.
 - Wiro task outputs and uploaded task inputs are remote provider artifacts. After the downloaded result has been normalized and the local persistence attempt settles, the adapter calls Wiro `InputOutputDelete`. The cleanup endpoint is idempotent. Cleanup failure is recorded only as a safe lifecycle event and does not remove a successfully stored local asset; operators should verify provider retention behavior in the Wiro project when this warning occurs.
 - ElevenLabs saved-library browsing and previews create provider API requests. Speech-to-speech conversion can consume credits and is triggered only by Apply. The project cannot add, import, or remove library voices; those changes occur only in ElevenLabs. The UI discloses provider contact before the voice library action.
-- `ELEVENLABS_ENABLE_LOGGING=false` asks the conversion API for zero-retention mode. ElevenLabs currently limits that mode to eligible enterprise accounts. It is not a promise about infrastructure retention; confirm the configured account's terms and eligibility. A non-eligible account must deliberately choose `true` for conversion to work.
+- `ELEVENLABS_ENABLE_LOGGING=false` asks the conversion API for zero-retention mode. ElevenLabs currently limits that mode to eligible enterprise accounts. It is not a promise about infrastructure retention; confirm the configured account's terms and eligibility. The software can deliberately use `true` for a non-eligible account after an informed decision, but the approved controlled pilot does not: participant cloud conversion stays unavailable unless zero-retention eligibility is confirmed.
 - Local preview, recording, prompt assets, the prompt workshop, and local voice treatments require no provider account and incur no provider usage.
 
 Do not put credentials, provider tokens, device identifiers, or unallowlisted user data in browser storage. Do not put real personal data or user media in source, docs, fixtures, screenshots, or logs. Legacy project media belongs only in its typed IndexedDB artifact store.
@@ -98,3 +133,7 @@ There is no account authentication because there is one local operator. Do not e
 - Remove provider keys from `.env` and restart the API to disable integrations.
 
 Provider-side data and ElevenLabs library membership must otherwise be managed with the providers' own account controls. The only automated remote deletion is the post-persistence Wiro task input/output cleanup described above.
+
+The exact retirement checklist, generic owner roles, limits, refusal rules, and escalation path are
+authoritative in the
+[controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md).

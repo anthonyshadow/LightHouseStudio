@@ -9,10 +9,12 @@ current MVP requirements.
 Product-owner scope recorded 2026-07-28: touch/mobile creation is required; the supported take
 maximum is 300 seconds; and Character, VTO, local Voice, ElevenLabs, OpenAI, BFL, and Wiro are all
 included in pilot qualification. This is target scope, not a claim that the current runtime is
-ready. OpenAI/BFL/Wiro still require separate startup-selected passes with no fallback. The exact
-physical device/browser matrix, participant data cleanup promise, provider/content policy, and
-credential/billing/evidence owner remain pilot blockers. Monetization and future cloud
-ownership/portability remain deferred.
+ready. OpenAI/BFL/Wiro still require separate startup-selected passes with no fallback. The
+[controlled-pilot release contract](docs/CONTROLLED_PILOT_RELEASE_CONTRACT.md) freezes the
+moderated cohort, physical qualification targets, independent 270/300-second warning behavior,
+participant cleanup promise, provider/content rules, generic local owner roles, limits, metrics,
+and escalation path. Those outcomes remain implementation/evidence gates; they are no longer open
+Wave 0 decisions. Monetization and future cloud ownership/portability remain deferred.
 
 ## Read before changing behavior
 

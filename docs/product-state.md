@@ -70,9 +70,10 @@ Lightframe Studio is not currently:
 
 ### Audience for the next validation release
 
-The intended audience for the controlled MVP is a small cohort of solo
-short-form creators, creative technologists, and design partners using qualified desktop and
-touch/mobile targets who:
+The intended audience for the controlled MVP is at most five invited solo short-form creators,
+creative technologists, or design partners using qualified desktop and touch/mobile targets. Every
+session is operator-assisted; no unassisted local-beta step is approved in the current
+[release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md). Participants:
 
 - are comfortable granting camera/microphone permissions and working within the published
   browser/device matrix;
@@ -357,7 +358,8 @@ under-secures the second.
 
 The next release may be called ready only if all of these constraints are true:
 
-- it is moderated or closely supported;
+- it follows the approved [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md);
+- it is fully operator-assisted, with at most five invited participants and no unassisted step;
 - it runs on the documented loopback, single-operator broker;
 - touch/mobile creation is included, but support cannot be claimed until a named physical
   device/browser matrix passes the touch, media, recording, processing, and cleanup protocol;
@@ -463,34 +465,36 @@ the UI/UX, architecture, security, performance, test, and documentation audits.
 - provider terms and retention settings matched to product claims; and
 - billing only after the pricing decision and ledger semantics are explicit.
 
-## 10. Missing product decisions
+## 10. Product decisions
 
 ### Product-owner decisions recorded 2026-07-28
 
-| Decision             | Recorded outcome                                                                                                                             | Consequence                                                                                                                                                                   |
-| -------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Touch/mobile         | Full touch/mobile creation is included.                                                                                                      | Touch recovery, narrow-screen flow, assistive technology, physical media, and a named device/browser matrix are P0 gates.                                                     |
-| Included experiences | Character, VTO, local Voice, ElevenLabs, OpenAI, BFL, and Wiro are included.                                                                 | Character remains the primary promise and VTO a named beta. OpenAI/BFL/Wiro run as separate startup-selected configurations with no fallback; every path needs qualification. |
-| Maximum take         | 300 seconds.                                                                                                                                 | The current uncapped recorder must gain an accessible warning and safe automatic Stop/finalize behavior, then pass physical-target evidence.                                  |
-| Later decisions      | Retention/deletion, provider/content policy, live-smoke credential/evidence owner, monetization, and cloud ownership/portability remain TBD. | The first three remain external-pilot gates. Monetization and cloud decisions stay deferred to their evidence stages.                                                         |
+| Decision                | Recorded outcome                                                                                                                                                                                                     | Consequence                                                                                                                                                          |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pilot cohort            | At most five invited, technically comfortable solo creators/design partners; every session operator-assisted; no unassisted local-beta step.                                                                         | Lightweight first-use guidance remains evidence-triggered rather than a prerequisite for moderated research.                                                         |
+| Touch/mobile            | Full touch/mobile creation is included across the named desktop, five Apple-phone, five popularity-led Android-phone, Android 17 phone sentinel, five popularity-led tablet, and Android 17 tablet sentinel targets. | Every exact device/browser/OS row remains unsupported until physical evidence passes.                                                                                |
+| Included experiences    | Character, VTO, local Voice, ElevenLabs, OpenAI, BFL, and Wiro are included in qualification.                                                                                                                        | Character remains primary and VTO beta. OpenAI/BFL/Wiro use separate startup configurations with no fallback. Wiro is operator qualification only.                   |
+| Time boundaries         | Recording and Decart each have an independent 300-second maximum and a persistent accessible warning at 270 seconds.                                                                                                 | Recording auto-finalizes through the coalesced Stop path; expected Decart completion preserves/falls back to local preview and finalizes a recording before release. |
+| Participant data        | Fresh browser profile and `LIGHTFRAME_DATA_DIR` per participant; retain through at most one seven-day return; retire within 24 hours after the final engagement and no later than day eight.                         | Detach is not delete. Whole-environment retirement is the only pilot local-deletion promise and must be verified.                                                    |
+| Provider/content policy | Exact provider settings, adult/consented content allowlist, refusal rules, zero-retention requirement for ElevenLabs, and Wiro participant exclusion are approved.                                                   | A changed model, setting, entitlement, or retention term stops qualification rather than triggering fallback or silent substitution.                                 |
+| Access and limits       | Operator-owned credentials; at most 30 Decart minutes, 10 billable image submissions, and three ElevenLabs conversions per participant; stop a path after two potentially billable failures.                         | Limits are operator policy, not app entitlements or billing truth.                                                                                                   |
+| Local owners            | Generic Pilot Product Owner, Credential Custodian, Billing Authorizer, Evidence Recorder, and Support & Escalation Owner roles.                                                                                      | One operator may hold several roles; personal assignments must be revisited before leaving local-only operation.                                                     |
+| Metrics                 | The content-free hypotheses in section 17 are approved with no participant content, raw provider data, credentials, device IDs, or network archives.                                                                 | Aggregate at cohort close and retire row-level participant codes with the isolated environment.                                                                      |
+| Deferred decisions      | Monetization and future cloud ownership/portability.                                                                                                                                                                 | Defer to their evidence stages; Wave 0 does not authorize payments, accounts, or cloud persistence.                                                                  |
 
-The remaining rows are decisions, not hidden requirements. Select among the options at the stated
-time rather than treating an audit recommendation as an already approved strategy.
+The complete operating detail is authoritative in the
+[controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md).
 
-| Decision                   | Options to validate                                                                                              | When it must be decided                                                                                                |
-| -------------------------- | ---------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Primary customer           | Solo design partner; casual creator; professional creator; VTO/commerce creator                                  | Choose the controlled-pilot cohort now; choose the broader target after Stage B evidence.                              |
-| MVP promise                | Character Performance; general AI studio; VTO-led experience                                                     | Choose Character Performance for the pilot unless leadership explicitly rejects the audit consensus.                   |
-| Provider access            | Operator-owned accounts; bring-your-own keys; platform-owned shared access                                       | Assign the pilot credential, billing-authorization, smoke-evidence, and support owner before live qualification.       |
-| AI expiry during recording | Prevent recording beyond safe window; warn and finish locally; stop AI while finalizing; other explicit recovery | Decide before implementing the visible session cap.                                                                    |
-| Failed paid requests       | Count against allowance; restore allowance; conditional restore by provider result                               | Establish a pilot operator policy now; automate only after provider billing evidence.                                  |
-| Generated previews         | Unlimited operator-controlled; cohort quota; per-character quota                                                 | Set a pilot limit now; decide a sellable allowance in Stage D.                                                         |
-| Local-data retirement      | Operator wipe only; in-app erase-all; per-asset deletion                                                         | Decide the pilot isolation, retention, and verified retirement promise before participant references are accepted.     |
-| Character ownership        | Browser-profile local; exportable file; account-owned cloud asset; shareable team asset                          | Keep local for validation; decide after reuse and portability evidence.                                                |
-| Take persistence           | Current temporary take; local history; cloud history                                                             | Keep temporary for pilot; decide after users demonstrate retrieval demand.                                             |
-| Upload limits              | Preserve current image/audio limits; tighten for support; expand for professional use                            | Keep current validated limits for pilot; revisit from failure and cost data.                                           |
-| Moderation posture         | Operator allowlist; provider settings only; product moderation system                                            | Approve the pilot provider/settings, participant content, refusal, escalation, and support policy before external use. |
-| Automatic fallback         | None; user-selected alternative; automatic provider substitution                                                 | Preserve no automatic fallback unless later evidence outweighs consent and cost risks.                                 |
+### Decisions intentionally left for later evidence
+
+| Decision            | Current local outcome                                        | Later trigger                                                                   |
+| ------------------- | ------------------------------------------------------------ | ------------------------------------------------------------------------------- |
+| Broader customer    | Use the five-person design-partner cohort.                   | Choose a broader target after Stage B repeat-value evidence.                    |
+| Character ownership | Browser-profile local with operator-owned reference storage. | Decide export/cloud/team ownership after reuse and portability evidence.        |
+| Take persistence    | Keep the current temporary take and Download handoff.        | Decide history/cloud storage only after repeated retrieval demand.              |
+| Upload limits       | Preserve current validated image/audio limits.               | Revisit from failure, cost, and target-device memory data.                      |
+| Monetization        | No pricing, credits, allowance ledger, or checkout.          | Decide only after provider-unit economics and repeat value are measured.        |
+| Automatic fallback  | None.                                                        | Reconsider only through a later explicit consent/cost/provider-policy decision. |
 
 Current validated input boundaries should not be silently expanded: Character
 Builder accepts JPEG, PNG, or WebP images up to 10 MiB and 40 megapixels; the
@@ -626,15 +630,17 @@ cross-device access.
 
 ### Controlled-pilot policy
 
-- Use an isolated `LIGHTFRAME_DATA_DIR` or disposable environment for each
-  participant/cohort.
+- Use a fresh browser profile and isolated `LIGHTFRAME_DATA_DIR` for each participant.
 - State clearly that removing a reference detaches the relationship but does
   not delete stored bytes.
-- Provide the operator with a verified whole-dataset retirement procedure after
-  each participant's retention window.
+- Retain the isolated dataset through at most one scheduled seven-day return, then complete
+  verified whole-dataset retirement within 24 hours of the final engagement and no later than
+  eight days after first use.
 - Do not promise take history or recovery after refresh.
 - Do not place personal production data in fixtures, screenshots, source, or
   ordinary logs.
+- Follow the cleanup, provider, refusal, limits, and escalation rules in the
+  [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md).
 
 ### Self-serve local requirement
 
@@ -893,32 +899,27 @@ and account reporting validate it.
 24. What evidence would justify collaboration, templates, commerce, or mobile
     over improving the core performance loop?
 
-## 19. Decisions that should be made now
+## 19. Recorded Wave 0 decisions and remaining gates
 
-1. **Adopt the touch/mobile-inclusive controlled-pilot release definition.** Keep the deployment
-   loopback-only and do not weaken physical-device, trust, or provider evidence because the pilot
-   is moderated.
-2. **Make Character Performance the pilot promise.** Keep Workshop advanced and
-   label the included VTO experience as secondary/beta.
-3. **Choose the exact pilot cohort and recruitment criteria.**
-4. **Name the exact touch/mobile and desktop browser/device matrix.** All targets remain
-   unsupported until their physical protocol passes.
-5. **Implement and verify the approved 300-second recording maximum** and decide the user
-   experience when the separate AI cap approaches or expires during recording.
-6. **Qualify every included provider path:** Lucy 2.5, exact VTO 3, ElevenLabs, and separate
-   OpenAI/BFL/Wiro server configurations.
-7. **Approve the provider disclosure and capability-state language** at each
-   direct action.
-8. **Approve the participant access, provider usage limit, failed-request,
-   moderation/refusal, and escalation policy.**
-9. **Approve per-participant data isolation, retention window, and verified
-   operator wipe procedure.**
-10. **Choose whether first-use guidance will be withheld during moderated
-    formative research** and added only from observed evidence.
-11. **Approve the initial metric definitions and privacy boundary**, including
-    content-free collection and explicit denominators.
-12. **Require semantically truthful journey and visual evidence** for release
-    sign-off rather than accepting screenshot count alone.
+The product owner approved the
+[controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) on 2026-07-28. It freezes
+the cohort, product hierarchy, physical target matrix, independent warning/end behavior,
+participant isolation and retirement, provider settings, access limits, refusal/support rules,
+generic local owners, and content-free metrics. First-use guidance is withheld during the entirely
+moderated formative cohort unless repeated observed comprehension failures trigger it.
+
+The remaining work is implementation and evidence, not another Wave 0 choice:
+
+1. Implement and verify the independent 270/300-second recording and Decart contracts.
+2. Resolve touch recovery, saved-character entry, camera-permission recovery, direct disclosures,
+   capability truth, narrow-screen reachability, and Voice usage clarity.
+3. Obtain every named physical target and complete the full media, accessibility, memory,
+   background/foreground, download, and cleanup protocol on the exact stable versions.
+4. Qualify Lucy 2.5, exact VTO 3, ElevenLabs, and the separate OpenAI/BFL/Wiro configurations under
+   the approved provider policy.
+5. Rehearse the isolated whole-dataset retirement procedure on disposable data before admitting a
+   participant.
+6. Require semantically truthful journey, visual, physical, and live evidence for release sign-off.
 
 ## 20. Decisions that should be deferred
 

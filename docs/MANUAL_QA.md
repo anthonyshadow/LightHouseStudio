@@ -6,13 +6,20 @@ Synthetic-media automation cannot certify physical camera/microphone indicators,
 
 Record the date, browser/OS/version, device names, commit, configured capabilities, and downloaded sample MIME types. Never attach credentials, tokens, personal media, or raw provider responses to a report.
 
-Touch/mobile creation is a required pilot target, but the exact physical browser/OS/device matrix
-is still TBD. The pilot cannot be signed off from responsive emulation alone. Character, VTO, local
-Voice, ElevenLabs, OpenAI, BFL, and Wiro are included; run image-provider checks in separate
-startup configurations. The approved take maximum is 300 seconds, but the current recorder does
-not yet enforce it. After implementation, every named physical target must pass the warning,
-automatic Stop/finalization, playback, processing, download, background/foreground, and cleanup
-checks at that boundary.
+Touch/mobile creation and the exact physical browser/OS/device targets are approved in the
+[controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md). The matrix includes one
+desktop, five Apple phones, five popularity-led Android phones plus an Android 17 sentinel, and
+five popularity-led tablets plus an Android 17 tablet sentinel across applicable stable Chrome,
+Firefox, and Safari applications. This is a qualification target, not current support; the pilot
+cannot be signed off from responsive emulation alone.
+
+Character, VTO, local Voice, ElevenLabs, OpenAI, BFL, and Wiro are included in qualification; run
+image-provider checks in separate startup configurations, keep Wiro operator-only, and require
+confirmed zero-retention eligibility for participant ElevenLabs conversion. The approved take
+maximum is 300 seconds with a warning at 270 seconds, but the current recorder does not yet enforce
+it. After implementation, every named physical target must pass the warning, automatic
+Stop/finalization, playback, processing, download, background/foreground, and cleanup checks at
+that boundary.
 
 ## Viewport-bound shell and scroll ownership
 

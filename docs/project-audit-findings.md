@@ -36,12 +36,15 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
   OpenAI, BFL, and Wiro. The reference broker still selects exactly one image provider at startup;
   all three configurations require separate qualification and there is no automatic fallback.
 - The supported maximum take is 300 seconds. The current recorder does not yet enforce that limit,
-  so a warning plus safe automatic Stop/finalize behavior and physical-target evidence remain
-  required.
-- Retention/deletion, external-participant provider/content policy, live-smoke credential and
-  evidence ownership, monetization, and future cloud ownership/portability remain undecided.
-  Retention, provider policy, and smoke ownership are still controlled-pilot blockers; the
-  monetization and cloud decisions remain deliberately deferred.
+  and the approved warning begins at 270 seconds. Safe automatic Stop/finalize behavior and
+  physical-target evidence remain required.
+- The [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) freezes an entirely
+  moderated five-person cohort; the desktop/phone/tablet matrix; the participant isolation,
+  retention, detach/delete, and cleanup promise; exact provider settings and content/refusal
+  policy; generic local owner roles; operator limits; content-free metrics; and escalation.
+- Wiro remains operator qualification only, and participant ElevenLabs conversion requires
+  confirmed zero-retention eligibility. Monetization and future cloud ownership/portability remain
+  deliberately deferred.
 
 ## Severity summary
 
@@ -66,6 +69,8 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
   Character is primary; VTO is a named secondary/beta experience; Workshop is advanced. Local
   Voice, ElevenLabs, and all three separately configured image-provider paths are included.
   Keep the deployment loopback-only and qualify touch/mobile before release.
+- **Decision status:** The Wave 0 promise and cohort are approved. UI hierarchy, first-success
+  guidance, and physical qualification remain open implementation/evidence work.
 - **Decision owner:** Product.
 - **Details:** [Product state](product-state.md).
 
@@ -123,6 +128,10 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
 - **Controlled-pilot correction:** say detach, disclose retention at first upload/save and relevant
   destructive actions, use an isolated data directory per participant/cohort, and verify whole
   dataset retirement.
+- **Decision status:** The approved pilot promise uses a fresh browser profile and data directory
+  per participant, permits at most one seven-day return, and requires verified retirement within
+  24 hours after the final engagement and no later than day eight. Disclosure implementation and
+  cleanup rehearsal/evidence remain open.
 - **Deferred correction:** account-owned relationships, retention policy, tombstones, and
   relationship-aware deletion/garbage collection.
 - **Regression risk:** High if per-asset deletion is rushed.
@@ -169,9 +178,12 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
   Wiro's pinned model is explicitly uncensored. Safe refusal mapping is not moderation policy.
 - **Impact:** content expectations and support obligations vary silently by deployment.
 - **Correction:** qualify every selected provider configuration. Wiro is included for
-  qualification but must not be offered to external participants until the product owner approves
-  its settings and the participant content/refusal/support policy. A full moderation/reporting
+  qualification but is not offered to external participants under the approved release contract.
+  The adult/consented-content allowlist, refusal rules, exact provider settings, limits, and
+  escalation path are now approved. A full moderation/reporting
   system is a public-product requirement, not a local pilot prerequisite.
+- **Decision status:** Policy is frozen; disclosure implementation and live qualification remain
+  open.
 - **Regression risk:** Medium.
 
 ### DOC-001 / TEST-007 — Included providers require live entitlement/device evidence

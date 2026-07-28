@@ -6,10 +6,15 @@ so each path needs its own qualified pass. Run a pass only with authorized test 
 supported camera/microphone, an account whose quota and retention settings are understood, and
 permission to incur provider usage.
 
-The owner for live-smoke credentials, billing authorization, and the evidence record remains TBD.
-Release qualification cannot be signed off until that owner and the external-participant provider
-settings/content policy are approved. In particular, do not qualify Wiro's uncensored model for
-participant use merely because a technical smoke succeeds.
+The approved local-phase owners are the generic **Credential Custodian**, **Billing Authorizer**,
+**Evidence Recorder**, **Pilot Product Owner**, and **Support & Escalation Owner** roles. One
+operator may hold several roles, but every pass records the authorizing/witnessing roles.
+Personal assignments must be revisited before leaving local-only operation.
+
+The external-participant settings, limits, and content/refusal policy are frozen in the
+[controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md). Wiro's uncensored model
+is technical/operator qualification only and cannot reach an external participant under this
+contract.
 
 ## Provider assumptions verified for this build
 
@@ -17,16 +22,18 @@ participant use merely because a technical smoke succeeds.
 - Decart browser access uses a [backend-minted client token](https://docs.platform.decart.ai/getting-started/client-tokens), scoped to one model, the exact loopback origin, a five-minute issuance window, and a five-minute realtime-session limit.
 - OpenAI uses the Responses API for prompt optimization and remains the default image provider with `gpt-image-2` at `high` quality. `REFERENCE_IMAGE_PROVIDER=bfl` instead selects the pinned US2 `https://api.us2.bfl.ai/v1/flux-2-pro` task API. `REFERENCE_IMAGE_PROVIDER=wiro` selects the pinned `https://api.wiro.ai/v1/Run/ByteDance/seedream-v5-lite-uncensored` task API with signature authentication. There is no provider fallback. Character Builder upload by itself is local storage work and does not contact an image provider.
 - ElevenLabs uses `/v2/voices` with `voice_type=saved`, `/v1/models`, and `/v1/speech-to-speech/:voice`. Preview and conversion revalidate voice membership through the saved filter. The project has no shared-library discovery or voice-add mutation. Provider plans can change voice eligibility and conversion access.
-- `ELEVENLABS_ENABLE_LOGGING=false` requests [Zero Retention Mode](https://elevenlabs.io/docs/eleven-api/resources/zero-retention-mode), which ElevenLabs currently limits to eligible enterprise accounts. Set it to `true` only after an informed retention decision when testing a non-eligible account.
+- `ELEVENLABS_ENABLE_LOGGING=false` requests [Zero Retention Mode](https://elevenlabs.io/docs/eleven-api/resources/zero-retention-mode), which ElevenLabs currently limits to eligible enterprise accounts. A non-eligible account may be used only for operator-only technical diagnosis after an informed retention decision; participant conversion remains unavailable.
 
 Do not run live provider checks in CI, screenshots, stories, ordinary component tests, or shared environments. Never print or capture `.env`, request authorization headers, permanent keys, temporary credentials, raw provider bodies, personal media, or full network archives.
 
 ## Before starting
 
 1. Run `npm run quality` and `npm run test:e2e` with deterministic fakes first.
-2. Confirm the assigned credential/billing/evidence owner has authorized the pass. Review current
-   Decart, OpenAI, BFL, Wiro, and ElevenLabs pricing, quota, model availability, voice eligibility,
-   content policy, and data-retention terms in the provider accounts.
+2. Record the Credential Custodian, Billing Authorizer, Evidence Recorder, and Support &
+   Escalation Owner for the pass. Confirm authorization and review current Decart, OpenAI, BFL,
+   Wiro, and ElevenLabs pricing, quota, model availability, voice eligibility, content policy, and
+   data-retention terms in the provider accounts. Stop if any value differs from the approved
+   contract.
 3. Use dedicated least-privilege development keys. Put them only in local `.env`:
 
    ```dotenv
@@ -36,6 +43,8 @@ Do not run live provider checks in CI, screenshots, stories, ordinary component 
    # For a separate BFL pass, select bfl and configure:
    # BFL_API_KEY=your-local-secret
    # BFL_REFERENCE_IMAGE_MODEL=flux-2-pro
+   # BFL_SAFETY_TOLERANCE=2
+   # BFL_DISABLE_PROMPT_UPSAMPLING=true
    # For a separate Wiro pass, select wiro and configure:
    # WIRO_API_KEY=your-local-project-key
    # WIRO_API_SECRET=your-local-project-secret
@@ -88,7 +97,8 @@ save behavior, sanitized errors, and no fallback to the raw prompt after an
 optimization failure.
 
 Run this section in three separate server configurations: OpenAI, BFL, and Wiro. All three are
-included in the pilot; the app still selects exactly one at startup and never falls back. For BFL,
+included in pilot qualification; Wiro remains operator-only. The app still selects exactly one at
+startup and never falls back. For BFL,
 confirm capabilities report `providerId: "bfl"` and `modelId: "flux-2-pro"`, one initial task is
 created per explicit request, polling stays within the configured deadline, source-guided actions
 succeed without a public upload, and browser responses/log captures contain neither signed URLs
@@ -116,6 +126,8 @@ Pass requires saved-only listing and revalidation, absent public/import surfaces
 Record only:
 
 - date, commit, browser/OS, anonymous device class;
+- authorizing Credential Custodian/Billing Authorizer and witnessing Evidence Recorder/Support &
+  Escalation Owner role labels;
 - capability and model ids;
 - action timestamps, safe HTTP status/code, output MIME type, and pass/fail notes;
 - approximate connection and clip duration for cost review.
@@ -125,7 +137,7 @@ Then Stop AI, stop the camera, discard/download test takes as appropriate, close
 Uploaded and generated test references remain immutable under
 `LIGHTFRAME_DATA_DIR`; the app has no asset-delete action. For a disposable
 smoke, configure a dedicated data directory before starting and retire it only
-under the local operator’s explicit storage policy. Never remove a shared asset
+under the verified procedure in the controlled-pilot contract. Never remove a shared asset
 directory as routine test cleanup.
 
 Failures caused by missing credentials, device permission, account entitlement, incompatible voices/models, quota/billing, provider policy, firewall/NAT, or provider outage are concrete external limitations. Capture the safe error code and stop; do not weaken security boundaries or embed credentials to bypass them.

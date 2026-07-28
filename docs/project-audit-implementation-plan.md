@@ -11,8 +11,10 @@ phase status.
 The default release assumption is a moderated, loopback-only, touch/mobile-inclusive
 design-partner pilot with Character AI primary, VTO beta, local Voice and ElevenLabs, separate
 OpenAI/BFL/Wiro qualification, an app-owned 300-second take maximum, and no public exposure. The
-exact physical browser/device matrix, participant-data cleanup promise, provider/content policy,
-and credential/billing/evidence owner remain unresolved pilot dependencies.
+approved [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) now freezes the
+physical browser/device targets, participant-data cleanup promise, provider/content policy,
+generic local owner roles, usage limits, and escalation path. Their implementation and dated
+physical/live evidence remain unresolved release dependencies.
 
 ## Phase 1 — Immediate journey and trust blockers
 
@@ -25,7 +27,7 @@ adding new capability.
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Scope          | Stage-level touch/pointer control reveal; never-hidden Stop Recording; one-shot Shelf entry intent to Characters; camera-denial recovery classification; direct-Decart disclosure; “configured” capability copy.                                                                                        |
 | Likely systems | `StudioSessionControlBar`, `MediaStage`, `StudioApp`, Shelf controller, `studioStageNotices`, safe-error taxonomy, AI chooser, component/E2E/visual tests.                                                                                                                                              |
-| Dependencies   | Name the exact physical touch/mobile matrix; approve concise Decart disclosure; preserve `/` and current overlays.                                                                                                                                                                                      |
+| Dependencies   | Use the frozen physical touch/mobile matrix and disclosure policy; obtain the named devices for evidence; preserve `/` and current overlays.                                                                                                                                                            |
 | Risks          | Auto-hide regressions; focus restoration; stale Shelf intent; accidentally presenting configuration as live health.                                                                                                                                                                                     |
 | Acceptance     | Touch/pointer restores controls after timeout; Stop remains available during recording; both character entries show Characters without an extra user correction; permission denial offers the intended settings recovery; every direct Decart Start carries disclosure; configuration copy is truthful. |
 | Required tests | Unit tests for activity/timeout and notice mapping; E2E from both character entries through Use/Start; keyboard/focus checks; touch-context browser test; intentional visual updates only where copy/state changes.                                                                                     |
@@ -57,7 +59,7 @@ establish release evidence for every included capability.
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Scope          | Preserve token constraints in browser types; app-owned session clock/events; warning and expected-expiry outcome; local fallback; gated live evidence for Lucy, exact VTO, ElevenLabs, and separate OpenAI/BFL/Wiro configurations.                                     |
 | Likely systems | realtime contracts/route/client, Decart gateway/resource/session hooks, stage status/controls, development realtime driver, live-smoke doc.                                                                                                                             |
-| Dependencies   | Phase 1 disclosure; approved warning threshold; assigned credential/billing/evidence owner; approved provider/content and retention settings; authorized test accounts and named devices for manual smoke.                                                              |
+| Dependencies   | Phase 1 disclosure; frozen 270/300-second thresholds; generic local owner roles; approved provider/content and retention settings; authorized test accounts and physical access to every named device.                                                                  |
 | Risks          | Confusing token TTL with active-session cap; timer drift; recording finalization/source-loss races; raw SDK error leakage.                                                                                                                                              |
 | Acceptance     | UI shows the authoritative maximum before Start and elapsed/remaining while active; warns; expected cap completion is not presented as a crash; local preview and current recipe survive; cleanup is deterministic; included-provider smoke evidence is dated and safe. |
 | Required tests | Accelerated deterministic tick/end cases, disconnect distinction, expiry during recording/finalization, cleanup/cancellation, API contract tests, no external traffic in normal CI, manual gated smoke.                                                                 |

@@ -106,7 +106,7 @@ For every implementation wave:
 
 ## 5. Wave 0 — Freeze the local release contract
 
-**Status:** Pending  
+**Status:** Complete 2026-07-28
 **Why first:** these are product and operational inputs to several High/Critical fixes. Coding
 around them would create copy, timer, data, device, and provider-policy churn.
 
@@ -135,8 +135,17 @@ Already fixed decisions must not be reopened during implementation:
 - Wiro cannot reach external participants until its uncensored configuration is explicitly
   approved by the provider/content policy.
 
-**Exit gate:** the decisions are recorded in `product-state.md`, privacy/provider procedures, and
-release documentation. Named owners accept the cost, data, and support responsibilities.
+**Completion:** the product owner approved the
+[controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md). It records an entirely
+moderated cohort of at most five participants; the desktop, five Apple-phone, five
+popularity-led Android-phone, Android 17 phone sentinel, five popularity-led tablet, and Android 17
+tablet sentinel qualification targets; 30-second warnings for the independent recording and Decart
+caps; isolated participant environments and bounded verified retirement; exact provider
+configurations and refusal rules; generic local owner roles; operator usage limits; content-free
+metrics; and escalation.
+
+**Exit gate:** satisfied for decision freeze. Physical-device access, implementation, live
+qualification, cleanup rehearsal, and dated evidence remain gates in their later waves.
 
 ## 6. Wave 1 — Critical touch and recording-control safety
 

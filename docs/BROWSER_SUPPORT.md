@@ -4,11 +4,19 @@ Browser media behavior depends on browser version, operating system, hardware, p
 
 ## Recommended baseline
 
-Use the current stable desktop Chrome or Edge on macOS or Windows for the broadest expected
-combination of camera capture, WebRTC, WebM/Opus recording, Web Audio, and local remuxing. Current
-Firefox and Safari are targets, not assumed equivalents. Touch/mobile creation is required for the
-pilot, but no mobile browser/device is supported until the product owner names the exact physical
-matrix and that matrix passes the checks in this document.
+The approved pilot targets current stable Chrome, Firefox, and Safari on their applicable
+platforms. Safari is unavailable on Android. On iOS/iPadOS, Chrome and Firefox share the system
+WebKit engine but still require separate application-level permission, viewport, download,
+background/foreground, and recovery checks.
+
+The 2026-07-28 qualification baseline is macOS/iOS/iPadOS 26.6, Safari 26.6, Android 17,
+Chrome 150.x/151.x stable as generally available for the platform, and Firefox 153.x stable.
+Before recording release evidence, update to the latest generally available stable patch and
+record the exact installed version. Do not inherit support across a later OS/browser release.
+
+Touch/mobile creation is required, but none of the named targets is a current support claim. Each
+remains blocked until it passes the complete physical protocol in this document and
+[Manual QA](MANUAL_QA.md).
 
 The studio must run in a secure context. Loopback HTTP (`127.0.0.1`/`localhost`) is appropriate for local development; any non-loopback deployment needs HTTPS and a separate server security design.
 
@@ -79,23 +87,30 @@ Codec claims from `MediaRecorder.isTypeSupported` are necessary but not sufficie
   boundaries, but those provider contracts do not replace the app-owned recording cap.
 - Reduced-power/mobile devices may not render offline audio or remux quickly enough for a comfortable workflow.
 
-## Provisional release browser matrix
+## Approved qualification matrix
 
-The product owner has not yet selected exact OS versions and device models. The following is the
-minimum candidate matrix, not a support claim. Name and approve the exact physical targets, then
-run [manual QA](MANUAL_QA.md) on at least:
+The product owner selected the following physical targets. The phone selection follows the latest
+available high-volume model data and adds Google reference devices for the current Android
+platform. The tablet selection covers high-volume Apple/Samsung families and an Android 17
+large-screen sentinel. Rebaseline popularity before a release candidate; do not silently
+substitute a device.
 
-- current Chrome and Edge desktop;
-- current Firefox desktop;
-- current Safari on macOS;
-- current iOS Safari on a physical phone;
-- one Android Chromium device;
-- at least one external/USB or Bluetooth input configuration if relevant.
+| Class                      | Physical targets                                                                            | OS/browser requirement                                                                                                                     |
+| -------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| Desktop                    | MacBook Pro 14-inch (2021, M1 Pro; `MacBookPro18,3`)                                        | macOS 26.6; Safari 26.6; Chrome 150.0.7871.187 or newer stable patch in major 150; Firefox 153.x stable                                    |
+| Apple phones               | iPhone 17; iPhone 17 Pro; iPhone 17 Pro Max; iPhone 16; iPhone 16 Pro Max                   | iOS 26.6; Safari 26.6; Chrome for iOS 151.x stable; Firefox for iOS 153.x stable                                                           |
+| Android phones             | Galaxy A07 4G; Galaxy A16 5G; Galaxy A56 5G; Galaxy A36 5G; Redmi A5                        | Latest vendor-stable OS; Chrome and Firefox latest stable. Android 17 support remains blocked on a row until the OEM release is available. |
+| Android 17 phone sentinel  | Google Pixel 10                                                                             | Android 17 current stable patch; Chrome and Firefox latest stable                                                                          |
+| Popularity-led tablets     | iPad (A16); iPad Air 11-inch (M3); iPad Pro 11-inch (M5); Galaxy Tab A9+; Galaxy Tab S10 FE | Apple rows: iPadOS/Safari 26.6 plus Chrome/Firefox latest stable. Android rows: latest vendor-stable OS; Chrome/Firefox latest stable.     |
+| Android 17 tablet sentinel | Google Pixel Tablet                                                                         | Android 17 current stable patch; Chrome and Firefox latest stable                                                                          |
 
-For each desktop engine, cover the five required CSS viewports where the browser permits. On
-physical phone/tablet targets, cover the closest portrait sizes plus landscape, safe areas, browser
-chrome expansion/collapse, and the software keyboard. Test camera/mic allow and deny, source
-replacement, local and model recording through the 300-second cap, downloaded playback, local and
+The complete selection basis, rolling-version rule, and qualification statuses live in the
+[controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md).
+
+For each desktop browser, cover the five required CSS viewports where the browser permits. On each
+physical phone/tablet target, cover portrait and landscape, safe areas, browser chrome
+expansion/collapse, and the software keyboard. Test camera/mic allow and deny, source replacement,
+Local/Character/VTO recording through the 300-second cap, downloaded playback, local and
 ElevenLabs processing, permission revocation, background/foreground transitions, 200% zoom/large
-text, keyboard and touch operation, overlay focus, and cleanup indicators. Provider modes also
-require live credentials, account entitlement, and the approved content/retention policy.
+text, keyboard/touch operation, overlay focus, and cleanup indicators. Provider modes also require
+live credentials, exact account entitlement, and the approved content/retention policy.

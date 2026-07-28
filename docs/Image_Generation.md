@@ -25,6 +25,10 @@ The source-guided provider operation has two product uses: **edit** changes an e
 - `BFL_API_KEY` is required only when `REFERENCE_IMAGE_PROVIDER=bfl`. Selecting BFL without it makes image generation unavailable and does not fall back to OpenAI.
 - `WIRO_API_KEY` and `WIRO_API_SECRET` are both required when `REFERENCE_IMAGE_PROVIDER=wiro`. Every Wiro request uses the configured signature-authentication scheme; selecting Wiro with either credential missing makes image generation unavailable and does not fall back.
 - Defaults are `gpt-5.6` for optimization (`medium` reasoning) and `gpt-image-2` at `high` quality for images. `OPENAI_PROMPT_OPTIMIZER_MODEL`, `OPENAI_PROMPT_OPTIMIZER_REASONING`, `OPENAI_PROMPT_OPTIMIZER_VERSION`, `OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS`, `OPENAI_REFERENCE_IMAGE_MODEL`, and `OPENAI_REFERENCE_IMAGE_QUALITY` can change those settings.
+- The approved controlled-pilot override is `BFL_SAFETY_TOLERANCE=2` with
+  `BFL_DISABLE_PROMPT_UPSAMPLING=true`. The application default remains `4`, so a missing override
+  does not satisfy pilot qualification. Wiro remains operator-only under the current
+  [release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md).
 - The API advertises configured capability through `GET /api/capabilities`; it reads local configuration only and does **not** contact any provider, test quota, or test model access.
 - OpenAI generated images retain the existing 150-second timeout and zero SDK retries. BFL has one `BFL_REFERENCE_IMAGE_TIMEOUT_MS` deadline, default 150 seconds, across its single non-retried task submission, polling, and signed-result download. Wiro has the equivalent `WIRO_REFERENCE_IMAGE_TIMEOUT_MS` deadline, default 180 seconds, across submission, Task Detail polling, download, and normalization. Optimization defaults to a separate 120-second timeout and has no automatic retry.
 
