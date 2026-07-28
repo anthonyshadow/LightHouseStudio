@@ -18,6 +18,7 @@
         "e2e/**/*.ts",
         "scripts/**/*.mjs"
       ],
+      "ignoreDependencies": ["@emnapi/runtime"],
       "ignoreExportsUsedInFile": true
     },
     "apps/api": {
