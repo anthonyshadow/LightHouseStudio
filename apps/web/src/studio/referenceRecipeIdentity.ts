@@ -1,5 +1,9 @@
 import { canonicalPrompt } from '@studio/domain';
-import type { SavedCharacterPrompt, SavedPrompt } from '../features/creative-assets/types';
+import type {
+  CreativeAssetStore,
+  SavedCharacterPrompt,
+  SavedPrompt,
+} from '../features/creative-assets/types';
 import type {
   SessionDraft,
   SessionReferenceImage,
@@ -20,6 +24,32 @@ export type ActiveRecipeFingerprint = {
 };
 
 export type RecipeAsset = SavedCharacterPrompt | SavedPrompt;
+
+export type ActiveRecipeState = {
+  readonly recipe: ActiveStudioRecipe;
+  readonly fingerprint: ActiveRecipeFingerprint | null;
+};
+
+export type ActiveRecipeAction =
+  | {
+      readonly type: 'commit';
+      readonly recipe: Exclude<ActiveStudioRecipe, null>;
+      readonly fingerprint: ActiveRecipeFingerprint;
+    }
+  | { readonly type: 'clear' };
+
+export const INITIAL_ACTIVE_RECIPE_STATE: ActiveRecipeState = {
+  recipe: null,
+  fingerprint: null,
+};
+
+export const activeRecipeReducer = (
+  _state: ActiveRecipeState,
+  action: ActiveRecipeAction,
+): ActiveRecipeState =>
+  action.type === 'commit'
+    ? { recipe: action.recipe, fingerprint: action.fingerprint }
+    : INITIAL_ACTIVE_RECIPE_STATE;
 
 type ExactActiveRecipeInput = {
   readonly fingerprint: ActiveRecipeFingerprint;
@@ -50,4 +80,71 @@ export const isExactActiveRecipe = ({
     asset.referenceImageAssetId === fingerprint.assetReferenceImageAssetId &&
     fingerprint.referenceImageAssetId === fingerprint.assetReferenceImageAssetId
   );
+};
+
+export type ResolvedActiveRecipe = {
+  readonly recipe: ActiveStudioRecipe;
+  readonly fingerprint: ActiveRecipeFingerprint | null;
+  readonly asset: RecipeAsset | null;
+  readonly characterName: string | undefined;
+  readonly character: {
+    readonly id: string;
+    readonly name: string;
+    readonly referenceImageAssetId: string | null;
+  } | null;
+  readonly label: string | undefined;
+};
+
+/** Resolves the authoritative reducer state against the current draft and repository snapshot. */
+export const resolveActiveRecipe = (
+  state: ActiveRecipeState,
+  store: CreativeAssetStore,
+  draft: Pick<SessionDraft, 'mode' | 'prompt' | 'referenceImage'>,
+): ResolvedActiveRecipe => {
+  const { recipe, fingerprint } = state;
+  if (!recipe) {
+    return {
+      recipe: null,
+      fingerprint: null,
+      asset: null,
+      characterName: undefined,
+      character: null,
+      label: undefined,
+    };
+  }
+
+  const assets =
+    recipe.origin === 'character-prompt' ? store.savedCharacterPrompts : store.savedPrompts;
+  const asset = assets.find((candidate) => candidate.id === recipe.assetId) ?? null;
+  const exact = Boolean(
+    asset && (!fingerprint || isExactActiveRecipe({ fingerprint, asset, draft })),
+  );
+  if (!exact || !asset) {
+    return {
+      recipe: null,
+      fingerprint: null,
+      asset,
+      characterName: undefined,
+      character: null,
+      label: undefined,
+    };
+  }
+
+  const characterName =
+    recipe.origin === 'character-prompt' && 'name' in asset ? asset.name : undefined;
+  return {
+    recipe,
+    fingerprint,
+    asset,
+    characterName,
+    character:
+      characterName && 'name' in asset
+        ? {
+            id: asset.id,
+            name: characterName,
+            referenceImageAssetId: asset.referenceImageAssetId,
+          }
+        : null,
+    label: recipe.origin === 'saved-prompt' && 'title' in asset ? asset.title : characterName,
+  };
 };

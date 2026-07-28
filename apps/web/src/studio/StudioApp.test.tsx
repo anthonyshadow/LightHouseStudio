@@ -365,10 +365,14 @@ describe('StudioApp composition lifecycle', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Apply reference recipe' }));
 
     await waitFor(() => expect(harness.session.replaceRecipeDraft).toHaveBeenCalledOnce());
-    expect(harness.fetchReferenceImageMetadata).toHaveBeenCalledWith(referenceAsset.assetId);
+    expect(harness.fetchReferenceImageMetadata).toHaveBeenCalledWith(
+      referenceAsset.assetId,
+      expect.any(AbortSignal),
+    );
     expect(harness.hydrateReferenceImage).toHaveBeenCalledWith(
       referenceAsset.assetId,
       expect.objectContaining(referenceAsset),
+      expect.any(AbortSignal),
     );
     expect(harness.session.replaceRecipeDraft).toHaveBeenCalledWith({
       mode: 'lucy-2.5',

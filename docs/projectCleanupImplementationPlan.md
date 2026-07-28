@@ -2,17 +2,17 @@
 
 ## Current status
 
-| Item                    | Status                                                                                                                                                                                                                                                                                                                                                                                                                                                |
-| ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                                                                                                                                                                                                      |
-| Date generated          | 2026-07-27                                                                                                                                                                                                                                                                                                                                                                                                                                            |
-| Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                                                                                                                                                                                                               |
-| Open findings           | 2 unresolved (2 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, DEAD-003, ARCH-001, ARCH-002, DUP-001, DUP-002, DUP-003, and COMP-001 resolved                                                                                                                                                                                                                                                                                               |
-| Remaining phases        | 2                                                                                                                                                                                                                                                                                                                                                                                                                                                     |
-| Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                                                                                                                                                                                                                 |
-| Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                                                                                                                                                                                                          |
-| Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted.                                                                                                                                                                                     |
-| Graphify status         | PHASE-007 moved the graph from 3,662 nodes / 8,293 edges to a 3,686 / 8,346 code checkpoint and 3,673 / 8,333 after roadmap self-removal, with only the known non-source `hooks.json` zero-node warning. `StudioApp` degree fell 83→73 and `StudioExperience` 26→24; the entrypoint still reaches one `MediaStage` in two hops, and notice, legacy availability, and Builder launch/discard responsibilities now reach focused directly tested units. |
+| Item                    | Status                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                                                                                                                                                                                        |
+| Date generated          | 2026-07-27                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                                                                                                                                                                                                 |
+| Open findings           | 1 unresolved (1 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, DEAD-003, ARCH-001, ARCH-002, DUP-001, DUP-002, DUP-003, COMP-001, and STATE-001 resolved                                                                                                                                                                                                                                                                      |
+| Remaining phases        | 1                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                                                                                                                                                                                                   |
+| Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                                                                                                                                                                                            |
+| Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted.                                                                                                                                                                       |
+| Graphify status         | PHASE-008 moved the graph from 3,673 nodes / 8,333 edges to a 3,716 / 8,458 code checkpoint and 3,708 / 8,449 after findings/roadmap self-removal. `useReferenceRecipeHandoff` symbol degree fell 15→12 and module degree 47→33; its Studio caller/export path remains unchanged, focused identity/hydration/Workshop/attribution clusters have direct tests, and the module graph reports 370 files / 1,008 local edges / zero cycles. |
 
 ## Execution rules
 
@@ -30,88 +30,11 @@
 
 ## Remaining phases overview
 
-| Phase ID  | Title                              | Finding IDs | Risk | Dependencies | Expected outcome                                                                    |
-| --------- | ---------------------------------- | ----------- | ---- | ------------ | ----------------------------------------------------------------------------------- |
-| PHASE-008 | Decompose recipe handoff internals | STATE-001   | High | None         | Focused state workflows behind the unchanged Studio facade                          |
-| PHASE-009 | Reconcile final documentation      | DOC-001     | Low  | PHASE-008    | Correct canonical filename/links and documentation aligned with implemented cleanup |
+| Phase ID  | Title                         | Finding IDs | Risk | Dependencies | Expected outcome                                                                    |
+| --------- | ----------------------------- | ----------- | ---- | ------------ | ----------------------------------------------------------------------------------- |
+| PHASE-009 | Reconcile final documentation | DOC-001     | Low  | None         | Correct canonical filename/links and documentation aligned with implemented cleanup |
 
 ## Phase sections
-
-### PHASE-008: Decompose recipe handoff internals
-
-#### Objective
-
-Separate active identity, reference hydration, Workshop coordination, and Builder preload/attribution internally while retaining one stable facade and source of truth.
-
-#### Findings resolved
-
-- `STATE-001`
-
-#### Scope
-
-`useReferenceRecipeHandoff.ts`, focused internal hooks/reducers/helpers, tests, and only necessary caller adjustments.
-
-#### Out of scope
-
-Changing public facade semantics; adding a global store/cache; provider/API changes; Workshop/Builder redesign; Studio root work already completed.
-
-#### Dependencies
-
-None. PHASE-007 is complete.
-
-#### Risk assessment
-
-- **Regression risk:** High.
-- **Architectural risk:** High if multiple sources of truth emerge.
-- **Data/compatibility risk:** Medium for saved recipe/reference identity.
-- **User-facing risk:** High across Shelf/Workshop/Builder.
-- **Rollback difficulty:** Medium.
-
-#### Implementation sequence
-
-1. Build a state/effect matrix for exact identity, hydration start/success/failure/retry/stale/abort, recent attribution, Workshop blocking/save/open, and Builder preload.
-2. Add focused tests for uncovered transitions and concurrent/stale operations.
-3. Extract pure identity/reducer logic, hydration controller, Workshop coordinator, and Builder preload/attribution unit with explicit inputs/outputs.
-4. Keep `useReferenceRecipeHandoff` as the single caller facade and authoritative composition of those units.
-5. Remove duplicated derived state/effects and prove no duplicate request/commit.
-
-#### Graphify requirements
-
-Explain the hook, all 15+ dependencies, callers and tests. After update, verify cohesive internal clusters, unchanged facade callers/export, no cycle/cross-feature ownership reversal, no duplicated hydration entry, and lower direct fan-out.
-
-#### Acceptance criteria
-
-Facade API and every state/effect matrix outcome remain unchanged; stale async work cannot commit; hydration/retry is not duplicated; exact identity, attribution, draft blocking/replacement and preload behavior pass; new units are independently testable and narrowly owned.
-
-#### Required validation
-
-Focused hook/unit tests; recipe/reference/Workshop/Builder suites; `npm run quality`; `npm run test:coverage`; `npm run test:e2e`; `npm run test:visual`; Graphify/module checks.
-
-#### Rollback strategy
-
-Revert extracted units and facade wiring together. Do not maintain parallel old/new flows.
-
-#### Documentation updates
-
-Resolve STATE-001 with state matrix, public facade confirmation, coverage and graph fan-out evidence; update Architecture only if internal ownership descriptions are present.
-
-#### Standalone implementation prompt
-
-```text
-Implement only PHASE-008 (“Decompose recipe handoff internals”), resolving STATE-001. Read all instructions, findings/plan, Architecture and Recipe Shelf/Workshop/Character Builder/reference journeys. Verify PHASE-003/007; inspect branch/commit/status and protect user work.
-
-Preserve useReferenceRecipeHandoff's public facade and exact recipe identity, owner-scoped hydration/retry/error behavior, recent attribution, Workshop draft blocking/replacement/open/save behavior, Builder preload, cancellation/operation-token semantics, accessibility and provider-cost boundaries. Do not add global state/cache/context, redesign UI, change API/provider behavior or keep parallel sources of truth.
-
-Run baselines. Before editing use installed Graphify to explain useReferenceRecipeHandoff, map all callers, imports/exports/tests, hydration and identity paths, Builder/Workshop edges, fan-in/out, cycles/dynamic imports and change impact. Confirm source effects and create a state/effect matrix covering success/failure/retry/stale/abort and cross-tool transitions. Add missing focused tests first.
-
-Extract narrowly owned internals: pure active-recipe identity/reducer logic; one reference hydration/retry controller; Workshop coordination; Builder preload/recent-attribution. Keep the original facade as their authoritative composition. Inputs/outputs and side effects must be explicit; remove duplicated derived state/effects and prove a single hydration/commit path.
-
-Run graphify update . and repeat queries. Verify facade callers/export unchanged, dependencies form cohesive internal clusters, direct fan-out decreases, no cycles/reverse ownership/orphans/duplicate entry paths appear. Run all focused and recipe/reference/Workshop/Builder tests, npm run quality, npm run test:coverage, npm run test:e2e and npm run test:visual.
-
-After every matrix/validation criterion passes, mark STATE-001 Resolved with implementation/files/tests/coverage/Graphify/limitations/PHASE-008; preserve history and add new IDs. Remove PHASE-008/overview row, update counts/dependencies without renumbering. Keep it if incomplete.
-
-Report facade/state decisions, extracted units, async guarantees, tests/coverage, graph diff, validation/failures/new findings, docs, self-removal and next phase.
-```
 
 ### PHASE-009: Reconcile final documentation
 
@@ -133,7 +56,7 @@ New production cleanup, rewriting historical rationale, claiming the project is 
 
 #### Dependencies
 
-PHASE-008. PHASE-004 through PHASE-007 are complete.
+None. PHASE-004 through PHASE-008 are complete.
 
 #### Risk assessment
 

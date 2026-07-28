@@ -6,11 +6,13 @@ import { createPromptBuilderDraft } from '@studio/domain';
 import type {
   CreativeAssetRepository,
   CreativeAssetStore,
+  SavedCharacterPrompt,
   SavedPrompt,
 } from '../features/creative-assets/types';
 import type { SessionReferenceImage } from '../features/media-session/types';
 import type { StudioSessionController } from '../features/media-session/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiClientError } from '../adapters/api-client/apiClient';
 import { isExactActiveRecipe, useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 
 const fetchReferenceImageMetadata = vi.hoisted(() => vi.fn());
@@ -173,9 +175,23 @@ describe('reference recipe handoff', () => {
   const renderHandoff = ({
     store,
     referenceAsset,
+    mediaLocked = false,
+    recordingActive = false,
+    sessionModeLocked = false,
+    characterBuilderOpenBlockedReason,
+    canReplaceRecipeDraft = true,
+    replaceRecipeDraftResults,
+    initialReferenceImage = null,
   }: {
     store: CreativeAssetStore;
     referenceAsset: UploadedReferenceImageAsset | GeneratedReferenceImageAsset;
+    mediaLocked?: boolean;
+    recordingActive?: boolean;
+    sessionModeLocked?: boolean;
+    characterBuilderOpenBlockedReason?: string | undefined;
+    canReplaceRecipeDraft?: boolean;
+    replaceRecipeDraftResults?: readonly boolean[] | undefined;
+    initialReferenceImage?: SessionReferenceImage | null;
   }) => {
     const hydrated: SessionReferenceImage = {
       kind: 'persisted',
@@ -190,13 +206,15 @@ describe('reference recipe handoff', () => {
       getSnapshot: () => ({ store, health: 'ready', notice: null }),
       recordSuccessfulPrompt,
       enrichNewestMatchingRecent: vi.fn(),
+      createSavedCharacterPrompt: vi.fn(),
     } as unknown as CreativeAssetRepository;
     const draft = {
       mode: 'lucy-2.5' as const,
       prompt: '',
-      referenceImage: null as SessionReferenceImage | null,
+      referenceImage: initialReferenceImage,
       enhance: false,
     };
+    let replacementAttempt = 0;
     const replaceRecipeDraft = vi.fn(
       (next: {
         mode: 'lucy-2.5';
@@ -204,6 +222,9 @@ describe('reference recipe handoff', () => {
         referenceImage: SessionReferenceImage | null;
         enhance: boolean;
       }) => {
+        const committed = replaceRecipeDraftResults?.[replacementAttempt] ?? true;
+        replacementAttempt += 1;
+        if (!committed) return false;
         Object.assign(draft, next);
         return true;
       },
@@ -211,23 +232,35 @@ describe('reference recipe handoff', () => {
     const session = {
       draft,
       replaceRecipeDraft,
-      canReplaceRecipeDraft: vi.fn(() => true),
+      canReplaceRecipeDraft: vi.fn(() => canReplaceRecipeDraft),
       selectMode: vi.fn(() => true),
     } as unknown as StudioSessionController;
+    const openWorkshopOverlay = vi.fn();
+    const closeOverlay = vi.fn();
     const result = renderHook(() =>
       useReferenceRecipeHandoff({
         repository,
         store,
         session,
-        mediaLocked: false,
-        recordingActive: false,
-        sessionModeLocked: false,
-        characterBuilderOpenBlockedReason: undefined,
-        openWorkshopOverlay: vi.fn(),
-        closeOverlay: vi.fn(),
+        mediaLocked,
+        recordingActive,
+        sessionModeLocked,
+        characterBuilderOpenBlockedReason,
+        openWorkshopOverlay,
+        closeOverlay,
       }),
     );
-    return { ...result, hydrated, recordSuccessfulPrompt, replaceRecipeDraft };
+    return {
+      ...result,
+      closeOverlay,
+      draft,
+      hydrated,
+      openWorkshopOverlay,
+      recordSuccessfulPrompt,
+      replaceRecipeDraft,
+      repository,
+      session,
+    };
   };
 
   it('preloads an image-only character without enhancement and records Recent only after use', async () => {
@@ -435,5 +468,323 @@ describe('reference recipe handoff', () => {
       referenceImageAssetId: uploadedAsset.assetId,
       characterName: 'Deleted archive character',
     });
+  });
+
+  it('retains the exact failed selection for owner-scoped retry and commits only once', async () => {
+    const store: CreativeAssetStore = {
+      schemaVersion: 4,
+      savedPrompts: [savedPrompt],
+      recentPrompts: [],
+      savedCharacterPrompts: [],
+    };
+    fetchReferenceImageMetadata
+      .mockRejectedValueOnce(new ApiClientError('missing', 404, 'not_found'))
+      .mockResolvedValueOnce(uploadedAsset);
+    const harness = renderHandoff({ store, referenceAsset: uploadedAsset });
+
+    act(() => {
+      harness.result.current.actions.useRecipe({
+        origin: 'saved-prompt',
+        assetId: savedPrompt.id,
+        prompt: savedPrompt.prompt,
+        modelModeId: savedPrompt.modelModeId,
+        referenceImageAssetId: uploadedAsset.assetId,
+      });
+    });
+
+    await waitFor(() =>
+      expect(harness.result.current.state.referenceUseFailureMessage).toContain(
+        'no longer available',
+      ),
+    );
+    expect(harness.replaceRecipeDraft).not.toHaveBeenCalled();
+    expect(harness.closeOverlay).not.toHaveBeenCalled();
+
+    act(() => {
+      harness.result.current.actions.retryReferenceUse();
+    });
+
+    await waitFor(() => expect(harness.replaceRecipeDraft).toHaveBeenCalledOnce());
+    expect(fetchReferenceImageMetadata).toHaveBeenCalledTimes(2);
+    expect(fetchReferenceImageMetadata).toHaveBeenLastCalledWith(
+      uploadedAsset.assetId,
+      expect.any(AbortSignal),
+    );
+    expect(hydrateReferenceImage).toHaveBeenCalledOnce();
+    expect(hydrateReferenceImage).toHaveBeenCalledWith(
+      uploadedAsset.assetId,
+      uploadedAsset,
+      expect.any(AbortSignal),
+    );
+    expect(harness.result.current.state.referenceUseFailureMessage).toBeNull();
+    expect(harness.closeOverlay).toHaveBeenCalledOnce();
+  });
+
+  it('rejects duplicate selections while one hydration operation owns the commit path', async () => {
+    let resolveMetadata: ((asset: UploadedReferenceImageAsset) => void) | undefined;
+    fetchReferenceImageMetadata.mockImplementation(
+      () =>
+        new Promise<UploadedReferenceImageAsset>((resolve) => {
+          resolveMetadata = resolve;
+        }),
+    );
+    const store: CreativeAssetStore = {
+      schemaVersion: 4,
+      savedPrompts: [savedPrompt],
+      recentPrompts: [],
+      savedCharacterPrompts: [],
+    };
+    const harness = renderHandoff({ store, referenceAsset: uploadedAsset });
+    const selection = {
+      origin: 'saved-prompt' as const,
+      assetId: savedPrompt.id,
+      prompt: savedPrompt.prompt,
+      modelModeId: savedPrompt.modelModeId,
+      referenceImageAssetId: uploadedAsset.assetId,
+    };
+
+    act(() => {
+      harness.result.current.actions.useRecipe(selection);
+      harness.result.current.actions.useRecipe(selection);
+    });
+
+    expect(fetchReferenceImageMetadata).toHaveBeenCalledOnce();
+    expect(harness.result.current.state.referenceUsePending).toBe(true);
+    act(() => {
+      resolveMetadata?.(uploadedAsset);
+    });
+    await waitFor(() => expect(harness.replaceRecipeDraft).toHaveBeenCalledOnce());
+  });
+
+  it('aborts hydration on unmount and prevents stale session or repository commits', () => {
+    let operationSignal: AbortSignal | undefined;
+    fetchReferenceImageMetadata.mockImplementationOnce((_assetId: string, signal?: AbortSignal) => {
+      operationSignal = signal;
+      return new Promise<UploadedReferenceImageAsset>(() => undefined);
+    });
+    const store: CreativeAssetStore = {
+      schemaVersion: 4,
+      savedPrompts: [savedPrompt],
+      recentPrompts: [],
+      savedCharacterPrompts: [],
+    };
+    const harness = renderHandoff({ store, referenceAsset: uploadedAsset });
+
+    act(() => {
+      harness.result.current.actions.useRecipe({
+        origin: 'saved-prompt',
+        assetId: savedPrompt.id,
+        prompt: savedPrompt.prompt,
+        modelModeId: savedPrompt.modelModeId,
+        referenceImageAssetId: uploadedAsset.assetId,
+      });
+    });
+    expect(operationSignal).toBeDefined();
+
+    harness.unmount();
+
+    expect(operationSignal?.aborted).toBe(true);
+    expect(harness.replaceRecipeDraft).not.toHaveBeenCalled();
+    expect(harness.recordSuccessfulPrompt).not.toHaveBeenCalled();
+    expect(harness.closeOverlay).not.toHaveBeenCalled();
+  });
+
+  it('retains the failed commit for retry without publishing identity or closing early', async () => {
+    const exactSavedPrompt = {
+      ...savedPrompt,
+      referenceImageAssetId: uploadedAsset.assetId,
+    };
+    const store: CreativeAssetStore = {
+      schemaVersion: 4,
+      savedPrompts: [exactSavedPrompt],
+      recentPrompts: [],
+      savedCharacterPrompts: [],
+    };
+    const harness = renderHandoff({
+      store,
+      referenceAsset: uploadedAsset,
+      replaceRecipeDraftResults: [false, true],
+    });
+
+    act(() => {
+      harness.result.current.actions.useRecipe({
+        origin: 'saved-prompt',
+        assetId: exactSavedPrompt.id,
+        prompt: exactSavedPrompt.prompt,
+        modelModeId: exactSavedPrompt.modelModeId,
+        referenceImageAssetId: uploadedAsset.assetId,
+      });
+    });
+
+    await waitFor(() =>
+      expect(harness.result.current.state.referenceUseFailureMessage).toContain(
+        'Release the active camera',
+      ),
+    );
+    expect(harness.result.current.state.activeRecipe).toBeNull();
+    expect(harness.closeOverlay).not.toHaveBeenCalled();
+
+    act(() => {
+      harness.result.current.actions.retryReferenceUse();
+    });
+
+    await waitFor(() =>
+      expect(harness.result.current.state.activeRecipe).toEqual({
+        origin: 'saved-prompt',
+        assetId: exactSavedPrompt.id,
+      }),
+    );
+    expect(harness.replaceRecipeDraft).toHaveBeenCalledTimes(2);
+    expect(harness.closeOverlay).toHaveBeenCalledOnce();
+  });
+
+  it('coordinates a legacy Workshop source through open, atomic use, and save', async () => {
+    const workshopDraft = createPromptBuilderDraft('add-object');
+    const character: SavedCharacterPrompt = {
+      id: 'legacy-workshop-character',
+      name: 'Legacy object edit',
+      prompt: 'Add a brass desk lamp beside the presenter.',
+      source: 'generator',
+      promptIntent: 'add-object',
+      builderDraft: workshopDraft,
+      guidedDesign: null,
+      referenceImageStatus: 'prompt-only',
+      referenceImageAssetId: null,
+      uploadedReferenceImageAssetId: null,
+      finalReferenceKind: null,
+      notes: '',
+      tags: [],
+      createdAt: '2026-07-21T12:00:00.000Z',
+      updatedAt: '2026-07-21T12:00:00.000Z',
+      lastUsedAt: null,
+      useCount: 0,
+    };
+    const store: CreativeAssetStore = {
+      schemaVersion: 4,
+      savedPrompts: [],
+      recentPrompts: [],
+      savedCharacterPrompts: [character],
+    };
+    const harness = renderHandoff({ store, referenceAsset: uploadedAsset });
+
+    act(() => {
+      harness.result.current.actions.openSavedWorkshop(workshopDraft, character);
+    });
+    expect(harness.openWorkshopOverlay).toHaveBeenCalledOnce();
+    expect(harness.result.current.state.workshopDraft).toEqual(workshopDraft);
+
+    act(() => {
+      harness.result.current.actions.applyWorkshopPrompt({
+        prompt: character.prompt,
+        draft: workshopDraft,
+        validation: { valid: true, blocking: [], warnings: [] },
+        referenceImageAssetId: null,
+      });
+    });
+    await waitFor(() =>
+      expect(harness.result.current.state.activeRecipe).toEqual({
+        origin: 'character-prompt',
+        assetId: character.id,
+      }),
+    );
+    expect(fetchReferenceImageMetadata).not.toHaveBeenCalled();
+    expect(harness.replaceRecipeDraft).toHaveBeenCalledOnce();
+
+    act(() => {
+      harness.result.current.actions.saveWorkshopPrompt({
+        name: 'Saved object edit',
+        prompt: character.prompt,
+        draft: workshopDraft,
+        validation: { valid: true, blocking: [], warnings: [] },
+        referenceImageAssetId: null,
+      });
+    });
+    expect(harness.repository.createSavedCharacterPrompt).toHaveBeenCalledWith({
+      name: 'Saved object edit',
+      prompt: character.prompt,
+      source: 'generator',
+      promptIntent: 'add-object',
+      builderDraft: workshopDraft,
+      referenceImageStatus: 'prompt-only',
+      referenceImageAssetId: null,
+    });
+  });
+
+  it('preserves Character Builder blocking precedence across Shelf and hydration state', () => {
+    const externalBlock = renderHandoff({
+      store: {
+        schemaVersion: 4,
+        savedPrompts: [],
+        recentPrompts: [],
+        savedCharacterPrompts: [],
+      },
+      referenceAsset: uploadedAsset,
+      characterBuilderOpenBlockedReason: 'Finish the current take first.',
+      canReplaceRecipeDraft: false,
+    });
+    expect(externalBlock.result.current.state.characterBuilderSaveBlockedReason).toBe(
+      'Finish the current take first.',
+    );
+
+    const shelfBlock = renderHandoff({
+      store: {
+        schemaVersion: 4,
+        savedPrompts: [],
+        recentPrompts: [],
+        savedCharacterPrompts: [],
+      },
+      referenceAsset: uploadedAsset,
+    });
+    act(() => {
+      shelfBlock.result.current.actions.setShelfDirty(true);
+    });
+    expect(shelfBlock.result.current.state.characterBuilderSaveBlockedReason).toContain(
+      'unfinished Recipe Shelf changes',
+    );
+
+    const sessionBlock = renderHandoff({
+      store: {
+        schemaVersion: 4,
+        savedPrompts: [],
+        recentPrompts: [],
+        savedCharacterPrompts: [],
+      },
+      referenceAsset: uploadedAsset,
+      canReplaceRecipeDraft: false,
+    });
+    expect(sessionBlock.result.current.state.characterBuilderSaveBlockedReason).toContain(
+      'Release the active camera',
+    );
+
+    fetchReferenceImageMetadata.mockImplementationOnce(
+      () => new Promise<UploadedReferenceImageAsset>(() => undefined),
+    );
+    const pendingBlock = renderHandoff({
+      store: {
+        schemaVersion: 4,
+        savedPrompts: [
+          {
+            ...savedPrompt,
+            referenceImageAssetId: uploadedAsset.assetId,
+          },
+        ],
+        recentPrompts: [],
+        savedCharacterPrompts: [],
+      },
+      referenceAsset: uploadedAsset,
+    });
+    act(() => {
+      pendingBlock.result.current.actions.useRecipe({
+        origin: 'saved-prompt',
+        assetId: savedPrompt.id,
+        prompt: savedPrompt.prompt,
+        modelModeId: savedPrompt.modelModeId,
+        referenceImageAssetId: uploadedAsset.assetId,
+      });
+    });
+    expect(pendingBlock.result.current.state.characterBuilderSaveBlockedReason).toContain(
+      'current recipe handoff',
+    );
+    pendingBlock.unmount();
   });
 });
