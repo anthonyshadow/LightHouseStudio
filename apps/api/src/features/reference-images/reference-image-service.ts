@@ -12,6 +12,7 @@ import {
 import {
   type ReferenceImageAssetStore,
   ReferenceImageStorageError,
+  type StoreReferenceImageInput,
   type StoredReferenceImageContent,
   type StoredReferenceImageMetadata,
 } from './asset-store.js';
@@ -44,6 +45,7 @@ import {
   generationRequestFingerprint,
   type GenerateReferenceImageInput,
   hashReferenceImageEditInstructions,
+  type PreparedReferenceImageGeneration,
   prepareReferenceImageGeneration,
   recommendedSettingsForOptions,
   toReferenceImageAsset,
@@ -55,6 +57,26 @@ export interface UploadReferenceImageInput {
   readonly bytes: Buffer;
   readonly mimeType: ValidReferenceImageMimeType;
   readonly signal?: AbortSignal;
+}
+
+type GeneratedReferenceImageStoreInput = Exclude<
+  StoreReferenceImageInput,
+  { readonly source: 'uploaded' }
+>;
+type ReferenceImageDerivation = NonNullable<GeneratedReferenceImageStoreInput['derivation']>;
+
+interface ReferenceImageFinalizationOperationMetadata {
+  readonly localOwnerId: string;
+  readonly requestId: string;
+  readonly requestFingerprint: string;
+  readonly originalPrompt: string;
+  readonly prepared: PreparedReferenceImageGeneration;
+}
+
+interface ReferenceImageFinalizationInput {
+  readonly providerResult: GeneratedReferenceImagePayload;
+  readonly derivation: ReferenceImageDerivation;
+  readonly operation: ReferenceImageFinalizationOperationMetadata;
 }
 
 const uploadRequestFingerprint = (input: UploadReferenceImageInput): string =>
@@ -291,36 +313,16 @@ export class ReferenceImageService {
         ...(input.signal === undefined ? {} : { signal: input.signal }),
       }),
     );
-    return this.#withRemoteArtifactCleanup(generated, async () => {
-      this.#assertProviderResultMatchesSelection(generated);
-      const image = await validateReferenceImageBytes(
-        generated.bytes,
-        prepared.size,
-        generated.mimeType,
-      );
-      return this.#store.store({
+    return this.#finalizeReferenceImage({
+      providerResult: generated,
+      derivation: { kind: 'generate' },
+      operation: {
         localOwnerId: input.localOwnerId,
-        bytes: image.bytes,
-        mimeType: image.mimeType,
-        size: prepared.size,
-        width: image.width,
-        height: image.height,
-        provider: generated.providerId,
-        model: generated.modelId,
-        quality: this.#imageQuality,
         originalPrompt: input.rawPrompt,
-        derivedPrompt: prepared.prompt,
-        promptAudit: prepared.promptAudit,
-        promptHash: prepared.promptHash,
         requestId: input.requestId,
         requestFingerprint,
-        requestFingerprintVersion: 2,
-        derivation: { kind: 'generate' },
-        ...(generated.providerRequestId === undefined
-          ? {}
-          : { providerRequestId: generated.providerRequestId }),
-        ...this.#storedProviderAudit(generated.safeUsage),
-      });
+        prepared,
+      },
     });
   }
 
@@ -357,37 +359,20 @@ export class ReferenceImageService {
       }),
     );
 
-    return this.#withRemoteArtifactCleanup(edited, async () => {
-      this.#assertProviderResultMatchesSelection(edited);
-      const image = await validateReferenceImageBytes(edited.bytes, prepared.size, edited.mimeType);
-      return this.#store.store({
+    return this.#finalizeReferenceImage({
+      providerResult: edited,
+      derivation: {
+        kind: 'edit',
+        sourceAssetId: input.sourceAssetId,
+        changeInstructionsHash: hashReferenceImageEditInstructions(input.changeInstructions),
+      },
+      operation: {
         localOwnerId: input.localOwnerId,
-        bytes: image.bytes,
-        mimeType: image.mimeType,
-        size: prepared.size,
-        width: image.width,
-        height: image.height,
-        provider: edited.providerId,
-        model: edited.modelId,
-        quality: this.#imageQuality,
         originalPrompt: input.rawPrompt,
-        // The provider-only prompt contains the raw requested change and must not be persisted.
-        derivedPrompt: prepared.prompt,
-        promptAudit: prepared.promptAudit,
-        promptHash: prepared.promptHash,
         requestId: input.requestId,
         requestFingerprint,
-        requestFingerprintVersion: 2,
-        derivation: {
-          kind: 'edit',
-          sourceAssetId: input.sourceAssetId,
-          changeInstructionsHash: hashReferenceImageEditInstructions(input.changeInstructions),
-        },
-        ...(edited.providerRequestId === undefined
-          ? {}
-          : { providerRequestId: edited.providerRequestId }),
-        ...this.#storedProviderAudit(edited.safeUsage),
-      });
+        prepared,
+      },
     });
   }
 
@@ -416,35 +401,53 @@ export class ReferenceImageService {
       }),
     );
 
-    return this.#withRemoteArtifactCleanup(composed, async () => {
-      this.#assertProviderResultMatchesSelection(composed);
-      const image = await validateReferenceImageBytes(
-        composed.bytes,
-        prepared.size,
-        composed.mimeType,
-      );
-      return this.#store.store({
+    return this.#finalizeReferenceImage({
+      providerResult: composed,
+      derivation: { kind: 'compose', sourceAssetId: input.sourceAssetId },
+      operation: {
         localOwnerId: input.localOwnerId,
-        bytes: image.bytes,
-        mimeType: image.mimeType,
-        size: prepared.size,
-        width: image.width,
-        height: image.height,
-        provider: composed.providerId,
-        model: composed.modelId,
-        quality: this.#imageQuality,
         originalPrompt: input.rawPrompt,
-        derivedPrompt: prepared.prompt,
-        promptAudit: prepared.promptAudit,
-        promptHash: prepared.promptHash,
         requestId: input.requestId,
         requestFingerprint,
+        prepared,
+      },
+    });
+  }
+
+  async #finalizeReferenceImage(
+    input: ReferenceImageFinalizationInput,
+  ): Promise<StoredReferenceImageMetadata> {
+    const { providerResult, derivation, operation } = input;
+    return this.#withRemoteArtifactCleanup(providerResult, async () => {
+      this.#assertProviderResultMatchesSelection(providerResult);
+      const image = await validateReferenceImageBytes(
+        providerResult.bytes,
+        operation.prepared.size,
+        providerResult.mimeType,
+      );
+      return this.#store.store({
+        localOwnerId: operation.localOwnerId,
+        bytes: image.bytes,
+        mimeType: image.mimeType,
+        size: operation.prepared.size,
+        width: image.width,
+        height: image.height,
+        provider: providerResult.providerId,
+        model: providerResult.modelId,
+        quality: this.#imageQuality,
+        originalPrompt: operation.originalPrompt,
+        // Edit provider prompts can contain raw change instructions; persist only the prepared prompt.
+        derivedPrompt: operation.prepared.prompt,
+        promptAudit: operation.prepared.promptAudit,
+        promptHash: operation.prepared.promptHash,
+        requestId: operation.requestId,
+        requestFingerprint: operation.requestFingerprint,
         requestFingerprintVersion: 2,
-        derivation: { kind: 'compose', sourceAssetId: input.sourceAssetId },
-        ...(composed.providerRequestId === undefined
+        derivation,
+        ...(providerResult.providerRequestId === undefined
           ? {}
-          : { providerRequestId: composed.providerRequestId }),
-        ...this.#storedProviderAudit(composed.safeUsage),
+          : { providerRequestId: providerResult.providerRequestId }),
+        ...this.#storedProviderAudit(providerResult.safeUsage),
       });
     });
   }

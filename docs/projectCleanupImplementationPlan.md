@@ -7,12 +7,12 @@
 | Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                                                                    |
 | Date generated          | 2026-07-27                                                                                                                                                                                                                                                                                                          |
 | Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                                                                             |
-| Open findings           | 5 unresolved (5 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, DEAD-003, ARCH-001, ARCH-002, and DUP-001 resolved                                                                                                                                                                                         |
-| Remaining phases        | 5                                                                                                                                                                                                                                                                                                                   |
+| Open findings           | 4 unresolved (4 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, DEAD-003, ARCH-001, ARCH-002, DUP-001, and DUP-002 resolved                                                                                                                                                                                |
+| Remaining phases        | 4                                                                                                                                                                                                                                                                                                                   |
 | Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                                                                               |
 | Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                                                                        |
 | Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted.                                                   |
-| Graphify status         | PHASE-004 refresh completed at 3,674 nodes / 8,296 edges (from 3,663 / 8,260), with only the known non-source `hooks.json` zero-node warning. BFL and Wiro retain separate protocol paths and converge through their thin wrappers only at the shared hardened transport and identical bounded/deadline primitives. |
+| Graphify status         | PHASE-005 final refresh completed at 3,662 nodes / 8,294 edges (from 3,674 / 8,296 after roadmap self-removal), with only the known non-source `hooks.json` zero-node warning. Generate/edit/compose retain their public route/provider/coordinator paths and converge only at one typed service-private finalizer. |
 
 ## Execution rules
 
@@ -32,88 +32,12 @@
 
 | Phase ID  | Title                                         | Finding IDs | Risk        | Dependencies                | Expected outcome                                                                    |
 | --------- | --------------------------------------------- | ----------- | ----------- | --------------------------- | ----------------------------------------------------------------------------------- |
-| PHASE-005 | Consolidate reference-asset finalization      | DUP-002     | Medium      | None                        | One typed service-private persistence path for generate/edit/compose                |
 | PHASE-006 | Share image-picker/drop presentation          | DUP-003     | Low-medium  | None                        | Shared accessible DOM behavior without merging storage/lifecycle policy             |
 | PHASE-007 | Decompose independent Studio root controllers | COMP-001    | Medium-high | PHASE-006                   | Smaller composition root with identical stage/overlay topology                      |
 | PHASE-008 | Decompose recipe handoff internals            | STATE-001   | High        | PHASE-007                   | Focused state workflows behind the unchanged Studio facade                          |
-| PHASE-009 | Reconcile final documentation                 | DOC-001     | Low         | PHASE-005 through PHASE-008 | Correct canonical filename/links and documentation aligned with implemented cleanup |
+| PHASE-009 | Reconcile final documentation                 | DOC-001     | Low         | PHASE-006 through PHASE-008 | Correct canonical filename/links and documentation aligned with implemented cleanup |
 
 ## Phase sections
-
-### PHASE-005: Consolidate reference-asset finalization
-
-#### Objective
-
-Make generate/edit/compose use one typed service-private validation/metadata/persistence path without obscuring their distinct provider operations.
-
-#### Findings resolved
-
-- `DUP-002`
-
-#### Scope
-
-`ReferenceImageService` generate/edit/compose finalization and focused tests.
-
-#### Out of scope
-
-Provider transport, public routes/contracts, prompts, idempotency/coalescing redesign, asset deletion/GC, web UI, or broad service decomposition.
-
-#### Dependencies
-
-None. PHASE-004 is complete.
-
-#### Risk assessment
-
-- **Regression risk:** Medium.
-- **Architectural risk:** Low-medium.
-- **Data/compatibility risk:** Medium for provenance.
-- **User-facing risk:** Medium on generation failure/saved assets.
-- **Rollback difficulty:** Low.
-
-#### Implementation sequence
-
-1. Table current operation inputs, derivations, source IDs, metadata/audit fields, validation, persistence order, and errors.
-2. Add parity tests for generated/edited/composed records and failure ordering.
-3. Extract one private typed finalizer with explicit derivation/source/result/metadata parameters.
-4. Keep provider invocation, coordinator/idempotency keys and input checks in separate public operations; remove duplicate finalization blocks.
-
-#### Graphify requirements
-
-Trace service operations to providers/store/routes/tests before and after. Confirm only the intended finalization edges converge, public operation nodes/entry paths remain, no cycles/orphans or fan-out growth occurs.
-
-#### Acceptance criteria
-
-Stored bytes, IDs, owner scope, provenance, metadata/audit values, errors, and persistence/cleanup ordering match prior tests for all operations; one finalization implementation remains; contracts unchanged.
-
-#### Required validation
-
-Reference service/routes/providers tests; contract parity; `npm run quality`; `npm run test:coverage`; `npm run test:production`; Graphify/module checks.
-
-#### Rollback strategy
-
-Revert the private helper and restore explicit branches. No stored-data migration is permitted.
-
-#### Documentation updates
-
-Resolve DUP-002 with parity/graph evidence; update Architecture only if its ownership description becomes inaccurate.
-
-#### Standalone implementation prompt
-
-```text
-Implement only PHASE-005 (“Consolidate reference-asset finalization”), resolving DUP-002. Read instructions, findings/plan, Architecture/privacy/image-generation docs, and complete ReferenceImageService/tests. Verify PHASE-004; inspect branch/commit/status and preserve user changes.
-
-Preserve HTTP contracts, bytes/IDs, owner scoping, idempotency/coalescing, derivation/source provenance, audit metadata, provider calls/prompts, error mapping, persistence and provider-cleanup ordering. Do not change provider transport, add GC, redesign the service, or touch web UI.
-
-Run baselines. Use installed Graphify before editing to map generate/edit/compose through provider, coordinator, asset store, routes and tests; inspect callers, exports, fan-in/out/cycles/change impact. Confirm source behavior with a comparison table and add parity tests first.
-
-Extract one private typed finalization method parameterized only by validated provider result, derivation/source relations and operation metadata. Keep each public operation's validation, provider invocation and coordinator key explicit. Remove repeated assertion/byte validation/metadata/persistence blocks without generalizing unrelated logic.
-
-Run graphify update ., repeat paths and verify only finalization edges converge, public operations and consumers remain, no cycles/orphans appear, and fan-out improves. Run full reference service/route/provider and contract tests, npm run quality, npm run test:coverage and npm run test:production.
-
-After all criteria pass, mark DUP-002 Resolved with changes/files/validation/Graphify/limitations/PHASE-005; preserve history and add new IDs for new issues. Remove PHASE-005/overview row, update counts/dependencies without renumbering. Keep it if incomplete.
-
-Report exact consolidation and preserved provenance/order, tests, graph diff, validation/failures/new findings, docs, self-removal, next phase.
-```
 
 ### PHASE-006: Share image-picker/drop presentation
 
@@ -364,7 +288,7 @@ New production cleanup, rewriting historical rationale, claiming the project is 
 
 #### Dependencies
 
-PHASE-005 through PHASE-008. PHASE-004 is complete.
+PHASE-006 through PHASE-008. PHASE-004 and PHASE-005 are complete.
 
 #### Risk assessment
 
