@@ -5,7 +5,6 @@ import {
   type GuidedDesignV1,
 } from '@studio/domain';
 import {
-  abortTransaction,
   browserIndexedDb,
   openIndexedDatabase,
   requestResult,
@@ -13,11 +12,8 @@ import {
 } from '../../adapters/indexed-db/indexedDb';
 import {
   GUIDED_PROJECT_SCHEMA_VERSION,
-  type CheckpointCommit,
-  type LocalProjectRepository,
-  type ProjectArtifactCommit,
-  type ProjectArtifactRecord,
   type GuidedProjectDataV1,
+  type LocalProjectRepository,
   type PersistedVideoMetadata,
   type ProjectRecordV1,
   type ProjectStorageState,
@@ -29,14 +25,7 @@ export const GUIDED_PROJECT_DATABASE_VERSION = 1;
 export const GUIDED_PROJECTS_STORE = 'projects';
 export const GUIDED_PROJECT_ARTIFACTS_STORE = 'artifacts';
 
-export type ProjectStorageErrorCode =
-  | 'closed'
-  | 'invalid-project'
-  | 'invalid-artifact'
-  | 'not-found'
-  | 'revision-conflict'
-  | 'immutable-artifact'
-  | 'storage-failed';
+export type ProjectStorageErrorCode = 'closed' | 'storage-failed';
 
 export class ProjectStorageError extends Error {
   readonly code: ProjectStorageErrorCode;
@@ -51,40 +40,25 @@ export class ProjectStorageError extends Error {
 export interface LocalProjectRepositoryOptions {
   readonly indexedDB?: IDBFactory | null;
   readonly databaseName?: string;
-  readonly now?: () => Date;
 }
 
-export type ProjectRetention = 'persistent' | 'best-effort' | 'unsupported';
+type ProjectArtifactKind = 'original-video' | 'original-audio' | 'processed-video';
 
-export interface ProjectPersistenceManager {
-  persisted?(): Promise<boolean>;
-  persist?(): Promise<boolean>;
+interface ProjectArtifactRecord {
+  readonly id: string;
+  readonly projectId: string;
+  readonly kind: ProjectArtifactKind;
+  readonly blob: Blob;
+  readonly mimeType: string;
+  readonly sizeBytes: number;
+  readonly sourceArtifactId: string | null;
+  readonly createdAt: string;
 }
-
-/** Call only after an explicit user-initiated media save. */
-export const requestPersistentProjectStorage = async (
-  suppliedManager?: ProjectPersistenceManager | null,
-): Promise<ProjectRetention> => {
-  const manager =
-    suppliedManager === undefined
-      ? typeof navigator === 'undefined'
-        ? null
-        : navigator.storage
-      : suppliedManager;
-  if (!manager?.persist) return 'unsupported';
-  try {
-    if (manager.persisted && (await manager.persisted())) return 'persistent';
-    return (await manager.persist()) ? 'persistent' : 'best-effort';
-  } catch {
-    return 'best-effort';
-  }
-};
 
 interface ProjectBackend {
   list(): Promise<readonly ProjectRecordV1[]>;
   load(projectId: string): Promise<ProjectRecordV1 | null>;
   readArtifact(projectId: string, artifactId: string): Promise<Blob | null>;
-  commit(input: CheckpointCommit, now: string): Promise<ProjectRecordV1>;
   deleteProject(projectId: string): Promise<void>;
   close(): void;
 }
@@ -106,8 +80,6 @@ const DEGRADED_STATE: ProjectStorageState = {
   notice:
     'Durable browser storage failed. Your project and active media remain available in this tab for retry or download.',
 };
-
-const validId = (value: string) => value.trim().length > 0 && value.length <= 256;
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -153,8 +125,9 @@ const sanitizeVideoMetadata = (value: unknown): PersistedVideoMetadata | null | 
     typeof value.sizeBytes !== 'number' ||
     !Number.isSafeInteger(value.sizeBytes) ||
     value.sizeBytes < 0
-  )
+  ) {
     return undefined;
+  }
   return {
     filename,
     mimeType,
@@ -165,7 +138,7 @@ const sanitizeVideoMetadata = (value: unknown): PersistedVideoMetadata | null | 
   };
 };
 
-/** Allowlist durable checkpoint data; runtime and unknown fields are discarded. */
+/** Allowlist compatibility checkpoint data; runtime and unknown fields are discarded. */
 export const sanitizeGuidedProjectData = (value: unknown): GuidedProjectDataV1 | null => {
   if (!isRecord(value)) return null;
   const characterId = nullableText(value.characterId, 256);
@@ -218,8 +191,9 @@ export const sanitizeGuidedProjectData = (value: unknown): GuidedProjectDataV1 |
     selectedVoiceName === undefined ||
     (downloadStartedAt === null && value.downloadStartedAt !== null) ||
     (completedAt === null && value.completedAt !== null)
-  )
+  ) {
     return null;
+  }
   return {
     characterId,
     characterName,
@@ -271,8 +245,9 @@ export const sanitizeProjectRecord = (value: unknown): ProjectRecordV1 | null =>
     !data ||
     !createdAt ||
     !updatedAt
-  )
+  ) {
     return null;
+  }
   return {
     schemaVersion: GUIDED_PROJECT_SCHEMA_VERSION,
     id,
@@ -303,8 +278,9 @@ const sanitizeArtifactRecord = (value: unknown): ProjectArtifactRecord | null =>
     value.blob.size !== value.sizeBytes ||
     sourceArtifactId === undefined ||
     !createdAt
-  )
+  ) {
     return null;
+  }
   return {
     id,
     projectId,
@@ -315,113 +291,6 @@ const sanitizeArtifactRecord = (value: unknown): ProjectArtifactRecord | null =>
     sourceArtifactId,
     createdAt,
   };
-};
-
-const validateCommit = (input: CheckpointCommit) => {
-  if (!validId(input.projectId)) {
-    throw new ProjectStorageError('invalid-project', 'A valid project ID is required.');
-  }
-  if (!input.title.trim() || input.title.length > 160) {
-    throw new ProjectStorageError(
-      'invalid-project',
-      'A project title between 1 and 160 characters is required.',
-    );
-  }
-  if (
-    input.expectedRevision !== null &&
-    (!Number.isSafeInteger(input.expectedRevision) || input.expectedRevision < 1)
-  ) {
-    throw new ProjectStorageError('invalid-project', 'The expected project revision is invalid.');
-  }
-  const ids = new Set<string>();
-  for (const artifact of input.artifacts ?? []) {
-    validateArtifact(artifact);
-    if (ids.has(artifact.id)) {
-      throw new ProjectStorageError(
-        'invalid-artifact',
-        `Artifact ${artifact.id} appears more than once in the checkpoint.`,
-      );
-    }
-    ids.add(artifact.id);
-  }
-};
-
-const validateArtifact = (artifact: ProjectArtifactCommit) => {
-  if (!validId(artifact.id) || !(artifact.blob instanceof Blob) || artifact.blob.size === 0) {
-    throw new ProjectStorageError(
-      'invalid-artifact',
-      'Project artifacts must have an ID and data.',
-    );
-  }
-  const mimeType = (artifact.mimeType ?? artifact.blob.type).trim();
-  if (!mimeType || mimeType.length > 128) {
-    throw new ProjectStorageError(
-      'invalid-artifact',
-      'Project artifacts require a valid MIME type.',
-    );
-  }
-  if (artifact.kind === 'processed-video' && !artifact.sourceArtifactId) {
-    throw new ProjectStorageError(
-      'invalid-artifact',
-      'A processed video must reference its immutable original video.',
-    );
-  }
-};
-
-const artifactRecord = (
-  projectId: string,
-  input: ProjectArtifactCommit,
-  now: string,
-): ProjectArtifactRecord => ({
-  id: input.id,
-  projectId,
-  kind: input.kind,
-  blob: input.blob,
-  mimeType: (input.mimeType ?? input.blob.type).trim(),
-  sizeBytes: input.blob.size,
-  sourceArtifactId: input.sourceArtifactId ?? null,
-  createdAt: now,
-});
-
-const recordForCommit = (
-  input: CheckpointCommit,
-  current: ProjectRecordV1 | null,
-  now: string,
-): ProjectRecordV1 => {
-  const data = sanitizeGuidedProjectData(input.data);
-  if (!data)
-    throw new ProjectStorageError('invalid-project', 'Project checkpoint data is invalid.');
-  return {
-    schemaVersion: GUIDED_PROJECT_SCHEMA_VERSION,
-    id: input.projectId,
-    title: input.title.trim(),
-    revision: (current?.revision ?? 0) + 1,
-    checkpoint: input.checkpoint,
-    data,
-    createdAt: current?.createdAt ?? now,
-    updatedAt: now,
-  };
-};
-
-const assertExpectedRevision = (input: CheckpointCommit, current: ProjectRecordV1 | null) => {
-  if (input.expectedRevision === null) {
-    if (current) {
-      throw new ProjectStorageError(
-        'revision-conflict',
-        `Project ${input.projectId} already exists at revision ${current.revision}.`,
-      );
-    }
-    return;
-  }
-  if (!current) {
-    throw new ProjectStorageError('not-found', `Project ${input.projectId} was not found.`);
-  }
-  if (current.revision !== input.expectedRevision) {
-    throw new ProjectStorageError(
-      'revision-conflict',
-      `Project ${input.projectId} changed from revision ${input.expectedRevision} to ${current.revision}.`,
-    );
-  }
 };
 
 const toSummary = (project: ProjectRecordV1): ProjectSummary => ({
@@ -439,38 +308,9 @@ const toSummary = (project: ProjectRecordV1): ProjectSummary => ({
 const cloneProject = (record: ProjectRecordV1): ProjectRecordV1 => structuredClone(record);
 
 const cloneArtifact = (record: ProjectArtifactRecord): ProjectArtifactRecord => ({
-  id: record.id,
-  projectId: record.projectId,
-  kind: record.kind,
+  ...record,
   blob: record.blob.slice(0, record.blob.size, record.mimeType),
-  mimeType: record.mimeType,
-  sizeBytes: record.sizeBytes,
-  sourceArtifactId: record.sourceArtifactId,
-  createdAt: record.createdAt,
 });
-
-interface ProjectBackendSnapshot {
-  readonly projects: readonly ProjectRecordV1[];
-  readonly artifacts: readonly ProjectArtifactRecord[];
-}
-
-interface DeletedProjectSnapshot {
-  readonly projectId: string;
-  readonly revision: number | null;
-}
-
-interface RemovedArtifactSnapshot {
-  readonly artifactId: string;
-  readonly projectId: string;
-}
-
-const sameArtifactIdentity = (left: ProjectArtifactRecord, right: ProjectArtifactRecord): boolean =>
-  left.id === right.id &&
-  left.projectId === right.projectId &&
-  left.kind === right.kind &&
-  left.mimeType === right.mimeType &&
-  left.sizeBytes === right.sizeBytes &&
-  left.sourceArtifactId === right.sourceArtifactId;
 
 class MemoryProjectBackend implements ProjectBackend {
   readonly #projects = new Map<string, ProjectRecordV1>();
@@ -491,19 +331,6 @@ class MemoryProjectBackend implements ProjectBackend {
     this.#artifacts.set(record.id, cloneArtifact(record));
   }
 
-  removeSeededArtifact(artifactId: string) {
-    this.#assertOpen();
-    this.#artifacts.delete(artifactId);
-  }
-
-  snapshot(): ProjectBackendSnapshot {
-    this.#assertOpen();
-    return {
-      projects: [...this.#projects.values()].map(cloneProject),
-      artifacts: [...this.#artifacts.values()].map(cloneArtifact),
-    };
-  }
-
   list() {
     this.#assertOpen();
     return Promise.resolve([...this.#projects.values()].map(cloneProject));
@@ -511,66 +338,21 @@ class MemoryProjectBackend implements ProjectBackend {
 
   load(projectId: string) {
     this.#assertOpen();
-    const value = this.#projects.get(projectId);
-    return Promise.resolve(value ? cloneProject(value) : null);
+    const project = this.#projects.get(projectId);
+    return Promise.resolve(project ? cloneProject(project) : null);
   }
 
   readArtifact(projectId: string, artifactId: string) {
     this.#assertOpen();
     const artifact = this.#artifacts.get(artifactId);
-    if (!artifact || artifact.projectId !== projectId) return Promise.resolve(null);
-    return Promise.resolve(cloneArtifact(artifact).blob);
-  }
-
-  commit(input: CheckpointCommit, now: string) {
-    this.#assertOpen();
-    validateCommit(input);
-    const current = this.#projects.get(input.projectId) ?? null;
-    assertExpectedRevision(input, current);
-
-    const nextArtifacts = new Map(this.#artifacts);
-    for (const artifactId of input.removeArtifactIds ?? []) {
-      const artifact = nextArtifacts.get(artifactId);
-      if (!artifact || artifact.projectId !== input.projectId) continue;
-      if (artifact.kind !== 'processed-video') {
-        throw new ProjectStorageError(
-          'immutable-artifact',
-          'Original project media can only be removed by deleting the project.',
-        );
-      }
-      nextArtifacts.delete(artifactId);
-    }
-    for (const pending of input.artifacts ?? []) {
-      if (nextArtifacts.has(pending.id)) {
-        throw new ProjectStorageError(
-          'immutable-artifact',
-          `Artifact ${pending.id} already exists and cannot be overwritten.`,
-        );
-      }
-      if (pending.kind === 'processed-video') {
-        const source = nextArtifacts.get(pending.sourceArtifactId ?? '');
-        if (!source || source.projectId !== input.projectId || source.kind !== 'original-video') {
-          throw new ProjectStorageError(
-            'invalid-artifact',
-            'The processed video source must be an original video in this project.',
-          );
-        }
-      }
-      nextArtifacts.set(pending.id, artifactRecord(input.projectId, pending, now));
-    }
-
-    const nextProject = recordForCommit(input, current, now);
-    this.#artifacts.clear();
-    for (const [id, artifact] of nextArtifacts) this.#artifacts.set(id, artifact);
-    this.#projects.set(input.projectId, cloneProject(nextProject));
-    return Promise.resolve(cloneProject(nextProject));
+    return Promise.resolve(artifact?.projectId === projectId ? cloneArtifact(artifact).blob : null);
   }
 
   deleteProject(projectId: string) {
     this.#assertOpen();
     this.#projects.delete(projectId);
-    for (const [id, artifact] of this.#artifacts) {
-      if (artifact.projectId === projectId) this.#artifacts.delete(id);
+    for (const [artifactId, artifact] of this.#artifacts) {
+      if (artifact.projectId === projectId) this.#artifacts.delete(artifactId);
     }
     return Promise.resolve();
   }
@@ -637,225 +419,6 @@ class IndexedDbProjectBackend implements ProjectBackend {
     return artifact?.projectId === projectId ? artifact.blob : null;
   }
 
-  async commit(input: CheckpointCommit, now: string) {
-    validateCommit(input);
-    const transaction = this.database.transaction(
-      [GUIDED_PROJECTS_STORE, GUIDED_PROJECT_ARTIFACTS_STORE],
-      'readwrite',
-    );
-    const completion = transactionComplete(transaction);
-    const projects = transaction.objectStore(GUIDED_PROJECTS_STORE);
-    const artifacts = transaction.objectStore(GUIDED_PROJECT_ARTIFACTS_STORE);
-    try {
-      const rawCurrent = await requestResult<unknown>(projects.get(input.projectId));
-      const current = sanitizeProjectRecord(rawCurrent);
-      if (rawCurrent !== undefined && rawCurrent !== null && !current) {
-        throw new ProjectStorageError(
-          'storage-failed',
-          `Project ${input.projectId} contains an unsupported or damaged record.`,
-        );
-      }
-      assertExpectedRevision(input, current);
-
-      for (const artifactId of input.removeArtifactIds ?? []) {
-        const existing = sanitizeArtifactRecord(
-          await requestResult<unknown>(artifacts.get(artifactId)),
-        );
-        if (!existing || existing.projectId !== input.projectId) continue;
-        if (existing.kind !== 'processed-video') {
-          throw new ProjectStorageError(
-            'immutable-artifact',
-            'Original project media can only be removed by deleting the project.',
-          );
-        }
-        artifacts.delete(artifactId);
-      }
-
-      for (const pending of input.artifacts ?? []) {
-        const existing = sanitizeArtifactRecord(
-          await requestResult<unknown>(artifacts.get(pending.id)),
-        );
-        if (existing) {
-          throw new ProjectStorageError(
-            'immutable-artifact',
-            `Artifact ${pending.id} already exists and cannot be overwritten.`,
-          );
-        }
-        if (pending.kind === 'processed-video') {
-          const source = sanitizeArtifactRecord(
-            await requestResult<unknown>(artifacts.get(pending.sourceArtifactId ?? '')),
-          );
-          if (!source || source.projectId !== input.projectId || source.kind !== 'original-video') {
-            throw new ProjectStorageError(
-              'invalid-artifact',
-              'The processed video source must be an original video in this project.',
-            );
-          }
-        }
-        artifacts.add(artifactRecord(input.projectId, pending, now));
-      }
-
-      const next = recordForCommit(input, current, now);
-      projects.put(next);
-      await completion;
-      return next;
-    } catch (error) {
-      abortTransaction(transaction);
-      await completion.catch(() => undefined);
-      throw error;
-    }
-  }
-
-  async flushSnapshot(
-    snapshot: ProjectBackendSnapshot,
-    deletedProjects: readonly DeletedProjectSnapshot[],
-    removedArtifacts: readonly RemovedArtifactSnapshot[],
-  ): Promise<void> {
-    const projectsToWrite = snapshot.projects.map((project) => sanitizeProjectRecord(project));
-    const artifactsToWrite = snapshot.artifacts.map((artifact) => sanitizeArtifactRecord(artifact));
-    if (
-      projectsToWrite.some((project) => project === null) ||
-      artifactsToWrite.some((artifact) => artifact === null)
-    ) {
-      throw new ProjectStorageError(
-        'storage-failed',
-        'The in-memory project snapshot could not be validated for durable storage.',
-      );
-    }
-    const validProjects = projectsToWrite as ProjectRecordV1[];
-    const validArtifacts = artifactsToWrite as ProjectArtifactRecord[];
-    const projectIds = new Set(validProjects.map((project) => project.id));
-    if (validArtifacts.some((artifact) => !projectIds.has(artifact.projectId))) {
-      throw new ProjectStorageError(
-        'storage-failed',
-        'The in-memory project snapshot contains media without its owning project.',
-      );
-    }
-
-    const transaction = this.database.transaction(
-      [GUIDED_PROJECTS_STORE, GUIDED_PROJECT_ARTIFACTS_STORE],
-      'readwrite',
-    );
-    const completion = transactionComplete(transaction);
-    const projects = transaction.objectStore(GUIDED_PROJECTS_STORE);
-    const artifacts = transaction.objectStore(GUIDED_PROJECT_ARTIFACTS_STORE);
-    try {
-      for (const deleted of deletedProjects) {
-        const rawCurrent = await requestResult<unknown>(projects.get(deleted.projectId));
-        const current = sanitizeProjectRecord(rawCurrent);
-        if (rawCurrent !== undefined && rawCurrent !== null && !current) {
-          throw new ProjectStorageError(
-            'storage-failed',
-            `Project ${deleted.projectId} contains an unsupported or damaged record.`,
-          );
-        }
-        if (current && deleted.revision !== null && current.revision > deleted.revision) {
-          throw new ProjectStorageError(
-            'revision-conflict',
-            `Project ${deleted.projectId} changed after it was deleted from this tab.`,
-          );
-        }
-        projects.delete(deleted.projectId);
-        await deleteProjectArtifacts(artifacts, deleted.projectId);
-      }
-
-      for (const removed of removedArtifacts) {
-        const rawExisting = await requestResult<unknown>(artifacts.get(removed.artifactId));
-        const existing = sanitizeArtifactRecord(rawExisting);
-        if (rawExisting !== undefined && rawExisting !== null && !existing) {
-          throw new ProjectStorageError(
-            'storage-failed',
-            `Artifact ${removed.artifactId} contains an unsupported or damaged record.`,
-          );
-        }
-        if (!existing || existing.projectId !== removed.projectId) continue;
-        if (existing.kind !== 'processed-video') {
-          throw new ProjectStorageError(
-            'immutable-artifact',
-            'Original project media can only be removed by deleting the project.',
-          );
-        }
-        artifacts.delete(removed.artifactId);
-      }
-
-      for (const artifact of validArtifacts) {
-        const rawExisting = await requestResult<unknown>(artifacts.get(artifact.id));
-        const existing = sanitizeArtifactRecord(rawExisting);
-        if (rawExisting !== undefined && rawExisting !== null && !existing) {
-          throw new ProjectStorageError(
-            'storage-failed',
-            `Artifact ${artifact.id} contains an unsupported or damaged record.`,
-          );
-        }
-        if (existing) {
-          if (!sameArtifactIdentity(existing, artifact)) {
-            throw new ProjectStorageError(
-              'immutable-artifact',
-              `Artifact ${artifact.id} conflicts with durable immutable media.`,
-            );
-          }
-          continue;
-        }
-        artifacts.add(cloneArtifact(artifact));
-      }
-
-      for (const project of validProjects) {
-        const rawCurrent = await requestResult<unknown>(projects.get(project.id));
-        const current = sanitizeProjectRecord(rawCurrent);
-        if (rawCurrent !== undefined && rawCurrent !== null && !current) {
-          throw new ProjectStorageError(
-            'storage-failed',
-            `Project ${project.id} contains an unsupported or damaged record.`,
-          );
-        }
-        if (
-          current &&
-          (current.revision > project.revision ||
-            (current.revision === project.revision &&
-              JSON.stringify(current) !== JSON.stringify(project)))
-        ) {
-          throw new ProjectStorageError(
-            'revision-conflict',
-            `Project ${project.id} has a conflicting durable revision.`,
-          );
-        }
-        projects.put(cloneProject(project));
-      }
-
-      for (const project of validProjects) {
-        const references = [
-          [project.data.originalVideoArtifactId, 'original-video'],
-          [project.data.originalAudioArtifactId, 'original-audio'],
-          [project.data.processedVideoArtifactId, 'processed-video'],
-        ] as const;
-        for (const [artifactId, expectedKind] of references) {
-          if (!artifactId) continue;
-          const referenced = sanitizeArtifactRecord(
-            await requestResult<unknown>(artifacts.get(artifactId)),
-          );
-          if (
-            !referenced ||
-            referenced.projectId !== project.id ||
-            referenced.kind !== expectedKind ||
-            (expectedKind === 'processed-video' &&
-              referenced.sourceArtifactId !== project.data.originalVideoArtifactId)
-          ) {
-            throw new ProjectStorageError(
-              'storage-failed',
-              `Project ${project.id} references unavailable or inconsistent media.`,
-            );
-          }
-        }
-      }
-
-      await completion;
-    } catch (error) {
-      abortTransaction(transaction);
-      await completion.catch(() => undefined);
-      throw error;
-    }
-  }
-
   async deleteProject(projectId: string) {
     const transaction = this.database.transaction(
       [GUIDED_PROJECTS_STORE, GUIDED_PROJECT_ARTIFACTS_STORE],
@@ -888,24 +451,15 @@ const openProjectDatabase = (factory: IDBFactory, databaseName: string): Promise
     }
   });
 
-const safeTimestamp = (now: () => Date) => {
-  const value = now();
-  return Number.isFinite(value.valueOf()) ? value.toISOString() : new Date(0).toISOString();
-};
-
 export const createLocalProjectRepository = (
   options: LocalProjectRepositoryOptions = {},
 ): LocalProjectRepository => {
   const factory = options.indexedDB === undefined ? browserIndexedDb() : options.indexedDB;
   const databaseName = options.databaseName ?? GUIDED_PROJECT_DATABASE_NAME;
-  const now = options.now ?? (() => new Date());
   let state = INITIAL_STATE;
   let backend: ProjectBackend | null = null;
   const memoryFallback = new MemoryProjectBackend();
-  const deletedProjects = new Map<string, number | null>();
-  const removedArtifacts = new Map<string, string>();
   let initialization: Promise<ProjectStorageState> | null = null;
-  let durableRetry: Promise<ProjectStorageState> | null = null;
   let closed = false;
 
   const initialize = async (): Promise<ProjectStorageState> => {
@@ -936,56 +490,12 @@ export const createLocalProjectRepository = (
     return initialization;
   };
 
-  const retryDurableStorage = (): Promise<ProjectStorageState> => {
-    if (durableRetry) return durableRetry;
-    const attempt = (async () => {
-      if (closed) throw new ProjectStorageError('closed', 'Project storage is closed.');
-      await initialize();
-      if (state.durable && backend !== memoryFallback) return state;
-      if (!factory) {
-        state = SESSION_ONLY_STATE;
-        return state;
-      }
-
-      const snapshot = memoryFallback.snapshot();
-      let candidate: IndexedDbProjectBackend | null = null;
-      try {
-        candidate = new IndexedDbProjectBackend(await openProjectDatabase(factory, databaseName));
-        await candidate.flushSnapshot(
-          snapshot,
-          [...deletedProjects].map(([projectId, revision]) => ({ projectId, revision })),
-          [...removedArtifacts].map(([artifactId, projectId]) => ({ artifactId, projectId })),
-        );
-        if (closed) throw new ProjectStorageError('closed', 'Project storage is closed.');
-        backend = candidate;
-        state = READY_STATE;
-        deletedProjects.clear();
-        removedArtifacts.clear();
-      } catch (error) {
-        candidate?.close();
-        if (closed) throw error;
-        backend = memoryFallback;
-        state = DEGRADED_STATE;
-      }
-      return state;
-    })();
-    durableRetry = attempt;
-    void attempt.then(
-      () => {
-        if (durableRetry === attempt) durableRetry = null;
-      },
-      () => {
-        if (durableRetry === attempt) durableRetry = null;
-      },
-    );
-    return attempt;
-  };
-
   const getBackend = async () => {
-    if (durableRetry) await durableRetry;
+    if (closed) throw new ProjectStorageError('closed', 'Project storage is closed.');
     await initialize();
-    if (!backend)
+    if (!backend) {
       throw new ProjectStorageError('storage-failed', 'Project storage is unavailable.');
+    }
     return backend;
   };
 
@@ -994,10 +504,7 @@ export const createLocalProjectRepository = (
     try {
       return await run(target);
     } catch (error) {
-      const recoverable =
-        target !== memoryFallback &&
-        (!(error instanceof ProjectStorageError) || error.code === 'storage-failed');
-      if (recoverable) {
+      if (target !== memoryFallback) {
         target.close();
         backend = memoryFallback;
         state = DEGRADED_STATE;
@@ -1014,7 +521,6 @@ export const createLocalProjectRepository = (
 
   return {
     initialize,
-    retryDurableStorage,
     getStorageState: () => state,
     list: async () => {
       const projects = await operation((target) => target.list());
@@ -1059,41 +565,9 @@ export const createLocalProjectRepository = (
       }
       return blob;
     },
-    commit: async (input) => {
-      const committedAt = safeTimestamp(now);
-      const record = await operation((target) => target.commit(input, committedAt));
-      if (backend === memoryFallback) {
-        deletedProjects.delete(input.projectId);
-        for (const artifactId of input.removeArtifactIds ?? []) {
-          removedArtifacts.set(artifactId, input.projectId);
-        }
-        for (const artifact of input.artifacts ?? []) removedArtifacts.delete(artifact.id);
-      } else {
-        try {
-          await memoryFallback.commit(input, committedAt);
-        } catch {
-          memoryFallback.seedProject(record);
-          for (const artifactId of input.removeArtifactIds ?? []) {
-            memoryFallback.removeSeededArtifact(artifactId);
-          }
-          for (const artifact of input.artifacts ?? []) {
-            memoryFallback.seedArtifact(artifactRecord(input.projectId, artifact, committedAt));
-          }
-        }
-      }
-      return record;
-    },
     deleteProject: async (projectId) => {
-      const remembered = await memoryFallback.load(projectId);
       await operation((target) => target.deleteProject(projectId));
-      if (backend === memoryFallback) {
-        deletedProjects.set(projectId, remembered?.revision ?? null);
-        for (const [artifactId, ownerProjectId] of removedArtifacts) {
-          if (ownerProjectId === projectId) removedArtifacts.delete(artifactId);
-        }
-      } else {
-        await memoryFallback.deleteProject(projectId);
-      }
+      if (backend !== memoryFallback) await memoryFallback.deleteProject(projectId);
     },
     close: () => {
       if (closed) return;

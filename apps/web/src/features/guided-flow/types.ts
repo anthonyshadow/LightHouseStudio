@@ -84,38 +84,6 @@ export interface ProjectSummary {
   readonly updatedAt: string;
 }
 
-export type ProjectArtifactKind = 'original-video' | 'original-audio' | 'processed-video';
-
-export interface ProjectArtifactRecord {
-  readonly id: string;
-  readonly projectId: string;
-  readonly kind: ProjectArtifactKind;
-  readonly blob: Blob;
-  readonly mimeType: string;
-  readonly sizeBytes: number;
-  readonly sourceArtifactId: string | null;
-  readonly createdAt: string;
-}
-
-export interface ProjectArtifactCommit {
-  readonly id: string;
-  readonly kind: ProjectArtifactKind;
-  readonly blob: Blob;
-  readonly mimeType?: string;
-  readonly sourceArtifactId?: string | null;
-}
-
-export interface CheckpointCommit {
-  readonly projectId: string;
-  readonly expectedRevision: number | null;
-  readonly title: string;
-  readonly checkpoint: GuidedProjectCheckpoint;
-  readonly data: GuidedProjectDataV1;
-  readonly artifacts?: readonly ProjectArtifactCommit[];
-  /** Only processed variants may be removed outside whole-project deletion. */
-  readonly removeArtifactIds?: readonly string[];
-}
-
 export type ProjectStorageHealth = 'ready' | 'session-only' | 'degraded';
 
 export interface ProjectStorageState {
@@ -126,35 +94,10 @@ export interface ProjectStorageState {
 
 export interface LocalProjectRepository {
   initialize(): Promise<ProjectStorageState>;
-  /** Reopen durable storage and flush every in-memory project and artifact without dropping memory. */
-  retryDurableStorage(): Promise<ProjectStorageState>;
   getStorageState(): ProjectStorageState;
   list(): Promise<readonly ProjectSummary[]>;
   load(projectId: string): Promise<ProjectRecordV1 | null>;
   readArtifact(projectId: string, artifactId: string): Promise<Blob | null>;
-  commit(input: CheckpointCommit): Promise<ProjectRecordV1>;
   deleteProject(projectId: string): Promise<void>;
   close(): void;
 }
-
-export const createEmptyGuidedProjectData = (): GuidedProjectDataV1 => ({
-  characterId: null,
-  characterName: '',
-  characterPrompt: '',
-  characterDraft: null,
-  guidedDesign: null,
-  referenceMode: null,
-  referenceImageAssetId: null,
-  referenceImageStale: false,
-  originalVideoArtifactId: null,
-  originalVideoMetadata: null,
-  originalAudioArtifactId: null,
-  originalAudioMimeType: null,
-  processedVideoArtifactId: null,
-  processedVideoMetadata: null,
-  finalVariant: null,
-  selectedVoiceId: null,
-  selectedVoiceName: null,
-  downloadStartedAt: null,
-  completedAt: null,
-});

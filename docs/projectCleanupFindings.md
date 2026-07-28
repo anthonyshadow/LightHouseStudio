@@ -82,9 +82,9 @@ All implementation phases must preserve these properties.
 | TEST-001   | Aggregate coverage masks critical orchestration gaps                   | Tests                            | High     | Confirmed       | Resolved | Recording review and Character Builder generation/controllers | PHASE-001         |
 | TEST-002   | Local-first E2E journey exercises a retired Workshop character flow    | Tests                            | High     | Confirmed       | Resolved | `e2e/local-first-preparation.spec.ts`                         | PHASE-001         |
 | TOOL-001   | Visual matrix, baselines, pruning, and documentation disagree          | Tooling/tests                    | High     | Confirmed       | Resolved | Visual Playwright suite and platform snapshots                | PHASE-001         |
-| DEAD-001   | Legacy Guided repository retains an unreachable write pipeline         | Dead/compatibility code          | Medium   | Confirmed       | Open     | Guided IndexedDB compatibility repository                     | PHASE-002         |
-| DEAD-002   | Disabled starter-picker presentation remains compiled                  | Dead UI code                     | Low      | Confirmed       | Open     | Character Builder form and styles                             | PHASE-002         |
-| DEAD-003   | Production telemetry is a no-op seam with no consumer                  | Dead service code                | Low      | Confirmed       | Open     | Studio telemetry and mount effect                             | PHASE-002         |
+| DEAD-001   | Legacy Guided repository retains an unreachable write pipeline         | Dead/compatibility code          | Medium   | Confirmed       | Resolved | Guided IndexedDB compatibility repository                     | PHASE-002         |
+| DEAD-002   | Disabled starter-picker presentation remains compiled                  | Dead UI code                     | Low      | Confirmed       | Resolved | Character Builder form and styles                             | PHASE-002         |
+| DEAD-003   | Production telemetry is a no-op seam with no consumer                  | Dead service code                | Low      | Confirmed       | Resolved | Studio telemetry and mount effect                             | PHASE-002         |
 | ARCH-001   | Shared confirmation dialog is owned by Character Builder               | Architecture/ownership           | Medium   | Confirmed       | Open     | Shared UI and Legacy Projects                                 | PHASE-003         |
 | ARCH-002   | Character generation remains owned by Prompt Workshop internals        | Architecture/ownership           | High     | Confirmed       | Open     | Character Builder, prompt-authoring, media-session helpers    | PHASE-003         |
 | DUP-001    | BFL and Wiro duplicate hardened task-download transport                | Duplication/security maintenance | High     | Confirmed       | Open     | API provider adapters                                         | PHASE-004         |
@@ -172,7 +172,7 @@ All implementation phases must preserve these properties.
 - **Category:** Dead and compatibility code
 - **Severity:** Medium
 - **Confidence:** Confirmed
-- **Status:** Open
+- **Status:** Resolved
 - **Affected files:** `apps/web/src/features/guided-flow/projectRepository.ts` (1,106 lines), its types/tests, `StudioApp.tsx`, `LegacyProjectManager.tsx`, and Character Builder legacy migration.
 - **Affected features or runtime flows:** Retained Guided project discovery, download, delete, and migration into Character Builder.
 - **Evidence:** Runtime consumers use initialization/state/list, load/read-artifact, and delete. `LocalProjectRepository.commit`, checkpoint/revision conflict machinery, immutable artifact writes, snapshot flush/reconciliation, persistent-storage request, and `createEmptyGuidedProjectData` are referenced only by repository tests/stories or their own module surface. `/guided` is retired and cannot reopen projects.
@@ -188,13 +188,14 @@ All implementation phases must preserve these properties.
 - **Suggested implementation phase:** PHASE-002
 - **Estimated scope:** Medium-large deletion with focused compatibility risk
 - **Related findings:** COMP-001
+- **PHASE-002 resolution evidence (2026-07-27):** Reduced `projectRepository.ts` from 1,106 to 580 lines and its public compatibility types from 160 to 103 lines. Removed `commit`, checkpoint/artifact commit inputs, revision-conflict and immutable-write machinery, memory snapshot/reconciliation, durable retry/flush, persistence-retention requests, timestamped authoring, and the public empty-project constructor. The runtime interface now exposes only initialization/state, list, load, artifact read, transactional delete, and close; its read-only memory fallback still protects records and bytes already loaded before a mid-session IndexedDB failure. Raw legacy IndexedDB fixtures pin `lightframe.local-projects` version 1, the `projects`/`artifacts` stores, allowlist sanitation, sort/load behavior, byte-identical owned artifact reads, damaged/cross-owner rejection, deletion isolation, fallback reads, migration inputs, unavailable storage, and late-open cleanup. No schema upgrade, migration, record rewrite, or automatic deletion was added.
 
 ### [DEAD-002] Disabled starter-picker presentation remains compiled
 
 - **Category:** Dead UI code
 - **Severity:** Low
 - **Confidence:** Confirmed
-- **Status:** Open
+- **Status:** Resolved
 - **Affected files:** `apps/web/src/features/character-builder/CharacterBuilderForm.tsx` (feature flag and starter branch around lines 73-263), its styles, stories/tests.
 - **Affected features or runtime flows:** Character Builder visual suggestions and legacy recipe hydration.
 - **Evidence:** `SHOW_DEMO_CHARACTERS` is the constant `false`; starter artwork, selection handler/branch, and associated styles are unreachable. Tests assert the section is absent. The nine starter catalog records are still used by legacy hydration/default-preview rules.
@@ -210,13 +211,14 @@ All implementation phases must preserve these properties.
 - **Suggested implementation phase:** PHASE-002
 - **Estimated scope:** Small
 - **Related findings:** ARCH-002
+- **PHASE-002 resolution evidence (2026-07-27):** Deleted `SHOW_DEMO_CHARACTERS`, the unreachable starter artwork component, selection handler and JSX, four starter-only style exports, the orphaned `starterDefaults`/choice builder, absence-only assertions, and stale Storybook language. `CHARACTER_STARTERS` still contains all nine records and asset mappings; catalog tests and Character Builder migration tests continue to prove legacy identity/hydration and default-preview reachability. Presentation-aware suggestions, montage preview, save, generation, responsive behavior, and accessibility remain covered.
 
 ### [DEAD-003] Production telemetry is a no-op seam with no consumer
 
 - **Category:** Dead service code
 - **Severity:** Low
 - **Confidence:** Confirmed
-- **Status:** Open
+- **Status:** Resolved
 - **Affected files:** `apps/web/src/studio/telemetry.ts`; its test; the `studio-viewed` effect in `StudioApp.tsx`.
 - **Affected features or runtime flows:** Studio mount only.
 - **Evidence:** Production creates a no-op telemetry object and records one event into it. The recording implementation is used only by its own test; no adapter is injected and no persisted/remote consumer exists. Architecture explicitly says there is no persisted browser telemetry.
@@ -232,6 +234,7 @@ All implementation phases must preserve these properties.
 - **Suggested implementation phase:** PHASE-002
 - **Estimated scope:** Small
 - **Related findings:** COMP-001
+- **PHASE-002 resolution evidence (2026-07-27):** Deleted `studio/telemetry.ts`, its test-only recorder/no-op test, the Studio import, memoized sink, view guard, and mount effect. Repository-wide source, configuration, environment, entrypoint, story, test, and Graphify searches found no other consumer or registration. Studio route canonicalization remains in the lazy state initializer, so mount behavior and user-visible routing are unchanged.
 
 ### [ARCH-001] Shared confirmation dialog is owned by Character Builder
 
@@ -511,7 +514,7 @@ PHASE-001 completion supersedes only the failing test/visual conclusions above: 
 ## 12. Recommended implementation order
 
 1. **PHASE-001 (completed):** Restore trustworthy validation (`TEST-001`, `TEST-002`, `TOOL-001`).
-2. **PHASE-002:** Remove only confirmed retired/unreachable code while preserving persisted data (`DEAD-001`–`003`).
+2. **PHASE-002 (completed):** Remove only confirmed retired/unreachable code while preserving persisted data (`DEAD-001`–`003`).
 3. **PHASE-003:** Correct shared/feature ownership after the Character Builder migration (`ARCH-001`, `ARCH-002`).
 4. **PHASE-004:** Consolidate duplicated provider-safe download primitives (`DUP-001`).
 5. **PHASE-005:** Consolidate service-private reference asset finalization (`DUP-002`).
@@ -531,4 +534,16 @@ PHASE-001 is complete. Production runtime modules, contracts, persistence, provi
 - **Visual review:** The 15 approved Darwin diffs and Linux refresh consistently show the current status header, stage control strip, modal copy, and responsive layout. The four new Linux assets cover desktop/small-mobile AI experience choice and Add-object Prompt Workshop. No threshold was raised and no unrelated visual case was accepted without review.
 - **Graphify:** `graphify update .` refreshed the code graph from 3,699 nodes / 8,342 edges to 3,726 / 8,404 at the partial checkpoint, then to 3,711 / 8,389 after the final assets, documentation reconciliation, and roadmap-section removal. Both refreshes repeated only the known non-source `hooks.json` zero-node warning. Direct path checks show one-hop focused-test imports to `useTakeReviewFlow`, `useCharacterReferenceGeneration`, and `useCharacterBuilderController`; `prune-visual-baselines.mjs` imports the shared `studioVisualMatrix.ts` inventory in one hop. Knip passes, and `npm run check:modules` reports 352 files / 947 local edges / zero cycles. No production runtime module was edited.
 - **Limitations:** `npm run audit:prod` was not run because the phase requires explicit authorization before sending dependency metadata externally. The Playwright image's bundled npm 11.13 rejected the existing lockfile while the repository-compatible npm 11.6.2 completed isolated Linux installs on both architectures; no dependency or lockfile normalization was folded into this visual/test phase.
-- **Plan status:** TEST-001, TEST-002, and TOOL-001 are resolved. PHASE-001 has self-removed from `projectCleanupImplementationPlan.md`; PHASE-002 is next.
+- **Plan status at PHASE-001 completion:** TEST-001, TEST-002, and TOOL-001 were resolved. PHASE-001 had self-removed from `projectCleanupImplementationPlan.md`; PHASE-002 was next.
+
+## 14. PHASE-002 implementation record
+
+PHASE-002 is complete. The IndexedDB database name, version, store/index schema, persisted record shape, starter catalog/assets, current route behavior, and provider boundaries were unchanged. No runtime migration or record deletion ran.
+
+- **Changed code/tests:** The Guided compatibility repository lost its create/commit/revision/artifact-write/snapshot-flush/durable-retry/retention surface and is now read/list/artifact-read/delete/migration only. Representative raw IndexedDB compatibility fixtures replaced authoring tests. The constant-false starter-picker presentation and its orphaned model/styles/tests/story text were removed while the nine-record catalog remains. The no-op Studio telemetry module, test, import, and mount effect were deleted.
+- **Size:** `projectRepository.ts` fell from 1,106 to 580 lines; its focused test became a 438-line compatibility-fixture suite instead of 615 lines of authoring tests; Guided public types fell from 160 to 103; Character Builder form/styles/model lost 209 lines; telemetry source/test lost 53 lines; Studio lost the 14-line no-op effect. The final phase diff contains 394 insertions and 1,445 deletions across code, tests, stories, E2E, Graphify output, and canonical documentation, with insertions concentrated in compatibility fixtures and the historical implementation record.
+- **Validation:** The pre-change focused baseline passed 36/36. After implementation, focused repository/Legacy Manager/Builder migration/form/catalog/model/Studio coverage passed 57/57. `npm run quality` passed outside the restrictive sandbox: 92 files / 700 unit tests, 21 files / 53 Storybook tests, types, lint, format, Knip, module checks, production builds, and Storybook build. `npm run test:coverage` passed at 83.37% statements, 71.98% branches, 85.19% functions, and 86.05% lines. `npm run test:e2e` passed 128 with 10 intentional skips across Chromium, WebKit, and mobile. The first sandboxed quality run had the already-characterized loopback `listen EPERM`; the authorized rerun passed.
+- **Graphify:** Pre-change queries showed runtime reachability only through Studio initialization/state, Legacy Manager list/load/read/delete, and Character Builder migration. The final `graphify update .` refresh moved 3,711 nodes / 8,389 edges to 3,659 / 8,245 after roadmap self-removal and read-only fallback preservation, repeating only the known non-source `hooks.json` zero-node warning. Direct graph/source inspection finds no authoring, flush, retention, hidden-picker, starter-default, or telemetry code nodes. Retained paths still connect Studio to the compatibility repository and Legacy Manager, migration to project list/load, and migration/model hydration to `CHARACTER_STARTERS`. Knip passes; `npm run check:modules` reports 350 files / 945 local edges / zero cycles.
+- **Documentation:** Architecture, Manual QA, Product Evolution, this findings history, and the live implementation plan now describe the reduced compatibility boundary and retired picker accurately. No current user journey changed.
+- **Limitations/new findings:** Live browser data was not mutated for validation; deterministic raw IndexedDB fixtures protect the exact compatibility contract without risking user records. No new cleanup finding was discovered. Production dependency audit and visual snapshots were outside this phase's required validation and were not changed.
+- **Plan status:** DEAD-001, DEAD-002, and DEAD-003 are resolved. PHASE-002 has self-removed from `projectCleanupImplementationPlan.md`; PHASE-003 is next.

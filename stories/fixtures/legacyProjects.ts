@@ -1,17 +1,39 @@
 import { fn } from 'storybook/test';
 import type {
+  GuidedProjectDataV1,
   LocalProjectRepository,
   ProjectRecordV1,
   ProjectStorageState,
   ProjectSummary,
 } from '@web/features/guided-flow/types';
-import { createEmptyGuidedProjectData } from '@web/features/guided-flow/types';
 
 export const readyProjectStorage: ProjectStorageState = {
   health: 'ready',
   durable: true,
   notice: null,
 };
+
+const emptyGuidedData = (): GuidedProjectDataV1 => ({
+  characterId: null,
+  characterName: '',
+  characterPrompt: '',
+  characterDraft: null,
+  guidedDesign: null,
+  referenceMode: null,
+  referenceImageAssetId: null,
+  referenceImageStale: false,
+  originalVideoArtifactId: null,
+  originalVideoMetadata: null,
+  originalAudioArtifactId: null,
+  originalAudioMimeType: null,
+  processedVideoArtifactId: null,
+  processedVideoMetadata: null,
+  finalVariant: null,
+  selectedVoiceId: null,
+  selectedVoiceName: null,
+  downloadStartedAt: null,
+  completedAt: null,
+});
 
 const createProject = (id: string, title: string, hasVideo: boolean): ProjectRecordV1 => ({
   schemaVersion: 1,
@@ -20,7 +42,7 @@ const createProject = (id: string, title: string, hasVideo: boolean): ProjectRec
   revision: 1,
   checkpoint: hasVideo ? 'complete' : 'character-ready',
   data: {
-    ...createEmptyGuidedProjectData(),
+    ...emptyGuidedData(),
     characterName: title,
     originalVideoArtifactId: hasVideo ? `${id}-original` : null,
     originalVideoMetadata: hasVideo
@@ -67,14 +89,10 @@ export const createLegacyProjectRepository = (): LocalProjectRepository => {
   };
   return {
     initialize: fn(() => Promise.resolve(readyProjectStorage)),
-    retryDurableStorage: fn(() => Promise.resolve(readyProjectStorage)),
     getStorageState: fn(() => readyProjectStorage),
     list: fn(() => Promise.resolve([...projects.values()].map(toSummary))),
     load: fn(load),
     readArtifact: fn(() => Promise.resolve(new Blob(['legacy-video'], { type: 'video/webm' }))),
-    commit: fn(() =>
-      Promise.reject(new Error('Legacy Storybook fixture does not create projects.')),
-    ),
     deleteProject: fn(deleteProject),
     close: fn(),
   };

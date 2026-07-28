@@ -7,12 +7,12 @@
 | Findings document       | `docs/projectCleanupFindings.md`                                                                                                                                                                                                                                  |
 | Date generated          | 2026-07-27                                                                                                                                                                                                                                                        |
 | Audited branch / commit | `Refactor` / `5c7f3e62c9a14b9f044ae7919747bf4cafda3e52`                                                                                                                                                                                                           |
-| Open findings           | 11 unresolved (11 open); TEST-001, TEST-002, and TOOL-001 resolved                                                                                                                                                                                                |
-| Remaining phases        | 8                                                                                                                                                                                                                                                                 |
+| Open findings           | 8 unresolved (8 open); TEST-001, TEST-002, TOOL-001, DEAD-001, DEAD-002, and DEAD-003 resolved                                                                                                                                                                    |
+| Remaining phases        | 7                                                                                                                                                                                                                                                                 |
 | Important prerequisites | Use Node 24/npm 11; preserve local-first/provider-cost boundaries and persisted legacy data; keep the passing functional, focused-hook, pruning, and cross-platform visual safety gates green during structural work.                                             |
 | Known baseline failures | None in the completed safety-net scope: functional E2E passes 128 with 10 intentional skips, and Darwin plus Linux/amd64 visual runs each pass all 29 cases.                                                                                                      |
 | Other limitations       | `npm run audit:prod` was not authorized because it sends dependency metadata externally. Disposable Linux installs pass with repository-compatible npm 11.6.2; the Playwright image's npm 11.13 requests broader optional-lock normalization and was not adopted. |
-| Graphify status         | Final safety-net refresh completed at 3,711 nodes / 8,389 edges (from 3,699 / 8,342), with only the known non-source `hooks.json` zero-node warning. Direct paths connect all three target hooks to focused tests; module check remains cycle-free.               |
+| Graphify status         | PHASE-002 refresh completed at 3,659 nodes / 8,245 edges (from 3,711 / 8,389), with only the known non-source `hooks.json` zero-node warning. Removed authoring, starter-picker, and telemetry symbols are absent; retained compatibility paths remain connected. |
 
 ## Execution rules
 
@@ -30,99 +30,17 @@
 
 ## Remaining phases overview
 
-| Phase ID  | Title                                            | Finding IDs                  | Risk        | Dependencies                    | Expected outcome                                                                    |
-| --------- | ------------------------------------------------ | ---------------------------- | ----------- | ------------------------------- | ----------------------------------------------------------------------------------- |
-| PHASE-002 | Remove confirmed retired and unreachable code    | DEAD-001, DEAD-002, DEAD-003 | Medium      | None                            | Smaller compatibility repository and UI/root surface with legacy data preserved     |
-| PHASE-003 | Repair Character Builder and shared UI ownership | ARCH-001, ARCH-002           | Medium-high | PHASE-002                       | Feature imports match current product ownership; shared UI has a neutral home       |
-| PHASE-004 | Consolidate hardened provider download transport | DUP-001                      | High        | PHASE-003                       | One security-reviewed downloader policy with provider-specific protocols preserved  |
-| PHASE-005 | Consolidate reference-asset finalization         | DUP-002                      | Medium      | PHASE-004                       | One typed service-private persistence path for generate/edit/compose                |
-| PHASE-006 | Share image-picker/drop presentation             | DUP-003                      | Low-medium  | PHASE-003                       | Shared accessible DOM behavior without merging storage/lifecycle policy             |
-| PHASE-007 | Decompose independent Studio root controllers    | COMP-001                     | Medium-high | PHASE-002, PHASE-003, PHASE-006 | Smaller composition root with identical stage/overlay topology                      |
-| PHASE-008 | Decompose recipe handoff internals               | STATE-001                    | High        | PHASE-003, PHASE-007            | Focused state workflows behind the unchanged Studio facade                          |
-| PHASE-009 | Reconcile final documentation                    | DOC-001                      | Low         | PHASE-002 through PHASE-008     | Correct canonical filename/links and documentation aligned with implemented cleanup |
+| Phase ID  | Title                                            | Finding IDs        | Risk        | Dependencies                | Expected outcome                                                                    |
+| --------- | ------------------------------------------------ | ------------------ | ----------- | --------------------------- | ----------------------------------------------------------------------------------- |
+| PHASE-003 | Repair Character Builder and shared UI ownership | ARCH-001, ARCH-002 | Medium-high | None                        | Feature imports match current product ownership; shared UI has a neutral home       |
+| PHASE-004 | Consolidate hardened provider download transport | DUP-001            | High        | PHASE-003                   | One security-reviewed downloader policy with provider-specific protocols preserved  |
+| PHASE-005 | Consolidate reference-asset finalization         | DUP-002            | Medium      | PHASE-004                   | One typed service-private persistence path for generate/edit/compose                |
+| PHASE-006 | Share image-picker/drop presentation             | DUP-003            | Low-medium  | PHASE-003                   | Shared accessible DOM behavior without merging storage/lifecycle policy             |
+| PHASE-007 | Decompose independent Studio root controllers    | COMP-001           | Medium-high | PHASE-003, PHASE-006        | Smaller composition root with identical stage/overlay topology                      |
+| PHASE-008 | Decompose recipe handoff internals               | STATE-001          | High        | PHASE-003, PHASE-007        | Focused state workflows behind the unchanged Studio facade                          |
+| PHASE-009 | Reconcile final documentation                    | DOC-001            | Low         | PHASE-003 through PHASE-008 | Correct canonical filename/links and documentation aligned with implemented cleanup |
 
 ## Phase sections
-
-### PHASE-002: Remove confirmed retired and unreachable code
-
-#### Objective
-
-Delete only code proven unreachable after Guided-flow retirement and Character Builder migration, while retaining exact compatibility access to browser data.
-
-#### Findings resolved
-
-- `DEAD-001`
-- `DEAD-002`
-- `DEAD-003`
-
-#### Scope
-
-Guided `projectRepository` authoring/write APIs and tests/types; Character Builder hidden starter-picker JSX/handlers/styles/story text; Studio no-op telemetry/effect/test. Runtime legacy list/read/download/delete/migration consumers are in scope for compatibility tests, not removal.
-
-#### Out of scope
-
-Changing IndexedDB schema/version/data; deleting starter catalog records/assets; reopening Guided projects; refactoring StudioApp beyond removed telemetry; new observability; unrelated Knip findings.
-
-#### Dependencies
-
-No remaining phase prerequisite. The completed safety-net work must remain passing so current journeys and critical hooks stay reliable.
-
-#### Risk assessment
-
-- **Regression risk:** Medium.
-- **Architectural risk:** Low-medium.
-- **Data/compatibility risk:** High if legacy boundaries are misunderstood; mitigated by fixtures.
-- **User-facing risk:** Medium for existing users with retained projects.
-- **Rollback difficulty:** Low for code, but never perform data migration/deletion.
-
-#### Implementation sequence
-
-1. Build representative legacy IndexedDB fixtures and pin list, sanitation, artifact download/read, deletion, and Character Builder migration behavior.
-2. Reconfirm every repository export/caller through Graphify, source, tests, stories, dynamic imports, and public exports.
-3. Remove create/commit/revision/write/flush/persistent-storage/retention-reporting paths and test-only constructors; narrow types/exports to compatibility needs.
-4. Remove the constant-false starter picker, handler, artwork-only imports, styles, and stale story claim; retain catalog compatibility data.
-5. Remove the telemetry module, test, import, and no-op mount effect after rechecking configuration/dev registrations.
-6. Run Knip and graph checks to remove all newly orphaned symbols.
-
-#### Graphify requirements
-
-Before: explain `projectRepository.ts`, trace every runtime consumer, query starter catalog/form and telemetry paths. After: update the graph; confirm removed authoring/telemetry branches have no nodes/edges, retained compatibility paths still reach app entry points, catalog data still reaches legacy hydration, and no cycles/orphans were introduced.
-
-#### Acceptance criteria
-
-Legacy records remain listable, sanitized, downloadable/readable, deletable, and migratable without schema/version changes. No current runtime export permits Guided create/commit. Hidden starter presentation and telemetry have no remaining source/test/style symbols. Knip/module/Graphify checks pass.
-
-#### Required validation
-
-Targeted repository compatibility, Legacy Manager, Builder migration and form tests; Storybook; `npm run quality`; `npm run test:coverage`; `npm run test:e2e`; `graphify update .`.
-
-#### Rollback strategy
-
-Revert source/tests. Because the phase performs no data migrations or runtime record deletion, rollback is code-only. If a compatibility consumer is uncertain, do not delete it; keep the phase open and mark verification work.
-
-#### Documentation updates
-
-Resolve DEAD-001–003 with exact deleted APIs/LOC, retained compatibility surface, fixture evidence, and graph diff. Update architecture/user stories only if observable compatibility descriptions need clarification.
-
-#### Standalone implementation prompt
-
-```text
-Implement only PHASE-002 (“Remove confirmed retired and unreachable code”) from the Lightframe Studio cleanup roadmap, resolving DEAD-001, DEAD-002, and DEAD-003.
-
-First read all repository instructions, docs/projectCleanupFindings.md, docs/projectCleanupImplementationPlan.md, architecture/privacy/product-evolution documents, and Guided/Character Builder user journeys. Inspect branch/commit/status; never reset, clean, overwrite, or discard user work. Confirm the completed safety-net gates remain passing.
-
-Preserve public behavior, persisted browser data, accessibility, responsiveness, and integrations. In particular, preserve the exact IndexedDB database/store/schema/version and legacy list/sanitize/read/download/delete/migrate behavior. Never delete or rewrite user records. Retain all starter catalog records/assets used by legacy hydration. Do not add telemetry or refactor unrelated Studio code.
-
-Run relevant baselines. Read Graphify instructions, then explain projectRepository.ts and trace every export to Studio initialization, LegacyProjectManager, Character Builder migration, tests, stories, dynamic imports, routes, and public surfaces. Query the hidden starter picker/catalog and telemetry sinks. Confirm graph evidence with source/config/runtime registration.
-
-Add fixture-based compatibility tests first. Then remove only unreachable Guided create/commit/revision/write/flush/persistence-request/retention-reporting APIs, types, tests, and fixtures; narrow the repository to read/list/download/delete/migration. Remove the constant-false starter picker JSX, handler, artwork-only imports, styles and stale story language, retaining compatibility catalog data. Remove the no-op/recording telemetry module, test, Studio import and mount effect after verifying there is no configured consumer. Remove all resulting orphaned exports/imports without opportunistic cleanup.
-
-Run graphify update . and repeat reachability/path queries. Verify deleted write/telemetry paths are absent, retained legacy and catalog paths still reach runtime, exports are correct, and no cycles/orphans appear. Run targeted compatibility/Builder/Legacy Manager/Storybook tests, npm run quality, npm run test:coverage, and npm run test:e2e. Separate pre-existing failures.
-
-Only after all criteria pass, mark DEAD-001/002/003 Resolved in the findings and append changes/files/validation/Graphify/limitations/PHASE-002. Preserve historical evidence and add new issues under new IDs. Remove PHASE-002 and its overview row from the plan, update counts/dependencies, never renumber phases. Keep the phase if any compatibility uncertainty or validation failure remains.
-
-Report resolved findings, retained data contract, code/tests removed, validation, graph diff, pre-existing failures/new findings, docs, self-removal, and next phase.
-```
 
 ### PHASE-003: Repair Character Builder and shared UI ownership
 
@@ -145,7 +63,7 @@ Changing generation/provider behavior; extracting the shared drop-zone (PHASE-00
 
 #### Dependencies
 
-PHASE-002.
+None.
 
 #### Risk assessment
 
@@ -449,7 +367,7 @@ Global state/context/router; moving `MediaStage`; handoff internals (PHASE-008);
 
 #### Dependencies
 
-PHASE-002, PHASE-003, PHASE-006.
+PHASE-003, PHASE-006.
 
 #### Risk assessment
 
@@ -602,7 +520,7 @@ New production cleanup, rewriting historical rationale, claiming the project is 
 
 #### Dependencies
 
-PHASE-002 through PHASE-008.
+PHASE-003 through PHASE-008.
 
 #### Risk assessment
 
@@ -643,7 +561,7 @@ Resolve DOC-001. Ensure findings history remains; when this is the final complet
 #### Standalone implementation prompt
 
 ```text
-Implement only PHASE-009 (“Reconcile final documentation”), resolving DOC-001 and finalizing the documented cleanup queue. Read all instructions, docs/projectCleanupFindings.md, docs/projectCleanupImplementationPlan.md, README documentation map, Architecture, image-generation/privacy/live-smoke/user-journey docs. Confirm PHASE-002 through PHASE-008 are complete and the safety-net gates remain passing; inspect branch/commit/status and preserve user changes.
+Implement only PHASE-009 (“Reconcile final documentation”), resolving DOC-001 and finalizing the documented cleanup queue. Read all instructions, docs/projectCleanupFindings.md, docs/projectCleanupImplementationPlan.md, README documentation map, Architecture, image-generation/privacy/live-smoke/user-journey docs. Confirm PHASE-003 through PHASE-008 are complete and the safety-net gates remain passing; inspect branch/commit/status and preserve user changes.
 
 Do not implement new cleanup, rewrite historical rationale, change behavior/contracts/data, update dependencies or claim the project is defect-free. Preserve external bookmarks where the actual documentation host has a supported redirect mechanism; do not keep duplicate divergent canonical documents.
 

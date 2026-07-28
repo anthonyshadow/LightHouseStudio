@@ -5,7 +5,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import {
-  createEmptyGuidedProjectData,
+  type GuidedProjectDataV1,
   type LocalProjectRepository,
   type ProjectRecordV1,
   type ProjectStorageState,
@@ -19,6 +19,28 @@ const READY_STORAGE: ProjectStorageState = {
   notice: null,
 };
 
+const emptyGuidedData = (): GuidedProjectDataV1 => ({
+  characterId: null,
+  characterName: '',
+  characterPrompt: '',
+  characterDraft: null,
+  guidedDesign: null,
+  referenceMode: null,
+  referenceImageAssetId: null,
+  referenceImageStale: false,
+  originalVideoArtifactId: null,
+  originalVideoMetadata: null,
+  originalAudioArtifactId: null,
+  originalAudioMimeType: null,
+  processedVideoArtifactId: null,
+  processedVideoMetadata: null,
+  finalVariant: null,
+  selectedVoiceId: null,
+  selectedVoiceName: null,
+  downloadStartedAt: null,
+  completedAt: null,
+});
+
 const createProject = (
   id: string,
   title: string,
@@ -30,7 +52,7 @@ const createProject = (
   revision: 1,
   checkpoint: 'complete',
   data: {
-    ...createEmptyGuidedProjectData(),
+    ...emptyGuidedData(),
     characterName: title,
     originalVideoArtifactId: options.hasVideo ? `${id}-original` : null,
     originalVideoMetadata: options.hasVideo
@@ -67,14 +89,10 @@ const createRepository = (initialProjects: readonly ProjectRecordV1[]) => {
   const video = new Blob(['legacy-video'], { type: 'video/webm' });
   const repository: LocalProjectRepository = {
     initialize: vi.fn(() => Promise.resolve(READY_STORAGE)),
-    retryDurableStorage: vi.fn(() => Promise.resolve(READY_STORAGE)),
     getStorageState: vi.fn(() => READY_STORAGE),
     list: vi.fn(() => Promise.resolve([...projects.values()].map(toSummary))),
     load: vi.fn((projectId: string) => Promise.resolve(projects.get(projectId) ?? null)),
     readArtifact: vi.fn(() => Promise.resolve(video)),
-    commit: vi.fn(() =>
-      Promise.reject<ProjectRecordV1>(new Error('Not used by the legacy project manager.')),
-    ),
     deleteProject: vi.fn((projectId: string) => {
       projects.delete(projectId);
       return Promise.resolve();

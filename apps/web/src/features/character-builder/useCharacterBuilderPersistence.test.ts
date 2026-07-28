@@ -1,7 +1,7 @@
 import { createPromptBuilderDraft } from '@studio/domain';
 import { describe, expect, it, vi } from 'vitest';
 import {
-  createEmptyGuidedProjectData,
+  type GuidedProjectDataV1,
   type LocalProjectRepository,
   type ProjectRecordV1,
   type ProjectSummary,
@@ -10,6 +10,28 @@ import { createGuidedDesignFromDraft } from './characterModel';
 import { createCharacterBuilderLegacyMigration } from './useCharacterBuilderPersistence';
 
 const now = '2026-07-21T12:00:00.000Z';
+
+const emptyGuidedData = (): GuidedProjectDataV1 => ({
+  characterId: null,
+  characterName: '',
+  characterPrompt: '',
+  characterDraft: null,
+  guidedDesign: null,
+  referenceMode: null,
+  referenceImageAssetId: null,
+  referenceImageStale: false,
+  originalVideoArtifactId: null,
+  originalVideoMetadata: null,
+  originalAudioArtifactId: null,
+  originalAudioMimeType: null,
+  processedVideoArtifactId: null,
+  processedVideoMetadata: null,
+  finalVariant: null,
+  selectedVoiceId: null,
+  selectedVoiceName: null,
+  downloadStartedAt: null,
+  completedAt: null,
+});
 
 const createLegacyRepository = (record: ProjectRecordV1): LocalProjectRepository => {
   const summary: ProjectSummary = {
@@ -26,12 +48,10 @@ const createLegacyRepository = (record: ProjectRecordV1): LocalProjectRepository
   const storage = { health: 'ready', durable: true, notice: null } as const;
   return {
     initialize: vi.fn(() => Promise.resolve(storage)),
-    retryDurableStorage: vi.fn(() => Promise.resolve(storage)),
     getStorageState: () => storage,
     list: vi.fn(() => Promise.resolve([summary])),
     load: vi.fn((projectId: string) => Promise.resolve(projectId === record.id ? record : null)),
     readArtifact: vi.fn(() => Promise.resolve(null)),
-    commit: vi.fn(() => Promise.reject(new Error('Unexpected commit.'))),
     deleteProject: vi.fn(() => Promise.reject(new Error('Unexpected delete.'))),
     close: vi.fn(),
   };
@@ -53,7 +73,7 @@ const createLegacyRecord = (guidedDesign: ProjectRecordV1['data']['guidedDesign'
     revision: 4,
     checkpoint: 'character-design',
     data: {
-      ...createEmptyGuidedProjectData(),
+      ...emptyGuidedData(),
       characterName: 'Legacy character',
       characterPrompt: 'A science host',
       characterDraft: draft,

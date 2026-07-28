@@ -114,16 +114,12 @@ test('direction preview is last on narrow screens and remains beside the form on
   expect(narrowPreview.top).toBeGreaterThanOrEqual(narrowFinal.bottom);
 });
 
-test('the hidden demo section is not required for preview generation and save', async ({
-  page,
-}) => {
+test('character direction supports preview generation and save', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
   await openBuilder(page);
 
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
-  await expect(dialog.getByRole('heading', { name: 'Try a demo character' })).toHaveCount(0);
-
   await chooseAdultCharacterDirection(page);
   await expect(dialog.getByRole('button', { name: 'Save Character' })).toBeEnabled();
   await dialog.getByRole('button', { name: 'Generate Preview' }).click();

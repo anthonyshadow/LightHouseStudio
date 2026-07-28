@@ -50,7 +50,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'The guided character builder exposes visual starters, presentation-aware catalog choices, independent appearance controls, a sticky direction preview, generation settings, and guarded confirmation/regeneration dialogs.',
+          'The character builder exposes presentation-aware catalog choices, independent appearance controls, a sticky direction preview, generation settings, and guarded confirmation/regeneration dialogs.',
       },
     },
   },

@@ -49,7 +49,6 @@ import { AIExperienceChooser } from './AIExperienceChooser';
 import { StudioHeader } from './StudioHeader';
 import { StudioSessionControlBar } from './StudioSessionControlBar';
 import { resolveLegacyEntry, type StudioInitialOverlay } from './routeResolution';
-import { createNoopStudioTelemetry } from './telemetry';
 import { useProviderAvailability } from './useProviderAvailability';
 import {
   useReferenceRecipeHandoff,
@@ -818,8 +817,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
 };
 
 const RoutedStudioExperience = () => {
-  const telemetry = useMemo(() => createNoopStudioTelemetry(), []);
-  const viewedTrackedRef = useRef(false);
   const [entry] = useState(() => {
     const resolution = resolveLegacyEntry(window.location);
     if (resolution.shouldReplace) {
@@ -827,17 +824,6 @@ const RoutedStudioExperience = () => {
     }
     return resolution;
   });
-  useEffect(() => {
-    if (viewedTrackedRef.current) return;
-    viewedTrackedRef.current = true;
-    telemetry.track({
-      type: 'studio-viewed',
-      canonicalPath: '/',
-      canonicalizedLegacyEntry: entry.shouldReplace,
-      initialOverlay: entry.initialOverlay?.kind ?? null,
-      timestamp: new Date().toISOString(),
-    });
-  }, [entry, telemetry]);
   return <StudioExperience initialOverlay={entry.initialOverlay} />;
 };
 

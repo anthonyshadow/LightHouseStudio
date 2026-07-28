@@ -1,4 +1,4 @@
-import { type CSSObject, useTheme } from '@emotion/react';
+import { useTheme } from '@emotion/react';
 import type { CharacterTransformDraft } from '@studio/domain';
 import { useState, type ReactNode } from 'react';
 import { VisuallyHidden } from '../../ui';
@@ -8,7 +8,6 @@ import {
   getVisualOptionImageSrc,
   getVisualProfile,
   resolveGuidedChoice,
-  type CharacterStarter,
   type VisualCatalogCategory,
 } from './catalog';
 import type { GuidedChoiceValue, GuidedDesignV1, VisualProfile } from '@studio/domain';
@@ -19,10 +18,6 @@ import {
   optionGridStyles,
   optionLabelStyles,
   optionVisualStyles,
-  starterCardStyles,
-  starterCopyStyles,
-  starterGridStyles,
-  starterImageStyles,
 } from './formStyles';
 import { CharacterChoiceDrawer } from './CharacterChoiceDrawer';
 import { CharacterVisualChoiceSection } from './CharacterVisualChoiceSection';
@@ -32,7 +27,6 @@ import {
   EDITABLE_CHARACTER_CATEGORIES,
   genderFromDesign,
   GENDER_OPTIONS,
-  starterDefaults,
 } from './characterModel';
 
 export { buildCanonicalCharacterDraft, createEmptyGuidedDesign } from './characterModel';
@@ -66,57 +60,6 @@ const profileLabels: Readonly<Record<VisualProfile, string>> = {
   man: 'Man',
   'non-binary': 'Non-binary',
   unspecified: 'Not specified',
-};
-
-// The demo-character picker is intentionally paused. Keep the implementation
-// wired so existing starter-backed drafts still hydrate and the section can be restored easily.
-const SHOW_DEMO_CHARACTERS = false;
-
-const starterArtworkStyles = (montage: boolean): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: montage ? 'repeat(2, minmax(0, 1fr))' : '1fr',
-  gridTemplateRows: montage ? 'repeat(2, minmax(0, 1fr))' : '1fr',
-  gap: montage ? '2px' : 0,
-  '& > img': {
-    display: 'block',
-    width: '100%',
-    height: '100%',
-    minWidth: 0,
-    objectFit: 'cover',
-    objectPosition: 'center',
-  },
-});
-
-const StarterArtwork = ({
-  starter,
-  profile,
-  hasExplicitPresentation,
-}: {
-  starter: CharacterStarter;
-  profile: VisualProfile;
-  hasExplicitPresentation: boolean;
-}) => {
-  const artworkProfiles = hasExplicitPresentation ? [profile] : STARTER_MONTAGE_PROFILES;
-  const presentationDescription = hasExplicitPresentation
-    ? `${profileLabels[profile]} presentation representative adult`
-    : 'diverse adult presentation montage';
-
-  return (
-    <span
-      role="img"
-      aria-label={`${starter.label}, ${presentationDescription}. ${starter.description}`}
-      css={[starterImageStyles(), starterArtworkStyles(!hasExplicitPresentation)]}
-    >
-      {artworkProfiles.map((artworkProfile) => (
-        <img
-          key={artworkProfile}
-          src={starter.imageSrcByProfile[artworkProfile]}
-          alt=""
-          aria-hidden="true"
-        />
-      ))}
-    </span>
-  );
 };
 
 export const CharacterBuilderForm = ({
@@ -170,16 +113,6 @@ export const CharacterBuilderForm = ({
     }
     updateDesign(next);
   };
-  const selectStarter = (starter: CharacterStarter) => {
-    if (starter.id === design.starterId) {
-      updateDesign({ ...design, starterId: null });
-      return;
-    }
-    const next = starterDefaults(starter, gender);
-    updateDesign(
-      hasExplicitPresentation ? next : { ...next, choices: { ...next.choices, gender: null } },
-    );
-  };
   const updateChoice = (
     category: Exclude<VisualCatalogCategory, 'gender'>,
     choice: GuidedChoiceValue | null,
@@ -228,42 +161,6 @@ export const CharacterBuilderForm = ({
       >
         {referenceUpload}
       </CharacterChoiceDrawer>
-      {SHOW_DEMO_CHARACTERS ? (
-        <CharacterChoiceDrawer
-          id="character-starters"
-          title="Try a demo character"
-          description="Optional: choose any of the nine demos for a complete, editable direction."
-          currentLabel={selectedStarter?.label}
-          defaultOpen
-        >
-          <div css={starterGridStyles(theme)}>
-            {CHARACTER_STARTERS.map((starter) => {
-              const selected = starter.id === design.starterId;
-              return (
-                <button
-                  key={starter.id}
-                  type="button"
-                  aria-pressed={selected}
-                  disabled={disabled}
-                  css={starterCardStyles(theme, selected)}
-                  onClick={() => selectStarter(starter)}
-                >
-                  <StarterArtwork
-                    starter={starter}
-                    profile={profile}
-                    hasExplicitPresentation={hasExplicitPresentation}
-                  />
-                  <span css={starterCopyStyles(theme)}>
-                    <strong>{starter.label}</strong>
-                    <span>{starter.description}</span>
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </CharacterChoiceDrawer>
-      ) : null}
-
       <CharacterChoiceDrawer
         id="character-gender"
         title="Presentation"

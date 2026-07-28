@@ -8,10 +8,8 @@ import {
   CUSTOM_OPTION_ID,
   VISUAL_CATALOG,
   VISUAL_CATALOG_VERSION,
-  getSuggestedOptions,
   getVisualProfile,
   resolveGuidedChoice,
-  type CharacterStarter,
   type VisualCatalogCategory,
 } from './catalog';
 import type {
@@ -253,43 +251,6 @@ export const createGuidedDesignFromDraft = (draft: CharacterTransformDraft): Gui
       style: choiceFromCanonicalText('style', profile, mood.style),
       mood: choiceFromCanonicalText('mood', profile, mood.mood),
       background: choiceFromCanonicalText('background', profile, mood.background),
-    },
-  };
-};
-
-const findChoice = (
-  category: Exclude<VisualCatalogCategory, 'gender'>,
-  profile: VisualProfile,
-  preferredLabels: readonly string[],
-): GuidedChoiceValue | null => {
-  const options = getSuggestedOptions(category, profile);
-  const selected = preferredLabels
-    .map((label) => options.find((candidate) => candidate.label === label))
-    .find((candidate) => candidate !== undefined);
-  return selected ? { optionId: selected.id } : options[0] ? { optionId: options[0].id } : null;
-};
-
-export const starterDefaults = (starter: CharacterStarter, gender: GenderValue): GuidedDesignV1 => {
-  const profile = getVisualProfile(gender);
-  return {
-    catalogVersion: VISUAL_CATALOG_VERSION,
-    starterId: starter.id,
-    choices: {
-      ...emptyChoices(),
-      ...starter.choices,
-      gender: {
-        optionId:
-          profile === 'unspecified' ? 'shared.gender.not-specified' : `shared.gender.${profile}`,
-      },
-      adultAge: findChoice('adultAge', profile, ['Adult']),
-      appearance: findChoice('appearance', profile, ['Natural']),
-      skinTone: findChoice('skinTone', profile, ['Medium brown']),
-      bodyShape: findChoice('bodyShape', profile, ['Balanced']),
-      hair: findChoice('hair', profile, ['Medium', 'Textured medium', 'Medium waves', 'Bob']),
-      hairColor: findChoice('hairColor', profile, ['Dark brown']),
-      outfit: findChoice('outfit', profile, ['Professional']),
-      accessories: findChoice('accessories', profile, ['None']),
-      expression: findChoice('expression', profile, ['Friendly', 'Warm smile']),
     },
   };
 };

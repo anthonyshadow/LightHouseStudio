@@ -28,7 +28,7 @@ Open the header character selector, choose **Create new character**, and repeat 
 
 Above `64rem`, confirm Character Direction Preview remains in the sticky right rail beside the form. At `64rem` and below, confirm it follows **Preserve and constraints** as the final item in the single-column flow, so users can reach preview and generation without returning to the top.
 
-Confirm **Try a demo character** is absent while its picker is paused. Before choosing Presentation, confirm the direction preview uses a diverse four-profile montage. Choose Woman, Man, Non-binary, and explicit Not specified in turn; confirm person-bearing artwork swaps immediately, the change is announced, shared Skin Tone remains unfiltered, and any outside-suggestion current choice remains pinned rather than erased.
+Before choosing Presentation, confirm the direction preview uses a diverse four-profile montage. Choose Woman, Man, Non-binary, and explicit Not specified in turn; confirm person-bearing artwork swaps immediately, the change is announced, shared Skin Tone remains unfiltered, and any outside-suggestion current choice remains pinned rather than erased. Legacy starter-backed characters must still hydrate with their saved identity and preview fallback even though the retired starter picker is no longer part of the form.
 
 Edit the form, close and reopen the panel, then reload and confirm the single active IndexedDB draft resumes. Confirm **Reset Draft** requires confirmation and the next open is fresh. Force IndexedDB open, transaction, and quota failures; a failed close flush must leave the tab copy intact, explain that changes are not reload-safe, and require explicit discard. After a successful Save Character, reopen and confirm a fresh character starts.
 

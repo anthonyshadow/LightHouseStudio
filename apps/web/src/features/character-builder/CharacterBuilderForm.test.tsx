@@ -138,11 +138,10 @@ describe('CharacterBuilderForm', () => {
     expect(hairDrawer).not.toHaveAttribute('open');
   });
 
-  it('hides demo characters and renders six profile-aware suggestions', async () => {
+  it('renders six profile-aware suggestions', async () => {
     const user = userEvent.setup();
     render(<BuilderHarness />);
 
-    expect(screen.queryByRole('heading', { name: 'Try a demo character' })).not.toBeInTheDocument();
     const unspecifiedHair = await openSection(user, 'Hairstyle');
     expect(
       unspecifiedHair
