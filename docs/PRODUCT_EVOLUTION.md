@@ -164,8 +164,8 @@ Covered by: voice rules and processing tests plus local/network-isolation and fa
 ### Optional providers degrade independently
 
 The header capability strip reports local, AI-video, and cloud-voice
-availability. Reference availability appears where it is used in Workshop and
-Character Builder. Image generation now has one startup-selected server
+availability. Reference availability appears where it is used in Character
+Builder. Image generation now has one startup-selected server
 provider: the existing OpenAI path remains the default, while the pinned BFL
 FLUX.2 Pro task adapter is the explicit alternative. There is no browser
 selector or automatic fallback, and provider-aware idempotency prevents an

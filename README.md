@@ -166,7 +166,7 @@ Read [architecture](docs/ARCHITECTURE.md), [privacy and temporary data](docs/PRI
 
 - [Architecture and ownership](docs/ARCHITECTURE.md)
 - [Privacy, retention, and provider cost](docs/PRIVACY_AND_TEMPORARY_DATA.md)
-- [Image generation API flow](docs/Image_Generartion.md)
+- [Image generation API flow](docs/Image_Generation.md)
 - [Product evolution and changed flows](docs/PRODUCT_EVOLUTION.md)
 - [Browser support](docs/BROWSER_SUPPORT.md)
 - [Recording memory policy](docs/RECORDING_MEMORY_POLICY.md)

@@ -36,8 +36,8 @@ HTTP and WebSockets; live device/provider checks use
 [Manual QA](docs/MANUAL_QA.md) and
 [Gated live provider smoke testing](docs/LIVE_PROVIDER_SMOKE.md). Do not update
 visual snapshots or run the pruning script as part of an unrelated change. The
-visual suite currently defines 29 cases, while the checked-in Linux set is
-missing the two AI-experience-choice baselines.
+visual suite currently defines 29 cases, and the checked-in Darwin and Linux
+sets each contain all 29 reviewed baselines.
 
 When behavior, routes, storage, commands, environment variables, or provider
 boundaries change, update the canonical document named in the

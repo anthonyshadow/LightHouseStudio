@@ -39,7 +39,7 @@ Enter through `/projects`, `/?project=…`, and `/guided?project=…`; confirm e
 ## No-key and local guarantee
 
 1. Leave `DECART_API_KEY`, `OPENAI_API_KEY`, and `ELEVENLABS_API_KEY` empty, restart `npm run dev`, and open a private browser window.
-2. Confirm the header reports local ready, **AI video not configured**, and **Voice cloud optional**, while Workshop/Character Builder reports reference generation unavailable. `/api/capabilities` must not contact any provider.
+2. Confirm the header reports local ready, **AI video not configured**, and **Voice cloud optional**, while Character Builder reports reference generation unavailable. `/api/capabilities` must not contact any provider.
 3. Before Start, edit prompts, open the workshop, save/search/edit/delete a recipe, and attach then clear a valid image. Confirm no camera permission prompt appears.
 4. Open DevTools Network, preserve the log, and filter for `realtime-token`, `reference-images`, `elevenlabs`, `decart`, and provider/WebSocket traffic.
 5. Select **Start Camera + Mic**. Allow the camera/microphone.
