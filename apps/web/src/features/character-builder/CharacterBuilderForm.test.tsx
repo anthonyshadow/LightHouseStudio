@@ -5,7 +5,7 @@ import {
   type CharacterTransformDraft,
   type GuidedDesignV1,
 } from '@studio/domain';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useState } from 'react';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -357,13 +357,13 @@ describe('CharacterBuilderForm', () => {
       const category = await openSection(user, title);
       await user.click(category.getByRole('button', { name: 'Describe My Own' }));
       const value = `custom ${key} direction`;
-      await user.type(category.getByLabelText(label), value);
+      fireEvent.change(category.getByLabelText(label), { target: { value } });
       expect(readSnapshot().design.choices[key]).toEqual({
         optionId: 'custom',
         customValue: value,
       });
     }
-  }, 20_000);
+  });
 
   it('stores ethnicity and skin tone independently from general appearance', async () => {
     const user = userEvent.setup();
