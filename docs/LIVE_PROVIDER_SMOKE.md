@@ -81,12 +81,12 @@ Run this section once with the default OpenAI image provider and once for each t
 1. Record a short local take with clearly audible non-sensitive speech.
 2. In ElevenLabs account controls, record the IDs of one saved and one unsaved disposable voice without copying credentials into the test log.
 3. Open the Studio voice library. Search/page saved results and play a preview. Confirm the saved ID can appear, the unsaved ID cannot appear, no add/import control exists, and no recording audio is uploaded.
-4. Select a compatible saved voice. Confirm selection alone does not call the conversion route.
+4. Select a saved voice, including a saved community Professional Voice Clone when available. Confirm selection alone does not call model discovery or the conversion route.
 5. Apply once. Confirm the server revalidates saved membership and only the audio sidecar is sent to `/api/elevenlabs/voice-changer/recording`; processing locks incomplete playback/download and the final remux preserves video.
 6. Remove the disposable voice from the saved library in ElevenLabs, refresh Studio, and confirm it disappears. If a stale direct conversion request is exercised, confirm it returns the safe library-not-found response before conversion.
 7. Restore Original and confirm no provider request. Run one controlled failure if the test account permits and confirm the original/last valid take survives with sanitized guidance.
 
-Pass requires saved-only listing and revalidation, absent public/import surfaces, proxied previews, model filtering, explicit conversion, audio-only upload, immutable-original processing, safe replacement, and no leaked key/upstream URL/body.
+Pass requires saved-only listing and revalidation, absent public/import surfaces, proxied previews, conversion-time model validation, explicit conversion, audio-only upload, immutable-original processing, safe replacement, and no leaked key/upstream URL/body.
 
 ## Evidence and cleanup
 

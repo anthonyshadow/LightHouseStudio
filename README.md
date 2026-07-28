@@ -101,7 +101,7 @@ The project talks to ElevenLabs through its server-side HTTPS adapter; no Eleven
 
 The browser queries `GET /v2/voices` with `voice_type=saved`, so the selector contains only voices currently in the configured account's saved collection. Add, remove, or organize voices in ElevenLabs, then select **Refresh voices** in Studio. The project exposes no shared-library discovery or add/import endpoint.
 
-`ELEVENLABS_STS_MODEL_ID` must identify a model returned by `GET /v1/models` with `can_do_voice_conversion: true`; the documented default is `eleven_multilingual_sts_v2`. Preview and conversion revalidate the selected ID against the saved library, and professional voices are hidden when the configured model reports that it cannot serve them.
+`ELEVENLABS_STS_MODEL_ID` must identify a model returned by `GET /v1/models` with `can_do_voice_conversion: true`; the documented default is `eleven_multilingual_sts_v2`. Browsing and previewing do not require model discovery. Preview and conversion revalidate the selected ID against the saved library, while the Voice Changer endpoint remains authoritative about any provider-side policy on a particular saved voice. Studio does not hide community Professional Voice Clones based only on their `category`.
 
 `ELEVENLABS_ENABLE_LOGGING=false` requests zero-retention mode. ElevenLabs currently limits that mode to eligible enterprise accounts. If the account is not eligible, review the provider's retention terms and deliberately set the value to `true`; otherwise conversion will be rejected even when the key, voice, and model are valid.
 

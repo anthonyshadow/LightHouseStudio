@@ -37,7 +37,6 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
 export const standardModel: ElevenLabsModel = {
   modelId: 'eleven_multilingual_sts_v2',
   canDoVoiceConversion: true,
-  servesProfessionalVoices: false,
 };
 
 export const voice = (overrides: Partial<ProviderVoice> = {}): ProviderVoice => ({

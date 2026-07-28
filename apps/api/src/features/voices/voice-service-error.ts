@@ -1,7 +1,6 @@
 export type VoiceServiceFailureReason =
   | 'configured-model-unavailable'
   | 'configured-model-incompatible'
-  | 'voice-incompatible'
   | 'library-voice-not-found'
   | 'preview-unavailable'
   | 'zero-retention-required';

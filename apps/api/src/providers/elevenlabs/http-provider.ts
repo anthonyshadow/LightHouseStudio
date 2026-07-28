@@ -17,6 +17,75 @@ const providerIdSchema = z.string().trim().min(1).max(200);
 /** Bridges Fetch's web stream through its async iterator without unsafe type coercion. */
 const nodeReadableFromWeb = (body: ReadableStream<Uint8Array>): Readable => Readable.from(body);
 
+const isMp3Signature = (bytes: Uint8Array): boolean =>
+  (bytes.byteLength >= 3 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) ||
+  (bytes.byteLength >= 2 && bytes[0] === 0xff && ((bytes[1] ?? 0) & 0xe0) === 0xe0);
+
+const hasMp3Path = (rawUrl: string): boolean => {
+  try {
+    return new URL(rawUrl).pathname.toLowerCase().endsWith('.mp3');
+  } catch {
+    return false;
+  }
+};
+
+const nodeReadableFromValidatedMp3 = async (
+  body: ReadableStream<Uint8Array>,
+): Promise<Readable> => {
+  const reader = body.getReader();
+  const initialChunks: Uint8Array[] = [];
+  let initialByteCount = 0;
+
+  try {
+    while (initialByteCount < 3) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      if (chunk.value.byteLength === 0) continue;
+      initialChunks.push(chunk.value);
+      initialByteCount += chunk.value.byteLength;
+    }
+  } catch {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+    throw new ProviderError('preview', 'invalid-response');
+  }
+
+  const signature = new Uint8Array(Math.min(initialByteCount, 3));
+  let signatureOffset = 0;
+  for (const chunk of initialChunks) {
+    const remaining = signature.byteLength - signatureOffset;
+    if (remaining <= 0) break;
+    const bytesToCopy = Math.min(chunk.byteLength, remaining);
+    signature.set(chunk.subarray(0, bytesToCopy), signatureOffset);
+    signatureOffset += bytesToCopy;
+  }
+  if (!isMp3Signature(signature)) {
+    await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+    throw new ProviderError('preview', 'invalid-response');
+  }
+
+  return Readable.from(
+    (async function* () {
+      let completed = false;
+      try {
+        yield* initialChunks;
+        while (true) {
+          const chunk = await reader.read();
+          if (chunk.done) {
+            completed = true;
+            break;
+          }
+          yield chunk.value;
+        }
+      } finally {
+        if (!completed) await reader.cancel().catch(() => undefined);
+        reader.releaseLock();
+      }
+    })(),
+  );
+};
+
 const labelsSchema = z.record(z.string(), z.unknown()).nullish();
 const workspaceVoiceSchema = z
   .object({
@@ -41,7 +110,6 @@ const modelSchema = z
   .object({
     model_id: z.string().trim().min(1).max(200),
     can_do_voice_conversion: z.boolean(),
-    serves_pro_voices: z.boolean(),
   })
   .passthrough();
 
@@ -196,19 +264,38 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
     }
   }
 
-  #audioResponse(response: Response, operation: ProviderOperation): AudioStream {
+  async #audioResponse(
+    response: Response,
+    operation: ProviderOperation,
+    previewUrl?: string,
+  ): Promise<AudioStream> {
     const upstreamContentType =
       response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() ?? '';
-    const contentType =
+    let contentType =
       upstreamContentType === 'application/octet-stream' ? 'audio/mpeg' : upstreamContentType;
-    if (response.body === null || !contentType.startsWith('audio/')) {
-      void response.body?.cancel().catch(() => undefined);
+    if (response.body === null) {
+      throw new ProviderError(operation, 'invalid-response', response.status);
+    }
+
+    let body: Readable;
+    if (contentType.startsWith('audio/')) {
+      body = nodeReadableFromWeb(response.body);
+    } else if (
+      operation === 'preview' &&
+      upstreamContentType === 'text/plain' &&
+      previewUrl !== undefined &&
+      hasMp3Path(previewUrl)
+    ) {
+      body = await nodeReadableFromValidatedMp3(response.body);
+      contentType = 'audio/mpeg';
+    } else {
+      void response.body.cancel().catch(() => undefined);
       throw new ProviderError(operation, 'invalid-response', response.status);
     }
 
     const contentLength = parseContentLength(response.headers.get('content-length'));
     return {
-      body: nodeReadableFromWeb(response.body),
+      body,
       contentType,
       ...(contentLength === undefined ? {} : { contentLength }),
     };
@@ -221,7 +308,6 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
     return parsed.data.map((model) => ({
       modelId: model.model_id,
       canDoVoiceConversion: model.can_do_voice_conversion,
-      servesProfessionalVoices: model.serves_pro_voices,
     }));
   }
 
@@ -289,7 +375,7 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
       void response.body?.cancel().catch(() => undefined);
       throw new ProviderError('preview', 'upstream', response.status);
     }
-    return this.#audioResponse(response, 'preview');
+    return this.#audioResponse(response, 'preview', rawUrl);
   }
 
   async convertRecording(

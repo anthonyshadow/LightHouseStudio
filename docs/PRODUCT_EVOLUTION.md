@@ -185,6 +185,8 @@ The first voice browser exposed workspace and public sources, with preview, publ
 
 The current browser is mounted only after the operator opens a disclosure labelled as contacting the provider and lists `voice_type=saved` results only. Merely completing a take does not fetch voice metadata. Public discovery and import were removed from the UI, browser client, app contracts, local API, and provider adapter. Preview and conversion revalidate saved membership; only conversion receives the original audio sidecar. Library changes now belong exclusively to ElevenLabs account controls.
 
+An early saved-only implementation also filtered `category: professional` voices when generic model metadata reported `serves_pro_voices: false`. That removed every saved result for accounts whose collection consisted of community Professional Voice Clones, even though the Voice Changer API is the authoritative policy boundary. Browsing and preview are now model-independent, every saved category remains visible, and conversion still validates the configured model's speech-to-speech capability before submitting the selected saved voice.
+
 Browser capability notices distinguish missing MediaRecorder, Web Audio replacement, offline rendering, and runtime encoder/remux compatibility. Unsupported post-processing never makes the original take unavailable.
 
 Why it fits: provider contact and browser limitations are visible at the moment they matter, while the local capture loop remains intact.

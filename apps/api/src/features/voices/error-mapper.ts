@@ -30,15 +30,6 @@ export const translateVoiceServiceError: ErrorTranslator = (error) => {
           'The configured ElevenLabs model does not support speech-to-speech conversion.',
         ),
       );
-    case 'voice-incompatible':
-      return translate(
-        error,
-        new AppError(
-          409,
-          'incompatible_voice',
-          'This professional voice cannot be used by the configured speech-to-speech model.',
-        ),
-      );
     case 'library-voice-not-found':
       return translate(
         error,

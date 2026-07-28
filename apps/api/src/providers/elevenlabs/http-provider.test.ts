@@ -99,6 +99,60 @@ describe('ElevenLabsHttpProvider', () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it('validates and proxies an ElevenLabs MP3 preview mislabeled as text', async () => {
+    const previewBytes = Buffer.from([
+      0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x54, 0x53,
+    ]);
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(previewBytes, {
+          status: 200,
+          headers: {
+            'content-type': 'text/plain',
+            'content-length': String(previewBytes.byteLength),
+          },
+        }),
+      ),
+    );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+
+    const result = await provider.fetchPreview(
+      'https://storage.googleapis.com/eleven-public-prod/voice/preview.mp3',
+      signal(),
+    );
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of result.body) {
+      if (!(chunk instanceof Uint8Array)) throw new TypeError('Expected binary preview data.');
+      chunks.push(chunk);
+    }
+
+    expect(result.contentType).toBe('audio/mpeg');
+    expect(result.contentLength).toBe(previewBytes.byteLength);
+    expect(Buffer.concat(chunks)).toEqual(previewBytes);
+  });
+
+  it('rejects mislabeled preview content without an MP3 signature', async () => {
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response('not audio', {
+          status: 200,
+          headers: { 'content-type': 'text/plain' },
+        }),
+      ),
+    );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+
+    await expect(
+      provider.fetchPreview(
+        'https://storage.googleapis.com/eleven-public-prod/voice/preview.mp3',
+        signal(),
+      ),
+    ).rejects.toMatchObject({
+      operation: 'preview',
+      reason: 'invalid-response',
+    });
+  });
+
   it('uses multipart audio for provider conversion while returning a streamed result', async () => {
     const fetchMock = vi.fn<typeof fetch>(() =>
       Promise.resolve(
@@ -136,7 +190,6 @@ describe('ElevenLabsHttpProvider', () => {
           {
             model_id: 'eleven_multilingual_sts_v2',
             can_do_voice_conversion: 'true',
-            serves_pro_voices: false,
           },
         ]),
       ),

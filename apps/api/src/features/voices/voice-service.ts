@@ -26,12 +26,6 @@ const runParallel = async <Left, Right>(
   }
 };
 
-const isProfessionalVoice = (voice: ProviderVoice): boolean =>
-  voice.category?.trim().toLowerCase() === 'professional';
-
-const isModelCompatible = (voice: ProviderVoice, model: ElevenLabsModel): boolean =>
-  model.servesProfessionalVoices || !isProfessionalVoice(voice);
-
 const summarizeVoice = (voice: ProviderVoice): VoiceSummary => ({
   voiceId: voice.voiceId,
   name: voice.name,
@@ -89,12 +83,6 @@ export class VoiceService {
     return operation.subscribe(signal, () => new ProviderError('models', 'aborted'));
   }
 
-  #assertVoiceCompatible(voice: ProviderVoice, model: ElevenLabsModel): void {
-    if (!isModelCompatible(voice, model)) {
-      throw new VoiceServiceError('voice-incompatible');
-    }
-  }
-
   #requireLibraryVoice(voice: ProviderVoice | null): ProviderVoice {
     if (voice === null) throw new VoiceServiceError('library-voice-not-found');
     return voice;
@@ -106,28 +94,19 @@ export class VoiceService {
     readonly nextPageToken: string | null;
     readonly signal: AbortSignal;
   }): Promise<WorkspaceVoicesResponse> {
-    const [page, model] = await runParallel(
-      input.signal,
-      (signal) => this.#provider.listWorkspaceVoices({ ...input, signal }),
-      (signal) => this.#conversionModel(signal),
-    );
+    const page = await this.#provider.listWorkspaceVoices(input);
     return {
-      voices: page.voices.filter((voice) => isModelCompatible(voice, model)).map(summarizeVoice),
+      voices: page.voices.map(summarizeVoice),
       hasMore: page.hasMore,
       nextPageToken: page.nextPageToken,
-      // Filtering is local, so the upstream total would be misleading.
       total: null,
     };
   }
 
   async workspacePreview(voiceId: string, signal: AbortSignal): Promise<AudioStream> {
-    const [candidate, model] = await runParallel(
-      signal,
-      (operationSignal) => this.#provider.getWorkspaceVoice(voiceId, operationSignal),
-      (operationSignal) => this.#conversionModel(operationSignal),
+    const voice = this.#requireLibraryVoice(
+      await this.#provider.getWorkspaceVoice(voiceId, signal),
     );
-    const voice = this.#requireLibraryVoice(candidate);
-    this.#assertVoiceCompatible(voice, model);
     if (voice.previewUrl === null) {
       throw new VoiceServiceError('preview-unavailable');
     }
@@ -145,8 +124,7 @@ export class VoiceService {
       (signal) => this.#provider.getWorkspaceVoice(input.voiceId, signal),
       (signal) => this.#conversionModel(signal),
     );
-    const voice = this.#requireLibraryVoice(candidate);
-    this.#assertVoiceCompatible(voice, model);
+    this.#requireLibraryVoice(candidate);
     try {
       return await this.#provider.convertRecording(
         input.voiceId,

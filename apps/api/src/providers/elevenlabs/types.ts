@@ -3,7 +3,6 @@ import type { AudioStream } from '../../application/audio-stream.js';
 export interface ElevenLabsModel {
   readonly modelId: string;
   readonly canDoVoiceConversion: boolean;
-  readonly servesProfessionalVoices: boolean;
 }
 
 export interface ProviderVoice {

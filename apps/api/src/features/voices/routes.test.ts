@@ -21,6 +21,7 @@ describe('ElevenLabs voice API', () => {
   const apps: ReturnType<typeof createApp>[] = [];
   afterEach(async () => {
     vi.useRealTimers();
+    vi.restoreAllMocks();
     await Promise.all(apps.splice(0).map(async (app) => app.close()));
   });
 
@@ -30,7 +31,7 @@ describe('ElevenLabs voice API', () => {
     return { app, provider };
   };
 
-  it('trims workspace search, caps paging, and filters incompatible professional voices', async () => {
+  it('trims workspace search, caps paging, and returns every saved voice category', async () => {
     const { app, provider } = setup();
     provider.workspaceVoices = [
       voice(),
@@ -57,6 +58,14 @@ describe('ElevenLabs voice API', () => {
           labels: { accent: 'Canadian' },
           previewAvailable: true,
         },
+        {
+          voiceId: 'professional-one',
+          name: 'Pro',
+          category: 'professional',
+          description: 'Bright and conversational',
+          labels: { accent: 'Canadian' },
+          previewAvailable: true,
+        },
       ],
       hasMore: true,
       nextPageToken: 'next-opaque',
@@ -77,9 +86,7 @@ describe('ElevenLabs voice API', () => {
     expect(provider.workspaceSearches).toHaveLength(1);
   });
 
-  it('shares configured-model discovery briefly, then refreshes it after the bounded TTL', async () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-07-26T12:00:00.000Z'));
+  it('keeps browsing independent of conversion-model discovery', async () => {
     const { app, provider } = setup();
     const listModels = vi.spyOn(provider, 'listModels');
 
@@ -89,10 +96,29 @@ describe('ElevenLabs voice API', () => {
       url: '/api/elevenlabs/voices/voice-one/preview',
       headers: intentHeaders,
     });
+
+    expect(listModels).not.toHaveBeenCalled();
+  });
+
+  it('shares conversion-model discovery briefly, then refreshes it after the bounded TTL', async () => {
+    const now = vi
+      .spyOn(Date, 'now')
+      .mockReturnValue(new Date('2026-07-26T12:00:00.000Z').getTime());
+    const { app, provider } = setup();
+    const listModels = vi.spyOn(provider, 'listModels');
+    const conversion = {
+      method: 'POST' as const,
+      url: '/api/elevenlabs/voice-changer/recording?voiceId=voice-one',
+      headers: { ...originHeaders, 'content-type': 'audio/webm' },
+      payload: Buffer.from('original-sidecar'),
+    };
+
+    await app.inject(conversion);
+    await app.inject(conversion);
     expect(listModels).toHaveBeenCalledOnce();
 
-    vi.setSystemTime(Date.now() + VOICE_MODEL_CACHE_TTL_MS);
-    await app.inject({ method: 'GET', url: '/api/elevenlabs/voices', headers: intentHeaders });
+    now.mockReturnValue(Date.now() + VOICE_MODEL_CACHE_TTL_MS);
+    await app.inject(conversion);
     expect(listModels).toHaveBeenCalledTimes(2);
   });
 
@@ -183,7 +209,7 @@ describe('ElevenLabs voice API', () => {
     expect(Buffer.from(provider.conversions[0]?.audio ?? [])).toEqual(audio);
   });
 
-  it('revalidates voice/model compatibility immediately before conversion', async () => {
+  it('allows a saved professional-library voice to reach Voice Changer', async () => {
     const { app, provider } = setup();
     provider.workspaceVoices = [voice({ category: 'professional' })];
     const response = await app.inject({
@@ -193,9 +219,8 @@ describe('ElevenLabs voice API', () => {
       payload: Buffer.from('original-sidecar'),
     });
 
-    expect(response.statusCode).toBe(409);
-    expect(response.json<ApiErrorResponse>().error.code).toBe('incompatible_voice');
-    expect(provider.conversions).toHaveLength(0);
+    expect(response.statusCode).toBe(200);
+    expect(provider.conversions).toHaveLength(1);
   });
 
   it('validates conversion origin, media type, emptiness, and the 25 MiB limit', async () => {
@@ -253,9 +278,10 @@ describe('ElevenLabs voice API', () => {
     }
     const { app } = setup(new FailingProvider());
     const response = await app.inject({
-      method: 'GET',
-      url: '/api/elevenlabs/voices',
-      headers: intentHeaders,
+      method: 'POST',
+      url: '/api/elevenlabs/voice-changer/recording?voiceId=voice-one',
+      headers: { ...originHeaders, 'content-type': 'audio/webm' },
+      payload: Buffer.from('original-sidecar'),
     });
 
     expect(response.statusCode).toBe(502);
@@ -273,8 +299,8 @@ describe('ElevenLabs voice API', () => {
   it('cancels a stalled parallel provider branch when its sibling fails', async () => {
     let siblingAborted = false;
     class FailingProvider extends FakeElevenLabsProvider {
-      override listWorkspaceVoices(): Promise<never> {
-        return Promise.reject(new ProviderError('workspace-voices', 'upstream', 502));
+      override getWorkspaceVoice(): Promise<never> {
+        return Promise.reject(new ProviderError('workspace-voice', 'upstream', 502));
       }
 
       override listModels(signal: AbortSignal): Promise<never> {
@@ -293,9 +319,10 @@ describe('ElevenLabs voice API', () => {
     const { app } = setup(new FailingProvider());
 
     const response = await app.inject({
-      method: 'GET',
-      url: '/api/elevenlabs/voices',
-      headers: intentHeaders,
+      method: 'POST',
+      url: '/api/elevenlabs/voice-changer/recording?voiceId=voice-one',
+      headers: { ...originHeaders, 'content-type': 'audio/webm' },
+      payload: Buffer.from('original-sidecar'),
     });
 
     expect(response.statusCode).toBe(502);
@@ -313,9 +340,10 @@ describe('ElevenLabs voice API', () => {
     }
     const { app } = setup(new LimitedProvider());
     const response = await app.inject({
-      method: 'GET',
-      url: '/api/elevenlabs/voices',
-      headers: intentHeaders,
+      method: 'POST',
+      url: '/api/elevenlabs/voice-changer/recording?voiceId=voice-one',
+      headers: { ...originHeaders, 'content-type': 'audio/webm' },
+      payload: Buffer.from('original-sidecar'),
     });
 
     expect(response.statusCode).toBe(429);
