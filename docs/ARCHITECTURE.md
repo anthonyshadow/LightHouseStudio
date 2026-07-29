@@ -199,7 +199,11 @@ The backend remains database-free and single-operator, with no accounts, analyti
 
 - Session orchestration owns local/remote streams, cloned provider-input tracks, provider client, start abort controller, operation generation, preview URL, live timers, and the single post-finalization `releaseForRecordedReview()` cleanup path.
 - The session draft controller owns the per-mode text/enhancement map and a discriminated reference: either an ephemeral manual `File` with an owned object URL or a persisted asset ID with hydrated bytes and a stable content URL. Atomic recipe replacement validates persisted bytes before changing the draft, and stable asset IDs define pending/applied identity.
-- Capture preferences own session-only device/profile drafts and negotiated-setting display. Owned local media performs atomic stream replacement; neither recipes nor browser storage receive device ids.
+- Capture preferences own session-only device/profile drafts, browser-visible device discovery,
+  the single `devicechange` listener, preferred-device availability/fallback state, and
+  negotiated-setting display. A missing preferred camera resolves to the browser default for the
+  next explicit start while the preference remains available for reconnection. Owned local media
+  performs atomic stream replacement; neither recipes nor browser storage receive device ids.
 - Recording orchestration owns `MediaRecorder` instances, recording chunks, the audio sidecar, the independent warning/cap timer, immutable original/processed artifact URLs, download-initiation state, and unload protection.
 - The legacy Guided project repository owns allowlisted checkpoint metadata and IndexedDB media Blobs. The Studio manager creates a short-lived object URL only for an explicit download and revokes it immediately after dispatch without deleting durable media.
 - Voice processing owns processing abort controllers and temporary Web Audio/remux resources; it never mutates the originals.

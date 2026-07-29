@@ -71,6 +71,45 @@ The executable visual matrix and pruning inventory share the same case paths. Da
 | ElevenLabs preview               | Explicit voice-browser action, fetch/Blob URL/audio playback            | Preview exposes retry; selection and the valid take remain available                            |
 | Download                         | Blob URLs and browser download handling                                 | Mobile browsers may open/share instead of saving directly                                       |
 
+## Phone webcams and Apple Continuity Camera
+
+Lightframe does not detect nearby phones. Browsers do not provide a reliable Bluetooth, Wi-Fi,
+proximity, or physical-device-presence API for this purpose. Capture Settings lists a phone only
+when the operating system and browser expose it through `enumerateDevices()` as a normal
+`videoinput`. The app does not create a fake iPhone option, scan the local network, or switch to a
+newly discovered phone automatically.
+
+Readable device names usually require camera permission from a prior explicit Start. Before that,
+a browser may return a generic name, an empty label, or a reduced device list. Opening or refreshing
+Capture Settings enumerates devices and reads permission state where supported; it never calls
+`getUserMedia` or triggers a permission prompt.
+
+On a compatible Mac and iPhone, Apple Continuity Camera generally requires:
+
+1. **Continuity Camera** enabled under iPhone **Settings → General → AirPlay & Continuity**.
+2. The same Apple Account on both devices with two-factor authentication.
+3. Bluetooth and Wi-Fi enabled on both devices, with the devices near one another.
+4. The iPhone locked and positioned with its rear camera facing the creator.
+5. A USB connection when wireless discovery is unavailable or unstable.
+
+The operating system, browser version, Apple hardware/account requirements, device policy, and
+whether another application already owns the camera can all affect discovery. Lightframe does not
+claim Continuity Camera support on non-Apple systems; it simply lists any phone-webcam device the
+current operating system exposes.
+
+If a phone does not appear:
+
+- confirm it appears as a camera in another native/browser application;
+- review browser and operating-system camera permission;
+- enable the setup requirements above, move the devices closer, or connect USB;
+- close other applications that may own the phone camera;
+- select **Refresh** in Capture Settings, then retry an explicit camera Start;
+- update the operating system and browser if discovery remains unavailable.
+
+Disconnect/reconnect behavior is browser- and OS-dependent. `devicechange` refreshes the list, but
+some platforms report changes late. If the active track ends, Lightframe releases its owned media
+and exposes the existing recovery path rather than silently changing a recording or AI session.
+
 ## Recording formats
 
 At runtime the app tries, in order, WebM VP9/Opus, WebM VP8/Opus, WebM AV1/Opus, generic WebM, H.264/AAC MP4, generic MP4, then the browser default. Audio sidecars similarly prefer WebM/Opus and fall back to MP4 or the browser default.

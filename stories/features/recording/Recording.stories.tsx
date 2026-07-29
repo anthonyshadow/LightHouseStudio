@@ -80,10 +80,122 @@ export const RecordingInProgress: Story = {
 export const DeviceAndQualitySettings: Story = {
   render: () => (
     <StoryColumn width="42rem">
+      <CaptureSettingsPanel controller={createCapturePreferencesController()} mode="local" />
+    </StoryColumn>
+  ),
+};
+
+export const PhoneCameraAvailable: Story = {
+  render: () => (
+    <StoryColumn width="42rem">
       <CaptureSettingsPanel
-        controller={createCapturePreferencesController()}
+        controller={createCapturePreferencesController({
+          draft: {
+            videoDeviceId: 'iphone-camera',
+            audioDeviceId: 'microphone-1',
+            profile: '1080p30',
+          },
+          applied: {
+            videoDeviceId: 'iphone-camera',
+            audioDeviceId: 'microphone-1',
+            profile: '1080p30',
+          },
+          effectiveApplied: {
+            videoDeviceId: 'iphone-camera',
+            audioDeviceId: 'microphone-1',
+            profile: '1080p30',
+          },
+          cameraDevices: [
+            { deviceId: 'camera-1', label: 'FaceTime HD Camera' },
+            { deviceId: 'iphone-camera', label: 'Creator’s iPhone Camera' },
+            { deviceId: 'camera-3', label: 'OBS Virtual Camera' },
+          ],
+          hasPendingChanges: false,
+          actualSettings: {
+            video: {
+              label: 'Creator’s iPhone Camera',
+              deviceId: 'iphone-camera',
+              width: 1_920,
+              height: 1_080,
+              frameRate: 30,
+            },
+            audio: { label: 'Creator Microphone', deviceId: 'microphone-1' },
+          },
+        })}
         mode="local"
-        onApplied={fn()}
+      />
+    </StoryColumn>
+  ),
+};
+
+export const CameraPermissionNotGranted: Story = {
+  render: () => (
+    <StoryColumn width="42rem">
+      <CaptureSettingsPanel
+        controller={createCapturePreferencesController({
+          draft: {
+            videoDeviceId: null,
+            audioDeviceId: null,
+            profile: '720p30',
+          },
+          applied: {
+            videoDeviceId: null,
+            audioDeviceId: null,
+            profile: '720p30',
+          },
+          effectiveApplied: {
+            videoDeviceId: null,
+            audioDeviceId: null,
+            profile: '720p30',
+          },
+          cameraDevices: [{ deviceId: 'camera-1', label: 'Camera 1' }],
+          microphoneDevices: [{ deviceId: 'microphone-1', label: 'Microphone 1' }],
+          cameraPermissionState: 'prompt',
+          hasPendingChanges: false,
+          actualSettings: { video: null, audio: null },
+        })}
+        mode="local"
+      />
+    </StoryColumn>
+  ),
+};
+
+export const PreferredCameraUnavailable: Story = {
+  render: () => (
+    <StoryColumn width="42rem">
+      <CaptureSettingsPanel
+        controller={createCapturePreferencesController({
+          draft: {
+            videoDeviceId: 'iphone-camera',
+            audioDeviceId: 'microphone-1',
+            profile: '720p30',
+          },
+          applied: {
+            videoDeviceId: 'iphone-camera',
+            audioDeviceId: 'microphone-1',
+            profile: '720p30',
+          },
+          effectiveApplied: {
+            videoDeviceId: null,
+            audioDeviceId: 'microphone-1',
+            profile: '720p30',
+          },
+          cameraDevices: [{ deviceId: 'camera-1', label: 'FaceTime HD Camera' }],
+          videoFallbackNotice:
+            'The previously selected camera is unavailable. The default camera will be used until it reconnects.',
+          hasPendingChanges: false,
+          actualSettings: {
+            video: {
+              label: 'FaceTime HD Camera',
+              deviceId: 'camera-1',
+              width: 1_280,
+              height: 720,
+              frameRate: 30,
+            },
+            audio: { label: 'Creator Microphone', deviceId: 'microphone-1' },
+          },
+        })}
+        mode="local"
       />
     </StoryColumn>
   ),

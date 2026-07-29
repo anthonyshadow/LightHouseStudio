@@ -81,11 +81,14 @@ const harness = vi.hoisted(() => {
   const capturePreferences = {
     draft: { videoDeviceId: null, audioDeviceId: null, profile: '720p30' as const },
     applied: { videoDeviceId: null, audioDeviceId: null, profile: '720p30' as const },
+    effectiveApplied: { videoDeviceId: null, audioDeviceId: null, profile: '720p30' as const },
     cameraDevices: [],
     microphoneDevices: [],
     supportedProfiles: ['720p30' as const],
     devicesState: 'idle' as const,
+    cameraPermissionState: 'unknown' as const,
     deviceError: null,
+    videoFallbackNotice: null,
     applyError: null,
     applying: false,
     hasPendingChanges: false,
@@ -94,6 +97,8 @@ const harness = vi.hoisted(() => {
     updateVideoDeviceId: vi.fn(),
     updateAudioDeviceId: vi.fn(),
     updateProfile: vi.fn(),
+    reportVideoDeviceUnavailable: vi.fn(),
+    dismissVideoFallbackNotice: vi.fn(),
     apply: vi.fn(() => Promise.resolve(true)),
     discardPending: vi.fn(),
   };

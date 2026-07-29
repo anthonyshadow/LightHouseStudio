@@ -1,7 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   enumerateMediaDevices,
+  readCameraPermissionState,
   readCaptureStreamSettings,
+  subscribeToMediaDeviceChanges,
   supportsLocal1080pProfile,
 } from '../../adapters/browser-media/browserMedia';
 import type { CapturePreferences } from '../../application/types';
@@ -55,8 +57,12 @@ export const useCapturePreferences = ({
   const [microphoneDevices, setMicrophoneDevices] = useState<CaptureDeviceOption[]>([]);
   const [devicesState, setDevicesState] =
     useState<CapturePreferencesController['devicesState']>('idle');
+  const [cameraPermissionState, setCameraPermissionState] =
+    useState<CapturePreferencesController['cameraPermissionState']>('unknown');
   const [deviceError, setDeviceError] = useState<string | null>(null);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [runtimeUnavailableVideoId, setRuntimeUnavailableVideoId] = useState<string | null>(null);
+  const [dismissedVideoFallbackId, setDismissedVideoFallbackId] = useState<string | null>(null);
   const [applying, setApplying] = useState(false);
   const refreshInFlightRef = useRef<Promise<void> | null>(null);
   const applyInFlightRef = useRef<Promise<boolean> | null>(null);
@@ -82,11 +88,19 @@ export const useCapturePreferences = ({
       setDevicesState('loading');
       setDeviceError(null);
       try {
-        const devices = await enumerateMediaDevices();
+        const [devices, permissionState] = await Promise.all([
+          enumerateMediaDevices(),
+          readCameraPermissionState(),
+        ]);
+        if (!mountedRef.current) return;
         setCameraDevices(deviceOptions(devices, 'videoinput'));
         setMicrophoneDevices(deviceOptions(devices, 'audioinput'));
+        setCameraPermissionState(permissionState);
+        setRuntimeUnavailableVideoId(null);
+        setDismissedVideoFallbackId(null);
         setDevicesState('ready');
       } catch {
+        if (!mountedRef.current) return;
         setDevicesState('error');
         setDeviceError(
           'Camera and microphone choices could not be listed. Default devices remain available.',
@@ -99,8 +113,17 @@ export const useCapturePreferences = ({
     return request;
   }, []);
 
+  useEffect(
+    () =>
+      subscribeToMediaDeviceChanges(() => {
+        void refreshDevices();
+      }),
+    [refreshDevices],
+  );
+
   const updateVideoDeviceId = useCallback((videoDeviceId: string | null) => {
     setApplyError(null);
+    setRuntimeUnavailableVideoId((current) => (current === videoDeviceId ? current : null));
     setDraft((current) => ({ ...current, videoDeviceId }));
   }, []);
 
@@ -128,7 +151,19 @@ export const useCapturePreferences = ({
     setApplyError(null);
     const request = (async () => {
       try {
-        await onApply(preferences);
+        const videoUnavailable =
+          devicesState === 'ready' &&
+          Boolean(preferences.videoDeviceId) &&
+          !cameraDevices.some(({ deviceId }) => deviceId === preferences.videoDeviceId);
+        const audioUnavailable =
+          devicesState === 'ready' &&
+          Boolean(preferences.audioDeviceId) &&
+          !microphoneDevices.some(({ deviceId }) => deviceId === preferences.audioDeviceId);
+        await onApply({
+          ...preferences,
+          videoDeviceId: videoUnavailable ? null : preferences.videoDeviceId,
+          audioDeviceId: audioUnavailable ? null : preferences.audioDeviceId,
+        });
         if (mountedRef.current && applyOperationRef.current === operation) {
           setApplied(preferences);
         }
@@ -149,21 +184,55 @@ export const useCapturePreferences = ({
     })();
     applyInFlightRef.current = request;
     return request;
-  }, [applied, draft, onApply]);
+  }, [applied, cameraDevices, devicesState, draft, microphoneDevices, onApply]);
 
   const discardPending = useCallback(() => {
     setApplyError(null);
     setDraft(applied);
   }, [applied]);
 
+  const appliedVideoUnavailable =
+    Boolean(applied.videoDeviceId) &&
+    (runtimeUnavailableVideoId === applied.videoDeviceId ||
+      (devicesState === 'ready' &&
+        !cameraDevices.some(({ deviceId }) => deviceId === applied.videoDeviceId)));
+  const appliedAudioUnavailable =
+    devicesState === 'ready' &&
+    Boolean(applied.audioDeviceId) &&
+    !microphoneDevices.some(({ deviceId }) => deviceId === applied.audioDeviceId);
+  const effectiveApplied = useMemo<CapturePreferences>(
+    () => ({
+      ...applied,
+      videoDeviceId: appliedVideoUnavailable ? null : applied.videoDeviceId,
+      audioDeviceId: appliedAudioUnavailable ? null : applied.audioDeviceId,
+    }),
+    [applied, appliedAudioUnavailable, appliedVideoUnavailable],
+  );
+  const videoFallbackNotice =
+    appliedVideoUnavailable &&
+    applied.videoDeviceId &&
+    dismissedVideoFallbackId !== applied.videoDeviceId
+      ? 'The previously selected camera is unavailable. The default camera will be used until it reconnects.'
+      : null;
+
+  const dismissVideoFallbackNotice = useCallback(() => {
+    setDismissedVideoFallbackId(applied.videoDeviceId);
+  }, [applied.videoDeviceId]);
+  const reportVideoDeviceUnavailable = useCallback((deviceId: string) => {
+    setRuntimeUnavailableVideoId(deviceId);
+  }, []);
+
   return {
     draft,
     applied,
+    effectiveApplied,
     cameraDevices,
     microphoneDevices,
     supportedProfiles,
     devicesState,
+    cameraPermissionState,
     deviceError,
+    videoFallbackNotice,
     applyError,
     applying,
     hasPendingChanges: !samePreferences(draft, applied),
@@ -172,6 +241,8 @@ export const useCapturePreferences = ({
     updateVideoDeviceId,
     updateAudioDeviceId,
     updateProfile,
+    reportVideoDeviceUnavailable,
+    dismissVideoFallbackNotice,
     apply,
     discardPending,
   };

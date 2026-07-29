@@ -4,12 +4,15 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   acquireLocalMedia,
   enumerateMediaDevices,
+  readCameraPermissionState,
   readCaptureStreamSettings,
+  subscribeToMediaDeviceChanges,
   supportsLocal1080pProfile,
   withCaptureDevices,
 } from './browserMedia';
 
 const originalMediaDevices = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices');
+const originalPermissions = Object.getOwnPropertyDescriptor(navigator, 'permissions');
 
 const installMediaDevices = (value: Partial<MediaDevices>) => {
   Object.defineProperty(navigator, 'mediaDevices', {
@@ -21,6 +24,8 @@ const installMediaDevices = (value: Partial<MediaDevices>) => {
 afterEach(() => {
   if (originalMediaDevices) Object.defineProperty(navigator, 'mediaDevices', originalMediaDevices);
   else Reflect.deleteProperty(navigator, 'mediaDevices');
+  if (originalPermissions) Object.defineProperty(navigator, 'permissions', originalPermissions);
+  else Reflect.deleteProperty(navigator, 'permissions');
 });
 
 const liveTrack = (
@@ -53,6 +58,26 @@ describe('browser media capture settings', () => {
     await expect(enumerateMediaDevices()).resolves.toBe(devices);
     expect(enumerateDevices).toHaveBeenCalledOnce();
     expect(getUserMedia).not.toHaveBeenCalled();
+  });
+
+  it('reads camera permission without prompting and owns device-change listener cleanup', async () => {
+    const query = vi.fn().mockResolvedValue({ state: 'denied' });
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: { query },
+    });
+    const addEventListener = vi.fn();
+    const removeEventListener = vi.fn();
+    installMediaDevices({ addEventListener, removeEventListener });
+    const listener = vi.fn();
+
+    await expect(readCameraPermissionState()).resolves.toBe('denied');
+    const unsubscribe = subscribeToMediaDeviceChanges(listener);
+    expect(query).toHaveBeenCalledWith({ name: 'camera' });
+    expect(addEventListener).toHaveBeenCalledWith('devicechange', listener);
+
+    unsubscribe();
+    expect(removeEventListener).toHaveBeenCalledWith('devicechange', listener);
   });
 
   it('applies selected devices and quality only during explicit acquisition', async () => {

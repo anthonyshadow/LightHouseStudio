@@ -8,6 +8,7 @@ import { StudioDesignProvider } from '../../ui';
 import { CaptureSettingsPanel } from './CaptureSettingsPanel';
 
 const originalMediaDevices = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices');
+const originalPermissions = Object.getOwnPropertyDescriptor(navigator, 'permissions');
 
 const installMediaDevices = (value: Partial<MediaDevices>) => {
   Object.defineProperty(navigator, 'mediaDevices', {
@@ -20,6 +21,8 @@ afterEach(() => {
   cleanup();
   if (originalMediaDevices) Object.defineProperty(navigator, 'mediaDevices', originalMediaDevices);
   else Reflect.deleteProperty(navigator, 'mediaDevices');
+  if (originalPermissions) Object.defineProperty(navigator, 'permissions', originalPermissions);
+  else Reflect.deleteProperty(navigator, 'permissions');
 });
 
 const device = (kind: MediaDeviceKind, deviceId: string, label: string): MediaDeviceInfo => ({
@@ -71,6 +74,71 @@ describe('CaptureSettingsPanel', () => {
     });
     expect(getUserMedia).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Apply settings' })).toBeDisabled();
+  });
+
+  it('renders every browser camera label, including varied Continuity Camera names', async () => {
+    installMediaDevices({
+      enumerateDevices: vi
+        .fn()
+        .mockResolvedValue([
+          device('videoinput', 'built-in', 'FaceTime HD Camera'),
+          device('videoinput', 'iphone', 'Creator’s iPhone Camera'),
+          device('videoinput', 'continuity', 'Continuity Camera (Desk)'),
+          device('videoinput', 'virtual', 'OBS Virtual Camera'),
+        ]),
+      getSupportedConstraints: () => ({}),
+    });
+
+    const Harness = () => {
+      const controller = useCapturePreferences({
+        stream: null,
+        onApply: vi.fn().mockResolvedValue(undefined),
+      });
+      return (
+        <StudioDesignProvider>
+          <CaptureSettingsPanel controller={controller} mode="local" />
+        </StudioDesignProvider>
+      );
+    };
+    render(<Harness />);
+
+    const camera = await screen.findByLabelText('Camera');
+    expect(camera).toHaveTextContent('FaceTime HD Camera');
+    expect(camera).toHaveTextContent('Creator’s iPhone Camera');
+    expect(camera).toHaveTextContent('Continuity Camera (Desk)');
+    expect(camera).toHaveTextContent('OBS Virtual Camera');
+    expect(screen.queryByText('Use a phone as a camera')).not.toBeInTheDocument();
+  });
+
+  it('explains denied permission and an empty browser camera list without requesting access', async () => {
+    const getUserMedia = vi.fn();
+    installMediaDevices({
+      getUserMedia,
+      enumerateDevices: vi.fn().mockResolvedValue([]),
+      getSupportedConstraints: () => ({}),
+    });
+    Object.defineProperty(navigator, 'permissions', {
+      configurable: true,
+      value: { query: vi.fn().mockResolvedValue({ state: 'denied' }) },
+    });
+
+    const Harness = () => {
+      const controller = useCapturePreferences({
+        stream: null,
+        onApply: vi.fn().mockResolvedValue(undefined),
+      });
+      return (
+        <StudioDesignProvider>
+          <CaptureSettingsPanel controller={controller} mode="local" />
+        </StudioDesignProvider>
+      );
+    };
+    render(<Harness />);
+
+    expect(await screen.findByText('Camera permission blocked')).toBeInTheDocument();
+    expect(screen.getByText('No camera available')).toBeInTheDocument();
+    expect(screen.getByText('Use a phone as a camera')).toBeInTheDocument();
+    expect(getUserMedia).not.toHaveBeenCalled();
   });
 
   it('shows provider-managed quality and active negotiated settings', () => {

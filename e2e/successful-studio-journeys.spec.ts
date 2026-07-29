@@ -7,6 +7,7 @@ import {
   installSuccessfulStudioHarness,
   openRecipeDockWhenOverlaid,
   readBrowserState,
+  startLocalPreview,
   triggerGenerationEnded,
   triggerGenerationTick,
   triggerProviderDisconnect,
@@ -767,6 +768,50 @@ test('VTON 3 accepts a valid ephemeral garment image and starts with image-only 
       .filter(({ path }) => path === '/api/realtime-token')
       .map(({ model }) => model),
   ).toEqual(['lucy-vton-3']);
+  expectNoExternalProviderTraffic(network);
+});
+
+test('switches to a browser-exposed phone camera while Capture Settings stays open', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+  await startLocalPreview(page);
+  await page.evaluate(() => {
+    Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', {
+      configurable: true,
+      value: () =>
+        Promise.resolve([
+          {
+            kind: 'videoinput',
+            deviceId: 'built-in-camera',
+            groupId: 'built-in',
+            label: 'FaceTime HD Camera',
+            toJSON: () => ({}),
+          },
+          {
+            kind: 'videoinput',
+            deviceId: 'phone-camera',
+            groupId: 'continuity',
+            label: 'Creator’s iPhone Camera',
+            toJSON: () => ({}),
+          },
+        ]),
+    });
+  });
+
+  await page.getByRole('button', { name: 'Open capture settings' }).click();
+  const settingsDialog = page.getByRole('dialog', { name: 'Capture Settings' });
+  const cameraSelector = page.getByLabel('Camera', { exact: true });
+  await expect(settingsDialog).toBeVisible();
+  await expect(cameraSelector).toContainText('Creator’s iPhone Camera');
+  await cameraSelector.selectOption('phone-camera');
+  await page.getByRole('button', { name: 'Apply settings' }).click();
+
+  await expect(settingsDialog).toBeVisible();
+  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+  await expect.poll(async () => (await readBrowserState(page)).cameraCalls).toBe(2);
+  expect((await readBrowserState(page)).lifecycleEvents).toContain('local-video-stopped');
   expectNoExternalProviderTraffic(network);
 });
 

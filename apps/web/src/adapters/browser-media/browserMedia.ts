@@ -86,6 +86,27 @@ export const enumerateMediaDevices = async (): Promise<MediaDeviceInfo[]> => {
   return navigator.mediaDevices.enumerateDevices();
 };
 
+export type CameraPermissionState = PermissionState | 'unknown';
+
+export const readCameraPermissionState = async (): Promise<CameraPermissionState> => {
+  if (!navigator.permissions?.query) return 'unknown';
+  try {
+    const status = await navigator.permissions.query({
+      name: 'camera',
+    });
+    return status.state;
+  } catch {
+    return 'unknown';
+  }
+};
+
+export const subscribeToMediaDeviceChanges = (listener: () => void): (() => void) => {
+  const mediaDevices = navigator.mediaDevices;
+  if (!mediaDevices?.addEventListener) return () => undefined;
+  mediaDevices.addEventListener('devicechange', listener);
+  return () => mediaDevices.removeEventListener('devicechange', listener);
+};
+
 const finiteSetting = (value: number | undefined): number | null =>
   typeof value === 'number' && Number.isFinite(value) ? value : null;
 

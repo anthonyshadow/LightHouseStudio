@@ -72,11 +72,21 @@ Enter through `/projects`, `/?project=…`, and `/guided?project=…`; confirm e
 3. Reload. Confirm camera id, microphone id, and local quality target return to defaults and that no device id or label was added to `localStorage`.
 4. Start local preview, open Capture Settings, and verify Active capture reports labels and negotiated resolution/frame rate from track settings. The browser may negotiate below the target.
 5. With two usable inputs, Apply a different camera/microphone. Confirm the complete replacement becomes live, then the old owned tracks stop. During acquisition there must never be an empty committed stream.
-6. Force replacement acquisition to fail. Confirm the existing preview and its track identities remain live, the panel reports that settings were unchanged, and the failed candidate is cleaned up.
-7. Confirm Apply/Discard and overlay close handle pending choices correctly: Discard restores applied values; close warns, and declining preserves the panel and draft. Capture changes are unavailable while recording or while AI is starting/live.
-8. In Character mode enter unique prompt text and toggle enhancement. Switch to Try-On while idle and enter different values. Switch back and forth; each mode's text/enhancement draft must return unchanged.
-9. Add a reference image, then switch modes. Confirm the warning says text is kept and the reference is removed; declining keeps the mode and image. Accepting revokes the departing preview and never carries the file to the other mode.
-10. Reload and confirm active mode drafts are gone while saved Recipe Shelf text remains. Inspect storage again: no active prompt draft, image/file URL, device id, recording, or voice selection is durable.
+6. On macOS, expose a nearby iPhone through Continuity Camera. Confirm its browser-provided label
+   appears beside the built-in and other connected cameras without a custom network/proximity
+   request. Selecting it and applying settings must switch the persistent preview while the panel
+   stays open.
+7. Disconnect the selected iPhone. Confirm `devicechange` refreshes the list, the phone is not
+   replaced by a fake disabled option, and a dismissible default-camera notice appears. Stop and
+   restart local preview; confirm the browser default is used safely while the preferred ID remains
+   session-only. Reconnect and Refresh; confirm the phone returns without automatic selection.
+8. Repeat with any Android/third-party phone webcam exposed by the operating system. Confirm the app
+   treats it as a normal `videoinput` and shows no Apple-specific support claim.
+9. Force replacement acquisition to fail. Confirm the existing preview and its track identities remain live, the panel reports that settings were unchanged, and the failed candidate is cleaned up.
+10. Confirm Apply/Discard and overlay close handle pending choices correctly: Discard restores applied values; close warns, and declining preserves the panel and draft. Capture changes are unavailable while recording or while AI is starting/live.
+11. In Character mode enter unique prompt text and toggle enhancement. Switch to Try-On while idle and enter different values. Switch back and forth; each mode's text/enhancement draft must return unchanged.
+12. Add a reference image, then switch modes. Confirm the warning says text is kept and the reference is removed; declining keeps the mode and image. Accepting revokes the departing preview and never carries the file to the other mode.
+13. Reload and confirm active mode drafts are gone while saved Recipe Shelf text remains. Inspect storage again: no active prompt draft, image/file URL, device id, recording, or voice selection is durable.
 
 ## Permission and device failures
 

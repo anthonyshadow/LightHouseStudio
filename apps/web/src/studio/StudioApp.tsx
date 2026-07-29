@@ -596,7 +596,6 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
                 : aiSessionActive
                   ? { disabledReason: 'Stop AI before changing camera or microphone sources.' }
                   : {})}
-            onApplied={closeOverlay}
           />
         </OverlayPanel>
 

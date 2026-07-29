@@ -37,6 +37,17 @@ export type StudioSessionWithCapturePreferences = StudioSessionController & {
   capturePreferences: CapturePreferencesController;
 };
 
+const canFallbackFromSelectedCamera = (error: unknown): boolean => {
+  if (typeof error !== 'object' || error === null || !('name' in error)) return false;
+  return [
+    'NotFoundError',
+    'DevicesNotFoundError',
+    'NotReadableError',
+    'TrackStartError',
+    'OverconstrainedError',
+  ].includes(String(error.name));
+};
+
 export const useStudioSession = ({
   availability,
   realtimeSessionProfile,
@@ -151,11 +162,31 @@ export const useStudioSession = ({
     stream: localStream,
     onApply: applyCapturePreferences,
   });
+  const { effectiveApplied: effectiveCapturePreferences, reportVideoDeviceUnavailable } =
+    capturePreferences;
+
+  const ensureMediaWithCameraFallback = useCallback(
+    async (requirements: MediaRequirements, operation: number): Promise<MediaStream> => {
+      try {
+        return await ensureMedia(requirements, operation);
+      } catch (caught) {
+        if (!requirements.deviceId || !canFallbackFromSelectedCamera(caught)) throw caught;
+        reportVideoDeviceUnavailable(requirements.deviceId);
+        const fallbackRequirements = { ...requirements };
+        delete fallbackRequirements.deviceId;
+        return ensureMedia(fallbackRequirements, operation);
+      }
+    },
+    [ensureMedia, reportVideoDeviceUnavailable],
+  );
 
   const ensurePreferredMedia = useCallback(
     (requirements: MediaRequirements, operation: number) =>
-      ensureMedia(withCaptureDevices(requirements, capturePreferences.applied), operation),
-    [capturePreferences.applied, ensureMedia],
+      ensureMediaWithCameraFallback(
+        withCaptureDevices(requirements, effectiveCapturePreferences),
+        operation,
+      ),
+    [effectiveCapturePreferences, ensureMediaWithCameraFallback],
   );
 
   const {
@@ -192,7 +223,7 @@ export const useStudioSession = ({
       setError(null);
       setLifecycle('requesting-media');
       try {
-        const stream = await ensureMedia(requirements, operation);
+        const stream = await ensureMediaWithCameraFallback(requirements, operation);
         if (operationRef.current !== operation) return null;
         setLifecycle('ready');
         return stream;
@@ -206,7 +237,7 @@ export const useStudioSession = ({
         return null;
       }
     },
-    [ensureMedia],
+    [ensureMediaWithCameraFallback],
   );
 
   const startLocal = useCallback(async () => {
@@ -216,11 +247,11 @@ export const useStudioSession = ({
     setApplied(null);
     await beginMedia(
       withCaptureDevices(
-        localMediaRequirements(capturePreferences.applied.profile),
-        capturePreferences.applied,
+        localMediaRequirements(effectiveCapturePreferences.profile),
+        effectiveCapturePreferences,
       ),
     );
-  }, [beginMedia, capturePreferences.applied, disconnectRealtime, setApplied]);
+  }, [beginMedia, disconnectRealtime, effectiveCapturePreferences, setApplied]);
 
   const stopModel = useCallback(async () => {
     setLifecycle('stopping-ai');

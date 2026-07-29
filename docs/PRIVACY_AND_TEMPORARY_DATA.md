@@ -112,7 +112,12 @@ Selecting and starting Local Camera does not:
 
 The page does call the local `/api/capabilities` broker endpoint to render integration availability. That endpoint reads server configuration and does not contact Decart, OpenAI, BFL, Wiro, or ElevenLabs. Local voice effects use Web Audio and local remuxing only.
 
-Opening Capture Settings may enumerate browser-visible input devices, but it does not call `getUserMedia`. Device ids, device labels, and the selected quality target remain in React memory and are not added to Recipe Shelf storage.
+Opening Capture Settings may enumerate browser-visible input devices and read permission state, but
+it does not call `getUserMedia` or prompt for permission. Device ids, device labels, and the
+selected quality target remain in React memory and are not added to Recipe Shelf storage. A
+preferred device can therefore survive settings closure and camera stop/start in the same tab, but
+not reload. If that device disappears, the app retains the in-memory preference while using the
+browser default for a later explicit start.
 
 ## Recording retention and temporary artifacts
 

@@ -3,6 +3,7 @@ import type {
   RecordingLifecycleStatus,
 } from '@studio/domain';
 import type { StudioMode } from '../../application/types';
+import type { CameraPermissionState } from '../../adapters/browser-media/browserMedia';
 import type {
   CaptureDeviceOption,
   CapturePreferences,
@@ -83,11 +84,14 @@ export type CaptureDeviceState = 'idle' | 'loading' | 'ready' | 'error';
 export type CapturePreferencesController = {
   draft: CapturePreferences;
   applied: CapturePreferences;
+  effectiveApplied: CapturePreferences;
   cameraDevices: CaptureDeviceOption[];
   microphoneDevices: CaptureDeviceOption[];
   supportedProfiles: LocalCaptureProfileId[];
   devicesState: CaptureDeviceState;
+  cameraPermissionState: CameraPermissionState;
   deviceError: string | null;
+  videoFallbackNotice: string | null;
   applyError: string | null;
   applying: boolean;
   hasPendingChanges: boolean;
@@ -96,6 +100,8 @@ export type CapturePreferencesController = {
   updateVideoDeviceId: (deviceId: string | null) => void;
   updateAudioDeviceId: (deviceId: string | null) => void;
   updateProfile: (profile: LocalCaptureProfileId) => void;
+  reportVideoDeviceUnavailable: (deviceId: string) => void;
+  dismissVideoFallbackNotice: () => void;
   apply: () => Promise<boolean>;
   discardPending: () => void;
 };

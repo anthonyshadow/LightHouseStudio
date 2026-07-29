@@ -37,6 +37,8 @@ vi.mock('../../adapters/api-client/apiClient', () => {
 vi.mock('../../adapters/browser-media/browserMedia', () => ({
   acquireLocalMedia: adapters.acquireLocalMedia,
   enumerateMediaDevices: vi.fn().mockResolvedValue([]),
+  readCameraPermissionState: vi.fn().mockResolvedValue('unknown'),
+  subscribeToMediaDeviceChanges: vi.fn(() => () => undefined),
   supportsLocal1080pProfile: () => true,
   readCaptureStreamSettings: () => ({ video: null, audio: null }),
   withCaptureDevices: (
@@ -175,6 +177,44 @@ describe('useStudioSession explicit-start boundaries', () => {
       deviceId: 'camera-2',
       audioDeviceId: 'microphone-2',
     });
+    unmount();
+  });
+
+  it('falls back once to the default camera when a preferred camera disappeared', async () => {
+    const fallbackStream = fakeStream();
+    adapters.acquireLocalMedia
+      .mockRejectedValueOnce(new DOMException('Selected camera disappeared.', 'NotFoundError'))
+      .mockResolvedValueOnce(fallbackStream);
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    act(() => result.current.capturePreferences.updateVideoDeviceId('phone-camera'));
+    await act(async () => {
+      await result.current.capturePreferences.apply();
+    });
+    await act(async () => {
+      await result.current.startLocal();
+    });
+
+    expect(adapters.acquireLocalMedia).toHaveBeenNthCalledWith(1, {
+      width: 1_280,
+      height: 720,
+      frameRate: 30,
+      deviceId: 'phone-camera',
+    });
+    expect(adapters.acquireLocalMedia).toHaveBeenNthCalledWith(2, {
+      width: 1_280,
+      height: 720,
+      frameRate: 30,
+    });
+    expect(result.current.localStream).toBe(fallbackStream);
+    expect(result.current.lifecycle).toBe('ready');
+    expect(result.current.capturePreferences.applied.videoDeviceId).toBe('phone-camera');
+    expect(result.current.capturePreferences.effectiveApplied.videoDeviceId).toBeNull();
+    expect(result.current.capturePreferences.videoFallbackNotice).toMatch(/default camera/i);
     unmount();
   });
 

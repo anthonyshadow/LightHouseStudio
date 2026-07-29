@@ -13,7 +13,6 @@ export type CaptureSettingsPanelProps = {
   mode: StudioMode;
   disabled?: boolean;
   disabledReason?: string;
-  onApplied?: () => void;
 };
 
 const panelStyles = (theme: Theme): CSSObject => ({
@@ -63,6 +62,58 @@ const settingsGroupStyles = (theme: Theme): CSSObject => ({
   border: `1px solid ${theme.colors.border}`,
   borderRadius: theme.radii.medium,
   background: theme.colors.surfaceSoft,
+});
+
+const cameraSectionStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  gap: theme.space.sm,
+});
+
+const noticeActionStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: theme.space.sm,
+  '& button': {
+    minHeight: '2.75rem',
+  },
+});
+
+const helpStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  borderBlockStart: `1px solid ${theme.colors.border}`,
+  paddingBlockStart: theme.space.sm,
+  color: theme.colors.textMuted,
+  fontSize: theme.fontSizes.metadata,
+  lineHeight: 1.5,
+  '& summary': {
+    minHeight: '2.75rem',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: theme.space.sm,
+    color: theme.colors.text,
+    cursor: 'pointer',
+    fontWeight: 720,
+  },
+  '& summary::after': {
+    content: '"›"',
+    fontSize: '1.25rem',
+    lineHeight: 1,
+    transform: 'rotate(90deg)',
+  },
+  '&[open] summary::after': {
+    transform: 'rotate(-90deg)',
+  },
+  '& p': { margin: `${theme.space.xs} 0 0` },
+  '& ol': {
+    display: 'grid',
+    gap: theme.space.xs,
+    margin: `${theme.space.sm} 0 0`,
+    paddingInlineStart: '1.35rem',
+  },
 });
 
 const actualSettingsStyles = (theme: Theme): CSSObject => ({
@@ -116,6 +167,14 @@ const selectedDeviceAvailable = (
   options: CaptureDeviceOption[],
 ): boolean => !selected || options.some((option) => option.deviceId === selected);
 
+const looksLikePhoneCamera = (label: string): boolean =>
+  /\b(?:continuity camera|iphone camera|android phone camera|phone camera)\b/iu.test(label);
+
+const isMacDesktop = (): boolean =>
+  typeof navigator !== 'undefined' &&
+  /Mac/iu.test(navigator.platform) &&
+  navigator.maxTouchPoints < 2;
+
 const resolutionLabel = (
   settings: CapturePreferencesController['actualSettings']['video'],
 ): string => {
@@ -130,7 +189,6 @@ export const CaptureSettingsPanel = ({
   mode,
   disabled = false,
   disabledReason,
-  onApplied,
 }: CaptureSettingsPanelProps) => {
   const theme = useTheme();
   const localMode = mode === 'local';
@@ -144,7 +202,7 @@ export const CaptureSettingsPanel = ({
   const submit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (disabled) return;
-    if (await controller.apply()) onApplied?.();
+    await controller.apply();
   };
 
   const cameraSelectionAvailable = selectedDeviceAvailable(
@@ -155,6 +213,10 @@ export const CaptureSettingsPanel = ({
     controller.draft.audioDeviceId,
     controller.microphoneDevices,
   );
+  const phoneCameraVisible = controller.cameraDevices.some(({ label }) =>
+    looksLikePhoneCamera(label),
+  );
+  const showMacContinuityHelp = isMacDesktop();
 
   return (
     <form css={panelStyles(theme)} onSubmit={(event) => void submit(event)}>
@@ -182,29 +244,92 @@ export const CaptureSettingsPanel = ({
             {controller.applyError}
           </StatusNotice>
         ) : null}
+        {controller.videoFallbackNotice ? (
+          <StatusNotice tone="warning" role="status" title="Using the default camera">
+            <div css={noticeActionStyles(theme)}>
+              <span>{controller.videoFallbackNotice}</span>
+              <Button
+                type="button"
+                size="small"
+                variant="quiet"
+                aria-label="Dismiss unavailable camera notice"
+                onClick={controller.dismissVideoFallbackNotice}
+              >
+                Dismiss
+              </Button>
+            </div>
+          </StatusNotice>
+        ) : null}
 
         <div css={settingsGroupStyles(theme)}>
-          <SelectField
-            label="Camera"
-            value={controller.draft.videoDeviceId ?? ''}
-            disabled={controlsDisabled}
-            hint={
-              controller.devicesState === 'loading'
-                ? 'Looking for available cameras…'
-                : 'Labels may remain generic until camera permission is granted.'
-            }
-            onChange={(event) => controller.updateVideoDeviceId(event.currentTarget.value || null)}
-          >
-            <option value="">Default camera</option>
-            {!cameraSelectionAvailable && controller.draft.videoDeviceId ? (
-              <option value={controller.draft.videoDeviceId}>Selected camera (unavailable)</option>
+          <section aria-label="Camera settings" css={cameraSectionStyles(theme)}>
+            <SelectField
+              label="Camera"
+              value={controller.draft.videoDeviceId ?? ''}
+              disabled={controlsDisabled}
+              hint={
+                controller.devicesState === 'loading'
+                  ? 'Looking for available cameras…'
+                  : 'Every camera exposed by the browser appears here. Labels may remain generic until permission is granted.'
+              }
+              onChange={(event) =>
+                controller.updateVideoDeviceId(event.currentTarget.value || null)
+              }
+            >
+              <option value="">Default camera</option>
+              {!cameraSelectionAvailable && controller.draft.videoDeviceId ? (
+                <option value={controller.draft.videoDeviceId}>
+                  Selected camera (unavailable)
+                </option>
+              ) : null}
+              {controller.cameraDevices.map((device) => (
+                <option key={device.deviceId} value={device.deviceId}>
+                  {device.label}
+                </option>
+              ))}
+            </SelectField>
+
+            {controller.cameraPermissionState === 'denied' ? (
+              <StatusNotice tone="warning" role="status" title="Camera permission blocked">
+                Allow camera access in browser or system settings, then select Refresh. Opening this
+                panel never requests permission.
+              </StatusNotice>
+            ) : controller.cameraPermissionState === 'prompt' ? (
+              <StatusNotice tone="neutral" role="status" title="Camera permission not granted">
+                Camera access is requested only after an explicit Start action. Device names may be
+                generic until then.
+              </StatusNotice>
             ) : null}
-            {controller.cameraDevices.map((device) => (
-              <option key={device.deviceId} value={device.deviceId}>
-                {device.label}
-              </option>
-            ))}
-          </SelectField>
+
+            {controller.devicesState === 'ready' && controller.cameraDevices.length === 0 ? (
+              <StatusNotice tone="warning" role="status" title="No camera available">
+                No camera is currently exposed to this browser. Connect or enable a camera, review
+                permission, then select Refresh.
+              </StatusNotice>
+            ) : null}
+
+            {!phoneCameraVisible ? (
+              <details css={helpStyles(theme)}>
+                <summary>Use a phone as a camera</summary>
+                <p>Your phone will appear here when your computer exposes it as a camera.</p>
+                {showMacContinuityHelp ? (
+                  <ol>
+                    <li>
+                      On iPhone, enable Settings → General → AirPlay &amp; Continuity → Continuity
+                      Camera.
+                    </li>
+                    <li>
+                      Confirm the Mac and iPhone use the same Apple Account with two-factor
+                      authentication.
+                    </li>
+                    <li>Enable Bluetooth and Wi-Fi on both devices and keep them nearby.</li>
+                    <li>Lock and position the iPhone with its rear camera facing you.</li>
+                    <li>Use USB if the wireless connection is unavailable or unstable.</li>
+                  </ol>
+                ) : null}
+              </details>
+            ) : null}
+          </section>
 
           <SelectField
             label="Microphone"
@@ -277,6 +402,7 @@ export const CaptureSettingsPanel = ({
 
       <footer css={footerStyles(theme)}>
         <Button
+          type="button"
           size="small"
           variant="quiet"
           aria-label="Refresh media devices"
@@ -287,6 +413,7 @@ export const CaptureSettingsPanel = ({
           Refresh
         </Button>
         <Button
+          type="button"
           size="small"
           variant="quiet"
           aria-label="Discard capture setting changes"
