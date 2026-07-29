@@ -308,6 +308,55 @@ test('touch recovers timed-out live and playback controls while recording Stop n
   expectNoExternalProviderTraffic(network);
 });
 
+test('the independent recording maximum warns and safely opens take review', async ({ page }) => {
+  await page.clock.install({ time: new Date('2026-07-28T12:00:00.000Z') });
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+
+  const controls = page.getByLabel('Studio session controls');
+  await controls.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+  await controls.getByRole('button', { name: 'Record' }).click();
+
+  await page.clock.fastForward(270_000);
+  await expect(
+    page.getByRole('status', { name: 'Recording ends in 30 seconds or less' }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole('timer', {
+      name: 'Recording elapsed time 4:30, maximum 5:00, 0:30 remaining',
+    }),
+  ).toHaveAttribute('data-recording-duration-status', 'warning');
+
+  await page.clock.fastForward(30_000);
+  await expect(page.getByLabel('Recorded take playback')).toBeVisible();
+  await expect(
+    page.getByRole('status', { name: 'Recording ended at the 5:00 maximum' }),
+  ).toBeVisible();
+  const takeControls = controls.getByRole('group', { name: 'Recorded take controls' });
+  await expect(takeControls.getByRole('link', { name: 'Download' })).toBeVisible();
+  await expect(takeControls.getByRole('button', { name: 'Discard' })).toBeVisible();
+  await expect(takeControls.getByRole('button', { name: 'Voice' })).toBeVisible();
+  await expect(takeControls.getByRole('button', { name: 'Close' })).toBeVisible();
+
+  const browser = await readBrowserState(page);
+  expect(browser.recorderStarts).toBe(2);
+  expect(browser.recorderStops).toBe(2);
+  const finalizationIndexes = browser.lifecycleEvents.flatMap((event, index) =>
+    event === 'recorder-finalized' ? [index] : [],
+  );
+  const releaseIndexes = browser.lifecycleEvents.flatMap((event, index) =>
+    event === 'local-video-stopped' || event === 'local-audio-stopped' ? [index] : [],
+  );
+  expect(finalizationIndexes).toHaveLength(2);
+  expect(releaseIndexes.length).toBeGreaterThan(0);
+  expect(
+    Math.min(...releaseIndexes),
+    `lifecycle order: ${browser.lifecycleEvents.join(', ')}`,
+  ).toBeGreaterThan(Math.max(...finalizationIndexes));
+  expectNoExternalProviderTraffic(network);
+});
+
 test('persistent controls preserve local media across VTON choice, AI stop, track toggles, and full shutdown', async ({
   page,
 }) => {

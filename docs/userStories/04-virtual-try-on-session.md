@@ -23,7 +23,9 @@ As a creator, I want to preview a Lucy VTON 3 garment transformation, so that I 
    track exists, recording stays unavailable and local fallback is retained. After connection, the
    stage shows the authoritative **5:00 maximum** and elapsed/remaining time.
 8. Update garment text, image, or enhancement as needed. Select **Apply changes** to commit the complete draft, or **Revert draft** to restore the current applied snapshot.
-9. Use **Change**, **Stop AI**, or Dock **Reset AI** deliberately. To capture the result, select **Record**, then **Stop recording**, and complete take review.
+9. Use **Change**, **Stop AI**, or Dock **Reset AI** deliberately. To capture the result, select
+   **Record**, then **Stop recording**, and complete take review. Recording announces its own final
+   30 seconds at 4:30 and auto-finalizes at 5:00 independently of the Decart session clock.
 10. At 30 seconds remaining, read the accessible **AI session ending soon** warning. Expected
     completion preserves the current garment recipe and local preview; an active take finalizes
     before provider/local resources release.
@@ -40,6 +42,8 @@ the draft is valid. The implementation model ID remains `lucy-vton-3`.
 - If provider video fails, ends, or disconnects, return to the local preview and retry/stop deliberately.
 - An expected maximum-duration completion is shown as completion, not as a provider crash. An early
   generation end remains a distinct safe recovery state.
+- If the recording cap and provider/source completion coincide, Stop coalesces and the take
+  finalizes once before AI/local resources release.
 
 ## Completion criteria
 

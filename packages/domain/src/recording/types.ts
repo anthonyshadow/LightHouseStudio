@@ -4,6 +4,17 @@ import type { SessionModeId } from '../session';
 export type RecordingLifecycleStatus =
   'idle' | 'ready' | 'recording' | 'stopping' | 'recorded' | 'error';
 
+export type RecordingDurationStatus = 'active' | 'warning' | 'limit-reached';
+
+export type RecordingDurationTiming = Readonly<{
+  status: RecordingDurationStatus;
+  maximumSeconds: number;
+  warningThresholdSeconds: number;
+  elapsedSeconds: number;
+  remainingSeconds: number;
+  warning: boolean;
+}>;
+
 export interface RecordingArtifact<TMedia = unknown> {
   readonly id: string;
   /** Browser adapters may specialize this generic as Blob; the domain never inspects it. */

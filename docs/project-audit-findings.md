@@ -122,6 +122,11 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
   ElevenLabs processing, and cleanup on every claimed physical target before publishing support.
   Do not silently discard chunks or treat the numerically equal Decart/ElevenLabs limits as the
   recording policy's technical source.
+- **Implementation status (2026-07-28):** the independent domain policy, 270-second accessible
+  warning, 300-second coalesced Stop/finalize path, completion explanation, and deterministic
+  Local/Character/VTO race/failure/cleanup coverage are implemented. Named physical target memory,
+  codec, processing, interruption, download, and cleanup measurements remain open, so
+  `PERF-001`/`TEST-005` are not complete release evidence.
 - **Dependencies:** Final pilot device/browser matrix.
 - **Regression risk:** Medium for the runtime cap; none for evidence collection.
 

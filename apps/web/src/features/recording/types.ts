@@ -126,11 +126,16 @@ export type RecordingController = {
 };
 
 export type AutomaticRecordingStopReason =
-  'source-ended' | 'recorder-error' | 'recorder-stopped' | 'finalization-timeout';
+  | 'maximum-duration'
+  | 'source-ended'
+  | 'recorder-error'
+  | 'recorder-stopped'
+  | 'finalization-timeout';
 
 export type AutomaticRecordingStopEvent = {
   mode: StudioMode;
   reason: AutomaticRecordingStopReason;
+  artifactId?: string;
 };
 
 export type UseRecordingOptions = {

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { useTheme } from '@emotion/react';
+import { getRecordingDurationTiming } from '@studio/domain';
 import { formatDuration } from '../recording/recordingHelpers';
 import {
   type RealtimeSessionTiming,
@@ -479,7 +480,12 @@ export const MediaStage = ({
           : presentation.kind === 'live' && !hasVisibleMedia
             ? 'Camera unavailable'
             : lifecycleLabel(lifecycle, mode, experienceLabel);
-  const statusToneResolved = recording ? 'recording' : statusTone;
+  const recordingDurationTiming = getRecordingDurationTiming(recordingSeconds);
+  const statusToneResolved = recording
+    ? recordingDurationTiming.warning
+      ? 'warning'
+      : 'recording'
+    : statusTone;
   const aiStarting =
     mode !== 'local' && ['requesting-media', 'requesting-token', 'connecting'].includes(lifecycle);
   const resolvedStageControlsVisible =
@@ -575,9 +581,16 @@ export const MediaStage = ({
             role={recording ? 'timer' : 'status'}
             aria-live={recording ? 'off' : 'polite'}
             aria-label={
-              recording ? `Recording elapsed time ${formatDuration(recordingSeconds)}` : statusLabel
+              recording
+                ? `Recording elapsed time ${formatDuration(
+                    recordingDurationTiming.elapsedSeconds,
+                  )}, maximum ${formatDuration(
+                    recordingDurationTiming.maximumSeconds,
+                  )}, ${formatDuration(recordingDurationTiming.remainingSeconds)} remaining`
+                : statusLabel
             }
             css={badgeStyles(theme, statusToneResolved)}
+            data-recording-duration-status={recording ? recordingDurationTiming.status : undefined}
           >
             <span css={statusDotStyles(theme, statusToneResolved)} aria-hidden="true" />
             <span>{statusLabel}</span>

@@ -5,6 +5,7 @@ import {
   createSafeError,
   failRecordingLifecycle,
   prepareRecordingLifecycle,
+  RECORDING_MAXIMUM_SECONDS,
   startRecordingLifecycle,
   stopRecordingLifecycle,
   type RecordingLifecycle as DomainRecordingLifecycle,
@@ -74,6 +75,7 @@ export const useRecording = ({
   const stopPromiseRef = useRef<Promise<RecordingArtifact | null> | null>(null);
   const stopResolverRef = useRef<((artifact: RecordingArtifact | null) => void) | null>(null);
   const stopTimerRef = useRef<number | null>(null);
+  const durationLimitTimerRef = useRef<number | null>(null);
   const mainStoppedAtRef = useRef<number | null>(null);
   const disposedRef = useRef(false);
   const automaticStopCallbackRef = useRef(onAutomaticStop);
@@ -89,17 +91,28 @@ export const useRecording = ({
     [],
   );
 
-  const notifyAutomaticStop = useCallback((attempt: RecordingAttempt) => {
+  const notifyAutomaticStop = useCallback((attempt: RecordingAttempt, artifactId?: string) => {
     const reason = attempt.automaticStopReason;
     if (!reason) return;
     attempt.automaticStopReason = null;
-    automaticStopCallbackRef.current?.({ mode: attempt.mode, reason });
+    queueMicrotask(() => {
+      if (disposedRef.current) return;
+      automaticStopCallbackRef.current?.({
+        mode: attempt.mode,
+        reason,
+        ...(reason === 'maximum-duration' && artifactId ? { artifactId } : {}),
+      });
+    });
   }, []);
 
   const resolveStop = useCallback((artifact: RecordingArtifact | null) => {
     if (stopTimerRef.current !== null) {
       window.clearTimeout(stopTimerRef.current);
       stopTimerRef.current = null;
+    }
+    if (durationLimitTimerRef.current !== null) {
+      window.clearTimeout(durationLimitTimerRef.current);
+      durationLimitTimerRef.current = null;
     }
     stopResolverRef.current?.(artifact);
     stopResolverRef.current = null;
@@ -207,7 +220,7 @@ export const useRecording = ({
         );
       }
 
-      notifyAutomaticStop(attempt);
+      notifyAutomaticStop(attempt, artifact.id);
       resolveStop(artifact);
     },
     [artifacts, failAttempt, notifyAutomaticStop, resolveStop],
@@ -408,6 +421,14 @@ export const useRecording = ({
           attempt.startedAt.toISOString(),
         );
         setLifecycle(domainLifecycleRef.current.status);
+        durationLimitTimerRef.current = window.setTimeout(() => {
+          if (disposedRef.current || attemptRef.current !== attempt || attempt.stopRequested) {
+            return;
+          }
+          setElapsedSeconds(RECORDING_MAXIMUM_SECONDS);
+          markAutomaticStop(attempt, 'maximum-duration');
+          void stop();
+        }, RECORDING_MAXIMUM_SECONDS * 1_000);
       } catch {
         pendingMetadataRef.current = null;
         cleanupRecordingAttempt(attempt);
@@ -486,6 +507,10 @@ export const useRecording = ({
       stopRecorderBestEffort(attempt?.mainRecorder ?? null);
       stopRecorderBestEffort(attempt?.sidecarRecorder ?? null);
       if (stopTimerRef.current !== null) window.clearTimeout(stopTimerRef.current);
+      if (durationLimitTimerRef.current !== null) {
+        window.clearTimeout(durationLimitTimerRef.current);
+        durationLimitTimerRef.current = null;
+      }
       resolveStop(null);
     };
   }, [resolveStop]);

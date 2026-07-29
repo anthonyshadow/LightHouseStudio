@@ -28,7 +28,9 @@ As a creator, I want to turn my live camera into a Lucy 2.5 character performanc
 7. Open the Recipe Dock to refine the recipe. The Dock displays **Changes are pending**; no live state changes yet.
 8. Select **Apply changes** to send prompt, image (or explicit image clear), and enhancement setting as one snapshot. Or select **Revert draft** to restore the last applied snapshot.
 9. Use **Change** to return to experience choice, **Stop AI** to release the provider while retaining local media and the draft, or **Reset AI** in the Dock to clear prompt, ephemeral image, and applied state.
-10. To capture transformed video, select **Record**, then **Stop recording**, and follow [Take review and cleanup](07-take-review-and-cleanup.md).
+10. To capture transformed video, select **Record**, then **Stop recording**, and follow [Take
+    review and cleanup](07-take-review-and-cleanup.md). Recording announces its own final 30 seconds
+    at 4:30 and auto-finalizes at 5:00 independently of the Decart session clock.
 11. At 30 seconds remaining, read the accessible **AI session ending soon** warning. Expected
     completion returns to local preview with the current recipe intact. If a take is active, Studio
     finalizes it before releasing AI/local resources and opens recorded playback.
@@ -46,6 +48,8 @@ ends usage after any active recording finalizes.
 - On disconnect, unusable video, or audio-only output, the stage announces **AI disconnected — local fallback** and retains local preview rather than becoming blank.
 - An early generation end is reported separately from the expected five-minute completion; raw
   provider reasons/codes are never shown.
+- If the recording cap and provider/source completion coincide, Stop coalesces and the take
+  finalizes once before AI/local resources release.
 - A ready local preview remains reusable across mode and recipe changes. Mode, capture-source, and cross-model changes lock while AI is starting/live, during recording, or while a take is under review.
 
 ## Completion criteria

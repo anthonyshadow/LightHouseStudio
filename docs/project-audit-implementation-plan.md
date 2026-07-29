@@ -224,6 +224,13 @@ touch/mobile matrix.
 
 **Findings:** `PERF-001`, `TEST-005`
 
+**Implementation status (2026-07-28):** the runtime and deterministic automated portion is
+implemented: the independent 270/300-second policy, accessible warning, coalesced automatic Stop,
+main-authoritative sidecar handling, finalization-before-release ordering, completion explanation,
+and Local/Character/VTO cap races are covered. The phase remains active because every named
+physical target still needs the required 1-/5-minute memory, codec, local/ElevenLabs processing,
+background/foreground, download, and cleanup record.
+
 | Field          | Plan                                                                                                                                                                                                                                  |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Scope          | Accessible pre-limit warning; safe automatic Stop/finalization at 300 seconds; physical device/codec measurement table; 1- and 5-minute finalization/local/ElevenLabs-processing/cleanup peaks; background/foreground cleanup checks. |

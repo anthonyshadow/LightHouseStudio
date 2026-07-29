@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { deriveStageNotices } from '../features/live-stage';
-import { deriveStudioStageNotices } from './studioStageNotices';
+import { deriveRecordingDurationNotices, deriveStudioStageNotices } from './studioStageNotices';
 
 const callbacks = () => ({
   onRetryProviderAvailability: vi.fn(),
@@ -118,5 +118,77 @@ describe('deriveStudioStageNotices', () => {
     notice?.action?.onAction();
     expect(handlers.onOpenCaptureSettings).toHaveBeenCalledOnce();
     expect(handlers.onClearSessionError).not.toHaveBeenCalled();
+  });
+});
+
+describe('deriveRecordingDurationNotices', () => {
+  it('announces the independent recording warning at 270 seconds', () => {
+    expect(
+      deriveRecordingDurationNotices({
+        lifecycle: 'recording',
+        elapsedSeconds: 269,
+        automaticStopEvent: null,
+        playableTakeId: null,
+      }),
+    ).toEqual([]);
+
+    expect(
+      deriveRecordingDurationNotices({
+        lifecycle: 'recording',
+        elapsedSeconds: 270,
+        automaticStopEvent: null,
+        playableTakeId: null,
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        id: 'recording-duration-warning',
+        severity: 'warning',
+        title: 'Recording ends in 30 seconds or less',
+      }),
+    ]);
+  });
+
+  it('explains a safely finalized maximum-duration take without masking failures', () => {
+    expect(
+      deriveRecordingDurationNotices({
+        lifecycle: 'recorded',
+        elapsedSeconds: 300,
+        automaticStopEvent: {
+          mode: 'lucy-vton-3',
+          reason: 'maximum-duration',
+          artifactId: 'take-at-maximum',
+        },
+        playableTakeId: 'take-at-maximum',
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        id: 'recording-duration-complete',
+        title: 'Recording ended at the 5:00 maximum',
+      }),
+    ]);
+
+    expect(
+      deriveRecordingDurationNotices({
+        lifecycle: 'error',
+        elapsedSeconds: 300,
+        automaticStopEvent: { mode: 'local', reason: 'maximum-duration' },
+        playableTakeId: null,
+      }),
+    ).toEqual([]);
+  });
+
+  it('does not attach a stale maximum explanation to a different restored take', () => {
+    expect(
+      deriveRecordingDurationNotices({
+        lifecycle: 'recorded',
+        elapsedSeconds: 120,
+        automaticStopEvent: {
+          mode: 'local',
+          reason: 'maximum-duration',
+          artifactId: 'old-take',
+        },
+        playableTakeId: 'restored-take',
+      }),
+    ).toEqual([]);
   });
 });

@@ -424,11 +424,28 @@ describe('MediaStage', () => {
       }),
     );
 
-    expect(screen.getByRole('timer', { name: 'Recording elapsed time 1:05' })).toHaveAttribute(
-      'aria-live',
-      'off',
-    );
+    expect(
+      screen.getByRole('timer', {
+        name: 'Recording elapsed time 1:05, maximum 5:00, 3:55 remaining',
+      }),
+    ).toHaveAttribute('aria-live', 'off');
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
+  });
+
+  it('marks the recording timer as warning state at the independent pre-limit threshold', () => {
+    render(
+      stage({
+        lifecycle: 'ready',
+        recording: true,
+        recordingSeconds: 270,
+      }),
+    );
+
+    expect(
+      screen.getByRole('timer', {
+        name: 'Recording elapsed time 4:30, maximum 5:00, 0:30 remaining',
+      }),
+    ).toHaveAttribute('data-recording-duration-status', 'warning');
   });
 
   it('shows the independent AI maximum and remaining time while recording', () => {
@@ -447,7 +464,11 @@ describe('MediaStage', () => {
       }),
     );
 
-    expect(screen.getByRole('timer', { name: 'Recording elapsed time 1:05' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('timer', {
+        name: 'Recording elapsed time 1:05, maximum 5:00, 3:55 remaining',
+      }),
+    ).toBeInTheDocument();
     expect(
       screen.getByRole('timer', {
         name: 'AI session maximum 5:00, elapsed 4:30, 0:30 remaining',

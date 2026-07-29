@@ -9,6 +9,9 @@ import {
   createRecordingFilename,
   formatDuration,
   formatFileSize,
+  getRecordingDurationTiming,
+  RECORDING_MAXIMUM_SECONDS,
+  RECORDING_WARNING_THRESHOLD_SECONDS,
   selectRecordingMimeType,
   selectRecordingSource,
   shouldRevokeRecordingObjectUrl,
@@ -129,6 +132,43 @@ describe('recording lifecycle rules', () => {
       sizeBytes: 10,
     });
     expect(startAudioSidecar('attempt-2', false)).toEqual({ status: 'unavailable' });
+  });
+});
+
+describe('recording duration policy', () => {
+  it('owns the independent 270-second warning and 300-second recording maximum', () => {
+    expect(RECORDING_WARNING_THRESHOLD_SECONDS).toBe(270);
+    expect(RECORDING_MAXIMUM_SECONDS).toBe(300);
+    expect(getRecordingDurationTiming(269.99)).toEqual({
+      status: 'active',
+      maximumSeconds: 300,
+      warningThresholdSeconds: 270,
+      elapsedSeconds: 269,
+      remainingSeconds: 31,
+      warning: false,
+    });
+    expect(getRecordingDurationTiming(270)).toMatchObject({
+      status: 'warning',
+      elapsedSeconds: 270,
+      remainingSeconds: 30,
+      warning: true,
+    });
+    expect(getRecordingDurationTiming(300)).toMatchObject({
+      status: 'limit-reached',
+      elapsedSeconds: 300,
+      remainingSeconds: 0,
+      warning: false,
+    });
+  });
+
+  it('normalizes invalid and out-of-range elapsed values without extending the cap', () => {
+    expect(getRecordingDurationTiming(Number.NaN).elapsedSeconds).toBe(0);
+    expect(getRecordingDurationTiming(-1).elapsedSeconds).toBe(0);
+    expect(getRecordingDurationTiming(301)).toMatchObject({
+      status: 'limit-reached',
+      elapsedSeconds: 300,
+      remainingSeconds: 0,
+    });
   });
 });
 

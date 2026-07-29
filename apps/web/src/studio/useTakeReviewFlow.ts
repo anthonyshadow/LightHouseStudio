@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StagePresentation } from '../features/live-stage';
-import { hasSameRecordingTracks } from '../features/recording';
+import { hasSameRecordingTracks, type AutomaticRecordingStopEvent } from '../features/recording';
 import { useRecording, useRecordingSource } from '../orchestration/recording';
 import { type useStudioSession } from '../orchestration/session';
 import { useVoiceProcessing } from '../orchestration/voice-processing';
@@ -91,19 +91,25 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
   const [reviewReady, setReviewReady] = useState(false);
   const [finalizingStream, setFinalizingStream] = useState<MediaStream | null>(null);
   const [finalizingStartedAt, setFinalizingStartedAt] = useState<number | null>(null);
+  const [automaticRecordingStopEvent, setAutomaticRecordingStopEvent] =
+    useState<AutomaticRecordingStopEvent | null>(null);
   const finishPromiseRef = useRef<Promise<void> | null>(null);
 
   const automaticDisplayStream = session.displayStream;
   const automaticReviewRelease = session.releaseForRecordedReview;
-  const handleAutomaticRecordingStop = useCallback(() => {
-    setFinalizingStream((current) => current ?? automaticDisplayStream);
-    setFinalizingStartedAt((current) => current ?? Date.now());
-    void automaticReviewRelease().then(() => {
-      setFinalizingStream(null);
-      setFinalizingStartedAt(null);
-      setReviewReady(true);
-    });
-  }, [automaticDisplayStream, automaticReviewRelease]);
+  const handleAutomaticRecordingStop = useCallback(
+    (event: AutomaticRecordingStopEvent) => {
+      setAutomaticRecordingStopEvent(event);
+      setFinalizingStream((current) => current ?? automaticDisplayStream);
+      setFinalizingStartedAt((current) => current ?? Date.now());
+      void automaticReviewRelease().then(() => {
+        setFinalizingStream(null);
+        setFinalizingStartedAt(null);
+        setReviewReady(true);
+      });
+    },
+    [automaticDisplayStream, automaticReviewRelease],
+  );
 
   const recording = useRecording({ onAutomaticStop: handleAutomaticRecordingStop });
   const processing = useVoiceProcessing(recording);
@@ -130,6 +136,7 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
     setFinalizingStream(currentDisplayStream);
     setFinalizingStartedAt(Date.now());
     setReviewReady(false);
+    setAutomaticRecordingStopEvent(null);
 
     const finishPromise = finalizeTakeForReview({
       finalize: stopRecording,
@@ -212,6 +219,7 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
     recordingSource,
     finalizingStartedAt,
     finalizingStream,
+    automaticRecordingStopEvent,
     finishTake,
     stagePresentation,
   } as const;

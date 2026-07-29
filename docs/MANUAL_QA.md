@@ -16,8 +16,9 @@ cannot be signed off from responsive emulation alone.
 Character, VTO, local Voice, ElevenLabs, OpenAI, BFL, and Wiro are included in qualification; run
 image-provider checks in separate startup configurations, keep Wiro operator-only, and require
 confirmed zero-retention eligibility for participant ElevenLabs conversion. The approved take
-maximum is 300 seconds with a warning at 270 seconds, but the current recorder does not yet enforce
-it. After implementation, every named physical target must pass the warning, automatic
+maximum is 300 seconds with a warning at 270 seconds. The runtime enforces that independent
+recording boundary through its coalesced Stop/finalize path; every named physical target must still
+pass the warning, automatic
 Stop/finalization, playback, processing, download, background/foreground, and cleanup checks at
 that boundary.
 
@@ -136,8 +137,8 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 
 ## Recording and take safety
 
-- After the 300-second cap is implemented, exercise the warning threshold and let a take reach the
-  cap without manually selecting Stop. Confirm the app coalesces any concurrent Stop, finalizes the
+- Exercise the 270-second warning and let a take reach the 300-second cap without manually
+  selecting Stop. Confirm the app coalesces any concurrent Stop, finalizes the
   main recording and optional sidecar before releasing live/provider resources, publishes one
   playable original, reports why recording ended, and never silently drops chunks. Repeat locally
   and with Character/VTO on every named physical target; run local and ElevenLabs processing from

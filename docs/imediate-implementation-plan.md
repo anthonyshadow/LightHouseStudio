@@ -295,6 +295,13 @@ crash, and cleanup/local fallback remain deterministic.
 
 **Findings:** `PERF-001`, `UX-014`, `TEST-005`
 
+**Implementation status (2026-07-28):** runtime and deterministic automated work is implemented.
+The independent 270/300-second policy warns, coalesces automatic/manual/source Stop, preserves one
+main-authoritative original across sidecar and finalization races, explains maximum completion, and
+keeps release ordering intact for Local, Character, and VTO. Wave 4 remains open until the named
+physical matrix supplies the required memory, codec, processing, interruption, download, and
+cleanup evidence.
+
 Implement in this order:
 
 1. Add an app-owned 300-second maximum and accessible pre-limit warning to recording

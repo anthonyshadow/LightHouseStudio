@@ -2,7 +2,7 @@
 
 import { act, renderHook } from '@testing-library/react';
 import { StrictMode, type PropsWithChildren } from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RecordingArtifact, RecordingSource } from '../../features/recording/types';
 import { useRecording } from './useRecording';
 
@@ -62,11 +62,13 @@ const createSource = ({
 
 type RecorderHarness = {
   recorderConstructor: ReturnType<typeof vi.fn>;
+  recorderStop: ReturnType<typeof vi.fn>;
   streamConstructor: ReturnType<typeof vi.fn>;
 };
 
 const installRecorderHarness = ({
   defaultRecorderMime = 'video/webm',
+  duplicateStopEventCall,
   errorOnStartCall,
   failArtifactBlob = false,
   failRecorderCall,
@@ -79,6 +81,7 @@ const installRecorderHarness = ({
   unexpectedStopOnStartCall,
 }: {
   defaultRecorderMime?: string;
+  duplicateStopEventCall?: number;
   errorOnStartCall?: number;
   failArtifactBlob?: boolean;
   failRecorderCall?: number;
@@ -92,6 +95,7 @@ const installRecorderHarness = ({
 } = {}): RecorderHarness => {
   let recorderCalls = 0;
   const recorderConstructor = vi.fn();
+  const recorderStop = vi.fn();
   const streamConstructor = vi.fn();
 
   class FakeMediaStream {
@@ -166,6 +170,7 @@ const installRecorderHarness = ({
 
     stop(): void {
       if (this.state === 'inactive') return;
+      recorderStop(this.callIndex);
       if (this.callIndex === throwOnStopCall) throw new Error('recorder stop failed');
       this.state = 'inactive';
       if (this.callIndex === hangStopCall) return;
@@ -176,6 +181,9 @@ const installRecorderHarness = ({
           }),
         });
         this.emit('stop', { data: new NativeBlob() });
+        if (this.callIndex === duplicateStopEventCall) {
+          this.emit('stop', { data: new NativeBlob() });
+        }
       });
     }
 
@@ -205,11 +213,15 @@ const installRecorderHarness = ({
       : vi.fn().mockReturnValue('blob:recording'),
     revokeObjectURL: vi.fn(),
   });
-  return { recorderConstructor, streamConstructor };
+  return { recorderConstructor, recorderStop, streamConstructor };
 };
 
 beforeEach(() => {
   vi.clearAllMocks();
+});
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('useRecording recorder construction failures', () => {
@@ -743,6 +755,232 @@ describe('useRecording recorder construction failures', () => {
     expect(URL.revokeObjectURL).not.toHaveBeenCalled();
 
     unmount();
+  });
+
+  it.each([
+    ['Local', 'local'],
+    ['Character', 'lucy-2.5'],
+    ['VTO', 'lucy-vton-3'],
+  ] as const)(
+    'warns and safely auto-finalizes a %s source at the independent recording maximum',
+    async (_label, mode) => {
+      vi.useFakeTimers();
+      const harness = installRecorderHarness();
+      const onAutomaticStop = vi.fn();
+      const source = createSource({
+        videoSource: mode === 'local' ? 'local' : 'transformed',
+        audioSource: mode === 'local' ? 'microphone' : 'provider',
+      });
+      const videoTrack = source.stream.getVideoTracks()[0];
+      const audioTrack = source.stream.getAudioTracks()[0];
+      const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
+
+      await act(async () => {
+        await result.current.start(source, mode);
+      });
+
+      act(() => {
+        vi.advanceTimersByTime(270_000);
+      });
+      expect(result.current.lifecycle).toBe('recording');
+      expect(result.current.elapsedSeconds).toBe(270);
+      expect(onAutomaticStop).not.toHaveBeenCalled();
+
+      await act(async () => {
+        vi.advanceTimersByTime(30_000);
+        vi.runAllTicks();
+        await Promise.resolve();
+      });
+
+      expect(result.current.lifecycle).toBe('recorded');
+      expect(result.current.elapsedSeconds).toBe(300);
+      expect(result.current.original).toMatchObject({
+        sourceModeId: mode,
+        durationMs: 300_000,
+      });
+      expect(onAutomaticStop).toHaveBeenCalledOnce();
+      expect(onAutomaticStop).toHaveBeenCalledWith(
+        expect.objectContaining({
+          mode,
+          reason: 'maximum-duration',
+          artifactId: result.current.original?.id,
+        }),
+      );
+      expect(harness.recorderStop).toHaveBeenNthCalledWith(1, 2);
+      expect(harness.recorderStop).toHaveBeenNthCalledWith(2, 1);
+      expect(videoTrack?.stop).not.toHaveBeenCalled();
+      expect(audioTrack?.stop).not.toHaveBeenCalled();
+
+      unmount();
+    },
+  );
+
+  it('coalesces a manual Stop arriving with the cap into the same recorder finalization', async () => {
+    vi.useFakeTimers();
+    const harness = installRecorderHarness();
+    const onAutomaticStop = vi.fn();
+    const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
+
+    await act(async () => {
+      await result.current.start(createSource(), 'local');
+    });
+
+    let concurrentStop!: Promise<RecordingArtifact | null>;
+    await act(async () => {
+      vi.advanceTimersByTime(300_000);
+      concurrentStop = result.current.stop();
+      vi.runAllTicks();
+      await concurrentStop;
+    });
+
+    expect(result.current.lifecycle).toBe('recorded');
+    expect(harness.recorderStop).toHaveBeenNthCalledWith(1, 2);
+    expect(harness.recorderStop).toHaveBeenNthCalledWith(2, 1);
+    expect(onAutomaticStop).toHaveBeenCalledOnce();
+    expect(onAutomaticStop).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'local',
+        reason: 'maximum-duration',
+        artifactId: result.current.original?.id,
+      }),
+    );
+
+    unmount();
+  });
+
+  it('coalesces a source end at the cap and ignores a duplicate main-recorder stop event', async () => {
+    vi.useFakeTimers();
+    const harness = installRecorderHarness({ duplicateStopEventCall: 1 });
+    const onAutomaticStop = vi.fn();
+    const source = createSource({ videoSource: 'transformed', audioSource: 'provider' });
+    const videoTrack = source.stream.getVideoTracks()[0];
+    const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
+
+    await act(async () => {
+      await result.current.start(source, 'lucy-2.5');
+    });
+    const endedListener = (
+      videoTrack?.addEventListener as unknown as ReturnType<typeof vi.fn>
+    ).mock.calls.find(([type]) => type === 'ended')?.[1] as EventListener | undefined;
+
+    await act(async () => {
+      vi.advanceTimersByTime(300_000);
+      endedListener?.(new Event('ended'));
+      vi.runAllTicks();
+      await Promise.resolve();
+    });
+
+    expect(result.current.lifecycle).toBe('recorded');
+    expect(result.current.original?.durationMs).toBe(300_000);
+    expect(harness.recorderStop).toHaveBeenNthCalledWith(1, 2);
+    expect(harness.recorderStop).toHaveBeenNthCalledWith(2, 1);
+    expect(URL.createObjectURL).toHaveBeenCalledOnce();
+    expect(onAutomaticStop).toHaveBeenCalledOnce();
+    expect(onAutomaticStop).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'lucy-2.5',
+        reason: 'maximum-duration',
+        artifactId: result.current.original?.id,
+      }),
+    );
+
+    unmount();
+  });
+
+  it('preserves the capped main take when its optional sidecar finishes after the grace period', async () => {
+    vi.useFakeTimers();
+    installRecorderHarness({ hangStopCall: 2 });
+    const onAutomaticStop = vi.fn();
+    const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
+
+    await act(async () => {
+      await result.current.start(createSource(), 'lucy-2.5');
+      vi.advanceTimersByTime(300_000);
+      vi.runAllTicks();
+      await Promise.resolve();
+    });
+    expect(result.current.lifecycle).toBe('stopping');
+
+    await act(async () => {
+      vi.advanceTimersByTime(1_500);
+      await Promise.resolve();
+    });
+
+    expect(result.current.lifecycle).toBe('recorded');
+    expect(result.current.original?.durationMs).toBe(300_000);
+    expect(result.current.sidecar).toMatchObject({
+      state: 'error',
+      error: 'Audio sidecar did not finish; the video take was preserved.',
+    });
+    expect(onAutomaticStop).toHaveBeenCalledWith(
+      expect.objectContaining({
+        mode: 'lucy-2.5',
+        reason: 'maximum-duration',
+        artifactId: result.current.original?.id,
+      }),
+    );
+
+    unmount();
+  });
+
+  it('reports a capped finalization timeout and settles without publishing an incomplete take', async () => {
+    vi.useFakeTimers();
+    installRecorderHarness({ hangStopCall: 1 });
+    const onAutomaticStop = vi.fn();
+    const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
+
+    await act(async () => {
+      await result.current.start(createSource(), 'lucy-vton-3');
+      vi.advanceTimersByTime(300_000);
+      vi.runAllTicks();
+      await Promise.resolve();
+    });
+    expect(result.current.lifecycle).toBe('stopping');
+
+    await act(async () => {
+      vi.advanceTimersByTime(10_000);
+      await Promise.resolve();
+    });
+
+    expect(result.current.lifecycle).toBe('error');
+    expect(result.current.original).toBeNull();
+    expect(result.current.recordingError).toMatch(/did not finish the recording in time/i);
+    expect(onAutomaticStop).toHaveBeenCalledWith({
+      mode: 'lucy-vton-3',
+      reason: 'maximum-duration',
+    });
+
+    unmount();
+  });
+
+  it('settles capped finalization on unmount without stopping borrowed source tracks or firing late work', async () => {
+    vi.useFakeTimers();
+    const harness = installRecorderHarness({ hangStopCall: 1 });
+    const onAutomaticStop = vi.fn();
+    const source = createSource();
+    const videoTrack = source.stream.getVideoTracks()[0];
+    const audioTrack = source.stream.getAudioTracks()[0];
+    const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
+
+    await act(async () => {
+      await result.current.start(source, 'local');
+      vi.advanceTimersByTime(300_000);
+      vi.runAllTicks();
+      await Promise.resolve();
+    });
+
+    const stopping = result.current.stop();
+    unmount();
+    await expect(stopping).resolves.toBeNull();
+    act(() => {
+      vi.advanceTimersByTime(20_000);
+    });
+
+    expect(onAutomaticStop).not.toHaveBeenCalled();
+    expect(harness.recorderStop).toHaveBeenNthCalledWith(1, 2);
+    expect(harness.recorderStop).toHaveBeenNthCalledWith(2, 1);
+    expect(videoTrack?.stop).not.toHaveBeenCalled();
+    expect(audioTrack?.stop).not.toHaveBeenCalled();
   });
 
   it('reports an ended model source so its owner can release the paid session', async () => {

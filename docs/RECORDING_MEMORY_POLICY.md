@@ -3,8 +3,25 @@
 Studio deliberately retains the original recording, optional audio sidecar, and any processed
 replacement in the active tab so a completed take remains reviewable and downloadable. This is a
 product contract, not an accidental implementation detail. The approved supported maximum is 300
-seconds. The current runtime does not yet warn or stop at that boundary, so it cannot claim
-compliance until it safely finalizes an in-progress take at 300 seconds and preserves the original.
+seconds. The runtime now announces the independent recording warning at 270 seconds and invokes
+the existing coalesced Stop/finalize path at 300 seconds. It preserves a valid main take when the
+optional sidecar fails or times out and releases live/provider owners only after finalization
+settles. This deterministic runtime evidence does not by itself qualify a physical target.
+
+## Runtime evidence
+
+Accelerated domain, controller, stage, and review-flow tests cover:
+
+- Local, Character, and VTO sources reaching the independent recording cap;
+- simultaneous manual/cap Stop calls and duplicate recorder events;
+- source end at the boundary, delayed sidecar settlement, terminal finalization timeout, and
+  unmount during finalization;
+- one playable original when the main recording succeeds, with the main video authoritative when
+  the optional sidecar fails; and
+- no early stop of borrowed recording tracks before session-owned cleanup.
+
+Physical evidence remains open. No row in the approved browser/device matrix is supported until
+the protocol below records a successful real 300-second take plus processing and cleanup results.
 
 ## What to measure
 
@@ -28,7 +45,7 @@ duration. Do not use an emulator as evidence for a physical mobile target.
 
 ## Release policy
 
-- Implement a visible, accessible warning before 300 seconds and a safe automatic Stop/finalize at
+- Preserve the visible, accessible warning before 300 seconds and safe automatic Stop/finalize at
   300 seconds. Never terminate by dropping chunks, stopping borrowed source tracks early, or
   releasing live/provider resources before final recorder data and the optional sidecar settle.
 - Treat the estimate as a planning budget only. Streaming upload or chunk eviction requires a

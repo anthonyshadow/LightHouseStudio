@@ -83,8 +83,9 @@ Codec claims from `MediaRecorder.isTypeSupported` are necessary but not sufficie
 - Enterprise policies, browser extensions, VPN/firewall rules, NAT, and provider outages can block WebRTC while local capture still works.
 - Long recordings and audio remuxing are memory-intensive because current Studio artifacts are
   held in the tab. The [recording memory policy](RECORDING_MEMORY_POLICY.md) defines the required
-  target-device measurements. The approved take maximum is 300 seconds, but ordinary recording
-  does not yet warn or safely auto-finalize from the recording policy at that boundary.
+  target-device measurements. Ordinary recording now announces its warning at 270 seconds and
+  safely routes the 300-second cap through the coalesced Stop/finalize path, but no target is
+  qualified until its physical memory, codec, processing, interruption, and cleanup protocol passes.
   Connection-start credentials, the broker's default AI active-session scope, and ElevenLabs
   conversion also use five-minute boundaries. The AI scope is now exposed through an app-owned
   monotonic timer with a 30-second warning and ordered expected completion; it still does not

@@ -19,7 +19,9 @@ As a creator, I want to preview and record my camera locally, so that I can prod
 6. Confirm the controls collapse to the dominant **Stop recording** action and the recording timer
    advances. Stop remains visible, focusable, and operable for the entire recording rather than
    participating in live/playback auto-hide.
-7. Perform the take, then select **Stop recording**. Outside recording, stage pointer, touch,
+7. Perform the take, then select **Stop recording**. At 4:30, Studio announces that 30 seconds or
+   less remain. If no manual Stop occurs, the app invokes the same Stop/finalize path at the
+   independent 5:00 recording maximum. Outside recording, stage pointer, touch,
    focus, mouse-pointer, or keyboard activity restores timed-out live controls and restarts their
    single idle timer.
 8. Wait on the finalizing stage state. The app stops the main recorder and optional audio sidecar, receives final chunks, creates the take, and only then releases live device tracks.
@@ -33,6 +35,8 @@ As a creator, I want to preview and record my camera locally, so that I can prod
   explicit Start action. No provider work starts.
 - Select **Close** before recording to release local tracks and return to private idle.
 - If recording cannot create a valid artifact, the studio releases live resources and returns to idle with an error instead of leaving a partially live state.
+- At the recording maximum, Studio explains why the take ended and preserves playback, Voice,
+  Download, Close, and confirmed Discard. This timer does not depend on an AI provider session.
 
 ## Completion criteria
 

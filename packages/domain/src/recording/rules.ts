@@ -2,12 +2,37 @@ import { DomainRuleError, type SafeError } from '../errors/safe-error';
 import type {
   AudioSidecar,
   RecordingArtifact,
+  RecordingDurationTiming,
   RecordingLifecycle,
   RecordingLifecycleStatus,
   RecordingReleaseReason,
   RecordingSourceAvailability,
   RecordingSourceDescriptor,
 } from './types';
+
+export const RECORDING_MAXIMUM_SECONDS = 300;
+export const RECORDING_WARNING_THRESHOLD_SECONDS = 270;
+
+export const getRecordingDurationTiming = (elapsedSeconds: number): RecordingDurationTiming => {
+  const normalizedElapsed = Number.isFinite(elapsedSeconds)
+    ? Math.min(RECORDING_MAXIMUM_SECONDS, Math.max(0, Math.floor(elapsedSeconds)))
+    : 0;
+  const status =
+    normalizedElapsed >= RECORDING_MAXIMUM_SECONDS
+      ? 'limit-reached'
+      : normalizedElapsed >= RECORDING_WARNING_THRESHOLD_SECONDS
+        ? 'warning'
+        : 'active';
+
+  return {
+    status,
+    maximumSeconds: RECORDING_MAXIMUM_SECONDS,
+    warningThresholdSeconds: RECORDING_WARNING_THRESHOLD_SECONDS,
+    elapsedSeconds: normalizedElapsed,
+    remainingSeconds: RECORDING_MAXIMUM_SECONDS - normalizedElapsed,
+    warning: status === 'warning',
+  };
+};
 
 export const createRecordingLifecycle = <TMedia = unknown>(
   sourceReady = false,

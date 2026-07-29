@@ -1,4 +1,6 @@
+import { getRecordingDurationTiming } from '@studio/domain';
 import type { StageNotice } from '../features/live-stage';
+import type { AutomaticRecordingStopEvent, RecordingLifecycle } from '../features/recording';
 import type { CapabilityState } from './StudioHeader';
 
 const formErrorCodes = new Set(['model-input-required', 'apply-failed']);
@@ -33,6 +35,52 @@ export type StudioStageNoticeInputs = Readonly<{
 
 export const isStudioFormError = (error: StudioStageSessionError | null): boolean =>
   Boolean(error && formErrorCodes.has(error.code));
+
+export type RecordingDurationNoticeInputs = Readonly<{
+  lifecycle: RecordingLifecycle;
+  elapsedSeconds: number;
+  automaticStopEvent: AutomaticRecordingStopEvent | null;
+  playableTakeId: string | null;
+}>;
+
+export const deriveRecordingDurationNotices = ({
+  lifecycle,
+  elapsedSeconds,
+  automaticStopEvent,
+  playableTakeId,
+}: RecordingDurationNoticeInputs): readonly StageNotice[] => {
+  const timing = getRecordingDurationTiming(elapsedSeconds);
+
+  if (lifecycle === 'recording' && timing.warning) {
+    return [
+      {
+        id: 'recording-duration-warning',
+        severity: 'warning',
+        title: 'Recording ends in 30 seconds or less',
+        message: 'Studio will stop and safely finalize this take at the supported 5:00 maximum.',
+        priority: 975,
+      },
+    ];
+  }
+
+  if (
+    automaticStopEvent?.reason === 'maximum-duration' &&
+    automaticStopEvent.artifactId === playableTakeId
+  ) {
+    return [
+      {
+        id: 'recording-duration-complete',
+        severity: 'info',
+        title: 'Recording ended at the 5:00 maximum',
+        message:
+          'The original take was finalized safely. Playback, Voice, Download, Close, and Discard remain available.',
+        priority: 925,
+      },
+    ];
+  }
+
+  return [];
+};
 
 export const deriveStudioStageNotices = ({
   localCaptureAvailable,

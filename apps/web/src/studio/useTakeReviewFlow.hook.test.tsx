@@ -3,6 +3,7 @@
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { useRecording as useRecordingHook } from '../orchestration/recording';
+import type { AutomaticRecordingStopEvent } from '../features/recording';
 
 const useRecording = vi.hoisted(() => vi.fn());
 const useRecordingSource = vi.hoisted(() => vi.fn());
@@ -130,10 +131,12 @@ describe('useTakeReviewFlow finalization ownership', () => {
     const artifact = { id: 'take-automatic' } as NonNullable<RecordingController['presented']>;
     const release = deferred<void>();
     const recording = createRecording(vi.fn());
-    useRecording.mockImplementation((options: { onAutomaticStop: () => void }) => {
-      capturedAutomaticStop = options.onAutomaticStop;
-      return recording;
-    });
+    useRecording.mockImplementation(
+      (options: { onAutomaticStop: (event: AutomaticRecordingStopEvent) => void }) => {
+        capturedAutomaticStop = options.onAutomaticStop;
+        return recording;
+      },
+    );
     const displayStream = {} as MediaStream;
     const releaseForRecordedReview = vi.fn(() => release.promise);
     const { result, rerender } = renderHook(() =>
@@ -143,7 +146,13 @@ describe('useTakeReviewFlow finalization ownership', () => {
       }),
     );
 
-    act(() => capturedAutomaticStop());
+    act(() =>
+      capturedAutomaticStop({
+        mode: 'local',
+        reason: 'maximum-duration',
+        artifactId: 'take-automatic',
+      }),
+    );
     expect(result.current.stagePresentation).toMatchObject({
       kind: 'finalizing',
       retainedStream: displayStream,
@@ -154,6 +163,11 @@ describe('useTakeReviewFlow finalization ownership', () => {
     recording.presented = artifact;
     rerender();
     expect(result.current.recording.presented).toBe(artifact);
+    expect(result.current.automaticRecordingStopEvent).toEqual({
+      mode: 'local',
+      reason: 'maximum-duration',
+      artifactId: 'take-automatic',
+    });
     await act(async () => {
       release.resolve();
       await release.promise;
@@ -214,6 +228,6 @@ describe('useTakeReviewFlow finalization ownership', () => {
   });
 });
 
-let capturedAutomaticStop: () => void = () => {
+let capturedAutomaticStop: (event: AutomaticRecordingStopEvent) => void = () => {
   throw new Error('Automatic stop callback was not installed.');
 };

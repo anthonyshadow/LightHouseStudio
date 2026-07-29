@@ -15,7 +15,9 @@ As a creator, I want to finalize, inspect, download, and deliberately release my
 2. Select **Record** and verify the stage controls collapse to the sole **Stop recording** action,
    which remains visible and receives focus. The app pins the selected video/audio track identities
    and snapshots source metadata for this take.
-3. Select **Stop recording**. Do not start another media action while the stage reports finalization.
+3. Select **Stop recording**. If the take continues, Studio announces the final 30 seconds at 4:30
+   and invokes the same coalesced Stop path at the independent 5:00 maximum. Do not start another
+   media action while the stage reports finalization.
 4. Wait for main video and optional audio-sidecar recorders to settle. The app creates the original Blob, URL, filename, metadata, and duration before it releases local/provider resources.
 5. Confirm that the stage displays **Recorded take playback** with compact Download, Discard,
    Voice, and Close actions. After those controls time out, pointer/touch/focus/keyboard activity on
@@ -30,6 +32,9 @@ As a creator, I want to finalize, inspect, download, and deliberately release my
 - If the optional sidecar fails but main video is valid, the app still publishes the video take and reports the voice limitation.
 - If download dispatch fails, review remains intact and Close stays unavailable; retry the download or discard deliberately.
 - If a selected recording track ends or an AI callback would change its source, the app finalizes the current take before accepting a new source.
+- A take stopped by the supported maximum explains the boundary after playback appears and retains
+  Voice, Download, Close, and confirmed Discard. A concurrent manual Stop or source end does not
+  start a second finalization.
 - A before-unload warning and discard confirmation reduce unintentional loss, but a refresh, crash, tab closure, or device restart still loses an unclosed in-memory take.
 
 ## Completion criteria

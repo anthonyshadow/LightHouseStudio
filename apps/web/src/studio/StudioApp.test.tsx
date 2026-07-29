@@ -255,6 +255,7 @@ vi.mock('./useTakeReviewFlow', () => ({
     recordingSource: null,
     finalizingStartedAt: null,
     finalizingStream: null,
+    automaticRecordingStopEvent: null,
     finishTake: vi.fn(() => Promise.resolve()),
     stagePresentation: { kind: 'idle', mode: 'lucy-2.5' },
   }),

@@ -228,9 +228,11 @@ Read [architecture](docs/ARCHITECTURE.md), [privacy and temporary data](docs/PRI
   warning, and treats the expected limit as completion rather than a crash. SDK generation ticks
   can move the display forward but never reset or replace the monotonic budget. If the limit lands
   during recording, the take finalizes before provider/local resources release; otherwise local
-  preview and the working recipe remain available. The approved take maximum is also 300 seconds,
-  but the current recorder does not yet warn or safely auto-finalize from that independent
-  recording policy; this remains a separate pilot blocker.
+  preview and the working recipe remain available. Recording separately owns its approved
+  300-second maximum: at 270 seconds Studio announces the final 30 seconds, then routes the cap
+  through the coalesced Stop/finalize path and explains the completed boundary without relying on
+  provider expiry. Physical 300-second memory, codec, processing, interruption, and cleanup
+  qualification remains a pilot blocker for every named target.
 - ElevenLabs saved-library browsing and click-to-play previews contact the provider only after the labeled disclosure/action and carry the Studio provider-intent header. Preview bytes use a short-lived, app-owned Blob URL that is aborted/revoked on replacement or unmount. Browsing, previewing, or selecting does not upload the take. Applying a saved voice sends only the completed audio sidecar and may use credits. Library membership is managed only in ElevenLabs.
 - The server accepts loopback hosts only. It is not designed for LAN, tunnel, or public hosting. Remote deployment requires authentication, authorization, CSRF analysis, abuse/rate controls, tenant isolation, secret management, and a new security review.
 

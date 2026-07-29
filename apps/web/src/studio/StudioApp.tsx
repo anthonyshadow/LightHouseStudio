@@ -38,7 +38,11 @@ import { AIExperienceChooser } from './AIExperienceChooser';
 import { StudioHeader } from './StudioHeader';
 import { StudioSessionControlBar } from './StudioSessionControlBar';
 import { resolveLegacyEntry, type StudioInitialOverlay } from './routeResolution';
-import { deriveStudioStageNotices, isStudioFormError } from './studioStageNotices';
+import {
+  deriveRecordingDurationNotices,
+  deriveStudioStageNotices,
+  isStudioFormError,
+} from './studioStageNotices';
 import { useCharacterBuilderLaunchController } from './useCharacterBuilderLaunchController';
 import { useLegacyProjectAvailability } from './useLegacyProjectAvailability';
 import { useProviderAvailability } from './useProviderAvailability';
@@ -138,6 +142,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     recordingSource,
     finalizingStartedAt,
     finalizingStream,
+    automaticRecordingStopEvent,
     finishTake,
     stagePresentation,
   } = useTakeReviewFlow({
@@ -251,6 +256,12 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
         onClearSessionError: clearSessionError,
         onDismissNotice: dismissNotice,
       }),
+      ...deriveRecordingDurationNotices({
+        lifecycle: recording.lifecycle,
+        elapsedSeconds: recording.elapsedSeconds,
+        automaticStopEvent: automaticRecordingStopEvent,
+        playableTakeId: recording.presented?.id ?? null,
+      }),
     ];
     const timing = session.realtimeSessionTiming;
     if (timing?.warning) {
@@ -284,11 +295,15 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     clearSessionError,
     openCaptureSettingsForRecovery,
     recording.recordingError,
+    recording.elapsedSeconds,
+    recording.lifecycle,
+    recording.presented,
     recording.sidecar.error,
     recording.sidecar.state,
     retryProviderAvailability,
     session.error,
     session.realtimeSessionTiming,
+    automaticRecordingStopEvent,
   ]);
 
   const closeCreativePanel = closeOverlay;
