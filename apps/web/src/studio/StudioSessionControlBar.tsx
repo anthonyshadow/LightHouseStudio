@@ -184,15 +184,14 @@ const idleRowStyles = (theme: Theme): CSSObject => ({
   },
 });
 
+const isStartingAi = (session: StudioSessionController): boolean =>
+  session.draft.mode !== 'local' &&
+  ['requesting-media', 'requesting-token', 'connecting'].includes(session.lifecycle);
+
 const transitionLabel = (session: StudioSessionController): string | null => {
   if (session.lifecycle === 'stopping-ai') return 'Stopping AI…';
   if (session.lifecycle === 'stopping-media') return 'Stopping camera…';
-  if (
-    session.draft.mode !== 'local' &&
-    ['requesting-media', 'requesting-token', 'connecting'].includes(session.lifecycle)
-  ) {
-    return 'Starting AI…';
-  }
+  if (isStartingAi(session)) return 'Starting AI…';
   if (session.lifecycle === 'requesting-media' && !session.localStream) return 'Starting camera…';
   return null;
 };
@@ -217,15 +216,24 @@ export const StudioSessionControlBar = ({
   const theme = useTheme();
   const transition = transitionLabel(session);
   const aiActive = ['connected', 'generating', 'reconnecting'].includes(session.lifecycle);
-  const aiStarting =
-    session.draft.mode !== 'local' &&
-    ['requesting-media', 'requesting-token', 'connecting'].includes(session.lifecycle);
+  const aiStarting = isStartingAi(session);
   const localActive = Boolean(session.localStream);
   const recordingActive = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
   const takeReviewActive = reviewingTake && Boolean(recording.presented);
   const controlsVisible = visible || recordingActive;
   const endDisabled = controlsLocked || recordingActive || aiStarting || Boolean(transition);
   const stopAiDisabled = controlsLocked || recordingActive;
+  const recordingAction = (
+    <RecordingAction
+      recording={recording}
+      source={recordingSource}
+      mode={session.draft.mode}
+      modelOutputReady={session.transformedVideoUsable}
+      supported={recordingSupported}
+      {...(recordingBlockedReason ? { blockedReason: recordingBlockedReason } : {})}
+      onStop={onStopRecording}
+    />
+  );
 
   return (
     <section
@@ -286,15 +294,7 @@ export const StudioSessionControlBar = ({
             </div>
           ) : recordingActive ? (
             <div css={recordingRowStyles(theme)} data-recording-controls="dominant">
-              <RecordingAction
-                recording={recording}
-                source={recordingSource}
-                mode={session.draft.mode}
-                modelOutputReady={session.transformedVideoUsable}
-                supported={recordingSupported}
-                {...(recordingBlockedReason ? { blockedReason: recordingBlockedReason } : {})}
-                onStop={onStopRecording}
-              />
+              {recordingAction}
             </div>
           ) : (
             <div css={actionRowStyles(theme)}>
@@ -346,15 +346,7 @@ export const StudioSessionControlBar = ({
                 <CameraIcon off={!session.cameraEnabled} />
               </Button>
 
-              <RecordingAction
-                recording={recording}
-                source={recordingSource}
-                mode={session.draft.mode}
-                modelOutputReady={session.transformedVideoUsable}
-                supported={recordingSupported}
-                {...(recordingBlockedReason ? { blockedReason: recordingBlockedReason } : {})}
-                onStop={onStopRecording}
-              />
+              {recordingAction}
 
               {aiStarting ? (
                 <Button variant="secondary" onClick={() => void session.stopModel()}>

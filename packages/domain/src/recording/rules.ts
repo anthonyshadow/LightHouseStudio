@@ -13,16 +13,17 @@ import type {
 export const RECORDING_MAXIMUM_SECONDS = 300;
 export const RECORDING_WARNING_THRESHOLD_SECONDS = 270;
 
+const recordingDurationStatus = (elapsedSeconds: number): RecordingDurationTiming['status'] => {
+  if (elapsedSeconds >= RECORDING_MAXIMUM_SECONDS) return 'limit-reached';
+  if (elapsedSeconds >= RECORDING_WARNING_THRESHOLD_SECONDS) return 'warning';
+  return 'active';
+};
+
 export const getRecordingDurationTiming = (elapsedSeconds: number): RecordingDurationTiming => {
   const normalizedElapsed = Number.isFinite(elapsedSeconds)
     ? Math.min(RECORDING_MAXIMUM_SECONDS, Math.max(0, Math.floor(elapsedSeconds)))
     : 0;
-  const status =
-    normalizedElapsed >= RECORDING_MAXIMUM_SECONDS
-      ? 'limit-reached'
-      : normalizedElapsed >= RECORDING_WARNING_THRESHOLD_SECONDS
-        ? 'warning'
-        : 'active';
+  const status = recordingDurationStatus(normalizedElapsed);
 
   return {
     status,

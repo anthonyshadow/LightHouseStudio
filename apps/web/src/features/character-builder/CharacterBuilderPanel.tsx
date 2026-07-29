@@ -92,6 +92,46 @@ const referenceProviderLabel = (
   }
 };
 
+type ReferenceGenerationDisclosureOptions = Readonly<
+  Pick<
+    CharacterBuilderPanelProps,
+    | 'generationAvailable'
+    | 'referenceImageProvider'
+    | 'referenceImageModel'
+    | 'referenceImageOptimizerModel'
+  >
+>;
+
+const buildReferenceGenerationDisclosure = ({
+  generationAvailable,
+  referenceImageProvider,
+  referenceImageModel,
+  referenceImageOptimizerModel,
+}: ReferenceGenerationDisclosureOptions): string => {
+  const optimizerContact = referenceImageOptimizerModel
+    ? `OpenAI (${referenceImageOptimizerModel}) optimizes the direction, then `
+    : '';
+
+  if (referenceImageProvider === 'wiro') {
+    const model = referenceImageModel ?? 'selected model';
+    if (generationAvailable) {
+      return `${optimizerContact}Wiro (${model}) creates the image in this explicit operator-qualification run. Wiro is unavailable for participant generation. This may use provider credits; successful output remains local until this operator environment is retired.`;
+    }
+    return `Wiro (${model}) is restricted to explicit operator-qualification runs and is unavailable for participant generation. This configured generation path is currently unavailable. Upload and Save without generation remain local.`;
+  }
+
+  const provider = referenceProviderLabel(referenceImageProvider);
+  const model = referenceImageModel ? ` (${referenceImageModel})` : '';
+  return `${optimizerContact}${provider}${model} creates the image. This may use provider credits. The result is stored as an immutable local asset until this participant environment is retired. Upload and Save without generation do not contact image or optimizer providers.`;
+};
+
+const characterSaveLabel = (state: CharacterBuilderState): string => {
+  if (!state.preview?.stale) return 'Save Character';
+  return state.uploadedReference
+    ? 'Save Character (uploaded image)'
+    : 'Save Character (prompt only)';
+};
+
 export const CharacterBuilderPanel = ({
   open,
   state,
@@ -146,23 +186,13 @@ export const CharacterBuilderPanel = ({
   const uploadedReference = state.uploadedReference;
   const previewCapabilityAvailable = generationAvailable && (!uploadedReference || editAvailable);
   const heroReference = state.preview?.asset ?? uploadedReference?.asset ?? null;
-  const saveLabel =
-    state.preview?.stale && uploadedReference
-      ? 'Save Character (uploaded image)'
-      : state.preview?.stale
-        ? 'Save Character (prompt only)'
-        : 'Save Character';
-  const providerLabel = referenceProviderLabel(referenceImageProvider);
-  const providerModel = referenceImageModel ? ` (${referenceImageModel})` : '';
-  const optimizerContact = referenceImageOptimizerModel
-    ? `OpenAI (${referenceImageOptimizerModel}) optimizes the direction, then `
-    : '';
-  const referenceGenerationDisclosure =
-    referenceImageProvider === 'wiro'
-      ? generationAvailable
-        ? `${optimizerContact}Wiro (${referenceImageModel ?? 'selected model'}) creates the image in this explicit operator-qualification run. Wiro is unavailable for participant generation. This may use provider credits; successful output remains local until this operator environment is retired.`
-        : `Wiro (${referenceImageModel ?? 'selected model'}) is restricted to explicit operator-qualification runs and is unavailable for participant generation. This configured generation path is currently unavailable. Upload and Save without generation remain local.`
-      : `${optimizerContact}${providerLabel}${providerModel} creates the image. This may use provider credits. The result is stored as an immutable local asset until this participant environment is retired. Upload and Save without generation do not contact image or optimizer providers.`;
+  const saveLabel = characterSaveLabel(state);
+  const referenceGenerationDisclosure = buildReferenceGenerationDisclosure({
+    generationAvailable,
+    referenceImageProvider,
+    referenceImageModel,
+    referenceImageOptimizerModel,
+  });
 
   return (
     <>

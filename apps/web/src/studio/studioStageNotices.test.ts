@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
 import { deriveStageNotices } from '../features/live-stage';
-import { deriveRecordingDurationNotices, deriveStudioStageNotices } from './studioStageNotices';
+import {
+  deriveRealtimeSessionNotices,
+  deriveRecordingDurationNotices,
+  deriveStudioStageNotices,
+} from './studioStageNotices';
 
 const callbacks = () => ({
   onRetryProviderAvailability: vi.fn(),
@@ -190,5 +194,40 @@ describe('deriveRecordingDurationNotices', () => {
         playableTakeId: 'restored-take',
       }),
     ).toEqual([]);
+  });
+});
+
+describe('deriveRealtimeSessionNotices', () => {
+  it('keeps warning and completion copy tied to the provider-session timing state', () => {
+    expect(
+      deriveRealtimeSessionNotices({
+        status: 'active',
+        maximumSeconds: 300,
+        elapsedSeconds: 270,
+        remainingSeconds: 30,
+        warning: true,
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        id: 'realtime-session-warning',
+        title: 'AI session ending soon',
+      }),
+    ]);
+
+    expect(
+      deriveRealtimeSessionNotices({
+        status: 'completed',
+        maximumSeconds: 300,
+        elapsedSeconds: 300,
+        remainingSeconds: 0,
+        warning: false,
+      }),
+    ).toEqual([
+      expect.objectContaining({
+        id: 'realtime-session-complete',
+        title: 'AI session maximum reached',
+      }),
+    ]);
+    expect(deriveRealtimeSessionNotices(null)).toEqual([]);
   });
 });

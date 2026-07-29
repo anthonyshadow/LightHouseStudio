@@ -55,6 +55,33 @@ type LiveSnapshot = {
   mirrored: boolean;
 };
 
+type ResolvedLiveMedia = {
+  livePresentation: LiveSnapshot | Extract<StagePresentation, { kind: 'live' }> | null;
+  stream: MediaStream | null;
+  mirrored: boolean;
+};
+
+const resolveLiveMedia = (
+  presentation: StagePresentation,
+  lastLiveSnapshot: LiveSnapshot | null,
+): ResolvedLiveMedia => {
+  if (presentation.kind === 'live') {
+    return {
+      livePresentation: presentation,
+      stream: presentation.stream,
+      mirrored: presentation.mirrored,
+    };
+  }
+  if (presentation.kind === 'finalizing') {
+    return {
+      livePresentation: lastLiveSnapshot,
+      stream: presentation.retainedStream ?? lastLiveSnapshot?.stream ?? null,
+      mirrored: lastLiveSnapshot?.mirrored ?? false,
+    };
+  }
+  return { livePresentation: null, stream: null, mirrored: false };
+};
+
 const StageIcon = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
     <path
@@ -106,6 +133,31 @@ const lifecycleLabel = (
 
 const lifecycleTone = (lifecycle: SessionLifecycle): 'neutral' | 'accent' | 'recording' =>
   ['ready', 'connected', 'generating'].includes(lifecycle) ? 'accent' : 'neutral';
+
+const stageStatusLabel = (
+  presentation: StagePresentation,
+  recording: boolean,
+  recordingSeconds: number,
+  hasVisibleMedia: boolean,
+  lifecycle: SessionLifecycle,
+  mode: StudioMode,
+  experienceLabel?: string,
+): string => {
+  if (presentation.kind === 'playback') return 'Recorded take';
+  if (presentation.kind === 'finalizing') return 'Finalizing take';
+  if (recording) return `Recording ${formatDuration(recordingSeconds)}`;
+  if (presentation.kind === 'live' && !hasVisibleMedia) return 'Camera unavailable';
+  return lifecycleLabel(lifecycle, mode, experienceLabel);
+};
+
+const formatRealtimeTiming = (timing: RealtimeSessionTiming | null): string | null => {
+  if (!timing) return null;
+  const maximum = formatDuration(timing.maximumSeconds);
+  if (timing.status === 'completed') return `AI ${maximum} / ${maximum} · complete`;
+  return `AI ${formatDuration(timing.elapsedSeconds)} / ${maximum} · ${formatDuration(
+    timing.remainingSeconds,
+  )} left`;
+};
 
 const emptyCopy = (mode: StudioMode): { title: string; description: string } => {
   if (mode === 'lucy-2.5') {
@@ -208,29 +260,12 @@ export const MediaStage = ({
   const setPlaybackError = (message: string | null) => {
     setPlaybackFailure({ identity: playbackIdentity, message });
   };
-  const livePresentation =
-    presentation.kind === 'live'
-      ? presentation
-      : presentation.kind === 'finalizing'
-        ? lastLiveSnapshot
-        : null;
-  const stream =
-    presentation.kind === 'live'
-      ? presentation.stream
-      : presentation.kind === 'finalizing'
-        ? (presentation.retainedStream ?? lastLiveSnapshot?.stream ?? null)
-        : null;
+  const { livePresentation, stream, mirrored } = resolveLiveMedia(presentation, lastLiveSnapshot);
   const transformed = livePresentation?.origin === 'provider';
   const details = describeStageMedia(presentation, stream, transformed);
   const stageMode = presentation.kind === 'idle' ? presentation.mode : mode;
   const copy = emptyCopy(stageMode);
   const statusTone = presentation.kind === 'playback' ? 'accent' : lifecycleTone(lifecycle);
-  const mirrored =
-    presentation.kind === 'live'
-      ? presentation.mirrored
-      : presentation.kind === 'finalizing'
-        ? (lastLiveSnapshot?.mirrored ?? false)
-        : false;
   const playbackLocked = presentation.kind === 'playback' && presentation.controlsLocked;
   const isFinalizing = presentation.kind === 'finalizing';
   const hasVisibleMedia = details.hasLiveVideo;
@@ -470,16 +505,15 @@ export const MediaStage = ({
       ]
     : notices;
 
-  const statusLabel =
-    presentation.kind === 'playback'
-      ? 'Recorded take'
-      : presentation.kind === 'finalizing'
-        ? 'Finalizing take'
-        : recording
-          ? `Recording ${formatDuration(recordingSeconds)}`
-          : presentation.kind === 'live' && !hasVisibleMedia
-            ? 'Camera unavailable'
-            : lifecycleLabel(lifecycle, mode, experienceLabel);
+  const statusLabel = stageStatusLabel(
+    presentation,
+    recording,
+    recordingSeconds,
+    hasVisibleMedia,
+    lifecycle,
+    mode,
+    experienceLabel,
+  );
   const recordingDurationTiming = getRecordingDurationTiming(recordingSeconds);
   const statusToneResolved = recording
     ? recordingDurationTiming.warning
@@ -496,15 +530,7 @@ export const MediaStage = ({
     realtimeSessionTiming !== null &&
     presentation.kind !== 'playback' &&
     presentation.kind !== 'finalizing';
-  const realtimeTimingLabel = realtimeSessionTiming
-    ? realtimeSessionTiming.status === 'completed'
-      ? `AI ${formatDuration(realtimeSessionTiming.maximumSeconds)} / ${formatDuration(
-          realtimeSessionTiming.maximumSeconds,
-        )} · complete`
-      : `AI ${formatDuration(realtimeSessionTiming.elapsedSeconds)} / ${formatDuration(
-          realtimeSessionTiming.maximumSeconds,
-        )} · ${formatDuration(realtimeSessionTiming.remainingSeconds)} left`
-    : null;
+  const realtimeTimingLabel = formatRealtimeTiming(realtimeSessionTiming);
   const realtimeTimingTone =
     realtimeSessionTiming?.warning || realtimeSessionTiming?.status === 'limit-reached'
       ? 'warning'

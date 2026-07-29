@@ -61,6 +61,12 @@ const profileLabels: Readonly<Record<VisualProfile, string>> = {
   unspecified: 'Not specified',
 };
 
+const previewReadinessLabel = (generated: boolean, stale: boolean): string => {
+  if (generated && !stale) return 'Preview ready';
+  if (stale) return 'Preview needs an update';
+  return 'Generation is optional';
+};
+
 export const CharacterBuilderForm = ({
   draft,
   design,
@@ -155,13 +161,7 @@ export const CharacterBuilderForm = ({
       <div css={reviewShortcutStyles(theme)}>
         <span>
           <strong>Review your character</strong>
-          <small>
-            {referenceImageGenerated && !referenceImageStale
-              ? 'Preview ready'
-              : referenceImageStale
-                ? 'Preview needs an update'
-                : 'Generation is optional'}
-          </small>
+          <small>{previewReadinessLabel(referenceImageGenerated, referenceImageStale)}</small>
         </span>
         <Button
           size="small"

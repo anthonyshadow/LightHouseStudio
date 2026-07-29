@@ -62,6 +62,12 @@ export const createRealtimeSessionClock = ({
   let limitReached = false;
   let timer: number | null = null;
 
+  const clearTimer = () => {
+    if (timer === null) return;
+    window.clearInterval(timer);
+    timer = null;
+  };
+
   const emit = (timing: RealtimeSessionTiming) => {
     if (
       timing.status === lastTiming.status &&
@@ -77,10 +83,7 @@ export const createRealtimeSessionClock = ({
   const reachLimit = () => {
     if (disposed || limitReached) return;
     limitReached = true;
-    if (timer !== null) {
-      window.clearInterval(timer);
-      timer = null;
-    }
+    clearTimer();
     emit(timingAt('limit-reached', maximum, maximum));
     onLimitReached();
   };
@@ -119,10 +122,7 @@ export const createRealtimeSessionClock = ({
       return expected;
     },
     complete() {
-      if (timer !== null) {
-        window.clearInterval(timer);
-        timer = null;
-      }
+      clearTimer();
       disposed = true;
       limitReached = true;
       lastTiming = timingAt('completed', maximum, maximum);
@@ -130,8 +130,7 @@ export const createRealtimeSessionClock = ({
       return lastTiming;
     },
     dispose() {
-      if (timer !== null) window.clearInterval(timer);
-      timer = null;
+      clearTimer();
       disposed = true;
     },
     hasReachedLimit: () => limitReached,

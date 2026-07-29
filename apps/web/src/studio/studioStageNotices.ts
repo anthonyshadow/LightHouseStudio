@@ -1,5 +1,6 @@
 import { getRecordingDurationTiming } from '@studio/domain';
 import type { StageNotice } from '../features/live-stage';
+import type { RealtimeSessionTiming } from '../features/media-session';
 import type { AutomaticRecordingStopEvent, RecordingLifecycle } from '../features/recording';
 import type { CapabilityState } from './StudioHeader';
 
@@ -80,6 +81,35 @@ export const deriveRecordingDurationNotices = ({
   }
 
   return [];
+};
+
+export const deriveRealtimeSessionNotices = (
+  timing: RealtimeSessionTiming | null,
+): readonly StageNotice[] => {
+  if (timing?.warning) {
+    return [
+      {
+        id: 'realtime-session-warning',
+        severity: 'warning',
+        title: 'AI session ending soon',
+        message:
+          '30 seconds or less remain. This provider limit is independent of the take limit; an active take will finalize safely at the boundary.',
+        priority: 875,
+      },
+    ];
+  }
+
+  if (timing?.status !== 'limit-reached' && timing?.status !== 'completed') return [];
+  return [
+    {
+      id: 'realtime-session-complete',
+      severity: 'info',
+      title: 'AI session maximum reached',
+      message:
+        'The expected provider session completed. Local preview and the current recipe remain available.',
+      priority: 850,
+    },
+  ];
 };
 
 export const deriveStudioStageNotices = ({

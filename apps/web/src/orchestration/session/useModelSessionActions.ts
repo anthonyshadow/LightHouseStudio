@@ -54,24 +54,28 @@ export type ModelSessionActions = {
   applyChanges: () => Promise<void>;
 };
 
-const disconnectError = (reason: RealtimeDisconnectReason): SafeMediaError =>
-  reason === 'remote-ended'
-    ? {
+const disconnectError = (reason: RealtimeDisconnectReason): SafeMediaError => {
+  switch (reason) {
+    case 'remote-ended':
+      return {
         code: 'remote-ended',
         message: 'The transformed video ended. Local preview is still available.',
         recovery: 'Reconnect AI, continue locally, or stop the camera.',
-      }
-    : reason === 'generation-ended'
-      ? {
-          code: 'generation-ended',
-          message: 'The AI generation ended before the session maximum.',
-          recovery: 'Your local preview and working recipe are safe. Start AI again when ready.',
-        }
-      : {
-          code: 'provider-disconnected',
-          message: 'The AI connection ended. Local preview is still available.',
-          recovery: 'Reconnect AI, continue locally, or stop the camera.',
-        };
+      };
+    case 'generation-ended':
+      return {
+        code: 'generation-ended',
+        message: 'The AI generation ended before the session maximum.',
+        recovery: 'Your local preview and working recipe are safe. Start AI again when ready.',
+      };
+    case 'provider-disconnected':
+      return {
+        code: 'provider-disconnected',
+        message: 'The AI connection ended. Local preview is still available.',
+        recovery: 'Reconnect AI, continue locally, or stop the camera.',
+      };
+  }
+};
 
 const realtimeStartError = (error: unknown): SafeMediaError => {
   if (error instanceof ApiClientError && error.code === 'provider_authentication') {

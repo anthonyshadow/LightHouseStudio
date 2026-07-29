@@ -103,7 +103,6 @@ export const useRealtimeResource = ({
 
   const connect = useCallback(
     async (input: RealtimeConnectInput): Promise<boolean> => {
-      let providerDisconnected = false;
       const session = await connectDecartRealtime({
         apiKey: input.apiKey,
         model: input.model,
@@ -143,7 +142,6 @@ export const useRealtimeResource = ({
           onConnectionChange(next);
           if (next !== 'disconnected') return;
 
-          providerDisconnected = true;
           ++operationRef.current;
           disconnect();
           onDisconnected('provider-disconnected');
@@ -164,7 +162,7 @@ export const useRealtimeResource = ({
         },
       });
 
-      if (operationRef.current !== input.operation || providerDisconnected) {
+      if (operationRef.current !== input.operation) {
         session.disconnect();
         clearRemote();
         return false;

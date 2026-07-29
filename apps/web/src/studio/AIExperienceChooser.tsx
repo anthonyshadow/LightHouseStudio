@@ -75,6 +75,17 @@ const eyebrowStyles = (theme: Theme, primary: boolean): CSSObject => ({
   textTransform: 'uppercase',
 });
 
+const unavailableMessage = (state: CapabilityState): string => {
+  switch (state) {
+    case 'loading':
+      return 'Integration configuration is still loading. Character building and recipe preparation remain available.';
+    case 'error':
+      return 'Integration configuration could not be read. Retry from the header; local preparation remains available.';
+    case 'ready':
+      return 'Decart is not configured. You can prepare characters and try-on recipes, but AI Start is unavailable.';
+  }
+};
+
 export const AIExperienceChooser = ({
   open,
   decartAvailable,
@@ -92,12 +103,7 @@ export const AIExperienceChooser = ({
 }: AIExperienceChooserProps) => {
   const theme = useTheme();
   const startAvailable = capabilityState === 'ready' && decartAvailable;
-  const unavailableMessage =
-    capabilityState === 'loading'
-      ? 'Integration configuration is still loading. Character building and recipe preparation remain available.'
-      : capabilityState === 'error'
-        ? 'Integration configuration could not be read. Retry from the header; local preparation remains available.'
-        : 'Decart is not configured. You can prepare characters and try-on recipes, but AI Start is unavailable.';
+  const startUnavailableMessage = unavailableMessage(capabilityState);
 
   return (
     <OverlayPanel
@@ -140,7 +146,7 @@ export const AIExperienceChooser = ({
               </>
             )}
             {!startAvailable ? (
-              <StatusNotice role="status">{unavailableMessage}</StatusNotice>
+              <StatusNotice role="status">{startUnavailableMessage}</StatusNotice>
             ) : null}
           </div>
         </article>
@@ -170,7 +176,7 @@ export const AIExperienceChooser = ({
               Choose Saved Try-On
             </Button>
             {!startAvailable ? (
-              <StatusNotice role="status">{unavailableMessage}</StatusNotice>
+              <StatusNotice role="status">{startUnavailableMessage}</StatusNotice>
             ) : null}
           </div>
         </article>

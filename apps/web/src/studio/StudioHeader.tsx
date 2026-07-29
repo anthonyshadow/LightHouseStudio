@@ -34,6 +34,15 @@ const capabilityLabel = (
   return available ? 'configured' : unavailableLabel;
 };
 
+const systemStatusLabel = (
+  capabilityState: CapabilityState,
+  systemState: 'loading' | 'ready' | 'limited',
+): string => {
+  if (capabilityState === 'loading') return 'Checking integrations';
+  if (capabilityState === 'error') return 'Integration status unavailable';
+  return systemState === 'ready' ? 'Studio available to try' : 'Studio limited';
+};
+
 export const StudioHeader = ({
   availability,
   browser,
@@ -58,14 +67,7 @@ export const StudioHeader = ({
       : localCaptureAvailable && availability.decart
         ? 'ready'
         : 'limited';
-  const systemLabel =
-    systemState === 'loading'
-      ? 'Checking integrations'
-      : capabilityState === 'error'
-        ? 'Integration status unavailable'
-        : systemState === 'ready'
-          ? 'Studio available to try'
-          : 'Studio limited';
+  const systemLabel = systemStatusLabel(capabilityState, systemState);
   const characterImageUrl = activeCharacterImageAssetId
     ? referenceImageContentUrl(activeCharacterImageAssetId)
     : null;

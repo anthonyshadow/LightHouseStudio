@@ -47,6 +47,15 @@ const samePreferences = (left: CapturePreferences, right: CapturePreferences): b
   left.audioDeviceId === right.audioDeviceId &&
   left.profile === right.profile;
 
+const selectedDeviceUnavailable = (
+  devicesState: CapturePreferencesController['devicesState'],
+  devices: readonly CaptureDeviceOption[],
+  selectedDeviceId: string | null,
+): boolean =>
+  devicesState === 'ready' &&
+  Boolean(selectedDeviceId) &&
+  !devices.some(({ deviceId }) => deviceId === selectedDeviceId);
+
 export const useCapturePreferences = ({
   stream,
   onApply,
@@ -151,14 +160,16 @@ export const useCapturePreferences = ({
     setApplyError(null);
     const request = (async () => {
       try {
-        const videoUnavailable =
-          devicesState === 'ready' &&
-          Boolean(preferences.videoDeviceId) &&
-          !cameraDevices.some(({ deviceId }) => deviceId === preferences.videoDeviceId);
-        const audioUnavailable =
-          devicesState === 'ready' &&
-          Boolean(preferences.audioDeviceId) &&
-          !microphoneDevices.some(({ deviceId }) => deviceId === preferences.audioDeviceId);
+        const videoUnavailable = selectedDeviceUnavailable(
+          devicesState,
+          cameraDevices,
+          preferences.videoDeviceId,
+        );
+        const audioUnavailable = selectedDeviceUnavailable(
+          devicesState,
+          microphoneDevices,
+          preferences.audioDeviceId,
+        );
         await onApply({
           ...preferences,
           videoDeviceId: videoUnavailable ? null : preferences.videoDeviceId,
@@ -194,12 +205,12 @@ export const useCapturePreferences = ({
   const appliedVideoUnavailable =
     Boolean(applied.videoDeviceId) &&
     (runtimeUnavailableVideoId === applied.videoDeviceId ||
-      (devicesState === 'ready' &&
-        !cameraDevices.some(({ deviceId }) => deviceId === applied.videoDeviceId)));
-  const appliedAudioUnavailable =
-    devicesState === 'ready' &&
-    Boolean(applied.audioDeviceId) &&
-    !microphoneDevices.some(({ deviceId }) => deviceId === applied.audioDeviceId);
+      selectedDeviceUnavailable(devicesState, cameraDevices, applied.videoDeviceId));
+  const appliedAudioUnavailable = selectedDeviceUnavailable(
+    devicesState,
+    microphoneDevices,
+    applied.audioDeviceId,
+  );
   const effectiveApplied = useMemo<CapturePreferences>(
     () => ({
       ...applied,

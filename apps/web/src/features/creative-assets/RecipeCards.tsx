@@ -46,6 +46,14 @@ const Tags = ({ tags }: { tags: readonly string[] }) => {
   );
 };
 
+const recentPromptReferenceLabel = (item: RecentPrompt, imageOnly: boolean): string => {
+  if (!item.referenceImageAssetId) {
+    return item.savedPromptId ? 'Linked to saved recipe' : 'Recent text only';
+  }
+  if (!imageOnly) return 'Reference image attached';
+  return item.savedCharacterPromptId ? 'Linked to saved character' : 'Image-only character';
+};
+
 export const SavedPromptCard = ({
   item,
   selected = false,
@@ -172,6 +180,7 @@ export const RecentPromptCard = ({
   const theme = useTheme();
   const imageOnly = !item.prompt.trim() && Boolean(item.referenceImageAssetId);
   const title = item.characterName ?? 'Recent direction';
+  const referenceLabel = recentPromptReferenceLabel(item, imageOnly);
   return (
     <article css={cardStyles(theme, selected)} data-selected={selected || undefined}>
       <header css={cardHeaderStyles(theme)}>
@@ -195,17 +204,7 @@ export const RecentPromptCard = ({
       </header>
       <div css={metadataStyles(theme)}>
         <span>{modeName(item.modelModeId)}</span>
-        <span>
-          {item.referenceImageAssetId
-            ? imageOnly
-              ? item.savedCharacterPromptId
-                ? 'Linked to saved character'
-                : 'Image-only character'
-              : 'Reference image attached'
-            : item.savedPromptId
-              ? 'Linked to saved recipe'
-              : 'Recent text only'}
-        </span>
+        <span>{referenceLabel}</span>
       </div>
       {item.referenceImageAssetId ? (
         <ReferenceImagePreview
