@@ -28,7 +28,15 @@ As a creator, I want to choose the camera, microphone, and local quality target 
    stream to become healthy and appear on the persistent stage before the prior stream is released.
 10. Leave the panel open while connecting or disconnecting a device. The list refreshes on the
     browser `devicechange` event; **Refresh** remains available for browser/OS discovery delays.
-    A newly appearing phone is never selected automatically.
+    The app also rescans after an explicit camera Start succeeds because mobile browsers may expose
+    front/back cameras only after permission. A newly appearing phone is never selected
+    automatically.
+11. During a ready local preview, use **Switch camera** in the stage video control bar only when
+    the active track reports a front/rear `facingMode` and post-permission device capabilities
+    expose the opposite mode. The app requests the opposite `user`/`environment` mode instead of
+    cycling unrelated camera sources. The replacement becomes healthy before the old owned stream
+    is stopped. When the active video track exposes a numeric zoom capability, use the adjacent
+    **Zoom camera out/in** controls; unsupported controls are omitted rather than simulated.
 
 The live-stage mic and camera on/off controls affect the current session
 immediately. They are separate from Capture Settings, which owns source/profile

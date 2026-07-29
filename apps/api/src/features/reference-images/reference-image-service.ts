@@ -135,7 +135,7 @@ export class ReferenceImageService {
   }
 
   get editAvailable(): boolean {
-    return this.#provider?.edit !== undefined && this.#optimizer !== null;
+    return this.#provider?.edit !== undefined;
   }
 
   async optimize(

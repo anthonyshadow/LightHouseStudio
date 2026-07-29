@@ -209,7 +209,7 @@ describe('reference image contracts', () => {
     ).toBe(false);
   });
 
-  it('requires nonempty, bounded edit instructions and an enabled optimization', () => {
+  it('requires nonempty, bounded edit instructions and accepts the explicit fallback branch', () => {
     const request = {
       requestId: 'cb6ab812-0ebd-455b-8fe1-3a3665daf158',
       rawPrompt: 'A ceramic astronaut',
@@ -232,18 +232,18 @@ describe('reference image contracts', () => {
       editReferenceImageRequestSchema.safeParse({ ...request, changeInstructions: '   ' }).success,
     ).toBe(false);
     expect(
-      editReferenceImageRequestSchema.safeParse({
+      editReferenceImageRequestSchema.parse({
         ...request,
         optimization: { enabled: false },
-      }).success,
-    ).toBe(false);
+      }).optimization,
+    ).toEqual({ enabled: false });
     expect(
       editReferenceImageRequestSchema.safeParse({ ...request, sourceImageBytes: 'private' })
         .success,
     ).toBe(false);
   });
 
-  it('requires enabled optimization for source-image composition', () => {
+  it('accepts optimized and explicit raw-fallback source-image composition', () => {
     const request = {
       requestId: 'cb6ab812-0ebd-455b-8fe1-3a3665daf158',
       rawPrompt: 'A ceramic astronaut',
@@ -260,11 +260,11 @@ describe('reference image contracts', () => {
 
     expect(composeReferenceImageRequestSchema.parse(request)).toEqual(request);
     expect(
-      composeReferenceImageRequestSchema.safeParse({
+      composeReferenceImageRequestSchema.parse({
         ...request,
         optimization: { enabled: false },
-      }).success,
-    ).toBe(false);
+      }).optimization,
+    ).toEqual({ enabled: false });
     expect(
       composeReferenceImageRequestSchema.safeParse({ ...request, sourceImageBytes: 'private' })
         .success,

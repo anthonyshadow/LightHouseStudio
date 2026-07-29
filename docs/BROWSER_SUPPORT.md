@@ -31,7 +31,8 @@ scroll and focus to the existing preview/generation region. The preview remains 
 the single-column DOM; no duplicate controls or state are created.
 
 The in-stage session control bar owns **Start Camera + Mic**, **Start AI**, mic/camera toggles,
-**Record**/**Stop recording**, AI Change/Stop, and compact take actions. In live and playback states
+capability-gated camera switching/zoom, **Record**/**Stop recording**, AI Change/Stop, and compact
+take actions. In live and playback states
 it hides after three seconds of inactivity and returns when the persistent stage receives
 pointer/mouse, touch, or focus activity, or when keyboard activity occurs. These inputs share one
 timer owner. During recording the bar collapses to the dominant **Stop recording** action, which
@@ -55,21 +56,23 @@ The executable visual matrix and pruning inventory share the same case paths. Da
 
 ## Capability matrix
 
-| Capability                       | Required browser API or condition                                       | Degradation                                                                                     |
-| -------------------------------- | ----------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
-| Prompt Workshop and Recipe Shelf | React, `localStorage` for durability                                    | Falls back to in-memory session-only assets if storage fails                                    |
-| Character drafts                 | IndexedDB                                                               | Keeps the current draft in memory, warns before unsafe close, and exposes retry or discard      |
-| Character Builder references     | Same-origin broker and writable `LIGHTFRAME_DATA_DIR`                   | Prompt-only drafting/save remains; upload/generation reports the storage failure                |
-| Legacy Guided projects           | IndexedDB with structured-clone `Blob` support                          | Keeps retained records available for manager download/delete when durable storage can be opened |
-| Capture source selection         | `enumerateDevices`; labels may require prior permission                 | Default camera/microphone remain selectable                                                     |
-| Camera preview                   | Secure context, `navigator.mediaDevices.getUserMedia`                   | Blocked with actionable notice                                                                  |
-| Recording                        | `MediaRecorder`, a live video track, a supported/default MIME type      | Record is disabled/errors safely; the live session remains available for explicit Close/Stop AI |
-| Model output                     | Local capture, WebRTC, official Decart SDK/provider reachability        | Local fallback remains; AI unavailable                                                          |
-| Local voice effects              | `AudioContext`, `OfflineAudioContext`, decode support                   | Original take remains downloadable                                                              |
-| Processed remux                  | Mediabunny input parsing plus browser AAC or Opus encoding              | Processing fails safely; original/last valid take remains                                       |
-| ElevenLabs conversion            | Audio sidecar, same-origin broker, provider account/model/voice support | Local effects and original remain available                                                     |
-| ElevenLabs preview               | Explicit voice-browser action, fetch/Blob URL/audio playback            | Preview exposes retry; selection and the valid take remain available                            |
-| Download                         | Blob URLs and browser download handling                                 | Mobile browsers may open/share instead of saving directly                                       |
+| Capability                       | Required browser API or condition                                         | Degradation                                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------- |
+| Prompt Workshop and Recipe Shelf | React, `localStorage` for durability                                      | Falls back to in-memory session-only assets if storage fails                                    |
+| Character drafts                 | IndexedDB                                                                 | Keeps the current draft in memory, warns before unsafe close, and exposes retry or discard      |
+| Character Builder references     | Same-origin broker and writable `LIGHTFRAME_DATA_DIR`                     | Prompt-only drafting/save remains; upload/generation reports the storage failure                |
+| Legacy Guided projects           | IndexedDB with structured-clone `Blob` support                            | Keeps retained records available for manager download/delete when durable storage can be opened |
+| Capture source selection         | `enumerateDevices`; labels may require prior permission                   | Default camera/microphone remain selectable                                                     |
+| Camera preview                   | Secure context, `navigator.mediaDevices.getUserMedia`                     | Blocked with actionable notice                                                                  |
+| Front/rear camera switching      | Active `facingMode` plus an opposite mode in post-permission capabilities | Switch control is omitted; the current camera remains                                           |
+| Camera zoom                      | Active track `getCapabilities().zoom` and `applyConstraints`              | Zoom controls are omitted; capture remains available                                            |
+| Recording                        | `MediaRecorder`, a live video track, a supported/default MIME type        | Record is disabled/errors safely; the live session remains available for explicit Close/Stop AI |
+| Model output                     | Local capture, WebRTC, official Decart SDK/provider reachability          | Local fallback remains; AI unavailable                                                          |
+| Local voice effects              | `AudioContext`, `OfflineAudioContext`, decode support                     | Original take remains downloadable                                                              |
+| Processed remux                  | Mediabunny input parsing plus browser AAC or Opus encoding                | Processing fails safely; original/last valid take remains                                       |
+| ElevenLabs conversion            | Audio sidecar, same-origin broker, provider account/model/voice support   | Local effects and original remain available                                                     |
+| ElevenLabs preview               | Explicit voice-browser action, fetch/Blob URL/audio playback              | Preview exposes retry; selection and the valid take remain available                            |
+| Download                         | Blob URLs and browser download handling                                   | Mobile browsers may open/share instead of saving directly                                       |
 
 ## Phone webcams and Apple Continuity Camera
 
@@ -82,7 +85,20 @@ newly discovered phone automatically.
 Readable device names usually require camera permission from a prior explicit Start. Before that,
 a browser may return a generic name, an empty label, or a reduced device list. Opening or refreshing
 Capture Settings enumerates devices and reads permission state where supported; it never calls
-`getUserMedia` or triggers a permission prompt.
+`getUserMedia` or triggers a permission prompt. After an explicit Start succeeds, Lightframe
+rescans so browsers that reveal front/back or phone cameras only after permission can populate the
+list. Exact device selection does not also request a competing facing mode.
+
+During a ready local preview, **Switch camera** is distinct from Capture Settings source selection.
+It appears only when the active track reports `user` or `environment` and the browser's
+post-permission input capabilities expose the opposite mode. The action reacquires atomically with
+an exact opposite `facingMode`; it does not cycle unrelated webcams or Continuity Camera sources.
+If the browser does not expose enough facing metadata, the button is omitted.
+
+If the active track publishes numeric `zoom` capabilities, **Zoom camera out/in** applies bounded
+track constraints and the recorded source receives that camera-level zoom. If iOS Safari omits
+`getCapabilities().zoom`, Lightframe cannot request native optical/digital camera zoom through the
+web platform and does not show a misleading CSS-only crop control.
 
 On a compatible Mac and iPhone, Apple Continuity Camera generally requires:
 

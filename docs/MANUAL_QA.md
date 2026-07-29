@@ -71,7 +71,17 @@ Enter through `/projects`, `/?project=…`, and `/guided?project=…`; confirm e
 2. Select a camera, microphone, and local quality target, then Apply. With no live preview, confirm media still does not start; the choices are used only when a later explicit Start occurs.
 3. Reload. Confirm camera id, microphone id, and local quality target return to defaults and that no device id or label was added to `localStorage`.
 4. Start local preview, open Capture Settings, and verify Active capture reports labels and negotiated resolution/frame rate from track settings. The browser may negotiate below the target.
+   Confirm the post-permission rescan reveals any front/back/phone cameras that were hidden or
+   generically labelled before Start.
 5. With two usable inputs, Apply a different camera/microphone. Confirm the complete replacement becomes live, then the old owned tracks stop. During acquisition there must never be an empty committed stream.
+   On a phone whose post-permission capabilities report both `user` and `environment`, close
+   settings and select **Switch camera** in the stage control bar. Confirm it requests the opposite
+   facing mode and preserves the current stream until replacement succeeds. Confirm the button is
+   absent for desktop webcams, Continuity Camera, and any source without an exposed opposite mode;
+   it must not cycle those unrelated sources.
+   If the active track reports zoom capabilities, exercise **Zoom camera out** and **Zoom camera
+   in**, confirm bounds are enforced and affect the captured track, and confirm the controls are
+   absent on a track without numeric `getCapabilities().zoom`.
 6. On macOS, expose a nearby iPhone through Continuity Camera. Confirm its browser-provided label
    appears beside the built-in and other connected cameras without a custom network/proximity
    request. Selecting it and applying settings must switch the persistent preview while the panel
@@ -186,7 +196,7 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Open Dock, Take, Workshop, Shelf, and Capture Settings in succession. Confirm only one major tool remains open and opening/closing it does not start or stop media/provider work.
 - Make a Recipe Shelf editor or capture-settings draft dirty, close the overlay, open another major tool, and reopen it. Ordinary closure must preserve the draft and focus return; only the tool's explicit Reset/Discard action may clear pending values.
 - Close and reopen Prompt Workshop. Confirm the current Add, Replace, and Restyle draft remains in tab memory. Reset current intent must warn only when that intent has content and must not clear another intent's draft.
-- In Character Builder, confirm full-body reference framing is the default and framing, orientation, rendering, expression, and background choices are draft-persisted. Generate a valid character and verify optimizer/generator failures block generation with Retry and no raw fallback.
+- In Character Builder, confirm full-body reference framing is the default and framing, orientation, rendering, expression, and background choices are draft-persisted. Force optimization to fail while image generation remains available: the image must generate from the raw direction, show a yellow warning, and retain Save. Select **Retry optimization and regenerate**; a successful optimizer retry must create a new optimized asset, while another optimizer failure must keep the valid raw preview. Separately force image-provider failure and confirm it blocks with targeted Retry and no provider fallback.
 - After a generated Builder reference is saved, verify Lucy receives the saved compact prompt, image, and `enhance: true` in the same state replacement.
 - Stack Voice Browser over Voice Treatments. Confirm the parent is inert/hidden from assistive technology until the child closes, Escape closes only the child, and focus then returns to the parent before the major overlay can close.
 - Begin closing an overlay and immediately pointer-down/click its backdrop above Record or a stage action. Confirm the exiting backdrop remains mounted for the animation, intercepts the event, and no underlying action fires. Repeat with reduced motion enabled.

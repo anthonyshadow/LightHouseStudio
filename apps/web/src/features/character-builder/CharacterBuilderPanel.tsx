@@ -21,6 +21,7 @@ export interface CharacterBuilderPanelProps {
   state: CharacterBuilderState;
   returnFocusRef?: RefObject<HTMLElement | null>;
   generationAvailable: boolean;
+  optimizationAvailable?: boolean;
   editAvailable: boolean;
   referenceImageProvider?: 'openai' | 'bfl' | 'wiro' | null;
   referenceImageModel?: string | null;
@@ -37,6 +38,7 @@ export interface CharacterBuilderPanelProps {
   onChange: (draft: CharacterTransformDraft, design: GuidedDesignV1) => void;
   onOptionsChange: (options: CharacterReferenceOptions) => void;
   onGenerate: () => void;
+  onRetryOptimization?: () => void;
   onUploadReference?: (file: File) => void;
   onRemoveUpload?: () => void;
   onRequestRegeneration: () => void;
@@ -109,7 +111,7 @@ const buildReferenceGenerationDisclosure = ({
   referenceImageOptimizerModel,
 }: ReferenceGenerationDisclosureOptions): string => {
   const optimizerContact = referenceImageOptimizerModel
-    ? `OpenAI (${referenceImageOptimizerModel}) optimizes the direction, then `
+    ? `OpenAI (${referenceImageOptimizerModel}) attempts to optimize the direction, then `
     : '';
 
   if (referenceImageProvider === 'wiro') {
@@ -137,6 +139,7 @@ export const CharacterBuilderPanel = ({
   state,
   returnFocusRef,
   generationAvailable,
+  optimizationAvailable = true,
   editAvailable,
   referenceImageProvider = null,
   referenceImageModel = null,
@@ -153,6 +156,7 @@ export const CharacterBuilderPanel = ({
   onChange,
   onOptionsChange,
   onGenerate,
+  onRetryOptimization = () => undefined,
   onUploadReference = () => undefined,
   onRemoveUpload = () => undefined,
   onRequestRegeneration,
@@ -183,6 +187,12 @@ export const CharacterBuilderPanel = ({
   const operationLocked = saving || closing;
   const formLocked = operationLocked || state.phase === 'restoring' || saveRecoveryPending;
   const previewIsUsable = Boolean(state.preview && !state.preview.stale);
+  const previewUsedRawPrompt = Boolean(
+    state.preview &&
+    !state.preview.stale &&
+    state.preview.asset.source === 'generated' &&
+    !state.preview.asset.optimizationEnabled,
+  );
   const uploadedReference = state.uploadedReference;
   const previewCapabilityAvailable = generationAvailable && (!uploadedReference || editAvailable);
   const heroReference = state.preview?.asset ?? uploadedReference?.asset ?? null;
@@ -359,6 +369,33 @@ export const CharacterBuilderPanel = ({
                       ? 'Combined preview generation is unavailable. You can still save and use the uploaded image directly.'
                       : 'Reference image generation is unavailable. You can still save this character without an image.'}
                   </span>
+                ) : null}
+                {previewUsedRawPrompt ? (
+                  <StatusNotice
+                    tone="warning"
+                    role="status"
+                    title={
+                      optimizationAvailable
+                        ? 'Prompt optimization failed'
+                        : 'Prompt optimization unavailable'
+                    }
+                  >
+                    <div>
+                      This preview was generated from your raw character prompt so image generation
+                      could continue.
+                    </div>
+                    {optimizationAvailable ? (
+                      <Button
+                        type="button"
+                        size="small"
+                        variant="quiet"
+                        disabled={generationBusy || formLocked || !previewCapabilityAvailable}
+                        onClick={onRetryOptimization}
+                      >
+                        Retry optimization and regenerate
+                      </Button>
+                    ) : null}
+                  </StatusNotice>
                 ) : null}
                 <StatusNotice
                   id="character-builder-provider-disclosure"

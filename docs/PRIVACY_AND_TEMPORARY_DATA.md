@@ -92,8 +92,10 @@ eligibility. Local cleanup is never represented as provider-side deletion.
 - Character reference generation exists only in Character Builder. Beside **Generate Preview** and
   **Generate Combined Preview**, and again inside **Regenerate**, Builder names the optimizer,
   selected image provider/model, possible credit usage, retained immutable output, and provider-free
-  upload/save alternatives. Builder never silently falls back to a raw prompt after optimizer
-  failure. Each provider action may be billable. Prompt Workshop has no provider or
+  upload/save alternatives. If optimization fails, Builder continues through the same explicitly
+  selected image provider with the raw direction, shows a yellow warning on the result, and offers
+  an explicit optimization retry that creates a new immutable image only after optimization
+  succeeds. Each image-provider action may be billable. Prompt Workshop has no provider or
   reference-generation action.
 - **Browse saved ElevenLabs voices · contacts provider** requests only `voice_type=saved` metadata after the disclosure is opened; it does not send the take. Every provider-contacting voice request carries the explicit Studio voice-intent header, which the loopback broker requires before invoking ElevenLabs.
 - **Preview voice** is a labeled click-to-fetch action. It requests provider preview audio, owns and revokes the resulting Blob URL, and does not send the recording.

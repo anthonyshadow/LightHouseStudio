@@ -190,6 +190,55 @@ describe('StudioSessionControlBar', () => {
     expect(session.stopCamera).toHaveBeenCalledOnce();
   });
 
+  it('offers capability-gated camera switching and zoom in the stage control bar', async () => {
+    const user = userEvent.setup();
+    const switchCamera = vi.fn().mockResolvedValue(undefined);
+    const setZoom = vi.fn().mockResolvedValue(undefined);
+    const session = createSession({
+      lifecycle: 'ready',
+      localStream: stream,
+      cameraControls: {
+        facingMode: 'user',
+        nextFacingMode: 'environment',
+        switching: false,
+        zoom: { min: 1, max: 3, step: 0.5, value: 1.5 },
+        error: null,
+        switchCamera,
+        setZoom,
+      },
+    });
+    renderBar(session);
+
+    await user.click(screen.getByRole('button', { name: 'Switch to rear camera' }));
+    await user.click(screen.getByRole('button', { name: 'Zoom camera in' }));
+    await user.click(screen.getByRole('button', { name: 'Zoom camera out' }));
+
+    expect(switchCamera).toHaveBeenCalledOnce();
+    expect(setZoom).toHaveBeenNthCalledWith(1, 2);
+    expect(setZoom).toHaveBeenNthCalledWith(2, 1);
+    expect(screen.getByText('Zoom 1.5×')).toBeVisible();
+  });
+
+  it('omits facing-mode switching when the browser exposes no opposite-facing camera', () => {
+    const session = createSession({
+      lifecycle: 'ready',
+      localStream: stream,
+      cameraControls: {
+        facingMode: 'user',
+        nextFacingMode: null,
+        switching: false,
+        zoom: { min: 1, max: 3, step: 0.5, value: 1 },
+        error: null,
+        switchCamera: vi.fn().mockResolvedValue(undefined),
+        setZoom: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+    renderBar(session);
+
+    expect(screen.queryByRole('button', { name: /switch to .* camera/i })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Zoom camera in' })).toBeVisible();
+  });
+
   it('stops only AI while preserving the separate end-session action', async () => {
     const user = userEvent.setup();
     const session = createSession({

@@ -18,7 +18,6 @@ import {
   createWorkshopPromptHash,
   REFERENCE_IMAGE_COMPOSITION_PROMPT_TEMPLATE_VERSION,
   REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION,
-  versionReferenceImagePrompt,
 } from './prompt.js';
 
 export interface GenerateReferenceImageInput extends CreateReferenceImageRequest {
@@ -299,14 +298,13 @@ export const prepareReferenceImageGeneration = (
     };
   }
 
-  const versioned = versionReferenceImagePrompt(input.rawPrompt, input.options.framing);
   const size = ORIENTATION_DEFAULTS[input.options.orientation].size;
   const result: CharacterPromptOptimizationResult = {
-    optimizedImagePrompt: versioned.derivedPrompt,
+    optimizedImagePrompt: input.rawPrompt,
     lucy25CharacterPrompt: input.rawPrompt,
     normalizedCharacterDescription: input.rawPrompt,
     preservedCharacterFacts: [],
-    technicalDefaultsAdded: ['Applied the existing deterministic reference-image wrapper.'],
+    technicalDefaultsAdded: [],
     warnings: [],
     recommendedSettings: recommendedSettingsForSize(
       size,
@@ -316,7 +314,7 @@ export const prepareReferenceImageGeneration = (
     ),
   };
   return {
-    prompt: versioned.derivedPrompt,
+    prompt: input.rawPrompt,
     size,
     format: 'jpeg',
     promptHash: createWorkshopPromptHash(input.rawPrompt),

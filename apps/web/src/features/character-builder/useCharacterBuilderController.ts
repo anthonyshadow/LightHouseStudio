@@ -46,6 +46,7 @@ export type {
 export interface UseCharacterBuilderControllerOptions {
   readonly open: boolean;
   readonly generationAvailable: boolean;
+  readonly optimizationAvailable?: boolean;
   readonly editAvailable: boolean;
   readonly saveBlockedReason?: string | undefined;
   readonly legacyRepository?: LocalProjectRepository | undefined;
@@ -75,6 +76,7 @@ const editIsBlocked = (
 export const useCharacterBuilderController = ({
   open,
   generationAvailable,
+  optimizationAvailable = true,
   editAvailable,
   saveBlockedReason,
   legacyRepository,
@@ -127,10 +129,12 @@ export const useCharacterBuilderController = ({
   const {
     cancel: cancelGeneration,
     generatePreview,
+    retryOptimization,
     regenerate,
   } = useCharacterReferenceGeneration({
     open,
     generationAvailable,
+    optimizationAvailable,
     editAvailable,
     stateRef,
     locksRef,
@@ -345,6 +349,7 @@ export const useCharacterBuilderController = ({
     onChange: changeDraft,
     onOptionsChange: changeOptions,
     onGenerate: generatePreview,
+    onRetryOptimization: retryOptimization,
     onUploadReference: (file: File) => void upload.select(file),
     onRemoveUpload: upload.remove,
     onRequestRegeneration: () => {

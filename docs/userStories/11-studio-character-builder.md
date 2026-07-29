@@ -55,10 +55,18 @@ relationship but does not delete the stored asset.
 Prompt-only, prompt+uploaded-image, and **Save & Use Image Only** paths make no
 OpenAI optimizer or image-model request.
 
-The first **Generate Preview** attempt performs two phases:
+The first **Generate Preview** attempt normally performs two phases:
 
 1. Optimize the current structured direction.
 2. Generate a new immutable reference asset from that optimized prompt.
+
+If phase 1 fails or optimization is not configured, phase 2 still runs with the validated raw
+character direction through the same startup-selected image provider. The successful preview shows
+a yellow **Prompt optimization failed** (or unavailable) warning. When optimization is configured,
+**Retry optimization and regenerate** retries only the optimizer first and creates a replacement
+image with the optimized prompt only after that retry succeeds. A failed retry leaves the valid raw
+preview visible. This prompt fallback never changes the selected image provider or automatically
+retries a billable image submission.
 
 The action-adjacent disclosure names the OpenAI optimizer model and the startup-selected image
 provider/model, says provider credits may be used, and states that successful output remains an
@@ -72,8 +80,9 @@ again reuses the successful optimization while the normalized raw direction and
 reference options remain unchanged. Editing either input requires a new optimization.
 
 When an upload is attached, **Generate Combined Preview** replaces that action:
-it optimizes the current structured direction and sends the owner-scoped source
-bytes to the composition endpoint, which creates a new immutable result.
+it attempts to optimize the current structured direction and sends the owner-scoped source
+bytes plus either the optimized or raw direction to the composition endpoint, which creates a new
+immutable result.
 
 The preview announces `Optimizing prompt…` and `Generating preview…` without fake percentages. The current image remains in the stable frame during loading or failure.
 
@@ -118,19 +127,20 @@ It never displays Reopen and never enters the retired Guided runtime. No legacy 
 
 ## Failure and recovery behavior
 
-| Failure point                      | Required behavior                                                                                                      |
-| ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
-| Invalid/incomplete save input      | Keep every choice visible and leave the affected Save unavailable; a valid upload alone still permits image-only save. |
-| Upload validation/storage failure  | Reject unsupported, over-10-MiB, or over-40-megapixel input; preserve the prior valid draft/reference and allow retry. |
-| Draft persistence failure          | Preserve the tab copy, expose retry, and require explicit discard before unsafe close.                                 |
-| Optimization or generation failure | Keep form state and the previous preview; expose a targeted retry.                                                     |
-| Generation/edit unavailable        | Explain the provider boundary; prompt-only and direct-upload/image-only Save remain available where valid.             |
-| Stale preview                      | Keep it visible but exclude it from generated-image Save; retain the valid prompt/upload fallback.                     |
-| Missing stored reference           | Keep recoverable character text available and expose the applicable retry, clear, or continue-without-reference path.  |
-| Durable Shelf write failure        | Keep the panel open and do not publish in-memory success.                                                              |
-| Draft finalization failure         | Retain the saved ID and retry only finalization.                                                                       |
-| Studio preload failure             | Keep the saved character and retry preload without duplicating it.                                                     |
-| Missing legacy media               | Keep the project record visible and report that the selected bytes are unavailable.                                    |
+| Failure point                     | Required behavior                                                                                                      |
+| --------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Invalid/incomplete save input     | Keep every choice visible and leave the affected Save unavailable; a valid upload alone still permits image-only save. |
+| Upload validation/storage failure | Reject unsupported, over-10-MiB, or over-40-megapixel input; preserve the prior valid draft/reference and allow retry. |
+| Draft persistence failure         | Preserve the tab copy, expose retry, and require explicit discard before unsafe close.                                 |
+| Optimization failure              | Continue generation with the raw direction, show a yellow warning on success, and expose optimized regeneration retry. |
+| Generation failure                | Keep form state and the previous preview; expose a targeted retry without changing image provider.                     |
+| Generation/edit unavailable       | Explain the provider boundary; prompt-only and direct-upload/image-only Save remain available where valid.             |
+| Stale preview                     | Keep it visible but exclude it from generated-image Save; retain the valid prompt/upload fallback.                     |
+| Missing stored reference          | Keep recoverable character text available and expose the applicable retry, clear, or continue-without-reference path.  |
+| Durable Shelf write failure       | Keep the panel open and do not publish in-memory success.                                                              |
+| Draft finalization failure        | Retain the saved ID and retry only finalization.                                                                       |
+| Studio preload failure            | Keep the saved character and retry preload without duplicating it.                                                     |
+| Missing legacy media              | Keep the project record visible and report that the selected bytes are unavailable.                                    |
 
 ## Accessibility and responsive behavior
 

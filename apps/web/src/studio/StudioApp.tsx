@@ -637,9 +637,8 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
                 ? { initialValue: characterBuilderLaunch.initialValue }
                 : {})}
               returnFocusRef={characterSelectorRef}
-              generationAvailable={Boolean(
-                availability.referenceImages && availability.referenceImageOptimizerAvailable,
-              )}
+              generationAvailable={Boolean(availability.referenceImages)}
+              optimizationAvailable={Boolean(availability.referenceImageOptimizerAvailable)}
               editAvailable={Boolean(availability.referenceImageEditAvailable)}
               {...(availability.referenceImageProvider !== undefined
                 ? { referenceImageProvider: availability.referenceImageProvider }

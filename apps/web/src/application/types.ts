@@ -36,6 +36,7 @@ export type BrowserCapabilities = {
 };
 
 export type LocalCaptureProfileId = '720p30' | '1080p30';
+export type CameraFacingMode = 'user' | 'environment';
 
 export type CapturePreferences = {
   videoDeviceId: string | null;
@@ -46,6 +47,7 @@ export type CapturePreferences = {
 export type CaptureDeviceOption = {
   deviceId: string;
   label: string;
+  facingModes?: readonly CameraFacingMode[];
 };
 
 export type CaptureVideoSettings = {

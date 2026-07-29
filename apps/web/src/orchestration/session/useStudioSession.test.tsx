@@ -10,6 +10,10 @@ import type { ModelMode } from '../../features/media-session';
 
 const adapters = vi.hoisted(() => ({
   acquireLocalMedia: vi.fn(),
+  applyCameraZoom: vi.fn(),
+  enumerateMediaDevices: vi.fn(),
+  readCameraFacingState: vi.fn(),
+  readCameraZoomState: vi.fn(),
   requestRealtimeToken: vi.fn(),
   getDecartModelRequirements: vi.fn(),
   connectDecartRealtime: vi.fn(),
@@ -36,7 +40,10 @@ vi.mock('../../adapters/api-client/apiClient', () => {
 
 vi.mock('../../adapters/browser-media/browserMedia', () => ({
   acquireLocalMedia: adapters.acquireLocalMedia,
-  enumerateMediaDevices: vi.fn().mockResolvedValue([]),
+  applyCameraZoom: adapters.applyCameraZoom,
+  enumerateMediaDevices: adapters.enumerateMediaDevices,
+  readCameraFacingState: adapters.readCameraFacingState,
+  readCameraZoomState: adapters.readCameraZoomState,
   readCameraPermissionState: vi.fn().mockResolvedValue('unknown'),
   subscribeToMediaDeviceChanges: vi.fn(() => () => undefined),
   supportsLocal1080pProfile: () => true,
@@ -81,7 +88,11 @@ const deferred = <T,>(): Deferred<T> => {
   return { promise, resolve };
 };
 
-const fakeTrack = (kind: 'video' | 'audio'): ControllableTrack => {
+const fakeTrack = (
+  kind: 'video' | 'audio',
+  deviceId?: string,
+  facingMode?: 'user' | 'environment',
+): ControllableTrack => {
   const listeners = new Map<string, Listener>();
   let readyState: MediaStreamTrackState = 'live';
   return {
@@ -89,6 +100,11 @@ const fakeTrack = (kind: 'video' | 'audio'): ControllableTrack => {
     get readyState() {
       return readyState;
     },
+    getCapabilities: () => ({}),
+    getSettings: () => ({
+      ...(deviceId ? { deviceId } : {}),
+      ...(facingMode ? { facingMode } : {}),
+    }),
     applyConstraints: vi.fn().mockResolvedValue(undefined),
     addEventListener: vi.fn((event: string, listener: Listener) => listeners.set(event, listener)),
     removeEventListener: vi.fn((event: string, listener: Listener) => {
@@ -102,8 +118,12 @@ const fakeTrack = (kind: 'video' | 'audio'): ControllableTrack => {
   } as unknown as ControllableTrack;
 };
 
-const fakeStream = ({ video = true, audio = true } = {}): MediaStream => {
-  const videoTrack = video ? fakeTrack('video') : null;
+const fakeStream = (
+  { video = true, audio = true }: { video?: boolean; audio?: boolean } = {},
+  videoDeviceId?: string,
+  facingMode?: 'user' | 'environment',
+): MediaStream => {
+  const videoTrack = video ? fakeTrack('video', videoDeviceId, facingMode) : null;
   const audioTrack = audio ? fakeTrack('audio') : null;
   const tracks = [videoTrack, audioTrack].filter(
     (track): track is ControllableTrack => track !== null,
@@ -130,6 +150,10 @@ const fakeRealtimeSession = (apply = vi.fn().mockResolvedValue(undefined)): Real
 beforeEach(() => {
   vi.clearAllMocks();
   adapters.acquireLocalMedia.mockResolvedValue(fakeStream());
+  adapters.applyCameraZoom.mockResolvedValue({ min: 1, max: 4, step: 0.5, value: 2 });
+  adapters.enumerateMediaDevices.mockResolvedValue([]);
+  adapters.readCameraFacingState.mockReturnValue(null);
+  adapters.readCameraZoomState.mockReturnValue(null);
   adapters.getDecartModelRequirements.mockResolvedValue({
     width: 1_280,
     height: 720,
@@ -255,6 +279,78 @@ describe('useStudioSession explicit-start boundaries', () => {
       true,
     );
     expect(result.current.capturePreferences.applied.videoDeviceId).toBe('camera-2');
+    unmount();
+  });
+
+  it('switches phone camera facing mode through atomic replacement', async () => {
+    const front = fakeStream({}, 'front-camera', 'user');
+    const back = fakeStream({}, 'back-camera', 'environment');
+    const restartedBack = fakeStream({}, 'back-camera', 'environment');
+    adapters.acquireLocalMedia
+      .mockResolvedValueOnce(front)
+      .mockResolvedValueOnce(back)
+      .mockResolvedValueOnce(restartedBack);
+    adapters.readCameraFacingState.mockImplementation((track: MediaStreamTrack | undefined) => {
+      const current = track?.getSettings().facingMode;
+      return current === 'user'
+        ? { current: 'user', next: 'environment' }
+        : current === 'environment'
+          ? { current: 'environment', next: 'user' }
+          : null;
+    });
+    adapters.enumerateMediaDevices.mockResolvedValue([
+      {
+        kind: 'videoinput',
+        deviceId: 'front-camera',
+        label: 'Front Camera',
+        groupId: 'phone',
+        toJSON: () => ({}),
+      },
+      {
+        kind: 'videoinput',
+        deviceId: 'back-camera',
+        label: 'Back Camera',
+        groupId: 'phone',
+        toJSON: () => ({}),
+      },
+    ]);
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+
+    await act(async () => {
+      await result.current.startLocal();
+    });
+    await waitFor(() => expect(result.current.cameraControls?.nextFacingMode).toBe('environment'));
+
+    await act(async () => {
+      await result.current.cameraControls?.switchCamera();
+    });
+
+    expect(adapters.acquireLocalMedia).toHaveBeenLastCalledWith({
+      width: 1_280,
+      height: 720,
+      frameRate: 30,
+      facingMode: 'environment',
+    });
+    expect(result.current.localStream).toBe(back);
+    expect(front.getTracks().every((track) => vi.mocked(track.stop).mock.calls.length === 1)).toBe(
+      true,
+    );
+
+    await act(async () => {
+      await result.current.stopCamera();
+      await result.current.startLocal();
+    });
+    expect(adapters.acquireLocalMedia).toHaveBeenLastCalledWith({
+      width: 1_280,
+      height: 720,
+      frameRate: 30,
+      facingMode: 'environment',
+    });
+    expect(result.current.localStream).toBe(restartedBack);
     unmount();
   });
 

@@ -6,6 +6,7 @@ import type {
   ComposeReferenceImageRequest,
   CreateReferenceImageRequest,
   EditReferenceImageRequest,
+  GeneratedReferenceImageAsset,
   OptimizeCharacterReferencePromptRequest,
   OptimizeCharacterReferencePromptResponse,
   ReferenceImageAsset,
@@ -91,7 +92,9 @@ const optimization: OptimizeCharacterReferencePromptResponse = {
   inputHash: 'b'.repeat(64),
 };
 
-const referenceAsset = (assetId = '550e8400-e29b-41d4-a716-446655440000'): ReferenceImageAsset => ({
+const referenceAsset = (
+  assetId = '550e8400-e29b-41d4-a716-446655440000',
+): GeneratedReferenceImageAsset => ({
   assetId,
   mimeType: 'image/jpeg',
   size: '1024x1024',
@@ -119,6 +122,20 @@ const referenceAsset = (assetId = '550e8400-e29b-41d4-a716-446655440000'): Refer
   createdAt: '2026-07-18T12:00:00.000Z',
   updatedAt: '2026-07-18T12:00:00.000Z',
   contentUrl: `/api/reference-images/${assetId}/content`,
+});
+
+const rawReferenceAsset = (
+  assetId = '550e8400-e29b-41d4-a716-446655440010',
+): ReferenceImageAsset => ({
+  ...referenceAsset(assetId),
+  optimizationEnabled: false,
+  optimizedImagePrompt: rawPrompt,
+  lucy25CharacterPrompt: rawPrompt,
+  normalizedCharacterDescription: rawPrompt,
+  preservedCharacterFacts: [],
+  technicalDefaultsAdded: [],
+  optimizer: null,
+  optimizationInputHash: null,
 });
 
 const callbacks = (): ReferencePreviewGenerationCallbacks => ({
@@ -236,6 +253,73 @@ describe('useReferencePreviewGeneration', () => {
     expect(retriedRequest.requestId).toBe(firstRequest.requestId);
     expect(retriedRequest.optimization).toEqual(firstRequest.optimization);
     expect(handlers.onSuccess).toHaveBeenCalledOnce();
+  });
+
+  it('falls back to raw generation when optimization fails, then retries optimization before regenerating', async () => {
+    const optimizationError = new Error('Optimizer unavailable');
+    optimizeCharacterReferencePrompt
+      .mockRejectedValueOnce(optimizationError)
+      .mockResolvedValueOnce(optimization);
+    createReferenceImage
+      .mockResolvedValueOnce(rawReferenceAsset())
+      .mockResolvedValueOnce(referenceAsset());
+    const handlers = callbacks();
+    const { result } = renderHook(() => useReferencePreviewGeneration(handlers));
+
+    await act(async () => {
+      await result.current.generate({ rawPrompt, options });
+    });
+
+    expect(createReferenceImage.mock.calls[0]?.[0].optimization).toEqual({ enabled: false });
+    expect(handlers.onSuccess).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        asset: rawReferenceAsset(),
+        optimization: null,
+      }),
+    );
+    expect(handlers.onError).not.toHaveBeenCalled();
+
+    await act(async () => {
+      await result.current.generate({
+        rawPrompt,
+        options,
+        attemptOptimization: true,
+        fallbackOnOptimizationFailure: false,
+        forceOptimization: true,
+      });
+    });
+
+    expect(optimizeCharacterReferencePrompt).toHaveBeenCalledTimes(2);
+    expect(createReferenceImage.mock.calls[1]?.[0].optimization).toMatchObject({
+      enabled: true,
+      inputHash: optimization.inputHash,
+    });
+    expect(handlers.onSuccess).toHaveBeenLastCalledWith(
+      expect.objectContaining({
+        asset: referenceAsset(),
+        optimization,
+      }),
+    );
+  });
+
+  it('continues source-image composition through the raw branch after optimizer failure', async () => {
+    optimizeCharacterReferencePrompt.mockRejectedValueOnce(new Error('Optimizer unavailable'));
+    composeReferenceImage.mockResolvedValueOnce(rawReferenceAsset());
+    const handlers = callbacks();
+    const { result } = renderHook(() => useReferencePreviewGeneration(handlers));
+    const sourceAssetId = '550e8400-e29b-41d4-a716-446655440001';
+
+    await act(async () => {
+      await result.current.generate({ rawPrompt, options, sourceAssetId });
+    });
+
+    expect(composeReferenceImage).toHaveBeenCalledWith(
+      sourceAssetId,
+      expect.objectContaining({ optimization: { enabled: false } }),
+      expect.any(AbortSignal),
+    );
+    expect(handlers.onSuccess).toHaveBeenCalledOnce();
+    expect(handlers.onError).not.toHaveBeenCalled();
   });
 
   it('reuses the optimization when only the generation source changes', async () => {

@@ -14,6 +14,7 @@ export interface CharacterBuilderCoordinatorProps {
   readonly open: boolean;
   readonly returnFocusRef?: RefObject<HTMLElement | null>;
   readonly generationAvailable: boolean;
+  readonly optimizationAvailable?: boolean;
   readonly editAvailable: boolean;
   readonly referenceImageProvider?: 'openai' | 'bfl' | 'wiro' | null;
   readonly referenceImageModel?: string | null;

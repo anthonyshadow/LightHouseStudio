@@ -119,7 +119,7 @@ describe('API shell', () => {
     expect(capabilities.json()).toMatchObject({
       referenceImages: {
         available: true,
-        editAvailable: false,
+        editAvailable: true,
         providerId: 'wiro',
         modelId: 'seedream-v5-lite-uncensored',
         optimizer: { available: false },

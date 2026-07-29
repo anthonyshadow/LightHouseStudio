@@ -3,10 +3,11 @@ import type { RealtimeSessionProfile } from '@studio/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   hasLiveVideo,
+  readCameraFacingState,
   withCaptureDevices,
   type MediaRequirements,
 } from '../../adapters/browser-media/browserMedia';
-import type { CapturePreferences } from '../../application/types';
+import type { CameraFacingMode, CapturePreferences } from '../../application/types';
 import {
   toSafeMediaError,
   type ProviderAvailability,
@@ -48,6 +49,16 @@ const canFallbackFromSelectedCamera = (error: unknown): boolean => {
   ].includes(String(error.name));
 };
 
+const withPreferredFacingMode = (
+  requirements: MediaRequirements,
+  preferences: CapturePreferences,
+  facingMode: CameraFacingMode | null,
+): MediaRequirements => {
+  const preferred = withCaptureDevices(requirements, preferences);
+  if (!facingMode || preferences.videoDeviceId) return preferred;
+  return { ...preferred, facingMode };
+};
+
 export const useStudioSession = ({
   availability,
   realtimeSessionProfile,
@@ -56,7 +67,11 @@ export const useStudioSession = ({
   const [lifecycle, setLifecycle] = useState<SessionLifecycle>('idle');
   const [error, setError] = useState<SafeMediaError | null>(null);
   const [applying, setApplying] = useState(false);
+  const [switchingCamera, setSwitchingCamera] = useState(false);
+  const [cameraControlError, setCameraControlError] = useState<string | null>(null);
   const operationRef = useRef(0);
+  const cameraControlOperationRef = useRef(0);
+  const preferredFacingModeRef = useRef<CameraFacingMode | null>(null);
   const startAbortRef = useRef<AbortController | null>(null);
   const disconnectRealtimeRef = useRef<() => void>(() => undefined);
   const {
@@ -104,8 +119,10 @@ export const useStudioSession = ({
     currentRequirements,
     microphoneEnabled,
     cameraEnabled,
+    cameraZoom,
     toggleMicrophone,
     toggleCamera,
+    setCameraZoom,
     release: releaseLocalMedia,
   } = useOwnedLocalMedia({
     operationRef,
@@ -137,7 +154,11 @@ export const useStudioSession = ({
         draftRef.current.mode === 'local'
           ? localMediaRequirements(preferences.profile)
           : (currentRequirements ?? LOCAL_MEDIA_REQUIREMENTS);
-      const requirements = withCaptureDevices(baseRequirements, preferences);
+      const requirements = withPreferredFacingMode(
+        baseRequirements,
+        preferences,
+        preferredFacingModeRef.current,
+      );
       const operation = ++operationRef.current;
       setError(null);
       setLifecycle('requesting-media');
@@ -146,6 +167,7 @@ export const useStudioSession = ({
         if (operationRef.current !== operation) {
           throw new DOMException('Superseded media request.', 'AbortError');
         }
+        if (preferences.videoDeviceId) preferredFacingModeRef.current = null;
         setLifecycle('ready');
       } catch (caught) {
         if (operationRef.current === operation) {
@@ -162,8 +184,58 @@ export const useStudioSession = ({
     stream: localStream,
     onApply: applyCapturePreferences,
   });
-  const { effectiveApplied: effectiveCapturePreferences, reportVideoDeviceUnavailable } =
-    capturePreferences;
+  const {
+    cameraDevices,
+    effectiveApplied: effectiveCapturePreferences,
+    reportVideoDeviceUnavailable,
+  } = capturePreferences;
+
+  const activeCameraTrack = localStream?.getVideoTracks()[0];
+  const cameraFacing =
+    effectiveCapturePreferences.videoDeviceId === null
+      ? readCameraFacingState(activeCameraTrack, cameraDevices)
+      : null;
+
+  const switchCamera = useCallback(async (): Promise<void> => {
+    if (!cameraFacing || !currentRequirements || switchingCamera || applying) return;
+    const controlOperation = ++cameraControlOperationRef.current;
+    const mediaOperation = ++operationRef.current;
+    const operationIsCurrent = () =>
+      cameraControlOperationRef.current === controlOperation &&
+      operationRef.current === mediaOperation;
+    const requirements: MediaRequirements = { ...currentRequirements };
+    delete requirements.deviceId;
+    requirements.facingMode = cameraFacing.next;
+    setSwitchingCamera(true);
+    setCameraControlError(null);
+    try {
+      await replaceMedia(requirements, mediaOperation);
+      if (operationIsCurrent()) preferredFacingModeRef.current = cameraFacing.next;
+    } catch {
+      if (operationIsCurrent()) {
+        setCameraControlError(
+          `The ${cameraFacing.next === 'environment' ? 'rear' : 'front'} camera could not be started. The current camera stayed live.`,
+        );
+      }
+    } finally {
+      if (cameraControlOperationRef.current === controlOperation) setSwitchingCamera(false);
+    }
+  }, [applying, cameraFacing, currentRequirements, replaceMedia, switchingCamera]);
+
+  const updateCameraZoom = useCallback(
+    async (value: number): Promise<void> => {
+      const operation = ++cameraControlOperationRef.current;
+      setCameraControlError(null);
+      try {
+        await setCameraZoom(value);
+      } catch {
+        if (cameraControlOperationRef.current === operation) {
+          setCameraControlError('Camera zoom could not be changed on this device.');
+        }
+      }
+    },
+    [setCameraZoom],
+  );
 
   const ensureMediaWithCameraFallback = useCallback(
     async (requirements: MediaRequirements, operation: number): Promise<MediaStream> => {
@@ -181,11 +253,14 @@ export const useStudioSession = ({
   );
 
   const ensurePreferredMedia = useCallback(
-    (requirements: MediaRequirements, operation: number) =>
-      ensureMediaWithCameraFallback(
-        withCaptureDevices(requirements, effectiveCapturePreferences),
-        operation,
-      ),
+    (requirements: MediaRequirements, operation: number) => {
+      const preferred = withPreferredFacingMode(
+        requirements,
+        effectiveCapturePreferences,
+        preferredFacingModeRef.current,
+      );
+      return ensureMediaWithCameraFallback(preferred, operation);
+    },
     [effectiveCapturePreferences, ensureMediaWithCameraFallback],
   );
 
@@ -220,6 +295,9 @@ export const useStudioSession = ({
   const beginMedia = useCallback(
     async (requirements: MediaRequirements): Promise<MediaStream | null> => {
       const operation = ++operationRef.current;
+      ++cameraControlOperationRef.current;
+      setSwitchingCamera(false);
+      setCameraControlError(null);
       setError(null);
       setLifecycle('requesting-media');
       try {
@@ -246,9 +324,10 @@ export const useStudioSession = ({
     disconnectRealtime();
     setApplied(null);
     await beginMedia(
-      withCaptureDevices(
+      withPreferredFacingMode(
         localMediaRequirements(effectiveCapturePreferences.profile),
         effectiveCapturePreferences,
+        preferredFacingModeRef.current,
       ),
     );
   }, [beginMedia, disconnectRealtime, effectiveCapturePreferences, setApplied]);
@@ -291,6 +370,9 @@ export const useStudioSession = ({
   const stopCamera = useCallback(async () => {
     setLifecycle('stopping-media');
     ++operationRef.current;
+    ++cameraControlOperationRef.current;
+    setSwitchingCamera(false);
+    setCameraControlError(null);
     startAbortRef.current?.abort();
     startAbortRef.current = null;
     disconnectRealtime();
@@ -377,6 +459,15 @@ export const useStudioSession = ({
       applying,
       microphoneEnabled,
       cameraEnabled,
+      cameraControls: {
+        facingMode: cameraFacing?.current ?? null,
+        nextFacingMode: cameraFacing?.next ?? null,
+        switching: switchingCamera,
+        zoom: cameraZoom,
+        error: cameraControlError,
+        switchCamera,
+        setZoom: updateCameraZoom,
+      },
       capturePreferences,
       startLocal,
       preflight: startLocal,
@@ -412,6 +503,12 @@ export const useStudioSession = ({
       applying,
       microphoneEnabled,
       cameraEnabled,
+      cameraZoom,
+      cameraControlError,
+      cameraFacing,
+      switchingCamera,
+      switchCamera,
+      updateCameraZoom,
       capturePreferences,
       startLocal,
       startModel,

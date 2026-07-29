@@ -44,6 +44,13 @@ const CameraIcon = ({ off }: { off: boolean }) => (
   </svg>
 );
 
+const SwitchCameraIcon = () => (
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+    <path d="M7 7h10l-2.5-2.5M17 17H7l2.5 2.5" stroke="currentColor" />
+    <path d="m17 7 2.5 2.5M7 17l-2.5-2.5" stroke="currentColor" />
+  </svg>
+);
+
 const SparkIcon = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
     <path
@@ -184,6 +191,44 @@ const idleRowStyles = (theme: Theme): CSSObject => ({
   },
 });
 
+const cameraToolsStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  gap: theme.space.xs,
+  paddingInline: theme.space.xxs,
+  '& button': {
+    minWidth: '2.75rem',
+    minHeight: '2.75rem',
+    paddingInline: theme.space.sm,
+  },
+  '& svg': { width: '1.2rem', height: '1.2rem' },
+  '& output': {
+    minWidth: '4.5rem',
+    color: theme.colors.text,
+    fontFamily: theme.type.mono,
+    fontSize: theme.fontSizes.caption,
+    textAlign: 'center',
+  },
+  '& [data-camera-control-error]': {
+    color: theme.colors.warning,
+    fontSize: theme.fontSizes.caption,
+  },
+  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+    gap: '0.3rem',
+    '& button': { paddingInline: '0.55rem' },
+    '& [data-switch-camera-label]': {
+      position: 'absolute',
+      width: '1px',
+      height: '1px',
+      overflow: 'hidden',
+      clip: 'rect(0 0 0 0)',
+    },
+    '& output': { minWidth: '3.7rem' },
+  },
+});
+
 const isStartingAi = (session: StudioSessionController): boolean =>
   session.draft.mode !== 'local' &&
   ['requesting-media', 'requesting-token', 'connecting'].includes(session.lifecycle);
@@ -221,6 +266,18 @@ export const StudioSessionControlBar = ({
   const recordingActive = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
   const takeReviewActive = reviewingTake && Boolean(recording.presented);
   const controlsVisible = visible || recordingActive;
+  const cameraControls = session.cameraControls;
+  const cameraZoom = cameraControls?.zoom ?? null;
+  const switchCameraLabel = cameraControls?.nextFacingMode
+    ? `Switch to ${cameraControls.nextFacingMode === 'environment' ? 'rear' : 'front'} camera`
+    : undefined;
+  const showCameraTools =
+    localActive &&
+    !recordingActive &&
+    !takeReviewActive &&
+    !aiActive &&
+    !aiStarting &&
+    Boolean(cameraControls?.nextFacingMode || cameraControls?.zoom);
   const endDisabled = controlsLocked || recordingActive || aiStarting || Boolean(transition);
   const stopAiDisabled = controlsLocked || recordingActive;
   const recordingAction = (
@@ -272,6 +329,63 @@ export const StudioSessionControlBar = ({
               >
                 Change
               </button>
+            </div>
+          ) : null}
+
+          {showCameraTools && cameraControls ? (
+            <div css={cameraToolsStyles(theme)} role="group" aria-label="Camera controls">
+              {switchCameraLabel ? (
+                <Button
+                  type="button"
+                  variant="secondary"
+                  busy={cameraControls.switching}
+                  disabled={controlsLocked || cameraControls.switching}
+                  aria-label={switchCameraLabel}
+                  title={switchCameraLabel}
+                  onClick={() => void cameraControls.switchCamera()}
+                >
+                  <SwitchCameraIcon />
+                  <span data-switch-camera-label>Switch camera</span>
+                </Button>
+              ) : null}
+              {cameraZoom ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="quiet"
+                    aria-label="Zoom camera out"
+                    disabled={
+                      controlsLocked ||
+                      cameraControls.switching ||
+                      cameraZoom.value <= cameraZoom.min
+                    }
+                    onClick={() => void cameraControls.setZoom(cameraZoom.value - cameraZoom.step)}
+                  >
+                    −
+                  </Button>
+                  <output aria-live="polite">
+                    Zoom {cameraZoom.value.toFixed(1).replace(/\.0$/u, '')}×
+                  </output>
+                  <Button
+                    type="button"
+                    variant="quiet"
+                    aria-label="Zoom camera in"
+                    disabled={
+                      controlsLocked ||
+                      cameraControls.switching ||
+                      cameraZoom.value >= cameraZoom.max
+                    }
+                    onClick={() => void cameraControls.setZoom(cameraZoom.value + cameraZoom.step)}
+                  >
+                    +
+                  </Button>
+                </>
+              ) : null}
+              {cameraControls.error ? (
+                <span data-camera-control-error role="alert">
+                  {cameraControls.error}
+                </span>
+              ) : null}
             </div>
           ) : null}
 

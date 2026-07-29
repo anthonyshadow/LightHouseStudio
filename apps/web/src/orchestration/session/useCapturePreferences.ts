@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   enumerateMediaDevices,
+  readCameraDeviceFacingModes,
   readCameraPermissionState,
   readCaptureStreamSettings,
   subscribeToMediaDeviceChanges,
@@ -37,6 +38,7 @@ const deviceOptions = (
     options.push({
       deviceId: device.deviceId,
       label: device.label.trim() || `${fallback} ${options.length + 1}`,
+      ...(kind === 'videoinput' ? { facingModes: readCameraDeviceFacingModes(device) } : {}),
     });
   }
   return options;
@@ -129,6 +131,12 @@ export const useCapturePreferences = ({
       }),
     [refreshDevices],
   );
+
+  useEffect(() => {
+    if (stream?.getVideoTracks().some((track) => track.readyState === 'live')) {
+      void refreshDevices().then(refreshDevices);
+    }
+  }, [refreshDevices, stream]);
 
   const updateVideoDeviceId = useCallback((videoDeviceId: string | null) => {
     setApplyError(null);

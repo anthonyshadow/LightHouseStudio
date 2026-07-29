@@ -7,13 +7,25 @@ import { useCapturePreferences } from './useCapturePreferences';
 
 const originalMediaDevices = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices');
 
-const device = (kind: MediaDeviceKind, deviceId: string, label: string): MediaDeviceInfo => ({
-  kind,
-  deviceId,
-  label,
-  groupId: '',
-  toJSON: () => ({}),
-});
+const device = (
+  kind: MediaDeviceKind,
+  deviceId: string,
+  label: string,
+  facingModes: readonly string[] = [],
+): MediaDeviceInfo =>
+  ({
+    kind,
+    deviceId,
+    label,
+    groupId: '',
+    getCapabilities: () => ({ facingMode: facingModes }),
+    toJSON: () => ({}),
+  }) as unknown as MediaDeviceInfo;
+
+const streamWithLiveVideo = {
+  getVideoTracks: () => [{ readyState: 'live' }],
+  getAudioTracks: () => [],
+} as unknown as MediaStream;
 
 afterEach(() => {
   if (originalMediaDevices) Object.defineProperty(navigator, 'mediaDevices', originalMediaDevices);
@@ -68,8 +80,8 @@ describe('useCapturePreferences', () => {
 
     await waitFor(() =>
       expect(result.current.cameraDevices).toEqual([
-        { deviceId: 'camera-1', label: 'Built-in Camera' },
-        { deviceId: 'phone-1', label: 'Creator’s iPhone Camera' },
+        { deviceId: 'camera-1', label: 'Built-in Camera', facingModes: [] },
+        { deviceId: 'phone-1', label: 'Creator’s iPhone Camera', facingModes: [] },
       ]),
     );
     expect(result.current.applied.videoDeviceId).toBe('camera-1');
@@ -152,6 +164,43 @@ describe('useCapturePreferences', () => {
     });
     expect(result.current.applying).toBe(false);
     expect(result.current.hasPendingChanges).toBe(false);
+  });
+
+  it('rescans after a live stream grants permission so phone cameras become discoverable', async () => {
+    let scan = 0;
+    const enumerateDevices = vi.fn(() => {
+      scan += 1;
+      return Promise.resolve(
+        scan === 1
+          ? [device('videoinput', 'camera-1', '')]
+          : [
+              device('videoinput', 'camera-1', 'Front Camera', ['user']),
+              device('videoinput', 'camera-2', 'Back Camera', ['environment']),
+            ],
+      );
+    });
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: {
+        enumerateDevices,
+        getSupportedConstraints: () => ({}),
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      },
+    });
+    const onApply = vi.fn().mockResolvedValue(undefined);
+    const { result } = renderHook(() =>
+      useCapturePreferences({ stream: streamWithLiveVideo, onApply }),
+    );
+
+    await waitFor(() =>
+      expect(result.current.cameraDevices).toEqual([
+        { deviceId: 'camera-1', label: 'Front Camera', facingModes: ['user'] },
+        { deviceId: 'camera-2', label: 'Back Camera', facingModes: ['environment'] },
+      ]),
+    );
+    expect(enumerateDevices).toHaveBeenCalledTimes(2);
+    expect(onApply).not.toHaveBeenCalled();
   });
 
   it('does not publish a late apply result after unmount', async () => {

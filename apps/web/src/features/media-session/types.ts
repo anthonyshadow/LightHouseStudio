@@ -1,9 +1,11 @@
 import type {
+  CameraFacingMode,
   ModelMode,
   RealtimeSessionTiming,
   SessionLifecycle,
   StudioMode,
 } from '../../application/types';
+import type { CameraZoomState } from '../../adapters/browser-media/browserMedia';
 import type { SafeMediaError } from './errors';
 
 export type {
@@ -68,6 +70,15 @@ export type StudioSessionController = {
   applying: boolean;
   microphoneEnabled: boolean;
   cameraEnabled: boolean;
+  cameraControls?: {
+    facingMode: CameraFacingMode | null;
+    nextFacingMode: CameraFacingMode | null;
+    switching: boolean;
+    zoom: CameraZoomState | null;
+    error: string | null;
+    switchCamera: () => Promise<void>;
+    setZoom: (value: number) => Promise<void>;
+  };
   startLocal: () => Promise<void>;
   preflight: () => Promise<void>;
   startModel: () => Promise<void>;

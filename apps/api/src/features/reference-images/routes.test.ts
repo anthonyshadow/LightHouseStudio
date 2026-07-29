@@ -684,7 +684,7 @@ describe('reference image API', () => {
     });
   });
 
-  it('keeps the explicit disabled branch and existing deterministic wrapper', async () => {
+  it('sends the raw prompt when optimization is explicitly disabled', async () => {
     const inputs: GenerateReferenceImageProviderInput[] = [];
     const app = await setup({
       generate: vi.fn(async (input: GenerateReferenceImageProviderInput) => {
@@ -701,8 +701,7 @@ describe('reference image API', () => {
     });
 
     expect(generated.statusCode).toBe(200);
-    expect(inputs[0]?.prompt).toContain('Exactly one character with one clearly visible face');
-    expect(inputs[0]?.prompt).toContain('A clockwork character');
+    expect(inputs[0]?.prompt).toBe('A clockwork character');
     expect(generated.json<CreateReferenceImageResponse>().asset).toMatchObject({
       optimizationEnabled: false,
       lucy25CharacterPrompt: 'A clockwork character',
@@ -710,7 +709,7 @@ describe('reference image API', () => {
     });
   });
 
-  it('uses full-body composition and the known landscape size in the default bypass path', async () => {
+  it('uses the known landscape size without rewriting the raw fallback prompt', async () => {
     const inputs: GenerateReferenceImageProviderInput[] = [];
     const app = await setup({
       generate: vi.fn(async (input: GenerateReferenceImageProviderInput) => {
@@ -731,7 +730,7 @@ describe('reference image API', () => {
 
     expect(generated.statusCode).toBe(200);
     expect(inputs[0]).toMatchObject({ size: '1536x1024' });
-    expect(inputs[0]?.prompt).toContain('Show the complete character');
+    expect(inputs[0]?.prompt).toBe('A clockwork character');
   });
 
   it('blocks stale fingerprints, changed models, and contradictory settings before image generation', async () => {

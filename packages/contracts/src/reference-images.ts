@@ -199,7 +199,7 @@ export const editReferenceImageRequestSchema = z
       .max(REFERENCE_IMAGE_CHANGE_INSTRUCTIONS_MAX_LENGTH),
     options: characterReferenceOptionsSchema,
     generator: characterReferenceGeneratorSchema.optional(),
-    optimization: enabledReferenceImageOptimizationSchema,
+    optimization: referenceImageOptimizationSchema,
   })
   .strict();
 
@@ -209,7 +209,7 @@ export const composeReferenceImageRequestSchema = z
     rawPrompt: rawCharacterPromptSchema,
     options: characterReferenceOptionsSchema,
     generator: characterReferenceGeneratorSchema.optional(),
-    optimization: enabledReferenceImageOptimizationSchema,
+    optimization: referenceImageOptimizationSchema,
   })
   .strict();
 

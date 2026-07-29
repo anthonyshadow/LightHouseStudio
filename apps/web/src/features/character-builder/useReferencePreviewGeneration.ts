@@ -23,11 +23,14 @@ export interface ReferencePreviewGenerationInput {
   options: CharacterReferenceOptions;
   sourceAssetId?: string | undefined;
   changeInstructions?: string | undefined;
+  attemptOptimization?: boolean | undefined;
+  fallbackOnOptimizationFailure?: boolean | undefined;
+  forceOptimization?: boolean | undefined;
 }
 
 export interface ReferencePreviewGenerationResult {
   asset: ReferenceImageAsset;
-  optimization: OptimizeCharacterReferencePromptResponse;
+  optimization: OptimizeCharacterReferencePromptResponse | null;
   sourceKey: string;
   operationId: string;
   requestId: string;
@@ -46,6 +49,20 @@ export interface ReferencePreviewGenerationCallbacks {
 }
 
 const normalizedInstructions = (value: string | undefined) => value?.trim() ?? '';
+
+const toRequestOptimization = (
+  optimization: OptimizeCharacterReferencePromptResponse | null,
+): EditReferenceImageRequest['optimization'] => {
+  if (!optimization) return { enabled: false };
+  return {
+    enabled: true,
+    result: optimization.result,
+    model: optimization.model,
+    version: optimization.version,
+    inputHash: optimization.inputHash,
+    manuallyEdited: false,
+  };
+};
 
 /**
  * Character Builder-owned single-flight optimizer/generator.
@@ -99,23 +116,29 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
 
       try {
         let optimization =
-          optimizationRef.current?.optimizationKey === optimizationKey
+          !input.forceOptimization && optimizationRef.current?.optimizationKey === optimizationKey
             ? optimizationRef.current.response
             : null;
-        if (!optimization) {
+        if (!optimization && input.attemptOptimization !== false) {
           callbacksRef.current.onPhase('optimizing', operationId, sourceKey);
-          optimization = await optimizeCharacterReferencePrompt(
-            { rawPrompt: input.rawPrompt, options: input.options },
-            controller.signal,
-          );
-          if (!stillCurrent()) return;
-          optimizationRef.current = { optimizationKey, response: optimization };
-          callbacksRef.current.onOptimizationSuccess(
-            optimization,
-            operationId,
-            sourceKey,
-            optimizationKey,
-          );
+          try {
+            optimization = await optimizeCharacterReferencePrompt(
+              { rawPrompt: input.rawPrompt, options: input.options },
+              controller.signal,
+            );
+            if (!stillCurrent()) return;
+            optimizationRef.current = { optimizationKey, response: optimization };
+            callbacksRef.current.onOptimizationSuccess(
+              optimization,
+              operationId,
+              sourceKey,
+              optimizationKey,
+            );
+          } catch (error: unknown) {
+            if (!stillCurrent()) return;
+            if (input.fallbackOnOptimizationFailure === false) throw error;
+            optimization = null;
+          }
         }
 
         const changeInstructions = normalizedInstructions(input.changeInstructions);
@@ -128,20 +151,13 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
           sourceAssetId: edit || compose ? input.sourceAssetId : null,
           sourceKey,
           changeInstructions,
-          optimizationInputHash: optimization.inputHash,
+          optimizationInputHash: optimization?.inputHash ?? null,
         });
         providerRequestId =
           failedRequestRef.current?.fingerprint === requestFingerprint
             ? failedRequestRef.current.requestId
             : crypto.randomUUID();
-        const enabledOptimization: EditReferenceImageRequest['optimization'] = {
-          enabled: true,
-          result: optimization.result,
-          model: optimization.model,
-          version: optimization.version,
-          inputHash: optimization.inputHash,
-          manuallyEdited: false,
-        };
+        const requestOptimization = toRequestOptimization(optimization);
 
         const asset =
           edit && input.sourceAssetId
@@ -152,7 +168,7 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
                   rawPrompt: input.rawPrompt,
                   changeInstructions,
                   options: input.options,
-                  optimization: enabledOptimization,
+                  optimization: requestOptimization,
                 },
                 controller.signal,
               )
@@ -163,7 +179,7 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
                     requestId: providerRequestId,
                     rawPrompt: input.rawPrompt,
                     options: input.options,
-                    optimization: enabledOptimization,
+                    optimization: requestOptimization,
                   },
                   controller.signal,
                 )
@@ -172,7 +188,7 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
                     requestId: providerRequestId,
                     rawPrompt: input.rawPrompt,
                     options: input.options,
-                    optimization: enabledOptimization,
+                    optimization: requestOptimization,
                   },
                   controller.signal,
                 );

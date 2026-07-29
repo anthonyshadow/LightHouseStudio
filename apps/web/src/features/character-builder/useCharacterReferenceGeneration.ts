@@ -19,6 +19,7 @@ import type {
 export interface UseCharacterReferenceGenerationOptions {
   readonly open: boolean;
   readonly generationAvailable: boolean;
+  readonly optimizationAvailable?: boolean;
   readonly editAvailable: boolean;
   readonly stateRef: CharacterBuilderStateRef;
   readonly locksRef: CharacterBuilderOperationLocksRef;
@@ -29,6 +30,7 @@ export interface UseCharacterReferenceGenerationOptions {
 export interface CharacterReferenceGenerationController {
   readonly cancel: () => void;
   readonly generatePreview: () => void;
+  readonly retryOptimization: () => void;
   readonly regenerate: (changeInstructions: string) => void;
 }
 
@@ -49,6 +51,7 @@ const generationIsBlocked = (
 export const useCharacterReferenceGeneration = ({
   open,
   generationAvailable,
+  optimizationAvailable = true,
   editAvailable,
   stateRef,
   locksRef,
@@ -159,6 +162,7 @@ export const useCharacterReferenceGeneration = ({
       .generate({
         rawPrompt: generated.prompt,
         options: parsedOptions.data,
+        attemptOptimization: optimizationAvailable,
         ...(current.uploadedReference
           ? { sourceAssetId: current.uploadedReference.asset.assetId }
           : {}),
@@ -173,6 +177,51 @@ export const useCharacterReferenceGeneration = ({
     generationAvailable,
     hasPendingSave,
     locksRef,
+    optimizationAvailable,
+    stateRef,
+  ]);
+
+  const retryOptimization = useCallback(() => {
+    const current = stateRef.current;
+    const asset = current.preview?.asset;
+    const generated = generateStructuredPrompt(current.draft);
+    const parsedOptions = characterReferenceOptionsSchema.safeParse(current.options);
+    if (
+      generationIsBlocked(current, locksRef, hasPendingSave()) ||
+      !generationAvailable ||
+      !optimizationAvailable ||
+      Boolean(current.uploadedReference && !editAvailable) ||
+      current.preview?.stale ||
+      asset?.source !== 'generated' ||
+      asset.optimizationEnabled ||
+      !generated.validation.valid ||
+      !generated.prompt ||
+      !parsedOptions.success
+    ) {
+      return;
+    }
+    locksRef.current.generation = true;
+    void generation
+      .generate({
+        rawPrompt: generated.prompt,
+        options: parsedOptions.data,
+        attemptOptimization: true,
+        fallbackOnOptimizationFailure: false,
+        forceOptimization: true,
+        ...(current.uploadedReference
+          ? { sourceAssetId: current.uploadedReference.asset.assetId }
+          : {}),
+      })
+      .finally(() => {
+        locksRef.current.generation = false;
+      });
+  }, [
+    editAvailable,
+    generation,
+    generationAvailable,
+    hasPendingSave,
+    locksRef,
+    optimizationAvailable,
     stateRef,
   ]);
 
@@ -212,6 +261,7 @@ export const useCharacterReferenceGeneration = ({
         .generate({
           rawPrompt: generated.prompt,
           options: current.options,
+          attemptOptimization: optimizationAvailable,
           ...(sourceAssetId ? { sourceAssetId } : {}),
           ...(instructions ? { changeInstructions: instructions } : {}),
         })
@@ -219,8 +269,16 @@ export const useCharacterReferenceGeneration = ({
           locksRef.current.generation = false;
         });
     },
-    [dispatch, editAvailable, generation, hasPendingSave, locksRef, stateRef],
+    [
+      dispatch,
+      editAvailable,
+      generation,
+      hasPendingSave,
+      locksRef,
+      optimizationAvailable,
+      stateRef,
+    ],
   );
 
-  return { cancel, generatePreview, regenerate };
+  return { cancel, generatePreview, retryOptimization, regenerate };
 };

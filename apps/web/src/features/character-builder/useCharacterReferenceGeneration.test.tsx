@@ -62,6 +62,14 @@ const generatedAsset: ReferenceImageAsset = {
   contentUrl: '/api/reference-images/550e8400-e29b-41d4-a716-446655440000/content',
 };
 
+const rawGeneratedAsset: Extract<ReferenceImageAsset, { source: 'generated' }> = {
+  ...(generatedAsset as Extract<ReferenceImageAsset, { source: 'generated' }>),
+  optimizationEnabled: false,
+  optimizedImagePrompt: generatedAsset.originalPrompt,
+  optimizer: null,
+  optimizationInputHash: null,
+};
+
 const uploadedAsset: UploadedReferenceImageAsset = {
   assetId: '8f45ea24-c274-41a5-a988-aa0602115191',
   mimeType: 'image/png',
@@ -246,6 +254,23 @@ describe('useCharacterReferenceGeneration', () => {
       expect.objectContaining({ sourceAssetId: uploadedAsset.assetId }),
     );
     expect(generate.mock.calls[1]?.[0]).not.toHaveProperty('changeInstructions');
+  });
+
+  it('retries optimization from a restored raw preview before regenerating', () => {
+    const state = createReadyState();
+    state.phase = 'preview-ready';
+    state.preview = { asset: rawGeneratedAsset, sourceKey: 'raw-source', stale: false };
+    const rendered = renderGeneration(state);
+
+    act(() => rendered.result.current.retryOptimization());
+
+    expect(generate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        attemptOptimization: true,
+        fallbackOnOptimizationFailure: false,
+        forceOptimization: true,
+      }),
+    );
   });
 
   it('cancels on close, clears its lock, and blocks work while save recovery is pending', () => {

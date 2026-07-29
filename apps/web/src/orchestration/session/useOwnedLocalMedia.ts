@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
+  applyCameraZoom,
   acquireLocalMedia,
   hasLiveAudio,
   hasLiveVideo,
+  readCameraZoomState,
   stopOwnedStream,
+  type CameraZoomState,
   type MediaRequirements,
 } from '../../adapters/browser-media/browserMedia';
 
@@ -13,10 +16,12 @@ export type OwnedLocalMediaController = {
   currentRequirements: MediaRequirements | null;
   microphoneEnabled: boolean;
   cameraEnabled: boolean;
+  cameraZoom: CameraZoomState | null;
   ensure: (requirements: MediaRequirements, operation: number) => Promise<MediaStream>;
   replace: (requirements: MediaRequirements, operation: number) => Promise<MediaStream>;
   toggleMicrophone: () => void;
   toggleCamera: () => void;
+  setCameraZoom: (value: number) => Promise<void>;
   release: () => void;
 };
 
@@ -28,9 +33,11 @@ export type OwnedLocalMediaOptions = {
 
 const requestedDevicesMatch = (stream: MediaStream, requirements: MediaRequirements): boolean => {
   const videoDeviceId = stream.getVideoTracks()[0]?.getSettings?.().deviceId;
+  const facingMode = stream.getVideoTracks()[0]?.getSettings?.().facingMode;
   const audioDeviceId = stream.getAudioTracks()[0]?.getSettings?.().deviceId;
   return (
     (!requirements.deviceId || videoDeviceId === requirements.deviceId) &&
+    (!requirements.facingMode || facingMode === requirements.facingMode) &&
     (!requirements.audioDeviceId || audioDeviceId === requirements.audioDeviceId)
   );
 };
@@ -44,6 +51,7 @@ export const useOwnedLocalMedia = ({
   const [currentRequirements, setCurrentRequirements] = useState<MediaRequirements | null>(null);
   const [microphoneEnabled, setMicrophoneEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(true);
+  const [cameraZoom, setCameraZoomState] = useState<CameraZoomState | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const microphoneEnabledRef = useRef(true);
   const cameraEnabledRef = useRef(true);
@@ -99,6 +107,7 @@ export const useOwnedLocalMedia = ({
       nextStream.getVideoTracks().forEach((track) => {
         track.enabled = cameraEnabledRef.current;
       });
+      setCameraZoomState(readCameraZoomState(nextStream.getVideoTracks()[0]));
       streamRef.current = nextStream;
       setStream(nextStream);
       setCurrentRequirements(requirements);
@@ -183,6 +192,13 @@ export const useOwnedLocalMedia = ({
     setCameraEnabled(enabled);
   }, []);
 
+  const setCameraZoom = useCallback(async (value: number): Promise<void> => {
+    const track = streamRef.current?.getVideoTracks()[0];
+    if (!track) throw new DOMException('Camera zoom is unavailable.', 'NotSupportedError');
+    const next = await applyCameraZoom(track, value);
+    if (streamRef.current?.getVideoTracks()[0] === track) setCameraZoomState(next);
+  }, []);
+
   const release = useCallback(() => {
     const owned = streamRef.current;
     streamRef.current = null;
@@ -192,6 +208,7 @@ export const useOwnedLocalMedia = ({
     setCurrentRequirements(null);
     setMicrophoneEnabled(true);
     setCameraEnabled(true);
+    setCameraZoomState(null);
     if (owned) unobserve(owned);
     stopOwnedStream(owned);
   }, [unobserve]);
@@ -212,10 +229,12 @@ export const useOwnedLocalMedia = ({
     currentRequirements,
     microphoneEnabled,
     cameraEnabled,
+    cameraZoom,
     ensure,
     replace,
     toggleMicrophone,
     toggleCamera,
+    setCameraZoom,
     release,
   };
 };

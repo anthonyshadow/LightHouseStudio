@@ -64,7 +64,7 @@ An optimized request's `optimization.result` must be the complete optimizer resu
 
 ### 2. Optimize the character direction — `POST /api/reference-images/optimize`
 
-**Why it exists:** A raw character description is useful to the user but is not yet the precise, structured instruction needed for a consistent reference image. Optimization creates two deliberately separate prompts: the image prompt sent to the selected image provider and the compact Lucy 2.5 prompt later used for video transformation. When optimization is enabled, generation is blocked if this step fails; the app never silently falls back to the raw text.
+**Why it exists:** A raw character description is useful to the user but is not yet the precise, structured instruction needed for a consistent reference image. Optimization creates two deliberately separate prompts: the image prompt sent to the selected image provider and the compact Lucy 2.5 prompt later used for video transformation. Character Builder attempts this step first. If it fails, the browser submits the explicit disabled branch so generation can continue with the raw direction, then marks the stored result as unoptimized and offers a visible optimized-regeneration retry.
 
 **Required JSON input:**
 
@@ -120,14 +120,14 @@ An optimized request's `optimization.result` must be the complete optimizer resu
 }
 ```
 
-`generator` remains optional. The HTTP contract still accepts `{ "enabled": false }` for compatibility with older local clients; the broker then deterministically wraps the raw prompt, selects the size from `options.orientation`, and uses JPEG. The current application exposes character reference generation only through Character Builder, whose previews always use the optimized path.
+`generator` remains optional. `{ "enabled": false }` is the current optimizer-fallback branch. The broker sends the validated raw prompt unchanged, selects the size from `options.orientation`, uses JPEG, and persists null optimizer/hash audit fields plus `optimizationEnabled: false`.
 
 **Broker checks before OpenAI:** The optimizer model/version/hash must still be current, and the broker-produced canonical framing, orientation, size, and quality must match the request and configured quality. A stale or browser-altered contradictory result is rejected before any image call.
 
 **OpenAI image call:** When OpenAI is selected, the broker calls `OpenAI.images.generate` with exactly:
 
 - `model`: `OPENAI_REFERENCE_IMAGE_MODEL` or `gpt-image-2`.
-- `prompt`: the optimized image prompt (or deterministic wrapper when optimization is explicitly disabled).
+- `prompt`: the optimized image prompt, or the validated raw prompt unchanged when optimization is explicitly disabled.
 - `n: 1`: exactly one output.
 - `size`: `1024x1024`, `1024x1536`, or `1536x1024` from the validated optimization/settings.
 - `quality`: configured `high` or `medium`.
@@ -160,7 +160,7 @@ The client deliberately omits `response_format` because GPT Image returns base64
 
 **Why it exists:** Written regeneration feedback should alter an existing reference while retaining the character identity and other unchanged visual properties. The client sends only the opaque UUID path parameter; the browser does not upload the source bytes again.
 
-**Required JSON input:** the same optimized generation fields as step 3, plus `changeInstructions` (trimmed, 1–2,000 characters). Optimization is required for edits. `sourceAssetId` must be a UUID for an asset owned by the requesting local origin.
+**Required JSON input:** the same generation fields as step 3, plus `changeInstructions` (trimmed, 1–2,000 characters). The optimization field accepts the enabled result or the explicit disabled fallback branch. `sourceAssetId` must be a UUID for an asset owned by the requesting local origin.
 
 **External call made by the broker:** OpenAI uses `OpenAI.images.edit` with the same model, one-result, size, quality, output format/compression, opaque background, and low moderation fields as generation, plus:
 
@@ -175,7 +175,7 @@ Only a SHA-256 hash of the written change is persisted. The combined provider pr
 
 **Why it exists:** **Generate Combined Preview** applies the current character direction to an uploaded source while preserving recognizable identity and useful source details. Blank regeneration with an uploaded source uses this route again; it does not edit from a previous generated output.
 
-**Required JSON input:** the same optimized generation fields as step 3. `sourceAssetId` is a UUID for an owned stored upload or other owned reference. There is no `changeInstructions` field; if the user supplies written feedback, the client uses the edit route instead.
+**Required JSON input:** the same generation fields as step 3, including either the enabled optimization result or explicit disabled fallback branch. `sourceAssetId` is a UUID for an owned stored upload or other owned reference. There is no `changeInstructions` field; if the user supplies written feedback, the client uses the edit route instead.
 
 **External call made by the broker:** OpenAI uses `images.edit`, not `images.generate`; BFL uses the same FLUX.2 Pro task endpoint with `input_image`; Wiro uses the same Seedream Run endpoint with multipart `inputImage`. In every case the source is resolved server-side and the provider-only prompt asks for a polished Lucy 2.5 character reference, preservation of recognizable identity/face/body/source details, and application of the optimized direction to role, outfit, styling, expression, framing, lighting, and background. Explicit identity changes in the direction take precedence.
 
@@ -199,20 +199,28 @@ Check capabilities (local configuration only)
           +-- Upload source --> POST /uploads --> immutable local asset; no provider call
           |                         |
           |                         +-- Direct save -------------> no provider call
-          |                         +-- Combined preview --------> optimize --> selected provider(source)
+          |                         +-- Combined preview --------> optimize --+--> selected provider(source)
+          |                                                                  |
+          |                                                        failure -> raw prompt
           |
-          +-- New preview ----------> optimize --> selected provider
+          +-- New preview ----------> optimize --+--> selected provider
+          |                                      |
+          |                            failure -> raw prompt
           |
-          +-- Regenerate with source and no feedback -------------> optimize --> selected provider(source)
+          +-- Regenerate with source and no feedback -------------> optimize --+--> selected provider(source)
+          |                                                                    |
+          |                                                          failure -> raw prompt
           |
-          +-- Regenerate with written feedback -------------------> optimize --> selected provider(source, change)
+          +-- Regenerate with written feedback -------------------> optimize --+--> selected provider(source, change)
+                                                                             |
+                                                                   failure -> raw prompt
                                       |
                                       v
                   strict output validation --> immutable local asset --> metadata/content read
 ```
 
 1. The UI first reads capabilities. If the selected image provider is not configured, local drafting, upload, and direct save stay available while image actions are disabled. OpenAI optimization is advertised independently.
-2. Any provider-backed preview obtains a current optimization result first. If image generation then fails, retrying with the same normalized raw prompt and reference options reuses that successful optimization instead of paying for another optimizer call. Changing the raw prompt or any optimization-relevant option requires a new result. Source-image identity is part of the generation request, but not the optimization cache key because source bytes are never sent to the optimizer.
+2. Any provider-backed preview attempts to obtain a current optimization result first. If optimization fails, the same operation continues once with the raw prompt and records an unoptimized immutable asset. The UI shows a yellow warning; its retry attempts optimization again and calls the image provider only after that retry succeeds. If image generation fails after optimization succeeds, retrying with the same normalized raw prompt and reference options reuses that successful optimization instead of paying for another optimizer call. Changing the raw prompt or any optimization-relevant option requires a new result. Source-image identity is part of the generation request, but not the optimization cache key because source bytes are never sent to the optimizer.
 3. The client assigns one UUID request ID. If the network fails after submission, retrying the exact action reuses that ID, allowing the broker to return the already-created asset rather than spend again.
 4. The broker derives a local owner ID from the exact loopback host, so it can only retrieve source bytes and return assets for that owner.
 5. The broker calls the selected provider operation, validates the returned bytes through the shared image gate, and stores the output immutably under `LIGHTFRAME_DATA_DIR` with provenance: actual provider/model, original/derived prompts, optimization audit, provider-aware request fingerprint, output settings, optional provider task/request ID, allowlisted provider settings/usage, and edit/composition source lineage. Wiro remote input/output files are then deleted best-effort.
@@ -221,9 +229,9 @@ Check capabilities (local configuration only)
 ## Failure, privacy, and cost boundaries
 
 - Missing selected-provider configuration returns an unavailable image capability; it does not disable local uploads, prompt-only work, or independently configured optimization.
-- Authentication, moderation, rate limit, timeout, connection, malformed response, refusal, invalid image, storage, ownership, stale optimization, and request-ID conflict failures are converted to safe application errors. Previous valid previews remain intact.
+- Optimizer authentication, rate limit, timeout, connection, malformed-response, and refusal failures enter the explicit raw branch and remain visible through the unoptimized-result warning. Image-provider, storage, ownership, stale-optimization, and request-ID failures are converted to safe application errors. Previous valid previews remain intact.
 - Each successful generation, composition, or edit asks the selected provider for one image and can incur provider usage. OpenAI has no SDK retry; BFL and Wiro each submit one task exactly once and retry only status polling for that same task.
-- The raw recipe and selected options go to OpenAI only for explicit optimization. The selected image provider receives the optimized prompt; composition/editing additionally send server-resolved source bytes only after the explicit action.
+- The raw recipe and selected options go to OpenAI for the attempted optimization. The selected image provider receives the optimized prompt on success or the raw prompt after optimizer failure/unavailability; composition/editing additionally send server-resolved source bytes only after the explicit action. This prompt fallback never changes the startup-selected image provider.
 - Upload, direct-upload save, image-only save, metadata reads, content reads, and `/api/capabilities` do not contact an image provider.
 - The local broker does not return provider credentials, task/request IDs, provider-specific settings, polling/signed URLs, internal storage paths, raw provider payloads, source base64, or persisted raw edit instructions to the browser.
 

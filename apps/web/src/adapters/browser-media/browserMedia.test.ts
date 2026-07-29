@@ -2,8 +2,12 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
+  applyCameraZoom,
   acquireLocalMedia,
   enumerateMediaDevices,
+  readCameraDeviceFacingModes,
+  readCameraFacingState,
+  readCameraZoomState,
   readCameraPermissionState,
   readCaptureStreamSettings,
   subscribeToMediaDeviceChanges,
@@ -99,7 +103,6 @@ describe('browser media capture settings', () => {
 
     expect(getUserMedia).toHaveBeenCalledWith({
       video: {
-        facingMode: { ideal: 'user' },
         width: { ideal: 1_920 },
         height: { ideal: 1_080 },
         frameRate: { ideal: 30 },
@@ -112,6 +115,110 @@ describe('browser media capture settings', () => {
         deviceId: { exact: 'microphone-2' },
       },
     });
+  });
+
+  it('uses the front-facing preference only when no exact camera was selected', async () => {
+    const video = liveTrack('video', 'Front camera', { deviceId: 'camera-1' });
+    const audio = liveTrack('audio', 'Microphone', { deviceId: 'microphone-1' });
+    const getUserMedia = vi
+      .fn<(constraints?: MediaStreamConstraints) => Promise<MediaStream>>()
+      .mockResolvedValue(streamFrom(video, audio));
+    installMediaDevices({ getUserMedia });
+
+    await acquireLocalMedia({ width: 1_280, height: 720, frameRate: 30 });
+
+    expect(getUserMedia.mock.calls[0]?.[0]?.video).toMatchObject({
+      facingMode: { ideal: 'user' },
+    });
+  });
+
+  it('uses an exact facing mode without pinning a camera device', async () => {
+    const video = liveTrack('video', 'Rear camera', { facingMode: 'environment' });
+    const audio = liveTrack('audio', 'Microphone', { deviceId: 'microphone-1' });
+    const getUserMedia = vi
+      .fn<(constraints?: MediaStreamConstraints) => Promise<MediaStream>>()
+      .mockResolvedValue(streamFrom(video, audio));
+    installMediaDevices({ getUserMedia });
+
+    await acquireLocalMedia({
+      width: 1_280,
+      height: 720,
+      frameRate: 30,
+      facingMode: 'environment',
+    });
+
+    expect(getUserMedia.mock.calls[0]?.[0]?.video).toMatchObject({
+      facingMode: { exact: 'environment' },
+    });
+    expect(getUserMedia.mock.calls[0]?.[0]?.video).not.toHaveProperty('deviceId');
+  });
+
+  it('shows facing-mode switching only when an opposite camera capability is exposed', () => {
+    installMediaDevices({
+      getSupportedConstraints: () => ({ facingMode: true }),
+    });
+    const frontDevice = {
+      kind: 'videoinput',
+      deviceId: 'front-camera',
+      label: 'Front Camera',
+      groupId: 'phone',
+      getCapabilities: () => ({ facingMode: ['user'] }),
+      toJSON: () => ({}),
+    } as unknown as MediaDeviceInfo;
+    const rearDevice = {
+      kind: 'videoinput',
+      deviceId: 'rear-camera',
+      label: 'Rear Camera',
+      groupId: 'phone',
+      getCapabilities: () => ({ facingMode: ['environment'] }),
+      toJSON: () => ({}),
+    } as unknown as MediaDeviceInfo;
+    const frontTrack = {
+      getCapabilities: () => ({ facingMode: ['user'] }),
+      getSettings: () => ({ facingMode: 'user' }),
+    } as unknown as MediaStreamTrack;
+    const desktopTrack = {
+      getCapabilities: () => ({}),
+      getSettings: () => ({}),
+    } as unknown as MediaStreamTrack;
+    const devices = [
+      {
+        deviceId: frontDevice.deviceId,
+        label: frontDevice.label,
+        facingModes: readCameraDeviceFacingModes(frontDevice),
+      },
+      {
+        deviceId: rearDevice.deviceId,
+        label: rearDevice.label,
+        facingModes: readCameraDeviceFacingModes(rearDevice),
+      },
+    ];
+
+    expect(readCameraFacingState(frontTrack, devices)).toEqual({
+      current: 'user',
+      next: 'environment',
+    });
+    expect(readCameraFacingState(desktopTrack, devices)).toBeNull();
+    expect(readCameraFacingState(frontTrack, [devices[0]!])).toBeNull();
+  });
+
+  it('feature-detects and applies camera zoom without assuming browser support', async () => {
+    const applyConstraints = vi.fn().mockResolvedValue(undefined);
+    const track = {
+      getCapabilities: () => ({ zoom: { min: 1, max: 4, step: 0.5 } }),
+      getSettings: () => ({ zoom: 2 }),
+      applyConstraints,
+    } as unknown as MediaStreamTrack;
+
+    expect(readCameraZoomState(track)).toEqual({ min: 1, max: 4, step: 0.5, value: 2 });
+    await expect(applyCameraZoom(track, 9)).resolves.toEqual({
+      min: 1,
+      max: 4,
+      step: 0.5,
+      value: 4,
+    });
+    expect(applyConstraints).toHaveBeenCalledWith({ advanced: [{ zoom: 4 }] });
+    expect(readCameraZoomState(undefined)).toBeNull();
   });
 
   it('feature-detects the optional profile and reports negotiated settings honestly', () => {
