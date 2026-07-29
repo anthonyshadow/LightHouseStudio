@@ -17,7 +17,10 @@ As a creator, I want to preview a Lucy VTON 3 garment transformation, so that I 
 4. If the current VTON draft is ready, review the inline Decart transfer/usage/300-second/Stop
    disclosure and select **Start Virtual Try-On**. Otherwise select **Configure Virtual Try-On** to
    open the Dock, or **Choose Saved Try-On** to use the Shelf.
-5. In **Try-On recipe**, provide a garment direction, attach a temporary garment image, or both. Prompt enhancement is optional and off by default. Start stays unavailable until text or an image exists.
+5. In **Try-On recipe**, read the **Virtual Try-On beta guidance**, then provide a garment
+   direction, attach a temporary garment image, or both. Use one garment on a plain background.
+   The app makes no fit, sizing, fabric-behavior, or purchase-accuracy claim. Prompt enhancement is
+   optional and off by default. Start stays unavailable until text or an image exists.
 6. Start the configured experience and wait through short-lived credential issuance and the provider connection.
 7. Confirm that live transformed video is present on stage. Before a usable transformed video
    track exists, recording stays unavailable and local fallback is retained. After connection, the

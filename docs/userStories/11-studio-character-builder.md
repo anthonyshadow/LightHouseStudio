@@ -40,10 +40,12 @@ After a successful Save Character, the draft is finalized and removed best-effor
 ## Reference upload and optional preview generation
 
 Image generation is never required to save a character. The Reference image
-field accepts validated JPEG, PNG, or WebP up to 10 MiB and 40 megapixels. An
-upload is written immediately as an immutable owner-scoped local asset and
-restores by opaque ID after reload. It does not contact OpenAI. **Remove**
-detaches the draft relationship but does not delete the stored asset.
+field accepts validated JPEG, PNG, or WebP up to 10 MiB and 40 megapixels. Before
+first selection it explains that an upload is written immediately as an
+immutable owner-scoped local asset and remains until whole-environment
+retirement. It restores by opaque ID after reload and does not contact an image
+provider. **Detach uploaded character reference** detaches the draft
+relationship but does not delete the stored asset.
 
 Prompt-only, prompt+uploaded-image, and **Save & Use Image Only** paths make no
 OpenAI optimizer or image-model request.
@@ -52,6 +54,13 @@ The first **Generate Preview** attempt performs two phases:
 
 1. Optimize the current structured direction.
 2. Generate a new immutable reference asset from that optimized prompt.
+
+The action-adjacent disclosure names the OpenAI optimizer model and the startup-selected image
+provider/model, says provider credits may be used, and states that successful output remains an
+immutable local asset until participant-environment retirement. It also keeps upload and Save
+without generation explicitly provider-free. The same disclosure is present in the Regenerate
+dialog. A selected Wiro configuration remains generation-disabled under the default
+`PILOT_ACCESS_MODE=participant`; only a separate operator-only technical run may enable it.
 
 If optimization succeeds but image generation fails, selecting **Generate Preview**
 again reuses the successful optimization while the normalized raw direction and
@@ -70,7 +79,10 @@ Editing a character input after generation marks the preview stale. The prior im
 - Blank instructions perform fresh generation without a prior generated asset when there is no upload. With an upload, they compose from that uploaded source again.
 - Written instructions send the current owner-scoped source ID, optimized direction, and requested change to the edit endpoint. That source is the matching preview, or the current upload when the visible preview is stale and an upload remains available. The server resolves those bytes and creates a new immutable child asset.
 
-Uploaded, generated, composed, edited, removed, discarded, and superseded assets are not promoted or mutated. Assets that are no longer referenced may remain in server storage; there is no in-app asset deletion/garbage-collection flow.
+Uploaded, generated, composed, edited, detached, discarded, and superseded assets are not promoted
+or mutated. Reset and character-record deletion also say that they detach relationships without
+deleting immutable bytes. Assets that are no longer referenced may remain in server storage; there
+is no in-app asset deletion/garbage-collection flow.
 
 ## Save and Studio preload
 

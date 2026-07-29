@@ -141,10 +141,13 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
 - **Controlled-pilot correction:** say detach, disclose retention at first upload/save and relevant
   destructive actions, use an isolated data directory per participant/cohort, and verify whole
   dataset retirement.
-- **Decision status:** The approved pilot promise uses a fresh browser profile and data directory
-  per participant, permits at most one seven-day return, and requires verified retirement within
-  24 hours after the final engagement and no later than day eight. Disclosure implementation and
-  cleanup rehearsal/evidence remain open.
+- **Implementation status (2026-07-28):** The approved pilot promise uses a fresh browser profile
+  and data directory per participant, permits at most one seven-day return, and requires verified
+  retirement within 24 hours after the final engagement and no later than day eight. Upload,
+  detach, retained-reference Save, Reset, and character-record deletion now distinguish detached
+  relationships from retained bytes. The operator checklist and executable disposable drill prove
+  exact-leaf retirement and shared-root/sibling preservation. The checklist must still be completed
+  for each real participant; public/self-service erase-all remains deferred.
 - **Deferred correction:** account-owned relationships, retention policy, tombstones, and
   relationship-aware deletion/garbage collection.
 - **Regression risk:** High if per-asset deletion is rushed.
@@ -208,8 +211,11 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
   The adult/consented-content allowlist, refusal rules, exact provider settings, limits, and
   escalation path are now approved. A full moderation/reporting
   system is a public-product requirement, not a local pilot prerequisite.
-- **Decision status:** Policy is frozen; disclosure implementation and live qualification remain
-  open.
+- **Implementation status (2026-07-28):** Policy is frozen. Participant mode now server-disables
+  Wiro regardless of configured credentials; an explicit operator-qualification startup mode is
+  required for its separate technical pass. Builder, VTO, and ElevenLabs decision points expose
+  provider/usage/retention or expectation-setting copy. Separate live provider qualification
+  remains open under `DOC-001` / `TEST-007`.
 - **Regression risk:** Medium.
 
 ### DOC-001 / TEST-007 — Included providers require live entitlement/device evidence

@@ -101,6 +101,7 @@ export const CharacterRecipeList = ({
             ) : (
               <DeleteConfirmation
                 name={item.name}
+                retainedReference={Boolean(item.referenceImageAssetId)}
                 onCancel={controller.closeEditor}
                 onConfirm={() =>
                   controller.perform(() =>

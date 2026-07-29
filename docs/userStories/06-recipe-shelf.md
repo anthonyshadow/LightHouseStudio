@@ -19,7 +19,11 @@ As a creator, I want to manage reusable prompts and character recipes, so that I
 5. To create a character, select **New character recipe**; Character Builder opens and owns creation, optional reference work, save, and Studio preload. To create generic Try-On text, select **New garment recipe** and use the inline form.
 6. Select **Edit** on a true character card to open that exact record in Character Builder. Legacy structured Add, Replace, and Restyle records continue to expose **Open workshop** instead.
 7. On any card, select **Use** to put its prompt into the relevant working draft. Saved characters may be prompt-only, direct uploaded/image-only, or generated/composed; the saved record retains uploaded-source/final-reference provenance and applicable Recents retain the character name. If it has a persisted reference asset, wait while the app validates metadata and hydrates its bytes before committing the recipe.
-8. Use Builder-owned **Edit**, or card-level **Rename** and **Delete**, to maintain saved characters. Generic saved prompts retain their inline Edit action. Select **Save a copy** on an unlinked recent to preserve it as a saved recipe.
+8. Use Builder-owned **Edit**, or card-level **Rename** and **Delete**, to maintain saved
+   characters. When a character has a persisted reference, its confirmation says that deleting the
+   character record detaches reference links but leaves immutable image bytes until
+   whole-environment retirement. Generic saved prompts retain their inline Edit action. Select
+   **Save a copy** on an unlinked recent to preserve it as a saved recipe.
 9. Close the Shelf normally to retain unsaved work; use an explicit Cancel/Delete/confirmation path for destructive changes.
 
 ## Failure and alternate paths

@@ -22,6 +22,9 @@ export interface CharacterBuilderPanelProps {
   returnFocusRef?: RefObject<HTMLElement | null>;
   generationAvailable: boolean;
   editAvailable: boolean;
+  referenceImageProvider?: 'openai' | 'bfl' | 'wiro' | null;
+  referenceImageModel?: string | null;
+  referenceImageOptimizerModel?: string | null;
   saveBlockedReason?: string | undefined;
   autosaveMessage?: string | null;
   saveRecoveryPending?: boolean;
@@ -74,12 +77,30 @@ const operationLabel = (state: CharacterBuilderState): string | null => {
 const isGenerationBusy = (state: CharacterBuilderState) =>
   ['optimizing', 'generating', 'regenerating'].includes(state.phase);
 
+const referenceProviderLabel = (
+  provider: CharacterBuilderPanelProps['referenceImageProvider'],
+): string => {
+  switch (provider) {
+    case 'openai':
+      return 'OpenAI';
+    case 'bfl':
+      return 'Black Forest Labs';
+    case 'wiro':
+      return 'Wiro';
+    default:
+      return 'the configured image provider';
+  }
+};
+
 export const CharacterBuilderPanel = ({
   open,
   state,
   returnFocusRef,
   generationAvailable,
   editAvailable,
+  referenceImageProvider = null,
+  referenceImageModel = null,
+  referenceImageOptimizerModel = null,
   saveBlockedReason,
   autosaveMessage = null,
   saveRecoveryPending = false,
@@ -131,6 +152,17 @@ export const CharacterBuilderPanel = ({
       : state.preview?.stale
         ? 'Save Character (prompt only)'
         : 'Save Character';
+  const providerLabel = referenceProviderLabel(referenceImageProvider);
+  const providerModel = referenceImageModel ? ` (${referenceImageModel})` : '';
+  const optimizerContact = referenceImageOptimizerModel
+    ? `OpenAI (${referenceImageOptimizerModel}) optimizes the direction, then `
+    : '';
+  const referenceGenerationDisclosure =
+    referenceImageProvider === 'wiro'
+      ? generationAvailable
+        ? `${optimizerContact}Wiro (${referenceImageModel ?? 'selected model'}) creates the image in this explicit operator-qualification run. Wiro is unavailable for participant generation. This may use provider credits; successful output remains local until this operator environment is retired.`
+        : `Wiro (${referenceImageModel ?? 'selected model'}) is restricted to explicit operator-qualification runs and is unavailable for participant generation. This configured generation path is currently unavailable. Upload and Save without generation remain local.`
+      : `${optimizerContact}${providerLabel}${providerModel} creates the image. This may use provider credits. The result is stored as an immutable local asset until this participant environment is retired. Upload and Save without generation do not contact image or optimizer providers.`;
 
   return (
     <>
@@ -257,7 +289,7 @@ export const CharacterBuilderPanel = ({
                     aria-describedby={
                       !previewCapabilityAvailable
                         ? 'character-builder-generation-unavailable'
-                        : undefined
+                        : 'character-builder-provider-disclosure'
                     }
                     onClick={() => {
                       if (previewCapabilityAvailable) onRequestRegeneration();
@@ -273,7 +305,7 @@ export const CharacterBuilderPanel = ({
                     aria-describedby={
                       !previewCapabilityAvailable
                         ? 'character-builder-generation-unavailable'
-                        : undefined
+                        : 'character-builder-provider-disclosure'
                     }
                     onClick={() => {
                       if (previewCapabilityAvailable) onGenerate();
@@ -298,6 +330,12 @@ export const CharacterBuilderPanel = ({
                       : 'Reference image generation is unavailable. You can still save this character without an image.'}
                   </span>
                 ) : null}
+                <StatusNotice
+                  id="character-builder-provider-disclosure"
+                  title="Provider, usage, and local retention"
+                >
+                  {referenceGenerationDisclosure}
+                </StatusNotice>
               </div>
             }
             previewSettings={
@@ -319,6 +357,9 @@ export const CharacterBuilderPanel = ({
           namingMode === 'image-only' ? suggestedImageOnlyCharacterName : suggestedCharacterName
         }
         imageOnly={namingMode === 'image-only'}
+        retainsReferenceAsset={Boolean(
+          namingMode === 'image-only' || previewIsUsable || uploadedReference,
+        )}
         locked={characterNameLocked}
         returnFocusRef={namingMode === 'image-only' ? imageOnlySaveButtonRef : saveButtonRef}
         onCancel={() => setNamingMode(null)}
@@ -334,6 +375,7 @@ export const CharacterBuilderPanel = ({
         open={state.phase === 'requesting-regeneration'}
         busy={state.phase === 'regenerating'}
         editAvailable={editAvailable}
+        providerDisclosure={referenceGenerationDisclosure}
         returnFocusRef={regenerateButtonRef}
         onCancel={onCancelRegeneration}
         onSubmit={(instructions) => {
@@ -347,8 +389,8 @@ export const CharacterBuilderPanel = ({
         title="Reset this character draft?"
         description={
           saveRecoveryPending
-            ? 'This abandons the pending Studio handoff and removes the resumable draft. Any character already committed to the Shelf remains saved; generated server assets may remain unreferenced.'
-            : 'This removes the resumable draft from this browser and starts a fresh character. Generated server assets remain stored and may become unreferenced.'
+            ? 'This abandons the pending Studio handoff and removes the resumable draft. Any character already committed to the Shelf remains saved. Reference relationships are detached; immutable local image bytes remain until whole-environment retirement.'
+            : 'This removes the resumable draft from this browser and starts a fresh character. Reference relationships are detached; immutable local image bytes remain until whole-environment retirement.'
         }
         confirmLabel="Reset Draft"
         danger

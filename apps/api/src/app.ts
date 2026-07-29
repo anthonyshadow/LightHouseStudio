@@ -140,23 +140,29 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
           dependencies.config.elevenLabsEnableLogging,
         );
 
-  const referenceImageProvider = resolveOptionalProvider(dependencies.referenceImageProvider, () =>
-    createConfiguredReferenceImageProvider(dependencies.config, {
-      ...(dependencies.fetchImplementation === undefined
-        ? {}
-        : { fetchImplementation: dependencies.fetchImplementation }),
-      observeBflLifecycle: (event) => {
-        app.log.info(event, 'BFL reference image lifecycle');
-      },
-      observeWiroLifecycle: (event) => {
-        if (event.stage === 'cleanup_failed') {
-          app.log.warn(event, 'Wiro remote artifact cleanup failed');
-          return;
-        }
-        app.log.info(event, 'Wiro reference image lifecycle');
-      },
-    }),
+  const wiroAllowedForAccessMode =
+    dependencies.config.referenceImageProvider !== 'wiro' ||
+    dependencies.config.pilotAccessMode === 'operator-qualification';
+  const configuredReferenceImageProvider = resolveOptionalProvider(
+    dependencies.referenceImageProvider,
+    () =>
+      createConfiguredReferenceImageProvider(dependencies.config, {
+        ...(dependencies.fetchImplementation === undefined
+          ? {}
+          : { fetchImplementation: dependencies.fetchImplementation }),
+        observeBflLifecycle: (event) => {
+          app.log.info(event, 'BFL reference image lifecycle');
+        },
+        observeWiroLifecycle: (event) => {
+          if (event.stage === 'cleanup_failed') {
+            app.log.warn(event, 'Wiro remote artifact cleanup failed');
+            return;
+          }
+          app.log.info(event, 'Wiro reference image lifecycle');
+        },
+      }),
   );
+  const referenceImageProvider = wiroAllowedForAccessMode ? configuredReferenceImageProvider : null;
   const characterPromptOptimizer = resolveOptionalProvider(
     dependencies.characterPromptOptimizer,
     () =>

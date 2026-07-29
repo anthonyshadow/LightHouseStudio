@@ -5,9 +5,11 @@ Lightframe Studio is local-first, not offline-only. Local capture stays in the b
 The product owner approved the external-participant retention, detach, deletion, and whole-dataset
 cleanup promise in the
 [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) on 2026-07-28. The
-current behavior documented below remains implementation truth. Participant data must not be
-admitted until the later disclosure/cleanup implementation wave passes and the approved procedure
-has been rehearsed on a disposable environment.
+current behavior documented below remains implementation truth. Wave 5 now exposes the approved
+detach/retention and provider-usage boundaries, server-gates Wiro in participant mode, and provides
+the [operator retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md). The executable disposable
+retirement drill must pass before participant data is admitted; the real checklist remains
+mandatory for every participant.
 
 ## Data inventory
 
@@ -49,6 +51,9 @@ The backend has no product database, accounts, or take/session history. It retai
   leaf to the operating-system Trash, verify the asset IDs fail against a fresh disposable
   environment, reconcile provider cleanup, obtain Evidence Recorder and Support & Escalation Owner
   initials, then permanently remove that reviewed leaf.
+- Use the [controlled-pilot data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md) for the
+  content-free proof. `npm run pilot:data-retirement:drill` verifies exact-leaf retirement and
+  shared-root/sibling preservation using disposable temporary data.
 - Never use a recursive deletion command with an unresolved variable, broad glob, shared root,
   home directory, repository, or provider credential directory. Any ambiguity fails closed and
   blocks the next participant.
@@ -60,14 +65,16 @@ The backend has no product database, accounts, or take/session history. It retai
 
 Provider-side retention is a separate disclosed boundary. Before participant contact, the
 Credential Custodian and Billing Authorizer must review the exact account setting and current
-terms. Wiro is operator-only and requires successful `InputOutputDelete`; participant ElevenLabs
-conversion requires confirmed zero-retention eligibility. Local cleanup is never represented as
-provider-side deletion.
+terms. `PILOT_ACCESS_MODE=participant` server-disables selected Wiro image work even when its
+credentials are configured. Wiro technical passes require the explicit
+`PILOT_ACCESS_MODE=operator-qualification` startup mode, no participant present, and successful
+`InputOutputDelete`. Participant ElevenLabs conversion requires confirmed zero-retention
+eligibility. Local cleanup is never represented as provider-side deletion.
 
 ## Explicit consent points
 
-- **Upload reference** sends validated image bytes only to the same-origin local broker, which writes an immutable asset under `LIGHTFRAME_DATA_DIR`. Upload does not contact an image provider. **Remove** detaches the draft relationship; it does not delete the stored asset.
-- **Save Character** validates and durably stores the current character, then preloads Lucy 2.5 without starting/applying the provider session. Prompt-only and direct-upload Save make no optimizer or image request. **Save & Use Image Only** is also local-only. A stale generated/composed preview is never attached.
+- **Upload reference** sends validated image bytes only to the same-origin local broker, which writes an immutable asset under `LIGHTFRAME_DATA_DIR`. The picker states this retention before first selection. Upload does not contact an image provider. **Detach uploaded character reference** removes the draft relationship; it does not delete the stored asset.
+- **Save Character** validates and durably stores the current character, then preloads Lucy 2.5 without starting/applying the provider session. The naming surface distinguishes prompt-only save from a save that retains immutable local reference bytes. Prompt-only and direct-upload Save make no optimizer or image request. **Save & Use Image Only** is also local-only. A stale generated/composed preview is never attached.
 - **Generate Preview** is the explicit automatic optimize→image action. If image generation fails after successful optimization, an unchanged retry reuses that in-memory optimizer result; it does not contact the optimizer again. **Generate Combined Preview** additionally sends the owner-scoped uploaded source bytes to the selected image provider after optimization. OpenAI receives an SDK upload, BFL receives raw base64 in `input_image`, and Wiro receives one multipart `inputImage`; none requires a public temporary upload. **Regenerate** first asks for optional feedback: without an upload, blank feedback sends no previous generated image; with an upload, blank feedback composes from that source again. Written feedback sends an opaque source asset ID and instructions to the broker, which resolves owner-scoped image bytes server-side for the selected provider.
 - **Start Camera + Mic**, **Check camera & mic**, or a valid direct **Start Character/Try-On AI** is the first possible camera/microphone permission request. Editing prompts and recipes does not open devices.
 - **Apply capture settings** stores selected devices/quality for this tab. With no preview it does not start media; with a local preview it atomically acquires a replacement before releasing the current stream.
@@ -82,10 +89,17 @@ provider-side deletion.
   before resource release.
 - **Apply changes** sends the complete current model snapshot, including an explicit image clear when applicable.
 - **Optimize / Re-optimize reference prompt** sends the raw character recipe and selected framing, orientation, rendering, expression, and background settings through the loopback broker to the OpenAI Responses API with response storage disabled. The result remains separate from the raw recipe and can be edited before generation.
-- Character reference generation exists only in Character Builder. **Generate Preview**, **Generate Combined Preview**, and **Regenerate** require explicit actions, and Builder never silently falls back to a raw prompt after optimizer failure. Each may be billable. Prompt Workshop has no provider or reference-generation action.
+- Character reference generation exists only in Character Builder. Beside **Generate Preview** and
+  **Generate Combined Preview**, and again inside **Regenerate**, Builder names the optimizer,
+  selected image provider/model, possible credit usage, retained immutable output, and provider-free
+  upload/save alternatives. Builder never silently falls back to a raw prompt after optimizer
+  failure. Each provider action may be billable. Prompt Workshop has no provider or
+  reference-generation action.
 - **Browse saved ElevenLabs voices · contacts provider** requests only `voice_type=saved` metadata after the disclosure is opened; it does not send the take. Every provider-contacting voice request carries the explicit Studio voice-intent header, which the loopback broker requires before invoking ElevenLabs.
 - **Preview voice** is a labeled click-to-fetch action. It requests provider preview audio, owns and revokes the resulting Blob URL, and does not send the recording.
-- **Apply ElevenLabs voice** sends only the completed audio sidecar, not video, through the same-origin broker.
+- **Apply ElevenLabs voice** shows the exact take duration, configured speech-to-speech model,
+  possible credit usage, and zero-retention requirement at the selected-voice action. Apply sends
+  only the completed immutable audio sidecar, not video, through the same-origin broker.
 
 ## Local no-provider guarantee
 

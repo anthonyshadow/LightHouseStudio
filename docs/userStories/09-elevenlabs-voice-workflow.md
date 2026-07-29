@@ -18,7 +18,12 @@ As a creator, I want to preview and apply a voice already saved in my ElevenLabs
 3. Confirm Voice Browser explains that only voices currently saved in the ElevenLabs library are shown. The project has no public-library or add/import action.
 4. Enter a search term (name, style, accent, etc.) and select **Search**. Use **Previous**, **Next**, or **Refresh voices** to navigate saved results.
 5. Select an inline audio preview to listen. The broker validates and normalizes saved provider MP3 previews even when ElevenLabs storage supplies a generic text media header. If a preview fails validation, use the displayed retry path or select another voice; no recording has been uploaded.
-6. Select a saved voice card, including a saved community Professional Voice Clone if present, then select **Apply [voice] to recorded audio**. Confirm the processing state; the server first revalidates that the voice remains saved and the configured model supports speech-to-speech, then sends the immutable original audio sidecar through the local broker and never sends video.
+6. Select a saved voice card, including a saved community Professional Voice Clone if present.
+   Before **Apply [voice] to recorded audio**, read the exact clip duration, configured
+   speech-to-speech model, possible provider-credit use, and zero-retention requirement. Apply is
+   the upload boundary: the server first revalidates that the voice remains saved and the
+   configured model supports speech-to-speech, then sends the immutable original audio sidecar
+   through the local broker and never sends video.
 7. Wait for ElevenLabs conversion and local video/audio remuxing to complete. On success, inspect the processed playback, then return to take review for download, close, or discard.
 
 ## Failure and alternate paths

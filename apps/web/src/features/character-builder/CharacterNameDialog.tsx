@@ -1,11 +1,12 @@
 import { ASSET_NAME_MAX_LENGTH, containsMeaningfulText, normalizeWhitespace } from '@studio/domain';
 import { useId, useRef, useState, type FormEvent, type RefObject } from 'react';
-import { Button, OverlayPanel, TextField } from '../../ui';
+import { Button, OverlayPanel, StatusNotice, TextField } from '../../ui';
 
 export interface CharacterNameDialogProps {
   readonly open: boolean;
   readonly initialName: string;
   readonly imageOnly?: boolean;
+  readonly retainsReferenceAsset?: boolean;
   readonly locked?: boolean;
   readonly returnFocusRef?: RefObject<HTMLElement | null>;
   readonly onCancel: () => void;
@@ -16,6 +17,7 @@ export const CharacterNameDialog = ({
   open,
   initialName,
   imageOnly = false,
+  retainsReferenceAsset = false,
   locked = false,
   returnFocusRef,
   onCancel,
@@ -90,6 +92,18 @@ export const CharacterNameDialog = ({
           onChange={(event) => setName(event.currentTarget.value)}
         />
       </form>
+      {retainsReferenceAsset ? (
+        <StatusNotice title="Local reference retention">
+          Saving keeps the selected immutable reference image in this participant environment.
+          Detaching or deleting the character later removes its links, not the stored image bytes.
+          Only whole-environment retirement deletes those local bytes.
+        </StatusNotice>
+      ) : (
+        <StatusNotice>
+          This prompt-only save stays in the browser Recipe Shelf and does not contact an image
+          provider.
+        </StatusNotice>
+      )}
     </OverlayPanel>
   );
 };

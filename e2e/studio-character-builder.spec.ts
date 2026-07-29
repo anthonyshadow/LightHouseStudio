@@ -453,7 +453,7 @@ test('prompt plus upload saves the uploaded source directly with enhancement off
   expect((await readBrowserState(page)).connections).toEqual([]);
 });
 
-test('uploaded draft references restore across reload and Remove only detaches them', async ({
+test('uploaded draft references restore across reload and Detach does not contact a provider', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -478,7 +478,7 @@ test('uploaded draft references restore across reload and Remove only detaches t
     network.referenceImageUploads[0]?.assetId ?? '',
   );
 
-  await dialog.getByRole('button', { name: 'Remove uploaded character reference' }).click();
+  await dialog.getByRole('button', { name: 'Detach uploaded character reference' }).click();
   await expect(dialog.getByAltText('Current uploaded character reference')).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Save & Use Image Only' })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Close character builder' }).click();

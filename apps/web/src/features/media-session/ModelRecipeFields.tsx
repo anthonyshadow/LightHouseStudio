@@ -64,6 +64,13 @@ export const ModelRecipeFields = ({
         onChange={session.updateReferenceImage}
       />
 
+      {mode === 'lucy-vton-3' ? (
+        <StatusNotice title="Virtual Try-On beta guidance">
+          Use one garment on a plain background. This preview is creative visualization only; it
+          does not predict fit, sizing, fabric behavior, or purchase accuracy.
+        </StatusNotice>
+      ) : null}
+
       <label css={enhancementToggleStyles(theme)}>
         <input
           type="checkbox"

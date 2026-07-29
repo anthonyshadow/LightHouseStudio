@@ -53,4 +53,23 @@ describe('CharacterNameDialog', () => {
     screen.getByRole('button', { name: 'Resume Save' }).click();
     expect(onSubmit).toHaveBeenCalledWith('Portrait Coach');
   });
+
+  it('distinguishes prompt-only save from retained local reference bytes', () => {
+    const view = renderDialog();
+    expect(screen.getByText(/prompt-only save.*does not contact an image provider/i)).toBeVisible();
+
+    view.onCancel.mockClear();
+    cleanup();
+    renderDialog({ retainsReferenceAsset: true });
+
+    expect(screen.getByText('Local reference retention')).toBeVisible();
+    expect(
+      screen.getByText(
+        /deleting the character later removes its links, not the stored image bytes/i,
+      ),
+    ).toBeVisible();
+    expect(
+      screen.getByText(/whole-environment retirement deletes those local bytes/i),
+    ).toBeVisible();
+  });
 });

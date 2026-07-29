@@ -37,6 +37,7 @@ export interface ImagePickerDropPreview {
   readonly byteSize: number;
   readonly description: string;
   readonly removeLabel: string;
+  readonly removeText?: string;
   readonly removeTitle?: string;
   readonly onRemove: () => void;
 }
@@ -174,7 +175,7 @@ export const ImagePickerDropField = ({
               window.requestAnimationFrame(() => inputRef.current?.focus());
             }}
           >
-            Remove
+            {preview.removeText ?? 'Remove'}
           </Button>
         </div>
       ) : null}

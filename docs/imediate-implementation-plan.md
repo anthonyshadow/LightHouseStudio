@@ -334,6 +334,8 @@ remains responsive, and releases resources according to the recording memory pol
 
 ## 10. Wave 5 — High data, provider, cost, and content trust boundary
 
+**Status:** Complete 2026-07-28
+
 **Findings:** `SEC-004`, `UX-013`, `PROD-006`; `SEC-005`, `PROD-007`, `PROD-009`, `PROD-010`,
 `PROD-015`
 
@@ -373,6 +375,21 @@ Required evidence:
 **Exit gate:** the UI, operator procedure, and provider settings tell the same truthful story.
 Wiro remains unavailable to participants unless the approved policy explicitly permits its exact
 configuration.
+
+**Completion:** Upload, retained-reference Save, Detach, Reset, and character-record deletion now
+state when immutable bytes remain. Builder generation and regeneration identify optimizer and
+selected provider/model contact, possible credits, retained output, and provider-free
+alternatives. ElevenLabs Apply shows duration/model/usage/zero-retention context, and VTO carries
+the approved beta/no-accuracy guidance. `PILOT_ACCESS_MODE=participant` server-disables Wiro even
+with credentials; only the explicit operator-qualification mode enables its separate technical
+pass. The operator checklist and disposable retirement drill prove exact-leaf removal and
+shared-root/sibling preservation without adding unsafe per-asset garbage collection. Copy,
+accessibility, safe provider recovery, no-provider network denial, targeted multi-browser/mobile
+journeys, and the normal quality gate pass. The approved release contract supplies the signed
+policy decision. The two intentional Builder baselines were reviewed and refreshed on Darwin and
+the pinned Linux runtime; both 29-case curated suites pass. Real
+participant checklists and live-provider/device qualification remain later release evidence, not
+Wave 5 implementation gaps.
 
 ## 11. Wave 6 — Touch/mobile, accessibility, Voice, and activation usability
 

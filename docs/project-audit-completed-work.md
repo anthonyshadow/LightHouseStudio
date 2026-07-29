@@ -78,3 +78,50 @@ Intentional exclusions:
 
 Validation results and any environment-limited checks are recorded in the task handoff and should
 be repeated after later implementation phases.
+
+## 2026-07-28 — Wave 5 controlled-pilot trust and operating boundary
+
+**Findings:** `SEC-004`, `SEC-005`, `UX-013`, `PROD-006`, `PROD-007`, `PROD-009`, `PROD-010`,
+`PROD-015`
+
+**Scope:** local controlled-pilot disclosure, provider eligibility, and whole-environment
+retirement procedure; no public ownership or per-asset garbage collection.
+
+Completed:
+
+- Replaced the retained Builder upload action with truthful **Detach** language and disclosed
+  immutable local retention before first upload, retained-reference Save, Reset, and
+  character-record deletion.
+- Added action-adjacent optimizer/provider/model, possible-credit, local-output-retention, and
+  provider-free-alternative copy for Generate, Combined, Regenerate, and Edit paths.
+- Added exact clip duration, configured model, possible-credit, and zero-retention context at
+  ElevenLabs Apply.
+- Added the approved one-garment/plain-background VTO beta guidance and no fit, sizing,
+  fabric-behavior, or purchase-accuracy claim.
+- Added `PILOT_ACCESS_MODE`; participant mode server-disables Wiro even when credentials are
+  configured, while explicit operator-qualification mode preserves the separate technical pass.
+- Aligned the default BFL safety tolerance with the approved controlled-pilot value `2`.
+- Added the per-participant retirement checklist and an executable disposable drill that verifies
+  exact-leaf retirement, retained-path absence, and shared-root/sibling preservation.
+- Updated canonical privacy, architecture, setup, provider-smoke, product/audit, and observable
+  journey documentation.
+
+Validation:
+
+- `npm run pilot:data-retirement:drill`
+- targeted Vitest: 70 tests passed
+- `npm run quality`: 852 unit/component/API tests and 55 Storybook tests passed; type, lint,
+  formatting, dead-code, module-cycle, package/web/API build, and Storybook build gates passed
+- targeted Playwright provider-free and Character Builder journeys: 60 tests passed across
+  Chromium, WebKit, and mobile projects
+- curated Darwin and pinned-Linux visual regression: 29 tests passed per platform after reviewing
+  and updating only the two intentional Character Builder baselines on each platform
+
+Intentional exclusions:
+
+- No live paid provider calls or claim of provider entitlement, billing, output quality, or
+  physical-device qualification.
+- No public accounts, authorization, cloud storage, billing implementation, analytics, moderation
+  system, per-asset deletion, or relationship-unsafe garbage collection.
+- Every real participant still requires a completed content-free retirement checklist; live
+  provider and physical-device evidence remain Waves 8–9 gates.

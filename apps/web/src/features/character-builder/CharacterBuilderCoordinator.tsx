@@ -15,6 +15,9 @@ export interface CharacterBuilderCoordinatorProps {
   readonly returnFocusRef?: RefObject<HTMLElement | null>;
   readonly generationAvailable: boolean;
   readonly editAvailable: boolean;
+  readonly referenceImageProvider?: 'openai' | 'bfl' | 'wiro' | null;
+  readonly referenceImageModel?: string | null;
+  readonly referenceImageOptimizerModel?: string | null;
   readonly saveBlockedReason?: string | undefined;
   readonly legacyRepository?: LocalProjectRepository | undefined;
   readonly onSaveCharacter: (
@@ -31,6 +34,9 @@ export interface CharacterBuilderCoordinatorProps {
 export const CharacterBuilderCoordinator = ({
   open,
   returnFocusRef,
+  referenceImageProvider,
+  referenceImageModel,
+  referenceImageOptimizerModel,
   ...options
 }: CharacterBuilderCoordinatorProps) => {
   const controller = useCharacterBuilderController({ open, ...options });
@@ -38,6 +44,9 @@ export const CharacterBuilderCoordinator = ({
     <CharacterBuilderPanel
       open={open}
       {...(returnFocusRef ? { returnFocusRef } : {})}
+      {...(referenceImageProvider !== undefined ? { referenceImageProvider } : {})}
+      {...(referenceImageModel !== undefined ? { referenceImageModel } : {})}
+      {...(referenceImageOptimizerModel !== undefined ? { referenceImageOptimizerModel } : {})}
       {...controller}
     />
   );

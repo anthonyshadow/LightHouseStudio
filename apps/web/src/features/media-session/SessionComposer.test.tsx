@@ -97,6 +97,10 @@ describe('SessionComposer', () => {
       'Add a garment direction or garment reference to start.',
     );
     expect(session.startModel).not.toHaveBeenCalled();
+    expect(screen.getByText('Virtual Try-On beta guidance')).toBeInTheDocument();
+    expect(
+      screen.getByText(/does not predict fit, sizing, fabric behavior, or purchase accuracy/i),
+    ).toBeInTheDocument();
   });
 
   it('shares the complete Decart disclosure beside direct Dock Start', () => {

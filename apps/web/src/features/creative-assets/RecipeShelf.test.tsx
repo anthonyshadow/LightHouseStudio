@@ -179,6 +179,29 @@ describe('RecipeShelf', () => {
     expect(onCreateCharacter).toHaveBeenCalledOnce();
   });
 
+  it('explains that deleting a character record detaches but does not erase reference bytes', async () => {
+    const user = userEvent.setup();
+    const repository = createRepository();
+    repository.createSavedCharacterPrompt({
+      name: 'Retained portrait',
+      prompt: 'Transform the subject into an adult studio host.',
+      promptIntent: 'character-transform',
+      referenceImageStatus: 'persisted-reference',
+      referenceImageAssetId: 'retained-reference',
+    });
+    renderShelf(repository);
+
+    await user.click(screen.getByRole('button', { name: /Characters/ }));
+    await user.click(screen.getByRole('button', { name: 'Delete Retained portrait' }));
+
+    const dialog = screen.getByRole('alertdialog');
+    expect(dialog).toHaveTextContent('deletes the saved character record');
+    expect(dialog).toHaveTextContent('Immutable local image bytes remain');
+    expect(screen.queryByRole('button', { name: 'Delete permanently' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Delete character record' }));
+    expect(screen.queryByRole('heading', { name: 'Retained portrait' })).not.toBeInTheDocument();
+  });
+
   it('keeps legacy object-edit records in Prompt Workshop', async () => {
     const user = userEvent.setup();
     const repository = createRepository();

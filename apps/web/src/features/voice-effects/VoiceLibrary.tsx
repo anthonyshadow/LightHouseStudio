@@ -6,6 +6,8 @@ import { useVoiceLibrary } from '../../orchestration/voice-library/useVoiceLibra
 
 export type VoiceLibraryProps = {
   disabled: boolean;
+  clipDurationLabel: string;
+  modelId?: string | null;
   onApply: (voice: VoiceSummary) => void;
 };
 
@@ -23,7 +25,12 @@ const searchFormStyles = (theme: Theme): CSSObject => ({
 });
 const searchButtonStyles = (): CSSObject => ({ alignSelf: 'end' });
 
-export const VoiceLibrary = ({ disabled, onApply }: VoiceLibraryProps) => {
+export const VoiceLibrary = ({
+  disabled,
+  clipDurationLabel,
+  modelId,
+  onApply,
+}: VoiceLibraryProps) => {
   const theme = useTheme();
   const library = useVoiceLibrary();
 
@@ -106,9 +113,22 @@ export const VoiceLibrary = ({ disabled, onApply }: VoiceLibraryProps) => {
       </Button>
 
       {library.selected ? (
-        <Button variant="primary" disabled={disabled} onClick={applySelectedVoice}>
-          Apply {library.selected.voice.name} to recorded audio
-        </Button>
+        <>
+          <StatusNotice id="elevenlabs-apply-disclosure" title="Provider usage">
+            Clip duration: {clipDurationLabel}. Apply sends only the immutable original audio
+            sidecar to ElevenLabs
+            {modelId ? ` using ${modelId}` : ''} and may use provider credits. Zero-retention
+            eligibility is required; provider refusal is final for this request.
+          </StatusNotice>
+          <Button
+            variant="primary"
+            disabled={disabled}
+            aria-describedby="elevenlabs-apply-disclosure"
+            onClick={applySelectedVoice}
+          >
+            Apply {library.selected.voice.name} to recorded audio
+          </Button>
+        </>
       ) : null}
     </div>
   );

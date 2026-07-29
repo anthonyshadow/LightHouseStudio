@@ -213,11 +213,17 @@ export const RenameForm = ({
 
 interface DeleteConfirmationProps {
   name: string;
+  retainedReference?: boolean;
   onConfirm: () => void;
   onCancel: () => void;
 }
 
-export const DeleteConfirmation = ({ name, onConfirm, onCancel }: DeleteConfirmationProps) => {
+export const DeleteConfirmation = ({
+  name,
+  retainedReference = false,
+  onConfirm,
+  onCancel,
+}: DeleteConfirmationProps) => {
   const theme = useTheme();
   const titleId = useId();
   const descriptionId = useId();
@@ -236,15 +242,16 @@ export const DeleteConfirmation = ({ name, onConfirm, onCancel }: DeleteConfirma
         Delete “{name}”?
       </h3>
       <p id={descriptionId} css={dialogTextStyles(theme)}>
-        This removes the saved recipe text. Any matching recent prompt remains available without the
-        saved link.
+        {retainedReference
+          ? 'This deletes the saved character record and detaches its reference links. Immutable local image bytes remain until whole-environment retirement.'
+          : 'This removes the saved recipe text. Any matching recent prompt remains available without the saved link.'}
       </p>
       <div css={actionStyles(theme)}>
         <Button ref={cancelRef} variant="secondary" onClick={onCancel}>
           Keep recipe
         </Button>
         <Button variant="danger" onClick={onConfirm}>
-          Delete permanently
+          {retainedReference ? 'Delete character record' : 'Delete permanently'}
         </Button>
       </div>
     </div>

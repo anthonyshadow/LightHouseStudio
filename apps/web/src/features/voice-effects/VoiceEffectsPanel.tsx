@@ -7,6 +7,7 @@ import type { VoiceProcessingController } from './types';
 import type { BrowserCapabilities } from '../media-session';
 import { LOCAL_EFFECTS } from './types';
 import { VoiceLibrary } from './VoiceLibrary';
+import { formatDuration } from '../recording';
 
 export type VoiceBrowserCapabilities = Pick<BrowserCapabilities, 'webAudio' | 'offlineAudio'>;
 
@@ -14,6 +15,7 @@ export type VoiceEffectsPanelProps = {
   recording: RecordingController;
   processing: VoiceProcessingController;
   elevenLabsAvailable: boolean;
+  elevenLabsModel?: string | null;
   browserCapabilities?: VoiceBrowserCapabilities;
 };
 
@@ -48,6 +50,7 @@ export const VoiceEffectsPanel = ({
   recording,
   processing,
   elevenLabsAvailable,
+  elevenLabsModel = null,
   browserCapabilities = detectVoiceBrowserCapabilities(),
 }: VoiceEffectsPanelProps) => {
   const theme = useTheme();
@@ -67,6 +70,7 @@ export const VoiceEffectsPanel = ({
   const canReplaceAudio = browserCapabilities.webAudio;
   const canRenderLocalEffects = canReplaceAudio && browserCapabilities.offlineAudio;
   const tooLongForElevenLabs = (recording.original?.durationMs ?? 0) > 5 * 60 * 1000;
+  const clipDurationLabel = formatDuration((recording.original?.durationMs ?? 0) / 1000);
   const treatmentReady =
     recording.processingState === 'ready' && processing.selection.kind !== 'none';
 
@@ -182,6 +186,8 @@ export const VoiceEffectsPanel = ({
               </StatusNotice>
               <VoiceLibrary
                 disabled={!hasAudio || processingActive || !canReplaceAudio}
+                clipDurationLabel={clipDurationLabel}
+                modelId={elevenLabsModel}
                 onApply={(voice) => void processing.applyElevenLabs(voice.voiceId, voice.name)}
               />
             </OverlayPanel>

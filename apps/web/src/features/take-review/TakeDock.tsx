@@ -13,6 +13,7 @@ export type TakeDockProps = {
   recording: RecordingController;
   processing: VoiceProcessingController;
   elevenLabsAvailable: boolean;
+  elevenLabsModel?: string | null;
   browserCapabilities?: VoiceBrowserCapabilities;
   view?: 'all' | 'take' | 'voice';
   onCloseTake?: () => void;
@@ -167,6 +168,7 @@ export const TakeDock = ({
   recording,
   processing,
   elevenLabsAvailable,
+  elevenLabsModel = null,
   browserCapabilities,
   view = 'all',
   onCloseTake,
@@ -256,6 +258,7 @@ export const TakeDock = ({
               recording={recording}
               processing={processing}
               elevenLabsAvailable={elevenLabsAvailable}
+              elevenLabsModel={elevenLabsModel}
               {...(browserCapabilities ? { browserCapabilities } : {})}
             />
           </div>

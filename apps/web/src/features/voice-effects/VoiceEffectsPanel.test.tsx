@@ -173,7 +173,14 @@ describe('VoiceLibrary accessibility', () => {
       total: 1,
     });
 
-    renderWithTheme(<VoiceLibrary disabled={false} onApply={onApply} />);
+    renderWithTheme(
+      <VoiceLibrary
+        disabled={false}
+        clipDurationLabel="0:05"
+        modelId="eleven_multilingual_sts_v2"
+        onApply={onApply}
+      />,
+    );
     await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
 
     vi.stubGlobal('URL', {
@@ -185,6 +192,14 @@ describe('VoiceLibrary accessibility', () => {
     );
     expect(await screen.findByLabelText('Listen to Saved Star preview')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Select Saved Star' }));
+    expect(screen.getByText(/Clip duration: 0:05/)).toHaveTextContent(
+      'using eleven_multilingual_sts_v2',
+    );
+    expect(
+      screen.getByRole('button', { name: 'Apply Saved Star to recorded audio' }),
+    ).toHaveAccessibleDescription(
+      /may use provider credits.*Zero-retention eligibility is required/i,
+    );
     await user.click(screen.getByRole('button', { name: 'Apply Saved Star to recorded audio' }));
 
     expect(onApply).toHaveBeenCalledWith({

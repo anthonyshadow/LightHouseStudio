@@ -30,11 +30,12 @@ describe('parseEnvironment', () => {
       openAiReferenceImageQuality: 'high',
       referenceImageProvider: 'openai',
       bflReferenceImageModel: 'flux-2-pro',
-      bflSafetyTolerance: 4,
+      bflSafetyTolerance: 2,
       bflDisablePromptUpsampling: true,
       bflReferenceImageTimeoutMs: DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
       wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
       wiroReferenceImageTimeoutMs: DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
+      pilotAccessMode: 'participant',
     });
   });
 
@@ -61,6 +62,7 @@ describe('parseEnvironment', () => {
         WIRO_API_SECRET: ' wiro-secret-placeholder ',
         WIRO_REFERENCE_IMAGE_MODEL: ' seedream-v5-lite-uncensored ',
         WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '170000',
+        PILOT_ACCESS_MODE: ' operator-qualification ',
         ELEVENLABS_API_KEY: '  eleven-placeholder  ',
         ELEVENLABS_STS_MODEL_ID: ' custom-sts ',
         ELEVENLABS_ENABLE_LOGGING: 'false',
@@ -87,6 +89,7 @@ describe('parseEnvironment', () => {
       wiroApiSecret: 'wiro-secret-placeholder',
       wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
       wiroReferenceImageTimeoutMs: 170_000,
+      pilotAccessMode: 'operator-qualification',
       referenceImageTimeoutMs: 140_000,
       elevenLabsApiKey: 'eleven-placeholder',
       elevenLabsModelId: 'custom-sts',
@@ -113,6 +116,7 @@ describe('parseEnvironment', () => {
     { WIRO_REFERENCE_IMAGE_MODEL: 'seedream-v5-lite' },
     { WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '9999' },
     { WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '180001' },
+    { PILOT_ACCESS_MODE: 'public' },
   ])('rejects invalid environment input %#', (environment) => {
     expect(() => parseEnvironment(environment)).toThrow(EnvironmentValidationError);
   });
@@ -124,6 +128,7 @@ describe('parseEnvironment', () => {
         WIRO_API_KEY: ' wiro-key ',
         WIRO_API_SECRET: ' wiro-secret ',
         WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '175000',
+        PILOT_ACCESS_MODE: 'operator-qualification',
       }),
     ).toMatchObject({
       referenceImageProvider: 'wiro',
@@ -131,6 +136,7 @@ describe('parseEnvironment', () => {
       wiroApiSecret: 'wiro-secret',
       wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
       wiroReferenceImageTimeoutMs: 175_000,
+      pilotAccessMode: 'operator-qualification',
       referenceImageTimeoutMs: 175_000,
     });
   });

@@ -50,7 +50,7 @@ describe('BuilderReferenceImageField presentation', () => {
     expect(input).toHaveAccessibleName('Upload imageDrag & drop or choose a file');
     expect(input).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');
     expect(input).toHaveAccessibleDescription(
-      'Optional character referenceJPEG, PNG, or WebP up to 10 MiB and 40 megapixels. The file is stored as an immutable local asset for draft restore and saved characters.',
+      'Optional character referenceJPEG, PNG, or WebP up to 10 MiB and 40 megapixels. Selecting a file stores an immutable local asset until this participant environment is retired. Detaching it later removes the relationship, not the stored bytes.',
     );
     await user.tab();
     expect(input).toHaveFocus();
@@ -143,12 +143,14 @@ describe('BuilderReferenceImageField presentation', () => {
       uploadedReference.displayName,
     );
     expect(screen.getByText('1.50 MiB')).toBeInTheDocument();
-    expect(screen.getByText(/immutable local asset will be restored/u)).toBeInTheDocument();
+    expect(screen.getByText(/Detach removes this draft relationship/u)).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent(
       'The image exceeds the 40-megapixel decoded-image limit.',
     );
 
-    await user.click(screen.getByRole('button', { name: 'Remove uploaded character reference' }));
+    const detach = screen.getByRole('button', { name: 'Detach uploaded character reference' });
+    expect(detach).toHaveTextContent('Detach');
+    await user.click(detach);
 
     expect(onRemove).toHaveBeenCalledOnce();
     await waitFor(() =>
@@ -176,7 +178,7 @@ describe('BuilderReferenceImageField presentation', () => {
     );
     expect(input).toBeDisabled();
     expect(
-      screen.getByRole('button', { name: 'Remove uploaded character reference' }),
+      screen.getByRole('button', { name: 'Detach uploaded character reference' }),
     ).toBeDisabled();
 
     const dropTarget = input.parentElement;

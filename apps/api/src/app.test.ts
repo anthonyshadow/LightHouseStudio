@@ -109,6 +109,7 @@ describe('API shell', () => {
         referenceImageProvider: 'wiro',
         wiroApiKey: 'wiro-key',
         wiroApiSecret: 'wiro-secret',
+        pilotAccessMode: 'operator-qualification',
       }),
     });
     apps.push(app);
@@ -122,6 +123,29 @@ describe('API shell', () => {
         providerId: 'wiro',
         modelId: 'seedream-v5-lite-uncensored',
         optimizer: { available: false },
+      },
+    });
+  });
+
+  it('server-disables Wiro for participant access even when credentials are configured', async () => {
+    const app = createApp({
+      config: testConfig({
+        referenceImageProvider: 'wiro',
+        wiroApiKey: 'wiro-key',
+        wiroApiSecret: 'wiro-secret',
+        pilotAccessMode: 'participant',
+      }),
+    });
+    apps.push(app);
+
+    const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
+
+    expect(capabilities.json()).toMatchObject({
+      referenceImages: {
+        available: false,
+        editAvailable: false,
+        providerId: 'wiro',
+        modelId: 'seedream-v5-lite-uncensored',
       },
     });
   });

@@ -591,6 +591,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
               recording={recording}
               processing={processing}
               elevenLabsAvailable={availability.elevenLabs}
+              elevenLabsModel={availability.elevenLabsModel}
               browserCapabilities={browser}
               onCloseTake={closeOverlay}
               onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
@@ -614,6 +615,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
               recording={recording}
               processing={processing}
               elevenLabsAvailable={availability.elevenLabs}
+              elevenLabsModel={availability.elevenLabsModel}
               browserCapabilities={browser}
               onBackToTake={() => openOverlay('take-review')}
             />
@@ -633,6 +635,15 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
                 availability.referenceImages && availability.referenceImageOptimizerAvailable,
               )}
               editAvailable={Boolean(availability.referenceImageEditAvailable)}
+              {...(availability.referenceImageProvider !== undefined
+                ? { referenceImageProvider: availability.referenceImageProvider }
+                : {})}
+              {...(availability.referenceImageModel !== undefined
+                ? { referenceImageModel: availability.referenceImageModel }
+                : {})}
+              {...(availability.referenceImageOptimizerModel !== undefined
+                ? { referenceImageOptimizerModel: availability.referenceImageOptimizerModel }
+                : {})}
               {...(characterBuilderSaveBlockedReason
                 ? { saveBlockedReason: characterBuilderSaveBlockedReason }
                 : {})}

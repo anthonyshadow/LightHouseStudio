@@ -163,7 +163,13 @@ Then Stop AI, stop the camera, discard/download test takes as appropriate, close
 Uploaded and generated test references remain immutable under
 `LIGHTFRAME_DATA_DIR`; the app has no asset-delete action. For a disposable
 smoke, configure a dedicated data directory before starting and retire it only
-under the verified procedure in the controlled-pilot contract. Never remove a shared asset
-directory as routine test cleanup.
+under the [controlled-pilot data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md). Never
+remove a shared asset directory as routine test cleanup. Run
+`npm run pilot:data-retirement:drill` before the first retained-data pass.
+
+Wiro is unavailable with the default `PILOT_ACCESS_MODE=participant` even when credentials are
+present. Its separate technical smoke requires `PILOT_ACCESS_MODE=operator-qualification`, no
+participant present, and successful remote `InputOutputDelete` evidence. Do not use that mode to
+broaden participant access.
 
 Failures caused by missing credentials, device permission, account entitlement, incompatible voices/models, quota/billing, provider policy, firewall/NAT, or provider outage are concrete external limitations. Capture the safe error code and stop; do not weaken security boundaries or embed credentials to bypass them.

@@ -25,11 +25,12 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   openAiReferenceImageQuality: 'high',
   referenceImageProvider: 'openai',
   bflReferenceImageModel: 'flux-2-pro',
-  bflSafetyTolerance: 4,
+  bflSafetyTolerance: 2,
   bflDisablePromptUpsampling: true,
   bflReferenceImageTimeoutMs: 1_000,
   wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
   wiroReferenceImageTimeoutMs: 1_000,
+  pilotAccessMode: 'participant',
   lightframeDataDir: './.lightframe-data-test',
   ...overrides,
 });

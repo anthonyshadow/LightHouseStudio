@@ -5,6 +5,7 @@ export interface RegenerationDialogProps {
   open: boolean;
   busy?: boolean;
   editAvailable?: boolean;
+  providerDisclosure?: string | undefined;
   returnFocusRef?: RefObject<HTMLElement | null>;
   onCancel: () => void;
   onSubmit: (changeInstructions: string) => void;
@@ -14,6 +15,7 @@ export const RegenerationDialog = ({
   open,
   busy = false,
   editAvailable = true,
+  providerDisclosure,
   returnFocusRef,
   onCancel,
   onSubmit,
@@ -64,6 +66,9 @@ export const RegenerationDialog = ({
         disabled={busy}
         onChange={(event) => setInstructions(event.currentTarget.value)}
       />
+      {providerDisclosure ? (
+        <StatusNotice title="Provider and retention">{providerDisclosure}</StatusNotice>
+      ) : null}
       {!editAvailable ? (
         <StatusNotice tone="warning" role="status">
           Provider-backed edits are unavailable. Leave the field blank to generate a fresh image

@@ -17,7 +17,7 @@ export const DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS = 120_000;
 export const MAX_PROMPT_OPTIMIZER_TIMEOUT_MS = 180_000;
 export const BFL_REFERENCE_IMAGE_MODEL = 'flux-2-pro' as const;
 export const WIRO_REFERENCE_IMAGE_MODEL = 'seedream-v5-lite-uncensored' as const;
-export const DEFAULT_BFL_SAFETY_TOLERANCE = 4;
+export const DEFAULT_BFL_SAFETY_TOLERANCE = 2;
 export const DEFAULT_BFL_DISABLE_PROMPT_UPSAMPLING = true;
 
 const normalizeOptionalString = (value: unknown): unknown => {
@@ -94,6 +94,10 @@ const environmentSchema = z.object({
     z.literal(WIRO_REFERENCE_IMAGE_MODEL).default(WIRO_REFERENCE_IMAGE_MODEL),
   ),
   WIRO_REFERENCE_IMAGE_TIMEOUT_MS: timeoutSchema(DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS),
+  PILOT_ACCESS_MODE: z.preprocess(
+    normalizeOptionalString,
+    z.enum(['participant', 'operator-qualification']).default('participant'),
+  ),
   ELEVENLABS_API_KEY: optionalSecretSchema,
   ELEVENLABS_STS_MODEL_ID: optionalModelSchema,
   ELEVENLABS_ENABLE_LOGGING: strictBooleanSchema(false),
@@ -126,6 +130,7 @@ export interface RuntimeConfig {
   readonly wiroApiSecret?: string;
   readonly wiroReferenceImageModel: typeof WIRO_REFERENCE_IMAGE_MODEL;
   readonly wiroReferenceImageTimeoutMs: number;
+  readonly pilotAccessMode: 'participant' | 'operator-qualification';
   readonly elevenLabsApiKey?: string;
   readonly elevenLabsModelId: string;
   readonly elevenLabsEnableLogging: boolean;
@@ -244,6 +249,7 @@ export const parseEnvironment = (
       : { wiroApiSecret: result.data.WIRO_API_SECRET }),
     wiroReferenceImageModel: result.data.WIRO_REFERENCE_IMAGE_MODEL,
     wiroReferenceImageTimeoutMs: result.data.WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
+    pilotAccessMode: result.data.PILOT_ACCESS_MODE,
     ...(result.data.ELEVENLABS_API_KEY === undefined
       ? {}
       : { elevenLabsApiKey: result.data.ELEVENLABS_API_KEY }),
