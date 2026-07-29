@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream';
+import { VOICE_CONVERSION_OUTPUT_MAX_BYTES, VOICE_PREVIEW_MAX_BYTES } from '@studio/contracts';
 import { z } from 'zod';
 import { ProviderError, type ProviderOperation } from '../provider-error.js';
 import type { AudioStream } from '../../application/audio-stream.js';
@@ -14,8 +15,22 @@ const ELEVENLABS_API_ORIGIN = 'https://api.elevenlabs.io';
 const ALLOWED_PREVIEW_HOSTS = new Set(['storage.googleapis.com']);
 const providerIdSchema = z.string().trim().min(1).max(200);
 
-/** Bridges Fetch's web stream through its async iterator without unsafe type coercion. */
-const nodeReadableFromWeb = (body: ReadableStream<Uint8Array>): Readable => Readable.from(body);
+export type ElevenLabsAudioLimits = Readonly<{
+  previewBytes: number;
+  conversionBytes: number;
+}>;
+
+const DEFAULT_AUDIO_LIMITS: ElevenLabsAudioLimits = {
+  previewBytes: VOICE_PREVIEW_MAX_BYTES,
+  conversionBytes: VOICE_CONVERSION_OUTPUT_MAX_BYTES,
+};
+
+type ProviderResponse = Readonly<{
+  response: Response;
+  callerSignal: AbortSignal;
+  timeoutSignal: AbortSignal;
+  combinedSignal: AbortSignal;
+}>;
 
 const isMp3Signature = (bytes: Uint8Array): boolean =>
   (bytes.byteLength >= 3 && bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) ||
@@ -29,61 +44,71 @@ const hasMp3Path = (rawUrl: string): boolean => {
   }
 };
 
-const nodeReadableFromValidatedMp3 = async (
-  body: ReadableStream<Uint8Array>,
-): Promise<Readable> => {
-  const reader = body.getReader();
-  const initialChunks: Uint8Array[] = [];
-  let initialByteCount = 0;
-
-  try {
-    while (initialByteCount < 3) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      if (chunk.value.byteLength === 0) continue;
-      initialChunks.push(chunk.value);
-      initialByteCount += chunk.value.byteLength;
-    }
-  } catch {
-    await reader.cancel().catch(() => undefined);
-    reader.releaseLock();
-    throw new ProviderError('preview', 'invalid-response');
-  }
-
-  const signature = new Uint8Array(Math.min(initialByteCount, 3));
+const firstBytes = (chunks: readonly Uint8Array[], count: number): Uint8Array => {
+  const available = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
+  const signature = new Uint8Array(Math.min(available, count));
   let signatureOffset = 0;
-  for (const chunk of initialChunks) {
+  for (const chunk of chunks) {
     const remaining = signature.byteLength - signatureOffset;
     if (remaining <= 0) break;
     const bytesToCopy = Math.min(chunk.byteLength, remaining);
     signature.set(chunk.subarray(0, bytesToCopy), signatureOffset);
     signatureOffset += bytesToCopy;
   }
-  if (!isMp3Signature(signature)) {
-    await reader.cancel().catch(() => undefined);
+  return signature;
+};
+
+const readBoundedAudio = async (
+  providerResponse: ProviderResponse,
+  operation: ProviderOperation,
+  maximumBytes: number,
+): Promise<{ readonly chunks: readonly Uint8Array[]; readonly byteLength: number }> => {
+  const { response, callerSignal, timeoutSignal, combinedSignal } = providerResponse;
+  if (response.body === null) {
+    throw new ProviderError(operation, 'invalid-response', response.status);
+  }
+  const reader = response.body.getReader();
+  const chunks: Uint8Array[] = [];
+  let byteLength = 0;
+  let completed = false;
+  const abortReader = () => {
+    void reader.cancel().catch(() => undefined);
+  };
+  combinedSignal.addEventListener('abort', abortReader, { once: true });
+
+  try {
+    if (callerSignal.aborted) throw new ProviderError(operation, 'aborted');
+    if (timeoutSignal.aborted) throw new ProviderError(operation, 'timeout');
+    while (true) {
+      const chunk = await reader.read();
+      if (callerSignal.aborted) throw new ProviderError(operation, 'aborted');
+      if (timeoutSignal.aborted) throw new ProviderError(operation, 'timeout');
+      if (chunk.done) {
+        completed = true;
+        break;
+      }
+      if (chunk.value.byteLength === 0) continue;
+      byteLength += chunk.value.byteLength;
+      if (byteLength > maximumBytes) {
+        throw new ProviderError(operation, 'response-too-large', response.status);
+      }
+      chunks.push(chunk.value.slice());
+    }
+  } catch (error) {
+    if (error instanceof ProviderError) throw error;
+    if (callerSignal.aborted) throw new ProviderError(operation, 'aborted');
+    if (timeoutSignal.aborted) throw new ProviderError(operation, 'timeout');
+    throw new ProviderError(operation, 'invalid-response', response.status);
+  } finally {
+    combinedSignal.removeEventListener('abort', abortReader);
+    if (!completed) await reader.cancel().catch(() => undefined);
     reader.releaseLock();
-    throw new ProviderError('preview', 'invalid-response');
   }
 
-  return Readable.from(
-    (async function* () {
-      let completed = false;
-      try {
-        yield* initialChunks;
-        while (true) {
-          const chunk = await reader.read();
-          if (chunk.done) {
-            completed = true;
-            break;
-          }
-          yield chunk.value;
-        }
-      } finally {
-        if (!completed) await reader.cancel().catch(() => undefined);
-        reader.releaseLock();
-      }
-    })(),
-  );
+  if (byteLength === 0) {
+    throw new ProviderError(operation, 'invalid-response', response.status);
+  }
+  return { chunks, byteLength };
 };
 
 const labelsSchema = z.record(z.string(), z.unknown()).nullish();
@@ -152,10 +177,16 @@ const normalizeWorkspaceVoice = (voice: z.infer<typeof workspaceVoiceSchema>): P
   previewUrl: voice.preview_url?.trim() || null,
 });
 
-const parseContentLength = (header: string | null): number | undefined => {
-  if (header === null) return undefined;
-  const value = Number.parseInt(header, 10);
-  return Number.isSafeInteger(value) && value >= 0 ? value : undefined;
+const parseContentLength = (
+  header: string | null,
+): { readonly present: false } | { readonly present: true; readonly value: number | null } => {
+  if (header === null) return { present: false };
+  if (!/^\d+$/u.test(header)) return { present: true, value: null };
+  const value = Number(header);
+  return {
+    present: true,
+    value: Number.isSafeInteger(value) && value >= 0 ? value : null,
+  };
 };
 
 const isAllowedPreviewUrl = (rawUrl: string): boolean => {
@@ -215,11 +246,18 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
   readonly #apiKey: string;
   readonly #fetch: typeof fetch;
   readonly #timeoutMs: number;
+  readonly #audioLimits: ElevenLabsAudioLimits;
 
-  constructor(apiKey: string, fetchImplementation: typeof fetch = fetch, timeoutMs = 30_000) {
+  constructor(
+    apiKey: string,
+    fetchImplementation: typeof fetch = fetch,
+    timeoutMs = 30_000,
+    audioLimits: ElevenLabsAudioLimits = DEFAULT_AUDIO_LIMITS,
+  ) {
     this.#apiKey = apiKey;
     this.#fetch = fetchImplementation;
     this.#timeoutMs = timeoutMs;
+    this.#audioLimits = audioLimits;
   }
 
   async #request(
@@ -227,7 +265,7 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
     operation: ProviderOperation,
     signal: AbortSignal,
     init: RequestInit = {},
-  ): Promise<Response> {
+  ): Promise<ProviderResponse> {
     const timeoutSignal = AbortSignal.timeout(this.#timeoutMs);
     const combinedSignal = AbortSignal.any([signal, timeoutSignal]);
     const headers = new Headers(init.headers);
@@ -252,23 +290,32 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
       void response.body?.cancel().catch(() => undefined);
       throw new ProviderError(operation, reason, response.status);
     }
-    return response;
+    return { response, callerSignal: signal, timeoutSignal, combinedSignal };
   }
 
-  async #json(request: Promise<Response>, operation: ProviderOperation): Promise<unknown> {
-    const response = await request;
+  async #json(request: Promise<ProviderResponse>, operation: ProviderOperation): Promise<unknown> {
+    const providerResponse = await request;
+    const { response } = providerResponse;
     try {
       return await response.json();
     } catch {
+      if (providerResponse.callerSignal.aborted) {
+        throw new ProviderError(operation, 'aborted');
+      }
+      if (providerResponse.timeoutSignal.aborted) {
+        throw new ProviderError(operation, 'timeout');
+      }
       throw new ProviderError(operation, 'invalid-response', response.status);
     }
   }
 
   async #audioResponse(
-    response: Response,
+    providerResponse: ProviderResponse,
     operation: ProviderOperation,
+    maximumBytes: number,
     previewUrl?: string,
   ): Promise<AudioStream> {
+    const { response } = providerResponse;
     const upstreamContentType =
       response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() ?? '';
     let contentType =
@@ -277,27 +324,48 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
       throw new ProviderError(operation, 'invalid-response', response.status);
     }
 
-    let body: Readable;
-    if (contentType.startsWith('audio/')) {
-      body = nodeReadableFromWeb(response.body);
-    } else if (
+    const acceptsMislabeledPreview =
       operation === 'preview' &&
       upstreamContentType === 'text/plain' &&
       previewUrl !== undefined &&
-      hasMp3Path(previewUrl)
-    ) {
-      body = await nodeReadableFromValidatedMp3(response.body);
+      hasMp3Path(previewUrl);
+    if (acceptsMislabeledPreview) {
       contentType = 'audio/mpeg';
-    } else {
+    } else if (!contentType.startsWith('audio/')) {
       void response.body.cancel().catch(() => undefined);
       throw new ProviderError(operation, 'invalid-response', response.status);
     }
 
-    const contentLength = parseContentLength(response.headers.get('content-length'));
+    const declaredLength = parseContentLength(response.headers.get('content-length'));
+    if (declaredLength.present && declaredLength.value === null) {
+      void response.body.cancel().catch(() => undefined);
+      throw new ProviderError(operation, 'invalid-response', response.status);
+    }
+    if (
+      declaredLength.present &&
+      declaredLength.value !== null &&
+      declaredLength.value > maximumBytes
+    ) {
+      void response.body.cancel().catch(() => undefined);
+      throw new ProviderError(operation, 'response-too-large', response.status);
+    }
+
+    const audio = await readBoundedAudio(providerResponse, operation, maximumBytes);
+    if (
+      declaredLength.present &&
+      declaredLength.value !== null &&
+      declaredLength.value !== audio.byteLength
+    ) {
+      throw new ProviderError(operation, 'invalid-response', response.status);
+    }
+    if (contentType === 'audio/mpeg' && !isMp3Signature(firstBytes(audio.chunks, 3))) {
+      throw new ProviderError(operation, 'invalid-response', response.status);
+    }
+
     return {
-      body,
+      body: Readable.from(audio.chunks),
       contentType,
-      ...(contentLength === undefined ? {} : { contentLength }),
+      contentLength: audio.byteLength,
     };
   }
 
@@ -358,12 +426,13 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
     }
 
     const timeoutSignal = AbortSignal.timeout(this.#timeoutMs);
+    const combinedSignal = AbortSignal.any([signal, timeoutSignal]);
     let response: Response;
     try {
       response = await this.#fetch(rawUrl, {
         method: 'GET',
         redirect: 'error',
-        signal: AbortSignal.any([signal, timeoutSignal]),
+        signal: combinedSignal,
         headers: { Accept: 'audio/*' },
       });
     } catch {
@@ -375,7 +444,12 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
       void response.body?.cancel().catch(() => undefined);
       throw new ProviderError('preview', 'upstream', response.status);
     }
-    return this.#audioResponse(response, 'preview', rawUrl);
+    return this.#audioResponse(
+      { response, callerSignal: signal, timeoutSignal, combinedSignal },
+      'preview',
+      this.#audioLimits.previewBytes,
+      rawUrl,
+    );
   }
 
   async convertRecording(
@@ -400,6 +474,6 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
       method: 'POST',
       body: form,
     });
-    return this.#audioResponse(response, 'conversion');
+    return this.#audioResponse(response, 'conversion', this.#audioLimits.conversionBytes);
   }
 }

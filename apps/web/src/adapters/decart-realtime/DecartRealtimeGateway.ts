@@ -1,3 +1,4 @@
+import { createSafeError, type SafeError } from '@studio/domain';
 import type { ModelMode } from '../../application/types';
 
 export type RealtimeSnapshot = {
@@ -26,10 +27,105 @@ export type ConnectRealtimeOptions = {
   onConnectionChange: (state: RealtimeConnectionState) => void;
   onGenerationTick: (event: RealtimeGenerationEvent) => void;
   onGenerationEnded: (event: RealtimeGenerationEvent) => void;
-  onError: (error: unknown) => void;
+  onError: (error: SafeError) => void;
 };
 
 export type ModelRequirements = { width: number; height: number; frameRate: number };
+
+type DecartSdkErrorShape = Readonly<{ code: string }>;
+
+const isDecartSdkErrorShape = (error: unknown): error is DecartSdkErrorShape =>
+  typeof error === 'object' &&
+  error !== null &&
+  'code' in error &&
+  typeof (error as { code?: unknown }).code === 'string';
+
+const decartErrorByCode: Readonly<Record<string, SafeError>> = {
+  INVALID_API_KEY: createSafeError(
+    'provider-authentication',
+    'The realtime credential was rejected.',
+    {
+      retryable: true,
+      recovery: 'Stop AI, then start it again to request a fresh credential.',
+    },
+  ),
+  MODEL_NOT_FOUND: createSafeError('model-unavailable', 'This realtime model is unavailable.', {
+    retryable: false,
+    recovery: 'Continue locally and verify the pinned Decart model before retrying.',
+  }),
+  WEBRTC_ICE_ERROR: createSafeError(
+    'network-failure',
+    'The realtime media connection could not be established.',
+    {
+      retryable: true,
+      recovery: 'Keep the local preview, check the network, then start AI again.',
+    },
+  ),
+  WEBRTC_TIMEOUT_ERROR: createSafeError('network-failure', 'The realtime connection timed out.', {
+    retryable: true,
+    recovery: 'Keep the local preview, check the network, then start AI again.',
+  }),
+  WEBRTC_WEBSOCKET_ERROR: createSafeError(
+    'network-failure',
+    'The realtime signaling connection could not be established.',
+    {
+      retryable: true,
+      recovery: 'Keep the local preview, check the network, then start AI again.',
+    },
+  ),
+  WEBRTC_SERVER_ERROR: createSafeError(
+    'provider-unavailable',
+    'The realtime provider could not complete the session.',
+    {
+      retryable: true,
+      recovery: 'Keep the local preview and try starting AI again shortly.',
+    },
+  ),
+  WEBRTC_SIGNALING_ERROR: createSafeError(
+    'provider-unavailable',
+    'The realtime provider could not complete signaling.',
+    {
+      retryable: true,
+      recovery: 'Keep the local preview and try starting AI again shortly.',
+    },
+  ),
+};
+
+const genericDecartError = (): SafeError =>
+  createSafeError('unknown', 'Realtime transformation encountered a provider error.', {
+    retryable: true,
+    recovery: 'Keep the local preview, then retry or reset the AI session.',
+  });
+
+export const toSafeDecartRealtimeError = (error: unknown): SafeError => {
+  if (error instanceof DecartRealtimeGatewayError) return error.safeError;
+  if (error instanceof DOMException) {
+    if (error.name === 'AbortError') {
+      return createSafeError('aborted', 'The realtime connection was cancelled.', {
+        retryable: true,
+      });
+    }
+    if (error.name === 'TimeoutError') {
+      return createSafeError('network-failure', 'The realtime connection timed out.', {
+        retryable: true,
+        recovery: 'Keep the local preview, check the network, then start AI again.',
+      });
+    }
+  }
+  if (!isDecartSdkErrorShape(error)) return genericDecartError();
+  return decartErrorByCode[error.code] ?? genericDecartError();
+};
+
+export class DecartRealtimeGatewayError extends Error {
+  readonly safeError: SafeError;
+
+  constructor(error: unknown) {
+    const safeError = toSafeDecartRealtimeError(error);
+    super(safeError.message);
+    this.name = 'DecartRealtimeGatewayError';
+    this.safeError = safeError;
+  }
+}
 
 type DevelopmentRealtimeDriver = {
   getModelRequirements?: (model: ModelMode) => Promise<ModelRequirements>;
@@ -52,13 +148,17 @@ export const getDecartModelRequirements = async (model: ModelMode): Promise<Mode
   if (developmentDriver?.getModelRequirements) {
     return developmentDriver.getModelRequirements(model);
   }
-  const { models, resolveFpsNumber } = await import('@decartai/sdk');
-  const definition = models.realtime(model);
-  return {
-    width: definition.width,
-    height: definition.height,
-    frameRate: resolveFpsNumber(definition.fps),
-  };
+  try {
+    const { models, resolveFpsNumber } = await import('@decartai/sdk');
+    const definition = models.realtime(model);
+    return {
+      width: definition.width,
+      height: definition.height,
+      frameRate: resolveFpsNumber(definition.fps),
+    };
+  } catch (error) {
+    throw new DecartRealtimeGatewayError(error);
+  }
 };
 
 export const connectDecartRealtime = async (
@@ -110,7 +210,7 @@ export const connectDecartRealtime = async (
     });
   } catch (error) {
     stopProviderInput();
-    throw error;
+    throw new DecartRealtimeGatewayError(error);
   }
   let timeout: number | undefined;
   let abortConnection: (() => void) | undefined;
@@ -135,13 +235,14 @@ export const connectDecartRealtime = async (
       (lateRealtime) => lateRealtime.disconnect(),
       () => undefined,
     );
-    throw error;
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw new DecartRealtimeGatewayError(error);
   } finally {
     if (timeout !== undefined) window.clearTimeout(timeout);
     if (abortConnection) options.signal?.removeEventListener('abort', abortConnection);
   }
 
-  const errorListener = (error: unknown) => options.onError(error);
+  const errorListener = (error: unknown) => options.onError(toSafeDecartRealtimeError(error));
   const generationTickListener = (event: { seconds: number }) =>
     options.onGenerationTick({ elapsedSeconds: event.seconds });
   const generationEndedListener = (event: { seconds: number }) =>
@@ -154,11 +255,15 @@ export const connectDecartRealtime = async (
   return {
     async apply(snapshot) {
       if (disconnected) throw new Error('Realtime session is disconnected.');
-      await realtime.set({
-        prompt: snapshot.prompt,
-        enhance: snapshot.enhance,
-        image: snapshot.image,
-      });
+      try {
+        await realtime.set({
+          prompt: snapshot.prompt,
+          enhance: snapshot.enhance,
+          image: snapshot.image,
+        });
+      } catch (error) {
+        throw new DecartRealtimeGatewayError(error);
+      }
     },
     disconnect() {
       if (disconnected) return;

@@ -66,6 +66,7 @@ vi.mock('../../adapters/browser-media/browserMedia', () => ({
 }));
 
 vi.mock('../../adapters/decart-realtime/DecartRealtimeGateway', () => ({
+  DecartRealtimeGatewayError: class DecartRealtimeGatewayError extends Error {},
   getDecartModelRequirements: adapters.getDecartModelRequirements,
   connectDecartRealtime: adapters.connectDecartRealtime,
 }));
@@ -552,6 +553,50 @@ describe('useStudioSession explicit-start boundaries', () => {
     });
     expect(options?.localStream).toBe(local);
     expect(adapters.requestRealtimeToken).toHaveBeenCalledWith('lucy-2.5', expect.any(AbortSignal));
+    unmount();
+  });
+
+  it('surfaces an app-owned Decart recovery class without exposing provider detail', async () => {
+    const local = fakeStream();
+    adapters.acquireLocalMedia.mockResolvedValue(local);
+    let options: ConnectRealtimeOptions | undefined;
+    adapters.connectDecartRealtime.mockImplementation((nextOptions: ConnectRealtimeOptions) => {
+      options = nextOptions;
+      return Promise.resolve(fakeRealtimeSession());
+    });
+    const { result, unmount } = renderHook(() =>
+      useStudioSession({
+        availability: { decart: true, elevenLabs: false, elevenLabsModel: null },
+      }),
+    );
+    await act(async () => {
+      await result.current.startLocal();
+    });
+    act(() => {
+      result.current.selectMode('lucy-2.5');
+      result.current.updatePrompt('An adult stop-motion astronomer');
+    });
+    await act(async () => {
+      await result.current.startModel();
+    });
+
+    act(() => {
+      options?.onError({
+        code: 'network-failure',
+        message: 'The realtime media connection could not be established.',
+        retryable: true,
+        recovery: 'Keep the local preview, check the network, then start AI again.',
+      });
+    });
+
+    expect(result.current.lifecycle).toBe('connected');
+    expect(result.current.localStream).toBe(local);
+    expect(result.current.error).toEqual({
+      code: 'network-failure',
+      message: 'The realtime media connection could not be established.',
+      recovery: 'Keep the local preview, check the network, then start AI again.',
+    });
+    expect(JSON.stringify(result.current.error)).not.toContain('provider detail');
     unmount();
   });
 

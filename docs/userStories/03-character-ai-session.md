@@ -48,6 +48,9 @@ ends usage after any active recording finalizes.
 
 - Connection start can be cancelled before it completes.
 - On disconnect, unusable video, or audio-only output, the stage announces **AI disconnected — local fallback** and retains local preview rather than becoming blank.
+- Known Decart authentication/model/network/provider classes show app-owned recovery guidance.
+  Unknown SDK errors use one generic retry/reset path. Raw provider codes, messages, data, URLs,
+  and causes are never shown.
 - An early generation end is reported separately from the expected five-minute completion; raw
   provider reasons/codes are never shown.
 - If the recording cap and provider/source completion coincide, Stop coalesces and the take

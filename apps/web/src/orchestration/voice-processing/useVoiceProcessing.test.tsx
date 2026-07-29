@@ -165,4 +165,31 @@ describe('useVoiceProcessing operation ownership', () => {
 
     unmount();
   });
+
+  it('preserves the immutable original and last valid take when provider output is rejected', async () => {
+    adapters.convertRecordingVoice.mockRejectedValueOnce(
+      new Error(
+        'The converted voice exceeded the safe five-minute output limit. The original take is still available.',
+      ),
+    );
+    const recording = recordingController();
+    const original = recording.original;
+    const presented = recording.presented;
+    const { result, unmount } = renderHook(() => useVoiceProcessing(recording));
+
+    await act(async () => {
+      await result.current.applyElevenLabs('voice-one', 'Nova');
+    });
+
+    expect(adapters.replaceRecordingAudio).not.toHaveBeenCalled();
+    expect(recording.completeProcessing).not.toHaveBeenCalled();
+    expect(recording.failProcessing).toHaveBeenCalledWith(
+      'The converted voice exceeded the safe five-minute output limit. The original take is still available.',
+    );
+    expect(recording.original).toBe(original);
+    expect(recording.presented).toBe(presented);
+    expect(result.current.selection).toEqual({ kind: 'none' });
+
+    unmount();
+  });
 });

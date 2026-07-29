@@ -63,6 +63,7 @@ export type NetworkJourneyState = {
   >;
   referenceImageMetadataReads: string[];
   referenceImageContentReads: string[];
+  providerSdkRequests: string[];
   blockedExternalRequests: string[];
   blockedExternalWebSockets: string[];
   setCapabilityFailuresRemaining(count: number): void;
@@ -72,6 +73,7 @@ export type StudioHarnessOptions = {
   stubMediaPlayback?: boolean;
   referenceImagesAvailable?: boolean;
   elevenLabsAvailable?: boolean;
+  realtimeVideoAvailable?: boolean;
   realtimeProvidesVideo?: boolean;
   capabilityFailuresBeforeSuccess?: number;
 };

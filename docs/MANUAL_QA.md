@@ -1,5 +1,10 @@
 # Manual QA checklist
 
+For a release candidate, capture each physical target/browser result using the strict
+[controlled-pilot qualification evidence contract](PILOT_QUALIFICATION_EVIDENCE.md). The validator
+requires all approved check IDs for the exact commit and rejects arbitrary notes or extra fields
+that could contain prompts, personal media, raw provider data, identifiers, or credentials.
+
 Run `npm run quality`, `npm run test:coverage`, `npm run test:e2e`, `npm run test:visual`, and `npm run audit:prod` first. Manual checks complement deterministic tests; they are required for physical devices, codec output, track cleanup, and live provider integrations.
 
 Synthetic-media automation cannot certify physical camera/microphone indicators, the final browser/OS codec artifact, real Decart disconnect billing/lifecycle, OpenAI/BFL/Wiro reference results, or real ElevenLabs conversion. Complete those checks with intended release browsers, physical devices, and explicitly authorized provider test accounts before release.

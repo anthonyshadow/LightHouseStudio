@@ -32,6 +32,19 @@ export const translateProviderError: ErrorTranslator = (error) => {
     );
   }
 
+  if (error.reason === 'response-too-large') {
+    return translate(
+      error,
+      new AppError(
+        502,
+        'provider_response_too_large',
+        error.operation === 'preview'
+          ? 'The saved voice preview exceeded the safe audio limit. Choose another voice or retry.'
+          : 'The converted voice exceeded the safe five-minute output limit. The original take is still available.',
+      ),
+    );
+  }
+
   if (error.reason === 'quota') {
     return translate(
       error,

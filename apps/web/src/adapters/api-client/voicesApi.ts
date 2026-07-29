@@ -1,4 +1,6 @@
 import {
+  VOICE_CONVERSION_OUTPUT_MAX_BYTES,
+  VOICE_PREVIEW_MAX_BYTES,
   VOICE_PROVIDER_INTENT_HEADER,
   VOICE_PROVIDER_INTENT_VALUE,
   workspaceVoicesResponseSchema,
@@ -12,6 +14,72 @@ const invalidResponse = (capability: string): Error =>
 const providerIntentHeaders = (): Record<string, string> => ({
   [VOICE_PROVIDER_INTENT_HEADER]: VOICE_PROVIDER_INTENT_VALUE,
 });
+
+const declaredContentLength = (response: Response): number | null | undefined => {
+  const header = response.headers.get('content-length');
+  if (header === null) return undefined;
+  if (!/^\d+$/u.test(header)) return null;
+  const value = Number(header);
+  return Number.isSafeInteger(value) && value >= 0 ? value : null;
+};
+
+const readBoundedAudioBlob = async (
+  response: Response,
+  maximumBytes: number,
+  capability: string,
+  signal: AbortSignal,
+): Promise<Blob> => {
+  const contentType =
+    response.headers.get('content-type')?.split(';', 1)[0]?.trim().toLowerCase() ?? '';
+  const contentLength = declaredContentLength(response);
+  if (
+    !contentType.startsWith('audio/') ||
+    contentLength === null ||
+    (contentLength !== undefined && contentLength > maximumBytes) ||
+    response.body === null
+  ) {
+    void response.body?.cancel().catch(() => undefined);
+    throw invalidResponse(capability);
+  }
+
+  const reader = response.body.getReader();
+  const chunks: ArrayBuffer[] = [];
+  let byteLength = 0;
+  let completed = false;
+  const abortReader = () => {
+    void reader.cancel().catch(() => undefined);
+  };
+  signal.addEventListener('abort', abortReader, { once: true });
+  try {
+    signal.throwIfAborted();
+    while (true) {
+      const chunk = await reader.read();
+      signal.throwIfAborted();
+      if (chunk.done) {
+        completed = true;
+        break;
+      }
+      if (chunk.value.byteLength === 0) continue;
+      byteLength += chunk.value.byteLength;
+      if (byteLength > maximumBytes) throw invalidResponse(capability);
+      const copy = new Uint8Array(chunk.value.byteLength);
+      copy.set(chunk.value);
+      chunks.push(copy.buffer);
+    }
+  } catch (error) {
+    if (signal.aborted) throw new DOMException('Voice audio request was cancelled.', 'AbortError');
+    if (error instanceof DOMException && error.name === 'AbortError') throw error;
+    throw invalidResponse(capability);
+  } finally {
+    signal.removeEventListener('abort', abortReader);
+    if (!completed) await reader.cancel().catch(() => undefined);
+    reader.releaseLock();
+  }
+  if (byteLength === 0 || (contentLength !== undefined && contentLength !== byteLength)) {
+    throw invalidResponse(capability);
+  }
+  return new Blob(chunks, { type: contentType });
+};
 
 export const listWorkspaceVoices = async (
   search: string,
@@ -42,11 +110,7 @@ export const fetchVoicePreview = async (
     cache: 'no-store',
     headers: { ...providerIntentHeaders(), Accept: 'audio/*' },
   });
-  const preview = await response.blob();
-  if (preview.size === 0 || !preview.type.startsWith('audio/')) {
-    throw invalidResponse('voice preview');
-  }
-  return preview;
+  return readBoundedAudioBlob(response, VOICE_PREVIEW_MAX_BYTES, 'voice preview', signal);
 };
 
 export const convertRecordingVoice = async (
@@ -65,9 +129,10 @@ export const convertRecordingVoice = async (
     },
     body: sidecar,
   });
-  const converted = await response.blob();
-  if (converted.size === 0 || !converted.type.startsWith('audio/')) {
-    throw invalidResponse('voice conversion');
-  }
-  return converted;
+  return readBoundedAudioBlob(
+    response,
+    VOICE_CONVERSION_OUTPUT_MAX_BYTES,
+    'voice conversion',
+    signal,
+  );
 };

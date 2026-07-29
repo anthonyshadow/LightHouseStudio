@@ -172,6 +172,9 @@ substitute a device.
 
 The complete selection basis, rolling-version rule, and qualification statuses live in the
 [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md).
+The executable `7` provider/local plus `45` physical target/browser release rows live in the
+[qualification evidence matrix](qualification/required-matrix.json); records are checked under the
+[content-free evidence contract](PILOT_QUALIFICATION_EVIDENCE.md).
 
 For each desktop browser, cover the five required CSS viewports where the browser permits. On each
 physical phone/tablet target, cover portrait and landscape, safe areas, browser chrome

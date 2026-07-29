@@ -6,6 +6,7 @@ export type ProviderFailureReason =
   | 'timeout'
   | 'upstream'
   | 'invalid-response'
+  | 'response-too-large'
   | 'invalid-audio'
   | 'feature-unavailable'
   | 'zero-retention-unavailable'

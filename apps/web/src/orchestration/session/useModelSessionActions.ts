@@ -2,7 +2,10 @@ import { canApplyRealtimeChanges } from '@studio/domain';
 import type { RealtimeSessionProfile } from '@studio/contracts';
 import { useCallback, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { ApiClientError, requestRealtimeToken } from '../../adapters/api-client/apiClient';
-import { getDecartModelRequirements } from '../../adapters/decart-realtime/DecartRealtimeGateway';
+import {
+  DecartRealtimeGatewayError,
+  getDecartModelRequirements,
+} from '../../adapters/decart-realtime/DecartRealtimeGateway';
 import { hasLiveVideo } from '../../adapters/browser-media/browserMedia';
 import {
   isModelMode,
@@ -85,6 +88,7 @@ const realtimeStartError = (error: unknown): SafeMediaError => {
       recovery: 'Replace DECART_API_KEY on the API server, restart it, then start AI again.',
     };
   }
+  if (error instanceof DecartRealtimeGatewayError) return error.safeError;
   return toSafeMediaError(
     error,
     'Realtime transformation could not be started. Local preview is safe.',
@@ -117,13 +121,16 @@ export const useModelSessionActions = ({
     [setApplied, setApplying, setError, setLifecycle],
   );
 
-  const handleProviderError = useCallback(() => {
-    setError({
-      code: 'realtime-provider-error',
-      message: 'Realtime transformation encountered a provider error.',
-      recovery: 'Keep the local preview, then retry or reset the AI session.',
-    });
-  }, [setError]);
+  const handleProviderError = useCallback(
+    (error: SafeMediaError) => {
+      setError({
+        code: error.code,
+        message: error.message,
+        ...(error.recovery ? { recovery: error.recovery } : {}),
+      });
+    },
+    [setError],
+  );
 
   const handleSessionLimitReached = useCallback(() => {
     setApplying(false);
@@ -260,12 +267,22 @@ export const useModelSessionActions = ({
       if (committedPrompt || committedReferenceAssetId) {
         onPromptCommitted?.(currentDraft.mode, committedPrompt, committedReferenceAssetId);
       }
-    } catch {
+    } catch (error) {
       if (operationRef.current !== operation) return;
+      const safe =
+        error instanceof DecartRealtimeGatewayError
+          ? error.safeError
+          : {
+              code: 'apply-failed',
+              message: 'Changes were not applied.',
+              recovery: 'Review the pending draft and try Apply again.',
+            };
       setError({
-        code: 'apply-failed',
-        message: 'Changes were not applied. The previous live recipe is still active.',
-        recovery: 'Review the pending draft and try Apply again.',
+        ...safe,
+        message:
+          safe.code === 'aborted'
+            ? safe.message
+            : `${safe.message} The previous live recipe is still active.`,
       });
     } finally {
       if (operationRef.current === operation) setApplying(false);

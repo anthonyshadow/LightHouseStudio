@@ -353,6 +353,31 @@ describe('ElevenLabs voice API', () => {
     expect(response.body).not.toContain('not exposed');
   });
 
+  it('maps oversized successful provider audio to a browser-safe error', async () => {
+    class OversizedProvider extends FakeElevenLabsProvider {
+      override convertRecording(): Promise<never> {
+        return Promise.reject(new ProviderError('conversion', 'response-too-large', 200));
+      }
+    }
+    const { app } = setup(new OversizedProvider());
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/elevenlabs/voice-changer/recording?voiceId=voice-one',
+      headers: { ...originHeaders, 'content-type': 'audio/webm' },
+      payload: Buffer.from('original-sidecar'),
+    });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toEqual({
+      error: {
+        code: 'provider_response_too_large',
+        message:
+          'The converted voice exceeded the safe five-minute output limit. The original take is still available.',
+      },
+    });
+    expect(response.body).not.toContain('response-too-large');
+  });
+
   it('explains zero-retention account rejection without exposing the upstream body', async () => {
     class ZeroRetentionRejectedProvider extends FakeElevenLabsProvider {
       override convertRecording(): Promise<never> {

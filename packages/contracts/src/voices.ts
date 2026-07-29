@@ -44,6 +44,16 @@ export const workspaceVoiceParamsSchema = z.object({ voiceId: providerIdSchema }
 export const voiceChangerQuerySchema = z.object({ voiceId: providerIdSchema }).strict();
 
 export const VOICE_CONVERSION_MAX_BYTES = 25 * 1024 * 1024;
+/**
+ * Saved previews are short provider MP3 assets. Two MiB allows more than two minutes at the
+ * requested 128 kbps format while bounding an unexpected successful response.
+ */
+export const VOICE_PREVIEW_MAX_BYTES = 2 * 1024 * 1024;
+/**
+ * Voice Changer is pinned to mp3_44100_128. Five minutes is about 4.8 MB at 128 kbps; eight MiB
+ * leaves more than 70% container/metadata headroom without permitting unbounded output.
+ */
+export const VOICE_CONVERSION_OUTPUT_MAX_BYTES = 8 * 1024 * 1024;
 export const VOICE_CONVERSION_CONTENT_TYPES = [
   'audio/aac',
   'audio/mp4',

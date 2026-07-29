@@ -456,12 +456,18 @@ test('persistent controls preserve local media across VTON choice, AI stop, trac
   expectNoExternalProviderTraffic(network);
 });
 
-test('Local Camera starts, records, and finalizes a playable take without provider work', async ({
+test('no-key Local Camera records and finalizes without provider HTTP, WebSocket, SDK, or token work', async ({
   page,
 }) => {
-  const network = await installSuccessfulStudioHarness(page);
+  const network = await installSuccessfulStudioHarness(page, {
+    elevenLabsAvailable: false,
+    realtimeVideoAvailable: false,
+    referenceImagesAvailable: false,
+  });
   await page.goto('/');
-  await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
+  const availability = page.getByLabel('Integration availability');
+  await expect(availability).toContainText('AI video not configured');
+  await expect(availability).toContainText('Voice cloud not configured (optional)');
 
   await page.getByRole('button', { name: 'Shelf' }).click();
   await page.getByRole('button', { name: 'Try-on recipes' }).click();
@@ -505,6 +511,7 @@ test('Local Camera starts, records, and finalizes a playable take without provid
   expect(new Set(network.apiRequests.map(({ path }) => path))).toEqual(
     new Set(['/api/capabilities']),
   );
+  expect(network.providerSdkRequests).toEqual([]);
   expectNoExternalProviderTraffic(network);
 });
 
@@ -776,7 +783,6 @@ test('switches to a browser-exposed phone camera while Capture Settings stays op
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
-  await startLocalPreview(page);
   await page.evaluate(() => {
     Object.defineProperty(navigator.mediaDevices, 'enumerateDevices', {
       configurable: true,
@@ -799,6 +805,7 @@ test('switches to a browser-exposed phone camera while Capture Settings stays op
         ]),
     });
   });
+  await startLocalPreview(page);
 
   await page.getByRole('button', { name: 'Open capture settings' }).click();
   const settingsDialog = page.getByRole('dialog', { name: 'Capture Settings' });

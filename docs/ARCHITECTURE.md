@@ -157,7 +157,20 @@ Studio owns one temporary take at a time; it does not implement take history, re
 
 The retired Guided IndexedDB repository remains a compatibility boundary for existing project/media records. Studio's Legacy Project Manager can list, download the chosen video variant, and transactionally delete a project with its owned artifacts, but it cannot reopen the retired journey. No legacy media is deleted automatically. On first character-builder initialization, the newest valid `character-design` checkpoint may seed the active builder draft; a migration marker prevents repeated import after reset or completion. Draft and project repositories share only low-level request, transaction, abort, and open-lifecycle primitives. Each repository keeps its own schema and migration rules, closes databases that resolve after owner shutdown, and closes on `versionchange`.
 
-The original video and sidecar are immutable processing sources. Every local or ElevenLabs treatment starts from those originals, never from the currently presented processed result. Local Web Audio effects render offline, then Mediabunny copies encoded video while replacing audio. ElevenLabs conversion sends only the sidecar after explicit Apply and remuxes the returned audio the same way. Processing pauses and locks the existing stage player. A replacement URL is created before the prior processed URL is revoked; success restores the prior time, clamped to the replacement duration, and remains paused. Cancel, failure, or replacement-URL creation failure preserves the last valid playable artifact.
+The original video and sidecar are immutable processing sources. Every local or ElevenLabs
+treatment starts from those originals, never from the currently presented processed result. Local
+Web Audio effects render offline, then Mediabunny copies encoded video while replacing audio.
+ElevenLabs conversion sends only the sidecar after explicit Apply and remuxes the returned audio the
+same way. The pinned `mp3_44100_128` output has an app-owned inclusive 8 MiB ceiling, derived from
+the approximately 4.8 MB five-minute bitrate payload plus container/metadata headroom; saved
+previews use a separate 2 MiB ceiling. The provider adapter rejects malformed or oversized declared
+lengths before reading, counts cumulative chunks before publishing a bounded Node stream, cancels
+the upstream reader on overflow/caller cancellation, and validates MP3 signatures. The browser
+independently checks declared and cumulative bytes before constructing its Blob. Processing pauses
+and locks the existing stage player. A replacement URL is created before the prior processed URL is
+revoked; success restores the prior time, clamped to the replacement duration, and remains paused.
+Cancel, failure, overflow, or replacement-URL creation failure preserves the last valid playable
+artifact and immutable originals.
 
 ## Creative asset persistence
 
@@ -175,7 +188,33 @@ Reference images are the durable server-owned media type. `ReferenceImageAssetSt
 
 The Fastify server binds to `127.0.0.1` and rejects non-loopback Host headers. Every provider or reference-asset mutation requires a canonical loopback `Origin`. Every provider-contacting ElevenLabs route additionally requires `X-Lightframe-Provider-Intent: voice`; a cross-site image/element GET therefore cannot trigger credentialed provider traffic. Responses use no-store headers. Production startup fails fast when the built web distribution is absent; API-only startup remains available only in development and test.
 
-Permanent provider keys remain in server environment memory. App-owned Zod contracts validate every HTTP boundary, and provider adapters normalize upstream data. `PILOT_ACCESS_MODE` defaults to `participant`; in that mode the server leaves a startup-selected Wiro image provider unavailable even when its credentials are configured. The explicit `operator-qualification` mode is required for the separate Wiro technical pass with no participant present. This gate is server-owned rather than a presentation-only disabled state and does not add provider fallback. ElevenLabs listing uses `/v2/voices?voice_type=saved`; preview and conversion resolve a submitted ID through the same saved filter before provider audio work, so removed or unsaved voices cannot be used through direct requests. Listing and preview do not load conversion-model metadata or infer Voice Changer eligibility from a voice category; this keeps saved community Professional Voice Clones visible and leaves provider voice policy to the authoritative conversion endpoint. Preview URLs remain restricted to allowlisted ElevenLabs and Google Storage hosts. ElevenLabs currently serves some `.mp3` preview objects as `text/plain`; the adapter treats that exact combination as `audio/mpeg` only after consuming and preserving a valid ID3 or MPEG frame signature, while other non-audio responses remain rejected. Successful ElevenLabs voice-model discovery for conversion is shared while in flight and cached for 30 seconds; failures are never cached. Automatic request URL logging is disabled because voice search terms and provider ids are ephemeral user data. Confirmed provider failures retain provider-specific safe codes; unexpected programming or storage faults return `internal_error`. Safe 5xx diagnostics contain only request ID, method, route template, elapsed time, normalized class/reason/code/status, numeric upstream status, and up to five sanitized call-site frames. They exclude URLs, query strings, bodies, prompts, raw messages/causes, provider URLs, keys, and temporary credentials. Invalid-audio codes are classified before plan guidance, and zero-retention guidance requires both an exact entitlement code and `param: enable_logging`, so malformed sidecars are never mislabeled as entitlement problems.
+Permanent provider keys remain in server environment memory. App-owned Zod contracts validate every
+HTTP boundary, and provider adapters normalize upstream data. The Decart browser adapter recognizes
+only the pinned SDK's allowlisted authentication, model, WebRTC timeout/ICE/WebSocket, server, and
+signaling codes. It emits app-owned safe errors; arbitrary SDK codes, messages, data, URLs, and
+causes collapse to a generic fallback. `PILOT_ACCESS_MODE` defaults to `participant`; in that mode
+the server leaves a startup-selected Wiro image provider unavailable even when its credentials are
+configured. The explicit `operator-qualification` mode is required for the separate Wiro technical
+pass with no participant present. This gate is server-owned rather than a presentation-only
+disabled state and does not add provider fallback. ElevenLabs listing uses
+`/v2/voices?voice_type=saved`; preview and conversion resolve a submitted ID through the same saved
+filter before provider audio work, so removed or unsaved voices cannot be used through direct
+requests. Listing and preview do not load conversion-model metadata or infer Voice Changer
+eligibility from a voice category; this keeps saved community Professional Voice Clones visible
+and leaves provider voice policy to the authoritative conversion endpoint. Preview URLs remain
+restricted to allowlisted ElevenLabs and Google Storage hosts. ElevenLabs currently serves some
+`.mp3` preview objects as `text/plain`; the adapter treats that exact combination as `audio/mpeg`
+only after consuming and preserving a valid ID3 or MPEG frame signature, while other non-audio
+responses remain rejected. Successful ElevenLabs voice-model discovery for conversion is shared
+while in flight and cached for 30 seconds; failures are never cached. Automatic request URL logging
+is disabled because voice search terms and provider ids are ephemeral user data. Confirmed provider
+failures retain provider-specific safe codes; unexpected programming or storage faults return
+`internal_error`. Safe 5xx diagnostics contain only request ID, method, route template, elapsed
+time, normalized class/reason/code/status, numeric upstream status, and up to five sanitized
+call-site frames. They exclude URLs, query strings, bodies, prompts, raw messages/causes, provider
+URLs, keys, and temporary credentials. Invalid-audio codes are classified before plan guidance,
+and zero-retention guidance requires both an exact entitlement code and `param: enable_logging`, so
+malformed sidecars are never mislabeled as entitlement problems.
 
 Fastify Helmet is enabled, but Content Security Policy and
 Cross-Origin-Embedder-Policy are disabled because the configured realtime/media
@@ -215,7 +254,7 @@ The backend remains database-free and single-operator, with no accounts, analyti
 - The Recipe Shelf owns serialized text, metadata, and opaque asset relationships, never image bytes or storage keys.
 - The reference asset store owns atomic filesystem writes and private metadata. Detach and regeneration only change browser relationships; there is no ordinary delete route, and retained orphan cleanup is an explicit future operator policy.
 - The stable stage owns video DOM attachment and audio metering. Modal panels own only presentation/focus state and never own or restart media resources.
-- The API owns request abort/timeout wiring and upstream stream closure for the duration of each HTTP request. Subscriber-aware coalescing gives every optimization/generation/edit/composition waiter an isolated cancellation lifetime. When the final subscriber leaves, the shared controller signals upstream cancellation for both optimization and owner-scoped image work. BFL and Wiro each use one deadline across a single non-retried task submission, bounded status polling, and a hardened result download. BFL polling follows the exact trusted provider URL; Wiro polling stays on the pinned Task API. Their thin provider wrappers share one API-internal remote-image transport policy for HTTPS URL rules, per-hop DNS/private-network rejection, address pinning, redirects, media types, and byte limits; bounded JSON, delay, and deadline primitives are shared only where their contracts are identical. Wiro additionally normalizes the documented 2k aspect-ratio output to the app's exact dimensions, then deletes Wiro input/output files after the local persistence attempt. An owner-scoped coordinator slot remains reserved until the upstream promise settles; if upstream has not settled or ignores the abort, a later request observes `generation_in_progress`. ElevenLabs fetches receive the request signal, and parallel voice operations abort their sibling on terminal failure. Decart SDK `0.1.15` token creation does not expose one, so the broker races and discards a late token result but cannot cancel that already-started upstream fetch.
+- The API owns request abort/timeout wiring and upstream stream closure for the duration of each HTTP request. Subscriber-aware coalescing gives every optimization/generation/edit/composition waiter an isolated cancellation lifetime. When the final subscriber leaves, the shared controller signals upstream cancellation for both optimization and owner-scoped image work. BFL and Wiro each use one deadline across a single non-retried task submission, bounded status polling, and a hardened result download. BFL polling follows the exact trusted provider URL; Wiro polling stays on the pinned Task API. Their thin provider wrappers share one API-internal remote-image transport policy for HTTPS URL rules, per-hop DNS/private-network rejection, address pinning, redirects, media types, and byte limits; bounded JSON, delay, and deadline primitives are shared only where their contracts are identical. Wiro additionally normalizes the documented 2k aspect-ratio output to the app's exact dimensions, then deletes Wiro input/output files after the local persistence attempt. An owner-scoped coordinator slot remains reserved until the upstream promise settles; if upstream has not settled or ignores the abort, a later request observes `generation_in_progress`. ElevenLabs fetches receive the request signal; their audio readers own response-body cancellation and bounded buffering, and parallel voice operations abort their sibling on terminal failure. Decart SDK `0.1.15` token creation does not expose one, so the broker races and discards a late token result but cannot cancel that already-started upstream fetch.
 
 Late async work checks its operation or abort signal before committing. Replaced owned streams and object URLs are disposed; referenced source tracks used for recording are not stopped by recording or processing code. Review cleanup is idempotent and occurs after finalization, while artifact URL cleanup occurs only on processed replacement, Close, Discard, or unmount.
 

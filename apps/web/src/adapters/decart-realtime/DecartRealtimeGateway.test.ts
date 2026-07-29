@@ -32,7 +32,11 @@ vi.mock('@decartai/sdk', () => ({
   noopLogger: sdk.noopLogger,
 }));
 
-import { connectDecartRealtime, getDecartModelRequirements } from './DecartRealtimeGateway';
+import {
+  connectDecartRealtime,
+  getDecartModelRequirements,
+  toSafeDecartRealtimeError,
+} from './DecartRealtimeGateway';
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -153,6 +157,104 @@ describe('Decart realtime gateway', () => {
     expect(onGenerationEnded).toHaveBeenCalledWith({ elapsedSeconds: 299 });
     expect(JSON.stringify(onGenerationEnded.mock.calls)).not.toContain('raw provider reason');
     session.disconnect();
+  });
+
+  it.each([
+    ['INVALID_API_KEY', 'provider-authentication'],
+    ['MODEL_NOT_FOUND', 'model-unavailable'],
+    ['WEBRTC_TIMEOUT_ERROR', 'network-failure'],
+    ['WEBRTC_ICE_ERROR', 'network-failure'],
+    ['WEBRTC_WEBSOCKET_ERROR', 'network-failure'],
+    ['WEBRTC_SERVER_ERROR', 'provider-unavailable'],
+    ['WEBRTC_SIGNALING_ERROR', 'provider-unavailable'],
+  ] as const)('maps installed SDK code %s to app-owned code %s', (providerCode, safeCode) => {
+    const safe = toSafeDecartRealtimeError({
+      code: providerCode,
+      message: 'private provider message',
+      data: { url: 'wss://private.example/session' },
+      cause: new Error('api-key=secret'),
+    });
+
+    expect(safe.code).toBe(safeCode);
+    expect(JSON.stringify(safe)).not.toContain('private provider message');
+    expect(JSON.stringify(safe)).not.toContain('private.example');
+    expect(JSON.stringify(safe)).not.toContain('secret');
+  });
+
+  it('uses the generic fallback for unknown provider shapes', () => {
+    const safe = toSafeDecartRealtimeError({
+      code: 'FUTURE_PRIVATE_CODE',
+      message: 'private provider detail',
+    });
+
+    expect(safe).toMatchObject({
+      code: 'unknown',
+      message: 'Realtime transformation encountered a provider error.',
+      retryable: true,
+    });
+    expect(JSON.stringify(safe)).not.toContain('FUTURE_PRIVATE_CODE');
+    expect(JSON.stringify(safe)).not.toContain('private provider detail');
+  });
+
+  it('normalizes error events before they leave the adapter', async () => {
+    const onError = vi.fn();
+    const session = await connectDecartRealtime({
+      apiKey: 'browser-scoped-token',
+      model: 'lucy-2.5',
+      localStream: {} as MediaStream,
+      initial: { prompt: 'Adult field host', image: null, enhance: false },
+      onRemoteStream: vi.fn(),
+      onConnectionChange: vi.fn(),
+      onGenerationTick: vi.fn(),
+      onGenerationEnded: vi.fn(),
+      onError,
+    });
+    const listener = sdk.on.mock.calls.find(([event]) => event === 'error')?.[1] as
+      ((value: unknown) => void) | undefined;
+
+    listener?.({
+      code: 'WEBRTC_ICE_ERROR',
+      message: 'ICE failed against private-provider-url',
+    });
+
+    expect(onError).toHaveBeenCalledWith(
+      expect.objectContaining({ code: 'network-failure', retryable: true }),
+    );
+    expect(JSON.stringify(onError.mock.calls)).not.toContain('private-provider-url');
+    session.disconnect();
+  });
+
+  it('normalizes Apply failures while retaining the prior session and listener owner', async () => {
+    sdk.set.mockRejectedValueOnce({
+      code: 'WEBRTC_SERVER_ERROR',
+      message: 'private provider failure',
+    });
+    const session = await connectDecartRealtime({
+      apiKey: 'browser-scoped-token',
+      model: 'lucy-2.5',
+      localStream: {} as MediaStream,
+      initial: { prompt: 'Adult field host', image: null, enhance: false },
+      onRemoteStream: vi.fn(),
+      onConnectionChange: vi.fn(),
+      onGenerationTick: vi.fn(),
+      onGenerationEnded: vi.fn(),
+      onError: vi.fn(),
+    });
+
+    await expect(
+      session.apply({ prompt: 'Keep the expression calm', image: null, enhance: false }),
+    ).rejects.toMatchObject({
+      safeError: {
+        code: 'provider-unavailable',
+        message: 'The realtime provider could not complete the session.',
+      },
+    });
+    expect(sdk.disconnect).not.toHaveBeenCalled();
+    expect(sdk.off).not.toHaveBeenCalled();
+
+    session.disconnect();
+    expect(sdk.disconnect).toHaveBeenCalledOnce();
+    expect(sdk.off).toHaveBeenCalledTimes(3);
   });
 
   it('stops only its cloned provider input and disconnects a client that resolves after abort', async () => {

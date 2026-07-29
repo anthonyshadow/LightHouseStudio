@@ -19,6 +19,7 @@ export const API_ERROR_CODES = [
   'provider_failure',
   'provider_policy',
   'provider_quota',
+  'provider_response_too_large',
   'rate_limited',
   'request_aborted',
   'request_id_conflict',

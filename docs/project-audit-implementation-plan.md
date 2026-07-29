@@ -70,7 +70,9 @@ budget, allowlisted tick/end reconciliation, warning/expected completion, local 
 recording-finalization ordering all have deterministic coverage plus a focused Chromium journey.
 The maximum-duration journey also passes in WebKit and the mobile project. The phase remains active
 because the paid maximum-duration Decart live passes, the rest of `DOC-001`/`TEST-007` provider
-qualification, named physical-device evidence, and dated evidence record are still pending.
+qualification, and named physical-device evidence are still pending. The dated evidence record is
+now a strict, machine-checked contract: 7 provider/local and 45 physical target/browser rows must
+pass for the exact release-candidate commit, while extra fields and stale records fail closed.
 
 | Field          | Plan                                                                                                                                                                                                                                                                    |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -169,6 +171,12 @@ WebKit media evidence remains required before this phase can move to completed w
 toolchain advisories through focused, compatible changes.
 
 **Findings:** `ARCH-002`, `PERF-002`, `TEST-006`, `SEC-007`
+
+**Status (2026-07-29):** provider/runtime scope complete through Wave 7. Decart safe-error
+allowlisting and bounded ElevenLabs success output, browser defense, cancellation, and preservation
+tests are implemented. The phase remains active only because `SEC-007` compatible development
+toolchain remediation and the phase-level full/production audit acceptance are assigned to Wave 10;
+do not move this phase to completed work yet.
 
 | Field          | Plan                                                                                                                                                                                                                                                                                 |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |

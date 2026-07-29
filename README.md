@@ -160,6 +160,11 @@ mode to eligible enterprise accounts. The software permits an informed operator 
 technical work, but the approved controlled pilot keeps participant conversion unavailable unless
 zero-retention eligibility is confirmed.
 
+Provider preview audio is capped at 2 MiB. Voice Changer is pinned to `mp3_44100_128`; its
+five-minute output is capped at 8 MiB based on the 128 kbps payload plus container/metadata
+headroom. The API and browser both enforce declared and cumulative bytes. Overflow, malformed
+audio, or cancellation preserves the immutable original and the last valid take.
+
 ## Commands
 
 ```bash
@@ -181,6 +186,7 @@ npm run storybook:build # static Storybook build
 npm run check:dead-code # Knip entrypoint/export/dependency validation
 npm run check:modules # local import resolution, cycle, and boundary checks
 npm run recording:memory:estimate -- --duration-seconds 300 --main-mib-per-minute 12 # planning estimate from a measured take
+npm run pilot:qualification:check -- --commit <full-sha> --verbose # content-free Wave 8 evidence gate
 npm run audit:prod    # high-severity production dependency audit
 npm run quality       # types, Storybook, lint, format, static checks, tests, and builds
 ```
@@ -192,6 +198,9 @@ core state/viewport pairs and readiness assertions define correctness; 29 is the
 budget. Darwin and Linux baselines remain separate because host font rasterization differs.
 
 Default automated tests use fakes and deny unexpected external HTTP and WebSockets; they do not require devices, provider credentials, paid requests, or external media services. Mocked browser journeys exercise successful Local, Lucy 2.5, and VTON 3 flows across Chromium, WebKit, and mobile. Live provider checks are deliberately manual and gated; see [live provider smoke testing](docs/LIVE_PROVIDER_SMOKE.md).
+Wave 8 records use the strict, content-free
+[pilot qualification evidence contract](docs/PILOT_QUALIFICATION_EVIDENCE.md); the validator is a
+release command and is intentionally excluded from ordinary quality/CI.
 
 ## Architecture at a glance
 
@@ -253,6 +262,7 @@ update trigger for every retained document. The most frequently needed reference
 - [Privacy, retention, and provider cost](docs/PRIVACY_AND_TEMPORARY_DATA.md)
 - [Implemented user journeys](docs/userStories/README.md)
 - [Browser support](docs/BROWSER_SUPPORT.md)
+- [Pilot qualification evidence](docs/PILOT_QUALIFICATION_EVIDENCE.md)
 - [Manual QA](docs/MANUAL_QA.md) and [gated live provider smoke](docs/LIVE_PROVIDER_SMOKE.md)
 - [Project audit findings](docs/project-audit-findings.md)
 - [Coding-agent working guide](AGENTS.md)

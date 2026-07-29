@@ -436,6 +436,15 @@ approved assistive technologies. Responsive screenshots alone do not satisfy thi
 
 ## 12. Wave 7 — Medium architecture and provider hardening
 
+**Status (2026-07-29):** Complete. The pinned Decart SDK error event/throw shapes now cross the
+adapter only as a small app-owned allowlist with a generic fallback; cancellation, disconnect, and
+listener/track cleanup remain independently covered. ElevenLabs preview and Voice Changer success
+responses now enforce declared and cumulative byte ceilings, cancel the upstream reader on
+overflow/caller cancellation, reject malformed MP3 output, and apply the same bounds again before
+the browser constructs a Blob. Exact-boundary, declared/chunked/endless overflow, cancellation,
+safe-error, and immutable-original/last-valid-take tests pass. No live provider call was needed or
+made.
+
 ### 7A. Safe Decart error recovery
 
 **Findings:** `ARCH-002`, remaining Medium portion of `TEST-004`
@@ -463,10 +472,28 @@ adapters.
 **Exit gate:** provider failures remain safe but actionable, and successful Voice output cannot
 consume unbounded server/browser memory.
 
+**Completion evidence:** the installed `@decartai/sdk@0.1.15` declarations and implementation plus
+the documented realtime error classes were used to freeze mappings for authentication, model
+availability, WebRTC timeout/ICE/WebSocket, server, and signaling failures. Unknown codes, raw
+messages, data, URLs, and causes collapse to the generic app fallback. ElevenLabs remains pinned to
+`mp3_44100_128`; five minutes at 128 kbps is approximately 4.8 MB, so the app-owned conversion
+ceiling is 8 MiB and the short saved-preview ceiling is 2 MiB. Both server and browser accept the
+inclusive boundary and fail closed above it.
+
 ## 13. Wave 8 — High provider and physical-device qualification
 
 **Findings:** `DOC-001`, `TEST-007`, `PROD-008`, `PROD-016`; final manual evidence for
 `TEST-001`, `TEST-005`, `TEST-011`
+
+**Status (2026-07-29):** Evidence implementation complete; qualification open. The approved matrix
+is now executable as 7 provider/local requirements and 45 physical target/browser requirements.
+Strict records allow only the date, full commit, generic environment/owner classes, exact app-owned
+configuration, bounded timing/duration/MIME data, safe code, and pass/fail/blocked outcomes. Extra
+fields are rejected, records from another commit do not count, and
+`npm run pilot:qualification:check` fails closed while any row is missing or invalid. A
+deterministic no-key Local journey separately protects the browser from provider HTTP, WebSocket,
+SDK, token, and media work. No paid/live or physical pass was run in this implementation, so Wave 8
+and every dependent release finding remain open.
 
 Run only against the stable release candidate after the preceding behavior and policy waves pass.
 Use dedicated least-privilege credentials, explicit billing authorization, non-sensitive test

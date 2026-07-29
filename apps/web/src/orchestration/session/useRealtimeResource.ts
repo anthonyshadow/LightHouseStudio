@@ -1,3 +1,4 @@
+import type { SafeError } from '@studio/domain';
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
 import {
   connectDecartRealtime,
@@ -21,7 +22,7 @@ export type RealtimeResourceOptions = {
   onConnectionChange: (state: RealtimeConnectionState) => void;
   onDisconnected: (reason: RealtimeDisconnectReason) => void;
   onSessionLimitReached: () => void;
-  onProviderError: () => void;
+  onProviderError: (error: SafeError) => void;
 };
 
 export type RealtimeConnectInput = {
@@ -157,8 +158,8 @@ export const useRealtimeResource = ({
           disconnect();
           onDisconnected('generation-ended');
         },
-        onError: () => {
-          if (operationRef.current === input.operation) onProviderError();
+        onError: (error) => {
+          if (operationRef.current === input.operation) onProviderError(error);
         },
       });
 

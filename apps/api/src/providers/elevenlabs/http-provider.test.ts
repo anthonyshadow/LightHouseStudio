@@ -14,6 +14,11 @@ const requestedUrl = (input: RequestInfo | URL | undefined): string => {
   if (input instanceof URL) return input.href;
   return input?.url ?? '';
 };
+const mp3Bytes = (byteLength: number): Uint8Array<ArrayBuffer> => {
+  const bytes = new Uint8Array(byteLength);
+  if (byteLength >= 3) bytes.set([0x49, 0x44, 0x33], 0);
+  return bytes;
+};
 
 describe('ElevenLabsHttpProvider', () => {
   it('normalizes saved-library voices and sends only provider-required query/header values', async () => {
@@ -154,9 +159,10 @@ describe('ElevenLabsHttpProvider', () => {
   });
 
   it('uses multipart audio for provider conversion while returning a streamed result', async () => {
+    const convertedBytes = mp3Bytes(9);
     const fetchMock = vi.fn<typeof fetch>(() =>
       Promise.resolve(
-        new Response(Buffer.from('converted'), {
+        new Response(convertedBytes, {
           status: 200,
           headers: { 'content-type': 'application/octet-stream', 'content-length': '9' },
         }),
@@ -181,6 +187,200 @@ describe('ElevenLabsHttpProvider', () => {
     const form = init?.body as FormData;
     expect(form.get('model_id')).toBe('eleven_multilingual_sts_v2');
     expect(form.get('audio')).toBeInstanceOf(Blob);
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of result.body) {
+      if (!(chunk instanceof Uint8Array)) throw new TypeError('Expected binary conversion data.');
+      chunks.push(chunk);
+    }
+    expect(Buffer.concat(chunks)).toEqual(Buffer.from(convertedBytes));
+  });
+
+  it('accepts below-boundary and exact-boundary conversion audio', async () => {
+    const limits = { previewBytes: 8, conversionBytes: 12 };
+    const responses = [mp3Bytes(11), mp3Bytes(12)];
+    const fetchMock = vi.fn<typeof fetch>(() => {
+      const bytes = responses.shift();
+      if (!bytes) throw new Error('Missing audio fixture.');
+      return Promise.resolve(
+        new Response(bytes, {
+          status: 200,
+          headers: {
+            'content-type': 'audio/mpeg',
+            'content-length': String(bytes.byteLength),
+          },
+        }),
+      );
+    });
+    const provider = new ElevenLabsHttpProvider(
+      'server-only-placeholder',
+      fetchMock,
+      1_000,
+      limits,
+    );
+
+    const below = await provider.convertRecording(
+      'voice-one',
+      'eleven_multilingual_sts_v2',
+      Buffer.from('original'),
+      'audio/webm',
+      false,
+      signal(),
+    );
+    const exact = await provider.convertRecording(
+      'voice-one',
+      'eleven_multilingual_sts_v2',
+      Buffer.from('original'),
+      'audio/webm',
+      false,
+      signal(),
+    );
+
+    expect(below.contentLength).toBe(11);
+    expect(exact.contentLength).toBe(12);
+  });
+
+  it('rejects and cancels a declared oversized successful response before reading it', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(mp3Bytes(3));
+      },
+      cancel,
+    });
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'audio/mpeg', 'content-length': '13' },
+        }),
+      ),
+    );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000, {
+      previewBytes: 8,
+      conversionBytes: 12,
+    });
+
+    await expect(
+      provider.convertRecording(
+        'voice-one',
+        'eleven_multilingual_sts_v2',
+        Buffer.from('original'),
+        'audio/webm',
+        false,
+        signal(),
+      ),
+    ).rejects.toMatchObject({
+      operation: 'conversion',
+      reason: 'response-too-large',
+    });
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+  });
+
+  it('counts chunked output, rejects overflow, and cancels an endless upstream stream', async () => {
+    const cancel = vi.fn();
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(pulls++ === 0 ? mp3Bytes(4) : Buffer.alloc(4, 1));
+      },
+      cancel,
+    });
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'audio/mpeg' },
+        }),
+      ),
+    );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000, {
+      previewBytes: 8,
+      conversionBytes: 8,
+    });
+
+    await expect(
+      provider.convertRecording(
+        'voice-one',
+        'eleven_multilingual_sts_v2',
+        Buffer.from('original'),
+        'audio/webm',
+        false,
+        signal(),
+      ),
+    ).rejects.toMatchObject({
+      operation: 'conversion',
+      reason: 'response-too-large',
+    });
+    expect(pulls).toBeLessThanOrEqual(4);
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+  });
+
+  it('cancels a successful response body when the caller cancels during streaming', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({ cancel });
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'audio/mpeg' },
+        }),
+      ),
+    );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000, {
+      previewBytes: 8,
+      conversionBytes: 8,
+    });
+    const controller = new AbortController();
+    const pending = provider.convertRecording(
+      'voice-one',
+      'eleven_multilingual_sts_v2',
+      Buffer.from('original'),
+      'audio/webm',
+      false,
+      controller.signal,
+    );
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({
+      operation: 'conversion',
+      reason: 'aborted',
+    });
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+  });
+
+  it('rejects a successful audio response with a malformed declared length or MP3 body', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(mp3Bytes(4), {
+          status: 200,
+          headers: { 'content-type': 'audio/mpeg', 'content-length': '4bytes' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(new TextEncoder().encode('not-mp3'), {
+          status: 200,
+          headers: { 'content-type': 'audio/mpeg' },
+        }),
+      );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000, {
+      previewBytes: 16,
+      conversionBytes: 16,
+    });
+    const convert = () =>
+      provider.convertRecording(
+        'voice-one',
+        'eleven_multilingual_sts_v2',
+        Buffer.from('original'),
+        'audio/webm',
+        false,
+        signal(),
+      );
+
+    await expect(convert()).rejects.toMatchObject({ reason: 'invalid-response' });
+    await expect(convert()).rejects.toMatchObject({ reason: 'invalid-response' });
   });
 
   it('rejects malformed provider booleans instead of silently changing capability truth', async () => {

@@ -401,7 +401,7 @@ the UI/UX, architecture, security, performance, test, and documentation audits.
 | **PROD-013** | Replace configuration-as-health claims with truthful states such as Configured or Limited; report active health only during an attempted connection.                                                                                                                                                                         | UX-007, ARCH-002                    |
 | **PROD-014** | **Implemented policy:** the first-take cue and dismissal are local mounted-session UI only. The controlled pilot uses moderated observation/content-free evidence and no network analytics backend.                                                                                                                          | Privacy-safe instrumentation        |
 | **PROD-015** | **Implemented:** ElevenLabs Apply shows clip duration, configured model, possible credit use, and the zero-retention requirement without inventing a confirmation threshold.                                                                                                                                                 | SEC-006                             |
-| **PROD-016** | Require live smoke evidence for Lucy 2.5, exact VTO 3, ElevenLabs, and separate OpenAI/BFL/Wiro startup configurations before the pilot.                                                                                                                                                                                     | DOC-001, Manual QA                  |
+| **PROD-016** | **Evidence contract implemented; qualification pending:** require exact-commit live smoke records for Lucy 2.5, exact VTO 3, ElevenLabs, and separate OpenAI/BFL/Wiro startup configurations before the pilot. The strict validator rejects stale, incomplete, or content-bearing records.                                   | DOC-001, Manual QA                  |
 | **PROD-017** | Touch/mobile creation is required; ship only after `UX-001`, narrow-screen, assistive-technology, and named physical device/browser evidence pass.                                                                                                                                                                           | UX-001, UX-003, TEST-005, TEST-011  |
 | **PROD-018** | Defer account portability until repeat local value is proven and an account model is chosen.                                                                                                                                                                                                                                 | Stage C                             |
 | **PROD-019** | Defer cloud take history until users demonstrate repeat-take retrieval needs.                                                                                                                                                                                                                                                | Stage C/E                           |
@@ -447,6 +447,12 @@ end/disconnect, and finalizes a boundary-crossing take before resource release. 
 remains a pilot gate until the paid five-minute live smoke passes for both claimed Decart
 configurations on the qualified physical matrix.
 
+Implementation note (2026-07-29): **Truthful capability state** now includes an allowlisted Decart
+runtime error boundary with generic fallback, and successful ElevenLabs preview/conversion output
+is byte-bounded on both the API and browser sides. Automated boundary, overflow, cancellation,
+malformed-output, safe-error, and take-preservation evidence passes; live provider qualification
+remains a separate release gate.
+
 ### Required before an unassisted local beta
 
 - lightweight in-context first-use guidance based on observed hesitation points;
@@ -457,7 +463,6 @@ configurations on the qualified physical matrix.
 - improved Character Builder action/preview reachability on narrow screens;
 - clearer recording hierarchy and voice Apply usage context;
 - actionable self-support and recovery guidance;
-- bounded successful ElevenLabs response handling; and
 - an explicit user-facing policy for provider usage limits and failed requests.
 
 ### Required before a remote or public MVP

@@ -71,6 +71,11 @@ Do not run live provider checks in CI, screenshots, stories, ordinary component 
 
 Pass requires correct model scope, explicit action ordering, usable output gating, atomic updates, image clearing, finalization-before-release, local fallback, sanitized errors, and complete cleanup.
 
+For one controlled failure in each available class, record only the app-owned result:
+authentication, model unavailable, WebRTC timeout/ICE/WebSocket, server/signaling, or generic
+fallback. Confirm raw SDK codes/messages/data/URLs/causes never appear. Cancellation must remain a
+cancelled operation, and listener/provider-input cleanup must still occur exactly once.
+
 ## Decart VTON 3
 
 1. Select Try-On and use a non-sensitive garment prompt or garment image.
@@ -144,19 +149,36 @@ token, signature, nonce, prompt, or CDN path.
 5. Apply once. Confirm the server revalidates saved membership and only the audio sidecar is sent to `/api/elevenlabs/voice-changer/recording`; processing locks incomplete playback/download and the final remux preserves video.
 6. Remove the disposable voice from the saved library in ElevenLabs, refresh Studio, and confirm it disappears. If a stale direct conversion request is exercised, confirm it returns the safe library-not-found response before conversion.
 7. Restore Original and confirm no provider request. Run one controlled failure if the test account permits and confirm the original/last valid take survives with sanitized guidance.
+8. Confirm preview responses remain below 2 MiB and the five-minute `mp3_44100_128` result remains
+   below the inclusive 8 MiB app ceiling. Do not weaken the ceiling if a result exceeds it; record
+   the safe `provider_response_too_large` result, retain the original/last valid take, and escalate
+   the provider/configuration mismatch.
 
-Pass requires saved-only listing and revalidation, absent public/import surfaces, proxied previews, conversion-time model validation, explicit conversion, audio-only upload, immutable-original processing, safe replacement, and no leaked key/upstream URL/body.
+Pass requires saved-only listing and revalidation, absent public/import surfaces, proxied and
+byte-bounded previews, conversion-time model validation, explicit conversion, audio-only upload,
+bounded successful output, immutable-original processing, safe replacement, and no leaked
+key/upstream URL/body.
 
 ## Evidence and cleanup
 
-Record only:
+Create one strict content-free record per provider requirement under the
+[qualification evidence contract](PILOT_QUALIFICATION_EVIDENCE.md). Record only:
 
 - date, commit, browser/OS, anonymous device class;
 - authorizing Credential Custodian/Billing Authorizer and witnessing Evidence Recorder/Support &
   Escalation Owner role labels;
 - capability and model ids;
-- action timestamps, safe HTTP status/code, output MIME type, and pass/fail notes;
+- action timestamps, safe HTTP status/code, output MIME type, and pass/fail/blocked result;
 - approximate connection and clip duration for cost review.
+
+Validate the records against the exact release-candidate commit:
+
+```bash
+npm run pilot:qualification:check -- --commit "$(git rev-parse HEAD)" --verbose
+```
+
+The command must remain open until every provider/local and physical target/browser row passes.
+Deterministic provider fakes and an older commit's record do not satisfy a live row.
 
 Then Stop AI, stop the camera, discard/download test takes as appropriate, close the tab, verify camera/mic indicators and WebRTC sessions are gone, remove keys from `.env` when no longer needed, and restart to confirm optional integrations disable cleanly. Restore any temporary ElevenLabs library membership only through provider account controls.
 

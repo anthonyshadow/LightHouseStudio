@@ -4,6 +4,8 @@ import {
   PAGE_SIZE_LIMIT,
   SUPPORTED_MODEL_IDS,
   VOICE_CONVERSION_MAX_BYTES,
+  VOICE_CONVERSION_OUTPUT_MAX_BYTES,
+  VOICE_PREVIEW_MAX_BYTES,
   VOICE_PROVIDER_INTENT_HEADER,
   VOICE_PROVIDER_INTENT_VALUE,
   apiErrorResponseSchema,
@@ -446,7 +448,7 @@ describe('ElevenLabs contracts', () => {
     ).toBe(false);
   });
 
-  it('validates audio-only conversion parameters and the 25 MiB boundary constant', () => {
+  it('validates audio-only conversion parameters and the app-owned byte ceilings', () => {
     expect(voiceChangerQuerySchema.parse({ voiceId: ' voice-1 ' })).toEqual({
       voiceId: 'voice-1',
     });
@@ -454,6 +456,8 @@ describe('ElevenLabs contracts', () => {
     expect(voiceConversionContentTypeSchema.parse('audio/webm')).toBe('audio/webm');
     expect(voiceConversionContentTypeSchema.safeParse('video/webm').success).toBe(false);
     expect(VOICE_CONVERSION_MAX_BYTES).toBe(25 * 1024 * 1024);
+    expect(VOICE_PREVIEW_MAX_BYTES).toBe(2 * 1024 * 1024);
+    expect(VOICE_CONVERSION_OUTPUT_MAX_BYTES).toBe(8 * 1024 * 1024);
     expect(VOICE_PROVIDER_INTENT_HEADER).toBe('x-lightframe-provider-intent');
     expect(VOICE_PROVIDER_INTENT_VALUE).toBe('voice');
   });

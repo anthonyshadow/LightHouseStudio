@@ -172,6 +172,7 @@ export const installProviderNetworkDriver = async (
     referenceImageCompositions: [],
     referenceImageMetadataReads: [],
     referenceImageContentReads: [],
+    providerSdkRequests: [],
     blockedExternalRequests: [],
     blockedExternalWebSockets: [],
     setCapabilityFailuresRemaining: (count) => {
@@ -193,6 +194,9 @@ export const installProviderNetworkDriver = async (
 
   await page.route('**/*', async (route) => {
     const requestUrl = new URL(route.request().url());
+    if (requestUrl.pathname.toLowerCase().includes('@decartai')) {
+      network.providerSdkRequests.push(requestUrl.href);
+    }
     const isLocal =
       ['127.0.0.1', 'localhost'].includes(requestUrl.hostname) ||
       (requestUrl.protocol === 'blob:' &&
@@ -220,7 +224,10 @@ export const installProviderNetworkDriver = async (
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          realtimeVideo: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
+          realtimeVideo: {
+            available: options.realtimeVideoAvailable ?? true,
+            models: options.realtimeVideoAvailable === false ? [] : ['lucy-2.5', 'lucy-vton-3'],
+          },
           elevenLabs: {
             available: options.elevenLabsAvailable ?? false,
             modelId: options.elevenLabsAvailable ? 'eleven_multilingual_sts_v2' : null,

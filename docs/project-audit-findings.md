@@ -229,6 +229,11 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
   preview → Apply → remux → Download; and separate OpenAI, BFL, and Wiro
   optimize/generate/compose/edit passes using the startup-selected provider configuration. Never
   run paid providers in CI.
+- **Implementation status (2026-07-29):** the content-free evidence contract, exact 7
+  provider/local plus 45 physical target/browser matrix, strict validator, and deterministic
+  no-key Local denial regression are implemented. No live entitlement or physical-device record
+  has been supplied, so `DOC-001` / `TEST-007` remain open and the validator reports the release
+  gate as open.
 - **Regression risk:** None.
 
 ## Recommended pre-self-service improvements
@@ -279,10 +284,23 @@ observation and physical/reflow evidence remain.
 Map a small allowlist of documented SDK error codes to app-owned safe recovery codes. Never expose
 raw provider messages or arbitrary codes.
 
+**Implementation status (2026-07-29):** the pinned SDK's documented/installed authentication,
+model, WebRTC timeout/ICE/WebSocket, server, and signaling errors now map inside the browser adapter
+to app-owned authentication, availability, and network recovery classes. Unknown shapes retain the
+generic fallback; raw messages, data, URLs, codes, and causes do not leave the adapter. Tests cover
+known/unknown mapping, cancellation, disconnect, Apply preservation, and listener/track cleanup.
+
 ### PERF-002 / TEST-006 — Successful ElevenLabs output is not byte-bounded
 
 Add declared-length and counting-stream ceilings with exact-boundary/overflow/cancellation tests
 before wider self-service or public use. Preserve the original take on failure.
+
+**Implementation status (2026-07-29):** complete. Saved previews are capped at 2 MiB and the pinned
+five-minute `mp3_44100_128` conversion result at 8 MiB. The API rejects malformed/oversized declared
+lengths before reading, counts every chunk before publishing a bounded result, cancels the upstream
+reader on overflow/caller cancellation, and validates MP3 signatures. The browser independently
+checks declared and cumulative bytes before Blob construction. Boundary, endless-stream,
+cancellation, normalized-error, and immutable-original/last-valid-take tests pass.
 
 ### SEC-007 — Development-only dependency advisories remain
 
@@ -332,9 +350,9 @@ The independent specialist reports reused `TEST-###`; the canonical plan uses th
 | `TEST-001` | Touch/pointer control recovery and never-hidden Stop behavior for `UX-001`; automated coverage complete, named physical evidence pending. |
 | `TEST-002` | Complete saved-character entry-intent → Use → Start journey for `UX-002`.                                                                 |
 | `TEST-003` | State-driven curated visual matrix and semantic readiness invariants.                                                                     |
-| `TEST-004` | Decart cap/tick/end behavior for `ARCH-001` is automated; typed-error breadth for `ARCH-002` and live boundary evidence remain.           |
+| `TEST-004` | Decart cap/tick/end and typed safe-error breadth are automated; paid live maximum-duration evidence remains.                              |
 | `TEST-005` | Physical-device recording-memory/finalization/cleanup evidence for `PERF-001`.                                                            |
-| `TEST-006` | Declared/chunked successful ElevenLabs output bounds for `PERF-002`.                                                                      |
+| `TEST-006` | Complete: declared/chunked/endless successful ElevenLabs bounds, cancellation, browser defense, and take preservation.                    |
 | `TEST-007` | Gated live provider/device entitlement and full included-provider journeys.                                                               |
 | `TEST-008` | Risk-based dynamic-state axe/focus/screen-reader coverage.                                                                                |
 | `TEST-009` | Outcome-based Character Builder responsive/reflow coverage.                                                                               |

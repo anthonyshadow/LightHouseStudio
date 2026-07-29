@@ -1,0 +1,122 @@
+{
+  "schemaVersion": 1,
+  "evidenceId": "local-no-key-chrome-2030-01-01",
+  "requirementId": "provider:local-no-key",
+  "recordedAt": "2030-01-01T12:00:00.000Z",
+  "commitSha": "0123456789abcdef0123456789abcdef01234567",
+  "accountEnvironmentClass": "no-provider-credentials",
+  "accessMode": "participant",
+  "configurationId": "local:no-provider-credentials",
+  "environment": {
+    "deviceClass": "Approved anonymous desktop class",
+    "osName": "Approved OS",
+    "osVersion": "Approved version",
+    "browserName": "Approved browser",
+    "browserVersion": "Approved version"
+  },
+  "roles": [
+    "Credential Custodian",
+    "Billing Authorizer",
+    "Evidence Recorder",
+    "Support & Escalation Owner"
+  ],
+  "checks": [
+    {
+      "id": "capabilities-unavailable",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": null,
+      "mimeType": null
+    },
+    {
+      "id": "local-preparation",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": null,
+      "mimeType": null
+    },
+    {
+      "id": "local-capture",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": null,
+      "mimeType": null
+    },
+    {
+      "id": "record-finalize",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": 10,
+      "mimeType": "video/webm"
+    },
+    {
+      "id": "local-voice",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": 10,
+      "mimeType": "video/webm"
+    },
+    {
+      "id": "download",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": 10,
+      "mimeType": "video/webm"
+    },
+    {
+      "id": "cleanup",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": null,
+      "mimeType": null
+    },
+    {
+      "id": "no-external-http",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": null,
+      "mimeType": null
+    },
+    {
+      "id": "no-external-websocket",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": null,
+      "mimeType": null
+    },
+    {
+      "id": "no-provider-sdk",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": null,
+      "mimeType": null
+    },
+    {
+      "id": "no-provider-token",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": null,
+      "mimeType": null
+    },
+    {
+      "id": "no-external-media",
+      "result": "pass",
+      "safeCode": "ok",
+      "durationMs": 1000,
+      "clipDurationSeconds": null,
+      "mimeType": null
+    }
+  ],
+  "overallResult": "pass"
+}

@@ -37,6 +37,9 @@ As a creator, I want to preview and apply a voice already saved in my ElevenLabs
 - If ElevenLabs rejects a particular saved voice for plan, sharing, or voice policy reasons, the original take remains available and the safe provider guidance is shown.
 - Cancel active processing to preserve the existing artifact.
 - Provider errors are sanitized; retry retrieval or conversion from the visible error action.
+- Successful preview audio is limited to 2 MiB. The pinned five-minute `mp3_44100_128` conversion
+  result is limited to 8 MiB. Declared, chunked, endless, empty, malformed, and cancelled output
+  fails before replacement; the original and last valid take remain available.
 - Select **Original** to restore the immutable capture without another provider call.
 
 ## Completion criteria
