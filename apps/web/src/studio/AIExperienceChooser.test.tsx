@@ -12,6 +12,8 @@ afterEach(cleanup);
 const renderChooser = (overrides: Partial<ComponentProps<typeof AIExperienceChooser>> = {}) => {
   const props: ComponentProps<typeof AIExperienceChooser> = {
     open: true,
+    decartAvailable: true,
+    capabilityState: 'ready',
     characterReady: false,
     virtualTryOnReady: false,
     onClose: vi.fn(),
@@ -37,7 +39,9 @@ describe('AIExperienceChooser', () => {
     const props = renderChooser();
 
     expect(screen.getByRole('heading', { name: 'Character Transformation' })).toBeVisible();
-    expect(screen.getByRole('heading', { name: 'Virtual Try-On' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Virtual Try-On Beta' })).toBeVisible();
+    expect(screen.getByText('Primary · Character')).toBeVisible();
+    expect(screen.getByText('Secondary · Beta')).toBeVisible();
 
     await user.click(screen.getByRole('button', { name: 'Choose Saved Character' }));
     expect(props.onChooseSavedCharacter).toHaveBeenCalledOnce();
@@ -69,5 +73,19 @@ describe('AIExperienceChooser', () => {
 
     expect(props.onStartCharacter).toHaveBeenCalledOnce();
     expect(props.onStartVirtualTryOn).toHaveBeenCalledOnce();
+  });
+
+  it('keeps preparation available while explaining why provider Start is unavailable', () => {
+    renderChooser({
+      decartAvailable: false,
+      characterReady: true,
+      virtualTryOnReady: true,
+    });
+
+    expect(screen.queryByRole('button', { name: /Start with/u })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start Virtual Try-On' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create Character' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Configure Virtual Try-On' })).toBeEnabled();
+    expect(screen.getAllByText(/Decart is not configured/u)).toHaveLength(2);
   });
 });

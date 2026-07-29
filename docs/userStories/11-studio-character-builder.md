@@ -23,7 +23,12 @@ Prompt Workshop never creates or edits a character. It owns only Add, Replace, a
 4. Name and save the current valid character/reference combination.
 5. Continue in Studio with the character already selected and preloaded in Lucy 2.5.
 
-The panel contains no journey stepper. Its DOM order is the full set of character choices and constraints followed by the preview. On wide layouts the preview is pinned as a sticky rail beside the form; on narrow layouts it follows the final control as the last item in the single-column flow. The preview keeps a stable 4:5 frame while provider work runs.
+The panel contains no journey stepper. Its DOM order is a narrow-layout **Review & Generate**
+shortcut, the full set of character choices and constraints, and then the one preview. On wide
+layouts the shortcut is hidden and the preview is pinned as a sticky rail beside the form. On
+narrow layouts the shortcut remains anchored while the preview follows the final control; choosing
+it scrolls and moves focus to that same preview/generation region. No preview or generation state
+is duplicated. The preview keeps a stable 4:5 frame while provider work runs.
 
 ## Draft persistence and reset
 
@@ -134,6 +139,8 @@ It never displays Reopen and never enters the retired Guided runtime. No legacy 
 - Provider phases use a polite atomic status region; failures use an alert.
 - Preview and Save regions expose busy state, and conflicting controls are disabled while work is active.
 - The footer remains reachable through internal scrolling and safe-area padding.
+- At 1024 CSS px and below, **Review & Generate** remains reachable and focuses the single preview
+  at `834×1112`, `390×844`, `320×568`, and 200% text.
 - The header character selector retains its full accessible name and an approximately 44px touch target at mobile widths. The fullscreen dialog retains the exact **Build Your Character** title.
 - Keyboard, screen-reader, reduced-motion, 200% zoom, short-height, portrait, landscape, and notched-safe-area layouts must remain operable.
 

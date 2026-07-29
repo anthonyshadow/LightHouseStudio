@@ -13,7 +13,8 @@ As a creator, I want to preview a Lucy VTON 3 garment transformation, so that I 
 
 1. Optionally prepare a garment recipe in the Recipe Dock or choose one from the Recipe Shelf.
 2. Select **Start Camera + Mic**, grant permission, and confirm a healthy local preview.
-3. Select **Start AI**, then choose **Virtual Try-On** in **Choose AI experience**.
+3. Select **Start AI**, then choose the secondary **Virtual Try-On Beta** experience. Character
+   Transformation remains the visually primary path.
 4. If the current VTON draft is ready, review the inline Decart transfer/usage/300-second/Stop
    disclosure and select **Start Virtual Try-On**. Otherwise select **Configure Virtual Try-On** to
    open the Dock, or **Choose Saved Try-On** to use the Shelf.

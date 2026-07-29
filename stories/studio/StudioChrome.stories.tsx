@@ -83,6 +83,8 @@ const ChooserHarness = ({ ready }: { ready: boolean }) => {
       </StorySection>
       <AIExperienceChooser
         open={open}
+        decartAvailable
+        capabilityState="ready"
         activeCharacterName={ready ? 'Midnight culture host' : undefined}
         characterReady={ready}
         virtualTryOnReady={false}

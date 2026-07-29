@@ -88,6 +88,22 @@ describe('CharacterBuilderForm', () => {
     expect(preview.parentElement?.lastElementChild).toBe(preview);
   });
 
+  it('moves focus to the one existing review and generation region', () => {
+    render(<BuilderHarness />);
+
+    const preview = screen.getByRole('complementary', {
+      name: 'Character Direction Preview',
+    });
+    expect(screen.getAllByRole('complementary')).toHaveLength(1);
+
+    const reviewButton = screen.getByText('Review & Generate').closest('button');
+    if (!reviewButton) throw new Error('Missing Review & Generate button');
+    fireEvent.click(reviewButton);
+
+    expect(preview).toHaveFocus();
+    expect(screen.getAllByRole('complementary')).toHaveLength(1);
+  });
+
   it('disables every character input while its owning transaction is atomic', async () => {
     const user = userEvent.setup();
     render(<BuilderHarness disabled />);

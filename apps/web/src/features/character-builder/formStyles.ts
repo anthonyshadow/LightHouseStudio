@@ -9,6 +9,34 @@ export const builderLayoutStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 64rem)': { gridTemplateColumns: '1fr' },
 });
 
+export const reviewShortcutStyles = (theme: Theme): CSSObject => ({
+  position: 'sticky',
+  zIndex: 2,
+  insetBlockStart: 0,
+  display: 'none',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  alignItems: 'center',
+  gap: theme.space.sm,
+  padding: theme.space.sm,
+  border: `1px solid ${theme.colors.accent}`,
+  borderRadius: theme.radii.medium,
+  background: `color-mix(in srgb, ${theme.colors.canvasRaised} 94%, transparent)`,
+  boxShadow: theme.shadows.soft,
+  backdropFilter: 'blur(12px)',
+  '& > span': { minWidth: 0 },
+  '& strong, & small': { display: 'block' },
+  '& small': {
+    marginBlockStart: theme.space.xxs,
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSizes.caption,
+  },
+  '@media (max-width: 64rem)': { display: 'grid' },
+  '@media (max-width: 24rem)': {
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    '& > button': { width: '100%' },
+  },
+});
+
 export const sectionStackStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   display: 'grid',

@@ -327,11 +327,11 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await page.getByRole('button', { name: 'Voice treatments' }).click();
       const treatments = page.getByRole('dialog', { name: 'Voice Treatments' });
       await expect(
-        treatments.getByRole('heading', { name: 'Voice treatment', exact: true }),
+        treatments.getByRole('heading', { name: 'Choose a voice treatment', exact: true }),
       ).toBeVisible();
       await treatments
         .getByRole('button', {
-          name: 'Browse saved ElevenLabs voices · contacts provider',
+          name: 'Browse saved voices · contacts ElevenLabs',
         })
         .click();
       const browser = page.getByRole('dialog', { name: 'Voice Browser' });

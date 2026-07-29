@@ -42,6 +42,9 @@ Provider contact is deliberate and cost-sensitive:
 6. Optionally apply a local or saved ElevenLabs voice, then **Download**.
 7. Close/release or explicitly discard the temporary take.
 
+The idle stage includes a small, dismissible first-take cue with that sequence. It is tab/session
+state only: dismissal is not persisted, measured, or sent anywhere.
+
 `/` is the only application route. Character Builder and the other creative tools open over the
 same mounted Studio; they do not create parallel media players or sessions.
 
@@ -50,7 +53,8 @@ same mounted Studio; they do not create parallel media players or sessions.
 - Local webcam/microphone preview, capture settings, recording, finalization, playback, download,
   close, and confirmed discard
 - Fullscreen Character Builder with resumable IndexedDB draft, prompt-only/image-only/combined
-  paths, optional generation, and durable browser-local character metadata
+  paths, optional generation, a single-DOM narrow-screen **Review & Generate** shortcut, and
+  durable browser-local character metadata
 - `lucy-2.5` realtime Character Transformation with complete atomic Apply/Revert/Reset snapshots
 - Pinned `lucy-vton-3` Virtual Try-On using prompt, ephemeral garment image, or both
 - Structured Add/Replace/Restyle Prompt Workshop and Recipe Shelf v4 for saved/recent/character

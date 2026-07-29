@@ -14,8 +14,11 @@ As a creator, I want to preview and apply a voice already saved in my ElevenLabs
 ## End-to-end steps
 
 1. Open **Voice treatments** from Latest take.
-2. Select **Browse saved ElevenLabs voices · contacts provider**. Read the disclosure: previews do not upload the take; applying a voice sends only original audio and may use credits.
-3. Confirm Voice Browser explains that only voices currently saved in the ElevenLabs library are shown. The project has no public-library or add/import action.
+2. Select **Browse saved voices · contacts ElevenLabs**. Confirm the Voice Browser breadcrumb
+   remains **Take review → Voice treatments → Saved voices** and read the concise disclosure:
+   preview does not upload the take; Apply sends only original audio and may use credits.
+3. Open **Where these voices come from** when needed and confirm only voices currently saved in the
+   ElevenLabs library are shown. The project has no public-library or add/import action.
 4. Enter a search term (name, style, accent, etc.) and select **Search**. Use **Previous**, **Next**, or **Refresh voices** to navigate saved results.
 5. Select an inline audio preview to listen. The broker validates and normalizes saved provider MP3 previews even when ElevenLabs storage supplies a generic text media header. If a preview fails validation, use the displayed retry path or select another voice; no recording has been uploaded.
 6. Select a saved voice card, including a saved community Professional Voice Clone if present.

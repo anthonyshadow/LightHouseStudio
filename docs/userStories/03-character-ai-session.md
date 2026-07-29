@@ -15,7 +15,9 @@ As a creator, I want to turn my live camera into a Lucy 2.5 character performanc
 
 1. Use the header character selector to choose a saved character, or choose **Create new character** and save one. The selected name appears in the header.
 2. Select **Start Camera + Mic**, grant permission, and confirm a healthy local preview.
-3. Select **Start AI**, then choose **Character Transformation** in **Choose AI experience**.
+3. Select **Start AI**. **Character Transformation** is the primary choice; **Virtual Try-On
+   Beta** remains secondary. If provider configuration is still loading or unavailable, the
+   chooser explains the recovery boundary and does not offer a start action.
 4. If the selected character is ready, review the inline Decart disclosure and choose **Start with
    [character name]**. Otherwise choose **Create Character** or **Choose Saved Character**; the
    latter opens the existing Shelf directly on **Characters**, then complete **Use** and return to

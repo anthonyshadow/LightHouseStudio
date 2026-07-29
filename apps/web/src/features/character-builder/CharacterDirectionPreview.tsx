@@ -1,5 +1,5 @@
 import { useTheme, type CSSObject } from '@emotion/react';
-import type { ReactNode } from 'react';
+import type { ReactNode, RefObject } from 'react';
 import { rotatingSpinnerAnimationStyles } from '../../ui/animationStyles';
 import {
   heroPreviewStyles,
@@ -33,6 +33,7 @@ export interface CharacterDirectionPreviewSelection {
 }
 
 export interface CharacterDirectionPreviewProps {
+  readonly containerRef?: RefObject<HTMLElement | null>;
   readonly characterLabel: string;
   readonly profile: string;
   readonly starterLabel: string;
@@ -52,6 +53,7 @@ export interface CharacterDirectionPreviewProps {
 }
 
 export const CharacterDirectionPreview = ({
+  containerRef,
   characterLabel,
   profile,
   starterLabel,
@@ -72,6 +74,8 @@ export const CharacterDirectionPreview = ({
   const theme = useTheme();
   return (
     <aside
+      ref={containerRef}
+      tabIndex={-1}
       aria-labelledby="direction-preview-heading"
       css={[
         previewPanelStyles(theme),

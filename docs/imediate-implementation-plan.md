@@ -396,6 +396,15 @@ Wave 5 implementation gaps.
 **Findings:** `UX-003`–`UX-006`, `UX-008`; `PROD-001`, `PROD-002`, `PROD-011`, `PROD-014`;
 `TEST-008`, `TEST-009`, `TEST-011`
 
+**Status (2026-07-28):** runtime implementation and deterministic automated coverage complete.
+The Studio now has session-only first-take guidance, action-first rail descriptions,
+Character-primary/VTO-beta hierarchy with configuration recovery copy, a single-DOM narrow Builder
+review shortcut, compact Voice breadcrumbs/progressive disclosure, dynamic axe/reflow coverage, and
+a focused WebKit/touch synthetic-media smoke. The wave remains release-incomplete until the named
+physical-device, safe-area/browser-chrome/software-keyboard, VoiceOver/TalkBack/desktop
+screen-reader, and real WebKit media checks are executed and recorded. The ten intentional Darwin
+baseline changes are reviewed; equivalent Linux baseline regeneration/review remains.
+
 Implement only after the primary safety behavior is stable:
 
 1. Keep Character visibly primary, VTO secondary/beta, Workshop advanced, and the local preview →

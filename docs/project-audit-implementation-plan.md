@@ -103,6 +103,10 @@ model.
 
 **Findings:** `PROD-001`, `PROD-002`, `UX-004`, `UX-005`, `UX-007`, `PROD-012`
 
+**Status (2026-07-28):** runtime and automated implementation complete through Wave 6. Manual
+moderated comprehension/terminology observation remains required before this phase can move to
+completed work.
+
 | Field          | Plan                                                                                                                                                                                                                                                |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Scope          | Light in-context activation guidance; action-first subtitles; Character-first hierarchy; returning-character resume; unavailable-experience reasons/recovery.                                                                                       |
@@ -132,6 +136,10 @@ model.
 technology without duplicating stateful UI.
 
 **Findings:** `UX-003`, `UX-006`, `TEST-008`, `TEST-009`, `TEST-011`
+
+**Status (2026-07-28):** runtime and automated implementation complete through Wave 6. Named
+physical touch/mobile, assistive-technology, safe-area/browser-chrome/software-keyboard, and real
+WebKit media evidence remains required before this phase can move to completed work.
 
 | Field          | Plan                                                                                                                                                                                                                                  |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

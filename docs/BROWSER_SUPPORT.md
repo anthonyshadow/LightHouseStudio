@@ -26,6 +26,10 @@ Studio is a viewport-bound workspace rather than a scrolling document. `html`, `
 
 The fullscreen character builder owns one internal vertical scroller because its independently collapsible choice drawers can contain many visual options. It never creates document overflow and keeps its header, 4:5 preview, controls, focus rings, footer actions, and safe-area padding within the available width and height. The Studio stage remains mounted and inert beneath the panel.
 
+At `64rem` and below, Character Builder shows an anchored **Review & Generate** shortcut that moves
+scroll and focus to the existing preview/generation region. The preview remains the last item in
+the single-column DOM; no duplicate controls or state are created.
+
 The in-stage session control bar owns **Start Camera + Mic**, **Start AI**, mic/camera toggles,
 **Record**/**Stop recording**, AI Change/Stop, and compact take actions. In live and playback states
 it hides after three seconds of inactivity and returns when the persistent stage receives
@@ -76,7 +80,9 @@ Codec claims from `MediaRecorder.isTypeSupported` are necessary but not sufficie
 ## Known platform risks
 
 - Safari and iOS have historically differed in `MediaRecorder` MIME output, background-tab behavior, camera interruption, Blob download UX, and Web Audio codec support.
-- Control-bar activity recovery is implemented for mouse movement and keyboard input. Explicit touch/pointer/focus recovery after auto-hide is not currently covered, so verify it on each touch target.
+- Control-bar recovery has deterministic pointer, touch, focus, and keyboard coverage, including a
+  configured mobile-touch project. This does not qualify physical hardware; repeat the real
+  timeout/recovery protocol on every named touch target.
 - Older mobile engines may implement `vh` differently from the dynamic visible viewport. The `dvh` path and safe-area padding must still be checked with browser chrome shown/hidden and the on-screen keyboard open.
 - Mobile browsers may stop camera tracks when the tab backgrounds, the screen locks, a call arrives, or another app claims the camera.
 - Multiple cameras/microphones, Bluetooth handoff, privacy switches, and virtual devices can end tracks unexpectedly.

@@ -1,7 +1,7 @@
 import { useTheme } from '@emotion/react';
 import type { CharacterTransformDraft } from '@studio/domain';
-import { useState, type ReactNode } from 'react';
-import { VisuallyHidden } from '../../ui';
+import { useRef, useState, type ReactNode } from 'react';
+import { Button, VisuallyHidden } from '../../ui';
 import { CharacterDirectionPreview } from './CharacterDirectionPreview';
 import {
   CHARACTER_STARTERS,
@@ -18,6 +18,7 @@ import {
   optionGridStyles,
   optionLabelStyles,
   optionVisualStyles,
+  reviewShortcutStyles,
 } from './formStyles';
 import { CharacterChoiceDrawer } from './CharacterChoiceDrawer';
 import { CharacterVisualChoiceSection } from './CharacterVisualChoiceSection';
@@ -77,6 +78,7 @@ export const CharacterBuilderForm = ({
   onChange,
 }: CharacterBuilderFormProps) => {
   const theme = useTheme();
+  const previewRef = useRef<HTMLElement>(null);
   const [presentationAnnouncement, setPresentationAnnouncement] = useState('');
   const gender = genderFromDesign(design);
   const profile = getVisualProfile(gender);
@@ -150,6 +152,28 @@ export const CharacterBuilderForm = ({
           {presentationAnnouncement}
         </span>
       </VisuallyHidden>
+      <div css={reviewShortcutStyles(theme)}>
+        <span>
+          <strong>Review your character</strong>
+          <small>
+            {referenceImageGenerated && !referenceImageStale
+              ? 'Preview ready'
+              : referenceImageStale
+                ? 'Preview needs an update'
+                : 'Generation is optional'}
+          </small>
+        </span>
+        <Button
+          size="small"
+          variant="primary"
+          onClick={() => {
+            previewRef.current?.scrollIntoView?.({ block: 'start' });
+            previewRef.current?.focus({ preventScroll: true });
+          }}
+        >
+          Review &amp; Generate
+        </Button>
+      </div>
       <CharacterChoiceDrawer
         id="character-reference-image"
         title="Reference image"
@@ -273,6 +297,7 @@ export const CharacterBuilderForm = ({
       </CharacterChoiceDrawer>
 
       <CharacterDirectionPreview
+        containerRef={previewRef}
         characterLabel={selectedStarter?.label ?? 'Character'}
         profile={profile}
         starterLabel={selectedStarter?.label ?? 'Not selected'}

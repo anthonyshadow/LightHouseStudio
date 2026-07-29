@@ -75,7 +75,7 @@ test('retired project entries canonicalize and open the legacy-project manager',
   }
 });
 
-test('direction preview is last on narrow screens and remains beside the form on desktop', async ({
+test('single direction preview stays beside desktop form and has a narrow review shortcut', async ({
   page,
 }) => {
   await installSuccessfulStudioHarness(page);
@@ -106,12 +106,18 @@ test('direction preview is last on narrow screens and remains beside the form on
   const desktopPreview = await rect(preview);
   expect(desktopPreview.left).toBeGreaterThanOrEqual(desktopFirst.right);
   expect(Math.abs(desktopPreview.top - desktopFirst.top)).toBeLessThanOrEqual(1);
+  await expect(dialog.getByRole('button', { name: 'Review & Generate' })).toBeHidden();
 
   await page.setViewportSize({ width: 390, height: 844 });
 
   const narrowFinal = await rect(finalSection);
   const narrowPreview = await rect(preview);
   expect(narrowPreview.top).toBeGreaterThanOrEqual(narrowFinal.bottom);
+  const reviewShortcut = dialog.getByRole('button', { name: 'Review & Generate' });
+  await expect(reviewShortcut).toBeVisible();
+  await reviewShortcut.click();
+  await expect(preview).toBeFocused();
+  await expect(dialog.getByRole('complementary')).toHaveCount(1);
 });
 
 test('character direction supports preview generation and save', async ({ page }) => {

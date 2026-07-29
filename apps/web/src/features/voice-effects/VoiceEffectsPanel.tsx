@@ -41,6 +41,31 @@ const introStyles = (theme: Theme): CSSObject => ({
   fontSize: '0.8rem',
 });
 
+const breadcrumbStyles = (theme: Theme): CSSObject => ({
+  margin: 0,
+  color: theme.colors.accentStrong,
+  fontSize: theme.fontSizes.caption,
+  fontWeight: 760,
+});
+
+const compatibilityDetailsStyles = (theme: Theme): CSSObject => ({
+  padding: theme.space.sm,
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.radii.medium,
+  color: theme.colors.textMuted,
+  background: theme.colors.surfaceSoft,
+  fontSize: theme.fontSizes.caption,
+  '& summary': {
+    minHeight: '2.75rem',
+    display: 'flex',
+    alignItems: 'center',
+    color: theme.colors.text,
+    cursor: 'pointer',
+    fontWeight: 760,
+  },
+  '& p': { margin: `${theme.space.xs} 0 0` },
+});
+
 const detectVoiceBrowserCapabilities = (): VoiceBrowserCapabilities => ({
   webAudio: 'AudioContext' in window || 'webkitAudioContext' in window,
   offlineAudio: 'OfflineAudioContext' in window || 'webkitOfflineAudioContext' in window,
@@ -77,8 +102,9 @@ export const VoiceEffectsPanel = ({
   return (
     <section aria-labelledby="voice-treatment-heading" css={panelStyles(theme)}>
       <header>
+        <p css={breadcrumbStyles(theme)}>Take review → Voice treatments</p>
         <h3 id="voice-treatment-heading" css={headingStyles()}>
-          Voice treatment
+          Choose a voice treatment
         </h3>
         <p css={introStyles(theme)}>
           Every treatment starts from the immutable original audio—not the previously processed
@@ -131,10 +157,13 @@ export const VoiceEffectsPanel = ({
         </StatusNotice>
       ) : null}
       {hasAudio && canReplaceAudio ? (
-        <StatusNotice title="Audio replacement compatibility">
-          Final track replacement requires a browser-supported audio encoder. Compatibility is
-          checked when you apply a treatment; a failed replacement never overwrites the original.
-        </StatusNotice>
+        <details css={compatibilityDetailsStyles(theme)}>
+          <summary>Browser compatibility details</summary>
+          <p>
+            Final track replacement requires a browser-supported audio encoder. Compatibility is
+            checked when you apply a treatment; a failed replacement never overwrites the original.
+          </p>
+        </details>
       ) : null}
       {processingActive ? (
         <StatusNotice role="status" aria-live="polite" title="Rendering voice treatment…">
@@ -168,21 +197,22 @@ export const VoiceEffectsPanel = ({
               variant="secondary"
               onClick={() => setVoiceLibraryOpen(true)}
             >
-              Browse saved ElevenLabs voices · contacts provider
+              Browse saved voices · contacts ElevenLabs
             </Button>
             <OverlayPanel
               open={voiceLibraryOpen}
               onClose={() => setVoiceLibraryOpen(false)}
               title="Voice Browser"
-              description="Previewing saved library voices does not upload this take. Applying one sends only the immutable original audio sidecar."
+              description="Take review → Voice treatments → Saved voices. Preview does not upload this take; Apply sends only the immutable original audio sidecar."
               placement="right"
               size="wide"
               bodyMode="scroll"
               closeLabel="Close voice browser"
               returnFocusRef={voiceBrowserButtonRef}
             >
-              <StatusNotice tone="warning">
-                Previews do not send your recording. Applying a voice may use provider credits.
+              <StatusNotice tone="warning" title="Listen first; apply deliberately">
+                Preview a saved voice without uploading your recording. Apply may use provider
+                credits and sends only the original audio sidecar.
               </StatusNotice>
               <VoiceLibrary
                 disabled={!hasAudio || processingActive || !canReplaceAudio}

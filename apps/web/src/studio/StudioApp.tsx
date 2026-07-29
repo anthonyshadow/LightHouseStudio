@@ -27,6 +27,7 @@ import { useStudioSession } from '../orchestration/session';
 import { Button, OverlayPanel, StudioDesignProvider } from '../ui';
 import {
   headerRegionStyles,
+  firstSuccessGuideStyles,
   mainGridStyles,
   pageStyles,
   shellStyles,
@@ -109,6 +110,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     initialOverlay?.kind === 'legacy-projects' ? 'legacy-projects' : null,
   );
   const [dismissedNotices, setDismissedNotices] = useState<ReadonlySet<string>>(new Set());
+  const [firstSuccessGuideVisible, setFirstSuccessGuideVisible] = useState(true);
   const [recipeShelfEntryIntent, setRecipeShelfEntryIntent] =
     useState<RecipeShelfEntryIntent | null>(null);
   const nextRecipeShelfEntryIntentIdRef = useRef(0);
@@ -430,6 +432,27 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
               recording={recording.lifecycle === 'recording'}
               recordingSeconds={recording.elapsedSeconds}
               realtimeSessionTiming={session.realtimeSessionTiming}
+              idleAction={
+                stagePresentation.kind === 'idle' && firstSuccessGuideVisible ? (
+                  <aside aria-label="First take guide" css={firstSuccessGuideStyles(theme)}>
+                    <strong>First take</strong>
+                    <span>
+                      Start camera → choose Character → Record → optional Voice → Download
+                    </span>
+                    <Button
+                      size="small"
+                      variant="quiet"
+                      aria-label="Dismiss first take guide"
+                      onClick={() => setFirstSuccessGuideVisible(false)}
+                    >
+                      <span data-guide-dismiss-long>Dismiss</span>
+                      <span data-guide-dismiss-short aria-hidden="true">
+                        ×
+                      </span>
+                    </Button>
+                  </aside>
+                ) : null
+              }
               {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}
               controls={({ visible }) => (
                 <StudioSessionControlBar
@@ -517,6 +540,8 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
 
         <AIExperienceChooser
           open={activeOverlay === 'ai-experience'}
+          decartAvailable={availability.decart}
+          capabilityState={capabilityState}
           {...(activeCharacterName ? { activeCharacterName } : {})}
           characterReady={
             Boolean(activeCharacterName) &&

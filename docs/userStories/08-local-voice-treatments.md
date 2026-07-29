@@ -11,8 +11,10 @@ As a creator, I want to audition local voice effects on a completed take, so tha
 
 ## End-to-end steps
 
-1. From **Latest take**, select **Voice treatments**.
-2. Read the compatibility notice and confirm that the original take remains available throughout processing.
+1. From **Latest take**, select **Voice treatments** and confirm the visible **Take review → Voice
+   treatments** breadcrumb.
+2. Confirm that the original take remains available throughout processing. Open **Browser
+   compatibility details** only when the secondary encoder/remux explanation is needed.
 3. Select **Original** to keep/revert to untouched capture, or select **Warm**, **Clear**, or **Robot** to request an effect.
 4. Wait while the app renders the original sidecar offline and remuxes the new audio with the original encoded video. During this interval, stage playback and download are locked.
 5. If the result succeeds, confirm **Voice treatment ready**. The stage now plays the processed version, restored to a safe equivalent playback time and paused.

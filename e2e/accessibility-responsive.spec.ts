@@ -175,6 +175,9 @@ for (const viewport of representativeViewports) {
     await page.goto('/');
 
     await expect(page.getByRole('main')).toBeVisible();
+    await expect(page.getByRole('complementary', { name: 'First take guide' })).toContainText(
+      'Start camera → choose Character → Record → optional Voice → Download',
+    );
     await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
 
     const skipLink = page.getByRole('link', { name: 'Skip to studio' });
@@ -183,6 +186,12 @@ for (const viewport of representativeViewports) {
     await page.keyboard.press('Enter');
     await expect(page.getByRole('main')).toBeFocused();
     await expectNoDocumentOverflow(page);
+    await expect(page.getByRole('button', { name: 'Dock' })).toHaveAccessibleDescription(
+      'Set up camera or AI',
+    );
+    await expect(page.getByRole('button', { name: 'Workshop' })).toHaveAccessibleDescription(
+      'Advanced · build one visual change',
+    );
 
     await openRecipeDockWhenOverlaid(page);
     const characterMode = page.getByRole('button', { name: 'Character · Lucy 2.5' });
@@ -210,6 +219,50 @@ for (const viewport of representativeViewports) {
     expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
   });
 }
+
+test('first-take guidance is dismissible without durable onboarding state', async ({ page }) => {
+  await installProviderFreeStudio(page);
+  await page.goto('/');
+
+  const guide = page.getByRole('complementary', { name: 'First take guide' });
+  await expect(guide).toBeVisible();
+  await guide.getByRole('button', { name: 'Dismiss first take guide' }).click();
+  await expect(guide).toBeHidden();
+
+  await page.reload();
+  await expect(page.getByRole('complementary', { name: 'First take guide' })).toBeVisible();
+});
+
+test('small-mobile Builder review shortcut survives 200% text and keeps one preview', async ({
+  page,
+}) => {
+  test.setTimeout(60_000);
+  const network = await installProviderFreeStudio(page);
+  await page.setViewportSize({ width: 320, height: 568 });
+  await page.goto('/');
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%';
+  });
+
+  await page.getByRole('button', { name: /Open character options/u }).click();
+  await page.getByRole('button', { name: 'Create new character' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
+  const shortcut = dialog.getByRole('button', { name: 'Review & Generate' });
+  await expect(shortcut).toBeVisible();
+  await shortcut.click();
+
+  const preview = dialog.getByRole('complementary', {
+    name: 'Character Direction Preview',
+  });
+  await expect(preview).toBeFocused();
+  await expect(dialog.getByRole('complementary')).toHaveCount(1);
+  await expectNoDocumentOverflow(page);
+  await expectNoAxeViolations(page);
+  expect(await cameraCalls(page)).toBe(0);
+  expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
+  expect(network.blockedExternalRequests).toEqual([]);
+  expect(network.blockedExternalWebSockets).toEqual([]);
+});
 
 test('small-mobile Recipe Dock scrolls internally and Escape restores launcher focus', async ({
   page,

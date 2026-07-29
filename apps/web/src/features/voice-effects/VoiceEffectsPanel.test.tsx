@@ -111,10 +111,26 @@ describe('VoiceEffectsPanel', () => {
     );
 
     expect(voiceApi.listWorkspaceVoices).not.toHaveBeenCalled();
-    await user.click(screen.getByText(/Browse saved ElevenLabs voices/));
+    await user.click(screen.getByText(/Browse saved voices/));
 
     expect(screen.getByRole('dialog', { name: 'Voice Browser' })).toBeInTheDocument();
+    expect(screen.getByText(/Take review → Voice treatments → Saved voices/)).toBeVisible();
     await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
+  });
+
+  it('keeps provider and compatibility detail available through progressive disclosure', () => {
+    renderWithTheme(
+      <VoiceEffectsPanel
+        recording={createRecording()}
+        processing={createProcessing()}
+        elevenLabsAvailable
+        browserCapabilities={{ webAudio: true, offlineAudio: true }}
+      />,
+    );
+
+    expect(screen.getByText('Take review → Voice treatments')).toBeVisible();
+    expect(screen.getByText('Browser compatibility details')).toBeVisible();
+    expect(screen.getByText(/failed replacement never overwrites the original/)).not.toBeVisible();
   });
 
   it('keeps Original available while processing so restoration is immediate', async () => {

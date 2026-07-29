@@ -28,6 +28,14 @@ Imports should point inward toward pure rules and contracts. The web app does no
 
 `StudioHeader` exposes the active-character selector; **Create new character** inside that selector opens the builder. `StudioSessionControlBar` is the primary session surface: idle starts with **Start Camera + Mic**, live local media exposes **Start AI**, and `AIExperienceChooser` selects Character Transformation or Virtual Try-On. The Recipe Dock remains the detailed/direct path for editing, Apply/Revert/Reset, preflight, and model-specific Start.
 
+The idle stage may render one Studio-owned, dismissible first-take cue through `MediaStage`'s
+presentation-only `idleAction` slot. Its dismissal lives only in the mounted `StudioExperience`;
+it is not persisted and creates no analytics event or navigation state. Creative-rail buttons keep
+their established Dock/Take/Workshop/Shelf names while visible action subtitles describe setup,
+review, advanced change-building, and saved-work reuse. The AI chooser visually and semantically
+keeps Character primary and labels Virtual Try-On as a secondary beta; configuration-unavailable
+states explain why Start is absent while local preparation stays available.
+
 `StudioHeader` treats `/api/capabilities` as configuration presence only: it says configured,
 limited, available to try, or configuration unavailable, never provider health or entitlement.
 Every Character/VTO Start surface shares one app-owned Decart disclosure covering live
@@ -44,6 +52,13 @@ The shell is deliberately viewport-bound:
 - Every shrinking grid/flex boundary has `min-width: 0` and `min-height: 0`. The document and fixed shell are not scroll owners. Each overlay has one intentional, bounded body scroller with sticky header and primary-action regions.
 - Recipe Dock, Capture Settings, Take Review, Voice Treatments, Prompt Workshop, Recipe Shelf, Character Builder, and Legacy Projects are always portal overlays. None participates in shell columns or rows. The Character Builder is fullscreen at every breakpoint and owns its bounded internal scroller.
 - The stage and capture-strip row allocations do not change for mode switches, notices, recording, finalization, playback, or overlay visibility. Recording, review lock, mode changes, and unsafe settings changes remain controlled by the same orchestration state.
+
+Character Builder retains one preview/generation DOM. Above the single-column breakpoint that
+preview remains a sticky side rail. At narrower sizes a sticky **Review & Generate** shortcut
+scrolls and moves focus to that same preview region; it does not mirror preview state or create a
+second generation action. Voice Treatments keeps the immutable-original and provider/usage
+boundaries visible, uses a Take review → Voice treatments → Saved voices breadcrumb, and places
+secondary browser/library compatibility explanations in native progressive-disclosure details.
 
 `MediaStage` is mounted once in the stable stage region and owns one persistent `<video>` element. A discriminated `StagePresentation` selects idle, live, finalizing, or playback presentation without keying or replacing that node. Live media is attached imperatively with `srcObject`, muted and inline; finalized playback uses `src`, native controls, and audio. The unused source is cleared before each source-kind switch. Finalization retains the last live binding/frame under a blocking stage layer until playback is ready. Opening or closing any tool overlay must not recreate the stage, change its source, alter playback time, or restart a provider controller. Video uses `object-fit: contain`; only local preview is mirrored. Provider output and recorded playback use native orientation, and local video remains the fallback until a transformed live video track is usable.
 

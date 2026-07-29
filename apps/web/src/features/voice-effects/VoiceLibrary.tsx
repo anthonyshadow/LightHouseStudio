@@ -24,6 +24,23 @@ const searchFormStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 31rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
 });
 const searchButtonStyles = (): CSSObject => ({ alignSelf: 'end' });
+const libraryDetailsStyles = (theme: Theme): CSSObject => ({
+  padding: `0 ${theme.space.sm}`,
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.radii.medium,
+  color: theme.colors.textMuted,
+  background: theme.colors.surfaceSoft,
+  fontSize: theme.fontSizes.caption,
+  '& summary': {
+    minHeight: '2.75rem',
+    display: 'flex',
+    alignItems: 'center',
+    color: theme.colors.text,
+    cursor: 'pointer',
+    fontWeight: 760,
+  },
+  '& p': { margin: `0 0 ${theme.space.sm}` },
+});
 
 export const VoiceLibrary = ({
   disabled,
@@ -41,10 +58,13 @@ export const VoiceLibrary = ({
 
   return (
     <div css={stackStyles(theme)}>
-      <StatusNotice>
-        Only voices currently saved in your ElevenLabs library are shown. Manage library membership
-        in ElevenLabs, then refresh this list.
-      </StatusNotice>
+      <details css={libraryDetailsStyles(theme)}>
+        <summary>Where these voices come from</summary>
+        <p>
+          Only voices currently saved in your ElevenLabs library are shown. Manage library
+          membership in ElevenLabs, then refresh this list.
+        </p>
+      </details>
       <form css={searchFormStyles(theme)} onSubmit={library.submitSearch}>
         <TextField
           label="Search voices"

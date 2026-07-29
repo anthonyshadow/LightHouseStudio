@@ -329,41 +329,61 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
           ref={dockToggleRef}
           variant={activeTool === 'dock' ? 'primary' : 'secondary'}
           disabled={recordingActive}
+          aria-label="Dock"
+          aria-describedby="dock-tool-description"
           aria-current={activeTool === 'dock' ? 'page' : undefined}
           aria-haspopup="dialog"
           onClick={onOpenDock}
         >
-          Dock
+          <span data-tool-label>
+            <strong>Dock</strong>
+            <small id="dock-tool-description">Set up camera or AI</small>
+          </span>
         </Button>
         <Button
           ref={takeToggleRef}
           variant={activeTool === 'take' ? 'primary' : 'secondary'}
           disabled={!hasTake || recordingActive}
+          aria-label="Take"
+          aria-describedby="take-tool-description"
           aria-current={activeTool === 'take' ? 'page' : undefined}
           aria-haspopup="dialog"
           onClick={onOpenTake}
         >
-          Take
+          <span data-tool-label>
+            <strong>Take</strong>
+            <small id="take-tool-description">Review and download</small>
+          </span>
         </Button>
         <Button
           ref={workshopToggleRef}
           variant={activeTool === 'workshop' ? 'primary' : 'secondary'}
           disabled={characterWorkshopBlocked}
+          aria-label="Workshop"
+          aria-describedby="workshop-tool-description"
           aria-expanded={panel === 'workshop'}
           aria-haspopup="dialog"
           onClick={() => (panel === 'workshop' ? onClose('workshop') : onOpenWorkshop())}
         >
-          Workshop
+          <span data-tool-label>
+            <strong>Workshop</strong>
+            <small id="workshop-tool-description">Advanced · build one visual change</small>
+          </span>
         </Button>
         <Button
           ref={shelfToggleRef}
           variant={activeTool === 'shelf' ? 'primary' : 'secondary'}
           disabled={recordingActive}
+          aria-label="Shelf"
+          aria-describedby="shelf-tool-description"
           aria-expanded={panel === 'shelf'}
           aria-haspopup="dialog"
           onClick={onToggleShelf}
         >
-          Shelf
+          <span data-tool-label>
+            <strong>Shelf</strong>
+            <small id="shelf-tool-description">Reuse saved work</small>
+          </span>
         </Button>
         <span title="Prompts and generated references persist locally; manual uploads and takes stay temporary.">
           Local-first workspace · generated references persist locally

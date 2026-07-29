@@ -1,9 +1,12 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { DecartStartDisclosure } from '../features/media-session';
-import { Button, OverlayPanel } from '../ui';
+import { Button, OverlayPanel, StatusNotice } from '../ui';
+import type { CapabilityState } from './StudioHeader';
 
 type AIExperienceChooserProps = {
   open: boolean;
+  decartAvailable: boolean;
+  capabilityState: CapabilityState;
   activeCharacterName?: string | undefined;
   characterReady: boolean;
   virtualTryOnReady: boolean;
@@ -29,15 +32,17 @@ const chooserStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-const experienceCardStyles = (theme: Theme): CSSObject => ({
+const experienceCardStyles = (theme: Theme, primary: boolean): CSSObject => ({
   minWidth: 0,
   display: 'grid',
   alignContent: 'start',
   gap: theme.space.sm,
   padding: theme.space.lg,
-  border: `1px solid ${theme.colors.border}`,
+  border: `1px solid ${primary ? theme.colors.accent : theme.colors.border}`,
   borderRadius: theme.radii.large,
-  background: theme.colors.surfaceSoft,
+  background: primary
+    ? `linear-gradient(145deg, ${theme.colors.accentSoft}, ${theme.colors.surfaceSoft})`
+    : theme.colors.surfaceSoft,
   '& header': { display: 'grid', gap: theme.space.xs },
   '& h3': {
     margin: 0,
@@ -62,8 +67,18 @@ const experienceCardStyles = (theme: Theme): CSSObject => ({
   },
 });
 
+const eyebrowStyles = (theme: Theme, primary: boolean): CSSObject => ({
+  color: primary ? theme.colors.accentStrong : theme.colors.textMuted,
+  fontSize: theme.fontSizes.caption,
+  fontWeight: 850,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+});
+
 export const AIExperienceChooser = ({
   open,
+  decartAvailable,
+  capabilityState,
   activeCharacterName,
   characterReady,
   virtualTryOnReady,
@@ -76,6 +91,13 @@ export const AIExperienceChooser = ({
   onChooseSavedVirtualTryOn,
 }: AIExperienceChooserProps) => {
   const theme = useTheme();
+  const startAvailable = capabilityState === 'ready' && decartAvailable;
+  const unavailableMessage =
+    capabilityState === 'loading'
+      ? 'Integration configuration is still loading. Character building and recipe preparation remain available.'
+      : capabilityState === 'error'
+        ? 'Integration configuration could not be read. Retry from the header; local preparation remains available.'
+        : 'Decart is not configured. You can prepare characters and try-on recipes, but AI Start is unavailable.';
 
   return (
     <OverlayPanel
@@ -89,9 +111,9 @@ export const AIExperienceChooser = ({
       closeLabel="Cancel AI experience selection"
     >
       <div css={chooserStyles(theme)}>
-        <article css={experienceCardStyles(theme)}>
+        <article css={experienceCardStyles(theme, true)}>
           <header>
-            <span aria-hidden="true">✦ Character</span>
+            <span css={eyebrowStyles(theme, true)}>Primary · Character</span>
             <h3>Character Transformation</h3>
             <p>
               {activeCharacterName
@@ -100,7 +122,7 @@ export const AIExperienceChooser = ({
             </p>
           </header>
           <div>
-            {characterReady ? (
+            {characterReady && startAvailable ? (
               <>
                 <Button variant="primary" onClick={onStartCharacter}>
                   Start with {activeCharacterName}
@@ -117,19 +139,22 @@ export const AIExperienceChooser = ({
                 </Button>
               </>
             )}
+            {!startAvailable ? (
+              <StatusNotice role="status">{unavailableMessage}</StatusNotice>
+            ) : null}
           </div>
         </article>
 
-        <article css={experienceCardStyles(theme)}>
+        <article css={experienceCardStyles(theme, false)}>
           <header>
-            <span aria-hidden="true">◇ Try-On</span>
-            <h3>Virtual Try-On</h3>
+            <span css={eyebrowStyles(theme, false)}>Secondary · Beta</span>
+            <h3>Virtual Try-On Beta</h3>
             <p>
               Preview a garment recipe using the existing VTON configuration and saved-recipe flow.
             </p>
           </header>
           <div>
-            {virtualTryOnReady ? (
+            {virtualTryOnReady && startAvailable ? (
               <>
                 <Button variant="primary" onClick={onStartVirtualTryOn}>
                   Start Virtual Try-On
@@ -144,6 +169,9 @@ export const AIExperienceChooser = ({
             <Button variant="secondary" onClick={onChooseSavedVirtualTryOn}>
               Choose Saved Try-On
             </Button>
+            {!startAvailable ? (
+              <StatusNotice role="status">{unavailableMessage}</StatusNotice>
+            ) : null}
           </div>
         </article>
       </div>

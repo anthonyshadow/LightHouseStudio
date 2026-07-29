@@ -188,6 +188,19 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Confirm visible focus, logical order, field labels, fieldset/segmented-control semantics, status announcements, and associated validation.
 - Test a screen reader on idle, requesting permission, pending Apply, recording, processing, error, and success states.
 - Test exactly `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`, then one intermediate width on each side of the 1024 px and 640 px layout changes. Also test portrait/landscape, 200% zoom, large text, touch targets, and reduced motion.
+- On the idle stage, confirm the dismissible first-take cue states **Start camera → choose
+  Character → Record → optional Voice → Download**, disappears for the current mounted session,
+  and returns after reload without writing a preference or issuing analytics/network work.
+- Confirm the rail retains Dock/Take/Workshop/Shelf while its action subtitles explain setup,
+  review/download, advanced visual change, and saved-work reuse. Start AI must present Character as
+  primary and Virtual Try-On as secondary/beta; an unconfigured Decart state must explain why Start
+  is unavailable without blocking local character/recipe preparation.
+- In Character Builder at `834×1112`, `390×844`, and `320×568`, choose the anchored **Review &
+  Generate** shortcut at normal and 200% text. It must move focus to the one preview/generation
+  region, retain logical focus order, and never create a second preview or Generate action.
+- In Voice Treatments, confirm the breadcrumb remains understandable through the stacked saved
+  voice browser, compatibility/library detail is available through disclosure controls, and the
+  action-adjacent preview/Apply transfer and usage statements remain visible.
 - In live and playback states, wait three seconds for the session control bar to hide, then verify
   keyboard and mouse-pointer activity restore it and restart the full timeout. Explicitly verify
   touch/pointer and focus recovery on every named physical touch target. While recording, wait

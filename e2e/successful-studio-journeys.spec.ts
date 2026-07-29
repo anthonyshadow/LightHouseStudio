@@ -209,6 +209,7 @@ for (const viewport of exactViewports) {
       '[data-scroll-region="take-review"]',
     );
     expect(voiceScroll.scrollHeight).toBeGreaterThanOrEqual(voiceScroll.clientHeight);
+    await expectNoAxeViolations(page);
     await expectStableStageRect(page, stableStageRect);
     await page.getByRole('button', { name: 'Back to take review' }).click();
 
@@ -252,6 +253,48 @@ for (const viewport of exactViewports) {
     expectNoExternalProviderTraffic(network);
   });
 }
+
+test('focused WebKit and touch media smoke reaches record, Voice, and review recovery', async ({
+  page,
+}, testInfo) => {
+  test.skip(
+    !['webkit', 'mobile'].includes(testInfo.project.name),
+    'This smoke targets WebKit and the configured touch project.',
+  );
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+
+  const controls = page.getByLabel('Studio session controls');
+  await controls.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  const preview = page.getByLabel('Live local camera preview');
+  await expect(preview).toBeVisible();
+  await expect(preview).toHaveAttribute('playsinline', '');
+
+  await controls.getByRole('button', { name: 'Record' }).click();
+  const stop = controls.getByRole('button', { name: 'Stop recording' });
+  await expect(stop).toBeVisible();
+  await stop.click();
+
+  await expect(page.getByLabel('Recorded take playback')).toBeVisible();
+  await controls
+    .getByRole('group', { name: 'Recorded take controls' })
+    .getByRole('button', { name: 'Voice' })
+    .click();
+  await expect(page.getByRole('dialog', { name: 'Voice Treatments' })).toBeVisible();
+  await expect(page.getByText('Take review → Voice treatments')).toBeVisible();
+  await page.getByRole('button', { name: 'Back to take review' }).click();
+  await page
+    .getByRole('dialog', { name: 'Latest Take' })
+    .getByRole('button', { name: 'Discard' })
+    .click();
+  await expect(page.getByLabel('Recorded take playback')).toHaveCount(0);
+
+  const browser = await readBrowserState(page);
+  expect(browser.cameraCalls).toBe(1);
+  expect(browser.recorderStarts).toBe(2);
+  expect(browser.recorderStops).toBe(2);
+  expectNoExternalProviderTraffic(network);
+});
 
 test('touch recovers timed-out live and playback controls while recording Stop never hides', async ({
   page,

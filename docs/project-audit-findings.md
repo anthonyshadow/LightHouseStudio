@@ -238,6 +238,10 @@ storage, and a silent switch from pinned `lucy-vton-3` to a moving alias.
 Use moderated observation first. Before an unassisted pilot, add light, dismissible in-context
 guidance inside the current route/stage; do not add an onboarding route or tour.
 
+**Implementation status (2026-07-28):** the idle stage now exposes a compact, dismissible
+first-take sequence. Dismissal is mounted-session state only and emits no analytics/network event.
+Moderated comprehension evidence remains required.
+
 ### PROD-013 / UX-007 — “Systems ready” overstates configuration
 
 `/api/capabilities` reports configuration, not provider health, entitlement, or quota. Prefer
@@ -253,12 +257,22 @@ The single DOM is correct, but the preview and generation actions follow every c
 section. Add an anchored Review/Generate affordance or compact status without duplicating the
 preview controls. Validate 320×568, 390×844, tablet, and 200% text.
 
+**Implementation status (2026-07-28):** a narrow-layout anchored **Review & Generate** shortcut
+moves scroll and focus to the one existing preview/generation region. Component and browser tests
+cover one-DOM ownership, 320/390/834 layouts, and 200% text; physical evidence remains.
+
 ### UX-004 / UX-005 / UX-006 — First-use hierarchy, vocabulary, and recording density
 
 Keep Dock/Shelf/Workshop for now, add action-first subtitles, subordinate advanced tools during
 first success, and keep Stop Recording dominant. The recording branch now shows the sole Stop
 action; broader first-use hierarchy, vocabulary, physical-device, and 200% reflow evidence remain.
 Do not mechanically rename Dock to “AI Setup” because it also owns Local Camera.
+
+**Implementation status (2026-07-28):** the idle cue names the primary sequence; rail buttons
+retain their established nouns with action-first descriptions; Character is visually primary,
+VTO is secondary/beta, Workshop is advanced, and unavailable AI Start explains configuration
+without blocking preparation. The sole dominant Stop branch remains unchanged. Terminology
+observation and physical/reflow evidence remain.
 
 ### ARCH-002 — Decart errors are safely but excessively flattened
 
