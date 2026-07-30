@@ -22,7 +22,7 @@
     },
     {
       "id": "decart-lucy-2.5",
-      "configurationId": "decart:lucy-2.5:sdk-0.1.15:300s",
+      "configurationId": "decart:lucy-2.5:sdk-0.1.17:300s",
       "accessMode": "participant",
       "checks": [
         "prompt-only",
@@ -39,7 +39,7 @@
     },
     {
       "id": "decart-lucy-vton-3",
-      "configurationId": "decart:lucy-vton-3:sdk-0.1.15:300s",
+      "configurationId": "decart:lucy-vton-3:sdk-0.1.17:300s",
       "accessMode": "participant",
       "checks": [
         "prompt-only",

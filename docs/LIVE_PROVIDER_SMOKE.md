@@ -30,8 +30,8 @@ provider bodies, signed/polling URLs, personal media, or full network archives.
 | Requirement      | Exact configuration                                                           |
 | ---------------- | ----------------------------------------------------------------------------- |
 | Local            | No provider credentials                                                       |
-| Decart Character | SDK `0.1.15`, exact `lucy-2.5`, 300-second session                            |
-| Decart VTO       | SDK `0.1.15`, exact `lucy-vton-3`, 300-second session                         |
+| Decart Character | SDK `0.1.17`, exact `lucy-2.5`, 300-second session                            |
+| Decart VTO       | SDK `0.1.17`, exact `lucy-vton-3`, 300-second session                         |
 | ElevenLabs       | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false` |
 | OpenAI image     | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                      |
 | BFL image        | `flux-2-pro`, safety `2`, prompt upsampling off                               |
