@@ -17,6 +17,7 @@ export type TakeDockProps = {
   browserCapabilities?: VoiceBrowserCapabilities;
   view?: 'all' | 'take' | 'voice';
   onCloseTake?: () => void;
+  onEditVideo?: () => void;
   onOpenVoiceTreatments?: () => void;
   onBackToTake?: () => void;
 };
@@ -196,6 +197,7 @@ export const TakeDock = ({
   browserCapabilities,
   view = 'all',
   onCloseTake,
+  onEditVideo,
   onOpenVoiceTreatments,
   onBackToTake,
 }: TakeDockProps) => {
@@ -261,6 +263,7 @@ export const TakeDock = ({
                 <TakeReviewActions
                   recording={recording}
                   {...(onCloseTake ? { onCloseTake } : {})}
+                  {...(onEditVideo ? { onEditVideo } : {})}
                   {...(onOpenVoiceTreatments ? { onOpenVoiceTreatments } : {})}
                 />
               </div>

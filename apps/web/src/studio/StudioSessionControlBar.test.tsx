@@ -116,6 +116,7 @@ const renderBar = (
   reviewingTake = false,
   onCloseTakeReview = vi.fn(),
   onOpenVoiceTreatments = vi.fn(),
+  onEditVideo?: () => void,
 ) =>
   render(
     <StudioDesignProvider>
@@ -130,6 +131,7 @@ const renderBar = (
         onOpenVoiceTreatments={onOpenVoiceTreatments}
         onChooseAiExperience={onChooseAiExperience}
         onChangeExperience={onChooseAiExperience}
+        {...(onEditVideo ? { onEditVideo } : {})}
       />
     </StudioDesignProvider>,
   );
@@ -298,6 +300,7 @@ describe('StudioSessionControlBar', () => {
     const artifact = takeArtifact();
     const onCloseTakeReview = vi.fn();
     const onOpenVoiceTreatments = vi.fn();
+    const onEditVideo = vi.fn();
     const reviewedRecording = createRecording('recorded', {
       original: artifact,
       presented: artifact,
@@ -311,6 +314,7 @@ describe('StudioSessionControlBar', () => {
       true,
       onCloseTakeReview,
       onOpenVoiceTreatments,
+      onEditVideo,
     );
 
     const controls = screen.getByRole('region', { name: 'Studio session controls' });
@@ -318,10 +322,13 @@ describe('StudioSessionControlBar', () => {
     expect(screen.getByRole('group', { name: 'Recorded take controls' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Edit video' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Voice' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Release' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Start Camera + Mic' })).not.toBeInTheDocument();
 
+    await user.click(screen.getByRole('button', { name: 'Edit video' }));
+    expect(onEditVideo).toHaveBeenCalledOnce();
     await user.click(screen.getByRole('button', { name: 'Voice' }));
     expect(onOpenVoiceTreatments).toHaveBeenCalledOnce();
     const download = screen.getByRole('link', { name: 'Download' });

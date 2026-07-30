@@ -1,4 +1,5 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
+import type { RefObject } from 'react';
 import { Button } from '../../ui';
 import type { RecordingController } from '../recording/types';
 
@@ -6,7 +7,9 @@ export type TakeReviewActionsProps = {
   recording: RecordingController;
   presentation?: 'panel' | 'control-bar';
   onCloseTake?: () => void;
+  onEditVideo?: () => void;
   onOpenVoiceTreatments?: () => void;
+  editVideoButtonRef?: RefObject<HTMLButtonElement | null>;
 };
 
 const actionStyles = (
@@ -69,7 +72,9 @@ export const TakeReviewActions = ({
   recording,
   presentation = 'panel',
   onCloseTake,
+  onEditVideo,
   onOpenVoiceTreatments,
+  editVideoButtonRef,
 }: TakeReviewActionsProps) => {
   const theme = useTheme();
   const artifact = recording.presented;
@@ -116,6 +121,16 @@ export const TakeReviewActions = ({
       >
         {compact ? 'Download' : 'Download take'}
       </a>
+      {onEditVideo ? (
+        <Button
+          ref={editVideoButtonRef}
+          variant="secondary"
+          disabled={locked}
+          onClick={onEditVideo}
+        >
+          Edit video
+        </Button>
+      ) : null}
       <Button variant="danger" disabled={locked} onClick={discard}>
         Discard
       </Button>

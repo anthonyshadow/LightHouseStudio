@@ -129,4 +129,24 @@ describe('TakeDock metadata', () => {
     expect(controller.discard).toHaveBeenCalledOnce();
     expect(onCloseTake).toHaveBeenCalledOnce();
   });
+
+  it('offers a retained uploaded-video workflow action when provided', async () => {
+    const user = userEvent.setup();
+    const onEditVideo = vi.fn();
+
+    render(
+      <StudioDesignProvider>
+        <TakeDock
+          recording={recording()}
+          processing={processing}
+          elevenLabsAvailable={false}
+          view="take"
+          onEditVideo={onEditVideo}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Edit video' }));
+    expect(onEditVideo).toHaveBeenCalledOnce();
+  });
 });

@@ -450,6 +450,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     existingVideo.showResult();
     openOverlay('take-review');
   }, [existingVideo, openOverlay]);
+  const openExistingVideo = useCallback(() => openOverlay('video-upload'), [openOverlay]);
   const closeExistingVideo = useCallback(() => {
     if (existingVideo.providerActive) return;
     if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
@@ -526,7 +527,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                   onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
                   onChooseAiExperience={() => openOverlay('ai-experience')}
                   onChangeExperience={() => openOverlay('ai-experience')}
-                  onUploadVideo={() => openOverlay('video-upload')}
+                  onUploadVideo={openExistingVideo}
+                  {...(existingVideo.selection ? { onEditVideo: openExistingVideo } : {})}
                   uploadButtonRef={uploadToggleRef}
                 />
               )}
@@ -563,7 +565,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           size="wide"
           bodyMode="scroll"
           closeDisabled={existingVideo.providerActive}
-          closeOnBackdrop={!existingVideo.active}
+          closeOnBackdrop={!existingVideo.selection}
           returnFocusRef={uploadToggleRef}
         >
           <ExistingVideoPanel
@@ -706,6 +708,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               elevenLabsModel={availability.elevenLabsModel}
               browserCapabilities={browser}
               onCloseTake={closeOverlay}
+              {...(existingVideo.selection ? { onEditVideo: openExistingVideo } : {})}
               onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
             />
           </Suspense>

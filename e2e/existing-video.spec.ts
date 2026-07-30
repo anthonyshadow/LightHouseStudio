@@ -91,7 +91,9 @@ test('provider-free upload previews and enters the existing take/download surfac
   await expect(dialog).toContainText('No provider transfer');
   await dialog.getByRole('button', { name: 'Continue locally' }).click();
 
-  await expect(page.getByRole('dialog', { name: 'Latest take' })).toBeVisible();
+  const review = page.getByRole('dialog', { name: 'Latest take' });
+  await expect(review).toBeVisible();
+  await expect(review.getByRole('button', { name: 'Edit video' })).toBeVisible();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
   await page.getByRole('link', { name: 'Download take' }).click();
   await expect(page.getByText('A download was started.')).toBeVisible();
@@ -102,6 +104,31 @@ test('provider-free upload previews and enters the existing take/download surfac
   expect(network.providerSdkRequests).toEqual([]);
   expect(network.blockedExternalRequests).toEqual([]);
   expect(network.blockedExternalWebSockets).toEqual([]);
+});
+
+test('a selected upload ignores backdrop dismissal and can be reopened after an explicit close', async ({
+  page,
+}) => {
+  await installCameraSentinel(page);
+  await installProviderNetworkDriver(page, { videoProcessingAvailable: false });
+  await page.goto('/');
+  const fixture = await loadH264VideoFixture();
+
+  await selectExistingVideo(page, fixture, 'resume-source.mp4');
+  const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
+  const backdrop = page.locator('[data-overlay-panel-root]').filter({ has: dialog });
+
+  await backdrop.click({ position: { x: 16, y: 120 } });
+  await expect(dialog).toBeVisible();
+
+  await dialog.getByRole('button', { name: 'Close panel' }).click();
+  await expect(dialog).toBeHidden();
+
+  const editVideo = page.getByRole('button', { name: 'Edit video' });
+  await expect(editVideo).toBeVisible();
+  await editVideo.click();
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByTitle('resume-source.mp4')).toHaveText('resume-source.mp4');
 });
 
 test('the upload editor and open saved-character chooser reflow at every supported viewport', async ({
@@ -146,6 +173,10 @@ test('the upload editor and open saved-character chooser reflow at every support
     await expect(dialog.getByRole('listbox', { name: 'Saved Character' })).toBeHidden();
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
+    const editVideo = page.getByRole('button', { name: 'Edit video' });
+    await expect(editVideo).toBeVisible();
+    expect((await editVideo.boundingBox())?.height).toBeGreaterThanOrEqual(44);
+    await expectNoDocumentOverflow(page);
   }
 });
 
