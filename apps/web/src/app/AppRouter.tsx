@@ -15,16 +15,10 @@ import {
   RouterProvider,
   Routes,
   useLocation,
-  type Location,
 } from 'react-router';
 import { Button } from '../ui/primitives/Button';
 import { EntryPage } from './EntryPage';
 import { APP_PATHS, isStudioPath } from './paths';
-import {
-  readStudioNavigationState,
-  resolveLegacyEntry,
-  toStudioNavigationState,
-} from './routeResolution';
 
 const LazyStudioApp = lazy(() =>
   import('../studio/StudioApp').then((module) => ({ default: module.StudioApp })),
@@ -107,67 +101,22 @@ class RouteErrorBoundary extends Component<RouteErrorBoundaryProps, RouteErrorBo
   }
 }
 
-const locationInput = (location: Location): Pick<Location, 'pathname' | 'search'> => ({
-  pathname: location.pathname,
-  search: location.search,
-});
-
-const LegacyStudioRedirect = () => {
-  const location = useLocation();
-  const resolution = resolveLegacyEntry(locationInput(location));
-
-  return (
-    <Navigate
-      replace
-      to={resolution.canonicalPath}
-      state={toStudioNavigationState(resolution.initialOverlay)}
-    />
-  );
-};
-
 interface EntryRouteProps {
   readonly focusEnterOnMount: boolean;
 }
 
-const EntryRoute = ({ focusEnterOnMount }: EntryRouteProps) => {
-  const location = useLocation();
-  const resolution = resolveLegacyEntry(locationInput(location));
-
-  if (resolution.canonicalPath === APP_PATHS.studio) {
-    return (
-      <Navigate
-        replace
-        to={APP_PATHS.studio}
-        state={toStudioNavigationState(resolution.initialOverlay)}
-      />
-    );
-  }
-  if (resolution.shouldReplace) {
-    return <Navigate replace to={APP_PATHS.entry} />;
-  }
-
-  return <EntryPage focusEnterOnMount={focusEnterOnMount} />;
-};
+const EntryRoute = ({ focusEnterOnMount }: EntryRouteProps) => (
+  <EntryPage focusEnterOnMount={focusEnterOnMount} />
+);
 
 interface StudioRouteProps {
   readonly focusMainOnMount: boolean;
 }
 
 const StudioRoute = ({ focusMainOnMount }: StudioRouteProps) => {
-  const location = useLocation();
-  const resolution = resolveLegacyEntry(locationInput(location));
-  const navigationState = readStudioNavigationState(location.state);
-
-  if (resolution.shouldReplace) {
-    return <Navigate replace to={APP_PATHS.studio} state={navigationState ?? undefined} />;
-  }
-
   return (
     <Suspense fallback={<StudioLoading />}>
-      <LazyStudioApp
-        initialOverlay={navigationState?.initialOverlay ?? null}
-        focusMainOnMount={focusMainOnMount}
-      />
+      <LazyStudioApp focusMainOnMount={focusMainOnMount} />
     </Suspense>
   );
 };
@@ -193,9 +142,6 @@ export const RoutedApplication = () => {
             path={APP_PATHS.studio}
             element={<StudioRoute focusMainOnMount={focusMainOnMount} />}
           />
-          <Route path="/advanced" element={<LegacyStudioRedirect />} />
-          <Route path="/guided" element={<LegacyStudioRedirect />} />
-          <Route path="/projects" element={<LegacyStudioRedirect />} />
           <Route path="*" element={<Navigate replace to={APP_PATHS.entry} />} />
         </Routes>
       </RouteErrorBoundary>

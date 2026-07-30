@@ -10,7 +10,6 @@ import {
   useState,
 } from 'react';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
-import type { StudioInitialOverlay } from '../app/routeResolution';
 import type { PromptCommittedHandler } from '../application/types';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
 import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
@@ -81,11 +80,10 @@ const REVIEW_LOCK_REASON =
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
 interface StudioExperienceProps {
-  initialOverlay: StudioInitialOverlay;
   focusMainOnMount: boolean;
 }
 
-const StudioExperience = ({ initialOverlay, focusMainOnMount }: StudioExperienceProps) => {
+const StudioExperience = ({ focusMainOnMount }: StudioExperienceProps) => {
   const theme = useTheme();
   const mainRef = useRef<HTMLElement>(null);
   const repository = useMemo(() => createCreativeAssetRepository(), []);
@@ -108,9 +106,7 @@ const StudioExperience = ({ initialOverlay, focusMainOnMount }: StudioExperience
     close: closeOverlay,
     closeIf: closeOverlayIf,
     toggle: toggleOverlay,
-  } = useStudioOverlayController(
-    initialOverlay?.kind === 'legacy-projects' ? 'legacy-projects' : null,
-  );
+  } = useStudioOverlayController(null);
   const [dismissedNotices, setDismissedNotices] = useState<ReadonlySet<string>>(new Set());
   const [firstSuccessGuideVisible, setFirstSuccessGuideVisible] = useState(true);
   const [recipeShelfEntryIntent, setRecipeShelfEntryIntent] =
@@ -710,7 +706,6 @@ const StudioExperience = ({ initialOverlay, focusMainOnMount }: StudioExperience
             <LegacyProjectManager
               repository={legacyRepository}
               storage={legacyStorage}
-              focusProjectId={initialOverlay?.focusProjectId ?? null}
               onProjectCountChange={synchronizeLegacyProjectCount}
             />
           </Suspense>
@@ -774,10 +769,9 @@ const StudioExperience = ({ initialOverlay, focusMainOnMount }: StudioExperience
 };
 
 export interface StudioAppProps {
-  readonly initialOverlay?: StudioInitialOverlay;
   readonly focusMainOnMount?: boolean;
 }
 
-export const StudioApp = ({ initialOverlay = null, focusMainOnMount = false }: StudioAppProps) => (
-  <StudioExperience initialOverlay={initialOverlay} focusMainOnMount={focusMainOnMount} />
+export const StudioApp = ({ focusMainOnMount = false }: StudioAppProps) => (
+  <StudioExperience focusMainOnMount={focusMainOnMount} />
 );

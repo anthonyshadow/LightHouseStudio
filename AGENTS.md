@@ -34,16 +34,15 @@ old story, or intended design.
 
 - Node `>=24 <25`; `.nvmrc` pins the repository default. pnpm `>=11.18 <12`.
 - `pnpm install` for ordinary local work; `pnpm install --frozen-lockfile` when reproducing CI.
-- `/` is the provider-free entry and `/studio` is the only active Studio runtime. Known retired
-  Studio entries redirect to `/studio`; unknown paths return to `/`. Do not revive retired pages.
+- `/` is the provider-free entry and `/studio` is the only active Studio runtime. Every other path
+  returns to `/`. Do not add aliases for retired pages.
 
 ## Architecture and state
 
 - `packages/domain` and `packages/contracts` stay independent of React and provider payloads.
-- `AppRouter.tsx` owns browser routing, route metadata, validated legacy navigation state, and the
-  lazy Studio boundary. `StudioApp.tsx` remains the runtime composition boundary. Keep one
-  persistent `MediaStage`, shared `OverlayPanel`, app-owned contracts, repositories, and existing
-  adapters.
+- `AppRouter.tsx` owns browser routing, route metadata, and the lazy Studio boundary.
+  `StudioApp.tsx` remains the runtime composition boundary. Keep one persistent `MediaStage`,
+  shared `OverlayPanel`, app-owned contracts, repositories, and existing adapters.
 - The entry route must not mount Studio, load provider/media modules, request capabilities, acquire
   media, or contact a provider.
 - Keep product policy in domain/orchestration, not presentation components or provider adapters.
@@ -175,7 +174,7 @@ graphify update .
 
 ## Prohibited shortcuts and stop conditions
 
-Do not revive retired routes, add client secrets, bypass app-owned schemas, weaken explicit
+Do not add retired route aliases, add client secrets, bypass app-owned schemas, weaken explicit
 provider intent, add surprise fallback/cost, leak provider data, replace persistent stage/overlay
 ownership, delete retained media without a relationship-safe policy, weaken tests to pass, or
 blindly accept snapshots.

@@ -63,16 +63,19 @@ test('direct and refreshed Studio entries preserve one stage', async ({ page }) 
   await expect(page.getByRole('button', { name: 'Start Camera + Mic' })).toBeVisible();
 });
 
-test('known legacy links reach Studio while unknown paths return to entry', async ({ page }) => {
+test('noncanonical paths return to entry without mounting Studio', async ({ page }) => {
   await installSuccessfulStudioHarness(page);
-  await page.goto('/projects?project=%20project-42%20&ignored=1');
-  await expect(page).toHaveURL(/\/studio$/u);
-  await expect(page.getByRole('dialog', { name: 'Legacy Projects' })).toBeVisible();
-
-  await page.goto('/arbitrary-path?project=project-42');
-  await expect(page).toHaveURL(/\/$/u);
-  await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
-  await expect(page.getByRole('dialog', { name: 'Legacy Projects' })).toHaveCount(0);
+  for (const path of [
+    '/advanced',
+    '/guided',
+    '/projects?project=project-42',
+    '/arbitrary-path?project=project-42',
+  ]) {
+    await page.goto(path);
+    await expect(page).toHaveURL(/\/$/u);
+    await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
+    await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
+  }
 });
 
 test('recording and temporary-take work cannot be lost silently through Back', async ({ page }) => {

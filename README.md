@@ -34,8 +34,9 @@ claim that qualification has passed.
 
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio` owns the
 one persistent stage; creative tools open as overlays without remounting it or creating another
-media session. Known retired routes redirect to `/studio`, project-oriented legacy entries open
-the compatibility manager, and unknown paths return to `/`.
+media session. Those are the only registered application routes; every other path returns to `/`.
+Existing compatibility projects can still be downloaded or deleted from Recipe Shelf when Studio
+detects them, but they have no URL entry.
 
 Leaving Studio is blocked during recording/finalization. A temporary take, active Voice work, or
 dirty Recipe Shelf edit requires confirmed discard; saved origin-scoped browser data is unaffected.

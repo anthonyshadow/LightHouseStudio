@@ -105,7 +105,6 @@ const createRepository = (initialProjects: readonly ProjectRecordV1[]) => {
 const renderManager = (
   repository: LocalProjectRepository,
   options: {
-    readonly focusProjectId?: string;
     readonly storage?: ProjectStorageState;
     readonly onProjectCountChange?: (count: number) => void;
   } = {},
@@ -115,9 +114,6 @@ const renderManager = (
       <LegacyProjectManager
         repository={repository}
         storage={options.storage ?? READY_STORAGE}
-        {...(options.focusProjectId === undefined
-          ? {}
-          : { focusProjectId: options.focusProjectId })}
         {...(options.onProjectCountChange === undefined
           ? {}
           : { onProjectCountChange: options.onProjectCountChange })}
@@ -128,17 +124,15 @@ const renderManager = (
 afterEach(cleanup);
 
 describe('LegacyProjectManager', () => {
-  it('lists legacy projects without Guided or reopen navigation and focuses a requested project', async () => {
+  it('lists legacy projects without Guided or reopen navigation', async () => {
     const repository = createRepository([
       createProject('project-1', 'Copper host', { hasVideo: true }),
       createProject('project-2', 'Night host'),
     ]);
-    renderManager(repository, { focusProjectId: 'project-2' });
+    renderManager(repository);
 
     expect(await screen.findByRole('heading', { name: 'Copper host' })).toBeInTheDocument();
-    const focusedRow = screen.getByRole('heading', { name: 'Night host' }).closest('li');
-    expect(focusedRow).not.toBeNull();
-    await waitFor(() => expect(focusedRow).toHaveFocus());
+    expect(screen.getByRole('heading', { name: 'Night host' })).toBeInTheDocument();
     expect(screen.queryByRole('link')).not.toBeInTheDocument();
     expect(screen.queryByText('Reopen')).not.toBeInTheDocument();
     expect(screen.getByText(/can no longer be reopened for editing/i)).toBeInTheDocument();

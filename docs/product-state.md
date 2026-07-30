@@ -39,9 +39,9 @@ required, but no physical target is qualified yet.
 
 ## Current capabilities
 
-- `/` is a provider-free entry and `/studio` is the lazy-loaded Studio runtime. Known retired
-  entries return to Studio, unknown paths return to entry, and legacy projects are
-  compatibility-only downloads/deletions.
+- `/` is a provider-free entry and `/studio` is the lazy-loaded Studio runtime. They are the only
+  registered routes; every other path returns to entry. Detected legacy projects remain
+  compatibility-only downloads/deletions within Studio and have no URL entry.
 - One persistent stage owns local/AI preview, recording, finalization, and take playback. Shared
   overlays never own a second media session.
 - Capture supports device choice, browser-exposed camera switching, and capability-gated zoom.

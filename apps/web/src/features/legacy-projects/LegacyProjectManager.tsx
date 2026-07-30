@@ -42,23 +42,19 @@ const readableFilename = (
 export interface LegacyProjectManagerProps {
   readonly repository: LocalProjectRepository;
   readonly storage: ProjectStorageState;
-  readonly focusProjectId?: string | null;
   readonly onProjectCountChange?: (count: number) => void;
 }
 
 export const LegacyProjectManager = ({
   repository,
   storage,
-  focusProjectId = null,
   onProjectCountChange,
 }: LegacyProjectManagerProps) => {
   const theme = useTheme();
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const rowRefs = useRef(new Map<string, HTMLLIElement>());
   const deleteButtonRefs = useRef(new Map<string, HTMLButtonElement>());
   const returnFocusProjectIdRef = useRef<string | null>(null);
   const deleteInvokerRef = useRef<HTMLElement>(null);
-  const focusedProjectIdRef = useRef<string | null>(null);
   const onProjectCountChangeRef = useRef(onProjectCountChange);
   const [projects, setProjects] = useState<readonly ProjectSummary[]>([]);
   const [loading, setLoading] = useState(true);
@@ -105,22 +101,6 @@ export const LegacyProjectManager = ({
       active = false;
     };
   }, [repository]);
-
-  useEffect(() => {
-    if (loading || !focusProjectId || focusedProjectIdRef.current === focusProjectId) return;
-    const target = rowRefs.current.get(focusProjectId);
-    if (!target) return;
-    target.focus();
-    target.scrollIntoView?.({ block: 'nearest' });
-    focusedProjectIdRef.current = focusProjectId;
-  }, [focusProjectId, loading, projects]);
-
-  const rowRef =
-    (projectId: string): RefCallback<HTMLLIElement> =>
-    (node) => {
-      if (node) rowRefs.current.set(projectId, node);
-      else rowRefs.current.delete(projectId);
-    };
 
   const deleteButtonRef =
     (projectId: string): RefCallback<HTMLButtonElement> =>
@@ -233,13 +213,7 @@ export const LegacyProjectManager = ({
       {projects.length > 0 ? (
         <ul css={projectListStyles(theme)}>
           {projects.map((project) => (
-            <li
-              key={project.id}
-              ref={rowRef(project.id)}
-              tabIndex={-1}
-              data-focus-target={focusProjectId === project.id}
-              css={projectCardStyles(theme)}
-            >
+            <li key={project.id} css={projectCardStyles(theme)}>
               <div>
                 <h3>{project.title}</h3>
                 <p>

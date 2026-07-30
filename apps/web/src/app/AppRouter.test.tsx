@@ -23,11 +23,6 @@ vi.mock('../studio/StudioApp', () => ({
     return (
       <main ref={mainRef} id="studio-main" tabIndex={-1}>
         Studio route
-        <output data-testid="legacy-project">
-          {props.initialOverlay?.kind === 'legacy-projects'
-            ? (props.initialOverlay.focusProjectId ?? 'all')
-            : 'closed'}
-        </output>
       </main>
     );
   },
@@ -83,7 +78,7 @@ describe('AppRouter', () => {
     expect(await screen.findByText('Studio route')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/studio');
     await waitFor(() => expect(document.activeElement).toHaveAttribute('id', 'studio-main'));
-    expect(appHarness.latestProps?.initialOverlay).toBeNull();
+    expect(appHarness.latestProps).toEqual({ focusMainOnMount: true });
     expect(document.title).toBe('Lightframe Studio');
   });
 
@@ -107,35 +102,27 @@ describe('AppRouter', () => {
     expect(document.activeElement).toBe(document.body);
   });
 
-  it('replaces an unknown route with the entry page', async () => {
-    const { router } = renderApplication('/not-a-route?project=untrusted');
+  it.each([
+    '/advanced',
+    '/guided',
+    '/projects?project=project-42',
+    '/not-a-route?project=untrusted',
+  ])('replaces the noncanonical path %s with the entry page', async (path) => {
+    const { router } = renderApplication(path);
 
     expect(await screen.findByRole('button', { name: 'Enter' })).toBeInTheDocument();
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     expect(router.state.location.search).toBe('');
+    expect(appHarness.renderCount).toBe(0);
   });
 
-  it('replaces a legacy project link with validated Studio navigation state', async () => {
-    const { router } = renderApplication('/projects?project=%20project-42%20&ignored=1');
+  it.each(['/?new=1', '/?characterFlow=guided', '/?project=project-42'])(
+    'does not activate Studio from the obsolete entry query %s',
+    async (path) => {
+      renderApplication(path);
 
-    expect(await screen.findByText('Studio route')).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/studio');
-    expect(router.state.location.search).toBe('');
-    expect(screen.getByTestId('legacy-project')).toHaveTextContent('project-42');
-  });
-
-  it('rejects untrusted direct Studio history state and canonicalizes the URL', async () => {
-    const { router } = renderApplication({
-      pathname: '/studio/',
-      search: '?ignored=1',
-      state: {
-        initialOverlay: { kind: 'legacy-projects', focusProjectId: 'x'.repeat(257) },
-      },
-    });
-
-    expect(await screen.findByText('Studio route')).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/studio');
-    expect(router.state.location.search).toBe('');
-    expect(screen.getByTestId('legacy-project')).toHaveTextContent('closed');
-  });
+      expect(await screen.findByRole('button', { name: 'Enter' })).toBeInTheDocument();
+      expect(appHarness.renderCount).toBe(0);
+    },
+  );
 });

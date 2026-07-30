@@ -40,42 +40,6 @@ const openConstraints = async (page: Page): Promise<void> => {
   if ((await drawer.getAttribute('open')) === null) await summary.click();
 };
 
-test('retired entries canonicalize to the mounted Studio experience', async ({ page }) => {
-  await installSuccessfulStudioHarness(page);
-  for (const entry of ['/advanced', '/guided', '/?new=1', '/?characterFlow=guided']) {
-    await page.goto(entry);
-    await expect(page).toHaveURL(/\/studio$/u);
-    await expect(page.getByRole('heading', { name: 'Lightframe Studio' })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Open character options/u })).toBeVisible();
-  }
-});
-
-test('retired entry canonicalization replaces history instead of preserving the old route', async ({
-  page,
-}) => {
-  await installSuccessfulStudioHarness(page);
-  await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
-  await page.goto('/advanced');
-  await expect(page).toHaveURL(/\/studio$/u);
-
-  await page.goBack();
-  await expect(page).toHaveURL(/\/$/u);
-  await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
-});
-
-test('retired project entries canonicalize and open the legacy-project manager', async ({
-  page,
-}) => {
-  await installSuccessfulStudioHarness(page);
-  for (const entry of ['/projects', '/?project=project-42', '/guided?project=project-42']) {
-    await page.goto(entry);
-    await expect(page).toHaveURL(/\/studio$/u);
-    await expect(page.getByRole('dialog', { name: 'Legacy Projects' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Legacy projects', exact: true })).toBeVisible();
-  }
-});
-
 test('single direction preview stays beside desktop form and has a narrow review shortcut', async ({
   page,
 }) => {

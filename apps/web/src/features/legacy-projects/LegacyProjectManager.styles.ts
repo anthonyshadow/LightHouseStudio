@@ -41,14 +41,6 @@ export const projectCardStyles = (theme: Theme): CSSObject => ({
   border: `1px solid ${theme.colors.border}`,
   borderRadius: theme.radii.medium,
   background: theme.colors.surfaceSoft,
-  '&[data-focus-target="true"]': {
-    borderColor: theme.colors.accent,
-    boxShadow: `0 0 0 1px ${theme.colors.accentSoft}`,
-  },
-  '&:focus-visible': {
-    outline: `2px solid ${theme.colors.focus}`,
-    outlineOffset: '3px',
-  },
   '& h3': { margin: 0 },
   '& p': {
     margin: `${theme.space.xxs} 0 0`,

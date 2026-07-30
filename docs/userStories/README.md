@@ -21,9 +21,10 @@ references, not release-readiness claims or future requirements.
 
 ## Shared runtime rules
 
-- `/` is the provider-free entry and `/studio` is the active Studio runtime. Known retired entries
-  canonicalize to `/studio`; unknown paths return to `/`; project entries may open the
-  download/delete-only Legacy Projects manager.
+- `/` is the provider-free entry and `/studio` is the active Studio runtime. They are the only
+  registered routes; every other path returns to `/`.
+- When old browser-local project data is detected, Recipe Shelf can open the download/delete-only
+  Legacy Projects manager. It has no route and cannot revive the retired Guided experience.
 - Browser navigation cannot abandon recording/finalization. Leaving with a temporary take, active
   Voice process, or dirty Shelf form requires confirmed discard.
 - Camera access, provider contact, and billable work require an explicit action. Local Camera does

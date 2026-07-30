@@ -7,9 +7,10 @@ This file preserves durable rationale for intentional product changes. Current b
 
 Studio originally rendered directly at `/`, and every retired or unknown path canonicalized to
 that same runtime. The application now keeps a minimal provider-free entry at `/` and lazy-loads
-the one Studio runtime at `/studio`. Known retired Studio links still reach `/studio`; unknown
-paths return to the entry instead of bypassing it. Browser-local data needs no migration because
-its ownership is origin-scoped, not path-scoped.
+the one Studio runtime at `/studio`. Retired Studio links initially redirected into that runtime
+during the transition; those URL aliases and their navigation-state handoff have since been
+removed. Only `/` and `/studio` remain registered, and every other path returns to the entry.
+Browser-local data needs no migration because its ownership is origin-scoped, not path-scoped.
 
 Browser Back and Forward hand focus between Enter and the Studio main landmark. Recording and
 finalization cannot be abandoned by routing; temporary take, Voice, and dirty Shelf work requires
@@ -17,8 +18,8 @@ confirmed discard. This routing layer does not authorize public deployment.
 
 ## One Studio replaced parallel journeys
 
-`/studio` is the sole media runtime. Legacy project links may open the compatibility manager but
-never revive Guided.
+`/studio` is the sole media runtime. Detected legacy project data may open the compatibility
+manager from Recipe Shelf, but no legacy URL opens it and Guided is not revived.
 
 One persistent media stage now owns preview, transformed video, recording, finalization, and
 playback. Dock, Capture Settings, Workshop, Shelf, Character Builder, Take Review, Voice, and

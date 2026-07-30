@@ -23,10 +23,9 @@ implementation code, and the API does not know about React.
 
 `AppRouter.tsx` is the browser URL boundary. React Router's data browser router renders the
 provider-free entry at `/` and lazy-loads Studio at `/studio`; the data-router form is required for
-route blocking. It also owns route titles/descriptions, focus handoff, loading/error surfaces,
-known legacy redirects, and allowlisted navigation-state validation. Unknown paths return to `/`.
-The loopback Vite/Fastify SPA fallback already serves both paths, and origin-scoped browser storage
-requires no migration.
+route blocking. It also owns route titles/descriptions, focus handoff, and loading/error surfaces.
+Only `/` and `/studio` are registered; every other path returns to `/`. The loopback Vite/Fastify
+SPA fallback already serves both paths, and origin-scoped browser storage requires no migration.
 
 The entry does not mount `StudioApp`, request capabilities, acquire media, load Decart, open a
 WebSocket, or contact a provider. `StudioApp.tsx` remains the sole runtime composition boundary.
@@ -37,7 +36,7 @@ The mounted Studio owns focused controllers for:
 - local/realtime media and per-mode drafts;
 - recording, review, and voice processing;
 - Character Builder, Prompt Workshop, and Recipe Shelf handoff;
-- overlays and the compatibility project manager.
+- overlays and the data-triggered compatibility project manager.
 
 `MediaStage` stays mounted once and owns one `<video>` element. A discriminated presentation state
 switches among idle, live, finalizing, and playback. Live media uses `srcObject`; playback uses
