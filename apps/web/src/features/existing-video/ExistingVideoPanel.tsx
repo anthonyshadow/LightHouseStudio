@@ -121,7 +121,10 @@ export const ExistingVideoPanel = ({
   const pickerRef = useRef<HTMLInputElement>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const [recipeLoading, setRecipeLoading] = useState(false);
-  const locked = workflow.acceptedSubmission || workflow.active;
+  const structureLocked = workflow.acceptedSubmission || workflow.active;
+  const recipeLocked =
+    workflow.active ||
+    (workflow.acceptedSubmission && !(workflow.phase === 'error' && workflow.retryJob));
   const selected = workflow.selection;
 
   const chooseFiles = (files: FileList | null) => {
@@ -131,7 +134,7 @@ export const ExistingVideoPanel = ({
 
   const receiveDrop = (event: DragEvent<HTMLDivElement>) => {
     event.preventDefault();
-    if (locked) return;
+    if (structureLocked) return;
     chooseFiles(event.dataTransfer.files);
   };
 
@@ -274,6 +277,13 @@ export const ExistingVideoPanel = ({
           {referenceError}
         </StatusNotice>
       ) : null}
+      {workflow.phase === 'error' && workflow.acceptedSubmission && workflow.retryJob ? (
+        <StatusNotice tone="warning">
+          Decart already accepted this exact submission. You can edit the recipe fields below for a
+          possible later submission, but <strong>Resume accepted job</strong> checks and downloads
+          the original accepted recipe without submitting or changing it.
+        </StatusNotice>
+      ) : null}
 
       {workflow.phase === 'checkpoint' ? (
         <Surface tone="soft" padding="compact">
@@ -334,14 +344,18 @@ export const ExistingVideoPanel = ({
             <div css={rowStyles(theme)}>
               <Button
                 variant="secondary"
-                disabled={locked || workflow.steps.some((step) => step.modelId === 'lucy-2.5')}
+                disabled={
+                  structureLocked || workflow.steps.some((step) => step.modelId === 'lucy-2.5')
+                }
                 onClick={() => workflow.addStep('lucy-2.5')}
               >
                 Add Lucy
               </Button>
               <Button
                 variant="secondary"
-                disabled={locked || workflow.steps.some((step) => step.modelId === 'lucy-vton-3')}
+                disabled={
+                  structureLocked || workflow.steps.some((step) => step.modelId === 'lucy-vton-3')
+                }
                 onClick={() => workflow.addStep('lucy-vton-3')}
               >
                 Add VTO
@@ -369,7 +383,7 @@ export const ExistingVideoPanel = ({
                   <select
                     defaultValue=""
                     disabled={
-                      locked ||
+                      recipeLocked ||
                       recipeLoading ||
                       !savedRecipes.some((recipe) => recipe.modelId === step.modelId)
                     }
@@ -405,7 +419,7 @@ export const ExistingVideoPanel = ({
                   <textarea
                     value={step.prompt}
                     maxLength={1_200}
-                    disabled={locked}
+                    disabled={recipeLocked}
                     placeholder={
                       step.modelId === 'lucy-2.5'
                         ? 'Describe the character or visual edit'
@@ -422,7 +436,7 @@ export const ExistingVideoPanel = ({
                   <input
                     type="file"
                     accept={REFERENCE_IMAGE_ACCEPT}
-                    disabled={locked}
+                    disabled={recipeLocked}
                     onChange={(event) => void chooseReference(step, event.currentTarget.files?.[0])}
                   />
                 </label>
@@ -436,7 +450,7 @@ export const ExistingVideoPanel = ({
                     <input
                       type="checkbox"
                       checked={step.enhancePrompt}
-                      disabled={locked}
+                      disabled={recipeLocked}
                       onChange={(event) =>
                         workflow.updateStep(step.id, {
                           enhancePrompt: event.currentTarget.checked,
@@ -449,21 +463,21 @@ export const ExistingVideoPanel = ({
                 <div css={rowStyles(theme)}>
                   <Button
                     variant="quiet"
-                    disabled={locked || index === 0}
+                    disabled={structureLocked || index === 0}
                     onClick={() => workflow.moveStep(index, -1)}
                   >
                     Move up
                   </Button>
                   <Button
                     variant="quiet"
-                    disabled={locked || index === workflow.steps.length - 1}
+                    disabled={structureLocked || index === workflow.steps.length - 1}
                     onClick={() => workflow.moveStep(index, 1)}
                   >
                     Move down
                   </Button>
                   <Button
                     variant="danger"
-                    disabled={locked}
+                    disabled={structureLocked}
                     onClick={() => workflow.removeStep(step.id)}
                   >
                     Remove
@@ -502,7 +516,7 @@ export const ExistingVideoPanel = ({
                     variant="primary"
                     busy={workflow.active}
                     disabled={
-                      locked ||
+                      structureLocked ||
                       !videoProcessingAvailable ||
                       workflow.steps.some(
                         (step) => !step.prompt.trim() && step.referenceImage === null,
@@ -526,7 +540,11 @@ export const ExistingVideoPanel = ({
                     {workflow.active ? 'Cancel upload' : 'Replace video'}
                   </Button>
                 ) : null}
-                <Button variant="danger" disabled={locked} onClick={() => workflow.reset(true)}>
+                <Button
+                  variant="danger"
+                  disabled={structureLocked}
+                  onClick={() => workflow.reset(true)}
+                >
                   Remove
                 </Button>
               </div>
@@ -549,7 +567,7 @@ export const ExistingVideoPanel = ({
       ) : null}
       {workflow.retryJob ? (
         <Button variant="primary" onClick={() => void workflow.retryExistingJob()}>
-          Retry existing job status or download
+          Resume accepted job · no new submission
         </Button>
       ) : null}
 

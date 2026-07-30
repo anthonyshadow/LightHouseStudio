@@ -179,8 +179,10 @@ See [privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) for the user-fac
 ## Backend boundary
 
 Fastify binds to `127.0.0.1`, rejects non-loopback Host headers, and requires exact loopback Origin
-checks for provider or reference mutations. ElevenLabs provider-contact routes also require
-`X-Lightframe-Provider-Intent: voice`; Decart batch routes require
+checks for provider or reference mutations. Browsers may omit `Origin` on same-origin `GET`
+requests, so provider reads accept an exact loopback `Origin` or referrer, or browser
+`Sec-Fetch-Site: same-origin`; their explicit provider-intent header remains mandatory. ElevenLabs
+provider-contact routes require `X-Lightframe-Provider-Intent: voice`; Decart batch routes require
 `X-Lightframe-Provider-Intent: video`. Responses are `no-store`.
 
 Permanent keys remain in server environment memory. App-owned schemas validate every HTTP

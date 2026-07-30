@@ -92,10 +92,10 @@ automatic reconnect fails the row.
 
 Use disposable H.264 MP4, H.264 MOV, and VP8 WebM samples in both 16:9 and 9:16 where the physical
 target supports them. Confirm current exact-model account limits against
-[Lucy Edit](https://platform.decart.ai/models/lucy-edit),
-[Lucy VTON](https://platform.decart.ai/models/lucy-vton), and the
-[Decart video requirements](https://docs.platform.decart.ai/getting-started/models) before
-spending. The app-owned subset remains narrower than generic provider claims.
+[Decart video editing](https://docs.platform.decart.ai/models/video/video-editing),
+[Lucy 2.5 API](https://docs.platform.decart.ai/api-reference/lucy-25), and
+[Lucy VTON 3 API](https://docs.platform.decart.ai/api-reference/lucy-vton-3) before spending. The
+app-owned subset remains narrower than generic provider claims.
 
 For each exact batch model:
 
@@ -103,15 +103,18 @@ For each exact batch model:
    unavailable and no provider network/SDK is used.
 2. Configure prompt-only, reference-only where applicable, and combined input. Confirm VTO's beta,
    rights, retention, and submission disclosure is visible before action.
-3. Submit once. Confirm multipart recipe/video/reference order, synthetic filenames, fixed `720p`,
-   and no provider request before authoritative server inspection.
+3. Submit once. Confirm the broker's multipart input maps to Decart's documented `data`, `prompt`,
+   optional `reference_image`, `resolution=720p`, and `enhance_prompt` fields; uses synthetic
+   filenames and exact `lucy-2.5`; and makes no provider request before authoritative server
+   inspection.
 4. Observe validating, submitting, queued, processing, retrieving, and ready as applicable. The UI
    may show elapsed time but never a fabricated percentage or provider ID/URL/body.
 5. Download the completed result. Verify 1280×720 or 720×1280 orientation, duration within 500 ms,
    bounded size, restored source audio, and playback on the persistent stage.
-6. Exercise a retryable status/content interruption. It must reuse the accepted job. An explicit
-   submission retry must use a new job ID and be described as another potentially billable
-   submission.
+6. Exercise a retryable status/content interruption. It must reuse the accepted job. Recipe fields
+   remain editable with a warning that edits do not mutate the accepted job. A terminal failure
+   removes the stale resume action; an explicit submission retry must use a new job ID and be
+   described as another potentially billable submission.
 7. Release terminal state and inspect the dedicated temporary root. Local cleanup must complete
    without claiming provider cancellation or provider-side deletion.
 

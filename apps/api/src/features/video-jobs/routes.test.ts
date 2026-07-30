@@ -39,6 +39,73 @@ describe('video job route boundary', () => {
     }
   });
 
+  it('accepts browser same-origin reads that omit Origin while rejecting unverified reads', async () => {
+    const app = createApp({ config: testConfig(), decartVideoProvider: null });
+    apps.push(app);
+    const jobId = crypto.randomUUID();
+
+    const sameOriginMetadata = await app.inject({
+      method: 'GET',
+      url: `/api/video-jobs/${jobId}`,
+      headers: {
+        host: trustedHeaders.host,
+        'sec-fetch-site': 'same-origin',
+        'x-lightframe-provider-intent': 'video',
+      },
+    });
+    expect(sameOriginMetadata.statusCode).toBe(404);
+
+    const sameOriginReferrer = await app.inject({
+      method: 'GET',
+      url: `/api/video-jobs/${jobId}/content`,
+      headers: {
+        host: trustedHeaders.host,
+        referer: `${trustedHeaders.origin}/studio`,
+        'x-lightframe-provider-intent': 'video',
+      },
+    });
+    expect(sameOriginReferrer.statusCode).toBe(404);
+
+    for (const headers of [
+      {
+        host: trustedHeaders.host,
+        'x-lightframe-provider-intent': 'video',
+      },
+      {
+        host: trustedHeaders.host,
+        referer: 'https://malicious.example/studio',
+        'sec-fetch-site': 'cross-site',
+        'x-lightframe-provider-intent': 'video',
+      },
+    ]) {
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/video-jobs/${jobId}`,
+        headers,
+      });
+      expect(response.statusCode).toBe(403);
+      expect(response.json<ApiErrorResponse>().error.code).toBe('forbidden_origin');
+    }
+  });
+
+  it('continues to require an explicit Origin for provider mutations', async () => {
+    const app = createApp({ config: testConfig(), decartVideoProvider: null });
+    apps.push(app);
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/api/video-jobs/${crypto.randomUUID()}`,
+      headers: {
+        host: trustedHeaders.host,
+        referer: `${trustedHeaders.origin}/studio`,
+        'sec-fetch-site': 'same-origin',
+        'x-lightframe-provider-intent': 'video',
+      },
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(response.json<ApiErrorResponse>().error.code).toBe('forbidden_origin');
+  });
+
   it('requires explicit video intent and reports provider unavailability without parsing media', async () => {
     const app = createApp({ config: testConfig(), decartVideoProvider: null });
     apps.push(app);

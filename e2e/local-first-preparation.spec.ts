@@ -1,6 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
   apiErrorResponseSchema,
+  VIDEO_PROVIDER_INTENT_HEADER,
+  VIDEO_PROVIDER_INTENT_VALUE,
   VOICE_PROVIDER_INTENT_HEADER,
   VOICE_PROVIDER_INTENT_VALUE,
 } from '@studio/contracts';
@@ -183,4 +185,35 @@ test('development proxy preserves exact Origin validation for provider mutations
   expect(apiErrorResponseSchema.parse(await mismatchedOrigin.json()).error.code).toBe(
     'forbidden_origin',
   );
+});
+
+test('same-origin browser video-job reads work when fetch omits Origin', async ({ page }) => {
+  const jobId = crypto.randomUUID();
+  let requestHeaders: Record<string, string> | null = null;
+  await page.route(`**/api/video-jobs/${jobId}`, async (route) => {
+    requestHeaders = await route.request().allHeaders();
+    await route.continue();
+  });
+  await page.goto('/');
+
+  const result = await page.evaluate(
+    async ({ header, value, id }) => {
+      const response = await fetch(`/api/video-jobs/${id}`, {
+        headers: { [header]: value },
+      });
+      const payload: unknown = await response.json();
+      return { status: response.status, payload };
+    },
+    {
+      header: VIDEO_PROVIDER_INTENT_HEADER,
+      value: VIDEO_PROVIDER_INTENT_VALUE,
+      id: jobId,
+    },
+  );
+
+  expect(requestHeaders).not.toBeNull();
+  expect(requestHeaders).not.toHaveProperty('origin');
+  expect(requestHeaders).toMatchObject({ referer: 'http://127.0.0.1:4173/' });
+  expect(result.status).toBe(404);
+  expect(apiErrorResponseSchema.parse(result.payload).error.code).toBe('not_found');
 });

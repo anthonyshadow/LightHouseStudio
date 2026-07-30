@@ -15,6 +15,7 @@ import {
   releaseVideoJob,
   submitVideoJob,
 } from '../../adapters/api-client/videoJobsApi';
+import { ApiClientError } from '../../adapters/api-client/apiClient';
 import {
   replaceRecordingAudio,
   stripRecordingAudio,
@@ -74,6 +75,13 @@ class RetryExistingVideoJobError extends Error {
     this.name = 'RetryExistingVideoJobError';
   }
 }
+
+const acceptedJobInterruptionMessage = (error: unknown, fallback: string): string => {
+  if (error instanceof ApiClientError) {
+    return `${error.message} Decart already accepted this submission; resuming it does not create another submission.`;
+  }
+  return fallback;
+};
 
 export const useExistingVideoWorkflow = ({
   recording,
@@ -202,10 +210,10 @@ export const useExistingVideoWorkflow = ({
 
   const updateStep = useCallback(
     (id: string, patch: Partial<Omit<ExistingVideoStep, 'id' | 'modelId'>>) => {
-      if (acceptedSubmission) return;
+      if (acceptedSubmission && (phase !== 'error' || retryJob === null)) return;
       setSteps((current) => current.map((step) => (step.id === id ? { ...step, ...patch } : step)));
     },
-    [acceptedSubmission],
+    [acceptedSubmission, phase, retryJob],
   );
 
   const removeStep = useCallback(
@@ -317,7 +325,10 @@ export const useExistingVideoWorkflow = ({
           if (controller.signal.aborted) throw error;
           setRetryJob({ jobId, stepIndex });
           throw new RetryExistingVideoJobError(
-            'The status check was interrupted. Retry status without creating another Decart submission.',
+            acceptedJobInterruptionMessage(
+              error,
+              'The status check was interrupted. Retry status without creating another Decart submission.',
+            ),
           );
         }
         if (generation !== generationRef.current) return;
@@ -328,6 +339,7 @@ export const useExistingVideoWorkflow = ({
         }
       }
       if (current.status !== 'ready') {
+        setRetryJob(null);
         await releaseVideoJob(jobId).catch(() => undefined);
         throw new Error(
           current.error?.message ??
@@ -342,7 +354,10 @@ export const useExistingVideoWorkflow = ({
         if (controller.signal.aborted) throw error;
         setRetryJob({ jobId, stepIndex });
         throw new RetryExistingVideoJobError(
-          'The result download was interrupted. Retry it without creating another Decart submission.',
+          acceptedJobInterruptionMessage(
+            error,
+            'The result download was interrupted. Retry it without creating another Decart submission.',
+          ),
         );
       }
       await releaseVideoJob(jobId).catch(() => undefined);

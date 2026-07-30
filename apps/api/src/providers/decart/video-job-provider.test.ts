@@ -81,5 +81,14 @@ describe('DecartHttpVideoJobProvider', () => {
       }),
     ).rejects.toBeInstanceOf(DecartVideoProviderError);
     expect(fetchImplementation).toHaveBeenCalledOnce();
+    const [url, init] = fetchImplementation.mock.calls[0]!;
+    expect(url).toBe('https://provider.invalid/v1/jobs/lucy-2.5');
+    const form = init?.body;
+    expect(form).toBeInstanceOf(FormData);
+    if (!(form instanceof FormData)) throw new Error('Expected a provider multipart body.');
+    expect([...form.keys()]).toEqual(['data', 'prompt', 'resolution', 'enhance_prompt']);
+    expect(form.get('prompt')).toBe('Change the lighting');
+    expect(form.get('resolution')).toBe('720p');
+    expect(form.get('enhance_prompt')).toBe('false');
   });
 });

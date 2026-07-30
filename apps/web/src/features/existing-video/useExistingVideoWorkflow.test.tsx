@@ -2,6 +2,7 @@
 
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { ApiClientError } from '../../adapters/api-client/apiClient';
 import type { RecordingArtifact, RecordingController } from '../recording/types';
 
 const adapters = vi.hoisted(() => ({
@@ -175,6 +176,93 @@ describe('useExistingVideoWorkflow', () => {
 
     expect(adapters.submitVideoJob).toHaveBeenCalledTimes(2);
     expect(recording.completeVisualProcessing).toHaveBeenCalledTimes(2);
+    unmount();
+  });
+
+  it('preserves editable drafts while an accepted job status check can be resumed', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    adapters.fetchVideoJob.mockRejectedValueOnce(
+      new ApiClientError(
+        'This provider action requires the exact local Studio origin.',
+        403,
+        'forbidden_origin',
+      ),
+    );
+    const recording = recordingController();
+    const { result, unmount } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        publishUploadedVideo: vi.fn(),
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => result.current.addStep('lucy-2.5'));
+    const stepId = result.current.steps[0]!.id;
+    act(() => result.current.updateStep(stepId, { prompt: 'Original accepted prompt' }));
+
+    await act(async () => result.current.submitStep(0));
+
+    expect(result.current.phase).toBe('error');
+    expect(result.current.acceptedSubmission).toBe(true);
+    expect(result.current.retryJob).not.toBeNull();
+    expect(result.current.message).toContain('exact local Studio origin');
+    expect(result.current.message).toContain('resuming it does not create another submission');
+
+    act(() => result.current.updateStep(stepId, { prompt: 'Edited possible retry prompt' }));
+    expect(result.current.steps[0]!.prompt).toBe('Edited possible retry prompt');
+
+    await act(async () => result.current.retryExistingJob());
+    await waitFor(() => expect(result.current.phase).toBe('complete'));
+
+    expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
+    expect(adapters.submitVideoJob.mock.calls[0]![1]).toMatchObject({
+      prompt: 'Original accepted prompt',
+    });
+    unmount();
+  });
+
+  it('clears a resume action when the accepted provider job reports terminal failure', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    adapters.fetchVideoJob
+      .mockRejectedValueOnce(new TypeError('temporary network interruption'))
+      .mockImplementationOnce((jobId: string) =>
+        Promise.resolve({
+          ...jobStatus(jobId),
+          status: 'failed',
+          result: null,
+          error: {
+            code: 'provider_rejected',
+            message: 'Decart could not complete this visual processing request.',
+          },
+        }),
+      );
+    const { result, unmount } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording: recordingController(),
+        publishUploadedVideo: vi.fn(),
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => result.current.addStep('lucy-2.5'));
+    act(() =>
+      result.current.updateStep(result.current.steps[0]!.id, {
+        prompt: 'Change the lighting',
+      }),
+    );
+    await act(async () => result.current.submitStep(0));
+    await act(async () => result.current.retryExistingJob());
+
+    expect(result.current.phase).toBe('error');
+    expect(result.current.acceptedSubmission).toBe(false);
+    expect(result.current.retryJob).toBeNull();
+    expect(result.current.message).toBe(
+      'Decart could not complete this visual processing request.',
+    );
+    expect(adapters.releaseVideoJob).toHaveBeenCalledTimes(1);
     unmount();
   });
 });

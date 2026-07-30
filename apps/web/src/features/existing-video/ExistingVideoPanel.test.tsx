@@ -118,4 +118,66 @@ describe('ExistingVideoPanel', () => {
       screen.getByRole('button', { name: 'Start first · 2 planned submissions' }),
     ).toBeEnabled();
   });
+
+  it('keeps recipe fields editable after an accepted job interruption and explains resume semantics', () => {
+    const updateStep = vi.fn();
+    const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+    const interrupted = workflow({
+      selection: {
+        file: source,
+        mimeType: 'video/mp4',
+        audioSidecar: null,
+        audioUnavailableReason: null,
+        metadata: {
+          kind: 'uploaded',
+          mode: 'local',
+          selectedAt: '2026-07-30T12:00:00.000Z',
+          displayName: source.name,
+          container: 'mp4',
+          videoCodec: 'avc',
+          audioCodec: null,
+          durationMs: 30_000,
+          width: 1_920,
+          height: 1_080,
+          sizeBytes: 5_000_000,
+          hasAudio: false,
+        },
+      },
+      steps: [
+        {
+          id: 'lucy',
+          modelId: 'lucy-2.5',
+          prompt: 'Change the scene',
+          enhancePrompt: false,
+          referenceImage: null,
+        },
+      ],
+      phase: 'error',
+      message: 'The status check was interrupted.',
+      acceptedSubmission: true,
+      retryJob: { jobId: crypto.randomUUID(), stepIndex: 0 },
+      updateStep,
+    });
+
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel workflow={interrupted} videoProcessingAvailable onFinish={vi.fn()} />
+      </StudioDesignProvider>,
+    );
+
+    const prompt = screen.getByPlaceholderText('Describe the character or visual edit');
+    expect(prompt).toBeEnabled();
+    fireEvent.change(prompt, { target: { value: 'Make the character a robot' } });
+    expect(updateStep).toHaveBeenCalledWith('lucy', {
+      prompt: 'Make the character a robot',
+    });
+    expect(screen.getAllByRole('button', { name: 'Remove' })).toEqual([
+      expect.objectContaining({ disabled: true }),
+      expect.objectContaining({ disabled: true }),
+    ]);
+    expect(
+      screen.getByRole('button', { name: 'Resume accepted job · no new submission' }),
+    ).toBeEnabled();
+    expect(screen.getByText(/checks and downloads the original accepted recipe/u)).toBeVisible();
+  });
 });

@@ -45,6 +45,13 @@ Discard flow.
   second step preserves the first result. Voice failure preserves the last visual/source layer.
 - Retrying status, content retrieval, inspection, or audio composition reuses the accepted job.
   Retrying a provider submission is a new explicit potentially billable action.
+- If an accepted job's status or content request is interrupted, prompt, reference, enhancement,
+  and saved-recipe fields remain editable. The UI states that **Resume accepted job** still checks
+  the immutable accepted recipe and creates no submission; draft edits apply only after that job
+  reaches a terminal failure and the creator explicitly starts a new submission.
+- Same-origin browser status/content reads remain protected even when the browser omits `Origin`:
+  the API verifies the exact loopback referrer or same-origin Fetch Metadata plus explicit video
+  intent. Mixing `localhost` and `127.0.0.1` is rejected with actionable local-origin guidance.
 
 ## Temporary and cost boundaries
 
