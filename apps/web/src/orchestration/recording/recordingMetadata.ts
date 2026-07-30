@@ -1,7 +1,11 @@
 import type { StudioMode } from '../../features/media-session';
-import type { RecordingSource, TakeMetadata } from '../../features/recording/types';
+import type {
+  RecordedTakeMetadata,
+  RecordingSource,
+  TakeMetadata,
+} from '../../features/recording/types';
 
-type TrackMeasurements = Pick<TakeMetadata, 'width' | 'height' | 'frameRate'>;
+type TrackMeasurements = Pick<RecordedTakeMetadata, 'width' | 'height' | 'frameRate'>;
 
 const asRecord = (value: unknown): Record<string, unknown> | null =>
   typeof value === 'object' && value !== null ? (value as Record<string, unknown>) : null;

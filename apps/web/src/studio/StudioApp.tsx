@@ -14,6 +14,8 @@ import type { PromptCommittedHandler } from '../application/types';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
 import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
 import { useCreativeAssetRepository } from '../features/creative-assets/useCreativeAssetRepository';
+import { ExistingVideoPanel } from '../features/existing-video/ExistingVideoPanel';
+import { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import { MediaStage } from '../features/live-stage';
 import {
   confirmModeReplacement,
@@ -75,19 +77,49 @@ const TakeDock = lazy(() =>
 const deferredPanelFallback = <p role="status">Loading studio tool…</p>;
 
 const REVIEW_LOCK_REASON =
-  'Download and release or discard the recorded take before starting or changing media.';
+  'Download and release or discard the temporary take before starting or changing media.';
 
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
 interface StudioExperienceProps {
   focusMainOnMount: boolean;
+  initialIntent?: 'camera' | 'upload';
 }
 
-const StudioExperience = ({ focusMainOnMount }: StudioExperienceProps) => {
+const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceProps) => {
   const theme = useTheme();
   const mainRef = useRef<HTMLElement>(null);
   const repository = useMemo(() => createCreativeAssetRepository(), []);
   const repositoryState = useCreativeAssetRepository(repository);
+  const existingVideoSavedRecipes = useMemo(
+    () => [
+      ...repositoryState.store.savedPrompts.map((recipe) => ({
+        id: recipe.id,
+        label: recipe.title,
+        modelId: recipe.modelModeId,
+        prompt: recipe.prompt,
+        referenceImageAssetId: recipe.referenceImageAssetId,
+      })),
+      ...repositoryState.store.savedCharacterPrompts.map((character) => ({
+        id: character.id,
+        label: `Character · ${character.name}`,
+        modelId: 'lucy-2.5' as const,
+        prompt: character.prompt,
+        referenceImageAssetId: character.referenceImageAssetId,
+      })),
+    ],
+    [repositoryState.store],
+  );
+  const recordAcceptedBatchStep = useCallback(
+    (step: { readonly modelId: ModelMode; readonly prompt: string }) => {
+      if (!step.prompt.trim()) return;
+      repository.recordSuccessfulPrompt({
+        prompt: step.prompt,
+        modelModeId: step.modelId,
+      });
+    },
+    [repository],
+  );
   const {
     repository: legacyRepository,
     storage: legacyStorage,
@@ -106,7 +138,7 @@ const StudioExperience = ({ focusMainOnMount }: StudioExperienceProps) => {
     close: closeOverlay,
     closeIf: closeOverlayIf,
     toggle: toggleOverlay,
-  } = useStudioOverlayController(null);
+  } = useStudioOverlayController(initialIntent === 'upload' ? 'video-upload' : null);
   const [dismissedNotices, setDismissedNotices] = useState<ReadonlySet<string>>(new Set());
   const [firstSuccessGuideVisible, setFirstSuccessGuideVisible] = useState(true);
   const [recipeShelfEntryIntent, setRecipeShelfEntryIntent] =
@@ -119,6 +151,8 @@ const StudioExperience = ({ focusMainOnMount }: StudioExperienceProps) => {
   const legacyManagerToggleRef = useRef<HTMLButtonElement>(null);
   const dockToggleRef = useRef<HTMLButtonElement>(null);
   const takeToggleRef = useRef<HTMLButtonElement>(null);
+  const uploadToggleRef = useRef<HTMLButtonElement>(null);
+  const initialCameraIntentHandledRef = useRef(false);
   const closeTakeReview = useCallback(() => {
     closeOverlay();
     window.requestAnimationFrame(() => dockToggleRef.current?.focus());
@@ -144,11 +178,29 @@ const StudioExperience = ({ focusMainOnMount }: StudioExperienceProps) => {
     finalizingStream,
     automaticRecordingStopEvent,
     finishTake,
-    stagePresentation,
+    publishUploadedVideo,
+    stagePresentation: takeStagePresentation,
   } = useTakeReviewFlow({
     session,
     onReviewCleared: handleReviewCleared,
   });
+  const existingVideo = useExistingVideoWorkflow({
+    recording,
+    publishUploadedVideo,
+    onSubmissionAccepted: recordAcceptedBatchStep,
+  });
+  const stagePresentation =
+    takeStagePresentation.kind === 'playback' &&
+    existingVideo.comparison === 'original' &&
+    recording.original
+      ? { ...takeStagePresentation, artifact: recording.original }
+      : takeStagePresentation;
+
+  useEffect(() => {
+    if (initialIntent !== 'camera' || initialCameraIntentHandledRef.current) return;
+    initialCameraIntentHandledRef.current = true;
+    void session.startLocal();
+  }, [initialIntent, session]);
   const aiSessionActive = isModelSessionActive(session);
   const sessionModeLocked = mediaLocked || aiSessionActive || session.lifecycle === 'disconnected';
   const characterBuilderOpenBlockedReason = recordingActive
@@ -389,10 +441,20 @@ const StudioExperience = ({ focusMainOnMount }: StudioExperienceProps) => {
     void session.startModel();
   };
   const discardTemporaryWork = useCallback(() => {
+    existingVideo.reset(false);
     processing.cancel();
     recording.discard();
     setShelfDirty(false);
-  }, [processing, recording, setShelfDirty]);
+  }, [existingVideo, processing, recording, setShelfDirty]);
+  const finishExistingVideoSetup = useCallback(() => {
+    existingVideo.showResult();
+    openOverlay('take-review');
+  }, [existingVideo, openOverlay]);
+  const closeExistingVideo = useCallback(() => {
+    if (existingVideo.providerActive) return;
+    if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
+    closeOverlay();
+  }, [closeOverlay, existingVideo]);
 
   return (
     <div css={pageStyles(theme)}>
@@ -427,6 +489,8 @@ const StudioExperience = ({ focusMainOnMount }: StudioExperienceProps) => {
                     <strong>First take</strong>
                     <span>
                       Start camera → choose Character → Record → optional Voice → Download
+                      <br />
+                      Or Upload → optional visual processing → optional Voice → Download
                     </span>
                     <Button
                       size="small"
@@ -462,6 +526,8 @@ const StudioExperience = ({ focusMainOnMount }: StudioExperienceProps) => {
                   onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
                   onChooseAiExperience={() => openOverlay('ai-experience')}
                   onChangeExperience={() => openOverlay('ai-experience')}
+                  onUploadVideo={() => openOverlay('video-upload')}
+                  uploadButtonRef={uploadToggleRef}
                 />
               )}
               notices={stageNotices}
@@ -477,13 +543,36 @@ const StudioExperience = ({ focusMainOnMount }: StudioExperienceProps) => {
 
         <StudioExitGuard
           recordingOrFinalizing={
-            recordingActive || finalizingStartedAt !== null || finalizingStream !== null
+            recordingActive ||
+            finalizingStartedAt !== null ||
+            finalizingStream !== null ||
+            existingVideo.providerActive
           }
           hasTemporaryTake={Boolean(recording.presented)}
           voiceProcessingActive={recording.processingState === 'processing'}
           shelfDirty={shelfDirty}
           onDiscardTemporaryWork={discardTemporaryWork}
         />
+
+        <OverlayPanel
+          open={activeOverlay === 'video-upload'}
+          onClose={closeExistingVideo}
+          title="Upload existing video"
+          description="Preview locally, then optionally run one or two explicitly ordered visual steps."
+          placement="right"
+          size="wide"
+          bodyMode="scroll"
+          closeDisabled={existingVideo.providerActive}
+          closeOnBackdrop={!existingVideo.active}
+          returnFocusRef={uploadToggleRef}
+        >
+          <ExistingVideoPanel
+            workflow={existingVideo}
+            videoProcessingAvailable={Boolean(availability.videoProcessing)}
+            savedRecipes={existingVideoSavedRecipes}
+            onFinish={finishExistingVideoSetup}
+          />
+        </OverlayPanel>
 
         <OverlayPanel
           open={activeOverlay === 'character-selector'}
@@ -602,7 +691,7 @@ const StudioExperience = ({ focusMainOnMount }: StudioExperienceProps) => {
           open={activeOverlay === 'take-review' && Boolean(recording.presented)}
           onClose={closeOverlay}
           title="Latest Take"
-          description="Playback stays on the stage while you review this temporary in-memory recording."
+          description="Playback stays on the stage while you review this temporary in-memory take."
           placement="bottom"
           size="wide"
           bodyMode="contained"
@@ -770,8 +859,12 @@ const StudioExperience = ({ focusMainOnMount }: StudioExperienceProps) => {
 
 export interface StudioAppProps {
   readonly focusMainOnMount?: boolean;
+  readonly initialIntent?: 'camera' | 'upload';
 }
 
-export const StudioApp = ({ focusMainOnMount = false }: StudioAppProps) => (
-  <StudioExperience focusMainOnMount={focusMainOnMount} />
+export const StudioApp = ({ focusMainOnMount = false, initialIntent }: StudioAppProps) => (
+  <StudioExperience
+    focusMainOnMount={focusMainOnMount}
+    {...(initialIntent ? { initialIntent } : {})}
+  />
 );

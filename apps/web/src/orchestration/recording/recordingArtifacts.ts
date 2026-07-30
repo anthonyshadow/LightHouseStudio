@@ -165,8 +165,12 @@ export const createProcessedRecordingArtifact = (
   mimeType: string,
   label: string,
 ): RecordingArtifact => {
-  const extension = mimeType.includes('mp4') ? 'mp4' : 'webm';
-  const base = source.filename.replace(/\.(mp4|webm)$/i, '');
+  const extension = mimeType.includes('mp4')
+    ? 'mp4'
+    : mimeType.includes('quicktime')
+      ? 'mov'
+      : 'webm';
+  const base = source.filename.replace(/\.(mp4|mov|webm)$/i, '');
   return {
     ...source,
     id: `${source.id}-${label}`,

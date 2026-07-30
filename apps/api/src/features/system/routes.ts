@@ -3,11 +3,13 @@ import {
   healthResponseSchema,
   REFERENCE_IMAGE_SIZES,
   SUPPORTED_MODEL_IDS,
+  VIDEO_TRANSFORM_MODEL_IDS,
 } from '@studio/contracts';
 import type { FastifyInstance } from 'fastify';
 
 export interface CapabilityAvailability {
   readonly decartAvailable: boolean;
+  readonly decartVideoAvailable: boolean;
   readonly elevenLabsAvailable: boolean;
   readonly elevenLabsModelId: string;
   readonly referenceImagesAvailable: boolean;
@@ -31,6 +33,10 @@ export const registerSystemRoutes = (
       realtimeVideo: {
         available: availability.decartAvailable,
         models: [...SUPPORTED_MODEL_IDS],
+      },
+      videoProcessing: {
+        available: availability.decartVideoAvailable,
+        models: [...VIDEO_TRANSFORM_MODEL_IDS],
       },
       elevenLabs: {
         available: availability.elevenLabsAvailable,

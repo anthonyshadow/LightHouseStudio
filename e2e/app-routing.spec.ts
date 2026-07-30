@@ -7,13 +7,15 @@ import {
 } from './support/studioHarness';
 import { ENTRY_PATH, STUDIO_PATH } from './support/studioRoutes';
 
-test('entry stays provider-free and Enter pushes a focused Studio runtime', async ({ page }) => {
+test('entry stays provider-free and camera entry pushes a focused Studio runtime', async ({
+  page,
+}) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto(ENTRY_PATH);
 
   await expect(page).toHaveTitle('Enter Lightframe Studio');
   await expect(page.getByRole('heading', { name: 'Enter Lightframe Studio' })).toBeAttached();
-  const enter = page.getByRole('button', { name: 'Enter' });
+  const enter = page.getByRole('button', { name: 'Start with camera' });
   await expect(enter).toBeVisible();
   await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
   await expect(page.locator('meta[name="robots"]')).toHaveAttribute('content', 'noindex, nofollow');
@@ -38,12 +40,12 @@ test('entry stays provider-free and Enter pushes a focused Studio runtime', asyn
 test('Back and Forward restore focus at each application boundary', async ({ page }) => {
   await installSuccessfulStudioHarness(page);
   await page.goto(ENTRY_PATH);
-  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.getByRole('button', { name: 'Start with camera' }).click();
   await expect(page.locator('#studio-main')).toBeFocused();
 
   await page.goBack();
   await expect(page).toHaveURL(/\/$/u);
-  await expect(page.getByRole('button', { name: 'Enter' })).toBeFocused();
+  await expect(page.getByRole('button', { name: 'Start with camera' })).toBeFocused();
 
   await page.goForward();
   await expect(page).toHaveURL(/\/studio$/u);
@@ -71,7 +73,7 @@ test('noncanonical paths return to entry without mounting Studio', async ({ page
   ]) {
     await page.goto(path);
     await expect(page).toHaveURL(/\/$/u);
-    await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start with camera' })).toBeVisible();
     await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
   }
 });
@@ -79,7 +81,7 @@ test('noncanonical paths return to entry without mounting Studio', async ({ page
 test('recording and temporary-take work cannot be lost silently through Back', async ({ page }) => {
   await installSuccessfulStudioHarness(page);
   await page.goto(ENTRY_PATH);
-  await page.getByRole('button', { name: 'Enter' }).click();
+  await page.getByRole('button', { name: 'Start with camera' }).click();
   await startLocalPreview(page);
   await page.getByRole('button', { name: 'Record' }).click();
   await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
@@ -96,5 +98,5 @@ test('recording and temporary-take work cannot be lost silently through Back', a
   await expect(discard).toBeVisible();
   await discard.getByRole('button', { name: 'Discard and leave' }).click();
   await expect(page).toHaveURL(/\/$/u);
-  await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start with camera' })).toBeVisible();
 });

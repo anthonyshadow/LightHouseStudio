@@ -11,6 +11,7 @@ export type ActiveOverlay =
   | 'character-selector'
   | 'ai-experience'
   | 'legacy-projects'
+  | 'video-upload'
   | null;
 
 type OverlayAction =

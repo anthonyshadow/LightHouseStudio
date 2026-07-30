@@ -210,6 +210,10 @@ describe('reference image API client', () => {
         new Response(
           JSON.stringify({
             realtimeVideo: { available: true, models: ['lucy-2.5'] },
+            videoProcessing: {
+              available: true,
+              models: ['lucy-2.5', 'lucy-vton-3'],
+            },
             elevenLabs: { available: false, modelId: null },
             referenceImages: {
               available: true,

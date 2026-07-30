@@ -1,9 +1,12 @@
 import helmet from '@fastify/helmet';
+import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
 import Fastify, { LogController, type FastifyInstance } from 'fastify';
 import type { RuntimeConfig } from './config/environment.js';
 import { registerRealtimeRoutes } from './features/realtime/routes.js';
 import { registerSystemRoutes } from './features/system/routes.js';
+import { registerVideoJobRoutes } from './features/video-jobs/routes.js';
+import { VideoJobService } from './features/video-jobs/video-job-service.js';
 import {
   LocalReferenceImageAssetStore,
   type ReferenceImageAssetStore,
@@ -20,6 +23,10 @@ import {
   DecartSdkTokenProvider,
   type DecartTokenProvider,
 } from './providers/decart/token-provider.js';
+import {
+  DecartHttpVideoJobProvider,
+  type DecartVideoJobProvider,
+} from './providers/decart/video-job-provider.js';
 import { ElevenLabsHttpProvider } from './providers/elevenlabs/http-provider.js';
 import type { ElevenLabsProvider } from './providers/elevenlabs/types.js';
 import { translateProviderError } from './providers/error-mapper.js';
@@ -46,6 +53,7 @@ export const SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES = [
 export interface AppDependencies {
   readonly config: RuntimeConfig;
   readonly decartProvider?: DecartTokenProvider | null;
+  readonly decartVideoProvider?: DecartVideoJobProvider | null;
   readonly elevenLabsProvider?: ElevenLabsProvider | null;
   readonly referenceImageProvider?: ReferenceImageProvider | null;
   readonly characterPromptOptimizer?: CharacterPromptOptimizer | null;
@@ -87,6 +95,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
   });
+  void app.register(multipart);
 
   if (dependencies.staticRoot !== undefined) {
     void app.register(fastifyStatic, {
@@ -119,6 +128,14 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     dependencies.config.decartApiKey === undefined
       ? null
       : new DecartSdkTokenProvider(dependencies.config.decartApiKey),
+  );
+  const decartVideoProvider = resolveOptionalProvider(dependencies.decartVideoProvider, () =>
+    dependencies.config.decartApiKey === undefined
+      ? null
+      : new DecartHttpVideoJobProvider(
+          dependencies.config.decartApiKey,
+          dependencies.fetchImplementation,
+        ),
   );
 
   const elevenLabsProvider = resolveOptionalProvider(dependencies.elevenLabsProvider, () =>
@@ -190,9 +207,15 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
       optimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
     },
   );
+  const videoJobService = new VideoJobService(
+    decartVideoProvider,
+    dependencies.config.lightframeDataDir,
+    dependencies.config.pilotAccessMode === 'participant',
+  );
 
   registerSystemRoutes(app, {
     decartAvailable: decartProvider !== null,
+    decartVideoAvailable: decartVideoProvider !== null,
     elevenLabsAvailable: elevenLabsProvider !== null,
     elevenLabsModelId: dependencies.config.elevenLabsModelId,
     referenceImagesAvailable: referenceImageService.generationAvailable,
@@ -205,8 +228,12 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     promptOptimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
   });
   registerRealtimeRoutes(app, decartProvider);
+  registerVideoJobRoutes(app, videoJobService);
   registerReferenceImageRoutes(app, referenceImageService);
   registerVoiceRoutes(app, voiceService);
+  app.addHook('onClose', async () => {
+    await videoJobService.close();
+  });
   installErrorHandling(app, {
     serveSpa: dependencies.staticRoot !== undefined,
     translators: [

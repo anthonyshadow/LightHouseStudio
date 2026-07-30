@@ -4,3 +4,4 @@ export * from './health';
 export * from './realtime';
 export * from './reference-images';
 export * from './voices';
+export * from './video-jobs';

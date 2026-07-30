@@ -1,7 +1,7 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { Button, StatusNotice, Surface } from '../../ui';
 import { formatBytes, formatDuration } from '../recording';
-import type { RecordingController, TakeMetadata } from '../recording/types';
+import type { RecordedTakeMetadata, RecordingController, TakeMetadata } from '../recording/types';
 import type { VoiceProcessingController } from '../voice-effects/types';
 import {
   VoiceEffectsPanel,
@@ -110,7 +110,7 @@ const takeModeLabel = (mode: TakeMetadata['mode']): string => {
 const formatFrameRate = (frameRate: number): string =>
   `${Number.isInteger(frameRate) ? frameRate : Number(frameRate.toFixed(2))} fps`;
 
-const defaultAudioSourceLabel = (source: TakeMetadata['audioSource']): string => {
+const defaultAudioSourceLabel = (source: RecordedTakeMetadata['audioSource']): string => {
   switch (source) {
     case 'provider':
       return 'Provider output';
@@ -123,6 +123,30 @@ const defaultAudioSourceLabel = (source: TakeMetadata['audioSource']): string =>
 
 const captureMetadataChips = (metadata: TakeMetadata | null): MetadataChip[] => {
   if (!metadata) return [];
+  if (metadata.kind === 'uploaded') {
+    return [
+      { key: 'mode', label: 'Uploaded video' },
+      {
+        key: 'selected-at',
+        label: new Date(metadata.selectedAt).toLocaleTimeString([], {
+          hour: 'numeric',
+          minute: '2-digit',
+        }),
+        title: new Date(metadata.selectedAt).toLocaleString(),
+        dateTime: metadata.selectedAt,
+      },
+      { key: 'filename', label: metadata.displayName, title: metadata.displayName },
+      { key: 'resolution', label: `${metadata.width} × ${metadata.height}` },
+      {
+        key: 'codec',
+        label: `${metadata.container.toUpperCase()} · ${metadata.videoCodec === 'avc' ? 'H.264' : 'VP8'}`,
+      },
+      {
+        key: 'audio',
+        label: `Audio: ${metadata.hasAudio ? (metadata.audioCodec ?? 'Present') : 'None'}`,
+      },
+    ];
+  }
   const chips: MetadataChip[] = [
     { key: 'mode', label: takeModeLabel(metadata.mode) },
     {

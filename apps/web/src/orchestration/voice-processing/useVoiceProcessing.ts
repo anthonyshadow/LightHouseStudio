@@ -79,7 +79,7 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
       return {
         controller,
         operationId,
-        video: current.original.media,
+        video: (current.visual ?? current.original).media,
         sidecar: current.sidecar.blob,
       };
     },

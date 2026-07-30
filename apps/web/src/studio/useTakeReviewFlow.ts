@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StagePresentation } from '../features/live-stage';
 import { hasSameRecordingTracks, type AutomaticRecordingStopEvent } from '../features/recording';
+import type { RestorePersistedOriginalInput } from '../features/recording/types';
 import { useRecording, useRecordingSource } from '../orchestration/recording';
 import { type useStudioSession } from '../orchestration/session';
 import { useVoiceProcessing } from '../orchestration/voice-processing';
@@ -122,6 +123,18 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
     session.transformedVideoUsable ? session.remoteStream : null,
   );
 
+  const publishUploadedVideo = useCallback(
+    (input: RestorePersistedOriginalInput) => {
+      const artifact = recording.restorePersistedOriginal(input);
+      setAutomaticRecordingStopEvent(null);
+      setFinalizingStartedAt(null);
+      setFinalizingStream(null);
+      setReviewReady(true);
+      return artifact;
+    },
+    [recording],
+  );
+
   useEffect(() => {
     if (recording.presented) return;
     onReviewCleared();
@@ -221,6 +234,7 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
     finalizingStream,
     automaticRecordingStopEvent,
     finishTake,
+    publishUploadedVideo,
     stagePresentation,
   } as const;
 };

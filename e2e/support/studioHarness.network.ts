@@ -229,6 +229,10 @@ export const installProviderNetworkDriver = async (
             available: options.realtimeVideoAvailable ?? true,
             models: options.realtimeVideoAvailable === false ? [] : ['lucy-2.5', 'lucy-vton-3'],
           },
+          videoProcessing: {
+            available: options.videoProcessingAvailable ?? true,
+            models: options.videoProcessingAvailable === false ? [] : ['lucy-2.5', 'lucy-vton-3'],
+          },
           elevenLabs: {
             available: options.elevenLabsAvailable ?? false,
             modelId: options.elevenLabsAvailable ? 'eleven_multilingual_sts_v2' : null,

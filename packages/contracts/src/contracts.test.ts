@@ -47,6 +47,7 @@ describe('health and capabilities contracts', () => {
     expect(
       capabilitiesResponseSchema.parse({
         realtimeVideo: { available: true, models: [...SUPPORTED_MODEL_IDS] },
+        videoProcessing: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
         elevenLabs: { available: false, modelId: null },
         referenceImages: {
           available: true,
@@ -64,6 +65,7 @@ describe('health and capabilities contracts', () => {
       }),
     ).toEqual({
       realtimeVideo: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
+      videoProcessing: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
       elevenLabs: { available: false, modelId: null },
       referenceImages: {
         available: true,
@@ -82,6 +84,7 @@ describe('health and capabilities contracts', () => {
     expect(
       capabilitiesResponseSchema.safeParse({
         realtimeVideo: { available: true, models: ['local'] },
+        videoProcessing: { available: false, models: [] },
         elevenLabs: { available: false, modelId: null },
         referenceImages: {
           available: false,

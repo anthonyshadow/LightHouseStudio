@@ -1,4 +1,5 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
+import type { RefObject } from 'react';
 import { referenceImageContentUrl } from '../adapters/api-client/apiClient';
 import { Button } from '../ui';
 import { fadingVisibilityAnimationStyles } from '../ui/animationStyles';
@@ -26,6 +27,8 @@ type StudioSessionControlBarProps = {
   onOpenVoiceTreatments: () => void;
   onChooseAiExperience: () => void;
   onChangeExperience: () => void;
+  onUploadVideo?: () => void;
+  uploadButtonRef?: RefObject<HTMLButtonElement | null>;
 };
 
 const MicrophoneIcon = ({ muted }: { muted: boolean }) => (
@@ -257,6 +260,8 @@ export const StudioSessionControlBar = ({
   onOpenVoiceTreatments,
   onChooseAiExperience,
   onChangeExperience,
+  onUploadVideo,
+  uploadButtonRef,
 }: StudioSessionControlBarProps) => {
   const theme = useTheme();
   const transition = transitionLabel(session);
@@ -398,6 +403,14 @@ export const StudioSessionControlBar = ({
                 onClick={() => void session.startLocal()}
               >
                 {transition ?? 'Start Camera + Mic'}
+              </Button>
+              <Button
+                ref={uploadButtonRef}
+                variant="secondary"
+                disabled={controlsLocked || Boolean(transition)}
+                onClick={onUploadVideo}
+              >
+                Upload video
               </Button>
             </div>
           ) : transition && !aiStarting ? (

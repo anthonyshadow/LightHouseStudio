@@ -2,8 +2,10 @@
 
 ## Current runtime
 
-Studio keeps one original recording, an optional audio sidecar, and at most one processed
-replacement in browser memory so the take remains reviewable and downloadable.
+Studio keeps one immutable recorded or uploaded source, an optional source-audio sidecar, the
+latest successful visual result, and at most one voiced result in browser memory. Presentation is
+always `voiced → visual → source`; replacing the source or an already-run recipe invalidates every
+downstream layer.
 
 The runtime:
 
@@ -11,7 +13,13 @@ The runtime:
 - coalesces duplicate/manual/limit Stop requests;
 - settles final main-recorder data and the optional sidecar before releasing session-owned media;
 - publishes a valid main video when the sidecar fails or times out; and
-- releases artifact URLs only on processed replacement, Release, Discard, or unmount.
+- commits a healthy visual or voiced replacement before revoking the superseded URL; and
+- releases artifact URLs only on downstream invalidation, Release, Discard, or unmount.
+
+Uploaded source limits are decimal bytes: 300,000,000 for local/Lucy-only workflows and
+200,000,000 when VTO is planned. Downloaded provider output is capped at 300,000,000 bytes.
+Server-side upload and result files are streamed to the dedicated temporary video-job root rather
+than buffered in process memory. They are not a recovery store.
 
 Automated domain and controller tests cover those rules, including source end, delayed sidecar,
 finalization timeout, and unmount races. They do not qualify real browser memory, codecs, or
@@ -26,8 +34,9 @@ For every required device/browser row in
    MIME type, and main/sidecar byte sizes.
 2. Complete the required 300-second Local, Character, and VTO paths. Confirm the warning,
    automatic finalization, playable original, responsive controls, and cleanup indicators.
-3. Measure at idle, one minute, five minutes, finalization, after local Voice, after ElevenLabs
-   Voice when qualified, and after Release/Discard.
+3. Complete a maximum-size uploaded local path and both ordered visual chains. Measure before
+   submission, at the intermediate checkpoint, after the second result, after local Voice, after
+   ElevenLabs Voice when qualified, and after Release/Discard.
 4. Record finalization/processing duration and whether the browser evicted, terminated, or
    materially degraded the tab.
 5. Play every downloaded result outside Studio and verify duration, video, and audio.
@@ -51,6 +60,8 @@ sustained loss of control responsiveness, early source-track release, or leaked 
 Never reduce pressure by dropping chunks or silently evicting originals. Streaming upload, chunk
 eviction, or a shorter supported workflow requires an explicit product decision.
 
-Re-run affected rows when MIME selection, sidecar/remux behavior, retained outputs, or the approved
-device/browser matrix changes. The separate five-minute Decart session and ElevenLabs conversion
-limits never substitute for the recording timer.
+Re-run affected rows when MIME selection, upload inspection, sidecar/remux behavior, retained
+layers, or the approved device/browser matrix changes. Do not reduce pressure by deleting the
+immutable source or intermediate artifact while it is the last valid result. The separate
+five-minute Decart session and ElevenLabs conversion limits never substitute for the recording
+timer.

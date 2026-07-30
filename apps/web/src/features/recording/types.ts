@@ -42,7 +42,8 @@ export type RecordingSource = {
  * take starts. Optional measurements are omitted when a browser cannot report
  * an actual value; this object is never persisted or updated after capture.
  */
-export type TakeMetadata = Readonly<{
+export type RecordedTakeMetadata = Readonly<{
+  kind?: 'recorded';
   mode: StudioMode;
   startedAt: string;
   videoSource: RecordingSource['videoSource'];
@@ -53,6 +54,23 @@ export type TakeMetadata = Readonly<{
   videoSourceLabel?: string;
   audioSourceLabel?: string;
 }>;
+
+export type UploadedTakeMetadata = Readonly<{
+  kind: 'uploaded';
+  mode: 'local';
+  selectedAt: string;
+  displayName: string;
+  container: 'mp4' | 'quicktime' | 'webm';
+  videoCodec: 'avc' | 'vp8';
+  audioCodec: string | null;
+  durationMs: number;
+  width: number;
+  height: number;
+  sizeBytes: number;
+  hasAudio: boolean;
+}>;
+
+export type TakeMetadata = RecordedTakeMetadata | UploadedTakeMetadata;
 
 /**
  * Serializable fields required to restore an original take from browser-local
@@ -111,6 +129,7 @@ export type RecordingController = {
   activeSource: RecordingSource | null;
   metadata: TakeMetadata | null;
   original: RecordingArtifact | null;
+  visual: RecordingArtifact | null;
   processed: RecordingArtifact | null;
   presented: RecordingArtifact | null;
   sidecar: RecordingAudioSidecar;
@@ -126,6 +145,7 @@ export type RecordingController = {
   markDownloaded: () => void;
   beginProcessing: () => void;
   cancelProcessing: () => void;
+  completeVisualProcessing: (blob: Blob, mimeType: string, label: string) => RecordingArtifact;
   completeProcessing: (blob: Blob, mimeType: string, label: string) => RecordingArtifact;
   failProcessing: (message: string) => void;
   restoreOriginal: () => void;

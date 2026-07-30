@@ -1,7 +1,7 @@
 # Gated live provider smoke
 
 Live checks are manual, opt-in, cost-bearing, and excluded from normal test/quality commands.
-Current repository evidence is `0/7`; no provider/local row is qualified.
+Current repository evidence is `0/10`; no provider/local row is qualified.
 
 Use only authorized, least-privilege test credentials, non-sensitive disposable media, understood
 account retention/quota, and an approved spend. Never run this procedure in CI, Storybook,
@@ -27,15 +27,18 @@ provider bodies, signed/polling URLs, personal media, or full network archives.
 
 ## Required configurations
 
-| Requirement      | Exact configuration                                                           |
-| ---------------- | ----------------------------------------------------------------------------- |
-| Local            | No provider credentials                                                       |
-| Decart Character | SDK `0.1.17`, exact `lucy-2.5`, 300-second session                            |
-| Decart VTO       | SDK `0.1.17`, exact `lucy-vton-3`, 300-second session                         |
-| ElevenLabs       | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false` |
-| OpenAI image     | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                      |
-| BFL image        | `flux-2-pro`, safety `2`, prompt upsampling off                               |
-| Wiro image       | `seedream-v5-lite-uncensored`, 2k, watermark off, operator qualification      |
+| Requirement        | Exact configuration                                                           |
+| ------------------ | ----------------------------------------------------------------------------- |
+| Local              | No provider credentials                                                       |
+| Decart Character   | SDK `0.1.17`, exact `lucy-2.5`, 300-second session                            |
+| Decart VTO         | SDK `0.1.17`, exact `lucy-vton-3`, 300-second session                         |
+| Decart batch Lucy  | Queue HTTP, exact `lucy-2.5`, fixed `720p`, 300-second input                  |
+| Decart batch VTO   | Queue HTTP, exact `lucy-vton-3`, fixed `720p`, 300-second input               |
+| Decart batch chain | Lucy → VTO and VTO → Lucy with intermediate approval                          |
+| ElevenLabs         | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false` |
+| OpenAI image       | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                      |
+| BFL image          | `flux-2-pro`, safety `2`, prompt upsampling off                               |
+| Wiro image         | `seedream-v5-lite-uncensored`, 2k, watermark off, operator qualification      |
 
 Reference image providers require three separate server startups; there is no fallback.
 
@@ -84,6 +87,45 @@ After short checks pass, run once for each Decart model/account configuration:
 
 Early end, reset timer, missing warning, take loss, cleanup inversion, raw provider leakage, or
 automatic reconnect fails the row.
+
+## Decart batch video
+
+Use disposable H.264 MP4, H.264 MOV, and VP8 WebM samples in both 16:9 and 9:16 where the physical
+target supports them. Confirm current exact-model account limits against
+[Lucy Edit](https://platform.decart.ai/models/lucy-edit),
+[Lucy VTON](https://platform.decart.ai/models/lucy-vton), and the
+[Decart video requirements](https://docs.platform.decart.ai/getting-started/models) before
+spending. The app-owned subset remains narrower than generic provider claims.
+
+For each exact batch model:
+
+1. With `DECART_API_KEY` absent, preview and local Download must work while batch capability is
+   unavailable and no provider network/SDK is used.
+2. Configure prompt-only, reference-only where applicable, and combined input. Confirm VTO's beta,
+   rights, retention, and submission disclosure is visible before action.
+3. Submit once. Confirm multipart recipe/video/reference order, synthetic filenames, fixed `720p`,
+   and no provider request before authoritative server inspection.
+4. Observe validating, submitting, queued, processing, retrieving, and ready as applicable. The UI
+   may show elapsed time but never a fabricated percentage or provider ID/URL/body.
+5. Download the completed result. Verify 1280×720 or 720×1280 orientation, duration within 500 ms,
+   bounded size, restored source audio, and playback on the persistent stage.
+6. Exercise a retryable status/content interruption. It must reuse the accepted job. An explicit
+   submission retry must use a new job ID and be described as another potentially billable
+   submission.
+7. Release terminal state and inspect the dedicated temporary root. Local cleanup must complete
+   without claiming provider cancellation or provider-side deletion.
+
+For the ordered-chain row, run Lucy → VTO and VTO → Lucy. After step one, verify the intermediate
+Original/Result comparison and use **Finish here** once. In a separate pass, choose **Continue** and
+confirm only that explicit action starts the second submission. Force a second-stage failure and
+verify the first visual result, source audio, recipes, and local Voice/Download remain usable.
+
+Do not exceed four participant batch submissions or two submissions for either model. A two-step
+chain consumes two. Broker restart, 60-minute expiry, ambiguous responses, unavailable
+credentials, and background/foreground recovery must fail safely without automatic resubmission.
+
+Decart documents submit/poll/content retrieval but no qualified cancellation operation for this
+flow. Do not label browser abort, local cleanup, or DELETE as provider cancellation.
 
 ## Reference image providers
 

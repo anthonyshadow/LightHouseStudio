@@ -81,6 +81,7 @@ export type StudioHarnessOptions = {
   referenceImagesAvailable?: boolean;
   elevenLabsAvailable?: boolean;
   realtimeVideoAvailable?: boolean;
+  videoProcessingAvailable?: boolean;
   realtimeProvidesVideo?: boolean;
   capabilityFailuresBeforeSuccess?: number;
 };

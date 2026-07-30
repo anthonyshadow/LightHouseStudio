@@ -14,6 +14,7 @@ import {
 
 export const useRecordingArtifacts = () => {
   const [original, setOriginal] = useState<RecordingArtifact | null>(null);
+  const [visual, setVisual] = useState<RecordingArtifact | null>(null);
   const [processed, setProcessed] = useState<RecordingArtifact | null>(null);
   const [sidecar, setSidecar] = useState<RecordingAudioSidecar>(IDLE_AUDIO_SIDECAR);
   const [recordingError, setRecordingError] = useState<string | null>(null);
@@ -21,15 +22,19 @@ export const useRecordingArtifacts = () => {
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [downloaded, setDownloaded] = useState(false);
   const originalRef = useRef<RecordingArtifact | null>(null);
+  const visualRef = useRef<RecordingArtifact | null>(null);
   const processedRef = useRef<RecordingArtifact | null>(null);
 
   const publishOriginal = useCallback(
     (artifact: RecordingArtifact, nextSidecar: RecordingAudioSidecar) => {
       revokeArtifactUrl(originalRef.current, 'replacement');
+      revokeArtifactUrl(visualRef.current, 'replacement');
       revokeArtifactUrl(processedRef.current, 'replacement');
       originalRef.current = artifact;
+      visualRef.current = null;
       processedRef.current = null;
       setOriginal(artifact);
+      setVisual(null);
       setProcessed(null);
       setSidecar(nextSidecar);
       setRecordingError(null);
@@ -56,10 +61,13 @@ export const useRecordingArtifacts = () => {
 
   const discardArtifacts = useCallback(() => {
     revokeArtifactUrl(originalRef.current, 'discard');
+    revokeArtifactUrl(visualRef.current, 'discard');
     revokeArtifactUrl(processedRef.current, 'discard');
     originalRef.current = null;
+    visualRef.current = null;
     processedRef.current = null;
     setOriginal(null);
+    setVisual(null);
     setProcessed(null);
     setSidecar(IDLE_AUDIO_SIDECAR);
     setRecordingError(null);
@@ -68,9 +76,28 @@ export const useRecordingArtifacts = () => {
     setDownloaded(false);
   }, []);
 
-  const completeProcessing = useCallback(
+  const completeVisualProcessing = useCallback(
     (blob: Blob, mimeType: string, label: string): RecordingArtifact => {
       const source = originalRef.current;
+      if (!source) throw new Error('Original recording is unavailable.');
+      const artifact = createProcessedRecordingArtifact(source, blob, mimeType, label);
+      revokeArtifactUrl(visualRef.current, 'replacement');
+      revokeArtifactUrl(processedRef.current, 'replacement');
+      visualRef.current = artifact;
+      processedRef.current = null;
+      setVisual(artifact);
+      setProcessed(null);
+      setProcessingState('ready');
+      setProcessingError(null);
+      setDownloaded(false);
+      return artifact;
+    },
+    [],
+  );
+
+  const completeProcessing = useCallback(
+    (blob: Blob, mimeType: string, label: string): RecordingArtifact => {
+      const source = visualRef.current ?? originalRef.current;
       if (!source) throw new Error('Original recording is unavailable.');
       const artifact = createProcessedRecordingArtifact(source, blob, mimeType, label);
       revokeArtifactUrl(processedRef.current, 'replacement');
@@ -136,6 +163,7 @@ export const useRecordingArtifacts = () => {
   useEffect(
     () => () => {
       revokeArtifactUrl(originalRef.current, 'unmount');
+      revokeArtifactUrl(visualRef.current, 'unmount');
       revokeArtifactUrl(processedRef.current, 'unmount');
     },
     [],
@@ -144,6 +172,7 @@ export const useRecordingArtifacts = () => {
   return useMemo(
     () => ({
       original,
+      visual,
       processed,
       sidecar,
       recordingError,
@@ -161,12 +190,14 @@ export const useRecordingArtifacts = () => {
       markDownloaded,
       beginProcessing,
       cancelProcessing,
+      completeVisualProcessing,
       completeProcessing,
       failProcessing,
       restoreOriginal,
     }),
     [
       original,
+      visual,
       processed,
       sidecar,
       recordingError,
@@ -183,6 +214,7 @@ export const useRecordingArtifacts = () => {
       markDownloaded,
       beginProcessing,
       cancelProcessing,
+      completeVisualProcessing,
       completeProcessing,
       failProcessing,
       restoreOriginal,

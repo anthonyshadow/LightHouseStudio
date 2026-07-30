@@ -104,6 +104,20 @@ const completeProcessing: RecordingController['completeProcessing'] = (blob, mim
     sizeBytes: blob.size,
   });
 
+const completeVisualProcessing: RecordingController['completeVisualProcessing'] = (
+  blob,
+  mimeType,
+  label,
+) =>
+  createTakeArtifact({
+    id: 'visual-storybook',
+    media: blob,
+    objectUrl: 'blob:visual-storybook',
+    mimeType,
+    filename: `${label}.webm`,
+    sizeBytes: blob.size,
+  });
+
 export const createRecordingController = (
   overrides: Partial<RecordingController> = {},
 ): RecordingController => ({
@@ -111,6 +125,7 @@ export const createRecordingController = (
   activeSource: null,
   metadata: null,
   original: null,
+  visual: null,
   processed: null,
   presented: null,
   sidecar: { state: 'unavailable', blob: null, mimeType: null, error: null },
@@ -126,6 +141,7 @@ export const createRecordingController = (
   markDownloaded: fn(),
   beginProcessing: fn(),
   cancelProcessing: fn(),
+  completeVisualProcessing: fn(completeVisualProcessing),
   completeProcessing: fn(completeProcessing),
   failProcessing: fn(),
   restoreOriginal: fn(),

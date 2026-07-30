@@ -9,7 +9,7 @@ test('serves the built entry, direct Studio, and local health endpoint from one 
   await expect(health.json()).resolves.toEqual({ ok: true });
 
   await page.goto('/');
-  await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Start with camera' })).toBeVisible();
 
   await page.goto('/studio');
   await expect(page.getByRole('figure', { name: 'Studio media stage' })).toBeVisible();

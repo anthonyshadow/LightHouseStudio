@@ -50,6 +50,7 @@ const createRecording = (
     activeSource: null,
     metadata: null,
     original,
+    visual: null,
     processed: null,
     presented: original,
     sidecar: {
@@ -70,6 +71,7 @@ const createRecording = (
     markDownloaded: vi.fn(),
     beginProcessing: vi.fn(),
     cancelProcessing: vi.fn(),
+    completeVisualProcessing: vi.fn().mockReturnValue(original),
     completeProcessing: vi.fn().mockReturnValue(original),
     failProcessing: vi.fn(),
     restoreOriginal: vi.fn(),

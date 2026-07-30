@@ -53,6 +53,58 @@
       ]
     },
     {
+      "id": "decart-batch-lucy-2.5",
+      "configurationId": "decart:batch:lucy-2.5:720p:300s",
+      "accessMode": "participant",
+      "checks": [
+        "upload-h264-mp4",
+        "upload-h264-mov",
+        "upload-vp8-webm",
+        "exact-model-pin",
+        "fixed-720p",
+        "source-audio-restore",
+        "single-submit",
+        "status-download-retry",
+        "result-inspection",
+        "cleanup"
+      ]
+    },
+    {
+      "id": "decart-batch-lucy-vton-3",
+      "configurationId": "decart:batch:lucy-vton-3:720p:300s",
+      "accessMode": "participant",
+      "checks": [
+        "upload-h264-mp4",
+        "upload-h264-mov",
+        "upload-vp8-webm",
+        "exact-model-pin",
+        "fixed-720p",
+        "vto-beta-disclosure",
+        "source-audio-restore",
+        "single-submit",
+        "status-download-retry",
+        "result-inspection",
+        "cleanup"
+      ]
+    },
+    {
+      "id": "decart-batch-ordered-chain",
+      "configurationId": "decart:batch:ordered-chain:lucy-2.5+lucy-vton-3:720p",
+      "accessMode": "participant",
+      "checks": [
+        "lucy-then-vto",
+        "vto-then-lucy",
+        "intermediate-checkpoint",
+        "explicit-continue",
+        "finish-here",
+        "two-submission-count",
+        "second-failure-preserves-first",
+        "no-automatic-resubmission",
+        "source-audio-restore",
+        "cleanup"
+      ]
+    },
+    {
       "id": "elevenlabs-saved-voice",
       "configurationId": "elevenlabs:eleven_multilingual_sts_v2:saved-only:logging-false",
       "accessMode": "participant",
@@ -123,6 +175,12 @@
       "local-capture",
       "character-capture",
       "vto-capture",
+      "upload-select-replace-remove",
+      "upload-local-download",
+      "upload-single-visual-step",
+      "upload-ordered-chain-both-orders",
+      "upload-intermediate-checkpoint",
+      "upload-voice",
       "record-300-seconds",
       "record-finalize",
       "local-voice",

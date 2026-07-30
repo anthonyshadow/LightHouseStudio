@@ -60,3 +60,14 @@ Keep only lessons that should constrain future work.
 - Screenshot readiness is semantic; a stable fallback is not a valid product state.
 - Physical devices and live providers remain separate release gates because mocks cannot qualify
   codecs, memory, entitlements, retention, or output.
+
+## Separate provider acceptance from local completion
+
+- An accepted billable submission is an immutable fact. Poll, content retrieval, inspection, and
+  remux retries must reuse it; only a fresh explicit action may submit another job.
+- Multi-step cost consent belongs between completed artifacts. Preserve the intermediate result
+  and require approval before the next model rather than treating a chain as one opaque action.
+- Browser inspection improves usability, but streamed server inspection is the trust boundary for
+  provider input and retrieved output.
+- Source audio is an immutable composition input. Visual providers may replace video, but they do
+  not become the source of truth for final audio.

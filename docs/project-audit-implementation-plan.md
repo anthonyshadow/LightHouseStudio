@@ -9,6 +9,37 @@ Scope is fixed by the [controlled-pilot contract](CONTROLLED_PILOT_RELEASE_CONTR
 loopback-only, at most five participants, Character primary, VTO beta, touch/mobile required, a
 300-second take maximum, and no provider fallback.
 
+## Phase 0 — Existing-video and ordered-processing acceptance
+
+**Objective:** qualify the new first-class upload source and exact-model batch workflow before
+freezing a release candidate.
+
+Implementation scope:
+
+- one source/visual/voice take pipeline shared by recording and upload;
+- authoritative H.264 MP4/MOV and VP8 WebM inspection with the app-owned duration, aspect, byte,
+  720p orientation, and synchronization limits;
+- strict same-origin video-job contracts, a server-only exact-model Decart adapter, one in-memory
+  active job, temporary filesystem ownership, and safe errors;
+- zero, one, or two unique visual steps with an explicit intermediate checkpoint and no automatic
+  paid resubmission; and
+- provider-free upload/preview/download plus accessible keyboard/touch configuration in the
+  existing persistent stage and overlay system.
+
+Acceptance:
+
+- domain, contract, API, controller, component, E2E, accessibility, and cleanup tests cover every
+  rule and failure branch in the existing-video user story;
+- all five canonical viewports and 200% reflow preserve the stage, focus, high-consequence actions,
+  and named internal scrolling;
+- the exact-model live rows and all affected physical rows pass for the same commit;
+- `graphify update .` reflects the final ownership/dependency graph; and
+- every Phase 1 release command passes without paid traffic or weakened assertions.
+
+Keep this phase incomplete until automated, live, and physical evidence all pass. Deterministic
+implementation does not by itself qualify Decart output, mobile pickers, codecs, memory, or
+provider retention.
+
 ## Phase 1 — Exact-candidate automated gate
 
 **Objective:** establish one candidate before paid or physical qualification.
@@ -41,7 +72,7 @@ This documentation audit did not run the full release suite or registry-backed a
 
 ## Phase 2 — Provider and local qualification
 
-**Objective:** close the seven content-free provider/local rows for the Phase 1 commit.
+**Objective:** close the ten content-free provider/local rows for the Phase 1 commit.
 
 Run the approved procedures in [live provider smoke](LIVE_PROVIDER_SMOKE.md) and record only the
 schema in [qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md).
@@ -51,14 +82,17 @@ Required rows:
 1. Local with no provider credentials or external network;
 2. Decart `lucy-2.5`;
 3. Decart `lucy-vton-3`;
-4. ElevenLabs saved-voice browse, preview, Apply, remux, Download, and original restore;
-5. OpenAI optimization/reference generation;
-6. BFL reference generation as the startup-selected provider; and
-7. Wiro as a separate operator-qualification pass with required cleanup.
+4. Decart batch `lucy-2.5`;
+5. Decart batch `lucy-vton-3`;
+6. Decart ordered chain with Lucy → VTO, VTO → Lucy, intermediate approval, and early finish;
+7. ElevenLabs saved-voice browse, preview, Apply, remux, Download, and original restore;
+8. OpenAI optimization/reference generation;
+9. BFL reference generation as the startup-selected provider; and
+10. Wiro as a separate operator-qualification pass with required cleanup.
 
 Acceptance:
 
-- `pnpm pilot:qualification:check --commit <full-sha> --verbose` reports `7/7`;
+- `pnpm pilot:qualification:check --commit <full-sha> --verbose` reports `10/10`;
 - models, settings, access mode, retention, entitlements, billing authorization, and content policy
   match the release contract;
 - every initial billable submission is explicit, has no fallback, and is not automatically
@@ -79,11 +113,13 @@ Follow [Browser support](BROWSER_SUPPORT.md), [Manual QA](MANUAL_QA.md), and the
 
 Every applicable row must cover:
 
-- permission allow/deny/revoke, local/Character/VTO capture, and device replacement;
+- permission allow/deny/revoke; local/Character/VTO capture; uploaded-video selection,
+  replacement, local download, batch singles, both ordered chains and checkpoint; and device
+  replacement;
 - pointer/keyboard or touch recovery, orientation, safe areas, browser chrome, software keyboard,
   200% text, focus, status announcements, and the approved assistive technology;
 - a real 300-second take, finalization, memory checkpoints, background/foreground interruption,
-  local and ElevenLabs processing, download/playback, and cleanup; and
+  uploaded/recorded local and ElevenLabs processing, download/playback, and cleanup; and
 - exact OS/browser/device versions with no emulator or silent target substitution.
 
 Acceptance:

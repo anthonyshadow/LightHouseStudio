@@ -26,6 +26,8 @@ credentials.
 - [ ] Set the deadline: within 24 hours of this event and no later than day eight after first use.
 - [ ] Stop recording/AI, close Studio, stop the API, and verify camera, microphone, WebRTC, and
       provider activity ended.
+- [ ] Verify no active browser upload/poll/download/remux remains and the participant's
+      `.tmp/video-jobs` subtree contains no retained source, reference, or provider result.
 - [ ] Clear localStorage, IndexedDB, Cache Storage, service-worker data, and permissions for the
       exact loopback origin.
 - [ ] Remove the dedicated browser profile through browser controls.
@@ -46,18 +48,18 @@ Any path, profile, relationship, or provider-cleanup ambiguity blocks the next p
 
 ## Content-free record
 
-| Field                                       | Result                        |
-| ------------------------------------------- | ----------------------------- |
-| Anonymous code and session/deadline dates   |                               |
-| Exact loopback origin                       |                               |
-| Reviewed pilot-root and exact-leaf proof    | Pass / Fail                   |
-| Browser site/profile retirement             | Pass / Fail                   |
-| Former asset ID absent in empty environment | Pass / Fail                   |
-| Provider cleanup reconciliation             | Pass / Fail / N/A             |
-| Shared-root and sibling preservation        | Pass / Fail                   |
-| Evidence Recorder initials/time             |                               |
-| Support & Escalation Owner initials/time    |                               |
-| Final outcome                               | Pass / Block next participant |
+| Field                                         | Result                        |
+| --------------------------------------------- | ----------------------------- |
+| Anonymous code and session/deadline dates     |                               |
+| Exact loopback origin                         |                               |
+| Reviewed pilot-root and exact-leaf proof      | Pass / Fail                   |
+| Browser site/profile retirement               | Pass / Fail                   |
+| Former asset ID absent in empty environment   | Pass / Fail                   |
+| Provider and video-job cleanup reconciliation | Pass / Fail / N/A             |
+| Shared-root and sibling preservation          | Pass / Fail                   |
+| Evidence Recorder initials/time               |                               |
+| Support & Escalation Owner initials/time      |                               |
+| Final outcome                                 | Pass / Block next participant |
 
 Before admitting participant data, and after changing this procedure, run:
 

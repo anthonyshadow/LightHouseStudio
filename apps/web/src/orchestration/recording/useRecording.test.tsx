@@ -339,6 +339,48 @@ describe('useRecording recorder construction failures', () => {
     unmount();
   });
 
+  it('layers visual and voice artifacts while restoring voice to the latest visual', () => {
+    installRecorderHarness();
+    vi.mocked(URL.createObjectURL)
+      .mockReturnValueOnce('blob:source')
+      .mockReturnValueOnce('blob:visual')
+      .mockReturnValueOnce('blob:voice');
+    const { result, unmount } = renderHook(() => useRecording());
+
+    act(() => {
+      result.current.restorePersistedOriginal({
+        blob: new Blob(['source'], { type: 'video/mp4' }),
+        artifactMetadata: {
+          id: 'source',
+          mimeType: 'video/mp4',
+          filename: 'source.mp4',
+          sourceModeId: 'local',
+          startedAt: '2026-07-19T12:30:00.000Z',
+          durationMs: 1_000,
+        },
+      });
+      result.current.completeVisualProcessing(
+        new Blob(['visual'], { type: 'video/mp4' }),
+        'video/mp4',
+        'lucy',
+      );
+      result.current.completeProcessing(
+        new Blob(['voice'], { type: 'video/mp4' }),
+        'video/mp4',
+        'voice',
+      );
+    });
+
+    expect(result.current.presented?.objectUrl).toBe('blob:voice');
+    act(() => result.current.restoreOriginal());
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:voice');
+    expect(result.current.processed).toBeNull();
+    expect(result.current.presented?.objectUrl).toBe('blob:visual');
+    expect(result.current.original?.objectUrl).toBe('blob:source');
+
+    unmount();
+  });
+
   it('revokes a restored original exactly when it is discarded or unmounted', () => {
     installRecorderHarness();
     vi.mocked(URL.createObjectURL)

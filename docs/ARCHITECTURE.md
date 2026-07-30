@@ -35,6 +35,7 @@ The mounted Studio owns focused controllers for:
 
 - local/realtime media and per-mode drafts;
 - recording, review, and voice processing;
+- existing-video selection, local inspection, ordered batch processing, and checkpoint review;
 - Character Builder, Prompt Workshop, and Recipe Shelf handoff;
 - overlays and the data-triggered compatibility project manager.
 
@@ -134,26 +135,31 @@ warning/cap timer, and finalization:
 - publish the main video even when the sidecar fails;
 - release local/provider resources only after finalization settles.
 
-The finalized artifact replaces live media on the same stage. Studio keeps one temporary take,
-locks new acquisition while it is under review, and does not silently reacquire preview. Download
-initiation leaves review active and enables Release, but browser save completion is not observable;
-the creator must verify the file. Release or confirmed Discard revokes artifact URLs and returns to
-private idle.
+Recorded and uploaded media publish through one artifact boundary:
 
-Original video and sidecar are immutable processing sources. Every local or ElevenLabs treatment
-starts from them, not from the last processed output. Replacement creates the new URL before
-revoking the old processed URL. Failure or cancellation preserves the last playable result and the
-originals.
+`immutable source → latest successful visual → optional voiced layer → presented artifact`.
+
+The finalized or validated source replaces live media on the same persistent stage. The artifact
+owner creates and revokes every source/visual/voice URL. Changing source invalidates downstream
+layers; restoring Original voice removes only the voice layer and returns to the latest visual.
+Every Voice treatment reads immutable source audio and remuxes it onto `visual ?? source`.
+
+The existing-video controller uses Mediabunny plus browser decode confirmation for an early check.
+The API streams bytes to generated private paths and performs authoritative
+container/track/codec/duration/aspect/size inspection before Decart contact. One app job runs at a
+time. A two-step order submits serially and stops at an explicit intermediate checkpoint before the
+second billable request.
 
 ## Persistence
 
-| Store                       | Data                                                                  | Lifetime and trust boundary                                                               |
-| --------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
-| Recipe Shelf `localStorage` | Versioned, allowlisted prompt/character metadata and opaque asset IDs | Sanitized on read; degrades to session memory on failure; never stores image bytes        |
-| Character Builder IndexedDB | One resumable draft and save journal                                  | Compare-and-swap autosave; prevents duplicate save/preload after retry or reload          |
-| Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings         | Owner-scoped under `LIGHTFRAME_DATA_DIR`; no ordinary deletion route                      |
-| Legacy project IndexedDB    | Compatibility project metadata and media Blobs                        | List/download/delete plus one-time valid character-design seeding; Guided is not restored |
-| Session memory              | Streams, tokens, files, device IDs, recordings, sidecars, voice state | Cleaned on replacement, release/discard, unmount, or tab close as applicable              |
+| Store                       | Data                                                                  | Lifetime and trust boundary                                                                                                    |
+| --------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Recipe Shelf `localStorage` | Versioned, allowlisted prompt/character metadata and opaque asset IDs | Sanitized on read; degrades to session memory on failure; never stores image bytes                                             |
+| Character Builder IndexedDB | One resumable draft and save journal                                  | Compare-and-swap autosave; prevents duplicate save/preload after retry or reload                                               |
+| Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings         | Owner-scoped under `LIGHTFRAME_DATA_DIR`; no ordinary deletion route                                                           |
+| Legacy project IndexedDB    | Compatibility project metadata and media Blobs                        | List/download/delete plus one-time valid character-design seeding; Guided is not restored                                      |
+| Session memory              | Streams, tokens, files, device IDs, recordings, sidecars, voice state | Cleaned on replacement, release/discard, unmount, or tab close as applicable                                                   |
+| Video-job temp root         | Streamed input/reference and inspected provider output                | Process-temporary; inputs drop after acceptance, output after delivery, jobs expire at 60 minutes, and startup purges the root |
 
 Browser storage is untrusted and schema-migrated. Opaque IDs, provenance, and timestamps are
 preserved. The filesystem store uses atomic publication and never exposes internal paths,
@@ -166,7 +172,8 @@ See [privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) for the user-fac
 
 Fastify binds to `127.0.0.1`, rejects non-loopback Host headers, and requires exact loopback Origin
 checks for provider or reference mutations. ElevenLabs provider-contact routes also require
-`X-Lightframe-Provider-Intent: voice`. Responses are `no-store`.
+`X-Lightframe-Provider-Intent: voice`; Decart batch routes require
+`X-Lightframe-Provider-Intent: video`. Responses are `no-store`.
 
 Permanent keys remain in server environment memory. App-owned schemas validate every HTTP
 boundary. Provider adapters normalize upstream data into allowlisted safe codes; raw messages,
@@ -180,6 +187,7 @@ present. This is an access boundary, not provider fallback.
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Local status                | `GET /api/health`, `GET /api/capabilities`                                                                                                                                       |
 | Decart                      | `POST /api/realtime-token`                                                                                                                                                       |
+| Decart batch video          | `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, `DELETE /api/video-jobs/:jobId`                                                |
 | Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions` |
 | Local reference storage     | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                         |
 | ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `POST /api/elevenlabs/voice-changer/recording`                                                      |
@@ -195,11 +203,13 @@ The creator of a resource owns idempotent cleanup.
 | --------------------- | ----------------------------------------------------------------------------------------------------- |
 | Session orchestration | Owned local/remote streams, cloned provider input, provider client, token abort, active-session clock |
 | Session draft         | Ephemeral files and preview object URLs                                                               |
-| Recording/review      | Recorders, chunks, sidecar, cap timer, artifact URLs, unload protection                               |
+| Recording/review      | Recorders, chunks, immutable source/sidecar, visual/voice artifact URLs, cap timer, unload protection |
+| Existing-video flow   | Validation generations, ordered ephemeral drafts, provider polling/download, checkpoint consent       |
 | Voice processing      | Abort controllers, Web Audio/Mediabunny resources, temporary processed URLs                           |
 | Media stage           | DOM media attachment, metering, control-visibility timer                                              |
 | Overlay               | Focus/inert/scroll state only; never media                                                            |
 | API request/service   | Request abort, upstream streams, shared-operation subscribers, provider deadline                      |
+| Video-job service     | In-memory owner/job map, exact-once submission, private temp paths, expiry and result cleanup         |
 | Reference store       | Atomic files, metadata, request mappings, conservative temporary cleanup                              |
 
 Late async results check their generation or abort state before commit. A healthy replacement

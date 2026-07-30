@@ -46,7 +46,9 @@ areas, the software keyboard, browser chrome changes, or physical 200% text/refl
 | Front/rear switch | Active `facingMode` plus exposed opposite capability     | Control omitted; current camera remains                          |
 | Camera zoom       | Numeric track zoom capability and `applyConstraints`     | Control omitted; no CSS crop substitute                          |
 | Recording         | Live video, `MediaRecorder`, supported/default format    | Record unavailable or fails safely; session remains controllable |
+| Existing video    | File input/drop, Blob playback, supported H.264/VP8 file | Local validation explains export needs; camera stays optional    |
 | Decart output     | Local capture, WebRTC, provider reachability/entitlement | Local preview remains the fallback                               |
+| Batch visual      | Supported source, broker, exact model availability       | Local preview/download remains available without a key           |
 | Local Voice       | Web Audio, offline render, compatible remux encoder      | Original take remains usable                                     |
 | ElevenLabs Voice  | Sidecar, broker, saved voice/model/account support       | Original/local effects remain usable                             |
 | Download          | Blob URL plus browser download handling                  | Mobile may open/share rather than save directly                  |
@@ -90,6 +92,22 @@ Audio sidecars prefer WebM/Opus, then MP4, then the browser default. A positive
 `isTypeSupported()` result does not guarantee successful recording, local remux, download, or
 cross-player playback. Local Voice remux needs Opus for WebM or AAC for MP4.
 
+## Existing-video formats
+
+The accepted provider-processing subset is intentionally narrow:
+
+- MP4 or QuickTime/MOV with an H.264 video track;
+- WebM with a VP8 video track;
+- duration greater than zero and no more than 300 seconds; and
+- displayed aspect within 1% of 16:9 or 9:16.
+
+The browser performs an early metadata and decode check, but the server's streamed byte inspection
+is authoritative before provider contact. HEVC, ProRes, VP9, AV1, container aliases, and
+undocumented codecs are rejected with H.264 export guidance; Studio does not silently transcode
+them. Visual processing remains available without source audio, but Voice is disabled if a usable
+immutable audio sidecar cannot be extracted. Provider results must be 1280×720 or 720×1280, retain
+the source orientation, and differ from the input duration by no more than 500 ms.
+
 ## Known physical risks
 
 - Safari/iOS can differ in `MediaRecorder` output, Web Audio decode/encode, Blob download,
@@ -103,15 +121,19 @@ cross-player playback. Local Voice remux needs Opus for WebM or AAC for MP4.
 - Five-minute recording plus local/cloud voice processing can exceed practical memory or codec
   budgets on reduced-power devices. See the
   [recording memory policy](RECORDING_MEMORY_POLICY.md).
+- File-picker MIME reporting, H.264 MOV playback, WebM VP8 support, audio extraction, and download
+  behavior differ across iOS, Android, Safari, Firefox, and Chrome. A browser-local preview is not
+  evidence that server/provider qualification passed.
 
 ## Qualification rule
 
 Every required row must physically pass permission allow/deny/revoke; Local/Character/VTO capture;
-the 270/300-second warning and finalization; local and ElevenLabs Voice; download/playback;
-background/foreground recovery; memory checkpoints; and cleanup. Touch rows also require
-portrait/landscape, safe areas, browser chrome, software keyboard, 200% text, touch-control
-recovery, and camera switching when exposed. Desktop rows require the five canonical viewports,
-pointer/keyboard recovery, 200% text, and device replacement.
+uploaded-video pick, replace, local download, batch Lucy, batch VTO, both ordered chains and the
+intermediate checkpoint; the 270/300-second warning and finalization; local and ElevenLabs Voice;
+download/playback; background/foreground recovery; memory checkpoints; and cleanup. Touch rows
+also require native file pickers, portrait/landscape, safe areas, browser chrome, software
+keyboard, 200% text, touch-control recovery, and camera switching when exposed. Desktop rows
+require the five canonical viewports, pointer/keyboard recovery, 200% text, and device replacement.
 
 Record results through
 [controlled-pilot qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md). Emulation, a different

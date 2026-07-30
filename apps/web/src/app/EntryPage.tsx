@@ -13,6 +13,14 @@ const entryStyles = (theme: Theme): CSSObject => ({
   paddingBlock: `max(${theme.space.lg}, env(safe-area-inset-top)) max(${theme.space.lg}, env(safe-area-inset-bottom))`,
   paddingInline: `max(${theme.space.lg}, env(safe-area-inset-left)) max(${theme.space.lg}, env(safe-area-inset-right))`,
   overflow: 'hidden',
+  '& > div': {
+    display: 'grid',
+    gap: theme.space.sm,
+    width: 'min(28rem, 100%)',
+    textAlign: 'center',
+  },
+  '& p': { margin: 0, color: theme.colors.textMuted },
+  '& button': { minHeight: '3rem' },
 });
 
 const visuallyHiddenHeadingStyles = (): CSSObject => ({
@@ -43,16 +51,27 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
 
   return (
     <main css={entryStyles(theme)}>
-      <h1 css={visuallyHiddenHeadingStyles()}>Enter Lightframe Studio</h1>
-      <Button
-        ref={enterRef}
-        variant="primary"
-        onClick={() => {
-          void navigate(APP_PATHS.studio);
-        }}
-      >
-        Enter
-      </Button>
+      <div>
+        <h1 css={visuallyHiddenHeadingStyles()}>Enter Lightframe Studio</h1>
+        <p>Create from your camera or a compatible video already on this device.</p>
+        <Button
+          ref={enterRef}
+          variant="primary"
+          onClick={() => {
+            void navigate(APP_PATHS.studio, { state: { creationIntent: 'camera' } });
+          }}
+        >
+          Start with camera
+        </Button>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            void navigate(APP_PATHS.studio, { state: { creationIntent: 'upload' } });
+          }}
+        >
+          Upload existing video
+        </Button>
+      </div>
     </main>
   );
 };

@@ -5,3 +5,4 @@ export * from './prompts';
 export * from './recording';
 export * from './session';
 export * from './voice';
+export * from './video-processing';

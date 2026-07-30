@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { CreativeAssetStore } from '@studio/domain';
+import { installFakeVideoJobRoutes, loadH264VideoFixture } from './support/existingVideoHarness';
 import {
   closeRecipeDockWhenOverlaid,
   createLocalTake,
@@ -161,7 +162,7 @@ const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<Netwo
   await page.goto(entryRoute ? '/' : '/studio');
   await expect(page.getByRole('main')).toBeVisible();
   if (entryRoute) {
-    await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Start with camera' })).toBeVisible();
   } else {
     await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
   }
@@ -208,12 +209,43 @@ const selectSeededCharacter = async (page: Page): Promise<void> => {
   ).toBeVisible();
 };
 
+const openExistingVideoChooser = async (page: Page) => {
+  await page.getByRole('button', { name: 'Upload video' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
+  await expect(dialog).toBeVisible();
+  return dialog;
+};
+
+const selectVisualVideo = async (page: Page) => {
+  const dialog = await openExistingVideoChooser(page);
+  const fixture = await loadH264VideoFixture();
+  await dialog.locator('input[type="file"]').first().setInputFiles({
+    name: 'visual-source.mp4',
+    mimeType: 'video/mp4',
+    buffer: fixture,
+  });
+  await expect(dialog.getByRole('heading', { name: 'Uploaded source' })).toBeVisible();
+  await expect(dialog).toContainText('1280 × 720');
+  return { dialog, fixture };
+};
+
+const addVisualStep = async (
+  dialog: ReturnType<Page['getByRole']>,
+  modelId: 'lucy-2.5' | 'lucy-vton-3',
+  prompt: string,
+) => {
+  await dialog
+    .getByRole('button', { name: modelId === 'lucy-2.5' ? 'Add Lucy' : 'Add VTO' })
+    .click();
+  await dialog.locator('article').last().locator('textarea').fill(prompt);
+};
+
 const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
   'entry-initial': {
     id: 'entry-initial',
     setup: async (page) => {
       await expect(page.getByRole('heading', { name: 'Enter Lightframe Studio' })).toBeAttached();
-      await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Start with camera' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
     },
   },
@@ -314,6 +346,56 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await expect(review.getByRole('heading', { name: 'Latest take', exact: true })).toBeVisible();
       await expect(review.getByRole('link', { name: 'Download take' })).toBeVisible();
       await expect(review.getByText('Loading studio tool…', { exact: true })).toHaveCount(0);
+    },
+  },
+  'upload-chooser': {
+    id: 'upload-chooser',
+    setup: async (page) => {
+      const dialog = await openExistingVideoChooser(page);
+      await expect(dialog.getByRole('button', { name: 'Select video' })).toBeVisible();
+      await expect(dialog).toContainText('MP4/H.264, MOV/H.264, or WebM/VP8');
+    },
+  },
+  'upload-validated-setup': {
+    id: 'upload-validated-setup',
+    setup: async (page) => {
+      const { dialog } = await selectVisualVideo(page);
+      await addVisualStep(dialog, 'lucy-2.5', 'Transform into a documentary field presenter.');
+      await addVisualStep(dialog, 'lucy-vton-3', 'Apply the tailored amber field jacket.');
+      await expect(dialog).toContainText('2 planned Decart submissions');
+    },
+  },
+  'upload-processing': {
+    id: 'upload-processing',
+    setup: async (page) => {
+      const { dialog, fixture } = await selectVisualVideo(page);
+      await installFakeVideoJobRoutes(page, fixture, { processingReadsBeforeReady: 100 });
+      await addVisualStep(dialog, 'lucy-2.5', 'Transform into a documentary field presenter.');
+      await dialog.getByRole('button', { name: 'Start first · 1 planned submission' }).click();
+      await expect(dialog.getByText(/Stage: processing/u)).toBeVisible();
+    },
+  },
+  'upload-checkpoint': {
+    id: 'upload-checkpoint',
+    setup: async (page) => {
+      const { dialog, fixture } = await selectVisualVideo(page);
+      await installFakeVideoJobRoutes(page, fixture);
+      await addVisualStep(dialog, 'lucy-2.5', 'Transform into a documentary field presenter.');
+      await addVisualStep(dialog, 'lucy-vton-3', 'Apply the tailored amber field jacket.');
+      await dialog.getByRole('button', { name: 'Start first · 2 planned submissions' }).click();
+      await expect(
+        dialog.getByRole('heading', { name: 'Review the intermediate result' }),
+      ).toBeVisible();
+    },
+  },
+  'upload-result': {
+    id: 'upload-result',
+    setup: async (page) => {
+      const { dialog, fixture } = await selectVisualVideo(page);
+      await installFakeVideoJobRoutes(page, fixture);
+      await addVisualStep(dialog, 'lucy-2.5', 'Transform into a documentary field presenter.');
+      await dialog.getByRole('button', { name: 'Start first · 1 planned submission' }).click();
+      await expect(dialog.getByRole('heading', { name: 'Result ready' })).toBeVisible();
     },
   },
   'vton-prepared-with-reference': {

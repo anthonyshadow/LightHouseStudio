@@ -68,6 +68,7 @@ const recordingController = (): RecordingController => {
     activeSource: null,
     metadata: null,
     original,
+    visual: null,
     processed: null,
     presented: original,
     sidecar: readySidecar(),
@@ -83,6 +84,7 @@ const recordingController = (): RecordingController => {
     markDownloaded: vi.fn(),
     beginProcessing: vi.fn(),
     cancelProcessing: vi.fn(),
+    completeVisualProcessing: vi.fn().mockReturnValue(original),
     completeProcessing: vi.fn().mockReturnValue(original),
     failProcessing: vi.fn(),
     restoreOriginal: vi.fn(),
@@ -189,6 +191,45 @@ describe('useVoiceProcessing operation ownership', () => {
     expect(recording.original).toBe(original);
     expect(recording.presented).toBe(presented);
     expect(result.current.selection).toEqual({ kind: 'none' });
+
+    unmount();
+  });
+
+  it('applies immutable source audio to the latest visual layer', async () => {
+    const recording = recordingController();
+    const visual = {
+      ...originalArtifact(),
+      id: 'visual',
+      media: new Blob(['visual-video'], { type: 'video/mp4' }),
+      objectUrl: 'blob:visual',
+      mimeType: 'video/mp4',
+      filename: 'visual.mp4',
+    };
+    recording.visual = visual;
+    recording.presented = visual;
+    adapters.convertRecordingVoice.mockResolvedValue(
+      new Blob(['converted-audio'], { type: 'audio/mpeg' }),
+    );
+    adapters.replaceRecordingAudio.mockResolvedValue({
+      blob: new Blob(['voiced-visual'], { type: 'video/mp4' }),
+      mimeType: 'video/mp4',
+    });
+    const { result, unmount } = renderHook(() => useVoiceProcessing(recording));
+
+    await act(async () => {
+      await result.current.applyElevenLabs('voice-one', 'Nova');
+    });
+
+    expect(adapters.convertRecordingVoice).toHaveBeenCalledWith(
+      'voice-one',
+      recording.sidecar.blob,
+      expect.any(AbortSignal),
+    );
+    expect(adapters.replaceRecordingAudio).toHaveBeenCalledWith(
+      visual.media,
+      expect.any(Blob),
+      expect.any(AbortSignal),
+    );
 
     unmount();
   });

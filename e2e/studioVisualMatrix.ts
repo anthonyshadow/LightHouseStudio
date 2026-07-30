@@ -58,6 +58,26 @@ export const FOCUSED_VISUAL_SCENARIOS = [
     id: 'take-playback-review-settled',
     baseline: '04-take-review/playback-review-settled.png',
   },
+  {
+    id: 'upload-chooser',
+    baseline: '07-existing-video/chooser.png',
+  },
+  {
+    id: 'upload-validated-setup',
+    baseline: '07-existing-video/validated-setup.png',
+  },
+  {
+    id: 'upload-processing',
+    baseline: '07-existing-video/processing.png',
+  },
+  {
+    id: 'upload-checkpoint',
+    baseline: '07-existing-video/checkpoint.png',
+  },
+  {
+    id: 'upload-result',
+    baseline: '07-existing-video/result.png',
+  },
 ] as const;
 
 export const DESKTOP_VISUAL_SCENARIOS = [
@@ -83,10 +103,11 @@ export type VisualScenarioId =
 
 const viewportById = new Map(VISUAL_VIEWPORTS.map((viewport) => [viewport.id, viewport]));
 const desktopViewport = viewportById.get('desktop');
+const compactViewport = viewportById.get('compact');
 const smallMobileViewport = viewportById.get('small-mobile');
 
-if (!desktopViewport || !smallMobileViewport) {
-  throw new Error('The visual matrix requires desktop and small-mobile viewports.');
+if (!desktopViewport || !compactViewport || !smallMobileViewport) {
+  throw new Error('The visual matrix requires desktop, compact, and small-mobile viewports.');
 }
 
 export const VISUAL_CASE_MATRIX = [
@@ -99,6 +120,11 @@ export const VISUAL_CASE_MATRIX = [
   { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[2] },
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[3] },
   { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[4] },
+  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[5] },
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[6] },
+  { viewport: compactViewport, scenario: FOCUSED_VISUAL_SCENARIOS[7] },
+  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[8] },
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[9] },
   ...DESKTOP_VISUAL_SCENARIOS.map((scenario) => ({ viewport: desktopViewport, scenario })),
   ...SMALL_MOBILE_VISUAL_SCENARIOS.map((scenario) => ({
     viewport: smallMobileViewport,
@@ -110,7 +136,7 @@ export const VISUAL_BASELINE_PATHS = VISUAL_CASE_MATRIX.map(
   ({ viewport, scenario }) => `${viewport.folder}/${scenario.baseline}`,
 );
 
-const VISUAL_CASE_BUDGET = 20;
+const VISUAL_CASE_BUDGET = 29;
 const coveredViewportIds = new Set(VISUAL_CASE_MATRIX.map(({ viewport }) => viewport.id));
 const corePairs = new Set(
   VISUAL_CASE_MATRIX.map(({ viewport, scenario }) => `${viewport.id}/${scenario.id}`),

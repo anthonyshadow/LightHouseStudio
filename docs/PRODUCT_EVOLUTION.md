@@ -83,6 +83,23 @@ ElevenLabs discovery was narrowed to saved voices. Browsing, preview, and Apply 
 same-origin provider actions; only Apply sends the audio sidecar. Public discovery, import, voice
 creation, and library mutation were removed.
 
+## Existing video joined the take pipeline
+
+Upload became a peer to camera entry without adding a route, player, media library, saved-video
+store, or durable job database. Recorded and uploaded sources now enter one temporary layered take:
+immutable source, latest successful visual result, optional voiced result, and the presented
+highest valid layer.
+
+Batch Lucy and VTO are exact, server-mediated, asynchronous jobs. Each may run once in either
+order. A chain pauses after the first result because the next step is another billable submission;
+only explicit Continue creates it. The UI reports submission count rather than guessing credits or
+currency. Status/download/local-finalization retries reuse the accepted job, while a provider
+submission retry is a new explicit action.
+
+The accepted H.264/VP8 subset, 720p result checks, source-audio restoration, 500 ms duration
+tolerance, temporary storage, and four-submission participant limit are app-owned conservative
+policy until exact-model live and physical qualification is complete.
+
 ## Scope remains intentionally local
 
 Accounts, remote hosting, cloud projects, take history, collaboration, sharing, billing, and public

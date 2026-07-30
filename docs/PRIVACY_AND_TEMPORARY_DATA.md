@@ -18,6 +18,8 @@ This document separates current runtime behavior from the approved pilot operati
 | Camera/microphone streams                                                     | Browser memory while live                                                                             | None in Local; Decart during explicit AI session                                                  |
 | Decart client credential/timing                                               | Browser memory for the connection/session                                                             | Decart connection only                                                                            |
 | Current original take, sidecar, processed result                              | Browser memory until Release/Discard/reload/crash/close                                               | Sidecar only after explicit ElevenLabs Apply                                                      |
+| Uploaded video, ordered recipes, visual results, checkpoint state             | Browser tab memory until replacement, Release/Discard, reload/crash/close                             | Decart receives synthetic-named media and recipe only after explicit submit                       |
+| Active batch input/reference/output                                           | Generated private paths under `LIGHTFRAME_DATA_DIR/.tmp/video-jobs`; process-temporary, 60-minute cap | Decart during explicit submit/status/content; no provider cancellation or deletion is claimed     |
 | Saved-voice pages/selection                                                   | React memory                                                                                          | ElevenLabs metadata after explicit Browse                                                         |
 | Voice preview audio                                                           | Bounded, short-lived Blob URL; revoked on replacement/unmount                                         | ElevenLabs preview request; never the take                                                        |
 
@@ -36,6 +38,7 @@ provider payloads/errors are neither retained as product data nor returned to th
 | `GET /api/capabilities`           | Local broker configuration only; no provider request                                                                                                                |
 | Upload/direct image save          | Local broker/store only                                                                                                                                             |
 | Start/Apply Character or VTO      | Decart receives live camera/microphone media and the complete applied recipe/reference                                                                              |
+| Submit uploaded visual step       | Decart receives a synthetic-named compatible video, normalized prompt/options, and optional validated reference; Continue is a separate explicit submission         |
 | Optimize/Re-optimize              | OpenAI receives the raw character direction and selected reference options; response storage is disabled                                                            |
 | Generate/Combined/Regenerate/Edit | Startup-selected OpenAI/BFL/Wiro image provider receives the optimized or documented raw-fallback prompt; composition/editing also receives the owner-scoped source |
 | Browse saved voices               | ElevenLabs receives a saved-library metadata request; no take                                                                                                       |
@@ -55,6 +58,9 @@ permission state but does not request media. Local Voice uses Web Audio/remux on
 - Studio owns one temporary take. Download starts a browser download but does not prove completion.
   Release or confirmed Discard revokes take URLs and returns to idle.
 - A take survives overlay closure, but not reload, crash, tab closure, or device restart.
+- Uploaded workflow/job recovery is intentionally unsupported across reload, crash, tab closure, or
+  broker restart. The broker purges its dedicated job temp root at startup and expires jobs after
+  60 minutes.
 - Legacy projects remain in IndexedDB until explicit manager deletion, site-data clearing, private
   session closure, eviction, or profile retirement.
 - Recipe Dock portrait/garment files are tab-ephemeral.
@@ -112,9 +118,9 @@ Local cleanup must never be described as provider-side deletion.
 ## Server security scope
 
 The API is a trusted local broker: it binds to loopback, rejects non-loopback Host values, requires
-exact loopback Origin/Host for provider/reference mutations, requires explicit voice intent for
-ElevenLabs contact, validates/bounds inputs and outputs, owner-scopes references, and sanitizes
-errors. It has no public authentication or authorization.
+exact loopback Origin/Host for provider/reference mutations, requires explicit voice/video intent
+for ElevenLabs and Decart batch contact, validates/bounds inputs and outputs, owner-scopes
+references/jobs, and sanitizes errors. It has no public authentication or authorization.
 
 Do not expose it through LAN binding, a tunnel, proxy, container ingress, or public hostname.
 Accounts, remote persistence, public ingress, and tenancy remain deferred behind the

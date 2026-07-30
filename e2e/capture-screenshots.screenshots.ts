@@ -141,6 +141,7 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
         contentType: 'application/json',
         body: JSON.stringify({
           realtimeVideo: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
+          videoProcessing: { available: false, models: [] },
           elevenLabs: { available: true, modelId: 'eleven_multilingual_sts_v2' },
           referenceImages: {
             available: false,

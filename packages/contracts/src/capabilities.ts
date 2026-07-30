@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { supportedModelIdSchema } from './realtime';
 import { REFERENCE_IMAGE_SIZES } from './reference-images';
+import { videoTransformModelIdSchema } from './video-jobs';
 
 export const capabilitiesResponseSchema = z
   .object({
@@ -8,6 +9,12 @@ export const capabilitiesResponseSchema = z
       .object({
         available: z.boolean(),
         models: z.array(supportedModelIdSchema).max(2),
+      })
+      .strict(),
+    videoProcessing: z
+      .object({
+        available: z.boolean(),
+        models: z.array(videoTransformModelIdSchema).max(2),
       })
       .strict(),
     elevenLabs: z

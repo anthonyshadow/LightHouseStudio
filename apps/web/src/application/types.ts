@@ -21,6 +21,8 @@ export type RealtimeSessionTiming = Readonly<{
 
 export type ProviderAvailability = {
   decart: boolean;
+  videoProcessing?: boolean;
+  videoProcessingModels?: readonly ModelModeId[];
   elevenLabs: boolean;
   elevenLabsModel: string | null;
   referenceImages?: boolean;

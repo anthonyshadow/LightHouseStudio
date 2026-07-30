@@ -44,20 +44,26 @@ primary flows in [user stories](userStories/README.md) and record every applicab
 
 ### Common checks
 
-| Check                          | Pass condition                                                                                                                                |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| `permission-allow-deny-revoke` | Allow, deny, and revoke camera/mic; errors are actionable; no token/provider work precedes healthy local media                                |
-| `local-capture`                | Start Local, verify mirrored contained video/audio, capability-gated camera/zoom controls, recordable source                                  |
-| `character-capture`            | Exact Lucy 2.5 Start/Apply, local fallback until usable remote video, short playable take                                                     |
-| `vto-capture`                  | Exact pinned VTO Start/Apply, image-only does not invent text, short playable take                                                            |
-| `record-300-seconds`           | At 270 seconds warning is visible/announced; at 300 seconds Stop coalesces once                                                               |
-| `record-finalize`              | Main recorder and optional sidecar settle before source/provider release; one playable original survives sidecar failure                      |
-| `local-voice`                  | Warm/Clear/Robot always start from immutable original; success/cancel/failure preserves a valid take                                          |
-| `elevenlabs-voice`             | Saved browse/preview sends no take; Apply sends only original sidecar; remux/original recovery works                                          |
-| `download-playback`            | Download dispatch leaves review intact; result plays in a second player with expected duration/video/audio; Release works only after dispatch |
-| `background-foreground`        | Background/foreground, screen lock/call/device interruption recovers safely or finalizes without take loss                                    |
-| `memory-checkpoints`           | Complete [300-second memory protocol](RECORDING_MEMORY_POLICY.md) through processing and Release/Discard                                      |
-| `cleanup`                      | Camera/mic indicators, WebRTC/provider clients, recorders, timers, listeners, audio contexts, tracks, and superseded URLs terminate once      |
+| Check                              | Pass condition                                                                                                                                |
+| ---------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| `permission-allow-deny-revoke`     | Allow, deny, and revoke camera/mic; errors are actionable; no token/provider work precedes healthy local media                                |
+| `local-capture`                    | Start Local, verify mirrored contained video/audio, capability-gated camera/zoom controls, recordable source                                  |
+| `character-capture`                | Exact Lucy 2.5 Start/Apply, local fallback until usable remote video, short playable take                                                     |
+| `vto-capture`                      | Exact pinned VTO Start/Apply, image-only does not invent text, short playable take                                                            |
+| `upload-select-replace-remove`     | Native picker and drop publish compatible media without camera/provider work; replace/remove revokes only owned URLs                          |
+| `upload-local-download`            | A zero-step H.264 MP4/MOV or VP8 WebM source previews and downloads with no external request                                                  |
+| `upload-single-visual-step`        | Batch Lucy and batch VTO each submit exactly once, return inspected 720p output, and restore source audio                                     |
+| `upload-ordered-chain-both-orders` | Lucy → VTO and VTO → Lucy preserve order, count two submissions, and never start step two automatically                                       |
+| `upload-intermediate-checkpoint`   | Original/result comparison, completed/remaining recipes, **Finish here**, and explicit **Continue** behave accessibly                         |
+| `upload-voice`                     | Local and ElevenLabs Voice use immutable uploaded source audio and apply to the latest visual result                                          |
+| `record-300-seconds`               | At 270 seconds warning is visible/announced; at 300 seconds Stop coalesces once                                                               |
+| `record-finalize`                  | Main recorder and optional sidecar settle before source/provider release; one playable original survives sidecar failure                      |
+| `local-voice`                      | Warm/Clear/Robot always start from immutable original; success/cancel/failure preserves a valid take                                          |
+| `elevenlabs-voice`                 | Saved browse/preview sends no take; Apply sends only original sidecar; remux/original recovery works                                          |
+| `download-playback`                | Download dispatch leaves review intact; result plays in a second player with expected duration/video/audio; Release works only after dispatch |
+| `background-foreground`            | Background/foreground, screen lock/call/device interruption recovers safely or finalizes without take loss                                    |
+| `memory-checkpoints`               | Complete [300-second memory protocol](RECORDING_MEMORY_POLICY.md) through processing and Release/Discard                                      |
+| `cleanup`                          | Camera/mic indicators, WebRTC/provider clients, recorders, timers, listeners, audio contexts, tracks, and superseded URLs terminate once      |
 
 Repeat the common recording boundary for Local, Character, and VTO. If recording/source/provider
 completion coincide, only one finalization may publish. The stage must hold the last frame while
@@ -85,8 +91,9 @@ finalizing and become paused playback without reacquiring media.
 | `camera-switch-when-exposed` | Opposite `user`/`environment` mode switches atomically; control is absent when capability is not exposed |
 
 Touch/mobile creation includes opening Character Builder, creating/saving a reusable character,
-starting Character AI, recording, optional Voice, and Download—not just responsive shell
-inspection.
+starting Character AI, recording, optional Voice, and Download. It also includes native
+existing-video selection, replacement, ordered setup, checkpoint approval, Voice, and Download—not
+just responsive shell inspection.
 
 ## Viewport and overlay invariants
 
@@ -128,6 +135,16 @@ preview/generation region; **Review & Generate** moves focus to it without dupli
 
 ## Take, Voice, and cleanup checks
 
+- Exercise accepted H.264 MP4, H.264 MOV, and VP8 WebM plus rejected HEVC/ProRes/VP9/alias cases.
+  Confirm the full accessible filename is available without being sent to the server/provider.
+- Verify source duration/aspect/byte boundaries, no-audio visual use, Voice-disabled explanation,
+  VTO's lower input cap, exact 720p result orientation, and the 500 ms synchronization tolerance.
+- Interrupt upload before provider acceptance, background/foreground during polling, restart the
+  broker, expire a result, retry status/content/local finalization, and race source replacement.
+  No path may create an automatic paid resubmission or discard the last valid artifact.
+- Confirm provider-active processing blocks source/order mutation and Studio exit; refresh warns
+  but does not promise tab/process recovery. Repeated cleanup is idempotent and never claims
+  provider cancellation.
 - Recording pins source identity. Model recording is unavailable before live transformed video.
 - Final main video remains valid if the sidecar fails or reaches its grace timeout.
 - Playback stays on the persistent stage; Latest Take opens only through **Take** and contains no
@@ -159,5 +176,5 @@ Using keyboard and a screen reader:
 
 A passing JSON record must contain every required check for the exact row and commit. A blocked or
 failed record is valid evidence but does not satisfy release. Re-run the validator after recording
-results; release remains open until it reports `7/7` provider/local and `45/45` physical rows with
+results; release remains open until it reports `10/10` provider/local and `45/45` physical rows with
 no invalid records.

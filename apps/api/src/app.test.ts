@@ -26,6 +26,7 @@ describe('API shell', () => {
     expect(health.json()).toEqual({ ok: true });
     expect(capabilities.json()).toEqual({
       realtimeVideo: { available: false, models: ['lucy-2.5', 'lucy-vton-3'] },
+      videoProcessing: { available: false, models: ['lucy-2.5', 'lucy-vton-3'] },
       elevenLabs: { available: true, modelId: 'eleven_multilingual_sts_v2' },
       referenceImages: {
         available: false,
@@ -56,6 +57,25 @@ describe('API shell', () => {
       config.openAiPromptOptimizerTimeoutMs + OPENAI_CONNECTION_TIMEOUT_MARGIN_MS,
     );
     expect(app.server.requestTimeout).toBe(100_000);
+  });
+
+  it('reports exact batch video capability independently from realtime availability', async () => {
+    const app = createApp({
+      config: testConfig({ decartApiKey: 'server-only-secret' }),
+      decartProvider: null,
+    });
+    apps.push(app);
+
+    const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
+
+    expect(capabilities.json()).toMatchObject({
+      realtimeVideo: { available: false },
+      videoProcessing: {
+        available: true,
+        models: ['lucy-2.5', 'lucy-vton-3'],
+      },
+    });
+    expect(capabilities.body).not.toContain('server-only-secret');
   });
 
   it('reports the selected BFL image provider while keeping OpenAI optimization independent', async () => {

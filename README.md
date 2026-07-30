@@ -3,7 +3,7 @@
 Lightframe Studio is a local-first browser camera studio for short webcam performances with
 reusable characters. Its primary loop is:
 
-**Local preview → Character → Lucy 2.5 → Record → optional Voice → Download**
+**Camera or Upload → optional Lucy/VTO visual processing → optional Voice → Download**
 
 Virtual Try-On and Workshop are secondary tools. The app is single-operator, binds to loopback,
 and stores no accounts or cloud projects. It is not approved for LAN, tunnel, public, or
@@ -22,14 +22,16 @@ claim that qualification has passed.
 
 ## Product flow
 
-1. Open `/` and select **Enter** to move to `/studio`.
-2. Select **Start Camera + Mic** for provider-free local preview.
-3. Create or choose a reusable Character.
-4. Optionally select **Start AI** for Lucy 2.5 Character Transformation or VTO 3.
-5. Record a take. Studio warns at 270 seconds and automatically stops at 300 seconds.
-6. Review playback on the same persistent stage.
-7. Optionally apply a local effect or saved ElevenLabs voice.
-8. Initiate Download, verify the browser saved the file, then Release. Or confirm Discard without
+1. Open `/` and select **Start with camera** or **Upload existing video** to move to `/studio`.
+2. Camera provides the existing provider-free live flow. Upload validates and previews a
+   compatible device-local file without requesting camera permission or provider credentials.
+3. For camera, optionally choose Character/VTO, start AI, and Record. Studio warns at 270 seconds
+   and automatically stops at 300 seconds.
+4. For upload, choose zero, one, or two ordered Lucy/VTO steps. Each exact model appears at most
+   once; a two-step order pauses for explicit approval after the first result.
+5. Review playback on the same persistent stage.
+6. Optionally apply a local effect or saved ElevenLabs voice.
+7. Initiate Download, verify the browser saved the file, then Release. Or confirm Discard without
    downloading.
 
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio` owns the
@@ -43,12 +45,15 @@ dirty Recipe Shelf edit requires confirmed discard; saved origin-scoped browser 
 
 ## Capabilities and provider boundaries
 
-- Local camera, microphone, recording, playback, local voice effects, and download require no
-  provider credentials or external media traffic.
+- Local camera, microphone, existing-video validation/preview, recording, playback, local voice
+  effects, and download require no provider credentials or external media traffic.
 - Character Builder saves browser-local character metadata and immutable reference assets under
   `LIGHTFRAME_DATA_DIR`. Prompt-only save and upload do not generate images.
 - Lucy 2.5 and pinned `lucy-vton-3` start only after explicit user action. Decart receives live
   media and the applied prompt/reference snapshot.
+- Batch Lucy/VTO uses server-mediated exact-model jobs with fixed 720p output, explicit
+  submit/status/content stages, inspected size/duration/orientation, and no automatic retry of a
+  billable submission. The UI shows request count, not invented credits or percentages.
 - Reference generation uses one startup-selected provider: OpenAI `gpt-image-2`, BFL
   `flux-2-pro`, or Wiro `seedream-v5-lite-uncensored`. There is no automatic billable retry or
   provider fallback.
@@ -100,7 +105,7 @@ is the maintained list of defaults and tunables.
 
 | Variable                          | Purpose                                                                                   |
 | --------------------------------- | ----------------------------------------------------------------------------------------- |
-| `DECART_API_KEY`                  | Mint scoped browser credentials for Lucy 2.5 and VTO 3                                    |
+| `DECART_API_KEY`                  | Realtime scoped credentials and server-mediated exact-model batch video jobs              |
 | `OPENAI_API_KEY`                  | Character prompt optimization and OpenAI image work                                       |
 | `REFERENCE_IMAGE_PROVIDER`        | Startup choice: `openai` (default), `bfl`, or `wiro`                                      |
 | `BFL_API_KEY`                     | BFL image work when BFL is selected                                                       |

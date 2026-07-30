@@ -5,6 +5,8 @@ import type { CapabilityState } from './StudioHeader';
 
 const unavailableProviders: ProviderAvailability = {
   decart: false,
+  videoProcessing: false,
+  videoProcessingModels: [],
   elevenLabs: false,
   elevenLabsModel: null,
   referenceImages: false,
