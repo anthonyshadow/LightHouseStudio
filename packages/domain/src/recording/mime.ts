@@ -17,6 +17,3 @@ export const selectRecordingMimeType = (
 
 export const recordingFileExtension = (mimeType: string): 'mp4' | 'webm' =>
   mimeType.toLocaleLowerCase('en-US').includes('mp4') ? 'mp4' : 'webm';
-
-export const isAudioMimeType = (mimeType: string): boolean =>
-  /^audio\/(?:aac|mp3|mp4|mpeg|ogg|wav|webm)(?:;|$)/iu.test(mimeType.trim());

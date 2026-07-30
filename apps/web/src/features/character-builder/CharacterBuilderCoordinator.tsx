@@ -1,36 +1,16 @@
 import type { RefObject } from 'react';
-import type { LocalProjectRepository } from '../guided-flow/types';
 import { CharacterBuilderPanel } from './CharacterBuilderPanel';
 import {
   useCharacterBuilderController,
-  type CharacterSaveProgress,
-  type CharacterSaveSnapshot,
-  type CharacterSaveStage,
-  type CharacterBuilderDraftValueV1,
+  type UseCharacterBuilderControllerOptions,
 } from './useCharacterBuilderController';
-import type { CharacterBuilderTarget } from './characterBuilderPersistence';
 
-export interface CharacterBuilderCoordinatorProps {
-  readonly open: boolean;
+export type CharacterBuilderCoordinatorProps = UseCharacterBuilderControllerOptions & {
   readonly returnFocusRef?: RefObject<HTMLElement | null>;
-  readonly generationAvailable: boolean;
-  readonly optimizationAvailable?: boolean;
-  readonly editAvailable: boolean;
   readonly referenceImageProvider?: 'openai' | 'bfl' | 'wiro' | null;
   readonly referenceImageModel?: string | null;
   readonly referenceImageOptimizerModel?: string | null;
-  readonly saveBlockedReason?: string | undefined;
-  readonly legacyRepository?: LocalProjectRepository | undefined;
-  readonly onSaveCharacter: (
-    snapshot: CharacterSaveSnapshot,
-    characterId: string,
-    stage: CharacterSaveStage,
-    progress: CharacterSaveProgress,
-  ) => Promise<void>;
-  readonly onDismiss: () => void;
-  readonly target?: CharacterBuilderTarget | undefined;
-  readonly initialValue?: CharacterBuilderDraftValueV1 | undefined;
-}
+};
 
 export const CharacterBuilderCoordinator = ({
   open,

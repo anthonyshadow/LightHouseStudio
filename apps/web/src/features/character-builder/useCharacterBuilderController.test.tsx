@@ -13,12 +13,12 @@ import type {
   ResetCharacterBuilderDraftInput,
   SaveCharacterBuilderDraftInput,
 } from './draftRepository';
+import type { CharacterSaveSnapshot } from './characterBuilderControllerSupport';
 import type {
   CharacterBuilderDraftValueV1,
-  CharacterSaveSnapshot,
   CharacterSaveStage,
-  UseCharacterBuilderControllerOptions,
-} from './useCharacterBuilderController';
+} from './characterBuilderPersistence';
+import type { UseCharacterBuilderControllerOptions } from './useCharacterBuilderController';
 
 const draftRepositoryFactory = vi.hoisted(() => vi.fn());
 const uploadReferenceImage = vi.hoisted(() => vi.fn());

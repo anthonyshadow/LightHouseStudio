@@ -1,5 +1,10 @@
 import type { ApiErrorCode } from '@studio/contracts';
 
+const normalizeUpstreamStatus = (value: number | undefined): number | undefined =>
+  value !== undefined && Number.isInteger(value) && value >= 400 && value <= 599
+    ? value
+    : undefined;
+
 export class AppError extends Error {
   readonly statusCode: number;
   readonly code: ApiErrorCode;
@@ -15,6 +20,7 @@ export class AppError extends Error {
     this.name = 'AppError';
     this.statusCode = statusCode;
     this.code = code;
-    if (options?.upstreamStatus !== undefined) this.upstreamStatus = options.upstreamStatus;
+    const upstreamStatus = normalizeUpstreamStatus(options?.upstreamStatus);
+    if (upstreamStatus !== undefined) this.upstreamStatus = upstreamStatus;
   }
 }

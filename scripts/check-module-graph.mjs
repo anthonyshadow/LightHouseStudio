@@ -3,7 +3,7 @@ import path from 'node:path';
 import ts from 'typescript';
 
 const repositoryRoot = process.cwd();
-const sourceRoots = ['apps', 'packages', 'e2e', 'scripts'];
+const sourceRoots = ['apps', 'packages', 'e2e', 'scripts', 'stories', '.storybook'];
 const sourceExtensions = new Set(['.ts', '.tsx', '.mts', '.cts', '.mjs', '.js']);
 const ignoredDirectories = new Set([
   'coverage',
@@ -42,6 +42,7 @@ const workspaceAliases = new Map([
   ['@studio/contracts', path.join(repositoryRoot, 'packages/contracts/src/index.ts')],
   ['@studio/domain', path.join(repositoryRoot, 'packages/domain/src/index.ts')],
 ]);
+const webAliasRoot = path.join(repositoryRoot, 'apps/web/src');
 const edges = new Map(files.map((file) => [file, new Set()]));
 const unresolved = [];
 const boundaryViolations = [];
@@ -63,10 +64,7 @@ const allowedStudioImports = {
   root: new Set(['@studio/contracts', '@studio/domain']),
 };
 
-const resolveRelative = (importer, specifier) => {
-  const cleanSpecifier = specifier.split(/[?#]/u, 1)[0];
-  if (!cleanSpecifier) return null;
-  const rawTarget = path.resolve(path.dirname(importer), cleanSpecifier);
+const resolveTarget = (rawTarget) => {
   const candidates = [rawTarget];
   const extension = path.extname(rawTarget);
 
@@ -87,6 +85,18 @@ const resolveRelative = (importer, specifier) => {
   return null;
 };
 
+const resolveRelative = (importer, specifier) => {
+  const cleanSpecifier = specifier.split(/[?#]/u, 1)[0];
+  if (!cleanSpecifier) return null;
+  return resolveTarget(path.resolve(path.dirname(importer), cleanSpecifier));
+};
+
+const resolveWebAlias = (specifier) => {
+  if (specifier !== '@web' && !specifier.startsWith('@web/')) return null;
+  const relativeTarget = specifier === '@web' ? '' : specifier.slice('@web/'.length);
+  return resolveTarget(path.join(webAliasRoot, relativeTarget));
+};
+
 for (const file of files) {
   const source = fs.readFileSync(file, 'utf8');
   const imports = ts.preProcessFile(source, true, true).importedFiles;
@@ -97,6 +107,12 @@ for (const file of files) {
     let target = null;
     if (specifier.startsWith('.')) {
       target = resolveRelative(file, specifier);
+      if (!target) {
+        unresolved.push(`${path.relative(repositoryRoot, file)} -> ${specifier}`);
+        continue;
+      }
+    } else if (specifier === '@web' || specifier.startsWith('@web/')) {
+      target = resolveWebAlias(specifier);
       if (!target) {
         unresolved.push(`${path.relative(repositoryRoot, file)} -> ${specifier}`);
         continue;

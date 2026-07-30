@@ -378,6 +378,29 @@ describe('ElevenLabs voice API', () => {
     expect(response.body).not.toContain('response-too-large');
   });
 
+  it('maps oversized successful provider metadata to a browser-safe error', async () => {
+    class OversizedMetadataProvider extends FakeElevenLabsProvider {
+      override listWorkspaceVoices(): Promise<never> {
+        return Promise.reject(new ProviderError('workspace-voices', 'response-too-large', 200));
+      }
+    }
+    const { app } = setup(new OversizedMetadataProvider());
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/voices',
+      headers: intentHeaders,
+    });
+
+    expect(response.statusCode).toBe(502);
+    expect(response.json()).toEqual({
+      error: {
+        code: 'provider_response_too_large',
+        message: 'The voice provider response exceeded the safe metadata limit. Try again shortly.',
+      },
+    });
+    expect(response.body).not.toContain('response-too-large');
+  });
+
   it('explains zero-retention account rejection without exposing the upstream body', async () => {
     class ZeroRetentionRejectedProvider extends FakeElevenLabsProvider {
       override convertRecording(): Promise<never> {

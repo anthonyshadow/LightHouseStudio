@@ -39,16 +39,6 @@ import {
 import { useRecordingArtifacts } from './useRecordingArtifacts';
 import { captureTakeMetadata, domainAudioSource, domainVideoSource } from './recordingMetadata';
 
-export type {
-  AutomaticRecordingStopEvent,
-  AutomaticRecordingStopReason,
-  PersistedRecordingArtifactMetadata,
-  PersistedRecordingAudioSidecar,
-  RecordingController,
-  RestorePersistedOriginalInput,
-  UseRecordingOptions,
-} from '../../features/recording/types';
-
 const stopRecorderBestEffort = (recorder: MediaRecorder | null): void => {
   if (!recorder || recorder.state === 'inactive') return;
   try {

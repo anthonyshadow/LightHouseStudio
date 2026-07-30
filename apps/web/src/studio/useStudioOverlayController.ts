@@ -15,7 +15,6 @@ export type ActiveOverlay =
 
 type OverlayAction =
   | { readonly type: 'open'; readonly overlay: Exclude<ActiveOverlay, null> }
-  | { readonly type: 'open-if-empty'; readonly overlay: Exclude<ActiveOverlay, null> }
   | { readonly type: 'close' }
   | { readonly type: 'close-if'; readonly overlays: readonly Exclude<ActiveOverlay, null>[] }
   | { readonly type: 'toggle'; readonly overlay: Exclude<ActiveOverlay, null> };
@@ -27,8 +26,6 @@ export const studioOverlayReducer = (
   switch (action.type) {
     case 'open':
       return action.overlay;
-    case 'open-if-empty':
-      return current ?? action.overlay;
     case 'close':
       return null;
     case 'close-if':
@@ -43,9 +40,6 @@ export const useStudioOverlayController = (initial: ActiveOverlay) => {
   const open = useCallback((overlay: Exclude<ActiveOverlay, null>) => {
     dispatch({ type: 'open', overlay });
   }, []);
-  const openIfEmpty = useCallback((overlay: Exclude<ActiveOverlay, null>) => {
-    dispatch({ type: 'open-if-empty', overlay });
-  }, []);
   const close = useCallback(() => {
     dispatch({ type: 'close' });
   }, []);
@@ -56,5 +50,5 @@ export const useStudioOverlayController = (initial: ActiveOverlay) => {
     dispatch({ type: 'toggle', overlay });
   }, []);
 
-  return { active, open, openIfEmpty, close, closeIf, toggle } as const;
+  return { active, open, close, closeIf, toggle } as const;
 };

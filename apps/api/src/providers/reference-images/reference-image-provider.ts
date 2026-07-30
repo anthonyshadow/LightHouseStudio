@@ -1,4 +1,5 @@
 import type { CharacterPromptOptimizationResult, ReferenceImageSize } from '@studio/contracts';
+import { decodeCanonicalBase64 } from '../../application/strict-base64.js';
 
 export type ReferenceImageProviderId = 'openai' | 'bfl' | 'wiro';
 export type ReferenceImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
@@ -95,48 +96,17 @@ export class ReferenceImageProviderError extends Error {
 }
 
 export const MAX_PROVIDER_IMAGE_BYTES = 32 * 1024 * 1024;
-const MAX_PROVIDER_BASE64_LENGTH = Math.ceil(MAX_PROVIDER_IMAGE_BYTES / 3) * 4;
-
-const isBase64AlphabetCode = (code: number): boolean =>
-  (code >= 0x41 && code <= 0x5a) ||
-  (code >= 0x61 && code <= 0x7a) ||
-  (code >= 0x30 && code <= 0x39) ||
-  code === 0x2b ||
-  code === 0x2f;
-
-const hasCanonicalBase64Shape = (encoded: string): boolean => {
-  if (
-    encoded.length === 0 ||
-    encoded.length % 4 !== 0 ||
-    encoded.length > MAX_PROVIDER_BASE64_LENGTH
-  ) {
-    return false;
-  }
-  const padding = encoded.endsWith('==') ? 2 : encoded.endsWith('=') ? 1 : 0;
-  const contentLength = encoded.length - padding;
-  for (let index = 0; index < contentLength; index += 1) {
-    if (!isBase64AlphabetCode(encoded.charCodeAt(index))) return false;
-  }
-  return true;
-};
 
 /** Strictly decodes an inline provider image without accepting whitespace or URL-safe variants. */
 export const decodeProviderBase64 = (
   encoded: string,
   providerId: ReferenceImageProviderId,
 ): Buffer => {
-  if (!hasCanonicalBase64Shape(encoded)) {
+  const decoded = decodeCanonicalBase64(encoded, MAX_PROVIDER_IMAGE_BYTES);
+  if (!decoded.ok) {
     throw new ReferenceImageProviderError('invalid-response', { providerId });
   }
-  const bytes = Buffer.from(encoded, 'base64');
-  if (
-    bytes.byteLength === 0 ||
-    bytes.byteLength > MAX_PROVIDER_IMAGE_BYTES ||
-    bytes.toString('base64') !== encoded
-  ) {
-    throw new ReferenceImageProviderError('invalid-response', { providerId });
-  }
-  return bytes;
+  return decoded.bytes;
 };
 
 export const mimeTypeForReferenceImageFormat = (

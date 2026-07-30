@@ -19,8 +19,6 @@ import type {
   VoiceProcessingController,
 } from '../../features/voice-effects/types';
 
-export type { VoiceProcessingController } from '../../features/voice-effects/types';
-
 const safeProcessingMessage = (error: unknown): string => {
   if (error instanceof DOMException && error.name === 'AbortError')
     return 'Voice processing was canceled.';

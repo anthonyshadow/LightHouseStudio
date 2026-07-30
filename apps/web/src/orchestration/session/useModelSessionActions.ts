@@ -7,6 +7,7 @@ import {
   getDecartModelRequirements,
 } from '../../adapters/decart-realtime/DecartRealtimeGateway';
 import { hasLiveVideo } from '../../adapters/browser-media/browserMedia';
+import type { ModelMode, PromptCommittedHandler } from '../../application/types';
 import {
   isModelMode,
   toSafeMediaError,
@@ -41,11 +42,7 @@ export type ModelSessionActionsOptions = {
   ) => Promise<MediaStream>;
   localRef: RefObject<MediaStream | null>;
   realtimeSessionProfile?: RealtimeSessionProfile;
-  onPromptCommitted?: (
-    mode: 'lucy-2.5' | 'lucy-vton-3',
-    prompt: string,
-    referenceImageAssetId: string | null,
-  ) => void;
+  onPromptCommitted?: PromptCommittedHandler;
 };
 
 export type ModelSessionActions = {
@@ -146,6 +143,17 @@ export const useModelSessionActions = ({
     onProviderError: handleProviderError,
   });
 
+  const notifyPromptCommitted = useCallback(
+    (mode: ModelMode, draft: SessionDraft) => {
+      const committedPrompt = draft.prompt.trim();
+      const committedReferenceAssetId = persistedReferenceAssetId(draft.referenceImage);
+      if (committedPrompt || committedReferenceAssetId) {
+        onPromptCommitted?.(mode, committedPrompt, committedReferenceAssetId);
+      }
+    },
+    [onPromptCommitted],
+  );
+
   const startModel = useCallback(async () => {
     const currentDraft = draftRef.current;
     if (!isModelMode(currentDraft.mode)) {
@@ -209,11 +217,7 @@ export const useModelSessionActions = ({
       if (startAbortRef.current === controller) startAbortRef.current = null;
       setApplied(toAppliedState(currentDraft));
       setLifecycle((value) => (value === 'connecting' ? 'connected' : value));
-      const committedPrompt = currentDraft.prompt.trim();
-      const committedReferenceAssetId = persistedReferenceAssetId(currentDraft.referenceImage);
-      if (committedPrompt || committedReferenceAssetId) {
-        onPromptCommitted?.(currentDraft.mode, committedPrompt, committedReferenceAssetId);
-      }
+      notifyPromptCommitted(currentDraft.mode, currentDraft);
     } catch (caught) {
       if (operationRef.current === operation) startAbortRef.current = null;
       if (operationRef.current !== operation) return;
@@ -226,7 +230,7 @@ export const useModelSessionActions = ({
     draftRef,
     ensureMedia,
     localRef,
-    onPromptCommitted,
+    notifyPromptCommitted,
     operationRef,
     realtime,
     realtimeSessionProfile,
@@ -262,11 +266,7 @@ export const useModelSessionActions = ({
       await realtime.apply(toProviderSnapshot(currentDraft.mode, currentDraft));
       if (operationRef.current !== operation) return;
       setApplied(toAppliedState(currentDraft));
-      const committedPrompt = currentDraft.prompt.trim();
-      const committedReferenceAssetId = persistedReferenceAssetId(currentDraft.referenceImage);
-      if (committedPrompt || committedReferenceAssetId) {
-        onPromptCommitted?.(currentDraft.mode, committedPrompt, committedReferenceAssetId);
-      }
+      notifyPromptCommitted(currentDraft.mode, currentDraft);
     } catch (error) {
       if (operationRef.current !== operation) return;
       const safe =
@@ -291,7 +291,7 @@ export const useModelSessionActions = ({
     applying,
     draftRef,
     lifecycle,
-    onPromptCommitted,
+    notifyPromptCommitted,
     operationRef,
     realtime,
     setApplied,

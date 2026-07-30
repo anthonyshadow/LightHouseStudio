@@ -4,17 +4,7 @@ import {
   REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH,
   type OptimizeCharacterReferencePromptRequest,
 } from '@studio/contracts';
-import {
-  buildCharacterReferenceImagePrompt,
-  characterReferencePromptHashInput,
-  type CharacterReferencePromptFraming,
-} from '@studio/domain';
-
-/** Deterministically wraps, but never mutates, the authored Lucy prompt. */
-export const createReferenceImagePrompt = (
-  workshopPrompt: string,
-  framing: CharacterReferencePromptFraming = 'full_body',
-): string => buildCharacterReferenceImagePrompt(workshopPrompt, framing);
+import { characterReferencePromptHashInput } from '@studio/domain';
 
 /** Hashes the same canonical identity used by the local Recipe Shelf. */
 export const createWorkshopPromptHash = (workshopPrompt: string): string =>
@@ -72,18 +62,3 @@ export const createReferenceImageCompositionPrompt = (optimizedCharacterPrompt: 
     Math.max(0, REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH - prefix.length),
   )}`;
 };
-
-export interface ReferenceImagePromptVersion {
-  readonly originalPrompt: string;
-  readonly derivedPrompt: string;
-  readonly promptHash: string;
-}
-
-export const versionReferenceImagePrompt = (
-  workshopPrompt: string,
-  framing: CharacterReferencePromptFraming = 'full_body',
-): ReferenceImagePromptVersion => ({
-  originalPrompt: workshopPrompt,
-  derivedPrompt: createReferenceImagePrompt(workshopPrompt, framing),
-  promptHash: createWorkshopPromptHash(workshopPrompt),
-});

@@ -2,7 +2,7 @@ import { type ReferenceImageAsset } from '@studio/contracts';
 import { createPromptBuilderDraft, type GuidedDesignV1 } from '@studio/domain';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
 import { createEmptyGuidedDesign } from './characterModel';
-import type { CharacterBuilderState } from './machine';
+import type { CharacterBuilderAction, CharacterBuilderState } from './machine';
 import { DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS } from './ReferenceOptionsFields';
 import type {
   CharacterBuilderDraftValueV1,
@@ -45,6 +45,19 @@ export const createFreshCharacterBuilderDraftValue = (): CharacterBuilderDraftVa
   uploadedReference: null,
   pendingSave: null,
 });
+
+export const createFreshCharacterBuilderResetAction = (): Extract<
+  CharacterBuilderAction,
+  { type: 'reset' }
+> => {
+  const fresh = createFreshCharacterBuilderDraftValue();
+  return {
+    type: 'reset',
+    draft: fresh.draft,
+    design: fresh.design,
+    options: fresh.options,
+  };
+};
 
 export const toPersistedCharacterBuilderPreview = (
   state: CharacterBuilderState,

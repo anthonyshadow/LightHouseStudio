@@ -8,8 +8,8 @@ import type { StudioSessionController } from '../media-session/types';
 import type {
   CharacterSaveProgress,
   CharacterSaveSnapshot,
-  CharacterSaveStage,
-} from './useCharacterBuilderController';
+} from './characterBuilderControllerSupport';
+import type { CharacterSaveStage } from './characterBuilderPersistence';
 
 const referenceIdentity = (
   reference: StudioSessionController['draft']['referenceImage'],

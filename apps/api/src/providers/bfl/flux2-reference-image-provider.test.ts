@@ -11,6 +11,15 @@ const jsonResponse = (value: unknown, status = 200): Response =>
   });
 
 describe('BflFlux2ReferenceImageProvider', () => {
+  it('aligns direct construction with the pilot safety defaults', () => {
+    const provider = new BflFlux2ReferenceImageProvider('bfl-secret');
+
+    expect(provider.descriptor.effectiveSettings).toEqual({
+      safetyTolerance: 2,
+      disablePromptUpsampling: true,
+    });
+  });
+
   it('submits a prompt-only task once, polls the exact returned URL, and returns downloaded bytes with provenance', async () => {
     const pollingUrl = 'https://api.us1.bfl.ai/v1/get_result?id=task-one&token=signed';
     const fetchImplementation = vi

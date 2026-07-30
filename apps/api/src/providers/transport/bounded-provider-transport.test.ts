@@ -17,6 +17,11 @@ class BoundedJsonTestError extends Error {
 }
 
 const createError = (options?: BoundedJsonErrorOptions): Error => new BoundedJsonTestError(options);
+const createTooLargeError = (options?: BoundedJsonErrorOptions): Error => {
+  const error = new BoundedJsonTestError(options);
+  error.name = 'BoundedJsonTooLargeTestError';
+  return error;
+};
 
 describe('bounded provider transport primitives', () => {
   it('parses a bounded JSON response', async () => {
@@ -41,9 +46,12 @@ describe('bounded provider transport primitives', () => {
       },
     } as unknown as Response;
 
-    await expect(readBoundedJson(response, createError)).rejects.toMatchObject({
-      options: { upstreamStatus: 200 },
-    });
+    await expect(readBoundedJson(response, createError, createTooLargeError)).rejects.toMatchObject(
+      {
+        name: 'BoundedJsonTooLargeTestError',
+        options: { upstreamStatus: 200 },
+      },
+    );
     expect(cancel).not.toHaveBeenCalled();
   });
 
@@ -54,16 +62,21 @@ describe('bounded provider transport primitives', () => {
       .fn()
       .mockResolvedValueOnce({ done: false, value: chunks[0] })
       .mockResolvedValueOnce({ done: false, value: chunks[1] });
+    const releaseLock = vi.fn();
     const response = {
       status: 201,
       headers: new Headers(),
-      body: { getReader: () => ({ read, cancel }) },
+      body: { getReader: () => ({ read, cancel, releaseLock }) },
     } as unknown as Response;
 
-    await expect(readBoundedJson(response, createError)).rejects.toMatchObject({
-      options: { upstreamStatus: 201 },
-    });
+    await expect(readBoundedJson(response, createError, createTooLargeError)).rejects.toMatchObject(
+      {
+        name: 'BoundedJsonTooLargeTestError',
+        options: { upstreamStatus: 201 },
+      },
+    );
     expect(cancel).toHaveBeenCalledOnce();
+    expect(releaseLock).toHaveBeenCalledOnce();
   });
 
   it('rejects a missing body and malformed JSON with the existing error context', async () => {

@@ -1,5 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
+import { VOICE_CONVERSION_CONTENT_TYPES, type VoiceConversionContentType } from '@studio/contracts';
 import { ProviderError } from '../provider-error.js';
+import { MAX_PROVIDER_JSON_BYTES } from '../transport/bounded-provider-transport.js';
 import { ElevenLabsHttpProvider } from './http-provider.js';
 
 const jsonResponse = (value: unknown, status = 200): Response =>
@@ -19,6 +21,14 @@ const mp3Bytes = (byteLength: number): Uint8Array<ArrayBuffer> => {
   if (byteLength >= 3) bytes.set([0x49, 0x44, 0x33], 0);
   return bytes;
 };
+const conversionExtensions = {
+  'audio/aac': 'm4a',
+  'audio/mp4': 'm4a',
+  'audio/mpeg': 'mp3',
+  'audio/ogg': 'ogg',
+  'audio/wav': 'wav',
+  'audio/webm': 'webm',
+} satisfies Record<VoiceConversionContentType, string>;
 
 describe('ElevenLabsHttpProvider', () => {
   it('normalizes saved-library voices and sends only provider-required query/header values', async () => {
@@ -71,6 +81,139 @@ describe('ElevenLabsHttpProvider', () => {
     expect(requestedUrl(url)).toContain('voice_type=saved');
     expect(new Headers(init?.headers).get('xi-api-key')).toBe('server-only-placeholder');
   });
+
+  it.each([
+    [1, 2],
+    [10, 11],
+  ] as const)(
+    'rejects a provider voice page with %s requested entries and %s returned entries',
+    async (pageSize, returnedCount) => {
+      const fetchMock = vi.fn<typeof fetch>(() =>
+        Promise.resolve(
+          jsonResponse({
+            voices: Array.from({ length: returnedCount }, (_, index) => ({
+              voice_id: `voice-${index}`,
+              name: `Voice ${index}`,
+            })),
+            has_more: false,
+            next_page_token: null,
+          }),
+        ),
+      );
+      const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+
+      await expect(
+        provider.listWorkspaceVoices({
+          search: '',
+          pageSize,
+          nextPageToken: null,
+          signal: signal(),
+        }),
+      ).rejects.toMatchObject({
+        operation: 'workspace-voices',
+        reason: 'invalid-response',
+      });
+    },
+  );
+
+  it('rejects declared oversized successful metadata and cancels before reading', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        controller.enqueue(new TextEncoder().encode('[]'));
+        controller.close();
+      },
+      cancel,
+    });
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(body, {
+          status: 200,
+          headers: {
+            'content-type': 'application/json',
+            'content-length': String(MAX_PROVIDER_JSON_BYTES + 1),
+          },
+        }),
+      ),
+    );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+
+    await expect(provider.listModels(signal())).rejects.toMatchObject({
+      operation: 'models',
+      reason: 'response-too-large',
+      upstreamStatus: 200,
+    });
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+  });
+
+  it('rejects and cancels streamed successful metadata over the JSON limit', async () => {
+    const cancel = vi.fn();
+    const chunks = [new Uint8Array(MAX_PROVIDER_JSON_BYTES), new Uint8Array([0])];
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        const chunk = chunks.shift();
+        if (chunk === undefined) return;
+        controller.enqueue(chunk);
+      },
+      cancel,
+    });
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+
+    await expect(provider.listModels(signal())).rejects.toMatchObject({
+      operation: 'models',
+      reason: 'response-too-large',
+      upstreamStatus: 200,
+    });
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+  });
+
+  it.each(['declared', 'streamed'] as const)(
+    'falls back to status classification for %s oversized provider error JSON',
+    async (mode) => {
+      const cancel = vi.fn();
+      const chunks =
+        mode === 'declared'
+          ? [new TextEncoder().encode('{}')]
+          : [new Uint8Array(MAX_PROVIDER_JSON_BYTES), new Uint8Array([0])];
+      const body = new ReadableStream<Uint8Array>({
+        pull(controller) {
+          const chunk = chunks.shift();
+          if (chunk === undefined) return;
+          controller.enqueue(chunk);
+        },
+        cancel,
+      });
+      const fetchMock = vi.fn<typeof fetch>(() =>
+        Promise.resolve(
+          new Response(body, {
+            status: 429,
+            headers: {
+              'content-type': 'application/json',
+              ...(mode === 'declared'
+                ? { 'content-length': String(MAX_PROVIDER_JSON_BYTES + 1) }
+                : {}),
+            },
+          }),
+        ),
+      );
+      const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+
+      await expect(provider.listModels(signal())).rejects.toMatchObject({
+        operation: 'models',
+        reason: 'rate-limit',
+        upstreamStatus: 429,
+      });
+      await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+    },
+  );
 
   it('revalidates a submitted voice id against the saved library', async () => {
     const fetchMock = vi.fn<typeof fetch>(() =>
@@ -194,6 +337,38 @@ describe('ElevenLabsHttpProvider', () => {
     }
     expect(Buffer.concat(chunks)).toEqual(Buffer.from(convertedBytes));
   });
+
+  it.each(VOICE_CONVERSION_CONTENT_TYPES)(
+    'uses the exhaustive filename extension for validated %s audio',
+    async (mimeType) => {
+      const convertedBytes = mp3Bytes(3);
+      const fetchMock = vi.fn<typeof fetch>(() =>
+        Promise.resolve(
+          new Response(convertedBytes, {
+            status: 200,
+            headers: { 'content-type': 'audio/mpeg' },
+          }),
+        ),
+      );
+      const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+
+      await provider.convertRecording(
+        'voice-one',
+        'eleven_multilingual_sts_v2',
+        Buffer.from('original'),
+        mimeType,
+        false,
+        signal(),
+      );
+
+      const form = fetchMock.mock.calls[0]?.[1]?.body;
+      if (!(form instanceof FormData)) throw new TypeError('Expected multipart conversion data.');
+      expect(form.get('audio')).toMatchObject({
+        name: `recording.${conversionExtensions[mimeType]}`,
+        type: mimeType,
+      });
+    },
+  );
 
   it('accepts below-boundary and exact-boundary conversion audio', async () => {
     const limits = { previewBytes: 8, conversionBytes: 12 };
@@ -504,5 +679,32 @@ describe('ElevenLabsHttpProvider', () => {
     controller.abort();
 
     await expect(pending).rejects.toMatchObject({ reason: 'aborted', operation: 'models' });
+  });
+
+  it('cancels a successful metadata body when the caller aborts during JSON streaming', async () => {
+    const cancel = vi.fn();
+    const body = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(new TextEncoder().encode('[]'));
+      },
+      cancel,
+    });
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        new Response(body, {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        }),
+      ),
+    );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+    const controller = new AbortController();
+    const pending = provider.listModels(controller.signal);
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledOnce());
+
+    controller.abort();
+
+    await expect(pending).rejects.toMatchObject({ reason: 'aborted', operation: 'models' });
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
   });
 });

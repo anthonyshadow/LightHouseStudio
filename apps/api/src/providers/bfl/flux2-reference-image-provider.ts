@@ -21,6 +21,8 @@ const BFL_API_HOSTNAME_PATTERN = /^api(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)
 const INITIAL_POLL_DELAY_MS = 500;
 const MAX_POLL_DELAY_MS = 5_000;
 const MAX_CONSECUTIVE_POLL_FAILURES = 3;
+const DEFAULT_SAFETY_TOLERANCE = 2;
+const DEFAULT_DISABLE_PROMPT_UPSAMPLING = true;
 
 const submitResponseSchema = z
   .object({
@@ -145,8 +147,9 @@ export class BflFlux2ReferenceImageProvider implements ReferenceImageProvider {
     this.#fetch = options.fetchImplementation ?? fetch;
     this.#downloader = options.downloader ?? new SafeBflImageDownloader();
     this.#timeoutMs = options.timeoutMs ?? BFL_REFERENCE_IMAGE_TIMEOUT_MS;
-    this.#safetyTolerance = options.safetyTolerance ?? 4;
-    this.#disablePromptUpsampling = options.disablePromptUpsampling ?? true;
+    this.#safetyTolerance = options.safetyTolerance ?? DEFAULT_SAFETY_TOLERANCE;
+    this.#disablePromptUpsampling =
+      options.disablePromptUpsampling ?? DEFAULT_DISABLE_PROMPT_UPSAMPLING;
     this.#initialPollDelayMs = options.pollDelayMs ?? INITIAL_POLL_DELAY_MS;
     this.#observeLifecycle = options.observeLifecycle;
     this.descriptor = {

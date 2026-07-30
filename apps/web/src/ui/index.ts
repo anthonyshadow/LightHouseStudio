@@ -1,35 +1,13 @@
 export { StudioDesignProvider } from './StudioDesignProvider';
-export {
-  fadingVisibilityAnimationStyles,
-  overlayBackdropAnimationStyles,
-  overlayPanelAnimationStyles,
-  rotatingSpinnerAnimationStyles,
-} from './animationStyles';
-export { studioTheme, type StudioTheme } from './theme';
-export { Button, type ButtonProps, type ButtonVariant } from './primitives/Button';
-export { Surface, type SurfaceProps } from './primitives/Surface';
+export { studioTheme } from './theme';
+export { Button } from './primitives/Button';
+export { Surface } from './primitives/Surface';
 export { TextAreaField, TextField, SelectField } from './primitives/FormControls';
-export { StatusNotice, type NoticeTone } from './primitives/StatusNotice';
-export { SegmentedControl, type SegmentOption } from './primitives/SegmentedControl';
+export { StatusNotice } from './primitives/StatusNotice';
+export { SegmentedControl } from './primitives/SegmentedControl';
 export { VisuallyHidden } from './primitives/VisuallyHidden';
-export { IconButton, type IconButtonProps } from './primitives/IconButton';
-export { ConfirmationDialog, type ConfirmationDialogProps } from './primitives/ConfirmationDialog';
-export {
-  OverlayPanel,
-  type OverlayPanelPlacement,
-  type OverlayPanelInitialFocus,
-  type OverlayPanelProps,
-  type OverlayPanelSize,
-} from './primitives/OverlayPanel';
-export {
-  ReferenceImagePreview,
-  type ReferenceImagePreviewProps,
-} from './primitives/ReferenceImagePreview';
-export {
-  ImagePickerDropField,
-  type ImagePickerDropFeedback,
-  type ImagePickerDropFieldProps,
-  type ImagePickerDropGuidance,
-  type ImagePickerDropPicker,
-  type ImagePickerDropPreview,
-} from './primitives/ImagePickerDropField';
+export { IconButton } from './primitives/IconButton';
+export { ConfirmationDialog } from './primitives/ConfirmationDialog';
+export { OverlayPanel } from './primitives/OverlayPanel';
+export { ReferenceImagePreview } from './primitives/ReferenceImagePreview';
+export { ImagePickerDropField } from './primitives/ImagePickerDropField';

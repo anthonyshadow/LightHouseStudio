@@ -11,13 +11,7 @@ describe('studioOverlayReducer', () => {
     expect(studioOverlayReducer('recipe-shelf', { type: 'close' })).toBeNull();
   });
 
-  it('supports lifecycle transitions without replacing unrelated overlays', () => {
-    expect(studioOverlayReducer(null, { type: 'open-if-empty', overlay: 'take-review' })).toBe(
-      'take-review',
-    );
-    expect(
-      studioOverlayReducer('workshop', { type: 'open-if-empty', overlay: 'take-review' }),
-    ).toBe('workshop');
+  it('closes lifecycle-owned overlays without replacing unrelated overlays', () => {
     expect(
       studioOverlayReducer('take-review', {
         type: 'close-if',

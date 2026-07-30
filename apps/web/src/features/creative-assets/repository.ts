@@ -2,6 +2,7 @@ import {
   ASSET_NAME_MAX_LENGTH,
   AssetRuleError,
   createSavedCharacterPrompt as createDomainCharacterPrompt,
+  createEmptyCreativeAssetStore,
   createSavedPrompt as createDomainSavedPrompt,
   deleteSavedCharacterPrompt as deleteDomainCharacterPrompt,
   deleteSavedPrompt as deleteDomainSavedPrompt,
@@ -9,13 +10,13 @@ import {
   parseCreativeAssetStore,
   normalizeWhitespace,
   recordSuccessfulPromptUse,
+  sanitizeCreativeAssetStore,
   searchCreativeAssets,
   updateSavedCharacterPrompt as updateDomainCharacterPrompt,
   updateSavedPrompt as updateDomainSavedPrompt,
   type AssetMutationContext,
   type CreativeAssetStore,
 } from '@studio/domain';
-import { createEmptyCreativeAssetStore, sanitizeCreativeAssetStore } from './sanitation';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
@@ -69,6 +70,23 @@ export interface CreativeAssetRepositoryOptions {
   readonly now?: () => Date;
   readonly idFactory?: () => string;
 }
+
+const normalizeCharacterPromptInput = (input: CreateSavedCharacterPromptInput) => ({
+  name: input.name,
+  prompt: input.prompt,
+  source: input.source ?? 'generator',
+  promptIntent: input.promptIntent,
+  builderDraft: input.builderDraft ?? null,
+  guidedDesign: input.guidedDesign ?? null,
+  referenceImageStatus: input.referenceImageStatus ?? 'prompt-only',
+  referenceImageAssetId: input.referenceImageAssetId ?? null,
+  uploadedReferenceImageAssetId: input.uploadedReferenceImageAssetId ?? null,
+  ...(input.finalReferenceKind === undefined
+    ? {}
+    : { finalReferenceKind: input.finalReferenceKind }),
+  notes: input.notes ?? '',
+  tags: input.tags ?? [],
+});
 
 const defaultIdFactory = () => {
   if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
@@ -320,22 +338,7 @@ export const createCreativeAssetRepository = (
       const candidateStore = sanitizeCreativeAssetStore(
         createDomainCharacterPrompt(
           createEmptyCreativeAssetStore(),
-          {
-            name: input.name,
-            prompt: input.prompt,
-            source: input.source ?? 'generator',
-            promptIntent: input.promptIntent,
-            builderDraft: input.builderDraft ?? null,
-            guidedDesign: input.guidedDesign ?? null,
-            referenceImageStatus: input.referenceImageStatus ?? 'prompt-only',
-            referenceImageAssetId: input.referenceImageAssetId ?? null,
-            uploadedReferenceImageAssetId: input.uploadedReferenceImageAssetId ?? null,
-            ...(input.finalReferenceKind === undefined
-              ? {}
-              : { finalReferenceKind: input.finalReferenceKind }),
-            notes: input.notes ?? '',
-            tags: input.tags ?? [],
-          },
+          normalizeCharacterPromptInput(input),
           { now: createdAt, createId: () => input.id },
         ),
       ).store;
@@ -406,26 +409,10 @@ export const createCreativeAssetRepository = (
     const context = mutationContext();
     const id = context.createId();
     try {
-      const next = createDomainCharacterPrompt(
-        state.store,
-        {
-          name: input.name,
-          prompt: input.prompt,
-          source: input.source ?? 'generator',
-          promptIntent: input.promptIntent,
-          builderDraft: input.builderDraft ?? null,
-          guidedDesign: input.guidedDesign ?? null,
-          referenceImageStatus: input.referenceImageStatus ?? 'prompt-only',
-          referenceImageAssetId: input.referenceImageAssetId ?? null,
-          uploadedReferenceImageAssetId: input.uploadedReferenceImageAssetId ?? null,
-          ...(input.finalReferenceKind === undefined
-            ? {}
-            : { finalReferenceKind: input.finalReferenceKind }),
-          notes: input.notes ?? '',
-          tags: input.tags ?? [],
-        },
-        { ...context, createId: () => id },
-      );
+      const next = createDomainCharacterPrompt(state.store, normalizeCharacterPromptInput(input), {
+        ...context,
+        createId: () => id,
+      });
       const item = createdCharacterPrompt(next, id);
       commit(next);
       return item;
@@ -460,26 +447,10 @@ export const createCreativeAssetRepository = (
       return state.store.savedCharacterPrompts.find((item) => item.id === input.id) ?? existing;
     }
     try {
-      const next = createDomainCharacterPrompt(
-        state.store,
-        {
-          name: input.name,
-          prompt: input.prompt,
-          source: input.source ?? 'generator',
-          promptIntent: input.promptIntent,
-          builderDraft: input.builderDraft ?? null,
-          guidedDesign: input.guidedDesign ?? null,
-          referenceImageStatus: input.referenceImageStatus ?? 'prompt-only',
-          referenceImageAssetId: input.referenceImageAssetId ?? null,
-          uploadedReferenceImageAssetId: input.uploadedReferenceImageAssetId ?? null,
-          ...(input.finalReferenceKind === undefined
-            ? {}
-            : { finalReferenceKind: input.finalReferenceKind }),
-          notes: input.notes ?? '',
-          tags: input.tags ?? [],
-        },
-        { now: createdAt, createId: () => input.id },
-      );
+      const next = createDomainCharacterPrompt(state.store, normalizeCharacterPromptInput(input), {
+        now: createdAt,
+        createId: () => input.id,
+      });
       commitDurably(next, true);
       return createdCharacterPrompt(state.store, input.id);
     } catch (error) {

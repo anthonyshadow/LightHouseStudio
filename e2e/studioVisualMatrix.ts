@@ -1,9 +1,31 @@
+import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports.ts';
+
 export const VISUAL_VIEWPORTS = [
-  { id: 'desktop', folder: '01-full-desktop-1440x960', width: 1_440, height: 960 },
-  { id: 'compact', folder: '02-compact-desktop-1280x720', width: 1_280, height: 720 },
-  { id: 'tablet', folder: '03-tablet-portrait-834x1112', width: 834, height: 1_112 },
-  { id: 'mobile', folder: '04-mobile-portrait-390x844', width: 390, height: 844 },
-  { id: 'small-mobile', folder: '05-small-mobile-320x568', width: 320, height: 568 },
+  {
+    id: 'desktop',
+    folder: '01-full-desktop-1440x960',
+    ...STUDIO_VIEWPORT_SIZES.fullDesktop,
+  },
+  {
+    id: 'compact',
+    folder: '02-compact-desktop-1280x720',
+    ...STUDIO_VIEWPORT_SIZES.compactDesktop,
+  },
+  {
+    id: 'tablet',
+    folder: '03-tablet-portrait-834x1112',
+    ...STUDIO_VIEWPORT_SIZES.tabletPortrait,
+  },
+  {
+    id: 'mobile',
+    folder: '04-mobile-portrait-390x844',
+    ...STUDIO_VIEWPORT_SIZES.mobilePortrait,
+  },
+  {
+    id: 'small-mobile',
+    folder: '05-small-mobile-320x568',
+    ...STUDIO_VIEWPORT_SIZES.smallMobile,
+  },
 ] as const;
 
 export const CORE_VISUAL_SCENARIOS = [

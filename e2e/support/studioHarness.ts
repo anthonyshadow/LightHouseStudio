@@ -28,11 +28,4 @@ export {
   triggerGenerationTick,
   triggerProviderDisconnect,
 } from './studioHarness.browser.js';
-export type {
-  BrowserJourneyState,
-  MockReferenceImageAsset,
-  ModelId,
-  NetworkJourneyState,
-  SerializedSnapshot,
-  StudioHarnessOptions,
-} from './studioHarness.types.js';
+export type { NetworkJourneyState } from './studioHarness.types.js';

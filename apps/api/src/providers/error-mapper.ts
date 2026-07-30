@@ -12,6 +12,17 @@ const upstreamOptions = (
 ): { readonly upstreamStatus: number } | undefined =>
   upstreamStatus === undefined ? undefined : { upstreamStatus };
 
+const responseTooLargeMessage = (operation: ProviderError['operation']): string => {
+  switch (operation) {
+    case 'preview':
+      return 'The saved voice preview exceeded the safe audio limit. Choose another voice or retry.';
+    case 'conversion':
+      return 'The converted voice exceeded the safe five-minute output limit. The original take is still available.';
+    default:
+      return 'The voice provider response exceeded the safe metadata limit. Try again shortly.';
+  }
+};
+
 export const translateProviderError: ErrorTranslator = (error) => {
   if (!(error instanceof ProviderError)) return undefined;
 
@@ -35,13 +46,7 @@ export const translateProviderError: ErrorTranslator = (error) => {
   if (error.reason === 'response-too-large') {
     return translate(
       error,
-      new AppError(
-        502,
-        'provider_response_too_large',
-        error.operation === 'preview'
-          ? 'The saved voice preview exceeded the safe audio limit. Choose another voice or retry.'
-          : 'The converted voice exceeded the safe five-minute output limit. The original take is still available.',
-      ),
+      new AppError(502, 'provider_response_too_large', responseTooLargeMessage(error.operation)),
     );
   }
 

@@ -23,7 +23,6 @@ import { useReferenceRecipeWorkshop } from './useReferenceRecipeWorkshop';
 
 export { isExactActiveRecipe } from './referenceRecipeIdentity';
 export type ActiveStudioRecipe = ActiveStudioRecipeState;
-export type { PromptCommittedHandler } from './useReferenceRecipeAttribution';
 
 type UseReferenceRecipeHandoffOptions = {
   readonly repository: CreativeAssetRepository;

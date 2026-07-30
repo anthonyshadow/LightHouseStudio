@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { testConfig } from '../../test/fakes.js';
 import { BflFlux2ReferenceImageProvider } from '../bfl/flux2-reference-image-provider.js';
 import { OpenAIReferenceImageProvider } from '../openai/reference-image-provider.js';
@@ -46,6 +46,45 @@ describe('reference image provider factory', () => {
         }),
       ),
     ).toBeNull();
+  });
+
+  it('carries the selected BFL safety configuration through the factory to the wire request', async () => {
+    const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(
+      new Response('{}', {
+        status: 401,
+        headers: { 'content-type': 'application/json' },
+      }),
+    );
+    const provider = createConfiguredReferenceImageProvider(
+      testConfig({
+        referenceImageProvider: 'bfl',
+        bflApiKey: 'bfl-secret',
+        bflSafetyTolerance: 3,
+        bflDisablePromptUpsampling: false,
+      }),
+      { fetchImplementation },
+    );
+    if (provider === null) throw new TypeError('Expected the configured BFL provider.');
+
+    await expect(
+      provider.generate({
+        prompt: 'A precise character reference.',
+        size: '1024x1536',
+        format: 'webp',
+      }),
+    ).rejects.toMatchObject({
+      providerId: 'bfl',
+      reason: 'authentication',
+      upstreamStatus: 401,
+    });
+
+    expect(fetchImplementation).toHaveBeenCalledOnce();
+    const body = fetchImplementation.mock.calls[0]?.[1]?.body;
+    if (typeof body !== 'string') throw new TypeError('Expected a JSON request body.');
+    expect(JSON.parse(body)).toMatchObject({
+      safety_tolerance: 3,
+      disable_pup: false,
+    });
   });
 
   it('constructs only Wiro when both signature credentials exist', () => {

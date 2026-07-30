@@ -10,27 +10,42 @@ export type BoundedJsonErrorFactory = (options?: BoundedJsonErrorOptions) => Err
 export const readBoundedJson = async (
   response: Response,
   createError: BoundedJsonErrorFactory,
+  createTooLargeError: BoundedJsonErrorFactory = createError,
+  signal?: AbortSignal,
 ): Promise<unknown> => {
   const declaredLength = Number(response.headers.get('content-length'));
   if (Number.isFinite(declaredLength) && declaredLength > MAX_PROVIDER_JSON_BYTES) {
-    throw createError({ upstreamStatus: response.status });
+    throw createTooLargeError({ upstreamStatus: response.status });
   }
   if (response.body === null) throw createError();
 
   const reader = response.body.getReader();
   const chunks: Uint8Array[] = [];
   let byteLength = 0;
-  while (true) {
-    const next = await reader.read();
-    if (next.done) break;
-    byteLength += next.value.byteLength;
-    if (byteLength > MAX_PROVIDER_JSON_BYTES) {
-      await reader.cancel();
-      throw createError({ upstreamStatus: response.status });
+  const cancelReader = () => {
+    void reader.cancel().catch(() => undefined);
+  };
+  signal?.addEventListener('abort', cancelReader, { once: true });
+  if (signal?.aborted === true) cancelReader();
+
+  try {
+    while (true) {
+      const next = await reader.read();
+      signal?.throwIfAborted();
+      if (next.done) break;
+      byteLength += next.value.byteLength;
+      if (byteLength > MAX_PROVIDER_JSON_BYTES) {
+        await reader.cancel();
+        throw createTooLargeError({ upstreamStatus: response.status });
+      }
+      chunks.push(next.value);
     }
-    chunks.push(next.value);
+  } finally {
+    signal?.removeEventListener('abort', cancelReader);
+    reader.releaseLock();
   }
 
+  signal?.throwIfAborted();
   try {
     return JSON.parse(Buffer.concat(chunks, byteLength).toString('utf8')) as unknown;
   } catch (error) {

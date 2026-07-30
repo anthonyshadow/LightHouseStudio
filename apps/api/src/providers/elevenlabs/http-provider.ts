@@ -1,7 +1,13 @@
 import { Readable } from 'node:stream';
-import { VOICE_CONVERSION_OUTPUT_MAX_BYTES, VOICE_PREVIEW_MAX_BYTES } from '@studio/contracts';
+import {
+  PAGE_SIZE_LIMIT,
+  VOICE_CONVERSION_OUTPUT_MAX_BYTES,
+  VOICE_PREVIEW_MAX_BYTES,
+  type VoiceConversionContentType,
+} from '@studio/contracts';
 import { z } from 'zod';
 import { ProviderError, type ProviderOperation } from '../provider-error.js';
+import { readBoundedJson } from '../transport/bounded-provider-transport.js';
 import type { AudioStream } from '../../application/audio-stream.js';
 import type {
   ElevenLabsModel,
@@ -125,7 +131,7 @@ const workspaceVoiceSchema = z
 
 const workspaceVoicePageSchema = z
   .object({
-    voices: z.array(workspaceVoiceSchema),
+    voices: z.array(workspaceVoiceSchema).max(PAGE_SIZE_LIMIT),
     has_more: z.boolean(),
     next_page_token: z.string().nullish(),
   })
@@ -205,25 +211,40 @@ const isAllowedPreviewUrl = (rawUrl: string): boolean => {
   }
 };
 
-const audioExtension = (mimeType: string): string => {
-  if (mimeType.includes('mp4') || mimeType.includes('aac')) return 'm4a';
-  if (mimeType.includes('ogg')) return 'ogg';
-  if (mimeType.includes('wav')) return 'wav';
-  if (mimeType.includes('mpeg')) return 'mp3';
-  if (mimeType.includes('flac')) return 'flac';
-  return 'webm';
+const audioExtension = (mimeType: VoiceConversionContentType): string => {
+  switch (mimeType) {
+    case 'audio/aac':
+    case 'audio/mp4':
+      return 'm4a';
+    case 'audio/mpeg':
+      return 'mp3';
+    case 'audio/ogg':
+      return 'ogg';
+    case 'audio/wav':
+      return 'wav';
+    case 'audio/webm':
+      return 'webm';
+  }
 };
 
 const classifyProviderFailure = async (
   response: Response,
   operation: ProviderOperation,
+  signal: AbortSignal,
 ): Promise<ProviderError['reason']> => {
   const fallback: ProviderError['reason'] = response.status === 429 ? 'rate-limit' : 'upstream';
   if (!response.headers.get('content-type')?.toLowerCase().includes('application/json')) {
     return fallback;
   }
   try {
-    const parsed = providerFailureSchema.safeParse(await response.clone().json());
+    const parsed = providerFailureSchema.safeParse(
+      await readBoundedJson(
+        response,
+        () => new ProviderError(operation, 'invalid-response', response.status),
+        () => new ProviderError(operation, 'response-too-large', response.status),
+        signal,
+      ),
+    );
     if (!parsed.success) return fallback;
     const code = (parsed.data.detail.code ?? parsed.data.detail.status ?? '').toLowerCase();
     if (operation === 'conversion' && INVALID_AUDIO_CODES.has(code)) return 'invalid-audio';
@@ -286,8 +307,10 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
     }
 
     if (!response.ok) {
-      const reason = await classifyProviderFailure(response, operation);
+      const reason = await classifyProviderFailure(response, operation, combinedSignal);
       void response.body?.cancel().catch(() => undefined);
+      if (signal.aborted) throw new ProviderError(operation, 'aborted');
+      if (timeoutSignal.aborted) throw new ProviderError(operation, 'timeout');
       throw new ProviderError(operation, reason, response.status);
     }
     return { response, callerSignal: signal, timeoutSignal, combinedSignal };
@@ -297,13 +320,34 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
     const providerResponse = await request;
     const { response } = providerResponse;
     try {
-      return await response.json();
-    } catch {
+      return await readBoundedJson(
+        response,
+        (options) =>
+          new ProviderError(
+            operation,
+            'invalid-response',
+            options?.upstreamStatus ?? response.status,
+          ),
+        (options) =>
+          new ProviderError(
+            operation,
+            'response-too-large',
+            options?.upstreamStatus ?? response.status,
+          ),
+        providerResponse.combinedSignal,
+      );
+    } catch (error) {
       if (providerResponse.callerSignal.aborted) {
         throw new ProviderError(operation, 'aborted');
       }
       if (providerResponse.timeoutSignal.aborted) {
         throw new ProviderError(operation, 'timeout');
+      }
+      if (error instanceof ProviderError) {
+        if (error.reason === 'response-too-large') {
+          await response.body?.cancel().catch(() => undefined);
+        }
+        throw error;
       }
       throw new ProviderError(operation, 'invalid-response', response.status);
     }
@@ -396,7 +440,9 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
       'workspace-voices',
     );
     const parsed = workspaceVoicePageSchema.safeParse(data);
-    if (!parsed.success) throw new ProviderError('workspace-voices', 'invalid-response');
+    if (!parsed.success || parsed.data.voices.length > input.pageSize) {
+      throw new ProviderError('workspace-voices', 'invalid-response');
+    }
     return {
       voices: parsed.data.voices.map(normalizeWorkspaceVoice),
       hasMore: parsed.data.has_more,
@@ -415,7 +461,9 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
       'workspace-voice',
     );
     const parsed = workspaceVoicePageSchema.safeParse(data);
-    if (!parsed.success) throw new ProviderError('workspace-voice', 'invalid-response');
+    if (!parsed.success || parsed.data.voices.length > 1) {
+      throw new ProviderError('workspace-voice', 'invalid-response');
+    }
     const voice = parsed.data.voices.find((candidate) => candidate.voice_id === voiceId);
     return voice === undefined ? null : normalizeWorkspaceVoice(voice);
   }
@@ -456,7 +504,7 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
     voiceId: string,
     modelId: string,
     audio: Uint8Array,
-    mimeType: string,
+    mimeType: VoiceConversionContentType,
     enableLogging: boolean,
     signal: AbortSignal,
   ): Promise<AudioStream> {

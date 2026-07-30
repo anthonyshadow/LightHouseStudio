@@ -10,7 +10,7 @@ import { fetchReferenceImageMetadata } from '../../adapters/api-client/apiClient
 import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import {
   characterBuilderOperationError,
-  createFreshCharacterBuilderDraftValue,
+  createFreshCharacterBuilderResetAction,
   type CharacterBuilderOperationLocksRef,
   type CharacterSaveProgress,
   type CharacterSaveSnapshot,
@@ -221,13 +221,7 @@ export const useCharacterSaveJournal = ({
         await persistence.completeDraftDurably();
         clear();
         dispatch({ type: 'saved' });
-        const fresh = createFreshCharacterBuilderDraftValue();
-        dispatch({
-          type: 'reset',
-          draft: fresh.draft,
-          design: fresh.design,
-          options: fresh.options,
-        });
+        dispatch(createFreshCharacterBuilderResetAction());
         onDismiss();
       } catch (error: unknown) {
         dispatch({

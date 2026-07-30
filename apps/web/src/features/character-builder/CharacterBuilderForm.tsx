@@ -30,7 +30,7 @@ import {
   GENDER_OPTIONS,
 } from './characterModel';
 
-export type CharacterBuilderFormProps = {
+type CharacterBuilderFormProps = {
   draft: CharacterTransformDraft;
   design: GuidedDesignV1;
   referenceImageUrl?: string | null;

@@ -15,6 +15,7 @@ import {
   startVirtualTryOnAi,
   type NetworkJourneyState,
 } from './support/studioHarness';
+import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
 const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
 const SCREENSHOT_ROOT = path.resolve(
@@ -27,11 +28,11 @@ const FIXED_WEBP = Buffer.from(
 );
 
 const VIEWPORTS = [
-  { folder: '01-full-desktop-1440x960', width: 1_440, height: 960 },
-  { folder: '02-compact-desktop-1280x720', width: 1_280, height: 720 },
-  { folder: '03-tablet-portrait-834x1112', width: 834, height: 1_112 },
-  { folder: '04-mobile-portrait-390x844', width: 390, height: 844 },
-  { folder: '05-small-mobile-320x568', width: 320, height: 568 },
+  { folder: '01-full-desktop-1440x960', ...STUDIO_VIEWPORT_SIZES.fullDesktop },
+  { folder: '02-compact-desktop-1280x720', ...STUDIO_VIEWPORT_SIZES.compactDesktop },
+  { folder: '03-tablet-portrait-834x1112', ...STUDIO_VIEWPORT_SIZES.tabletPortrait },
+  { folder: '04-mobile-portrait-390x844', ...STUDIO_VIEWPORT_SIZES.mobilePortrait },
+  { folder: '05-small-mobile-320x568', ...STUDIO_VIEWPORT_SIZES.smallMobile },
 ] as const;
 
 const SEEDED_SHELF = {

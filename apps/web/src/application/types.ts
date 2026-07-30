@@ -5,6 +5,12 @@ export type StudioMode = SessionModeId;
 export type ModelMode = ModelModeId;
 export type SessionLifecycle = SessionLifecycleStatus;
 
+export type PromptCommittedHandler = (
+  mode: ModelMode,
+  prompt: string,
+  referenceImageAssetId: string | null,
+) => void;
+
 export type RealtimeSessionTiming = Readonly<{
   status: 'active' | 'limit-reached' | 'completed';
   maximumSeconds: number;

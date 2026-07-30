@@ -1,12 +1,4 @@
-import type {
-  CharacterTransformDraft,
-  GuidedChoiceKey,
-  GuidedChoiceValue,
-  GuidedDesignV1,
-  VisualProfile,
-} from '@studio/domain';
-
-export type { GuidedChoiceKey, GuidedChoiceValue, GuidedDesignV1, VisualProfile };
+import type { CharacterTransformDraft, GuidedDesignV1 } from '@studio/domain';
 
 export const GUIDED_PROJECT_SCHEMA_VERSION = 1 as const;
 

@@ -1,5 +1,6 @@
 import { canonicalPrompt } from '@studio/domain';
 import { useCallback, useEffect, useRef, type Dispatch } from 'react';
+import type { PromptCommittedHandler } from '../application/types';
 import type { RecipeSelection } from '../features/creative-assets/RecipeShelf.types';
 import type {
   CreativeAssetRepository,
@@ -20,12 +21,6 @@ import type {
   PendingReferenceRecipeUse,
   ReferenceRecipeHydrationResult,
 } from './useReferenceRecipeHydration';
-
-export type PromptCommittedHandler = (
-  mode: PendingReferenceRecipeUse['mode'],
-  prompt: string,
-  referenceImageAssetId: string | null,
-) => void;
 
 export const createPendingReferenceRecipeUse = (
   selection: RecipeSelection,

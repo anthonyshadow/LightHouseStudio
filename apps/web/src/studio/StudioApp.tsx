@@ -10,6 +10,7 @@ import {
   useState,
 } from 'react';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
+import type { PromptCommittedHandler } from '../application/types';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
 import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
 import { useCreativeAssetRepository } from '../features/creative-assets/useCreativeAssetRepository';
@@ -48,10 +49,7 @@ import {
 import { useCharacterBuilderLaunchController } from './useCharacterBuilderLaunchController';
 import { useLegacyProjectAvailability } from './useLegacyProjectAvailability';
 import { useProviderAvailability } from './useProviderAvailability';
-import {
-  useReferenceRecipeHandoff,
-  type PromptCommittedHandler,
-} from './useReferenceRecipeHandoff';
+import { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 import { useTakeReviewFlow } from './useTakeReviewFlow';
 import { useStudioOverlayController } from './useStudioOverlayController';
 

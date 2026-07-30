@@ -14,6 +14,7 @@ import {
   triggerGenerationTick,
   triggerProviderDisconnect,
 } from './support/studioHarness';
+import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
 const rememberStageVideo = (page: Page): Promise<void> =>
   page.evaluate(() => {
@@ -106,11 +107,11 @@ const expectNoAxeViolations = async (page: Page): Promise<void> => {
 };
 
 const exactViewports = [
-  { name: 'full desktop', width: 1_440, height: 960 },
-  { name: 'compact desktop', width: 1_280, height: 720 },
-  { name: 'tablet portrait', width: 834, height: 1_112 },
-  { name: 'mobile portrait', width: 390, height: 844 },
-  { name: 'small mobile', width: 320, height: 568 },
+  { name: 'full desktop', ...STUDIO_VIEWPORT_SIZES.fullDesktop },
+  { name: 'compact desktop', ...STUDIO_VIEWPORT_SIZES.compactDesktop },
+  { name: 'tablet portrait', ...STUDIO_VIEWPORT_SIZES.tabletPortrait },
+  { name: 'mobile portrait', ...STUDIO_VIEWPORT_SIZES.mobilePortrait },
+  { name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile },
 ] as const;
 
 const STAGE_CONTROLS_IDLE_TIMEOUT_MS = 3_000;

@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
 type MockStudioState = {
   apiRequests: string[];
@@ -161,11 +162,11 @@ const expectNoAxeViolations = async (page: Page) => {
 };
 
 const representativeViewports = [
-  { name: 'full desktop', width: 1_440, height: 960 },
-  { name: 'compact landscape desktop', width: 1_280, height: 720 },
-  { name: 'tablet portrait', width: 834, height: 1_112 },
-  { name: 'mobile portrait', width: 390, height: 844 },
-  { name: 'small mobile', width: 320, height: 568 },
+  { name: 'full desktop', ...STUDIO_VIEWPORT_SIZES.fullDesktop },
+  { name: 'compact landscape desktop', ...STUDIO_VIEWPORT_SIZES.compactDesktop },
+  { name: 'tablet portrait', ...STUDIO_VIEWPORT_SIZES.tabletPortrait },
+  { name: 'mobile portrait', ...STUDIO_VIEWPORT_SIZES.mobilePortrait },
+  { name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile },
 ] as const;
 
 for (const viewport of representativeViewports) {

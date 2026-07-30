@@ -11,6 +11,7 @@ import {
   characterBuilderOperationError,
   createCharacterBuilderOperationLocks,
   createFreshCharacterBuilderDraftValue,
+  createFreshCharacterBuilderResetAction,
   deriveCharacterName,
   type CharacterSaveProgress,
   type CharacterSaveSnapshot,
@@ -29,19 +30,6 @@ import type {
   CharacterBuilderDraftValueV1,
   CharacterBuilderTarget,
 } from './characterBuilderPersistence';
-
-export {
-  sanitizeCharacterBuilderDraftValue,
-  type CharacterBuilderDraftValueV1,
-  type CharacterSaveStage,
-  type PendingCharacterSave,
-  type PersistedCharacterBuilderPreview,
-  type PersistedCharacterSaveSnapshot,
-} from './characterBuilderPersistence';
-export type {
-  CharacterSaveProgress,
-  CharacterSaveSnapshot,
-} from './characterBuilderControllerSupport';
 
 export interface UseCharacterBuilderControllerOptions {
   readonly open: boolean;
@@ -256,13 +244,7 @@ export const useCharacterBuilderController = ({
       }
       clearSaveJournal();
       setDiscardCloseOpen(false);
-      const fresh = createFreshCharacterBuilderDraftValue();
-      dispatch({
-        type: 'reset',
-        draft: fresh.draft,
-        design: fresh.design,
-        options: fresh.options,
-      });
+      dispatch(createFreshCharacterBuilderResetAction());
       onDismiss();
       locksRef.current.discard = false;
       setDiscardCloseBusy(false);
@@ -296,13 +278,7 @@ export const useCharacterBuilderController = ({
         await resetStoredDraft();
         clearSaveJournal();
         setAutosaveMessage(null);
-        const fresh = createFreshCharacterBuilderDraftValue();
-        dispatch({
-          type: 'reset',
-          draft: fresh.draft,
-          design: fresh.design,
-          options: fresh.options,
-        });
+        dispatch(createFreshCharacterBuilderResetAction());
       } catch (error: unknown) {
         dispatch({
           type: 'validation-failed',

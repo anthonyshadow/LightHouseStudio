@@ -11,13 +11,11 @@ import {
 } from '@studio/contracts';
 import {
   type ReferenceImageAssetStore,
-  ReferenceImageStorageError,
   type StoreReferenceImageInput,
   type StoredReferenceImageContent,
   type StoredReferenceImageMetadata,
 } from './asset-store.js';
 import {
-  InvalidReferenceImageError,
   type ValidReferenceImageMimeType,
   validateReferenceImageBytes,
   validateUploadedReferenceImage,
@@ -549,14 +547,3 @@ export class ReferenceImageService {
     return this.#store.getContent(localOwnerId, assetId);
   }
 }
-
-export { InvalidReferenceImageError, ReferenceImageStorageError };
-export {
-  ReferenceImageGenerationStateError,
-  type ReferenceImageGenerationStateErrorReason,
-} from './reference-image-error.js';
-export type {
-  ComposeReferenceImageInput,
-  EditReferenceImageInput,
-  GenerateReferenceImageInput,
-} from './reference-image-preparation.js';

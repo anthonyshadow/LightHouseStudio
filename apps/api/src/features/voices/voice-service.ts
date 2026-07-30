@@ -1,4 +1,8 @@
-import type { VoiceSummary, WorkspaceVoicesResponse } from '@studio/contracts';
+import type {
+  VoiceConversionContentType,
+  VoiceSummary,
+  WorkspaceVoicesResponse,
+} from '@studio/contracts';
 import type { AudioStream } from '../../application/audio-stream.js';
 import { createSharedOperation, type SharedOperation } from '../../application/shared-operation.js';
 import { ProviderError } from '../../providers/provider-error.js';
@@ -116,7 +120,7 @@ export class VoiceService {
   async convertRecording(input: {
     readonly voiceId: string;
     readonly audio: Uint8Array;
-    readonly mimeType: string;
+    readonly mimeType: VoiceConversionContentType;
     readonly signal: AbortSignal;
   }): Promise<AudioStream> {
     const [candidate, model] = await runParallel(

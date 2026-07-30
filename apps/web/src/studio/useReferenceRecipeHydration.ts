@@ -133,11 +133,12 @@ export const useReferenceRecipeHydration = ({
 
         if (!isCurrent()) return;
         const generatedLucyReference =
-          pending.mode === 'lucy-2.5' && storedReferenceMetadata?.source === 'generated';
-        const appliedPrompt =
-          generatedLucyReference && storedReferenceMetadata?.source === 'generated'
-            ? storedReferenceMetadata.lucy25CharacterPrompt
-            : pending.prompt;
+          pending.mode === 'lucy-2.5' && storedReferenceMetadata?.source === 'generated'
+            ? storedReferenceMetadata
+            : null;
+        const appliedPrompt = generatedLucyReference
+          ? generatedLucyReference.lucy25CharacterPrompt
+          : pending.prompt;
         const referenceMatchesPendingPrompt =
           storedReferenceMetadata?.source !== 'generated' ||
           canonicalPrompt(storedReferenceMetadata.originalPrompt) ===
@@ -147,7 +148,7 @@ export const useReferenceRecipeHydration = ({
           referenceImage,
           storedReferenceMetadata,
           appliedPrompt,
-          enhance: generatedLucyReference,
+          enhance: generatedLucyReference !== null,
           referenceMatchesPendingPrompt,
         });
         if (!isCurrent()) return;

@@ -154,6 +154,17 @@ const matchesOperation = (state: CharacterBuilderState, operationId: string, sou
   state.operation.sourceRevision === state.revision &&
   state.operation.sourceKey === sourceKey;
 
+const markPreviewStale = (
+  preview: CharacterPreviewState | null,
+  sourceKey: string,
+): CharacterPreviewState | null =>
+  preview
+    ? {
+        ...preview,
+        stale: preview.stale || preview.sourceKey !== sourceKey,
+      }
+    : null;
+
 export const characterBuilderReducer = (
   state: CharacterBuilderState,
   action: CharacterBuilderAction,
@@ -178,19 +189,13 @@ export const characterBuilderReducer = (
     case 'edited': {
       if (state.phase === 'saving' || state.phase === 'closing') return state;
       const revision = state.revision + 1;
-      const preview = state.preview
-        ? {
-            ...state.preview,
-            stale: state.preview.stale || state.preview.sourceKey !== action.sourceKey,
-          }
-        : null;
       return {
         ...state,
         phase: 'editing',
         draft: action.draft,
         design: action.design,
         revision,
-        preview,
+        preview: markPreviewStale(state.preview, action.sourceKey),
         operation: null,
         error: null,
       };
@@ -198,18 +203,12 @@ export const characterBuilderReducer = (
     case 'options-changed': {
       if (state.phase === 'saving' || state.phase === 'closing') return state;
       const revision = state.revision + 1;
-      const preview = state.preview
-        ? {
-            ...state.preview,
-            stale: state.preview.stale || state.preview.sourceKey !== action.sourceKey,
-          }
-        : null;
       return {
         ...state,
         phase: 'editing',
         options: action.options,
         revision,
-        preview,
+        preview: markPreviewStale(state.preview, action.sourceKey),
         operation: null,
         error: null,
       };
@@ -223,12 +222,6 @@ export const characterBuilderReducer = (
         operation: null,
       };
     case 'upload-succeeded': {
-      const preview = state.preview
-        ? {
-            ...state.preview,
-            stale: state.preview.stale || state.preview.sourceKey !== action.sourceKey,
-          }
-        : null;
       return {
         ...state,
         phase: 'editing',
@@ -236,19 +229,13 @@ export const characterBuilderReducer = (
         uploadedReference: action.uploadedReference,
         uploadPending: false,
         uploadError: null,
-        preview,
+        preview: markPreviewStale(state.preview, action.sourceKey),
         operation: null,
       };
     }
     case 'upload-failed':
       return { ...state, uploadPending: false, uploadError: action.message };
     case 'upload-removed': {
-      const preview = state.preview
-        ? {
-            ...state.preview,
-            stale: state.preview.stale || state.preview.sourceKey !== action.sourceKey,
-          }
-        : null;
       return {
         ...state,
         phase: 'editing',
@@ -256,7 +243,7 @@ export const characterBuilderReducer = (
         uploadedReference: null,
         uploadPending: false,
         uploadError: null,
-        preview,
+        preview: markPreviewStale(state.preview, action.sourceKey),
         operation: null,
       };
     }

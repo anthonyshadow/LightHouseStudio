@@ -1,5 +1,4 @@
 import {
-  BUILDER_DETAIL_MAX_LENGTH,
   createPromptBuilderDraft as createDomainPromptBuilderDraft,
   generateStructuredPrompt as generateDomainStructuredPrompt,
   normalizePromptBuilderDraft as normalizeDomainPromptBuilderDraft,
@@ -9,8 +8,6 @@ import {
   type PromptValidation as DomainPromptValidation,
   type PromptValidationContext,
 } from '@studio/domain';
-
-export const PROMPT_DETAIL_LIMIT = BUILDER_DETAIL_MAX_LENGTH;
 
 export type PromptIntent = DomainPromptIntent;
 export type PromptBuilderDraft = DomainPromptBuilderDraft;

@@ -131,7 +131,7 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
         requireVoiceService(service).convertRecording({
           voiceId: query.data.voiceId,
           audio: request.body as Buffer,
-          mimeType,
+          mimeType: parsedContentType.data,
           signal,
         }),
       );

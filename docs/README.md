@@ -36,6 +36,7 @@ responsive layout does not qualify a physical target or live provider.
 
 | Document                                            | Use                                                                                                      |
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| [Maintainability audit](MAINTAINABILITY_AUDIT.md)   | Current repository-wide cleanup findings, phased implementation plan, and validation record              |
 | [Reference image generation](Image_Generation.md)   | Optimizer, upload, provider selection, immutable asset, retry, and cleanup flow                          |
 | [Remote backend handoff](REMOTE_BACKEND_HANDOFF.md) | Deferred design boundary for a separately approved remote product; not current behavior or authorization |
 

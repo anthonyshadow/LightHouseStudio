@@ -1,32 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   createReferenceImageEditPrompt,
-  createReferenceImagePrompt,
   createPromptOptimizationInputHash,
   createWorkshopPromptHash,
-  versionReferenceImagePrompt,
 } from './prompt.js';
 
-describe('reference image prompt versioning', () => {
-  it('wraps the unchanged Lucy prompt in the single-character reference composition', () => {
-    const original =
-      'Substitute the character in the video with a blue-furred fox.\nKeep the scarf.';
-    const result = versionReferenceImagePrompt(original);
-
-    expect(result.originalPrompt).toBe(original);
-    expect(result.derivedPrompt).toBe(createReferenceImagePrompt(original));
-    expect(result.derivedPrompt).toContain('Exactly one character with one clearly visible face');
-    expect(result.derivedPrompt).toContain('Front-facing, centered, and viewed at eye level');
-    expect(result.derivedPrompt).toContain('Show the complete character');
-    expect(result.derivedPrompt.endsWith(original)).toBe(true);
-  });
-
-  it('versions a deliberate selected crop in the deterministic bypass prompt', () => {
-    const result = versionReferenceImagePrompt('A blue-furred fox.', 'waist_up');
-
-    expect(result.derivedPrompt).toContain('Use a deliberate waist-up crop');
-  });
-
+describe('reference image prompt inputs', () => {
   it('produces a stable SHA-256 marker from the canonical workshop prompt', () => {
     const first = createWorkshopPromptHash('  A BLUE fox\nwith a scarf  ');
     const second = createWorkshopPromptHash('a blue   FOX with a scarf');

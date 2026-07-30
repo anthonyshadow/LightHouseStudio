@@ -1,3 +1,4 @@
+import type { VoiceConversionContentType } from '@studio/contracts';
 import type { AudioStream } from '../../application/audio-stream.js';
 
 export interface ElevenLabsModel {
@@ -37,7 +38,7 @@ export interface ElevenLabsProvider {
     voiceId: string,
     modelId: string,
     audio: Uint8Array,
-    mimeType: string,
+    mimeType: VoiceConversionContentType,
     enableLogging: boolean,
     signal: AbortSignal,
   ): Promise<AudioStream>;

@@ -110,20 +110,21 @@ quota. Missing optional configuration disables only the corresponding feature.
 
 ## Commands
 
-| Command                                                                                        | Purpose                                                     |
-| ---------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| `npm run dev`                                                                                  | Build shared packages and run API/web watchers              |
-| `npm run build`                                                                                | Build all workspaces                                        |
-| `npm run quality`                                                                              | Type, Storybook, lint, format, module, unit, and build gate |
-| `npm run test:coverage`                                                                        | Coverage gate                                               |
-| `npm run test:e2e`                                                                             | Functional Playwright journeys                              |
-| `npm run test:production`                                                                      | Built Fastify static-serving smoke; run build first         |
-| `npm run test:visual`                                                                          | Curated visual regression suite                             |
-| `npm run audit:prod`                                                                           | Production dependency audit                                 |
-| `npm run storybook`                                                                            | Local component catalog on port 6006                        |
-| `npm run pilot:qualification:check -- --commit <full-sha> --verbose`                           | Validate content-free pilot evidence                        |
-| `npm run pilot:data-retirement:drill`                                                          | Verify participant-data retirement                          |
-| `npm run recording:memory:estimate -- --duration-seconds 300 --main-mib-per-minute <measured>` | Estimate recording memory from measured output              |
+| Command                                                                                        | Purpose                                                                |
+| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `npm run dev`                                                                                  | Build shared packages and run API/web watchers                         |
+| `npm run build`                                                                                | Build all workspaces                                                   |
+| `npm run quality`                                                                              | Type, Storybook, lint, format, dead-code, module, unit, and build gate |
+| `npm run test:coverage`                                                                        | Coverage gate                                                          |
+| `npm run test:e2e`                                                                             | Functional Playwright journeys                                         |
+| `npm run test:production`                                                                      | Built Fastify static-serving smoke; run build first                    |
+| `npm run test:visual`                                                                          | Curated visual regression suite                                        |
+| `npm run audit:all`                                                                            | Complete dependency audit                                              |
+| `npm run audit:prod`                                                                           | Production dependency audit                                            |
+| `npm run storybook`                                                                            | Local component catalog on port 6006                                   |
+| `npm run pilot:qualification:check -- --commit <full-sha> --verbose`                           | Validate content-free pilot evidence                                   |
+| `npm run pilot:data-retirement:drill`                                                          | Verify participant-data retirement                                     |
+| `npm run recording:memory:estimate -- --duration-seconds 300 --main-mib-per-minute <measured>` | Estimate recording memory from measured output                         |
 
 Install Playwright browsers once with `npx playwright install`. Default tests use synthetic media
 and deny unexpected external HTTP and WebSockets; they never make paid/live provider calls.
@@ -134,18 +135,30 @@ Normal implementation gate:
 npm run quality
 ```
 
-Release gate:
+Exact-candidate release gate:
 
 ```bash
+npm run quality
 npm run test:coverage
 npm run test:e2e
 npm run test:production
 npm run test:visual
 npm run audit:prod
+npm run audit:all
+npm run pilot:data-retirement:drill
 ```
+
+Review the visual baseline inventory for every changed Darwin/Linux image. The exact-candidate
+commands are canonicalized in the [active plan](docs/project-audit-implementation-plan.md).
 
 Physical devices and live providers remain separately gated by [manual QA](docs/MANUAL_QA.md) and
 [live provider smoke](docs/LIVE_PROVIDER_SMOKE.md).
+
+`@emnapi/runtime` is an intentional direct development dependency for optional WASM fallback
+chains used by the pinned image/build tooling. Knip cannot observe that conditional loading, so
+the dependency is explicitly ignored there. Remove it only after clean-install build, Storybook,
+and test evidence on the maintained Darwin and Linux environments, including native and WASM
+fallback paths.
 
 ## Architecture
 

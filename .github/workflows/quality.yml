@@ -34,6 +34,7 @@ jobs:
       - run: npm run format:check
       - run: npm run check:dead-code
       - run: npm run check:modules
+      - run: npm run pilot:data-retirement:drill
       - run: npm test
       - run: npm run build
       - name: Upload unit failure report

@@ -1,4 +1,5 @@
 import { Readable } from 'node:stream';
+import type { VoiceConversionContentType } from '@studio/contracts';
 import type { RuntimeConfig } from '../config/environment.js';
 import type { AudioStream } from '../application/audio-stream.js';
 import type {
@@ -66,7 +67,7 @@ export class FakeElevenLabsProvider implements ElevenLabsProvider {
     readonly voiceId: string;
     readonly modelId: string;
     readonly audio: Uint8Array;
-    readonly mimeType: string;
+    readonly mimeType: VoiceConversionContentType;
     readonly enableLogging: boolean;
   }> = [];
   readonly previewUrls: string[] = [];
@@ -104,7 +105,7 @@ export class FakeElevenLabsProvider implements ElevenLabsProvider {
     voiceId: string,
     modelId: string,
     audio: Uint8Array,
-    mimeType: string,
+    mimeType: VoiceConversionContentType,
     enableLogging: boolean,
     _signal: AbortSignal,
   ): Promise<AudioStream> {

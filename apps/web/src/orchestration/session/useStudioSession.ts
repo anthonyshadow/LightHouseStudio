@@ -7,7 +7,11 @@ import {
   withCaptureDevices,
   type MediaRequirements,
 } from '../../adapters/browser-media/browserMedia';
-import type { CameraFacingMode, CapturePreferences } from '../../application/types';
+import type {
+  CameraFacingMode,
+  CapturePreferences,
+  PromptCommittedHandler,
+} from '../../application/types';
 import {
   toSafeMediaError,
   type ProviderAvailability,
@@ -27,11 +31,7 @@ import { useSessionDraftState } from './useSessionDraftState';
 export type StudioSessionOptions = {
   availability: ProviderAvailability;
   realtimeSessionProfile?: RealtimeSessionProfile;
-  onPromptCommitted?: (
-    mode: 'lucy-2.5' | 'lucy-vton-3',
-    prompt: string,
-    referenceImageAssetId: string | null,
-  ) => void;
+  onPromptCommitted?: PromptCommittedHandler;
 };
 
 export type StudioSessionWithCapturePreferences = StudioSessionController & {

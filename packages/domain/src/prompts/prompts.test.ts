@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { BUILDER_DETAIL_MAX_LENGTH } from '../common/text';
 import {
-  buildCharacterReferenceImagePrompt,
   characterReferencePromptHashInput,
   createPromptBuilderDraft,
   generateStructuredPrompt,
@@ -237,28 +236,6 @@ describe('structured prompt validation', () => {
 });
 
 describe('character reference image prompt', () => {
-  it('wraps the unchanged workshop prompt in the Lucy reference composition', () => {
-    const workshopPrompt =
-      '  Substitute the character in the video with an indigo-haired lunar\r\ncartographer.  ';
-    const imagePrompt = buildCharacterReferenceImagePrompt(workshopPrompt);
-
-    expect(imagePrompt).toContain('Exactly one character with one clearly visible face');
-    expect(imagePrompt).toContain('Front-facing, centered, and viewed at eye level');
-    expect(imagePrompt).toContain('Full-body framing by default');
-    expect(imagePrompt).toContain('Show the complete character');
-    expect(imagePrompt).toContain(workshopPrompt);
-    expect(imagePrompt.endsWith(workshopPrompt)).toBe(true);
-  });
-
-  it('honors a deliberate closer crop instead of the full-body default', () => {
-    const imagePrompt = buildCharacterReferenceImagePrompt(
-      'A blue-furred fox wearing a red scarf.',
-      'head_and_shoulders',
-    );
-
-    expect(imagePrompt).toContain('Use a deliberate head-and-shoulders crop');
-  });
-
   it('provides a stable canonical value for server-side SHA-256 hashing', () => {
     expect(characterReferencePromptHashInput('  Lunar   Cartographer  ')).toBe(
       characterReferencePromptHashInput('lunar cartographer'),
