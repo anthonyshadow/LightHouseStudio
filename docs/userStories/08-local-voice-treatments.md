@@ -1,41 +1,28 @@
 # Local voice treatments
 
-## User story
+**Outcome:** apply Warm, Clear, or Robot audio locally while retaining the immutable original take.
 
-As a creator, I want to audition local voice effects on a completed take, so that I can change the sound without sending the recording to a provider or degrading the original.
+## Journey
 
-## Starting state
+1. From a take with a usable audio sidecar, select **Voice treatments**.
+2. Choose **Original**, **Warm**, **Clear**, or **Robot**.
+3. For an effect, Studio renders the original sidecar offline and remuxes it with the original
+   encoded video. Playback and download stay locked during processing.
+4. On success, the stage switches to the processed artifact and reports **Voice treatment ready**.
+5. Choose another effect or **Original**. Every effect starts from the original, never a prior
+   processed result.
 
-- A latest take is under review and has a usable audio sidecar.
-- The browser supports Web Audio, offline rendering, and a compatible final remux path for local effects.
+## Guards and recovery
 
-## End-to-end steps
+- **Cancel processing** preserves the last valid artifact.
+- Missing sidecar audio leaves the original video usable.
+- Missing Web Audio disables all replacement; missing Offline Audio disables local effects but may
+  leave ElevenLabs available.
+- Encoder/remux failure never overwrites the original. Replacement commits before an old processed
+  URL is revoked.
+- No local treatment contacts a provider.
 
-1. From **Latest take**, select **Voice treatments** and confirm the visible **Take review → Voice
-   treatments** breadcrumb.
-2. Confirm that the original take remains available throughout processing. Open **Browser
-   compatibility details** only when the secondary encoder/remux explanation is needed.
-3. Select **Original** to keep/revert to untouched capture, or select **Warm**, **Clear**, or **Robot** to request an effect.
-4. Wait while the app renders the original sidecar offline and remuxes the new audio with the original encoded video. During this interval, stage playback and download are locked.
-5. If the result succeeds, confirm **Voice treatment ready**. The stage now plays the processed version, restored to a safe equivalent playback time and paused.
-6. Compare treatments by selecting another local effect. Each request begins from the original audio/video, not the prior processed result.
-7. Select **Original** at any time for an immediate no-network restore. Return to take review to
-   download, release, or discard.
+## Evidence status
 
-## Failure and alternate paths
-
-- If an effect is still rendering, select **Cancel processing**; the last valid playable artifact remains intact.
-- If the audio sidecar is unavailable, the feature explains that the original video remains usable; do not expect an effect to be created.
-- Missing Web Audio disables local and provider replacement. Missing offline rendering disables local effects but may leave provider conversion available.
-- Encoder/remux failures never overwrite the original. A new object URL is created before the prior processed URL is revoked.
-
-## Completion criteria
-
-The take is playing as an intentionally chosen local treatment or as the immutable original, and is
-ready for the normal download/release/discard flow.
-
-## UX investigation cues
-
-- Time from choosing an effect to a confident playable result.
-- Whether the “always starts from original” guarantee is understood.
-- Whether compatibility explanations distinguish unavailable audio, Web Audio, offline rendering, and remuxing clearly enough.
+Immutable-original, cancellation, stale-result, remux, and object-URL behavior have deterministic
+coverage. Physical browser codec/playback and long-take memory evidence remain pilot gates.

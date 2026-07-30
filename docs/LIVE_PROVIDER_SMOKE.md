@@ -1,197 +1,161 @@
-# Gated live provider smoke test
+# Gated live provider smoke
 
-Live smoke testing is manual, opt-in, cost-aware, and excluded from default test and quality
-commands. Character, VTO, ElevenLabs, OpenAI, BFL, and Wiro are all included in the intended pilot,
-so each path needs its own qualified pass. Run a pass only with authorized test credentials, a
-supported camera/microphone, an account whose quota and retention settings are understood, and
-permission to incur provider usage.
+Live checks are manual, opt-in, cost-bearing, and excluded from normal test/quality commands.
+Current repository evidence is `0/7`; no provider/local row is qualified.
 
-The approved local-phase owners are the generic **Credential Custodian**, **Billing Authorizer**,
-**Evidence Recorder**, **Pilot Product Owner**, and **Support & Escalation Owner** roles. One
-operator may hold several roles, but every pass records the authorizing/witnessing roles.
-Personal assignments must be revisited before leaving local-only operation.
+Use only authorized, least-privilege test credentials, non-sensitive disposable media, understood
+account retention/quota, and an approved spend. Never run this procedure in CI, Storybook,
+screenshots, ordinary tests, shared environments, or with a participant where the
+[release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) prohibits it.
 
-The external-participant settings, limits, and content/refusal policy are frozen in the
-[controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md). Wiro's uncensored model
-is technical/operator qualification only and cannot reach an external participant under this
-contract.
+## Preflight
 
-## Provider assumptions verified for this build
+1. Run deterministic release gates, including `npm run quality` and `npm run test:e2e`.
+2. Record the generic Credential Custodian, Billing Authorizer, Evidence Recorder, and Support &
+   Escalation Owner roles for this pass.
+3. Review current account model availability, pricing, quota, content policy, and retention. Stop
+   if they differ from the approved configuration.
+4. Configure only the provider under test using repository-root `.env` and `.env.example`; restart
+   the API.
+5. Verify `GET /api/capabilities` reports the expected configured provider/model. This is not a
+   reachability, entitlement, policy, quota, or billing check.
+6. Close competing camera apps and keep short samples short. Run a full five-minute pass only where
+   this procedure requires it and the Billing Authorizer approves it.
 
-- `@decartai/sdk` is pinned to `0.1.15`. Its registry recognizes `lucy-2.5` and the user-approved exact `lucy-vton-3` id. [Current Decart Virtual Try-On documentation](https://docs.platform.decart.ai/models/realtime/virtual-try-on) may instead show the moving `lucy-vton-latest` alias; this product intentionally does not follow that alias silently.
-- Decart browser access uses a [backend-minted client token](https://docs.platform.decart.ai/getting-started/client-tokens), scoped to one model, the exact loopback origin, a five-minute issuance window, and a five-minute realtime-session limit.
-- OpenAI uses the Responses API for prompt optimization and remains the default image provider with `gpt-image-2` at `high` quality. `REFERENCE_IMAGE_PROVIDER=bfl` instead selects the pinned US2 `https://api.us2.bfl.ai/v1/flux-2-pro` task API. `REFERENCE_IMAGE_PROVIDER=wiro` selects the pinned `https://api.wiro.ai/v1/Run/ByteDance/seedream-v5-lite-uncensored` task API with signature authentication. There is no image-provider fallback. An optimizer failure may continue with the validated raw prompt through that same selected provider and must be recorded as an unoptimized result. Character Builder upload by itself is local storage work and does not contact an image provider.
-- ElevenLabs uses `/v2/voices` with `voice_type=saved`, `/v1/models`, and `/v1/speech-to-speech/:voice`. Preview and conversion revalidate voice membership through the saved filter. The project has no shared-library discovery or voice-add mutation. Provider plans can change voice eligibility and conversion access.
-- `ELEVENLABS_ENABLE_LOGGING=false` requests [Zero Retention Mode](https://elevenlabs.io/docs/eleven-api/resources/zero-retention-mode), which ElevenLabs currently limits to eligible enterprise accounts. A non-eligible account may be used only for operator-only technical diagnosis after an informed retention decision; participant conversion remains unavailable.
+Never print or capture `.env`, authorization headers, permanent/temporary credentials, raw
+provider bodies, signed/polling URLs, personal media, or full network archives.
 
-Do not run live provider checks in CI, screenshots, stories, ordinary component tests, or shared environments. Never print or capture `.env`, request authorization headers, permanent keys, temporary credentials, raw provider bodies, personal media, or full network archives.
+## Required configurations
 
-## Before starting
+| Requirement      | Exact configuration                                                           |
+| ---------------- | ----------------------------------------------------------------------------- |
+| Local            | No provider credentials                                                       |
+| Decart Character | SDK `0.1.15`, exact `lucy-2.5`, 300-second session                            |
+| Decart VTO       | SDK `0.1.15`, exact `lucy-vton-3`, 300-second session                         |
+| ElevenLabs       | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false` |
+| OpenAI image     | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                      |
+| BFL image        | `flux-2-pro`, safety `2`, prompt upsampling off                               |
+| Wiro image       | `seedream-v5-lite-uncensored`, 2k, watermark off, operator qualification      |
 
-1. Run `npm run quality` and `npm run test:e2e` with deterministic fakes first.
-2. Record the Credential Custodian, Billing Authorizer, Evidence Recorder, and Support &
-   Escalation Owner for the pass. Confirm authorization and review current Decart, OpenAI, BFL,
-   Wiro, and ElevenLabs pricing, quota, model availability, voice eligibility, content policy, and
-   data-retention terms in the provider accounts. Stop if any value differs from the approved
-   contract.
-3. Use dedicated least-privilege development keys. Put them only in local `.env`:
+Reference image providers require three separate server startups; there is no fallback.
 
-   ```dotenv
-   DECART_API_KEY=your-local-secret
-   OPENAI_API_KEY=your-local-secret
-   REFERENCE_IMAGE_PROVIDER=openai
-   # For a separate BFL pass, select bfl and configure:
-   # BFL_API_KEY=your-local-secret
-   # BFL_REFERENCE_IMAGE_MODEL=flux-2-pro
-   # BFL_SAFETY_TOLERANCE=2
-   # BFL_DISABLE_PROMPT_UPSAMPLING=true
-   # For a separate Wiro pass, select wiro and configure:
-   # WIRO_API_KEY=your-local-project-key
-   # WIRO_API_SECRET=your-local-project-secret
-   # WIRO_REFERENCE_IMAGE_MODEL=seedream-v5-lite-uncensored
-   # Restricted server key with voice-read and speech-to-speech access:
-   ELEVENLABS_API_KEY=your-local-secret
-   ELEVENLABS_STS_MODEL_ID=eleven_multilingual_sts_v2
-   ELEVENLABS_ENABLE_LOGGING=false
-   ```
+## Local no-key
 
-4. Restart the API; verify `GET /api/capabilities` reports configured availability for each integration. This endpoint checks configuration presence, not live reachability, quota, or entitlement.
-5. Use non-sensitive test visuals and speech. Close other camera apps. Keep each realtime
-   connection and sample take as short as practical; never exceed the 300-second application and
-   provider-session constraints.
+With all provider credentials empty:
 
-## Decart Lucy 2.5
+- confirm preparation, upload/direct save, Local capture/recording, local Voice, Download, and
+  cleanup work;
+- confirm capabilities are unavailable for optional providers; and
+- confirm no external HTTP/WebSocket, provider SDK, provider token, or external media transfer.
 
-1. Select Character and enter one concise, harmless prompt. Do not attach an image on the first pass.
-2. Start and grant media. Verify local media becomes ready before `POST /api/realtime-token` and that the returned credential is scoped to `lucy-2.5`, the exact loopback origin, and a 300-second maximum session.
-3. Confirm transformed output is not displayed/recordable until a live remote video track exists.
-4. Record 5–10 seconds, select **Stop recording**, and verify the clip finalizes before Decart and owned local media disconnect. Confirm recorded playback replaces live media on the same stage and no camera/provider session is reacquired.
-5. Start a second short session with a non-sensitive reference portrait. Change the prompt, Apply, clear the image, Apply again, and confirm stale image influence clears without reconnecting.
-6. Stop AI and confirm provider/WebRTC activity and generation timing stop while local preview remains.
+## Decart Character and VTO
 
-Pass requires correct model scope, explicit action ordering, usable output gating, atomic updates, image clearing, finalization-before-release, local fallback, sanitized errors, and complete cleanup.
+For each exact model:
 
-For one controlled failure in each available class, record only the app-owned result:
-authentication, model unavailable, WebRTC timeout/ICE/WebSocket, server/signaling, or generic
-fallback. Confirm raw SDK codes/messages/data/URLs/causes never appear. Cancellation must remain a
-cancelled operation, and listener/provider-input cleanup must still occur exactly once.
+1. Prepare valid prompt-only, image-only, and combined input. Invalid/empty input must block before
+   camera/token work.
+2. Start local media, then the model. Confirm the token is exact-model/exact-origin scoped and
+   advertises a 300-second maximum.
+3. Keep local preview until a live remote video track exists; audio-only/partial output is not
+   recordable.
+4. Apply one complete state atomically. Character must clear stale image influence after explicit
+   clear/Apply; VTO image-only input must not invent a prompt.
+5. Record 5–10 seconds and Stop. Confirm recorder/sidecar finalization precedes provider/local
+   release and playback replaces live media on the same stage without reacquisition.
+6. Stop AI. Confirm provider/client/listeners/cloned tracks/timers end while the valid local
+   fallback or recorded take remains.
+7. Exercise an authorized failure class and confirm only app-owned safe guidance appears; cancel
+   remains cancellation and cleanup remains idempotent.
 
-## Decart VTON 3
+### Maximum-duration pass
 
-1. Select Try-On and use a non-sensitive garment prompt or garment image.
-2. Verify the token/model scope is exactly `lucy-vton-3`, independently of the character session.
-3. Test image-only input and confirm no invented prompt is added.
-4. Wait for usable remote video, make one atomic live Apply, record a short take, and select **Stop recording**.
-5. Confirm the take remains playable/downloadable, provider usage ends, recorded playback remains on the stage, and no local preview is reacquired.
+After short checks pass, run once for each Decart model/account configuration:
 
-## Decart maximum-duration qualification
+1. Verify the app clock starts only after the healthy connection commits and displays the
+   authoritative 5:00 maximum.
+2. If a reconnect occurs naturally, confirm elapsed time does not reset or move backward.
+3. At 30 seconds remaining, confirm the persistent accessible ending-soon warning does not displace
+   Record/Stop.
+4. Start a 10–15 second take before expiry. At expected completion, confirm recorder outputs settle
+   before provider/local release, playback remains valid, and no error or automatic reconnect
+   appears.
+5. Repeat without recording; expected completion must preserve the recipe, return to local
+   preview, and require a fresh explicit Start.
 
-Run this paid five-minute boundary pass only after the short Lucy/VTON checks above pass and the
-Billing Authorizer approves the additional duration. Run once for each Decart model/account
-configuration claimed for the pilot; use non-sensitive synthetic or disposable media and record
-only the final 10–15 seconds.
+Early end, reset timer, missing warning, take loss, cleanup inversion, raw provider leakage, or
+automatic reconnect fails the row.
 
-1. Start the model and verify the stage timer appears only after the healthy connection commits.
-   Record the displayed **5:00 maximum** without capturing the temporary credential or media.
-2. Allow one SDK-managed reconnect if it occurs naturally; confirm elapsed/remaining time does not
-   reset. Provider ticks may move the display forward but must not move it backward.
-3. At 30 seconds remaining, verify the static **AI session ending soon** status is announced once
-   and does not displace **Record** or **Stop recording**.
-4. Start a 10–15 second take before the boundary and do not manually stop it. At expected
-   completion, verify both recorder outputs finalize before provider/local track release, recorded
-   playback remains usable, and no crash/error notice or automatic reconnect appears.
-5. Repeat without recording. Verify expected completion returns to local preview, retains the
-   current recipe, labels the session completed, and permits a later deliberate Start with a fresh
-   full budget.
-6. Record only content-free evidence: date/time, model, SDK/app commit, browser/device, account
-   configuration identifier, warning observed, expected-end classification, ordering result, and
-   owner initials. Do not record raw SDK reasons, provider bodies, URLs, credentials, or media.
+## Reference image providers
 
-Any early end, timer reset, missing warning, raw provider leakage, take loss, cleanup inversion, or
-automatic reconnect after the maximum fails the pass and follows the escalation procedure.
+Use a dedicated `LIGHTFRAME_DATA_DIR` and one startup-selected provider at a time.
 
-## Selected-provider character references
+Common checks:
 
-Release any prior take first. Use non-sensitive, disposable character directions
-and images. Watch only the app-owned `/api/reference-images` requests; do not
-capture provider authorization or raw image payloads.
+1. Generate a harmless prompt-only preview. Confirm explicit action, optimize-before-image
+   ordering when optimization is available, and one immutable stored result.
+2. Upload JPEG/PNG/WebP and confirm local persistence without external provider contact. Verify
+   direct prompt+upload save and **Save & Use Image Only** are provider-free.
+3. Generate a combined preview from the upload; the server must resolve the owner-scoped source.
+4. Regenerate blank (compose from original upload) and with written feedback (new immutable edit
+   child); never mutate the source.
+5. Force optimizer failure. Ordinary generation must use the validated raw prompt through the
+   same selected provider, mark the result unoptimized, and keep it saveable. The explicit
+   optimizer-retry branch must preserve that result if optimization fails again without making a
+   new image request.
+6. Force image-provider failure and stale form state. Preserve the previous valid preview and
+   local/direct-save alternatives; do not switch providers.
+7. Confirm a retry of an ambiguous identical browser request reuses its request UUID/idempotency
+   result rather than creating a second billable submission.
 
-1. Open the header character selector, choose **Create new character**, enter a harmless direction, and select **Generate Preview**. Confirm the app performs optimization before generation and creates one immutable local result only after the explicit action.
-2. In fresh drafts, upload a JPEG, PNG, or WebP source. Confirm `POST /api/reference-images/uploads` stores it locally and no external provider request occurs. Exercise direct prompt+image save and **Save & Use Image Only** in separate drafts because either successful Save closes and resets the builder; confirm neither path generates or edits an image.
-3. Start another fresh uploaded draft with a character direction, then select **Generate Combined Preview**. Confirm the direction is optimized and the owner-scoped uploaded bytes are sent to the composition operation only after that action.
-4. Regenerate once with blank instructions and confirm the uploaded source is composed again. Regenerate once with written instructions and confirm an owner-scoped edit creates a new immutable child rather than mutating the source.
-5. Make the form stale and force one controlled provider failure. Confirm the previous preview stays visible but cannot be saved as a matching generated result until regeneration succeeds; prompt-only or direct-upload save remains available where valid.
+Provider-specific checks:
 
-Pass requires local-only upload, explicit billable actions, optimize-before-image
-ordering, owner-scoped source resolution, immutable results, correct direct/image-only
-save behavior, sanitized errors, and no fallback to the raw prompt after an
-optimization failure.
+- **OpenAI:** capabilities report `openai`/`gpt-image-2`; one result, configured quality, no SDK
+  retry.
+- **BFL:** report `bfl`/`flux-2-pro`; one initial task per action, trusted polling/download within
+  one deadline, source-guided work without public upload, no signed URL/source base64 leakage.
+- **Wiro:** start with `PILOT_ACCESS_MODE=operator-qualification` and no participant. Confirm
+  participant mode disables generation, one Run per action, all orientations normalize to exact
+  dimensions, source work uses no public upload, and `InputOutputDelete` succeeds after local
+  persistence. Logs may contain only safe lifecycle fields.
 
-Run this section in three separate server configurations: OpenAI, BFL, and Wiro. All three are
-included in pilot qualification; Wiro remains operator-only. The app still selects exactly one at
-startup and never falls back. For BFL,
-confirm capabilities report `providerId: "bfl"` and `modelId: "flux-2-pro"`, one initial task is
-created per explicit request, polling stays within the configured deadline, source-guided actions
-succeed without a public upload, and browser responses/log captures contain neither signed URLs
-nor source base64. For Wiro, confirm capabilities report `providerId: "wiro"` and
-`modelId: "seedream-v5-lite-uncensored"`, one Run request is created per explicit action, all three
-output orientations are normalized to the advertised exact dimensions, source-guided actions use
-no public upload, and `InputOutputDelete` removes remote input/output files after local persistence.
-Logs may contain only the task ID, lifecycle stage, status, and delivery origin—never the task
-token, signature, nonce, prompt, or CDN path.
+Wiro cleanup failure or participant availability fails the row.
 
 ## ElevenLabs
 
-1. Record a short local take with clearly audible non-sensitive speech.
-2. In ElevenLabs account controls, record the IDs of one saved and one unsaved disposable voice without copying credentials into the test log.
-3. Open the Studio voice library. Search/page saved results and play a preview. Confirm the saved ID can appear, the unsaved ID cannot appear, no add/import control exists, and no recording audio is uploaded.
-4. Select a saved voice, including a saved community Professional Voice Clone when available. Confirm selection alone does not call model discovery or the conversion route.
-5. Apply once. Confirm the server revalidates saved membership and only the audio sidecar is sent to `/api/elevenlabs/voice-changer/recording`; processing locks incomplete playback/download and the final remux preserves video.
-6. Remove the disposable voice from the saved library in ElevenLabs, refresh Studio, and confirm it disappears. If a stale direct conversion request is exercised, confirm it returns the safe library-not-found response before conversion.
-7. Restore Original and confirm no provider request. Run one controlled failure if the test account permits and confirm the original/last valid take survives with sanitized guidance.
-8. Confirm preview responses remain below 2 MiB and the five-minute `mp3_44100_128` result remains
-   below the inclusive 8 MiB app ceiling. Do not weaken the ceiling if a result exceeds it; record
-   the safe `provider_response_too_large` result, retain the original/last valid take, and escalate
-   the provider/configuration mismatch.
+1. Record a short, non-sensitive take with a usable original sidecar.
+2. Browse/search/page saved voices and preview one. Confirm unsaved voices/add-import controls are
+   absent, every provider request carries the voice-intent header, and preview sends no take.
+3. Select a saved voice. Selection alone must not discover models or convert.
+4. Apply once. Confirm saved membership/model are revalidated and only the immutable original
+   sidecar is uploaded; playback/download remain locked until remux completes.
+5. Remove a disposable saved voice in provider controls; refresh and confirm it disappears. A
+   stale direct request must fail before conversion.
+6. Restore Original with no provider call and exercise one controlled failure. The original/last
+   valid take must survive with sanitized guidance.
+7. Confirm preview stays within 2 MiB and the five-minute `mp3_44100_128` result within the
+   inclusive 8 MiB ceiling. Oversize/malformed/cancelled output must not replace the take.
 
-Pass requires saved-only listing and revalidation, absent public/import surfaces, proxied and
-byte-bounded previews, conversion-time model validation, explicit conversion, audio-only upload,
-bounded successful output, immutable-original processing, safe replacement, and no leaked
-key/upstream URL/body.
+Participant conversion requires confirmed zero-retention eligibility. A non-eligible account may
+be used only for separately authorized operator diagnosis after an informed retention decision.
 
 ## Evidence and cleanup
 
-Create one strict content-free record per provider requirement under the
-[qualification evidence contract](PILOT_QUALIFICATION_EVIDENCE.md). Record only:
-
-- date, commit, browser/OS, anonymous device class;
-- authorizing Credential Custodian/Billing Authorizer and witnessing Evidence Recorder/Support &
-  Escalation Owner role labels;
-- capability and model ids;
-- action timestamps, safe HTTP status/code, output MIME type, and pass/fail/blocked result;
-- approximate connection and clip duration for cost review.
-
-Validate the records against the exact release-candidate commit:
+Write one strict content-free record per requirement as described in
+[qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md), then run:
 
 ```bash
 npm run pilot:qualification:check -- --commit "$(git rev-parse HEAD)" --verbose
 ```
 
-The command must remain open until every provider/local and physical target/browser row passes.
-Deterministic provider fakes and an older commit's record do not satisfy a live row.
+After each pass, Stop AI/camera, release or discard test takes, close Studio, verify media/WebRTC
+indicators are gone, remove credentials when no longer needed, and restart to confirm optional
+integrations disable cleanly.
 
-Then Stop AI, stop the camera, discard/download test takes as appropriate, close the tab, verify camera/mic indicators and WebRTC sessions are gone, remove keys from `.env` when no longer needed, and restart to confirm optional integrations disable cleanly. Restore any temporary ElevenLabs library membership only through provider account controls.
-
-Uploaded and generated test references remain immutable under
-`LIGHTFRAME_DATA_DIR`; the app has no asset-delete action. For a disposable
-smoke, configure a dedicated data directory before starting and retire it only
-under the [controlled-pilot data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md). Never
-remove a shared asset directory as routine test cleanup. Run
+References remain immutable in `LIGHTFRAME_DATA_DIR`. Never remove a shared directory as routine
+cleanup. Use a dedicated disposable directory and the
+[pilot data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md); run
 `npm run pilot:data-retirement:drill` before the first retained-data pass.
 
-Wiro is unavailable with the default `PILOT_ACCESS_MODE=participant` even when credentials are
-present. Its separate technical smoke requires `PILOT_ACCESS_MODE=operator-qualification`, no
-participant present, and successful remote `InputOutputDelete` evidence. Do not use that mode to
-broaden participant access.
-
-Failures caused by missing credentials, device permission, account entitlement, incompatible voices/models, quota/billing, provider policy, firewall/NAT, or provider outage are concrete external limitations. Capture the safe error code and stop; do not weaken security boundaries or embed credentials to bypass them.
+Missing credentials, entitlement, approved account settings, device access, quota, firewall/NAT,
+or provider availability is `blocked`. Capture only the safe app-owned code and stop; never weaken
+security, retention, model pins, intent, or no-fallback rules.

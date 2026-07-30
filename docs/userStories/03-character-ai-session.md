@@ -1,68 +1,41 @@
 # Character AI session
 
-## User story
+**Outcome:** deliberately start, refine, and optionally record a `lucy-2.5` transformation while
+retaining local preview as the fallback.
 
-As a creator, I want to turn my live camera into a Lucy 2.5 character performance, so that I can preview, refine, and record a deliberate AI transformation.
+## Journey
 
-## Starting state
+1. Create or choose a saved character. Saving preloads it but never starts AI.
+2. Select **Start Camera + Mic**, then **Start AI** and the primary **Character Transformation**
+   experience.
+3. Review the Decart disclosure and select **Start with [character]**. If no character is ready,
+   use Character Builder or open Shelf directly on **Characters**.
+4. Studio validates the complete recipe, obtains a short-lived model-scoped credential, and
+   connects with cloned local input tracks.
+5. Recording stays unavailable until usable transformed video appears. Once connected, the stage
+   shows the independent 5:00 AI-session timer.
+6. Edit the Dock draft, then select **Apply changes** to send one complete prompt/reference/
+   enhancement snapshot. **Revert draft** restores the last applied snapshot.
+7. Select **Record** and **Stop recording** for a transformed take. Recording has its own 4:30
+   warning and 5:00 maximum, independent of the AI timer.
+8. Select **Stop AI** to release Decart while retaining local preview and the draft, or **Reset AI**
+   to stop and clear the model recipe.
 
-- The capability strip reports AI video configured; this is not a live health, entitlement, or
-  quota check.
-- No local preview, AI session, recording, or take review is active.
-- The creator has a saved/selected character, or is ready to create or choose one.
+The Dock is also a direct path: choose **Character · Lucy 2.5**, provide text or a reference,
+optionally check camera/mic, then select **Start Character AI**. Empty input is rejected before
+camera, token, or provider work.
 
-## End-to-end steps
+## Guards and recovery
 
-1. Use the header character selector to choose a saved character, or choose **Create new character** and save one. The selected name appears in the header.
-2. Select **Start Camera + Mic**, grant permission, and confirm a healthy local preview.
-3. Select **Start AI**. **Character Transformation** is the primary choice; **Virtual Try-On
-   Beta** remains secondary. If provider configuration is still loading or unavailable, the
-   chooser explains the recovery boundary and does not offer a start action.
-4. If the selected character is ready, review the inline Decart disclosure and choose **Start with
-   [character name]**. Otherwise choose **Create Character** or **Choose Saved Character**; the
-   latter opens the existing Shelf directly on **Characters**, then complete **Use** and return to
-   Start.
-5. Wait while the app validates the loaded recipe, requests a short-lived loopback credential, and connects a Decart session using cloned local input tracks.
-6. Continue watching the local fallback until the stage displays transformed video and **AI live**.
-   Once the healthy connection commits, the stage shows the authoritative **5:00 maximum** with
-   elapsed/remaining time. The local preview remains the recovery source if transformed video is
-   missing or ends.
-7. Open the Recipe Dock to refine the recipe. The Dock displays **Changes are pending**; no live state changes yet.
-8. Select **Apply changes** to send prompt, image (or explicit image clear), and enhancement setting as one snapshot. Or select **Revert draft** to restore the last applied snapshot.
-9. Use **Change** to return to experience choice, **Stop AI** to release the provider while retaining local media and the draft, or **Reset AI** in the Dock to clear prompt, ephemeral image, and applied state.
-10. To capture transformed video, select **Record**, then **Stop recording**, and follow [Take
-    review and cleanup](07-take-review-and-cleanup.md). Recording announces its own final 30 seconds
-    at 4:30 and auto-finalizes at 5:00 independently of the Decart session clock.
-11. At 30 seconds remaining, read the accessible **AI session ending soon** warning. Expected
-    completion returns to local preview with the current recipe intact. If a take is active, Studio
-    finalizes it before releasing AI/local resources and opens recorded playback.
+- Start can be cancelled while connecting.
+- Missing, ended, or disconnected transformed video returns to local fallback with safe recovery
+  copy; raw provider details never reach the UI.
+- Expected completion at 300 active seconds preserves local preview and the working recipe. An
+  early provider end remains an error.
+- If AI ends while recording, take finalization settles before provider/local resources release.
+- Mode, source, and cross-model changes lock during AI start/live, recording, and take review.
 
-For direct recipe work, the Dock remains an alternate entry: select **Character ·
-Lucy 2.5**, enter prompt/image/enhancement, optionally **Check camera & mic**,
-then select **Start Character AI**. Empty input blocks before camera or token
-work. The Dock uses the same disclosure: live camera/microphone media, the complete applied recipe,
-and any reference go to Decart; provider usage may begin for at most 300 seconds, and **Stop AI**
-ends usage after any active recording finalizes.
+## Evidence status
 
-## Failure and alternate paths
-
-- Connection start can be cancelled before it completes.
-- On disconnect, unusable video, or audio-only output, the stage announces **AI disconnected — local fallback** and retains local preview rather than becoming blank.
-- Known Decart authentication/model/network/provider classes show app-owned recovery guidance.
-  Unknown SDK errors use one generic retry/reset path. Raw provider codes, messages, data, URLs,
-  and causes are never shown.
-- An early generation end is reported separately from the expected five-minute completion; raw
-  provider reasons/codes are never shown.
-- If the recording cap and provider/source completion coincide, Stop coalesces and the take
-  finalizes once before AI/local resources release.
-- A ready local preview remains reusable across mode and recipe changes. Mode, capture-source, and cross-model changes lock while AI is starting/live, during recording, or while a take is under review.
-
-## Completion criteria
-
-The creator has a live applied Character AI recipe, a stopped/reset session, or a finalized model take. Starting AI is the explicit boundary that sends live camera media plus the complete applied recipe to Decart.
-
-## UX investigation cues
-
-- Number of steps from a blank character mode to first usable transformed video.
-- Comprehension of “working draft,” “pending,” “applied,” “revert,” and “reset.”
-- Whether fallback/reconnect information provides enough confidence to continue recording.
+Synthetic start/apply/fallback/reset, safe-error, timing, and finalization races are covered. Live
+Decart entitlement, output, maximum-duration, and physical-device evidence remain release gates.

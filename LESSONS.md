@@ -1,50 +1,62 @@
 # Engineering lessons
 
-These are repository-level corrections worth preserving when similar work is added later.
+Keep only lessons that should constrain future work.
 
-## Ownership before convenience
+## Own every resource
 
-- Never change permissions on a user-configured base directory. Create and secure only directories and files the application owns.
-- A component, controller, or service that creates a stream, database handle, object URL, abort controller, timer, or provider operation must also define replacement and shutdown behavior.
-- An async open can finish after its owner closes. Recheck ownership after every awaited acquisition and close a late resource before returning.
-- React StrictMode cleanup/remount is a real lifecycle. Reopenable resources need an owner wrapper; render-time construction plus one-way `close()` is insufficient.
+- The creator of a stream, track, recorder, URL, timer, listener, database handle, abort
+  controller, or provider client owns replacement and idempotent shutdown.
+- Recheck ownership after awaited acquisition. A resource that resolves after its owner closes
+  must be released before returning.
+- Recording borrows source tracks. Final recorder data and the optional sidecar settle before the
+  session releases its sources.
+- React StrictMode is a real lifecycle; reopenable resources need an owner that supports cleanup
+  and reacquisition.
 
-## Cancellation is subscriber state
+## Cancellation belongs to each caller
 
-- A shared upstream promise and a shared caller signal are different concepts. Each waiter needs independent cancellation and settlement.
-- Cancel upstream work only when that operation's policy allows it and no subscriber remains. Owner-exclusive, billable work may need to continue until settlement so retries observe a truthful in-progress state.
-- Parallel provider branches should share an operation-local abort controller so a terminal sibling failure stops work that can no longer contribute to a result.
-- Pass the HTTP request signal through every service/provider layer; do not stop cancellation at the route boundary.
+- A shared upstream operation and each subscriber's cancellation are separate state.
+- Cancel shared work only when policy permits and no subscriber remains.
+- Billable or idempotent work may need to settle so retries observe truthful in-progress or
+  completed state.
+- Carry the request signal through every service and provider layer.
 
-## Localhost still needs browser-intent boundaries
+## Local does not mean trustless
 
-- Same-origin response secrecy does not prevent a hostile page from causing a cross-site GET. Provider-contacting local reads require a non-simple, validated intent header in addition to loopback host/origin controls.
-- Provider audio previews are explicit fetches with an owned Blob URL, not ambient media-element URLs. Abort and revoke on replacement and unmount.
+- Loopback Host checks are not public authentication.
+- Browser actions that contact a provider require explicit intent; provider reads must not be
+  triggerable by an ambient cross-site request.
+- Credentials, raw provider messages, URLs, payloads, and causes never enter browser state or
+  client-visible errors.
 
-## Persistence must recover narrowly
+## Recover persisted data narrowly
 
-- Treat persisted JSON as untrusted. Recover or quarantine syntax/schema failures, but do not swallow filesystem I/O and permission errors.
-- Idempotency repair must match the exact owner and request identity before rewriting a mapping.
-- Remove only stale temporary paths with an app-owned naming/layout contract. Ordinary orphan assets may still be referenced by history outside the current process.
-- Keep migration and sanitation business rules canonical in the domain; repository envelopes handle only absence, nullability, and storage mechanics.
+- Treat browser JSON and IndexedDB records as untrusted, versioned input.
+- Repair idempotency only for an exact owner/request match.
+- Remove only app-owned temporary data or an explicitly isolated whole environment. An unlinked
+  immutable asset may still have a relationship outside the current process.
+- Keep stores with different transaction models behind separate repositories.
 
-## Composition deserves characterization
+## Preserve composition invariants
 
-- Before extracting a UI coordinator, test stable DOM/media identity, resource continuity, atomic handoffs, and cleanup order—not just route helpers or isolated child rendering.
-- Split workflow ownership into focused controllers while keeping the persistent media stage and local React state. A global store is not a prerequisite for a smaller composition shell.
-- Lazy loading is useful only when static barrel imports do not pull the same module back into the entry graph.
+- Characterize DOM/media identity, handoffs, late results, and cleanup order before extracting a
+  coordinator.
+- Keep one persistent stage and one shared overlay system; split controllers at ownership and
+  lifecycle boundaries.
+- Lazy loading helps only when static imports do not pull the same feature back into the entry
+  graph.
 
-## Errors and diagnostics are separate products
+## Separate user errors from diagnostics
 
-- Unknown faults are internal failures, not provider failures. Classify only confirmed upstream errors as provider failures.
-- Client error bodies stay stable and sanitized. Server diagnostics use an explicit allowlist: request ID, method, route template, elapsed time, normalized class/reason/code/status, numeric upstream status, and sanitized call-site frames.
-- Never log request URLs, query strings, bodies, prompts, provider URLs, raw messages, nested causes, keys, or temporary credentials.
-- Error behavior must depend on stable reason codes, never human-readable copy.
+- Map only confirmed, allowlisted provider failures to app-owned recovery codes.
+- Unknown faults are internal failures.
+- Diagnostics use a small safe allowlist; behavior depends on stable codes, never display copy.
 
-## Gates should encode architecture
+## Make constraints executable
 
-- CI uses a clean install and independent quality, coverage, browser, and curated visual jobs. Failure artifacts aid diagnosis without introducing deployment automation.
-- Dead-code entrypoints, module cycles, unresolved imports, package boundaries, runtime globals, and zero-warning lint are executable constraints, not documentation.
-- Coverage includes all production sources and thresholds ratchet from the measured post-refactor floor.
-- Keep the visual suite small and enforceable. Broader screenshots are manual artifacts, not tracked pseudo-assertions.
-- Use the dedicated empty-directory operation for portable artifact cleanup; generic `rm` reports different directory errors across platforms.
+- Tests deny unexpected external HTTP and WebSockets.
+- CI enforces types, lint, formatting, package boundaries, unresolved imports, cycles, dead code,
+  coverage, builds, and curated visuals.
+- Screenshot readiness is semantic; a stable fallback is not a valid product state.
+- Physical devices and live providers remain separate release gates because mocks cannot qualify
+  codecs, memory, entitlements, retention, or output.

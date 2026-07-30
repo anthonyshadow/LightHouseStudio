@@ -1,309 +1,217 @@
 # Architecture and ownership
 
-Lightframe Studio is a strict TypeScript npm workspace with a React browser app, a loopback Fastify broker, pure domain rules, runtime API contracts, and an explicit deny-external test policy. It was organized around product capabilities rather than around a previous implementation.
+Lightframe Studio is a TypeScript workspace with a React browser app, a loopback Fastify broker,
+pure domain rules, and runtime API contracts. Its design is local-first and single-operator.
 
-## Workspace boundaries
+## Dependency boundaries
 
-| Boundary                     | Responsibility                                                    | Must not own                                |
-| ---------------------------- | ----------------------------------------------------------------- | ------------------------------------------- |
-| `packages/domain`            | Pure session, prompt, asset, recording, and voice rules           | React, browser globals, HTTP, provider SDKs |
-| `packages/contracts`         | Zod schemas and app-owned request/response types                  | Raw provider response types, secrets        |
-| `apps/web/src/features`      | Focused UI and presentation models by capability                  | Permanent credentials, server persistence   |
-| `apps/web/src/orchestration` | Async lifecycle coordination and resource handoff                 | Raw provider payload assumptions            |
-| `apps/web/src/adapters`      | Browser APIs, same-origin API calls, Decart SDK, audio processing | Product policy decisions                    |
-| `apps/api/src/application`   | Transport-neutral server payload types                            | Fastify replies or provider implementations |
-| `apps/api/src/features`      | HTTP route validation and application services                    | Browser state, product database             |
-| `apps/api/src/providers`     | Decart, OpenAI, BFL, Wiro, and ElevenLabs protocol adaptation     | UI/domain leakage, unsafe upstream errors   |
-| `apps/api/src/http`          | Loopback/origin boundary, safe errors, streaming lifetime         | Provider-specific business rules            |
+| Boundary                     | Owns                                                              | Must not own                                 |
+| ---------------------------- | ----------------------------------------------------------------- | -------------------------------------------- |
+| `packages/domain`            | Pure session, prompt, asset, recording, and voice policy          | React, browser APIs, HTTP, provider payloads |
+| `packages/contracts`         | Zod HTTP schemas and app-owned request/response types             | Secrets or raw provider types                |
+| `apps/web/src/features`      | Capability-focused presentation and local view models             | Permanent credentials or server persistence  |
+| `apps/web/src/orchestration` | Async lifecycles, policy sequencing, and resource handoff         | Raw provider assumptions                     |
+| `apps/web/src/adapters`      | Browser APIs, same-origin API calls, Decart SDK, audio processing | Product policy                               |
+| `apps/api/src/features`      | Route validation and application services                         | Browser state or account data                |
+| `apps/api/src/providers`     | Decart, OpenAI, BFL, Wiro, and ElevenLabs protocols               | UI state or unsafe upstream errors           |
+| `apps/api/src/http`          | Loopback/origin checks, safe errors, and streaming lifetime       | Provider-specific policy                     |
 
-Imports should point inward toward pure rules and contracts. The web app does not import API implementation code, and the API does not know about React.
+Imports point inward toward domain rules and contracts. The web app does not import API
+implementation code, and the API does not know about React.
 
-## Studio shell and presentation ownership
+## Studio composition
 
-`StudioApp.tsx` is the composition and URL-dispatch boundary. `/` is the sole application route. The dependency-free `resolveLegacyEntry()` helper history-replaces `/advanced`, `/guided`, `/projects`, deprecated queries, and other SPA paths with `/`; project-oriented entries additionally initialize the legacy-project overlay. There is no rollout flag, global client store, or third-party router.
+`StudioApp.tsx` is the application composition and URL boundary. `/` is the sole route; retired
+entries redirect there, with project-oriented legacy entries opening the compatibility manager.
+There is no second product shell, media session, global client store, or third-party router.
 
-`CharacterBuilderCoordinator` owns character-form state beneath Studio without owning a second media session or creative repository. It restores one active IndexedDB draft, autosaves through revision compare-and-swap, coordinates durable reference upload, automatic prompt optimization, generation/composition/editing, and direct or image-only save, and journals the caller-owned character ID through durable Shelf persistence and Studio preload. The retired starter picker is no longer compiled, but the reusable visual catalog retains all nine starter records and assets for legacy hydration and preview fallback, plus four presentation profiles, shared skin-tone choices, profile-aware suggestions, and lossless custom values.
+The mounted Studio owns focused controllers for:
 
-`StudioExperience` is the sole runtime composition boundary. It wires focused local controllers for session/media, reference-and-recipe handoff, take review, overlays, and character building; no global store or all-purpose reducer is involved. `useLegacyProjectAvailability` owns the narrowed compatibility repository plus its initialization, count, storage-state synchronization, and disposal. `useCharacterBuilderLaunchController` owns create/edit launch preparation, single-flight discard confirmation, explicit promise settlement/cancellation, and launch errors. Pure `deriveStudioStageNotices` owns the Studio-specific notice sources and priorities, while the live-stage feature retains generic notice deduplication/limiting. `useReferenceRecipeHandoff` remains the Studio-facing facade for atomic reference hydration and delegates exact active-recipe identity to a pure feature-local module. `useTakeReviewFlow` owns review transitions and release ordering, and `useStudioOverlayController` owns overlay state. The fullscreen character builder and legacy-project manager are Studio-owned overlays: opening either preserves the stable stage, streams, session state, and creative repositories/controllers, while individual Dock or Shelf UI surfaces may unmount. Rare builder, legacy, review, workshop, and shelf surfaces are lazy-loaded while the stage remains mounted.
+- local/realtime media and per-mode drafts;
+- recording, review, and voice processing;
+- Character Builder, Prompt Workshop, and Recipe Shelf handoff;
+- overlays and the compatibility project manager.
 
-`StudioHeader` exposes the active-character selector; **Create new character** inside that selector opens the builder. `StudioSessionControlBar` is the primary session surface: idle starts with **Start Camera + Mic**, live local media exposes **Start AI**, and `AIExperienceChooser` selects Character Transformation or Virtual Try-On. The Recipe Dock remains the detailed/direct path for editing, Apply/Revert/Reset, preflight, and model-specific Start.
+`MediaStage` stays mounted once and owns one `<video>` element. A discriminated presentation state
+switches among idle, live, finalizing, and playback. Live media uses `srcObject`; playback uses
+`src`. Opening or closing a tool must not replace the player, restart media, alter playback time,
+or create a second take player.
 
-The idle stage may render one Studio-owned, dismissible first-take cue through `MediaStage`'s
-presentation-only `idleAction` slot. Its dismissal lives only in the mounted `StudioExperience`;
-it is not persisted and creates no analytics event or navigation state. Creative-rail buttons keep
-their established Dock/Take/Workshop/Shelf names while visible action subtitles describe setup,
-review, advanced change-building, and saved-work reuse. The AI chooser visually and semantically
-keeps Character primary and labels Virtual Try-On as a secondary beta; configuration-unavailable
-states explain why Start is absent while local preparation stays available.
+All tools use the shared `OverlayPanel` portal. It owns focus trap, inert background, Escape,
+topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. Each overlay
+has one named internal scroll region; the document does not scroll. Character Builder is
+fullscreen and uses one preview/generation DOM. Narrow screens reveal that same region through
+**Review & Generate** instead of duplicating stateful controls.
 
-`StudioHeader` treats `/api/capabilities` as configuration presence only: it says configured,
-limited, available to try, or configuration unavailable, never provider health or entitlement.
-Every Character/VTO Start surface shares one app-owned Decart disclosure covering live
-camera/microphone media, the complete recipe/reference snapshot, possible usage, the 300-second
-active-session maximum, Stop, and recording-finalization ordering. A saved-character action sets
-an app-owned one-shot Shelf entry intent; the existing persistent Shelf controller consumes it,
-selects `Characters`, clears it, and retains ordinary browse/category ownership afterward. The
-intent is not active-recipe state or persisted navigation.
+The shell is viewport-bound with safe-area padding and deliberate support for `1440×960`,
+`1280×720`, `834×1112`, `390×844`, and `320×568`. The stage, capture strip, and primary actions
+must remain reachable at short heights, touch sizes, and 200% text. Stage notices overlay the
+player rather than changing its geometry.
 
-The shell is deliberately viewport-bound:
+## Session lifecycle
 
-- `StudioDesignProvider.tsx` gives `html`, `body`, and `#root` a full viewport size and `overflow: hidden`.
-- `StudioApp.styles.ts` uses a viewport-bound application page with `100vh`/`100svh` fallbacks and `100dvh` as the preferred size, plus safe-area padding. Its fixed rows are the header, `minmax(0, 1fr)` stage host, fixed-height capture strip, and tool launcher.
-- Every shrinking grid/flex boundary has `min-width: 0` and `min-height: 0`. The document and fixed shell are not scroll owners. Each overlay has one intentional, bounded body scroller with sticky header and primary-action regions.
-- Recipe Dock, Capture Settings, Take Review, Voice Treatments, Prompt Workshop, Recipe Shelf, Character Builder, and Legacy Projects are always portal overlays. None participates in shell columns or rows. The Character Builder is fullscreen at every breakpoint and owns its bounded internal scroller.
-- The stage and capture-strip row allocations do not change for mode switches, notices, recording, finalization, playback, or overlay visibility. Recording, review lock, mode changes, and unsafe settings changes remain controlled by the same orchestration state.
+`useStudioSession` coordinates the session; pure domain rules decide valid modes and transitions.
+The three modes are Local, `lucy-2.5`, and pinned `lucy-vton-3`.
 
-Character Builder retains one preview/generation DOM. Above the single-column breakpoint that
-preview remains a sticky side rail. At narrower sizes a sticky **Review & Generate** shortcut
-scrolls and moves focus to that same preview region; it does not mirror preview state or create a
-second generation action. Voice Treatments keeps the immutable-original and provider/usage
-boundaries visible, uses a Take review → Voice treatments → Saved voices breadcrumb, and places
-secondary browser/library compatibility explanations in native progressive-disclosure details.
+1. The user edits a mode-specific in-memory draft. Text and enhancement survive mode switches;
+   every departing reference relationship is cleared, and owned object URLs are revoked.
+2. Model input is validated before camera, token, SDK, or provider work. Local needs no provider
+   input.
+3. Explicit Start acquires or reuses local media. Replacement media commits only after the new
+   stream is healthy; the old owned stream remains valid on failure.
+4. For AI modes, the browser requests a short-lived model/origin-scoped credential from the
+   loopback broker, then lazily loads Decart.
+5. The Decart adapter connects a clone of the local input. Local preview remains independently
+   owned until transformed video is usable.
+6. Start and Apply send one complete prompt/reference/enhancement snapshot. `image: null` clears
+   provider image state. The last successful snapshot is the applied state; later edits remain
+   pending until Apply. Revert restores it.
+7. Stop and Reset invalidate the operation generation, abort where supported, disconnect provider
+   resources, dispose late results, and remove listeners. Reset replaces the whole mode draft and
+   clears prompt, enhancement, reference, and applied state.
 
-`MediaStage` is mounted once in the stable stage region and owns one persistent `<video>` element. A discriminated `StagePresentation` selects idle, live, finalizing, or playback presentation without keying or replacing that node. Live media is attached imperatively with `srcObject`, muted and inline; finalized playback uses `src`, native controls, and audio. The unused source is cleared before each source-kind switch. Finalization retains the last live binding/frame under a blocking stage layer until playback is ready. Opening or closing any tool overlay must not recreate the stage, change its source, alter playback time, or restart a provider controller. Video uses `object-fit: contain`; only local preview is mirrored. Provider output and recorded playback use native orientation, and local video remains the fallback until a transformed live video track is usable.
+The active-session clock begins only after a healthy AI connection commits. Provider ticks may
+move its display forward but cannot reset it. At the app boundary, an active recording finalizes
+before AI/local resources release; otherwise Studio returns to local preview with the working
+draft preserved.
 
-The persistent `MediaStage` boundary owns the single live/playback control-visibility timer. Native
-stage `pointermove`, `pointerdown`, `touchstart`, and `focusin` activity plus keyboard activity
-reveal the controls and reset that timer; the control subtree only renders the resulting
-visible/inert state. Recording suspends auto-hide, and `StudioSessionControlBar` independently
-keeps the sole **Stop recording** action visible as a safety invariant. Playback exposes compact
-take actions on the stage; the Latest Take detail overlay is opened explicitly through **Take**
-and never appears automatically after finalization.
+Capture preferences are tab-memory state, not recipe data. Device enumeration does not request
+permission and device IDs are not persisted. Apply during local preview performs atomic stream
+replacement. Source changes are blocked while AI or recording owns the source. Facing-mode and
+track zoom controls appear only when the active camera exposes those capabilities.
 
-`OverlayPanel` is the shared portal primitive for drawers, sheets, fullscreen panels, and stacked dialogs. It keeps its backdrop present through the exit transition, intercepts a backdrop-targeted pointer-down before it can click through, and dismisses only the topmost overlay. It locks body overflow, labels the modal, makes the application root and covered dialogs inert/hidden from assistive technology, excludes hidden, disabled, and inert descendants from focus trapping, and centralizes initial/return focus. Its close guard disables Escape and the close button during the atomic part of character Save. Ordinary builder closure first flushes autosave; an unsafe storage failure requires explicit discard.
+## Character and recipe ownership
 
-The policy-free `ConfirmationDialog` is owned beside `OverlayPanel` in the neutral
-UI primitive boundary and is shared by Builder, Studio, and Legacy Projects.
-Browser image decoding/validation and the accepted file-input media types live in
-the neutral browser-media adapter. The neutral `ImagePickerDropField` owns the
-two current reference fields' hidden input, drag depth, drop/preview/remove/focus
-presentation, feedback wiring, and responsive styles. Builder and media-session
-remain thin adapters with separate labels and policy: Builder owns immutable
-upload/persistence effects, while media-session owns browser validation and its
-tab-ephemeral object-URL lifecycle.
+Character Builder exclusively owns character create/edit, its resumable IndexedDB draft,
+reference upload, prompt optimization, image generation/edit/composition, durable save journal,
+Shelf persistence, and atomic Studio preload.
 
-## Session data flow
+Prompt Workshop owns only Add, Replace, and Restyle structured object recipes. Recipe Shelf owns
+saved/recent/character metadata and atomic reuse. Neither owns Character generation or a media
+session.
 
-1. The user edits a mode-specific `SessionDraft`. `useSessionDraftState` keeps one in-memory draft for Local, Lucy 2.5, and VTON 3. Text and enhancement choices survive idle mode switches independently; the departing mode's `File` and preview URL are always cleared and revoked. Text assets and the structured workshop may be used without media access.
-2. Model input is validated before camera access. Local mode needs no AI input.
-3. Explicit Start obtains or reuses local media. The primary surface starts local media first and then opens the AI experience chooser; the Dock may start a validated model directly. A model start resolves the selected model's camera requirements only after validation.
-4. After healthy local video exists, the browser requests a short-lived credential from the loopback broker.
-5. The broker validates Host, an Origin with the exact same loopback host and port, the body, the optional session profile, and the model allowlist. It then asks Decart for an origin/model-scoped credential with a five-minute connection-start TTL and returns the separately enforced `constraints.maxSessionDurationSeconds`. Studio omits the compatibility profile identifier, so the API applies its default five-minute active-session scope; the retired Guided profile remains an internal compatibility contract rather than a UI route.
-6. The browser validates the response, rejects a missing or model-mismatched constraint, and maps it into an app-owned credential result without exposing provider payloads to presentation/domain types.
-7. The browser dynamically imports the official Decart SDK and connects a cloned provider-input stream derived from the owned local tracks. Local preview remains independently owned and available as the display fallback until a live transformed video track exists.
-8. Only after the connected session commits does `useRealtimeResource` start one monotonic active-session clock. The stage exposes the authoritative maximum and non-live-region elapsed/remaining timer. A static accessible warning appears at 30 seconds remaining. Allowlisted SDK `generationTick` seconds can reconcile the display forward across reconnects; they never move it backward, reset the budget, or represent billing truth.
-9. The adapter subscribes only to `generationTick`, `generationEnded`, and the existing safe error event. It maps lifecycle seconds into app-owned events, keeps the unrestricted provider end reason private, and removes every listener on disconnect. An end at the app boundary is expected completion; an early generation end or disconnect remains a safe unexpected outcome.
-10. Start or Apply sends one complete prompt/image/enhancement snapshot. `image: null` is meaningful: it clears provider image state.
-11. The last successful snapshot becomes `AppliedRealtimeState`. Further edits stay pending until Apply; Revert restores the working draft.
-12. Stop/Reset invalidates the operation generation, aborts the browser token request, disconnects provider resources, disposes late results, and clears the active timer. Reset also clears the ephemeral reference and applied state.
+Character references follow these rules:
 
-At the expected active-session boundary, orchestration enters `stopping-ai` without presenting an
-error. With no recording, it closes the provider session and returns to local preview while
-preserving the working recipe. With an active take, `useTakeReviewFlow` first coalesces Stop,
-settles main and sidecar recorder data, and only then calls the existing recorded-review release
-boundary. The numerically equal recording maximum is a separate Wave 4 policy and never derives
-from this Decart clock.
+- JPEG, PNG, and WebP uploads are validated before storage.
+- Upload and prompt-only Save do not contact an image provider.
+- A stale generated preview may remain visible but cannot be attached to Save.
+- Optimization failure may continue with the raw direction and an explicit warning.
+- Image-provider failure never triggers fallback or automatic billable resubmission.
+- Generation uses one startup-selected provider: OpenAI, BFL, or Wiro.
+- Generated, edited, and composed assets are immutable; new work creates a child asset.
+- Handoff commits prompt, reference bytes, provenance, and enhancement as one validated state.
 
-Safe camera/device failures remain app-owned session errors. `camera-denied`,
-`permission-denied`, missing, busy, and unavailable device classes receive the shared **Capture
-settings** action. Studio clears the handled error as that action opens the existing overlay so a
-later explicit Start can retry; neither the recovery action nor settings enumeration requests a
-Decart token.
+## Recording, review, and voice
 
-Capture preferences are a separate tab-memory controller, not part of a prompt or recipe. The draft/applied pair contains selected camera id, microphone id, and the local `720p30`/`1080p30` target. Device enumeration does not call `getUserMedia`, and no device id is persisted. Apply without a live stream only stages the selection for the next explicit Start. Apply during a local preview acquires and validates a complete replacement stream before committing it and stopping the previous owned stream; on failure the current preview remains active. Source changes are blocked while recording or while AI is starting/live. Model capture dimensions remain provider-required, while the chosen devices still apply.
+Recording composes a new stream from borrowed live tracks:
 
-The guide's Lucy 2.1 character identifier was intentionally superseded by the user's approved `lucy-2.5`. The VTON boundary remains independently selectable and testable as `lucy-vton-3`.
+| Session                 | Video             | Audio                                                |
+| ----------------------- | ----------------- | ---------------------------------------------------- |
+| Local                   | Local camera      | Local microphone when present                        |
+| AI before usable output | Not recordable    | Not applicable                                       |
+| AI with usable output   | Transformed video | Provider audio when live, otherwise local microphone |
 
-### Character reference prompt pipeline
+The chosen track identities and take metadata are pinned at Start. Recording never owns or stops
+source tracks.
 
-Character Builder owns the entire character lifecycle: create/edit launch, canonical character fields, optional upload, reference optimization/generation/editing, draft persistence, save journaling, durable Shelf create-or-update, and atomic Lucy 2.5 preload. A Builder draft carries an explicit create target or saved-character edit target. Opening a different edit target requires an accessible confirmation and durably deletes the unfinished draft before the selected record is hydrated. Edit save reuses the saved character ID and preserves unrelated Shelf metadata.
+Recording orchestration owns the `MediaRecorder` instances, chunks, optional audio sidecar,
+warning/cap timer, and finalization:
 
-The Character Builder feature also physically owns its single-flight preview
-generation hook and the source/optimization identity helpers used by upload,
-persistence, save, launch, and generation. Prompt Workshop has no import or
-re-export of that provider-contacting implementation.
+- warn accessibly at 270 seconds;
+- route the 300-second cap and manual Stop through one coalesced path;
+- settle final recorder data and the optional sidecar before releasing live resources;
+- publish the main video even when the sidecar fails;
+- release local/provider resources only after finalization settles.
 
-Prompt Workshop owns only the three non-character structured intents: Add object, Replace object, and Restyle object. Its tab-memory controller retains those drafts and has no character form, image-generation state, optimizer, reference persistence, or provider contact. Historical records stored in the character collection with one of those three structured intents remain Workshop-owned for compatibility; true character records route Edit through Builder. Direct Use remains a separate atomic Recipe Shelf handoff and does not enter Builder.
+The finalized artifact replaces live media on the same stage. Studio keeps one temporary take,
+locks new acquisition while it is under review, and does not silently reacquire preview. Download
+initiation leaves review active and enables Release, but browser save completion is not observable;
+the creator must verify the file. Release or confirmed Discard revokes artifact URLs and returns to
+private idle.
 
-For Builder reference work, a server-only OpenAI Responses API call attempts to compile the structured character direction plus selected reference settings into a strict result containing an image-generation prompt and compact Lucy 2.5 character-replacement prompt. Image generation is independently selected once at API startup by `REFERENCE_IMAGE_PROVIDER`: OpenAI `gpt-image-2` remains the default, BFL uses the pinned `flux-2-pro` endpoint, and Wiro uses the pinned ByteDance `seedream-v5-lite-uncensored` task endpoint. Missing selected-provider credentials make only image generation unavailable; the broker never switches image providers. The selected image provider receives the optimized image prompt when optimization succeeds or the validated raw direction when optimization fails or is unavailable. The stored asset records which branch was used; its Lucy prompt becomes the prompt used when that asset is inserted into a session.
+Original video and sidecar are immutable processing sources. Every local or ElevenLabs treatment
+starts from them, not from the last processed output. Replacement creates the new URL before
+revoking the old processed URL. Failure or cancellation preserves the last playable result and the
+originals.
 
-The fullscreen builder maps visual selections into the canonical Character draft, including first-class Skin Tone, Body Shape, Hairstyle, and Hair Color fields. A JPEG, PNG, or WebP upload is validated and written immediately to the immutable local reference store; upload alone does not call an image provider. A current upload can be saved with a prompt, or **Save & Use Image Only** can create a reusable image-only character. Prompt-only Save never calls the optimizer or image endpoint. `Generate Preview` attempts optimization for the frozen current prompt before generation. If optimization fails, the same action generates with the raw direction, keeps the flow successful, and marks the preview with an accessible warning and an optimized-regeneration retry. If only image generation fails, an unchanged retry reuses a successful optimization. With an upload, **Generate Combined Preview** follows the same optimization-or-raw branch and composes the source with that direction. OpenAI receives the stored source as its SDK upload, BFL receives raw base64 in `input_image`, and Wiro receives a multipart `inputImage` upload. Editing any character or output setting keeps the old preview visible but marks it stale, excluding it from Save until regeneration; prompt-only or direct-upload Save remains available as applicable.
+## Persistence
 
-The optimizer result is keyed to the raw recipe and normalized reference settings. Semantic prompt content remains model-owned, while the API service canonicalizes framing, orientation, output size, and configured quality from the validated app request before returning the optimization; this keeps smaller compatible optimizer models from overriding app policy. The explicit unoptimized branch sends the validated raw direction unchanged, derives only app-owned output size/format policy, and persists `optimizationEnabled: false`. Without an uploaded source, blank regeneration creates a fresh image and sends no prior generated asset. With an uploaded source, blank regeneration composes from that source again. Written regeneration calls `POST /api/reference-images/:sourceAssetId/edits`; the server resolves owner-scoped source bytes, preserves the immutable parent, and creates a new child asset. Request fingerprints bind operation kind, source, prompt/settings, optimization branch, and an in-memory change instruction. Owner isolation is enforced separately by the owner/request mapping and coordinator key; persisted metadata retains only the instruction hash. Generated/composed handoff hydrates the saved bytes and commits the saved Lucy prompt, image, and `enhance: true` together. Direct-upload and image-only handoff use the uploaded image with enhancement disabled.
+| Store                       | Data                                                                  | Lifetime and trust boundary                                                               |
+| --------------------------- | --------------------------------------------------------------------- | ----------------------------------------------------------------------------------------- |
+| Recipe Shelf `localStorage` | Versioned, allowlisted prompt/character metadata and opaque asset IDs | Sanitized on read; degrades to session memory on failure; never stores image bytes        |
+| Character Builder IndexedDB | One resumable draft and save journal                                  | Compare-and-swap autosave; prevents duplicate save/preload after retry or reload          |
+| Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings         | Owner-scoped under `LIGHTFRAME_DATA_DIR`; no ordinary deletion route                      |
+| Legacy project IndexedDB    | Compatibility project metadata and media Blobs                        | List/download/delete plus one-time valid character-design seeding; Guided is not restored |
+| Session memory              | Streams, tokens, files, device IDs, recordings, sidecars, voice state | Cleaned on replacement, release/discard, unmount, or tab close as applicable              |
 
-New references default to full-body framing with the complete silhouette and safe margin whenever the character's anatomy permits it. A closer crop remains an explicit workshop choice. The app's target media profile is known landscape 16:9, so the reference `auto` orientation resolves to `1536x1024`; explicit portrait and square choices continue to override it.
+Browser storage is untrusted and schema-migrated. Opaque IDs, provenance, and timestamps are
+preserved. The filesystem store uses atomic publication and never exposes internal paths,
+provider URLs, credentials, or raw payloads. Detached reference assets are retained because the
+runtime lacks a complete relationship graph and deletion route.
 
-## Recording and processing flow
-
-Recording source composition is explicit:
-
-| Session                    | Video                  | Audio                                                |
-| -------------------------- | ---------------------- | ---------------------------------------------------- |
-| Local                      | Live local camera      | Live local microphone when present                   |
-| Model before usable output | Not recordable         | Not applicable                                       |
-| Model with usable output   | Live transformed video | Provider audio when live, otherwise local microphone |
-
-`MediaRecorder` receives a new composed stream that references source tracks but does not own or stop them. An audio-only sidecar is recorded at the same time when audio is available. The chosen video and audio track identities are pinned while recording. The take also snapshots mode, start time, source labels, and available track dimensions/frame rate at Start, so later live-source changes cannot rewrite completed metadata. If a selected track ends or a provider callback would change the selected source, the take finalizes first; source recomposition and provider-audio/microphone fallback apply to the next take.
-
-Decart may emit successive `MediaStream` objects that share accumulated track instances as audio and video subscribe independently. Session orchestration retains partial streams without displaying them, promotes only a live-video stream, preserves shared track identities across callbacks, and stops only tracks absent from a true replacement.
-
-Recording orchestration separates the recorder attempt/lifecycle from a focused artifact owner for takes, processing state, unload protection, and object-URL release. The domain owns an independent 300-second recording maximum and 270-second warning threshold. A per-attempt orchestration timer sets the displayed elapsed time to the supported maximum, records the app-owned completion reason, and invokes the same coalesced Stop path; Decart session time, provider callbacks, and ElevenLabs limits are not recording clocks. **Stop recording** and the automatic cap share one ordered handoff: duplicate requests are ignored, both recorders are stopped, final `dataavailable`/`stop` events settle within the existing sidecar grace and terminal timeout, and the main Blob, object URL, immutable metadata, and truthful stop duration are published first. Main-video finalization is authoritative: an optional sidecar timeout or failure produces a sidecar warning while preserving valid video. Only after finalization settles does `releaseForRecordedReview()` abort pending work, disconnect provider resources, remove listeners, stop remote/cloned input and owned local tracks, and dispose analysers and timers. Recording borrows source tracks and never stops them itself.
-
-Track settings/capability reads and immutable take-metadata construction live in a pure recording helper. The lifecycle hook retains recorder start, stop, finalization, and resource ownership; metadata extraction cannot independently stop or retain tracks.
-
-The finalized artifact then replaces live media in the same stage. The app does not fall back to or reacquire local preview, and all new media acquisition, mode/device changes, and recording are locked while a take is under review. Empty output, recorder timeout, or Blob/object-URL failure still releases live resources and returns to private idle with a stage error; if a valid artifact was already published, a later secondary failure cannot remove it from review. Recording stop always settles, including construction and URL-creation exceptions.
-
-Studio owns one temporary take at a time; it does not implement take history, rename, trim, or
-persistent media save. `Download take` dispatches a browser download but leaves playback active.
-Because completion is not browser-observable, successful synchronous dispatch only enables
-`Release` on the stage and `Close and release` in Latest Take. Either action revokes original and
-processed URLs and returns to private idle. A failed dispatch leaves review intact. Confirmed
-Discard performs the same cleanup without download. Until Release or Discard, the persistent
-main-stage player is the only take player; the explicitly opened Latest Take overlay supplies
-metadata and actions, not a second player.
-
-The retired Guided IndexedDB repository remains a compatibility boundary for existing project/media records. Studio's Legacy Project Manager can list, download the chosen video variant, and transactionally delete a project with its owned artifacts, but it cannot reopen the retired journey. No legacy media is deleted automatically. On first character-builder initialization, the newest valid `character-design` checkpoint may seed the active builder draft; a migration marker prevents repeated import after reset or completion. Draft and project repositories share only low-level request, transaction, abort, and open-lifecycle primitives. Each repository keeps its own schema and migration rules, closes databases that resolve after owner shutdown, and closes on `versionchange`.
-
-The original video and sidecar are immutable processing sources. Every local or ElevenLabs
-treatment starts from those originals, never from the currently presented processed result. Local
-Web Audio effects render offline, then Mediabunny copies encoded video while replacing audio.
-ElevenLabs conversion sends only the sidecar after explicit Apply and remuxes the returned audio the
-same way. The pinned `mp3_44100_128` output has an app-owned inclusive 8 MiB ceiling, derived from
-the approximately 4.8 MB five-minute bitrate payload plus container/metadata headroom; saved
-previews use a separate 2 MiB ceiling. The provider adapter rejects malformed or oversized declared
-lengths before reading, counts cumulative chunks before publishing a bounded Node stream, cancels
-the upstream reader on overflow/caller cancellation, and validates MP3 signatures. The browser
-independently checks declared and cumulative bytes before constructing its Blob. Processing pauses
-and locks the existing stage player. A replacement URL is created before the prior processed URL is
-revoked; success restores the prior time, clamped to the replacement duration, and remains paused.
-Cancel, failure, overflow, or replacement-URL creation failure preserves the last valid playable
-artifact and immutable originals.
-
-## Creative asset persistence
-
-The Recipe Shelf is behind a repository interface. It treats `localStorage` as untrusted input, validates a schema version, allowlists fields, normalizes records, enforces collection limits, and reports one of three health states:
-
-- `ready`: durable browser storage is available;
-- `recovered`: corrupt or outdated records were dropped and the usable subset was repaired;
-- `session-only`: storage is unavailable or a write failed, so the in-memory repository continues for this tab.
-
-The v4 payload keeps prompt text, bounded metadata, nullable opaque reference-image asset IDs, the complete canonical character draft, optional guided-design provenance, the uploaded source relationship, and the final reference kind (`uploaded` or `generated`). Recent items may retain the character name. It migrates v1, v2, and v3 data through validation rather than trusting storage. Image bytes and content URLs never enter `localStorage`. The strict character-create operation accepts a caller-owned ID, writes sanitized localStorage before publishing repository state, and treats the same ID/payload as an idempotent replay. Builder edit updates that same ID in place. The builder's separate IndexedDB journal advances from intent through durable character persistence and Studio preload so retry/reload cannot duplicate a character.
-
-Reference images are the durable server-owned media type. `ReferenceImageAssetStore` is injectable; under `LIGHTFRAME_DATA_DIR`, the default filesystem implementation atomically publishes each immutable asset directory containing image bytes and versioned private metadata, then separately atomically publishes its request-id mapping. Generated metadata records authoritative provider/model provenance, optional provider task ID, and a bounded allowlist of provider settings/usage; signed URLs, polling URLs, payloads, and credentials are never stored or returned to the browser. Version-2 request fingerprints bind the selected provider, model, adapter version, and effective settings in addition to the existing prompt/source inputs. Legacy OpenAI fingerprints remain replayable only under the matching active OpenAI model, so switching providers produces a conflict instead of returning or overwriting an asset from the other provider. A mapping failure can therefore leave a valid asset that an exact owner/request scan later repairs. The configured base directory is never chmodded; only app-owned `reference-images/v1`, `assets`, and `idempotency` descendants use owner-only directory/file modes. Relative paths resolve from the repository root, with a non-destructive legacy API-relative lookup only when the canonical directory is absent. The local owner ID is a deterministic SHA-256 value derived from the exact loopback Host including port, so a different port is a distinct asset namespace. Opaque browser-visible IDs are distinct from internal storage keys. Exact owner/request matches can repair missing or malformed idempotency mappings by scanning valid metadata; unrelated malformed metadata is skipped while real I/O failures remain visible. Failed and stale app-owned temporary writes are removed conservatively, while detached, regenerated, or otherwise unlinked assets are intentionally retained because historical records may still reference them and there is no complete server-side relationship graph or deletion route.
+See [privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) for the user-facing data contract.
 
 ## Backend boundary
 
-The Fastify server binds to `127.0.0.1` and rejects non-loopback Host headers. Every provider or reference-asset mutation requires a canonical loopback `Origin`. Every provider-contacting ElevenLabs route additionally requires `X-Lightframe-Provider-Intent: voice`; a cross-site image/element GET therefore cannot trigger credentialed provider traffic. Responses use no-store headers. Production startup fails fast when the built web distribution is absent; API-only startup remains available only in development and test.
+Fastify binds to `127.0.0.1`, rejects non-loopback Host headers, and requires exact loopback Origin
+checks for provider or reference mutations. ElevenLabs provider-contact routes also require
+`X-Lightframe-Provider-Intent: voice`. Responses are `no-store`.
 
-Permanent provider keys remain in server environment memory. App-owned Zod contracts validate every
-HTTP boundary, and provider adapters normalize upstream data. The Decart browser adapter recognizes
-only the pinned SDK's allowlisted authentication, model, WebRTC timeout/ICE/WebSocket, server, and
-signaling codes. It emits app-owned safe errors; arbitrary SDK codes, messages, data, URLs, and
-causes collapse to a generic fallback. `PILOT_ACCESS_MODE` defaults to `participant`; in that mode
-the server leaves a startup-selected Wiro image provider unavailable even when its credentials are
-configured. The explicit `operator-qualification` mode is required for the separate Wiro technical
-pass with no participant present. This gate is server-owned rather than a presentation-only
-disabled state and does not add provider fallback. ElevenLabs listing uses
-`/v2/voices?voice_type=saved`; preview and conversion resolve a submitted ID through the same saved
-filter before provider audio work, so removed or unsaved voices cannot be used through direct
-requests. Listing and preview do not load conversion-model metadata or infer Voice Changer
-eligibility from a voice category; this keeps saved community Professional Voice Clones visible
-and leaves provider voice policy to the authoritative conversion endpoint. Preview URLs remain
-restricted to allowlisted ElevenLabs and Google Storage hosts. ElevenLabs currently serves some
-`.mp3` preview objects as `text/plain`; the adapter treats that exact combination as `audio/mpeg`
-only after consuming and preserving a valid ID3 or MPEG frame signature, while other non-audio
-responses remain rejected. Successful ElevenLabs voice-model discovery for conversion is shared
-while in flight and cached for 30 seconds; failures are never cached. Automatic request URL logging
-is disabled because voice search terms and provider ids are ephemeral user data. Confirmed provider
-failures retain provider-specific safe codes; unexpected programming or storage faults return
-`internal_error`. Safe 5xx diagnostics contain only request ID, method, route template, elapsed
-time, normalized class/reason/code/status, numeric upstream status, and up to five sanitized
-call-site frames. They exclude URLs, query strings, bodies, prompts, raw messages/causes, provider
-URLs, keys, and temporary credentials. Invalid-audio codes are classified before plan guidance,
-and zero-retention guidance requires both an exact entitlement code and `param: enable_logging`, so
-malformed sidecars are never mislabeled as entitlement problems.
+Permanent keys remain in server environment memory. App-owned schemas validate every HTTP
+boundary. Provider adapters normalize upstream data into allowlisted safe codes; raw messages,
+bodies, URLs, prompts, credentials, causes, and arbitrary codes never reach clients or logs.
 
-Fastify Helmet is enabled, but Content Security Policy and
-Cross-Origin-Embedder-Policy are disabled because the configured realtime/media
-provider origins vary. That local compatibility choice is not a security basis
-for exposing the broker remotely.
+`PILOT_ACCESS_MODE=participant` server-disables Wiro even when configured. The separate
+`operator-qualification` mode is required for technical Wiro evidence with no participant
+present. This is an access boundary, not provider fallback.
 
-The backend remains database-free and single-operator, with no accounts, analytics, jobs, SQL migrations, or session history. It is stateful only for immutable reference assets and their idempotency metadata. Reference mutations require exact loopback Origin/Host matching; reads require the local owner identity. This keeps the local-first privacy model inspectable, but it is not a public multi-user security design.
+| Boundary                    | Routes                                                                                                                                                                           |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local status                | `GET /api/health`, `GET /api/capabilities`                                                                                                                                       |
+| Decart                      | `POST /api/realtime-token`                                                                                                                                                       |
+| Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions` |
+| Local reference storage     | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                         |
+| ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `POST /api/elevenlabs/voice-changer/recording`                                                      |
 
-The [remote backend handoff](REMOTE_BACKEND_HANDOFF.md) maps these current seams into a proposed
-authenticated subject/organization boundary, transactional metadata, private object storage,
-durable provider operations, indexed idempotency, explicit import/export, relationship-aware
-deletion, and remote operations/test strategy. That document is design-only and pending product,
-security/privacy, architecture, operations, data-owner, and spend-policy approval. It adds no
-current runtime boundary: the Host-derived owner remains local-only and must be discarded rather
-than migrated as identity.
+Capabilities report configuration presence only. The backend has no accounts, analytics, jobs,
+SQL database, or session history. Host-derived owner IDs are a local namespace, not identity.
 
-### HTTP API surface
+## Resource ownership
 
-| Boundary                | Routes                                                                                                                                                                           | Behavior                                                                                                                      |
-| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
-| Local status            | `GET /api/health`, `GET /api/capabilities`                                                                                                                                       | Shallow liveness and configured-capability presence only; neither probes a provider or storage health.                        |
-| Decart                  | `POST /api/realtime-token`                                                                                                                                                       | Mints one short-lived, model/origin-scoped browser credential after exact trusted-origin validation.                          |
-| Reference providers     | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions` | Optimizes through OpenAI when configured and generates, edits, or composes through the one server-selected image provider.    |
-| Local reference storage | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                         | Stores validated local uploads and returns owner-scoped metadata/content. Upload does not contact an external image provider. |
-| ElevenLabs reads        | `GET /api/elevenlabs/voices` and `GET /api/elevenlabs/voices/:voiceId/preview`                                                                                                   | Contacts ElevenLabs only with the explicit voice-intent header and returns/revalidates saved-library voices.                  |
-| ElevenLabs mutation     | `POST /api/elevenlabs/voice-changer/recording`                                                                                                                                   | Requires trusted origin plus voice intent and sends only the completed audio sidecar. The app has no library mutation route.  |
+The creator of a resource owns idempotent cleanup.
 
-## Ownership and cleanup rules
+| Owner                 | Resources                                                                                             |
+| --------------------- | ----------------------------------------------------------------------------------------------------- |
+| Session orchestration | Owned local/remote streams, cloned provider input, provider client, token abort, active-session clock |
+| Session draft         | Ephemeral files and preview object URLs                                                               |
+| Recording/review      | Recorders, chunks, sidecar, cap timer, artifact URLs, unload protection                               |
+| Voice processing      | Abort controllers, Web Audio/Mediabunny resources, temporary processed URLs                           |
+| Media stage           | DOM media attachment, metering, control-visibility timer                                              |
+| Overlay               | Focus/inert/scroll state only; never media                                                            |
+| API request/service   | Request abort, upstream streams, shared-operation subscribers, provider deadline                      |
+| Reference store       | Atomic files, metadata, request mappings, conservative temporary cleanup                              |
 
-- Session orchestration owns local/remote streams, cloned provider-input tracks, provider client, start abort controller, operation generation, preview URL, live timers, and the single post-finalization `releaseForRecordedReview()` cleanup path.
-- The session draft controller owns the per-mode text/enhancement map and a discriminated reference: either an ephemeral manual `File` with an owned object URL or a persisted asset ID with hydrated bytes and a stable content URL. Atomic recipe replacement validates persisted bytes before changing the draft, and stable asset IDs define pending/applied identity.
-- Capture preferences own session-only device/profile drafts, browser-visible device discovery,
-  the single `devicechange` listener, preferred-device availability/fallback state, and
-  negotiated-setting display. A missing preferred camera resolves to the browser default for the
-  next explicit start while the preference remains available for reconnection. Discovery runs
-  again after explicit media permission succeeds because mobile browsers may expose additional
-  cameras only then. Exact device selection omits any competing facing-mode hint. Owned local media
-  performs atomic stream replacement, switches only between capability-exposed `user` and
-  `environment` facing modes from the stage bar, and owns capability-detected track zoom
-  constraints; arbitrary source selection remains in Capture Settings, and neither recipes nor
-  browser storage receive device ids.
-- Recording orchestration owns `MediaRecorder` instances, recording chunks, the audio sidecar, the independent warning/cap timer, immutable original/processed artifact URLs, download-initiation state, and unload protection.
-- The legacy Guided project repository owns allowlisted checkpoint metadata and IndexedDB media Blobs. The Studio manager creates a short-lived object URL only for an explicit download and revokes it immediately after dispatch without deleting durable media.
-- Voice processing owns processing abort controllers and temporary Web Audio/remux resources; it never mutates the originals.
-- The Recipe Shelf owns serialized text, metadata, and opaque asset relationships, never image bytes or storage keys.
-- The reference asset store owns atomic filesystem writes and private metadata. Detach and regeneration only change browser relationships; there is no ordinary delete route, and retained orphan cleanup is an explicit future operator policy.
-- The stable stage owns video DOM attachment and audio metering. Modal panels own only presentation/focus state and never own or restart media resources.
-- The API owns request abort/timeout wiring and upstream stream closure for the duration of each HTTP request. Subscriber-aware coalescing gives every optimization/generation/edit/composition waiter an isolated cancellation lifetime. When the final subscriber leaves, the shared controller signals upstream cancellation for both optimization and owner-scoped image work. BFL and Wiro each use one deadline across a single non-retried task submission, bounded status polling, and a hardened result download. BFL polling follows the exact trusted provider URL; Wiro polling stays on the pinned Task API. Their thin provider wrappers share one API-internal remote-image transport policy for HTTPS URL rules, per-hop DNS/private-network rejection, address pinning, redirects, media types, and byte limits; bounded JSON, delay, and deadline primitives are shared only where their contracts are identical. Wiro additionally normalizes the documented 2k aspect-ratio output to the app's exact dimensions, then deletes Wiro input/output files after the local persistence attempt. An owner-scoped coordinator slot remains reserved until the upstream promise settles; if upstream has not settled or ignores the abort, a later request observes `generation_in_progress`. ElevenLabs fetches receive the request signal; their audio readers own response-body cancellation and bounded buffering, and parallel voice operations abort their sibling on terminal failure. Decart SDK `0.1.15` token creation does not expose one, so the broker races and discards a late token result but cannot cancel that already-started upstream fetch.
+Late async results check their generation or abort state before commit. A healthy replacement
+commits before the previous owned resource is released. Duplicate Stop coalesces. Recording only
+borrows source tracks.
 
-Late async work checks its operation or abort signal before committing. Replaced owned streams and object URLs are disposed; referenced source tracks used for recording are not stopped by recording or processing code. Review cleanup is idempotent and occurs after finalization, while artifact URL cleanup occurs only on processed replacement, Close, Discard, or unmount.
+## Deployment and tests
 
-## Deployment assumptions
+Development uses Vite on `127.0.0.1:4173` and the API on `127.0.0.1:4100`. Production mode serves
+the built client and API from Fastify on one loopback origin. There is no supported public
+deployment, authentication, tenancy, billing, infrastructure automation, backup, remote
+observability, or asset garbage collection.
 
-Development uses two loopback ports with Vite proxying `/api` to the fixed API port `4100`; changing `PORT` alone is not supported by the normal development or functional Playwright path. Visual tests launch a web-only Vite server with a mocked API, and Storybook has no API proxy. A production build is served by Fastify from one origin and refuses to start without `apps/web/dist`. `npm run build` followed by `NODE_ENV=production npm start` is the supported production-mode local smoke. `localhost`/loopback is treated as the secure local camera context; non-loopback deployment requires HTTPS plus a separate design for authentication, CSRF, authorization, tenant isolation, rate limiting, provider-cost abuse, observability, and secrets.
+Tests keep provider and browser effects behind injectable seams:
 
-Rare Studio tools and the realtime provider SDK remain dynamic chunks so they do not inflate the initial shell. Production browser source maps are disabled. There is no remote deployment workflow, infrastructure-as-code, automatic rollback, backup policy, asset garbage collection, or production operations runbook. Fastify emits sanitized operational logs, but production composition has no metrics, traces, alerts, error-reporting service, or persisted browser telemetry. `SIGINT`/`SIGTERM` invoke graceful `app.close()` without a forced-shutdown deadline.
+- domain tests cover pure policy;
+- component/controller tests cover state, races, focus, and cleanup;
+- Fastify tests inject provider dependencies and fetch;
+- Storybook uses typed local doubles;
+- Playwright uses deterministic synthetic media and denies unexpected HTTP/WebSockets;
+- live provider and physical-device checks are manual release evidence.
 
-## Testing seams
-
-Pure domain functions cover deterministic rules. Recipe and compatibility project repositories and the voice-library client are injectable. Reducer tests cover guarded transitions and stable restore; catalog tests cover every presentation profile, shared choices, custom values, retained starter compatibility data, and out-of-suggestion preservation; project fixtures cover the unchanged legacy IndexedDB schema, allowlist sanitation, Blob integrity and ownership, transactional deletion, migration inputs, unavailable storage, and URL cleanup. Fastify provider dependencies and `fetch` are injectable. Browser adapters isolate `MediaStream`, `MediaRecorder`, Web Audio, and Decart SDK effects. Network contracts use app-owned schemas. Vitest replaces both external `fetch` and `WebSocket`; Playwright journeys route-deny external HTTP and WebSockets.
-
-Responsive Playwright coverage uses `1440×960`, `1280×720`, `834×1112`, `390×844`, and `320×568`. In addition to keyboard-only preparation and WCAG A/AA axe checks, the Chromium journey matrix traverses Local live, recording, playback, and review plus Character and VTON live at every exact size. It asserts document/body containment, named overlay scroll ownership, persistent Record/Stop recording visibility, stage geometry within one CSS pixel, one persistent video/player, source continuity across tools, final-data-before-release ordering, and no automatic provider/camera reacquisition. The curated Chromium suite uses a 29-case review budget: closed initial Studio, Local live, and recording across all five viewports; high-risk Character/Builder/library/review states at desktop and small mobile; desktop VTO/Voice; and small-mobile finalizing/permission failure. Each scenario has semantic readiness assertions and rejects an unresolved deferred-tool fallback before capture. Baselines are stored by host platform (`chromium-linux`, `chromium-darwin`, and any explicitly generated additional platform), because browser font rasterization and system-font fallback are OS-specific. The executable matrix and pruning inventory share the same paths; semantic required-state/viewport invariants, not an exact count alone, define coverage. Broader screenshots are untracked manual-run artifacts. See the [visual coverage manifest](screenshot-test-coverage.md). Component and Storybook browser tests cover composition-level stage identity and overlay continuity, including playback-time continuity, recipe/reference handoff, recording finalization, overlay isolation/focus/exit behavior, capture-preference replacement, reference validation, failure settlement, URL ownership, session cleanup, interactions, and accessibility.
-
-The functional harness also completes one Chromium saved-voice journey through library listing,
-provider preview, deliberate Apply, local remux, processed download, and Restore Original. It
-records only safe request metadata and proves that preview has no request body, every ElevenLabs
-request carries the app-owned voice-intent marker, Apply uploads the immutable audio sidecar rather
-than video, processed replacement revokes only the processed URL, and the original remains valid.
-The harness continues to route-deny every unexpected external HTTP request and WebSocket.
-
-Coverage gates are aggregate thresholds of 81% statements, 69% branches, 82% functions, and 83%
-lines. Local `npm run quality` includes Storybook typecheck, browser tests, and build. CI runs both
-the full development-tree audit and the production-only audit before its primary static/unit/build
-gate. Storybook type, interaction, and static-build checks run in a dedicated job; coverage,
-functional E2E, production static-serving smoke, and visual regression remain separate jobs. The
-production smoke builds the web/API packages and uses Fastify to serve the compiled Studio and
-`/api/health` from one origin, while functional and visual journeys continue to use their isolated
-development/mock servers.
-
-CI rejects dependency advisories in both the full and production-only trees. The lockfile resolves
-the identified ESLint/minimatch/brace-expansion and tsup/esbuild chains to patched releases without
-an override. Fresh registry-backed results remain a release acceptance gate rather than an inferred
-claim from lockfile inspection.
-
-Successful browser journeys use a narrow Vite-development-only realtime driver for synthetic media and provider callbacks. The branch is guarded by `import.meta.env.DEV`. A Vite `generateBundle` guard fails every production build if the seam identifier remains in executable chunks, and production source maps are disabled so the development source is not published indirectly. Default tests therefore cover Local, Lucy 2.5, and VTON 3 without devices, credentials, paid traffic, or a production mock switch.
+The visual and responsive suites protect all five canonical viewports, one persistent player,
+bounded scrolling, accessible actions, source continuity, finalization ordering, and provider-free
+local preparation. See [screenshot coverage](screenshot-test-coverage.md), [manual QA](MANUAL_QA.md),
+and [live provider smoke](LIVE_PROVIDER_SMOKE.md).

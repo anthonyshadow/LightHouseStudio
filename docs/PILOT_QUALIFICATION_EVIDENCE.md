@@ -1,68 +1,58 @@
 # Controlled-pilot qualification evidence
 
-Wave 8 is a release-evidence gate. Deterministic tests protect implementation behavior, but they
-cannot qualify live entitlements, provider output, physical media codecs, device memory, browser
-interruptions, or cleanup indicators. The gate passes only when content-free evidence from the
-exact release-candidate commit covers every row in the approved provider and physical matrix.
+Deterministic tests protect implementation behavior; they do not qualify live entitlements,
+provider output, physical codecs/memory, browser interruption, or hardware cleanup indicators.
+Release requires content-free evidence from the exact candidate commit for every row in
+[`qualification/required-matrix.json`](qualification/required-matrix.json).
 
-The machine-readable matrix is
-[`qualification/required-matrix.json`](qualification/required-matrix.json). It is derived from the
-[controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md); changing it requires an
-explicit product-owner decision and requalification of affected rows.
+**Current repository state:** no committed pass records; the gate is `0/7` provider/local and
+`0/45` physical rows.
 
-## Recording a pass
+## Record a result
 
-1. Build and test the exact candidate commit. Run `npm run quality`, `npm run test:e2e`, and the
-   other release commands before paid or physical qualification.
-2. Follow [the live provider procedure](LIVE_PROVIDER_SMOKE.md), [manual QA](MANUAL_QA.md), and the
-   [recording memory protocol](RECORDING_MEMORY_POLICY.md). Do not substitute mocks, emulators, a
-   different model, or a different device for a required row.
+1. Run the normal release commands for the exact candidate first.
+2. Follow [live provider smoke](LIVE_PROVIDER_SMOKE.md), [Manual QA](MANUAL_QA.md), and the
+   [recording memory protocol](RECORDING_MEMORY_POLICY.md). Required live/physical rows cannot use
+   mocks, emulators, another model, or substitute hardware.
 3. Copy
    [`qualification/evidence/example.local-no-key.json.example`](qualification/evidence/example.local-no-key.json.example)
-   to a new `.json` file in the same directory. Use one record per provider/local requirement or
-   physical target/browser pair.
-4. Use the exact `requirementId`, `configurationId`, access mode, device class, and check IDs emitted
-   by:
+   to a new `.json` record in that directory.
+4. Obtain the exact requirement/configuration/access-mode/check IDs from:
 
    ```bash
    npm run pilot:qualification:check -- --commit "$(git rev-parse HEAD)" --verbose
    ```
 
-5. Record every check as `pass`, `fail`, or `blocked`. A passing record must have only passing
-   checks. A failed or blocked record is valid operational evidence but does not satisfy the gate.
-6. Re-run the command. The gate passes only at `7/7` provider/local requirements and `45/45`
-   physical target/browser requirements, with no invalid records, all for the requested commit.
+5. Mark every check `pass`, `fail`, or `blocked`. A satisfying record has only passing checks.
+6. Re-run the validator. Release requires `7/7`, `45/45`, no invalid records, and the requested
+   commit on every record.
 
-The validator is intentionally not part of `npm run quality`: an ordinary developer or CI runner
-must not need credentials, paid calls, or physical devices. Release qualification invokes it
-explicitly after authorized passes.
+The validator is deliberately outside `npm run quality`; ordinary development and CI must not need
+credentials, paid calls, or physical devices.
 
 ## Safe record boundary
 
-The schema is an allowlist. It accepts only:
+The allowlisted schema accepts only:
 
-- UTC recording time and the full 40-character candidate commit;
-- the required app-owned configuration identifier and participant/operator access mode;
-- generic owner roles, account-environment class, browser/OS version, and anonymous device class;
-- required check IDs, pass/fail/blocked result, app-owned safe code, bounded timing or clip
-  duration, and output MIME type; and
-- the aggregate result.
+- UTC time and full 40-character candidate commit;
+- required configuration/access mode and generic owner roles;
+- account-environment class, browser/OS version, and anonymous device class;
+- required check ID/result, app-owned safe code, bounded timing/clip duration, MIME type; and
+- aggregate result.
 
-It rejects extra fields. Do not add notes, prompts, filenames, participant codes, personal media,
-provider bodies, raw errors, URLs, request/response headers, network archives, task IDs, voice IDs,
-device IDs, credentials, tokens, billing identifiers, or account names. Provider account controls
-remain the authority for billing, quota, entitlement, and retention review; the repository record
-contains only the approved environment class.
+It rejects extra fields. Never add notes, prompts, filenames, participant codes, media, provider
+bodies/errors/URLs, headers, network archives, task/voice/device IDs, credentials, tokens, billing
+identifiers, or account names.
 
-## Freshness and failures
+## Freshness and failure
 
-Evidence is commit-specific. A later candidate is open until its own rows pass, even if older
-records remain for historical review. Re-run affected rows whenever model/configuration, provider
-adapter behavior, recorder MIME selection, sidecar/remux behavior, retention settings, supported
-browser/device versions, or the approved matrix changes.
+Evidence is commit-specific. Re-run affected rows when provider/model/configuration, adapter,
+recording MIME/sidecar/remux, retention, browser/device versions, or the approved matrix changes.
 
-A missing credential, entitlement, policy approval, physical target, or authorized owner is a
-`blocked` result. A provider refusal, early session end, unsafe leak, unexpected request, take loss,
-memory failure, unsupported codec, or incomplete cleanup is a `fail` result. Neither can be
-converted to `pass` by weakening a test, changing a model alias, retrying a billable submission,
-using provider fallback, or substituting deterministic automation.
+- `blocked`: required credential, entitlement, approval, owner, account setting, or physical target
+  is unavailable.
+- `fail`: the attempted row exposed an unsafe leak/request, provider refusal/early end, take loss,
+  memory/codec failure, or incomplete cleanup.
+
+Neither becomes a pass by weakening a check, following an alias, retrying an initial billable
+submission, switching providers, or substituting automation.

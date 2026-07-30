@@ -1,54 +1,40 @@
 # Take review and cleanup
 
-## User story
+**Outcome:** preserve one finalized take long enough to inspect, optionally process, download, and
+deliberately release or discard it.
 
-As a creator, I want to finalize, inspect, download, and deliberately release my latest take, so that I neither lose a recording nor leave an in-memory media artifact behind.
+## Journey
 
-## Starting state
+1. Select **Record** from a ready local source or usable transformed video. Studio pins the chosen
+   track identities and source metadata.
+2. Select **Stop recording**, or let the independent 5:00 maximum invoke the same coalesced Stop
+   path after the 4:30 warning.
+3. Wait for the main recorder and optional audio sidecar to settle. Playback becomes authoritative
+   before live/provider resources release.
+4. Confirm **Recorded take playback** and compact Download, Discard, Voice, and Release actions on
+   the persistent stage.
+5. Select **Take** to inspect mode, sources, start time, dimensions/frame rate when known, duration,
+   size, and MIME type. The panel does not create another player.
+6. Optionally apply a voice treatment. Playback and download remain locked until processing
+   settles or is cancelled.
+7. Select **Download**. Studio records only that download initiation was requested; it cannot
+   verify browser save completion.
+8. Verify the browser saved the file, then select **Release**. Or select **Discard** and confirm
+   irreversible removal without a download.
 
-- A local or transformed AI source is live and recordable.
-- There is no existing take under review; the app owns only one temporary take at a time.
+## Guards and recovery
 
-## End-to-end steps
+- Release stays disabled until download initiation. A click can still be blocked or mishandled by
+  the browser, so verify the downloaded file before release.
+- Main video remains available if the optional sidecar fails.
+- Processing failure/cancel preserves the original and last valid playable artifact.
+- Source end, manual Stop, provider end, and maximum-duration Stop coalesce into one finalization.
+- A before-unload warning and discard confirmation reduce accidental loss, but refresh, crash, tab
+  closure, or device restart still loses the in-memory take.
+- No new camera or provider activity starts while review owns the take.
 
-1. Confirm that **Record** is enabled. Local capture uses local camera/microphone; AI capture requires usable transformed video and uses provider audio when live or microphone fallback otherwise.
-2. Select **Record** and verify the stage controls collapse to the sole **Stop recording** action,
-   which remains visible and receives focus. The app pins the selected video/audio track identities
-   and snapshots source metadata for this take.
-3. Select **Stop recording**. If the take continues, Studio announces the final 30 seconds at 4:30
-   and invokes the same coalesced Stop path at the independent 5:00 maximum. Do not start another
-   media action while the stage reports finalization.
-4. Wait for main video and optional audio-sidecar recorders to settle. The app creates the original Blob, URL, filename, metadata, and duration before it releases local/provider resources.
-5. Confirm that the stage displays **Recorded take playback** with compact Download, Discard,
-   Voice, and Release actions. After those controls time out, pointer/touch/focus/keyboard activity
-   on the persistent stage restores them and resets the idle timer. Latest Take must still be
-   closed.
-6. Select **Take** to open Latest Take and review mode, video/audio source, start time, dimensions/frame rate, duration, size, and MIME information. The overlay does not create a second player.
-7. Play the take on the main stage. If desired, select **Voice** on the stage or **Voice treatments** in Latest Take; processing temporarily locks playback/download until a complete replacement exists.
-8. Select **Download** on the stage or **Download take** in the panel. This tells the browser to begin a download and changes the panel state to **A download was started**.
-9. After download initiation, select **Release** on the stage or **Close and release** in Latest
-   Take. The app revokes original/processed URLs, clears the take, closes review, and returns to
-   private idle. Or select **Discard**, read the irreversible confirmation, and confirm removal
-   without a download.
+## Evidence status
 
-## Failure and alternate paths
-
-- If the optional sidecar fails but main video is valid, the app still publishes the video take and reports the voice limitation.
-- If download dispatch fails, review remains intact and Release stays unavailable; retry the
-  download or discard deliberately.
-- If a selected recording track ends or an AI callback would change its source, the app finalizes the current take before accepting a new source.
-- A take stopped by the supported maximum explains the boundary after playback appears and retains
-  Voice, Download, Release, and confirmed Discard. A concurrent manual Stop or source end does not
-  start a second finalization.
-- A before-unload warning and discard confirmation reduce unintentional loss, but a refresh, crash, tab closure, or device restart still loses an unclosed in-memory take.
-
-## Completion criteria
-
-The creator has a playable take awaiting action, has initiated a download and released it, or has
-confirmed discard. No new camera/provider activity begins while review owns the take.
-
-## UX investigation cues
-
-- Clarity of the transition between live, finalizing, playback, downloaded, and released states.
-- Whether “download started” versus download completed is understood.
-- Whether requiring Release after download prevents loss without feeling redundant.
+Automated journeys cover finalization ordering, maximum-duration races, voice locking, download
+initiation, release, and discard. Browser download completion, real codecs, memory, and interruption
+recovery remain manual/physical evidence.

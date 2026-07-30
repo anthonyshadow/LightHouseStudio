@@ -1,73 +1,53 @@
 # Documentation map
 
-Use this index to find the canonical source instead of copying rules between documents. “Audit
-action” records the 2026-07-28 documentation review; it is not a lifecycle status.
+Use the narrowest authoritative document. Do not copy detailed rules into several files.
 
-## Project and engineering
+## Start here
 
-| Document                                                                       | Purpose / intended reader                                                                                                | Authority and update trigger                                                                                                    | Audit action   |
-| ------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | -------------- |
-| [`../README.md`](../README.md)                                                 | Product overview, setup, configuration, commands; all readers                                                            | Authoritative for entry-level project/setup facts. Update with capabilities, commands, environment, or release status.          | Update         |
-| [`../AGENTS.md`](../AGENTS.md)                                                 | Compact repository rules; coding agents/contributors                                                                     | Authoritative working guide. Update when boundaries, gates, or required reading changes.                                        | Update         |
-| [`README.md`](README.md)                                                       | Documentation inventory and authority map; all readers                                                                   | Canonical document map. Update whenever a retained document is created, moved, removed, or changes authority.                   | Create         |
-| [`ARCHITECTURE.md`](ARCHITECTURE.md)                                           | Current ownership, lifecycles, boundaries; engineers                                                                     | Canonical current architecture. Update with routes, ownership, provider, persistence, test, or deployment changes.              | Update         |
-| [`PRIVACY_AND_TEMPORARY_DATA.md`](PRIVACY_AND_TEMPORARY_DATA.md)               | Data location, retention, provider contact/cost; product, QA, engineering                                                | Canonical data/privacy boundary. Update with storage, deletion, provider, or deployment changes.                                | Keep unchanged |
-| [`REMOTE_BACKEND_HANDOFF.md`](REMOTE_BACKEND_HANDOFF.md)                       | Approval-ready Wave 11 remote design; product, security/privacy, architecture, operations, data owners                   | Canonical pre-implementation remote handoff. It does not describe current behavior or authorize remote implementation.          | Create         |
-| [`BROWSER_SUPPORT.md`](BROWSER_SUPPORT.md)                                     | Supported browser behavior and responsive constraints; QA/engineering                                                    | Canonical compatibility policy. Update with browser, codec, viewport, touch, or visual-matrix changes.                          | Update         |
-| [`CONTROLLED_PILOT_RELEASE_CONTRACT.md`](CONTROLLED_PILOT_RELEASE_CONTRACT.md) | Approved local cohort, qualification matrix, data/provider policy, limits, owners, and escalation; product/operations/QA | Canonical pre-remote release contract. Update only through an explicit product-owner decision and rebaseline affected evidence. | Create         |
-| [`PILOT_DATA_RETIREMENT_CHECKLIST.md`](PILOT_DATA_RETIREMENT_CHECKLIST.md)     | Per-participant isolation, retirement, and content-free evidence checklist; operators/QA                                 | Canonical controlled-pilot local-data retirement procedure. Update with the approved promise, data roots, or verification flow. | Create         |
-| [`PILOT_QUALIFICATION_EVIDENCE.md`](PILOT_QUALIFICATION_EVIDENCE.md)           | Strict Wave 8 provider/device evidence format and release gate; operators/QA                                             | Canonical qualification-record contract. Update with the approved matrix or safe evidence fields.                               | Create         |
-| [`RECORDING_MEMORY_POLICY.md`](RECORDING_MEMORY_POLICY.md)                     | Measurement protocol for in-memory recording; QA/engineering                                                             | Authoritative release-evidence policy. Update with recorder/processing or support-limit changes.                                | Keep unchanged |
-| [`MANUAL_QA.md`](MANUAL_QA.md)                                                 | Physical device and manual release checks; QA                                                                            | Canonical manual checklist. Update when user-visible flows or support claims change.                                            | Keep unchanged |
-| [`LIVE_PROVIDER_SMOKE.md`](LIVE_PROVIDER_SMOKE.md)                             | Opt-in paid/live provider checks; authorized release testers                                                             | Canonical live-provider procedure. Update with provider/model/SDK/account requirements.                                         | Update         |
-| [`Image_Generation.md`](Image_Generation.md)                                   | Reference optimizer/generation API flow; integration engineers                                                           | Canonical image-provider flow. Update with contracts, providers, models, or retention.                                          | Keep unchanged |
-| [`PRODUCT_EVOLUTION.md`](PRODUCT_EVOLUTION.md)                                 | Historical product rationale; product/engineering                                                                        | Historical, not current implementation truth. Append when a major direction changes; do not rewrite history.                    | Keep unchanged |
-| [`../LESSONS.md`](../LESSONS.md)                                               | Durable engineering lessons; contributors                                                                                | Historical rationale. Add only reusable lessons; do not turn into a task plan.                                                  | Keep unchanged |
-| [`../stories/README.md`](../stories/README.md)                                 | Storybook catalog guide; UI contributors                                                                                 | Canonical Storybook usage. Update with catalog/test workflow changes.                                                           | Keep unchanged |
-| [`../stories/Overview.mdx`](../stories/Overview.mdx)                           | In-Storybook overview; UI reviewers                                                                                      | Current component-catalog landing content. Update with catalog organization.                                                    | Keep unchanged |
+| Document                                                    | Authority                                                                             |
+| ----------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| [Project README](../README.md)                              | Product overview, setup, configuration, commands, and release posture                 |
+| [Repository working guide](../AGENTS.md)                    | Required engineering boundaries, validation, and stop conditions                      |
+| [Product state](product-state.md)                           | Current product, limitations, pilot status, decisions, and success hypotheses         |
+| [Architecture](ARCHITECTURE.md)                             | Current dependency, ownership, lifecycle, persistence, API, and deployment boundaries |
+| [User stories](userStories/README.md)                       | Observable current journeys and their evidence limits                                 |
+| [Privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) | Data location, provider contact, retention, deletion, and cost boundaries             |
 
-## Current product journeys
+## Controlled-pilot release
 
-[`userStories/README.md`](userStories/README.md) is the index and shared behavioral contract.
-Stories describe observable current behavior, not aspirations.
+| Document                                                           | Use                                                                                           |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
+| [Release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md)           | Approved cohort, device/provider matrix, limits, data promise, roles, metrics, and escalation |
+| [Active implementation plan](project-audit-implementation-plan.md) | Incomplete exact-candidate, provider, physical, and moderated-pilot gates only                |
+| [Open findings](project-audit-findings.md)                         | Unresolved release findings and deferred public-product blockers                              |
+| [Completed work](project-audit-completed-work.md)                  | Durable summary of implemented audit outcomes; not release evidence                           |
+| [Qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md)          | Content-free evidence schema and validator contract                                           |
+| [Manual QA](MANUAL_QA.md)                                          | Physical device, touch, accessibility, media, and cleanup protocol                            |
+| [Live provider smoke](LIVE_PROVIDER_SMOKE.md)                      | Authorized, opt-in, cost-bearing provider qualification                                       |
+| [Data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md)    | Per-participant isolation and whole-environment cleanup                                       |
+| [Recording memory policy](RECORDING_MEMORY_POLICY.md)              | Real 300-second measurement and support gate                                                  |
+| [Browser support](BROWSER_SUPPORT.md)                              | Claimed browser/device support and current qualification status                               |
+| [Screenshot coverage](screenshot-test-coverage.md)                 | Curated visual matrix, baselines, and readiness rules                                         |
 
-| Document                                                                                                                         | Journey                                  | Update trigger                                    | Audit action                           |
-| -------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------- | ------------------------------------------------- | -------------------------------------- |
-| [`userStories/README.md`](userStories/README.md)                                                                                 | Journey index and shared invariants      | Any journey addition, removal, or shared contract | Update                                 |
-| [`userStories/01-configure-capture-settings.md`](userStories/01-configure-capture-settings.md)                                   | Session-only camera/mic/quality setup    | Capture preference behavior                       | Keep unchanged                         |
-| [`userStories/02-local-camera-capture.md`](userStories/02-local-camera-capture.md)                                               | Provider-free preview, recording, review | Media, recording, or recovery behavior            | Update                                 |
-| [`userStories/03-character-ai-session.md`](userStories/03-character-ai-session.md)                                               | Lucy 2.5 start/apply/stop                | Decart/session behavior                           | Keep unchanged                         |
-| [`userStories/04-virtual-try-on-session.md`](userStories/04-virtual-try-on-session.md)                                           | VTON 3 preparation and live session      | VTO behavior/model contract                       | Keep unchanged                         |
-| [`userStories/05-character-workshop-and-reference-generation.md`](userStories/05-character-workshop-and-reference-generation.md) | Structured object prompt work            | Workshop/reference behavior                       | Keep unchanged                         |
-| [`userStories/06-recipe-shelf.md`](userStories/06-recipe-shelf.md)                                                               | Saved/recent/character library           | Repository, category, or reuse behavior           | Keep unchanged                         |
-| [`userStories/07-take-review-and-cleanup.md`](userStories/07-take-review-and-cleanup.md)                                         | Playback/download/release/discard        | Recording artifact policy                         | Update                                 |
-| [`userStories/08-local-voice-treatments.md`](userStories/08-local-voice-treatments.md)                                           | Browser-local voice processing           | Local processing/remux                            | Keep unchanged                         |
-| [`userStories/09-elevenlabs-voice-workflow.md`](userStories/09-elevenlabs-voice-workflow.md)                                     | Saved voice browse/preview/apply         | ElevenLabs boundary                               | Keep unchanged                         |
-| [`userStories/10-capability-and-recovery-boundaries.md`](userStories/10-capability-and-recovery-boundaries.md)                   | Independent degradation and recovery     | Capability/error behavior                         | Update                                 |
-| [`userStories/11-studio-character-builder.md`](userStories/11-studio-character-builder.md)                                       | Reusable Character Builder               | Builder/draft/reference/save behavior             | Replace/move from obsolete nested path |
+The release contract changes only through an explicit product-owner decision. A runtime test or
+responsive layout does not qualify a physical target or live provider.
 
-## Audit and planning
+## Focused technical references
 
-These are dated audit outputs. The findings register is the cross-specialist recommendation source;
-the active plan contains only incomplete phases.
+| Document                                            | Use                                                                                                      |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| [Reference image generation](Image_Generation.md)   | Optimizer, upload, provider selection, immutable asset, retry, and cleanup flow                          |
+| [Remote backend handoff](REMOTE_BACKEND_HANDOFF.md) | Deferred design boundary for a separately approved remote product; not current behavior or authorization |
 
-| Document                                                                       | Purpose / intended reader                                                    | Authority and update trigger                                                             | Audit action |
-| ------------------------------------------------------------------------------ | ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- | ------------ |
-| [`architecture-audit.md`](architecture-audit.md)                               | Detailed systems/provider/security assessment; engineering                   | Audit evidence snapshot; update only for a deliberate re-audit or finding status note.   | Create       |
-| [`product-state.md`](product-state.md)                                         | Product/MVP/roadmap assessment; product and stakeholders                     | Audit snapshot, not implemented-feature truth. Revisit after pilot evidence.             | Create       |
-| [`ui-ux-current-state.md`](ui-ux-current-state.md)                             | Surface/journey/responsive/accessibility assessment; design/engineering      | Audit snapshot with evidence. Update status after intentional UX phases.                 | Create       |
-| [`project-audit-findings.md`](project-audit-findings.md)                       | Unified prioritized findings and specialist resolutions; all decision makers | Canonical audit findings register. Update status/cross-links when phases complete.       | Create       |
-| [`project-audit-implementation-plan.md`](project-audit-implementation-plan.md) | Incomplete phased work with implementation prompts; product/engineering      | Canonical active sequence. Remove a phase only after its criteria pass.                  | Create       |
-| [`imediate-implementation-plan.md`](imediate-implementation-plan.md)           | Dependency-safe local-to-remote execution order; product/engineering/QA      | Derived pre-remote sequencing and exit gate. Update when canonical phase status changes. | Create       |
-| [`project-audit-completed-work.md`](project-audit-completed-work.md)           | Concise history removed from the active plan; all readers                    | Append-only completion record, corrected only for factual errors.                        | Create       |
-| [`screenshot-test-coverage.md`](screenshot-test-coverage.md)                   | Curated state/viewport/fixture manifest; UI/QA                               | Canonical visual-regression manifest. Update with matrix or fixture changes.             | Create       |
+## Rationale and UI catalog
 
-## Removed material
+| Document                                      | Use                                              |
+| --------------------------------------------- | ------------------------------------------------ |
+| [Product evolution](PRODUCT_EVOLUTION.md)     | Durable rationale for major product changes      |
+| [Engineering lessons](../LESSONS.md)          | Reusable constraints learned from implementation |
+| [Storybook catalog](../stories/README.md)     | Story organization and test expectations         |
+| [Storybook overview](../stories/Overview.mdx) | In-catalog orientation for reviewers             |
 
-The audit deleted 14 unreferenced PNGs under the former
-`userStories/11-new-user-character-ai-voice-download/images/` directory. They depicted the retired
-Guided runtime or older Workshop/Shelf states, were not linked from retained documentation, and
-could misrepresent the current single-route Studio. Git history remains the recovery path.
-Historical product rationale remains in `PRODUCT_EVOLUTION.md` and `LESSONS.md`.
-
-No document was merged or archived. No historical rationale document was deleted.
+Historical audit snapshots and the duplicate immediate plan were removed after their current
+findings were consolidated into the product state, findings register, active plan, and completed
+work. Git history remains the archive.

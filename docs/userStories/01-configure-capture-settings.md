@@ -1,64 +1,34 @@
 # Configure capture settings
 
-## User story
+**Outcome:** choose session-only camera, microphone, and local quality preferences without starting
+media or contacting a provider.
 
-As a creator, I want to choose the camera, microphone, and local quality target for this tab before capture begins, so that the next preview uses the right equipment without an accidental permission request.
+## Journey
 
-## Starting state
+1. Open **Device settings** (**Open capture settings**).
+2. Wait for device discovery or select **Refresh**. Listing devices does not request permission;
+   labels may stay generic until a later explicit camera start.
+3. Choose a camera and microphone. In Local Camera, also choose `720p · 30 fps` or, when supported,
+   `1080p · 30 fps`; AI modes use provider-required dimensions.
+4. Select **Apply settings**. With no preview, the choices apply to the next Start. During a ready
+   local preview, Studio commits a healthy replacement before releasing the old stream.
+5. Confirm the negotiated sources and resolution under **Active capture**.
 
-- The studio is open on `localhost` or HTTPS in a browser with media-device support.
-- No take is recording or under review. AI is not connecting or live.
-- The creator may be in Local Camera, Character AI, or Virtual Try-On mode.
+The list refreshes on `devicechange` and after a successful Start. Studio never auto-selects a
+newly attached phone. During an eligible local preview, the stage exposes **Switch camera** only
+for browser-reported front/rear modes and hardware zoom only when the track reports zoom support.
 
-## End-to-end steps
+## Guards and recovery
 
-1. Locate the capture controls below the stage and select **Device settings** (accessible name: **Open capture settings**).
-2. Read the panel description: device discovery is session-only and does not start camera or microphone capture.
-3. Wait for the initial device scan, or select **Refresh** to scan again. The browser may show
-   generic labels until a prior camera permission exists. Opening the panel does not request it.
-4. In **Camera**, keep **Default camera** or choose any camera exposed by the browser. This can
-   include the built-in camera, Apple Continuity Camera/iPhone, USB or virtual cameras, and
-   phone-webcam devices supplied by another operating system.
-5. In **Microphone**, keep **Default microphone** or choose a specific available microphone. This microphone supplies local capture and can be the fallback audio source for AI output.
-6. If Local Camera is selected, choose `720p · 30 fps` or `1080p · 30 fps`. If an AI mode is selected, note that the model controls resolution while the selected devices still apply.
-7. Review **Active capture**. Before a preview it says Not started; after a preview it reports negotiated camera, microphone, and resolution.
-8. Select **Apply settings**.
-9. If no preview is running, the choices will be used only on the next explicit camera start. If a
-   Local Camera preview is running, the settings panel remains open: wait for the replacement
-   stream to become healthy and appear on the persistent stage before the prior stream is released.
-10. Leave the panel open while connecting or disconnecting a device. The list refreshes on the
-    browser `devicechange` event; **Refresh** remains available for browser/OS discovery delays.
-    The app also rescans after an explicit camera Start succeeds because mobile browsers may expose
-    front/back cameras only after permission. A newly appearing phone is never selected
-    automatically.
-11. During a ready local preview, use **Switch camera** in the stage video control bar only when
-    the active track reports a front/rear `facingMode` and post-permission device capabilities
-    expose the opposite mode. The app requests the opposite `user`/`environment` mode instead of
-    cycling unrelated camera sources. The replacement becomes healthy before the old owned stream
-    is stopped. When the active video track exposes a numeric zoom capability, use the adjacent
-    **Zoom camera out/in** controls; unsupported controls are omitted rather than simulated.
+- **Discard** restores the last applied preferences without changing live media.
+- If a selected device disappears, Studio retains the choice, explains that the browser default
+  will be used, and allows reselection after reconnection.
+- A failed live replacement leaves the current preview active and reports **Settings unchanged**.
+- Settings are disabled during AI start/live, recording/finalization, and take review.
+- Preferences are in-memory for the tab; device IDs are not written to Recipe Shelf storage.
 
-The live-stage mic and camera on/off controls affect the current session
-immediately. They are separate from Capture Settings, which owns source/profile
-selection and atomic stream replacement.
+## Evidence status
 
-## Failure and alternate paths
-
-- **Discard** restores the previously applied settings and leaves active capture unchanged.
-- If a selected camera disappears, it stays visible as “Selected camera (unavailable).” A
-  dismissible notice explains that the browser default will be used on the next explicit start.
-  The in-memory preference is retained so the camera can be chosen again after reconnection.
-- If the browser reports no camera or denied permission, the Camera section names the state and
-  keeps permission requests behind the explicit Start action.
-- If a live local replacement cannot be acquired, the current preview remains active and the panel reports **Settings unchanged**.
-- During recording, take review, or an active AI lifecycle, the controls explain why settings are unavailable instead of applying a partial change.
-
-## Completion criteria
-
-The desired device/profile is either staged for the next explicit start or is confirmed in **Active capture**. No provider was contacted and no device ID was persisted in Recipe Shelf/browser storage.
-
-## UX investigation cues
-
-- Count the choices required before the creator feels confident that the intended device is selected.
-- Observe whether generic device labels or the difference between requested and negotiated resolution creates hesitation.
-- Measure whether the blocked-state explanations are discovered before a creator tries to change settings mid-session.
+Atomic replacement, post-permission refresh, unavailable-device fallback, front/rear switching,
+and zoom gating have automated coverage. Physical camera discovery and controls remain part of the
+[pilot qualification gate](../PILOT_QUALIFICATION_EVIDENCE.md).

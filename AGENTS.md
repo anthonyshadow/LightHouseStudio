@@ -13,8 +13,8 @@ ready. OpenAI/BFL/Wiro still require separate startup-selected passes with no fa
 [controlled-pilot release contract](docs/CONTROLLED_PILOT_RELEASE_CONTRACT.md) freezes the
 moderated cohort, physical qualification targets, independent 270/300-second warning behavior,
 participant cleanup promise, provider/content rules, generic local owner roles, limits, metrics,
-and escalation path. Those outcomes remain implementation/evidence gates; they are no longer open
-Wave 0 decisions. Monetization and future cloud ownership/portability remain deferred.
+and escalation path. Those outcomes remain implementation/evidence gates, not open product
+decisions. Monetization and future cloud ownership/portability remain deferred.
 
 ## Read before changing behavior
 

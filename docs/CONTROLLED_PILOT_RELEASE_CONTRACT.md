@@ -1,302 +1,188 @@
 # Controlled-pilot release contract
 
-**Status:** Product-owner approved on 2026-07-28
+**Approved:** 2026-07-28
 
-**Scope:** Local, single-operator, loopback-only design-partner pilot
+**Scope:** Moderated, local, single-operator, loopback-only pilot
 
-**Implementation state:** Target contract; not a claim that the current runtime or physical matrix
-has passed qualification
+**State:** Target contract; not a support or qualification claim
 
-This contract freezes the product and operating decisions required before the remaining local
-implementation waves. Current behavior remains defined by the code, [architecture](ARCHITECTURE.md),
-and [observable user stories](userStories/README.md). A target below is unsupported until its
+Code and [observable user stories](userStories/README.md) define current behavior. This contract
+defines what must be true before the pilot can start. A row remains unsupported until its
 automated, physical-device, accessibility, memory, cleanup, and live-provider evidence passes.
 
-## Pilot promise and cohort
+## Pilot promise and boundary
 
-- The pilot promise is short-form solo Character Performance: local preview → reusable Character
-  → Lucy 2.5 → Record → optional Voice → Download.
-- Virtual Try-On is a named secondary beta. Workshop is an advanced supporting tool.
-- The cohort is at most five invited, technically comfortable solo creators, creative
-  technologists, or design partners.
-- Every participant session is scheduled and operator-assisted from setup through cleanup. No
-  unassisted local-beta step is approved in this release contract.
-- The operator admits one participant environment at a time. Participants do not receive
-  credentials, shell access, shared ingress, or unsupervised access to provider-funded actions.
-- The broker remains bound to loopback. LAN access, tunnels, proxies, public hostnames, shared
-  servers, accounts, billing, and cloud persistence are outside this pilot.
+- Primary promise: local preview → reusable Character → Lucy 2.5 → Record → optional Voice →
+  Download.
+- Virtual Try-On is secondary/beta; Workshop is an advanced supporting tool.
+- Cohort: at most five invited, technically comfortable solo creators/design partners.
+- Every session is scheduled, moderated, and operator-assisted from setup through cleanup.
+- One isolated participant environment may be active at a time.
+- Participants receive no provider credentials, shell access, shared ingress, or unsupervised
+  provider-funded actions.
+- The broker stays on loopback. LAN/tunnel/proxy/public hosting, accounts, billing, sharing, and
+  cloud persistence are outside this contract.
 
 ## Qualification matrix
 
-### Version policy
+The exact executable matrix is
+[`qualification/required-matrix.json`](qualification/required-matrix.json):
 
-The matrix snapshot was selected on 2026-07-28. Apple lists iOS/iPadOS 26.6 and Safari 26.6 as the
-current stable releases, and Android 17 is the current stable Android platform release. Browser
-qualification uses the latest generally available stable patch on the day evidence is recorded,
-never beta, developer, nightly, or early-stable-only builds. The evidence record must contain the
-exact installed version.
+- `7` provider/local requirements: no-key Local, Decart Character, Decart VTO, ElevenLabs,
+  OpenAI, BFL, and operator-only Wiro.
+- `45` physical device/browser rows across one desktop, Apple/Android phones, and
+  Apple/Android tablets.
 
-If a named OEM has not released a stable Android 17 build for a target, test that device on its
-latest vendor-stable release but leave the Android 17 support row blocked. A Google Pixel reference
-target must independently pass Android 17. A browser or OS release after this snapshot does not
-inherit support: re-run the affected physical protocol before changing the published claim.
+The frozen physical targets are:
 
-### Desktop target
+- MacBook Pro 14-inch (2021, M1 Pro);
+- iPhone 17, 17 Pro, 17 Pro Max, 16, and 16 Pro Max;
+- Galaxy A07 4G, A16 5G, A56 5G, A36 5G, Redmi A5, plus Pixel 10 as the Android 17 sentinel;
+- iPad (A16), iPad Air 11-inch (M3), iPad Pro 11-inch (M5), Galaxy Tab A9+, Galaxy Tab S10 FE,
+  plus Pixel Tablet as the Android 17 tablet sentinel.
 
-| Device                                                     | OS         | Browsers                                                                                    | Qualification status                       |
-| ---------------------------------------------------------- | ---------- | ------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| Apple MacBook Pro 14-inch (2021, M1 Pro; `MacBookPro18,3`) | macOS 26.6 | Safari 26.6; Chrome 150.0.7871.187 or newer stable patch in major 150; Firefox 153.x stable | Target selected; physical protocol pending |
+The 2026-07-28 version snapshot uses macOS/iOS/iPadOS/Safari 26.6, Android 17 sentinels, and the
+stable Chrome/Firefox versions recorded in the matrix. Record the latest generally available
+stable patch and its exact installed version when evidence is produced. Never use beta/nightly
+builds or inherit support across a later OS/browser release.
 
-The desktop browser set is Chrome, Firefox, and Safari. Edge is not part of this pilot contract.
+An OEM device without stable Android 17 may be tested on its latest vendor-stable OS, but that does
+not qualify an Android 17 claim. iOS browsers share WebKit but each browser app still needs its own
+permission, viewport, download, interruption, and recovery pass. Safari is not an Android
+requirement.
 
-### Apple phone targets
+Use [Manual QA](MANUAL_QA.md), [live provider smoke](LIVE_PROVIDER_SMOKE.md), the
+[memory protocol](RECORDING_MEMORY_POLICY.md), and the strict
+[evidence contract](PILOT_QUALIFICATION_EVIDENCE.md). Responsive emulation, fakes, and evidence
+from another commit do not qualify a physical/live row.
 
-Every row uses iOS 26.6 and must pass Safari 26.6, Chrome for iOS 151.x stable, and Firefox for iOS
-153.x stable. Apple mobile browsers share the system WebKit engine, but each browser application
-still needs its own permission, viewport, download, background/foreground, and recovery pass.
+Current repository evidence is open: there are no committed pass records. Re-run:
 
-| Physical target   | OS       | Qualification status              |
-| ----------------- | -------- | --------------------------------- |
-| iPhone 17         | iOS 26.6 | Target selected; evidence pending |
-| iPhone 17 Pro     | iOS 26.6 | Target selected; evidence pending |
-| iPhone 17 Pro Max | iOS 26.6 | Target selected; evidence pending |
-| iPhone 16         | iOS 26.6 | Target selected; evidence pending |
-| iPhone 16 Pro Max | iOS 26.6 | Target selected; evidence pending |
-
-### Android phone targets
-
-The five popularity-led targets cover the current high-volume Galaxy A and Redmi families.
-Google Pixel 10 is an additional latest-platform sentinel so Android 17 can be qualified without
-waiting for every OEM rollout. Each Android target must pass Chrome 150.x stable or the later
-generally available stable major installed on the evidence date, plus Firefox 153.x stable.
-Safari is not available on Android and is therefore not an Android test requirement.
-
-| Physical target                   | Required OS condition                                                        | Qualification status              |
-| --------------------------------- | ---------------------------------------------------------------------------- | --------------------------------- |
-| Samsung Galaxy A07 4G             | Latest vendor-stable release; Android 17 row remains blocked until available | Target selected; evidence pending |
-| Samsung Galaxy A16 5G             | Latest vendor-stable release; Android 17 row remains blocked until available | Target selected; evidence pending |
-| Samsung Galaxy A56 5G             | Latest vendor-stable release; Android 17 row remains blocked until available | Target selected; evidence pending |
-| Samsung Galaxy A36 5G             | Latest vendor-stable release; Android 17 row remains blocked until available | Target selected; evidence pending |
-| Xiaomi Redmi A5                   | Latest vendor-stable release; Android 17 row remains blocked until available | Target selected; evidence pending |
-| Google Pixel 10 platform sentinel | Android 17, current stable patch                                             | Target selected; evidence pending |
-
-### Tablet targets
-
-The five popularity-led targets cover the leading Apple and Samsung volume families. Google Pixel
-Tablet is an additional Android 17 large-screen sentinel. Apple rows must pass Safari, Chrome, and
-Firefox. Android rows must pass Chrome and Firefox; Safari is not available on Android.
-
-| Physical target             | Required OS condition                                                | Browsers                                                 | Qualification status              |
-| --------------------------- | -------------------------------------------------------------------- | -------------------------------------------------------- | --------------------------------- |
-| Apple iPad (A16)            | iPadOS 26.6                                                          | Safari 26.6; Chrome for iOS 151.x; Firefox for iOS 153.x | Target selected; evidence pending |
-| Apple iPad Air 11-inch (M3) | iPadOS 26.6                                                          | Safari 26.6; Chrome for iOS 151.x; Firefox for iOS 153.x | Target selected; evidence pending |
-| Apple iPad Pro 11-inch (M5) | iPadOS 26.6                                                          | Safari 26.6; Chrome for iOS 151.x; Firefox for iOS 153.x | Target selected; evidence pending |
-| Samsung Galaxy Tab A9+      | Latest vendor-stable release; Android 17 row blocked until available | Chrome and Firefox latest stable                         | Target selected; evidence pending |
-| Samsung Galaxy Tab S10 FE   | Latest vendor-stable release; Android 17 row blocked until available | Chrome and Firefox latest stable                         | Target selected; evidence pending |
-| Google Pixel Tablet         | Android 17, current stable patch                                     | Chrome and Firefox latest stable                         | Target selected; evidence pending |
-
-The popularity basis is the latest available global handset sales and tablet vendor data, not a
-permanent claim that these models will remain the most used. Revisit the model list before each
-release candidate rather than silently substituting a device:
-
-- [Counterpoint global smartphone model sales, Q1 2026](https://counterpointresearch.com/en/insights/iphone-17-global-best-selling-smartphone-in-q1-2026-top-10-take-25-percent-share)
-- [IDC worldwide tablet shipments, 2025](https://www.idc.com/resource-center/blog/global-tablet-shipments-rise-1-9-in-4q25-as-seasonal-demand-offsets-cooling-replacement-cycle/)
-- [Apple security releases](https://support.apple.com/en-ca/100100)
-- [Android 17 release](https://developer.android.com/blog/posts/android-17-is-here)
-- [Chrome releases](https://chromereleases.googleblog.com/)
-- [Mozilla Firefox security advisories](https://www.mozilla.org/en-US/security/known-vulnerabilities/firefox/)
+```bash
+npm run pilot:qualification:check -- --commit "$(git rev-parse HEAD)" --verbose
+```
 
 ## Independent five-minute boundaries
 
-The recording limit and Decart active-session limit are separate app-owned contracts even though
-both are 300 seconds.
+The runtime now enforces both app-owned limits and automated tests cover their ordering. Physical
+and live qualification still remain open.
 
 ### Recording
 
-- The supported take maximum is 300 seconds.
-- At 270 seconds, show a persistent in-stage warning with 30 seconds remaining, announce it through
-  an accessible status region, and keep **Stop recording** visible and operable.
-- Continue showing remaining time without moving or resizing the stage.
-- At 300 seconds, invoke the existing coalesced Stop/finalize path exactly once.
-- Final recorder data and the optional audio sidecar settle before any owned local/provider
-  resource is released.
-- Playback, Voice, Download, Release, and confirmed Discard remain available. The review state
-  explains that recording ended at the supported maximum.
+- Maximum take: 300 seconds.
+- At 270 seconds, show and announce a persistent 30-second warning without hiding Stop or moving
+  the stage.
+- At 300 seconds, invoke the coalesced Stop/finalize path once.
+- Main video and optional sidecar settle before session-owned media/provider resources release.
+- A valid main video remains authoritative if the sidecar fails.
+- Playback, Voice, Download, Release, and confirmed Discard remain available, with the stop reason.
 
 ### Decart active session
 
-- Every direct Character or VTO Start surface states the 300-second maximum before provider
-  contact.
-- At 270 active seconds, show a persistent in-stage warning and accessible remaining-time status
-  without displacing Record or Stop.
-- Expected completion at 300 seconds is not an error. Preserve the recipe, return to local preview,
-  and offer an explicit new Start when resources have settled.
-- If the provider boundary arrives while recording, coalesce through recording finalization and do
-  not release the provider/local sources until final recorder data and the optional sidecar settle.
-- Unexpected disconnect, permission, quota, entitlement, and provider failures remain distinct
-  safe recovery classes.
+- Every Character/VTO Start surface discloses the 300-second maximum before provider contact.
+- The clock starts only after a healthy connection commits and does not reset on reconnect.
+- At 270 active seconds, show and announce the ending-soon warning without displacing Record/Stop.
+- Expected completion at 300 seconds preserves the recipe and returns to local preview; a new
+  session requires an explicit Start.
+- If recording is active, finalize it before releasing provider/local sources.
+- Early disconnect, permission, quota, entitlement, and provider failures remain distinct safe
+  recovery classes.
+
+The two clocks are independent even though they share a number.
 
 ## Participant data promise
 
-- Each participant receives a fresh browser profile and a dedicated, explicitly resolved
-  `LIGHTFRAME_DATA_DIR`. Participant environments are never reused or shared.
-- The operator may retain the isolated local dataset only through the participant's scheduled
-  engagement, including one planned seven-day return session.
-- The whole local dataset is retired within 24 hours after the final scheduled session, withdrawal,
-  or cancellation, and no later than eight days after the first session.
-- **Remove**, **Detach**, draft reset, character deletion, or relation cleanup does not mean that
-  immutable reference bytes were deleted. Only the whole-environment retirement procedure makes
-  that local deletion promise.
-- The current Studio take remains temporary browser memory. Download is the participant's durable
-  handoff; downloaded participant copies are outside the operator's Lightframe dataset.
-- Participant prompts, images, audio, video, provider payloads, device identifiers, and credentials
-  are excluded from evidence records. After local cleanup, retain only aggregated content-free
-  counts with no participant lookup key.
-- Provider-side retention follows the exact reviewed account setting and current provider terms.
-  It is disclosed before contact and is not represented as local deletion. Wiro's automated
-  input/output cleanup must succeed or be recorded as a failed technical qualification.
+- Give each participant a fresh browser profile and dedicated, explicitly resolved
+  `LIGHTFRAME_DATA_DIR`; never share or reuse an environment.
+- Use a random code containing no name, email, device identifier, or provider identifier.
+- Retain the isolated local dataset only through the scheduled engagement, including at most one
+  planned seven-day return.
+- Retire it within 24 hours after the final session, withdrawal, or cancellation, and no later
+  than eight days after first use.
+- Remove/Detach, draft reset, and character deletion remove relationships; they do not delete
+  immutable reference bytes. Only verified whole-environment retirement makes the pilot deletion
+  promise.
+- The current Studio take is temporary browser memory. Download is the participant’s durable
+  handoff and is outside the operator’s Lightframe dataset.
+- Retain only aggregated content-free counts after cleanup, with no participant lookup key.
+- Local cleanup is not provider-side deletion. Review the exact provider account terms/settings
+  before contact and disclose that boundary.
 
-## Isolated environment and verified cleanup
-
-Before a session:
-
-1. Create a random participant code that contains no name, email, or device identifier.
-2. Create a fresh browser profile for that code.
-3. Resolve a new explicit absolute directory under the operator-controlled pilot root and set that
-   exact leaf as `LIGHTFRAME_DATA_DIR`.
-4. Confirm the directory is not shared, does not contain another participant's files, and is not a
-   repository, home directory, cloud-synced folder, or provider credential location.
-5. Record only the participant code, session dates, and cleanup deadline in the private operator
-   checklist.
-
-At retirement:
-
-1. Stop recording/session work, close the Studio tab, stop the API, and verify camera, microphone,
-   WebRTC, and provider activity are gone.
-2. Clear site data for the exact loopback origin in the dedicated browser profile, including
-   localStorage, IndexedDB, Cache Storage, service-worker data, and permissions.
-3. Remove the dedicated browser profile through the browser's profile controls.
-4. Move the exact participant `LIGHTFRAME_DATA_DIR` leaf to the operating-system Trash. Never use a
-   recursive command against an unresolved variable, shared root, home directory, or broad glob.
-5. Restart against an empty disposable data directory and verify that retained participant asset
-   IDs cannot be resolved.
-6. Verify Wiro cleanup outcomes and use provider account controls for any provider-managed
-   disposable artifacts. Remove local keys when the qualification pass is finished.
-7. Have the Evidence Recorder and Support & Escalation Owner initial the content-free checklist,
-   then permanently empty the specifically reviewed trashed participant leaf.
-
-Cleanup fails closed: any missing path proof, shared-profile ambiguity, provider cleanup warning,
-or unexplained retained relationship blocks the next participant.
+Follow the [data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md) for every participant.
+Any uncertain path, shared profile/root, unresolved relationship, or provider-cleanup warning
+blocks the next participant.
 
 ## Approved provider configurations
 
-All permanent credentials remain server-side, least-privilege, and operator-owned. OpenAI, BFL,
-and Wiro are separate startup-selected passes with no fallback and no automatic retry of the
+All permanent credentials are least-privilege, server-only, and operator-owned. Reference image
+providers are separate startup-selected passes with no provider fallback or automatic retry of an
 initial billable submission.
 
-| Provider         | Approved local-pilot configuration                                                                                        | Participant rule                                                                                         |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| Decart Character | Exact `lucy-2.5`; origin/model-scoped client token; 300-second active-session maximum                                     | Allowed only after direct disclosure and live qualification                                              |
-| Decart VTO       | Exact pinned `lucy-vton-3`; no moving alias                                                                               | Named beta; one garment/plain background guidance; no fit, sizing, or purchase-accuracy claim            |
-| OpenAI optimizer | `gpt-5.6`, `medium` reasoning, `lucy-character-reference-v1`, 120-second timeout, response storage disabled               | Allowed after explicit Optimize/Generate intent and account-term review                                  |
-| OpenAI image     | `gpt-image-2`, `high`, one result, 150-second timeout, zero SDK retries                                                   | Allowed after explicit Generate/Regenerate/Compose intent                                                |
-| BFL image        | `flux-2-pro`, safety tolerance `2`, prompt upsampling disabled, one 150-second submit/poll/download deadline              | Allowed after separate live qualification; no fallback or automatic resubmission                         |
-| Wiro image       | `seedream-v5-lite-uncensored`, one `2k` result, watermark disabled, one 180-second deadline, required `InputOutputDelete` | Technical/operator qualification only; unavailable to external participants under this contract          |
-| ElevenLabs       | Saved voices only; `eleven_multilingual_sts_v2`; `ELEVENLABS_ENABLE_LOGGING=false`; restricted key                        | Participant use requires confirmed zero-retention eligibility; otherwise cloud conversion is unavailable |
+| Provider         | Approved configuration                                                                                    | Participant rule                                                 |
+| ---------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
+| Decart Character | Exact `lucy-2.5`; model/origin-scoped token; 300-second active limit                                      | After disclosure and live qualification                          |
+| Decart VTO       | Exact `lucy-vton-3`; no moving alias                                                                      | Beta; one garment/plain background; no fit/sizing/purchase claim |
+| OpenAI optimizer | `gpt-5.6`, `medium`, version `lucy-character-reference-v1`, 120-second timeout, response storage disabled | Explicit optimize/generate path only                             |
+| OpenAI image     | `gpt-image-2`, `high`, one result, 150-second timeout, zero SDK retries                                   | Explicit image action only                                       |
+| BFL image        | `flux-2-pro`, safety tolerance `2`, prompt upsampling disabled, one 150-second deadline                   | Separate live qualification                                      |
+| Wiro image       | `seedream-v5-lite-uncensored`, one 2k result, watermark off, one 180-second deadline, `InputOutputDelete` | Operator qualification only; never external participants         |
+| ElevenLabs       | Saved voices; `eleven_multilingual_sts_v2`; `ELEVENLABS_ENABLE_LOGGING=false`; restricted key             | Participant Apply requires confirmed zero-retention eligibility  |
 
-If a provider/model, retention term, safety setting, entitlement, or account capability differs
-from this table, stop the pass. Do not silently substitute a model, enable logging, loosen a safety
-setting, follow an alias, retry a paid submission, or fall back to another provider.
+Stop the pass if a model, safety/retention setting, entitlement, or account capability differs.
+Do not follow aliases, loosen safety, enable provider logging, switch provider, or resubmit a paid
+initial request to obtain a pass. An optimizer failure may use the documented raw-prompt branch
+through the same selected image provider; that is not provider fallback.
 
-## Participant content, refusal, and support policy
+## Content and refusal policy
 
-Participants must be adults and must have the right and consent to use every submitted face,
-voice, garment, prompt, and reference. The operator refuses or stops:
+Participants must be adults and have rights and consent for every face, voice, garment, prompt,
+and reference. Refuse or stop minors/age-ambiguous subjects; sexual or exploitative content;
+deceptive impersonation/fraud; non-consensual face or voice use; hateful, violent, illegal,
+self-harm-promoting, or harassing content; safety-control bypasses; external-participant Wiro use;
+and uncertain ownership/consent.
 
-- minors or age-ambiguous subjects;
-- nudity, sexual or exploitative content;
-- deceptive impersonation, fraud, or non-consensual face/voice use;
-- hateful, harassing, violent, illegal, or self-harm-promoting content;
-- attempts to bypass provider safety controls or use Wiro's uncensored configuration; and
-- content whose ownership or consent cannot be established for the moderated session.
+A provider refusal is final for that request. Do not rephrase to evade it or switch providers to
+obtain disallowed output. A refusal may still have incurred provider cost.
 
-Provider refusal is final for that request. The operator does not rephrase a rejected request to
-evade controls and does not switch providers to obtain a disallowed result. A safe refusal does not
-promise that a paid provider request was free; the Billing Authorizer reviews the provider record.
+## Roles and operator limits
 
-## Generic local-phase owners
+One person may hold several roles, but every live pass records the authorizing/witnessing role:
 
-These generic role names are approved for the local phase:
+| Role                       | Responsibility                                  |
+| -------------------------- | ----------------------------------------------- |
+| Pilot Product Owner        | Scope, policy, and go/no-go                     |
+| Credential Custodian       | Key creation, scope, storage, rotation, removal |
+| Billing Authorizer         | Paid-pass approval, quota/cost review           |
+| Evidence Recorder          | Content-free qualification and cleanup records  |
+| Support & Escalation Owner | Moderation, recovery, incidents, session stop   |
 
-| Role                       | Responsibility                                                                  |
-| -------------------------- | ------------------------------------------------------------------------------- |
-| Pilot Product Owner        | Owns cohort, release scope, policy approval, and go/no-go                       |
-| Credential Custodian       | Creates, scopes, stores, rotates, and removes provider credentials              |
-| Billing Authorizer         | Approves each paid pass and reviews quota/cost outcomes                         |
-| Evidence Recorder          | Maintains the content-free qualification and cleanup record                     |
-| Support & Escalation Owner | Moderates sessions, stops unsafe work, coordinates recovery, and owns incidents |
+Limits per participant:
 
-One local operator may hold multiple roles, but every live pass records which generic role
-authorized and witnessed it. Generic roles are not accounts, authentication identities, or a
-substitute for named operational ownership in a future remote product. Personal assignments must
-be revisited before moving beyond local-only operation.
+- 30 cumulative connected Decart minutes across Character and VTO;
+- 10 image generation/edit/composition submissions across all separately selected provider passes;
+- 3 ElevenLabs conversions;
+- stop a provider path after two requests that may have incurred cost; and
+- provider work only while the operator is present and the Billing Authorizer approves.
 
-## Operator limits
+These are moderated operator limits, not runtime entitlements or billing truth.
 
-- At most five invited participants and one active participant environment at a time.
-- At most 30 cumulative Decart connected minutes per participant across Character and VTO.
-- At most 10 billable image preview/generation/edit/composition submissions per participant across
-  all separately selected image-provider passes.
-- At most three ElevenLabs conversion submissions per participant.
-- Stop a provider path after two failed requests that may have incurred cost. Do not retry it in
-  that participant session.
-- No automatic retry of an initial billable submission and no provider fallback.
-- Provider-funded access exists only while the operator is present and the Billing Authorizer has
-  approved the pass.
+## Evidence, support, and release gate
 
-These are operator-enforced pilot limits, not app entitlements or billing truth. Provider account
-budgets must be lower than the approved pilot budget where the provider supports them.
+Evidence may contain only approved configuration/model labels, safe outcome codes, timing/duration
+buckets, MIME type, stop/finalization/download outcomes, support time, and participant
+comprehension results. It must not contain prompts, media, raw errors/bodies, URLs, credentials,
+device IDs, provider IDs, or network archives.
 
-## Content-free metrics
+On unsafe output, unexplained external traffic, repeated paid failure, possible credential/data
+exposure, isolation doubt, or cleanup failure:
 
-Use the hypotheses and denominators in [Product state](product-state.md#17-recommended-success-metrics).
-The Evidence Recorder may capture only:
+1. preserve local preview/recipe/valid take where safe;
+2. stop provider and API work;
+3. record only the safe app-owned event;
+4. revoke affected credentials and retire the environment when exposure is possible; and
+5. resume only after the responsible role records a safe disposition.
 
-- anonymous session outcome and elapsed time to local preview, Character Start, review, and
-  Download;
-- safe provider/model identifier, connected seconds, expected expiry, and safe outcome class;
-- generation/conversion attempt count, input duration where applicable, and success/failure class;
-- recording stop/finalization/download success and whether an immutable original survived;
-- participant answers about disclosure, detach-versus-delete, and Download; and
-- operator support minutes.
-
-Do not capture content, raw errors, provider payloads, URLs, credentials, device identifiers, or
-network archives. Aggregate the metrics at cohort close and delete row-level participant codes with
-the isolated environment.
-
-## Support and escalation
-
-The Support & Escalation Owner remains present throughout every participant session.
-
-1. Preserve local preview, the prepared recipe, and the last valid take where possible.
-2. Stop after an unexpected provider charge class, repeated paid failure, unsafe output, policy
-   refusal, unexplained external request, data-isolation doubt, or cleanup failure.
-3. Record only the safe app-owned code, provider/model ID, action time, and outcome class.
-4. Credential or suspected data exposure ends the session immediately: stop the API, revoke the
-   affected key, isolate the participant environment, and begin verified retirement.
-5. Billing disputes go to the Billing Authorizer; credential incidents go to the Credential
-   Custodian; release/data/support incidents go to the Pilot Product Owner and Support &
-   Escalation Owner.
-6. Resume only after the responsible role records a safe disposition. Never weaken origin,
-   validation, intent, retention, cleanup, model-pin, or no-fallback boundaries to recover a pass.
-
-## Release effect
-
-Wave 0 is complete because the cohort, matrix, thresholds, retention promise, cleanup procedure,
-provider configurations, content policy, role ownership, operator limits, metrics, and escalation
-path are approved and recorded.
-
-This does not close the implementation or evidence findings. In particular, touch recovery,
-narrow-screen usability, direct disclosures, capability truth, the two independent time
-boundaries, data-lifecycle UI, full physical-device passes, memory measurements, accessibility,
-and live provider qualification remain release gates in later waves.
+Pilot release remains blocked until the normal release commands pass and the exact candidate has
+`7/7` provider/local plus `45/45` physical rows, complete accessibility/memory/cleanup evidence,
+and a passed retirement record for every participant. Accounts, cloud ownership/portability,
+billing, public sharing, and remote operations remain deferred.

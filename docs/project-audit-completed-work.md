@@ -1,127 +1,76 @@
 # Project audit completed work
 
-This file preserves concise completion records removed from the
-[active implementation plan](project-audit-implementation-plan.md). Add an entry only after every
-acceptance criterion and validation gate for that work passes.
+This is a durable summary of implemented audit outcomes. It does not qualify the current release
+candidate; live, physical, accessibility, and exact-candidate gates remain in the
+[active plan](project-audit-implementation-plan.md).
 
-## 2026-07-28 — Wave 0 local release contract
+## 2026-07-28 — Release contract and audit baseline
 
-**Scope:** Product and operating decisions only; no runtime compatibility or provider-readiness
-claim.
+- Approved the moderated, loopback-only cohort, device/browser targets, independent 270/300-second
+  recording and Decart behavior, participant isolation/retirement, provider settings, content
+  policy, generic owners, operator limits, metrics, and escalation path.
+- Established Character Performance as primary, VTO as beta, Workshop as advanced, and
+  touch/mobile as required.
+- Audited architecture, product, UI/UX, provider boundaries, documentation, and tests.
+- Rebuilt the curated visual suite around meaningful current states, semantic readiness, five
+  canonical viewports, deterministic fixtures, and Darwin/Linux baselines.
+- Removed obsolete Guided visuals and stale provider/current-state documentation.
 
-Completed:
+Authority: [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md).
 
-- Approved an entirely operator-assisted cohort of at most five invited solo creators/design
-  partners with no unassisted local-beta step.
-- Named the desktop, Apple/Android phone, and tablet qualification targets plus rolling stable
-  Chrome, Firefox, Safari, iOS/iPadOS 26.6, and Android 17 baselines.
-- Selected independent 30-second warnings for the 300-second recording and Decart active-session
-  boundaries, including expected-end behavior during recording.
-- Approved per-participant browser/data-directory isolation, a seven-day-return window, retirement
-  within 24 hours of the final engagement and no later than eight days after first use, and a
-  relationship-safe cleanup verification procedure.
-- Approved exact Decart, OpenAI, BFL, Wiro, and ElevenLabs pilot settings, participant content and
-  refusal rules, and no fallback or automatic paid resubmission.
-- Assigned generic local-phase Credential Custodian, Billing Authorizer, Evidence Recorder, Pilot
-  Product Owner, and Support & Escalation Owner roles.
-- Approved participant/provider limits, content-free metrics, and the incident/escalation path.
-- Recorded the full decision in
-  [the controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) and synchronized
-  product, privacy, provider, browser, QA, audit, and release documentation.
+## 2026-07-28 to 2026-07-29 — Journey and UI corrections
 
-Intentional exclusions:
+- Stage-owned pointer, touch, focus, and keyboard activity restores hidden live/playback controls.
+  Recording always exposes one dominant Stop action.
+- Both saved-character entries open Characters and complete Use through Start.
+- Camera permission denial routes to Capture Settings without provider work.
+- Direct Character/VTO/Dock Starts share Decart transfer, usage, maximum, and Stop disclosure.
+- Capability copy distinguishes configured/limited availability from live health.
+- Character is visually primary, VTO is beta, Workshop is advanced, and the first-take sequence is
+  dismissible session state.
+- Narrow Character Builder layouts use one Review & Generate target; reflow, viewport containment,
+  focus, axe, and synthetic WebKit/touch journeys cover the canonical risks.
+- Take cleanup language is explicit: Download enables Release or Close and release; confirmed
+  Discard remains separate.
 
-- No claim that the physical matrix, latest OS/browser combinations, 300-second behavior, provider
-  configurations, cleanup procedure, or accessibility protocol has passed.
-- No application code, remote exposure, accounts, cloud persistence, billing, or public
-  moderation system.
-- Wiro remains technical/operator qualification only, and ElevenLabs participant conversion
-  requires confirmed zero-retention eligibility.
+## 2026-07-28 to 2026-07-29 — Media and provider hardening
 
-## 2026-07-28 — Repository, product, provider, UI/UX, and documentation audit
+- Decart constraints survive the API/browser boundary. An app-owned monotonic clock, warning,
+  expected-end handling, fallback, and recording-finalization ordering have deterministic tests.
+- Recording owns its independent 270-second warning and 300-second coalesced Stop/finalize path for
+  Local, Character, and VTO sources.
+- Main video remains authoritative when the optional sidecar fails; immutable originals survive
+  every voice failure/cancel path.
+- Decart SDK failures use an allowlisted app-owned taxonomy; raw provider data remains private.
+- ElevenLabs previews and conversion outputs are byte-bounded with declared/cumulative overflow,
+  cancellation, MP3 validation, browser defense, and exact-boundary tests.
+- Saved-voice functional coverage includes explicit listing/preview intent, immutable-sidecar
+  Apply, remux, Download, Restore Original, and object-URL cleanup with external-network denial.
 
-**Findings:** `TEST-003`, `DOC-002`  
-**Scope:** audit and evidence only, except for visual-test/documentation modernization.
+## 2026-07-28 to 2026-07-29 — Pilot trust and evidence infrastructure
 
-Completed:
+- Builder, VTO, image-provider, and ElevenLabs decision points disclose retention, possible usage,
+  provider/model context, and beta limitations.
+- Participant mode disables Wiro even when configured; operator-qualification mode is explicit.
+- Reference actions use truthful Detach/retention language.
+- The retirement checklist and disposable exact-leaf drill protect shared roots and siblings.
+- A strict qualification matrix and validator require seven provider/local rows and 45 physical
+  browser/device rows for one exact commit. Evidence rejects extra or content-bearing fields.
+- Release coverage now includes deterministic provider-free and provider-lifecycle journeys,
+  accessibility/reflow checks, Storybook, curated visuals, production smoke, and full/production
+  dependency-audit jobs.
 
-- Independently reviewed architecture, product, and UI/UX, then ran a cross-specialist challenge
-  and recorded the final disagreements/resolutions.
-- Queried the existing Graphify knowledge graph for architecture, provider boundaries, media
-  ownership, and high-impact modules.
-- Compared current Decart and ElevenLabs integration behavior with current official documentation.
-- Created the canonical architecture, product, UI/UX, consolidated findings, active plan, visual
-  coverage, and documentation-index documents.
-- Rebalanced the curated Chromium suite within its 29-case review budget around current central
-  states and all five established viewports.
-- Added semantic screenshot readiness checks that reject unresolved deferred-tool fallbacks.
-- Added deterministic saved-character, Character Builder combined-reference, VTO, and Voice
-  fixtures without live provider traffic.
-- Generated all 29 Darwin and all 29 Linux/amd64 baselines with the pinned Chromium/Playwright
-  runtime, then visually reviewed every retained image in platform contact sheets plus full-size
-  spot checks of initial Studio, recording, Character Builder, saved-character library, settled
-  Take Review, Voice Browser, and permission failure.
-- Pruned 54 non-curated broad captures only after both platform sets were complete; the retained
-  manifest now verifies exactly 29 baselines per platform with no missing or extra files.
-- Re-enabled the curated visual job in the main CI workflow.
-- Removed obsolete, unreferenced images of the retired Guided experience and moved the current
-  Character Builder story to a stable direct path.
-- Corrected stale provider-documentation links and current-state journey/documentation claims.
+## 2026-07-29 — Remote handoff design
 
-Intentional exclusions:
+The [remote backend handoff](REMOTE_BACKEND_HANDOFF.md) maps current loopback identity,
+filesystem/browser persistence, provider operations, idempotency, media, retention, portability,
+spend safety, observability, rollback, and tests to proposed remote boundaries.
 
-- No broad product refactor, backend, authentication, payments, analytics, cloud persistence, or
-  provider fallback.
-- No live paid provider calls.
-- No claim that the visual work fixes the interaction defects it now exposes.
-- No silent replacement of the pinned `lucy-vton-3` contract.
+This completed a design artifact only. It is unapproved, unimplemented, and does not authorize
+accounts, remote exposure, cloud persistence, billing, or public data handling.
 
-Validation results and any environment-limited checks are recorded in the task handoff and should
-be repeated after later implementation phases.
+## Current qualification boundary
 
-## 2026-07-28 — Wave 5 controlled-pilot trust and operating boundary
-
-**Findings:** `SEC-004`, `SEC-005`, `UX-013`, `PROD-006`, `PROD-007`, `PROD-009`, `PROD-010`,
-`PROD-015`
-
-**Scope:** local controlled-pilot disclosure, provider eligibility, and whole-environment
-retirement procedure; no public ownership or per-asset garbage collection.
-
-Completed:
-
-- Replaced the retained Builder upload action with truthful **Detach** language and disclosed
-  immutable local retention before first upload, retained-reference Save, Reset, and
-  character-record deletion.
-- Added action-adjacent optimizer/provider/model, possible-credit, local-output-retention, and
-  provider-free-alternative copy for Generate, Combined, Regenerate, and Edit paths.
-- Added exact clip duration, configured model, possible-credit, and zero-retention context at
-  ElevenLabs Apply.
-- Added the approved one-garment/plain-background VTO beta guidance and no fit, sizing,
-  fabric-behavior, or purchase-accuracy claim.
-- Added `PILOT_ACCESS_MODE`; participant mode server-disables Wiro even when credentials are
-  configured, while explicit operator-qualification mode preserves the separate technical pass.
-- Aligned the default BFL safety tolerance with the approved controlled-pilot value `2`.
-- Added the per-participant retirement checklist and an executable disposable drill that verifies
-  exact-leaf retirement, retained-path absence, and shared-root/sibling preservation.
-- Updated canonical privacy, architecture, setup, provider-smoke, product/audit, and observable
-  journey documentation.
-
-Validation:
-
-- `npm run pilot:data-retirement:drill`
-- targeted Vitest: 70 tests passed
-- `npm run quality`: 852 unit/component/API tests and 55 Storybook tests passed; type, lint,
-  formatting, dead-code, module-cycle, package/web/API build, and Storybook build gates passed
-- targeted Playwright provider-free and Character Builder journeys: 60 tests passed across
-  Chromium, WebKit, and mobile projects
-- curated Darwin and pinned-Linux visual regression: 29 tests passed per platform after reviewing
-  and updating only the two intentional Character Builder baselines on each platform
-
-Intentional exclusions:
-
-- No live paid provider calls or claim of provider entitlement, billing, output quality, or
-  physical-device qualification.
-- No public accounts, authorization, cloud storage, billing implementation, analytics, moderation
-  system, per-asset deletion, or relationship-unsafe garbage collection.
-- Every real participant still requires a completed content-free retirement checklist; live
-  provider and physical-device evidence remain Waves 8–9 gates.
+No completed qualification records are checked in. At this documentation audit the validator
+reports **0/7 provider/local** and **0/45 physical** passes. Historical test runs and implemented
+automation do not replace the exact-candidate work in the active plan.

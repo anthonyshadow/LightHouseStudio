@@ -1,60 +1,37 @@
 # Virtual try-on session
 
-## User story
+**Outcome:** deliberately preview and optionally record a `lucy-vton-3` garment transformation.
+VTO remains a secondary beta.
 
-As a creator, I want to preview a Lucy VTON 3 garment transformation, so that I can record a virtual try-on from a consciously prepared garment recipe.
+## Journey
 
-## Starting state
+1. Select **Start Camera + Mic**, then **Start AI** and **Virtual Try-On Beta**.
+2. If no VTO recipe is ready, open the Dock or choose a saved Try-On recipe.
+3. In **Try-On recipe**, provide garment direction, a temporary JPEG/PNG/WebP image up to 10 MiB,
+   or both. Prompt enhancement is optional and off by default.
+4. Read the one-garment/plain-background guidance and Decart transfer, cost, Stop, and 300-second
+   disclosure, then select **Start Virtual Try-On**.
+5. Wait for usable transformed video; recording remains unavailable and local fallback stays
+   visible until it arrives.
+6. Edit text, image, or enhancement, then **Apply changes** as one complete snapshot or **Revert
+   draft**.
+7. Record if desired. Recording and AI each have independent 4:30 warnings and 5:00 Stop/end paths.
+8. Use **Stop AI** to retain local preview and the draft, or **Reset AI** to clear the recipe.
 
-- AI video is configured (not health-checked) and no media, recording, or reviewed take is active.
-- The creator has a garment description, a valid JPEG/PNG/WebP garment image no larger than 10 MiB, or both.
+The Dock can start directly after valid input and optional **Check camera & mic**. It always uses
+the pinned `lucy-vton-3` model.
 
-## End-to-end steps
+## Guards and recovery
 
-1. Optionally prepare a garment recipe in the Recipe Dock or choose one from the Recipe Shelf.
-2. Select **Start Camera + Mic**, grant permission, and confirm a healthy local preview.
-3. Select **Start AI**, then choose the secondary **Virtual Try-On Beta** experience. Character
-   Transformation remains the visually primary path.
-4. If the current VTON draft is ready, review the inline Decart transfer/usage/300-second/Stop
-   disclosure and select **Start Virtual Try-On**. Otherwise select **Configure Virtual Try-On** to
-   open the Dock, or **Choose Saved Try-On** to use the Shelf.
-5. In **Try-On recipe**, read the **Virtual Try-On beta guidance**, then provide a garment
-   direction, attach a temporary garment image, or both. Use one garment on a plain background.
-   The app makes no fit, sizing, fabric-behavior, or purchase-accuracy claim. Prompt enhancement is
-   optional and off by default. Start stays unavailable until text or an image exists.
-6. Start the configured experience and wait through short-lived credential issuance and the provider connection.
-7. Confirm that live transformed video is present on stage. Before a usable transformed video
-   track exists, recording stays unavailable and local fallback is retained. After connection, the
-   stage shows the authoritative **5:00 maximum** and elapsed/remaining time.
-8. Update garment text, image, or enhancement as needed. Select **Apply changes** to commit the complete draft, or **Revert draft** to restore the current applied snapshot.
-9. Use **Change**, **Stop AI**, or Dock **Reset AI** deliberately. To capture the result, select
-   **Record**, then **Stop recording**, and complete take review. Recording announces its own final
-   30 seconds at 4:30 and auto-finalizes at 5:00 independently of the Decart session clock.
-10. At 30 seconds remaining, read the accessible **AI session ending soon** warning. Expected
-    completion preserves the current garment recipe and local preview; an active take finalizes
-    before provider/local resources release.
+- Empty input blocks Start before camera, token, or provider work.
+- Invalid or oversized images are rejected before provider contact. Dock images remain
+  tab-ephemeral and are revoked when replaced or cleared.
+- Studio makes no fit, sizing, fabric-behavior, or purchase-accuracy claim.
+- Expected 300-second completion preserves the recipe and local preview; early end/disconnect is a
+  distinct safe recovery state.
+- An active take finalizes once before source resources release.
 
-The Dock remains an alternate direct path: select **Virtual Try-On · VTON 3**,
-optionally **Check camera & mic**, and choose **Start Virtual Try-On AI** after
-the draft is valid. The implementation model ID remains `lucy-vton-3`.
+## Evidence status
 
-## Failure and alternate paths
-
-- Invalid/oversized images are rejected before provider start; use another supported file.
-- Empty recipe input disables Start before camera access and token issuance.
-- Clearing a manual image revokes its ephemeral browser preview; it is not stored in Recipe Shelf.
-- If provider video fails, ends, or disconnects, return to the local preview and retry/stop deliberately.
-- An expected maximum-duration completion is shown as completion, not as a provider crash. An early
-  generation end remains a distinct safe recovery state.
-- If the recording cap and provider/source completion coincide, Stop coalesces and the take
-  finalizes once before AI/local resources release.
-
-## Completion criteria
-
-The creator has a live `lucy-vton-3` session with a deliberate applied recipe, a finalized take, or an intentionally stopped/reset session.
-
-## UX investigation cues
-
-- Whether creators understand the distinction between text direction, garment reference, and optional enhancement.
-- Whether they understand why the Start button is disabled before they try to use it.
-- Time and uncertainty between submitting the recipe and seeing recordable transformed video.
+Image-only start, explicit Apply, fallback, and duration races have deterministic coverage. Live
+VTO output, provider maximum-duration, and physical-device evidence remain pilot gates.

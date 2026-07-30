@@ -1,198 +1,77 @@
-# Product evolution and changed flows
+# Product evolution
 
-The guide was treated as a capability contract, not a clone checklist. Lightframe Studio now has one canonical Studio experience at `/`, with character creation moved into a resumable fullscreen panel over the permanently mounted stage. The changes reduce route and ownership ambiguity without removing direct-control tools or legacy project access.
+This file preserves durable rationale for intentional product changes. Current behavior belongs in
+[Architecture](ARCHITECTURE.md) and the [observable user stories](userStories/README.md).
 
-## Intentional changes
+## One Studio replaced parallel journeys
 
-### Lucy 2.5 replaces Lucy 2.1
+`/` is the sole application route. Retired and unknown entries canonicalize to Studio; legacy
+project links may open the compatibility manager but never revive Guided.
 
-The user explicitly approved `lucy-2.5` during implementation. Character mode, API allowlists, saved-asset mode scoping, filenames, and tests use that exact identifier. `lucy-vton-3` remains a separate try-on capability. This update adopts the supported newer character model without merging the two workflows or weakening explicit provider consent.
+One persistent media stage now owns preview, transformed video, recording, finalization, and
+playback. Dock, Capture Settings, Workshop, Shelf, Character Builder, Take Review, Voice, and
+Legacy Projects are overlays. This avoided parallel media sessions, modal systems, and stores.
 
-### Studio is the sole application route
+## Local preview precedes provider work
 
-The normal `/` entry opens Studio. `/advanced`, `/guided`, `/projects`, deprecated character-flow queries, and other non-API SPA entries use history replacement to canonicalize to `/`, so Back cannot re-enter a retired journey. Project-oriented entries open the Studio legacy-project manager without changing the canonical URL.
+The primary path became **Start Camera + Mic → Start AI**. Drafting, uploads, saved-character
+selection, and local capture do not require provider credentials, SDK loading, token minting, or
+external media traffic. Provider contact remains explicit and cost-sensitive.
 
-Why it fits: one runtime owns streams, recording, recipes, active selection, and overlays. Character building cannot accidentally create a parallel media session or repository.
+Character uses the exact `lucy-2.5` model. VTO remains a separate, secondary beta pinned to
+`lucy-vton-3`; the two experiences are not interchangeable and have no fallback.
 
-Covered by: route canonicalization, history replacement, legacy-project focus, and Studio-mounted overlay tests.
+## Characters became reusable, resumable assets
 
-### One stable stage anchors the Studio overlay workspace
+Character creation moved into a fullscreen Builder with one recoverable draft and a journaled,
+idempotent save. The Recipe Shelf stores sanitized, versioned character/recipe metadata and opaque
+reference relationships. It does not store image or take bytes.
 
-Studio retains one permanently mounted media stage as its visual anchor. Recipe Dock, Capture Settings, Take Review, Voice Treatments, Prompt Workshop, Recipe Shelf, Character Builder, and Legacy Projects open as modal overlays that never participate in shell sizing or own media. Responsive rules change overlay placement, not the stage rectangle, video identity, source, or playback time.
+Prompt-only, uploaded-image, image-only, and generated/combined references remain separate choices.
+Saving or uploading never implies a billable generation request. A generated preview becomes stale
+after relevant edits and cannot silently survive into Save.
 
-Covered by: responsive/manual checks, semantic landmarks and labels, keyboard interaction, and component accessibility rules.
+## Reference media became immutable and explicit
 
-### Stage controls lead into a deliberate AI choice
+Uploaded and generated references are immutable, owner-scoped local assets. Detaching a reference,
+resetting a draft, or deleting a browser record does not promise byte deletion. The controlled
+pilot therefore uses isolated participant environments and verified whole-environment retirement
+instead of unsafe orphan garbage collection.
 
-The primary journey now starts local media through **Start Camera + Mic**. Once
-the local stage is healthy, **Start AI** opens a fullscreen chooser for
-Character Transformation or Virtual Try-On and offers the relevant
-create/configure, saved-choice, or start-with-selected action. The Recipe Dock
-remains the direct-control surface for model-specific recipes, preflight,
-Apply/Revert/Reset, and direct Start.
+OpenAI, BFL, and Wiro are startup-selected provider passes. They never fall back to one another or
+automatically repeat an initial billable submission. Wiro is operator qualification only.
 
-Why it fits: local device consent is visible before the creator chooses a paid
-realtime experience, while advanced controls remain available without a second
-runtime.
+## Live recipe changes became atomic
 
-Covered by: session-control, experience-chooser, Studio composition, responsive,
-and successful-journey tests.
+Pending and applied recipes are distinct. Apply sends one complete prompt/reference/enhancement
+snapshot; Revert restores the last successful snapshot; Reset invalidates late work. Local preview
+remains on stage until transformed video is actually usable.
 
-### Preparation is separated from provider execution
+## Recording became a bounded handoff
 
-Prompt editing, structured generation, image validation, and recipe management work before camera access. A model draft is rejected before any media or token request when empty. An optional camera/mic preflight lets the operator resolve permission/device problems without starting AI.
+Recording pins its source identity, coalesces duplicate Stop, and finalizes the authoritative video
+plus optional sidecar before live/provider cleanup. Playback replaces live media on the same stage.
+The product keeps one temporary take, not a take library.
 
-A ready local preflight remains reusable across mode/recipe changes and can be atomically replaced through Capture Settings. Incompatible changes lock only once AI is starting/live, while recording, or during take review; those boundaries prevent active provider or recorder ownership from silently crossing modes.
+The app owns an independent 270-second warning and 300-second Stop/finalize boundary. The equal
+Decart active-session limit and ElevenLabs input limit do not substitute for that recording rule.
 
-Why it fits: creators can prepare safely, understand consent, and avoid spending provider time while drafting.
+Download is the durable handoff. It enables the Release actions but does not pretend browser
+download completion is observable. Confirmed Discard performs the same URL cleanup without a
+download.
 
-Covered by: session input validation, operation ordering, repository/component tests, and the local no-provider QA check.
+## Voice processing preserves the original
 
-### Pending versus applied recipes are visible and recoverable
+Every local or ElevenLabs treatment starts from the immutable original take and sidecar, never a
+previous processed result. Replacement is published before the old processed URL is revoked;
+failure or cancellation preserves the last valid take.
 
-Live edits never silently alter Decart state. Apply sends one atomic prompt/image/enhancement snapshot; clearing a reference sends explicit `null`. Revert restores the last successful snapshot, while Reset invalidates late starts and clears both draft and provider image state.
+ElevenLabs discovery was narrowed to saved voices. Browsing, preview, and Apply are explicit,
+same-origin provider actions; only Apply sends the audio sidecar. Public discovery, import, voice
+creation, and library mutation were removed.
 
-Why it fits: experimentation stays deliberate and an Apply failure cannot obscure which recipe is actually live.
+## Scope remains intentionally local
 
-Covered by: realtime snapshot tests for normalization, image-only behavior, pending detection, and explicit clearing; orchestration tests for cancel/reset and safe failure.
-
-### Character direction is visual, gender-aware, and still open-ended
-
-The structured Character transform gives Ethnicity, Skin Tone, Body Shape, and Hair Color their own canonical fields alongside Gender, Adult Age, Appearance, Hair, Outfit, Accessories, Expression, and Mood. Ethnicity is optional and self-described, uses representative portraits without defining complexion, and remains independent of Skin Tone. Studio exposes every field without removing the existing Workshop controls or presets.
-
-The fullscreen builder retains nine illustrated starter definitions for legacy hydration and preview fallback, but the retired demo-picker presentation is no longer compiled. Presentation-aware visual catalogs remain available for Woman, Man, Non-binary, and Not specified. Applicable categories show tailored suggestions, while fixed enums retain their true cardinality. Hair color remains independent of hairstyle; shared ethnicity and skin-tone choices are never gender-filtered; Show All exposes the full catalog; and Describe My Own preserves text outside the catalog. Changing presentation recomputes recommendations but pins an existing out-of-suggestion choice instead of deleting it.
-
-Why it fits: creators can make fast visual decisions without turning gender into a restriction or losing the precision of free-form direction.
-
-Covered by: schema migration, prompt generation, catalog cardinality, shared-choice, custom-value, gender-change preservation, Character Builder tests, and Prompt Workshop boundary tests.
-
-### Reference uploads and generation are explicit, durable, and stale-safe
-
-Save Character validates and compiles the design but never generates an image. A
-Character Builder upload is validated and stored as an immutable local asset
-without contacting OpenAI. It can be saved with a prompt, or through **Save &
-Use Image Only**. `Generate Preview` automatically optimizes the current
-character and creates one immutable reference. With an uploaded source,
-**Generate Combined Preview** optimizes and composes from that source.
-
-Any later character or setting edit marks the visible preview stale and excludes
-it from generated-image Save; prompt-only or direct-upload Save remains
-available where valid. Regenerate always asks for optional feedback. Blank
-feedback creates a fresh image when there is no upload, or composes from the
-uploaded source again. Written feedback uses an owner-scoped source through the
-image-edit endpoint. Remove/detach changes only the browser relationship;
-immutable source and result assets may remain on disk.
-
-Why it fits: uploading or saving a reusable character no longer implies a
-potentially billable image request, while generated/composed references remain
-available when visual consistency matters.
-
-Covered by: upload validation/restore, direct and image-only save,
-optimize→generate/compose, blank regeneration, instructed edit, provenance,
-stale-reference fallback, and recovery tests.
-
-### Local fallback remains on stage until transformed video is truly usable
-
-Provider output is gated on a live video track. Audio-only, missing, or ended remote output falls back to the still-owned local preview with an actionable state. This turns intermittent provider startup into a recoverable transition rather than a blank stage.
-
-Decart can announce audio and video in separate callbacks while reusing accumulated track objects. Remote replacement therefore compares track identity: adding provider audio never stops the already-live transformed video, while genuinely replaced tracks are released. Both subscription orders and true replacement are deterministic under test.
-
-Covered by: track-selection/source-composition tests and manual disconnect/track-ending QA.
-
-### Recipe Shelf adds resilient, scoped creative memory
-
-Saved recipes, successful recents, and restorable structured character prompts share a searchable model-scoped shelf. Recents are recorded only after successful Start/Apply. Corrupt storage is sanitized; failed storage falls back to a session-only repository with a visible notice. Reference-image status distinguishes missing, uploaded, and generated relationships without storing image bytes in the Shelf.
-
-Recipe Shelf v3 historically added the complete canonical character draft and
-optional versioned guided provenance. The current v4 payload adds the uploaded
-source relationship, whether the final reference is uploaded or generated, and
-the character name on applicable Recents. It migrates v1, v2, and v3 records
-with validated defaults: a legacy persisted reference becomes a generated final
-reference, its uploaded-source relationship remains null, and missing structured
-traits receive their schema defaults.
-
-Why it fits: repeated creative work becomes faster without accounts, sync, or cloud storage; Recipe Shelf itself still stores no image or recording bytes.
-
-Covered by: domain and repository tests for CRUD, sanitation, search, deduplication, caps, use counts, recovery, and storage fallback.
-
-### Legacy Guided projects remain manageable in Studio
-
-Existing Guided project and media records remain in their versioned IndexedDB repository. The temporary Studio manager lists them, downloads the selected final/original video, and transactionally deletes project metadata with owned artifacts. It deliberately has no Reopen action because the Guided runtime is retired. No project or media is deleted automatically.
-
-Storage permission and quota remain browser-controlled. The app requests persistent storage only after an explicit media save and reports best-effort or tab-only fallback truthfully. An unsuccessful write keeps the active Blob available for retry or original download.
-
-Why it fits: route retirement does not strand or silently erase previously saved local media.
-
-Covered by: revision-conflict, byte-integrity, sanitation, immutable-original, processed-replacement, deletion, URL cleanup, session-only fallback, retention, stable-restore, and route tests.
-
-### Creative drafts survive navigation and blocked actions explain themselves
-
-Closing and reopening Prompt Workshop or Recipe Shelf restores its current draft. Character Builder additionally autosaves one targeted active draft to IndexedDB after 400 ms, flushes pending work on close, resumes across reload, and exposes explicit Reset Draft. Opening a different saved character asks before durably discarding that unfinished draft. Save is single-flight and journals a stable character ID across strict Shelf persistence, draft completion, and Studio preload; edit updates that ID in place. Ordinary overlay closure is nondestructive; only explicit Reset, Clear, Delete, or confirmed Discard actions own data loss.
-
-Changing recipe models now confirms and actually remounts a dirty form instead of silently retargeting its text. Search is paused while an inline edit is dirty so filtering cannot unmount unsaved work. Dynamic Clear, Save, and session-action controls hand focus to an intentional successor when the focused element disappears.
-
-Why it fits: preparation is intentionally free and local, so losing work or presenting an enabled no-op action would undermine the product's safest workflow.
-
-Covered by: Recipe Shelf dirty-state/focus component tests and Playwright checks for workshop restoration and live-local insertion blocking.
-
-### Take finalization is a first-class handoff
-
-Selecting **Stop recording** waits for the main recorder and sidecar to settle and publishes the immutable artifact before releasing Decart, remote/cloned tracks, owned camera/microphone tracks, listeners, analysers, and timers. The artifact then replaces live media in the same persistent stage. The studio does not return to or reacquire local preview, and new media work remains locked until the operator closes or discards the take. Compact take actions remain on the stage; the detailed Latest Take overlay opens only when the operator selects **Take**.
-
-The video recorder is authoritative and the audio sidecar is optional: if sidecar construction, start, error handling, or finalization fails, a valid main video still becomes the latest take with an audio-specific recovery notice. This closes a subtle clip-loss path without hiding that voice treatment is unavailable.
-
-Automatic source-ended, spontaneous-stop, recorder-error, and finalization-timeout paths also notify session orchestration exactly once, so live resources are released even when the operator did not select Stop recording. Browser-default recordings take their MIME type and extension from emitted chunks before recorder fallbacks, preserving native MP4 output where applicable. Recording lifecycle changes are announced and focus moves to the replacement action/status instead of disappearing.
-
-Download dispatch leaves main-stage playback available and enables Close; the app truthfully does not claim browser download completion. Close revokes take URLs and returns to private idle. Confirmed Discard performs the same cleanup without download. A before-unload warning and explicit discard confirmation reduce accidental loss.
-
-The retired Guided implementation used a 3–2–1 countdown and a seven-minute Decart profile around a five-minute take. Studio keeps its existing five-minute active-session policy identifier and runtime behavior; route retirement does not rename or broaden that unrelated realtime policy.
-
-The selected recording tracks are pinned for the lifetime of a take. If either selected video or audio ends, or provider subscription changes which audio/video would be selected, the current take finalizes before the UI accepts the replacement source. This prevents a label or preview from claiming one source while `MediaRecorder` is still capturing another.
-
-Covered by: recorder-construction, chunk-MIME, hung-sidecar, automatic-stop, StrictMode, focus/status, source-recomposition, mocked Local journey, and a model-recording browser assertion that finalization precedes provider release.
-
-### Voice treatments always preserve the immutable original
-
-Every local or ElevenLabs treatment starts from the original take and original sidecar. Processing locks playback/download only while replacement is incomplete, exposes Cancel, and publishes a processed take only after remux success. Original restores immediately without network traffic.
-
-All new capture is locked for the entire review, and superseded processing jobs cannot publish, fail, or unlock a newer job. A missing or unsupported sidecar remains a recoverable voice-only limitation and never invalidates the video take.
-
-Why it fits: creators can compare treatments without generational degradation or losing a valid clip.
-
-Covered by: voice rules and processing tests plus local/network-isolation and failed-conversion QA.
-
-### Optional providers degrade independently
-
-The header capability strip reports local, AI-video, and cloud-voice
-availability. Reference availability appears where it is used in Character
-Builder. Image generation now has one startup-selected server
-provider: the existing OpenAI path remains the default, while the pinned BFL
-FLUX.2 Pro task adapter is the explicit alternative. There is no browser
-selector or automatic fallback, and provider-aware idempotency prevents an
-OpenAI result from being replayed after switching to BFL. OpenAI Responses
-optimization remains separately configurable. Missing Decart disables only
-realtime video; missing selected image credentials disables image generation
-and editing but leaves text drafting and direct uploaded/image-only character
-use; missing OpenAI optimizer credentials disables optimization independently;
-missing ElevenLabs disables only its library/conversion. Local capture, assets,
-recording, and local effects remain usable. Errors are actionable and sanitized.
-
-Covered by: capability/API tests, optional `503` cases, and no-key manual QA.
-
-### Voice discovery is an explicit provider boundary
-
-The first voice browser exposed workspace and public sources, with preview, public import, and conversion as separate explicit actions. That established the provider-contact and audio-only conversion boundaries, but it also offered voices that were not yet usable by the project.
-
-The current browser is mounted only after the operator opens a disclosure labelled as contacting the provider and lists `voice_type=saved` results only. Merely completing a take does not fetch voice metadata. Public discovery and import were removed from the UI, browser client, app contracts, local API, and provider adapter. Preview and conversion revalidate saved membership; only conversion receives the original audio sidecar. Library changes now belong exclusively to ElevenLabs account controls.
-
-An early saved-only implementation also filtered `category: professional` voices when generic model metadata reported `serves_pro_voices: false`. That removed every saved result for accounts whose collection consisted of community Professional Voice Clones, even though the Voice Changer API is the authoritative policy boundary. Browsing and preview are now model-independent, every saved category remains visible, and conversion still validates the configured model's speech-to-speech capability before submitting the selected saved voice.
-
-Browser capability notices distinguish missing MediaRecorder, Web Audio replacement, offline rendering, and runtime encoder/remux compatibility. Unsupported post-processing never makes the original take unavailable.
-
-Why it fits: provider contact and browser limitations are visible at the moment they matter, while the local capture loop remains intact.
-
-Covered by: voice-panel loading/cancel tests, strict HTTP/WebSocket guards, capability UI, and safe remux failure behavior.
-
-## Scope guardrails
-
-The build deliberately excludes accounts, remote/cloud projects, server-side take history, collaboration, live distribution, network analytics, payments, social publishing, and speculative AI features. Character drafts and legacy projects are intentionally scoped to one origin/profile and remain subject to explicit deletion, site-data clearing, private-session lifetime, and browser eviction. Immutable uploaded/generated reference assets are separately owner-scoped by the loopback host and retained under `LIGHTFRAME_DATA_DIR`; detached or orphaned assets have no in-app deletion/garbage-collection flow. Broader persistence would change the privacy/security category and require a new design.
+Accounts, remote hosting, cloud projects, take history, collaboration, sharing, billing, and public
+moderation remain outside the current product. The loopback owner hash, device IDs, provider IDs,
+and storage paths must never become future user identity.

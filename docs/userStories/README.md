@@ -1,44 +1,43 @@
 # Lightframe Studio user stories
 
-This directory documents the product flows implemented in Lightframe Studio. These are behavioral references for product, design, QA, and engineering; they describe the current local-first implementation rather than future requirements.
+These stories describe observable behavior in the current local-first Studio. They are journey
+references, not release-readiness claims or future requirements.
 
-## How to use these stories
+## Journeys
 
-Each story is written as an observable end-to-end journey:
+| Flow                                         | Story                                                                          |
+| -------------------------------------------- | ------------------------------------------------------------------------------ |
+| Choose camera, microphone, and local quality | [Configure capture settings](01-configure-capture-settings.md)                 |
+| Preview and record without provider work     | [Local camera capture](02-local-camera-capture.md)                             |
+| Run and record Lucy 2.5                      | [Character AI session](03-character-ai-session.md)                             |
+| Run and record VTON 3                        | [Virtual try-on session](04-virtual-try-on-session.md)                         |
+| Build Add, Replace, or Restyle directions    | [Structured prompt workshop](05-structured-prompt-workshop.md)                 |
+| Save and reuse recipes                       | [Recipe Shelf](06-recipe-shelf.md)                                             |
+| Review, download, and release a take         | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
+| Apply browser-local voice effects            | [Local voice treatments](08-local-voice-treatments.md)                         |
+| Apply a saved ElevenLabs voice               | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
+| Recover from missing capabilities            | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md) |
+| Build and preload a reusable character       | [Studio character builder](11-studio-character-builder.md)                     |
 
-1. **Starting state** identifies prerequisites and locks that must be absent.
-2. **End-to-end steps** records every user action, system transition, and visible checkpoint.
-3. **Failure and alternate paths** captures the recovery choices that a creator encounters.
-4. **Completion criteria** defines when the goal is complete.
-5. **UX investigation cues** identifies the friction, comprehension, and timing points to test before redesigning the flow.
+## Shared runtime rules
 
-Use the documents to run usability sessions or journey walkthroughs: ask participants to attempt the primary flow without help, note where they pause or mispredict the result, then compare that behavior with the documented guardrails and recovery paths.
+- `/` is the only active route. Retired entries canonicalize to `/`; project entries may open the
+  download/delete-only Legacy Projects manager.
+- Camera access, provider contact, and billable work require an explicit action. Local Camera does
+  not request provider credentials, load the Decart SDK, or send media externally.
+- Character Builder owns true character creation and editing. Workshop owns only Add, Replace, and
+  Restyle object recipes. VTO is secondary/beta.
+- Studio keeps one mounted media stage and one temporary take. A take blocks new media work until
+  it is released after download initiation or explicitly discarded.
+- The recording and Decart session limits are independent: each warns at 270 seconds and ends
+  through its own safe path at 300 seconds.
+- Recipe metadata is browser-local. Builder reference bytes are immutable local server assets;
+  Dock portrait and garment uploads are tab-ephemeral.
 
-| Flow                                                           | Document                                                                                            |
-| -------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| Configure camera, microphone, and local quality                | [01 Configure capture settings](01-configure-capture-settings.md)                                   |
-| Preview and record without provider work                       | [02 Local camera capture](02-local-camera-capture.md)                                               |
-| Create and control a live Character AI session                 | [03 Character AI session](03-character-ai-session.md)                                               |
-| Create and control a virtual try-on session                    | [04 Virtual try-on session](04-virtual-try-on-session.md)                                           |
-| Build a character prompt and generate a reference              | [05 Character workshop and reference generation](05-character-workshop-and-reference-generation.md) |
-| Save, find, and reuse creative recipes                         | [06 Recipe Shelf](06-recipe-shelf.md)                                                               |
-| Finalize, review, download, or discard a take                  | [07 Take review and cleanup](07-take-review-and-cleanup.md)                                         |
-| Apply a browser-local voice treatment                          | [08 Local voice treatments](08-local-voice-treatments.md)                                           |
-| Preview and apply a saved ElevenLabs library voice             | [09 ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                                     |
-| Work safely when providers or browser features are unavailable | [10 Capability and recovery boundaries](10-capability-and-recovery-boundaries.md)                   |
-| Build, preview, save, and preload a reusable Studio character  | [11 Studio character builder](11-studio-character-builder.md)                                       |
+## Evidence boundary
 
-Shared product rules:
-
-- The app is a single-operator, loopback-only Studio. It has no accounts or cloud project history. `/` is the sole application route; retired entries canonicalize there without remounting the Studio runtime.
-- The primary session path is **Start Camera + Mic**, then **Start AI** and the fullscreen experience chooser. The Recipe Dock remains the detailed/direct path for model recipes and lifecycle controls.
-- The fullscreen character builder owns every true character create/edit entry from the header and Recipe Shelf, autosaves one targeted active draft to IndexedDB, and exposes an explicit Reset Draft action. Prompt Workshop owns only Add, Replace, and Restyle recipes. Existing Guided projects remain downloadable or deletable through the temporary Legacy Projects manager, but cannot be reopened.
-- Camera/microphone access, provider contact, and billable work begin only through explicit actions.
-- Saving a character does not imply image generation: prompt-only, direct uploaded-image, image-only, generated, and uploaded-source combined references are separate choices. Builder uploads are immutable local assets; Recipe Dock portrait/garment files remain tab-ephemeral.
-- Character visual suggestions adapt to Woman, Man, Non-binary, or Not specified without deleting an existing selection; shared choices and custom text remain available.
-- The Studio stage remains mounted while overlays are open; closing the character builder preserves its durably autosaved draft.
-- Recording uses **Record** and **Stop recording**. Studio keeps one temporary take and locks new
-  capture work until the operator downloads and releases it or confirms discard. Playback appears
-  on the persistent stage; the detailed Latest Take panel opens only after **Take** is selected.
-  Legacy Guided project media remains in its existing browser-local repository until explicit
-  deletion.
+Deterministic tests cover the implemented journeys, including synthetic provider and 300-second
+cases. They do not qualify physical devices, accessibility tools, codecs, memory behavior, live
+provider entitlement/output, or cleanup. Controlled-pilot support remains blocked until the exact
+release candidate satisfies the [qualification evidence gate](../PILOT_QUALIFICATION_EVIDENCE.md)
+and [release contract](../CONTROLLED_PILOT_RELEASE_CONTRACT.md).

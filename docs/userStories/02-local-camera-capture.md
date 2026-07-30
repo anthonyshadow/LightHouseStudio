@@ -1,52 +1,36 @@
 # Local camera capture
 
-## User story
+**Outcome:** create a playable in-memory take using only browser camera, microphone, and recording.
 
-As a creator, I want to preview and record my camera locally, so that I can produce a take without enabling any AI or cloud-voice service.
+## Journey
 
-## Starting state
+1. Optionally stage sources in **Device settings**.
+2. Select **Start Camera + Mic** (or Dock **Start local preview**) and grant browser permission.
+3. Confirm **Live local camera preview**. Use the mic/camera toggles and any capability-gated
+   front/rear or zoom controls.
+4. Select **Record**, or press Space while focus is outside interactive/editable content.
+5. Select the dominant **Stop recording** action. It remains visible and focusable throughout
+   recording.
+6. If recording continues, Studio warns at 4:30 and invokes the same coalesced Stop/finalize path
+   at 5:00.
+7. Wait for the main recorder and optional audio sidecar to settle. Studio then releases live
+   tracks and shows **Recorded take playback** on the same stage.
+8. Use the compact Download, Discard, Voice, and Release actions, or select **Take** for
+   [detailed review](07-take-review-and-cleanup.md).
 
-- The studio is open in a secure, supported browser with a camera, microphone, and MediaRecorder.
-- There is no recording and no take in review.
+## Guards and recovery
 
-## End-to-end steps
+- Permission/device failures show safe guidance and a **Capture settings** action; retry remains an
+  explicit Start.
+- **Close** before recording releases camera and microphone.
+- A sidecar failure does not invalidate a playable main video.
+- Invalid final output returns Studio to idle with an error instead of retaining a partial live
+  session.
+- The local path does not request a Decart token, load its SDK, open provider WebRTC, or send media
+  externally.
 
-1. Optionally open **Device settings** and stage the desired sources/quality.
-2. Select **Start Camera + Mic** on the stage. The Recipe Dock’s **Local Camera** → **Start local preview** action is an equivalent direct-control entry.
-3. Respond to the browser camera/microphone permission prompt. If granted, verify that the main stage changes from its idle Local Camera message to a mirrored **Live local camera preview**.
-4. Check framing and microphone readiness on the stage. Creative tools and cross-model recipe insertion remain available because a ready local preview can be reused across modes. Use the stage mic/camera toggles if needed. When the active mobile camera and enumerated device capabilities expose both `user` and `environment` facing modes, the same video control bar offers **Switch camera** to request the opposite mode; it never cycles unrelated desktop or Continuity Camera sources. When the active track exposes hardware zoom, it offers **Zoom camera out/in**. These controls are capability-gated and lock after AI starts connecting, during recording, or while a take is under review.
-5. Select **Record**. Alternatively, press Space only while focus is outside a text field, select, editor, or overlay control.
-6. Confirm the controls collapse to the dominant **Stop recording** action and the recording timer
-   advances. Stop remains visible, focusable, and operable for the entire recording rather than
-   participating in live/playback auto-hide.
-7. Perform the take, then select **Stop recording**. At 4:30, Studio announces that 30 seconds or
-   less remain. If no manual Stop occurs, the app invokes the same Stop/finalize path at the
-   independent 5:00 recording maximum. Outside recording, stage pointer, touch,
-   focus, mouse-pointer, or keyboard activity restores timed-out live controls and restarts their
-   single idle timer.
-8. Wait on the finalizing stage state. The app stops the main recorder and optional audio sidecar, receives final chunks, creates the take, and only then releases live device tracks.
-9. Verify that the same persistent stage becomes **Recorded take playback** with compact Download,
-   Discard, Voice, and Release actions. Latest Take must remain closed until **Take** is selected;
-   open it for details, then continue with [Take review and cleanup](07-take-review-and-cleanup.md).
+## Evidence status
 
-## Failure and alternate paths
-
-- If permission is denied, a device is busy/missing, or constraints cannot be met, the stage
-  displays a sanitized explanation and a **Capture settings** recovery action. That action
-  acknowledges the handled error and opens the existing settings overlay; retry remains an
-  explicit Start action. No provider work starts.
-- Select **Close** before recording to release local tracks and return to private idle.
-- If recording cannot create a valid artifact, the studio releases live resources and returns to idle with an error instead of leaving a partially live state.
-- At the recording maximum, Studio explains why the take ended and preserves playback, Voice,
-  Download, Release, and confirmed Discard. This timer does not depend on an AI provider session.
-
-## Completion criteria
-
-A playable latest take is visible, or local tracks have been deliberately stopped. This flow does not request a Decart token, load the Decart SDK, open a provider WebRTC connection, or send media/prompt/image data to Decart.
-
-## UX investigation cues
-
-- Time permission prompt → confident preview → recording start.
-- Whether the difference between live-session **Close**, **Stop recording**, and take-review
-  **Release** is clear.
-- Whether the local-only guarantee is visible at the decision point, rather than only in documentation.
+The no-key journey, network denial, control recovery, finalization ordering, and 270/300-second
+policy are automated. Physical browser/device, codec, memory, interruption, and long-take evidence
+remain pending for the controlled pilot.
