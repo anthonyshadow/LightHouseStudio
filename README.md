@@ -22,18 +22,23 @@ claim that qualification has passed.
 
 ## Product flow
 
-1. Select **Start Camera + Mic** for provider-free local preview.
-2. Create or choose a reusable Character.
-3. Optionally select **Start AI** for Lucy 2.5 Character Transformation or VTO 3.
-4. Record a take. Studio warns at 270 seconds and automatically stops at 300 seconds.
-5. Review playback on the same persistent stage.
-6. Optionally apply a local effect or saved ElevenLabs voice.
-7. Initiate Download, verify the browser saved the file, then Release. Or confirm Discard without
+1. Open `/` and select **Enter** to move to `/studio`.
+2. Select **Start Camera + Mic** for provider-free local preview.
+3. Create or choose a reusable Character.
+4. Optionally select **Start AI** for Lucy 2.5 Character Transformation or VTO 3.
+5. Record a take. Studio warns at 270 seconds and automatically stops at 300 seconds.
+6. Review playback on the same persistent stage.
+7. Optionally apply a local effect or saved ElevenLabs voice.
+8. Initiate Download, verify the browser saved the file, then Release. Or confirm Discard without
    downloading.
 
-`/` is the only application route. Creative tools open as overlays without remounting the stage or
-creating another media session. Retired routes redirect to `/`; project-oriented legacy entries
-open the compatibility project manager.
+`/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio` owns the
+one persistent stage; creative tools open as overlays without remounting it or creating another
+media session. Known retired routes redirect to `/studio`, project-oriented legacy entries open
+the compatibility manager, and unknown paths return to `/`.
+
+Leaving Studio is blocked during recording/finalization. A temporary take, active Voice work, or
+dirty Recipe Shelf edit requires confirmed discard; saved origin-scoped browser data is unaffected.
 
 ## Capabilities and provider boundaries
 
@@ -74,9 +79,9 @@ cp .env.example .env
 pnpm dev
 ```
 
-Open <http://127.0.0.1:4173>. Vite proxies `/api` to `127.0.0.1:4100`; keep `PORT=4100` for the
-normal development and functional Playwright paths. Leave provider keys empty to exercise the
-fully local path.
+Open <http://127.0.0.1:4173> for the entry or <http://127.0.0.1:4173/studio> for a direct Studio
+load. Vite proxies `/api` to `127.0.0.1:4100`; keep `PORT=4100` for the normal development and
+functional Playwright paths. Leave provider keys empty to exercise the fully local path.
 
 For the production-mode loopback smoke:
 

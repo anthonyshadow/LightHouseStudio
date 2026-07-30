@@ -138,7 +138,7 @@ const stabilizeActiveStageVideo = async (page: Page): Promise<void> => {
   });
 };
 
-const prepareVisualPage = async (page: Page): Promise<NetworkJourneyState> => {
+const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<NetworkJourneyState> => {
   await page.clock.setFixedTime(CAPTURE_TIME);
   await page.emulateMedia({ reducedMotion: 'reduce' });
   const network = await installSuccessfulStudioHarness(page, {
@@ -158,9 +158,13 @@ const prepareVisualPage = async (page: Page): Promise<NetworkJourneyState> => {
     { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: SEEDED_CHARACTER_STORE },
   );
 
-  await page.goto('/');
+  await page.goto(entryRoute ? '/' : '/studio');
   await expect(page.getByRole('main')).toBeVisible();
-  await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
+  if (entryRoute) {
+    await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
+  } else {
+    await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
+  }
   await page.addStyleTag({
     content: `
       *, *::before, *::after {
@@ -205,6 +209,14 @@ const selectSeededCharacter = async (page: Page): Promise<void> => {
 };
 
 const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
+  'entry-initial': {
+    id: 'entry-initial',
+    setup: async (page) => {
+      await expect(page.getByRole('heading', { name: 'Enter Lightframe Studio' })).toBeAttached();
+      await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
+      await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
+    },
+  },
   'studio-initial-closed': {
     id: 'studio-initial-closed',
     setup: async (page) => {
@@ -388,7 +400,7 @@ test.describe('curated Studio visual regression', () => {
     const { viewport, scenario, baseline } = visualCase;
     test(`${viewport.id} / ${scenario.id}`, async ({ page }) => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
-      const network = await prepareVisualPage(page);
+      const network = await prepareVisualPage(page, scenario.id === 'entry-initial');
       await scenario.setup(page);
       await settlePage(page);
       await stabilizeActiveStageVideo(page);

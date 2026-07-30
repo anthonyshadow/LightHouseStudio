@@ -10,6 +10,7 @@ import {
   useState,
 } from 'react';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
+import type { StudioInitialOverlay } from '../app/routeResolution';
 import type { PromptCommittedHandler } from '../application/types';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
 import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
@@ -25,7 +26,7 @@ import { isModelSessionActive } from '../features/media-session/sessionComposerM
 import { persistedReferenceAssetId } from '../features/media-session/types';
 import { CaptureSettingsPanel, RecordingControls } from '../features/recording';
 import { useStudioSession } from '../orchestration/session';
-import { Button, OverlayPanel, StudioDesignProvider } from '../ui';
+import { Button, OverlayPanel } from '../ui';
 import {
   headerRegionStyles,
   firstSuccessGuideStyles,
@@ -37,9 +38,9 @@ import {
 } from './StudioApp.styles';
 import { CreativeWorkspace, type AuxiliaryPanel, type ModelMode } from './CreativeWorkspace';
 import { AIExperienceChooser } from './AIExperienceChooser';
+import { StudioExitGuard } from './StudioExitGuard';
 import { StudioHeader } from './StudioHeader';
 import { StudioSessionControlBar } from './StudioSessionControlBar';
-import { resolveLegacyEntry, type StudioInitialOverlay } from './routeResolution';
 import {
   deriveRecordingDurationNotices,
   deriveRealtimeSessionNotices,
@@ -81,10 +82,12 @@ const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
 interface StudioExperienceProps {
   initialOverlay: StudioInitialOverlay;
+  focusMainOnMount: boolean;
 }
 
-const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
+const StudioExperience = ({ initialOverlay, focusMainOnMount }: StudioExperienceProps) => {
   const theme = useTheme();
+  const mainRef = useRef<HTMLElement>(null);
   const repository = useMemo(() => createCreativeAssetRepository(), []);
   const repositoryState = useCreativeAssetRepository(repository);
   const {
@@ -217,6 +220,11 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     saveWorkshopPrompt,
     openWorkshop,
   } = handoff.actions;
+
+  useLayoutEffect(() => {
+    if (!focusMainOnMount) return;
+    mainRef.current?.focus();
+  }, [focusMainOnMount]);
 
   useLayoutEffect(() => {
     promptCommittedHandlerRef.current = recordCommittedPrompt;
@@ -384,6 +392,11 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     closeOverlay();
     void session.startModel();
   };
+  const discardTemporaryWork = useCallback(() => {
+    processing.cancel();
+    recording.discard();
+    setShelfDirty(false);
+  }, [processing, recording, setShelfDirty]);
 
   return (
     <div css={pageStyles(theme)}>
@@ -403,7 +416,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
           />
         </div>
 
-        <main id="studio-main" tabIndex={-1} css={mainGridStyles()}>
+        <main ref={mainRef} id="studio-main" tabIndex={-1} css={mainGridStyles()}>
           <div css={stageColumnStyles(theme)}>
             <MediaStage
               presentation={stagePresentation}
@@ -465,6 +478,16 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
             />
           </div>
         </main>
+
+        <StudioExitGuard
+          recordingOrFinalizing={
+            recordingActive || finalizingStartedAt !== null || finalizingStream !== null
+          }
+          hasTemporaryTake={Boolean(recording.presented)}
+          voiceProcessingActive={recording.processingState === 'processing'}
+          shelfDirty={shelfDirty}
+          onDiscardTemporaryWork={discardTemporaryWork}
+        />
 
         <OverlayPanel
           open={activeOverlay === 'character-selector'}
@@ -750,19 +773,11 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
   );
 };
 
-const RoutedStudioExperience = () => {
-  const [entry] = useState(() => {
-    const resolution = resolveLegacyEntry(window.location);
-    if (resolution.shouldReplace) {
-      window.history.replaceState(window.history.state, '', resolution.canonicalPath);
-    }
-    return resolution;
-  });
-  return <StudioExperience initialOverlay={entry.initialOverlay} />;
-};
+export interface StudioAppProps {
+  readonly initialOverlay?: StudioInitialOverlay;
+  readonly focusMainOnMount?: boolean;
+}
 
-export const StudioApp = () => (
-  <StudioDesignProvider>
-    <RoutedStudioExperience />
-  </StudioDesignProvider>
+export const StudioApp = ({ initialOverlay = null, focusMainOnMount = false }: StudioAppProps) => (
+  <StudioExperience initialOverlay={initialOverlay} focusMainOnMount={focusMainOnMount} />
 );

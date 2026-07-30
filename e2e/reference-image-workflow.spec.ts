@@ -21,7 +21,7 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
 
   await openCharacterBuilder(page);
   await page.getByRole('button', { name: 'Generate Preview' }).click();
@@ -132,7 +132,7 @@ test('saved character opens in Builder and updates its original record after reg
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
 
   await openCharacterBuilder(page);
   await page.getByRole('button', { name: 'Generate Preview' }).click();
@@ -252,7 +252,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
       storageKey: CREATIVE_ASSET_STORAGE_KEY,
     },
   );
-  await page.goto('/');
+  await page.goto('/studio');
 
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   await page.getByRole('button', { name: /^Recent\b/u }).click();
@@ -317,7 +317,7 @@ test('legacy v1 text-only shelf migrates to v4 with null reference identities', 
     },
     { legacyKey: LEGACY_CREATIVE_ASSET_STORAGE_KEY },
   );
-  await page.goto('/');
+  await page.goto('/studio');
 
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Use Legacy text host' })).toBeVisible();

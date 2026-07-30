@@ -7,7 +7,7 @@ import {
 
 const openRecipeDockWhenOverlaid = async (page: Page) => {
   const launcher = page.getByRole('button', { name: 'Dock' });
-  if (!(await launcher.isVisible())) return;
+  await expect(launcher).toBeVisible();
   await launcher.click();
   await expect(page.getByRole('dialog', { name: 'Recipe Dock' })).toBeVisible();
 };
@@ -80,7 +80,7 @@ test('prepares an object recipe accessibly without camera or provider work', asy
     if (url.pathname.startsWith('/api/')) apiRequests.push(url.pathname);
   });
 
-  await page.goto('/');
+  await page.goto('/studio');
 
   const icon = page.locator('link[rel~="icon"]');
   await expect(icon).toHaveAttribute('href', '/favicon.svg');

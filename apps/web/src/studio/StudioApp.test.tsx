@@ -3,6 +3,7 @@
 import type { ReferenceImageAsset } from '@studio/contracts';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
+import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   CreativeWorkspaceActions,
@@ -143,7 +144,9 @@ const harness = vi.hoisted(() => {
     presented: null,
     sidecar: { state: 'idle' as const, artifact: null, error: null },
     recordingError: null,
+    processingState: 'idle' as const,
     elapsedSeconds: 0,
+    discard: vi.fn(),
   };
 
   return {
@@ -253,7 +256,7 @@ vi.mock('./useProviderAvailability', () => ({
 vi.mock('./useTakeReviewFlow', () => ({
   useTakeReviewFlow: () => ({
     recording: harness.recording,
-    processing: {},
+    processing: { cancel: vi.fn() },
     recordingActive: false,
     reviewLocked: false,
     mediaLocked: false,
@@ -280,6 +283,8 @@ vi.mock('../ui', async () => {
   return {
     StudioDesignProvider,
     Button,
+    ConfirmationDialog: ({ open }: { open: boolean }) =>
+      open ? <section aria-label="Discard temporary work and leave?" /> : null,
     OverlayPanel: ({
       open,
       title,
@@ -334,6 +339,18 @@ vi.mock('./CreativeWorkspace', () => ({
 }));
 
 import { StudioApp } from './StudioApp';
+import { StudioDesignProvider } from '../ui';
+
+const renderStudio = () =>
+  render(
+    <StudioDesignProvider>
+      <RouterProvider
+        router={createMemoryRouter([{ path: '/studio', element: <StudioApp /> }], {
+          initialEntries: ['/studio'],
+        })}
+      />
+    </StudioDesignProvider>,
+  );
 
 describe('StudioApp composition lifecycle', () => {
   afterEach(cleanup);
@@ -356,7 +373,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('keeps the mounted stage node stable while overlays change', () => {
-    render(<StudioApp />);
+    renderStudio();
     const stage = screen.getByTestId('media-stage');
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
 
@@ -372,7 +389,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('hydrates and atomically hands a saved reference recipe to the session', async () => {
-    render(<StudioApp />);
+    renderStudio();
     fireEvent.click(screen.getByRole('button', { name: 'Apply reference recipe' }));
 
     await waitFor(() => expect(harness.session.replaceRecipeDraft).toHaveBeenCalledOnce());
@@ -402,7 +419,7 @@ describe('StudioApp composition lifecycle', () => {
     harness.fetchReferenceImageMetadata
       .mockRejectedValueOnce(new Error('missing'))
       .mockResolvedValueOnce(referenceAsset);
-    render(<StudioApp />);
+    renderStudio();
     fireEvent.click(screen.getByRole('button', { name: 'Apply reference recipe' }));
     await waitFor(() => expect(screen.getByTestId('handoff-error')).not.toBeEmptyDOMElement());
 
@@ -419,7 +436,7 @@ describe('StudioApp composition lifecycle', () => {
 
   it('continues a failed handoff without silently retaining the missing reference', async () => {
     harness.fetchReferenceImageMetadata.mockRejectedValueOnce(new Error('missing'));
-    render(<StudioApp />);
+    renderStudio();
     fireEvent.click(screen.getByRole('button', { name: 'Apply reference recipe' }));
     await waitFor(() => expect(screen.getByTestId('handoff-error')).not.toBeEmptyDOMElement());
 
@@ -436,7 +453,7 @@ describe('StudioApp composition lifecycle', () => {
   });
 
   it('keeps repository prompt recording connected through the session callback bridge', () => {
-    render(<StudioApp />);
+    renderStudio();
 
     act(() => {
       harness.promptCommitted?.('lucy-2.5', 'A newly committed presenter', null);
@@ -451,7 +468,7 @@ describe('StudioApp composition lifecycle', () => {
 
   it('cancels saved-character entry before replacing hidden Shelf edits', () => {
     vi.spyOn(window, 'confirm').mockReturnValue(false);
-    render(<StudioApp />);
+    renderStudio();
 
     fireEvent.click(screen.getByRole('button', { name: 'Mark shelf dirty' }));
     fireEvent.click(screen.getByRole('button', { name: 'Character selector' }));

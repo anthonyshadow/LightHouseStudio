@@ -142,8 +142,7 @@ const expectNoDocumentOverflow = async (page: Page) => {
 
 const openRecipeDockWhenOverlaid = async (page: Page) => {
   const launcher = page.getByRole('button', { name: 'Dock' });
-  if (!(await launcher.isVisible())) return;
-
+  await expect(launcher).toBeVisible();
   await launcher.click();
   await expect(page.getByRole('dialog', { name: 'Recipe Dock' })).toBeVisible();
 };
@@ -173,7 +172,7 @@ for (const viewport of representativeViewports) {
   test(`${viewport.name} preparation is accessible and viewport-bound`, async ({ page }) => {
     const network = await installProviderFreeStudio(page);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
-    await page.goto('/');
+    await page.goto('/studio');
 
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'First take guide' })).toContainText(
@@ -223,7 +222,7 @@ for (const viewport of representativeViewports) {
 
 test('first-take guidance is dismissible without durable onboarding state', async ({ page }) => {
   await installProviderFreeStudio(page);
-  await page.goto('/');
+  await page.goto('/studio');
 
   const guide = page.getByRole('complementary', { name: 'First take guide' });
   await expect(guide).toBeVisible();
@@ -240,7 +239,7 @@ test('small-mobile Builder review shortcut survives 200% text and keeps one prev
   test.setTimeout(60_000);
   const network = await installProviderFreeStudio(page);
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/');
+  await page.goto('/studio');
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '200%';
   });
@@ -270,7 +269,7 @@ test('small-mobile Recipe Dock scrolls internally and Escape restores launcher f
 }) => {
   const network = await installProviderFreeStudio(page);
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/');
+  await page.goto('/studio');
 
   const launcher = page.getByRole('button', { name: 'Dock' });
   await launcher.focus();
@@ -316,7 +315,7 @@ test('large text keeps critical preparation controls usable at a narrow width', 
 }) => {
   const network = await installProviderFreeStudio(page);
   await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/');
+  await page.goto('/studio');
   await page.evaluate(() => {
     document.documentElement.style.fontSize = '150%';
   });
@@ -334,7 +333,7 @@ test('large text keeps critical preparation controls usable at a narrow width', 
 
 test('empty VTON Start is blocked before camera access or token issuance', async ({ page }) => {
   const network = await installProviderFreeStudio(page);
-  await page.goto('/');
+  await page.goto('/studio');
 
   await openRecipeDockWhenOverlaid(page);
   const vtonMode = page.getByRole('button', { name: 'Virtual Try-On · VTON 3' });
@@ -358,7 +357,7 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
   page,
 }) => {
   const network = await installProviderFreeStudio(page);
-  await page.goto('/');
+  await page.goto('/studio');
 
   await openRecipeDockWhenOverlaid(page);
   const start = page.getByRole('button', { name: 'Start local preview' });

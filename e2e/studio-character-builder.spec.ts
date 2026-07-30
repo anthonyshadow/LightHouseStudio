@@ -44,7 +44,7 @@ test('retired entries canonicalize to the mounted Studio experience', async ({ p
   await installSuccessfulStudioHarness(page);
   for (const entry of ['/advanced', '/guided', '/?new=1', '/?characterFlow=guided']) {
     await page.goto(entry);
-    await expect(page).toHaveURL(/\/$/u);
+    await expect(page).toHaveURL(/\/studio$/u);
     await expect(page.getByRole('heading', { name: 'Lightframe Studio' })).toBeVisible();
     await expect(page.getByRole('button', { name: /Open character options/u })).toBeVisible();
   }
@@ -55,12 +55,13 @@ test('retired entry canonicalization replaces history instead of preserving the 
 }) => {
   await installSuccessfulStudioHarness(page);
   await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
   await page.goto('/advanced');
-  await expect(page).toHaveURL(/\/$/u);
+  await expect(page).toHaveURL(/\/studio$/u);
 
   await page.goBack();
   await expect(page).toHaveURL(/\/$/u);
-  await expect(page.getByRole('heading', { name: 'Lightframe Studio' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
 });
 
 test('retired project entries canonicalize and open the legacy-project manager', async ({
@@ -69,7 +70,7 @@ test('retired project entries canonicalize and open the legacy-project manager',
   await installSuccessfulStudioHarness(page);
   for (const entry of ['/projects', '/?project=project-42', '/guided?project=project-42']) {
     await page.goto(entry);
-    await expect(page).toHaveURL(/\/$/u);
+    await expect(page).toHaveURL(/\/studio$/u);
     await expect(page.getByRole('dialog', { name: 'Legacy Projects' })).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Legacy projects', exact: true })).toBeVisible();
   }
@@ -80,7 +81,7 @@ test('single direction preview stays beside desktop form and has a narrow review
 }) => {
   await installSuccessfulStudioHarness(page);
   await page.setViewportSize({ width: 1_440, height: 960 });
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
 
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
@@ -122,7 +123,7 @@ test('single direction preview stays beside desktop form and has a narrow review
 
 test('character direction supports preview generation and save', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
 
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
@@ -159,7 +160,7 @@ test('prompt-only save performs no image request and immediately preloads the Do
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
 
@@ -222,7 +223,7 @@ test('both saved-character entries open Characters and complete Use through Star
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
   await page.getByRole('button', { name: 'Save Character', exact: true }).click();
@@ -313,7 +314,7 @@ test('image-only upload saves and preloads without starting AI, then appears in 
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
@@ -419,7 +420,7 @@ test('prompt plus upload saves the uploaded source directly with enhancement off
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
@@ -463,7 +464,7 @@ test('uploaded draft references restore across reload and Detach does not contac
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
   let dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
@@ -500,7 +501,7 @@ test('uploaded draft references restore across reload and Detach does not contac
 
 test('invalid device files fail accessibly before any upload request', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
@@ -518,7 +519,7 @@ test('combined preview composes from the immutable upload and preloads the gener
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   await dialog.locator('input[type="file"][accept*="image/png"]').setInputFiles({
@@ -567,7 +568,7 @@ test('Generate Preview always optimizes, and stale form edits detach the image f
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
 
@@ -599,7 +600,7 @@ test('image-backed save preserves the exact generated asset and optimized Lucy p
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
   await page.getByRole('button', { name: 'Generate Preview' }).click();
@@ -669,7 +670,7 @@ test('regeneration distinguishes a fresh image from an instructed source-image e
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
   await page.getByRole('button', { name: 'Generate Preview' }).click();
@@ -700,7 +701,7 @@ test('regeneration distinguishes a fresh image from an instructed source-image e
 
 test('drafts survive close and reload, while Reset Draft starts fresh', async ({ page }) => {
   await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
   await openConstraints(page);
@@ -726,7 +727,7 @@ test('editing a character requires explicit discard of a different unfinished dr
   page,
 }) => {
   await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
 
   await openBuilder(page);
   await chooseAdultCharacterDirection(page);
@@ -779,7 +780,7 @@ test('unfinished Shelf edits block character Save without blocking builder editi
   page,
 }) => {
   await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
   await shelf.getByRole('button', { name: 'Try-on recipes' }).click();

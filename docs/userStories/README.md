@@ -21,8 +21,11 @@ references, not release-readiness claims or future requirements.
 
 ## Shared runtime rules
 
-- `/` is the only active route. Retired entries canonicalize to `/`; project entries may open the
+- `/` is the provider-free entry and `/studio` is the active Studio runtime. Known retired entries
+  canonicalize to `/studio`; unknown paths return to `/`; project entries may open the
   download/delete-only Legacy Projects manager.
+- Browser navigation cannot abandon recording/finalization. Leaving with a temporary take, active
+  Voice process, or dirty Shelf form requires confirmed discard.
 - Camera access, provider contact, and billable work require an explicit action. Local Camera does
   not request provider credentials, load the Decart SDK, or send media externally.
 - Character Builder owns true character creation and editing. Workshop owns only Add, Replace, and

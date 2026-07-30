@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { StudioApp } from './studio/StudioApp';
+import { AppRouter } from './app/AppRouter';
+import { StudioDesignProvider } from './ui/StudioDesignProvider';
 
 const root = document.getElementById('root');
 
@@ -10,6 +11,8 @@ if (!root) {
 
 createRoot(root).render(
   <StrictMode>
-    <StudioApp />
+    <StudioDesignProvider>
+      <AppRouter />
+    </StudioDesignProvider>
   </StrictMode>,
 );

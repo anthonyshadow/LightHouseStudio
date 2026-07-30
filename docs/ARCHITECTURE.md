@@ -21,9 +21,16 @@ implementation code, and the API does not know about React.
 
 ## Studio composition
 
-`StudioApp.tsx` is the application composition and URL boundary. `/` is the sole route; retired
-entries redirect there, with project-oriented legacy entries opening the compatibility manager.
-There is no second product shell, media session, global client store, or third-party router.
+`AppRouter.tsx` is the browser URL boundary. React Router's data browser router renders the
+provider-free entry at `/` and lazy-loads Studio at `/studio`; the data-router form is required for
+route blocking. It also owns route titles/descriptions, focus handoff, loading/error surfaces,
+known legacy redirects, and allowlisted navigation-state validation. Unknown paths return to `/`.
+The loopback Vite/Fastify SPA fallback already serves both paths, and origin-scoped browser storage
+requires no migration.
+
+The entry does not mount `StudioApp`, request capabilities, acquire media, load Decart, open a
+WebSocket, or contact a provider. `StudioApp.tsx` remains the sole runtime composition boundary.
+There is no second product shell, media session, global client store, or provider client.
 
 The mounted Studio owns focused controllers for:
 
@@ -42,6 +49,11 @@ topmost dismissal, scroll lock, transition-safe backdrop behavior, and return fo
 has one named internal scroll region; the document does not scroll. Character Builder is
 fullscreen and uses one preview/generation DOM. Narrow screens reveal that same region through
 **Review & Generate** instead of duplicating stateful controls.
+
+`StudioExitGuard` blocks navigation leaving `/studio` while recording or finalization is active.
+A temporary take, active Voice process, or dirty Shelf form requires confirmed discard before the
+route proceeds. Hard unload receives the matching browser warning, while future navigation among
+`/studio/*` children is deliberately exempt so a shared runtime layout can remain mounted.
 
 The shell is viewport-bound with safe-area padding and deliberate support for `1440×960`,
 `1280×720`, `834×1112`, `390×844`, and `320×568`. The stage, capture strip, and primary actions

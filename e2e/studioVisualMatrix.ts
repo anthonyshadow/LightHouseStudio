@@ -29,10 +29,19 @@ export const VISUAL_VIEWPORTS = [
 ] as const;
 
 export const CORE_VISUAL_SCENARIOS = [
-  { id: 'studio-initial-closed', baseline: '01-studio/initial-closed.png' },
   { id: 'local-camera-live', baseline: '01-studio/local-camera-live.png' },
   { id: 'recording-active', baseline: '01-studio/recording-active.png' },
 ] as const;
+
+export const ENTRY_VISUAL_SCENARIO = {
+  id: 'entry-initial',
+  baseline: '00-entry/initial.png',
+} as const;
+
+export const STUDIO_INITIAL_VISUAL_SCENARIO = {
+  id: 'studio-initial-closed',
+  baseline: '01-studio/initial-closed.png',
+} as const;
 
 export const FOCUSED_VISUAL_SCENARIOS = [
   { id: 'ai-experience-choice', baseline: '01-studio/ai-experience-choice.png' },
@@ -65,12 +74,15 @@ export const SMALL_MOBILE_VISUAL_SCENARIOS = [
 ] as const;
 
 export type VisualScenarioId =
+  | (typeof ENTRY_VISUAL_SCENARIO)['id']
+  | (typeof STUDIO_INITIAL_VISUAL_SCENARIO)['id']
   | (typeof CORE_VISUAL_SCENARIOS)[number]['id']
   | (typeof FOCUSED_VISUAL_SCENARIOS)[number]['id']
   | (typeof DESKTOP_VISUAL_SCENARIOS)[number]['id']
   | (typeof SMALL_MOBILE_VISUAL_SCENARIOS)[number]['id'];
 
 const focusedViewportIds = new Set(['desktop', 'small-mobile']);
+const studioInitialViewportIds = new Set(['desktop', 'mobile', 'small-mobile']);
 const viewportById = new Map(VISUAL_VIEWPORTS.map((viewport) => [viewport.id, viewport]));
 const desktopViewport = viewportById.get('desktop');
 const smallMobileViewport = viewportById.get('small-mobile');
@@ -80,8 +92,13 @@ if (!desktopViewport || !smallMobileViewport) {
 }
 
 export const VISUAL_CASE_MATRIX = [
+  { viewport: desktopViewport, scenario: ENTRY_VISUAL_SCENARIO },
+  { viewport: smallMobileViewport, scenario: ENTRY_VISUAL_SCENARIO },
   ...VISUAL_VIEWPORTS.flatMap((viewport) =>
     CORE_VISUAL_SCENARIOS.map((scenario) => ({ viewport, scenario })),
+  ),
+  ...VISUAL_VIEWPORTS.filter((viewport) => studioInitialViewportIds.has(viewport.id)).map(
+    (viewport) => ({ viewport, scenario: STUDIO_INITIAL_VISUAL_SCENARIO }),
   ),
   ...VISUAL_VIEWPORTS.filter((viewport) => focusedViewportIds.has(viewport.id)).flatMap(
     (viewport) => FOCUSED_VISUAL_SCENARIOS.map((scenario) => ({ viewport, scenario })),

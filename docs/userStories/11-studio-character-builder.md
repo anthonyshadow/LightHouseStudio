@@ -5,9 +5,9 @@ reference, then preload it into Studio without starting AI.
 
 ## Entry and journey
 
-`/` remains the sole route and the Studio stage stays mounted behind the fullscreen Builder.
-Create from the header or Shelf; edit from the active-character selector or a true character card.
-Recording, finalization, and take review block Builder entry.
+Enter `/studio`; the one Studio stage stays mounted behind the fullscreen Builder. Create from the
+header or Shelf; edit from the active-character selector or a true character card. Recording,
+finalization, and take review block Builder entry.
 
 1. Open **Build Your Character** for a new character or the named edit panel for an existing one.
 2. Optionally upload a reference, then define identity and visual direction. Image generation is

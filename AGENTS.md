@@ -34,13 +34,18 @@ old story, or intended design.
 
 - Node `>=24 <25`; `.nvmrc` pins the repository default. pnpm `>=11.18 <12`.
 - `pnpm install` for ordinary local work; `pnpm install --frozen-lockfile` when reproducing CI.
-- `/` is the only route. Retired/unknown entries are compatibility redirects, not pages to revive.
+- `/` is the provider-free entry and `/studio` is the only active Studio runtime. Known retired
+  Studio entries redirect to `/studio`; unknown paths return to `/`. Do not revive retired pages.
 
 ## Architecture and state
 
 - `packages/domain` and `packages/contracts` stay independent of React and provider payloads.
-- `StudioApp.tsx` is a composition boundary. Keep one persistent `MediaStage`, shared
-  `OverlayPanel`, app-owned contracts, repositories, and existing adapters.
+- `AppRouter.tsx` owns browser routing, route metadata, validated legacy navigation state, and the
+  lazy Studio boundary. `StudioApp.tsx` remains the runtime composition boundary. Keep one
+  persistent `MediaStage`, shared `OverlayPanel`, app-owned contracts, repositories, and existing
+  adapters.
+- The entry route must not mount Studio, load provider/media modules, request capabilities, acquire
+  media, or contact a provider.
 - Keep product policy in domain/orchestration, not presentation components or provider adapters.
 - Split at ownership/lifecycle boundaries, not an arbitrary line count.
 - Do not add a second media node/session, modal system, saved-character store, provider client, or
@@ -87,6 +92,9 @@ old story, or intended design.
 - Playback replaces live media on the same stage. Voice processing always starts from immutable
   originals; replacement occurs before old URL revocation; failure/cancel preserves the last valid
   artifact.
+- Route exit cannot abandon recording/finalization. A temporary take, active Voice work, or dirty
+  Shelf edit requires confirmed discard before leaving `/studio`; future `/studio/*` transitions
+  must preserve the shared runtime.
 - Do not solve memory pressure by silently evicting chunks/originals. Follow
   [`docs/RECORDING_MEMORY_POLICY.md`](docs/RECORDING_MEMORY_POLICY.md).
 

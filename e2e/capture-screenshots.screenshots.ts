@@ -656,7 +656,7 @@ for (const viewport of VIEWPORTS) {
         value: JSON.stringify(SEEDED_SHELF),
       });
 
-      await page.goto('/');
+      await page.goto('/studio');
       await expect(page.getByRole('main')).toBeVisible();
       await expect(page.getByLabel('Integration availability')).toContainText(
         'AI video configured',

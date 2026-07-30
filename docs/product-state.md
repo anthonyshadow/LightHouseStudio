@@ -1,6 +1,6 @@
 # Lightframe Studio product state
 
-**Current as of:** 2026-07-29
+**Current as of:** 2026-07-30
 
 **Release frame:** operator-assisted, loopback-only controlled pilot
 
@@ -39,7 +39,8 @@ required, but no physical target is qualified yet.
 
 ## Current capabilities
 
-- `/` is the sole application route. Retired entries return to Studio; legacy projects are
+- `/` is a provider-free entry and `/studio` is the lazy-loaded Studio runtime. Known retired
+  entries return to Studio, unknown paths return to entry, and legacy projects are
   compatibility-only downloads/deletions.
 - One persistent stage owns local/AI preview, recording, finalization, and take playback. Shared
   overlays never own a second media session.
@@ -53,6 +54,8 @@ required, but no physical target is qualified yet.
 - Recording owns an accessible warning at 270 seconds and coalesced Stop/finalize at 300 seconds.
 - Studio keeps one temporary take. Download is the durable handoff; Release or Discard revokes its
   URLs.
+- Recording/finalization blocks route exit. A temporary take, active Voice operation, or dirty
+  Shelf form requires confirmed discard before leaving Studio.
 - Local and ElevenLabs voice treatments always start from immutable originals. ElevenLabs is
   limited to explicitly browsed saved voices and receives only the audio sidecar on Apply.
 - Uploaded and generated references are immutable local assets. Detach, Reset, or browser-record
@@ -102,7 +105,7 @@ See [active audit plan](project-audit-implementation-plan.md) and
 - Keep Character Performance as the pilot promise; do not broaden the first-run story.
 - Keep provider contact explicit and preserve startup selection with no automatic fallback.
 - Keep the 300-second recording and Decart limits independent.
-- Keep the one-route, one-stage, shared-overlay architecture.
+- Keep the two-route, one-runtime, one-stage, shared-overlay architecture.
 - Keep downloaded files outside the Lightframe dataset and describe Download as the durable
   handoff.
 - Use truthful Detach/retention language and whole-environment retirement for the pilot.

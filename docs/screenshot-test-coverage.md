@@ -13,15 +13,17 @@ accessibility, physical-device, and live-provider behavior belongs to other test
 
 The current matrix has 29 Chromium cases:
 
-| Group             | States | Viewports                | Cases |
-| ----------------- | -----: | ------------------------ | ----: |
-| Core Studio       |      3 | all five                 |    15 |
-| Focused high-risk |      5 | desktop and small mobile |    10 |
-| Desktop-specific  |      2 | desktop                  |     2 |
-| Small-mobile risk |      2 | small mobile             |     2 |
+| Group             | States | Viewports                         | Cases |
+| ----------------- | -----: | --------------------------------- | ----: |
+| Entry             |      1 | desktop and small mobile          |     2 |
+| Core Studio       |      2 | all five                          |    10 |
+| Studio idle       |      1 | desktop, mobile, and small mobile |     3 |
+| Focused high-risk |      5 | desktop and small mobile          |    10 |
+| Desktop-specific  |      2 | desktop                           |     2 |
+| Small-mobile risk |      2 | small mobile                      |     2 |
 
 Twenty-nine is a review/CI budget, not the definition of correctness. The executable invariants
-require unique paths, all five viewport IDs, and every core state/viewport pair.
+require unique paths, all five viewport IDs, and every local-live/recording state/viewport pair.
 
 | Viewport ID    |       Size |
 | -------------- | ---------: |
@@ -33,20 +35,21 @@ require unique paths, all five viewport IDs, and every core state/viewport pair.
 
 ## Protected states
 
-| Scope                  | Baseline                                             |
-| ---------------------- | ---------------------------------------------------- |
-| All viewports          | `01-studio/initial-closed.png`                       |
-| All viewports          | `01-studio/local-camera-live.png`                    |
-| All viewports          | `01-studio/recording-active.png`                     |
-| Desktop + small mobile | `01-studio/ai-experience-choice.png`                 |
-| Desktop + small mobile | `01-studio/selected-character-ai-live.png`           |
-| Desktop + small mobile | `02-character-builder/combined-reference-ready.png`  |
-| Desktop + small mobile | `03-character-library/saved-character-selection.png` |
-| Desktop + small mobile | `04-take-review/playback-review-settled.png`         |
-| Desktop                | `05-virtual-try-on/prepared-with-reference.png`      |
-| Desktop                | `06-voice/voice-browser-loaded.png`                  |
-| Small mobile           | `01-studio/take-finalizing.png`                      |
-| Small mobile           | `01-studio/media-permission-error.png`               |
+| Scope                           | Baseline                                             |
+| ------------------------------- | ---------------------------------------------------- |
+| Desktop + small mobile          | `00-entry/initial.png`                               |
+| Desktop + mobile + small mobile | `01-studio/initial-closed.png`                       |
+| All viewports                   | `01-studio/local-camera-live.png`                    |
+| All viewports                   | `01-studio/recording-active.png`                     |
+| Desktop + small mobile          | `01-studio/ai-experience-choice.png`                 |
+| Desktop + small mobile          | `01-studio/selected-character-ai-live.png`           |
+| Desktop + small mobile          | `02-character-builder/combined-reference-ready.png`  |
+| Desktop + small mobile          | `03-character-library/saved-character-selection.png` |
+| Desktop + small mobile          | `04-take-review/playback-review-settled.png`         |
+| Desktop                         | `05-virtual-try-on/prepared-with-reference.png`      |
+| Desktop                         | `06-voice/voice-browser-loaded.png`                  |
+| Small mobile                    | `01-studio/take-finalizing.png`                      |
+| Small mobile                    | `01-studio/media-permission-error.png`               |
 
 The matrix intentionally emphasizes the actual first impression, provider-free live capture,
 dominant recording Stop, Character reuse, the densest Builder/review states, and representative
