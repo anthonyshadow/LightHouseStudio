@@ -11,6 +11,7 @@ import {
   type RecordingLifecycle as DomainRecordingLifecycle,
 } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { transcodeRecordingToMp4 } from '../../adapters/media-processing/transcodeRecording';
 import type { StudioMode } from '../../features/media-session';
 import type {
   AutomaticRecordingStopReason,
@@ -24,6 +25,7 @@ import type {
 } from '../../features/recording/types';
 import {
   createOriginalRecordingArtifact,
+  createRawRecordingBlob,
   createRecordingSidecar,
   IDLE_AUDIO_SIDECAR,
 } from './recordingArtifacts';
@@ -67,6 +69,7 @@ export const useRecording = ({
   const stopTimerRef = useRef<number | null>(null);
   const durationLimitTimerRef = useRef<number | null>(null);
   const mainStoppedAtRef = useRef<number | null>(null);
+  const transcodeControllerRef = useRef<AbortController | null>(null);
   const disposedRef = useRef(false);
   const automaticStopCallbackRef = useRef(onAutomaticStop);
 
@@ -134,7 +137,7 @@ export const useRecording = ({
   );
 
   const finalizeAttempt = useCallback(
-    (attempt: RecordingAttempt) => {
+    async (attempt: RecordingAttempt): Promise<void> => {
       if (attemptRef.current !== attempt || !attempt.mainStopped) return;
       cleanupRecordingAttempt(attempt);
       attemptRef.current = null;
@@ -147,12 +150,9 @@ export const useRecording = ({
         return;
       }
 
-      let artifact: RecordingArtifact | null;
+      let rawRecording: Blob | null;
       try {
-        artifact = createOriginalRecordingArtifact(
-          attempt,
-          mainStoppedAtRef.current ?? performance.now(),
-        );
+        rawRecording = createRawRecordingBlob(attempt);
       } catch {
         failAttempt(
           attempt,
@@ -161,7 +161,7 @@ export const useRecording = ({
         );
         return;
       }
-      if (!artifact) {
+      if (!rawRecording) {
         failAttempt(attempt, 'The browser produced an empty recording.');
         return;
       }
@@ -176,6 +176,57 @@ export const useRecording = ({
           error: 'The audio sidecar could not be finalized; the video take was preserved.',
         };
       }
+
+      const transcodeController = new AbortController();
+      transcodeControllerRef.current = transcodeController;
+      let converted: Awaited<ReturnType<typeof transcodeRecordingToMp4>>;
+      try {
+        converted = await transcodeRecordingToMp4(rawRecording, {
+          requireAudio: attempt.audioTrack !== null,
+          signal: transcodeController.signal,
+        });
+      } catch {
+        if (disposedRef.current || transcodeController.signal.aborted) {
+          resolveStop(null);
+          return;
+        }
+        failAttempt(
+          attempt,
+          'This recording could not be transcoded to downloadable H.264 MP4.',
+          'This recording could not be transcoded to downloadable H.264 MP4. No unconverted file was published.',
+        );
+        return;
+      } finally {
+        if (transcodeControllerRef.current === transcodeController) {
+          transcodeControllerRef.current = null;
+        }
+      }
+      if (disposedRef.current || transcodeController.signal.aborted) {
+        resolveStop(null);
+        return;
+      }
+
+      let artifact: RecordingArtifact | null;
+      try {
+        artifact = createOriginalRecordingArtifact(
+          attempt,
+          converted.blob,
+          converted.mimeType,
+          mainStoppedAtRef.current ?? performance.now(),
+        );
+      } catch {
+        failAttempt(
+          attempt,
+          'The browser could not create a playable recording artifact.',
+          'The browser could not create a playable recording artifact. The live source can now be released safely.',
+        );
+        return;
+      }
+      if (!artifact) {
+        failAttempt(attempt, 'The browser produced an empty converted recording.');
+        return;
+      }
+
       try {
         artifacts.publishOriginal(artifact, sidecar);
       } catch {
@@ -220,7 +271,7 @@ export const useRecording = ({
     const attempt = attemptRef.current;
     if (!attempt || !attempt.mainStopped) return;
     if (attempt.sidecarStopped) {
-      finalizeAttempt(attempt);
+      void finalizeAttempt(attempt);
       return;
     }
     if (attempt.sidecarWaitTimer !== null) return;
@@ -229,7 +280,7 @@ export const useRecording = ({
       attempt.sidecarWaitTimer = null;
       attempt.sidecarStopped = true;
       attempt.sidecarError = 'Audio sidecar did not finish; the video take was preserved.';
-      finalizeAttempt(attempt);
+      void finalizeAttempt(attempt);
     }, SIDECAR_FINALIZATION_GRACE_MS);
   }, [finalizeAttempt]);
 
@@ -260,7 +311,7 @@ export const useRecording = ({
         mainStoppedAtRef.current ??= performance.now();
         attempt.sidecarStopped = true;
         attempt.sidecarError = 'Audio sidecar did not finish; the video take was preserved.';
-        finalizeAttempt(attempt);
+        void finalizeAttempt(attempt);
         return;
       }
       failAttempt(
@@ -311,7 +362,7 @@ export const useRecording = ({
         artifacts.reportRecordingError('Recording is not supported in this browser.');
         return Promise.resolve();
       }
-      if (attemptRef.current) return Promise.resolve();
+      if (attemptRef.current || transcodeControllerRef.current) return Promise.resolve();
       const videoTrack = source.stream
         .getVideoTracks()
         .find((track) => track.readyState === 'live');
@@ -443,7 +494,7 @@ export const useRecording = ({
   );
 
   const discard = useCallback(() => {
-    if (attemptRef.current) return;
+    if (attemptRef.current || transcodeControllerRef.current) return;
     artifacts.discardArtifacts();
     pendingMetadataRef.current = null;
     mainStoppedAtRef.current = null;
@@ -456,7 +507,12 @@ export const useRecording = ({
   const restorePersistedOriginal = useCallback(
     (input: RestorePersistedOriginalInput): RecordingArtifact => {
       const status = domainLifecycleRef.current.status;
-      if (attemptRef.current || status === 'recording' || status === 'stopping') {
+      if (
+        attemptRef.current ||
+        transcodeControllerRef.current ||
+        status === 'recording' ||
+        status === 'stopping'
+      ) {
         throw new Error('A persisted take cannot be restored while recording is active.');
       }
       if (artifacts.processingState === 'processing') {
@@ -496,6 +552,8 @@ export const useRecording = ({
       mainStoppedAtRef.current = null;
       stopRecorderBestEffort(attempt?.mainRecorder ?? null);
       stopRecorderBestEffort(attempt?.sidecarRecorder ?? null);
+      transcodeControllerRef.current?.abort();
+      transcodeControllerRef.current = null;
       if (stopTimerRef.current !== null) window.clearTimeout(stopTimerRef.current);
       if (durationLimitTimerRef.current !== null) {
         window.clearTimeout(durationLimitTimerRef.current);

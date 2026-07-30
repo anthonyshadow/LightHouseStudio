@@ -6,8 +6,8 @@
 
 1. From a take with a usable audio sidecar, select **Voice treatments**.
 2. Choose **Original**, **Warm**, **Clear**, or **Robot**.
-3. For an effect, Studio renders the original sidecar offline and remuxes it with the original
-   encoded video. Playback and download stay locked during processing.
+3. For an effect, Studio renders the original sidecar offline and remuxes it as AAC with the
+   original H.264 video in MP4. Playback and download stay locked during processing.
 4. On success, the stage switches to the processed artifact and reports **Voice treatment ready**.
 5. Choose another effect or **Original**. Every effect starts from the original, never a prior
    processed result.

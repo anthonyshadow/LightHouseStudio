@@ -12,9 +12,17 @@ The runtime:
 - warns accessibly at 270 seconds and auto-stops at the 300-second maximum;
 - coalesces duplicate/manual/limit Stop requests;
 - settles final main-recorder data and the optional sidecar before releasing session-owned media;
-- publishes a valid main video when the sidecar fails or times out; and
+- temporarily retains the settled raw main Blob while MediaBunny builds a complete H.264/AAC MP4;
+- publishes only that converted MP4 and never exposes the raw recorder Blob for download;
+- publishes a valid converted main video when the sidecar fails or times out;
 - commits a healthy visual or voiced replacement before revoking the superseded URL; and
 - releases artifact URLs only on downstream invalidation, Release, Discard, or unmount.
+
+Peak finalization memory therefore includes recorder chunks, the raw assembled input, the
+in-progress encoded output, the final MP4 Blob, and the optional sidecar until conversion returns
+and prior temporaries become collectible. MP4 Fast Start is disabled to avoid an additional
+in-memory media-chunk staging copy. Conversion is cancellable on ownership loss but raw chunks are
+never silently evicted to relieve pressure.
 
 Uploaded source limits are decimal bytes: 300,000,000 for local/Lucy-only workflows and
 200,000,000 when VTO is planned. Downloaded provider output is capped at 300,000,000 bytes.
@@ -30,15 +38,16 @@ physical devices.
 For every required device/browser row in
 [`qualification/required-matrix.json`](qualification/required-matrix.json):
 
-1. Record the exact release-candidate commit, browser/OS version, device class, selected recording
-   MIME type, and main/sidecar byte sizes.
+1. Record the exact release-candidate commit, browser/OS version, device class, selected
+   intermediate recording MIME type, raw main/sidecar byte sizes, final MP4 byte size, and confirmed
+   H.264/AAC output codecs.
 2. Complete the required 300-second Local, Character, and VTO paths. Confirm the warning,
    automatic finalization, playable original, responsive controls, and cleanup indicators.
 3. Complete a maximum-size uploaded local path and both ordered visual chains. Measure before
    submission, at the intermediate checkpoint, after the second result, after local Voice, after
    ElevenLabs Voice when qualified, and after Release/Discard.
-4. Record finalization/processing duration and whether the browser evicted, terminated, or
-   materially degraded the tab.
+4. Record recorder-settlement, H.264/AAC transcode, and Voice-processing durations plus whether the
+   browser evicted, terminated, or materially degraded the tab.
 5. Play every downloaded result outside Studio and verify duration, video, and audio.
 
 Use actual per-minute sizes with the planning estimator:

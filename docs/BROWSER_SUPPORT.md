@@ -38,20 +38,20 @@ areas, the software keyboard, browser chrome changes, or physical 200% text/refl
 
 ## Capability and degradation
 
-| Capability        | Requirement                                              | Safe degradation                                                 |
-| ----------------- | -------------------------------------------------------- | ---------------------------------------------------------------- |
-| Local preparation | React; browser storage for durable Shelf/Builder data    | Session-only work with warning where storage fails               |
-| Camera preview    | `navigator.mediaDevices.getUserMedia` and permission     | Actionable blocked state; no provider contact                    |
-| Device selection  | `enumerateDevices`; labels may need prior permission     | Browser default remains available                                |
-| Front/rear switch | Active `facingMode` plus exposed opposite capability     | Control omitted; current camera remains                          |
-| Camera zoom       | Numeric track zoom capability and `applyConstraints`     | Control omitted; no CSS crop substitute                          |
-| Recording         | Live video, `MediaRecorder`, supported/default format    | Record unavailable or fails safely; session remains controllable |
-| Existing video    | File input/drop, Blob playback, supported H.264/VP8 file | Local validation explains export needs; camera stays optional    |
-| Decart output     | Local capture, WebRTC, provider reachability/entitlement | Local preview remains the fallback                               |
-| Batch visual      | Supported source, broker, exact model availability       | Local preview/download remains available without a key           |
-| Local Voice       | Web Audio, offline render, compatible remux encoder      | Original take remains usable                                     |
-| ElevenLabs Voice  | Sidecar, broker, saved voice/model/account support       | Original/local effects remain usable                             |
-| Download          | Blob URL plus browser download handling                  | Mobile may open/share rather than save directly                  |
+| Capability        | Requirement                                                            | Safe degradation                                                                       |
+| ----------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Local preparation | React; browser storage for durable Shelf/Builder data                  | Session-only work with warning where storage fails                                     |
+| Camera preview    | `navigator.mediaDevices.getUserMedia` and permission                   | Actionable blocked state; no provider contact                                          |
+| Device selection  | `enumerateDevices`; labels may need prior permission                   | Browser default remains available                                                      |
+| Front/rear switch | Active `facingMode` plus exposed opposite capability                   | Control omitted; current camera remains                                                |
+| Camera zoom       | Numeric track zoom capability and `applyConstraints`                   | Control omitted; no CSS crop substitute                                                |
+| Recording         | Live video, `MediaRecorder`, decodable capture, H.264 WebCodecs encode | No raw download fallback; conversion fails safely and the session remains controllable |
+| Existing video    | File input/drop, Blob playback, supported H.264/VP8 file               | Local validation explains export needs; camera stays optional                          |
+| Decart output     | Local capture, WebRTC, provider reachability/entitlement               | Local preview remains the fallback                                                     |
+| Batch visual      | Supported source, broker, exact model availability                     | Local preview/download remains available without a key                                 |
+| Local Voice       | Web Audio, offline render, AAC encoder, MP4 remux                      | Original take remains usable                                                           |
+| ElevenLabs Voice  | Sidecar, broker, saved voice/model/account support                     | Original/local effects remain usable                                                   |
+| Download          | Blob URL plus browser download handling                                | Mobile may open/share rather than save directly                                        |
 
 `GET /api/capabilities` reports configuration presence only. It does not prove browser codec
 support, provider reachability, quota, entitlement, or output quality.
@@ -78,7 +78,7 @@ source.
 
 ## Recording formats
 
-The app asks `MediaRecorder` for the first supported candidate:
+The app asks `MediaRecorder` for the first supported intermediate capture candidate:
 
 1. WebM VP9/Opus
 2. WebM VP8/Opus
@@ -88,9 +88,16 @@ The app asks `MediaRecorder` for the first supported candidate:
 6. generic MP4
 7. browser default
 
-Audio sidecars prefer WebM/Opus, then MP4, then the browser default. A positive
-`isTypeSupported()` result does not guarantee successful recording, local remux, download, or
-cross-player playback. Local Voice remux needs Opus for WebM or AAC for MP4.
+After the main recorder and optional sidecar settle, MediaBunny decodes that intermediate and
+forces the primary video to AVC/H.264 and its primary audio, when present, to AAC in one MP4. The
+browser's H.264 WebCodecs encoder is required. Studio lazily registers MediaBunny's official
+on-device AAC encoder extension when native AAC encoding is unavailable. The raw recorder
+container receives no object URL and cannot be downloaded.
+
+Audio sidecars still prefer WebM/Opus, then MP4, then the browser default so Voice can always start
+from immutable captured audio. A positive `isTypeSupported()` result does not guarantee successful
+recording, decode, H.264 encode, download, or cross-player playback. If conversion cannot preserve
+the primary video and audio tracks, Studio publishes no download artifact.
 
 ## Existing-video formats
 
@@ -118,8 +125,8 @@ the source orientation, and differ from the input duration by no more than 500 m
   end tracks.
 - Browser policy, extensions, VPN/firewall/NAT, and provider outages may block WebRTC while Local
   remains usable.
-- Five-minute recording plus local/cloud voice processing can exceed practical memory or codec
-  budgets on reduced-power devices. See the
+- Five-minute recording, the required device-local H.264/AAC conversion, and local/cloud voice
+  processing can exceed practical memory or codec budgets on reduced-power devices. See the
   [recording memory policy](RECORDING_MEMORY_POLICY.md).
 - File-picker MIME reporting, H.264 MOV playback, WebM VP8 support, audio extraction, and download
   behavior differ across iOS, Android, Safari, Firefox, and Chrome. A browser-local preview is not

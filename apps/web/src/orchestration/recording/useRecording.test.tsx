@@ -4,6 +4,20 @@ import { act, renderHook } from '@testing-library/react';
 import { StrictMode, type PropsWithChildren } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { RecordingArtifact, RecordingSource } from '../../features/recording/types';
+
+type RecordingTranscode = (
+  blob: Blob,
+  options: Readonly<{ requireAudio: boolean; signal: AbortSignal }>,
+) => Promise<Readonly<{ blob: Blob; mimeType: 'video/mp4' }>>;
+
+const recordingTranscode = vi.hoisted(() => ({
+  transcode: vi.fn<RecordingTranscode>(),
+}));
+
+vi.mock('../../adapters/media-processing/transcodeRecording', () => ({
+  transcodeRecordingToMp4: recordingTranscode.transcode,
+}));
+
 import { useRecording } from './useRecording';
 
 const NativeBlob = Blob;
@@ -218,6 +232,12 @@ const installRecorderHarness = ({
 
 beforeEach(() => {
   vi.clearAllMocks();
+  recordingTranscode.transcode.mockImplementation((blob: Blob) =>
+    Promise.resolve({
+      blob: new NativeBlob([blob], { type: 'video/mp4' }),
+      mimeType: 'video/mp4',
+    }),
+  );
 });
 
 afterEach(() => {
@@ -448,7 +468,8 @@ describe('useRecording recorder construction failures', () => {
       stoppedRecording.artifact = await result.current.stop();
     });
 
-    expect(stoppedRecording.artifact?.mimeType).toContain('video/');
+    expect(stoppedRecording.artifact?.mimeType).toBe('video/mp4');
+    expect(stoppedRecording.artifact?.filename).toMatch(/\.mp4$/);
     expect(stoppedRecording.artifact?.sourceModeId).toBe('local');
     expect(result.current.lifecycle).toBe('recorded');
     expect(result.current.original?.media.size).toBeGreaterThan(0);
@@ -645,6 +666,105 @@ describe('useRecording recorder construction failures', () => {
     unmount();
   });
 
+  it('keeps review and Download unavailable until H.264 MP4 transcoding completes', async () => {
+    installRecorderHarness();
+    let finishTranscode!: (value: { blob: Blob; mimeType: 'video/mp4' }) => void;
+    recordingTranscode.transcode.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishTranscode = resolve;
+        }),
+    );
+    const { result, unmount } = renderHook(() => useRecording());
+
+    await act(async () => {
+      await result.current.start(createSource(), 'local');
+    });
+
+    let stopping!: Promise<RecordingArtifact | null>;
+    act(() => {
+      stopping = result.current.stop();
+    });
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    expect(result.current.lifecycle).toBe('stopping');
+    expect(result.current.original).toBeNull();
+    expect(result.current.presented).toBeNull();
+    expect(result.current.downloaded).toBe(false);
+    expect(recordingTranscode.transcode).toHaveBeenCalledOnce();
+    const [rawRecording, transcodeOptions] = recordingTranscode.transcode.mock.calls[0] ?? [];
+    expect(rawRecording).toBeInstanceOf(Blob);
+    expect(transcodeOptions?.requireAudio).toBe(true);
+    expect(transcodeOptions?.signal).toBeInstanceOf(AbortSignal);
+
+    const converted = new NativeBlob(['converted'], { type: 'video/mp4' });
+    await act(async () => {
+      finishTranscode({ blob: converted, mimeType: 'video/mp4' });
+      await stopping;
+    });
+
+    expect(result.current.lifecycle).toBe('recorded');
+    expect(result.current.presented?.media).toBe(converted);
+    expect(result.current.presented?.mimeType).toBe('video/mp4');
+    expect(result.current.presented?.filename).toMatch(/\.mp4$/);
+    unmount();
+  });
+
+  it('does not publish the raw recorder file when MP4 transcoding fails', async () => {
+    installRecorderHarness();
+    recordingTranscode.transcode.mockRejectedValueOnce(new Error('H.264 encoder unavailable'));
+    const { result, unmount } = renderHook(() => useRecording());
+
+    await act(async () => {
+      await result.current.start(createSource(), 'local');
+    });
+    let artifact: RecordingArtifact | null = null;
+    await act(async () => {
+      artifact = await result.current.stop();
+    });
+
+    expect(artifact).toBeNull();
+    expect(result.current.lifecycle).toBe('error');
+    expect(result.current.original).toBeNull();
+    expect(result.current.presented).toBeNull();
+    expect(URL.createObjectURL).not.toHaveBeenCalled();
+    expect(result.current.recordingError).toMatch(/H\.264 MP4/i);
+    unmount();
+  });
+
+  it('cancels device-side transcoding and settles Stop when recording ownership unmounts', async () => {
+    installRecorderHarness();
+    const transcodeSignal: { current: AbortSignal | null } = { current: null };
+    recordingTranscode.transcode.mockImplementationOnce(
+      (_blob: Blob, { signal }: Readonly<{ requireAudio: boolean; signal: AbortSignal }>) =>
+        new Promise((_resolve, reject) => {
+          transcodeSignal.current = signal;
+          signal.addEventListener(
+            'abort',
+            () => reject(new DOMException('Aborted', 'AbortError')),
+            { once: true },
+          );
+        }),
+    );
+    const { result, unmount } = renderHook(() => useRecording());
+
+    await act(async () => {
+      await result.current.start(createSource(), 'local');
+    });
+    const stopping = result.current.stop();
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+
+    unmount();
+    await expect(stopping).resolves.toBeNull();
+    expect(transcodeSignal.current?.aborted).toBe(true);
+  });
+
   it('captures immutable start-time metadata, retains it for voice variants, and clears it on replacement or discard', async () => {
     installRecorderHarness();
     const settings: MediaTrackSettings = { width: 1_920, height: 1_080, frameRate: 29.97 };
@@ -735,6 +855,9 @@ describe('useRecording recorder construction failures', () => {
       videoSource: 'local',
       audioSource: 'none',
     });
+    const [, transcodeOptions] = recordingTranscode.transcode.mock.calls[0] ?? [];
+    expect(transcodeOptions?.requireAudio).toBe(false);
+    expect(transcodeOptions?.signal).toBeInstanceOf(AbortSignal);
     unmount();
   });
 

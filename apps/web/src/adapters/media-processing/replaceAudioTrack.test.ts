@@ -9,6 +9,11 @@ const media = vi.hoisted(() => ({
   dispose: vi.fn(),
   finalize: vi.fn(),
   outputState: 'pending',
+  registerAacEncoder: vi.fn(),
+}));
+
+vi.mock('@mediabunny/aac-encoder', () => ({
+  registerAacEncoder: media.registerAacEncoder,
 }));
 
 vi.mock('./audioEffects', () => ({
@@ -76,6 +81,7 @@ beforeEach(() => {
   media.cancel.mockReset().mockResolvedValue(undefined);
   media.dispose.mockReset();
   media.finalize.mockReset().mockResolvedValue(undefined);
+  media.registerAacEncoder.mockReset();
 });
 
 describe('replaceRecordingAudio', () => {
@@ -105,6 +111,23 @@ describe('replaceRecordingAudio', () => {
     ).rejects.toThrow('mux failed');
     expect(media.cancel).toHaveBeenCalledOnce();
     expect(media.dispose).toHaveBeenCalledOnce();
+  });
+
+  it('uses the MediaBunny AAC fallback for MP4 replacement audio', async () => {
+    media.canEncode = false;
+    media.registerAacEncoder.mockImplementation(() => {
+      media.canEncode = true;
+    });
+
+    const result = await replaceRecordingAudio(
+      new Blob(['video'], { type: 'video/mp4' }),
+      new Blob(['audio'], { type: 'audio/webm' }),
+      new AbortController().signal,
+    );
+
+    expect(result.blob.size).toBe(3);
+    expect(media.registerAacEncoder).toHaveBeenCalledOnce();
+    expect(media.finalize).toHaveBeenCalledOnce();
   });
 
   it('rejects unsupported encoding before starting output and still disposes input', async () => {

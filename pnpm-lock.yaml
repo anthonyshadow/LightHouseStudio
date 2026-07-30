@@ -161,6 +161,9 @@ importers:
       '@emotion/react':
         specifier: 11.14.0
         version: 11.14.0(@types/react@19.2.17)(react@19.2.8)(supports-color@10.2.2)
+      '@mediabunny/aac-encoder':
+        specifier: 1.52.0
+        version: 1.52.0(mediabunny@1.52.0)
       '@studio/contracts':
         specifier: workspace:*
         version: link:../../packages/contracts
@@ -1028,6 +1031,11 @@ packages:
     peerDependencies:
       '@types/react': '>=16'
       react: '>=16'
+
+  '@mediabunny/aac-encoder@1.52.0':
+    resolution: {integrity: sha512-/oNSe7ztMFwrbT2HREAvZYShlOPIQTD6HHqFoGXU26UaWOdkTz7i81sSX0/4KZasmuauvdTUfrX5r5DDx2uttw==}
+    peerDependencies:
+      mediabunny: ^1.0.0
 
   '@napi-rs/wasm-runtime@1.1.6':
     resolution: {integrity: sha512-ZLv/JdUfkvOy9eCnnBaGfiO+XimbjebAeO+MRQqD/B+FR1tnRN0tpKSJHRbE8sFfS6aqsXZ67TQjfwfsxULVbg==}
@@ -4949,6 +4957,10 @@ snapshots:
       '@types/mdx': 2.0.14
       '@types/react': 19.2.17
       react: 19.2.8
+
+  '@mediabunny/aac-encoder@1.52.0(mediabunny@1.52.0)':
+    dependencies:
+      mediabunny: 1.52.0
 
   '@napi-rs/wasm-runtime@1.1.6(@emnapi/core@1.11.2)(@emnapi/runtime@1.11.2)':
     dependencies:

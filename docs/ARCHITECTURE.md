@@ -127,13 +127,21 @@ The chosen track identities and take metadata are pinned at Start. Recording nev
 source tracks.
 
 Recording orchestration owns the `MediaRecorder` instances, chunks, optional audio sidecar,
-warning/cap timer, and finalization:
+warning/cap timer, MediaBunny conversion, and finalization:
 
 - warn accessibly at 270 seconds;
 - route the 300-second cap and manual Stop through one coalesced path;
 - settle final recorder data and the optional sidecar before releasing live resources;
-- publish the main video even when the sidecar fails;
+- force the settled main video through an on-device H.264/AAC MP4 conversion;
+- publish only the converted MP4, never the raw recorder container, even when the sidecar fails;
+- cancel conversion and withhold the download artifact if ownership ends or a required track would
+  be dropped; and
 - release local/provider resources only after finalization settles.
+
+MediaBunny uses the browser's AVC/H.264 WebCodecs encoder and its official AAC encoder extension
+when native AAC encoding is unavailable. The conversion keeps the raw recorder Blob private to
+finalization and creates the artifact URL only after a complete MP4 exists. Review, Voice, and
+Download therefore remain unavailable while transcoding.
 
 Recorded and uploaded media publish through one artifact boundary:
 
@@ -199,18 +207,18 @@ SQL database, or session history. Host-derived owner IDs are a local namespace, 
 
 The creator of a resource owns idempotent cleanup.
 
-| Owner                 | Resources                                                                                             |
-| --------------------- | ----------------------------------------------------------------------------------------------------- |
-| Session orchestration | Owned local/remote streams, cloned provider input, provider client, token abort, active-session clock |
-| Session draft         | Ephemeral files and preview object URLs                                                               |
-| Recording/review      | Recorders, chunks, immutable source/sidecar, visual/voice artifact URLs, cap timer, unload protection |
-| Existing-video flow   | Validation generations, ordered ephemeral drafts, provider polling/download, checkpoint consent       |
-| Voice processing      | Abort controllers, Web Audio/Mediabunny resources, temporary processed URLs                           |
-| Media stage           | DOM media attachment, metering, control-visibility timer                                              |
-| Overlay               | Focus/inert/scroll state only; never media                                                            |
-| API request/service   | Request abort, upstream streams, shared-operation subscribers, provider deadline                      |
-| Video-job service     | In-memory owner/job map, exact-once submission, private temp paths, expiry and result cleanup         |
-| Reference store       | Atomic files, metadata, request mappings, conservative temporary cleanup                              |
+| Owner                 | Resources                                                                                                               |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Session orchestration | Owned local/remote streams, cloned provider input, provider client, token abort, active-session clock                   |
+| Session draft         | Ephemeral files and preview object URLs                                                                                 |
+| Recording/review      | Recorders, chunks, conversion abort, immutable source/sidecar, visual/voice artifact URLs, cap timer, unload protection |
+| Existing-video flow   | Validation generations, ordered ephemeral drafts, provider polling/download, checkpoint consent                         |
+| Voice processing      | Abort controllers, Web Audio/Mediabunny resources, temporary processed URLs                                             |
+| Media stage           | DOM media attachment, metering, control-visibility timer                                                                |
+| Overlay               | Focus/inert/scroll state only; never media                                                                              |
+| API request/service   | Request abort, upstream streams, shared-operation subscribers, provider deadline                                        |
+| Video-job service     | In-memory owner/job map, exact-once submission, private temp paths, expiry and result cleanup                           |
+| Reference store       | Atomic files, metadata, request mappings, conservative temporary cleanup                                                |
 
 Late async results check their generation or abort state before commit. A healthy replacement
 commits before the previous owned resource is released. Duplicate Stop coalesces. Recording only

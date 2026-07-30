@@ -1,4 +1,5 @@
 import type { AudioCodec } from 'mediabunny';
+import { ensureAacEncodingSupport } from './aacEncoding';
 import { decodeAudioBlob } from './audioEffects';
 
 const isMp4 = (blob: Blob): boolean => blob.type.includes('mp4') || blob.type.includes('quicktime');
@@ -97,13 +98,15 @@ export const replaceRecordingAudio = async (
     signal.throwIfAborted();
 
     const audioCodec: AudioCodec = mp4 ? 'aac' : 'opus';
-    if (
-      !(await canEncodeAudio(audioCodec, {
+    const canEncodeReplacementAudio = () =>
+      canEncodeAudio(audioCodec, {
         numberOfChannels: audioBuffer.numberOfChannels,
         sampleRate: audioBuffer.sampleRate,
         bitrate: 128_000,
-      }))
-    ) {
+      });
+    if (audioCodec === 'aac') {
+      await ensureAacEncodingSupport(canEncodeReplacementAudio);
+    } else if (!(await canEncodeReplacementAudio())) {
       throw new Error(`This browser cannot encode ${audioCodec.toUpperCase()} audio.`);
     }
 

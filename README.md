@@ -25,8 +25,9 @@ claim that qualification has passed.
 1. Open `/` and select **Start with camera** or **Upload existing video** to move to `/studio`.
 2. Camera provides the existing provider-free live flow. Upload validates and previews a
    compatible device-local file without requesting camera permission or provider credentials.
-3. For camera, optionally choose Character/VTO, start AI, and Record. Studio warns at 270 seconds
-   and automatically stops at 300 seconds.
+3. For camera, optionally choose Character/VTO, start AI, and Record. Studio warns at 270 seconds,
+   automatically stops at 300 seconds, then transcodes the settled recording on the device to an
+   H.264/AAC MP4 before review or Download becomes available.
 4. For upload, choose zero, one, or two ordered Lucy/VTO steps. Each exact model appears at most
    once; a two-step order pauses for explicit approval after the first result.
 5. Review playback on the same persistent stage.
@@ -45,8 +46,9 @@ dirty Recipe Shelf edit requires confirmed discard; saved origin-scoped browser 
 
 ## Capabilities and provider boundaries
 
-- Local camera, microphone, existing-video validation/preview, recording, playback, local voice
-  effects, and download require no provider credentials or external media traffic.
+- Local camera, microphone, existing-video validation/preview, recording, on-device MP4
+  transcoding, playback, local voice effects, and download require no provider credentials or
+  external media traffic.
 - Character Builder saves browser-local character metadata and immutable reference assets under
   `LIGHTFRAME_DATA_DIR`. Prompt-only save and upload do not generate images.
 - Lucy 2.5 and pinned `lucy-vton-3` start only after explicit user action. Decart receives live
@@ -68,7 +70,8 @@ retention, and provider-contact contract.
 
 - Node `>=24 <25` (`.nvmrc` pins the repository default)
 - pnpm `>=11.18 <12`
-- A current secure-context browser with `getUserMedia` and `MediaRecorder`
+- A current secure-context browser with `getUserMedia`, `MediaRecorder`, and WebCodecs H.264
+  decode/encode support
 - A camera and microphone for physical capture
 - Optional, independent credentials for provider-backed features
 
@@ -195,9 +198,11 @@ pure policy         runtime HTTP schemas
        Decart / OpenAI / BFL / Wiro / ElevenLabs
 ```
 
-The creator of a stream, recorder, timer, listener, object URL, audio context, or provider client
-owns idempotent cleanup. Recording borrows source tracks and never stops them. Finalization settles
-the video and optional sidecar before live resources release; the main video remains authoritative.
+The creator of a stream, recorder, timer, listener, object URL, audio context, transcoder, or
+provider client owns idempotent cleanup. Recording borrows source tracks and never stops them.
+Finalization settles the video and optional sidecar, transcodes the main recording on-device to
+H.264/AAC MP4, and publishes that downloadable artifact before live resources release. Raw
+recorder output never receives a download URL.
 
 The backend has no account database, jobs, or session history. Its only durable runtime data is the
 owner-scoped immutable reference-asset store. Read [architecture and ownership](docs/ARCHITECTURE.md)

@@ -97,14 +97,10 @@ export const createPersistedOriginalRecording = (
 
 export const createOriginalRecordingArtifact = (
   attempt: RecordingAttempt,
+  blob: Blob,
+  mimeType: string,
   mainStoppedAt = performance.now(),
 ): RecordingArtifact | null => {
-  const mimeType =
-    firstChunkMimeType(attempt.mainChunks) ||
-    attempt.mainRecorder.mimeType ||
-    selectVideoMime() ||
-    'video/webm';
-  const blob = new Blob(attempt.mainChunks, { type: mimeType });
   if (blob.size === 0) return null;
 
   return {
@@ -118,6 +114,16 @@ export const createOriginalRecordingArtifact = (
     durationMs: Math.max(0, mainStoppedAt - attempt.startTime),
     sizeBytes: blob.size,
   };
+};
+
+export const createRawRecordingBlob = (attempt: RecordingAttempt): Blob | null => {
+  const mimeType =
+    firstChunkMimeType(attempt.mainChunks) ||
+    attempt.mainRecorder.mimeType ||
+    selectVideoMime() ||
+    'video/webm';
+  const blob = new Blob(attempt.mainChunks, { type: mimeType });
+  return blob.size > 0 ? blob : null;
 };
 
 export const createRecordingSidecar = (attempt: RecordingAttempt): RecordingAudioSidecar => {

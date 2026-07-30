@@ -12,6 +12,7 @@
   "dependencies": {
     "@decartai/sdk": "0.1.17",
     "@emotion/react": "11.14.0",
+    "@mediabunny/aac-encoder": "1.52.0",
     "@studio/contracts": "workspace:*",
     "@studio/domain": "workspace:*",
     "mediabunny": "1.52.0",
