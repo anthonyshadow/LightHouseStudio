@@ -102,7 +102,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       })),
       ...repositoryState.store.savedCharacterPrompts.map((character) => ({
         id: character.id,
-        label: `Character · ${character.name}`,
+        label: character.name,
         modelId: 'lucy-2.5' as const,
         prompt: character.prompt,
         referenceImageAssetId: character.referenceImageAssetId,

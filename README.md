@@ -23,8 +23,9 @@ claim that qualification has passed.
 ## Product flow
 
 1. Open `/` and select **Start with camera** or **Upload existing video** to move to `/studio`.
-2. Camera provides the existing provider-free live flow. Upload validates and previews a
-   compatible device-local file without requesting camera permission or provider credentials.
+2. Camera provides the existing provider-free live flow. Upload validates a compatible
+   device-local file, shows a local first-frame preview or placeholder, and previews it on the
+   shared stage without requesting camera permission or provider credentials.
 3. For camera, optionally choose Character/VTO, start AI, and Record. Studio warns at 270 seconds,
    automatically stops at 300 seconds, then transcodes the settled recording on the device to an
    H.264/AAC MP4 before review or Download becomes available.

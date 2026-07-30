@@ -235,7 +235,9 @@ const addVisualStep = async (
   prompt: string,
 ) => {
   await dialog
-    .getByRole('button', { name: modelId === 'lucy-2.5' ? 'Add Lucy' : 'Add VTO' })
+    .getByRole('button', {
+      name: modelId === 'lucy-2.5' ? 'Swap Character' : 'Virtual Try On',
+    })
     .click();
   await dialog.locator('article').last().locator('textarea').fill(prompt);
 };

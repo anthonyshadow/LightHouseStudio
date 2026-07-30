@@ -1,7 +1,32 @@
 import { expect, test, type Page } from '@playwright/test';
 import { VIDEO_PROVIDER_INTENT_VALUE } from '@studio/contracts';
 import { installFakeVideoJobRoutes, loadH264VideoFixture } from './support/existingVideoHarness';
+import { expectNoDocumentOverflow } from './support/studioHarness';
 import { installProviderNetworkDriver } from './support/studioHarness.network';
+import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
+
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
+const SEEDED_UPLOAD_RECIPES = {
+  schemaVersion: 4,
+  savedPrompts: [
+    {
+      id: 'character-anchor',
+      title: 'Professional Anchor',
+      prompt:
+        'A professional anchor in a well-lit studio with a dark blazer and soft cinematic lighting.',
+      modelModeId: 'lucy-2.5',
+      source: 'manual',
+      referenceImageAssetId: null,
+      tags: ['anchor'],
+      createdAt: '2026-07-30T12:00:00.000Z',
+      updatedAt: '2026-07-30T12:00:00.000Z',
+      lastUsedAt: '2026-07-30T12:00:00.000Z',
+      useCount: 1,
+    },
+  ],
+  recentPrompts: [],
+  savedCharacterPrompts: [],
+};
 
 const installCameraSentinel = async (page: Page): Promise<void> => {
   await page.addInitScript(() => {
@@ -79,6 +104,51 @@ test('provider-free upload previews and enters the existing take/download surfac
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
 
+test('the upload editor and open saved-character chooser reflow at every supported viewport', async ({
+  page,
+}) => {
+  await installCameraSentinel(page);
+  await installProviderNetworkDriver(page);
+  await page.addInitScript(
+    ({ storageKey, store }) => {
+      window.localStorage.setItem(storageKey, JSON.stringify(store));
+    },
+    { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: SEEDED_UPLOAD_RECIPES },
+  );
+  const fixture = await loadH264VideoFixture();
+
+  for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {
+    await page.setViewportSize(viewport);
+    await page.goto('/');
+    await selectExistingVideo(page, fixture, 'responsive-source.mp4');
+    const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
+    await dialog.getByRole('button', { name: 'Swap Character' }).click();
+    await expectNoDocumentOverflow(page);
+    await expect(
+      dialog.locator('figure[aria-label="Video preview for responsive-source.mp4"]'),
+    ).toBeAttached();
+
+    const trigger = dialog.getByRole('button', { name: /Choose a Saved Character/u });
+    await trigger.click();
+    const option = dialog.getByRole('option', { name: /Professional Anchor/u });
+    await expect(option).toBeVisible();
+
+    const [triggerBox, optionBox] = await Promise.all([
+      trigger.boundingBox(),
+      option.boundingBox(),
+    ]);
+    expect(triggerBox?.height).toBeGreaterThanOrEqual(44);
+    expect(optionBox?.height).toBeGreaterThanOrEqual(44);
+    expect(optionBox?.x).toBeGreaterThanOrEqual(0);
+    expect((optionBox?.x ?? 0) + (optionBox?.width ?? 0)).toBeLessThanOrEqual(viewport.width + 1);
+
+    await page.keyboard.press('Escape');
+    await expect(dialog.getByRole('listbox', { name: 'Saved Character' })).toBeHidden();
+    await page.keyboard.press('Escape');
+    await expect(dialog).toBeHidden();
+  }
+});
+
 for (const order of [
   ['lucy-2.5', 'lucy-vton-3'],
   ['lucy-vton-3', 'lucy-2.5'],
@@ -98,7 +168,9 @@ for (const order of [
     const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
     for (const modelId of order) {
       await dialog
-        .getByRole('button', { name: modelId === 'lucy-2.5' ? 'Add Lucy' : 'Add VTO' })
+        .getByRole('button', {
+          name: modelId === 'lucy-2.5' ? 'Swap Character' : 'Virtual Try On',
+        })
         .click();
     }
     const steps = dialog.locator('article');
@@ -141,8 +213,8 @@ test('a second-stage failure preserves the first visual result and local finish 
 
   await selectExistingVideo(page, fixture);
   const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
-  await dialog.getByRole('button', { name: 'Add Lucy' }).click();
-  await dialog.getByRole('button', { name: 'Add VTO' }).click();
+  await dialog.getByRole('button', { name: 'Swap Character' }).click();
+  await dialog.getByRole('button', { name: 'Virtual Try On' }).click();
   const steps = dialog.locator('article');
   await steps.nth(0).locator('textarea').fill('First visual');
   await steps.nth(1).locator('textarea').fill('Second visual');

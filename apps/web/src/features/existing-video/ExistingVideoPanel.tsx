@@ -1,12 +1,15 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { useRef, useState, type DragEvent } from 'react';
-import {
-  REFERENCE_IMAGE_ACCEPT,
-  validateReferenceImage,
-} from '../../adapters/browser-media/imageValidation';
+import { validateReferenceImage } from '../../adapters/browser-media/imageValidation';
 import { hydrateReferenceImage } from '../../adapters/api-client/apiClient';
 import { Button, StatusNotice, Surface } from '../../ui';
 import { formatBytes, formatDuration } from '../recording';
+import {
+  ExistingVideoRecipeChooser,
+  type ExistingVideoSavedRecipe,
+} from './ExistingVideoRecipeChooser';
+import { ExistingVideoReferenceField } from './ExistingVideoReferenceField';
+import { ExistingVideoSourcePreview } from './ExistingVideoSourcePreview';
 import type { ExistingVideoStep, ExistingVideoWorkflow } from './useExistingVideoWorkflow';
 
 type ExistingVideoPanelProps = {
@@ -15,14 +18,6 @@ type ExistingVideoPanelProps = {
   readonly onFinish: () => void;
   readonly savedRecipes?: readonly ExistingVideoSavedRecipe[];
 };
-
-export type ExistingVideoSavedRecipe = Readonly<{
-  id: string;
-  label: string;
-  modelId: ExistingVideoStep['modelId'];
-  prompt: string;
-  referenceImageAssetId: string | null;
-}>;
 
 const panelStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
@@ -43,6 +38,16 @@ const dropZoneStyles = (theme: Theme): CSSObject => ({
   background: theme.colors.surface,
   textAlign: 'center',
   '& p': { color: theme.colors.textMuted },
+});
+
+const sourceOverviewStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  gap: theme.space.md,
+  alignItems: 'start',
+  '@media (min-width: 64rem)': {
+    gridTemplateColumns: 'minmax(18rem, 1.35fr) minmax(16rem, 1fr)',
+  },
 });
 
 const metadataStyles = (theme: Theme): CSSObject => ({
@@ -77,6 +82,26 @@ const rowStyles = (theme: Theme): CSSObject => ({
   '& > button': { minHeight: '2.75rem' },
 });
 
+const visualPlanHeaderStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'flex',
+  flexWrap: 'wrap',
+  alignItems: 'end',
+  justifyContent: 'space-between',
+  gap: theme.space.sm,
+  '& > div:first-of-type': { minWidth: 'min(100%, 18rem)', flex: '1 1 22rem' },
+  '& > div:last-of-type': { flex: '0 1 auto' },
+  '@media (max-width: 32rem)': {
+    alignItems: 'stretch',
+    '& > div:last-of-type': {
+      width: '100%',
+      display: 'grid',
+      gridTemplateColumns: 'minmax(0, 1fr)',
+      '& > button': { width: '100%' },
+    },
+  },
+});
+
 const stepStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.sm,
@@ -106,7 +131,10 @@ const stepStyles = (theme: Theme): CSSObject => ({
 });
 
 const modelLabel = (step: ExistingVideoStep): string =>
-  step.modelId === 'lucy-2.5' ? 'Lucy 2.5' : 'Virtual Try-On';
+  step.modelId === 'lucy-2.5' ? 'Swap Character' : 'Virtual Try On';
+
+const stepHeading = (step: ExistingVideoStep): string =>
+  step.modelId === 'lucy-2.5' ? 'Swap Character (Lucy 2.5)' : 'Virtual Try On';
 
 const Orientation = ({ width, height }: { width: number; height: number }) =>
   width > height ? 'Landscape 16:9' : 'Portrait 9:16';
@@ -138,11 +166,7 @@ export const ExistingVideoPanel = ({
     chooseFiles(event.dataTransfer.files);
   };
 
-  const chooseReference = async (step: ExistingVideoStep, file: File | undefined) => {
-    if (!file) {
-      workflow.updateStep(step.id, { referenceImage: null });
-      return;
-    }
+  const chooseReference = async (step: ExistingVideoStep, file: File) => {
     const validation = await validateReferenceImage(file, step.modelId);
     if (validation.blockingError) {
       setReferenceError(validation.blockingError);
@@ -230,42 +254,49 @@ export const ExistingVideoPanel = ({
         </p>
       </header>
 
-      <dl css={metadataStyles(theme)}>
-        <div>
-          <dt>File</dt>
-          <dd title={metadata.displayName}>{metadata.displayName}</dd>
+      <div css={sourceOverviewStyles(theme)}>
+        <ExistingVideoSourcePreview file={selected.file} displayName={metadata.displayName} />
+        <div css={panelStyles(theme)}>
+          <h3>Source details</h3>
+          <dl css={metadataStyles(theme)}>
+            <div>
+              <dt>File</dt>
+              <dd title={metadata.displayName}>{metadata.displayName}</dd>
+            </div>
+            <div>
+              <dt>Size</dt>
+              <dd>{formatBytes(metadata.sizeBytes)}</dd>
+            </div>
+            <div>
+              <dt>Duration</dt>
+              <dd>{formatDuration(metadata.durationMs / 1_000)}</dd>
+            </div>
+            <div>
+              <dt>Resolution</dt>
+              <dd>
+                {metadata.width} × {metadata.height}
+              </dd>
+            </div>
+            <div>
+              <dt>Orientation</dt>
+              <dd>
+                <Orientation width={metadata.width} height={metadata.height} />
+              </dd>
+            </div>
+            <div>
+              <dt>Video</dt>
+              <dd>
+                {metadata.container.toUpperCase()} ·{' '}
+                {metadata.videoCodec === 'avc' ? 'H.264' : 'VP8'}
+              </dd>
+            </div>
+            <div>
+              <dt>Audio</dt>
+              <dd>{metadata.hasAudio ? (metadata.audioCodec ?? 'Present') : 'None'}</dd>
+            </div>
+          </dl>
         </div>
-        <div>
-          <dt>Size</dt>
-          <dd>{formatBytes(metadata.sizeBytes)}</dd>
-        </div>
-        <div>
-          <dt>Duration</dt>
-          <dd>{formatDuration(metadata.durationMs / 1_000)}</dd>
-        </div>
-        <div>
-          <dt>Resolution</dt>
-          <dd>
-            {metadata.width} × {metadata.height}
-          </dd>
-        </div>
-        <div>
-          <dt>Orientation</dt>
-          <dd>
-            <Orientation width={metadata.width} height={metadata.height} />
-          </dd>
-        </div>
-        <div>
-          <dt>Video</dt>
-          <dd>
-            {metadata.container.toUpperCase()} · {metadata.videoCodec === 'avc' ? 'H.264' : 'VP8'}
-          </dd>
-        </div>
-        <div>
-          <dt>Audio</dt>
-          <dd>{metadata.hasAudio ? (metadata.audioCodec ?? 'Present') : 'None'}</dd>
-        </div>
-      </dl>
+      </div>
 
       {workflow.message ? (
         <StatusNotice tone={workflow.phase === 'error' ? 'danger' : 'neutral'} role="status">
@@ -334,39 +365,41 @@ export const ExistingVideoPanel = ({
       {workflow.phase !== 'checkpoint' && workflow.phase !== 'complete' ? (
         <>
           <section css={panelStyles(theme)} aria-labelledby="visual-plan-heading">
-            <div>
-              <h2 id="visual-plan-heading">Visual plan</h2>
-              <p>
-                Choose zero, one, or two ordered steps. Each step appears at most once and each
-                creates one Decart submission.
-              </p>
-            </div>
-            <div css={rowStyles(theme)}>
-              <Button
-                variant="secondary"
-                disabled={
-                  structureLocked || workflow.steps.some((step) => step.modelId === 'lucy-2.5')
-                }
-                onClick={() => workflow.addStep('lucy-2.5')}
-              >
-                Add Lucy
-              </Button>
-              <Button
-                variant="secondary"
-                disabled={
-                  structureLocked || workflow.steps.some((step) => step.modelId === 'lucy-vton-3')
-                }
-                onClick={() => workflow.addStep('lucy-vton-3')}
-              >
-                Add VTO
-              </Button>
+            <div css={visualPlanHeaderStyles(theme)}>
+              <div>
+                <h2 id="visual-plan-heading">Visual plan</h2>
+                <p>
+                  Choose zero, one, or two ordered steps. Each step appears at most once and each
+                  creates one Decart submission.
+                </p>
+              </div>
+              <div css={rowStyles(theme)}>
+                <Button
+                  variant="secondary"
+                  disabled={
+                    structureLocked || workflow.steps.some((step) => step.modelId === 'lucy-2.5')
+                  }
+                  onClick={() => workflow.addStep('lucy-2.5')}
+                >
+                  Swap Character
+                </Button>
+                <Button
+                  variant="secondary"
+                  disabled={
+                    structureLocked || workflow.steps.some((step) => step.modelId === 'lucy-vton-3')
+                  }
+                  onClick={() => workflow.addStep('lucy-vton-3')}
+                >
+                  Virtual Try On
+                </Button>
+              </div>
             </div>
 
             {workflow.steps.map((step, index) => (
               <article key={step.id} css={stepStyles(theme)}>
                 <header>
                   <h3>
-                    {index + 1}. {modelLabel(step)}
+                    {index + 1}. {stepHeading(step)}
                   </h3>
                   <span>{index + 1} Decart submission</span>
                 </header>
@@ -378,42 +411,13 @@ export const ExistingVideoPanel = ({
                 ) : (
                   <p>Confirm you have rights and consent for submitted media before continuing.</p>
                 )}
-                <label>
-                  Recipe Shelf
-                  <select
-                    defaultValue=""
-                    disabled={
-                      recipeLocked ||
-                      recipeLoading ||
-                      !savedRecipes.some((recipe) => recipe.modelId === step.modelId)
-                    }
-                    css={{
-                      minHeight: '2.75rem',
-                      paddingInline: theme.space.sm,
-                      border: `1px solid ${theme.colors.borderStrong}`,
-                      borderRadius: theme.radii.small,
-                      color: theme.colors.text,
-                      background: theme.colors.surfaceStrong,
-                    }}
-                    onChange={(event) => {
-                      void applySavedRecipe(step, event.currentTarget.value);
-                      event.currentTarget.value = '';
-                    }}
-                  >
-                    <option value="">
-                      {savedRecipes.some((recipe) => recipe.modelId === step.modelId)
-                        ? 'Apply a saved recipe…'
-                        : 'No saved recipes for this model'}
-                    </option>
-                    {savedRecipes
-                      .filter((recipe) => recipe.modelId === step.modelId)
-                      .map((recipe) => (
-                        <option key={recipe.id} value={recipe.id}>
-                          {recipe.label}
-                        </option>
-                      ))}
-                  </select>
-                </label>
+                <ExistingVideoRecipeChooser
+                  modelId={step.modelId}
+                  recipes={savedRecipes.filter((recipe) => recipe.modelId === step.modelId)}
+                  disabled={recipeLocked}
+                  loading={recipeLoading}
+                  onChoose={(recipeId) => void applySavedRecipe(step, recipeId)}
+                />
                 <label>
                   Prompt
                   <textarea
@@ -431,20 +435,16 @@ export const ExistingVideoPanel = ({
                   />
                   <span>{step.prompt.length}/1,200</span>
                 </label>
-                <label>
-                  Reference image (JPEG, PNG, or WebP)
-                  <input
-                    type="file"
-                    accept={REFERENCE_IMAGE_ACCEPT}
-                    disabled={recipeLocked}
-                    onChange={(event) => void chooseReference(step, event.currentTarget.files?.[0])}
-                  />
-                </label>
-                {step.referenceImage ? (
-                  <span title={step.referenceImage.name}>
-                    Selected reference: {step.referenceImage.name}
-                  </span>
-                ) : null}
+                <ExistingVideoReferenceField
+                  modelId={step.modelId}
+                  file={step.referenceImage}
+                  disabled={recipeLocked}
+                  onSelectFile={(file) => void chooseReference(step, file)}
+                  onRemove={() => {
+                    setReferenceError(null);
+                    workflow.updateStep(step.id, { referenceImage: null });
+                  }}
+                />
                 <label>
                   <span>
                     <input
