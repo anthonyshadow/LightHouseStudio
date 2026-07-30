@@ -77,7 +77,7 @@ const TakeDock = lazy(() =>
 const deferredPanelFallback = <p role="status">Loading studio tool…</p>;
 
 const REVIEW_LOCK_REASON =
-  'Download and close or discard the recorded take before starting or changing media.';
+  'Download and release or discard the recorded take before starting or changing media.';
 
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
@@ -159,7 +159,7 @@ const StudioExperience = ({ initialOverlay }: StudioExperienceProps) => {
     : finalizingStartedAt !== null || finalizingStream !== null
       ? 'Wait for the current take to finish finalizing before building a character.'
       : reviewLocked
-        ? 'Download and close or discard the current take before building a character.'
+        ? 'Download and release or discard the current take before building a character.'
         : undefined;
   const openCharacterBuilderOverlay = useCallback(
     () => openOverlay('character-builder'),

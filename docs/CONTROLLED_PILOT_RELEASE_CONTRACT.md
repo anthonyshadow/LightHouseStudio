@@ -120,7 +120,7 @@ both are 300 seconds.
 - At 300 seconds, invoke the existing coalesced Stop/finalize path exactly once.
 - Final recorder data and the optional audio sidecar settle before any owned local/provider
   resource is released.
-- Playback, Voice, Download, Close, and confirmed Discard remain available. The review state
+- Playback, Voice, Download, Release, and confirmed Discard remain available. The review state
   explains that recording ended at the supported maximum.
 
 ### Decart active session

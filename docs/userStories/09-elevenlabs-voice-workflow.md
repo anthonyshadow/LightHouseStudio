@@ -27,7 +27,8 @@ As a creator, I want to preview and apply a voice already saved in my ElevenLabs
    the upload boundary: the server first revalidates that the voice remains saved and the
    configured model supports speech-to-speech, then sends the immutable original audio sidecar
    through the local broker and never sends video.
-7. Wait for ElevenLabs conversion and local video/audio remuxing to complete. On success, inspect the processed playback, then return to take review for download, close, or discard.
+7. Wait for ElevenLabs conversion and local video/audio remuxing to complete. On success, inspect
+   the processed playback, then return to take review for download, release, or discard.
 
 ## Failure and alternate paths
 

@@ -5,7 +5,10 @@ For a release candidate, capture each physical target/browser result using the s
 requires all approved check IDs for the exact commit and rejects arbitrary notes or extra fields
 that could contain prompts, personal media, raw provider data, identifiers, or credentials.
 
-Run `npm run quality`, `npm run test:coverage`, `npm run test:e2e`, `npm run test:visual`, and `npm run audit:prod` first. Manual checks complement deterministic tests; they are required for physical devices, codec output, track cleanup, and live provider integrations.
+Run `npm run quality`, `npm run test:coverage`, `npm run test:e2e`, `npm run test:visual`,
+`npm run audit:all`, and `npm run audit:prod` first. Manual checks complement deterministic tests;
+they are required for physical devices, codec output, track cleanup, and live provider
+integrations.
 
 Synthetic-media automation cannot certify physical camera/microphone indicators, the final browser/OS codec artifact, real Decart disconnect billing/lifecycle, OpenAI/BFL/Wiro reference results, or real ElevenLabs conversion. Complete those checks with intended release browsers, physical devices, and explicitly authorized provider test accounts before release.
 
@@ -68,7 +71,10 @@ Enter through `/projects`, `/?project=…`, and `/guided?project=…`; confirm e
 6. Confirm no `/api/realtime-token`, Decart SDK chunk, Decart request, or provider WebRTC connection appears. `/api/capabilities` is an expected local broker request and should not create external provider traffic.
 7. Select **Record**, capture 5–10 seconds, then select **Stop recording**. Confirm the stage holds its last frame under `Finalizing take…`; only after the artifact is ready should the camera/mic indicator clear and the same stage become paused playback with native controls. Confirm Latest Take remains closed until **Take** is selected.
 8. Apply each local voice treatment. Confirm no external request occurs, each render starts from the immutable original, and failed/cancelled processing leaves the previous stage playback recoverable. Restore Original and confirm immediate recovery.
-9. Download the take and confirm playback remains active. Confirm successful browser download dispatch enables Close, Close returns the stage to private idle, and the downloaded file contains video and expected microphone audio. Record that the app can verify dispatch, not browser download completion.
+9. Download the take and confirm playback remains active. Confirm successful browser download
+   dispatch enables Release, Release returns the stage to private idle, and the downloaded file
+   contains video and expected microphone audio. Record that the app can verify dispatch, not
+   browser download completion.
 
 ## Capture settings and draft isolation
 
@@ -172,15 +178,22 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Model: verify Record is unavailable before transformed live video; provider audio is preferred and microphone is fallback.
 - Stop Character and Try-On recordings. Confirm final recorder data and artifact publication happen first; provider disconnect, listener removal, remote/cloned-input track stops, owned camera/mic stops, analyser/timer cleanup, and playback handoff happen afterward. No local or provider session may automatically reacquire.
 - Confirm the recorded artifact replaces live media inside the same stage, begins paused with native controls/audio, and remains there when Take Review closes or another tool opens. There must be no duplicate player in Take Review.
-- While review is active, confirm Start Local/AI, Record, mode changes, and device switching are blocked. Review exit is limited to Download-then-Close or confirmed Discard.
+- While review is active, confirm Start Local/AI, Record, mode changes, and device switching are
+  blocked. Review exit is limited to Download-then-Release or confirmed Discard.
 - Verify the take reports its immutable start-time mode, timestamp, actual video dimensions/frame rate when the track exposes them, and selected video/audio source labels. While review is active, confirm those displayed values remain stable. The source-ending/provider-callback-before-finalization variant requires the automated mocked recording tests because the review UI intentionally blocks source changes.
-- Click Download and confirm synchronous dispatch leaves playback intact and enables Close. Confirm Close revokes original/processed URLs and returns to private idle. Simulate dispatch failure and confirm playback, review state, and disabled Close remain intact. The browser cannot report actual download completion.
+- Click Download and confirm synchronous dispatch leaves playback intact and enables Release.
+  Confirm Release revokes original/processed URLs and returns to private idle. Simulate dispatch
+  failure and confirm playback, review state, and disabled Release remain intact. The browser
+  cannot report actual download completion.
 - Confirm Discard requires approval, then revokes the same URLs and returns to private idle without a download. There is no media Save, take history, rename, or trim control.
 - Force sidecar failure or its 1.5-second grace timeout and confirm valid main video still enters review with a warning. Force empty output, main-recorder timeout, Blob construction failure, and object-URL creation failure; Stop recording must settle, live resources must release, and the app must return to private idle with an actionable stage error unless a valid artifact was already published.
 - Attempt to refresh/close with a take and confirm unload protection. After intentionally leaving, confirm the take does not persist.
 - Play every downloaded output in a second player/browser and check filename, duration, size, video, and audio.
 - With focus on the page background and Record enabled, press Space to start and Space again to finish. Confirm held/repeated Space or Space with a modifier does not retrigger. Repeat while focus is in an input, textarea, select, button, link, tab, summary, or contenteditable element and while a modal is open; recording must not toggle.
-- At `390×844` and `320×568`, stop a take and confirm playback plus compact Download, Discard, Voice, and Close actions remain reachable on the stable stage. Select **Take** and confirm Latest Take then opens as an internally scrolling sheet/dialog with metadata and sticky actions, but no duplicate player.
+- At `390×844` and `320×568`, stop a take and confirm playback plus compact Download, Discard,
+  Voice, and Release actions remain reachable on the stable stage. Select **Take** and confirm
+  Latest Take then opens as an internally scrolling sheet/dialog with metadata and sticky actions,
+  but no duplicate player.
 
 ## Voice treatments
 
@@ -239,5 +252,7 @@ Use [the gated live smoke procedure](LIVE_PROVIDER_SMOKE.md) when a Decart key i
 - Repeat Start/Stop/Reset/model switches and recording/processing cycles while watching browser media indicators, WebRTC internals, memory/object URL behavior, and server requests.
 - Confirm Stop/Reset/unmount releases provider clients, owned tracks, timers, recorders, audio contexts, generated streams, and superseded object URLs. For Stop recording, confirm all final recorder data precedes the session-level release and that every owned track/resource terminates exactly once.
 - Confirm recording and processing never stop camera/provider source tracks they merely reference.
-- Confirm a take URL survives overlay closure and download dispatch, then is revoked only on processed replacement, Close, Discard, or unmount. A new processed URL must exist before the previous processed URL is revoked.
+- Confirm a take URL survives overlay closure and download dispatch, then is revoked only on
+  processed replacement, Release, Discard, or unmount. A new processed URL must exist before the
+  previous processed URL is revoked.
 - Confirm aborted browser requests cancel voice HTTP work where supported, discard any late token response, and never let late results replace current state.

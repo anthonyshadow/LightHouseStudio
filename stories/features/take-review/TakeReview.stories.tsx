@@ -21,7 +21,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Take review shows immutable capture metadata and temporary file details, then gates download, discard, close, original restoration, and voice treatment actions around the current in-memory artifact.',
+          'Take review shows immutable capture metadata and temporary file details, then gates download, discard, release, original restoration, and voice treatment actions around the current in-memory artifact.',
       },
     },
   },

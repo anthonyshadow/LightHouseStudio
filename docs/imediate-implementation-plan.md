@@ -584,6 +584,16 @@ silently waived.
 
 ## 15. Wave 10 — Medium-to-low maintenance and polish
 
+**Implementation status (2026-07-29):** `UX-009` is implemented: the post-download stage action is
+now **Release**, Latest Take uses **Close and release**, confirmed Discard is unchanged, and the
+existing cleanup tests continue to verify object-URL revocation without claiming browser download
+completion. The conditional `TEST-010` consolidation remains intentionally unnecessary because
+Wave 9 found no false-state or maintenance risk between the untracked broad artifact and curated
+regression oracle. For `SEC-007`, the locked tree now contains patched minimatch, brace-expansion,
+and esbuild releases without an override or forced downgrade, and CI runs full and production
+audits. Fresh registry-backed audit results remain required before this wave's exit gate is marked
+complete.
+
 ### Development dependency advisories
 
 **Finding:** `SEC-007`
@@ -618,6 +628,18 @@ This wave prepares the next phase but does not implement or expose it.
 
 **Remote findings:** `SEC-001`, `SEC-002`, `SEC-003`, `SEC-006`, `ARCH-003`, `PERF-003`; the
 remote portions of `SEC-004`
+
+**Implementation status (2026-07-29):** the
+[remote backend handoff](REMOTE_BACKEND_HANDOFF.md) now provides the deployment/threat model,
+identity/session/authorization matrix, resource inventory, database/object consistency design,
+explicit local import/export and reversible migration plan, proposed retention/deletion policy,
+durable provider/idempotency/spend boundary, authenticated media-ingestion rules, content-free
+operations plan, rollout/rollback strategy, and remote test matrix. Graphify traced the current
+Host-derived owner, asset-store, operation-coordinator, and browser-persistence seams; no
+present-day migration hazard justified application code. The package remains design-only and
+pending the recorded product, security/privacy, architecture, operations, data-owner, and
+spend-policy approvals plus the pre-remote checklist. Wave 11 is not exit-complete, the broker
+remains loopback-only, and no remote implementation is authorized.
 
 Produce an approved design package covering:
 

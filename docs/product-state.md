@@ -171,7 +171,7 @@ the first-run path feel like a catalogue of unrelated AI features.
 - Capture settings support device selection and a local quality target.
 - Camera and microphone can be toggled during the live session.
 - The user can record one current take, stop and finalize it, review it on the
-  same stage, download it, close it, or confirm discard.
+  same stage, download it, release it, or confirm discard.
 - Recording finalization settles before camera or provider resources are
   released.
 - The current Studio take is in browser memory only. There is no current take

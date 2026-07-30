@@ -153,7 +153,14 @@ Track settings/capability reads and immutable take-metadata construction live in
 
 The finalized artifact then replaces live media in the same stage. The app does not fall back to or reacquire local preview, and all new media acquisition, mode/device changes, and recording are locked while a take is under review. Empty output, recorder timeout, or Blob/object-URL failure still releases live resources and returns to private idle with a stage error; if a valid artifact was already published, a later secondary failure cannot remove it from review. Recording stop always settles, including construction and URL-creation exceptions.
 
-Studio owns one temporary take at a time; it does not implement take history, rename, trim, or persistent media save. `Download take` dispatches a browser download but leaves playback active. Because completion is not browser-observable, successful synchronous dispatch only enables `Close take`; Close revokes original and processed URLs and returns to private idle. A failed dispatch leaves review intact. Confirmed Discard performs the same cleanup without download. Until Close or Discard, the persistent main-stage player is the only take player; the explicitly opened Latest Take overlay supplies metadata and actions, not a second player.
+Studio owns one temporary take at a time; it does not implement take history, rename, trim, or
+persistent media save. `Download take` dispatches a browser download but leaves playback active.
+Because completion is not browser-observable, successful synchronous dispatch only enables
+`Release` on the stage and `Close and release` in Latest Take. Either action revokes original and
+processed URLs and returns to private idle. A failed dispatch leaves review intact. Confirmed
+Discard performs the same cleanup without download. Until Release or Discard, the persistent
+main-stage player is the only take player; the explicitly opened Latest Take overlay supplies
+metadata and actions, not a second player.
 
 The retired Guided IndexedDB repository remains a compatibility boundary for existing project/media records. Studio's Legacy Project Manager can list, download the chosen video variant, and transactionally delete a project with its owned artifacts, but it cannot reopen the retired journey. No legacy media is deleted automatically. On first character-builder initialization, the newest valid `character-design` checkpoint may seed the active builder draft; a migration marker prevents repeated import after reset or completion. Draft and project repositories share only low-level request, transaction, abort, and open-lifecycle primitives. Each repository keeps its own schema and migration rules, closes databases that resolve after owner shutdown, and closes on `versionchange`.
 
@@ -223,6 +230,14 @@ for exposing the broker remotely.
 
 The backend remains database-free and single-operator, with no accounts, analytics, jobs, SQL migrations, or session history. It is stateful only for immutable reference assets and their idempotency metadata. Reference mutations require exact loopback Origin/Host matching; reads require the local owner identity. This keeps the local-first privacy model inspectable, but it is not a public multi-user security design.
 
+The [remote backend handoff](REMOTE_BACKEND_HANDOFF.md) maps these current seams into a proposed
+authenticated subject/organization boundary, transactional metadata, private object storage,
+durable provider operations, indexed idempotency, explicit import/export, relationship-aware
+deletion, and remote operations/test strategy. That document is design-only and pending product,
+security/privacy, architecture, operations, data-owner, and spend-policy approval. It adds no
+current runtime boundary: the Host-derived owner remains local-only and must be discarded rather
+than migrated as identity.
+
 ### HTTP API surface
 
 | Boundary                | Routes                                                                                                                                                                           | Behavior                                                                                                                      |
@@ -277,8 +292,18 @@ request carries the app-owned voice-intent marker, Apply uploads the immutable a
 than video, processed replacement revokes only the processed URL, and the original remains valid.
 The harness continues to route-deny every unexpected external HTTP request and WebSocket.
 
-Coverage gates are aggregate thresholds of 81% statements, 69% branches, 82% functions, and 83% lines. Local `npm run quality` includes Storybook typecheck, browser tests, and build. CI runs Storybook type, interaction, and static-build checks in a dedicated job; coverage, functional E2E, production static-serving smoke, and visual regression remain separate jobs. The production smoke builds the web/API packages and uses Fastify to serve the compiled Studio and `/api/health` from one origin, while functional and visual journeys continue to use their isolated development/mock servers.
+Coverage gates are aggregate thresholds of 81% statements, 69% branches, 82% functions, and 83%
+lines. Local `npm run quality` includes Storybook typecheck, browser tests, and build. CI runs both
+the full development-tree audit and the production-only audit before its primary static/unit/build
+gate. Storybook type, interaction, and static-build checks run in a dedicated job; coverage,
+functional E2E, production static-serving smoke, and visual regression remain separate jobs. The
+production smoke builds the web/API packages and uses Fastify to serve the compiled Studio and
+`/api/health` from one origin, while functional and visual journeys continue to use their isolated
+development/mock servers.
 
-CI rejects high-severity production dependency advisories. Vite and the root development-server path use the patched esbuild release; tsup currently retains a nested low-severity esbuild copy used only by package build tooling, never by the reachable development server.
+CI rejects dependency advisories in both the full and production-only trees. The lockfile resolves
+the identified ESLint/minimatch/brace-expansion and tsup/esbuild chains to patched releases without
+an override. Fresh registry-backed results remain a release acceptance gate rather than an inferred
+claim from lockfile inspection.
 
 Successful browser journeys use a narrow Vite-development-only realtime driver for synthetic media and provider callbacks. The branch is guarded by `import.meta.env.DEV`. A Vite `generateBundle` guard fails every production build if the seam identifier remains in executable chunks, and production source maps are disabled so the development source is not published indirectly. Default tests therefore cover Local, Lucy 2.5, and VTON 3 without devices, credentials, paid traffic, or a production mock switch.

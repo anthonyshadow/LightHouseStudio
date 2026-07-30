@@ -32,6 +32,7 @@
     "test:production": "playwright test --config playwright.production.config.ts",
     "test:visual": "playwright test --config playwright.visual.config.ts",
     "test:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots",
+    "audit:all": "npm audit",
     "audit:prod": "npm audit --omit=dev --audit-level=high",
     "screenshots:prune": "node scripts/prune-visual-baselines.mjs",
     "check:dead-code": "knip",

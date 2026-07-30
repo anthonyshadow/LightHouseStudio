@@ -37,4 +37,8 @@ Shared product rules:
 - Saving a character does not imply image generation: prompt-only, direct uploaded-image, image-only, generated, and uploaded-source combined references are separate choices. Builder uploads are immutable local assets; Recipe Dock portrait/garment files remain tab-ephemeral.
 - Character visual suggestions adapt to Woman, Man, Non-binary, or Not specified without deleting an existing selection; shared choices and custom text remain available.
 - The Studio stage remains mounted while overlays are open; closing the character builder preserves its durably autosaved draft.
-- Recording uses **Record** and **Stop recording**. Studio keeps one temporary take and locks new capture work until the operator downloads and closes it or confirms discard. Playback appears on the persistent stage; the detailed Latest Take panel opens only after **Take** is selected. Legacy Guided project media remains in its existing browser-local repository until explicit deletion.
+- Recording uses **Record** and **Stop recording**. Studio keeps one temporary take and locks new
+  capture work until the operator downloads and releases it or confirms discard. Playback appears
+  on the persistent stage; the detailed Latest Take panel opens only after **Take** is selected.
+  Legacy Guided project media remains in its existing browser-local repository until explicit
+  deletion.

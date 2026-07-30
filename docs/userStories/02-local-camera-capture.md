@@ -25,7 +25,9 @@ As a creator, I want to preview and record my camera locally, so that I can prod
    focus, mouse-pointer, or keyboard activity restores timed-out live controls and restarts their
    single idle timer.
 8. Wait on the finalizing stage state. The app stops the main recorder and optional audio sidecar, receives final chunks, creates the take, and only then releases live device tracks.
-9. Verify that the same persistent stage becomes **Recorded take playback** with compact Download, Discard, Voice, and Close actions. Latest Take must remain closed until **Take** is selected; open it for details, then continue with [Take review and cleanup](07-take-review-and-cleanup.md).
+9. Verify that the same persistent stage becomes **Recorded take playback** with compact Download,
+   Discard, Voice, and Release actions. Latest Take must remain closed until **Take** is selected;
+   open it for details, then continue with [Take review and cleanup](07-take-review-and-cleanup.md).
 
 ## Failure and alternate paths
 
@@ -36,7 +38,7 @@ As a creator, I want to preview and record my camera locally, so that I can prod
 - Select **Close** before recording to release local tracks and return to private idle.
 - If recording cannot create a valid artifact, the studio releases live resources and returns to idle with an error instead of leaving a partially live state.
 - At the recording maximum, Studio explains why the take ended and preserves playback, Voice,
-  Download, Close, and confirmed Discard. This timer does not depend on an AI provider session.
+  Download, Release, and confirmed Discard. This timer does not depend on an AI provider session.
 
 ## Completion criteria
 
@@ -45,5 +47,6 @@ A playable latest take is visible, or local tracks have been deliberately stoppe
 ## UX investigation cues
 
 - Time permission prompt → confident preview → recording start.
-- Whether the difference between live-session **Close**, **Stop recording**, and take-review **Close take** is clear.
+- Whether the difference between live-session **Close**, **Stop recording**, and take-review
+  **Release** is clear.
 - Whether the local-only guarantee is visible at the decision point, rather than only in documentation.

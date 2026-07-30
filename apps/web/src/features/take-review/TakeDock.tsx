@@ -199,7 +199,8 @@ export const TakeDock = ({
                 Latest take
               </h2>
               <p role="status" aria-live="polite" aria-atomic="true" css={introStyles(theme)}>
-                Playback remains on the main stage. Download this temporary take before closing it.
+                Playback remains on the main stage. Download this temporary take before releasing
+                it.
               </p>
             </header>
             <div css={reviewBodyStyles(theme)}>

@@ -128,7 +128,15 @@ browser default for a later explicit start.
 
 ## Recording retention and temporary artifacts
 
-Studio recordings are temporary Blobs behind object URLs, not saved files. Studio owns one take, not a take history. **Stop recording** finalizes the artifact before releasing camera/provider resources, then the take replaces live media on the same stage. The detailed Latest Take overlay remains closed until **Take** is selected. The artifact survives tool-overlay closure but not refresh, browser crash, tab closure, or device restart. Download dispatch leaves playback active and enables Close; the browser does not expose download completion to the app. Close releases recording URLs and returns to private idle. Confirmed Discard does the same without download and is irreversible. Rename and trim are not implemented.
+Studio recordings are temporary Blobs behind object URLs, not saved files. Studio owns one take,
+not a take history. **Stop recording** finalizes the artifact before releasing camera/provider
+resources, then the take replaces live media on the same stage. The detailed Latest Take overlay
+remains closed until **Take** is selected. The artifact survives tool-overlay closure but not
+refresh, browser crash, tab closure, or device restart. Download dispatch leaves playback active
+and enables **Release** on the stage and **Close and release** in Latest Take; the browser does not
+expose download completion to the app. Either release action revokes recording URLs and returns to
+private idle. Confirmed Discard does the same without download and is irreversible. Rename and trim
+are not implemented.
 
 Legacy Guided projects may contain finalized original video, optional original-audio sidecar, and selected processed output as IndexedDB Blobs. Project metadata is allowlisted and revisioned; media streams, device identifiers, provider clients, credentials, and object URLs are excluded. The Studio legacy manager can download and transactionally delete these records but cannot reopen Guided. A project remains until explicit manager deletion, site-data clearing, private-session closure, or browser eviction.
 
@@ -157,6 +165,13 @@ The server is a trusted local integration broker. It binds to `127.0.0.1`, accep
 
 There is no account authentication because there is one local operator. Do not expose this server through a LAN binding, tunnel, reverse proxy, container ingress, or public hostname. Such deployment needs a new threat model and implementation for authentication, authorization, CSRF, rate limits, abuse/cost controls, tenant isolation, TLS, secrets, and privacy disclosure.
 
+The [remote backend handoff](REMOTE_BACKEND_HANDOFF.md) is the approval-ready design for that
+separate phase. Its proposed remote retention, deletion, account-erasure, import/export, backup,
+support-access, and provider-cleanup rules are not current product behavior and are not effective
+until the named product, security/privacy, architecture, operations, data-owner, and spend-policy
+approvals are recorded. Local Host hashes, paths, storage keys, device IDs, provider IDs, and
+tokens are explicitly excluded from future identity and ownership assignment.
+
 ## Operator controls
 
 - Revoke camera/microphone permission in browser site settings.
@@ -164,7 +179,8 @@ There is no account authentication because there is one local operator. Do not e
 - Use Close/Stop camera to release owned device tracks outside recording; **Stop recording** releases all owned live resources only after recording finalization settles.
 - Clear an image or Reset AI to revoke its preview and clear pending/applied reference state.
 - Detach/remove a reference to unlink the current selection without deleting an uploaded or generated asset used by history. Removing `LIGHTFRAME_DATA_DIR` is an operator-level destructive action that invalidates all stored reference IDs; retained orphans otherwise remain on disk by design.
-- In Studio, Download then Close a take, or confirm Discard without download, to release recording and processed object URLs.
+- In Studio, Download then Release a take, or confirm Discard without download, to revoke recording
+  and processed object URLs.
 - Use Manage Legacy Projects in Recipe Shelf (or enter through retired `/projects`) to remove one legacy project's checkpoint metadata and owned media transactionally; reusable Recipe Shelf characters remain.
 - Clear site storage to remove Recipe Shelf text/reference provenance, guided provenance, project checkpoints, and IndexedDB media. Uploaded and generated files remain in `LIGHTFRAME_DATA_DIR` until separately removed by the operator.
 - Remove provider keys from `.env` and restart the API to disable integrations.

@@ -129,12 +129,12 @@ export const TakeReviewActions = ({
         disabled={locked || !recording.downloaded}
         title={
           recording.downloaded
-            ? 'Release the temporary in-memory take.'
-            : 'Start a download before closing this temporary take.'
+            ? 'Close review and release the temporary in-memory take.'
+            : 'Start a download before releasing this temporary take.'
         }
         onClick={closeTake}
       >
-        {compact ? 'Close' : 'Close take'}
+        {compact ? 'Release' : 'Close and release'}
       </Button>
     </div>
   );

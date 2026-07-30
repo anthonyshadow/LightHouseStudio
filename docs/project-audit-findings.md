@@ -311,7 +311,19 @@ override; do not apply npm's proposed forced breaking downgrade during unrelated
 contributor/CI maintenance risk, not a shipped-runtime or controlled-pilot blocker. See
 [architecture audit](architecture-audit.md#sec-007--development-only-dependency-advisories-remain).
 
+**Implementation status (2026-07-29):** the locked dependency tree now resolves the formerly
+affected chains to `minimatch` 3.1.5/10.2.5, `brace-expansion` 1.1.16/5.0.8, and `esbuild`
+0.27.7/0.28.1 without an override or forced downgrade. CI now runs both the full-tree and
+production-only audits. A fresh registry-backed local audit remains an acceptance gate and is not
+claimed until dependency-inventory submission is explicitly authorized and succeeds.
+
 ## Public-launch blockers and deferred work
+
+**Design status (2026-07-29):** the
+[remote backend handoff](REMOTE_BACKEND_HANDOFF.md) now records the proposed cross-cutting design
+for these findings, including the current-to-remote seam map and approval/open-decision register.
+The findings remain open public-launch blockers: the design is not approved or implemented, the
+pre-remote checklist is incomplete, and the supported broker remains loopback-only.
 
 ### SEC-001 — No public identity or authorization boundary
 

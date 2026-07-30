@@ -19,7 +19,9 @@ hosting. See the [unified findings](docs/project-audit-findings.md) and
 [active implementation plan](docs/project-audit-implementation-plan.md). The approved
 [controlled-pilot release contract](docs/CONTROLLED_PILOT_RELEASE_CONTRACT.md) freezes the local
 cohort, qualification matrix, data/provider policy, operating limits, and generic owner roles; it
-does not claim that the remaining implementation or physical/live evidence has passed.
+does not claim that the remaining implementation or physical/live evidence has passed. The
+[remote backend handoff](docs/REMOTE_BACKEND_HANDOFF.md) is an approval-ready Wave 11 design, not
+authorization or implementation of accounts, cloud storage, public origins, or remote deployment.
 
 Provider contact is deliberate and cost-sensitive:
 
@@ -40,7 +42,7 @@ Provider contact is deliberate and cost-sensitive:
    sole stage action and does not auto-hide.
 5. Review playback on the same persistent stage.
 6. Optionally apply a local or saved ElevenLabs voice, then **Download**.
-7. Close/release or explicitly discard the temporary take.
+7. Release or explicitly discard the temporary take.
 
 The idle stage includes a small, dismissible first-take cue with that sequence. It is tab/session
 state only: dismissal is not persisted, measured, or sent anywhere.

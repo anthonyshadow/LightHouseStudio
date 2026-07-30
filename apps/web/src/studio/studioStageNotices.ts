@@ -74,7 +74,7 @@ export const deriveRecordingDurationNotices = ({
         severity: 'info',
         title: 'Recording ended at the 5:00 maximum',
         message:
-          'The original take was finalized safely. Playback, Voice, Download, Close, and Discard remain available.',
+          'The original take was finalized safely. Playback, Voice, Download, Release, and Discard remain available.',
         priority: 925,
       },
     ];

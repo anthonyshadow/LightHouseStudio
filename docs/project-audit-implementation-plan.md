@@ -174,9 +174,11 @@ toolchain advisories through focused, compatible changes.
 
 **Status (2026-07-29):** provider/runtime scope complete through Wave 7. Decart safe-error
 allowlisting and bounded ElevenLabs success output, browser defense, cancellation, and preservation
-tests are implemented. The phase remains active only because `SEC-007` compatible development
-toolchain remediation and the phase-level full/production audit acceptance are assigned to Wave 10;
-do not move this phase to completed work yet.
+tests are implemented. The `SEC-007` lockfile chains now resolve to patched minimatch,
+brace-expansion, and esbuild releases without an override or forced downgrade, and CI runs both
+full and production audits. The phase remains active until fresh registry-backed full/production
+audit acceptance is explicitly authorized and passes; do not move this phase to completed work
+yet.
 
 | Field          | Plan                                                                                                                                                                                                                                                                                 |
 | -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
@@ -287,6 +289,15 @@ background/foreground, download, and cleanup record.
 **Objective:** stabilize migration seams without implementing a backend prematurely.
 
 **Findings:** `ARCH-003`, `SEC-001`, `SEC-002`, `SEC-003`, `SEC-004`, `SEC-006`, `PERF-003`
+
+**Implementation status (2026-07-29):** the
+[remote backend handoff](REMOTE_BACKEND_HANDOFF.md) maps every current temporary identity,
+persistence, media, provider-operation, and idempotency seam to a proposed remote boundary and
+defines the required threat model, authorization matrix, persistence/consistency topology,
+portability, retention/deletion, spend safety, media ingestion, operations, rollback, and test
+strategy. No current-consumer migration hazard required a schema or runtime change. The phase
+remains active because the design approvals and pre-remote acceptance gates are pending; no remote
+exposure or implementation is authorized.
 
 | Field          | Plan                                                                                                                                                                                                                                            |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |

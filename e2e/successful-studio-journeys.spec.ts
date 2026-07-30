@@ -383,7 +383,7 @@ test('the independent recording maximum warns and safely opens take review', asy
   await expect(takeControls.getByRole('link', { name: 'Download' })).toBeVisible();
   await expect(takeControls.getByRole('button', { name: 'Discard' })).toBeVisible();
   await expect(takeControls.getByRole('button', { name: 'Voice' })).toBeVisible();
-  await expect(takeControls.getByRole('button', { name: 'Close' })).toBeVisible();
+  await expect(takeControls.getByRole('button', { name: 'Release' })).toBeVisible();
 
   const browser = await readBrowserState(page);
   expect(browser.recorderStarts).toBe(2);
@@ -614,7 +614,9 @@ test('saved voice preview, Apply, remux, Download, and Restore Original stay exp
   const processedDownloadStarted = page.waitForEvent('download');
   await processedDownload.click();
   await processedDownloadStarted;
-  await expect(processedTakeDialog.getByRole('button', { name: 'Close take' })).toBeEnabled();
+  await expect(
+    processedTakeDialog.getByRole('button', { name: 'Close and release' }),
+  ).toBeEnabled();
 
   await processedTakeDialog.getByRole('button', { name: 'Voice treatments' }).click();
   const restoredVoiceTreatments = page.getByRole('dialog', { name: 'Voice Treatments' });
@@ -630,7 +632,7 @@ test('saved voice preview, Apply, remux, Download, and Restore Original stay exp
   expectNoExternalProviderTraffic(network);
 });
 
-test('Download initiation enables Close and releases the reviewed take without reacquiring media', async ({
+test('Download initiation enables Release and clears the reviewed take without reacquiring media', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -646,14 +648,14 @@ test('Download initiation enables Close and releases the reviewed take without r
   await expect(playback).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
   const takeControls = page.getByRole('group', { name: 'Recorded take controls' });
-  const closeTake = takeControls.getByRole('button', { name: 'Close' });
-  await expect(closeTake).toBeDisabled();
+  const releaseTake = takeControls.getByRole('button', { name: 'Release' });
+  await expect(releaseTake).toBeDisabled();
 
   const downloadStarted = page.waitForEvent('download');
   await takeControls.getByRole('link', { name: 'Download' }).click();
   await downloadStarted;
-  await expect(closeTake).toBeEnabled();
-  await closeTake.click();
+  await expect(releaseTake).toBeEnabled();
+  await releaseTake.click();
 
   await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
   await expect(playback).toHaveCount(0);
@@ -792,7 +794,7 @@ test('a Lucy model take finalizes before the provider session is released', asyn
     page
       .getByRole('dialog', { name: 'Recipe Dock' })
       .getByText(
-        'Download and close or discard the recorded take before starting or changing media.',
+        'Download and release or discard the recorded take before starting or changing media.',
         { exact: true },
       ),
   ).toBeVisible();

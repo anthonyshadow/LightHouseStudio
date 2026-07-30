@@ -19,7 +19,8 @@ As a creator, I want to audition local voice effects on a completed take, so tha
 4. Wait while the app renders the original sidecar offline and remuxes the new audio with the original encoded video. During this interval, stage playback and download are locked.
 5. If the result succeeds, confirm **Voice treatment ready**. The stage now plays the processed version, restored to a safe equivalent playback time and paused.
 6. Compare treatments by selecting another local effect. Each request begins from the original audio/video, not the prior processed result.
-7. Select **Original** at any time for an immediate no-network restore. Return to take review to download, close, or discard.
+7. Select **Original** at any time for an immediate no-network restore. Return to take review to
+   download, release, or discard.
 
 ## Failure and alternate paths
 
@@ -30,7 +31,8 @@ As a creator, I want to audition local voice effects on a completed take, so tha
 
 ## Completion criteria
 
-The take is playing as an intentionally chosen local treatment or as the immutable original, and is ready for the normal download/close/discard flow.
+The take is playing as an intentionally chosen local treatment or as the immutable original, and is
+ready for the normal download/release/discard flow.
 
 ## UX investigation cues
 

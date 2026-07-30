@@ -291,7 +291,7 @@ describe('StudioSessionControlBar', () => {
     expect(onStopRecording).toHaveBeenCalledOnce();
   });
 
-  it('replaces live controls with take actions and restores them after close', async () => {
+  it('replaces live controls with take actions and restores them after release', async () => {
     const user = userEvent.setup();
     const artifact = takeArtifact();
     const onCloseTakeReview = vi.fn();
@@ -317,7 +317,7 @@ describe('StudioSessionControlBar', () => {
     expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Voice' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Close' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Release' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Start Camera + Mic' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Voice' }));
@@ -349,7 +349,7 @@ describe('StudioSessionControlBar', () => {
       </StudioDesignProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Close' }));
+    await user.click(screen.getByRole('button', { name: 'Release' }));
     expect(downloadedRecording.discard).toHaveBeenCalledOnce();
     expect(onCloseTakeReview).toHaveBeenCalledOnce();
 

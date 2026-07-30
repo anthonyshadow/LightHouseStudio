@@ -953,6 +953,12 @@ single-operator.
 - **Regression risk:** Medium; toolchain overrides can break lint resolution or
   package builds.
 
+**Implementation status (2026-07-29):** the lockfile now resolves the identified toolchain chains
+to patched `minimatch` 3.1.5/10.2.5, `brace-expansion` 1.1.16/5.0.8, and `esbuild`
+0.27.7/0.28.1 releases without an override or forced downgrade. CI now executes full-tree and
+production-only audits. This dated audit finding stays open until a fresh registry-backed audit is
+authorized and passes.
+
 ### PERF-001 — Recording and processing memory are duration-dependent
 
 - **Category:** Performance / reliability / resource exhaustion.
