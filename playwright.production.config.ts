@@ -15,7 +15,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: `NODE_ENV=production PORT=${productionPort} npm start`,
+    command: `NODE_ENV=production PORT=${productionPort} pnpm start`,
     url: `${baseURL}/api/health`,
     reuseExistingServer: false,
     timeout: 120_000,

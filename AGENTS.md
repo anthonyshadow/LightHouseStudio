@@ -32,8 +32,8 @@ old story, or intended design.
 
 ## Runtime and install
 
-- Node `>=24 <25`; `.nvmrc` pins the repository default. npm 11+.
-- `npm install` for ordinary local work; `npm ci` when reproducing CI.
+- Node `>=24 <25`; `.nvmrc` pins the repository default. pnpm `>=11.18 <12`.
+- `pnpm install` for ordinary local work; `pnpm install --frozen-lockfile` when reproducing CI.
 - `/` is the only route. Retired/unknown entries are compatibility redirects, not pages to revive.
 
 ## Architecture and state
@@ -109,17 +109,17 @@ old story, or intended design.
 Normal implementation gate:
 
 ```bash
-npm run quality
+pnpm quality
 ```
 
 Before release also run:
 
 ```bash
-npm run test:coverage
-npm run test:e2e
-npm run test:production # after build
-npm run test:visual
-npm run audit:prod
+pnpm test:coverage
+pnpm test:e2e
+pnpm test:production # after build
+pnpm test:visual
+pnpm audit:prod
 ```
 
 - Tests deny unexpected external HTTP and WebSockets. Never add paid/live provider traffic to CI,

@@ -82,10 +82,10 @@ baseline is missing:
 
 ```bash
 node scripts/prune-visual-baselines.mjs --check
-npm run test:visual
+pnpm test:visual
 ```
 
-Use `npm run test:visual:update` only for an intentional UI/matrix change. Inspect every changed
+Use `pnpm test:visual:update` only for an intentional UI/matrix change. Inspect every changed
 image on every affected platform and viewport before accepting it. Do not prune until replacement
 baselines exist.
 

@@ -22,21 +22,22 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run audit:all
-      - run: npm run audit:prod
-      - run: npm run typecheck
-      - run: npm run lint -- --max-warnings 0
-      - run: npm run format:check
-      - run: npm run check:dead-code
-      - run: npm run check:modules
-      - run: npm run pilot:data-retirement:drill
-      - run: npm test
-      - run: npm run build
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm audit:all
+      - run: pnpm audit:prod
+      - run: pnpm typecheck
+      - run: pnpm lint -- --max-warnings 0
+      - run: pnpm format:check
+      - run: pnpm check:dead-code
+      - run: pnpm check:modules
+      - run: pnpm pilot:data-retirement:drill
+      - run: pnpm test
+      - run: pnpm build
       - name: Upload unit failure report
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
@@ -52,12 +53,13 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npm run test:coverage
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test:coverage
       - name: Upload coverage report
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
@@ -73,15 +75,16 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run storybook:typecheck
-      - run: npm run storybook:test
-      - run: npm run storybook:build
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm storybook:typecheck
+      - run: pnpm storybook:test
+      - run: pnpm storybook:build
 
   production-smoke:
     name: Production static-serving smoke
@@ -89,14 +92,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run build
-      - run: npm run test:production
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm build
+      - run: pnpm test:production
 
   e2e:
     name: Browser journeys
@@ -104,13 +108,14 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium webkit
-      - run: npm run test:e2e
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium webkit
+      - run: pnpm test:e2e
       - name: Upload browser failure artifacts
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
@@ -128,13 +133,14 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run test:visual
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:visual
       - name: Upload visual failure artifacts
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
@@ -153,13 +159,14 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: npm
-      - run: npm ci
-      - run: npx playwright install --with-deps chromium
-      - run: npm run screenshots:capture
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm screenshots:capture
       - name: Upload broad captures
         if: ${{ always() }}
         uses: actions/upload-artifact@v7

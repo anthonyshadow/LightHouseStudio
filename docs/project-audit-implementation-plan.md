@@ -15,14 +15,14 @@ loopback-only, at most five participants, Character primary, VTO beta, touch/mob
 
 Complete:
 
-- `npm run quality`
-- `npm run test:coverage`
-- `npm run test:e2e`
-- `npm run test:production`
-- `npm run test:visual`
-- `npm run audit:prod`
-- `npm run audit:all`
-- `npm run pilot:data-retirement:drill`
+- `pnpm quality`
+- `pnpm test:coverage`
+- `pnpm test:e2e`
+- `pnpm test:production`
+- `pnpm test:visual`
+- `pnpm audit:prod`
+- `pnpm audit:all`
+- `pnpm pilot:data-retirement:drill`
 - visual baseline inventory and review for every changed Darwin/Linux image
 
 Acceptance:
@@ -54,7 +54,7 @@ Required rows:
 
 Acceptance:
 
-- `npm run pilot:qualification:check -- --commit <full-sha> --verbose` reports `7/7`;
+- `pnpm pilot:qualification:check --commit <full-sha> --verbose` reports `7/7`;
 - models, settings, access mode, retention, entitlements, billing authorization, and content policy
   match the release contract;
 - every initial billable submission is explicit, has no fallback, and is not automatically

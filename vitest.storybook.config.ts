@@ -21,7 +21,7 @@ export default defineConfig({
         plugins: [
           storybookTest({
             configDir: path.join(projectRoot, '.storybook'),
-            storybookScript: 'npm run storybook',
+            storybookScript: 'pnpm storybook',
           }),
         ],
         test: {

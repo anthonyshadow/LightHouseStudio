@@ -59,7 +59,7 @@ from another commit do not qualify a physical/live row.
 Current repository evidence is open: there are no committed pass records. Re-run:
 
 ```bash
-npm run pilot:qualification:check -- --commit "$(git rev-parse HEAD)" --verbose
+pnpm pilot:qualification:check --commit "$(git rev-parse HEAD)" --verbose
 ```
 
 ## Independent five-minute boundaries

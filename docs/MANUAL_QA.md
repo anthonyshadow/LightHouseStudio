@@ -12,19 +12,19 @@ do not qualify them.
 Run the exact release candidate:
 
 ```bash
-npm run quality
-npm run test:coverage
-npm run test:e2e
-npm run test:production
-npm run test:visual
-npm run audit:all
-npm run audit:prod
+pnpm quality
+pnpm test:coverage
+pnpm test:e2e
+pnpm test:production
+pnpm test:visual
+pnpm audit:all
+pnpm audit:prod
 ```
 
 Then obtain the exact required rows/check IDs:
 
 ```bash
-npm run pilot:qualification:check -- --commit "$(git rev-parse HEAD)" --verbose
+pnpm pilot:qualification:check --commit "$(git rev-parse HEAD)" --verbose
 ```
 
 Use the devices and browser versions in

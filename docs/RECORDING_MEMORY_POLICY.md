@@ -35,7 +35,7 @@ For every required device/browser row in
 Use actual per-minute sizes with the planning estimator:
 
 ```bash
-npm run recording:memory:estimate -- \
+pnpm recording:memory:estimate \
   --duration-seconds 300 \
   --main-mib-per-minute 12 \
   --sidecar-mib-per-minute 1

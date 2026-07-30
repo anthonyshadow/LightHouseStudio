@@ -89,7 +89,7 @@ pilot operator must:
 - retain only aggregated content-free metrics with no participant lookup key.
 
 Use the [pilot data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md) every time. The
-disposable `npm run pilot:data-retirement:drill` proves exact-leaf/sibling handling but does not
+disposable `pnpm pilot:data-retirement:drill` proves exact-leaf/sibling handling but does not
 replace real retirement evidence.
 
 Downloaded participant copies are their durable handoff and are outside the operator’s Lightframe

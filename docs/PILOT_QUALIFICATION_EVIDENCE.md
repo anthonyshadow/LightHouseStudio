@@ -20,14 +20,14 @@ Release requires content-free evidence from the exact candidate commit for every
 4. Obtain the exact requirement/configuration/access-mode/check IDs from:
 
    ```bash
-   npm run pilot:qualification:check -- --commit "$(git rev-parse HEAD)" --verbose
+   pnpm pilot:qualification:check --commit "$(git rev-parse HEAD)" --verbose
    ```
 
 5. Mark every check `pass`, `fail`, or `blocked`. A satisfying record has only passing checks.
 6. Re-run the validator. Release requires `7/7`, `45/45`, no invalid records, and the requested
    commit on every record.
 
-The validator is deliberately outside `npm run quality`; ordinary development and CI must not need
+The validator is deliberately outside `pnpm quality`; ordinary development and CI must not need
 credentials, paid calls, or physical devices.
 
 ## Safe record boundary

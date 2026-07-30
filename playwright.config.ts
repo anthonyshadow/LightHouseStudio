@@ -23,7 +23,7 @@ export default defineConfig({
     { name: 'mobile', use: { ...devices['iPhone 13'] } },
   ],
   webServer: {
-    command: 'npm run dev',
+    command: 'pnpm dev',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !runningInCi,
     timeout: 120_000,

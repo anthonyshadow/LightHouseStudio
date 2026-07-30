@@ -56,7 +56,7 @@ retention, and provider-contact contract.
 ## Requirements
 
 - Node `>=24 <25` (`.nvmrc` pins the repository default)
-- npm 11+
+- pnpm `>=11.18 <12`
 - A current secure-context browser with `getUserMedia` and `MediaRecorder`
 - A camera and microphone for physical capture
 - Optional, independent credentials for provider-backed features
@@ -68,9 +68,10 @@ Desktop Chromium is the baseline for the fullest codec and remux support. Consul
 
 ```bash
 nvm use
-npm install
+corepack enable
+pnpm install
 cp .env.example .env
-npm run dev
+pnpm dev
 ```
 
 Open <http://127.0.0.1:4173>. Vite proxies `/api` to `127.0.0.1:4100`; keep `PORT=4100` for the
@@ -80,8 +81,8 @@ fully local path.
 For the production-mode loopback smoke:
 
 ```bash
-npm run build
-NODE_ENV=production npm start
+pnpm build
+NODE_ENV=production pnpm start
 ```
 
 Open <http://127.0.0.1:4100>. Production startup fails when `apps/web/dist` is absent.
@@ -110,42 +111,42 @@ quota. Missing optional configuration disables only the corresponding feature.
 
 ## Commands
 
-| Command                                                                                        | Purpose                                                                |
-| ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `npm run dev`                                                                                  | Build shared packages and run API/web watchers                         |
-| `npm run build`                                                                                | Build all workspaces                                                   |
-| `npm run quality`                                                                              | Type, Storybook, lint, format, dead-code, module, unit, and build gate |
-| `npm run test:coverage`                                                                        | Coverage gate                                                          |
-| `npm run test:e2e`                                                                             | Functional Playwright journeys                                         |
-| `npm run test:production`                                                                      | Built Fastify static-serving smoke; run build first                    |
-| `npm run test:visual`                                                                          | Curated visual regression suite                                        |
-| `npm run audit:all`                                                                            | Complete dependency audit                                              |
-| `npm run audit:prod`                                                                           | Production dependency audit                                            |
-| `npm run storybook`                                                                            | Local component catalog on port 6006                                   |
-| `npm run pilot:qualification:check -- --commit <full-sha> --verbose`                           | Validate content-free pilot evidence                                   |
-| `npm run pilot:data-retirement:drill`                                                          | Verify participant-data retirement                                     |
-| `npm run recording:memory:estimate -- --duration-seconds 300 --main-mib-per-minute <measured>` | Estimate recording memory from measured output                         |
+| Command                                                                                  | Purpose                                                                |
+| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `pnpm dev`                                                                               | Build shared packages and run API/web watchers                         |
+| `pnpm build`                                                                             | Build all workspaces                                                   |
+| `pnpm quality`                                                                           | Type, Storybook, lint, format, dead-code, module, unit, and build gate |
+| `pnpm test:coverage`                                                                     | Coverage gate                                                          |
+| `pnpm test:e2e`                                                                          | Functional Playwright journeys                                         |
+| `pnpm test:production`                                                                   | Built Fastify static-serving smoke; run build first                    |
+| `pnpm test:visual`                                                                       | Curated visual regression suite                                        |
+| `pnpm audit:all`                                                                         | Complete dependency audit                                              |
+| `pnpm audit:prod`                                                                        | Production dependency audit                                            |
+| `pnpm storybook`                                                                         | Local component catalog on port 6006                                   |
+| `pnpm pilot:qualification:check --commit <full-sha> --verbose`                           | Validate content-free pilot evidence                                   |
+| `pnpm pilot:data-retirement:drill`                                                       | Verify participant-data retirement                                     |
+| `pnpm recording:memory:estimate --duration-seconds 300 --main-mib-per-minute <measured>` | Estimate recording memory from measured output                         |
 
-Install Playwright browsers once with `npx playwright install`. Default tests use synthetic media
+Install Playwright browsers once with `pnpm exec playwright install`. Default tests use synthetic media
 and deny unexpected external HTTP and WebSockets; they never make paid/live provider calls.
 
 Normal implementation gate:
 
 ```bash
-npm run quality
+pnpm quality
 ```
 
 Exact-candidate release gate:
 
 ```bash
-npm run quality
-npm run test:coverage
-npm run test:e2e
-npm run test:production
-npm run test:visual
-npm run audit:prod
-npm run audit:all
-npm run pilot:data-retirement:drill
+pnpm quality
+pnpm test:coverage
+pnpm test:e2e
+pnpm test:production
+pnpm test:visual
+pnpm audit:prod
+pnpm audit:all
+pnpm pilot:data-retirement:drill
 ```
 
 Review the visual baseline inventory for every changed Darwin/Linux image. The exact-candidate

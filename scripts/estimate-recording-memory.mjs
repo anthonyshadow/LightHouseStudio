@@ -1,4 +1,4 @@
-const usage = `Usage: npm run recording:memory:estimate -- \\
+const usage = `Usage: pnpm recording:memory:estimate \\
   --duration-seconds <seconds> \\
   --main-mib-per-minute <MiB> [--sidecar-mib-per-minute <MiB>] \\
   [--sample-rate <Hz>] [--channels <count>] [--processed-output-multiplier <factor>]`;

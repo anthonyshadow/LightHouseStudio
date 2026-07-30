@@ -3,20 +3,17 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
+  "packageManager": "pnpm@11.18.0",
   "engines": {
     "node": ">=24 <25",
-    "npm": ">=11"
+    "pnpm": ">=11.18 <12"
   },
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
   "scripts": {
-    "build:packages": "npm run build --workspace @studio/domain && npm run build --workspace @studio/contracts",
-    "dev": "npm run build:packages && concurrently -k -n api,web -c blue,magenta \"npm run dev --workspace @studio/api\" \"npm run dev --workspace @studio/web\"",
-    "build": "npm run build:packages && npm run build --workspace @studio/web && npm run build --workspace @studio/api",
-    "start": "npm run start --workspace @studio/api",
-    "typecheck": "npm run typecheck --workspaces --if-present && npm run typecheck:e2e",
+    "build:packages": "pnpm --filter @studio/domain build && pnpm --filter @studio/contracts build",
+    "dev": "pnpm build:packages && concurrently -k -n api,web -c blue,magenta \"pnpm --filter @studio/api dev\" \"pnpm --filter @studio/web dev\"",
+    "build": "pnpm build:packages && pnpm --filter @studio/web build && pnpm --filter @studio/api build",
+    "start": "pnpm --filter @studio/api start",
+    "typecheck": "pnpm -r --if-present typecheck && pnpm typecheck:e2e",
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
@@ -32,8 +29,8 @@
     "test:production": "playwright test --config playwright.production.config.ts",
     "test:visual": "playwright test --config playwright.visual.config.ts",
     "test:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots",
-    "audit:all": "npm audit",
-    "audit:prod": "npm audit --omit=dev --audit-level=high",
+    "audit:all": "pnpm audit",
+    "audit:prod": "pnpm audit --prod --audit-level high",
     "screenshots:prune": "node scripts/prune-visual-baselines.mjs",
     "check:dead-code": "knip",
     "check:modules": "node scripts/check-module-graph.mjs",
@@ -41,7 +38,7 @@
     "pilot:data-retirement:drill": "node scripts/verify-pilot-data-retirement.mjs",
     "pilot:qualification:check": "node scripts/validate-pilot-qualification.mjs",
     "screenshots:capture": "playwright test --config playwright.screenshots.config.ts",
-    "quality": "npm run typecheck && npm run storybook:typecheck && npm run lint && npm run format:check && npm run check:dead-code && npm run check:modules && npm run test && npm run storybook:test && npm run build && npm run storybook:build"
+    "quality": "pnpm typecheck && pnpm storybook:typecheck && pnpm lint && pnpm format:check && pnpm check:dead-code && pnpm check:modules && pnpm test && pnpm storybook:test && pnpm build && pnpm storybook:build"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.12.1",
@@ -72,6 +69,8 @@
     "jsdom": "29.1.1",
     "knip": "6.29.0",
     "prettier": "3.9.6",
+    "react": "19.2.8",
+    "react-dom": "19.2.8",
     "storybook": "10.5.4",
     "tsup": "8.5.1",
     "tsx": "4.23.1",

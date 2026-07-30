@@ -62,7 +62,7 @@ Any path, profile, relationship, or provider-cleanup ambiguity blocks the next p
 Before admitting participant data, and after changing this procedure, run:
 
 ```bash
-npm run pilot:data-retirement:drill
+pnpm pilot:data-retirement:drill
 ```
 
 The drill uses disposable temporary data to prove exact-leaf retirement, retired-ID absence, and

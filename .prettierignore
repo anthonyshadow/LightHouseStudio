@@ -3,7 +3,7 @@ dist
 coverage
 playwright-report
 test-results
-package-lock.json
+pnpm-lock.yaml
 REBUILD_FROM_SCRATCH_GUIDE_CREATIVE_EXPANSION.md
 .agents
 .codex

@@ -10,7 +10,7 @@ screenshots, ordinary tests, shared environments, or with a participant where th
 
 ## Preflight
 
-1. Run deterministic release gates, including `npm run quality` and `npm run test:e2e`.
+1. Run deterministic release gates, including `pnpm quality` and `pnpm test:e2e`.
 2. Record the generic Credential Custodian, Billing Authorizer, Evidence Recorder, and Support &
    Escalation Owner roles for this pass.
 3. Review current account model availability, pricing, quota, content policy, and retention. Stop
@@ -144,7 +144,7 @@ Write one strict content-free record per requirement as described in
 [qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md), then run:
 
 ```bash
-npm run pilot:qualification:check -- --commit "$(git rev-parse HEAD)" --verbose
+pnpm pilot:qualification:check --commit "$(git rev-parse HEAD)" --verbose
 ```
 
 After each pass, Stop AI/camera, release or discard test takes, close Studio, verify media/WebRTC
@@ -154,7 +154,7 @@ integrations disable cleanly.
 References remain immutable in `LIGHTFRAME_DATA_DIR`. Never remove a shared directory as routine
 cleanup. Use a dedicated disposable directory and the
 [pilot data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md); run
-`npm run pilot:data-retirement:drill` before the first retained-data pass.
+`pnpm pilot:data-retirement:drill` before the first retained-data pass.
 
 Missing credentials, entitlement, approved account settings, device access, quota, firewall/NAT,
 or provider availability is `blocked`. Capture only the safe app-owned code and stop; never weaken
