@@ -12,11 +12,5 @@
       "@studio/contracts": ["./packages/contracts/src/index.ts"]
     }
   },
-  "include": [
-    ".storybook/**/*.ts",
-    ".storybook/**/*.tsx",
-    "stories/**/*.ts",
-    "stories/**/*.tsx",
-    "vitest.storybook.config.ts"
-  ]
+  "include": [".storybook/**/*.ts", ".storybook/**/*.tsx", "stories/**/*.ts", "stories/**/*.tsx"]
 }

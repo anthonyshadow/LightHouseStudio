@@ -80,57 +80,64 @@ const publicResolver: ResolveHostname = () => Promise.resolve([{ address: '8.8.8
 describe.each(contracts)(
   '$providerId safe remote-image downloader adversarial contract',
   ({ providerId, create, isPublicAddress }) => {
-    it.each([
-      ['0.0.0.1', false],
-      ['10.0.0.1', false],
-      ['100.64.0.1', false],
-      ['127.0.0.1', false],
-      ['169.254.169.254', false],
-      ['172.16.0.1', false],
-      ['192.0.0.1', false],
-      ['192.0.2.1', false],
-      ['192.168.1.2', false],
-      ['198.18.0.1', false],
-      ['198.51.100.1', false],
-      ['203.0.113.1', false],
-      ['224.0.0.1', false],
-      ['240.0.0.1', false],
-      ['::', false],
-      ['::1', false],
-      ['64:ff9b::1', false],
-      ['100::1', false],
-      ['2001:db8::1', false],
-      ['fc00::1', false],
-      ['fe80::1', false],
-      ['ff00::1', false],
-      ['::ffff:127.0.0.1', false],
-      ['8.8.8.8', true],
-      ['2606:4700:4700::1111', true],
-      ['not-an-address', false],
-    ] as const)('classifies address %s as public=%s', (address, expected) => {
-      expect(isPublicAddress(address)).toBe(expected);
+    it('classifies the complete public/private address boundary', () => {
+      for (const [address, expected] of [
+        ['0.0.0.1', false],
+        ['10.0.0.1', false],
+        ['100.64.0.1', false],
+        ['127.0.0.1', false],
+        ['169.254.169.254', false],
+        ['172.16.0.1', false],
+        ['192.0.0.1', false],
+        ['192.0.2.1', false],
+        ['192.168.1.2', false],
+        ['198.18.0.1', false],
+        ['198.51.100.1', false],
+        ['203.0.113.1', false],
+        ['224.0.0.1', false],
+        ['240.0.0.1', false],
+        ['::', false],
+        ['::1', false],
+        ['64:ff9b::1', false],
+        ['100::1', false],
+        ['2001:db8::1', false],
+        ['fc00::1', false],
+        ['fe80::1', false],
+        ['ff00::1', false],
+        ['::ffff:127.0.0.1', false],
+        ['8.8.8.8', true],
+        ['2606:4700:4700::1111', true],
+        ['not-an-address', false],
+      ] as const) {
+        expect(isPublicAddress(address), address).toBe(expected);
+      }
     });
 
-    it.each([
-      'http://cdn.example.test/image',
-      'ftp://cdn.example.test/image',
-      'https://user@cdn.example.test/image',
-      'https://user:secret@cdn.example.test/image',
-      'https://cdn.example.test/image#fragment',
-    ])('rejects disallowed URL form %s before DNS or a connection', async (url) => {
-      const resolveHostname = vi.fn(publicResolver);
-      const request = vi.fn();
-      const downloader = create({
-        resolveHostname,
-        request: request as unknown as RequestImplementation,
-      });
+    it('rejects every disallowed URL form before DNS or a connection', async () => {
+      for (const url of [
+        'http://cdn.example.test/image',
+        'ftp://cdn.example.test/image',
+        'https://user@cdn.example.test/image',
+        'https://user:secret@cdn.example.test/image',
+        'https://cdn.example.test/image#fragment',
+      ]) {
+        const resolveHostname = vi.fn(publicResolver);
+        const request = vi.fn();
+        const downloader = create({
+          resolveHostname,
+          request: request as unknown as RequestImplementation,
+        });
 
-      await expect(downloader.download(url, new AbortController().signal)).rejects.toMatchObject({
-        providerId,
-        reason: 'invalid-response',
-      });
-      expect(resolveHostname).not.toHaveBeenCalled();
-      expect(request).not.toHaveBeenCalled();
+        await expect(
+          downloader.download(url, new AbortController().signal),
+          url,
+        ).rejects.toMatchObject({
+          providerId,
+          reason: 'invalid-response',
+        });
+        expect(resolveHostname, url).not.toHaveBeenCalled();
+        expect(request, url).not.toHaveBeenCalled();
+      }
     });
 
     it('rejects malformed and unresolved URLs before opening a connection', async () => {
@@ -268,30 +275,32 @@ describe.each(contracts)(
       expect(resolveHostname).toHaveBeenCalledTimes(4);
     });
 
-    it.each([
-      [302, {}, 'failure'],
-      [404, {}, 'failure'],
-      [503, {}, 'failure'],
-      [200, {}, 'invalid-response'],
-      [200, { 'content-type': 'text/html' }, 'invalid-response'],
-    ] as const)('rejects status %s with headers %j as %s', async (statusCode, headers, reason) => {
-      const downloader = create({
-        resolveHostname: publicResolver,
-        request: requestReturning(() => response(statusCode, headers)),
-      });
+    it('normalizes every invalid status and content-type response', async () => {
+      for (const [statusCode, headers, reason] of [
+        [302, {}, 'failure'],
+        [404, {}, 'failure'],
+        [503, {}, 'failure'],
+        [200, {}, 'invalid-response'],
+        [200, { 'content-type': 'text/html' }, 'invalid-response'],
+      ] as const) {
+        const downloader = create({
+          resolveHostname: publicResolver,
+          request: requestReturning(() => response(statusCode, headers)),
+        });
 
-      await expect(
-        downloader.download('https://cdn.example.test/image', new AbortController().signal),
-      ).rejects.toMatchObject({
-        providerId,
-        reason,
-        ...(reason === 'failure' ? { upstreamStatus: statusCode } : {}),
-      });
+        await expect(
+          downloader.download('https://cdn.example.test/image', new AbortController().signal),
+          `${statusCode} ${JSON.stringify(headers)}`,
+        ).rejects.toMatchObject({
+          providerId,
+          reason,
+          ...(reason === 'failure' ? { upstreamStatus: statusCode } : {}),
+        });
+      }
     });
 
-    it.each(['0', '-1', String(MAX_PROVIDER_IMAGE_BYTES + 1)])(
-      'rejects declared content length %s before buffering',
-      async (contentLength) => {
+    it('rejects every invalid declared content length before buffering', async () => {
+      for (const contentLength of ['0', '-1', String(MAX_PROVIDER_IMAGE_BYTES + 1)]) {
         const downloader = create({
           resolveHostname: publicResolver,
           request: requestReturning(() =>
@@ -304,9 +313,10 @@ describe.each(contracts)(
 
         await expect(
           downloader.download('https://cdn.example.test/image', new AbortController().signal),
+          contentLength,
         ).rejects.toMatchObject({ providerId, reason: 'invalid-response' });
-      },
-    );
+      }
+    });
 
     it('rejects an empty body and a streamed body over the byte limit', async () => {
       const emptyDownloader = create({

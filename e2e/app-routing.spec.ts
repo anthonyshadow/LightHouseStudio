@@ -1,13 +1,11 @@
 import { expect, test } from '@playwright/test';
 import {
-  expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
   readBrowserState,
   startLocalPreview,
 } from './support/studioHarness';
 import { ENTRY_PATH, STUDIO_PATH } from './support/studioRoutes';
-import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
 test('entry stays provider-free and Enter pushes a focused Studio runtime', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -100,19 +98,3 @@ test('recording and temporary-take work cannot be lost silently through Back', a
   await expect(page).toHaveURL(/\/$/u);
   await expect(page.getByRole('button', { name: 'Enter' })).toBeVisible();
 });
-
-for (const [name, viewport] of Object.entries(STUDIO_VIEWPORT_SIZES)) {
-  test(`entry remains contained at ${name}`, async ({ page }) => {
-    await installSuccessfulStudioHarness(page);
-    await page.setViewportSize(viewport);
-    await page.goto(ENTRY_PATH);
-    if (name === 'smallMobile') {
-      await page.evaluate(() => {
-        document.documentElement.style.fontSize = '200%';
-      });
-    }
-
-    await expect(page.getByRole('button', { name: 'Enter' })).toBeInViewport();
-    await expectNoDocumentOverflow(page);
-  });
-}

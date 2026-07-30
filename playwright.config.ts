@@ -18,9 +18,21 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'chromium', use: { ...devices['Desktop Chrome'] } },
-    { name: 'webkit', use: { ...devices['Desktop Safari'] } },
-    { name: 'mobile', use: { ...devices['iPhone 13'] } },
+    {
+      name: 'chromium',
+      grepInvert: /@(cross-browser|touch)/u,
+      use: { ...devices['Desktop Chrome'] },
+    },
+    {
+      name: 'webkit',
+      grep: /@cross-browser/u,
+      use: { ...devices['Desktop Safari'] },
+    },
+    {
+      name: 'mobile',
+      grep: /@(cross-browser|touch)/u,
+      use: { ...devices['iPhone 13'] },
+    },
   ],
   webServer: {
     command: 'pnpm dev',

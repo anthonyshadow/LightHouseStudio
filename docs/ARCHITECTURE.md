@@ -218,11 +218,12 @@ Tests keep provider and browser effects behind injectable seams:
 - domain tests cover pure policy;
 - component/controller tests cover state, races, focus, and cleanup;
 - Fastify tests inject provider dependencies and fetch;
-- Storybook uses typed local doubles;
+- Storybook uses typed local doubles and is typechecked/statically built as a review catalog;
 - Playwright uses deterministic synthetic media and denies unexpected HTTP/WebSockets;
 - live provider and physical-device checks are manual release evidence.
 
 The visual and responsive suites protect all five canonical viewports, one persistent player,
 bounded scrolling, accessible actions, source continuity, finalization ordering, and provider-free
-local preparation. See [screenshot coverage](screenshot-test-coverage.md), [manual QA](MANUAL_QA.md),
-and [live provider smoke](LIVE_PROVIDER_SMOKE.md).
+local preparation. See [testing strategy](TESTING.md),
+[screenshot coverage](screenshot-test-coverage.md), [manual QA](MANUAL_QA.md), and
+[live provider smoke](LIVE_PROVIDER_SMOKE.md).

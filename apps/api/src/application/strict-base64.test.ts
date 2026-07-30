@@ -13,15 +13,14 @@ describe('decodeCanonicalBase64', () => {
     });
   });
 
-  it.each(['', 'aW1hZ2U', 'aW1h Z2U=', 'aW1hZ2U_', '===='])(
-    'rejects a noncanonical shape: %j',
-    (encoded) => {
+  it('rejects every noncanonical shape', () => {
+    for (const encoded of ['', 'aW1hZ2U', 'aW1h Z2U=', 'aW1hZ2U_', '====']) {
       expect(decodeCanonicalBase64(encoded, 32)).toEqual({
         ok: false,
         reason: 'shape',
       });
-    },
-  );
+    }
+  });
 
   it('rejects decoded content above the byte limit', () => {
     expect(decodeCanonicalBase64('aW1hZ2U=', 4)).toEqual({

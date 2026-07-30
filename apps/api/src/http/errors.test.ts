@@ -21,9 +21,8 @@ describe('API error handling', () => {
     return app.inject({ method: 'GET', url: '/failure' });
   };
 
-  it.each([400, 599])(
-    'preserves valid upstream HTTP status %s in the safe envelope',
-    async (status) => {
+  it('preserves the valid upstream HTTP status boundaries in the safe envelope', async () => {
+    for (const status of [400, 599]) {
       const response = await requestAppError(status);
 
       expect(response.statusCode).toBe(502);
@@ -34,12 +33,11 @@ describe('API error handling', () => {
           upstreamStatus: status,
         },
       });
-    },
-  );
+    }
+  });
 
-  it.each([0, 399, 400.5, 600, Number.NaN, Number.POSITIVE_INFINITY])(
-    'omits invalid upstream status metadata %s without breaking the safe envelope',
-    async (status) => {
+  it('omits every invalid upstream status without breaking the safe envelope', async () => {
+    for (const status of [0, 399, 400.5, 600, Number.NaN, Number.POSITIVE_INFINITY]) {
       const response = await requestAppError(status);
 
       expect(response.statusCode).toBe(502);
@@ -49,6 +47,6 @@ describe('API error handling', () => {
           message: 'The provider request failed safely.',
         },
       });
-    },
-  );
+    }
+  });
 });

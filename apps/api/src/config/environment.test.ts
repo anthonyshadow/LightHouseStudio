@@ -98,27 +98,31 @@ describe('parseEnvironment', () => {
     });
   });
 
-  it.each([
-    { PORT: '0' },
-    { PORT: 'not-a-number' },
-    { NODE_ENV: 'staging' },
-    { ELEVENLABS_ENABLE_LOGGING: 'FALSE' },
-    { OPENAI_PROMPT_OPTIMIZER_REASONING: 'extreme' },
-    { OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '9999' },
-    { OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '180001' },
-    { OPENAI_REFERENCE_IMAGE_QUALITY: 'low' },
-    { REFERENCE_IMAGE_PROVIDER: 'automatic' },
-    { BFL_REFERENCE_IMAGE_MODEL: 'flux-2-pro-preview' },
-    { BFL_SAFETY_TOLERANCE: '6' },
-    { BFL_DISABLE_PROMPT_UPSAMPLING: 'TRUE' },
-    { BFL_REFERENCE_IMAGE_TIMEOUT_MS: '9999' },
-    { BFL_REFERENCE_IMAGE_TIMEOUT_MS: '180001' },
-    { WIRO_REFERENCE_IMAGE_MODEL: 'seedream-v5-lite' },
-    { WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '9999' },
-    { WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '180001' },
-    { PILOT_ACCESS_MODE: 'public' },
-  ])('rejects invalid environment input %#', (environment) => {
-    expect(() => parseEnvironment(environment)).toThrow(EnvironmentValidationError);
+  it('rejects the complete invalid environment boundary', () => {
+    for (const environment of [
+      { PORT: '0' },
+      { PORT: 'not-a-number' },
+      { NODE_ENV: 'staging' },
+      { ELEVENLABS_ENABLE_LOGGING: 'FALSE' },
+      { OPENAI_PROMPT_OPTIMIZER_REASONING: 'extreme' },
+      { OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '9999' },
+      { OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: '180001' },
+      { OPENAI_REFERENCE_IMAGE_QUALITY: 'low' },
+      { REFERENCE_IMAGE_PROVIDER: 'automatic' },
+      { BFL_REFERENCE_IMAGE_MODEL: 'flux-2-pro-preview' },
+      { BFL_SAFETY_TOLERANCE: '6' },
+      { BFL_DISABLE_PROMPT_UPSAMPLING: 'TRUE' },
+      { BFL_REFERENCE_IMAGE_TIMEOUT_MS: '9999' },
+      { BFL_REFERENCE_IMAGE_TIMEOUT_MS: '180001' },
+      { WIRO_REFERENCE_IMAGE_MODEL: 'seedream-v5-lite' },
+      { WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '9999' },
+      { WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '180001' },
+      { PILOT_ACCESS_MODE: 'public' },
+    ]) {
+      expect(() => parseEnvironment(environment), JSON.stringify(environment)).toThrow(
+        EnvironmentValidationError,
+      );
+    }
   });
 
   it('selects Wiro independently and uses its timeout without requiring OpenAI image credentials', () => {

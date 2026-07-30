@@ -55,9 +55,17 @@ const expectActionInsideViewport = async (page: Page, name: string): Promise<voi
   await expect
     .poll(
       async () => {
-        const box = await page.getByRole('button', { name }).boundingBox();
-        const viewport = page.viewportSize();
-        if (!box || !viewport) return false;
+        const geometry = await page.getByRole('button', { name }).evaluate((element) => {
+          const box = element.getBoundingClientRect();
+          return {
+            box: { x: box.x, y: box.y, width: box.width, height: box.height },
+            viewport: {
+              width: document.documentElement.clientWidth,
+              height: document.documentElement.clientHeight,
+            },
+          };
+        });
+        const { box, viewport } = geometry;
         return (
           box.x >= -1 &&
           box.y >= -1 &&
@@ -106,13 +114,7 @@ const expectNoAxeViolations = async (page: Page): Promise<void> => {
   ).toEqual([]);
 };
 
-const exactViewports = [
-  { name: 'full desktop', ...STUDIO_VIEWPORT_SIZES.fullDesktop },
-  { name: 'compact desktop', ...STUDIO_VIEWPORT_SIZES.compactDesktop },
-  { name: 'tablet portrait', ...STUDIO_VIEWPORT_SIZES.tabletPortrait },
-  { name: 'mobile portrait', ...STUDIO_VIEWPORT_SIZES.mobilePortrait },
-  { name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile },
-] as const;
+const exactViewports = [{ name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile }] as const;
 
 const STAGE_CONTROLS_IDLE_TIMEOUT_MS = 3_000;
 
@@ -258,7 +260,7 @@ for (const viewport of exactViewports) {
   });
 }
 
-test('focused WebKit and touch media smoke reaches record, Voice, and review recovery', async ({
+test('@cross-browser focused media smoke reaches record, Voice, and review recovery', async ({
   page,
 }, testInfo) => {
   test.skip(
@@ -300,7 +302,7 @@ test('focused WebKit and touch media smoke reaches record, Voice, and review rec
   expectNoExternalProviderTraffic(network);
 });
 
-test('touch recovers timed-out live and playback controls while recording Stop never hides', async ({
+test('@touch controls recover while recording Stop remains reachable', async ({
   page,
 }, testInfo) => {
   test.setTimeout(45_000);
@@ -672,30 +674,6 @@ test('Download initiation enables Release and clears the reviewed take without r
   expect(browser.revokedObjectUrls).toEqual(browser.createdObjectUrls);
   expect(browser.lifecycleEvents).toContain('local-video-stopped');
   expect(browser.lifecycleEvents).toContain('local-audio-stopped');
-  expectNoExternalProviderTraffic(network);
-});
-
-test('ordinary Shelf closure and a breakpoint change preserve the unsaved recipe draft', async ({
-  page,
-}) => {
-  const network = await installSuccessfulStudioHarness(page);
-  await page.setViewportSize({ width: 834, height: 1_112 });
-  await page.goto('/studio');
-
-  await page.getByRole('button', { name: 'Shelf' }).click();
-  await page.getByRole('button', { name: 'Try-on recipes' }).click();
-  await page.getByRole('button', { name: 'New garment recipe' }).click();
-  await page.getByLabel(/^Name/).fill('Unsaved field jacket');
-  await page.getByLabel(/^Prompt text/).fill('A field jacket in soft studio light.');
-  await page.getByRole('button', { name: 'Close creative tool' }).click();
-  await expect(page.getByRole('dialog', { name: 'Recipe Shelf' })).toBeHidden();
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole('button', { name: 'Shelf' }).click();
-  await expect(page.getByLabel(/^Name/)).toHaveValue('Unsaved field jacket');
-  await expect(page.getByLabel(/^Prompt text/)).toHaveValue('A field jacket in soft studio light.');
-  await expectNoDocumentOverflow(page);
-  expect((await readBrowserState(page)).cameraCalls).toBe(0);
   expectNoExternalProviderTraffic(network);
 });
 

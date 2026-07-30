@@ -11,4 +11,7 @@ catalog stays easy to browse and maintain.
 - `fixtures/` contains typed sample data and controller doubles shared by stories.
 - `support/` contains story-only layout and state helpers.
 
-Every story is included in Autodocs and in the Chromium-backed Storybook test project by default.
+Every story is included in Autodocs and the typechecked static Storybook build. Storybook is a
+review catalog, not a second automated render suite; selected `play` functions remain interactive
+examples when those stories are opened. Critical behavior belongs to the domain, component,
+controller, API, or Playwright layer described in [`docs/TESTING.md`](../docs/TESTING.md).

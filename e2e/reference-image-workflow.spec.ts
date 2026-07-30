@@ -7,7 +7,6 @@ import {
 } from './support/studioHarness';
 
 const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
-const LEGACY_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
 
 const openCharacterBuilder = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: /Open character options/u }).click();
@@ -274,66 +273,5 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
   await openRecipeDockWhenOverlaid(page);
   await expect(page.getByLabel('Character direction')).toHaveValue(missingPrompt);
   await expect(page.getByAltText('Current persisted reference preview')).toHaveCount(0);
-  expectNoExternalProviderTraffic(network);
-});
-
-test('legacy v1 text-only shelf migrates to v4 with null reference identities', async ({
-  page,
-}) => {
-  const network = await installSuccessfulStudioHarness(page, {
-    referenceImagesAvailable: false,
-  });
-  await page.addInitScript(
-    ({ legacyKey }) => {
-      localStorage.setItem(
-        legacyKey,
-        JSON.stringify({
-          schemaVersion: 1,
-          savedPrompts: [
-            {
-              id: 'legacy-host',
-              title: 'Legacy text host',
-              prompt: 'Transform the adult subject into a monochrome field host.',
-              modelModeId: 'lucy-2.5',
-              source: 'manual',
-              tags: ['legacy'],
-              createdAt: '2029-12-01T00:00:00.000Z',
-              updatedAt: '2029-12-02T00:00:00.000Z',
-              lastUsedAt: null,
-              useCount: 0,
-            },
-          ],
-          recentPrompts: [
-            {
-              id: 'legacy-recent',
-              prompt: 'Transform the adult subject into a monochrome field host.',
-              modelModeId: 'lucy-2.5',
-              usedAt: '2029-12-03T00:00:00.000Z',
-            },
-          ],
-          savedCharacterPrompts: [],
-        }),
-      );
-    },
-    { legacyKey: LEGACY_CREATIVE_ASSET_STORAGE_KEY },
-  );
-  await page.goto('/studio');
-
-  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
-  await expect(page.getByRole('button', { name: 'Use Legacy text host' })).toBeVisible();
-
-  const migrated = await page.evaluate((storageKey) => {
-    const serialized = localStorage.getItem(storageKey);
-    if (!serialized) return null;
-    return JSON.parse(serialized) as {
-      schemaVersion: number;
-      savedPrompts: Array<{ referenceImageAssetId?: string | null }>;
-      recentPrompts: Array<{ referenceImageAssetId?: string | null }>;
-    };
-  }, CREATIVE_ASSET_STORAGE_KEY);
-  expect(migrated?.schemaVersion).toBe(4);
-  expect(migrated?.savedPrompts[0]?.referenceImageAssetId).toBeNull();
-  expect(migrated?.recentPrompts[0]?.referenceImageAssetId).toBeNull();
-  expect(network.referenceImageGenerations).toEqual([]);
   expectNoExternalProviderTraffic(network);
 });

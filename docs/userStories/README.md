@@ -41,7 +41,9 @@ references, not release-readiness claims or future requirements.
 ## Evidence boundary
 
 Deterministic tests cover the implemented journeys, including synthetic provider and 300-second
-cases. They do not qualify physical devices, accessibility tools, codecs, memory behavior, live
-provider entitlement/output, or cleanup. Controlled-pilot support remains blocked until the exact
-release candidate satisfies the [qualification evidence gate](../PILOT_QUALIFICATION_EVIDENCE.md)
-and [release contract](../CONTROLLED_PILOT_RELEASE_CONTRACT.md).
+cases. The [testing strategy](../TESTING.md) maps those critical journeys to the smallest useful
+domain, controller, API, browser, or visual layer. It does not qualify physical devices,
+accessibility tools, codecs, memory behavior, live provider entitlement/output, or cleanup.
+Controlled-pilot support remains blocked until the exact release candidate satisfies the
+[qualification evidence gate](../PILOT_QUALIFICATION_EVIDENCE.md) and
+[release contract](../CONTROLLED_PILOT_RELEASE_CONTRACT.md).

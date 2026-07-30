@@ -27,6 +27,7 @@ Use the narrowest authoritative document. Do not copy detailed rules into severa
 | [Data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md)    | Per-participant isolation and whole-environment cleanup                                       |
 | [Recording memory policy](RECORDING_MEMORY_POLICY.md)              | Real 300-second measurement and support gate                                                  |
 | [Browser support](BROWSER_SUPPORT.md)                              | Claimed browser/device support and current qualification status                               |
+| [Testing strategy](TESTING.md)                                     | Layer ownership, commands, CI scope, visual policy, and new-test guidance                     |
 | [Screenshot coverage](screenshot-test-coverage.md)                 | Curated visual matrix, baselines, and readiness rules                                         |
 
 The release contract changes only through an explicit product-owner decision. A runtime test or

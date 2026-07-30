@@ -27,33 +27,37 @@ const imageBase64 = async (
 };
 
 describe('reference image validation', () => {
-  it.each(['aW1hZ2U', 'aW1h Z2U=', 'aW1hZ2U_', '===='])(
-    'rejects noncanonical base64 %s',
-    (encoded) => {
+  it('rejects every noncanonical base64 shape', () => {
+    for (const encoded of ['aW1hZ2U', 'aW1h Z2U=', 'aW1hZ2U_', '====']) {
       expect(() => decodeStrictBase64(encoded)).toThrow(InvalidReferenceImageError);
-    },
-  );
-
-  it.each(['jpeg', 'png', 'webp'] as const)('fully decodes a 1024-square %s', async (format) => {
-    const result = await validateReferenceImage(await imageBase64(1024, 1024, format));
-
-    expect(result).toMatchObject({
-      width: 1024,
-      height: 1024,
-      mimeType: `image/${format}`,
-    });
-    expect(result.bytes.byteLength).toBeLessThan(5 * 1024 * 1024);
+    }
   });
 
-  it.each([
-    ['1024x1536', 1024, 1536],
-    ['1536x1024', 1536, 1024],
-  ] as const)('validates the requested %s orientation exactly', async (size, width, height) => {
-    const result = await validateReferenceImage(await imageBase64(width, height), size);
-    expect(result).toMatchObject({ width, height, mimeType: 'image/jpeg' });
-    await expect(validateReferenceImage(await imageBase64(height, width), size)).rejects.toThrow(
-      `exactly ${width} by ${height}`,
-    );
+  it('fully decodes every supported 1024-square format', async () => {
+    for (const format of ['jpeg', 'png', 'webp'] as const) {
+      const result = await validateReferenceImage(await imageBase64(1024, 1024, format));
+
+      expect(result, format).toMatchObject({
+        width: 1024,
+        height: 1024,
+        mimeType: `image/${format}`,
+      });
+      expect(result.bytes.byteLength, format).toBeLessThan(5 * 1024 * 1024);
+    }
+  });
+
+  it('validates each requested portrait and landscape orientation exactly', async () => {
+    for (const [size, width, height] of [
+      ['1024x1536', 1024, 1536],
+      ['1536x1024', 1536, 1024],
+    ] as const) {
+      const result = await validateReferenceImage(await imageBase64(width, height), size);
+      expect(result, size).toMatchObject({ width, height, mimeType: 'image/jpeg' });
+      await expect(
+        validateReferenceImage(await imageBase64(height, width), size),
+        size,
+      ).rejects.toThrow(`exactly ${width} by ${height}`);
+    }
   });
 
   it('rejects an image that is not exactly 1024 by 1024', async () => {
@@ -92,9 +96,8 @@ describe('reference image validation', () => {
 });
 
 describe('uploaded reference image validation', () => {
-  it.each(['jpeg', 'png', 'webp'] as const)(
-    'preserves fully decoded %s upload bytes and metadata',
-    async (format) => {
+  it('preserves decoded upload bytes and metadata for every supported format', async () => {
+    for (const format of ['jpeg', 'png', 'webp'] as const) {
       const bytes = Buffer.from(await imageBase64(800, 1200, format), 'base64');
       const result = await validateUploadedReferenceImage(bytes, `image/${format}`);
 
@@ -104,8 +107,8 @@ describe('uploaded reference image validation', () => {
         height: 1200,
         mimeType: `image/${format}`,
       });
-    },
-  );
+    }
+  });
 
   it('rejects declared and decoded MIME mismatches and corrupt bytes', async () => {
     const jpeg = Buffer.from(await imageBase64(800, 1200, 'jpeg'), 'base64');

@@ -18,9 +18,8 @@ import type { GuidedChoiceKey, VisualProfile } from '@studio/domain';
 const profiles: readonly VisualProfile[] = ['woman', 'man', 'non-binary', 'unspecified'];
 
 describe('guided character visual catalog', () => {
-  it.each(profiles)(
-    'offers exactly six tailored body, hair, and outfit choices for %s',
-    (profile) => {
+  it('offers exactly six tailored body, hair, and outfit choices per profile', () => {
+    for (const profile of profiles) {
       for (const category of ['bodyShape', 'hair', 'outfit'] as const) {
         const choices = getSuggestedOptions(category, profile);
         expect(choices).toHaveLength(6);
@@ -28,32 +27,33 @@ describe('guided character visual catalog', () => {
         expect(choices.every((choice) => choice.profile === profile)).toBe(true);
         expect(choices.every((choice) => choice.imageSrc.endsWith('.webp'))).toBe(true);
       }
-    },
-  );
-
-  it.each(profiles)('offers six suggestions for every open-ended category for %s', (profile) => {
-    for (const category of [
-      'appearance',
-      'ethnicity',
-      'skinTone',
-      'bodyShape',
-      'hair',
-      'hairColor',
-      'outfit',
-      'accessories',
-      'role',
-      'style',
-      'expression',
-      'mood',
-      'background',
-    ] as const) {
-      expect(getSuggestedOptions(category, profile), `${profile} ${category}`).toHaveLength(6);
     }
   });
 
-  it.each(profiles)(
-    'uses optimized local artwork for every visual suggestion for %s',
-    (profile) => {
+  it('offers six suggestions for every open-ended category and profile', () => {
+    for (const profile of profiles) {
+      for (const category of [
+        'appearance',
+        'ethnicity',
+        'skinTone',
+        'bodyShape',
+        'hair',
+        'hairColor',
+        'outfit',
+        'accessories',
+        'role',
+        'style',
+        'expression',
+        'mood',
+        'background',
+      ] as const) {
+        expect(getSuggestedOptions(category, profile), `${profile} ${category}`).toHaveLength(6);
+      }
+    }
+  });
+
+  it('uses optimized local artwork for every visual suggestion and profile', () => {
+    for (const profile of profiles) {
       for (const category of [
         'adultAge',
         'appearance',
@@ -75,8 +75,8 @@ describe('guided character visual catalog', () => {
         expect(imageSources.every((source) => source.startsWith('/guided-character/'))).toBe(true);
         expect(imageSources.every((source) => source.endsWith('.webp'))).toBe(true);
       }
-    },
-  );
+    }
+  });
 
   it('retains the exact four existing adult age choices for every profile', () => {
     for (const profile of profiles) {

@@ -50,37 +50,39 @@ describe('structured prompt generation', () => {
     expect(validatePromptBuilderDraft(color).valid).toBe(true);
   });
 
-  it.each([
-    [
-      {
-        ...createPromptBuilderDraft('add-object'),
-        intent: 'add-object' as const,
-        objectDescription: 'a small brass compass',
-        placement: 'on the desk beside the notebook',
-      },
-      'Add a small brass compass. Placement: on the desk beside the notebook.',
-    ],
-    [
-      {
-        ...createPromptBuilderDraft('replace-object'),
-        intent: 'replace-object' as const,
-        target: 'ceramic mug',
-        replacementDescription: 'a clear glass tumbler',
-      },
-      'Replace the visible ceramic mug with a clear glass tumbler.',
-    ],
-    [
-      {
-        ...createPromptBuilderDraft('change-attribute'),
-        intent: 'change-attribute' as const,
-        target: 'jacket',
-        attribute: 'material',
-        newValue: 'soft green velvet',
-      },
-      "Change the jacket's material to soft green velvet.",
-    ],
-  ])('generates each object-edit intent', (draft, expected) => {
-    expect(generateStructuredPrompt(draft).prompt).toBe(expected);
+  it('generates every object-edit intent', () => {
+    for (const [draft, expected] of [
+      [
+        {
+          ...createPromptBuilderDraft('add-object'),
+          intent: 'add-object' as const,
+          objectDescription: 'a small brass compass',
+          placement: 'on the desk beside the notebook',
+        },
+        'Add a small brass compass. Placement: on the desk beside the notebook.',
+      ],
+      [
+        {
+          ...createPromptBuilderDraft('replace-object'),
+          intent: 'replace-object' as const,
+          target: 'ceramic mug',
+          replacementDescription: 'a clear glass tumbler',
+        },
+        'Replace the visible ceramic mug with a clear glass tumbler.',
+      ],
+      [
+        {
+          ...createPromptBuilderDraft('change-attribute'),
+          intent: 'change-attribute' as const,
+          target: 'jacket',
+          attribute: 'material',
+          newValue: 'soft green velvet',
+        },
+        "Change the jacket's material to soft green velvet.",
+      ],
+    ] as const) {
+      expect(generateStructuredPrompt(draft).prompt).toBe(expected);
+    }
   });
 });
 
@@ -121,9 +123,13 @@ describe('structured prompt validation', () => {
     expect(generateStructuredPrompt(draft).prompt).toBe('');
   });
 
-  it.each(['age 17 explorer', '17yo explorer', '17 yo explorer', 'aged 12 explorer'])(
-    'blocks an explicit minor age written as %s',
-    (characterBase) => {
+  it('blocks every supported explicit minor-age form', () => {
+    for (const characterBase of [
+      'age 17 explorer',
+      '17yo explorer',
+      '17 yo explorer',
+      'aged 12 explorer',
+    ]) {
       const draft = {
         ...createPromptBuilderDraft('character-transform'),
         characterBase,
@@ -132,12 +138,16 @@ describe('structured prompt validation', () => {
       expect(validatePromptBuilderDraft(draft).blockingIssues.map(({ code }) => code)).toContain(
         'minor-description-not-allowed',
       );
-    },
-  );
+    }
+  });
 
-  it.each(['age 18 explorer', '18yo explorer', 'aged 42 explorer', 'young adult explorer'])(
-    'does not misclassify an adult description written as %s',
-    (characterBase) => {
+  it('does not misclassify supported adult-age forms', () => {
+    for (const characterBase of [
+      'age 18 explorer',
+      '18yo explorer',
+      'aged 42 explorer',
+      'young adult explorer',
+    ]) {
       const draft = {
         ...createPromptBuilderDraft('character-transform'),
         characterBase,
@@ -146,8 +156,8 @@ describe('structured prompt validation', () => {
       expect(
         validatePromptBuilderDraft(draft).blockingIssues.map(({ code }) => code),
       ).not.toContain('minor-description-not-allowed');
-    },
-  );
+    }
+  });
 
   it('supports only adult age choices when sanitizing untrusted builder state', () => {
     const sanitized = sanitizePromptBuilderDraft({

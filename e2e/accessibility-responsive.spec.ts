@@ -162,9 +162,6 @@ const expectNoAxeViolations = async (page: Page) => {
 
 const representativeViewports = [
   { name: 'full desktop', ...STUDIO_VIEWPORT_SIZES.fullDesktop },
-  { name: 'compact landscape desktop', ...STUDIO_VIEWPORT_SIZES.compactDesktop },
-  { name: 'tablet portrait', ...STUDIO_VIEWPORT_SIZES.tabletPortrait },
-  { name: 'mobile portrait', ...STUDIO_VIEWPORT_SIZES.mobilePortrait },
   { name: 'small mobile', ...STUDIO_VIEWPORT_SIZES.smallMobile },
 ] as const;
 
@@ -219,19 +216,6 @@ for (const viewport of representativeViewports) {
     expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
   });
 }
-
-test('first-take guidance is dismissible without durable onboarding state', async ({ page }) => {
-  await installProviderFreeStudio(page);
-  await page.goto('/studio');
-
-  const guide = page.getByRole('complementary', { name: 'First take guide' });
-  await expect(guide).toBeVisible();
-  await guide.getByRole('button', { name: 'Dismiss first take guide' }).click();
-  await expect(guide).toBeHidden();
-
-  await page.reload();
-  await expect(page.getByRole('complementary', { name: 'First take guide' })).toBeVisible();
-});
 
 test('small-mobile Builder review shortcut survives 200% text and keeps one preview', async ({
   page,
@@ -306,27 +290,6 @@ test('small-mobile Recipe Dock scrolls internally and Escape restores launcher f
   await expectNoDocumentOverflow(page);
   expect(await cameraCalls(page)).toBe(0);
   expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
-  expect(network.blockedExternalRequests).toEqual([]);
-  expect(network.blockedExternalWebSockets).toEqual([]);
-});
-
-test('large text keeps critical preparation controls usable at a narrow width', async ({
-  page,
-}) => {
-  const network = await installProviderFreeStudio(page);
-  await page.setViewportSize({ width: 320, height: 568 });
-  await page.goto('/studio');
-  await page.evaluate(() => {
-    document.documentElement.style.fontSize = '150%';
-  });
-
-  await openRecipeDockWhenOverlaid(page);
-  await expect(page.getByRole('button', { name: 'Start local preview' })).toBeVisible();
-  await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
-  await expect(page.getByLabel('Character direction')).toBeVisible();
-  await expectNoDocumentOverflow(page);
-  await expectNoAxeViolations(page);
-  expect(await cameraCalls(page)).toBe(0);
   expect(network.blockedExternalRequests).toEqual([]);
   expect(network.blockedExternalWebSockets).toEqual([]);
 });

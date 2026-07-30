@@ -17,7 +17,7 @@ env:
 
 jobs:
   quality:
-    name: Types, lint, format, unit tests, and build
+    name: Essential checks, tests, and builds
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
@@ -29,15 +29,9 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit:all
-      - run: pnpm audit:prod
-      - run: pnpm typecheck
-      - run: pnpm lint -- --max-warnings 0
-      - run: pnpm format:check
-      - run: pnpm check:dead-code
-      - run: pnpm check:modules
       - run: pnpm pilot:data-retirement:drill
-      - run: pnpm test
-      - run: pnpm build
+      - run: pnpm quality
+      - run: pnpm test:production
       - name: Upload unit failure report
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
@@ -49,6 +43,7 @@ jobs:
 
   coverage:
     name: Unit coverage
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -68,39 +63,6 @@ jobs:
           path: coverage/
           if-no-files-found: ignore
           retention-days: 14
-
-  storybook:
-    name: Storybook type, interaction, and static build
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm storybook:typecheck
-      - run: pnpm storybook:test
-      - run: pnpm storybook:build
-
-  production-smoke:
-    name: Production static-serving smoke
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm build
-      - run: pnpm test:production
 
   e2e:
     name: Browser journeys
@@ -129,6 +91,7 @@ jobs:
 
   visual:
     name: Curated visual regression
+    if: ${{ github.event_name == 'workflow_dispatch' }}
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

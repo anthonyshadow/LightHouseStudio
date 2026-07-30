@@ -122,10 +122,14 @@ quota. Missing optional configuration disables only the corresponding feature.
 | `pnpm dev`                                                                               | Build shared packages and run API/web watchers                         |
 | `pnpm build`                                                                             | Build all workspaces                                                   |
 | `pnpm quality`                                                                           | Type, Storybook, lint, format, dead-code, module, unit, and build gate |
+| `pnpm test`                                                                              | Essential non-visual unit and API integration suite                    |
+| `pnpm test:unit`                                                                         | Focused domain, contract, web, component, and controller tests         |
+| `pnpm test:integration`                                                                  | Focused API/provider, Vite, and repository utility tests               |
 | `pnpm test:coverage`                                                                     | Coverage gate                                                          |
 | `pnpm test:e2e`                                                                          | Functional Playwright journeys                                         |
 | `pnpm test:production`                                                                   | Built Fastify static-serving smoke; run build first                    |
-| `pnpm test:visual`                                                                       | Curated visual regression suite                                        |
+| `pnpm test:visual`                                                                       | Explicit curated visual regression suite                               |
+| `pnpm test:all`                                                                          | All automated test categories, including visual regression             |
 | `pnpm audit:all`                                                                         | Complete dependency audit                                              |
 | `pnpm audit:prod`                                                                        | Production dependency audit                                            |
 | `pnpm storybook`                                                                         | Local component catalog on port 6006                                   |
@@ -133,8 +137,11 @@ quota. Missing optional configuration disables only the corresponding feature.
 | `pnpm pilot:data-retirement:drill`                                                       | Verify participant-data retirement                                     |
 | `pnpm recording:memory:estimate --duration-seconds 300 --main-mib-per-minute <measured>` | Estimate recording memory from measured output                         |
 
-Install Playwright browsers once with `pnpm exec playwright install`. Default tests use synthetic media
-and deny unexpected external HTTP and WebSockets; they never make paid/live provider calls.
+Install Playwright browsers once with `pnpm exec playwright install`. Default tests use synthetic
+media and deny unexpected external HTTP and WebSockets; they never make paid/live provider calls.
+Curated visual regression and broad screenshot capture are not part of the default test or
+ordinary push/pull-request CI workflows. See the [testing strategy](docs/TESTING.md) for layer
+ownership, focused commands, CI behavior, and safe baseline updates.
 
 Normal implementation gate:
 
@@ -202,6 +209,7 @@ Start with the [documentation map](docs/README.md). Key references:
 - [Active implementation plan](docs/project-audit-implementation-plan.md)
 - [Browser support](docs/BROWSER_SUPPORT.md)
 - [Manual QA](docs/MANUAL_QA.md)
+- [Testing strategy](docs/TESTING.md)
 - [Repository working guide](AGENTS.md)
 
 Before changing behavior, read the working guide, trace the owning presentation, orchestration,

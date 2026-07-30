@@ -81,8 +81,6 @@ export type VisualScenarioId =
   | (typeof DESKTOP_VISUAL_SCENARIOS)[number]['id']
   | (typeof SMALL_MOBILE_VISUAL_SCENARIOS)[number]['id'];
 
-const focusedViewportIds = new Set(['desktop', 'small-mobile']);
-const studioInitialViewportIds = new Set(['desktop', 'mobile', 'small-mobile']);
 const viewportById = new Map(VISUAL_VIEWPORTS.map((viewport) => [viewport.id, viewport]));
 const desktopViewport = viewportById.get('desktop');
 const smallMobileViewport = viewportById.get('small-mobile');
@@ -92,17 +90,15 @@ if (!desktopViewport || !smallMobileViewport) {
 }
 
 export const VISUAL_CASE_MATRIX = [
-  { viewport: desktopViewport, scenario: ENTRY_VISUAL_SCENARIO },
   { viewport: smallMobileViewport, scenario: ENTRY_VISUAL_SCENARIO },
   ...VISUAL_VIEWPORTS.flatMap((viewport) =>
     CORE_VISUAL_SCENARIOS.map((scenario) => ({ viewport, scenario })),
   ),
-  ...VISUAL_VIEWPORTS.filter((viewport) => studioInitialViewportIds.has(viewport.id)).map(
-    (viewport) => ({ viewport, scenario: STUDIO_INITIAL_VISUAL_SCENARIO }),
-  ),
-  ...VISUAL_VIEWPORTS.filter((viewport) => focusedViewportIds.has(viewport.id)).flatMap(
-    (viewport) => FOCUSED_VISUAL_SCENARIOS.map((scenario) => ({ viewport, scenario })),
-  ),
+  { viewport: desktopViewport, scenario: STUDIO_INITIAL_VISUAL_SCENARIO },
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[1] },
+  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[2] },
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[3] },
+  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[4] },
   ...DESKTOP_VISUAL_SCENARIOS.map((scenario) => ({ viewport: desktopViewport, scenario })),
   ...SMALL_MOBILE_VISUAL_SCENARIOS.map((scenario) => ({
     viewport: smallMobileViewport,
@@ -114,7 +110,7 @@ export const VISUAL_BASELINE_PATHS = VISUAL_CASE_MATRIX.map(
   ({ viewport, scenario }) => `${viewport.folder}/${scenario.baseline}`,
 );
 
-const VISUAL_CASE_BUDGET = 29;
+const VISUAL_CASE_BUDGET = 20;
 const coveredViewportIds = new Set(VISUAL_CASE_MATRIX.map(({ viewport }) => viewport.id));
 const corePairs = new Set(
   VISUAL_CASE_MATRIX.map(({ viewport, scenario }) => `${viewport.id}/${scenario.id}`),

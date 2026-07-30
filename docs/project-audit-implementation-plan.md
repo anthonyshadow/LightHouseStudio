@@ -25,6 +25,10 @@ Complete:
 - `pnpm pilot:data-retirement:drill`
 - visual baseline inventory and review for every changed Darwin/Linux image
 
+These exact-candidate commands are explicit release work. Coverage and visual regression are not
+ordinary push/pull-request CI jobs; that separation does not remove either release acceptance
+condition.
+
 Acceptance:
 
 - all commands pass from a clean install on the same full commit;
