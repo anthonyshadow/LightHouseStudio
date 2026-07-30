@@ -529,6 +529,26 @@ keeps this wave open; it is not a reason to weaken tests or substitute mocks.
 **Findings:** `TEST-001`, `TEST-002`, `TEST-004`–`TEST-009`, `TEST-011`; `TEST-010` only if the
 remaining harness duplication still causes false-state risk
 
+**Implementation status (2026-07-29):** deterministic regression consolidation is complete.
+Existing pure, component/controller, dynamic axe/focus, five-viewport, touch-recovery,
+WebKit/mobile synthetic-media, provider lifecycle, safe-error/output-bound, no-key provider-denial,
+Storybook, and curated visual protections were audited rather than duplicated. A missing Chromium
+saved-voice journey now covers saved-library listing, preview without a take body, explicit
+voice-intent on every ElevenLabs request, immutable-sidecar Apply, local remux, processed Download,
+Restore Original, and exact object-URL preservation/release. The broad screenshot capture remains
+an explicitly untracked artifact while the curated matrix and pruning inventory share the semantic
+scenario paths; no observed false-state risk justifies `TEST-010` consolidation.
+
+On the current Darwin host with Node 24, `quality`, coverage, the full functional E2E matrix,
+production smoke, the curated 29-case visual suite, and every build/Storybook command passed
+without baseline changes. The registry-backed production and full development dependency audits
+could not be rerun in this execution because external dependency-metadata submission was not
+authorized; the last documented state remains a clean production audit and six High plus one Low
+development-only advisories assigned to Wave 10. Named physical device/browser, assistive
+technology, codec, maximum-duration provider, and live-provider qualification also remain open
+under Wave 8. Therefore the implementation is present, but the Wave 9 release exit gate is not yet
+fully satisfied and no audit phase is moved to completed work.
+
 Consolidate protection after behavior settles:
 
 - pure domain tests for product rules and safe codes;

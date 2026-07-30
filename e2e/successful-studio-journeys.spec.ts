@@ -2,8 +2,10 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import {
   closeRecipeDockWhenOverlaid,
+  createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
+  FIXED_WEBM_BASE64,
   installSuccessfulStudioHarness,
   openRecipeDockWhenOverlaid,
   readBrowserState,
@@ -512,6 +514,119 @@ test('no-key Local Camera records and finalizes without provider HTTP, WebSocket
     new Set(['/api/capabilities']),
   );
   expect(network.providerSdkRequests).toEqual([]);
+  expectNoExternalProviderTraffic(network);
+});
+
+test('saved voice preview, Apply, remux, Download, and Restore Original stay explicit and immutable', async ({
+  page,
+  browserName,
+}) => {
+  test.skip(
+    browserName !== 'chromium',
+    'Deterministic browser remux qualification runs in Chromium.',
+  );
+  test.setTimeout(60_000);
+  const network = await installSuccessfulStudioHarness(page, {
+    elevenLabsAvailable: true,
+    stubMediaPlayback: false,
+  });
+  await page.goto('/');
+
+  await createLocalTake(page);
+  const takeDialog = page.getByRole('dialog', { name: 'Latest Take' });
+  const originalDownload = takeDialog.getByRole('link', { name: 'Download take' });
+  const originalUrl = await originalDownload.getAttribute('href');
+  expect(originalUrl).toMatch(/^blob:/u);
+
+  await takeDialog.getByRole('button', { name: 'Voice treatments' }).click();
+  const voiceTreatments = page.getByRole('dialog', { name: 'Voice Treatments' });
+  await expect(voiceTreatments).toBeVisible();
+  await voiceTreatments
+    .getByRole('button', { name: 'Browse saved voices · contacts ElevenLabs' })
+    .click();
+
+  const voiceBrowser = page.getByRole('dialog', { name: 'Voice Browser' });
+  await expect(voiceBrowser.getByRole('list', { name: 'Available voices' })).toContainText(
+    'Northstar Narrator',
+  );
+  await voiceBrowser
+    .getByRole('button', {
+      name: 'Load Northstar Narrator preview · contacts provider',
+    })
+    .click();
+  await expect(voiceBrowser.getByLabel('Listen to Northstar Narrator preview')).toHaveAttribute(
+    'src',
+    /^blob:/u,
+  );
+
+  const listRequests = network.voiceRequests.filter(({ kind }) => kind === 'list');
+  expect(listRequests.length).toBeGreaterThan(0);
+  expect(
+    listRequests.every(
+      (request) =>
+        request.voiceId === null &&
+        request.providerIntent === 'voice' &&
+        request.contentType === null &&
+        request.bodyByteSize === 0,
+    ),
+  ).toBe(true);
+  expect(network.voiceRequests.filter(({ kind }) => kind === 'preview')).toEqual([
+    {
+      kind: 'preview',
+      voiceId: 'northstar-narrator',
+      providerIntent: 'voice',
+      contentType: null,
+      bodyByteSize: 0,
+    },
+  ]);
+
+  await voiceBrowser.getByRole('button', { name: 'Select Northstar Narrator' }).click();
+  await expect(
+    voiceBrowser.getByRole('button', {
+      name: 'Apply Northstar Narrator to recorded audio',
+    }),
+  ).toHaveAccessibleDescription(/immutable original audio sidecar/u);
+  await voiceBrowser
+    .getByRole('button', { name: 'Apply Northstar Narrator to recorded audio' })
+    .click();
+  await voiceBrowser.getByRole('button', { name: 'Close voice browser' }).click();
+
+  await expect(
+    voiceTreatments.getByRole('status').filter({ hasText: 'Voice treatment ready' }),
+  ).toBeVisible();
+  await voiceTreatments.getByRole('button', { name: 'Back to take review' }).click();
+  const processedTakeDialog = page.getByRole('dialog', { name: 'Latest Take' });
+  const processedDownload = processedTakeDialog.getByRole('link', { name: 'Download take' });
+  await expect(processedDownload).toHaveAttribute('href', /^blob:/u);
+  const processedUrl = await processedDownload.getAttribute('href');
+  expect(processedUrl).not.toBe(originalUrl);
+
+  expect(network.voiceRequests.filter(({ kind }) => kind === 'convert')).toEqual([
+    {
+      kind: 'convert',
+      voiceId: 'northstar-narrator',
+      providerIntent: 'voice',
+      contentType: 'audio/webm;codecs=opus',
+      bodyByteSize: Buffer.from(FIXED_WEBM_BASE64, 'base64').byteLength,
+    },
+  ]);
+
+  const processedDownloadStarted = page.waitForEvent('download');
+  await processedDownload.click();
+  await processedDownloadStarted;
+  await expect(processedTakeDialog.getByRole('button', { name: 'Close take' })).toBeEnabled();
+
+  await processedTakeDialog.getByRole('button', { name: 'Voice treatments' }).click();
+  const restoredVoiceTreatments = page.getByRole('dialog', { name: 'Voice Treatments' });
+  await restoredVoiceTreatments.getByRole('button', { name: 'Original' }).click();
+  await restoredVoiceTreatments.getByRole('button', { name: 'Back to take review' }).click();
+  await expect(
+    page.getByRole('dialog', { name: 'Latest Take' }).getByRole('link', { name: 'Download take' }),
+  ).toHaveAttribute('href', originalUrl ?? '');
+  const browser = await readBrowserState(page);
+  expect(browser.createdObjectUrls).toContain(originalUrl);
+  expect(browser.revokedObjectUrls).toContain(processedUrl);
+  expect(browser.revokedObjectUrls).not.toContain(originalUrl);
   expectNoExternalProviderTraffic(network);
 });
 

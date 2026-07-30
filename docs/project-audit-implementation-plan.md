@@ -210,6 +210,18 @@ that pixel tests cannot prove.
 **Findings:** `TEST-001`, `TEST-002`, `TEST-004`, `TEST-005`, `TEST-006`, `TEST-007`, `TEST-008`,
 `TEST-009`, `TEST-011`
 
+**Implementation status (2026-07-29):** deterministic implementation and the locally executable
+Wave 9 gates are complete. Existing dynamic axe/focus, responsive/reflow, touch recovery,
+WebKit/mobile media smoke, provider lifecycle, recording maximum, safe output bounds, Storybook,
+and semantic visual readiness coverage were retained. The added saved-voice journey proves
+listing, body-free preview, explicit provider intent, immutable-sidecar Apply, remux, Download,
+Restore Original, and object-URL ownership while external HTTP/WebSocket denial remains active.
+The separate broad-capture artifact has not produced a false-state risk, so conditional `TEST-010`
+consolidation is not justified. The phase remains active because registry-backed audits were not
+authorized in this execution and Wave 8 still lacks the required physical device/browser,
+assistive-technology, codec, maximum-duration provider, and live-provider evidence. Do not move
+this phase to completed work yet.
+
 | Field          | Plan                                                                                                                                                                                                                                                                    |
 | -------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Scope          | Consolidate completed phase tests; risk-based dynamic axe/focus; full saved-voice synthetic journey; local-camera all-provider denial; semantic scenario registry shared by curated/broad capture if duplication still harms maintenance.                               |

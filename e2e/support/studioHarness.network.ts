@@ -164,6 +164,7 @@ export const installProviderNetworkDriver = async (
   let remainingCapabilityFailures = options.capabilityFailuresBeforeSuccess ?? 0;
   const network: NetworkJourneyState = {
     apiRequests: [],
+    voiceRequests: [],
     referenceWorkflowCalls: [],
     referenceImageUploads: [],
     referencePromptOptimizations: [],
@@ -488,6 +489,13 @@ export const installProviderNetworkDriver = async (
 
     if (requestUrl.pathname === '/api/elevenlabs/voices' && route.request().method() === 'GET') {
       network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.voiceRequests.push({
+        kind: 'list',
+        voiceId: null,
+        providerIntent: route.request().headers()['x-lightframe-provider-intent'] ?? null,
+        contentType: null,
+        bodyByteSize: 0,
+      });
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -499,7 +507,7 @@ export const installProviderNetworkDriver = async (
               category: 'professional',
               description: 'Warm, grounded documentary narration',
               labels: { style: 'narration' },
-              previewAvailable: false,
+              previewAvailable: true,
             },
           ],
           hasMore: false,
@@ -510,11 +518,39 @@ export const installProviderNetworkDriver = async (
       return;
     }
 
+    const voicePreviewMatch = requestUrl.pathname.match(
+      /^\/api\/elevenlabs\/voices\/([^/]+)\/preview$/u,
+    );
+    if (voicePreviewMatch && route.request().method() === 'GET') {
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.voiceRequests.push({
+        kind: 'preview',
+        voiceId: decodeURIComponent(voicePreviewMatch[1] ?? ''),
+        providerIntent: route.request().headers()['x-lightframe-provider-intent'] ?? null,
+        contentType: null,
+        bodyByteSize: 0,
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'audio/wav',
+        body: REPLACEMENT_VOICE_WAV,
+      });
+      return;
+    }
+
     if (
       requestUrl.pathname === '/api/elevenlabs/voice-changer/recording' &&
       route.request().method() === 'POST'
     ) {
       network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      const body = route.request().postDataBuffer() ?? Buffer.alloc(0);
+      network.voiceRequests.push({
+        kind: 'convert',
+        voiceId: requestUrl.searchParams.get('voiceId'),
+        providerIntent: route.request().headers()['x-lightframe-provider-intent'] ?? null,
+        contentType: route.request().headers()['content-type'] ?? null,
+        bodyByteSize: body.byteLength,
+      });
       await route.fulfill({
         status: 200,
         contentType: 'audio/wav',

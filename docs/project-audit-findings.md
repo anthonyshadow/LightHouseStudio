@@ -354,10 +354,10 @@ The independent specialist reports reused `TEST-###`; the canonical plan uses th
 | `TEST-005` | Physical-device recording-memory/finalization/cleanup evidence for `PERF-001`.                                                            |
 | `TEST-006` | Complete: declared/chunked/endless successful ElevenLabs bounds, cancellation, browser defense, and take preservation.                    |
 | `TEST-007` | Gated live provider/device entitlement and full included-provider journeys.                                                               |
-| `TEST-008` | Risk-based dynamic-state axe/focus/screen-reader coverage.                                                                                |
-| `TEST-009` | Outcome-based Character Builder responsive/reflow coverage.                                                                               |
+| `TEST-008` | Dynamic-state axe/focus coverage is automated; named physical screen-reader evidence remains.                                             |
+| `TEST-009` | Complete: outcome-based Character Builder responsive/reflow coverage at the canonical viewports and large text.                           |
 | `TEST-010` | Shared semantic scenario/readiness model for curated and broad capture when justified.                                                    |
-| `TEST-011` | Focused WebKit/touch/media interaction smoke without cross-browser pixel baselines.                                                       |
+| `TEST-011` | Focused synthetic WebKit/touch/media interaction smoke is automated; physical WebKit/media evidence remains.                              |
 
 ## Test modernization status
 

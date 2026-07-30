@@ -46,6 +46,14 @@ As a creator, I want to preview and apply a voice already saved in my ElevenLabs
 
 The creator has either a processed, playable take using the selected saved-library voice; the original restored; or an error/cancelled processing path that preserved the valid take.
 
+## Automated regression boundary
+
+The deterministic Chromium journey covers saved-library listing, preview without a take body,
+explicit Apply with the voice-intent header and immutable audio sidecar, successful local remux,
+processed download, and Restore Original. It denies unexpected external HTTP and WebSocket traffic;
+real provider entitlement, output quality, codecs, and physical-device playback remain manual/live
+qualification.
+
 ## UX investigation cues
 
 - Whether “contacts provider,” preview, and apply make their different privacy/cost consequences obvious.
