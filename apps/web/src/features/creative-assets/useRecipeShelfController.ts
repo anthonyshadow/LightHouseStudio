@@ -86,14 +86,14 @@ export const useRecipeShelfController = ({
     controlledSelection === undefined ? selectedRecipe : controlledSelection;
   const searchResults = repository.search(query, activeMode);
   const visibleCategory =
-    activeMode === 'lucy-vton-3' && category === 'characters' ? 'saved' : category;
+    activeMode === 'lucy-vton-latest' && category === 'characters' ? 'saved' : category;
   const availableTags = Array.from(
     new Set(
       [
         ...state.store.savedPrompts
           .filter((item) => item.modelModeId === activeMode)
           .flatMap((item) => item.tags),
-        ...(activeMode === 'lucy-2.5'
+        ...(activeMode === 'lucy-latest'
           ? state.store.savedCharacterPrompts.flatMap((item) => item.tags)
           : []),
       ].map((tag) => tag.trim()),
@@ -160,7 +160,7 @@ export const useRecipeShelfController = ({
     setSynchronizedEntryIntentId(entryIntent.id);
     leaveForm();
     setCategory(
-      activeMode === 'lucy-vton-3' && entryIntent.category === 'characters'
+      activeMode === 'lucy-vton-latest' && entryIntent.category === 'characters'
         ? 'saved'
         : entryIntent.category,
     );
@@ -284,7 +284,7 @@ export const useRecipeShelfController = ({
       onUsePrompt({
         origin: 'character-prompt',
         prompt: item.prompt,
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         assetId: item.id,
         characterName: item.name,
         referenceImageAssetId: item.referenceImageAssetId,

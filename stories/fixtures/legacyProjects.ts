@@ -49,7 +49,7 @@ const createProject = (id: string, title: string, hasVideo: boolean): ProjectRec
       ? {
           filename: `${id}.webm`,
           mimeType: 'video/webm',
-          sourceModeId: 'lucy-2.5',
+          sourceModeId: 'lucy-latest',
           startedAt: '2026-07-19T12:00:00.000Z',
           durationMs: 18_000,
           sizeBytes: 4_200_000,

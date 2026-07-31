@@ -41,8 +41,8 @@ export const useSessionDraftState = (): SessionDraftState => {
   const [activeMode, setActiveMode] = useState<StudioMode>('local');
   const [drafts, setDrafts] = useState<Record<StudioMode, SessionDraft>>(() => ({
     local: createEmptyDraft('local'),
-    'lucy-2.5': createEmptyDraft('lucy-2.5'),
-    'lucy-vton-3': createEmptyDraft('lucy-vton-3'),
+    'lucy-latest': createEmptyDraft('lucy-latest'),
+    'lucy-vton-latest': createEmptyDraft('lucy-vton-latest'),
   }));
   const draft = drafts[activeMode];
   const [applied, setApplied] = useState<AppliedRealtimeState | null>(null);

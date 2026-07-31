@@ -260,12 +260,12 @@ describe('useRecording recorder construction failures', () => {
           id: 'take-persisted',
           mimeType: 'video/webm',
           filename: 'saved-take.webm',
-          sourceModeId: 'lucy-2.5',
+          sourceModeId: 'lucy-latest',
           startedAt: '2026-07-19T12:30:00.000Z',
           durationMs: 4_250,
         },
         takeMetadata: {
-          mode: 'lucy-2.5',
+          mode: 'lucy-latest',
           startedAt: '2026-07-19T12:30:00.000Z',
           videoSource: 'transformed',
           audioSource: 'provider',
@@ -298,7 +298,7 @@ describe('useRecording recorder construction failures', () => {
       error: null,
     });
     expect(result.current.metadata).toMatchObject({
-      mode: 'lucy-2.5',
+      mode: 'lucy-latest',
       width: 1_920,
       height: 1_080,
     });
@@ -858,7 +858,7 @@ describe('useRecording recorder construction failures', () => {
           videoSource: 'transformed',
           audioSource: 'none',
         }),
-        'lucy-2.5',
+        'lucy-latest',
       );
     });
     expect(result.current.metadata).toBeNull();
@@ -866,7 +866,7 @@ describe('useRecording recorder construction failures', () => {
       await result.current.stop();
     });
     expect(result.current.metadata).toMatchObject({
-      mode: 'lucy-2.5',
+      mode: 'lucy-latest',
       width: 1_280,
       height: 720,
       frameRate: 30,
@@ -972,8 +972,8 @@ describe('useRecording recorder construction failures', () => {
 
   it.each([
     ['Local', 'local'],
-    ['Character', 'lucy-2.5'],
-    ['VTO', 'lucy-vton-3'],
+    ['Character', 'lucy-latest'],
+    ['VTO', 'lucy-vton-latest'],
   ] as const)(
     'warns and safely auto-finalizes a %s source at the independent recording maximum',
     async (_label, mode) => {
@@ -1070,7 +1070,7 @@ describe('useRecording recorder construction failures', () => {
     const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
 
     await act(async () => {
-      await result.current.start(source, 'lucy-2.5');
+      await result.current.start(source, 'lucy-latest');
     });
     const endedListener = (
       videoTrack?.addEventListener as unknown as ReturnType<typeof vi.fn>
@@ -1091,7 +1091,7 @@ describe('useRecording recorder construction failures', () => {
     expect(onAutomaticStop).toHaveBeenCalledOnce();
     expect(onAutomaticStop).toHaveBeenCalledWith(
       expect.objectContaining({
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         reason: 'maximum-duration',
         artifactId: result.current.original?.id,
       }),
@@ -1107,7 +1107,7 @@ describe('useRecording recorder construction failures', () => {
     const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
 
     await act(async () => {
-      await result.current.start(createSource(), 'lucy-2.5');
+      await result.current.start(createSource(), 'lucy-latest');
       vi.advanceTimersByTime(300_000);
       vi.runAllTicks();
       await Promise.resolve();
@@ -1127,7 +1127,7 @@ describe('useRecording recorder construction failures', () => {
     });
     expect(onAutomaticStop).toHaveBeenCalledWith(
       expect.objectContaining({
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         reason: 'maximum-duration',
         artifactId: result.current.original?.id,
       }),
@@ -1143,7 +1143,7 @@ describe('useRecording recorder construction failures', () => {
     const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
 
     await act(async () => {
-      await result.current.start(createSource(), 'lucy-vton-3');
+      await result.current.start(createSource(), 'lucy-vton-latest');
       vi.advanceTimersByTime(300_000);
       vi.runAllTicks();
       await Promise.resolve();
@@ -1159,7 +1159,7 @@ describe('useRecording recorder construction failures', () => {
     expect(result.current.original).toBeNull();
     expect(result.current.recordingError).toMatch(/did not finish the recording in time/i);
     expect(onAutomaticStop).toHaveBeenCalledWith({
-      mode: 'lucy-vton-3',
+      mode: 'lucy-vton-latest',
       reason: 'maximum-duration',
     });
 
@@ -1204,7 +1204,7 @@ describe('useRecording recorder construction failures', () => {
     const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
 
     await act(async () => {
-      await result.current.start(source, 'lucy-2.5');
+      await result.current.start(source, 'lucy-latest');
     });
 
     const endedListener = (
@@ -1220,7 +1220,7 @@ describe('useRecording recorder construction failures', () => {
 
     expect(onAutomaticStop).toHaveBeenCalledOnce();
     expect(onAutomaticStop).toHaveBeenCalledWith({
-      mode: 'lucy-2.5',
+      mode: 'lucy-latest',
       reason: 'source-ended',
     });
     expect(result.current.lifecycle).toBe('recorded');
@@ -1260,14 +1260,14 @@ describe('useRecording recorder construction failures', () => {
     const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
 
     await act(async () => {
-      await result.current.start(createSource(), 'lucy-vton-3');
+      await result.current.start(createSource(), 'lucy-vton-latest');
       await Promise.resolve();
       await Promise.resolve();
     });
 
     expect(onAutomaticStop).toHaveBeenCalledOnce();
     expect(onAutomaticStop).toHaveBeenCalledWith({
-      mode: 'lucy-vton-3',
+      mode: 'lucy-vton-latest',
       reason: 'recorder-error',
     });
     unmount();
@@ -1279,14 +1279,14 @@ describe('useRecording recorder construction failures', () => {
     const { result, unmount } = renderHook(() => useRecording({ onAutomaticStop }));
 
     await act(async () => {
-      await result.current.start(createSource(), 'lucy-2.5');
+      await result.current.start(createSource(), 'lucy-latest');
       await Promise.resolve();
       await Promise.resolve();
     });
 
     expect(onAutomaticStop).toHaveBeenCalledOnce();
     expect(onAutomaticStop).toHaveBeenCalledWith({
-      mode: 'lucy-2.5',
+      mode: 'lucy-latest',
       reason: 'recorder-stopped',
     });
     expect(result.current.lifecycle).toBe('recorded');

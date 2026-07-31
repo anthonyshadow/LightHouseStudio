@@ -1,11 +1,14 @@
 # Character AI session
 
-**Outcome:** deliberately start, refine, and optionally record a `lucy-2.5` transformation while
+**Outcome:** deliberately start, refine, and optionally record a `lucy-latest` transformation while
 retaining local preview as the fallback.
 
 ## Journey
 
 1. Create or choose a saved character. Saving preloads it but never starts AI.
+   The header selection exposes an adjacent **Unselect character** action, and the Character panel
+   exposes the same option. Unselecting returns the session draft to **Local Camera**, removes
+   **Start AI** from the stage controls, and restores local **Record**.
 2. Select **Start Camera + Mic**, then **Start AI** and the primary **Character Transformation**
    experience.
 3. Review the Decart disclosure and select **Start with [character]**. If no character is ready,
@@ -34,6 +37,8 @@ camera, token, or provider work.
   early provider end remains an error.
 - If AI ends while recording, take finalization settles before provider/local resources release.
 - Mode, source, and cross-model changes lock during AI start/live, recording, and take review.
+- Character unselection follows the same lock and is unavailable until AI, recording,
+  finalization, or take review releases its current owner.
 
 ## Evidence status
 

@@ -188,7 +188,7 @@ export const useReferenceRecipeAttribution = ({
             )
           : null;
       const sourceMode =
-        sourceAsset && 'modelModeId' in sourceAsset ? sourceAsset.modelModeId : 'lucy-2.5';
+        sourceAsset && 'modelModeId' in sourceAsset ? sourceAsset.modelModeId : 'lucy-latest';
       const appliedReferenceIdentity = referenceIdentity(referenceImage);
       const sourceStillMatches = Boolean(
         sourceAsset &&
@@ -255,7 +255,7 @@ export const useReferenceRecipeAttribution = ({
         type: 'commit',
         recipe: { origin: 'character-prompt', assetId: characterId },
         fingerprint: {
-          mode: 'lucy-2.5',
+          mode: 'lucy-latest',
           prompt: studioPrompt,
           referenceImageAssetId: referenceImage?.assetId ?? null,
           assetPrompt: snapshot.prompt,
@@ -269,7 +269,7 @@ export const useReferenceRecipeAttribution = ({
   const saveBlockedReason = characterBuilderSaveBlockedReason({
     openBlockedReason: characterBuilderOpenBlockedReason,
     shelfDirty,
-    canReplaceLucyRecipe: session.canReplaceRecipeDraft('lucy-2.5'),
+    canReplaceLucyRecipe: session.canReplaceRecipeDraft('lucy-latest'),
     referenceUsePending,
   });
   const saveBuiltCharacter = useCharacterStudioPreload({

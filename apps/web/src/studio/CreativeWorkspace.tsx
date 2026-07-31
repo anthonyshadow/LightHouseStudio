@@ -94,8 +94,8 @@ export type AuxiliaryPanel = 'closed' | 'workshop' | 'shelf';
 export type ModelMode = ModelModeId;
 
 const libraryModeOptions = [
-  { value: 'lucy-2.5', label: 'Character recipes', shortLabel: 'Character' },
-  { value: 'lucy-vton-3', label: 'Try-on recipes', shortLabel: 'Try-On' },
+  { value: 'lucy-latest', label: 'Character recipes', shortLabel: 'Character' },
+  { value: 'lucy-vton-latest', label: 'Try-on recipes', shortLabel: 'Try-On' },
 ] as const;
 
 export type CreativeWorkspaceState = {
@@ -349,7 +349,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
   } = refs;
   const theme = useTheme();
   const characterWorkshopBlocked =
-    recordingActive || (activeSessionMode !== 'lucy-2.5' && sessionModeLocked);
+    recordingActive || (activeSessionMode !== 'lucy-latest' && sessionModeLocked);
   const activePanel = panel === 'closed' ? null : panel;
   const shelfController = useRecipeShelfController({
     repository,

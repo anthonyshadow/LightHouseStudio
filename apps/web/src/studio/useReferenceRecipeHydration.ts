@@ -133,7 +133,7 @@ export const useReferenceRecipeHydration = ({
 
         if (!isCurrent()) return;
         const generatedLucyReference =
-          pending.mode === 'lucy-2.5' && storedReferenceMetadata?.source === 'generated'
+          pending.mode === 'lucy-latest' && storedReferenceMetadata?.source === 'generated'
             ? storedReferenceMetadata
             : null;
         const appliedPrompt = generatedLucyReference

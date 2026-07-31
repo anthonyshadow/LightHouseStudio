@@ -141,7 +141,7 @@ export const validateExistingVideo = async (
     };
     const issues = validateUploadedVideoFacts(
       facts,
-      includesVton ? [{ modelId: 'lucy-vton-3' }] : [],
+      includesVton ? [{ modelId: 'lucy-vton-latest' }] : [],
     );
     if (issues[0]) throw new Error(issues[0].message);
     signal.throwIfAborted();

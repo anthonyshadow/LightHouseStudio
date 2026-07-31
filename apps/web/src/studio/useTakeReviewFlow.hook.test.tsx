@@ -4,6 +4,7 @@ import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { useRecording as useRecordingHook } from '../orchestration/recording';
 import type { AutomaticRecordingStopEvent } from '../features/recording';
+import { createEmptyDraft } from '../features/media-session';
 
 const useRecording = vi.hoisted(() => vi.fn());
 const useRecordingSource = vi.hoisted(() => vi.fn());
@@ -49,7 +50,7 @@ const createSession = (
 ): FlowOptions['session'] =>
   ({
     displayStream,
-    draft: { mode: 'local' },
+    draft: createEmptyDraft('local'),
     localStream: displayStream,
     realtimeSessionTiming: null,
     completeExpectedModelSession: vi.fn().mockResolvedValue(undefined),
@@ -193,7 +194,7 @@ describe('useTakeReviewFlow finalization ownership', () => {
       return Promise.resolve();
     });
     const session = createSession(releaseForRecordedReview, {} as MediaStream, {
-      draft: { mode: 'lucy-2.5' } as FlowOptions['session']['draft'],
+      draft: { ...createEmptyDraft('lucy-latest'), prompt: 'Business host' },
       realtimeSessionTiming: {
         status: 'limit-reached',
         maximumSeconds: 300,

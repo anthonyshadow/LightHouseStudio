@@ -11,9 +11,9 @@ describe('studio transition policies', () => {
   });
 
   it('finalizes a model take when transformed video becomes unusable', () => {
-    expect(shouldFinalizeForUnusableModelOutput('recording', 'lucy-2.5', false)).toBe(true);
+    expect(shouldFinalizeForUnusableModelOutput('recording', 'lucy-latest', false)).toBe(true);
     expect(shouldFinalizeForUnusableModelOutput('recording', 'local', false)).toBe(false);
-    expect(shouldFinalizeForUnusableModelOutput('recording', 'lucy-vton-3', true)).toBe(false);
-    expect(shouldFinalizeForUnusableModelOutput('recorded', 'lucy-2.5', false)).toBe(false);
+    expect(shouldFinalizeForUnusableModelOutput('recording', 'lucy-vton-latest', true)).toBe(false);
+    expect(shouldFinalizeForUnusableModelOutput('recorded', 'lucy-latest', false)).toBe(false);
   });
 });

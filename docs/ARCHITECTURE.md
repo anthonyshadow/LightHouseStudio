@@ -69,7 +69,7 @@ player rather than changing its geometry.
 ## Session lifecycle
 
 `useStudioSession` coordinates the session; pure domain rules decide valid modes and transitions.
-The three modes are Local, `lucy-2.5`, and pinned `lucy-vton-3`.
+The three modes are Local, `lucy-latest`, and pinned `lucy-vton-latest`.
 
 1. The user edits a mode-specific in-memory draft. Text and enhancement survive mode switches;
    every departing reference relationship is cleared, and owned object URLs are revoked.

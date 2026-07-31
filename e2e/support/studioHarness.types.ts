@@ -10,7 +10,7 @@ import type {
 
 export type MockReferenceImageAsset = GeneratedReferenceImageAsset | UploadedReferenceImageAsset;
 
-export type ModelId = 'lucy-2.5' | 'lucy-vton-3';
+export type ModelId = 'lucy-latest' | 'lucy-vton-latest';
 
 export type SerializedSnapshot = {
   prompt: string;

@@ -3,8 +3,8 @@ import { recordingFileExtension } from './mime';
 
 const filenameMode: Readonly<Record<SessionModeId, string>> = {
   local: 'local',
-  'lucy-2.5': 'character',
-  'lucy-vton-3': 'virtual-try-on',
+  'lucy-latest': 'character',
+  'lucy-vton-latest': 'virtual-try-on',
 };
 
 const timestampForFilename = (value: string | number | Date): string => {

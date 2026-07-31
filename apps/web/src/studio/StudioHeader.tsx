@@ -22,6 +22,8 @@ type StudioHeaderProps = {
   activeCharacterName?: string | undefined;
   activeCharacterImageAssetId?: string | null | undefined;
   onOpenCharacterSelector: () => void;
+  onClearCharacter: () => void;
+  clearCharacterDisabledReason?: string | undefined;
 };
 
 const capabilityLabel = (
@@ -57,6 +59,8 @@ export const StudioHeader = ({
   activeCharacterName,
   activeCharacterImageAssetId,
   onOpenCharacterSelector,
+  onClearCharacter,
+  clearCharacterDisabledReason,
 }: StudioHeaderProps) => {
   const theme = useTheme();
   const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
@@ -109,6 +113,18 @@ export const StudioHeader = ({
           <span data-character-label>{activeCharacterName ?? 'Select Character'}</span>
           <ChevronDownIcon />
         </Button>
+        {activeCharacterName ? (
+          <Button
+            data-clear-character="true"
+            variant="quiet"
+            aria-label={`Unselect character: ${activeCharacterName}`}
+            title={clearCharacterDisabledReason ?? `Unselect ${activeCharacterName}`}
+            disabled={Boolean(clearCharacterDisabledReason)}
+            onClick={onClearCharacter}
+          >
+            <span aria-hidden="true">×</span>
+          </Button>
+        ) : null}
       </div>
       <details css={capabilityStyles(theme)} aria-label="Integration availability">
         <summary>

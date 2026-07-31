@@ -186,13 +186,13 @@ const stepStyles = (theme: Theme): CSSObject => ({
 });
 
 const modelLabel = (step: ExistingVideoStep): string =>
-  step.modelId === 'lucy-2.5' ? 'Swap Character' : 'Virtual Try On';
+  step.modelId === 'lucy-latest' ? 'Swap Character' : 'Virtual Try On';
 
 const stepHeading = (step: ExistingVideoStep): string =>
-  step.modelId === 'lucy-2.5' ? 'Swap Character (Lucy 2.5)' : 'Virtual Try On';
+  step.modelId === 'lucy-latest' ? 'Swap Character (Lucy 2.5)' : 'Virtual Try On';
 
 const stepIsComplete = (step: ExistingVideoStep): boolean => {
-  if (step.modelId === 'lucy-2.5') {
+  if (step.modelId === 'lucy-latest') {
     return Boolean(step.prompt.trim() || step.referenceImage);
   }
   if (step.inputKind === 'prompt') return Boolean(step.prompt.trim());
@@ -261,7 +261,7 @@ export const ExistingVideoPanel = ({
     }
     setReferenceError(null);
     workflow.updateStep(step.id, { referenceImage: file });
-    if (step.modelId === 'lucy-vton-3') {
+    if (step.modelId === 'lucy-vton-latest') {
       setRecentOutfits((current) => [
         { id: crypto.randomUUID(), file },
         ...current.filter((item) => item.file !== file),
@@ -284,7 +284,7 @@ export const ExistingVideoPanel = ({
         savedRecipeId: recipe.id,
         prompt: recipe.prompt,
         referenceImage: referenceImage?.file ?? null,
-        ...(step.modelId === 'lucy-vton-3'
+        ...(step.modelId === 'lucy-vton-latest'
           ? { inputKind: 'saved-outfit' as const, enhancePrompt: false }
           : {}),
       });
@@ -296,7 +296,7 @@ export const ExistingVideoPanel = ({
         savedRecipeId: recipe.id,
         prompt: recipe.prompt,
         referenceImage: null,
-        ...(step.modelId === 'lucy-vton-3'
+        ...(step.modelId === 'lucy-vton-latest'
           ? { inputKind: 'saved-outfit' as const, enhancePrompt: false }
           : {}),
       });
@@ -476,18 +476,20 @@ export const ExistingVideoPanel = ({
               </div>
               <div css={rowStyles(theme)} role="group" aria-label="Visual transformation">
                 <Button
-                  variant={workflow.steps[0]?.modelId === 'lucy-2.5' ? 'primary' : 'secondary'}
-                  aria-pressed={workflow.steps[0]?.modelId === 'lucy-2.5'}
+                  variant={workflow.steps[0]?.modelId === 'lucy-latest' ? 'primary' : 'secondary'}
+                  aria-pressed={workflow.steps[0]?.modelId === 'lucy-latest'}
                   disabled={structureLocked}
-                  onClick={() => workflow.addStep('lucy-2.5')}
+                  onClick={() => workflow.addStep('lucy-latest')}
                 >
                   Swap Character
                 </Button>
                 <Button
-                  variant={workflow.steps[0]?.modelId === 'lucy-vton-3' ? 'primary' : 'secondary'}
-                  aria-pressed={workflow.steps[0]?.modelId === 'lucy-vton-3'}
+                  variant={
+                    workflow.steps[0]?.modelId === 'lucy-vton-latest' ? 'primary' : 'secondary'
+                  }
+                  aria-pressed={workflow.steps[0]?.modelId === 'lucy-vton-latest'}
                   disabled={structureLocked}
-                  onClick={() => workflow.addStep('lucy-vton-3')}
+                  onClick={() => workflow.addStep('lucy-vton-latest')}
                 >
                   Virtual Try On
                 </Button>
@@ -500,7 +502,7 @@ export const ExistingVideoPanel = ({
                   <h3>{stepHeading(step)}</h3>
                   <span>1 Decart submission</span>
                 </header>
-                {step.modelId === 'lucy-vton-3' ? (
+                {step.modelId === 'lucy-vton-latest' ? (
                   <>
                     <p>
                       Virtual Try On is a controlled-pilot beta. Use media you have rights and
@@ -559,7 +561,7 @@ export const ExistingVideoPanel = ({
                         >
                           <option value="">Choose an outfit</option>
                           {savedRecipes
-                            .filter((recipe) => recipe.modelId === 'lucy-vton-3')
+                            .filter((recipe) => recipe.modelId === 'lucy-vton-latest')
                             .map((recipe) => (
                               <option key={recipe.id} value={`saved:${recipe.id}`}>
                                 {recipe.label}
@@ -592,7 +594,7 @@ export const ExistingVideoPanel = ({
                     />
                   </>
                 )}
-                {step.modelId === 'lucy-2.5' || step.inputKind === 'prompt' ? (
+                {step.modelId === 'lucy-latest' || step.inputKind === 'prompt' ? (
                   <>
                     <label>
                       Prompt
@@ -601,7 +603,7 @@ export const ExistingVideoPanel = ({
                         maxLength={1_200}
                         disabled={recipeLocked}
                         placeholder={
-                          step.modelId === 'lucy-2.5'
+                          step.modelId === 'lucy-latest'
                             ? 'Describe the character or visual edit'
                             : 'Describe the garment and desired appearance'
                         }
@@ -631,12 +633,12 @@ export const ExistingVideoPanel = ({
                     </label>
                   </>
                 ) : null}
-                {step.modelId === 'lucy-2.5' || step.inputKind === 'reference-image' ? (
+                {step.modelId === 'lucy-latest' || step.inputKind === 'reference-image' ? (
                   <ExistingVideoReferenceField
                     modelId={step.modelId}
                     file={step.referenceImage}
                     disabled={recipeLocked}
-                    allowUrlImport={step.modelId === 'lucy-vton-3'}
+                    allowUrlImport={step.modelId === 'lucy-vton-latest'}
                     onSelectFile={(file) => {
                       workflow.updateStep(step.id, { savedRecipeId: null });
                       void chooseReference(step, file);

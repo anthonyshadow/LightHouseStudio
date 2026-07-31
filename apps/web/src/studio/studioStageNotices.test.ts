@@ -158,7 +158,7 @@ describe('deriveRecordingDurationNotices', () => {
         lifecycle: 'recorded',
         elapsedSeconds: 300,
         automaticStopEvent: {
-          mode: 'lucy-vton-3',
+          mode: 'lucy-vton-latest',
           reason: 'maximum-duration',
           artifactId: 'take-at-maximum',
         },

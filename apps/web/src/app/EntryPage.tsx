@@ -58,7 +58,7 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
           ref={enterRef}
           variant="primary"
           onClick={() => {
-            void navigate(APP_PATHS.studio, { state: { creationIntent: 'camera' } });
+            void navigate(APP_PATHS.studio);
           }}
         >
           Start with camera

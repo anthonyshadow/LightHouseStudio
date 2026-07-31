@@ -253,8 +253,8 @@ for (const viewport of exactViewports) {
     const browser = await readBrowserState(page);
     expect(browser.cameraCalls).toBe(3);
     expect(browser.connections.map((connection) => connection.model)).toEqual([
-      'lucy-2.5',
-      'lucy-vton-3',
+      'lucy-latest',
+      'lucy-vton-latest',
     ]);
     expectNoExternalProviderTraffic(network);
   });
@@ -454,7 +454,7 @@ test('persistent controls preserve local media across VTON choice, AI stop, trac
   await expect(page.getByText('Studio idle', { exact: true })).toBeVisible();
   const browser = await readBrowserState(page);
   expect(browser.cameraCalls).toBe(1);
-  expect(browser.connections.map((connection) => connection.model)).toEqual(['lucy-vton-3']);
+  expect(browser.connections.map((connection) => connection.model)).toEqual(['lucy-vton-latest']);
   expect(browser.lifecycleEvents).toContain('local-video-stopped');
   expect(browser.lifecycleEvents).toContain('local-audio-stopped');
   await expectNoDocumentOverflow(page);
@@ -700,7 +700,7 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
   let browser = await readBrowserState(page);
   expect(browser.connections).toEqual([
     {
-      model: 'lucy-2.5',
+      model: 'lucy-latest',
       initial: {
         prompt: 'An adult paper-cut travel host',
         imageName: null,
@@ -732,7 +732,7 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
 
   browser = await readBrowserState(page);
   expect(browser.cameraCalls).toBe(1);
-  expect(browser.requirementModels).toEqual(['lucy-2.5', 'lucy-2.5']);
+  expect(browser.requirementModels).toEqual(['lucy-latest', 'lucy-latest']);
   expect(browser.connections).toHaveLength(2);
   expect(browser.connections[1]?.initial.prompt).toBe('An adult paper-cut science host');
   expect(browser.disconnectCalls).toBe(2);
@@ -740,7 +740,7 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
     network.apiRequests
       .filter(({ path }) => path === '/api/realtime-token')
       .map(({ model }) => model),
-  ).toEqual(['lucy-2.5', 'lucy-2.5']);
+  ).toEqual(['lucy-latest', 'lucy-latest']);
   expectNoExternalProviderTraffic(network);
 });
 
@@ -859,10 +859,10 @@ test('VTON 3 accepts a valid ephemeral garment image and starts with image-only 
 
   const browser = await readBrowserState(page);
   expect(browser.cameraCalls).toBe(1);
-  expect(browser.requirementModels).toEqual(['lucy-vton-3']);
+  expect(browser.requirementModels).toEqual(['lucy-vton-latest']);
   expect(browser.connections).toEqual([
     {
-      model: 'lucy-vton-3',
+      model: 'lucy-vton-latest',
       initial: { prompt: '', imageName: 'linen-overshirt.webp', enhance: false },
     },
   ]);
@@ -870,7 +870,7 @@ test('VTON 3 accepts a valid ephemeral garment image and starts with image-only 
     network.apiRequests
       .filter(({ path }) => path === '/api/realtime-token')
       .map(({ model }) => model),
-  ).toEqual(['lucy-vton-3']);
+  ).toEqual(['lucy-vton-latest']);
   expectNoExternalProviderTraffic(network);
 });
 

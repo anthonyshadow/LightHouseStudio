@@ -1,6 +1,6 @@
 export const LOCAL_MODE_ID = 'local' as const;
-export const CHARACTER_MODEL_ID = 'lucy-2.5' as const;
-export const VTON_MODEL_ID = 'lucy-vton-3' as const;
+export const CHARACTER_MODEL_ID = 'lucy-latest' as const;
+export const VTON_MODEL_ID = 'lucy-vton-latest' as const;
 
 export const MODEL_MODE_IDS = [CHARACTER_MODEL_ID, VTON_MODEL_ID] as const;
 export type ModelModeId = (typeof MODEL_MODE_IDS)[number];
@@ -30,18 +30,18 @@ export const SESSION_MODES = {
     label: 'Local camera',
     inputSemantics: 'none',
   },
-  'lucy-2.5': {
-    id: 'lucy-2.5',
+  'lucy-latest': {
+    id: 'lucy-latest',
     kind: 'model',
     label: 'Character',
-    providerModelId: 'lucy-2.5',
+    providerModelId: 'lucy-latest',
     inputSemantics: 'character',
   },
-  'lucy-vton-3': {
-    id: 'lucy-vton-3',
+  'lucy-vton-latest': {
+    id: 'lucy-vton-latest',
     kind: 'model',
     label: 'Virtual try-on',
-    providerModelId: 'lucy-vton-3',
+    providerModelId: 'lucy-vton-latest',
     inputSemantics: 'garment',
   },
 } as const satisfies Readonly<Record<SessionModeId, SessionMode>>;

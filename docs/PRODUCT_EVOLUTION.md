@@ -31,8 +31,8 @@ The primary path became **Start Camera + Mic → Start AI**. Drafting, uploads, 
 selection, and local capture do not require provider credentials, SDK loading, token minting, or
 external media traffic. Provider contact remains explicit and cost-sensitive.
 
-Character uses the exact `lucy-2.5` model. VTO remains a separate, secondary beta pinned to
-`lucy-vton-3`; the two experiences are not interchangeable and have no fallback.
+Character uses the exact `lucy-latest` model. VTO remains a separate, secondary beta pinned to
+`lucy-vton-latest`; the two experiences are not interchangeable and have no fallback.
 
 ## Characters became reusable, resumable assets
 

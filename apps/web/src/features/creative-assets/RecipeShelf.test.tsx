@@ -32,7 +32,7 @@ const renderShelf = (
     <StudioDesignProvider>
       <RecipeShelf
         repository={repository}
-        activeMode="lucy-2.5"
+        activeMode="lucy-latest"
         onUsePrompt={onUsePrompt}
         {...(builderActions ? { onCreateCharacter, onEditCharacter } : {})}
         onOpenCharacterWorkshop={onOpenCharacterWorkshop}
@@ -78,7 +78,7 @@ describe('RecipeShelf', () => {
       expect.objectContaining({
         origin: 'saved-prompt',
         prompt: 'Change the jacket material to copper satin.',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
       }),
     );
 
@@ -112,7 +112,7 @@ describe('RecipeShelf', () => {
     repository.createSavedPrompt({
       title: 'Night host',
       prompt: 'Transform the adult subject into a night host.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       source: 'manual',
       tags: [],
     });
@@ -122,7 +122,7 @@ describe('RecipeShelf', () => {
       <StudioDesignProvider>
         <RecipeShelf
           repository={repository}
-          activeMode="lucy-2.5"
+          activeMode="lucy-latest"
           promptUseDisabled
           onDirtyChange={onDirtyChange}
           onUsePrompt={vi.fn()}
@@ -233,7 +233,7 @@ describe('RecipeShelf', () => {
     const repository = createRepository();
     repository.recordSuccessfulPrompt({
       prompt: 'Substitute the character with an orbital cartographer.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       referenceImageAssetId: 'recent-reference-1',
     });
     repository.createSavedCharacterPrompt({
@@ -289,13 +289,13 @@ describe('RecipeShelf', () => {
     repository.createSavedPrompt({
       title: 'Editorial host',
       prompt: 'Give the adult presenter a refined editorial wardrobe.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       tags: ['Editorial', 'Studio'],
     });
     repository.createSavedPrompt({
       title: 'Casual host',
       prompt: 'Give the adult presenter a relaxed casual wardrobe.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       tags: ['Casual'],
     });
 
@@ -322,7 +322,7 @@ describe('RecipeShelf', () => {
     repository.createSavedPrompt({
       title: 'Editorial host',
       prompt: 'Give the presenter an editorial wardrobe.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       tags: ['Editorial'],
     });
     const character = repository.createSavedCharacterPrompt({
@@ -336,7 +336,7 @@ describe('RecipeShelf', () => {
       <StudioDesignProvider>
         <RecipeShelf
           repository={repository}
-          activeMode="lucy-2.5"
+          activeMode="lucy-latest"
           activeRecipe={null}
           onUsePrompt={onUsePrompt}
         />
@@ -349,7 +349,7 @@ describe('RecipeShelf', () => {
       <StudioDesignProvider>
         <RecipeShelf
           repository={repository}
-          activeMode="lucy-2.5"
+          activeMode="lucy-latest"
           activeRecipe={{ origin: 'character-prompt', assetId: character.id }}
           onUsePrompt={onUsePrompt}
         />
@@ -367,17 +367,17 @@ describe('RecipeShelf', () => {
     repository.createSavedPrompt({
       title: 'Character direction',
       prompt: 'Create a composed studio host.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
     });
     repository.createSavedPrompt({
       title: 'Garment direction',
       prompt: 'Apply the linen overshirt.',
-      modelModeId: 'lucy-vton-3',
+      modelModeId: 'lucy-vton-latest',
     });
 
     render(
       <StudioDesignProvider>
-        <RecipeShelf repository={repository} activeMode="lucy-vton-3" onUsePrompt={vi.fn()} />
+        <RecipeShelf repository={repository} activeMode="lucy-vton-latest" onUsePrompt={vi.fn()} />
       </StudioDesignProvider>,
     );
 
@@ -394,7 +394,7 @@ describe('RecipeShelf', () => {
     repository.createSavedPrompt({
       title: 'Editorial host',
       prompt: 'Give the presenter an editorial wardrobe.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
     });
     repository.createSavedCharacterPrompt({
       name: 'Field correspondent',
@@ -405,7 +405,7 @@ describe('RecipeShelf', () => {
     const onEntryIntentConsumed = vi.fn();
     const props = {
       repository,
-      activeMode: 'lucy-2.5' as const,
+      activeMode: 'lucy-latest' as const,
       onUsePrompt: vi.fn(),
       onEntryIntentConsumed,
     };

@@ -73,7 +73,7 @@ describe('recording source composition', () => {
     const providerAudio = track('audio', 'provider');
 
     const source = composeRecordingSource(
-      'lucy-2.5',
+      'lucy-latest',
       stream(camera, microphone),
       stream(transformed, providerAudio),
     );
@@ -88,7 +88,7 @@ describe('recording source composition', () => {
     const endedProviderAudio = track('audio', 'provider', 'ended');
 
     const source = composeRecordingSource(
-      'lucy-vton-3',
+      'lucy-vton-latest',
       stream(track('video', 'camera'), microphone),
       stream(transformed, endedProviderAudio),
     );
@@ -102,7 +102,7 @@ describe('recording source composition', () => {
     const microphone = track('audio', 'microphone');
 
     const source = composeRecordingSource(
-      'lucy-2.5',
+      'lucy-latest',
       stream(camera, microphone),
       stream(track('video', 'transformed', 'ended'), track('audio', 'provider')),
     );
@@ -113,7 +113,7 @@ describe('recording source composition', () => {
   it('returns null without a live local or transformed video track', () => {
     expect(
       composeRecordingSource(
-        'lucy-2.5',
+        'lucy-latest',
         stream(track('video', 'camera', 'ended'), track('audio', 'microphone')),
         stream(track('audio', 'provider')),
       ),
@@ -127,7 +127,7 @@ describe('recording source composition', () => {
     const active = composeRecordingSource('local', stream(camera, microphone), null);
     const sameTracks = composeRecordingSource('local', stream(camera, microphone), null);
     const changedAudio = composeRecordingSource(
-      'lucy-2.5',
+      'lucy-latest',
       stream(track('video', 'local'), microphone),
       stream(camera, providerAudio),
     );

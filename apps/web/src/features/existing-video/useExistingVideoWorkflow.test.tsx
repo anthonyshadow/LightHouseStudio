@@ -122,7 +122,7 @@ const inspected = (file: File) => ({
 
 const jobStatus = (jobId: string) => ({
   jobId,
-  modelId: 'lucy-2.5' as const,
+  modelId: 'lucy-latest' as const,
   status: 'ready' as const,
   createdAt: '2026-07-30T12:00:00.000Z',
   updatedAt: '2026-07-30T12:00:01.000Z',
@@ -176,15 +176,15 @@ describe('useExistingVideoWorkflow', () => {
     );
 
     await act(async () => result.current.selectFile(sourceFile));
-    act(() => result.current.addStep('lucy-2.5'));
-    expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-2.5']);
-    act(() => result.current.addStep('lucy-vton-3'));
-    expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-vton-3']);
-    act(() => result.current.addStep('lucy-2.5'));
-    expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-2.5']);
+    act(() => result.current.addStep('lucy-latest'));
+    expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-latest']);
+    act(() => result.current.addStep('lucy-vton-latest'));
+    expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-vton-latest']);
+    act(() => result.current.addStep('lucy-latest'));
+    expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-latest']);
     act(() =>
       result.current.updateStep(result.current.steps[0]!.id, {
-        prompt: 'Prompt for lucy-2.5',
+        prompt: 'Prompt for lucy-latest',
       }),
     );
 
@@ -195,7 +195,7 @@ describe('useExistingVideoWorkflow', () => {
     expect(recording.completeVisualProcessing).toHaveBeenCalledTimes(1);
     expect(onSubmissionAccepted).toHaveBeenCalledTimes(1);
     expect(result.current.completedStepCount).toBe(1);
-    expect(adapters.submitVideoJob.mock.calls[0]![1]).toMatchObject({ modelId: 'lucy-2.5' });
+    expect(adapters.submitVideoJob.mock.calls[0]![1]).toMatchObject({ modelId: 'lucy-latest' });
 
     expect(result.current.result?.objectUrl).toContain('blob:visual-lucy');
     act(() => result.current.downloadResult());
@@ -209,9 +209,9 @@ describe('useExistingVideoWorkflow', () => {
     expect(result.current.result).toBeNull();
     expect(result.current.comparison).toBe('original');
     expect(result.current.completedStepCount).toBe(0);
-    expect(result.current.submittedModels).toEqual(['lucy-2.5']);
+    expect(result.current.submittedModels).toEqual(['lucy-latest']);
 
-    act(() => result.current.addStep('lucy-vton-3'));
+    act(() => result.current.addStep('lucy-vton-latest'));
     act(() =>
       result.current.updateStep(result.current.steps[0]!.id, {
         prompt: 'Second submission from the retained original',
@@ -222,7 +222,7 @@ describe('useExistingVideoWorkflow', () => {
 
     expect(adapters.submitVideoJob).toHaveBeenCalledTimes(2);
     expect(adapters.submitVideoJob.mock.calls[1]![1]).toMatchObject({
-      modelId: 'lucy-vton-3',
+      modelId: 'lucy-vton-latest',
       prompt: 'Second submission from the retained original',
     });
     unmount();
@@ -257,7 +257,7 @@ describe('useExistingVideoWorkflow', () => {
 
     await act(async () => result.current.selectFile(sourceFile));
     act(() => {
-      result.current.addStep('lucy-2.5');
+      result.current.addStep('lucy-latest');
       result.current.selectVoice('voice-northstar', 'Northstar Narrator');
     });
     act(() =>
@@ -330,7 +330,7 @@ describe('useExistingVideoWorkflow', () => {
     );
 
     await act(async () => result.current.selectFile(sourceFile));
-    act(() => result.current.addStep('lucy-2.5'));
+    act(() => result.current.addStep('lucy-latest'));
     const stepId = result.current.steps[0]!.id;
     act(() => result.current.updateStep(stepId, { prompt: 'Original accepted prompt' }));
 
@@ -367,7 +367,7 @@ describe('useExistingVideoWorkflow', () => {
     );
 
     await act(async () => result.current.selectFile(sourceFile));
-    act(() => result.current.addStep('lucy-2.5'));
+    act(() => result.current.addStep('lucy-latest'));
     act(() =>
       result.current.updateStep(result.current.steps[0]!.id, {
         prompt: 'Keep the completed recipe pinned',
@@ -416,7 +416,7 @@ describe('useExistingVideoWorkflow', () => {
     );
 
     await act(async () => result.current.selectFile(sourceFile));
-    act(() => result.current.addStep('lucy-2.5'));
+    act(() => result.current.addStep('lucy-latest'));
     act(() =>
       result.current.updateStep(result.current.steps[0]!.id, {
         prompt: 'Change the lighting',

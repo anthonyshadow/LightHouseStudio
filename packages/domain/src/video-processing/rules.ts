@@ -60,7 +60,7 @@ export const validateUploadedVideoFacts = (
       message: 'Use a 16:9 landscape or 9:16 portrait video.',
     });
   }
-  const includesVton = steps.some((step) => step.modelId === 'lucy-vton-3');
+  const includesVton = steps.some((step) => step.modelId === 'lucy-vton-latest');
   const maximumBytes = includesVton ? VTON_VIDEO_SIZE_LIMIT_BYTES : GENERAL_VIDEO_SIZE_LIMIT_BYTES;
   if (facts.sizeBytes > maximumBytes) {
     issues.push({
@@ -81,10 +81,10 @@ export const validateVideoTransformPlan = (
   for (const step of steps) {
     if (!step.prompt.trim() && !step.hasReferenceImage) {
       issues.push(
-        `${step.modelId === 'lucy-2.5' ? 'Character' : 'Virtual Try-On'} needs a prompt, reference image, or both.`,
+        `${step.modelId === 'lucy-latest' ? 'Character' : 'Virtual Try-On'} needs a prompt, reference image, or both.`,
       );
     }
-    if (step.modelId === 'lucy-2.5') {
+    if (step.modelId === 'lucy-latest') {
       if (step.inputKind !== undefined && step.inputKind !== 'character') {
         issues.push('Character edits must use character input.');
       }
@@ -111,8 +111,8 @@ export const validateVideoTransformPlan = (
 };
 
 export const canSubmitPilotBatchJob = (
-  submittedModels: readonly ('lucy-2.5' | 'lucy-vton-3')[],
-  candidate: 'lucy-2.5' | 'lucy-vton-3',
+  submittedModels: readonly ('lucy-latest' | 'lucy-vton-latest')[],
+  candidate: 'lucy-latest' | 'lucy-vton-latest',
 ): boolean =>
   submittedModels.length < PILOT_BATCH_SUBMISSION_LIMIT &&
   submittedModels.filter((model) => model === candidate).length <

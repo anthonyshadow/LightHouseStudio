@@ -66,7 +66,7 @@ describe('createCreativeAssetRepository', () => {
       repository.createSavedPrompt({
         title: 'Valid title',
         prompt: '   ',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
       }),
     ).toThrow(
       expect.objectContaining({
@@ -87,28 +87,28 @@ describe('createCreativeAssetRepository', () => {
     const saved = repository.createSavedPrompt({
       title: '  Copper   jacket ',
       prompt: 'Change the jacket material to brushed copper.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       tags: ['Editorial', 'editorial', ...Array.from({ length: 20 }, (_, index) => `tag-${index}`)],
     });
     repository.createSavedPrompt({
       title: 'Linen overshirt',
       prompt: 'Dress the garment in natural linen.',
-      modelModeId: 'lucy-vton-3',
+      modelModeId: 'lucy-vton-latest',
     });
 
     expect(saved.title).toBe('Copper jacket');
     expect(saved.tags).toHaveLength(12);
-    expect(repository.search('copper', 'lucy-2.5').savedPrompts).toHaveLength(1);
-    expect(repository.search('linen', 'lucy-2.5').savedPrompts).toHaveLength(0);
+    expect(repository.search('copper', 'lucy-latest').savedPrompts).toHaveLength(1);
+    expect(repository.search('linen', 'lucy-latest').savedPrompts).toHaveLength(0);
 
     repository.recordSuccessfulPrompt({
       prompt: '  Change the jacket material to brushed copper.  ',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       savedPromptId: saved.id,
     });
     repository.recordSuccessfulPrompt({
       prompt: 'Change   the jacket material to brushed copper.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       savedPromptId: saved.id,
     });
     expect(repository.getSnapshot().store.recentPrompts).toHaveLength(1);
@@ -159,18 +159,18 @@ describe('createCreativeAssetRepository', () => {
     const repository = repositoryFixture(storage);
     repository.recordSuccessfulPrompt({
       prompt: 'Substitute the character with a glassblower.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       referenceImageAssetId: 'asset-a',
     });
     repository.recordSuccessfulPrompt({
       prompt: 'Substitute the character with a glassblower.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       referenceImageAssetId: 'asset-b',
     });
     const saved = repository.createSavedPrompt({
       title: 'Glassblower',
       prompt: 'Substitute the character with a glassblower.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       referenceImageAssetId: 'asset-b',
     });
     const character = repository.createSavedCharacterPrompt({
@@ -205,7 +205,7 @@ describe('createCreativeAssetRepository', () => {
 
     repository.recordSuccessfulPrompt({
       prompt: character.prompt,
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       savedCharacterPromptId: character.id,
       referenceImageAssetId: 'asset-b',
     });
@@ -216,7 +216,7 @@ describe('createCreativeAssetRepository', () => {
 
     repository.recordSuccessfulPrompt({
       prompt: character.prompt,
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       savedCharacterPromptId: character.id,
       referenceImageAssetId: 'asset-a',
     });
@@ -252,7 +252,7 @@ describe('createCreativeAssetRepository', () => {
 
     repository.recordSuccessfulPrompt({
       prompt: '',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       savedCharacterPromptId: character.id,
       characterName: character.name,
       referenceImageAssetId: 'uploaded-asset',
@@ -295,16 +295,16 @@ describe('createCreativeAssetRepository', () => {
     const repository = repositoryFixture();
     repository.recordSuccessfulPrompt({
       prompt: 'Substitute the character with a cartographer.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
     });
     repository.enrichNewestMatchingRecent(
       'Substitute the character with a cartographer.',
-      'lucy-2.5',
+      'lucy-latest',
       'asset-a',
     );
     repository.enrichNewestMatchingRecent(
       'Substitute the character with a cartographer.',
-      'lucy-2.5',
+      'lucy-latest',
       'asset-b',
     );
     expect(repository.getSnapshot().store.recentPrompts).toEqual([
@@ -323,7 +323,7 @@ describe('createCreativeAssetRepository', () => {
             id: 'legacy-prompt',
             title: 'Legacy prompt',
             prompt: 'Keep the scene cinematic.',
-            modelModeId: 'lucy-2.5',
+            modelModeId: 'lucy-latest',
             source: 'manual',
             tags: [],
             createdAt: '2026-07-14T12:00:00.000Z',
@@ -525,7 +525,7 @@ describe('createCreativeAssetRepository', () => {
             id: 'legacy-safe',
             title: 'Legacy recipe',
             prompt: 'Add a paper moon above the subject.',
-            modelModeId: 'lucy-2.5',
+            modelModeId: 'lucy-latest',
             source: 'manual',
             tags: [],
             createdAt: '2026-07-14T12:00:00.000Z',
@@ -555,7 +555,7 @@ describe('createCreativeAssetRepository', () => {
     repository.createSavedPrompt({
       title: 'Tab-only recipe',
       prompt: 'Add a small paper moon above the left shoulder.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
     });
 
     expect(repository.getSnapshot().health).toBe('session-only');

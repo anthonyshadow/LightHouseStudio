@@ -50,12 +50,12 @@ beforeEach(() => {
 
 describe('Decart realtime gateway', () => {
   it('resolves the requested Lucy 2.5 model constraints lazily', async () => {
-    await expect(getDecartModelRequirements('lucy-2.5')).resolves.toEqual({
+    await expect(getDecartModelRequirements('lucy-latest')).resolves.toEqual({
       width: 1_280,
       height: 720,
       frameRate: 30,
     });
-    expect(sdk.realtimeModel).toHaveBeenCalledWith('lucy-2.5');
+    expect(sdk.realtimeModel).toHaveBeenCalledWith('lucy-latest');
   });
 
   it('sends each live Apply as a full replacement payload including image null', async () => {
@@ -71,7 +71,7 @@ describe('Decart realtime gateway', () => {
 
     const session = await connectDecartRealtime({
       apiKey: 'browser-scoped-token',
-      model: 'lucy-2.5',
+      model: 'lucy-latest',
       localStream,
       initial: { prompt: 'An adult field host', image: initialImage, enhance: true },
       ...callbacks,
@@ -83,7 +83,7 @@ describe('Decart realtime gateway', () => {
       logger: sdk.noopLogger,
     });
     expect(sdk.connect).toHaveBeenCalledWith(localStream, {
-      model: { id: 'lucy-2.5', width: 1_280, height: 720, fps: 30 },
+      model: { id: 'lucy-latest', width: 1_280, height: 720, fps: 30 },
       mirror: 'auto',
       initialState: {
         prompt: { text: 'An adult field host', enhance: true },
@@ -108,7 +108,7 @@ describe('Decart realtime gateway', () => {
   it('detaches listeners and disconnects exactly once', async () => {
     const session = await connectDecartRealtime({
       apiKey: 'browser-scoped-token',
-      model: 'lucy-vton-3',
+      model: 'lucy-vton-latest',
       localStream: {} as MediaStream,
       initial: { prompt: '', image: new File(['garment'], 'top.png'), enhance: false },
       onRemoteStream: vi.fn(),
@@ -134,7 +134,7 @@ describe('Decart realtime gateway', () => {
     const onGenerationEnded = vi.fn();
     const session = await connectDecartRealtime({
       apiKey: 'browser-scoped-token',
-      model: 'lucy-2.5',
+      model: 'lucy-latest',
       localStream: {} as MediaStream,
       initial: { prompt: 'Adult field host', image: null, enhance: false },
       onRemoteStream: vi.fn(),
@@ -200,7 +200,7 @@ describe('Decart realtime gateway', () => {
     const onError = vi.fn();
     const session = await connectDecartRealtime({
       apiKey: 'browser-scoped-token',
-      model: 'lucy-2.5',
+      model: 'lucy-latest',
       localStream: {} as MediaStream,
       initial: { prompt: 'Adult field host', image: null, enhance: false },
       onRemoteStream: vi.fn(),
@@ -231,7 +231,7 @@ describe('Decart realtime gateway', () => {
     });
     const session = await connectDecartRealtime({
       apiKey: 'browser-scoped-token',
-      model: 'lucy-2.5',
+      model: 'lucy-latest',
       localStream: {} as MediaStream,
       initial: { prompt: 'Adult field host', image: null, enhance: false },
       onRemoteStream: vi.fn(),
@@ -285,7 +285,7 @@ describe('Decart realtime gateway', () => {
     const controller = new AbortController();
     const pending = connectDecartRealtime({
       apiKey: 'browser-scoped-token',
-      model: 'lucy-2.5',
+      model: 'lucy-latest',
       localStream: { getTracks: () => [sourceTrack] } as unknown as MediaStream,
       initial: { prompt: 'Adult field host', image: null, enhance: false },
       signal: controller.signal,

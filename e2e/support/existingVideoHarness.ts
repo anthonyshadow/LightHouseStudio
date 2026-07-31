@@ -41,9 +41,9 @@ export const installFakeVideoJobRoutes = async (
       const providerIntent = request.headers()[VIDEO_PROVIDER_INTENT_HEADER] ?? null;
       if (request.method() === 'PUT') {
         const body = request.postDataBuffer()?.toString('latin1') ?? '';
-        const modelId: VideoTransformModelId = body.includes('lucy-vton-3')
-          ? 'lucy-vton-3'
-          : 'lucy-2.5';
+        const modelId: VideoTransformModelId = body.includes('lucy-vton-latest')
+          ? 'lucy-vton-latest'
+          : 'lucy-latest';
         jobs.set(jobId, modelId);
         calls.push({
           method: 'PUT',
@@ -70,7 +70,7 @@ export const installFakeVideoJobRoutes = async (
         return;
       }
 
-      const modelId = jobs.get(jobId) ?? 'lucy-2.5';
+      const modelId = jobs.get(jobId) ?? 'lucy-latest';
       calls.push({
         method: request.method(),
         modelId,

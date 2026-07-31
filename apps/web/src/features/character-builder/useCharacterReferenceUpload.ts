@@ -93,7 +93,7 @@ export const useCharacterReferenceUpload = ({
           : crypto.randomUUID();
 
       try {
-        const validation = await validateReferenceImage(file, 'lucy-2.5');
+        const validation = await validateReferenceImage(file, 'lucy-latest');
         if (validation.blockingError) throw new Error(validation.blockingError);
         if (
           !validation.width ||

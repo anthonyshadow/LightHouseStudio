@@ -38,7 +38,7 @@ export const useReferenceRecipeWorkshop = ({
   const openSavedWorkshop = useCallback(
     (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => {
       if (recordingActive || draft.intent === 'character-transform') return;
-      if (session.draft.mode !== 'lucy-2.5' && !selectLucyMode()) return;
+      if (session.draft.mode !== 'lucy-latest' && !selectLucyMode()) return;
       sourceRecipeRef.current = { origin: 'character-prompt', assetId: asset.id };
       drafts.rememberDraft(draft);
       openWorkshopOverlay();
@@ -65,12 +65,12 @@ export const useReferenceRecipeWorkshop = ({
         sourceAsset &&
         !preserveCurrentReference &&
         (sourceRecipe?.origin !== 'saved-prompt' ||
-          ('modelModeId' in sourceAsset && sourceAsset.modelModeId === 'lucy-2.5')) &&
+          ('modelModeId' in sourceAsset && sourceAsset.modelModeId === 'lucy-latest')) &&
         canonicalPrompt(sourceAsset.prompt) === canonicalPrompt(action.prompt) &&
         sourceAsset.referenceImageAssetId === action.referenceImageAssetId,
       );
       return {
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: action.prompt,
         referenceImageAssetId: action.referenceImageAssetId,
         preserveCurrentReference,
@@ -117,7 +117,7 @@ export const useReferenceRecipeWorkshop = ({
 
   const openWorkshop = useCallback(() => {
     if (recordingActive) return;
-    if (session.draft.mode !== 'lucy-2.5' && !selectLucyMode()) return;
+    if (session.draft.mode !== 'lucy-latest' && !selectLucyMode()) return;
     sourceRecipeRef.current = activeRecipe;
     openWorkshopOverlay();
   }, [activeRecipe, openWorkshopOverlay, recordingActive, selectLucyMode, session.draft.mode]);

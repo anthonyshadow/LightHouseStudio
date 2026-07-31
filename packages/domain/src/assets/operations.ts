@@ -265,7 +265,7 @@ export const recordSuccessfulPromptUse = (
   const promptKey = canonicalPrompt(prompt);
   const referenceImageAssetId = normalizeReferenceImageAssetId(input.referenceImageAssetId);
   const matchingCharacter =
-    input.modelModeId === 'lucy-2.5' && input.savedCharacterPromptId
+    input.modelModeId === 'lucy-latest' && input.savedCharacterPromptId
       ? store.savedCharacterPrompts.find(
           (asset) =>
             asset.id === input.savedCharacterPromptId &&
@@ -278,7 +278,7 @@ export const recordSuccessfulPromptUse = (
   if (
     !hasPrompt &&
     (!referenceImageAssetId ||
-      input.modelModeId !== 'lucy-2.5' ||
+      input.modelModeId !== 'lucy-latest' ||
       !characterName ||
       !containsMeaningfulText(characterName))
   ) {
@@ -606,7 +606,7 @@ export const searchCreativeAssets = (
         matches([recent.prompt, recent.characterName ?? '']),
     ),
     savedCharacterPrompts:
-      modelModeId === 'lucy-vton-3'
+      modelModeId === 'lucy-vton-latest'
         ? []
         : store.savedCharacterPrompts.filter((asset) =>
             matches([asset.name, asset.prompt, asset.notes, ...asset.tags]),

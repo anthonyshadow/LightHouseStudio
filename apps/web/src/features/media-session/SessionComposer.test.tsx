@@ -66,13 +66,13 @@ describe('SessionComposer', () => {
     expect(screen.queryByText(/Starting AI sends live camera/u)).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Character · Lucy 2.5' }));
-    expect(session.selectMode).toHaveBeenCalledWith('lucy-2.5');
+    expect(session.selectMode).toHaveBeenCalledWith('lucy-latest');
   });
 
   it('preserves the visible portrait guidance and explicit workshop action', async () => {
     const user = userEvent.setup();
     const onOpenWorkshop = vi.fn();
-    renderComposer(createSession('lucy-2.5'), onOpenWorkshop);
+    renderComposer(createSession('lucy-latest'), onOpenWorkshop);
 
     expect(screen.getByLabelText('Optional portrait reference')).toHaveAttribute(
       'accept',
@@ -87,7 +87,7 @@ describe('SessionComposer', () => {
   });
 
   it('keeps the action footer persistent and explains why an empty AI draft cannot start', () => {
-    const session = createSession('lucy-vton-3');
+    const session = createSession('lucy-vton-latest');
     const view = renderComposer(session);
 
     expect(view.container.querySelector('[data-scroll-region="recipe-dock"]')).toBeTruthy();
@@ -105,8 +105,8 @@ describe('SessionComposer', () => {
 
   it('shares the complete Decart disclosure beside direct Dock Start', () => {
     renderComposer(
-      createSession('lucy-2.5', {
-        draft: { ...createEmptyDraft('lucy-2.5'), prompt: 'Adult field host' },
+      createSession('lucy-latest', {
+        draft: { ...createEmptyDraft('lucy-latest'), prompt: 'Adult field host' },
       }),
     );
 
@@ -120,14 +120,14 @@ describe('SessionComposer', () => {
 
   it('communicates real preflight and live provider state without changing controllers', () => {
     const applied = {
-      mode: 'lucy-2.5' as const,
+      mode: 'lucy-latest' as const,
       prompt: 'Adult field correspondent',
       referenceImage: null,
       referenceIdentity: null,
       enhance: true,
     };
     const view = renderComposer(
-      createSession('lucy-2.5', {
+      createSession('lucy-latest', {
         lifecycle: 'ready',
         localStream: {} as MediaStream,
       }),
@@ -138,9 +138,9 @@ describe('SessionComposer', () => {
     view.rerender(
       <StudioDesignProvider>
         <SessionComposer
-          session={createSession('lucy-2.5', {
+          session={createSession('lucy-latest', {
             draft: {
-              ...createEmptyDraft('lucy-2.5'),
+              ...createEmptyDraft('lucy-latest'),
               prompt: 'Adult field correspondent',
               enhance: true,
             },
@@ -162,8 +162,8 @@ describe('SessionComposer', () => {
   });
 
   it('locks recipe editing controls while recording', () => {
-    const session = createSession('lucy-2.5', {
-      draft: { ...createEmptyDraft('lucy-2.5'), prompt: 'Adult presenter' },
+    const session = createSession('lucy-latest', {
+      draft: { ...createEmptyDraft('lucy-latest'), prompt: 'Adult presenter' },
     });
     render(
       <StudioDesignProvider>
@@ -178,8 +178,8 @@ describe('SessionComposer', () => {
 
   it('does not reset a populated draft when the user declines confirmation', async () => {
     const user = userEvent.setup();
-    const session = createSession('lucy-vton-3', {
-      draft: { ...createEmptyDraft('lucy-vton-3'), prompt: 'navy wool jacket' },
+    const session = createSession('lucy-vton-latest', {
+      draft: { ...createEmptyDraft('lucy-vton-latest'), prompt: 'navy wool jacket' },
     });
     vi.spyOn(window, 'confirm').mockReturnValue(false);
     renderComposer(session);
@@ -191,8 +191,8 @@ describe('SessionComposer', () => {
   });
 
   it('moves focus to intentional actions when async session controls are replaced', async () => {
-    const idle = createSession('lucy-2.5', {
-      draft: { ...createEmptyDraft('lucy-2.5'), prompt: 'Adult field host' },
+    const idle = createSession('lucy-latest', {
+      draft: { ...createEmptyDraft('lucy-latest'), prompt: 'Adult field host' },
     });
     const view = renderComposer(idle);
     screen.getByRole('button', { name: 'Start Character AI' }).focus();
@@ -200,7 +200,7 @@ describe('SessionComposer', () => {
     view.rerender(
       <StudioDesignProvider>
         <SessionComposer
-          session={createSession('lucy-2.5', {
+          session={createSession('lucy-latest', {
             draft: idle.draft,
             lifecycle: 'requesting-token',
             localStream: {} as MediaStream,

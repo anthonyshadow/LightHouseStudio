@@ -1,8 +1,39 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { useRecording } from '../orchestration/recording';
-import { deriveTakeStagePresentation, finalizeTakeForReview } from './useTakeReviewFlow';
+import {
+  deriveTakeStagePresentation,
+  finalizeTakeForReview,
+  resolveRecordingMode,
+} from './useTakeReviewFlow';
 
 type RecordingController = ReturnType<typeof useRecording>;
+
+describe('resolveRecordingMode', () => {
+  it('keeps local capture available until transformed output is usable', () => {
+    expect(
+      resolveRecordingMode(
+        {
+          mode: 'lucy-latest',
+          prompt: 'Prompt-only character draft',
+          referenceImage: null,
+          enhance: false,
+        },
+        false,
+      ),
+    ).toBe('local');
+    expect(
+      resolveRecordingMode(
+        {
+          mode: 'lucy-vton-latest',
+          prompt: 'Navy wool jacket',
+          referenceImage: null,
+          enhance: false,
+        },
+        true,
+      ),
+    ).toBe('lucy-vton-latest');
+  });
+});
 
 const recordingState = (
   overrides: Partial<
@@ -28,10 +59,10 @@ describe('deriveTakeStagePresentation', () => {
         finalizingStartedAt: null,
         finalizingStream: null,
         displayStream: null,
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         transformedVideoUsable: false,
       }),
-    ).toEqual({ kind: 'idle', mode: 'lucy-2.5' });
+    ).toEqual({ kind: 'idle', mode: 'lucy-latest' });
 
     const localStream = {} as MediaStream;
     expect(
@@ -54,7 +85,7 @@ describe('deriveTakeStagePresentation', () => {
         finalizingStartedAt: null,
         finalizingStream: null,
         displayStream: providerStream,
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         transformedVideoUsable: true,
       }),
     ).toMatchObject({

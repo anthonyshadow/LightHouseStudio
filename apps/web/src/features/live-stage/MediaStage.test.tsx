@@ -566,8 +566,8 @@ describe('MediaStage', () => {
     const play = vi.mocked(HTMLMediaElement.prototype.play);
     const view = render(
       stage({
-        presentation: { kind: 'idle', mode: 'lucy-2.5' },
-        mode: 'lucy-2.5',
+        presentation: { kind: 'idle', mode: 'lucy-latest' },
+        mode: 'lucy-latest',
       }),
     );
 
@@ -579,8 +579,8 @@ describe('MediaStage', () => {
 
     view.rerender(
       stage({
-        presentation: { kind: 'idle', mode: 'lucy-vton-3' },
-        mode: 'lucy-vton-3',
+        presentation: { kind: 'idle', mode: 'lucy-vton-latest' },
+        mode: 'lucy-vton-latest',
       }),
     );
     expect(screen.getByText('Your private try-on stage.')).toBeInTheDocument();

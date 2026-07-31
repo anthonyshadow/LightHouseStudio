@@ -70,7 +70,7 @@ export const useReferenceRecipeHandoff = ({
     [mediaLocked, session],
   );
   const selectLucyMode = useCallback(
-    () => selectModeWithDraftProtection('lucy-2.5'),
+    () => selectModeWithDraftProtection('lucy-latest'),
     [selectModeWithDraftProtection],
   );
 
@@ -126,6 +126,12 @@ export const useReferenceRecipeHandoff = ({
     [hydration, repository],
   );
 
+  const clearActiveCharacter = useCallback((): boolean => {
+    if (!activeRecipe.character || sessionModeLocked || !session.selectMode('local')) return false;
+    dispatchActiveRecipe({ type: 'clear' });
+    return true;
+  }, [activeRecipe.character, session, sessionModeLocked]);
+
   const applyWorkshopPrompt = useCallback(
     (action: PromptWorkshopAction) => {
       hydration.useRecipe(workshop.createPendingUse(action));
@@ -157,6 +163,7 @@ export const useReferenceRecipeHandoff = ({
       rememberWorkshopDraft: workshop.rememberDraft,
       setShelfDirty: library.setDirty,
       useRecipe,
+      clearActiveCharacter,
       retryReferenceUse: hydration.retry,
       continueReferenceUseWithoutImage: hydration.continueWithoutReference,
       saveBuiltCharacter: attribution.saveBuiltCharacter,

@@ -28,7 +28,7 @@ export const ModelRecipeFields = ({
     <section aria-labelledby={`${mode}-recipe-fields-heading`} css={recipeFieldsStyles(theme)}>
       <header css={recipeFieldsHeadingStyles(theme)}>
         <h3 id={`${mode}-recipe-fields-heading`}>
-          {mode === 'lucy-2.5' ? 'Character recipe' : 'Try-On recipe'}
+          {mode === 'lucy-latest' ? 'Character recipe' : 'Try-On recipe'}
         </h3>
         <p>
           {session.applied
@@ -38,12 +38,12 @@ export const ModelRecipeFields = ({
       </header>
 
       <TextAreaField
-        label={mode === 'lucy-2.5' ? 'Character direction' : 'Garment direction'}
+        label={mode === 'lucy-latest' ? 'Character direction' : 'Garment direction'}
         value={session.draft.prompt}
         maxLength={1_200}
         disabled={recording}
         placeholder={
-          mode === 'lucy-2.5'
+          mode === 'lucy-latest'
             ? 'Describe the character or visible change…'
             : 'Substitute the current top with a navy wool jacket…'
         }
@@ -51,7 +51,7 @@ export const ModelRecipeFields = ({
         onChange={(event) => session.updatePrompt(event.target.value)}
       />
 
-      {mode === 'lucy-2.5' ? (
+      {mode === 'lucy-latest' ? (
         <Button variant="quiet" disabled={recording} onClick={onOpenWorkshop}>
           Open structured prompt workshop
         </Button>
@@ -64,7 +64,7 @@ export const ModelRecipeFields = ({
         onChange={session.updateReferenceImage}
       />
 
-      {mode === 'lucy-vton-3' ? (
+      {mode === 'lucy-vton-latest' ? (
         <StatusNotice title="Virtual Try-On beta guidance">
           Use one garment on a plain background. This preview is creative visualization only; it
           does not predict fit, sizing, fabric behavior, or purchase accuracy.

@@ -40,7 +40,7 @@ const WorkspaceHarness = () => {
     panel,
     activeTool: panel === 'closed' ? 'dock' : panel,
     activeSessionMode: 'local',
-    libraryMode: 'lucy-2.5',
+    libraryMode: 'lucy-latest',
     workshopDrafts: {},
     recordingActive: false,
     sessionModeLocked: false,

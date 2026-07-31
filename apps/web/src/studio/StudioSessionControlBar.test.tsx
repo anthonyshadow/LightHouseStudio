@@ -118,22 +118,30 @@ const renderBar = (
   reviewingTake = false,
   onCloseTakeReview = vi.fn(),
   onOpenVoiceTreatments = vi.fn(),
-  onEditVideo?: () => void,
+  options: {
+    experienceLabel?: string;
+    onDiscardTake?: () => void;
+    onEditVideo?: () => void;
+    recordingMode?: StudioSessionController['draft']['mode'];
+  } = {},
 ) =>
   render(
     <StudioDesignProvider>
       <StudioSessionControlBar
         session={session}
+        {...(options.experienceLabel ? { experienceLabel: options.experienceLabel } : {})}
         recording={recording}
+        recordingMode={options.recordingMode ?? session.draft.mode}
         recordingSource={session.localStream ? recordingSource : null}
         recordingSupported
         reviewingTake={reviewingTake}
         onStopRecording={onStopRecording}
         onCloseTakeReview={onCloseTakeReview}
+        {...(options.onDiscardTake ? { onDiscardTake: options.onDiscardTake } : {})}
         onOpenVoiceTreatments={onOpenVoiceTreatments}
         onChooseAiExperience={onChooseAiExperience}
         onChangeExperience={onChooseAiExperience}
-        {...(onEditVideo ? { onEditVideo } : {})}
+        {...(options.onEditVideo ? { onEditVideo: options.onEditVideo } : {})}
       />
     </StudioDesignProvider>,
   );
@@ -161,6 +169,7 @@ describe('StudioSessionControlBar', () => {
         <StudioSessionControlBar
           session={createSession({ lifecycle: 'requesting-media' })}
           recording={createRecording()}
+          recordingMode="local"
           recordingSource={null}
           recordingSupported
           reviewingTake={false}
@@ -175,11 +184,24 @@ describe('StudioSessionControlBar', () => {
     expect(screen.getByRole('button', { name: 'Starting camera…' })).toBeDisabled();
   });
 
-  it('keeps AI, track toggles, and full shutdown available during local preview', async () => {
+  it('keeps AI, track toggles, and full shutdown available for a selected experience', async () => {
     const user = userEvent.setup();
     const onChooseAiExperience = vi.fn();
-    const session = createSession({ lifecycle: 'ready', localStream: stream });
-    renderBar(session, onChooseAiExperience);
+    const session = createSession({
+      draft: { ...createEmptyDraft('lucy-latest'), prompt: 'Business host' },
+      lifecycle: 'ready',
+      localStream: stream,
+    });
+    renderBar(
+      session,
+      onChooseAiExperience,
+      createRecording(),
+      vi.fn().mockResolvedValue(undefined),
+      false,
+      vi.fn(),
+      vi.fn(),
+      { experienceLabel: 'Business host' },
+    );
 
     await user.click(screen.getByRole('button', { name: 'Start AI' }));
     const microphone = screen.getByRole('button', { name: 'Mute microphone' });
@@ -194,6 +216,30 @@ describe('StudioSessionControlBar', () => {
     expect(session.toggleMicrophone).toHaveBeenCalledOnce();
     expect(session.toggleCamera).toHaveBeenCalledOnce();
     expect(session.stopCamera).toHaveBeenCalledOnce();
+  });
+
+  it('uses local Record as the primary action when no AI experience is selected', async () => {
+    const user = userEvent.setup();
+    const recording = createRecording();
+    const session = createSession({
+      draft: createEmptyDraft('lucy-vton-latest'),
+      lifecycle: 'ready',
+      localStream: stream,
+    });
+    renderBar(
+      session,
+      vi.fn(),
+      recording,
+      vi.fn().mockResolvedValue(undefined),
+      false,
+      vi.fn(),
+      vi.fn(),
+      { recordingMode: 'local' },
+    );
+
+    expect(screen.queryByRole('button', { name: 'Start AI' })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Record' }));
+    expect(recording.start).toHaveBeenCalledWith(recordingSource, 'local');
   });
 
   it('offers capability-gated camera switching and zoom in the stage control bar', async () => {
@@ -248,7 +294,7 @@ describe('StudioSessionControlBar', () => {
   it('stops only AI while preserving the separate end-session action', async () => {
     const user = userEvent.setup();
     const session = createSession({
-      draft: { ...createEmptyDraft('lucy-2.5'), prompt: 'A neon samurai' },
+      draft: { ...createEmptyDraft('lucy-latest'), prompt: 'A neon samurai' },
       lifecycle: 'generating',
       localStream: stream,
       remoteStream: stream,
@@ -279,6 +325,7 @@ describe('StudioSessionControlBar', () => {
         <StudioSessionControlBar
           session={session}
           recording={createRecording('recording', { activeSource: recordingSource })}
+          recordingMode="local"
           recordingSource={recordingSource}
           recordingSupported
           reviewingTake={false}
@@ -316,7 +363,7 @@ describe('StudioSessionControlBar', () => {
       true,
       onCloseTakeReview,
       onOpenVoiceTreatments,
-      onEditVideo,
+      { onEditVideo },
     );
 
     const controls = screen.getByRole('region', { name: 'Studio session controls' });
@@ -348,6 +395,7 @@ describe('StudioSessionControlBar', () => {
         <StudioSessionControlBar
           session={idleSession}
           recording={downloadedRecording}
+          recordingMode="local"
           recordingSource={null}
           recordingSupported
           reviewingTake
@@ -369,6 +417,7 @@ describe('StudioSessionControlBar', () => {
         <StudioSessionControlBar
           session={createSession({ lifecycle: 'ready', localStream: stream })}
           recording={createRecording()}
+          recordingMode="local"
           recordingSource={recordingSource}
           recordingSupported
           reviewingTake={false}
@@ -381,10 +430,45 @@ describe('StudioSessionControlBar', () => {
       </StudioDesignProvider>,
     );
 
-    expect(screen.getByRole('button', { name: 'Start AI' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Record' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Start AI' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Close' })).toBeInTheDocument();
     expect(screen.queryByRole('group', { name: 'Recorded take controls' })).not.toBeInTheDocument();
+  });
+
+  it('notifies the upload workflow only after a take discard is confirmed', async () => {
+    const user = userEvent.setup();
+    const artifact = takeArtifact();
+    const recording = createRecording('recorded', {
+      original: artifact,
+      presented: artifact,
+    });
+    const onCloseTakeReview = vi.fn();
+    const onDiscardTake = vi.fn();
+    const confirm = vi
+      .spyOn(window, 'confirm')
+      .mockReturnValueOnce(false)
+      .mockReturnValueOnce(true);
+    renderBar(
+      createSession(),
+      vi.fn(),
+      recording,
+      vi.fn().mockResolvedValue(undefined),
+      true,
+      onCloseTakeReview,
+      vi.fn(),
+      { onDiscardTake },
+    );
+
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(recording.discard).not.toHaveBeenCalled();
+    expect(onDiscardTake).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+    expect(recording.discard).toHaveBeenCalledOnce();
+    expect(onDiscardTake).toHaveBeenCalledOnce();
+    expect(onCloseTakeReview).toHaveBeenCalledOnce();
+    confirm.mockRestore();
   });
 
   it('renders the stage-owned visibility state with matching inert semantics', () => {
@@ -394,6 +478,7 @@ describe('StudioSessionControlBar', () => {
         <StudioSessionControlBar
           session={session}
           recording={createRecording()}
+          recordingMode="local"
           recordingSource={recordingSource}
           recordingSupported
           reviewingTake={false}
@@ -417,6 +502,7 @@ describe('StudioSessionControlBar', () => {
         <StudioSessionControlBar
           session={session}
           recording={createRecording()}
+          recordingMode="local"
           recordingSource={recordingSource}
           recordingSupported
           reviewingTake={false}
@@ -441,6 +527,7 @@ describe('StudioSessionControlBar', () => {
         <StudioSessionControlBar
           session={createSession({ lifecycle: 'ready', localStream: stream })}
           recording={createRecording('recording', { activeSource: recordingSource })}
+          recordingMode="local"
           recordingSource={recordingSource}
           recordingSupported
           reviewingTake={false}

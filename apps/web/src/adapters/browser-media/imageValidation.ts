@@ -41,7 +41,7 @@ const loadDimensions = async (file: File): Promise<{ width: number; height: numb
 
 export const validateReferenceImage = async (
   file: File,
-  mode: 'lucy-2.5' | 'lucy-vton-3',
+  mode: 'lucy-latest' | 'lucy-vton-latest',
 ): Promise<ImageValidation> => {
   const candidate: ImageDescriptorCandidate = {
     mimeType: file.type,
@@ -54,7 +54,7 @@ export const validateReferenceImage = async (
     const dimensions = await loadDimensions(file);
     const warnings = getImageQualityWarnings(
       { ...candidate, ...dimensions },
-      mode === 'lucy-2.5' ? 'character' : 'garment',
+      mode === 'lucy-latest' ? 'character' : 'garment',
     ).map(({ message }) => message);
     return { blockingError: null, warnings, ...dimensions };
   } catch {

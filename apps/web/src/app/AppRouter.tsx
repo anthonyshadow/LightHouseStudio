@@ -116,10 +116,7 @@ interface StudioRouteProps {
 const StudioRoute = ({ focusMainOnMount }: StudioRouteProps) => {
   const location = useLocation();
   const routeState = location.state as { creationIntent?: unknown } | null;
-  const initialIntent =
-    routeState?.creationIntent === 'upload' || routeState?.creationIntent === 'camera'
-      ? routeState.creationIntent
-      : undefined;
+  const initialIntent = routeState?.creationIntent === 'upload' ? 'upload' : undefined;
   return (
     <Suspense fallback={<StudioLoading />}>
       <LazyStudioApp

@@ -59,7 +59,7 @@ const createProject = (
       ? {
           filename: `${id}.webm`,
           mimeType: 'video/webm',
-          sourceModeId: 'lucy-2.5',
+          sourceModeId: 'lucy-latest',
           startedAt: '2026-07-19T12:00:00.000Z',
           durationMs: 3_000,
           sizeBytes: 12,

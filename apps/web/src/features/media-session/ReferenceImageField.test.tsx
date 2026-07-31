@@ -17,7 +17,7 @@ describe('ReferenceImageField focus recovery', () => {
     const user = userEvent.setup();
     const { rerender } = render(
       <StudioDesignProvider>
-        <ReferenceImageField mode="lucy-2.5" referenceImage={null} onChange={vi.fn()} />
+        <ReferenceImageField mode="lucy-latest" referenceImage={null} onChange={vi.fn()} />
       </StudioDesignProvider>,
     );
 
@@ -34,7 +34,7 @@ describe('ReferenceImageField focus recovery', () => {
 
     rerender(
       <StudioDesignProvider>
-        <ReferenceImageField mode="lucy-vton-3" referenceImage={null} onChange={vi.fn()} />
+        <ReferenceImageField mode="lucy-vton-latest" referenceImage={null} onChange={vi.fn()} />
       </StudioDesignProvider>,
     );
 
@@ -54,7 +54,7 @@ describe('ReferenceImageField focus recovery', () => {
     render(
       <StudioDesignProvider>
         <ReferenceImageField
-          mode="lucy-2.5"
+          mode="lucy-latest"
           referenceImage={{ kind: 'ephemeral', file: image, previewUrl: 'blob:portrait' }}
           onChange={onChange}
         />
@@ -75,7 +75,7 @@ describe('ReferenceImageField focus recovery', () => {
     render(
       <StudioDesignProvider>
         <ReferenceImageField
-          mode="lucy-vton-3"
+          mode="lucy-vton-latest"
           referenceImage={{ kind: 'ephemeral', file: image, previewUrl: 'blob:garment' }}
           onChange={vi.fn()}
         />
@@ -103,7 +103,7 @@ describe('ReferenceImageField focus recovery', () => {
 
     render(
       <StudioDesignProvider>
-        <ReferenceImageField mode="lucy-vton-3" referenceImage={null} onChange={onChange} />
+        <ReferenceImageField mode="lucy-vton-latest" referenceImage={null} onChange={onChange} />
       </StudioDesignProvider>,
     );
 
@@ -125,7 +125,7 @@ describe('ReferenceImageField focus recovery', () => {
     const onChange = vi.fn();
     render(
       <StudioDesignProvider>
-        <ReferenceImageField mode="lucy-vton-3" referenceImage={null} onChange={onChange} />
+        <ReferenceImageField mode="lucy-vton-latest" referenceImage={null} onChange={onChange} />
       </StudioDesignProvider>,
     );
 
@@ -160,7 +160,7 @@ describe('ReferenceImageField focus recovery', () => {
     render(
       <StudioDesignProvider>
         <ReferenceImageField
-          mode="lucy-2.5"
+          mode="lucy-latest"
           referenceImage={{ kind: 'ephemeral', file: image, previewUrl: 'blob:portrait' }}
           disabled
           onChange={vi.fn()}

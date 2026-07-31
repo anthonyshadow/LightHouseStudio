@@ -30,10 +30,10 @@ provider bodies, signed/polling URLs, personal media, or full network archives.
 | Requirement       | Exact configuration                                                           |
 | ----------------- | ----------------------------------------------------------------------------- |
 | Local             | No provider credentials                                                       |
-| Decart Character  | SDK `0.1.17`, exact `lucy-2.5`, 300-second session                            |
-| Decart VTO        | SDK `0.1.17`, exact `lucy-vton-3`, 300-second session                         |
-| Decart batch Lucy | Queue HTTP, exact `lucy-2.5`, fixed `720p`, 300-second input                  |
-| Decart batch VTO  | Queue HTTP, exact `lucy-vton-3`, fixed `720p`, 300-second input               |
+| Decart Character  | SDK `0.1.17`, exact `lucy-latest`, 300-second session                         |
+| Decart VTO        | SDK `0.1.17`, exact `lucy-vton-latest`, 300-second session                    |
+| Decart batch Lucy | Queue HTTP, exact `lucy-latest`, fixed `720p`, 300-second input               |
+| Decart batch VTO  | Queue HTTP, exact `lucy-vton-latest`, fixed `720p`, 300-second input          |
 | ElevenLabs        | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false` |
 | OpenAI image      | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                      |
 | BFL image         | `flux-2-pro`, safety `2`, prompt upsampling off                               |
@@ -93,7 +93,7 @@ Use disposable H.264 MP4, H.264 MOV, and VP8 WebM samples in both 16:9 and 9:16 
 target supports them. Confirm current exact-model account limits against
 [Decart video editing](https://docs.platform.decart.ai/models/video/video-editing),
 [Lucy 2.5 API](https://docs.platform.decart.ai/api-reference/lucy-25), and
-[Lucy VTON 3 API](https://docs.platform.decart.ai/api-reference/lucy-vton-3) before spending. The
+[Lucy VTON 3 API](https://docs.platform.decart.ai/api-reference/lucy-vton-latest) before spending. The
 app-owned subset remains narrower than generic provider claims.
 
 For each exact batch model:
@@ -104,7 +104,7 @@ For each exact batch model:
    rights, retention, and submission disclosure is visible before action.
 3. Submit once. Confirm the broker's multipart input maps to Decart's documented `data`, `prompt`,
    optional `reference_image`, `resolution=720p`, and `enhance_prompt` fields; uses synthetic
-   filenames and the selected exact model (`lucy-2.5` or `lucy-vton-3`); and makes no
+   filenames and the selected exact model (`lucy-latest` or `lucy-vton-latest`); and makes no
    provider request before authoritative server inspection.
 4. Observe validating, submitting, queued, processing, retrieving, and ready as applicable. The UI
    may show elapsed time but never a fabricated percentage or provider ID/URL/body.

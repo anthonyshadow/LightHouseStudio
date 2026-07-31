@@ -342,7 +342,7 @@ export const hydrateReferenceImage = async (
     type: metadata.mimeType,
     lastModified: Date.parse(metadata.createdAt),
   });
-  const validation = await validateReferenceImage(file, 'lucy-2.5');
+  const validation = await validateReferenceImage(file, 'lucy-latest');
   if (
     validation.blockingError ||
     validation.width !== metadata.width ||

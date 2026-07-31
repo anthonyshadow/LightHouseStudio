@@ -10,7 +10,7 @@ const prompt: SavedPrompt = {
   id: 'saved-prompt',
   title: 'Presenter',
   prompt: 'A calm documentary presenter.',
-  modelModeId: 'lucy-2.5',
+  modelModeId: 'lucy-latest',
   source: 'manual',
   referenceImageAssetId: null,
   tags: [],
@@ -33,7 +33,7 @@ describe('active recipe reducer and resolution', () => {
       type: 'commit',
       recipe: { origin: 'saved-prompt', assetId: prompt.id },
       fingerprint: {
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: prompt.prompt,
         referenceImageAssetId: null,
         assetPrompt: prompt.prompt,
@@ -43,7 +43,7 @@ describe('active recipe reducer and resolution', () => {
 
     expect(
       resolveActiveRecipe(state, store, {
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: ` ${prompt.prompt} `,
         referenceImage: null,
       }),
@@ -60,7 +60,7 @@ describe('active recipe reducer and resolution', () => {
       type: 'commit',
       recipe: { origin: 'saved-prompt', assetId: prompt.id },
       fingerprint: {
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: prompt.prompt,
         referenceImageAssetId: null,
         assetPrompt: prompt.prompt,
@@ -70,7 +70,7 @@ describe('active recipe reducer and resolution', () => {
 
     expect(
       resolveActiveRecipe(state, store, {
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: 'A changed working draft.',
         referenceImage: null,
       }).recipe,

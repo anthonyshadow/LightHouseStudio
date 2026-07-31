@@ -397,7 +397,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     );
 
     act(() => {
-      expect(result.current.selectMode('lucy-2.5')).toBe(true);
+      expect(result.current.selectMode('lucy-latest')).toBe(true);
     });
     act(() => {
       result.current.updatePrompt('  An adult documentary photographer  ');
@@ -420,29 +420,29 @@ describe('useStudioSession explicit-start boundaries', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
     });
     act(() => {
       result.current.updatePrompt('A documentary host in a midnight studio');
       result.current.updateEnhancement(true);
     });
     act(() => {
-      result.current.selectMode('lucy-vton-3');
+      result.current.selectMode('lucy-vton-latest');
     });
     act(() => {
       result.current.updatePrompt('A structured amber field jacket');
     });
     expect(result.current.draft).toMatchObject({
-      mode: 'lucy-vton-3',
+      mode: 'lucy-vton-latest',
       prompt: 'A structured amber field jacket',
       enhance: false,
     });
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
     });
     expect(result.current.draft).toMatchObject({
-      mode: 'lucy-2.5',
+      mode: 'lucy-latest',
       prompt: 'A documentary host in a midnight studio',
       enhance: true,
     });
@@ -481,7 +481,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-vton-3');
+      result.current.selectMode('lucy-vton-latest');
     });
     await act(async () => {
       await result.current.startModel();
@@ -509,9 +509,9 @@ describe('useStudioSession explicit-start boundaries', () => {
     expect(result.current.lifecycle).toBe('ready');
 
     act(() => {
-      expect(result.current.selectMode('lucy-2.5')).toBe(true);
+      expect(result.current.selectMode('lucy-latest')).toBe(true);
     });
-    expect(result.current.draft.mode).toBe('lucy-2.5');
+    expect(result.current.draft.mode).toBe('lucy-latest');
     expect(result.current.localStream).not.toBeNull();
     expect(adapters.acquireLocalMedia).toHaveBeenCalledOnce();
     await act(async () => {
@@ -538,7 +538,7 @@ describe('useStudioSession explicit-start boundaries', () => {
       await result.current.startLocal();
     });
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('An adult stop-motion astronomer');
     });
     await act(async () => {
@@ -552,7 +552,10 @@ describe('useStudioSession explicit-start boundaries', () => {
       frameRate: { ideal: 30 },
     });
     expect(options?.localStream).toBe(local);
-    expect(adapters.requestRealtimeToken).toHaveBeenCalledWith('lucy-2.5', expect.any(AbortSignal));
+    expect(adapters.requestRealtimeToken).toHaveBeenCalledWith(
+      'lucy-latest',
+      expect.any(AbortSignal),
+    );
     unmount();
   });
 
@@ -573,7 +576,7 @@ describe('useStudioSession explicit-start boundaries', () => {
       await result.current.startLocal();
     });
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('An adult stop-motion astronomer');
     });
     await act(async () => {
@@ -620,7 +623,7 @@ describe('useStudioSession explicit-start boundaries', () => {
       await result.current.startLocal();
     });
     act(() => {
-      result.current.selectMode('lucy-vton-3');
+      result.current.selectMode('lucy-vton-latest');
       result.current.updatePrompt('A tailored navy dinner jacket');
     });
     await act(async () => {
@@ -672,16 +675,16 @@ describe('useStudioSession explicit-start boundaries', () => {
       }),
     );
 
-    expect(result.current.canReplaceRecipeDraft('lucy-2.5')).toBe(true);
+    expect(result.current.canReplaceRecipeDraft('lucy-latest')).toBe(true);
     await act(async () => {
       await result.current.startLocal();
     });
-    expect(result.current.canReplaceRecipeDraft('lucy-2.5')).toBe(true);
+    expect(result.current.canReplaceRecipeDraft('lucy-latest')).toBe(true);
 
     await act(async () => {
       await result.current.stopCamera();
     });
-    expect(result.current.canReplaceRecipeDraft('lucy-2.5')).toBe(true);
+    expect(result.current.canReplaceRecipeDraft('lucy-latest')).toBe(true);
     unmount();
   });
 
@@ -755,7 +758,7 @@ describe('useStudioSession model lifecycle contract', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('An adult documentary presenter');
     });
     await act(async () => {
@@ -820,7 +823,7 @@ describe('useStudioSession model lifecycle contract', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-vton-3');
+      result.current.selectMode('lucy-vton-latest');
       result.current.updatePrompt('A tailored navy field jacket');
     });
     await act(async () => {
@@ -841,13 +844,13 @@ describe('useStudioSession model lifecycle contract', () => {
 
   it.each([
     {
-      mode: 'lucy-2.5' as const,
+      mode: 'lucy-latest' as const,
       prompt: '  An adult copper-haired space pilot  ',
       enhance: true,
       withImage: false,
     },
     {
-      mode: 'lucy-vton-3' as const,
+      mode: 'lucy-vton-latest' as const,
       prompt: '  A cropped linen field jacket  ',
       enhance: false,
       withImage: true,
@@ -936,7 +939,7 @@ describe('useStudioSession model lifecycle contract', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('A watercolor explorer');
     });
     await act(async () => {
@@ -995,7 +998,7 @@ describe('useStudioSession model lifecycle contract', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('An adult field correspondent');
     });
     await act(async () => {
@@ -1034,7 +1037,7 @@ describe('useStudioSession model lifecycle contract', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('An adult paper-cutout cartographer');
     });
     await act(async () => {
@@ -1064,7 +1067,7 @@ describe('useStudioSession model lifecycle contract', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('Initial adult presenter');
     });
     await act(async () => {
@@ -1106,7 +1109,7 @@ describe('useStudioSession model lifecycle contract', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('Original live character');
       result.current.updateReferenceImage({
         kind: 'ephemeral',
@@ -1160,7 +1163,11 @@ describe('useStudioSession model lifecycle contract', () => {
     });
     expect(result.current.pendingChanges).toBe(false);
     expect(onPromptCommitted).toHaveBeenCalledTimes(2);
-    expect(onPromptCommitted).toHaveBeenLastCalledWith('lucy-2.5', 'Revised live character', null);
+    expect(onPromptCommitted).toHaveBeenLastCalledWith(
+      'lucy-latest',
+      'Revised live character',
+      null,
+    );
 
     unmount();
   });
@@ -1176,7 +1183,7 @@ describe('useStudioSession model lifecycle contract', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('A stop-motion botanist');
     });
     await act(async () => {
@@ -1194,7 +1201,7 @@ describe('useStudioSession model lifecycle contract', () => {
     expect(result.current.applied?.prompt).toBe('A stop-motion botanist');
     expect(result.current.lifecycle).toBe('connected');
     expect(onPromptCommitted).toHaveBeenCalledOnce();
-    expect(onPromptCommitted).toHaveBeenCalledWith('lucy-2.5', 'A stop-motion botanist', null);
+    expect(onPromptCommitted).toHaveBeenCalledWith('lucy-latest', 'A stop-motion botanist', null);
 
     unmount();
   });
@@ -1217,7 +1224,7 @@ describe('useStudioSession model lifecycle contract', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('');
       result.current.updateReferenceImage(reference);
       result.current.updateEnhancement(false);
@@ -1234,7 +1241,7 @@ describe('useStudioSession model lifecycle contract', () => {
       enhance: false,
     });
     expect(onPromptCommitted).toHaveBeenCalledOnce();
-    expect(onPromptCommitted).toHaveBeenCalledWith('lucy-2.5', '', reference.assetId);
+    expect(onPromptCommitted).toHaveBeenCalledWith('lucy-latest', '', reference.assetId);
 
     unmount();
   });
@@ -1257,7 +1264,7 @@ describe('useStudioSession model lifecycle contract', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('An adult studio presenter in amber light');
       result.current.updateEnhancement(true);
     });
@@ -1284,7 +1291,7 @@ describe('useStudioSession model lifecycle contract', () => {
     expect(result.current.applied).toBeNull();
     expect(result.current.error).toBeNull();
     expect(result.current.draft).toMatchObject({
-      mode: 'lucy-2.5',
+      mode: 'lucy-latest',
       prompt: 'An adult studio presenter in amber light',
       enhance: true,
     });
@@ -1311,7 +1318,7 @@ describe('useStudioSession model lifecycle contract', () => {
     );
 
     act(() => {
-      result.current.selectMode('lucy-2.5');
+      result.current.selectMode('lucy-latest');
       result.current.updatePrompt('A claymation astronomer');
     });
     let startPromise!: Promise<void>;
@@ -1342,7 +1349,7 @@ describe('useStudioSession model lifecycle contract', () => {
     expect(result.current.lifecycle).toBe('ready');
     if (action === 'resetModel') {
       expect(result.current.draft).toMatchObject({
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: '',
         referenceImage: null,
         enhance: false,

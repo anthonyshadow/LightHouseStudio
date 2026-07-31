@@ -54,7 +54,7 @@ export const ExistingVideoReferenceField = ({
 
   const visiblePreview = preview?.file === file ? preview : null;
   const guidance =
-    modelId === 'lucy-2.5'
+    modelId === 'lucy-latest'
       ? 'Use a clear portrait or character reference.'
       : 'Use one clearly visible garment on a simple background.';
 

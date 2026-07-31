@@ -270,7 +270,7 @@ test('both saved-character entries open Characters and complete Use through Star
 
   expect((await readBrowserState(page)).connections).toEqual([
     {
-      model: 'lucy-2.5',
+      model: 'lucy-latest',
       initial: {
         prompt: savedPrompt,
         imageName: null,
@@ -296,7 +296,7 @@ test('both saved-character entries open Characters and complete Use through Star
   await expect(chooser.getByLabel('Decart start disclosure')).toContainText('Stop AI ends usage');
   await chooser.getByRole('button', { name: 'Start with Shelf Field Host' }).click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
-  expect((await readBrowserState(page)).connections[0]?.model).toBe('lucy-2.5');
+  expect((await readBrowserState(page)).connections[0]?.model).toBe('lucy-latest');
 });
 
 test('image-only upload saves and preloads without starting AI, then appears in Recent after Start', async ({
@@ -372,7 +372,7 @@ test('image-only upload saves and preloads without starting AI, then appears in 
 
   expect((await readBrowserState(page)).connections).toEqual([
     {
-      model: 'lucy-2.5',
+      model: 'lucy-latest',
       initial: {
         prompt: '',
         imageName: `reference-${uploaded?.assetId}.png`,

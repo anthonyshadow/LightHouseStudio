@@ -24,7 +24,7 @@ export type ShelfCategory = RecipeShelfCategory;
 export type EditAction = 'edit' | 'rename' | 'delete';
 
 export const modeName = (mode: ModelModeId) =>
-  mode === 'lucy-2.5' ? 'Character' : 'Virtual Try-On';
+  mode === 'lucy-latest' ? 'Character' : 'Virtual Try-On';
 
 const formatDate = (value: string) => {
   const timestamp = Date.parse(value);
@@ -86,7 +86,7 @@ export const SavedPromptCard = ({
         </h3>
         <div css={cardBadgeGroupStyles(theme)}>
           {selected ? <span css={badgeStyles(theme, 'accent')}>Selected</span> : null}
-          <span css={badgeStyles(theme, item.modelModeId === 'lucy-2.5' ? 'accent' : 'signal')}>
+          <span css={badgeStyles(theme, item.modelModeId === 'lucy-latest' ? 'accent' : 'signal')}>
             {modeName(item.modelModeId)}
           </span>
         </div>

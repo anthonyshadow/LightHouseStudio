@@ -25,8 +25,8 @@ describe('API shell', () => {
 
     expect(health.json()).toEqual({ ok: true });
     expect(capabilities.json()).toEqual({
-      realtimeVideo: { available: false, models: ['lucy-2.5', 'lucy-vton-3'] },
-      videoProcessing: { available: false, models: ['lucy-2.5', 'lucy-vton-3'] },
+      realtimeVideo: { available: false, models: ['lucy-latest', 'lucy-vton-latest'] },
+      videoProcessing: { available: false, models: ['lucy-latest', 'lucy-vton-latest'] },
       elevenLabs: { available: true, modelId: 'eleven_multilingual_sts_v2' },
       referenceImages: {
         available: false,
@@ -72,7 +72,7 @@ describe('API shell', () => {
       realtimeVideo: { available: false },
       videoProcessing: {
         available: true,
-        models: ['lucy-2.5', 'lucy-vton-3'],
+        models: ['lucy-latest', 'lucy-vton-latest'],
       },
     });
     expect(capabilities.body).not.toContain('server-only-secret');

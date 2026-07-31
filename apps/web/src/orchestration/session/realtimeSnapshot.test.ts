@@ -13,7 +13,7 @@ import {
 } from './realtimeSnapshot';
 
 const draft = (overrides: Partial<SessionDraft> = {}): SessionDraft => ({
-  mode: 'lucy-2.5',
+  mode: 'lucy-latest',
   prompt: '',
   referenceImage: null,
   enhance: false,
@@ -29,7 +29,7 @@ const ephemeral = (file: File) => ({
 describe('realtime state snapshots', () => {
   it('rejects an empty model draft while allowing local preparation', () => {
     expect(validateModelDraft(draft())).toMatch(/prompt, a reference image, or both/i);
-    expect(validateModelDraft(draft({ mode: 'lucy-vton-3', prompt: '   ' }))).toMatch(
+    expect(validateModelDraft(draft({ mode: 'lucy-vton-latest', prompt: '   ' }))).toMatch(
       /before starting AI/i,
     );
     expect(validateModelDraft(draft({ mode: 'local' }))).toBeNull();
@@ -41,7 +41,7 @@ describe('realtime state snapshots', () => {
     );
 
     const snapshot = toProviderSnapshot(
-      'lucy-2.5',
+      'lucy-latest',
       draft({ prompt: '  Keep   the  expression calm ', enhance: true, referenceImage: null }),
     );
 
@@ -59,7 +59,9 @@ describe('realtime state snapshots', () => {
       lastModified: 1_720_955_200_000,
     });
 
-    expect(toProviderSnapshot('lucy-2.5', draft({ referenceImage: ephemeral(portrait) }))).toEqual({
+    expect(
+      toProviderSnapshot('lucy-latest', draft({ referenceImage: ephemeral(portrait) })),
+    ).toEqual({
       prompt: '',
       image: portrait,
       enhance: false,
@@ -85,8 +87,8 @@ describe('realtime state snapshots', () => {
 
     expect(
       toProviderSnapshot(
-        'lucy-vton-3',
-        draft({ mode: 'lucy-vton-3', referenceImage: ephemeral(garment) }),
+        'lucy-vton-latest',
+        draft({ mode: 'lucy-vton-latest', referenceImage: ephemeral(garment) }),
       ),
     ).toEqual({
       prompt: '',
@@ -110,7 +112,9 @@ describe('realtime state snapshots', () => {
     expect(hasPendingChanges({ ...initial, prompt: 'Explorer in copper' }, applied)).toBe(true);
     expect(hasPendingChanges({ ...initial, enhance: true }, applied)).toBe(true);
     expect(hasPendingChanges({ ...initial, referenceImage: null }, applied)).toBe(true);
-    expect(toProviderSnapshot('lucy-2.5', { ...initial, referenceImage: null }).image).toBeNull();
+    expect(
+      toProviderSnapshot('lucy-latest', { ...initial, referenceImage: null }).image,
+    ).toBeNull();
   });
 
   it('treats distinct image objects as replacements even when browser metadata matches', () => {

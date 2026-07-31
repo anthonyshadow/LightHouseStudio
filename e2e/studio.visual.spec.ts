@@ -228,12 +228,12 @@ const selectVisualVideo = async (page: Page) => {
 
 const addVisualStep = async (
   dialog: ReturnType<Page['getByRole']>,
-  modelId: 'lucy-2.5' | 'lucy-vton-3',
+  modelId: 'lucy-latest' | 'lucy-vton-latest',
   prompt: string,
 ) => {
   await dialog
     .getByRole('button', {
-      name: modelId === 'lucy-2.5' ? 'Swap Character' : 'Virtual Try On',
+      name: modelId === 'lucy-latest' ? 'Swap Character' : 'Virtual Try On',
     })
     .click();
   await dialog.locator('article').last().locator('textarea').fill(prompt);
@@ -360,7 +360,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'upload-validated-setup',
     setup: async (page) => {
       const { dialog } = await selectVisualVideo(page);
-      await addVisualStep(dialog, 'lucy-2.5', 'Transform into a documentary field presenter.');
+      await addVisualStep(dialog, 'lucy-latest', 'Transform into a documentary field presenter.');
       await expect(dialog).toContainText('1 planned Decart submission');
       await expect(dialog.getByRole('button', { name: 'Swap Character' })).toHaveAttribute(
         'aria-pressed',
@@ -374,7 +374,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     setup: async (page) => {
       const { dialog, fixture } = await selectVisualVideo(page);
       await installFakeVideoJobRoutes(page, fixture, { processingReadsBeforeReady: 100 });
-      await addVisualStep(dialog, 'lucy-2.5', 'Transform into a documentary field presenter.');
+      await addVisualStep(dialog, 'lucy-latest', 'Transform into a documentary field presenter.');
       await dialog.getByRole('button', { name: 'Start · 1 Decart submission' }).click();
       await expect(dialog.getByText(/Stage: processing/u)).toBeVisible();
     },
@@ -384,7 +384,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     setup: async (page) => {
       const { dialog, fixture } = await selectVisualVideo(page);
       await installFakeVideoJobRoutes(page, fixture);
-      await addVisualStep(dialog, 'lucy-2.5', 'Transform into a documentary field presenter.');
+      await addVisualStep(dialog, 'lucy-latest', 'Transform into a documentary field presenter.');
       await dialog.getByRole('button', { name: 'Start · 1 Decart submission' }).click();
       await expect(dialog.getByRole('heading', { name: 'Result ready' })).toBeVisible();
     },

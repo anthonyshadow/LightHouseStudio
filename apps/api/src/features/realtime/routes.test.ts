@@ -48,14 +48,14 @@ describe('realtime token API', () => {
       apiKey: 'temporary-client-token',
       expiresAt: '2030-01-01T00:00:00.000Z',
       constraints: {
-        model: 'lucy-2.5',
+        model: 'lucy-latest',
         maxSessionDurationSeconds: 300,
         applicationOrigin: 'http://localhost:5173',
       },
     });
     expect(scopes).toHaveLength(1);
     expect(scopes[0]).toMatchObject({
-      model: 'lucy-2.5',
+      model: 'lucy-latest',
       origin: 'http://localhost:5173',
       expiresInSeconds: 300,
       maxSessionDurationSeconds: 300,
@@ -68,7 +68,7 @@ describe('realtime token API', () => {
       method: 'POST',
       url: '/api/realtime-token',
       headers: localOriginHeaders,
-      payload: { model: 'lucy-vton-3' },
+      payload: { model: 'lucy-vton-latest' },
     });
     const local = await app.inject({
       method: 'POST',
@@ -95,7 +95,7 @@ describe('realtime token API', () => {
       method: 'POST',
       url: '/api/realtime-token',
       headers: localOriginHeaders,
-      payload: { model: 'lucy-2.5', sessionProfile: 'guided' },
+      payload: { model: 'lucy-latest', sessionProfile: 'guided' },
     });
 
     expect(response.statusCode).toBe(200);
@@ -166,7 +166,7 @@ describe('realtime token API', () => {
       method: 'POST',
       url: '/api/realtime-token',
       headers: localOriginHeaders,
-      payload: { model: 'lucy-2.5' },
+      payload: { model: 'lucy-latest' },
     });
 
     expect(response.statusCode).toBe(502);

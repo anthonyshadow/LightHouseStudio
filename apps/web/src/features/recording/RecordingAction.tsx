@@ -38,9 +38,9 @@ const recordingUnavailableReason = ({
     switch (mode) {
       case 'local':
         return 'Start local preview to enable Record.';
-      case 'lucy-2.5':
+      case 'lucy-latest':
         return 'Start Character AI and wait for live output to enable Record.';
-      case 'lucy-vton-3':
+      case 'lucy-vton-latest':
         return 'Start Virtual Try-On AI and wait for live output to enable Record.';
     }
   }

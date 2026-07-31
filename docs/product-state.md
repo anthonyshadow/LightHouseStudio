@@ -48,7 +48,7 @@ required, but no physical target is qualified yet.
 - Character Builder supports prompt-only, direct upload, image-only, generated, and combined
   references with recoverable draft/save state.
 - Recipe Shelf stores sanitized, versioned browser metadata and opaque reference relationships.
-- Character uses exact `lucy-2.5`; VTO uses pinned `lucy-vton-3`.
+- Character uses exact `lucy-latest`; VTO uses pinned `lucy-vton-latest`.
 - Existing H.264 MP4/MOV and VP8 WebM sources can stay local or run exactly one selected Decart
   batch model. Swap Character and VTO are mutually exclusive within an uploaded workflow.
 - OpenAI, BFL, and Wiro are separate startup-selected image-provider passes with no fallback.

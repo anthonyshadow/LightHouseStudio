@@ -46,7 +46,7 @@ describe('useReferenceRecipeWorkshop', () => {
       createSavedCharacterPrompt,
     } as unknown as CreativeAssetRepository;
     const session = {
-      draft: { mode: 'lucy-2.5', prompt: '', referenceImage: null, enhance: false },
+      draft: { mode: 'lucy-latest', prompt: '', referenceImage: null, enhance: false },
     } as unknown as StudioSessionController;
     const openWorkshopOverlay = vi.fn();
     const { result } = renderHook(() =>

@@ -64,9 +64,9 @@ export const ReferenceImageField = ({
   };
 
   const referenceLabel =
-    mode === 'lucy-2.5' ? 'Optional portrait reference' : 'Garment reference image';
+    mode === 'lucy-latest' ? 'Optional portrait reference' : 'Garment reference image';
   const guidance =
-    mode === 'lucy-2.5'
+    mode === 'lucy-latest'
       ? 'Use a clear, well-lit portrait for the most consistent character.'
       : 'Use one clearly visible, centered garment on a simple background.';
   const image = referenceImage?.file ?? null;

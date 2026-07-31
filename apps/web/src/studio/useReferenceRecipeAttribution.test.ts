@@ -22,7 +22,7 @@ const prompt: SavedPrompt = {
   id: 'saved-prompt',
   title: 'Presenter',
   prompt: 'A calm documentary presenter.',
-  modelModeId: 'lucy-2.5',
+  modelModeId: 'lucy-latest',
   source: 'manual',
   referenceImageAssetId: '8f45ea24-c274-41a5-a988-aa0602115191',
   tags: [],
@@ -87,7 +87,7 @@ describe('reference recipe attribution', () => {
       recordSuccessfulPrompt: vi.fn(),
     } as unknown as CreativeAssetRepository;
     const session = {
-      draft: { mode: 'lucy-2.5', prompt: '', referenceImage: null, enhance: false },
+      draft: { mode: 'lucy-latest', prompt: '', referenceImage: null, enhance: false },
       canReplaceRecipeDraft: vi.fn(() => true),
     } as unknown as StudioSessionController;
     const { result } = renderHook(() =>
@@ -129,7 +129,7 @@ describe('reference recipe attribution', () => {
       type: 'commit',
       recipe: { origin: 'saved-prompt', assetId: prompt.id },
       fingerprint: {
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: prompt.prompt,
         referenceImageAssetId: asset.assetId,
         assetPrompt: prompt.prompt,

@@ -161,14 +161,14 @@ const formatRealtimeTiming = (timing: RealtimeSessionTiming | null): string | nu
 };
 
 const emptyCopy = (mode: StudioMode): { title: string; description: string } => {
-  if (mode === 'lucy-2.5') {
+  if (mode === 'lucy-latest') {
     return {
       title: 'Your character, your story.',
       description:
         'Build a direction or add a portrait reference. Camera and AI remain off until you explicitly start.',
     };
   }
-  if (mode === 'lucy-vton-3') {
+  if (mode === 'lucy-vton-latest') {
     return {
       title: 'Your private try-on stage.',
       description:

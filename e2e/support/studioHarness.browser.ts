@@ -17,7 +17,7 @@ export const installSyntheticBrowserMedia = async (
 ): Promise<void> => {
   await page.addInitScript(
     ({ fixedWebmBase64, stubMediaPlayback, realtimeProvidesVideo }) => {
-      type TestModel = 'lucy-2.5' | 'lucy-vton-3';
+      type TestModel = 'lucy-latest' | 'lucy-vton-latest';
       type TestSnapshot = { prompt: string; image: File | null; enhance: boolean };
       type TestConnectionOptions = {
         model: TestModel;

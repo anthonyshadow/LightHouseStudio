@@ -138,7 +138,7 @@ export const SessionActions = ({
     startReason = lockReason ?? 'Finish the current take before starting an AI session.';
   else if (!hasStartContent) {
     startReason =
-      session.draft.mode === 'lucy-2.5'
+      session.draft.mode === 'lucy-latest'
         ? 'Add a character direction or portrait reference to start.'
         : 'Add a garment direction or garment reference to start.';
   }

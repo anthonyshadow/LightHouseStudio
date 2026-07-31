@@ -13,7 +13,7 @@ vi.mock('@decartai/sdk', () => ({
 }));
 
 const scope = (signal: AbortSignal = new AbortController().signal): TokenRequestScope => ({
-  model: 'lucy-2.5',
+  model: 'lucy-latest',
   origin: 'http://localhost:5173',
   expiresInSeconds: 300,
   maxSessionDurationSeconds: 300,
@@ -47,7 +47,7 @@ describe('DecartSdkTokenProvider', () => {
     });
     expect(sdkMocks.createToken).toHaveBeenCalledWith({
       expiresIn: 300,
-      allowedModels: ['lucy-2.5'],
+      allowedModels: ['lucy-latest'],
       allowedOrigins: ['http://localhost:5173'],
       constraints: { realtime: { maxSessionDuration: 300 } },
     });

@@ -93,7 +93,7 @@ type CharacterBuilderDestination =
 
 interface StudioExperienceProps {
   focusMainOnMount: boolean;
-  initialIntent?: 'camera' | 'upload';
+  initialIntent?: 'upload';
 }
 
 const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceProps) => {
@@ -114,7 +114,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       ...repositoryState.store.savedCharacterPrompts.map((character) => ({
         id: character.id,
         label: character.name,
-        modelId: 'lucy-2.5' as const,
+        modelId: 'lucy-latest' as const,
         prompt: character.prompt,
         referenceImageAssetId: character.referenceImageAssetId,
       })),
@@ -167,7 +167,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const dockToggleRef = useRef<HTMLButtonElement>(null);
   const takeToggleRef = useRef<HTMLButtonElement>(null);
   const uploadToggleRef = useRef<HTMLButtonElement>(null);
-  const initialCameraIntentHandledRef = useRef(false);
   const closeTakeReview = useCallback(() => {
     closeOverlay();
     window.requestAnimationFrame(() => dockToggleRef.current?.focus());
@@ -188,6 +187,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     recordingActive,
     reviewLocked,
     mediaLocked,
+    recordingMode,
     recordingSource,
     finalizingStartedAt,
     finalizingStream,
@@ -244,11 +244,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     takeStagePresentation.kind,
   ]);
 
-  useEffect(() => {
-    if (initialIntent !== 'camera' || initialCameraIntentHandledRef.current) return;
-    initialCameraIntentHandledRef.current = true;
-    void session.startLocal();
-  }, [initialIntent, session]);
   const aiSessionActive = isModelSessionActive(session);
   const sessionModeLocked = mediaLocked || aiSessionActive || session.lifecycle === 'disconnected';
   const characterBuilderActivityBlockedReason = recordingActive
@@ -296,7 +291,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     (stepId: string) => {
       if (characterBuilderActivityBlockedReason || existingVideo.providerActive) return;
       const step = existingVideo.steps.find((candidate) => candidate.id === stepId);
-      if (step?.modelId !== 'lucy-2.5') return;
+      if (step?.modelId !== 'lucy-latest') return;
       setCharacterBuilderDestination({ kind: 'existing-video', stepId });
       launchNewCharacterBuilder();
     },
@@ -339,6 +334,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     rememberWorkshopDraft,
     setShelfDirty,
     useRecipe,
+    clearActiveCharacter,
     retryReferenceUse,
     continueReferenceUseWithoutImage,
     saveBuiltCharacter,
@@ -371,7 +367,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       }
       const step = existingVideo.steps.find(
         (candidate) =>
-          candidate.id === characterBuilderDestination.stepId && candidate.modelId === 'lucy-2.5',
+          candidate.id === characterBuilderDestination.stepId &&
+          candidate.modelId === 'lucy-latest',
       );
       if (!step) {
         throw new Error('The Swap Character step is no longer available.');
@@ -522,7 +519,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       : recordingSource;
   const currentExperienceLabel =
     activeCharacterName ??
-    (session.draft.mode === 'lucy-vton-3' && hasDraftContent(session.draft)
+    (session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
       ? activeRecipeLabel
         ? `Virtual Try-On · ${activeRecipeLabel}`
         : 'Virtual Try-On'
@@ -530,11 +527,28 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const currentExperienceImageAssetId =
     activeCharacter?.referenceImageAssetId ??
     persistedReferenceAssetId(session.draft.referenceImage);
+  const effectiveRecordingMode = currentExperienceLabel ? session.draft.mode : recordingMode;
   const activeCharacterRecord = activeCharacter
     ? repositoryState.store.savedCharacterPrompts.find(
         (candidate) => candidate.id === activeCharacter.id,
       )
     : undefined;
+  const characterRemovalBlockedReason = recordingActive
+    ? 'Finish recording before removing the selected character.'
+    : finalizingStartedAt !== null || finalizingStream !== null
+      ? 'Wait for the current take to finish finalizing before removing the selected character.'
+      : reviewLocked
+        ? 'Release or discard the current take before removing the selected character.'
+        : aiSessionActive
+          ? 'Stop AI before removing the selected character.'
+          : session.lifecycle === 'disconnected'
+            ? 'Wait for the current session cleanup before removing the selected character.'
+            : undefined;
+  const unselectCharacter = useCallback(() => {
+    if (!clearActiveCharacter()) return;
+    closeOverlayIf(['character-selector']);
+    window.requestAnimationFrame(() => characterSelectorRef.current?.focus());
+  }, [clearActiveCharacter, closeOverlayIf]);
   const selectExperienceMode = (mode: StudioMode): boolean => {
     return (
       confirmModeReplacement(session.draft, mode, (message) => window.confirm(message)) &&
@@ -550,7 +564,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       return;
     }
     if (!changeLibraryMode(mode)) return;
-    if (mode === 'lucy-2.5') {
+    if (mode === 'lucy-latest') {
       nextRecipeShelfEntryIntentIdRef.current += 1;
       setRecipeShelfEntryIntent({
         id: nextRecipeShelfEntryIntentIdRef.current,
@@ -563,7 +577,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     setRecipeShelfEntryIntent((current) => (current?.id === id ? null : current));
   }, []);
   const configureVirtualTryOn = () => {
-    if (!selectExperienceMode('lucy-vton-3')) return;
+    if (!selectExperienceMode('lucy-vton-latest')) return;
     openOverlay('recipe-dock');
   };
   const startPreparedAi = (mode: ModelMode) => {
@@ -579,6 +593,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     recording.discard();
     setShelfDirty(false);
   }, [existingVideo, processing, recording, setShelfDirty]);
+  const discardExistingVideoSelection = useCallback(() => {
+    if (existingVideo.selection) existingVideo.reset(false);
+  }, [existingVideo]);
   const finishExistingVideoSetup = useCallback(() => {
     existingVideo.showResult();
     openOverlay('take-review');
@@ -676,6 +693,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             {...(activeCharacterName ? { activeCharacterName } : {})}
             activeCharacterImageAssetId={activeCharacter?.referenceImageAssetId}
             onOpenCharacterSelector={openCharacterSelector}
+            onClearCharacter={unselectCharacter}
+            {...(characterRemovalBlockedReason
+              ? { clearCharacterDisabledReason: characterRemovalBlockedReason }
+              : {})}
           />
         </div>
 
@@ -721,6 +742,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                   {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}
                   experienceImageAssetId={currentExperienceImageAssetId}
                   recording={recording}
+                  recordingMode={effectiveRecordingMode}
                   recordingSource={activeRecordingSource}
                   recordingSupported={browser.mediaRecorder}
                   {...(captureBlockedReason
@@ -731,6 +753,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                   controlsLocked={reviewLocked || finalizingStartedAt !== null}
                   onStopRecording={finishTake}
                   onCloseTakeReview={closeTakeReview}
+                  onDiscardTake={discardExistingVideoSelection}
                   onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
                   onChooseAiExperience={() => openOverlay('ai-experience')}
                   onChangeExperience={() => openOverlay('ai-experience')}
@@ -746,7 +769,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             <RecordingControls
               recording={recording}
               source={activeRecordingSource}
-              mode={session.draft.mode}
+              mode={effectiveRecordingMode}
               onOpenSettings={openCaptureSettings}
             />
           </div>
@@ -778,6 +801,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           returnFocusRef={uploadToggleRef}
         >
           <ExistingVideoPanel
+            key={existingVideo.selection?.metadata.selectedAt ?? 'empty-existing-video'}
             workflow={existingVideo}
             videoProcessingAvailable={Boolean(availability.videoProcessing)}
             elevenLabsAvailable={availability.elevenLabs}
@@ -815,16 +839,26 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                 : 'No saved character is selected.'}
             </p>
             {activeCharacterName ? (
-              <Button
-                variant="secondary"
-                disabled={Boolean(characterBuilderOpenBlockedReason)}
-                title={characterBuilderOpenBlockedReason}
-                onClick={() => {
-                  if (activeCharacterRecord) editCharacter(activeCharacterRecord);
-                }}
-              >
-                Edit {activeCharacterName}
-              </Button>
+              <>
+                <Button
+                  variant="secondary"
+                  disabled={Boolean(characterBuilderOpenBlockedReason)}
+                  title={characterBuilderOpenBlockedReason}
+                  onClick={() => {
+                    if (activeCharacterRecord) editCharacter(activeCharacterRecord);
+                  }}
+                >
+                  Edit {activeCharacterName}
+                </Button>
+                <Button
+                  variant="danger"
+                  disabled={Boolean(characterRemovalBlockedReason)}
+                  title={characterRemovalBlockedReason}
+                  onClick={unselectCharacter}
+                >
+                  Unselect character
+                </Button>
+              </>
             ) : null}
             <Button
               variant="primary"
@@ -837,7 +871,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             <Button
               variant="secondary"
               disabled={recordingActive}
-              onClick={() => openSavedRecipesFor('lucy-2.5')}
+              onClick={() => openSavedRecipesFor('lucy-latest')}
             >
               Choose saved character
             </Button>
@@ -851,17 +885,19 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           {...(activeCharacterName ? { activeCharacterName } : {})}
           characterReady={
             Boolean(activeCharacterName) &&
-            session.draft.mode === 'lucy-2.5' &&
+            session.draft.mode === 'lucy-latest' &&
             hasDraftContent(session.draft)
           }
-          virtualTryOnReady={session.draft.mode === 'lucy-vton-3' && hasDraftContent(session.draft)}
+          virtualTryOnReady={
+            session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
+          }
           onClose={closeOverlay}
-          onStartCharacter={() => startPreparedAi('lucy-2.5')}
+          onStartCharacter={() => startPreparedAi('lucy-latest')}
           onCreateCharacter={openCharacterBuilder}
-          onChooseSavedCharacter={() => openSavedRecipesFor('lucy-2.5')}
-          onStartVirtualTryOn={() => startPreparedAi('lucy-vton-3')}
+          onChooseSavedCharacter={() => openSavedRecipesFor('lucy-latest')}
+          onStartVirtualTryOn={() => startPreparedAi('lucy-vton-latest')}
           onConfigureVirtualTryOn={configureVirtualTryOn}
-          onChooseSavedVirtualTryOn={() => openSavedRecipesFor('lucy-vton-3')}
+          onChooseSavedVirtualTryOn={() => openSavedRecipesFor('lucy-vton-latest')}
         />
 
         <OverlayPanel
@@ -924,6 +960,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               elevenLabsModel={availability.elevenLabsModel}
               browserCapabilities={browser}
               onCloseTake={closeOverlay}
+              onDiscardTake={discardExistingVideoSelection}
               {...(existingVideo.selection ? { onEditVideo: openExistingVideo } : {})}
               onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
             />
@@ -1033,7 +1070,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
 export interface StudioAppProps {
   readonly focusMainOnMount?: boolean;
-  readonly initialIntent?: 'camera' | 'upload';
+  readonly initialIntent?: 'upload';
 }
 
 export const StudioApp = ({ focusMainOnMount = false, initialIntent }: StudioAppProps) => (

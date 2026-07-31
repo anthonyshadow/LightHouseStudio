@@ -78,7 +78,7 @@ describe('VideoJobService', () => {
       jobId,
       ownerId,
       recipe: {
-        modelId: 'lucy-2.5',
+        modelId: 'lucy-latest',
         prompt: 'Change the lighting',
         enhancePrompt: false,
         hasReferenceImage: false,
@@ -90,7 +90,7 @@ describe('VideoJobService', () => {
     });
 
     await waitFor(service, jobId, ownerId, 'queued');
-    expect(provider.submissions).toEqual([{ modelId: 'lucy-2.5', videoMimeType: 'video/mp4' }]);
+    expect(provider.submissions).toEqual([{ modelId: 'lucy-latest', videoMimeType: 'video/mp4' }]);
     expect(service.existing(jobId, ownerId)?.jobId).toBe(jobId);
 
     provider.nextStatus = 'completed';
@@ -124,7 +124,7 @@ describe('VideoJobService', () => {
       jobId,
       ownerId: 'owner-two',
       recipe: {
-        modelId: 'lucy-vton-3',
+        modelId: 'lucy-vton-latest',
         prompt: 'Apply the garment',
         enhancePrompt: false,
         hasReferenceImage: false,

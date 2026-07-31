@@ -3,7 +3,7 @@ import type { RefObject } from 'react';
 import { referenceImageContentUrl } from '../adapters/api-client/apiClient';
 import { Button } from '../ui';
 import { fadingVisibilityAnimationStyles } from '../ui/animationStyles';
-import type { StudioSessionController } from '../features/media-session';
+import type { StudioMode, StudioSessionController } from '../features/media-session';
 import {
   RecordingAction,
   type RecordingController,
@@ -16,6 +16,7 @@ type StudioSessionControlBarProps = {
   experienceLabel?: string | undefined;
   experienceImageAssetId?: string | null | undefined;
   recording: RecordingController;
+  recordingMode: StudioMode;
   recordingSource: RecordingSource | null;
   recordingSupported: boolean;
   recordingBlockedReason?: string | undefined;
@@ -24,6 +25,7 @@ type StudioSessionControlBarProps = {
   controlsLocked?: boolean;
   onStopRecording: () => Promise<void>;
   onCloseTakeReview: () => void;
+  onDiscardTake?: () => void;
   onOpenVoiceTreatments: () => void;
   onChooseAiExperience: () => void;
   onChangeExperience: () => void;
@@ -182,6 +184,13 @@ const actionRowStyles = (theme: Theme): CSSObject => ({
       overflow: 'hidden',
       clip: 'rect(0 0 0 0)',
     },
+    '&[data-local-recording-primary="true"] [data-secondary-label]': {
+      position: 'static',
+      width: 'auto',
+      height: 'auto',
+      overflow: 'visible',
+      clip: 'auto',
+    },
     '& [data-upload-label]': {
       position: 'absolute',
       width: '1px',
@@ -284,6 +293,7 @@ export const StudioSessionControlBar = ({
   experienceLabel,
   experienceImageAssetId,
   recording,
+  recordingMode,
   recordingSource,
   recordingSupported,
   recordingBlockedReason,
@@ -292,6 +302,7 @@ export const StudioSessionControlBar = ({
   controlsLocked = false,
   onStopRecording,
   onCloseTakeReview,
+  onDiscardTake,
   onOpenVoiceTreatments,
   onChooseAiExperience,
   onChangeExperience,
@@ -303,6 +314,8 @@ export const StudioSessionControlBar = ({
   const transition = transitionLabel(session);
   const aiActive = ['connected', 'generating', 'reconnecting'].includes(session.lifecycle);
   const aiStarting = isStartingAi(session);
+  const aiExperienceSelected = Boolean(experienceLabel);
+  const localRecordingPrimary = !aiActive && !aiStarting && !aiExperienceSelected;
   const localActive = Boolean(session.localStream);
   const recordingActive = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
   const takeReviewActive = reviewingTake && Boolean(recording.presented);
@@ -325,7 +338,7 @@ export const StudioSessionControlBar = ({
     <RecordingAction
       recording={recording}
       source={recordingSource}
-      mode={session.draft.mode}
+      mode={recordingMode}
       modelOutputReady={session.transformedVideoUsable}
       supported={recordingSupported}
       {...(recordingBlockedReason ? { blockedReason: recordingBlockedReason } : {})}
@@ -349,6 +362,7 @@ export const StudioSessionControlBar = ({
           recording={recording}
           presentation="control-bar"
           onCloseTake={onCloseTakeReview}
+          {...(onDiscardTake ? { onDiscardTake } : {})}
           {...(onEditVideo ? { onEditVideo, editVideoButtonRef: uploadButtonRef } : {})}
           onOpenVoiceTreatments={onOpenVoiceTreatments}
         />
@@ -467,7 +481,10 @@ export const StudioSessionControlBar = ({
               {recordingAction}
             </div>
           ) : (
-            <div css={actionRowStyles(theme)}>
+            <div
+              css={actionRowStyles(theme)}
+              data-local-recording-primary={localRecordingPrimary ? 'true' : undefined}
+            >
               {aiStarting ? (
                 <Button variant="primary" busy>
                   Starting AI…
@@ -482,7 +499,7 @@ export const StudioSessionControlBar = ({
                   <StopIcon />
                   Stop AI
                 </Button>
-              ) : (
+              ) : !localRecordingPrimary ? (
                 <Button
                   variant="primary"
                   disabled={controlsLocked || recordingActive}
@@ -494,6 +511,8 @@ export const StudioSessionControlBar = ({
                     AI
                   </span>
                 </Button>
+              ) : (
+                recordingAction
               )}
 
               <Button
@@ -519,7 +538,7 @@ export const StudioSessionControlBar = ({
                 <CameraIcon off={!session.cameraEnabled} />
               </Button>
 
-              {recordingAction}
+              {!localRecordingPrimary ? recordingAction : null}
 
               {aiStarting ? (
                 <Button variant="secondary" onClick={() => void session.stopModel()}>

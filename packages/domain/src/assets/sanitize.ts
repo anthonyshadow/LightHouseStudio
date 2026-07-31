@@ -190,7 +190,7 @@ const sanitizeRecentPrompt = (
   const hasPrompt = containsMeaningfulText(prompt);
   const validImageOnlyCharacter =
     !hasPrompt &&
-    modelModeId === 'lucy-2.5' &&
+    modelModeId === 'lucy-latest' &&
     persistedReferenceImageAssetId !== null &&
     containsMeaningfulText(characterName);
   if (
@@ -394,7 +394,7 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
         const character = charactersById.get(recent.savedCharacterPromptId);
         if (
           character &&
-          recent.modelModeId === 'lucy-2.5' &&
+          recent.modelModeId === 'lucy-latest' &&
           canonicalPrompt(character.prompt) === canonicalPrompt(recent.prompt) &&
           character.referenceImageAssetId === recent.referenceImageAssetId
         ) {

@@ -101,7 +101,7 @@ describe('creative asset CRUD and use', () => {
       {
         title: '  Chrome   Explorer ',
         prompt: '  A chrome explorer  ',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         source: 'manual',
         tags: [' Sci-Fi ', 'sci-fi', 'Portrait'],
       },
@@ -122,7 +122,7 @@ describe('creative asset CRUD and use', () => {
 
     store = recordSuccessfulPromptUse(
       used.store,
-      { prompt: ' A   CHROME explorer ', modelModeId: 'lucy-2.5' },
+      { prompt: ' A   CHROME explorer ', modelModeId: 'lucy-latest' },
       context('recent-1', 3),
     );
     expect(store.recentPrompts[0]?.savedPromptId).toBe('saved-1');
@@ -140,28 +140,32 @@ describe('creative asset CRUD and use', () => {
     let store = createEmptyCreativeAssetStore();
     store = recordSuccessfulPromptUse(
       store,
-      { prompt: 'Velvet  jacket', modelModeId: 'lucy-vton-3' },
+      { prompt: 'Velvet  jacket', modelModeId: 'lucy-vton-latest' },
       context('first', 0),
     );
     store = recordSuccessfulPromptUse(
       store,
-      { prompt: '  velvet jacket ', modelModeId: 'lucy-vton-3' },
+      { prompt: '  velvet jacket ', modelModeId: 'lucy-vton-latest' },
       context('second', 1),
     );
     store = recordSuccessfulPromptUse(
       store,
-      { prompt: 'velvet jacket', modelModeId: 'lucy-2.5' },
+      { prompt: 'velvet jacket', modelModeId: 'lucy-latest' },
       context('character', 2),
     );
     expect(store.recentPrompts).toHaveLength(2);
     expect(
-      store.recentPrompts.find((recent) => recent.modelModeId === 'lucy-vton-3'),
+      store.recentPrompts.find((recent) => recent.modelModeId === 'lucy-vton-latest'),
     ).toMatchObject({
       id: 'first',
       usedAt: timestamp(1),
     });
     expect(
-      recordSuccessfulPromptUse(store, { prompt: '  ', modelModeId: 'lucy-2.5' }, context('empty')),
+      recordSuccessfulPromptUse(
+        store,
+        { prompt: '  ', modelModeId: 'lucy-latest' },
+        context('empty'),
+      ),
     ).toBe(store);
   });
 
@@ -169,12 +173,12 @@ describe('creative asset CRUD and use', () => {
     let store = createEmptyCreativeAssetStore();
     store = recordSuccessfulPromptUse(
       store,
-      { prompt: 'Substitute the character with a lunar guide.', modelModeId: 'lucy-2.5' },
+      { prompt: 'Substitute the character with a lunar guide.', modelModeId: 'lucy-latest' },
       context('text-only', 0),
     );
     store = enrichNewestMatchingRecentWithReferenceImage(store, {
       prompt: ' substitute the character with a lunar guide. ',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       referenceImageAssetId: 'asset-a',
     });
     expect(store.recentPrompts).toEqual([
@@ -185,7 +189,7 @@ describe('creative asset CRUD and use', () => {
       store,
       {
         prompt: 'Substitute the character with a lunar guide.',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         referenceImageAssetId: 'asset-b',
       },
       context('asset-b-version', 1),
@@ -197,7 +201,7 @@ describe('creative asset CRUD and use', () => {
 
     const unchanged = enrichNewestMatchingRecentWithReferenceImage(store, {
       prompt: 'Substitute the character with a lunar guide.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       referenceImageAssetId: 'asset-c',
     });
     expect(unchanged).toBe(store);
@@ -209,7 +213,7 @@ describe('creative asset CRUD and use', () => {
       {
         title: 'Lunar guide A',
         prompt: 'Substitute the character with a lunar guide.',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         source: 'manual',
         referenceImageAssetId: 'asset-a',
       },
@@ -220,7 +224,7 @@ describe('creative asset CRUD and use', () => {
       {
         title: 'Lunar guide B',
         prompt: 'Substitute the character with a lunar guide.',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         source: 'manual',
         referenceImageAssetId: 'asset-b',
       },
@@ -231,7 +235,7 @@ describe('creative asset CRUD and use', () => {
       store,
       {
         prompt: 'Substitute the character with a lunar guide.',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         savedPromptId: 'saved-a',
         referenceImageAssetId: 'asset-b',
       },
@@ -246,7 +250,7 @@ describe('creative asset CRUD and use', () => {
       store,
       {
         prompt: 'Substitute the character with a lunar guide.',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         savedPromptId: 'saved-b',
         referenceImageAssetId: null,
       },
@@ -262,7 +266,7 @@ describe('creative asset CRUD and use', () => {
       {
         title: 'Linked guide',
         prompt: 'Substitute the character with an orbital guide.',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         source: 'manual',
         referenceImageAssetId: 'asset-a',
       },
@@ -272,7 +276,7 @@ describe('creative asset CRUD and use', () => {
       store,
       {
         prompt: 'Substitute the character with an orbital guide.',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         savedPromptId: 'saved-guide',
         referenceImageAssetId: 'asset-a',
       },
@@ -296,7 +300,7 @@ describe('creative asset CRUD and use', () => {
       {
         title: 'Reference A',
         prompt: 'Substitute the character with an orbital guide.',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         source: 'manual',
         referenceImageAssetId: 'asset-a',
       },
@@ -306,7 +310,7 @@ describe('creative asset CRUD and use', () => {
       store,
       {
         prompt: 'Substitute the character with an orbital guide.',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         savedPromptId: 'saved-a',
         referenceImageAssetId: 'asset-a',
       },
@@ -330,7 +334,7 @@ describe('creative asset CRUD and use', () => {
         {
           title: `Prompt ${index}`,
           prompt: `character prompt ${index}`,
-          modelModeId: 'lucy-2.5',
+          modelModeId: 'lucy-latest',
           source: 'manual',
         },
         context(`saved-${index}`, index),
@@ -342,7 +346,7 @@ describe('creative asset CRUD and use', () => {
     for (let index = 0; index < RECENT_PROMPT_LIMIT + 2; index += 1) {
       store = recordSuccessfulPromptUse(
         store,
-        { prompt: `unique recent ${index}`, modelModeId: 'lucy-2.5' },
+        { prompt: `unique recent ${index}`, modelModeId: 'lucy-latest' },
         context(`recent-${index}`, index),
       );
     }
@@ -416,7 +420,7 @@ describe('creative asset CRUD and use', () => {
       store,
       {
         prompt: '',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         savedCharacterPromptId: 'character-image-only',
         characterName: 'Uploaded Character 01',
         referenceImageAssetId: 'uploaded-asset-1',
@@ -528,7 +532,7 @@ describe('creative asset sanitation and recovery', () => {
     id: 'safe-id',
     title: ' Safe asset ',
     prompt: '  A useful prompt  ',
-    modelModeId: 'lucy-2.5',
+    modelModeId: 'lucy-latest',
     source: 'manual',
     tags: Array.from({ length: 14 }, (_, index) => (index === 1 ? 'TAG 0' : `tag ${index}`)),
     createdAt: timestamp(),
@@ -583,7 +587,7 @@ describe('creative asset sanitation and recovery', () => {
     const recent = {
       id: 'old',
       prompt: 'Ocean  guide',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       usedAt: timestamp(0),
     };
     const result = sanitizeCreativeAssetStore({
@@ -607,7 +611,7 @@ describe('creative asset sanitation and recovery', () => {
         {
           id: 'legacy-recent',
           prompt: 'A useful prompt',
-          modelModeId: 'lucy-2.5',
+          modelModeId: 'lucy-latest',
           referenceImageAssetId: 'untrusted-v1-asset',
           usedAt: timestamp(),
         },
@@ -743,7 +747,7 @@ describe('creative asset sanitation and recovery', () => {
         {
           id: 'image-only-recent',
           prompt: '',
-          modelModeId: 'lucy-2.5',
+          modelModeId: 'lucy-latest',
           savedCharacterPromptId: 'deleted-character',
           characterName: 'Uploaded Character 01',
           referenceImageAssetId: 'uploaded-asset-1',
@@ -810,7 +814,7 @@ describe('creative asset sanitation and recovery', () => {
     const recent = {
       id: 'asset-a-recent',
       prompt: 'Ocean guide',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       usedAt: timestamp(0),
       referenceImageAssetId: 'asset-a',
     };

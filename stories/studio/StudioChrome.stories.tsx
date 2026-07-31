@@ -38,6 +38,7 @@ const meta = {
     capabilityState: 'ready',
     characterSelectorRef: { current: null },
     onOpenCharacterSelector: fn(),
+    onClearCharacter: fn(),
   },
   parameters: {
     docs: {
@@ -63,6 +64,7 @@ const HeaderHarness = () => {
         characterSelectorRef={selectorRef}
         activeCharacterName="Midnight culture host"
         onOpenCharacterSelector={fn()}
+        onClearCharacter={fn()}
       />
     </StoryColumn>
   );
@@ -130,7 +132,31 @@ export const IdleControlBar: Story = {
       <StudioSessionControlBar
         session={createSessionController()}
         recording={createRecordingController()}
+        recordingMode="local"
         recordingSource={null}
+        recordingSupported
+        reviewingTake={false}
+        onStopRecording={fn(() => Promise.resolve())}
+        onCloseTakeReview={fn()}
+        onOpenVoiceTreatments={fn()}
+        onChooseAiExperience={fn()}
+        onChangeExperience={fn()}
+      />,
+    ),
+};
+
+export const LocalPreviewControlBar: Story = {
+  render: () =>
+    controlBarFrame(
+      <StudioSessionControlBar
+        session={createSessionController('local', {
+          lifecycle: 'ready',
+          localStream: emptyMediaStream(),
+          displayStream: emptyMediaStream(),
+        })}
+        recording={createRecordingController()}
+        recordingMode="local"
+        recordingSource={createRecordingSource()}
         recordingSupported
         reviewingTake={false}
         onStopRecording={fn(() => Promise.resolve())}
@@ -146,7 +172,7 @@ export const LiveCharacterControlBar: Story = {
   render: () =>
     controlBarFrame(
       <StudioSessionControlBar
-        session={createSessionController('lucy-2.5', {
+        session={createSessionController('lucy-latest', {
           lifecycle: 'generating',
           localStream: emptyMediaStream(),
           remoteStream: emptyMediaStream(),
@@ -155,6 +181,7 @@ export const LiveCharacterControlBar: Story = {
         })}
         experienceLabel="Midnight culture host"
         recording={createRecordingController()}
+        recordingMode="lucy-latest"
         recordingSource={createRecordingSource()}
         recordingSupported
         reviewingTake={false}
@@ -176,6 +203,7 @@ export const TakeReviewControlBar: Story = {
           localStream: emptyMediaStream(),
         })}
         recording={createRecordedController({ downloaded: true })}
+        recordingMode="local"
         recordingSource={null}
         recordingSupported
         reviewingTake

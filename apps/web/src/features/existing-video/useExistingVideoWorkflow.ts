@@ -78,7 +78,7 @@ const waitForPoll = (signal: AbortSignal): Promise<void> =>
   });
 
 const stepLabel = (modelId: VideoTransformModelId): string =>
-  modelId === 'lucy-2.5' ? 'Lucy' : 'VTO';
+  modelId === 'lucy-latest' ? 'Lucy' : 'VTO';
 
 class RetryExistingVideoJobError extends Error {
   constructor(message: string) {
@@ -168,7 +168,7 @@ export const useExistingVideoWorkflow = ({
       try {
         const validated = await validateExistingVideo(
           file,
-          step?.modelId === 'lucy-vton-3',
+          step?.modelId === 'lucy-vton-latest',
           controller.signal,
         );
         if (controller.signal.aborted) {
@@ -234,7 +234,7 @@ export const useExistingVideoWorkflow = ({
       const file = new File([draft.media], draft.filename, { type: draft.mimeType });
       const validated = await validateExistingVideo(
         file,
-        step?.modelId === 'lucy-vton-3',
+        step?.modelId === 'lucy-vton-latest',
         controller.signal,
       );
       if (controller.signal.aborted || generation !== generationRef.current) return;
@@ -286,7 +286,7 @@ export const useExistingVideoWorkflow = ({
       if (acceptedSubmission) return;
       if (
         selection &&
-        modelId === 'lucy-vton-3' &&
+        modelId === 'lucy-vton-latest' &&
         validateUploadedVideoFacts(selection.metadata, [{ modelId }]).some(
           (issue) => issue.code === 'payload-too-large',
         )
@@ -304,7 +304,7 @@ export const useExistingVideoWorkflow = ({
               prompt: '',
               enhancePrompt: false,
               referenceImage: null,
-              inputKind: modelId === 'lucy-vton-3' ? 'prompt' : 'character',
+              inputKind: modelId === 'lucy-vton-latest' ? 'prompt' : 'character',
             },
       );
       setMessage(null);
@@ -744,7 +744,7 @@ export const useExistingVideoWorkflow = ({
       >,
     ) => {
       setStep((current) => {
-        if (!current || current.id !== id || current.modelId !== 'lucy-vton-3') return current;
+        if (!current || current.id !== id || current.modelId !== 'lucy-vton-latest') return current;
         return {
           ...current,
           inputKind,

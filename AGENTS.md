@@ -64,7 +64,7 @@ old story, or intended design.
   screenshots, traces, or committed `.env` files.
 - Local Camera must remain independent of provider credentials, token minting, SDK loading, and all
   external media/network traffic.
-- Decart: use exact app-owned model IDs (`lucy-2.5`, pinned `lucy-vton-3`), scoped short-lived
+- Decart: use exact app-owned model IDs (`lucy-latest`, pinned `lucy-vton-latest`), scoped short-lived
   client tokens, lazy SDK loading, atomic full-state updates, explicit Start/Apply, safe normalized
   errors, and complete listener/client/track cleanup. Do not silently follow aliases or add
   provider fallback.

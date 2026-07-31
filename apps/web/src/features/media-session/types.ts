@@ -103,8 +103,8 @@ export type StudioSessionController = {
 export const isModelMode = (mode: StudioMode): mode is ModelMode => mode !== 'local';
 
 export const modeLabel = (mode: StudioMode): string => {
-  if (mode === 'lucy-2.5') return 'Character';
-  if (mode === 'lucy-vton-3') return 'Virtual Try-On';
+  if (mode === 'lucy-latest') return 'Character';
+  if (mode === 'lucy-vton-latest') return 'Virtual Try-On';
   return 'Local Camera';
 };
 

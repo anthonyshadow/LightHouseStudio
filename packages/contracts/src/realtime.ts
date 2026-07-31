@@ -1,7 +1,7 @@
 import { z } from 'zod';
 
-export const DEFAULT_CHARACTER_MODEL_ID = 'lucy-2.5' as const;
-export const SUPPORTED_MODEL_IDS = [DEFAULT_CHARACTER_MODEL_ID, 'lucy-vton-3'] as const;
+export const DEFAULT_CHARACTER_MODEL_ID = 'lucy-latest' as const;
+export const SUPPORTED_MODEL_IDS = [DEFAULT_CHARACTER_MODEL_ID, 'lucy-vton-latest'] as const;
 export const supportedModelIdSchema = z.enum(SUPPORTED_MODEL_IDS);
 export const realtimeSessionProfileSchema = z.enum(['advanced', 'guided']);
 

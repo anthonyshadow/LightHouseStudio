@@ -61,7 +61,7 @@ describe('recording metadata', () => {
   it('builds immutable take metadata and maps domain sources', () => {
     const metadata = captureTakeMetadata(
       { stream: {} as MediaStream, videoSource: 'transformed', audioSource: 'provider' },
-      'lucy-2.5',
+      'lucy-latest',
       new Date('2026-07-22T12:00:00.000Z'),
       track({ width: 1280, height: 720 }, {}, ' Output '),
       track({}, {}, ' Voice '),

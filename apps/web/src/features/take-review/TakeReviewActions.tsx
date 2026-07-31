@@ -7,6 +7,7 @@ export type TakeReviewActionsProps = {
   recording: RecordingController;
   presentation?: 'panel' | 'control-bar';
   onCloseTake?: () => void;
+  onDiscardTake?: () => void;
   onEditVideo?: () => void;
   onOpenVoiceTreatments?: () => void;
   editVideoButtonRef?: RefObject<HTMLButtonElement | null>;
@@ -72,6 +73,7 @@ export const TakeReviewActions = ({
   recording,
   presentation = 'panel',
   onCloseTake,
+  onDiscardTake,
   onEditVideo,
   onOpenVoiceTreatments,
   editVideoButtonRef,
@@ -96,7 +98,9 @@ export const TakeReviewActions = ({
     ) {
       return;
     }
-    closeTake();
+    recording.discard();
+    onDiscardTake?.();
+    onCloseTake?.();
   };
 
   return (

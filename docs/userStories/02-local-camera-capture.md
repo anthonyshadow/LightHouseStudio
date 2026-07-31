@@ -8,7 +8,9 @@
 2. Select **Start Camera + Mic** (or Dock **Start local preview**) and grant browser permission.
 3. Confirm **Live local camera preview**. Use the mic/camera toggles and any capability-gated
    front/rear or zoom controls.
-4. Select **Record**, or press Space while focus is outside interactive/editable content.
+4. With no Character or Virtual Try-On recipe selected, the stage control bar presents **Record**
+   as its primary action and does not present **Start AI**. Select **Record**, or press Space while
+   focus is outside interactive/editable content.
 5. Select the dominant **Stop recording** action. It remains visible and focusable throughout
    recording.
 6. If recording continues, Studio warns at 4:30 and invokes the same coalesced Stop/finalize path

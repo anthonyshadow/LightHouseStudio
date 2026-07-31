@@ -60,9 +60,10 @@ then edit either base, download, start over, or discard.
 11. **Start over** revokes generated visual and voice URLs, retains and presents the uploaded
     original, clears the selected transformation, and returns to **Visual plan**. It does not reset
     the moderated participant submission counters. The creator can choose either model again.
-12. Confirmed **Discard video** revokes the uploaded source and all generated results and returns
-    the open panel to **Choose an existing video**. The ordinary Latest Take controls remain
-    available after explicitly closing the upload panel.
+12. Confirmed **Discard video** in the panel, or **Discard** in the recorded-take control bar,
+    revokes the uploaded source and all generated results. The control bar returns from **Edit
+    video** to **Upload video**, and the next panel open starts at **Choose an existing video** with
+    no retained plan, chooser state, or prior source.
 
 ## Validation and failure behavior
 

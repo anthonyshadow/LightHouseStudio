@@ -5,7 +5,7 @@ import { downloadVideoJobResult, submitVideoJob } from './videoJobsApi';
 
 const status = (jobId: string) => ({
   jobId,
-  modelId: 'lucy-2.5',
+  modelId: 'lucy-latest',
   status: 'validating',
   createdAt: '2026-07-30T12:00:00.000Z',
   updatedAt: '2026-07-30T12:00:00.000Z',
@@ -33,7 +33,7 @@ describe('videoJobsApi', () => {
     await submitVideoJob(
       jobId,
       {
-        modelId: 'lucy-2.5',
+        modelId: 'lucy-latest',
         prompt: 'Change the scene',
         enhancePrompt: false,
         hasReferenceImage: true,

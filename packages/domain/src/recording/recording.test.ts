@@ -39,7 +39,7 @@ describe('recording source rules', () => {
   it('gates model recording on transformed video and prefers provider audio', () => {
     expect(
       selectRecordingSource({
-        modeId: 'lucy-2.5',
+        modeId: 'lucy-latest',
         localVideoLive: true,
         localAudioLive: true,
         modelVideoLive: false,
@@ -48,7 +48,7 @@ describe('recording source rules', () => {
     ).toBeNull();
     expect(
       selectRecordingSource({
-        modeId: 'lucy-2.5',
+        modeId: 'lucy-latest',
         localVideoLive: true,
         localAudioLive: true,
         modelVideoLive: true,
@@ -60,7 +60,7 @@ describe('recording source rules', () => {
   it('falls back to local microphone when provider audio is absent', () => {
     expect(
       selectRecordingSource({
-        modeId: 'lucy-vton-3',
+        modeId: 'lucy-vton-latest',
         localVideoLive: true,
         localAudioLive: true,
         modelVideoLive: true,
@@ -181,9 +181,9 @@ describe('recording helpers and ownership', () => {
   });
 
   it('creates mode-aware filenames and useful metadata formatting', () => {
-    expect(createRecordingFilename('lucy-vton-3', '2026-07-14T12:34:56.789Z', 'video/mp4')).toBe(
-      'virtual-try-on-take-20260714T123456Z.mp4',
-    );
+    expect(
+      createRecordingFilename('lucy-vton-latest', '2026-07-14T12:34:56.789Z', 'video/mp4'),
+    ).toBe('virtual-try-on-take-20260714T123456Z.mp4');
     expect(formatDuration(3_661_000)).toBe('1:01:01');
     expect(formatFileSize(20 * 1024)).toBe('20 KiB');
     expect(formatFileSize(10 * 1024 * 1024)).toBe('10.0 MiB');

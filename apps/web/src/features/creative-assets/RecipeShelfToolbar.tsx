@@ -20,7 +20,7 @@ export const RecipeShelfToolbar = ({
   const categories = [
     ['saved', 'Saved'],
     ['recent', 'Recent'],
-    ...(activeMode === 'lucy-2.5' ? ([['characters', 'Characters']] as const) : []),
+    ...(activeMode === 'lucy-latest' ? ([['characters', 'Characters']] as const) : []),
   ] as const;
 
   return (

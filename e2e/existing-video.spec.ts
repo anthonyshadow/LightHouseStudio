@@ -18,7 +18,7 @@ const SEEDED_UPLOAD_RECIPES = {
       title: 'Professional Anchor',
       prompt:
         'A professional anchor in a well-lit studio with a dark blazer and soft cinematic lighting.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       source: 'manual',
       referenceImageAssetId: null,
       tags: ['anchor'],
@@ -277,7 +277,7 @@ test('Create A Character returns to the upload plan with the new character selec
   expect(await cameraCalls(page)).toBe(0);
 });
 
-for (const modelId of ['lucy-2.5', 'lucy-vton-3'] as const) {
+for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
   test(`upload uses only ${modelId} when that visual option is selected`, async ({ page }) => {
     await installCameraSentinel(page);
     await installProviderNetworkDriver(page);
@@ -291,15 +291,15 @@ for (const modelId of ['lucy-2.5', 'lucy-vton-3'] as const) {
     const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
     await dialog
       .getByRole('button', {
-        name: modelId === 'lucy-2.5' ? 'Swap Character' : 'Virtual Try On',
+        name: modelId === 'lucy-latest' ? 'Swap Character' : 'Virtual Try On',
       })
       .click();
     const selectedButton = dialog.getByRole('button', {
-      name: modelId === 'lucy-2.5' ? 'Swap Character' : 'Virtual Try On',
+      name: modelId === 'lucy-latest' ? 'Swap Character' : 'Virtual Try On',
     });
-    const alternateModelId = modelId === 'lucy-2.5' ? 'lucy-vton-3' : 'lucy-2.5';
+    const alternateModelId = modelId === 'lucy-latest' ? 'lucy-vton-latest' : 'lucy-latest';
     const alternateButton = dialog.getByRole('button', {
-      name: alternateModelId === 'lucy-2.5' ? 'Swap Character' : 'Virtual Try On',
+      name: alternateModelId === 'lucy-latest' ? 'Swap Character' : 'Virtual Try On',
     });
     await expect(selectedButton).toHaveAttribute('aria-pressed', 'true');
     await expect(alternateButton).toBeEnabled();
@@ -323,7 +323,7 @@ for (const modelId of ['lucy-2.5', 'lucy-vton-3'] as const) {
       submissions.every(({ providerIntent }) => providerIntent === VIDEO_PROVIDER_INTENT_VALUE),
     ).toBe(true);
     expect(submissions.every(({ exposedOriginalFilename }) => !exposedOriginalFilename)).toBe(true);
-    if (modelId === 'lucy-2.5') {
+    if (modelId === 'lucy-latest') {
       const playback = page.getByLabel('Recorded take playback');
       const resultUrl = await playback.getAttribute('src');
       expect(resultUrl).toMatch(/^blob:/u);
@@ -385,7 +385,7 @@ for (const modelId of ['lucy-2.5', 'lucy-vton-3'] as const) {
         calls
           .filter(({ method }) => method === 'PUT')
           .map(({ modelId: submittedModel }) => submittedModel),
-      ).toEqual(['lucy-2.5', 'lucy-vton-3']);
+      ).toEqual(['lucy-latest', 'lucy-vton-latest']);
     } else {
       page.once('dialog', async (confirmation) => {
         expect(confirmation.message()).toContain('Discard this uploaded video and its results?');

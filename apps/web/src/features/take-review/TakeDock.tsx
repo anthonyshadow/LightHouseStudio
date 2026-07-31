@@ -17,6 +17,7 @@ export type TakeDockProps = {
   browserCapabilities?: VoiceBrowserCapabilities;
   view?: 'all' | 'take' | 'voice';
   onCloseTake?: () => void;
+  onDiscardTake?: () => void;
   onEditVideo?: () => void;
   onOpenVoiceTreatments?: () => void;
   onBackToTake?: () => void;
@@ -101,9 +102,9 @@ const takeModeLabel = (mode: TakeMetadata['mode']): string => {
   switch (mode) {
     case 'local':
       return 'Local Camera';
-    case 'lucy-2.5':
+    case 'lucy-latest':
       return 'Character AI';
-    case 'lucy-vton-3':
+    case 'lucy-vton-latest':
       return 'Virtual Try-On';
   }
 };
@@ -197,6 +198,7 @@ export const TakeDock = ({
   browserCapabilities,
   view = 'all',
   onCloseTake,
+  onDiscardTake,
   onEditVideo,
   onOpenVoiceTreatments,
   onBackToTake,
@@ -263,6 +265,7 @@ export const TakeDock = ({
                 <TakeReviewActions
                   recording={recording}
                   {...(onCloseTake ? { onCloseTake } : {})}
+                  {...(onDiscardTake ? { onDiscardTake } : {})}
                   {...(onEditVideo ? { onEditVideo } : {})}
                   {...(onOpenVoiceTreatments ? { onOpenVoiceTreatments } : {})}
                 />

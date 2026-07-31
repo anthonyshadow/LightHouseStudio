@@ -48,9 +48,9 @@ export const PrivateLocalCapture: Story = {
 
 export const CharacterDraft: Story = {
   args: {
-    session: createSessionController('lucy-2.5', {
+    session: createSessionController('lucy-latest', {
       draft: {
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: 'Transform the adult subject into a polished midnight culture host.',
         referenceImage: null,
         enhance: true,
@@ -65,15 +65,15 @@ export const CharacterDraft: Story = {
 
 export const LiveAppliedRecipe: Story = {
   args: {
-    session: createSessionController('lucy-2.5', {
+    session: createSessionController('lucy-latest', {
       draft: {
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: 'Adult field correspondent',
         referenceImage: null,
         enhance: true,
       },
       applied: {
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: 'Adult field correspondent',
         referenceImage: null,
         referenceIdentity: null,
@@ -95,9 +95,9 @@ const ephemeralPortrait = new File(['portrait'], 'portrait.webp', { type: 'image
 
 export const EphemeralReferenceInteraction: Story = {
   args: {
-    session: createSessionController('lucy-2.5', {
+    session: createSessionController('lucy-latest', {
       draft: {
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: '',
         referenceImage: {
           kind: 'ephemeral',

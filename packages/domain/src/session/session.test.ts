@@ -33,15 +33,15 @@ describe('session modes and drafts', () => {
   it('keeps local separate and exposes only the two exact provider modes', () => {
     expect(isModelModeId('local')).toBe(false);
     expect(isModelModeId('lucy-2.1')).toBe(false);
-    expect(isModelModeId('lucy-2.5')).toBe(true);
+    expect(isModelModeId('lucy-latest')).toBe(true);
     expect(SESSION_MODES.local.kind).toBe('local');
-    expect(SESSION_MODES['lucy-2.5'].providerModelId).toBe('lucy-2.5');
-    expect(SESSION_MODES['lucy-vton-3'].inputSemantics).toBe('garment');
+    expect(SESSION_MODES['lucy-latest'].providerModelId).toBe('lucy-latest');
+    expect(SESSION_MODES['lucy-vton-latest'].inputSemantics).toBe('garment');
   });
 
   it('allows local with no input and blocks an empty model draft', () => {
     expect(validateSessionDraft(createCleanSessionDraft('local'))).toEqual([]);
-    expect(validateSessionDraft(createCleanSessionDraft('lucy-2.5'))[0]?.code).toBe(
+    expect(validateSessionDraft(createCleanSessionDraft('lucy-latest'))[0]?.code).toBe(
       'model-input-required',
     );
   });
@@ -56,7 +56,7 @@ describe('atomic realtime state', () => {
       enhancePrompt: false,
     });
     expect(snapshot).toEqual({
-      modeId: 'lucy-2.5',
+      modeId: 'lucy-latest',
       prompt: '',
       imageId: 'session-image-1',
       enhancePrompt: false,
@@ -66,13 +66,13 @@ describe('atomic realtime state', () => {
   it('does not invent a VTON prompt for image-only input', () => {
     expect(
       buildRealtimeStateSnapshot({
-        modeId: 'lucy-vton-3',
+        modeId: 'lucy-vton-latest',
         prompt: '',
         image: image(),
         enhancePrompt: false,
       }),
     ).toEqual({
-      modeId: 'lucy-vton-3',
+      modeId: 'lucy-vton-latest',
       prompt: '',
       imageId: 'session-image-1',
       enhancePrompt: false,
@@ -82,13 +82,13 @@ describe('atomic realtime state', () => {
   it('always includes image and enhancement, including explicit image clearing', () => {
     expect(
       buildRealtimeStateSnapshot({
-        modeId: 'lucy-2.5',
+        modeId: 'lucy-latest',
         prompt: '  chrome explorer  ',
         image: null,
         enhancePrompt: false,
       }),
     ).toEqual({
-      modeId: 'lucy-2.5',
+      modeId: 'lucy-latest',
       prompt: 'chrome explorer',
       imageId: null,
       enhancePrompt: false,
@@ -97,7 +97,7 @@ describe('atomic realtime state', () => {
 
   it('detects pending changes and can revert locally to the live recipe', () => {
     const draft: SessionDraft = {
-      modeId: 'lucy-2.5',
+      modeId: 'lucy-latest',
       prompt: 'original',
       image: image(),
       enhancePrompt: false,
@@ -179,14 +179,14 @@ describe('image and live-output rules', () => {
   it('permits Apply and mode switching only in eligible states', () => {
     expect(
       canApplyRealtimeChanges({
-        activeModeId: 'lucy-2.5',
+        activeModeId: 'lucy-latest',
         status: 'generating',
         isApplying: false,
       }),
     ).toBe(true);
     expect(
       canApplyRealtimeChanges({
-        activeModeId: 'lucy-2.5',
+        activeModeId: 'lucy-latest',
         status: 'reconnecting',
         isApplying: false,
       }),

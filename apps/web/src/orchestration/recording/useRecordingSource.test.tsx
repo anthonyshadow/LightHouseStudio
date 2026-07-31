@@ -52,7 +52,7 @@ describe('useRecordingSource', () => {
       new FakeTrack('video', 'transformed'),
       providerAudio,
     ]) as unknown as MediaStream;
-    const { result } = renderHook(() => useRecordingSource('lucy-2.5', local, remote));
+    const { result } = renderHook(() => useRecordingSource('lucy-latest', local, remote));
 
     expect(result.current?.audioSource).toBe('provider');
 

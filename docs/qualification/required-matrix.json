@@ -21,8 +21,8 @@
       ]
     },
     {
-      "id": "decart-lucy-2.5",
-      "configurationId": "decart:lucy-2.5:sdk-0.1.17:300s",
+      "id": "decart-lucy-latest",
+      "configurationId": "decart:lucy-latest:sdk-0.1.17:300s",
       "accessMode": "participant",
       "checks": [
         "prompt-only",
@@ -38,8 +38,8 @@
       ]
     },
     {
-      "id": "decart-lucy-vton-3",
-      "configurationId": "decart:lucy-vton-3:sdk-0.1.17:300s",
+      "id": "decart-lucy-vton-latest",
+      "configurationId": "decart:lucy-vton-latest:sdk-0.1.17:300s",
       "accessMode": "participant",
       "checks": [
         "prompt-only",
@@ -53,8 +53,8 @@
       ]
     },
     {
-      "id": "decart-batch-lucy-2.5",
-      "configurationId": "decart:batch:lucy-2.5:720p:300s",
+      "id": "decart-batch-lucy-latest",
+      "configurationId": "decart:batch:lucy-latest:720p:300s",
       "accessMode": "participant",
       "checks": [
         "upload-h264-mp4",
@@ -70,8 +70,8 @@
       ]
     },
     {
-      "id": "decart-batch-lucy-vton-3",
-      "configurationId": "decart:batch:lucy-vton-3:720p:300s",
+      "id": "decart-batch-lucy-vton-latest",
+      "configurationId": "decart:batch:lucy-vton-latest:720p:300s",
       "accessMode": "participant",
       "checks": [
         "upload-h264-mp4",

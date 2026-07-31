@@ -112,7 +112,7 @@ describe('realtime API client', () => {
             apiKey: 'short-lived-browser-token',
             expiresAt: '2030-01-01T00:00:00.000Z',
             constraints: {
-              model: 'lucy-2.5',
+              model: 'lucy-latest',
               maxSessionDurationSeconds: 300,
             },
           }),
@@ -121,7 +121,9 @@ describe('realtime API client', () => {
       ),
     );
 
-    await expect(requestRealtimeToken('lucy-2.5', new AbortController().signal)).resolves.toEqual({
+    await expect(
+      requestRealtimeToken('lucy-latest', new AbortController().signal),
+    ).resolves.toEqual({
       apiKey: 'short-lived-browser-token',
       expiresAt: '2030-01-01T00:00:00.000Z',
       maxSessionDurationSeconds: 300,
@@ -149,7 +151,7 @@ describe('realtime API client', () => {
             apiKey: 'short-lived-browser-token',
             expiresAt: '2030-01-01T00:00:00.000Z',
             constraints: {
-              model: 'lucy-vton-3',
+              model: 'lucy-vton-latest',
               maxSessionDurationSeconds: 300,
             },
           }),
@@ -157,10 +159,10 @@ describe('realtime API client', () => {
     );
 
     await expect(
-      requestRealtimeToken('lucy-2.5', new AbortController().signal),
+      requestRealtimeToken('lucy-latest', new AbortController().signal),
     ).rejects.toMatchObject({ code: 'bad-token', status: 502 });
     await expect(
-      requestRealtimeToken('lucy-2.5', new AbortController().signal),
+      requestRealtimeToken('lucy-latest', new AbortController().signal),
     ).rejects.toMatchObject({ code: 'bad-token', status: 502 });
   });
 });
@@ -210,10 +212,10 @@ describe('reference image API client', () => {
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            realtimeVideo: { available: true, models: ['lucy-2.5'] },
+            realtimeVideo: { available: true, models: ['lucy-latest'] },
             videoProcessing: {
               available: true,
-              models: ['lucy-2.5', 'lucy-vton-3'],
+              models: ['lucy-latest', 'lucy-vton-latest'],
             },
             elevenLabs: { available: false, modelId: null },
             referenceImages: {

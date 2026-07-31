@@ -227,11 +227,13 @@ export const installProviderNetworkDriver = async (
         body: JSON.stringify({
           realtimeVideo: {
             available: options.realtimeVideoAvailable ?? true,
-            models: options.realtimeVideoAvailable === false ? [] : ['lucy-2.5', 'lucy-vton-3'],
+            models:
+              options.realtimeVideoAvailable === false ? [] : ['lucy-latest', 'lucy-vton-latest'],
           },
           videoProcessing: {
             available: options.videoProcessingAvailable ?? true,
-            models: options.videoProcessingAvailable === false ? [] : ['lucy-2.5', 'lucy-vton-3'],
+            models:
+              options.videoProcessingAvailable === false ? [] : ['lucy-latest', 'lucy-vton-latest'],
           },
           elevenLabs: {
             available: options.elevenLabsAvailable ?? false,

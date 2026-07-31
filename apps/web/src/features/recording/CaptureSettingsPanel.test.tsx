@@ -168,7 +168,7 @@ describe('CaptureSettingsPanel', () => {
       });
       return (
         <StudioDesignProvider>
-          <CaptureSettingsPanel controller={controller} mode="lucy-2.5" />
+          <CaptureSettingsPanel controller={controller} mode="lucy-latest" />
         </StudioDesignProvider>
       );
     };

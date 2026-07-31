@@ -70,7 +70,7 @@ export const isExactActiveRecipe = ({
   asset,
   draft,
 }: ExactActiveRecipeInput): boolean => {
-  const assetMode = 'modelModeId' in asset ? asset.modelModeId : 'lucy-2.5';
+  const assetMode = 'modelModeId' in asset ? asset.modelModeId : 'lucy-latest';
   return (
     draft.mode === fingerprint.mode &&
     canonicalPrompt(draft.prompt) === canonicalPrompt(fingerprint.prompt) &&

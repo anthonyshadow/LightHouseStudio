@@ -37,7 +37,7 @@ const hydrated: SessionReferenceImage = {
 };
 
 const pending: PendingReferenceRecipeUse = {
-  mode: 'lucy-2.5',
+  mode: 'lucy-latest',
   prompt: 'A calm presenter.',
   referenceImageAssetId: asset.assetId,
   preserveCurrentReference: false,

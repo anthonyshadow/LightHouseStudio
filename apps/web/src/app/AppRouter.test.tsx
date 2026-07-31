@@ -72,17 +72,14 @@ describe('AppRouter', () => {
     expect(description?.content).toContain('Enter Lightframe Studio');
   });
 
-  it('pushes Studio from the camera entry and hands focus to its main landmark', async () => {
+  it('pushes Studio from the camera entry without starting camera and hands focus to its main landmark', async () => {
     const { router } = renderApplication();
     fireEvent.click(screen.getByRole('button', { name: 'Start with camera' }));
 
     expect(await screen.findByText('Studio route')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/studio');
     await waitFor(() => expect(document.activeElement).toHaveAttribute('id', 'studio-main'));
-    expect(appHarness.latestProps).toEqual({
-      focusMainOnMount: true,
-      initialIntent: 'camera',
-    });
+    expect(appHarness.latestProps).toEqual({ focusMainOnMount: true });
     expect(document.title).toBe('Lightframe Studio');
   });
 

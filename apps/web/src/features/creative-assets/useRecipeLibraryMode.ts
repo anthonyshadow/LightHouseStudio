@@ -7,7 +7,7 @@ export const canReplaceDirtyLibraryMode = (
 ): boolean => !dirty || confirmDiscard();
 
 export const useRecipeLibraryMode = (sessionMode: StudioMode) => {
-  const [selectedMode, setSelectedMode] = useState<ModelMode>('lucy-2.5');
+  const [selectedMode, setSelectedMode] = useState<ModelMode>('lucy-latest');
   const [dirty, setDirty] = useState(false);
   const mode = sessionMode !== 'local' && !dirty ? sessionMode : selectedMode;
 

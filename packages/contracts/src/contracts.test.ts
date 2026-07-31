@@ -49,7 +49,7 @@ describe('health and capabilities contracts', () => {
     expect(
       capabilitiesResponseSchema.parse({
         realtimeVideo: { available: true, models: [...SUPPORTED_MODEL_IDS] },
-        videoProcessing: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
+        videoProcessing: { available: true, models: ['lucy-latest', 'lucy-vton-latest'] },
         elevenLabs: { available: false, modelId: null },
         referenceImages: {
           available: true,
@@ -66,8 +66,8 @@ describe('health and capabilities contracts', () => {
         },
       }),
     ).toEqual({
-      realtimeVideo: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
-      videoProcessing: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
+      realtimeVideo: { available: true, models: ['lucy-latest', 'lucy-vton-latest'] },
+      videoProcessing: { available: true, models: ['lucy-latest', 'lucy-vton-latest'] },
       elevenLabs: { available: false, modelId: null },
       referenceImages: {
         available: true,
@@ -109,7 +109,7 @@ describe('health and capabilities contracts', () => {
 describe('existing-video input contracts', () => {
   it('requires one explicit VTO input mode and rejects incompatible fields', () => {
     const base = {
-      modelId: 'lucy-vton-3' as const,
+      modelId: 'lucy-vton-latest' as const,
       prompt: '',
       enhancePrompt: false,
       hasReferenceImage: true,
@@ -431,24 +431,24 @@ describe('reference image contracts', () => {
 
 describe('realtime credential contracts', () => {
   it('supports exactly Character 2.5 and VTON 3', () => {
-    expect(DEFAULT_CHARACTER_MODEL_ID).toBe('lucy-2.5');
-    expect(supportedModelIdSchema.parse('lucy-2.5')).toBe('lucy-2.5');
-    expect(supportedModelIdSchema.parse('lucy-vton-3')).toBe('lucy-vton-3');
+    expect(DEFAULT_CHARACTER_MODEL_ID).toBe('lucy-latest');
+    expect(supportedModelIdSchema.parse('lucy-latest')).toBe('lucy-latest');
+    expect(supportedModelIdSchema.parse('lucy-vton-latest')).toBe('lucy-vton-latest');
     expect(supportedModelIdSchema.safeParse('lucy-2.1').success).toBe(false);
     expect(supportedModelIdSchema.safeParse('local').success).toBe(false);
   });
 
   it('defaults an omitted body or model to Character and rejects unknown fields', () => {
-    expect(realtimeTokenRequestSchema.parse(undefined)).toEqual({ model: 'lucy-2.5' });
-    expect(realtimeTokenRequestSchema.parse({})).toEqual({ model: 'lucy-2.5' });
-    expect(realtimeTokenRequestSchema.safeParse({ model: 'lucy-2.5', apiKey: 'bad' }).success).toBe(
-      false,
-    );
+    expect(realtimeTokenRequestSchema.parse(undefined)).toEqual({ model: 'lucy-latest' });
+    expect(realtimeTokenRequestSchema.parse({})).toEqual({ model: 'lucy-latest' });
     expect(
-      realtimeTokenRequestSchema.parse({ model: 'lucy-2.5', sessionProfile: 'guided' }),
-    ).toEqual({ model: 'lucy-2.5', sessionProfile: 'guided' });
+      realtimeTokenRequestSchema.safeParse({ model: 'lucy-latest', apiKey: 'bad' }).success,
+    ).toBe(false);
     expect(
-      realtimeTokenRequestSchema.safeParse({ model: 'lucy-2.5', sessionProfile: 'unknown' })
+      realtimeTokenRequestSchema.parse({ model: 'lucy-latest', sessionProfile: 'guided' }),
+    ).toEqual({ model: 'lucy-latest', sessionProfile: 'guided' });
+    expect(
+      realtimeTokenRequestSchema.safeParse({ model: 'lucy-latest', sessionProfile: 'unknown' })
         .success,
     ).toBe(false);
   });
@@ -458,7 +458,7 @@ describe('realtime credential contracts', () => {
       realtimeTokenResponseSchema.parse({
         apiKey: 'temporary-only',
         expiresAt: '2026-07-14T12:05:00.000Z',
-        constraints: { model: 'lucy-2.5', maxSessionDurationSeconds: 300 },
+        constraints: { model: 'lucy-latest', maxSessionDurationSeconds: 300 },
       }),
     ).toMatchObject({ apiKey: 'temporary-only' });
     expect(realtimeTokenResponseSchema.safeParse({ apiKey: '', expiresAt: 'soon' }).success).toBe(

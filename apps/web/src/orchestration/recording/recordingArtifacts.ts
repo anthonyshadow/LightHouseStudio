@@ -139,7 +139,7 @@ export const createOriginalRecordingArtifact = (
   if (blob.size === 0) return null;
 
   const identity = createRuntimeArtifactIdentity(
-    `${attempt.mode === 'local' ? 'Local' : attempt.mode === 'lucy-2.5' ? 'Character' : 'Virtual Try-On'} take`,
+    `${attempt.mode === 'local' ? 'Local' : attempt.mode === 'lucy-latest' ? 'Character' : 'Virtual Try-On'} take`,
     attempt.startedAt.toISOString(),
   );
   const recordingFilename = createRecordingFilename(attempt.mode, attempt.startedAt, mimeType);

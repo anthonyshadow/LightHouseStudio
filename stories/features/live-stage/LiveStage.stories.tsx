@@ -59,8 +59,8 @@ export const PrivateIdleStage: Story = {
 
 export const CharacterStageWithNotices: Story = {
   args: {
-    presentation: { kind: 'idle', mode: 'lucy-2.5' },
-    mode: 'lucy-2.5',
+    presentation: { kind: 'idle', mode: 'lucy-latest' },
+    mode: 'lucy-latest',
     lifecycle: 'reconnecting',
     recording: false,
     recordingSeconds: 0,

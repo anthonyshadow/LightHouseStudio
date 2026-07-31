@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { StagePresentation } from '../features/live-stage';
+import type { SessionDraft, StudioMode } from '../features/media-session';
 import { hasSameRecordingTracks, type AutomaticRecordingStopEvent } from '../features/recording';
 import type { RestorePersistedOriginalInput } from '../features/recording/types';
 import { useRecording, useRecordingSource } from '../orchestration/recording';
@@ -22,6 +23,11 @@ type TakeStagePresentationInput = {
   readonly mode: StudioSessionController['draft']['mode'];
   readonly transformedVideoUsable: boolean;
 };
+
+export const resolveRecordingMode = (
+  draft: SessionDraft,
+  transformedVideoUsable: boolean,
+): StudioMode => (draft.mode !== 'local' && transformedVideoUsable ? draft.mode : 'local');
 
 export const deriveTakeStagePresentation = ({
   reviewReady,
@@ -123,8 +129,9 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
   const recordingActive = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
   const reviewLocked = Boolean(recording.presented);
   const mediaLocked = recordingActive || reviewLocked;
+  const recordingMode = resolveRecordingMode(session.draft, session.transformedVideoUsable);
   const recordingSource = useRecordingSource(
-    session.draft.mode,
+    recordingMode,
     session.localStream,
     session.transformedVideoUsable ? session.remoteStream : null,
   );
@@ -235,6 +242,7 @@ export const useTakeReviewFlow = ({ session, onReviewCleared }: UseTakeReviewFlo
     recordingActive,
     reviewLocked,
     mediaLocked,
+    recordingMode,
     recordingSource,
     finalizingStartedAt,
     finalizingStream,

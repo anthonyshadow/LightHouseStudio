@@ -30,7 +30,7 @@ The exact executable matrix is
 [`qualification/required-matrix.json`](qualification/required-matrix.json):
 
 - `9` provider/local requirements: no-key Local; realtime Decart Character and VTO; batch
-  `lucy-2.5`; batch `lucy-vton-3`; ElevenLabs; OpenAI; BFL; and operator-only Wiro.
+  `lucy-latest`; batch `lucy-vton-latest`; ElevenLabs; OpenAI; BFL; and operator-only Wiro.
 - `45` physical device/browser rows across one desktop, Apple/Android phones, and
   Apple/Android tablets.
 
@@ -137,10 +137,10 @@ initial billable submission.
 
 | Provider          | Approved configuration                                                                                    | Participant rule                                                 |
 | ----------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Decart Character  | Exact `lucy-2.5`; model/origin-scoped token; 300-second active limit                                      | After disclosure and live qualification                          |
-| Decart VTO        | Exact `lucy-vton-3`; no moving alias                                                                      | Beta; one garment/plain background; no fit/sizing/purchase claim |
-| Decart batch Lucy | Exact `lucy-2.5`; asynchronous submit/status/content; fixed 720p; no automatic initial retry              | One explicit submission per step after disclosure                |
-| Decart batch VTO  | Exact `lucy-vton-3`; asynchronous submit/status/content; fixed 720p; no automatic initial retry           | Beta disclosure and rights/consent before each submission        |
+| Decart Character  | Exact `lucy-latest`; model/origin-scoped token; 300-second active limit                                   | After disclosure and live qualification                          |
+| Decart VTO        | Exact `lucy-vton-latest`; no moving alias                                                                 | Beta; one garment/plain background; no fit/sizing/purchase claim |
+| Decart batch Lucy | Exact `lucy-latest`; asynchronous submit/status/content; fixed 720p; no automatic initial retry           | One explicit submission per step after disclosure                |
+| Decart batch VTO  | Exact `lucy-vton-latest`; asynchronous submit/status/content; fixed 720p; no automatic initial retry      | Beta disclosure and rights/consent before each submission        |
 | OpenAI optimizer  | `gpt-5.6`, `medium`, version `lucy-character-reference-v1`, 120-second timeout, response storage disabled | Explicit optimize/generate path only                             |
 | OpenAI image      | `gpt-image-2`, `high`, one result, 150-second timeout, zero SDK retries                                   | Explicit image action only                                       |
 | BFL image         | `flux-2-pro`, safety tolerance `2`, prompt upsampling disabled, one 150-second deadline                   | Separate live qualification                                      |

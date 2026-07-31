@@ -69,7 +69,7 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
   let browser = await readBrowserState(page);
   expect(browser.connections).toEqual([
     {
-      model: 'lucy-2.5',
+      model: 'lucy-latest',
       initial: {
         prompt: optimized.response.result.lucy25CharacterPrompt,
         imageName: `reference-${generated.assetId}.png`,
@@ -238,7 +238,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
             {
               id: 'missing-recent',
               prompt,
-              modelModeId: 'lucy-2.5',
+              modelModeId: 'lucy-latest',
               referenceImageAssetId: assetId,
               usedAt: '2030-01-02T00:00:00.000Z',
             },

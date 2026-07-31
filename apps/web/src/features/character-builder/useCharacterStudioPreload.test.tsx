@@ -22,7 +22,7 @@ describe('useCharacterStudioPreload', () => {
     const replaceRecipeDraft = vi.fn(() => true);
     const session = {
       draft: {
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: '',
         referenceImage: null,
       },
@@ -72,7 +72,7 @@ describe('useCharacterStudioPreload', () => {
     expect(markCharacterPersisted).toHaveBeenCalledOnce();
     expect(markStudioPreloaded).toHaveBeenCalledOnce();
     expect(replaceRecipeDraft).toHaveBeenCalledWith({
-      mode: 'lucy-2.5',
+      mode: 'lucy-latest',
       prompt: 'Updated character prompt.',
       referenceImage: null,
       enhance: false,

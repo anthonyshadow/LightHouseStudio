@@ -104,7 +104,7 @@ const harness = vi.hoisted(() => {
     discardPending: vi.fn(),
   };
   const session = {
-    draft: { mode: 'lucy-2.5' as const, prompt: '', referenceImage: null, enhance: false },
+    draft: { mode: 'lucy-latest' as const, prompt: '', referenceImage: null, enhance: false },
     applied: null,
     lifecycle: 'idle' as const,
     localStream: null,
@@ -160,7 +160,7 @@ const harness = vi.hoisted(() => {
     legacyClose: vi.fn(),
     promptCommitted: null as
       | ((
-          mode: 'lucy-2.5' | 'lucy-vton-3',
+          mode: 'lucy-latest' | 'lucy-vton-latest',
           prompt: string,
           referenceImageAssetId: string | null,
         ) => void)
@@ -265,7 +265,7 @@ vi.mock('./useTakeReviewFlow', () => ({
     finalizingStream: null,
     automaticRecordingStopEvent: null,
     finishTake: vi.fn(() => Promise.resolve()),
-    stagePresentation: { kind: 'idle', mode: 'lucy-2.5' },
+    stagePresentation: { kind: 'idle', mode: 'lucy-latest' },
   }),
 }));
 
@@ -315,7 +315,7 @@ vi.mock('./CreativeWorkspace', () => ({
             props.actions.onUseRecipe({
               origin: 'character-prompt',
               assetId: 'character-1',
-              modelModeId: 'lucy-2.5',
+              modelModeId: 'lucy-latest',
               prompt: referenceAsset.originalPrompt,
               referenceImageAssetId: referenceAsset.assetId,
             })
@@ -341,7 +341,7 @@ vi.mock('./CreativeWorkspace', () => ({
 import { StudioApp } from './StudioApp';
 import { StudioDesignProvider } from '../ui';
 
-const renderStudio = (initialIntent?: 'camera' | 'upload') =>
+const renderStudio = (initialIntent?: 'upload') =>
   render(
     <StudioDesignProvider>
       <RouterProvider
@@ -424,14 +424,14 @@ describe('StudioApp composition lifecycle', () => {
       expect.any(AbortSignal),
     );
     expect(harness.session.replaceRecipeDraft).toHaveBeenCalledWith({
-      mode: 'lucy-2.5',
+      mode: 'lucy-latest',
       prompt: referenceAsset.lucy25CharacterPrompt,
       referenceImage: harness.hydratedReference,
       enhance: true,
     });
     expect(harness.repository.enrichNewestMatchingRecent).toHaveBeenCalledWith(
       referenceAsset.originalPrompt,
-      'lucy-2.5',
+      'lucy-latest',
       referenceAsset.assetId,
     );
   });
@@ -448,7 +448,7 @@ describe('StudioApp composition lifecycle', () => {
     await waitFor(() => expect(harness.session.replaceRecipeDraft).toHaveBeenCalledOnce());
     expect(harness.fetchReferenceImageMetadata).toHaveBeenCalledTimes(2);
     expect(harness.session.replaceRecipeDraft).toHaveBeenCalledWith({
-      mode: 'lucy-2.5',
+      mode: 'lucy-latest',
       prompt: referenceAsset.lucy25CharacterPrompt,
       referenceImage: harness.hydratedReference,
       enhance: true,
@@ -466,7 +466,7 @@ describe('StudioApp composition lifecycle', () => {
     );
     await waitFor(() => expect(harness.session.replaceRecipeDraft).toHaveBeenCalledOnce());
     expect(harness.session.replaceRecipeDraft).toHaveBeenCalledWith({
-      mode: 'lucy-2.5',
+      mode: 'lucy-latest',
       prompt: referenceAsset.originalPrompt,
       referenceImage: null,
       enhance: false,
@@ -477,12 +477,12 @@ describe('StudioApp composition lifecycle', () => {
     renderStudio();
 
     act(() => {
-      harness.promptCommitted?.('lucy-2.5', 'A newly committed presenter', null);
+      harness.promptCommitted?.('lucy-latest', 'A newly committed presenter', null);
     });
 
     expect(harness.repository.recordSuccessfulPrompt).toHaveBeenCalledWith({
       prompt: 'A newly committed presenter',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       referenceImageAssetId: null,
     });
   });

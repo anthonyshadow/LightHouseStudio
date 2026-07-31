@@ -45,7 +45,7 @@ export const RecipeShelfView = ({
       : controller.visibleCategory === 'recent'
         ? 'recent prompts'
         : 'character recipes';
-  const newRecipeLabel = `New ${activeMode === 'lucy-2.5' ? 'character' : 'garment'} recipe`;
+  const newRecipeLabel = `New ${activeMode === 'lucy-latest' ? 'character' : 'garment'} recipe`;
 
   return (
     <Surface
@@ -143,7 +143,7 @@ export const RecipeShelfView = ({
             variant="primary"
             size="small"
             onClick={() =>
-              activeMode === 'lucy-2.5' && controller.canCreateCharacter
+              activeMode === 'lucy-latest' && controller.canCreateCharacter
                 ? controller.createCharacter()
                 : controller.openCreate()
             }

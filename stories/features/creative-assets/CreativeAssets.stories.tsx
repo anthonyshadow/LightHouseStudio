@@ -42,7 +42,7 @@ const meta = {
   },
   args: {
     repository: createSeededCreativeAssetRepository(),
-    activeMode: 'lucy-2.5',
+    activeMode: 'lucy-latest',
     onUsePrompt: fn(),
   },
   parameters: {
@@ -58,7 +58,7 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-const ShelfHarness = ({ mode = 'lucy-2.5' }: { mode?: 'lucy-2.5' | 'lucy-vton-3' }) => {
+const ShelfHarness = ({ mode = 'lucy-latest' }: { mode?: 'lucy-latest' | 'lucy-vton-latest' }) => {
   const repository = useMemo(() => createSeededCreativeAssetRepository(), []);
   return (
     <StoryColumn width="72rem">
@@ -77,7 +77,7 @@ export const CharacterRecipes: Story = {
 };
 
 export const VirtualTryOnRecipes: Story = {
-  render: () => <ShelfHarness mode="lucy-vton-3" />,
+  render: () => <ShelfHarness mode="lucy-vton-latest" />,
 };
 
 export const FormsAndEmptyStates: Story = {

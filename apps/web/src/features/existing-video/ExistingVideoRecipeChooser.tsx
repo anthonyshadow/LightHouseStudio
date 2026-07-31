@@ -154,7 +154,7 @@ const referenceImageContentUrl = (assetId: string) =>
   `/api/reference-images/${encodeURIComponent(assetId)}/content`;
 
 const chooserCopy = (modelId: ExistingVideoStep['modelId']) =>
-  modelId === 'lucy-2.5'
+  modelId === 'lucy-latest'
     ? {
         label: 'Saved Character',
         action: 'Choose a Saved Character',
@@ -211,7 +211,7 @@ export const ExistingVideoRecipeChooser = ({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const copy = chooserCopy(modelId);
-  const canCreateCharacter = modelId === 'lucy-2.5' && Boolean(onCreateCharacter);
+  const canCreateCharacter = modelId === 'lucy-latest' && Boolean(onCreateCharacter);
   const optionCount = recipes.length + (canCreateCharacter ? 1 : 0);
   const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId);
   const unavailable = disabled || loading || optionCount === 0;

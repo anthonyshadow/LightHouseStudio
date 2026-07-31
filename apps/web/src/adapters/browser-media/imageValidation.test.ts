@@ -24,7 +24,10 @@ describe('browser reference image validation', () => {
   ])('accepts %s at exactly the inclusive 10 MiB limit', async (type, name) => {
     const close = mockDimensions(800, 1_000);
 
-    const result = await validateReferenceImage(sizedFile(MAX_IMAGE_BYTES, name, type), 'lucy-2.5');
+    const result = await validateReferenceImage(
+      sizedFile(MAX_IMAGE_BYTES, name, type),
+      'lucy-latest',
+    );
 
     expect(result.blockingError).toBeNull();
     expect(result).toMatchObject({ width: 800, height: 1_000 });
@@ -40,7 +43,7 @@ describe('browser reference image validation', () => {
 
     const result = await validateReferenceImage(
       sizedFile(MAX_IMAGE_BYTES + 1, 'too-large.png', 'image/png'),
-      'lucy-vton-3',
+      'lucy-vton-latest',
     );
 
     expect(result).toEqual({
@@ -55,10 +58,10 @@ describe('browser reference image validation', () => {
     vi.stubGlobal('createImageBitmap', decoder);
 
     await expect(
-      validateReferenceImage(sizedFile(10, 'portrait.gif', 'image/gif'), 'lucy-2.5'),
+      validateReferenceImage(sizedFile(10, 'portrait.gif', 'image/gif'), 'lucy-latest'),
     ).resolves.toEqual({ blockingError: 'Choose a JPEG, PNG, or WebP image.', warnings: [] });
     await expect(
-      validateReferenceImage(sizedFile(0, 'empty.webp', 'image/webp'), 'lucy-2.5'),
+      validateReferenceImage(sizedFile(0, 'empty.webp', 'image/webp'), 'lucy-latest'),
     ).resolves.toEqual({ blockingError: 'Choose a nonempty image.', warnings: [] });
     expect(decoder).not.toHaveBeenCalled();
   });
@@ -67,7 +70,7 @@ describe('browser reference image validation', () => {
     mockDimensions(400, 900);
     const character = await validateReferenceImage(
       sizedFile(1_024, 'narrow.jpg', 'image/jpeg'),
-      'lucy-2.5',
+      'lucy-latest',
     );
     expect(character.blockingError).toBeNull();
     expect(character.warnings).toEqual(
@@ -80,7 +83,7 @@ describe('browser reference image validation', () => {
     mockDimensions(2_400, 800);
     const garment = await validateReferenceImage(
       sizedFile(1_024, 'wide.webp', 'image/webp'),
-      'lucy-vton-3',
+      'lucy-vton-latest',
     );
     expect(garment.blockingError).toBeNull();
     expect(garment.warnings).toContain(
@@ -92,7 +95,7 @@ describe('browser reference image validation', () => {
     mockDimensions(1_100, 1_000);
     const character = await validateReferenceImage(
       sizedFile(1_024, 'slightly-wide.jpg', 'image/jpeg'),
-      'lucy-2.5',
+      'lucy-latest',
     );
     expect(character.warnings).toContain(
       'A clear portrait-oriented reference generally works best for character identity.',
@@ -101,7 +104,7 @@ describe('browser reference image validation', () => {
     mockDimensions(300, 1_000);
     const garment = await validateReferenceImage(
       sizedFile(1_024, 'very-narrow.webp', 'image/webp'),
-      'lucy-vton-3',
+      'lucy-vton-latest',
     );
     expect(garment.warnings).toContain(
       'Use an image where the garment is clearly visible and fills the frame.',
@@ -112,7 +115,7 @@ describe('browser reference image validation', () => {
     vi.stubGlobal('createImageBitmap', vi.fn().mockRejectedValue(new Error('decoder internals')));
 
     await expect(
-      validateReferenceImage(sizedFile(24, 'broken.png', 'image/png'), 'lucy-2.5'),
+      validateReferenceImage(sizedFile(24, 'broken.png', 'image/png'), 'lucy-latest'),
     ).resolves.toEqual({
       blockingError: 'The browser could not decode this image.',
       warnings: [],

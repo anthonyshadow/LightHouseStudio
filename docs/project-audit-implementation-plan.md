@@ -80,10 +80,10 @@ schema in [qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md).
 Required rows:
 
 1. Local with no provider credentials or external network;
-2. Decart `lucy-2.5`;
-3. Decart `lucy-vton-3`;
-4. Decart batch `lucy-2.5`;
-5. Decart batch `lucy-vton-3`;
+2. Decart `lucy-latest`;
+3. Decart `lucy-vton-latest`;
+4. Decart batch `lucy-latest`;
+5. Decart batch `lucy-vton-latest`;
 6. ElevenLabs saved-voice browse, preview, Apply, remux, Download, and original restore;
 7. OpenAI optimization/reference generation;
 8. BFL reference generation as the startup-selected provider; and

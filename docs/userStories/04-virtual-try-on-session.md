@@ -1,12 +1,14 @@
 # Virtual try-on session
 
-**Outcome:** deliberately preview and optionally record a `lucy-vton-3` garment transformation.
+**Outcome:** deliberately preview and optionally record a `lucy-vton-latest` garment transformation.
 VTO remains a secondary beta.
 
 ## Journey
 
 1. Select **Start Camera + Mic**, then **Start AI** and **Virtual Try-On Beta**.
-2. If no VTO recipe is ready, open the Dock or choose a saved Try-On recipe.
+2. If no VTO recipe is ready, open the Dock or choose a saved Try-On recipe. Until an outfit
+   recipe has content, the stage control bar keeps local **Record** as its primary action and does
+   not present **Start AI**.
 3. In **Try-On recipe**, provide garment direction, a temporary JPEG/PNG/WebP image up to 10 MiB,
    or both. Prompt enhancement is optional and off by default.
    In Upload Existing Video, the corresponding batch recipe instead requires exactly one mode:
@@ -22,7 +24,7 @@ VTO remains a secondary beta.
 8. Use **Stop AI** to retain local preview and the draft, or **Reset AI** to clear the recipe.
 
 The Dock can start directly after valid input and optional **Check camera & mic**. It always uses
-the pinned `lucy-vton-3` model.
+the pinned `lucy-vton-latest` model.
 
 ## Guards and recovery
 

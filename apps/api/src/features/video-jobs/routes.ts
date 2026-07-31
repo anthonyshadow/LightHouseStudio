@@ -135,7 +135,9 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
             await writePart(
               part.file,
               paths.inputPath,
-              recipe.modelId === 'lucy-vton-3' ? VTON_VIDEO_INPUT_MAX_BYTES : VIDEO_INPUT_MAX_BYTES,
+              recipe.modelId === 'lucy-vton-latest'
+                ? VTON_VIDEO_INPUT_MAX_BYTES
+                : VIDEO_INPUT_MAX_BYTES,
             );
             continue;
           }

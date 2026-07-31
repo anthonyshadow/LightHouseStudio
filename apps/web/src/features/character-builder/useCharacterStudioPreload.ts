@@ -51,8 +51,8 @@ export const useCharacterStudioPreload = ({
     ): Promise<void> => {
       if (saveBlockedReason) throw new Error(saveBlockedReason);
       if (
-        session.draft.mode !== 'lucy-2.5' &&
-        !confirmModeReplacement(session.draft, 'lucy-2.5', (message) => window.confirm(message))
+        session.draft.mode !== 'lucy-latest' &&
+        !confirmModeReplacement(session.draft, 'lucy-latest', (message) => window.confirm(message))
       ) {
         throw new Error('Character save was cancelled. The resumable draft is unchanged.');
       }
@@ -68,14 +68,14 @@ export const useCharacterStudioPreload = ({
       const currentReferenceId = referenceIdentity(session.draft.referenceImage);
       const incomingReferenceId = referenceImage?.assetId ?? null;
       const hasCurrentLucyRecipe =
-        session.draft.mode === 'lucy-2.5' &&
+        session.draft.mode === 'lucy-latest' &&
         (canonicalPrompt(session.draft.prompt).length > 0 || currentReferenceId !== null);
       if (
         hasCurrentLucyRecipe &&
         (canonicalPrompt(session.draft.prompt) !== canonicalPrompt(studioPrompt) ||
           currentReferenceId !== incomingReferenceId) &&
         !window.confirm(
-          'Replace the current Lucy 2.5 recipe in the Dock with this saved character? Your current Dock values will be replaced.',
+          'Replace the current Lucy latest recipe in the Dock with this saved character? Your current Dock values will be replaced.',
         )
       ) {
         throw new Error('Character save was cancelled. The resumable draft is unchanged.');
@@ -85,7 +85,7 @@ export const useCharacterStudioPreload = ({
       if (stage === 'intent') await progress.markCharacterPersisted();
 
       const preloaded = session.replaceRecipeDraft({
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: studioPrompt,
         referenceImage: hydratedReference,
         enhance: referenceImage?.source === 'generated',

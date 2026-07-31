@@ -177,7 +177,7 @@ describe('ExistingVideoPanel', () => {
             steps: [
               {
                 id: 'vto',
-                modelId: 'lucy-vton-3',
+                modelId: 'lucy-vton-latest',
                 savedRecipeId: null,
                 prompt: '',
                 enhancePrompt: false,
@@ -233,7 +233,7 @@ describe('ExistingVideoPanel', () => {
       steps: [
         {
           id: 'lucy',
-          modelId: 'lucy-2.5',
+          modelId: 'lucy-latest',
           savedRecipeId: null,
           prompt: 'Change the scene',
           enhancePrompt: false,
@@ -264,7 +264,7 @@ describe('ExistingVideoPanel', () => {
       'false',
     );
     fireEvent.click(screen.getByRole('button', { name: 'Virtual Try On' }));
-    expect(addStep).toHaveBeenCalledWith('lucy-vton-3');
+    expect(addStep).toHaveBeenCalledWith('lucy-vton-latest');
     expect(screen.queryByRole('button', { name: 'Move up' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Move down' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Start · 1 Decart submission' })).toBeEnabled();
@@ -303,7 +303,7 @@ describe('ExistingVideoPanel', () => {
             steps: [
               {
                 id: 'lucy',
-                modelId: 'lucy-2.5',
+                modelId: 'lucy-latest',
                 savedRecipeId: null,
                 prompt: '',
                 enhancePrompt: false,
@@ -319,7 +319,7 @@ describe('ExistingVideoPanel', () => {
             {
               id: 'anchor',
               label: 'Professional Anchor',
-              modelId: 'lucy-2.5',
+              modelId: 'lucy-latest',
               prompt:
                 'A professional anchor in a well-lit studio with a dark blazer and soft cinematic lighting.',
               referenceImageAssetId: 'asset-anchor',
@@ -378,7 +378,7 @@ describe('ExistingVideoPanel', () => {
             steps: [
               {
                 id: 'lucy',
-                modelId: 'lucy-2.5',
+                modelId: 'lucy-latest',
                 savedRecipeId: null,
                 prompt: '',
                 enhancePrompt: false,
@@ -393,7 +393,7 @@ describe('ExistingVideoPanel', () => {
             {
               id: 'anchor',
               label: 'Professional Anchor',
-              modelId: 'lucy-2.5',
+              modelId: 'lucy-latest',
               prompt: 'A professional anchor.',
               referenceImageAssetId: null,
             },
@@ -455,7 +455,7 @@ describe('ExistingVideoPanel', () => {
             steps: [
               {
                 id: 'lucy',
-                modelId: 'lucy-2.5',
+                modelId: 'lucy-latest',
                 savedRecipeId: null,
                 prompt: 'Use this portrait',
                 enhancePrompt: false,
@@ -505,7 +505,7 @@ describe('ExistingVideoPanel', () => {
       steps: [
         {
           id: 'lucy',
-          modelId: 'lucy-2.5',
+          modelId: 'lucy-latest',
           savedRecipeId: null,
           prompt: 'Change the scene',
           enhancePrompt: false,

@@ -3,7 +3,7 @@ import { z } from 'zod';
 export const VIDEO_PROVIDER_INTENT_HEADER = 'x-lightframe-provider-intent' as const;
 export const VIDEO_PROVIDER_INTENT_VALUE = 'video' as const;
 
-export const VIDEO_TRANSFORM_MODEL_IDS = ['lucy-2.5', 'lucy-vton-3'] as const;
+export const VIDEO_TRANSFORM_MODEL_IDS = ['lucy-latest', 'lucy-vton-latest'] as const;
 export const videoTransformModelIdSchema = z.enum(VIDEO_TRANSFORM_MODEL_IDS);
 export const VIDEO_TRANSFORM_INPUT_KINDS = [
   'character',
@@ -73,7 +73,7 @@ export const videoTransformRecipeSchema = z
       });
       return;
     }
-    if (value.modelId === 'lucy-2.5') {
+    if (value.modelId === 'lucy-latest') {
       if (value.inputKind !== undefined && value.inputKind !== 'character') {
         context.addIssue({
           code: 'custom',

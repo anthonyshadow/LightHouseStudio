@@ -24,17 +24,17 @@ const step = (modelId: VideoTransformStep['modelId']): VideoTransformStep => ({
   prompt: 'Transform the subject',
   hasReferenceImage: false,
   enhancePrompt: false,
-  inputKind: modelId === 'lucy-vton-3' ? 'prompt' : 'character',
+  inputKind: modelId === 'lucy-vton-latest' ? 'prompt' : 'character',
 });
 
 describe('uploaded video policy', () => {
   it('accepts the conservative five-minute H.264 policy', () => {
-    expect(validateUploadedVideoFacts(video(), [step('lucy-2.5')])).toEqual([]);
+    expect(validateUploadedVideoFacts(video(), [step('lucy-latest')])).toEqual([]);
   });
 
   it('uses the lower size limit for a selected VTO transformation', () => {
     const issues = validateUploadedVideoFacts(video({ sizeBytes: 200_000_001 }), [
-      step('lucy-vton-3'),
+      step('lucy-vton-latest'),
     ]);
     expect(issues).toHaveLength(1);
     expect(issues[0]?.code).toBe('payload-too-large');
@@ -56,15 +56,15 @@ describe('uploaded video policy', () => {
 
 describe('single visual policy', () => {
   it('allows either model by itself and rejects using both together', () => {
-    expect(validateVideoTransformPlan([step('lucy-2.5')])).toEqual([]);
-    expect(validateVideoTransformPlan([step('lucy-vton-3')])).toEqual([]);
-    expect(validateVideoTransformPlan([step('lucy-2.5'), step('lucy-vton-3')])).toEqual([
+    expect(validateVideoTransformPlan([step('lucy-latest')])).toEqual([]);
+    expect(validateVideoTransformPlan([step('lucy-vton-latest')])).toEqual([]);
+    expect(validateVideoTransformPlan([step('lucy-latest'), step('lucy-vton-latest')])).toEqual([
       'Choose only one visual transformation.',
     ]);
   });
 
   it('rejects an empty recipe', () => {
-    const empty = { ...step('lucy-2.5'), prompt: '' };
+    const empty = { ...step('lucy-latest'), prompt: '' };
     expect(validateVideoTransformPlan([empty])).toEqual([
       'Character needs a prompt, reference image, or both.',
     ]);
@@ -74,7 +74,7 @@ describe('single visual policy', () => {
     expect(
       validateVideoTransformPlan([
         {
-          ...step('lucy-vton-3'),
+          ...step('lucy-vton-latest'),
           inputKind: 'reference-image',
           prompt: 'must be cleared',
           hasReferenceImage: true,
@@ -84,13 +84,13 @@ describe('single visual policy', () => {
     expect(
       validateVideoTransformPlan([
         {
-          ...step('lucy-vton-3'),
+          ...step('lucy-vton-latest'),
           inputKind: 'saved-outfit',
           enhancePrompt: true,
         },
       ]),
     ).toEqual(['Saved outfits cannot enable prompt enhancement.']);
-    const legacyVtoStep = { ...step('lucy-vton-3') };
+    const legacyVtoStep = { ...step('lucy-vton-latest') };
     delete legacyVtoStep.inputKind;
     expect(validateVideoTransformPlan([legacyVtoStep])).toEqual([
       'Choose a Virtual Try-On input type.',
@@ -98,10 +98,13 @@ describe('single visual policy', () => {
   });
 
   it('enforces four total and two per model in the pilot', () => {
-    expect(canSubmitPilotBatchJob(['lucy-2.5'], 'lucy-2.5')).toBe(true);
-    expect(canSubmitPilotBatchJob(['lucy-2.5', 'lucy-2.5'], 'lucy-2.5')).toBe(false);
+    expect(canSubmitPilotBatchJob(['lucy-latest'], 'lucy-latest')).toBe(true);
+    expect(canSubmitPilotBatchJob(['lucy-latest', 'lucy-latest'], 'lucy-latest')).toBe(false);
     expect(
-      canSubmitPilotBatchJob(['lucy-2.5', 'lucy-vton-3', 'lucy-2.5', 'lucy-vton-3'], 'lucy-vton-3'),
+      canSubmitPilotBatchJob(
+        ['lucy-latest', 'lucy-vton-latest', 'lucy-latest', 'lucy-vton-latest'],
+        'lucy-vton-latest',
+      ),
     ).toBe(false);
   });
 });

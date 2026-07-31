@@ -62,7 +62,7 @@ const CharacterCreationHarness = () => {
           </Button>
           <RecipeShelf
             repository={repository}
-            activeMode="lucy-2.5"
+            activeMode="lucy-latest"
             onUsePrompt={fn()}
             onOpenCharacterWorkshop={fn()}
           />

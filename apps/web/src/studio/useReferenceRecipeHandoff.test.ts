@@ -9,8 +9,12 @@ import type {
   SavedCharacterPrompt,
   SavedPrompt,
 } from '../features/creative-assets/types';
-import type { SessionReferenceImage } from '../features/media-session/types';
-import type { StudioSessionController } from '../features/media-session/types';
+import {
+  createEmptyDraft,
+  type SessionDraft,
+  type SessionReferenceImage,
+  type StudioSessionController,
+} from '../features/media-session/types';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiClientError } from '../adapters/api-client/apiClient';
 import { isExactActiveRecipe, useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
@@ -27,7 +31,7 @@ const savedPrompt: SavedPrompt = {
   id: 'saved-prompt-1',
   title: 'Presenter',
   prompt: 'A calm documentary presenter',
-  modelModeId: 'lucy-2.5',
+  modelModeId: 'lucy-latest',
   source: 'manual',
   referenceImageAssetId: 'reference-1',
   tags: [],
@@ -45,7 +49,7 @@ const persistedReference: SessionReferenceImage = {
 };
 
 const exactFingerprint = {
-  mode: 'lucy-2.5',
+  mode: 'lucy-latest',
   prompt: 'A calm documentary presenter',
   referenceImageAssetId: 'reference-1',
   assetPrompt: 'A calm documentary presenter',
@@ -114,7 +118,7 @@ describe('reference recipe identity', () => {
         fingerprint: exactFingerprint,
         asset: savedPrompt,
         draft: {
-          mode: 'lucy-2.5',
+          mode: 'lucy-latest',
           prompt: '  A calm documentary presenter  ',
           referenceImage: persistedReference,
         },
@@ -132,7 +136,7 @@ describe('reference recipe identity', () => {
         fingerprint: exactFingerprint,
         asset: savedPrompt,
         draft: {
-          mode: 'lucy-2.5',
+          mode: 'lucy-latest',
           prompt: savedPrompt.prompt,
           referenceImage: replacementReference,
         },
@@ -143,7 +147,7 @@ describe('reference recipe identity', () => {
         fingerprint: exactFingerprint,
         asset: { ...savedPrompt, prompt: 'An edited presenter' },
         draft: {
-          mode: 'lucy-2.5',
+          mode: 'lucy-latest',
           prompt: savedPrompt.prompt,
           referenceImage: persistedReference,
         },
@@ -162,7 +166,7 @@ describe('reference recipe identity', () => {
         fingerprint: exactFingerprint,
         asset: savedPrompt,
         draft: {
-          mode: 'lucy-2.5',
+          mode: 'lucy-latest',
           prompt: savedPrompt.prompt,
           referenceImage: ephemeralReference,
         },
@@ -208,8 +212,8 @@ describe('reference recipe handoff', () => {
       enrichNewestMatchingRecent: vi.fn(),
       createSavedCharacterPrompt: vi.fn(),
     } as unknown as CreativeAssetRepository;
-    const draft = {
-      mode: 'lucy-2.5' as const,
+    const draft: SessionDraft = {
+      mode: 'lucy-latest' as const,
       prompt: '',
       referenceImage: initialReferenceImage,
       enhance: false,
@@ -217,7 +221,7 @@ describe('reference recipe handoff', () => {
     let replacementAttempt = 0;
     const replaceRecipeDraft = vi.fn(
       (next: {
-        mode: 'lucy-2.5';
+        mode: 'lucy-latest';
         prompt: string;
         referenceImage: SessionReferenceImage | null;
         enhance: boolean;
@@ -229,11 +233,15 @@ describe('reference recipe handoff', () => {
         return true;
       },
     );
+    const selectMode = vi.fn((mode: SessionDraft['mode']) => {
+      Object.assign(draft, createEmptyDraft(mode));
+      return true;
+    });
     const session = {
       draft,
       replaceRecipeDraft,
       canReplaceRecipeDraft: vi.fn(() => canReplaceRecipeDraft),
-      selectMode: vi.fn(() => true),
+      selectMode,
     } as unknown as StudioSessionController;
     const openWorkshopOverlay = vi.fn();
     const closeOverlay = vi.fn();
@@ -259,6 +267,7 @@ describe('reference recipe handoff', () => {
       recordSuccessfulPrompt,
       replaceRecipeDraft,
       repository,
+      selectMode,
       session,
     };
   };
@@ -296,14 +305,14 @@ describe('reference recipe handoff', () => {
         origin: 'character-prompt',
         assetId: character.id,
         prompt: '',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         referenceImageAssetId: uploadedAsset.assetId,
       });
     });
 
     await waitFor(() =>
       expect(harness.replaceRecipeDraft).toHaveBeenCalledWith({
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: '',
         referenceImage: harness.hydrated,
         enhance: false,
@@ -315,11 +324,15 @@ describe('reference recipe handoff', () => {
     expect(harness.recordSuccessfulPrompt).not.toHaveBeenCalled();
 
     act(() => {
-      harness.result.current.actions.recordCommittedPrompt('lucy-2.5', '', uploadedAsset.assetId);
+      harness.result.current.actions.recordCommittedPrompt(
+        'lucy-latest',
+        '',
+        uploadedAsset.assetId,
+      );
     });
     expect(harness.recordSuccessfulPrompt).toHaveBeenCalledWith({
       prompt: '',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       referenceImageAssetId: uploadedAsset.assetId,
       savedCharacterPromptId: character.id,
       characterName: character.name,
@@ -360,7 +373,7 @@ describe('reference recipe handoff', () => {
         origin: 'character-prompt',
         assetId: character.id,
         prompt: character.prompt,
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         referenceImageAssetId: generatedAsset.assetId,
         builderDraft: draft,
       });
@@ -368,7 +381,7 @@ describe('reference recipe handoff', () => {
 
     await waitFor(() =>
       expect(harness.replaceRecipeDraft).toHaveBeenCalledWith({
-        mode: 'lucy-2.5',
+        mode: 'lucy-latest',
         prompt: generatedAsset.lucy25CharacterPrompt,
         referenceImage: harness.hydrated,
         enhance: true,
@@ -416,7 +429,7 @@ describe('reference recipe handoff', () => {
         assetId: character.id,
         characterName: character.name,
         prompt: character.prompt,
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         referenceImageAssetId: generatedAsset.assetId,
       });
     });
@@ -430,6 +443,59 @@ describe('reference recipe handoff', () => {
     });
   });
 
+  it('unselects the active character only after returning the session to local mode', async () => {
+    const character = {
+      id: 'removable-character',
+      name: 'Removable field host',
+      prompt: generatedAsset.originalPrompt,
+      source: 'generator' as const,
+      promptIntent: 'character-transform' as const,
+      builderDraft: null,
+      guidedDesign: null,
+      referenceImageStatus: 'persisted-reference' as const,
+      referenceImageAssetId: generatedAsset.assetId,
+      uploadedReferenceImageAssetId: null,
+      finalReferenceKind: 'generated' as const,
+      notes: '',
+      tags: [],
+      createdAt: '2026-07-21T12:00:00.000Z',
+      updatedAt: '2026-07-21T12:00:00.000Z',
+      lastUsedAt: null,
+      useCount: 0,
+    };
+    const store: CreativeAssetStore = {
+      schemaVersion: 4,
+      savedPrompts: [],
+      recentPrompts: [],
+      savedCharacterPrompts: [character],
+    };
+    const harness = renderHandoff({ store, referenceAsset: generatedAsset });
+
+    act(() => {
+      harness.result.current.actions.useRecipe({
+        origin: 'character-prompt',
+        assetId: character.id,
+        prompt: character.prompt,
+        modelModeId: 'lucy-latest',
+        referenceImageAssetId: generatedAsset.assetId,
+      });
+    });
+    await waitFor(() =>
+      expect(harness.result.current.state.activeCharacterName).toBe(character.name),
+    );
+
+    let cleared = false;
+    act(() => {
+      cleared = harness.result.current.actions.clearActiveCharacter();
+    });
+
+    expect(cleared).toBe(true);
+    expect(harness.selectMode).toHaveBeenCalledWith('local');
+    expect(harness.draft).toEqual(createEmptyDraft('local'));
+    expect(harness.result.current.state.activeCharacterName).toBeUndefined();
+    expect(harness.result.current.state.activeRecipe).toBeNull();
+  });
+
   it('retains a deleted image-only character name when reusing its standalone Recent recipe', async () => {
     const store: CreativeAssetStore = {
       schemaVersion: 4,
@@ -438,7 +504,7 @@ describe('reference recipe handoff', () => {
         {
           id: 'standalone-image-only-recent',
           prompt: '',
-          modelModeId: 'lucy-2.5',
+          modelModeId: 'lucy-latest',
           characterName: 'Deleted archive character',
           referenceImageAssetId: uploadedAsset.assetId,
           usedAt: '2026-07-21T12:00:00.000Z',
@@ -452,7 +518,7 @@ describe('reference recipe handoff', () => {
       harness.result.current.actions.useRecipe({
         origin: 'recent-prompt',
         prompt: '',
-        modelModeId: 'lucy-2.5',
+        modelModeId: 'lucy-latest',
         characterName: 'Deleted archive character',
         referenceImageAssetId: uploadedAsset.assetId,
       });
@@ -460,11 +526,15 @@ describe('reference recipe handoff', () => {
     await waitFor(() => expect(harness.replaceRecipeDraft).toHaveBeenCalledOnce());
 
     act(() => {
-      harness.result.current.actions.recordCommittedPrompt('lucy-2.5', '', uploadedAsset.assetId);
+      harness.result.current.actions.recordCommittedPrompt(
+        'lucy-latest',
+        '',
+        uploadedAsset.assetId,
+      );
     });
     expect(harness.recordSuccessfulPrompt).toHaveBeenCalledWith({
       prompt: '',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       referenceImageAssetId: uploadedAsset.assetId,
       characterName: 'Deleted archive character',
     });

@@ -59,7 +59,7 @@ dirty Recipe Shelf edit requires confirmed discard; saved origin-scoped browser 
   external media traffic.
 - Character Builder saves browser-local character metadata and immutable reference assets under
   `LIGHTFRAME_DATA_DIR`. Prompt-only save and upload do not generate images.
-- Lucy 2.5 and pinned `lucy-vton-3` start only after explicit user action. Decart receives live
+- `Lucy-latest` and pinned `lucy-vton-latest` start only after explicit user action. Decart receives live
   media and the applied prompt/reference snapshot.
 - Batch Lucy/VTO uses server-mediated exact-model jobs with fixed 720p output, explicit
   submit/status/content stages, inspected size/duration/orientation, and no automatic retry of a

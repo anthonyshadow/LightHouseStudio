@@ -25,9 +25,9 @@ describe('DecartHttpVideoJobProvider', () => {
     );
 
     await provider.submit({
-      modelId: 'lucy-vton-3',
+      modelId: 'lucy-vton-latest',
       recipe: {
-        modelId: 'lucy-vton-3',
+        modelId: 'lucy-vton-latest',
         prompt: 'Apply the jacket',
         enhancePrompt: false,
         hasReferenceImage: true,
@@ -41,7 +41,7 @@ describe('DecartHttpVideoJobProvider', () => {
 
     expect(fetchImplementation).toHaveBeenCalledOnce();
     const [url, init] = fetchImplementation.mock.calls[0]!;
-    expect(url).toBe('https://provider.invalid/v1/jobs/lucy-vton-3');
+    expect(url).toBe('https://provider.invalid/v1/jobs/lucy-vton-latest');
     expect(init?.headers).toEqual({ 'X-API-KEY': 'server-secret' });
     const form = init?.body;
     expect(form).toBeInstanceOf(FormData);
@@ -66,9 +66,9 @@ describe('DecartHttpVideoJobProvider', () => {
 
     await expect(
       provider.submit({
-        modelId: 'lucy-2.5',
+        modelId: 'lucy-latest',
         recipe: {
-          modelId: 'lucy-2.5',
+          modelId: 'lucy-latest',
           prompt: 'Change the lighting',
           enhancePrompt: false,
           hasReferenceImage: false,
@@ -82,7 +82,7 @@ describe('DecartHttpVideoJobProvider', () => {
     ).rejects.toBeInstanceOf(DecartVideoProviderError);
     expect(fetchImplementation).toHaveBeenCalledOnce();
     const [url, init] = fetchImplementation.mock.calls[0]!;
-    expect(url).toBe('https://provider.invalid/v1/jobs/lucy-2.5');
+    expect(url).toBe('https://provider.invalid/v1/jobs/lucy-latest');
     const form = init?.body;
     expect(form).toBeInstanceOf(FormData);
     if (!(form instanceof FormData)) throw new Error('Expected a provider multipart body.');

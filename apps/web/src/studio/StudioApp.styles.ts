@@ -72,14 +72,25 @@ export const headerStyles = (theme: Theme): CSSObject => ({
 
 export const characterSelectorStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
+  alignItems: 'center',
   justifyContent: 'center',
+  gap: theme.space.xxs,
   minWidth: 0,
-  '& > button': {
+  '& > button:first-of-type': {
     minWidth: 0,
     maxWidth: '20rem',
     minHeight: '2.55rem',
     paddingBlock: theme.space.xxs,
     whiteSpace: 'nowrap',
+  },
+  '& > button[data-clear-character="true"]': {
+    width: '2.75rem',
+    minWidth: '2.75rem',
+    maxWidth: '2.75rem',
+    minHeight: '2.75rem',
+    padding: 0,
+    color: theme.colors.danger,
+    fontSize: '1.25rem',
   },
   '& img, & [data-character-placeholder]': {
     width: '1.65rem',
@@ -103,11 +114,15 @@ export const characterSelectorStyles = (theme: Theme): CSSObject => ({
     color: theme.colors.textFaint,
   },
   '@media (max-width: 39.99rem)': {
-    '& > button': {
+    '& > button:first-of-type': {
       width: '100%',
       maxWidth: 'none',
       minHeight: '2.75rem',
       paddingInline: theme.space.xs,
+    },
+    '& > button[data-clear-character="true"]': {
+      width: '2.75rem',
+      flex: '0 0 2.75rem',
     },
   },
 });

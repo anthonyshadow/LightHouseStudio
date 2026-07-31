@@ -42,7 +42,7 @@ const SEEDED_SHELF = {
       id: 'character-amber-host',
       title: 'Amber Field Host',
       prompt: 'Transform the adult subject into a cinematic field presenter.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       source: 'manual',
       referenceImageAssetId: null,
       tags: ['editorial', 'warm'],
@@ -55,7 +55,7 @@ const SEEDED_SHELF = {
       id: 'vton-amber-jacket',
       title: 'Structured Amber Jacket',
       prompt: 'Replace the current top with a structured amber field jacket.',
-      modelModeId: 'lucy-vton-3',
+      modelModeId: 'lucy-vton-latest',
       source: 'manual',
       referenceImageAssetId: null,
       tags: ['outerwear', 'amber'],
@@ -69,14 +69,14 @@ const SEEDED_SHELF = {
     {
       id: 'recent-character',
       prompt: 'An adult stop-motion science presenter in a practical studio.',
-      modelModeId: 'lucy-2.5',
+      modelModeId: 'lucy-latest',
       referenceImageAssetId: null,
       usedAt: '2026-07-18T13:00:00.000Z',
     },
     {
       id: 'recent-vton',
       prompt: 'A tailored linen travel overshirt in soft copper.',
-      modelModeId: 'lucy-vton-3',
+      modelModeId: 'lucy-vton-latest',
       referenceImageAssetId: null,
       usedAt: '2026-07-17T13:00:00.000Z',
     },
@@ -140,7 +140,7 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          realtimeVideo: { available: true, models: ['lucy-2.5', 'lucy-vton-3'] },
+          realtimeVideo: { available: true, models: ['lucy-latest', 'lucy-vton-latest'] },
           videoProcessing: { available: false, models: [] },
           elevenLabs: { available: true, modelId: 'eleven_multilingual_sts_v2' },
           referenceImages: {

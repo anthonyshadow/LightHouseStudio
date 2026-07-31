@@ -15,20 +15,20 @@ export const createSeededCreativeAssetRepository = (): CreativeAssetRepository =
     title: 'Midnight culture host',
     prompt:
       'Transform the adult subject into a polished midnight culture host in a structured navy jacket.',
-    modelModeId: 'lucy-2.5',
+    modelModeId: 'lucy-latest',
     source: 'manual',
     tags: ['editorial', 'host', 'night'],
   });
   repository.createSavedPrompt({
     title: 'Copper runway jacket',
     prompt: 'Replace the garment with a sculpted copper satin runway jacket.',
-    modelModeId: 'lucy-vton-3',
+    modelModeId: 'lucy-vton-latest',
     source: 'generated',
     tags: ['fashion', 'copper'],
   });
   repository.recordSuccessfulPrompt({
     prompt: 'Transform the adult subject into a sunlit botanical field explorer.',
-    modelModeId: 'lucy-2.5',
+    modelModeId: 'lucy-latest',
   });
   repository.createSavedCharacterPrompt({
     name: 'Botanical explorer',
