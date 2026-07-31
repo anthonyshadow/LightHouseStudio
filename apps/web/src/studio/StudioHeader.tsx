@@ -43,6 +43,12 @@ const systemStatusLabel = (
   return systemState === 'ready' ? 'Studio available to try' : 'Studio limited';
 };
 
+const ChevronDownIcon = () => (
+  <svg data-character-chevron aria-hidden="true" viewBox="0 0 16 16" fill="none">
+    <path d="m4 6 4 4 4-4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
 export const StudioHeader = ({
   availability,
   browser,
@@ -78,7 +84,7 @@ export const StudioHeader = ({
         <img src="/favicon.svg" alt="" width="38" height="38" />
         <div>
           <h1>Lightframe Studio</h1>
-          <span>Local-first creative camera</span>
+          <span>Local-first studio</span>
         </div>
       </div>
       <div css={characterSelectorStyles(theme)}>
@@ -100,13 +106,14 @@ export const StudioHeader = ({
               ✦
             </span>
           )}
-          <span data-character-label>{activeCharacterName ?? 'Character: None Selected'}</span>
+          <span data-character-label>{activeCharacterName ?? 'Select Character'}</span>
+          <ChevronDownIcon />
         </Button>
       </div>
       <details css={capabilityStyles(theme)} aria-label="Integration availability">
         <summary>
           <span css={systemStatusDotStyles(theme, systemState)} aria-hidden="true" />
-          <span>{systemLabel}</span>
+          <span data-system-label>{systemLabel}</span>
         </summary>
         <div css={capabilityDetailStyles(theme)}>
           <span>

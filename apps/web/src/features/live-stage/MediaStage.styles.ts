@@ -28,16 +28,16 @@ export const stageStyles = (theme: Theme, recording: boolean): CSSObject => ({
   '&::after': {
     position: 'absolute',
     zIndex: 0,
-    inset: '54% -12% -22%',
-    opacity: 0.32,
+    inset: '58% -10% -20%',
+    opacity: 0.24,
     backgroundImage: [
-      `linear-gradient(color-mix(in srgb, ${theme.colors.accent} 20%, transparent) 1px, transparent 1px)`,
-      `linear-gradient(90deg, color-mix(in srgb, ${theme.colors.accent} 20%, transparent) 1px, transparent 1px)`,
+      `linear-gradient(color-mix(in srgb, ${theme.colors.accent} 15%, transparent) 1px, transparent 1px)`,
+      `linear-gradient(90deg, color-mix(in srgb, ${theme.colors.accent} 15%, transparent) 1px, transparent 1px)`,
     ].join(', '),
-    backgroundSize: '2.1rem 2.1rem',
-    maskImage: 'linear-gradient(to bottom, transparent, black 28%, transparent 82%)',
-    WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 28%, transparent 82%)',
-    transform: 'perspective(18rem) rotateX(64deg)',
+    backgroundSize: '2.5rem 2.5rem',
+    maskImage: 'linear-gradient(to bottom, transparent, black 35%, transparent 85%)',
+    WebkitMaskImage: 'linear-gradient(to bottom, transparent, black 35%, transparent 85%)',
+    transform: 'perspective(20rem) rotateX(60deg)',
     transformOrigin: 'center top',
     content: '""',
     pointerEvents: 'none',
@@ -71,46 +71,49 @@ export const emptyStyles = (theme: Theme): CSSObject => ({
   placeSelf: 'center',
   display: 'grid',
   justifyItems: 'center',
-  width: 'min(36rem, calc(100% - 2rem))',
-  padding: 'clamp(1rem, 3vw, 2rem)',
+  padding: 'clamp(1rem, 3vw, 3rem)',
   textAlign: 'center',
   color: theme.colors.textMuted,
   textWrap: 'balance',
   '& strong': {
     display: 'block',
-    marginBlock: `${theme.space.sm} ${theme.space.xs}`,
+    marginBlock: `${theme.space.lg} ${theme.space.sm}`,
     color: theme.colors.text,
     fontFamily: theme.type.display,
-    fontSize: 'clamp(1.25rem, 2.5vw, 2rem)',
+    fontSize: 'clamp(1.5rem, 3vw, 2.35rem)',
     lineHeight: 1.12,
   },
   '& p': {
     maxWidth: '31rem',
     margin: 0,
-    fontSize: 'clamp(0.78rem, 1.2vw, 0.92rem)',
+    fontSize: 'clamp(0.82rem, 1.2vw, 1rem)',
     lineHeight: 1.55,
   },
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
     padding: theme.space.md,
-    '& strong': { fontSize: 'clamp(1rem, 6vw, 1.35rem)' },
+    '& strong': {
+      marginBlock: `${theme.space.sm} ${theme.space.xs}`,
+      fontSize: 'clamp(1.05rem, 6vw, 1.4rem)',
+    },
     '& p': { fontSize: '0.75rem', lineHeight: 1.4 },
   },
 });
 
 export const emptyIconStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
-  width: '3.5rem',
-  height: '3.5rem',
+  width: '4.5rem',
+  height: '4.5rem',
   placeItems: 'center',
   border: `1px solid ${theme.colors.borderStrong}`,
-  borderRadius: theme.radii.large,
-  color: theme.colors.accentStrong,
-  background: `linear-gradient(145deg, ${theme.colors.accentSoft}, ${theme.colors.violetSoft})`,
-  boxShadow: `0 0 2rem ${theme.colors.accentSoft}`,
-  '& svg': { width: '1.65rem', height: '1.65rem' },
+  borderRadius: '1.4rem',
+  color: theme.colors.accent,
+  background: `linear-gradient(145deg, ${theme.colors.accentSoft}, ${theme.colors.canvasRaised})`,
+  boxShadow: `0 1.5rem 3rem ${theme.colors.shadow}`,
+  '& svg': { width: '2rem', height: '2rem' },
   '@media (max-height: 36rem)': {
-    width: '2.75rem',
-    height: '2.75rem',
+    width: '3rem',
+    height: '3rem',
+    '& svg': { width: '1.45rem', height: '1.45rem' },
   },
 });
 
@@ -245,9 +248,9 @@ export const iconButtonStyles = (theme: Theme): CSSObject => ({
 export const framingGuideStyles = (theme: Theme, visible: boolean): CSSObject => ({
   position: 'absolute',
   zIndex: theme.layers.stageGuides,
-  inset: 'clamp(3.75rem, 10%, 5.5rem) clamp(1.5rem, 12%, 7rem)',
-  opacity: visible ? 0.82 : 0.5,
-  color: theme.colors.text,
+  inset: 'clamp(3.75rem, 8%, 5rem) clamp(1.5rem, 6%, 5rem)',
+  opacity: visible ? 0.56 : 0.3,
+  color: theme.colors.accent,
   pointerEvents: 'none',
   transition: `opacity ${theme.motion.standard}`,
   '&::before, &::after': {
@@ -262,7 +265,7 @@ export const framingGuideStyles = (theme: Theme, visible: boolean): CSSObject =>
   '&::after': { width: '1px', height: '1.5rem' },
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
     inset: '3.25rem 1.25rem 3.75rem',
-    opacity: visible ? 0.72 : 0.36,
+    opacity: visible ? 0.48 : 0.28,
   },
 });
 
@@ -272,10 +275,10 @@ export const guideCornerStyles = (position: 'tl' | 'tr' | 'bl' | 'br'): CSSObjec
   height: '1.1rem',
   ...(position.includes('t') ? { insetBlockStart: 0 } : { insetBlockEnd: 0 }),
   ...(position.includes('l') ? { insetInlineStart: 0 } : { insetInlineEnd: 0 }),
-  borderBlockStart: position.includes('t') ? '2px solid currentColor' : undefined,
-  borderBlockEnd: position.includes('b') ? '2px solid currentColor' : undefined,
-  borderInlineStart: position.includes('l') ? '2px solid currentColor' : undefined,
-  borderInlineEnd: position.includes('r') ? '2px solid currentColor' : undefined,
+  borderBlockStart: position.includes('t') ? '1px solid currentColor' : undefined,
+  borderBlockEnd: position.includes('b') ? '1px solid currentColor' : undefined,
+  borderInlineStart: position.includes('l') ? '1px solid currentColor' : undefined,
+  borderInlineEnd: position.includes('r') ? '1px solid currentColor' : undefined,
 });
 
 export const statusDotStyles = (

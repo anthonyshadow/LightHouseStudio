@@ -65,6 +65,13 @@ const SparkIcon = () => (
   </svg>
 );
 
+const UploadIcon = () => (
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+    <path d="M12 15V3m0 0L7.5 7.5M12 3l4.5 4.5" stroke="currentColor" />
+    <path d="M4 14v4a3 3 0 0 0 3 3h10a3 3 0 0 0 3-3v-4" stroke="currentColor" />
+  </svg>
+);
+
 const StopIcon = () => (
   <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
     <rect x="6.5" y="6.5" width="11" height="11" rx="1.5" stroke="currentColor" />
@@ -87,6 +94,11 @@ const barStyles = (theme: Theme, visible: boolean): CSSObject => ({
   boxShadow: theme.shadows.lifted,
   backdropFilter: 'blur(16px)',
   ...fadingVisibilityAnimationStyles(theme, visible, 'translateY(0)', 'translateY(0.75rem)'),
+  '&[data-session-state="idle"]': {
+    width: 'min(34rem, calc(100% - 1.3rem))',
+    padding: theme.space.xs,
+    borderRadius: '1.4rem',
+  },
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
     width: 'calc(100% - 0.8rem)',
     insetBlockEnd: '0.4rem',
@@ -154,6 +166,7 @@ const actionRowStyles = (theme: Theme): CSSObject => ({
     width: '1.45rem',
     height: '1.45rem',
   },
+  '& [data-ai-label-short]': { display: 'none' },
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
     gap: '0.3rem',
     '& > button': {
@@ -169,10 +182,25 @@ const actionRowStyles = (theme: Theme): CSSObject => ({
       overflow: 'hidden',
       clip: 'rect(0 0 0 0)',
     },
+    '& [data-upload-label]': {
+      position: 'absolute',
+      width: '1px',
+      height: '1px',
+      overflow: 'hidden',
+      clip: 'rect(0 0 0 0)',
+    },
+    '& > button[data-upload-action="true"]': {
+      width: '2.75rem',
+      minWidth: '2.75rem',
+      flex: '0 0 2.75rem',
+      padding: 0,
+    },
   },
   '@media (max-width: 20rem)': {
     '& > button': { paddingInline: '0.5rem' },
     '& > button:first-of-type': { fontSize: '0.72rem' },
+    '& [data-ai-label-long]': { display: 'none' },
+    '& [data-ai-label-short]': { display: 'inline' },
   },
 });
 
@@ -190,8 +218,14 @@ const recordingRowStyles = (theme: Theme): CSSObject => ({
 const idleRowStyles = (theme: Theme): CSSObject => ({
   ...actionRowStyles(theme),
   '& > button:first-of-type': {
-    flex: '0 1 18rem',
-    minWidth: 'min(18rem, 100%)',
+    flex: '1 1 18rem',
+    minWidth: 0,
+    minHeight: '3.2rem',
+    fontSize: theme.fontSizes.label,
+  },
+  '& > button[data-upload-action="true"]': {
+    flex: '0 0 auto',
+    minHeight: '3.2rem',
   },
 });
 
@@ -305,6 +339,9 @@ export const StudioSessionControlBar = ({
       aria-label="Studio session controls"
       aria-hidden={controlsVisible ? undefined : true}
       data-control-visibility={controlsVisible ? 'visible' : 'hidden'}
+      data-session-state={
+        takeReviewActive ? 'review' : !localActive ? 'idle' : recordingActive ? 'recording' : 'live'
+      }
       inert={!controlsVisible}
     >
       {takeReviewActive ? (
@@ -405,15 +442,18 @@ export const StudioSessionControlBar = ({
                 disabled={controlsLocked || Boolean(transition)}
                 onClick={() => void session.startLocal()}
               >
+                <CameraIcon off={false} />
                 {transition ?? 'Start Camera + Mic'}
               </Button>
               <Button
                 ref={uploadButtonRef}
+                data-upload-action="true"
                 variant="secondary"
                 disabled={controlsLocked || Boolean(transition)}
                 onClick={onEditVideo ?? onUploadVideo}
               >
-                {onEditVideo ? 'Edit video' : 'Upload video'}
+                <UploadIcon />
+                <span data-upload-label>{onEditVideo ? 'Edit video' : 'Upload video'}</span>
               </Button>
             </div>
           ) : transition && !aiStarting ? (
@@ -449,7 +489,10 @@ export const StudioSessionControlBar = ({
                   onClick={onChooseAiExperience}
                 >
                   <SparkIcon />
-                  Start AI
+                  <span data-ai-label-long>Start AI</span>
+                  <span data-ai-label-short aria-hidden="true">
+                    AI
+                  </span>
                 </Button>
               )}
 

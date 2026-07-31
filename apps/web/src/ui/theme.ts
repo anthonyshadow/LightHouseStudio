@@ -167,11 +167,11 @@ export const studioTheme: StudioTheme = {
       '#090d12',
     ].join(', '),
     stageIdle: [
-      'radial-gradient(circle at 18% 15%, rgba(98, 230, 194, 0.25), transparent 36%)',
-      'radial-gradient(circle at 82% 28%, rgba(155, 124, 255, 0.24), transparent 42%)',
-      'linear-gradient(145deg, #0b2027 0%, #101827 48%, #18132d 100%)',
+      'radial-gradient(circle at 18% 15%, rgba(98, 230, 194, 0.2), transparent 40%)',
+      'radial-gradient(circle at 82% 28%, rgba(155, 124, 255, 0.18), transparent 45%)',
+      'linear-gradient(145deg, #0b2027 0%, #0d131a 48%, #110e1d 100%)',
     ].join(', '),
-    stageScrim: 'linear-gradient(180deg, rgba(5, 9, 14, 0.04) 38%, rgba(5, 9, 14, 0.72) 100%)',
+    stageScrim: 'linear-gradient(180deg, rgba(5, 9, 14, 0) 50%, rgba(5, 9, 14, 0.6) 100%)',
     recordingGlow:
       'radial-gradient(circle, rgba(255, 91, 100, 0.28) 0%, rgba(255, 91, 100, 0.1) 46%, transparent 72%)',
   },

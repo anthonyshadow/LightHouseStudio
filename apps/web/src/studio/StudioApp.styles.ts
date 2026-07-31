@@ -6,10 +6,10 @@ export const pageStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
-  padding: `max(${theme.space.sm}, env(safe-area-inset-top)) max(${theme.space.sm}, env(safe-area-inset-right)) max(${theme.space.sm}, env(safe-area-inset-bottom)) max(${theme.space.sm}, env(safe-area-inset-left))`,
+  padding: `max(clamp(${theme.space.sm}, 1.5vw, ${theme.space.lg}), env(safe-area-inset-top)) max(clamp(${theme.space.sm}, 1.5vw, ${theme.space.lg}), env(safe-area-inset-right)) max(clamp(${theme.space.sm}, 1.5vw, ${theme.space.lg}), env(safe-area-inset-bottom)) max(clamp(${theme.space.sm}, 1.5vw, ${theme.space.lg}), env(safe-area-inset-left))`,
   '@supports (height: 100svh)': { height: '100svh' },
   '@supports (height: 100dvh)': { height: '100dvh' },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+  '@media (max-width: 39.99rem), (max-height: 48rem)': {
     padding: `max(${theme.space.xs}, env(safe-area-inset-top)) max(${theme.space.xs}, env(safe-area-inset-right)) max(${theme.space.xs}, env(safe-area-inset-bottom)) max(${theme.space.xs}, env(safe-area-inset-left))`,
   },
 });
@@ -19,20 +19,17 @@ export const shellStyles = (theme: Theme): CSSObject => ({
   height: '100%',
   marginInline: 'auto',
   display: 'grid',
-  gridTemplateRows: `${theme.layout.shellRows.header} minmax(0, 1fr) ${theme.layout.shellRows.launcher}`,
+  gridTemplateRows: '4rem minmax(0, 1fr)',
   gap: theme.space.sm,
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
   '@media (max-width: 80rem), (max-height: 48rem)': {
-    gridTemplateRows: `${theme.layout.shellRows.headerCompact} minmax(0, 1fr) ${theme.layout.shellRows.launcherCompact}`,
+    gridTemplateRows: '3.5rem minmax(0, 1fr)',
     gap: theme.space.xs,
   },
   '@media (max-width: 39.99rem)': {
-    gridTemplateRows: `6.5rem minmax(0, 1fr) ${theme.layout.shellRows.launcherMobile}`,
-  },
-  '@media (max-width: 20rem), (max-height: 36rem)': {
-    gridTemplateRows: `6rem minmax(0, 1fr) ${theme.layout.shellRows.launcherUltra}`,
+    gridTemplateRows: '3.25rem minmax(0, 1fr)',
   },
 });
 
@@ -58,19 +55,18 @@ export const skipLinkStyles = (theme: Theme): CSSObject => ({
 
 export const headerStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns: 'minmax(12rem, 1fr) auto minmax(10rem, 1fr)',
+  height: '100%',
+  gridTemplateColumns: 'minmax(10rem, 1fr) minmax(15rem, auto) minmax(8rem, 1fr)',
   alignItems: 'center',
-  gap: theme.space.lg,
+  gap: theme.space.md,
   minWidth: 0,
-  paddingBlock: theme.space.xxs,
   '@media (max-width: 45rem), (max-height: 48rem)': {
-    gridTemplateColumns: 'minmax(11rem, 1fr) auto minmax(8rem, 1fr)',
+    gridTemplateColumns: 'minmax(9rem, 1fr) minmax(12rem, auto) minmax(3rem, 1fr)',
     gap: theme.space.xs,
   },
   '@media (max-width: 39.99rem)': {
-    gridTemplateColumns: 'minmax(0, 1fr) auto',
-    gridTemplateRows: 'auto auto',
-    alignContent: 'center',
+    gridTemplateColumns: '2.25rem minmax(0, 1fr) 2.75rem',
+    gap: theme.space.xs,
   },
 });
 
@@ -100,10 +96,19 @@ export const characterSelectorStyles = (theme: Theme): CSSObject => ({
     overflow: 'hidden',
     textOverflow: 'ellipsis',
   },
+  '& [data-character-chevron]': {
+    width: '0.9rem',
+    height: '0.9rem',
+    flex: '0 0 auto',
+    color: theme.colors.textFaint,
+  },
   '@media (max-width: 39.99rem)': {
-    gridColumn: '1 / -1',
-    gridRow: '2',
-    '& > button': { width: '100%', maxWidth: 'none', minHeight: '2.55rem' },
+    '& > button': {
+      width: '100%',
+      maxWidth: 'none',
+      minHeight: '2.75rem',
+      paddingInline: theme.space.xs,
+    },
   },
 });
 
@@ -131,11 +136,9 @@ export const brandStyles = (theme: Theme): CSSObject => ({
     letterSpacing: '-0.025em',
   },
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    gridTemplateColumns: '1.8rem minmax(0, 1fr)',
-    gap: theme.space.xs,
-    '& img': { width: '1.75rem', height: '1.75rem' },
-    '& span': { display: 'none' },
-    '& h1': { fontSize: '0.95rem', whiteSpace: 'nowrap' },
+    display: 'block',
+    '& img': { width: '2.1rem', height: '2.1rem' },
+    '& > div': { display: 'none' },
   },
 });
 
@@ -169,8 +172,13 @@ export const capabilityStyles = (theme: Theme): CSSObject => ({
     color: theme.colors.text,
   },
   '@media (max-width: 39.99rem)': {
-    gridColumn: '2',
-    gridRow: '1',
+    '& summary': {
+      width: '2.75rem',
+      height: '2.75rem',
+      justifyContent: 'center',
+      padding: 0,
+    },
+    '& [data-system-label]': { display: 'none' },
   },
 });
 
@@ -238,23 +246,20 @@ export const mainGridStyles = (): CSSObject => ({
 
 export const stageColumnStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
-  gridTemplateRows: `minmax(0, 1fr) ${theme.layout.shellRows.capture}`,
+  gridTemplateRows: 'minmax(0, 1fr) 3.4rem 3rem',
   gap: theme.space.sm,
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
   '@media (max-width: 80rem), (max-height: 48rem)': {
     gap: theme.space.xs,
-    gridTemplateRows: `minmax(0, 1fr) ${theme.layout.shellRows.captureCompact}`,
-  },
-  '@media (min-width: 40rem) and (max-width: 63.99rem) and (min-height: 48.01rem)': {
-    gridTemplateRows: `minmax(0, 1fr) ${theme.layout.shellRows.captureTablet}`,
+    gridTemplateRows: 'minmax(0, 1fr) 3.15rem 2.85rem',
   },
   '@media (max-width: 39.99rem)': {
-    gridTemplateRows: `minmax(0, 1fr) ${theme.layout.shellRows.captureMobile}`,
+    gridTemplateRows: 'minmax(0, 1fr) 3.15rem 2.85rem',
   },
   '@media (max-width: 20rem), (max-height: 36rem)': {
-    gridTemplateRows: `minmax(0, 1fr) ${theme.layout.shellRows.captureUltra}`,
+    gridTemplateRows: 'minmax(0, 1fr) 3rem 2.75rem',
   },
 });
 
@@ -266,12 +271,44 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   height: '100%',
   minHeight: 0,
-  padding: theme.space.xxs,
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.radii.medium,
+  padding: '0.3rem',
+  border: `1px solid ${theme.colors.surfaceStrong}`,
+  borderRadius: '1rem',
   background: theme.colors.canvasRaised,
   overflow: 'hidden',
-  '& > button': { flex: '0 1 auto', minWidth: 0, whiteSpace: 'nowrap' },
+  '& > button': {
+    position: 'relative',
+    flex: '0 1 10rem',
+    minWidth: 0,
+    height: '100%',
+    minHeight: '2.75rem',
+    justifyContent: 'flex-start',
+    padding: `${theme.space.xxs} ${theme.space.sm}`,
+    overflow: 'hidden',
+    borderColor: theme.colors.surfaceStrong,
+    background: theme.colors.surface,
+    whiteSpace: 'nowrap',
+  },
+  '& > button[aria-current="page"]': {
+    borderColor: theme.colors.border,
+    background: theme.colors.surfaceStrong,
+    boxShadow: 'none',
+  },
+  '& > button[aria-current="page"]::before': {
+    position: 'absolute',
+    insetBlock: 0,
+    insetInlineStart: 0,
+    width: '0.2rem',
+    background: theme.colors.accent,
+    content: '""',
+  },
+  '& [data-tool-icon]': {
+    width: '1.05rem',
+    height: '1.05rem',
+    flex: '0 0 auto',
+    color: theme.colors.textMuted,
+  },
+  '& > button[aria-current="page"] [data-tool-icon]': { color: theme.colors.accent },
   '& [data-tool-label]': {
     minWidth: 0,
     display: 'grid',
@@ -282,8 +319,9 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     fontSize: 'inherit',
     fontWeight: 'inherit',
   },
+  '& [data-workshop-label-short]': { display: 'none' },
   '& [data-tool-label] small': {
-    maxWidth: '11rem',
+    maxWidth: '8rem',
     overflow: 'hidden',
     color: 'currentColor',
     fontSize: '0.66rem',
@@ -292,6 +330,9 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     textOverflow: 'ellipsis',
   },
   '& > span': {
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: theme.space.xs,
     minWidth: 0,
     marginInlineStart: 'auto',
     color: theme.colors.textFaint,
@@ -300,60 +341,92 @@ export const toolRailStyles = (theme: Theme): CSSObject => ({
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    '& > button': { flex: '1 1 0', minWidth: 0, paddingInline: theme.space.xs },
-    '& [data-tool-label]': { justifyItems: 'center' },
-    '& [data-tool-label] small': { display: 'none' },
+  '& > span svg': {
+    width: '0.95rem',
+    height: '0.95rem',
+    flex: '0 0 auto',
+    color: theme.colors.accent,
+  },
+  '@media (max-width: 79.99rem), (max-height: 48rem)': {
+    '& > button': { flex: '1 1 0', justifyContent: 'center' },
     '& > span': { display: 'none' },
+  },
+  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+    gap: '0.3rem',
+    padding: theme.space.xxs,
+    '& > button': {
+      flex: '1 1 0',
+      minWidth: 0,
+      paddingInline: theme.space.xxs,
+      gap: '0.28rem',
+    },
+    '& [data-tool-label]': { justifyItems: 'center' },
+    '& [data-tool-label] strong': { fontSize: '0.72rem' },
+    '& [data-tool-label] small': { display: 'none' },
+    '& [data-tool-icon]': { width: '0.95rem', height: '0.95rem' },
   },
   '@media (max-width: 20rem), (max-height: 36rem)': {
     '& > button': {
-      width: 'auto',
-      minWidth: 0,
-      paddingInline: theme.space.xxs,
-      fontSize: '0.68rem',
+      gap: '0.2rem',
+      fontSize: '0.66rem',
     },
+    '& [data-tool-label] strong': { fontSize: '0.66rem' },
+    '& [data-tool-icon]': { width: '0.82rem', height: '0.82rem' },
+    '& [data-workshop-label-long]': { display: 'none' },
+    '& [data-workshop-label-short]': { display: 'inline' },
   },
 });
 
 export const firstSuccessGuideStyles = (theme: Theme): CSSObject => ({
-  display: 'flex',
-  width: 'min(38rem, calc(100vw - 4rem))',
+  display: 'inline-grid',
+  gridTemplateColumns: 'auto minmax(0, 1fr) auto',
+  width: 'min(42rem, calc(100vw - 4rem))',
   maxWidth: '100%',
   alignItems: 'center',
-  justifyContent: 'center',
-  flexWrap: 'wrap',
-  gap: theme.space.xs,
-  marginBlockStart: theme.space.sm,
-  padding: `${theme.space.xs} ${theme.space.sm}`,
-  border: `1px solid ${theme.colors.borderStrong}`,
-  borderRadius: theme.radii.medium,
+  gap: theme.space.sm,
+  marginBlockStart: theme.space.lg,
+  padding: `${theme.space.xxs} ${theme.space.xs} ${theme.space.xxs} ${theme.space.sm}`,
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.radii.large,
   color: theme.colors.text,
-  background: `color-mix(in srgb, ${theme.colors.canvasRaised} 88%, transparent)`,
+  background: `color-mix(in srgb, ${theme.colors.canvasRaised} 76%, transparent)`,
+  boxShadow: theme.shadows.soft,
+  backdropFilter: 'blur(12px)',
   fontSize: theme.fontSizes.caption,
   lineHeight: 1.35,
   '&& > strong': {
-    display: 'inline',
+    display: 'block',
     margin: 0,
     fontFamily: theme.type.sans,
-    fontSize: theme.fontSizes.caption,
+    color: theme.colors.accent,
+    fontSize: '0.68rem',
+    fontWeight: 850,
+    letterSpacing: '0.12em',
     lineHeight: 1.35,
+    textTransform: 'uppercase',
   },
-  '& span': { color: theme.colors.textMuted },
+  '& [data-guide-copy]': {
+    minWidth: 0,
+    display: 'grid',
+    gap: '0.1rem',
+    color: theme.colors.textMuted,
+    textAlign: 'start',
+  },
+  '& [data-guide-copy] > span': {
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  '& [data-guide-upload]': { color: theme.colors.textFaint },
   '& button': { minHeight: '2.75rem' },
   '& [data-guide-dismiss-short]': { display: 'none' },
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    display: 'grid',
     width: '100%',
     gridTemplateColumns: 'auto minmax(0, 1fr) 2.75rem',
     marginBlockStart: theme.space.xs,
     padding: theme.space.xs,
-    '& span': {
-      maxWidth: '100%',
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
-    },
+    gap: theme.space.xs,
+    '& [data-guide-upload]': { display: 'none' },
     '& button': { width: '2.75rem', minWidth: '2.75rem', padding: 0 },
     '& [data-guide-dismiss-long]': { display: 'none' },
     '& [data-guide-dismiss-short]': { display: 'inline' },

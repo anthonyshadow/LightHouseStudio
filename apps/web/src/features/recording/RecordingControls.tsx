@@ -20,7 +20,10 @@ const captureSurfaceStyles = (theme: Theme): CSSObject => ({
   alignItems: 'center',
   gap: theme.space.sm,
   padding: `${theme.space.xs} ${theme.space.sm}`,
+  borderColor: `color-mix(in srgb, ${theme.colors.surfaceStrong} 72%, transparent)`,
   borderRadius: theme.radii.medium,
+  background: `color-mix(in srgb, ${theme.colors.canvas} 58%, transparent)`,
+  boxShadow: 'none',
   overflow: 'hidden',
   '@media (max-width: 79.99rem), (max-height: 48rem)': {
     gap: theme.space.xs,
@@ -46,8 +49,20 @@ const headingStyles = (): CSSObject => ({
   overflow: 'hidden',
   clip: 'rect(0 0 0 0)',
 });
-const settingsActionStyles = (): CSSObject => ({
+const settingsActionStyles = (theme: Theme): CSSObject => ({
+  minHeight: '2.75rem',
+  paddingInline: theme.space.sm,
+  borderColor: 'transparent',
+  color: theme.colors.textMuted,
+  background: 'transparent',
+  boxShadow: 'none',
+  fontSize: theme.fontSizes.caption,
   whiteSpace: 'nowrap',
+  '&:hover:not(:disabled)': {
+    color: theme.colors.accent,
+    borderColor: theme.colors.border,
+    background: theme.colors.surface,
+  },
   '@media (max-width: 39.99rem)': {
     width: '2.75rem',
     minWidth: '2.75rem',
@@ -136,7 +151,7 @@ export const RecordingControls = ({
         <Button
           variant="secondary"
           aria-label="Open capture settings"
-          css={settingsActionStyles()}
+          css={settingsActionStyles(theme)}
           disabled={active}
           onClick={onOpenSettings}
         >

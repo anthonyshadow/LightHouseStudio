@@ -456,6 +456,60 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
     closeOverlay();
   }, [closeOverlay, existingVideo]);
+  const creativeWorkspace = (
+    <CreativeWorkspace
+      repository={repository}
+      state={{
+        panel: creativePanel,
+        activeTool: activeCreativeTool,
+        activeSessionMode: session.draft.mode,
+        libraryMode,
+        workshopDraft,
+        workshopDrafts,
+        recordingActive,
+        sessionModeLocked,
+        recipeInsertionBlocked,
+        hasReferenceImage: Boolean(session.draft.referenceImage),
+        referenceUsePending,
+        referenceUseFailure: referenceUseFailureMessage
+          ? {
+              message: referenceUseFailureMessage,
+              onRetry: retryReferenceUse,
+              onContinueWithoutReference: continueReferenceUseWithoutImage,
+            }
+          : null,
+        legacyProjectCount,
+        activeRecipe,
+        recipeShelfEntryIntent,
+        hasTake: Boolean(recording.presented),
+      }}
+      refs={{
+        workshopToggleRef,
+        shelfToggleRef,
+        dockToggleRef,
+        takeToggleRef,
+        legacyManagerToggleRef,
+      }}
+      actions={{
+        onOpenDock: openDock,
+        onOpenTake: openTake,
+        onOpenWorkshop: openWorkshop,
+        onToggleShelf: () => toggleOverlay('recipe-shelf'),
+        onOpenLegacyProjects: openLegacyProjects,
+        onClose: closeCreativePanel,
+        onLibraryModeChange: changeLibraryMode,
+        onWorkshopDraftChange: rememberWorkshopDraft,
+        onUseWorkshop: applyWorkshopPrompt,
+        onSaveWorkshop: saveWorkshopPrompt,
+        onShelfDirtyChange: setShelfDirty,
+        onRecipeShelfEntryIntentConsumed: consumeRecipeShelfEntryIntent,
+        onUseRecipe: useRecipe,
+        onCreateCharacter: openCharacterBuilder,
+        onEditCharacter: editCharacter,
+        onOpenSavedWorkshop: openSavedWorkshop,
+      }}
+    />
+  );
 
   return (
     <div css={pageStyles(theme)}>
@@ -487,11 +541,14 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               idleAction={
                 stagePresentation.kind === 'idle' && firstSuccessGuideVisible ? (
                   <aside aria-label="First take guide" css={firstSuccessGuideStyles(theme)}>
-                    <strong>First take</strong>
-                    <span>
-                      Start camera → choose Character → Record → optional Voice → Download
-                      <br />
-                      Or Upload → optional visual processing → optional Voice → Download
+                    <strong>Start here</strong>
+                    <span data-guide-copy>
+                      <span>
+                        Start camera → choose Character → Record → optional Voice → Download
+                      </span>
+                      <span data-guide-upload>
+                        Upload → optional visual processing → optional Voice → Download
+                      </span>
                     </span>
                     <Button
                       size="small"
@@ -534,6 +591,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               )}
               notices={stageNotices}
             />
+            {creativeWorkspace}
             <RecordingControls
               recording={recording}
               source={activeRecordingSource}
@@ -802,59 +860,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             />
           </Suspense>
         </OverlayPanel>
-
-        <CreativeWorkspace
-          repository={repository}
-          state={{
-            panel: creativePanel,
-            activeTool: activeCreativeTool,
-            activeSessionMode: session.draft.mode,
-            libraryMode,
-            workshopDraft,
-            workshopDrafts,
-            recordingActive,
-            sessionModeLocked,
-            recipeInsertionBlocked,
-            hasReferenceImage: Boolean(session.draft.referenceImage),
-            referenceUsePending,
-            referenceUseFailure: referenceUseFailureMessage
-              ? {
-                  message: referenceUseFailureMessage,
-                  onRetry: retryReferenceUse,
-                  onContinueWithoutReference: continueReferenceUseWithoutImage,
-                }
-              : null,
-            legacyProjectCount,
-            activeRecipe,
-            recipeShelfEntryIntent,
-            hasTake: Boolean(recording.presented),
-          }}
-          refs={{
-            workshopToggleRef,
-            shelfToggleRef,
-            dockToggleRef,
-            takeToggleRef,
-            legacyManagerToggleRef,
-          }}
-          actions={{
-            onOpenDock: openDock,
-            onOpenTake: openTake,
-            onOpenWorkshop: openWorkshop,
-            onToggleShelf: () => toggleOverlay('recipe-shelf'),
-            onOpenLegacyProjects: openLegacyProjects,
-            onClose: closeCreativePanel,
-            onLibraryModeChange: changeLibraryMode,
-            onWorkshopDraftChange: rememberWorkshopDraft,
-            onUseWorkshop: applyWorkshopPrompt,
-            onSaveWorkshop: saveWorkshopPrompt,
-            onShelfDirtyChange: setShelfDirty,
-            onRecipeShelfEntryIntentConsumed: consumeRecipeShelfEntryIntent,
-            onUseRecipe: useRecipe,
-            onCreateCharacter: openCharacterBuilder,
-            onEditCharacter: editCharacter,
-            onOpenSavedWorkshop: openSavedWorkshop,
-          }}
-        />
       </div>
     </div>
   );

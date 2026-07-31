@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { ModelModeId } from '@studio/domain';
-import { lazy, Suspense, type RefObject } from 'react';
+import { lazy, Suspense, type ReactNode, type RefObject } from 'react';
 import type {
   ActiveRecipeIdentity,
   RecipeShelfEntryIntent,
@@ -38,6 +38,57 @@ const RecipeShelfView = lazy(() =>
   })),
 );
 const deferredWorkspaceFallback = <p role="status">Loading studio tool…</p>;
+
+type ToolIconName = 'dock' | 'take' | 'workshop' | 'shelf' | 'privacy';
+
+const ToolIcon = ({ name }: { name: ToolIconName }) => {
+  const paths: Record<ToolIconName, ReactNode> = {
+    dock: (
+      <>
+        <rect x="3" y="3" width="18" height="18" rx="3" />
+        <path d="M9 3v18M9 10h12" />
+      </>
+    ),
+    take: (
+      <>
+        <rect x="3" y="5" width="18" height="14" rx="3" />
+        <path d="M8 5v14M16 5v14M3 10h5M16 10h5M3 15h5M16 15h5" />
+      </>
+    ),
+    workshop: (
+      <>
+        <path d="m14 5 5 5M12.5 6.5l4-4 5 5-4 4" />
+        <path d="M13 10 5 18l-3 1 1-3 8-8M14 14l-2 2 4 4 4-4-2-2" />
+      </>
+    ),
+    shelf: (
+      <>
+        <path d="M4 4h4v16H4zM10 4h4v16h-4zM16 5l3-1 3 15-4 1z" />
+      </>
+    ),
+    privacy: (
+      <>
+        <path d="M12 3 5 6v5c0 4.5 2.7 8.1 7 10 4.3-1.9 7-5.5 7-10V6z" />
+        <path d="m9 12 2 2 4-4" />
+      </>
+    ),
+  };
+
+  return (
+    <svg
+      data-tool-icon={name === 'privacy' ? undefined : ''}
+      aria-hidden="true"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="1.6"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      {paths[name]}
+    </svg>
+  );
+};
 
 export type AuxiliaryPanel = 'closed' | 'workshop' | 'shelf';
 export type ModelMode = ModelModeId;
@@ -335,6 +386,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
           aria-haspopup="dialog"
           onClick={onOpenDock}
         >
+          <ToolIcon name="dock" />
           <span data-tool-label>
             <strong>Dock</strong>
             <small id="dock-tool-description">Set up camera or AI</small>
@@ -350,6 +402,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
           aria-haspopup="dialog"
           onClick={onOpenTake}
         >
+          <ToolIcon name="take" />
           <span data-tool-label>
             <strong>Take</strong>
             <small id="take-tool-description">Review and download</small>
@@ -365,8 +418,14 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
           aria-haspopup="dialog"
           onClick={() => (panel === 'workshop' ? onClose('workshop') : onOpenWorkshop())}
         >
+          <ToolIcon name="workshop" />
           <span data-tool-label>
-            <strong>Workshop</strong>
+            <strong>
+              <span data-workshop-label-long>Workshop</span>
+              <span data-workshop-label-short aria-hidden="true">
+                Build
+              </span>
+            </strong>
             <small id="workshop-tool-description">Advanced · build one visual change</small>
           </span>
         </Button>
@@ -380,12 +439,14 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
           aria-haspopup="dialog"
           onClick={onToggleShelf}
         >
+          <ToolIcon name="shelf" />
           <span data-tool-label>
             <strong>Shelf</strong>
             <small id="shelf-tool-description">Reuse saved work</small>
           </span>
         </Button>
         <span title="Prompts and generated references persist locally; manual uploads and takes stay temporary.">
+          <ToolIcon name="privacy" />
           Local-first workspace · generated references persist locally
         </span>
       </nav>
