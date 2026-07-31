@@ -83,6 +83,7 @@ const createRecording = (
   completeVisualProcessing: vi.fn(),
   completeProcessing: vi.fn(),
   failProcessing: vi.fn(),
+  clearVisualProcessing: vi.fn(),
   restoreOriginal: vi.fn(),
   ...overrides,
 });

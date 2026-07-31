@@ -135,8 +135,8 @@ the source orientation, and differ from the input duration by no more than 500 m
 ## Qualification rule
 
 Every required row must physically pass permission allow/deny/revoke; Local/Character/VTO capture;
-uploaded-video pick, replace, local download, batch Lucy, batch VTO, both ordered chains and the
-intermediate checkpoint; the 270/300-second warning and finalization; local and ElevenLabs Voice;
+uploaded-video pick, replace, local download, mutually exclusive batch Lucy and batch VTO; the
+270/300-second warning and finalization; local and ElevenLabs Voice;
 download/playback; background/foreground recovery; memory checkpoints; and cleanup. Touch rows
 also require native file pickers, portrait/landscape, safe areas, browser chrome, software
 keyboard, 200% text, touch-control recovery, and camera switching when exposed. Desktop rows

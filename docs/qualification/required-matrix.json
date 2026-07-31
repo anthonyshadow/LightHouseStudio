@@ -88,23 +88,6 @@
       ]
     },
     {
-      "id": "decart-batch-ordered-chain",
-      "configurationId": "decart:batch:ordered-chain:lucy-2.5+lucy-vton-3:720p",
-      "accessMode": "participant",
-      "checks": [
-        "lucy-then-vto",
-        "vto-then-lucy",
-        "intermediate-checkpoint",
-        "explicit-continue",
-        "finish-here",
-        "two-submission-count",
-        "second-failure-preserves-first",
-        "no-automatic-resubmission",
-        "source-audio-restore",
-        "cleanup"
-      ]
-    },
-    {
       "id": "elevenlabs-saved-voice",
       "configurationId": "elevenlabs:eleven_multilingual_sts_v2:saved-only:logging-false",
       "accessMode": "participant",
@@ -178,8 +161,6 @@
       "upload-select-replace-remove",
       "upload-local-download",
       "upload-single-visual-step",
-      "upload-ordered-chain-both-orders",
-      "upload-intermediate-checkpoint",
       "upload-voice",
       "record-300-seconds",
       "record-finalize",

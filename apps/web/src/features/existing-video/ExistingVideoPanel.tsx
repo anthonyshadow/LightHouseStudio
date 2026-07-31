@@ -80,7 +80,46 @@ const rowStyles = (theme: Theme): CSSObject => ({
   flexWrap: 'wrap',
   gap: theme.space.xs,
   alignItems: 'stretch',
-  '& > button': { minHeight: '2.75rem' },
+  '& > *': { minHeight: '2.75rem' },
+});
+
+const resultActionStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: theme.space.xs,
+  alignItems: 'stretch',
+  '& > *': {
+    flex: '1 1 9rem',
+    minWidth: 0,
+    minHeight: '2.85rem',
+  },
+  '@media (max-width: 32rem)': {
+    display: 'grid',
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    '& > *': { width: '100%' },
+  },
+});
+
+const downloadButtonStyles = (theme: Theme): CSSObject => ({
+  display: 'inline-flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  padding: '0.7rem 1rem',
+  border: '1px solid transparent',
+  borderRadius: theme.radii.medium,
+  color: theme.colors.onAccent,
+  background: `linear-gradient(135deg, ${theme.colors.accentStrong}, ${theme.colors.accent})`,
+  boxShadow: theme.shadows.soft,
+  fontWeight: 720,
+  lineHeight: 1.1,
+  textDecoration: 'none',
+  WebkitTapHighlightColor: 'transparent',
+  '&:hover': { transform: 'translateY(-1px)' },
+  '&:active': { transform: 'translateY(0)' },
+  '&:focus-visible': {
+    outline: `2px solid ${theme.colors.focus}`,
+    outlineOffset: '3px',
+  },
 });
 
 const visualPlanHeaderStyles = (theme: Theme): CSSObject => ({
@@ -160,6 +199,18 @@ export const ExistingVideoPanel = ({
   const chooseFiles = (files: FileList | null) => {
     const file = files?.[0];
     if (file) void workflow.selectFile(file);
+  };
+
+  const discardVideo = () => {
+    if (
+      !window.confirm(
+        'Discard this uploaded video and its results? They cannot be recovered after this tab releases them.',
+      )
+    ) {
+      return;
+    }
+    setReferenceError(null);
+    workflow.reset(true);
   };
 
   const receiveDrop = (event: DragEvent<HTMLDivElement>) => {
@@ -249,7 +300,6 @@ export const ExistingVideoPanel = ({
   }
 
   const metadata = selected.metadata;
-  const currentStep = workflow.steps[workflow.completedStepCount];
 
   return (
     <div css={panelStyles(theme)}>
@@ -323,78 +373,30 @@ export const ExistingVideoPanel = ({
         </StatusNotice>
       ) : null}
 
-      {workflow.phase === 'checkpoint' ? (
-        <Surface tone="soft" padding="compact">
-          <div css={panelStyles(theme)}>
-            <h2>Review the intermediate result</h2>
-            <p>
-              {modelLabel(workflow.steps[workflow.completedStepCount - 1]!)} is complete. The
-              remaining {currentStep ? modelLabel(currentStep) : 'step'} will create 1 additional
-              Decart submission only after Continue.
-            </p>
-            <div css={rowStyles(theme)} role="group" aria-label="Compare source and result">
-              <Button
-                variant={workflow.comparison === 'original' ? 'primary' : 'secondary'}
-                aria-pressed={workflow.comparison === 'original'}
-                onClick={workflow.showOriginal}
-              >
-                Original
-              </Button>
-              <Button
-                variant={workflow.comparison === 'result' ? 'primary' : 'secondary'}
-                aria-pressed={workflow.comparison === 'result'}
-                onClick={workflow.showResult}
-              >
-                Result
-              </Button>
-            </div>
-            <div css={rowStyles(theme)}>
-              <Button
-                variant="primary"
-                onClick={() => void workflow.submitStep(workflow.completedStepCount)}
-              >
-                Continue · 1 Decart submission
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  workflow.finishAtCheckpoint();
-                  onFinish();
-                }}
-              >
-                Finish here
-              </Button>
-            </div>
-          </div>
-        </Surface>
-      ) : null}
-
-      {workflow.phase !== 'checkpoint' && workflow.phase !== 'complete' ? (
+      {workflow.phase !== 'complete' ? (
         <>
           <section css={panelStyles(theme)} aria-labelledby="visual-plan-heading">
             <div css={visualPlanHeaderStyles(theme)}>
               <div>
                 <h2 id="visual-plan-heading">Visual plan</h2>
                 <p>
-                  Choose zero, one, or two ordered steps. Each step appears at most once and each
-                  creates one Decart submission.
+                  Choose Swap Character or Virtual Try On. Switch freely before submission; only the
+                  active transformation is used and it creates one Decart submission.
                 </p>
               </div>
-              <div css={rowStyles(theme)}>
+              <div css={rowStyles(theme)} role="group" aria-label="Visual transformation">
                 <Button
-                  variant="secondary"
-                  disabled={
-                    structureLocked || workflow.steps.some((step) => step.modelId === 'lucy-2.5')
-                  }
+                  variant={workflow.steps[0]?.modelId === 'lucy-2.5' ? 'primary' : 'secondary'}
+                  aria-pressed={workflow.steps[0]?.modelId === 'lucy-2.5'}
+                  disabled={structureLocked}
                   onClick={() => workflow.addStep('lucy-2.5')}
                 >
                   Swap Character
                 </Button>
                 <Button
-                  variant="secondary"
-                  disabled={
-                    structureLocked || workflow.steps.some((step) => step.modelId === 'lucy-vton-3')
-                  }
+                  variant={workflow.steps[0]?.modelId === 'lucy-vton-3' ? 'primary' : 'secondary'}
+                  aria-pressed={workflow.steps[0]?.modelId === 'lucy-vton-3'}
+                  disabled={structureLocked}
                   onClick={() => workflow.addStep('lucy-vton-3')}
                 >
                   Virtual Try On
@@ -402,13 +404,11 @@ export const ExistingVideoPanel = ({
               </div>
             </div>
 
-            {workflow.steps.map((step, index) => (
+            {workflow.steps.map((step) => (
               <article key={step.id} css={stepStyles(theme)}>
                 <header>
-                  <h3>
-                    {index + 1}. {stepHeading(step)}
-                  </h3>
-                  <span>{index + 1} Decart submission</span>
+                  <h3>{stepHeading(step)}</h3>
+                  <span>1 Decart submission</span>
                 </header>
                 {step.modelId === 'lucy-vton-3' ? (
                   <StatusNotice tone="warning">
@@ -482,20 +482,6 @@ export const ExistingVideoPanel = ({
                 </label>
                 <div css={rowStyles(theme)}>
                   <Button
-                    variant="quiet"
-                    disabled={structureLocked || index === 0}
-                    onClick={() => workflow.moveStep(index, -1)}
-                  >
-                    Move up
-                  </Button>
-                  <Button
-                    variant="quiet"
-                    disabled={structureLocked || index === workflow.steps.length - 1}
-                    onClick={() => workflow.moveStep(index, 1)}
-                  >
-                    Move down
-                  </Button>
-                  <Button
                     variant="danger"
                     disabled={structureLocked}
                     onClick={() => workflow.removeStep(step.id)}
@@ -513,7 +499,7 @@ export const ExistingVideoPanel = ({
               <p>
                 {workflow.steps.length === 0
                   ? 'No provider transfer. Keep the uploaded video local and continue to Voice or Download.'
-                  : `${workflow.steps.length} planned Decart submission${workflow.steps.length === 1 ? '' : 's'} in this order: ${workflow.steps.map(modelLabel).join(' → ')}.`}
+                  : `1 planned Decart submission: ${modelLabel(workflow.steps[0]!)}.`}
               </p>
               {!videoProcessingAvailable && workflow.steps.length > 0 ? (
                 <StatusNotice tone="warning">
@@ -544,8 +530,7 @@ export const ExistingVideoPanel = ({
                     }
                     onClick={() => void workflow.submitStep(workflow.completedStepCount)}
                   >
-                    Start first · {workflow.steps.length} planned submission
-                    {workflow.steps.length === 1 ? '' : 's'}
+                    Start · 1 Decart submission
                   </Button>
                 )}
                 {!workflow.acceptedSubmission ? (
@@ -595,8 +580,8 @@ export const ExistingVideoPanel = ({
         <div css={panelStyles(theme)}>
           <h2>Result ready</h2>
           <p>
-            The latest visual result is on the shared stage. Add optional Voice from the take
-            review, restore Original voice at any time, or Download.
+            Compare the uploaded original with the generated result on the shared stage. Download
+            saves the result; Start over keeps the original uploaded.
           </p>
           <div css={rowStyles(theme)} role="group" aria-label="Compare source and result">
             <Button
@@ -614,9 +599,24 @@ export const ExistingVideoPanel = ({
               Result
             </Button>
           </div>
-          <Button variant="primary" onClick={onFinish}>
-            Review Voice and Download
-          </Button>
+          <div css={resultActionStyles(theme)}>
+            {workflow.result ? (
+              <a
+                href={workflow.result.objectUrl}
+                download={workflow.result.filename}
+                css={downloadButtonStyles(theme)}
+                onClick={workflow.downloadResult}
+              >
+                Download
+              </a>
+            ) : null}
+            <Button variant="secondary" onClick={workflow.startOver}>
+              Start over
+            </Button>
+            <Button variant="danger" onClick={discardVideo}>
+              Discard video
+            </Button>
+          </div>
         </div>
       ) : null}
     </div>

@@ -74,6 +74,11 @@ const recordingController = (): RecordingController => {
     }),
     completeProcessing: vi.fn().mockReturnValue(source),
     failProcessing: vi.fn(),
+    clearVisualProcessing: vi.fn(() => {
+      recording.visual = null;
+      recording.processed = null;
+      recording.presented = recording.original;
+    }),
     restoreOriginal: vi.fn(),
   };
   return recording;
@@ -137,7 +142,7 @@ beforeEach(() => {
 });
 
 describe('useExistingVideoWorkflow', () => {
-  it('pauses after the first ordered step and never submits the second without Continue', async () => {
+  it('keeps visual choices mutually exclusive and submits only the selected model', async () => {
     const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
     adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
     const recording = recordingController();
@@ -152,30 +157,55 @@ describe('useExistingVideoWorkflow', () => {
     );
 
     await act(async () => result.current.selectFile(sourceFile));
-    act(() => {
-      result.current.addStep('lucy-2.5');
-      result.current.addStep('lucy-vton-3');
-    });
-    act(() => {
-      for (const step of result.current.steps) {
-        result.current.updateStep(step.id, { prompt: `Prompt for ${step.modelId}` });
-      }
-    });
+    act(() => result.current.addStep('lucy-2.5'));
+    expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-2.5']);
+    act(() => result.current.addStep('lucy-vton-3'));
+    expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-vton-3']);
+    act(() => result.current.addStep('lucy-2.5'));
+    expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-2.5']);
+    act(() =>
+      result.current.updateStep(result.current.steps[0]!.id, {
+        prompt: 'Prompt for lucy-2.5',
+      }),
+    );
 
     await act(async () => result.current.submitStep(0));
-    await waitFor(() => expect(result.current.phase).toBe('checkpoint'));
+    await waitFor(() => expect(result.current.phase).toBe('complete'));
 
     expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
     expect(recording.completeVisualProcessing).toHaveBeenCalledTimes(1);
     expect(onSubmissionAccepted).toHaveBeenCalledTimes(1);
     expect(result.current.completedStepCount).toBe(1);
-    expect(result.current.message).toContain('1 additional Decart submission');
+    expect(adapters.submitVideoJob.mock.calls[0]![1]).toMatchObject({ modelId: 'lucy-2.5' });
 
-    await act(async () => result.current.submitStep(1));
+    expect(result.current.result?.objectUrl).toContain('blob:visual-lucy');
+    act(() => result.current.downloadResult());
+    expect(recording.markDownloaded).toHaveBeenCalledOnce();
+
+    act(() => result.current.startOver());
+    expect(recording.clearVisualProcessing).toHaveBeenCalledOnce();
+    expect(result.current.phase).toBe('ready');
+    expect(result.current.selection?.file).toBe(sourceFile);
+    expect(result.current.steps).toEqual([]);
+    expect(result.current.result).toBeNull();
+    expect(result.current.comparison).toBe('original');
+    expect(result.current.completedStepCount).toBe(0);
+    expect(result.current.submittedModels).toEqual(['lucy-2.5']);
+
+    act(() => result.current.addStep('lucy-vton-3'));
+    act(() =>
+      result.current.updateStep(result.current.steps[0]!.id, {
+        prompt: 'Second submission from the retained original',
+      }),
+    );
+    await act(async () => result.current.submitStep(0));
     await waitFor(() => expect(result.current.phase).toBe('complete'));
 
     expect(adapters.submitVideoJob).toHaveBeenCalledTimes(2);
-    expect(recording.completeVisualProcessing).toHaveBeenCalledTimes(2);
+    expect(adapters.submitVideoJob.mock.calls[1]![1]).toMatchObject({
+      modelId: 'lucy-vton-3',
+      prompt: 'Second submission from the retained original',
+    });
     unmount();
   });
 

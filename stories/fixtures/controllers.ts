@@ -144,6 +144,7 @@ export const createRecordingController = (
   completeVisualProcessing: fn(completeVisualProcessing),
   completeProcessing: fn(completeProcessing),
   failProcessing: fn(),
+  clearVisualProcessing: fn(),
   restoreOriginal: fn(),
   ...overrides,
 });

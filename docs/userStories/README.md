@@ -5,20 +5,20 @@ references, not release-readiness claims or future requirements.
 
 ## Journeys
 
-| Flow                                         | Story                                                                                |
-| -------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Choose camera, microphone, and local quality | [Configure capture settings](01-configure-capture-settings.md)                       |
-| Preview and record without provider work     | [Local camera capture](02-local-camera-capture.md)                                   |
-| Run and record Lucy 2.5                      | [Character AI session](03-character-ai-session.md)                                   |
-| Run and record VTON 3                        | [Virtual try-on session](04-virtual-try-on-session.md)                               |
-| Build Add, Replace, or Restyle directions    | [Structured prompt workshop](05-structured-prompt-workshop.md)                       |
-| Save and reuse recipes                       | [Recipe Shelf](06-recipe-shelf.md)                                                   |
-| Review, download, and release a take         | [Take review and cleanup](07-take-review-and-cleanup.md)                             |
-| Apply browser-local voice effects            | [Local voice treatments](08-local-voice-treatments.md)                               |
-| Apply a saved ElevenLabs voice               | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                         |
-| Recover from missing capabilities            | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md)       |
-| Build and preload a reusable character       | [Studio character builder](11-studio-character-builder.md)                           |
-| Upload and process an existing video         | [Existing video and ordered processing](12-existing-video-and-ordered-processing.md) |
+| Flow                                         | Story                                                                                      |
+| -------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Choose camera, microphone, and local quality | [Configure capture settings](01-configure-capture-settings.md)                             |
+| Preview and record without provider work     | [Local camera capture](02-local-camera-capture.md)                                         |
+| Run and record Lucy 2.5                      | [Character AI session](03-character-ai-session.md)                                         |
+| Run and record VTON 3                        | [Virtual try-on session](04-virtual-try-on-session.md)                                     |
+| Build Add, Replace, or Restyle directions    | [Structured prompt workshop](05-structured-prompt-workshop.md)                             |
+| Save and reuse recipes                       | [Recipe Shelf](06-recipe-shelf.md)                                                         |
+| Review, download, and release a take         | [Take review and cleanup](07-take-review-and-cleanup.md)                                   |
+| Apply browser-local voice effects            | [Local voice treatments](08-local-voice-treatments.md)                                     |
+| Apply a saved ElevenLabs voice               | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                               |
+| Recover from missing capabilities            | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md)             |
+| Build and preload a reusable character       | [Studio character builder](11-studio-character-builder.md)                                 |
+| Upload and process an existing video         | [Existing video and single visual processing](12-existing-video-and-ordered-processing.md) |
 
 ## Shared runtime rules
 
@@ -35,8 +35,8 @@ references, not release-readiness claims or future requirements.
 - Studio keeps one mounted media stage and one temporary take pipeline. Its immutable source may
   be recorded or uploaded; presentation selects the voiced, visual, or source layer without
   mounting another player.
-- Each exact batch model may run at most once. A two-step chain stops after the first result and
-  requires explicit Continue before the second Decart submission.
+- An uploaded workflow may run either exact batch model once, never both. The creator may switch
+  the single active model before submission; only the active choice is used.
 - The recording and Decart session limits are independent: each warns at 270 seconds and ends
   through its own safe path at 300 seconds.
 - Recipe metadata is browser-local. Builder reference bytes are immutable local server assets;

@@ -9,7 +9,7 @@ Scope is fixed by the [controlled-pilot contract](CONTROLLED_PILOT_RELEASE_CONTR
 loopback-only, at most five participants, Character primary, VTO beta, touch/mobile required, a
 300-second take maximum, and no provider fallback.
 
-## Phase 0 — Existing-video and ordered-processing acceptance
+## Phase 0 — Existing-video single-processing acceptance
 
 **Objective:** qualify the new first-class upload source and exact-model batch workflow before
 freezing a release candidate.
@@ -21,8 +21,8 @@ Implementation scope:
   720p orientation, and synchronization limits;
 - strict same-origin video-job contracts, a server-only exact-model Decart adapter, one in-memory
   active job, temporary filesystem ownership, and safe errors;
-- zero, one, or two unique visual steps with an explicit intermediate checkpoint and no automatic
-  paid resubmission; and
+- zero or one visual transformation, with Lucy and VTO mutually exclusive and no automatic paid
+  resubmission; and
 - provider-free upload/preview/download plus accessible keyboard/touch configuration in the
   existing persistent stage and overlay system.
 
@@ -72,7 +72,7 @@ This documentation audit did not run the full release suite or registry-backed a
 
 ## Phase 2 — Provider and local qualification
 
-**Objective:** close the ten content-free provider/local rows for the Phase 1 commit.
+**Objective:** close the nine content-free provider/local rows for the Phase 1 commit.
 
 Run the approved procedures in [live provider smoke](LIVE_PROVIDER_SMOKE.md) and record only the
 schema in [qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md).
@@ -84,15 +84,14 @@ Required rows:
 3. Decart `lucy-vton-3`;
 4. Decart batch `lucy-2.5`;
 5. Decart batch `lucy-vton-3`;
-6. Decart ordered chain with Lucy → VTO, VTO → Lucy, intermediate approval, and early finish;
-7. ElevenLabs saved-voice browse, preview, Apply, remux, Download, and original restore;
-8. OpenAI optimization/reference generation;
-9. BFL reference generation as the startup-selected provider; and
-10. Wiro as a separate operator-qualification pass with required cleanup.
+6. ElevenLabs saved-voice browse, preview, Apply, remux, Download, and original restore;
+7. OpenAI optimization/reference generation;
+8. BFL reference generation as the startup-selected provider; and
+9. Wiro as a separate operator-qualification pass with required cleanup.
 
 Acceptance:
 
-- `pnpm pilot:qualification:check --commit <full-sha> --verbose` reports `10/10`;
+- `pnpm pilot:qualification:check --commit <full-sha> --verbose` reports `9/9`;
 - models, settings, access mode, retention, entitlements, billing authorization, and content policy
   match the release contract;
 - every initial billable submission is explicit, has no fallback, and is not automatically
@@ -114,7 +113,7 @@ Follow [Browser support](BROWSER_SUPPORT.md), [Manual QA](MANUAL_QA.md), and the
 Every applicable row must cover:
 
 - permission allow/deny/revoke; local/Character/VTO capture; uploaded-video selection,
-  replacement, local download, batch singles, both ordered chains and checkpoint; and device
+  replacement, local download, mutually exclusive batch Lucy and batch VTO; and device
   replacement;
 - pointer/keyboard or touch recovery, orientation, safe areas, browser chrome, software keyboard,
   200% text, focus, status announcements, and the approved assistive technology;

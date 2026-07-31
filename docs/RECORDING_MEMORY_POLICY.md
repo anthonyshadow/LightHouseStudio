@@ -43,9 +43,9 @@ For every required device/browser row in
    H.264/AAC output codecs.
 2. Complete the required 300-second Local, Character, and VTO paths. Confirm the warning,
    automatic finalization, playable original, responsive controls, and cleanup indicators.
-3. Complete a maximum-size uploaded local path and both ordered visual chains. Measure before
-   submission, at the intermediate checkpoint, after the second result, after local Voice, after
-   ElevenLabs Voice when qualified, and after Release/Discard.
+3. Complete maximum-size uploaded local, Lucy, and VTO paths as separate workflows. Measure before
+   submission, after the visual result, after local Voice, after ElevenLabs Voice when qualified,
+   and after Release/Discard.
 4. Record recorder-settlement, H.264/AAC transcode, and Voice-processing durations plus whether the
    browser evicted, terminated, or materially degraded the tab.
 5. Play every downloaded result outside Studio and verify duration, video, and audio.

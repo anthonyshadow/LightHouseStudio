@@ -35,7 +35,7 @@ The mounted Studio owns focused controllers for:
 
 - local/realtime media and per-mode drafts;
 - recording, review, and voice processing;
-- existing-video selection, local inspection, ordered batch processing, and checkpoint review;
+- existing-video selection, local inspection, and one mutually exclusive batch transformation;
 - Character Builder, Prompt Workshop, and Recipe Shelf handoff;
 - overlays and the data-triggered compatibility project manager.
 
@@ -156,12 +156,15 @@ The finalized or validated source replaces live media on the same persistent sta
 owner creates and revokes every source/visual/voice URL. Changing source invalidates downstream
 layers; restoring Original voice removes only the voice layer and returns to the latest visual.
 Every Voice treatment reads immutable source audio and remuxes it onto `visual ?? source`.
+Existing-video comparison selects the immutable source or visual result for presentation without
+changing artifact ownership. Its source-preserving Start over revokes the visual and optional
+voice layers, retains the source, and returns presentation to that source.
 
 The existing-video controller uses Mediabunny plus browser decode confirmation for an early check.
 The API streams bytes to generated private paths and performs authoritative
 container/track/codec/duration/aspect/size inspection before Decart contact. One app job runs at a
-time. A two-step order submits serially and stops at an explicit intermediate checkpoint before the
-second billable request.
+time. An uploaded workflow can switch its single active choice between Lucy and VTO before
+submission, and only that active model is submitted.
 
 ## Persistence
 
@@ -219,7 +222,7 @@ The creator of a resource owns idempotent cleanup.
 | Session orchestration | Owned local/remote streams, cloned provider input, provider client, token abort, active-session clock                   |
 | Session draft         | Ephemeral files and preview object URLs                                                                                 |
 | Recording/review      | Recorders, chunks, conversion abort, immutable source/sidecar, visual/voice artifact URLs, cap timer, unload protection |
-| Existing-video flow   | Validation generations, ordered ephemeral drafts, provider polling/download, checkpoint consent                         |
+| Existing-video flow   | Validation generations, one ephemeral visual draft, provider polling/download                                           |
 | Voice processing      | Abort controllers, Web Audio/Mediabunny resources, temporary processed URLs                                             |
 | Media stage           | DOM media attachment, metering, control-visibility timer                                                                |
 | Overlay               | Focus/inert/scroll state only; never media                                                                              |

@@ -1,10 +1,9 @@
-# Existing video and ordered processing
+# Existing video and single visual processing
 
 ## Goal
 
-Use a compatible browser-local video as the immutable take source, optionally apply Lucy 2.5,
-VTO 3, or both in an explicit order, then use the existing Voice, review, Download, Release, and
-Discard flow.
+Use a compatible browser-local video as the immutable take source, optionally apply either Lucy
+2.5 or VTO 3, compare the result with the source, then download, start over, or discard.
 
 ## Journey
 
@@ -18,9 +17,11 @@ Discard flow.
    local-only filename, size, duration, resolution, orientation, codec, and audio availability.
    Once a video is selected, backdrop clicks cannot dismiss the panel; the creator must use an
    explicit close action or complete the workflow.
-4. The creator may replace or remove the file, then choose zero, one, or two ordered visual steps.
-   **Swap Character** (Lucy 2.5) and **Virtual Try On** may each appear at most once. Every step owns
-   its prompt, prompt-enhancement switch, and optional validated reference. Saved characters and
+4. The creator may replace or remove the file, then choose zero or one visual transformation:
+   **Swap Character** (Lucy 2.5) or **Virtual Try On**, never both. Both selectors remain available
+   before submission so the creator can switch the single active choice directly. Only the active
+   transformation owns the submitted prompt, prompt-enhancement switch, and optional validated
+   reference. Saved characters and
    outfits open in a keyboard-operable custom chooser with an optional local thumbnail, recipe
    name, and a two-line prompt summary. The saved-character chooser ends with
    **Create A Character**. That action opens Character Builder; a successful save returns to this
@@ -28,17 +29,20 @@ Discard flow.
    Character step. An attached reference renders a local preview with replace and remove actions.
    Explicitly closing the panel retains the tab-local selection and plan; an **Edit video** action
    in the recorded-take controls reopens the same workflow.
-5. Review shows the exact order and planned Decart submission count. Zero steps finishes locally.
-   A visual submission requires compatible server inspection, exact model availability, provider
-   disclosure, and explicit action.
+5. Review shows the selected model and one planned Decart submission. No visual transformation
+   finishes locally. A visual submission requires compatible server inspection, exact model
+   availability, provider disclosure, and explicit action.
 6. Studio uploads one job, displays truthful app-owned stages and elapsed time, retrieves a
    size-bounded inspected 720p result, and restores the immutable source audio.
-7. A two-step workflow stops at an intermediate Original/Result comparison. **Finish here** keeps
-   the first result; **Continue** is the only action that creates the second billable submission.
-8. The creator may apply Voice from Latest Take. Voice always uses immutable source audio and
-   applies it to the latest visual layer. **Restore Original voice** removes only the voice layer.
-9. Download uses the existing review handoff. Release or confirmed Discard revokes every owned
-   object URL and asks the server to release terminal temporary job state.
+7. At **Result ready**, **Original** presents the immutable upload and **Result** presents the
+   generated visual on the same shared stage. Neither comparison action deletes or replaces an
+   artifact. **Download** directly downloads the generated visual result.
+8. **Start over** revokes generated visual and voice URLs, retains and presents the uploaded
+   original, clears the selected transformation, and returns to **Visual plan**. It does not reset
+   the moderated participant submission counters. The creator can choose either model again.
+9. Confirmed **Discard video** revokes the uploaded source and all generated results and returns
+   the open panel to **Choose an existing video**. The ordinary Latest Take controls remain
+   available after explicitly closing the upload panel.
 
 ## Validation and failure behavior
 
@@ -51,8 +55,8 @@ Discard flow.
   silently transcodes or invents an input-resolution ceiling.
 - A result must be 1280×720 or 720×1280, preserve orientation, stay under 300,000,000 bytes, and
   remain within 500 ms of source duration before it can become authoritative.
-- Failure before the first visual result preserves the source and drafts. Failure during the
-  second step preserves the first result. Voice failure preserves the last visual/source layer.
+- Visual failure preserves the source and selected draft. Voice failure preserves the last
+  visual/source layer.
 - Retrying status, content retrieval, inspection, or audio composition reuses the accepted job.
   Retrying a provider submission is a new explicit potentially billable action.
 - If an accepted job's status or content request is interrupted, prompt, reference, enhancement,
@@ -70,14 +74,14 @@ server stores generated paths and safe job state only while validating, submitti
 retrieving; it never persists prompts or original filenames. Cleanup is local and does not claim
 provider cancellation or provider-side deletion.
 
-The UI reports one or two submissions, not credits or currency. The controlled pilot allows four
-batch submissions per participant, at most two for either exact model; a two-step chain consumes
-two.
+The UI reports one planned submission, not credits or currency. The controlled pilot allows four
+batch submissions per participant, at most two for either exact model.
 
 ## Evidence boundary
 
 Automated tests use deterministic local media and fake provider responses. They prove contract,
-single-submission, ordering, checkpoint, failure preservation, and cleanup behavior, but not live
-model entitlement/output, real mobile pickers, H.264 MOV interoperability, five-minute memory, or
-physical downloads. Those remain gates in
+mutual exclusion, single submission, source/result stage comparison, result-download initiation,
+source-preserving Start over, responsive controls, failure preservation, and cleanup behavior, but
+not live model entitlement/output, real mobile pickers, H.264 MOV interoperability, five-minute
+memory, or physical downloads. Those remain gates in
 [Manual QA](../MANUAL_QA.md) and [Live provider smoke](../LIVE_PROVIDER_SMOKE.md).

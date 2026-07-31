@@ -18,7 +18,7 @@ This document separates current runtime behavior from the approved pilot operati
 | Camera/microphone streams                                                     | Browser memory while live                                                                                   | None in Local; Decart during explicit AI session                                                  |
 | Decart client credential/timing                                               | Browser memory for the connection/session                                                                   | Decart connection only                                                                            |
 | Current converted original take, sidecar, processed result                    | Browser memory until Release/Discard/reload/crash/close; raw recorder input exists only during finalization | Sidecar only after explicit ElevenLabs Apply                                                      |
-| Uploaded video, ordered recipes, visual results, checkpoint state             | Browser tab memory until replacement, Release/Discard, reload/crash/close                                   | Decart receives synthetic-named media and recipe only after explicit submit                       |
+| Uploaded video, one selected visual recipe, visual result                     | Browser tab memory until replacement, Release/Discard, reload/crash/close                                   | Decart receives synthetic-named media and recipe only after explicit submit                       |
 | Active batch input/reference/output                                           | Generated private paths under `LIGHTFRAME_DATA_DIR/.tmp/video-jobs`; process-temporary, 60-minute cap       | Decart during explicit submit/status/content; no provider cancellation or deletion is claimed     |
 | Saved-voice pages/selection                                                   | React memory                                                                                                | ElevenLabs metadata after explicit Browse                                                         |
 | Voice preview audio                                                           | Bounded, short-lived Blob URL; revoked on replacement/unmount                                               | ElevenLabs preview request; never the take                                                        |
@@ -57,7 +57,10 @@ the optional AAC WASM encoder entirely on the device. Local Voice uses Web Audio
 ## Current retention and deletion
 
 - Studio owns one temporary take. Download starts a browser download but does not prove completion.
-  Release or confirmed Discard revokes take URLs and returns to idle.
+  Release or confirmed Discard revokes take URLs and returns to idle. A completed uploaded-video
+  workflow downloads its generated result directly. **Start over** revokes generated visual/voice
+  URLs but retains the uploaded source; confirmed **Discard video** releases the source and results
+  and returns to the local upload picker.
 - A take survives overlay closure, but not reload, crash, tab closure, or device restart.
 - Uploaded workflow/job recovery is intentionally unsupported across reload, crash, tab closure, or
   broker restart. The broker purges its dedicated job temp root at startup and expires jobs after

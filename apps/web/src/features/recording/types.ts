@@ -148,6 +148,7 @@ export type RecordingController = {
   completeVisualProcessing: (blob: Blob, mimeType: string, label: string) => RecordingArtifact;
   completeProcessing: (blob: Blob, mimeType: string, label: string) => RecordingArtifact;
   failProcessing: (message: string) => void;
+  clearVisualProcessing: () => void;
   restoreOriginal: () => void;
 };
 

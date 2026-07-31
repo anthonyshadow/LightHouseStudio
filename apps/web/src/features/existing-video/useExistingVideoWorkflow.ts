@@ -6,7 +6,7 @@ import {
 import {
   canSubmitPilotBatchJob,
   validateUploadedVideoFacts,
-  validateVideoTransformOrder,
+  validateVideoTransformPlan,
 } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -40,7 +40,6 @@ export type ExistingVideoWorkflowPhase =
   | 'processing'
   | 'retrieving'
   | 'finalizing'
-  | 'checkpoint'
   | 'complete'
   | 'error';
 
@@ -182,8 +181,7 @@ export const useExistingVideoWorkflow = ({
 
   const addStep = useCallback(
     (modelId: VideoTransformModelId) => {
-      if (acceptedSubmission || steps.some((step) => step.modelId === modelId) || steps.length >= 2)
-        return;
+      if (acceptedSubmission) return;
       if (
         selection &&
         modelId === 'lucy-vton-3' &&
@@ -194,20 +192,23 @@ export const useExistingVideoWorkflow = ({
         setMessage('Videos used with Virtual Try-On must be 200 MB or smaller.');
         return;
       }
-      setSteps((current) => [
-        ...current,
-        {
-          id: crypto.randomUUID(),
-          modelId,
-          savedRecipeId: null,
-          prompt: '',
-          enhancePrompt: false,
-          referenceImage: null,
-        },
-      ]);
+      setSteps((current) =>
+        current[0]?.modelId === modelId
+          ? current
+          : [
+              {
+                id: crypto.randomUUID(),
+                modelId,
+                savedRecipeId: null,
+                prompt: '',
+                enhancePrompt: false,
+                referenceImage: null,
+              },
+            ],
+      );
       setMessage(null);
     },
-    [acceptedSubmission, selection, steps],
+    [acceptedSubmission, selection],
   );
 
   const updateStep = useCallback(
@@ -222,22 +223,6 @@ export const useExistingVideoWorkflow = ({
     (id: string) => {
       if (acceptedSubmission) return;
       setSteps((current) => current.filter((step) => step.id !== id));
-    },
-    [acceptedSubmission],
-  );
-
-  const moveStep = useCallback(
-    (index: number, direction: -1 | 1) => {
-      if (acceptedSubmission) return;
-      setSteps((current) => {
-        const target = index + direction;
-        if (target < 0 || target >= current.length) return current;
-        const reordered = [...current];
-        const [step] = reordered.splice(index, 1);
-        if (!step) return current;
-        reordered.splice(target, 0, step);
-        return reordered;
-      });
     },
     [acceptedSubmission],
   );
@@ -306,12 +291,8 @@ export const useExistingVideoWorkflow = ({
       const nextCompleted = stepIndex + 1;
       setCompletedStepCount(nextCompleted);
       setAcceptedSubmission(false);
-      setPhase(nextCompleted < steps.length ? 'checkpoint' : 'complete');
-      setMessage(
-        nextCompleted < steps.length
-          ? 'Review the intermediate result. Continuing creates 1 additional Decart submission.'
-          : 'Visual processing is complete. Voice remains optional and always uses source audio.',
-      );
+      setPhase('complete');
+      setMessage('Visual processing is complete. The result is ready to compare and download.');
     },
     [recording, selection, steps],
   );
@@ -381,15 +362,15 @@ export const useExistingVideoWorkflow = ({
       const source = recording.visual?.media ?? recording.original?.media;
       const step = steps[stepIndex];
       if (!selection || !source || !step || acceptedSubmission) return;
-      const orderIssues = validateVideoTransformOrder(
+      const planIssues = validateVideoTransformPlan(
         steps.map((candidate) => ({
           ...candidate,
           hasReferenceImage: candidate.referenceImage !== null,
         })),
       );
-      if (orderIssues[0]) {
+      if (planIssues[0]) {
         setPhase('error');
-        setMessage(orderIssues[0]);
+        setMessage(planIssues[0]);
         return;
       }
       if (!canSubmitPilotBatchJob(submittedModels, step.modelId)) {
@@ -517,16 +498,21 @@ export const useExistingVideoWorkflow = ({
     }
   }, [clearOperation, pollAndFinalize, recording, retryJob]);
 
-  const finishAtCheckpoint = useCallback(() => {
-    if (phase !== 'checkpoint') return;
-    setPhase('complete');
-    setMessage('Finished with the first visual result. Voice remains optional.');
-  }, [phase]);
-
   const cancelBeforeAcceptance = useCallback(() => {
     if (acceptedSubmission) return;
     controllerRef.current?.abort();
   }, [acceptedSubmission]);
+
+  const startOver = useCallback(() => {
+    if (!selection || phase !== 'complete') return;
+    clearOperation();
+    recording.clearVisualProcessing();
+    setSteps([]);
+    setPhase('ready');
+    setMessage(selection.audioUnavailableReason);
+    setCompletedStepCount(0);
+    setComparison('original');
+  }, [clearOperation, phase, recording, selection]);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 
@@ -560,21 +546,22 @@ export const useExistingVideoWorkflow = ({
       acceptedSubmission,
       pendingVisual,
       retryJob,
+      result: recording.visual,
       comparison,
       elapsedSeconds,
       active: ['validating', 'uploading', 'processing', 'retrieving', 'finalizing'].includes(phase),
-      providerActive: acceptedSubmission && !['checkpoint', 'complete'].includes(phase),
+      providerActive: acceptedSubmission && phase !== 'complete',
       selectFile,
       addStep,
       updateStep,
       removeStep,
-      moveStep,
       submitStep,
       retryFinalization,
       retryExistingJob,
-      finishAtCheckpoint,
       cancelBeforeAcceptance,
+      downloadResult: recording.markDownloaded,
       reset,
+      startOver,
       showOriginal: () => setComparison('original'),
       showResult: () => setComparison('result'),
     }),
@@ -585,15 +572,16 @@ export const useExistingVideoWorkflow = ({
       completedStepCount,
       comparison,
       elapsedSeconds,
-      finishAtCheckpoint,
       message,
-      moveStep,
       pendingVisual,
       retryExistingJob,
       retryJob,
       phase,
+      recording.markDownloaded,
+      recording.visual,
       removeStep,
       reset,
+      startOver,
       retryFinalization,
       selectFile,
       selection,

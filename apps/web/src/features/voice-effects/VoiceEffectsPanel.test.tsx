@@ -74,6 +74,7 @@ const createRecording = (
     completeVisualProcessing: vi.fn().mockReturnValue(original),
     completeProcessing: vi.fn().mockReturnValue(original),
     failProcessing: vi.fn(),
+    clearVisualProcessing: vi.fn(),
     restoreOriginal: vi.fn(),
   };
 };

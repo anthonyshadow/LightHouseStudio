@@ -364,8 +364,12 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     setup: async (page) => {
       const { dialog } = await selectVisualVideo(page);
       await addVisualStep(dialog, 'lucy-2.5', 'Transform into a documentary field presenter.');
-      await addVisualStep(dialog, 'lucy-vton-3', 'Apply the tailored amber field jacket.');
-      await expect(dialog).toContainText('2 planned Decart submissions');
+      await expect(dialog).toContainText('1 planned Decart submission');
+      await expect(dialog.getByRole('button', { name: 'Swap Character' })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
+      await expect(dialog.getByRole('button', { name: 'Virtual Try On' })).toBeEnabled();
     },
   },
   'upload-processing': {
@@ -374,21 +378,8 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       const { dialog, fixture } = await selectVisualVideo(page);
       await installFakeVideoJobRoutes(page, fixture, { processingReadsBeforeReady: 100 });
       await addVisualStep(dialog, 'lucy-2.5', 'Transform into a documentary field presenter.');
-      await dialog.getByRole('button', { name: 'Start first · 1 planned submission' }).click();
+      await dialog.getByRole('button', { name: 'Start · 1 Decart submission' }).click();
       await expect(dialog.getByText(/Stage: processing/u)).toBeVisible();
-    },
-  },
-  'upload-checkpoint': {
-    id: 'upload-checkpoint',
-    setup: async (page) => {
-      const { dialog, fixture } = await selectVisualVideo(page);
-      await installFakeVideoJobRoutes(page, fixture);
-      await addVisualStep(dialog, 'lucy-2.5', 'Transform into a documentary field presenter.');
-      await addVisualStep(dialog, 'lucy-vton-3', 'Apply the tailored amber field jacket.');
-      await dialog.getByRole('button', { name: 'Start first · 2 planned submissions' }).click();
-      await expect(
-        dialog.getByRole('heading', { name: 'Review the intermediate result' }),
-      ).toBeVisible();
     },
   },
   'upload-result': {
@@ -397,7 +388,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       const { dialog, fixture } = await selectVisualVideo(page);
       await installFakeVideoJobRoutes(page, fixture);
       await addVisualStep(dialog, 'lucy-2.5', 'Transform into a documentary field presenter.');
-      await dialog.getByRole('button', { name: 'Start first · 1 planned submission' }).click();
+      await dialog.getByRole('button', { name: 'Start · 1 Decart submission' }).click();
       await expect(dialog.getByRole('heading', { name: 'Result ready' })).toBeVisible();
     },
   },

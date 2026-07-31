@@ -3,6 +3,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
+import type { RecordingArtifact } from '../recording/types';
 import { ExistingVideoPanel } from './ExistingVideoPanel';
 import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
 
@@ -28,6 +29,7 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   acceptedSubmission: false,
   pendingVisual: null,
   retryJob: null,
+  result: null,
   comparison: 'result',
   elapsedSeconds: 0,
   active: false,
@@ -36,17 +38,32 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   addStep: vi.fn(),
   updateStep: vi.fn(),
   removeStep: vi.fn(),
-  moveStep: vi.fn(),
   submitStep: vi.fn(),
   retryFinalization: vi.fn(),
   retryExistingJob: vi.fn(),
-  finishAtCheckpoint: vi.fn(),
   cancelBeforeAcceptance: vi.fn(),
+  downloadResult: vi.fn(),
   reset: vi.fn(),
+  startOver: vi.fn(),
   showOriginal: vi.fn(),
   showResult: vi.fn(),
   ...overrides,
 });
+
+const resultArtifact = (): RecordingArtifact => {
+  const media = new Blob(['generated'], { type: 'video/mp4' });
+  return {
+    id: 'generated-result',
+    media,
+    objectUrl: 'blob:generated-result',
+    mimeType: media.type,
+    filename: 'source-lucy-1.mp4',
+    sourceModeId: 'local',
+    startedAt: '2026-07-30T12:00:00.000Z',
+    durationMs: 30_000,
+    sizeBytes: media.size,
+  };
+};
 
 beforeEach(() => {
   api.hydrateReferenceImage.mockReset();
@@ -94,9 +111,8 @@ describe('ExistingVideoPanel', () => {
     expect(screen.queryByText(/Decart submission/u)).not.toBeInTheDocument();
   });
 
-  it('shows metadata, explicit ordering controls, and the exact request count', () => {
+  it('shows metadata and keeps the visual choices mutually exclusive', () => {
     const addStep = vi.fn();
-    const moveStep = vi.fn();
     const source = new File(['video'], 'a very long local source name.mp4', {
       type: 'video/mp4',
     });
@@ -130,18 +146,9 @@ describe('ExistingVideoPanel', () => {
           enhancePrompt: false,
           referenceImage: null,
         },
-        {
-          id: 'vto',
-          modelId: 'lucy-vton-3',
-          savedRecipeId: null,
-          prompt: 'Apply the jacket',
-          enhancePrompt: false,
-          referenceImage: null,
-        },
       ],
       phase: 'ready',
       addStep,
-      moveStep,
     });
     render(
       <StudioDesignProvider>
@@ -152,14 +159,21 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByText(source.name)).toHaveAttribute('title', source.name);
     expect(screen.getByLabelText(`Video preview for ${source.name}`)).toBeVisible();
     expect(screen.getByText('1920 × 1080')).toBeInTheDocument();
-    expect(screen.getByText(/2 planned Decart submissions/u)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Swap Character' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeDisabled();
-    fireEvent.click(screen.getAllByRole('button', { name: 'Move down' })[0]!);
-    expect(moveStep).toHaveBeenCalledWith(0, 1);
-    expect(
-      screen.getByRole('button', { name: 'Start first · 2 planned submissions' }),
-    ).toBeEnabled();
+    expect(screen.getByText(/1 planned Decart submission: Swap Character/u)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Swap Character' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Virtual Try On' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Virtual Try On' }));
+    expect(addStep).toHaveBeenCalledWith('lucy-vton-3');
+    expect(screen.queryByRole('button', { name: 'Move up' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Move down' })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Start · 1 Decart submission' })).toBeEnabled();
   });
 
   it('shows image-rich saved characters with clamped prompt copy and applies the selected item', async () => {
@@ -429,5 +443,66 @@ describe('ExistingVideoPanel', () => {
       screen.getByRole('button', { name: 'Resume accepted job · no new submission' }),
     ).toBeEnabled();
     expect(screen.getByText(/checks and downloads the original accepted recipe/u)).toBeVisible();
+  });
+
+  it('downloads the result, starts over with the source, or discards the completed video', () => {
+    const reset = vi.fn();
+    const startOver = vi.fn();
+    const downloadResult = vi.fn();
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
+    const source = new File(['video'], 'completed-source.mp4', { type: 'video/mp4' });
+
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: null,
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-07-30T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: null,
+                durationMs: 30_000,
+                width: 1_280,
+                height: 720,
+                sizeBytes: source.size,
+                hasAudio: false,
+              },
+            },
+            phase: 'complete',
+            result: resultArtifact(),
+            startOver,
+            downloadResult,
+            reset,
+          })}
+          videoProcessingAvailable
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const download = screen.getByRole('link', { name: 'Download' });
+    expect(download).toHaveAttribute('href', 'blob:generated-result');
+    expect(download).toHaveAttribute('download', 'source-lucy-1.mp4');
+    fireEvent.click(download);
+    expect(downloadResult).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: /Review Voice/u })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Start over' }));
+    expect(startOver).toHaveBeenCalledOnce();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Discard video' }));
+
+    expect(confirm).toHaveBeenCalledWith(
+      'Discard this uploaded video and its results? They cannot be recovered after this tab releases them.',
+    );
+    expect(reset).toHaveBeenCalledWith(true);
   });
 });

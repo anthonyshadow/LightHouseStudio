@@ -56,9 +56,9 @@ describe('pilot qualification evidence', () => {
     const manifest = JSON.parse(await readFile(MANIFEST_PATH, 'utf8'));
     const requirements = expandQualificationRequirements(manifest);
 
-    expect(requirements.filter(({ kind }) => kind === 'provider')).toHaveLength(10);
+    expect(requirements.filter(({ kind }) => kind === 'provider')).toHaveLength(9);
     expect(requirements.filter(({ kind }) => kind === 'physical')).toHaveLength(45);
-    expect(new Set(requirements.map(({ key }) => key)).size).toBe(55);
+    expect(new Set(requirements.map(({ key }) => key)).size).toBe(54);
   });
 
   it('accepts only the exact content-free fields and app-owned configuration', async () => {
@@ -113,7 +113,7 @@ describe('pilot qualification evidence', () => {
     });
 
     expect(partial.errors).toEqual([]);
-    expect(partial.provider).toEqual({ covered: 1, total: 10 });
+    expect(partial.provider).toEqual({ covered: 1, total: 9 });
     expect(partial.physical).toEqual({ covered: 0, total: 45 });
     expect(partial.complete).toBe(false);
 

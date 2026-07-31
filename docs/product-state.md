@@ -43,14 +43,14 @@ required, but no physical target is qualified yet.
   registered routes; every other path returns to entry. Detected legacy projects remain
   compatibility-only downloads/deletions within Studio and have no URL entry.
 - One persistent stage owns local/AI preview, uploaded-video preview, recording, finalization,
-  intermediate comparison, and take playback. Shared overlays never own a second media session.
+  result comparison, and take playback. Shared overlays never own a second media session.
 - Capture supports device choice, browser-exposed camera switching, and capability-gated zoom.
 - Character Builder supports prompt-only, direct upload, image-only, generated, and combined
   references with recoverable draft/save state.
 - Recipe Shelf stores sanitized, versioned browser metadata and opaque reference relationships.
 - Character uses exact `lucy-2.5`; VTO uses pinned `lucy-vton-3`.
-- Existing H.264 MP4/MOV and VP8 WebM sources can stay local or run one ordered instance of each
-  exact Decart batch model. A two-step chain requires explicit intermediate approval.
+- Existing H.264 MP4/MOV and VP8 WebM sources can stay local or run exactly one selected Decart
+  batch model. Swap Character and VTO are mutually exclusive within an uploaded workflow.
 - OpenAI, BFL, and Wiro are separate startup-selected image-provider passes with no fallback.
   Participant mode disables Wiro.
 - Recording owns an accessible warning at 270 seconds and coalesced Stop/finalize at 300 seconds.
@@ -88,7 +88,7 @@ ElevenLabs output, responsive/reflow behavior, and provider-free network denial.
 That is not release qualification. At this audit, the repository contains no completed evidence
 records; the validator reports:
 
-- provider/local requirements: **0/10**;
+- provider/local requirements: **0/9**;
 - physical target/browser requirements: **0/45**.
 
 The remaining release gates are:
@@ -96,8 +96,8 @@ The remaining release gates are:
 1. run the exact-candidate quality, coverage, E2E, production, visual, and audit gates;
 2. qualify all 45 physical rows, including touch, accessibility, safe areas, real media, the
    300-second take, memory, interruption, processing, download, and cleanup;
-3. qualify Local no-key plus live and batch Lucy 2.5, live and batch VTO 3, both ordered batch
-   chains, ElevenLabs, OpenAI, BFL, and operator-only Wiro under the approved accounts/settings;
+3. qualify Local no-key plus live and batch Lucy 2.5, live and batch VTO 3, ElevenLabs, OpenAI,
+   BFL, and operator-only Wiro under the approved accounts/settings;
 4. run the isolation/retirement procedure for every real participant environment; and
 5. record moderated comprehension and value evidence without collecting content.
 

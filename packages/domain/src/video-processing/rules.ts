@@ -73,15 +73,11 @@ export const validateUploadedVideoFacts = (
   return issues;
 };
 
-export const validateVideoTransformOrder = (
+export const validateVideoTransformPlan = (
   steps: readonly VideoTransformStep[],
 ): readonly string[] => {
   const issues: string[] = [];
-  if (steps.length > 2) issues.push('Choose at most two visual transformations.');
-  const modelIds = steps.map((step) => step.modelId);
-  if (new Set(modelIds).size !== modelIds.length) {
-    issues.push('Each visual model can be used at most once.');
-  }
+  if (steps.length > 1) issues.push('Choose only one visual transformation.');
   for (const step of steps) {
     if (!step.prompt.trim() && !step.hasReferenceImage) {
       issues.push(

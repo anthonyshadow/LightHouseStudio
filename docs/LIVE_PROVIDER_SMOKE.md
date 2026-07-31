@@ -1,7 +1,7 @@
 # Gated live provider smoke
 
 Live checks are manual, opt-in, cost-bearing, and excluded from normal test/quality commands.
-Current repository evidence is `0/10`; no provider/local row is qualified.
+Current repository evidence is `0/9`; no provider/local row is qualified.
 
 Use only authorized, least-privilege test credentials, non-sensitive disposable media, understood
 account retention/quota, and an approved spend. Never run this procedure in CI, Storybook,
@@ -27,18 +27,17 @@ provider bodies, signed/polling URLs, personal media, or full network archives.
 
 ## Required configurations
 
-| Requirement        | Exact configuration                                                           |
-| ------------------ | ----------------------------------------------------------------------------- |
-| Local              | No provider credentials                                                       |
-| Decart Character   | SDK `0.1.17`, exact `lucy-2.5`, 300-second session                            |
-| Decart VTO         | SDK `0.1.17`, exact `lucy-vton-3`, 300-second session                         |
-| Decart batch Lucy  | Queue HTTP, exact `lucy-2.5`, fixed `720p`, 300-second input                  |
-| Decart batch VTO   | Queue HTTP, exact `lucy-vton-3`, fixed `720p`, 300-second input               |
-| Decart batch chain | Lucy → VTO and VTO → Lucy with intermediate approval                          |
-| ElevenLabs         | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false` |
-| OpenAI image       | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                      |
-| BFL image          | `flux-2-pro`, safety `2`, prompt upsampling off                               |
-| Wiro image         | `seedream-v5-lite-uncensored`, 2k, watermark off, operator qualification      |
+| Requirement       | Exact configuration                                                           |
+| ----------------- | ----------------------------------------------------------------------------- |
+| Local             | No provider credentials                                                       |
+| Decart Character  | SDK `0.1.17`, exact `lucy-2.5`, 300-second session                            |
+| Decart VTO        | SDK `0.1.17`, exact `lucy-vton-3`, 300-second session                         |
+| Decart batch Lucy | Queue HTTP, exact `lucy-2.5`, fixed `720p`, 300-second input                  |
+| Decart batch VTO  | Queue HTTP, exact `lucy-vton-3`, fixed `720p`, 300-second input               |
+| ElevenLabs        | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false` |
+| OpenAI image      | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                      |
+| BFL image         | `flux-2-pro`, safety `2`, prompt upsampling off                               |
+| Wiro image        | `seedream-v5-lite-uncensored`, 2k, watermark off, operator qualification      |
 
 Reference image providers require three separate server startups; there is no fallback.
 
@@ -118,13 +117,11 @@ For each exact batch model:
 7. Release terminal state and inspect the dedicated temporary root. Local cleanup must complete
    without claiming provider cancellation or provider-side deletion.
 
-For the ordered-chain row, run Lucy → VTO and VTO → Lucy. After step one, verify the intermediate
-Original/Result comparison and use **Finish here** once. In a separate pass, choose **Continue** and
-confirm only that explicit action starts the second submission. Force a second-stage failure and
-verify the first visual result, source audio, recipes, and local Voice/Download remain usable.
+Confirm that Lucy and VTO remain available as a mutually exclusive selector before submission.
+Switch in both directions and verify there is still only one active recipe and one submitted model.
 
-Do not exceed four participant batch submissions or two submissions for either model. A two-step
-chain consumes two. Broker restart, 60-minute expiry, ambiguous responses, unavailable
+Do not exceed four participant batch submissions or two submissions for either model. Broker
+restart, 60-minute expiry, ambiguous responses, unavailable
 credentials, and background/foreground recovery must fail safely without automatic resubmission.
 
 Decart documents submit/poll/content retrieval but no qualified cancellation operation for this

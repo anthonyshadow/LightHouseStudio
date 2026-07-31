@@ -29,9 +29,8 @@ automated, physical-device, accessibility, memory, cleanup, and live-provider ev
 The exact executable matrix is
 [`qualification/required-matrix.json`](qualification/required-matrix.json):
 
-- `10` provider/local requirements: no-key Local; realtime Decart Character and VTO; batch
-  `lucy-2.5`; batch `lucy-vton-3`; the ordered batch chain in both orders with its intermediate
-  checkpoint; ElevenLabs; OpenAI; BFL; and operator-only Wiro.
+- `9` provider/local requirements: no-key Local; realtime Decart Character and VTO; batch
+  `lucy-2.5`; batch `lucy-vton-3`; ElevenLabs; OpenAI; BFL; and operator-only Wiro.
 - `45` physical device/browser rows across one desktop, Apple/Android phones, and
   Apple/Android tablets.
 
@@ -97,12 +96,10 @@ The two clocks are independent even though they share a number.
 - The accepted pilot subset is MP4 or MOV with H.264 and WebM with VP8, at 16:9 or 9:16, no
   longer than 300 seconds. Local/Lucy-only input is at most 300,000,000 bytes; any VTO workflow is
   at most 200,000,000 bytes.
-- A workflow uses each batch model at most once. The only two-step orders are Lucy → VTO and VTO →
-  Lucy.
-- A two-step workflow stops after the first inspected 720p result. Only an explicit Continue
-  creates the second billable submission; Finish here proceeds with the valid intermediate.
-- The UI reports one or two planned Decart submissions, never fabricated percentages or
-  hard-coded credit/currency pricing.
+- A workflow may select Lucy or VTO as its single active batch transformation, never both. The
+  creator may switch the active choice before submission; only the active model is submitted.
+- The UI reports one planned Decart submission, never fabricated percentages or hard-coded
+  credit/currency pricing.
 - Visual results must retain orientation, differ from source duration by no more than 500 ms, and
   restore immutable source audio before promotion. ElevenLabs receives source audio only.
 - Upload, recipes, app jobs, inputs, results, and recovery are tab/process-temporary. Refresh,
@@ -181,7 +178,7 @@ One person may hold several roles, but every live pass records the authorizing/w
 Limits per participant:
 
 - 30 cumulative connected Decart minutes across Character and VTO;
-- 4 Decart batch submissions, at most 2 for either exact batch model; a two-step chain consumes 2;
+- 4 Decart batch submissions, at most 2 for either exact batch model;
 - 10 image generation/edit/composition submissions across all separately selected provider passes;
 - 3 ElevenLabs conversions;
 - stop a provider path after two requests that may have incurred cost; and
@@ -206,6 +203,6 @@ exposure, isolation doubt, or cleanup failure:
 5. resume only after the responsible role records a safe disposition.
 
 Pilot release remains blocked until the normal release commands pass and the exact candidate has
-`10/10` provider/local plus `45/45` physical rows, complete accessibility/memory/cleanup evidence,
+`9/9` provider/local plus `45/45` physical rows, complete accessibility/memory/cleanup evidence,
 and a passed retirement record for every participant. Accounts, cloud ownership/portability,
 billing, public sharing, and remote operations remain deferred.

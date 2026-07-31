@@ -120,6 +120,18 @@ export const useRecordingArtifacts = () => {
     setDownloaded(false);
   }, []);
 
+  const clearVisualProcessing = useCallback(() => {
+    revokeArtifactUrl(visualRef.current, 'replacement');
+    revokeArtifactUrl(processedRef.current, 'replacement');
+    visualRef.current = null;
+    processedRef.current = null;
+    setVisual(null);
+    setProcessed(null);
+    setProcessingState('idle');
+    setProcessingError(null);
+    setDownloaded(false);
+  }, []);
+
   const markSidecarRecording = useCallback((started: boolean, error: string | null) => {
     setSidecar(
       started
@@ -193,6 +205,7 @@ export const useRecordingArtifacts = () => {
       completeVisualProcessing,
       completeProcessing,
       failProcessing,
+      clearVisualProcessing,
       restoreOriginal,
     }),
     [
@@ -217,6 +230,7 @@ export const useRecordingArtifacts = () => {
       completeVisualProcessing,
       completeProcessing,
       failProcessing,
+      clearVisualProcessing,
       restoreOriginal,
     ],
   );

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   canSubmitPilotBatchJob,
   validateUploadedVideoFacts,
-  validateVideoTransformOrder,
+  validateVideoTransformPlan,
   type UploadedVideoFacts,
   type VideoTransformStep,
 } from '.';
@@ -18,11 +18,8 @@ const video = (overrides: Partial<UploadedVideoFacts> = {}): UploadedVideoFacts 
   ...overrides,
 });
 
-const step = (
-  modelId: VideoTransformStep['modelId'],
-  id: string = modelId,
-): VideoTransformStep => ({
-  id,
+const step = (modelId: VideoTransformStep['modelId']): VideoTransformStep => ({
+  id: modelId,
   modelId,
   prompt: 'Transform the subject',
   hasReferenceImage: false,
@@ -34,9 +31,8 @@ describe('uploaded video policy', () => {
     expect(validateUploadedVideoFacts(video(), [step('lucy-2.5')])).toEqual([]);
   });
 
-  it('uses the lower VTO size limit anywhere in the selected order', () => {
+  it('uses the lower size limit for a selected VTO transformation', () => {
     const issues = validateUploadedVideoFacts(video({ sizeBytes: 200_000_001 }), [
-      step('lucy-2.5'),
       step('lucy-vton-3'),
     ]);
     expect(issues).toHaveLength(1);
@@ -57,16 +53,18 @@ describe('uploaded video policy', () => {
   });
 });
 
-describe('ordered visual policy', () => {
-  it('allows either two-model order', () => {
-    expect(validateVideoTransformOrder([step('lucy-2.5'), step('lucy-vton-3')])).toEqual([]);
-    expect(validateVideoTransformOrder([step('lucy-vton-3'), step('lucy-2.5')])).toEqual([]);
+describe('single visual policy', () => {
+  it('allows either model by itself and rejects using both together', () => {
+    expect(validateVideoTransformPlan([step('lucy-2.5')])).toEqual([]);
+    expect(validateVideoTransformPlan([step('lucy-vton-3')])).toEqual([]);
+    expect(validateVideoTransformPlan([step('lucy-2.5'), step('lucy-vton-3')])).toEqual([
+      'Choose only one visual transformation.',
+    ]);
   });
 
-  it('rejects duplicates and empty recipes', () => {
-    const empty = { ...step('lucy-2.5', 'empty'), prompt: '' };
-    expect(validateVideoTransformOrder([step('lucy-2.5'), empty])).toEqual([
-      'Each visual model can be used at most once.',
+  it('rejects an empty recipe', () => {
+    const empty = { ...step('lucy-2.5'), prompt: '' };
+    expect(validateVideoTransformPlan([empty])).toEqual([
       'Character needs a prompt, reference image, or both.',
     ]);
   });

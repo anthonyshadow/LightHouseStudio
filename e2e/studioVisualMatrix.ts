@@ -71,10 +71,6 @@ export const FOCUSED_VISUAL_SCENARIOS = [
     baseline: '07-existing-video/processing.png',
   },
   {
-    id: 'upload-checkpoint',
-    baseline: '07-existing-video/checkpoint.png',
-  },
-  {
     id: 'upload-result',
     baseline: '07-existing-video/result.png',
   },
@@ -123,8 +119,7 @@ export const VISUAL_CASE_MATRIX = [
   { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[5] },
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[6] },
   { viewport: compactViewport, scenario: FOCUSED_VISUAL_SCENARIOS[7] },
-  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[8] },
-  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[9] },
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[8] },
   ...DESKTOP_VISUAL_SCENARIOS.map((scenario) => ({ viewport: desktopViewport, scenario })),
   ...SMALL_MOBILE_VISUAL_SCENARIOS.map((scenario) => ({
     viewport: smallMobileViewport,

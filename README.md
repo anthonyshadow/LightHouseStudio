@@ -29,9 +29,11 @@ claim that qualification has passed.
 3. For camera, optionally choose Character/VTO, start AI, and Record. Studio warns at 270 seconds,
    automatically stops at 300 seconds, then transcodes the settled recording on the device to an
    H.264/AAC MP4 before review or Download becomes available.
-4. For upload, choose zero, one, or two ordered Lucy/VTO steps. Each exact model appears at most
-   once; a two-step order pauses for explicit approval after the first result.
-5. Review playback on the same persistent stage.
+4. For upload, optionally choose exactly one active visual transformation: Lucy or VTO. The
+   creator can switch between them before submission; only the active choice is used.
+5. Review playback on the same persistent stage. A completed upload can switch between the
+   immutable Original and generated Result, download that result directly, or Start over while
+   retaining the original upload.
 6. Optionally apply a local effect or saved ElevenLabs voice.
 7. Initiate Download, verify the browser saved the file, then Release. Or confirm Discard without
    downloading.

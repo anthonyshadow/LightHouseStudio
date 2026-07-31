@@ -202,11 +202,14 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     publishUploadedVideo,
     onSubmissionAccepted: recordAcceptedBatchStep,
   });
+  const comparedExistingVideoArtifact =
+    existingVideo.comparison === 'original' ? recording.original : recording.visual;
   const stagePresentation =
+    activeOverlay === 'video-upload' &&
+    existingVideo.phase === 'complete' &&
     takeStagePresentation.kind === 'playback' &&
-    existingVideo.comparison === 'original' &&
-    recording.original
-      ? { ...takeStagePresentation, artifact: recording.original }
+    comparedExistingVideoArtifact
+      ? { ...takeStagePresentation, artifact: comparedExistingVideoArtifact }
       : takeStagePresentation;
 
   useEffect(() => {
@@ -722,7 +725,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           open={activeOverlay === 'video-upload'}
           onClose={closeExistingVideo}
           title="Upload existing video"
-          description="Preview locally, then optionally run one or two explicitly ordered visual steps."
+          description="Preview locally, then optionally run either Swap Character or Virtual Try On."
           placement="right"
           size="wide"
           bodyMode="scroll"
