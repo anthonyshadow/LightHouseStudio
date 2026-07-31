@@ -21,7 +21,7 @@ const previewMontageStyles: CSSObject = {
     width: '100%',
     height: '100%',
     minWidth: 0,
-    objectFit: 'contain',
+    objectFit: 'cover',
   },
 };
 
@@ -50,6 +50,7 @@ export interface CharacterDirectionPreviewProps {
   readonly error?: ReactNode;
   readonly selections: readonly CharacterDirectionPreviewSelection[];
   readonly summary: readonly string[];
+  readonly showOnNarrow?: boolean;
 }
 
 export const CharacterDirectionPreview = ({
@@ -70,23 +71,51 @@ export const CharacterDirectionPreview = ({
   error,
   selections,
   summary,
+  showOnNarrow = true,
 }: CharacterDirectionPreviewProps) => {
   const theme = useTheme();
   return (
     <aside
       ref={containerRef}
       tabIndex={-1}
-      aria-labelledby="direction-preview-heading"
+      aria-label="Character Direction Preview"
       css={[
         previewPanelStyles(theme),
         {
           gridColumn: '2',
           gridRow: '1 / span 30',
-          '@media (max-width: 64rem)': { gridColumn: '1', gridRow: 'auto' },
+          '@media (max-width: 79.99rem)': {
+            display: showOnNarrow ? 'grid' : 'none',
+            gridColumn: '1',
+            gridRow: 'auto',
+          },
         },
       ]}
     >
-      <h3 id="direction-preview-heading">Character Direction Preview</h3>
+      <div
+        css={{
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: theme.space.sm,
+        }}
+      >
+        <h3 id="direction-preview-heading">Direction Preview</h3>
+        <span
+          css={{
+            padding: `0.2rem ${theme.space.xs}`,
+            borderRadius: theme.radii.small,
+            color: theme.colors.accent,
+            background: theme.colors.accentSoft,
+            fontSize: '0.7rem',
+            fontWeight: 850,
+            letterSpacing: '0.04em',
+            textTransform: 'uppercase',
+          }}
+        >
+          Stage Progress
+        </span>
+      </div>
       <div css={heroPreviewStyles(theme)} aria-busy={busy || undefined}>
         {showMontage ? (
           <div

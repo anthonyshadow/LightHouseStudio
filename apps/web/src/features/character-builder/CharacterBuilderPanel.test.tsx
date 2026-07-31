@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ReferenceImageAsset } from '@studio/contracts';
 import { createPromptBuilderDraft } from '@studio/domain';
@@ -12,7 +12,8 @@ import { createCharacterBuilderState } from './machine';
 import { DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS } from './ReferenceOptionsFields';
 
 const renderPanel = (overrides: Partial<CharacterBuilderPanelProps> = {}) => {
-  const onGenerate = vi.fn();
+  const onGenerate = vi.fn<CharacterBuilderPanelProps['onGenerate']>();
+  const onChange = vi.fn<CharacterBuilderPanelProps['onChange']>();
   const state = {
     ...createCharacterBuilderState(
       createPromptBuilderDraft('character-transform'),
@@ -30,7 +31,7 @@ const renderPanel = (overrides: Partial<CharacterBuilderPanelProps> = {}) => {
         generationAvailable
         editAvailable
         canSave
-        onChange={vi.fn()}
+        onChange={onChange}
         onOptionsChange={vi.fn()}
         onGenerate={onGenerate}
         onRequestRegeneration={vi.fn()}
@@ -46,7 +47,7 @@ const renderPanel = (overrides: Partial<CharacterBuilderPanelProps> = {}) => {
     </StudioDesignProvider>,
   );
 
-  return { onGenerate };
+  return { onChange, onGenerate };
 };
 
 const rawPreviewAsset: ReferenceImageAsset = {
@@ -82,6 +83,56 @@ const rawPreviewAsset: ReferenceImageAsset = {
 afterEach(cleanup);
 
 describe('CharacterBuilderPanel Wave 5 trust boundary', () => {
+  it('keeps every workflow step available and reveals custom fields only on request', async () => {
+    const user = userEvent.setup();
+    const { onChange } = renderPanel();
+
+    expect(screen.getByRole('heading', { name: 'Set your foundation' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Optional Reference Image' })).toBeVisible();
+    expect(screen.queryByRole('button', { name: 'Generate Preview' })).not.toBeInTheDocument();
+
+    const stepNavigation = screen.getByRole('navigation', {
+      name: 'Character builder steps',
+    });
+    const start = within(stepNavigation).getByRole('button', { name: /^Start/i });
+    const details = within(stepNavigation).getByRole('button', { name: /^Refine details/i });
+    const preview = within(stepNavigation).getByRole('button', { name: /^Preview/i });
+    expect(start).toHaveAttribute('aria-current', 'step');
+    expect(details).toBeEnabled();
+    expect(preview).toBeEnabled();
+
+    const presentationSection = screen
+      .getByRole('heading', { name: 'Presentation' })
+      .closest('section');
+    expect(presentationSection).not.toBeNull();
+    expect(
+      within(presentationSection!).queryByLabelText('Describe presentation in your own words'),
+    ).not.toBeInTheDocument();
+    await user.click(within(presentationSection!).getByRole('button', { name: 'Describe My Own' }));
+    const presentationCustom = within(presentationSection!).getByLabelText(
+      'Describe presentation in your own words',
+    );
+    fireEvent.change(presentationCustom, {
+      target: { value: 'fluid editorial presentation' },
+    });
+    const changed = onChange.mock.lastCall;
+    expect(changed?.[0].characterBase).toContain('fluid editorial presentation');
+    expect(changed?.[1].choices.gender).toEqual({
+      optionId: 'custom',
+      customValue: 'fluid editorial presentation',
+    });
+
+    await user.click(preview);
+    expect(screen.getByRole('heading', { name: 'Ready to Generate?' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Generate Preview' })).toBeVisible();
+    expect(preview).toHaveAttribute('aria-current', 'step');
+
+    await user.click(details);
+    expect(screen.getByRole('heading', { name: 'Refine your style' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Appearance' })).toBeVisible();
+    expect(details).toHaveAttribute('aria-current', 'step');
+  });
+
   it('describes optimizer, selected image provider, possible usage, retention, and local paths', async () => {
     const user = userEvent.setup();
     const { onGenerate } = renderPanel({
@@ -90,6 +141,7 @@ describe('CharacterBuilderPanel Wave 5 trust boundary', () => {
       referenceImageOptimizerModel: 'gpt-5.6',
     });
 
+    await user.click(screen.getByRole('button', { name: /^Preview/i }));
     const generate = screen.getByRole('button', { name: 'Generate Preview' });
     expect(generate).toHaveAccessibleDescription(
       /OpenAI \(gpt-5.6\).*attempts to optimize.*Black Forest Labs \(flux-2-pro\).*may use provider credits.*immutable local asset.*Upload and Save without generation do not contact/i,
@@ -107,6 +159,7 @@ describe('CharacterBuilderPanel Wave 5 trust boundary', () => {
       referenceImageModel: 'seedream-v5-lite-uncensored',
     });
 
+    await user.click(screen.getByRole('button', { name: /^Preview/i }));
     expect(screen.getByText(/restricted to explicit operator-qualification runs/i)).toBeVisible();
     expect(screen.getByText(/unavailable for participant generation/i)).toBeVisible();
     expect(screen.getByText(/configured generation path is currently unavailable/i)).toBeVisible();
@@ -135,6 +188,7 @@ describe('CharacterBuilderPanel Wave 5 trust boundary', () => {
       onRetryOptimization,
     });
 
+    await user.click(screen.getByRole('button', { name: /^Preview/i }));
     expect(screen.getByText('Prompt optimization failed')).toBeVisible();
     expect(screen.getByText(/generated from your raw character prompt/i)).toBeVisible();
     await user.click(screen.getByRole('button', { name: 'Retry optimization and regenerate' }));

@@ -319,6 +319,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       });
       await expect(builder.getByAltText('Current uploaded character reference')).toBeVisible();
       await builder.getByRole('button', { name: 'Adult', exact: true }).click();
+      await builder.getByRole('button', { name: /^Preview(?: |$)/u }).click();
       await builder.getByRole('button', { name: 'Generate Combined Preview' }).click();
       await expect(builder.getByText('This preview matches the current character.')).toBeVisible();
       const preview = builder.getByRole('complementary', {

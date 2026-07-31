@@ -64,8 +64,7 @@ export const EDITABLE_CHARACTER_CATEGORIES: readonly {
     category: 'adultAge',
     title: 'Adult age',
     description: 'All choices describe adults. Artwork follows the selected presentation.',
-    customLabel: '',
-    fixed: true,
+    customLabel: 'Describe another adult age range',
   },
   {
     category: 'appearance',
@@ -291,6 +290,9 @@ export const buildCanonicalCharacterDraft = (
   const gender = genderFromDesign(design);
   const profile = getVisualProfile(gender);
   const starter = CHARACTER_STARTERS.find((candidate) => candidate.id === design.starterId);
+  const presentation = resolveGuidedChoice('gender', profile, design.choices.gender).customValue;
+  const adultAge = resolveGuidedChoice('adultAge', profile, design.choices.adultAge);
+  const customAdultAge = adultAge.customValue;
   const role = choiceText(design, 'role', profile);
   const style = choiceText(design, 'style', profile);
   const background = choiceText(design, 'background', profile);
@@ -300,7 +302,7 @@ export const buildCanonicalCharacterDraft = (
     presetId: design.starterId,
     adultAge: ageFromChoice(design, profile),
     gender,
-    characterBase: [starter?.label, role].filter(Boolean).join(', '),
+    characterBase: [presentation, customAdultAge, starter?.label, role].filter(Boolean).join(', '),
     appearance: choiceText(design, 'appearance', profile),
     ethnicity: choiceText(design, 'ethnicity', profile),
     skinTone: choiceText(design, 'skinTone', profile),

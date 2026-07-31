@@ -10,8 +10,12 @@ header or Shelf; edit from the active-character selector or a true character car
 finalization, and take review block Builder entry.
 
 1. Open **Build Your Character** for a new character or the named edit panel for an existing one.
-2. Optionally upload a reference, then define identity and visual direction. Image generation is
-   never required.
+2. Use the three-step guided workflow in any order:
+   - **Start:** optionally upload a reference first, then choose presentation and adult age;
+   - **Details:** refine appearance, identity, styling, role, mood, and setting; and
+   - **Preview:** review the combined direction and optionally generate a reference image.
+     Every step label remains enabled and directly clickable. **Back** and **Continue** are
+     conveniences, not validation gates.
 3. Choose one save path:
    - prompt-only;
    - prompt plus the uploaded image;
@@ -21,8 +25,18 @@ finalization, and take review block Builder entry.
 5. Builder closes, restores focus, and preloads/selects the character in Lucy 2.5, Dock, and Shelf.
    It does not Start/Apply AI, create a Recent item, or increment use count.
 
-The form and preview have one DOM instance. On narrow layouts, **Review & Generate** moves focus to
-that preview; on wide layouts the preview is a sticky rail.
+Only the active step is presented. Changing steps moves focus to the new step heading. The step
+rail is a full-height 260px orientation surface beside the active content on wide layouts and
+becomes a compact horizontally scrollable row on narrow layouts. A single direction preview stays
+visible as a 400px desktop rail and joins the reading order on the Preview step at narrower
+viewports; no character stateful control is duplicated.
+
+Every predefined option uses its profile-aware repository artwork when the catalog provides one.
+Shared semantic options such as adult age, role, style, expression, mood, and background resolve to
+the artwork for the selected presentation. A per-field **Describe My Own** control is collapsed by
+default, reveals a specific 500-character text field on request, and collapses when a predefined
+option is selected. Custom presentation uses presentation-neutral artwork suggestions without
+erasing existing choices.
 
 ## Draft persistence
 

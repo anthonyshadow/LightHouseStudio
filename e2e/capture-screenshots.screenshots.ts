@@ -431,7 +431,7 @@ const SCENARIOS: readonly Scenario[] = [
       await openShelf(page);
       await page.getByRole('button', { name: 'New character recipe' }).click();
       await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
-      await page.getByRole('button', { name: 'Adult', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Optional Reference Image' })).toBeVisible();
     },
   },
   {

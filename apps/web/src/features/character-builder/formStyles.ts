@@ -1,39 +1,203 @@
 import type { CSSObject, Theme } from '@emotion/react';
 
-export const builderLayoutStyles = (theme: Theme): CSSObject => ({
+export const builderLayoutStyles = (_theme: Theme): CSSObject => ({
+  width: '100%',
+  height: '100%',
   minWidth: 0,
+  minHeight: 0,
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1.55fr) minmax(17rem, 0.65fr)',
-  alignItems: 'start',
-  gap: theme.space.lg,
-  '@media (max-width: 64rem)': { gridTemplateColumns: '1fr' },
+  gridTemplateColumns: '16.25rem minmax(0, 1fr)',
+  overflow: 'hidden',
+  '@media (max-width: 64rem)': {
+    gridTemplateColumns: '1fr',
+    gridTemplateRows: 'auto minmax(0, 1fr)',
+  },
 });
 
-export const reviewShortcutStyles = (theme: Theme): CSSObject => ({
-  position: 'sticky',
-  zIndex: 2,
-  insetBlockStart: 0,
-  display: 'none',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
-  alignItems: 'center',
+export const stepNavigationStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  minHeight: 0,
+  display: 'flex',
+  flexDirection: 'column',
+  gap: theme.space.xl,
+  padding: theme.space.lg,
+  overflowY: 'auto',
+  borderInlineEnd: `1px solid ${theme.colors.border}`,
+  background: theme.colors.canvasRaised,
+  '@media (max-width: 64rem)': {
+    flexDirection: 'row',
+    gap: theme.space.lg,
+    padding: theme.space.md,
+    overflowX: 'auto',
+    overflowY: 'hidden',
+    borderInlineEnd: 0,
+    borderBlockEnd: `1px solid ${theme.colors.border}`,
+  },
+  '@media (max-width: 31rem)': {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+    gap: theme.space.xs,
+    padding: theme.space.sm,
+    overflowX: 'hidden',
+  },
+});
+
+export const stepButtonStyles = (theme: Theme, active: boolean): CSSObject => ({
+  minWidth: 0,
+  minHeight: '2.75rem',
+  display: 'flex',
+  alignItems: 'flex-start',
   gap: theme.space.sm,
-  padding: theme.space.sm,
-  border: `1px solid ${theme.colors.accent}`,
-  borderRadius: theme.radii.medium,
-  background: `color-mix(in srgb, ${theme.colors.canvasRaised} 94%, transparent)`,
-  boxShadow: theme.shadows.soft,
-  backdropFilter: 'blur(12px)',
-  '& > span': { minWidth: 0 },
+  padding: `0 ${theme.space.sm} 0 ${theme.space.md}`,
+  border: 0,
+  borderInlineStart: `2px solid ${active ? theme.colors.accent : 'transparent'}`,
+  color: active ? theme.colors.accent : theme.colors.textFaint,
+  background: 'transparent',
+  textAlign: 'start',
+  cursor: 'pointer',
+  '&:hover': { color: theme.colors.text },
+  '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '2px' },
+  '& [data-step-number]': {
+    flex: '0 0 auto',
+    width: '1.5rem',
+    height: '1.5rem',
+    display: 'grid',
+    placeItems: 'center',
+    border: '2px solid currentColor',
+    borderRadius: theme.radii.round,
+    fontSize: '0.7rem',
+    fontWeight: 800,
+  },
   '& strong, & small': { display: 'block' },
+  '& strong': { fontSize: theme.fontSizes.body, whiteSpace: 'nowrap' },
   '& small': {
     marginBlockStart: theme.space.xxs,
-    color: theme.colors.textMuted,
+    color: active ? theme.colors.textMuted : theme.colors.textFaint,
     fontSize: theme.fontSizes.caption,
+    lineHeight: 1.3,
   },
-  '@media (max-width: 64rem)': { display: 'grid' },
-  '@media (max-width: 24rem)': {
-    gridTemplateColumns: 'minmax(0, 1fr)',
-    '& > button': { width: '100%' },
+  '@media (max-width: 64rem)': {
+    flex: '0 0 auto',
+    padding: 0,
+    borderInlineStart: 0,
+    '& small': { display: 'none' },
+  },
+  '@media (max-width: 31rem)': {
+    width: '100%',
+    minHeight: '44px',
+    justifyContent: 'center',
+    gap: theme.space.xs,
+    '& strong': {
+      fontSize: '0.7rem',
+      lineHeight: 1.15,
+      whiteSpace: 'normal',
+    },
+  },
+});
+
+export const workflowMainStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  minHeight: 0,
+  overflowY: 'auto',
+  background: theme.colors.canvas,
+  scrollbarGutter: 'stable',
+});
+
+export const workflowCanvasStyles = (theme: Theme): CSSObject => ({
+  width: '100%',
+  minWidth: 0,
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) minmax(20rem, 25rem)',
+  alignItems: 'start',
+  gap: theme.space.xxl,
+  marginInline: 'auto',
+  padding: `${theme.space.xxl} ${theme.space.xl}`,
+  '@media (max-width: 79.99rem)': {
+    gridTemplateColumns: '1fr',
+    maxWidth: '52rem',
+    padding: theme.space.xl,
+  },
+  '@media (max-width: 40rem)': {
+    padding: theme.space.md,
+  },
+});
+
+export const stepContentStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  alignContent: 'start',
+  gap: theme.space.xxl,
+  '& > header': {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.space.sm,
+  },
+  '& > header h2': {
+    margin: 0,
+    fontFamily: theme.type.display,
+    fontSize: theme.fontSizes.section,
+    fontWeight: 650,
+  },
+  '@media (max-width: 40rem)': { gap: theme.space.xl },
+});
+
+export const stepEyebrowStyles = (theme: Theme): CSSObject => ({
+  flex: '0 0 auto',
+  padding: `0.2rem ${theme.space.xs}`,
+  borderRadius: theme.radii.small,
+  color: theme.colors.accent,
+  background: theme.colors.accentSoft,
+  fontSize: '0.7rem',
+  fontWeight: 800,
+  letterSpacing: '0.08em',
+  textTransform: 'uppercase',
+});
+
+export const fieldSectionStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  gap: theme.space.md,
+  '& > header': {
+    minWidth: 0,
+    display: 'flex',
+    alignItems: 'end',
+    justifyContent: 'space-between',
+    gap: theme.space.sm,
+  },
+  '& h3, & p': { margin: 0 },
+  '& h3': { fontSize: theme.fontSizes.label },
+  '& p': {
+    color: theme.colors.textFaint,
+    fontSize: theme.fontSizes.caption,
+    lineHeight: 1.45,
+  },
+});
+
+export const generationCardStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  gap: theme.space.lg,
+  padding: theme.space.lg,
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.radii.large,
+  background: theme.colors.canvasRaised,
+  '& > header': {
+    display: 'flex',
+    alignItems: 'center',
+    gap: theme.space.md,
+  },
+  '& h3, & p': { margin: 0 },
+  '& h3': { fontSize: theme.fontSizes.label },
+  '& p': { marginBlockStart: theme.space.xxs, color: theme.colors.textFaint },
+  '& [data-generation-icon]': {
+    width: '3rem',
+    height: '3rem',
+    display: 'grid',
+    placeItems: 'center',
+    borderRadius: theme.radii.round,
+    color: theme.colors.accent,
+    background: theme.colors.accentSoft,
+    fontSize: '1.4rem',
   },
 });
 
@@ -52,6 +216,17 @@ export const choiceSectionStyles = (theme: Theme): CSSObject => ({
   '&:last-of-type': { borderBlockEnd: 0, paddingBlockEnd: 0 },
   '& h3': { margin: 0, fontSize: theme.fontSizes.label },
   '& p': { margin: 0, color: theme.colors.textMuted, fontSize: theme.fontSizes.metadata },
+});
+
+export const directChoiceSectionStyles = (theme: Theme): CSSObject => ({
+  ...fieldSectionStyles(theme),
+  paddingBlockEnd: 0,
+  borderBlockEnd: 0,
+  '& [data-current-choice]': {
+    color: theme.colors.accent,
+    fontSize: theme.fontSizes.caption,
+    fontWeight: 800,
+  },
 });
 
 export const choiceDrawerStyles = (theme: Theme): CSSObject => ({
@@ -225,7 +400,7 @@ export const previewPanelStyles = (theme: Theme): CSSObject => ({
 export const heroPreviewStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
   width: '100%',
-  aspectRatio: '4 / 5',
+  aspectRatio: '3 / 4',
   overflow: 'hidden',
   border: `1px solid ${theme.colors.border}`,
   borderRadius: theme.radii.medium,

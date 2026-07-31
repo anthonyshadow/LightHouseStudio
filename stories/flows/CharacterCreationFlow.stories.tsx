@@ -27,6 +27,7 @@ type Story = StoryObj<typeof meta>;
 const CharacterCreationHarness = () => {
   const [draft, setDraft] = useState(() => createPromptBuilderDraft('character-transform'));
   const [design, setDesign] = useState(createEmptyGuidedDesign);
+  const [builderStep, setBuilderStep] = useState<1 | 2 | 3>(1);
   const [stage, setStage] = useState<'builder' | 'saved'>('builder');
   const repository = useMemo(() => createSeededCreativeAssetRepository(), []);
 
@@ -38,11 +39,13 @@ const CharacterCreationHarness = () => {
           <CharacterBuilderForm
             draft={draft}
             design={design}
+            activeStep={builderStep}
             previewActions={
               <Button variant="primary" onClick={() => setStage('saved')}>
                 Save character direction
               </Button>
             }
+            onStepChange={setBuilderStep}
             onChange={(nextDraft, nextDesign) => {
               setDraft(nextDraft);
               setDesign(nextDesign);

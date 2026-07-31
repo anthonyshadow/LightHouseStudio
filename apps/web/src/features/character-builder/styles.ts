@@ -1,18 +1,13 @@
 import type { CSSObject, Theme } from '@emotion/react';
 
 export const characterBuilderShellStyles = (theme: Theme): CSSObject => ({
-  width: '100%',
-  height: '100%',
+  width: `calc(100% + ${theme.space.xl})`,
+  height: `calc(100% + ${theme.space.xl})`,
   minWidth: 0,
   minHeight: 0,
-  overflow: 'auto',
+  margin: `-${theme.space.md}`,
+  overflow: 'hidden',
   overscrollBehavior: 'contain',
-  padding: `0 max(${theme.space.md}, env(safe-area-inset-right)) max(${theme.space.xl}, env(safe-area-inset-bottom)) max(${theme.space.md}, env(safe-area-inset-left))`,
-  scrollbarGutter: 'stable',
-  '@media (max-width: 39.99rem)': {
-    paddingInlineStart: `max(${theme.space.sm}, env(safe-area-inset-left))`,
-    paddingInlineEnd: `max(${theme.space.sm}, env(safe-area-inset-right))`,
-  },
 });
 
 export const characterBuilderStatusStyles = (theme: Theme): CSSObject => ({
@@ -31,7 +26,7 @@ export const characterBuilderPreviewActionsStyles = (theme: Theme): CSSObject =>
 export const characterBuilderFooterStyles = (theme: Theme): CSSObject => ({
   width: '100%',
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) repeat(3, auto)',
+  gridTemplateColumns: 'minmax(0, 1fr) repeat(5, auto)',
   alignItems: 'center',
   gap: theme.space.sm,
   paddingBlockEnd: 'env(safe-area-inset-bottom)',
@@ -42,7 +37,11 @@ export const characterBuilderFooterStyles = (theme: Theme): CSSObject => ({
   },
   '@media (max-width: 39.99rem)': {
     gridTemplateColumns: '1fr 1fr',
+    gap: '8px',
     '& > span': { gridColumn: '1 / -1' },
     '& > button': { width: '100%' },
+  },
+  '@media (max-width: 39.99rem) and (max-height: 36rem)': {
+    '& > span[data-footer-status="default"]': { display: 'none' },
   },
 });

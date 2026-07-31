@@ -43,13 +43,15 @@ const meta = {
   args: {
     draft: createPromptBuilderDraft('character-transform'),
     design: createEmptyGuidedDesign(),
+    activeStep: 1,
+    onStepChange: fn(),
     onChange: fn(),
   },
   parameters: {
     docs: {
       description: {
         component:
-          'The character builder exposes presentation-aware catalog choices, independent appearance controls, a sticky direction preview, generation settings, and guarded confirmation/regeneration dialogs.',
+          'The character builder exposes three always-available steps, presentation-aware artwork, optional custom values, generation settings, and guarded confirmation/regeneration dialogs.',
       },
     },
   },
@@ -61,11 +63,13 @@ type Story = StoryObj<typeof meta>;
 const BuilderHarness = () => {
   const [draft, setDraft] = useState(() => createPromptBuilderDraft('character-transform'));
   const [design, setDesign] = useState(createEmptyGuidedDesign);
+  const [activeStep, setActiveStep] = useState<1 | 2 | 3>(1);
   return (
     <StoryColumn width="82rem">
       <CharacterBuilderForm
         draft={draft}
         design={design}
+        activeStep={activeStep}
         previewStatus="Direction preview ready"
         previewActions={<Button variant="primary">Generate reference</Button>}
         previewSettings={
@@ -74,6 +78,7 @@ const BuilderHarness = () => {
             onChange={fn()}
           />
         }
+        onStepChange={setActiveStep}
         onChange={(nextDraft, nextDesign) => {
           setDraft(nextDraft);
           setDesign(nextDesign);

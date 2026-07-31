@@ -13,6 +13,7 @@ const openCharacterBuilder = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Create new character' }).click();
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
   await page.getByRole('button', { name: 'Adult', exact: true }).click();
+  await page.getByRole('button', { name: /^Preview(?: |$)/u }).click();
   await expect(page.getByRole('button', { name: 'Generate Preview' })).toBeEnabled();
 };
 
@@ -170,6 +171,7 @@ test('saved character opens in Builder and updates its original record after reg
   await page.getByRole('button', { name: 'Edit Immutable astronomy host' }).click();
   const builder = page.getByRole('dialog', { name: 'Edit Immutable astronomy host' });
   await expect(builder).toBeVisible();
+  await builder.getByRole('button', { name: /^Preview(?: |$)/u }).click();
   await expect(builder.getByText('This preview matches the current character.')).toBeVisible();
   await expect(builder.getByRole('img', { name: /direction preview/u })).toHaveAttribute(
     'src',

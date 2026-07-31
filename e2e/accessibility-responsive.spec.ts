@@ -218,9 +218,7 @@ for (const viewport of representativeViewports) {
   });
 }
 
-test('small-mobile Builder review shortcut survives 200% text and keeps one preview', async ({
-  page,
-}) => {
+test('small-mobile Builder steps survive 200% text and keep one preview', async ({ page }) => {
   test.setTimeout(60_000);
   const network = await installProviderFreeStudio(page);
   await page.setViewportSize({ width: 320, height: 568 });
@@ -232,14 +230,17 @@ test('small-mobile Builder review shortcut survives 200% text and keeps one prev
   await page.getByRole('button', { name: /Open character options/u }).click();
   await page.getByRole('button', { name: 'Create new character' }).click();
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
-  const shortcut = dialog.getByRole('button', { name: 'Review & Generate' });
-  await expect(shortcut).toBeVisible();
-  await shortcut.click();
+  const previewStep = dialog.getByRole('button', {
+    name: /^Preview(?: |$)/u,
+  });
+  await expect(previewStep).toBeVisible();
+  await previewStep.click();
 
   const preview = dialog.getByRole('complementary', {
     name: 'Character Direction Preview',
   });
-  await expect(preview).toBeFocused();
+  await expect(dialog.getByRole('heading', { name: 'Ready to Generate?' })).toBeFocused();
+  await expect(preview).toBeVisible();
   await expect(dialog.getByRole('complementary')).toHaveCount(1);
   await expectNoDocumentOverflow(page);
   await expectNoAxeViolations(page);

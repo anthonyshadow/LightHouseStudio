@@ -13,11 +13,11 @@ import {
   type VisualCatalogOption,
 } from './catalog';
 import type { GuidedChoiceValue, VisualProfile } from '@studio/domain';
-import { CharacterChoiceDrawer } from './CharacterChoiceDrawer';
 import {
   choiceActionsStyles,
   currentChoiceStyles,
   customFieldStyles,
+  directChoiceSectionStyles,
   optionCardStyles,
   optionGridStyles,
   optionLabelStyles,
@@ -91,7 +91,7 @@ export const CharacterVisualChoiceSection = ({
 }: CharacterVisualChoiceSectionProps) => {
   const theme = useTheme();
   const [showAll, setShowAll] = useState(false);
-  const [customOpen, setCustomOpen] = useState(choice?.optionId === CUSTOM_OPTION_ID);
+  const [customOpen, setCustomOpen] = useState(false);
   const visible = getVisibleOptions(category, profile, choice, showAll);
   const grouped = getAllOptionsGroupedByProfile(category);
   const customValue = choice?.optionId === CUSTOM_OPTION_ID ? (choice.customValue ?? '') : '';
@@ -104,13 +104,17 @@ export const CharacterVisualChoiceSection = ({
   };
 
   return (
-    <CharacterChoiceDrawer
-      id={`character-${category}`}
-      title={title}
-      description={description}
-      currentLabel={currentLabel}
-      defaultOpen={category === 'adultAge'}
+    <section
+      aria-labelledby={`character-${category}-heading`}
+      css={directChoiceSectionStyles(theme)}
     >
+      <header>
+        <div>
+          <h3 id={`character-${category}-heading`}>{title}</h3>
+          <p>{description}</p>
+        </div>
+        {currentLabel ? <span data-current-choice>{currentLabel}</span> : null}
+      </header>
       {visible.currentOutsideSuggestions && !showAll ? (
         <div role="status" css={currentChoiceStyles(theme)}>
           <span>
@@ -126,7 +130,19 @@ export const CharacterVisualChoiceSection = ({
             grouped[group].length ? (
               <section key={group} aria-label={`${group} ${title} options`}>
                 <p>{group === 'shared' ? 'Shared for every presentation' : group}</p>
-                <div css={optionGridStyles(theme)}>
+                <div
+                  css={[
+                    optionGridStyles(theme),
+                    category === 'adultAge'
+                      ? {
+                          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                          '@media (max-width: 32rem)': {
+                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                          },
+                        }
+                      : {},
+                  ]}
+                >
                   {grouped[group].map((option) => (
                     <CharacterOptionButton
                       key={option.id}
@@ -143,7 +159,19 @@ export const CharacterVisualChoiceSection = ({
           )}
         </div>
       ) : (
-        <div css={optionGridStyles(theme)}>
+        <div
+          css={[
+            optionGridStyles(theme),
+            category === 'adultAge'
+              ? {
+                  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+                  '@media (max-width: 32rem)': {
+                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+                  },
+                }
+              : {},
+          ]}
+        >
           {visible.suggested.map((option) => (
             <CharacterOptionButton
               key={option.id}
@@ -171,6 +199,7 @@ export const CharacterVisualChoiceSection = ({
             size="small"
             variant="quiet"
             aria-expanded={customOpen}
+            aria-controls={`character-${category}-custom-field`}
             disabled={disabled}
             onClick={() => setCustomOpen((value) => !value)}
           >
@@ -179,7 +208,7 @@ export const CharacterVisualChoiceSection = ({
         </div>
       ) : null}
       {customOpen && !fixed ? (
-        <div css={customFieldStyles(theme)}>
+        <div id={`character-${category}-custom-field`} css={customFieldStyles(theme)}>
           <label htmlFor={`character-${category}-custom`}>{customLabel}</label>
           <input
             id={`character-${category}-custom`}
@@ -194,6 +223,6 @@ export const CharacterVisualChoiceSection = ({
           />
         </div>
       ) : null}
-    </CharacterChoiceDrawer>
+    </section>
   );
 };

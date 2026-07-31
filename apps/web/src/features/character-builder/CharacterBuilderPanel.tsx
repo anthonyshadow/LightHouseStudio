@@ -4,7 +4,7 @@ import type { CharacterTransformDraft, GuidedDesignV1 } from '@studio/domain';
 import { useRef, useState, type RefObject } from 'react';
 import { Button, ConfirmationDialog, OverlayPanel, StatusNotice } from '../../ui';
 import { BuilderReferenceImageField } from './BuilderReferenceImageField';
-import { CharacterBuilderForm } from './CharacterBuilderForm';
+import { CharacterBuilderForm, type CharacterBuilderStep } from './CharacterBuilderForm';
 import { CharacterNameDialog } from './CharacterNameDialog';
 import type { CharacterBuilderState } from './machine';
 import { ReferenceOptionsFields } from './ReferenceOptionsFields';
@@ -180,6 +180,7 @@ export const CharacterBuilderPanel = ({
   const saveButtonRef = useRef<HTMLButtonElement>(null);
   const imageOnlySaveButtonRef = useRef<HTMLButtonElement>(null);
   const [namingMode, setNamingMode] = useState<'default' | 'image-only' | null>(null);
+  const [activeStep, setActiveStep] = useState<CharacterBuilderStep>(1);
   const status = operationLabel(state);
   const generationBusy = isGenerationBusy(state);
   const saving = state.phase === 'saving';
@@ -210,13 +211,25 @@ export const CharacterBuilderPanel = ({
         open={open}
         onClose={() => {
           setNamingMode(null);
+          setActiveStep(1);
           onClose();
         }}
         title={editingCharacterName ? `Edit ${editingCharacterName}` : 'Build Your Character'}
         description={
-          editingCharacterName
-            ? 'Update this reusable Lucy 2.5 character. Image generation remains optional.'
-            : 'Shape a reusable Lucy 2.5 character. Image generation is optional; your unfinished draft stays on this browser.'
+          <span
+            css={{
+              display: 'flex',
+              alignItems: 'center',
+              flexWrap: 'wrap',
+              gap: theme.space.xs,
+              fontSize: theme.fontSizes.caption,
+            }}
+          >
+            <strong css={{ color: theme.colors.accent }}>
+              {editingCharacterName ? '✎ Editing Character' : '✎ Interactive Design'}
+            </strong>
+            <span css={{ color: theme.colors.textFaint }}>· Jump to any step</span>
+          </span>
         }
         placement="fullscreen"
         size="wide"
@@ -228,7 +241,12 @@ export const CharacterBuilderPanel = ({
         {...(returnFocusRef ? { returnFocusRef } : {})}
         footer={
           <div css={characterBuilderFooterStyles(theme)} aria-busy={operationLocked || undefined}>
-            <span id={saveBlockedReason ? 'character-builder-save-blocked-reason' : undefined}>
+            <span
+              id={saveBlockedReason ? 'character-builder-save-blocked-reason' : undefined}
+              data-footer-status={
+                saveBlockedReason ? 'blocking' : autosaveMessage ? 'notice' : 'default'
+              }
+            >
               {saveBlockedReason ??
                 (state.preview?.stale
                   ? 'The visible preview is from an earlier character version and will not be attached.'
@@ -242,6 +260,21 @@ export const CharacterBuilderPanel = ({
             >
               Reset Draft
             </Button>
+            <Button
+              variant="secondary"
+              disabled={activeStep === 1}
+              onClick={() => setActiveStep((step) => (step === 3 ? 2 : 1))}
+            >
+              Back
+            </Button>
+            {activeStep < 3 ? (
+              <Button
+                variant="primary"
+                onClick={() => setActiveStep((step) => (step === 1 ? 2 : 3))}
+              >
+                Continue
+              </Button>
+            ) : null}
             {uploadedReference ? (
               <Button
                 ref={imageOnlySaveButtonRef}
@@ -263,7 +296,7 @@ export const CharacterBuilderPanel = ({
             ) : null}
             <Button
               ref={saveButtonRef}
-              variant="primary"
+              variant={activeStep === 3 ? 'primary' : 'quiet'}
               busy={saving}
               disabled={!canSave || state.uploadPending || generationBusy || operationLocked}
               aria-disabled={Boolean(saveBlockedReason) || undefined}
@@ -294,6 +327,7 @@ export const CharacterBuilderPanel = ({
           <CharacterBuilderForm
             draft={state.draft}
             design={state.design}
+            activeStep={activeStep}
             disabled={formLocked}
             referenceImageUrl={heroReference?.contentUrl ?? null}
             referenceImageGenerated={Boolean(state.preview)}
@@ -412,6 +446,7 @@ export const CharacterBuilderPanel = ({
                 onChange={onOptionsChange}
               />
             }
+            onStepChange={setActiveStep}
             onChange={onChange}
           />
         </div>

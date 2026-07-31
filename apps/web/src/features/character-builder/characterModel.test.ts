@@ -3,6 +3,31 @@ import { describe, expect, it } from 'vitest';
 import { buildCanonicalCharacterDraft, createGuidedDesignFromDraft } from './characterModel';
 
 describe('guided character model hydration', () => {
+  it('keeps custom presentation and adult age wording in the canonical prompt draft', () => {
+    const draft = createPromptBuilderDraft('character-transform');
+    const design = createGuidedDesignFromDraft(draft);
+    const customized = {
+      ...design,
+      choices: {
+        ...design.choices,
+        gender: {
+          optionId: 'custom' as const,
+          customValue: 'androgynous femme presentation',
+        },
+        adultAge: {
+          optionId: 'custom' as const,
+          customValue: 'adult in their late thirties',
+        },
+      },
+    };
+
+    expect(buildCanonicalCharacterDraft(customized, draft)).toMatchObject({
+      gender: null,
+      adultAge: null,
+      characterBase: 'androgynous femme presentation, adult in their late thirties',
+    });
+  });
+
   it('hydrates unrecognized canonical values as exact custom choices', () => {
     const draft = {
       ...createPromptBuilderDraft('character-transform'),
