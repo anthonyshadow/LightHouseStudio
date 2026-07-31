@@ -135,6 +135,21 @@ const optionTextStyles = (theme: Theme): CSSObject => ({
   },
 });
 
+const createOptionStyles = (theme: Theme): CSSObject => ({
+  ...optionStyles(theme),
+  minHeight: '3.25rem',
+  gridTemplateColumns: '2.25rem minmax(0, 1fr)',
+  marginTop: theme.space.xxs,
+  borderTop: `1px solid ${theme.colors.border}`,
+  borderRadius: 0,
+  color: theme.colors.accent,
+  fontWeight: 760,
+  '@media (max-width: 22rem)': {
+    gridTemplateColumns: '2.25rem minmax(0, 1fr)',
+    gap: theme.space.xs,
+  },
+});
+
 const referenceImageContentUrl = (assetId: string) =>
   `/api/reference-images/${encodeURIComponent(assetId)}/content`;
 
@@ -171,17 +186,21 @@ const RecipeThumbnail = ({ recipe }: { recipe: ExistingVideoSavedRecipe }) => {
 export interface ExistingVideoRecipeChooserProps {
   readonly modelId: ExistingVideoStep['modelId'];
   readonly recipes: readonly ExistingVideoSavedRecipe[];
+  readonly selectedRecipeId: string | null;
   readonly disabled: boolean;
   readonly loading: boolean;
   readonly onChoose: (recipeId: string) => void;
+  readonly onCreateCharacter?: () => void;
 }
 
 export const ExistingVideoRecipeChooser = ({
   modelId,
   recipes,
+  selectedRecipeId,
   disabled,
   loading,
   onChoose,
+  onCreateCharacter,
 }: ExistingVideoRecipeChooserProps) => {
   const theme = useTheme();
   const listboxId = useId();
@@ -192,11 +211,14 @@ export const ExistingVideoRecipeChooser = ({
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const copy = chooserCopy(modelId);
-  const unavailable = disabled || loading || recipes.length === 0;
+  const canCreateCharacter = modelId === 'lucy-2.5' && Boolean(onCreateCharacter);
+  const optionCount = recipes.length + (canCreateCharacter ? 1 : 0);
+  const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId);
+  const unavailable = disabled || loading || optionCount === 0;
   const visibleOpen = open && !unavailable;
 
   const focusOption = (index: number) => {
-    const normalized = (index + recipes.length) % recipes.length;
+    const normalized = (index + optionCount) % optionCount;
     setActiveIndex(normalized);
     window.requestAnimationFrame(() => optionRefs.current[normalized]?.focus());
   };
@@ -210,6 +232,11 @@ export const ExistingVideoRecipeChooser = ({
     setOpen(false);
     onChoose(recipeId);
     window.requestAnimationFrame(() => triggerRef.current?.focus());
+  };
+
+  const createCharacter = () => {
+    setOpen(false);
+    onCreateCharacter?.();
   };
 
   const handleOptionKeyDown = (event: KeyboardEvent<HTMLButtonElement>, index: number) => {
@@ -228,7 +255,7 @@ export const ExistingVideoRecipeChooser = ({
         break;
       case 'End':
         event.preventDefault();
-        focusOption(recipes.length - 1);
+        focusOption(optionCount - 1);
         break;
       case 'Escape':
         event.preventDefault();
@@ -237,7 +264,8 @@ export const ExistingVideoRecipeChooser = ({
       case 'Enter':
       case ' ':
         event.preventDefault();
-        choose(recipes[index]!.id);
+        if (index === recipes.length) createCharacter();
+        else choose(recipes[index]!.id);
         break;
     }
   };
@@ -269,7 +297,7 @@ export const ExistingVideoRecipeChooser = ({
           window.requestAnimationFrame(() => optionRefs.current[0]?.focus());
         }}
       >
-        <span>{recipes.length === 0 ? copy.empty : copy.action}</span>
+        <span>{selectedRecipe?.label ?? (optionCount === 0 ? copy.empty : copy.action)}</span>
         <span aria-hidden="true">{visibleOpen ? '▴' : '▾'}</span>
       </button>
 
@@ -283,7 +311,7 @@ export const ExistingVideoRecipeChooser = ({
               }}
               type="button"
               role="option"
-              aria-selected="false"
+              aria-selected={recipe.id === selectedRecipeId}
               tabIndex={index === activeIndex ? 0 : -1}
               css={optionStyles(theme)}
               onFocus={() => setActiveIndex(index)}
@@ -298,6 +326,25 @@ export const ExistingVideoRecipeChooser = ({
               </span>
             </button>
           ))}
+          {canCreateCharacter ? (
+            <button
+              ref={(node) => {
+                optionRefs.current[recipes.length] = node;
+              }}
+              type="button"
+              role="option"
+              aria-selected="false"
+              tabIndex={activeIndex === recipes.length ? 0 : -1}
+              css={createOptionStyles(theme)}
+              onFocus={() => setActiveIndex(recipes.length)}
+              onMouseMove={() => setActiveIndex(recipes.length)}
+              onKeyDown={(event) => handleOptionKeyDown(event, recipes.length)}
+              onClick={createCharacter}
+            >
+              <span aria-hidden="true">＋</span>
+              <span>Create A Character</span>
+            </button>
+          ) : null}
         </div>
       ) : null}
     </div>

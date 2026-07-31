@@ -1,13 +1,15 @@
 # Studio character builder
 
 **Outcome:** create or edit one reusable Lucy 2.5 character, optionally with a local or generated
-reference, then preload it into Studio without starting AI.
+reference, then select it in the originating Studio or uploaded-video context without starting AI.
 
 ## Entry and journey
 
 Enter `/studio`; the one Studio stage stays mounted behind the fullscreen Builder. Create from the
-header or Shelf; edit from the active-character selector or a true character card. Recording,
-finalization, and take review block Builder entry.
+header or Shelf, or from **Create A Character** at the end of an uploaded video's saved-character
+chooser. Edit from the active-character selector or a true character card. Recording and
+finalization block Builder entry. Take review blocks the general Studio entry but not the explicit
+handoff from an unsubmitted uploaded-video Swap Character step.
 
 1. Open **Build Your Character** for a new character or the named edit panel for an existing one.
 2. Use the three-step guided workflow in any order:
@@ -22,8 +24,12 @@ finalization, and take review block Builder entry.
    - **Save & Use Image Only**; or
    - a current generated/combined preview.
 4. Name and save. Edit updates the existing character ID and preserves unrelated Shelf metadata.
-5. Builder closes, restores focus, and preloads/selects the character in Lucy 2.5, Dock, and Shelf.
-   It does not Start/Apply AI, create a Recent item, or increment use count.
+5. Builder closes and returns to its originating context:
+   - general Studio entry preloads/selects the character in Lucy 2.5, Dock, and Shelf; or
+   - uploaded-video entry reopens the upload panel with the new character selected and its prompt
+     and optional reference filled into the originating Swap Character step.
+
+   Neither path starts/applies AI, creates a Recent item, or increments use count.
 
 Only the active step is presented. Changing steps moves focus to the new step heading. The step
 rail is a full-height 260px orientation surface beside the active content on wide layouts and
@@ -76,7 +82,8 @@ garbage-collection flow.
 - Invalid upload, missing stored reference, optimizer/generation/edit failure, or stale preview
   preserves the prior valid draft/reference and exposes a targeted retry or safe local save path.
 - Durable Shelf failure does not publish in-memory success or close Builder.
-- Studio preload failure keeps the saved character and retries only preload.
+- Studio preload or uploaded-step hydration failure keeps the saved character and retries only the
+  incomplete handoff.
 - Shared modal focus/inert/Escape/return-focus behavior, internal scrolling, status regions, and
   reduced-motion/reflow behavior remain part of the journey.
 

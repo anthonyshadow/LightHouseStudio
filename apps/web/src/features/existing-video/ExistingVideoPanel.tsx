@@ -17,6 +17,7 @@ type ExistingVideoPanelProps = {
   readonly videoProcessingAvailable: boolean;
   readonly onFinish: () => void;
   readonly savedRecipes?: readonly ExistingVideoSavedRecipe[];
+  readonly onCreateCharacter?: (stepId: string) => void;
 };
 
 const panelStyles = (theme: Theme): CSSObject => ({
@@ -144,6 +145,7 @@ export const ExistingVideoPanel = ({
   videoProcessingAvailable,
   onFinish,
   savedRecipes = [],
+  onCreateCharacter,
 }: ExistingVideoPanelProps) => {
   const theme = useTheme();
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -188,6 +190,7 @@ export const ExistingVideoPanel = ({
         ? await hydrateReferenceImage(recipe.referenceImageAssetId)
         : null;
       workflow.updateStep(step.id, {
+        savedRecipeId: recipe.id,
         prompt: recipe.prompt,
         referenceImage: referenceImage?.file ?? null,
       });
@@ -195,7 +198,11 @@ export const ExistingVideoPanel = ({
       setReferenceError(
         'The saved recipe text is still available, but its reference image could not be loaded.',
       );
-      workflow.updateStep(step.id, { prompt: recipe.prompt, referenceImage: null });
+      workflow.updateStep(step.id, {
+        savedRecipeId: recipe.id,
+        prompt: recipe.prompt,
+        referenceImage: null,
+      });
     } finally {
       setRecipeLoading(false);
     }
@@ -414,9 +421,13 @@ export const ExistingVideoPanel = ({
                 <ExistingVideoRecipeChooser
                   modelId={step.modelId}
                   recipes={savedRecipes.filter((recipe) => recipe.modelId === step.modelId)}
+                  selectedRecipeId={step.savedRecipeId}
                   disabled={recipeLocked}
                   loading={recipeLoading}
                   onChoose={(recipeId) => void applySavedRecipe(step, recipeId)}
+                  {...(step.modelId === 'lucy-2.5' && onCreateCharacter
+                    ? { onCreateCharacter: () => onCreateCharacter(step.id) }
+                    : {})}
                 />
                 <label>
                   Prompt
@@ -430,7 +441,10 @@ export const ExistingVideoPanel = ({
                         : 'Describe the garment and desired fit'
                     }
                     onChange={(event) =>
-                      workflow.updateStep(step.id, { prompt: event.currentTarget.value })
+                      workflow.updateStep(step.id, {
+                        savedRecipeId: null,
+                        prompt: event.currentTarget.value,
+                      })
                     }
                   />
                   <span>{step.prompt.length}/1,200</span>
@@ -439,10 +453,16 @@ export const ExistingVideoPanel = ({
                   modelId={step.modelId}
                   file={step.referenceImage}
                   disabled={recipeLocked}
-                  onSelectFile={(file) => void chooseReference(step, file)}
+                  onSelectFile={(file) => {
+                    workflow.updateStep(step.id, { savedRecipeId: null });
+                    void chooseReference(step, file);
+                  }}
                   onRemove={() => {
                     setReferenceError(null);
-                    workflow.updateStep(step.id, { referenceImage: null });
+                    workflow.updateStep(step.id, {
+                      savedRecipeId: null,
+                      referenceImage: null,
+                    });
                   }}
                 />
                 <label>

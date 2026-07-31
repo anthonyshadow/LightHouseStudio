@@ -99,7 +99,9 @@ track zoom controls appear only when the active camera exposes those capabilitie
 
 Character Builder exclusively owns character create/edit, its resumable IndexedDB draft,
 reference upload, prompt optimization, image generation/edit/composition, durable save journal,
-Shelf persistence, and atomic Studio preload.
+and Shelf persistence. Its completion handoff is destination-specific: general Studio entry
+atomically preloads the Lucy Dock, while uploaded-video entry hydrates and selects the saved
+character in the originating unsubmitted Swap Character step.
 
 Prompt Workshop owns only Add, Replace, and Restyle structured object recipes. Recipe Shelf owns
 saved/recent/character metadata and atomic reuse. Neither owns Character generation or a media

@@ -26,6 +26,7 @@ import { validateExistingVideo, type ValidatedExistingVideo } from './videoValid
 export type ExistingVideoStep = Readonly<{
   id: string;
   modelId: VideoTransformModelId;
+  savedRecipeId: string | null;
   prompt: string;
   enhancePrompt: boolean;
   referenceImage: File | null;
@@ -198,6 +199,7 @@ export const useExistingVideoWorkflow = ({
         {
           id: crypto.randomUUID(),
           modelId,
+          savedRecipeId: null,
           prompt: '',
           enhancePrompt: false,
           referenceImage: null,

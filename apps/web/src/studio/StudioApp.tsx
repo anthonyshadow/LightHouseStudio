@@ -9,8 +9,15 @@ import {
   useRef,
   useState,
 } from 'react';
+import { hydrateReferenceImage } from '../adapters/api-client/apiClient';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import type { PromptCommittedHandler } from '../application/types';
+import type {
+  CharacterSaveProgress,
+  CharacterSaveSnapshot,
+} from '../features/character-builder/characterBuilderControllerSupport';
+import type { CharacterSaveStage } from '../features/character-builder/characterBuilderPersistence';
+import { persistCharacterSaveSnapshot } from '../features/character-builder/persistCharacterSaveSnapshot';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
 import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
 import { useCreativeAssetRepository } from '../features/creative-assets/useCreativeAssetRepository';
@@ -81,6 +88,9 @@ const REVIEW_LOCK_REASON =
 
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
+type CharacterBuilderDestination =
+  Readonly<{ kind: 'studio' }> | Readonly<{ kind: 'existing-video'; stepId: string }>;
+
 interface StudioExperienceProps {
   focusMainOnMount: boolean;
   initialIntent?: 'camera' | 'upload';
@@ -144,6 +154,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const [firstSuccessGuideVisible, setFirstSuccessGuideVisible] = useState(true);
   const [recipeShelfEntryIntent, setRecipeShelfEntryIntent] =
     useState<RecipeShelfEntryIntent | null>(null);
+  const [characterBuilderDestination, setCharacterBuilderDestination] =
+    useState<CharacterBuilderDestination>({ kind: 'studio' });
   const nextRecipeShelfEntryIntentIdRef = useRef(0);
   const promptCommittedHandlerRef = useRef<PromptCommittedHandler>(noopPromptCommitted);
   const characterSelectorRef = useRef<HTMLButtonElement>(null);
@@ -204,13 +216,16 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   }, [initialIntent, session]);
   const aiSessionActive = isModelSessionActive(session);
   const sessionModeLocked = mediaLocked || aiSessionActive || session.lifecycle === 'disconnected';
-  const characterBuilderOpenBlockedReason = recordingActive
+  const characterBuilderActivityBlockedReason = recordingActive
     ? 'Finish recording and finalization before building a character.'
     : finalizingStartedAt !== null || finalizingStream !== null
       ? 'Wait for the current take to finish finalizing before building a character.'
-      : reviewLocked
-        ? 'Download and release or discard the current take before building a character.'
-        : undefined;
+      : undefined;
+  const characterBuilderOpenBlockedReason =
+    characterBuilderActivityBlockedReason ??
+    (reviewLocked
+      ? 'Download and release or discard the current take before building a character.'
+      : undefined);
   const openCharacterBuilderOverlay = useCallback(
     () => openOverlay('character-builder'),
     [openOverlay],
@@ -219,16 +234,44 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     launch: characterBuilderLaunch,
     discardPrompt: characterBuilderDiscardPrompt,
     launchError: characterBuilderLaunchError,
-    openNewCharacter: openCharacterBuilder,
-    editCharacter,
+    openNewCharacter: launchNewCharacterBuilder,
+    editCharacter: launchCharacterEditor,
     resolveDiscard: resolveCharacterBuilderDraftDiscard,
     dismissLaunchError: dismissCharacterBuilderLaunchError,
   } = useCharacterBuilderLaunchController({
-    ...(characterBuilderOpenBlockedReason
-      ? { blockedReason: characterBuilderOpenBlockedReason }
+    ...(characterBuilderActivityBlockedReason
+      ? { blockedReason: characterBuilderActivityBlockedReason }
       : {}),
     onOpen: openCharacterBuilderOverlay,
   });
+  const openCharacterBuilder = useCallback(() => {
+    if (characterBuilderOpenBlockedReason) return;
+    setCharacterBuilderDestination({ kind: 'studio' });
+    launchNewCharacterBuilder();
+  }, [characterBuilderOpenBlockedReason, launchNewCharacterBuilder]);
+  const editCharacter = useCallback(
+    (asset: Parameters<typeof launchCharacterEditor>[0]) => {
+      if (characterBuilderOpenBlockedReason) return;
+      setCharacterBuilderDestination({ kind: 'studio' });
+      launchCharacterEditor(asset);
+    },
+    [characterBuilderOpenBlockedReason, launchCharacterEditor],
+  );
+  const createCharacterForExistingVideo = useCallback(
+    (stepId: string) => {
+      if (characterBuilderActivityBlockedReason || existingVideo.providerActive) return;
+      const step = existingVideo.steps.find((candidate) => candidate.id === stepId);
+      if (step?.modelId !== 'lucy-2.5') return;
+      setCharacterBuilderDestination({ kind: 'existing-video', stepId });
+      launchNewCharacterBuilder();
+    },
+    [
+      characterBuilderActivityBlockedReason,
+      existingVideo.providerActive,
+      existingVideo.steps,
+      launchNewCharacterBuilder,
+    ],
+  );
   const openWorkshopOverlay = useCallback(() => openOverlay('workshop'), [openOverlay]);
   const handoff = useReferenceRecipeHandoff({
     repository,
@@ -269,6 +312,58 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     saveWorkshopPrompt,
     openWorkshop,
   } = handoff.actions;
+  const existingVideoCharacterSaveBlockedReason =
+    characterBuilderActivityBlockedReason ??
+    (shelfDirty
+      ? 'Save or discard the unfinished Recipe Shelf changes before saving this character.'
+      : undefined);
+  const activeCharacterBuilderSaveBlockedReason =
+    characterBuilderDestination.kind === 'existing-video'
+      ? existingVideoCharacterSaveBlockedReason
+      : characterBuilderSaveBlockedReason;
+  const saveExistingVideoCharacter = useCallback(
+    async (
+      snapshot: CharacterSaveSnapshot,
+      characterId: string,
+      stage: CharacterSaveStage,
+      progress: CharacterSaveProgress,
+    ): Promise<void> => {
+      if (existingVideoCharacterSaveBlockedReason) {
+        throw new Error(existingVideoCharacterSaveBlockedReason);
+      }
+      if (characterBuilderDestination.kind !== 'existing-video') {
+        throw new Error('The upload character destination is no longer available.');
+      }
+      const step = existingVideo.steps.find(
+        (candidate) =>
+          candidate.id === characterBuilderDestination.stepId && candidate.modelId === 'lucy-2.5',
+      );
+      if (!step) {
+        throw new Error('The Swap Character step is no longer available.');
+      }
+
+      if (stage === 'intent') {
+        persistCharacterSaveSnapshot(repository, snapshot, characterId);
+        await progress.markCharacterPersisted();
+      }
+
+      const reference = snapshot.referenceImage
+        ? await hydrateReferenceImage(snapshot.referenceImage.assetId, snapshot.referenceImage)
+        : null;
+      existingVideo.updateStep(step.id, {
+        savedRecipeId: characterId,
+        prompt: snapshot.prompt,
+        referenceImage: reference?.file ?? null,
+      });
+      await progress.markStudioPreloaded();
+    },
+    [
+      characterBuilderDestination,
+      existingVideo,
+      existingVideoCharacterSaveBlockedReason,
+      repository,
+    ],
+  );
 
   useLayoutEffect(() => {
     if (!focusMainOnMount) return;
@@ -457,6 +552,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
     closeOverlay();
   }, [closeOverlay, existingVideo]);
+  const dismissCharacterBuilder = useCallback(() => {
+    if (characterBuilderDestination.kind === 'existing-video' && existingVideo.selection) {
+      openOverlay('video-upload');
+      return;
+    }
+    closeOverlay();
+  }, [characterBuilderDestination, closeOverlay, existingVideo.selection, openOverlay]);
   const creativeWorkspace = (
     <CreativeWorkspace
       repository={repository}
@@ -632,6 +734,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             workflow={existingVideo}
             videoProcessingAvailable={Boolean(availability.videoProcessing)}
             savedRecipes={existingVideoSavedRecipes}
+            onCreateCharacter={createCharacterForExistingVideo}
             onFinish={finishExistingVideoSetup}
           />
         </OverlayPanel>
@@ -805,7 +908,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               {...(characterBuilderLaunch.initialValue
                 ? { initialValue: characterBuilderLaunch.initialValue }
                 : {})}
-              returnFocusRef={characterSelectorRef}
+              returnFocusRef={
+                characterBuilderDestination.kind === 'existing-video'
+                  ? uploadToggleRef
+                  : characterSelectorRef
+              }
               generationAvailable={Boolean(availability.referenceImages)}
               optimizationAvailable={Boolean(availability.referenceImageOptimizerAvailable)}
               editAvailable={Boolean(availability.referenceImageEditAvailable)}
@@ -818,12 +925,16 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               {...(availability.referenceImageOptimizerModel !== undefined
                 ? { referenceImageOptimizerModel: availability.referenceImageOptimizerModel }
                 : {})}
-              {...(characterBuilderSaveBlockedReason
-                ? { saveBlockedReason: characterBuilderSaveBlockedReason }
+              {...(activeCharacterBuilderSaveBlockedReason
+                ? { saveBlockedReason: activeCharacterBuilderSaveBlockedReason }
                 : {})}
               legacyRepository={legacyRepository}
-              onSaveCharacter={saveBuiltCharacter}
-              onDismiss={closeOverlay}
+              onSaveCharacter={
+                characterBuilderDestination.kind === 'existing-video'
+                  ? saveExistingVideoCharacter
+                  : saveBuiltCharacter
+              }
+              onDismiss={dismissCharacterBuilder}
             />
           </Suspense>
         ) : null}

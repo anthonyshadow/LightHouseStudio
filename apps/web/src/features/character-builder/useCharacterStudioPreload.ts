@@ -10,6 +10,7 @@ import type {
   CharacterSaveSnapshot,
 } from './characterBuilderControllerSupport';
 import type { CharacterSaveStage } from './characterBuilderPersistence';
+import { persistCharacterSaveSnapshot } from './persistCharacterSaveSnapshot';
 
 const referenceIdentity = (
   reference: StudioSessionController['draft']['referenceImage'],
@@ -80,28 +81,7 @@ export const useCharacterStudioPreload = ({
         throw new Error('Character save was cancelled. The resumable draft is unchanged.');
       }
 
-      const characterValue = {
-        name: snapshot.name,
-        prompt: snapshot.prompt,
-        builderDraft: snapshot.draft,
-        guidedDesign: snapshot.design,
-        referenceImageStatus: referenceImage
-          ? ('persisted-reference' as const)
-          : ('prompt-only' as const),
-        referenceImageAssetId: referenceImage?.assetId ?? null,
-        uploadedReferenceImageAssetId: snapshot.uploadedReferenceImageAssetId,
-        finalReferenceKind: snapshot.finalReferenceKind,
-      };
-      if (snapshot.saveKind === 'edit') {
-        repository.updateSavedCharacterPrompt(characterId, characterValue);
-      } else {
-        repository.persistSavedCharacterPrompt({
-          id: characterId,
-          ...characterValue,
-          source: 'generator',
-          promptIntent: snapshot.draft ? 'character-transform' : null,
-        });
-      }
+      persistCharacterSaveSnapshot(repository, snapshot, characterId);
       if (stage === 'intent') await progress.markCharacterPersisted();
 
       const preloaded = session.replaceRecipeDraft({

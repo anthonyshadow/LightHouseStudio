@@ -180,6 +180,56 @@ test('the upload editor and open saved-character chooser reflow at every support
   }
 });
 
+test('Create A Character returns to the upload plan with the new character selected', async ({
+  page,
+}) => {
+  await installCameraSentinel(page);
+  await installProviderNetworkDriver(page);
+  await page.goto('/');
+  const fixture = await loadH264VideoFixture();
+
+  await selectExistingVideo(page, fixture, 'character-source.mp4');
+  const upload = page.getByRole('dialog', { name: 'Upload existing video' });
+  await upload.getByRole('button', { name: 'Swap Character' }).click();
+  const characterChooser = upload.getByRole('button', { name: 'Choose a Saved Character' });
+  await characterChooser.click();
+  const options = upload.getByRole('option');
+  await expect(options.last()).toHaveAccessibleName('Create A Character');
+  await options.last().click();
+
+  const builder = page.getByRole('dialog', { name: 'Build Your Character' });
+  await expect(builder).toBeVisible();
+  await builder.getByRole('button', { name: 'Adult', exact: true }).click();
+  await builder.getByRole('button', { name: /^Preview(?: |$)/u }).click();
+  await builder.getByRole('button', { name: 'Save Character', exact: true }).click();
+  const naming = page.getByRole('dialog', { name: 'Name your character' });
+  await naming.getByRole('textbox', { name: /Character name/u }).fill('Upload Performer');
+  await naming.getByRole('button', { name: 'Save Character', exact: true }).click();
+
+  await expect(builder).toBeHidden();
+  await expect(upload).toBeVisible();
+  await expect(characterChooser).toContainText('Upload Performer');
+  await expect(upload.getByPlaceholder('Describe the character or visual edit')).not.toHaveValue(
+    '',
+  );
+  await characterChooser.click();
+  await expect(upload.getByRole('option', { name: /Upload Performer/u })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+
+  const savedCharacter = await page.evaluate((storageKey) => {
+    const payload = localStorage.getItem(storageKey);
+    if (!payload) return null;
+    const store = JSON.parse(payload) as {
+      savedCharacterPrompts?: Array<{ name?: string }>;
+    };
+    return store.savedCharacterPrompts?.find(({ name }) => name === 'Upload Performer') ?? null;
+  }, CREATIVE_ASSET_STORAGE_KEY);
+  expect(savedCharacter).toMatchObject({ name: 'Upload Performer' });
+  expect(await cameraCalls(page)).toBe(0);
+});
+
 for (const order of [
   ['lucy-2.5', 'lucy-vton-3'],
   ['lucy-vton-3', 'lucy-2.5'],

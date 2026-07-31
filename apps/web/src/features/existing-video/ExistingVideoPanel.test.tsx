@@ -125,6 +125,7 @@ describe('ExistingVideoPanel', () => {
         {
           id: 'lucy',
           modelId: 'lucy-2.5',
+          savedRecipeId: null,
           prompt: 'Change the scene',
           enhancePrompt: false,
           referenceImage: null,
@@ -132,6 +133,7 @@ describe('ExistingVideoPanel', () => {
         {
           id: 'vto',
           modelId: 'lucy-vton-3',
+          savedRecipeId: null,
           prompt: 'Apply the jacket',
           enhancePrompt: false,
           referenceImage: null,
@@ -194,6 +196,7 @@ describe('ExistingVideoPanel', () => {
               {
                 id: 'lucy',
                 modelId: 'lucy-2.5',
+                savedRecipeId: null,
                 prompt: '',
                 enhancePrompt: false,
                 referenceImage: null,
@@ -226,12 +229,76 @@ describe('ExistingVideoPanel', () => {
 
     await waitFor(() =>
       expect(updateStep).toHaveBeenCalledWith('lucy', {
+        savedRecipeId: 'anchor',
         prompt:
           'A professional anchor in a well-lit studio with a dark blazer and soft cinematic lighting.',
         referenceImage: reference,
       }),
     );
     expect(api.hydrateReferenceImage).toHaveBeenCalledWith('asset-anchor');
+  });
+
+  it('places Create A Character last and opens the builder for the current Swap Character step', () => {
+    const onCreateCharacter = vi.fn();
+    const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: null,
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-07-30T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: null,
+                durationMs: 30_000,
+                width: 1_920,
+                height: 1_080,
+                sizeBytes: source.size,
+                hasAudio: false,
+              },
+            },
+            steps: [
+              {
+                id: 'lucy',
+                modelId: 'lucy-2.5',
+                savedRecipeId: null,
+                prompt: '',
+                enhancePrompt: false,
+                referenceImage: null,
+              },
+            ],
+            phase: 'ready',
+          })}
+          videoProcessingAvailable
+          savedRecipes={[
+            {
+              id: 'anchor',
+              label: 'Professional Anchor',
+              modelId: 'lucy-2.5',
+              prompt: 'A professional anchor.',
+              referenceImageAssetId: null,
+            },
+          ]}
+          onCreateCharacter={onCreateCharacter}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a Saved Character' }));
+    const options = screen.getAllByRole('option');
+    expect(options.at(-1)).toHaveAccessibleName('Create A Character');
+    fireEvent.click(options.at(-1)!);
+    expect(onCreateCharacter).toHaveBeenCalledWith('lucy');
   });
 
   it('renders and releases the attached reference image preview', async () => {
@@ -279,6 +346,7 @@ describe('ExistingVideoPanel', () => {
               {
                 id: 'lucy',
                 modelId: 'lucy-2.5',
+                savedRecipeId: null,
                 prompt: 'Use this portrait',
                 enhancePrompt: false,
                 referenceImage: reference,
@@ -327,6 +395,7 @@ describe('ExistingVideoPanel', () => {
         {
           id: 'lucy',
           modelId: 'lucy-2.5',
+          savedRecipeId: null,
           prompt: 'Change the scene',
           enhancePrompt: false,
           referenceImage: null,
@@ -349,6 +418,7 @@ describe('ExistingVideoPanel', () => {
     expect(prompt).toBeEnabled();
     fireEvent.change(prompt, { target: { value: 'Make the character a robot' } });
     expect(updateStep).toHaveBeenCalledWith('lucy', {
+      savedRecipeId: null,
       prompt: 'Make the character a robot',
     });
     expect(screen.getAllByRole('button', { name: 'Remove' })).toEqual([

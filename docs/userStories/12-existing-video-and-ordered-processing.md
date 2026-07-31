@@ -22,9 +22,12 @@ Discard flow.
    **Swap Character** (Lucy 2.5) and **Virtual Try On** may each appear at most once. Every step owns
    its prompt, prompt-enhancement switch, and optional validated reference. Saved characters and
    outfits open in a keyboard-operable custom chooser with an optional local thumbnail, recipe
-   name, and a two-line prompt summary. An attached reference renders a local preview with replace
-   and remove actions. Explicitly closing the panel retains the tab-local selection and plan; an
-   **Edit video** action in the recorded-take controls reopens the same workflow.
+   name, and a two-line prompt summary. The saved-character chooser ends with
+   **Create A Character**. That action opens Character Builder; a successful save returns to this
+   panel with the new saved character selected and its prompt/reference filled into the same Swap
+   Character step. An attached reference renders a local preview with replace and remove actions.
+   Explicitly closing the panel retains the tab-local selection and plan; an **Edit video** action
+   in the recorded-take controls reopens the same workflow.
 5. Review shows the exact order and planned Decart submission count. Zero steps finishes locally.
    A visual submission requires compatible server inspection, exact model availability, provider
    disclosure, and explicit action.
