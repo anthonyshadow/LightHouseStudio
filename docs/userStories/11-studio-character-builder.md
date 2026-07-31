@@ -9,7 +9,7 @@ Enter `/studio`; the one Studio stage stays mounted behind the fullscreen Builde
 header or Shelf, or from **Create A Character** at the end of an uploaded video's saved-character
 chooser. Edit from the active-character selector or a true character card. Recording and
 finalization block Builder entry. Take review blocks the general Studio entry but not the explicit
-handoff from an unsubmitted uploaded-video Swap Character step.
+handoff from an unsubmitted edited-video Character Swap step.
 
 1. Open **Build Your Character** for a new character or the named edit panel for an existing one.
 2. Use the three-step guided workflow in any order:
@@ -27,7 +27,7 @@ handoff from an unsubmitted uploaded-video Swap Character step.
 5. Builder closes and returns to its originating context:
    - general Studio entry preloads/selects the character in Lucy 2.5, Dock, and Shelf; or
    - uploaded-video entry reopens the upload panel with the new character selected and its prompt
-     and optional reference filled into the originating Swap Character step.
+     and optional reference filled into the originating Character Swap step.
 
    Neither path starts/applies AI, creates a Recent item, or increments use count.
 

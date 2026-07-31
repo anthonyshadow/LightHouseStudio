@@ -1,13 +1,13 @@
 # Lightframe Studio
 
-Lightframe Studio is a local-first browser camera studio for short webcam performances with
-reusable characters. Its primary loop is:
+Lightframe Studio is a local-first browser studio for short-form video creation and reusable
+characters. Its primary loop is:
 
-**Camera or Upload → optional Lucy/VTO visual processing → optional Voice → Download**
+**Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Download**
 
-Virtual Try-On and Workshop are secondary tools. The app is single-operator, binds to loopback,
-and stores no accounts or cloud projects. It is not approved for LAN, tunnel, public, or
-multi-user deployment.
+Live AI camera transformation and Workshop remain advanced tools. The app is single-operator,
+binds to loopback, and stores no accounts or cloud projects. It is not approved for LAN, tunnel,
+public, or multi-user deployment.
 
 ## Status
 
@@ -22,30 +22,26 @@ claim that qualification has passed.
 
 ## Product flow
 
-1. Open `/` and select **Start with camera** or **Upload existing video** to move to `/studio`.
-2. Camera provides the existing provider-free live flow. Upload validates a compatible
-   device-local file and exposes a playable inline preview synchronized with the shared stage.
-   Creators without a file can explicitly hand off to the main stage, then preview, record,
-   finalize, and review there before the locally normalized take becomes the editable source.
-3. For camera, optionally choose Character/VTO, start AI, and Record. Studio warns at 270 seconds,
-   automatically stops at 300 seconds, then transcodes the settled recording on the device to an
-   H.264/AAC MP4 before review or Download becomes available.
-4. For upload, optionally choose exactly one active visual transformation: Lucy or VTO, and/or a
-   saved ElevenLabs voice. VTO accepts exactly one saved/recent outfit, reference image, or prompt
-   mode. Combined work always completes and normalizes the visual result before voice conversion.
-5. Review playback on the same persistent stage. A completed upload can switch between the
-   immutable Original and generated Result, download that result directly, or Start over while
-   retaining the original upload.
-6. Optionally apply a local effect or saved ElevenLabs voice.
-7. Initiate Download, verify the browser saved the file, then Release. Or confirm Discard without
-   downloading.
+1. Open `/` and select **Record New Video** or **Upload Video** to move to `/studio`.
+2. Studio opens in neutral **Local Camera** mode. Camera and microphone remain off until the
+   creator explicitly starts them from the control bar or **Record a local video** in the upload
+   panel. No AI model, provider session, or remote processing starts on entry or refresh.
+3. Record locally on the persistent stage, or select a compatible device-local file. A healthy
+   local recording is normalized on device and becomes the editor source after finalization.
+4. Review the source, then optionally choose exactly one visual transformation—**Character Swap**
+   or **Virtual Try On**—and/or **Voice**. Combined work completes and validates the visual result
+   before voice conversion.
+5. Preview **Original** and **Result**, revise the plan or edit base, then download the latest
+   healthy result or start over while retaining the immutable source.
+6. For advanced live work, explicitly start local media, choose Character or Virtual Try-On from
+   **Start AI** or the Dock, and record the transformed stream through the existing live flow.
 
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio` owns the
 one persistent stage; creative tools open as overlays without remounting it or creating another
 media session. Upload Existing Video alone also renders a secondary inline source/result player
 that borrows existing artifact URLs without owning tracks or sessions. Live preview, recording,
-finalization, and initial take review always stay on the main stage. Those are the only registered
-application routes; every other path returns to `/`.
+and finalization always stay on the main stage. Those are the only registered application routes;
+every other path returns to `/`.
 Existing compatibility projects can still be downloaded or deleted from Recipe Shelf when Studio
 detects them, but they have no URL entry.
 

@@ -193,7 +193,7 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    expect(screen.getByText(/controlled-pilot beta/u)).toBeVisible();
+    expect(screen.getByText(/For the controlled pilot/u)).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Prompt' })).not.toBeInTheDocument();
     expect(
       screen.queryByRole('textbox', { name: 'Public HTTPS image URL' }),
@@ -243,6 +243,7 @@ describe('ExistingVideoPanel', () => {
       ],
       phase: 'ready',
       addStep,
+      voiceAvailable: true,
     });
     render(
       <StudioDesignProvider>
@@ -253,8 +254,8 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByTitle(source.name)).toHaveTextContent(source.name);
     expect(screen.getByLabelText(`Video preview for ${source.name}`)).toBeVisible();
     expect(screen.getByText('1920 × 1080')).toBeInTheDocument();
-    expect(screen.getByText(/1 planned Decart submission: Swap Character/u)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Swap Character' })).toHaveAttribute(
+    expect(screen.getByText(/1 planned Decart submission: Character Swap/u)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Character Swap' })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
@@ -263,6 +264,8 @@ describe('ExistingVideoPanel', () => {
       'aria-pressed',
       'false',
     );
+    expect(screen.getByRole('heading', { name: 'Voice' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Add voice change' })).toBeEnabled();
     fireEvent.click(screen.getByRole('button', { name: 'Virtual Try On' }));
     expect(addStep).toHaveBeenCalledWith('lucy-vton-latest');
     expect(screen.queryByRole('button', { name: 'Move up' })).not.toBeInTheDocument();
@@ -347,7 +350,7 @@ describe('ExistingVideoPanel', () => {
     expect(api.hydrateReferenceImage).toHaveBeenCalledWith('asset-anchor');
   });
 
-  it('places Create A Character last and opens the builder for the current Swap Character step', () => {
+  it('places Create A Character last and opens the builder for the current Character Swap step', () => {
     const onCreateCharacter = vi.fn();
     const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
 

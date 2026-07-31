@@ -1,6 +1,6 @@
 # Project audit findings
 
-**Current as of:** 2026-07-30
+**Current as of:** 2026-07-31
 
 This register contains unresolved findings only. Current behavior is defined by
 [Architecture](ARCHITECTURE.md) and the [user stories](userStories/README.md). Execution order
@@ -8,7 +8,7 @@ lives in the [active plan](project-audit-implementation-plan.md).
 
 ## Assessment
 
-Lightframe Studio has a coherent local-first Character Performance loop and strong resource,
+Lightframe Studio has a coherent local-first record/upload post-editing loop and strong resource,
 provider, and persistence boundaries. The supported product remains an operator-assisted,
 loopback-only pilot candidate. It is not qualified for participants and is not a public backend.
 
@@ -27,7 +27,7 @@ passes because no completed evidence records are checked in.
 | `UX-001`, `UX-003`, `UX-006`, `TEST-001`, `TEST-008`, `TEST-009`, `TEST-011` — physical touch and accessibility | Touch/pointer/focus/keyboard recovery, dominant recording Stop, narrow Builder access, reflow, synthetic WebKit, axe, and focus tests exist. No named physical row is qualified.                                                              | Pass every required physical browser/device row, including safe areas, keyboard, 200% text, focus/status, screen reader, and real media behavior.                    |
 | `PERF-001`, `TEST-005` — real 300-second media evidence                                                         | The independent 270/300-second warning and coalesced Stop/finalize path are implemented for Local, Character, and VTO. Browser memory, codecs, interruption, remux, and cleanup remain unmeasured on required targets.                        | Record successful one- and five-minute checkpoints, finalization, local/ElevenLabs processing, download, background/foreground, and cleanup for all claimed targets. |
 | `SEC-004` — participant data retirement                                                                         | Detach/retention copy, isolated-directory policy, checklist, and disposable cleanup drill are implemented. No real participant environment has completed the procedure.                                                                       | Pass the drill before admission and complete the content-free checklist for every participant profile/data directory through final retirement.                       |
-| `PROD-001`, `PROD-002`, `UX-004`, `UX-005`, `UX-007` — comprehension and value                                  | Character-first hierarchy, action-first descriptions, availability reasons, and dismissible first-take guidance are implemented. No moderated cohort evidence exists.                                                                         | Observe the approved cohort without expanding scope; record only the contract's content-free activation, comprehension, reuse, output-value, and support measures.   |
+| `PROD-001`, `PROD-002`, `UX-004`, `UX-005`, `UX-007` — comprehension and value                                  | Record/upload hierarchy, action-first descriptions, availability reasons, and dismissible first-take guidance are implemented. No moderated cohort evidence exists.                                                                           | Observe the approved cohort without expanding scope; record only the contract's content-free activation, comprehension, reuse, output-value, and support measures.   |
 | `SEC-007` — dependency and candidate verification                                                               | The formerly affected dependency chains resolve to patched versions and CI contains full and production audits. This documentation pass did not perform a registry-backed audit or the full release suite.                                    | Run the release commands against the exact candidate and resolve any failures without forced downgrades or weakened tests.                                           |
 
 Resolved runtime, UX, provider, and visual findings are intentionally omitted. See
@@ -51,7 +51,7 @@ does not authorize remote exposure, accounts, cloud persistence, or billing.
 
 ## Decisions that remain fixed
 
-- Character Performance is primary; VTO is beta and Workshop is advanced.
+- Record/upload post-editing is primary; live Character/VTO transformation and Workshop are advanced.
 - Touch/mobile creation and the 300-second take maximum are required.
 - The server remains loopback-only.
 - Provider contact stays explicit; image providers remain startup-selected with no fallback or

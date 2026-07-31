@@ -9,8 +9,8 @@ retaining local preview as the fallback.
    The header selection exposes an adjacent **Unselect character** action, and the Character panel
    exposes the same option. Unselecting returns the session draft to **Local Camera**, removes
    **Start AI** from the stage controls, and restores local **Record**.
-2. Select **Start Camera + Mic**, then **Start AI** and the primary **Character Transformation**
-   experience.
+2. Explicitly start local media from **Record New Video** or Dock **Start local preview**, then
+   select **Start AI** and the advanced **Character Transformation** experience.
 3. Review the Decart disclosure and select **Start with [character]**. If no character is ready,
    use Character Builder or open Shelf directly on **Characters**.
 4. Studio validates the complete recipe, obtains a short-lived model-scoped credential, and

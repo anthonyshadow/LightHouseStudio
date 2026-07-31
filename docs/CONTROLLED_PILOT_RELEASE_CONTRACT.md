@@ -12,10 +12,11 @@ automated, physical-device, accessibility, memory, cleanup, and live-provider ev
 
 ## Pilot promise and boundary
 
-- Primary promise: Camera or Upload → visual processing → optional Voice → Download. Camera
-  remains the direct `/studio` default; uploaded media does not require camera permission or
-  provider credentials for local preview/download.
-- Virtual Try-On is secondary/beta; Workshop is an advanced supporting tool.
+- Primary promise: Record or Upload → Review → optional Virtual Try On, Character Swap, and/or
+  Voice → Download. Direct `/studio` starts in neutral Local Camera mode with camera, microphone,
+  and AI off until explicit action; upload requires no camera permission or provider credentials
+  for local preview/download.
+- Live Character/VTO camera transformation and Workshop are advanced supporting tools.
 - Cohort: at most five invited, technically comfortable solo creators/design partners.
 - Every session is scheduled, moderated, and operator-assisted from setup through cleanup.
 - One isolated participant environment may be active at a time.
@@ -135,17 +136,17 @@ All permanent credentials are least-privilege, server-only, and operator-owned. 
 providers are separate startup-selected passes with no provider fallback or automatic retry of an
 initial billable submission.
 
-| Provider          | Approved configuration                                                                                    | Participant rule                                                 |
-| ----------------- | --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| Decart Character  | Exact `lucy-latest`; model/origin-scoped token; 300-second active limit                                   | After disclosure and live qualification                          |
-| Decart VTO        | Exact `lucy-vton-latest`; no moving alias                                                                 | Beta; one garment/plain background; no fit/sizing/purchase claim |
-| Decart batch Lucy | Exact `lucy-latest`; asynchronous submit/status/content; fixed 720p; no automatic initial retry           | One explicit submission per step after disclosure                |
-| Decart batch VTO  | Exact `lucy-vton-latest`; asynchronous submit/status/content; fixed 720p; no automatic initial retry      | Beta disclosure and rights/consent before each submission        |
-| OpenAI optimizer  | `gpt-5.6`, `medium`, version `lucy-character-reference-v1`, 120-second timeout, response storage disabled | Explicit optimize/generate path only                             |
-| OpenAI image      | `gpt-image-2`, `high`, one result, 150-second timeout, zero SDK retries                                   | Explicit image action only                                       |
-| BFL image         | `flux-2-pro`, safety tolerance `2`, prompt upsampling disabled, one 150-second deadline                   | Separate live qualification                                      |
-| Wiro image        | `seedream-v5-lite-uncensored`, one 2k result, watermark off, one 180-second deadline, `InputOutputDelete` | Operator qualification only; never external participants         |
-| ElevenLabs        | Saved voices; `eleven_multilingual_sts_v2`; `ELEVENLABS_ENABLE_LOGGING=false`; restricted key             | Participant Apply requires confirmed zero-retention eligibility  |
+| Provider          | Approved configuration                                                                                    | Participant rule                                                |
+| ----------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
+| Decart Character  | Exact `lucy-latest`; model/origin-scoped token; 300-second active limit                                   | After disclosure and live qualification                         |
+| Decart VTO        | Exact `lucy-vton-latest`; no moving alias                                                                 | One garment/plain background; no fit/sizing/purchase claim      |
+| Decart batch Lucy | Exact `lucy-latest`; asynchronous submit/status/content; fixed 720p; no automatic initial retry           | One explicit submission per step after disclosure               |
+| Decart batch VTO  | Exact `lucy-vton-latest`; asynchronous submit/status/content; fixed 720p; no automatic initial retry      | Rights, consent, and limitations before each submission         |
+| OpenAI optimizer  | `gpt-5.6`, `medium`, version `lucy-character-reference-v1`, 120-second timeout, response storage disabled | Explicit optimize/generate path only                            |
+| OpenAI image      | `gpt-image-2`, `high`, one result, 150-second timeout, zero SDK retries                                   | Explicit image action only                                      |
+| BFL image         | `flux-2-pro`, safety tolerance `2`, prompt upsampling disabled, one 150-second deadline                   | Separate live qualification                                     |
+| Wiro image        | `seedream-v5-lite-uncensored`, one 2k result, watermark off, one 180-second deadline, `InputOutputDelete` | Operator qualification only; never external participants        |
+| ElevenLabs        | Saved voices; `eleven_multilingual_sts_v2`; `ELEVENLABS_ENABLE_LOGGING=false`; restricted key             | Participant Apply requires confirmed zero-retention eligibility |
 
 Stop the pass if a model, safety/retention setting, entitlement, or account capability differs.
 Do not follow aliases, loosen safety, enable provider logging, switch provider, or resubmit a paid

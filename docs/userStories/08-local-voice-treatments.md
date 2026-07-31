@@ -4,7 +4,8 @@
 
 ## Journey
 
-1. From a take with a usable audio sidecar, select **Voice treatments**.
+1. From Latest Take, or the post-recording editor when the corresponding option is available, open
+   **Voice** for a source with a usable audio sidecar.
 2. Choose **Original**, **Warm**, **Clear**, or **Robot**.
 3. For an effect, Studio renders the original sidecar offline and remuxes it as AAC with the
    original H.264 video in MP4. Playback and download stay locked during processing.

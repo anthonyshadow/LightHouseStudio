@@ -65,7 +65,7 @@ export const ModelRecipeFields = ({
       />
 
       {mode === 'lucy-vton-latest' ? (
-        <StatusNotice title="Virtual Try-On beta guidance">
+        <StatusNotice title="Virtual Try-On guidance">
           Use one garment on a plain background. This preview is creative visualization only; it
           does not predict fit, sizing, fabric behavior, or purchase accuracy.
         </StatusNotice>

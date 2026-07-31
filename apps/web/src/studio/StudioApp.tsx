@@ -371,7 +371,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           candidate.modelId === 'lucy-latest',
       );
       if (!step) {
-        throw new Error('The Swap Character step is no longer available.');
+        throw new Error('The Character Swap step is no longer available.');
       }
 
       if (stage === 'intent') {
@@ -549,6 +549,14 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     closeOverlayIf(['character-selector']);
     window.requestAnimationFrame(() => characterSelectorRef.current?.focus());
   }, [clearActiveCharacter, closeOverlayIf]);
+  const startAdvancedModel = useCallback(() => {
+    setRecordingForExistingVideo(false);
+    return session.startModel();
+  }, [session]);
+  const advancedLiveSession = useMemo(
+    () => ({ ...session, startModel: startAdvancedModel }),
+    [session, startAdvancedModel],
+  );
   const selectExperienceMode = (mode: StudioMode): boolean => {
     return (
       confirmModeReplacement(session.draft, mode, (message) => window.confirm(message)) &&
@@ -583,7 +591,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const startPreparedAi = (mode: ModelMode) => {
     if (!selectExperienceMode(mode)) return;
     closeOverlay();
-    void session.startModel();
+    void startAdvancedModel();
   };
   const discardTemporaryWork = useCallback(() => {
     adoptingExistingVideoRecordingRef.current = null;
@@ -712,13 +720,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               idleAction={
                 stagePresentation.kind === 'idle' && firstSuccessGuideVisible ? (
                   <aside aria-label="First take guide" css={firstSuccessGuideStyles(theme)}>
-                    <strong>Start here</strong>
+                    <strong>Create a video</strong>
                     <span data-guide-copy>
-                      <span>
-                        Start camera → choose Character → Record → optional Voice → Download
-                      </span>
+                      <span>Record New Video or Upload Video → review</span>
                       <span data-guide-upload>
-                        Upload → optional visual processing → optional Voice → Download
+                        Virtual Try On · Character Swap · Voice → Download
                       </span>
                     </span>
                     <Button
@@ -752,6 +758,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                   visible={visible}
                   controlsLocked={reviewLocked || finalizingStartedAt !== null}
                   onStopRecording={finishTake}
+                  onStartLocalRecording={startExistingVideoRecording}
                   onCloseTakeReview={closeTakeReview}
                   onDiscardTake={discardExistingVideoSelection}
                   onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
@@ -792,7 +799,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           open={activeOverlay === 'video-upload'}
           onClose={closeExistingVideo}
           title="Upload existing video"
-          description="Preview locally, then optionally run either Swap Character or Virtual Try On."
+          description="Review locally, then apply Character Swap, Virtual Try On, and/or Voice."
           placement="right"
           size="wide"
           bodyMode="scroll"
@@ -911,7 +918,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         >
           <SessionComposer
             embedded
-            session={session}
+            session={advancedLiveSession}
             recording={mediaLocked}
             {...(activeCharacterName ? { activeCharacterName } : {})}
             {...(reviewLocked ? { lockReason: REVIEW_LOCK_REASON } : {})}

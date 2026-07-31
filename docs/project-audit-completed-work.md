@@ -9,8 +9,8 @@ candidate; live, physical, accessibility, and exact-candidate gates remain in th
 - Approved the moderated, loopback-only cohort, device/browser targets, independent 270/300-second
   recording and Decart behavior, participant isolation/retirement, provider settings, content
   policy, generic owners, operator limits, metrics, and escalation path.
-- Established Character Performance as primary, VTO as beta, Workshop as advanced, and
-  touch/mobile as required.
+- Established the then-current Character-first hierarchy, Workshop as advanced, and touch/mobile
+  as required.
 - Audited architecture, product, UI/UX, provider boundaries, documentation, and tests.
 - Rebuilt the curated visual suite around meaningful current states, semantic readiness, five
   canonical viewports, deterministic fixtures, and Darwin/Linux baselines.
@@ -26,7 +26,7 @@ Authority: [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT
 - Camera permission denial routes to Capture Settings without provider work.
 - Direct Character/VTO/Dock Starts share Decart transfer, usage, maximum, and Stop disclosure.
 - Capability copy distinguishes configured/limited availability from live health.
-- Character is visually primary, VTO is beta, Workshop is advanced, and the first-take sequence is
+- Character was visually primary, Workshop was advanced, and the first-take sequence became
   dismissible session state.
 - Narrow Character Builder layouts use one Review & Generate target; reflow, viewport containment,
   focus, axe, and synthetic WebKit/touch journeys cover the canonical risks.
@@ -50,7 +50,7 @@ Authority: [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT
 ## 2026-07-28 to 2026-07-29 — Pilot trust and evidence infrastructure
 
 - Builder, VTO, image-provider, and ElevenLabs decision points disclose retention, possible usage,
-  provider/model context, and beta limitations.
+  provider/model context, and applicable limitations.
 - Participant mode disables Wiro even when configured; operator-qualification mode is explicit.
 - Reference actions use truthful Detach/retention language.
 - The retirement checklist and disposable exact-leaf drill protect shared roots and siblings.
@@ -77,3 +77,13 @@ matrix has nine provider/local rows. No completed qualification records are chec
 documentation audit the validator reports **0/9 provider/local** and **0/45 physical** passes.
 Historical test runs and implemented automation do not replace the exact-candidate work in the
 active plan.
+
+## 2026-07-31 — Primary post-recording workflow
+
+- Made **Record New Video** and **Upload Video** the first-run entry and idle-stage actions.
+- Kept Studio in neutral Local Camera mode with camera, microphone, AI, and provider work off until
+  an explicit control-bar, upload-panel, or advanced Dock action.
+- Routed primary local recordings into the existing-video editor after safe finalization while
+  preserving Dock-started local and live AI recordings in their existing Latest Take flow.
+- Presented Character Swap, Virtual Try On, and Voice as post-recording edits and removed the old
+  VTO feature-status qualifier while retaining rights, consent, input, provider, and accuracy limits.

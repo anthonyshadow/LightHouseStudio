@@ -24,6 +24,7 @@ type StudioSessionControlBarProps = {
   visible?: boolean;
   controlsLocked?: boolean;
   onStopRecording: () => Promise<void>;
+  onStartLocalRecording?: () => void;
   onCloseTakeReview: () => void;
   onDiscardTake?: () => void;
   onOpenVoiceTreatments: () => void;
@@ -301,6 +302,7 @@ export const StudioSessionControlBar = ({
   visible = true,
   controlsLocked = false,
   onStopRecording,
+  onStartLocalRecording,
   onCloseTakeReview,
   onDiscardTake,
   onOpenVoiceTreatments,
@@ -454,10 +456,13 @@ export const StudioSessionControlBar = ({
                 variant="primary"
                 busy={session.lifecycle === 'requesting-media'}
                 disabled={controlsLocked || Boolean(transition)}
-                onClick={() => void session.startLocal()}
+                onClick={() => {
+                  if (onStartLocalRecording) onStartLocalRecording();
+                  else void session.startLocal();
+                }}
               >
                 <CameraIcon off={false} />
-                {transition ?? 'Start Camera + Mic'}
+                {transition ?? 'Record New Video'}
               </Button>
               <Button
                 ref={uploadButtonRef}
@@ -467,7 +472,7 @@ export const StudioSessionControlBar = ({
                 onClick={onEditVideo ?? onUploadVideo}
               >
                 <UploadIcon />
-                <span data-upload-label>{onEditVideo ? 'Edit video' : 'Upload video'}</span>
+                <span data-upload-label>{onEditVideo ? 'Edit video' : 'Upload Video'}</span>
               </Button>
             </div>
           ) : transition && !aiStarting ? (

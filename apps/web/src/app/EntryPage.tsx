@@ -53,7 +53,7 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
     <main css={entryStyles(theme)}>
       <div>
         <h1 css={visuallyHiddenHeadingStyles()}>Enter Lightframe Studio</h1>
-        <p>Create from your camera or a compatible video already on this device.</p>
+        <p>Record or upload a video, then review it and apply optional AI edits.</p>
         <Button
           ref={enterRef}
           variant="primary"
@@ -61,7 +61,7 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
             void navigate(APP_PATHS.studio);
           }}
         >
-          Start with camera
+          Record New Video
         </Button>
         <Button
           variant="secondary"
@@ -69,7 +69,7 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
             void navigate(APP_PATHS.studio, { state: { creationIntent: 'upload' } });
           }}
         >
-          Upload existing video
+          Upload Video
         </Button>
       </div>
     </main>

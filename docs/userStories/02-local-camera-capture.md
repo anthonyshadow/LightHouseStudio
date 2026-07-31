@@ -5,7 +5,8 @@
 ## Journey
 
 1. Optionally stage sources in **Device settings**.
-2. Select **Start Camera + Mic** (or Dock **Start local preview**) and grant browser permission.
+2. Entering Studio leaves camera and microphone off. Select **Record New Video** in the control
+   bar (or Dock **Start local preview**) and grant browser permission.
 3. Confirm **Live local camera preview**. Use the mic/camera toggles and any capability-gated
    front/rear or zoom controls.
 4. With no Character or Virtual Try-On recipe selected, the stage control bar presents **Record**
@@ -15,10 +16,12 @@
    recording.
 6. If recording continues, Studio warns at 4:30 and invokes the same coalesced Stop/finalize path
    at 5:00.
-7. Wait for the main recorder and optional audio sidecar to settle. Studio then releases live
-   tracks and shows **Recorded take playback** on the same stage.
-8. Use the compact Download, Discard, Voice, and Release actions, or select **Take** for
-   [detailed review](07-take-review-and-cleanup.md).
+7. Wait for the main recorder and optional audio sidecar to settle. Studio releases live tracks
+   and shows **Recorded take playback** on the same stage.
+8. A control-bar **Record New Video** take becomes the source in the post-recording editor, where
+   Character Swap, Virtual Try On, and Voice are available. A Dock-started local take keeps the
+   compact Download, Discard, Voice, Release, and [detailed review](07-take-review-and-cleanup.md)
+   path used by advanced live sessions.
 
 ## Guards and recovery
 

@@ -24,10 +24,9 @@ const LazyStudioApp = lazy(() =>
   import('../studio/StudioApp').then((module) => ({ default: module.StudioApp })),
 );
 
-const ENTRY_DESCRIPTION =
-  'Enter Lightframe Studio, a local-first browser camera studio for short-form video.';
+const ENTRY_DESCRIPTION = 'Record or upload a video, then review and edit it in Lightframe Studio.';
 const STUDIO_DESCRIPTION =
-  'Lightframe is a local-first browser studio for webcam recording and realtime creative video.';
+  'Lightframe is a local-first browser studio for recording, uploads, post-recording edits, and advanced live AI.';
 
 const routeSurfaceStyles = {
   width: '100%',

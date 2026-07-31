@@ -1,10 +1,11 @@
 # Repository working guide
 
 Lightframe Studio is a local-first, single-operator browser camera studio. The current product goal
-is a trustworthy short-form loop: Local preview → reusable Character → Lucy 2.5 → Record →
-optional Voice → Download. VTO is secondary/beta and Workshop is advanced. The server is
-loopback-only; do not turn future accounts, cloud storage, billing, or public deployment into
-current MVP requirements.
+is a trustworthy short-form loop: Record or Upload → Review → optional Virtual Try On, Character
+Swap, and/or Voice → Download. Studio starts in the neutral Local Camera mode with camera and
+microphone off until an explicit control-bar or upload-panel action. Live Character/VTO camera
+transformation and Workshop are advanced flows. The server is loopback-only; do not turn future
+accounts, cloud storage, billing, or public deployment into current MVP requirements.
 
 Product-owner scope recorded 2026-07-28: touch/mobile creation is required; the supported take
 maximum is 300 seconds; and Character, VTO, local Voice, ElevenLabs, OpenAI, BFL, and Wiro are all

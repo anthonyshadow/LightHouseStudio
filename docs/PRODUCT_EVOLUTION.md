@@ -25,14 +25,22 @@ One persistent media stage now owns preview, transformed video, recording, final
 playback. Dock, Capture Settings, Workshop, Shelf, Character Builder, Take Review, Voice, and
 Legacy Projects are overlays. This avoided parallel media sessions, modal systems, and stores.
 
-## Local preview precedes provider work
+## Local preview preceded provider work
 
-The primary path became **Start Camera + Mic → Start AI**. Drafting, uploads, saved-character
-selection, and local capture do not require provider credentials, SDK loading, token minting, or
-external media traffic. Provider contact remains explicit and cost-sensitive.
+An earlier primary path became **Start Camera + Mic → Start AI**. Drafting, uploads,
+saved-character selection, and local capture did not require provider credentials, SDK loading,
+token minting, or external media traffic. Provider contact remained explicit and cost-sensitive.
 
-Character uses the exact `lucy-latest` model. VTO remains a separate, secondary beta pinned to
-`lucy-vton-latest`; the two experiences are not interchangeable and have no fallback.
+Character used exact `lucy-latest` and VTO remained separately pinned to `lucy-vton-latest`; the
+two experiences were not interchangeable and had no fallback.
+
+## Post-recording editing became the primary workflow
+
+The first-run loop is now **Record or Upload → Review → optional Virtual Try On, Character Swap,
+and/or Voice → Download**. Studio still initializes Local Camera mode, but entry alone does not
+request camera/microphone permission or start AI. Control-bar and upload-panel recording intents
+reuse the stage-owned local lifecycle, then adopt the finalized artifact into the existing-video
+editor. Dock-started local preview and live Character/VTO retain the advanced Latest Take flow.
 
 ## Characters became reusable, resumable assets
 

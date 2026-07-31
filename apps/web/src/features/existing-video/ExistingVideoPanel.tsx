@@ -186,10 +186,10 @@ const stepStyles = (theme: Theme): CSSObject => ({
 });
 
 const modelLabel = (step: ExistingVideoStep): string =>
-  step.modelId === 'lucy-latest' ? 'Swap Character' : 'Virtual Try On';
+  step.modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On';
 
 const stepHeading = (step: ExistingVideoStep): string =>
-  step.modelId === 'lucy-latest' ? 'Swap Character (Lucy 2.5)' : 'Virtual Try On';
+  step.modelId === 'lucy-latest' ? 'Character Swap (Lucy 2.5)' : 'Virtual Try On';
 
 const stepIsComplete = (step: ExistingVideoStep): boolean => {
   if (step.modelId === 'lucy-latest') {
@@ -360,8 +360,8 @@ export const ExistingVideoPanel = ({
       <header>
         <h2>{workflow.original?.kind === 'recorded' ? 'Recorded source' : 'Uploaded source'}</h2>
         <p>
-          The source, recipes, and results stay in this tab. Refreshing or closing it loses the
-          workflow.
+          Review this source, then apply optional AI edits. The source, recipes, and results stay in
+          this tab; refreshing or closing it loses the workflow.
         </p>
       </header>
 
@@ -470,7 +470,7 @@ export const ExistingVideoPanel = ({
               <div>
                 <h2 id="visual-plan-heading">Visual plan</h2>
                 <p>
-                  Choose Swap Character or Virtual Try On. Switch freely before submission; only the
+                  Choose Character Swap or Virtual Try On. Switch freely before submission; only the
                   active transformation is used and it creates one Decart submission.
                 </p>
               </div>
@@ -481,7 +481,7 @@ export const ExistingVideoPanel = ({
                   disabled={structureLocked}
                   onClick={() => workflow.addStep('lucy-latest')}
                 >
-                  Swap Character
+                  Character Swap
                 </Button>
                 <Button
                   variant={
@@ -505,9 +505,9 @@ export const ExistingVideoPanel = ({
                 {step.modelId === 'lucy-vton-latest' ? (
                   <>
                     <p>
-                      Virtual Try On is a controlled-pilot beta. Use media you have rights and
-                      consent to submit. One clearly visible garment on a plain background works
-                      best; results do not predict fit, sizing, or purchase accuracy.
+                      For the controlled pilot, use media you have rights and consent to submit. One
+                      clearly visible garment on a plain background works best; results do not
+                      predict fit, sizing, or purchase accuracy.
                     </p>
                     <div css={rowStyles(theme)} role="group" aria-label="Outfit input type">
                       {(
@@ -668,7 +668,7 @@ export const ExistingVideoPanel = ({
           <section css={panelStyles(theme)} aria-labelledby="voice-plan-heading">
             <div css={visualPlanHeaderStyles(theme)}>
               <div>
-                <h2 id="voice-plan-heading">Voice change</h2>
+                <h2 id="voice-plan-heading">Voice</h2>
                 <p>
                   Optional. The saved ElevenLabs library loads only when you open it. Combined edits
                   always finish the visual change before applying the selected voice.
@@ -825,8 +825,8 @@ export const ExistingVideoPanel = ({
         <div css={panelStyles(theme)}>
           <h2>Result ready</h2>
           <p>
-            Compare the uploaded original with the generated result on the shared stage. Download
-            saves the result; Start over keeps the original uploaded.
+            Compare the original source with the generated result on the shared stage. Download
+            saves the result; Start over keeps the original source.
           </p>
           <div css={resultActionStyles(theme)}>
             {workflow.result ? (

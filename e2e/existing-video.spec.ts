@@ -5,6 +5,7 @@ import {
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
+  readBrowserState,
 } from './support/studioHarness';
 import { installProviderNetworkDriver } from './support/studioHarness.network';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
@@ -67,7 +68,7 @@ const selectExistingVideo = async (
   bytes: Buffer,
   filename = 'creator-source.mp4',
 ): Promise<void> => {
-  await page.getByRole('button', { name: 'Upload existing video' }).click();
+  await page.getByRole('button', { name: 'Upload Video' }).click();
   await expect(page).toHaveURL(/\/studio$/u);
   const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
   await expect(dialog).toBeVisible();
@@ -87,7 +88,7 @@ test('Record a local video closes the panel and keeps capture on the persistent 
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/');
-  await page.getByRole('button', { name: 'Upload existing video' }).click();
+  await page.getByRole('button', { name: 'Upload Video' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
   const stageVideo = page.getByLabel('Studio media stage').locator('video');
@@ -124,6 +125,40 @@ test('Record a local video closes the panel and keeps capture on the persistent 
           .__lightframeExistingVideoStage === video,
     ),
   ).toBe(true);
+  await controls.getByRole('button', { name: 'Stop recording' }).click();
+
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Recorded source' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Character Swap' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Virtual Try On' })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Voice' })).toBeVisible();
+  await expect(page.getByLabel('Recorded take playback')).toBeVisible();
+  expectNoExternalProviderTraffic(network);
+});
+
+test('Record New Video starts only from the control bar and adopts the local take for editing', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/studio');
+
+  const controls = page.getByLabel('Studio session controls');
+  await expect(page.getByLabel('Studio media stage')).toContainText(
+    'Camera and microphone remain off until you start local preview.',
+  );
+  expect((await readBrowserState(page)).cameraCalls).toBe(0);
+
+  await controls.getByRole('button', { name: 'Record New Video' }).click();
+  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+  await controls.getByRole('button', { name: 'Record' }).click();
+  await controls.getByRole('button', { name: 'Stop recording' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
+  await expect(dialog.getByRole('heading', { name: 'Recorded source' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Character Swap' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Virtual Try On' })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Voice' })).toBeVisible();
+  expect((await readBrowserState(page)).cameraCalls).toBe(1);
   expectNoExternalProviderTraffic(network);
 });
 
@@ -198,7 +233,7 @@ test('the upload editor and open saved-character chooser reflow at every support
     await page.goto('/');
     await selectExistingVideo(page, fixture, 'responsive-source.mp4');
     const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
-    await dialog.getByRole('button', { name: 'Swap Character' }).click();
+    await dialog.getByRole('button', { name: 'Character Swap' }).click();
     await expectNoDocumentOverflow(page);
     await expect(dialog.getByLabel('Video preview for responsive-source.mp4')).toBeAttached();
 
@@ -237,7 +272,7 @@ test('Create A Character returns to the upload plan with the new character selec
 
   await selectExistingVideo(page, fixture, 'character-source.mp4');
   const upload = page.getByRole('dialog', { name: 'Upload existing video' });
-  await upload.getByRole('button', { name: 'Swap Character' }).click();
+  await upload.getByRole('button', { name: 'Character Swap' }).click();
   const characterChooser = upload.getByRole('button', { name: 'Choose a Saved Character' });
   await characterChooser.click();
   const options = upload.getByRole('option');
@@ -291,15 +326,15 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
     const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
     await dialog
       .getByRole('button', {
-        name: modelId === 'lucy-latest' ? 'Swap Character' : 'Virtual Try On',
+        name: modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
       })
       .click();
     const selectedButton = dialog.getByRole('button', {
-      name: modelId === 'lucy-latest' ? 'Swap Character' : 'Virtual Try On',
+      name: modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
     });
     const alternateModelId = modelId === 'lucy-latest' ? 'lucy-vton-latest' : 'lucy-latest';
     const alternateButton = dialog.getByRole('button', {
-      name: alternateModelId === 'lucy-latest' ? 'Swap Character' : 'Virtual Try On',
+      name: alternateModelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
     });
     await expect(selectedButton).toHaveAttribute('aria-pressed', 'true');
     await expect(alternateButton).toBeEnabled();
@@ -363,7 +398,7 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
       await expect(dialog.getByTitle('creator-source.mp4')).toHaveText('creator-source.mp4');
       await expect(dialog.getByRole('heading', { name: 'Result ready' })).toHaveCount(0);
       await expect(playback).toHaveAttribute('src', originalUrl!);
-      await expect(dialog.getByRole('button', { name: 'Swap Character' })).toHaveAttribute(
+      await expect(dialog.getByRole('button', { name: 'Character Swap' })).toHaveAttribute(
         'aria-pressed',
         'false',
       );

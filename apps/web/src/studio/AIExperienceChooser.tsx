@@ -109,7 +109,7 @@ export const AIExperienceChooser = ({
     <OverlayPanel
       open={open}
       onClose={onClose}
-      title="Choose AI experience"
+      title="Choose live AI experience"
       description="Your camera and microphone stay on while you choose how to transform the live preview."
       placement="fullscreen"
       size="wide"
@@ -119,7 +119,7 @@ export const AIExperienceChooser = ({
       <div css={chooserStyles(theme)}>
         <article css={experienceCardStyles(theme, true)}>
           <header>
-            <span css={eyebrowStyles(theme, true)}>Primary · Character</span>
+            <span css={eyebrowStyles(theme, true)}>Live AI · Character</span>
             <h3>Character Transformation</h3>
             <p>
               {activeCharacterName
@@ -153,8 +153,8 @@ export const AIExperienceChooser = ({
 
         <article css={experienceCardStyles(theme, false)}>
           <header>
-            <span css={eyebrowStyles(theme, false)}>Secondary · Beta</span>
-            <h3>Virtual Try-On Beta</h3>
+            <span css={eyebrowStyles(theme, false)}>Live AI · Try-On</span>
+            <h3>Virtual Try-On</h3>
             <p>
               Preview a garment recipe using the existing VTON configuration and saved-recipe flow.
             </p>

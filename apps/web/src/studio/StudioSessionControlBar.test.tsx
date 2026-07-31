@@ -122,6 +122,7 @@ const renderBar = (
     experienceLabel?: string;
     onDiscardTake?: () => void;
     onEditVideo?: () => void;
+    onStartLocalRecording?: () => void;
     recordingMode?: StudioSessionController['draft']['mode'];
   } = {},
 ) =>
@@ -136,6 +137,9 @@ const renderBar = (
         recordingSupported
         reviewingTake={reviewingTake}
         onStopRecording={onStopRecording}
+        {...(options.onStartLocalRecording
+          ? { onStartLocalRecording: options.onStartLocalRecording }
+          : {})}
         onCloseTakeReview={onCloseTakeReview}
         {...(options.onDiscardTake ? { onDiscardTake: options.onDiscardTake } : {})}
         onOpenVoiceTreatments={onOpenVoiceTreatments}
@@ -161,7 +165,7 @@ describe('StudioSessionControlBar', () => {
     const session = createSession();
     const view = renderBar(session);
 
-    await user.click(screen.getByRole('button', { name: 'Start Camera + Mic' }));
+    await user.click(screen.getByRole('button', { name: 'Record New Video' }));
     expect(session.startLocal).toHaveBeenCalledOnce();
 
     view.rerender(
@@ -182,6 +186,20 @@ describe('StudioSessionControlBar', () => {
       </StudioDesignProvider>,
     );
     expect(screen.getByRole('button', { name: 'Starting camera…' })).toBeDisabled();
+  });
+
+  it('delegates the primary record intent without starting media independently', async () => {
+    const user = userEvent.setup();
+    const session = createSession();
+    const onStartLocalRecording = vi.fn();
+    renderBar(session, vi.fn(), createRecording(), vi.fn(), false, vi.fn(), vi.fn(), {
+      onStartLocalRecording,
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Record New Video' }));
+
+    expect(onStartLocalRecording).toHaveBeenCalledOnce();
+    expect(session.startLocal).not.toHaveBeenCalled();
   });
 
   it('keeps AI, track toggles, and full shutdown available for a selected experience', async () => {
@@ -374,7 +392,7 @@ describe('StudioSessionControlBar', () => {
     expect(screen.getByRole('button', { name: 'Edit video' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Voice' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Release' })).toBeDisabled();
-    expect(screen.queryByRole('button', { name: 'Start Camera + Mic' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Record New Video' })).not.toBeInTheDocument();
 
     await user.click(screen.getByRole('button', { name: 'Edit video' }));
     expect(onEditVideo).toHaveBeenCalledOnce();

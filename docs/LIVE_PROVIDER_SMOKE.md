@@ -100,8 +100,8 @@ For each exact batch model:
 
 1. With `DECART_API_KEY` absent, preview and local Download must work while batch capability is
    unavailable and no provider network/SDK is used.
-2. Configure prompt-only, reference-only where applicable, and combined input. Confirm VTO's beta,
-   rights, retention, and submission disclosure is visible before action.
+2. Configure prompt-only, reference-only where applicable, and combined input. Confirm VTO rights,
+   retention, input limitations, and submission disclosure are visible before action.
 3. Submit once. Confirm the broker's multipart input maps to Decart's documented `data`, `prompt`,
    optional `reference_image`, `resolution=720p`, and `enhance_prompt` fields; uses synthetic
    filenames and the selected exact model (`lucy-latest` or `lucy-vton-latest`); and makes no

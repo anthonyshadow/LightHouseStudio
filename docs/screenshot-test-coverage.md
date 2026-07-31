@@ -55,8 +55,8 @@ local-live/recording state/viewport pair.
 | Small mobile  | `01-studio/take-finalizing.png`                      |
 | Small mobile  | `01-studio/media-permission-error.png`               |
 
-The matrix intentionally emphasizes the actual first impression, provider-free live capture,
-dominant recording Stop, Character reuse, the densest Builder/review states, and representative
+The matrix intentionally emphasizes the record/upload first impression, neutral Local Camera
+startup, provider-free live capture, dominant recording Stop, the densest Builder/review states, and representative
 loading/error boundaries.
 
 ## Determinism and readiness

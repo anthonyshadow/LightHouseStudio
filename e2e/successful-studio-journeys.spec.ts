@@ -129,7 +129,7 @@ for (const viewport of exactViewports) {
     await page.goto('/studio');
     await expectNoDocumentOverflow(page);
     await expect(page.getByLabel('Studio session controls')).toBeVisible();
-    await expectActionInsideViewport(page, 'Start Camera + Mic');
+    await expectActionInsideViewport(page, 'Record New Video');
     const stableStageRect = await readStageRect(page);
 
     await page.getByRole('button', { name: 'Workshop', exact: true }).click();
@@ -271,7 +271,7 @@ test('@cross-browser focused media smoke reaches record, Voice, and review recov
   await page.goto('/studio');
 
   const controls = page.getByLabel('Studio session controls');
-  await controls.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await startLocalPreview(page);
   const preview = page.getByLabel('Live local camera preview');
   await expect(preview).toBeVisible();
   await expect(preview).toHaveAttribute('playsinline', '');
@@ -313,7 +313,7 @@ test('@touch controls recover while recording Stop remains reachable', async ({
 
   const mediaStage = page.getByLabel('Studio media stage');
   const controls = page.locator('[aria-label="Studio session controls"]');
-  await controls.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await startLocalPreview(page);
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
 
   await expect(controls).toHaveAttribute('data-control-visibility', 'hidden', {
@@ -363,7 +363,7 @@ test('the independent recording maximum warns and safely opens take review', asy
   await page.goto('/studio');
 
   const controls = page.getByLabel('Studio session controls');
-  await controls.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await startLocalPreview(page);
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
   await controls.getByRole('button', { name: 'Record' }).click();
 
@@ -414,13 +414,13 @@ test('persistent controls preserve local media across VTON choice, AI stop, trac
   await page.goto('/studio');
 
   const controls = page.getByLabel('Studio session controls');
-  await controls.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await controls.getByRole('button', { name: 'Record New Video' }).click();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
   await expect(controls.getByRole('button', { name: 'Start AI' })).toBeVisible();
   expect((await readBrowserState(page)).cameraCalls).toBe(1);
 
   await controls.getByRole('button', { name: 'Start AI' }).click();
-  const chooser = page.getByRole('dialog', { name: 'Choose AI experience' });
+  const chooser = page.getByRole('dialog', { name: 'Choose live AI experience' });
   await expect(chooser.getByRole('heading', { name: 'Character Transformation' })).toBeVisible();
   await expect(chooser.getByRole('heading', { name: 'Virtual Try-On' })).toBeVisible();
   await expectNoDocumentOverflow(page);

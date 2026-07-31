@@ -259,10 +259,10 @@ test('both saved-character entries open Characters and complete Use through Star
       name: 'Selected character: Shelf Field Host. Open character options',
     }),
   ).toBeVisible();
-  await page.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await page.getByRole('button', { name: 'Record New Video' }).click();
   await expect(page.getByLabel('Local camera preview')).toBeVisible();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
-  let chooser = page.getByRole('dialog', { name: 'Choose AI experience' });
+  let chooser = page.getByRole('dialog', { name: 'Choose live AI experience' });
   await expect(chooser.getByLabel('Decart start disclosure')).toContainText('at most 300 seconds');
   expect(network.apiRequests.filter(({ path }) => path === '/api/realtime-token')).toHaveLength(0);
   await chooser.getByRole('button', { name: 'Start with Shelf Field Host' }).click();
@@ -280,10 +280,10 @@ test('both saved-character entries open Characters and complete Use through Star
   ]);
 
   await page.reload();
-  await page.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await page.getByRole('button', { name: 'Record New Video' }).click();
   await expect(page.getByLabel('Local camera preview')).toBeVisible();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
-  chooser = page.getByRole('dialog', { name: 'Choose AI experience' });
+  chooser = page.getByRole('dialog', { name: 'Choose live AI experience' });
   await chooser.getByRole('button', { name: 'Choose Saved Character' }).click();
   shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
   await expect(shelf.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
@@ -292,7 +292,7 @@ test('both saved-character entries open Characters and complete Use through Star
   );
   await shelf.getByRole('button', { name: 'Use Shelf Field Host' }).click();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
-  chooser = page.getByRole('dialog', { name: 'Choose AI experience' });
+  chooser = page.getByRole('dialog', { name: 'Choose live AI experience' });
   await expect(chooser.getByLabel('Decart start disclosure')).toContainText('Stop AI ends usage');
   await chooser.getByRole('button', { name: 'Start with Shelf Field Host' }).click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();

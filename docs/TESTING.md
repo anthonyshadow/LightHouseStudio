@@ -44,15 +44,19 @@ once through a single Vitest invocation.
 
 The retained suite protects:
 
-- provider-free entry and Local Camera capture without Decart/provider work;
+- provider-free entry, neutral Local Camera startup with no automatic media/AI, and discoverable
+  **Record New Video** / **Upload Video** actions;
 - reusable Character create/edit/save/preload and atomic reference hydration;
 - Lucy 2.5 and VTO explicit Start/Apply, safe fallback, and independent 300-second boundaries;
 - recording source pinning, duplicate Stop coalescing, recorder/sidecar/transcode ordering, forced
   H.264/AAC MP4 configuration, no-raw-fallback failure, playback, Download, Release, and confirmed
   Discard;
 - immutable-original local and ElevenLabs Voice processing;
-- upload/record inline playback, Original/Result edit-base synchronization, lazy voice selection,
-  strict visual-before-voice ordering, latest-result cleanup, and post-generation MP4 validation;
+- upload and primary local-record adoption into the editor; discoverable Character Swap, Virtual
+  Try On, and Voice; Original/Result synchronization; strict visual-before-voice ordering;
+  latest-result cleanup; and post-generation MP4 validation;
+- advanced live AI entry, Start/Apply behavior, Latest Take review, and cleanup remain independent
+  from the primary post-recording workflow;
 - versioned/sanitized Recipe Shelf and Character Builder persistence, recovery, and destructive
   actions;
 - loopback Host/Origin, explicit provider intent, bounded response/stream handling, SSRF-resistant

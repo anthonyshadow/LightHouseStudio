@@ -2,10 +2,12 @@
 
 ## Product context
 
-Lightframe Studio is a local-first, single-operator browser camera studio. The primary flow is
-Camera or Upload → optional Lucy/VTO → Record → optional Voice → Download. `/studio` is a
-fixed-viewport production workspace with one persistent media stage; tools are focus-managed
-overlays and must never remount the media. Character Builder creates a reusable Lucy 2.5 character
+Lightframe Studio is a local-first, single-operator browser video studio. The primary flow is
+Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Download.
+`/studio` starts in neutral Local Camera mode with camera, microphone, and AI off until an explicit
+action. It is a fixed-viewport workspace with one persistent media stage; tools are focus-managed
+overlays and must never remount the media. Live AI camera transformation is an advanced flow.
+Character Builder creates a reusable Lucy 2.5 character
 from approachable visual choices, an optional upload, and an optional paid reference generation.
 
 The Character builder must be immediately legible to first-time users: choose a starting point,

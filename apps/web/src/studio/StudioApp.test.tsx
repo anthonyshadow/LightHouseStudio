@@ -141,6 +141,9 @@ const harness = vi.hoisted(() => {
   const recording = {
     lifecycle: 'idle' as const,
     activeSource: null,
+    original: null as null | { id: string },
+    visual: null,
+    processed: null,
     presented: null,
     sidecar: { state: 'idle' as const, artifact: null, error: null },
     recordingError: null,
@@ -148,11 +151,29 @@ const harness = vi.hoisted(() => {
     elapsedSeconds: 0,
     discard: vi.fn(),
   };
+  const existingVideo = {
+    selection: null,
+    steps: [],
+    comparison: 'result' as const,
+    active: false,
+    providerActive: false,
+    adoptRecordedArtifact: vi.fn(() => Promise.resolve()),
+    cancelBeforeAcceptance: vi.fn(),
+    reset: vi.fn(),
+    showResult: vi.fn(),
+    updateStep: vi.fn(),
+  };
+  const takeStagePresentation: { kind: string; mode?: string } = {
+    kind: 'idle',
+    mode: 'lucy-latest',
+  };
 
   return {
     repository,
     session,
     recording,
+    existingVideo,
+    takeStagePresentation,
     latestWorkspace: null as WorkspaceHarnessProps | null,
     fetchReferenceImageMetadata: vi.fn(),
     hydrateReferenceImage: vi.fn(),
@@ -220,6 +241,23 @@ vi.mock('../features/recording', () => ({
   RecordingControls: () => <div>Recording controls</div>,
 }));
 
+vi.mock('../features/existing-video/ExistingVideoPanel', () => ({
+  ExistingVideoPanel: ({ onRecordVideo }: { onRecordVideo?: () => void }) => (
+    <div>
+      Post-recording editor
+      {onRecordVideo ? (
+        <button type="button" onClick={onRecordVideo}>
+          Record a local video
+        </button>
+      ) : null}
+    </div>
+  ),
+}));
+
+vi.mock('../features/existing-video/useExistingVideoWorkflow', () => ({
+  useExistingVideoWorkflow: () => harness.existingVideo,
+}));
+
 vi.mock('../features/media-session', async () => {
   const { confirmModeReplacement, hasDraftContent } =
     await import('../features/media-session/draftPolicy');
@@ -265,7 +303,7 @@ vi.mock('./useTakeReviewFlow', () => ({
     finalizingStream: null,
     automaticRecordingStopEvent: null,
     finishTake: vi.fn(() => Promise.resolve()),
-    stagePresentation: { kind: 'idle', mode: 'lucy-latest' },
+    stagePresentation: harness.takeStagePresentation,
   }),
 }));
 
@@ -365,7 +403,11 @@ describe('StudioApp composition lifecycle', () => {
     window.history.replaceState(null, '', '/');
     harness.latestWorkspace = null;
     harness.promptCommitted = null;
+    harness.recording.original = null;
+    harness.takeStagePresentation = { kind: 'idle', mode: 'lucy-latest' };
     harness.session.startLocal.mockClear();
+    harness.session.startLocal.mockImplementation(() => Promise.resolve());
+    harness.existingVideo.adoptRecordedArtifact.mockClear();
     harness.session.replaceRecipeDraft.mockClear();
     harness.repository.recordSuccessfulPrompt.mockClear();
     harness.repository.enrichNewestMatchingRecent.mockClear();
@@ -407,6 +449,24 @@ describe('StudioApp composition lifecycle', () => {
     expect(harness.session.startLocal).toHaveBeenCalledOnce();
     expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
+  });
+
+  it('adopts an explicitly recorded local take into the post-recording editor', async () => {
+    harness.session.startLocal.mockImplementationOnce(() => {
+      harness.recording.original = { id: 'recorded-source' };
+      harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
+      return Promise.resolve();
+    });
+    renderStudio('upload');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Record a local video' }));
+
+    await waitFor(() => expect(harness.existingVideo.adoptRecordedArtifact).toHaveBeenCalledOnce());
+    await waitFor(() =>
+      expect(screen.getByRole('region', { name: 'Upload existing video' })).toHaveTextContent(
+        'Post-recording editor',
+      ),
+    );
   });
 
   it('hydrates and atomically hands a saved reference recipe to the session', async () => {

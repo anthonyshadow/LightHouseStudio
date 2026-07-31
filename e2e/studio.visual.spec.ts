@@ -162,7 +162,7 @@ const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<Netwo
   await page.goto(entryRoute ? '/' : '/studio');
   await expect(page.getByRole('main')).toBeVisible();
   if (entryRoute) {
-    await expect(page.getByRole('button', { name: 'Start with camera' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
   } else {
     await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
   }
@@ -207,7 +207,7 @@ const selectSeededCharacter = async (page: Page): Promise<void> => {
 };
 
 const openExistingVideoChooser = async (page: Page) => {
-  await page.getByRole('button', { name: 'Upload video' }).click();
+  await page.getByRole('button', { name: 'Upload Video' }).click();
   const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
   await expect(dialog).toBeVisible();
   return dialog;
@@ -233,7 +233,7 @@ const addVisualStep = async (
 ) => {
   await dialog
     .getByRole('button', {
-      name: modelId === 'lucy-latest' ? 'Swap Character' : 'Virtual Try On',
+      name: modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
     })
     .click();
   await dialog.locator('article').last().locator('textarea').fill(prompt);
@@ -244,7 +244,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'entry-initial',
     setup: async (page) => {
       await expect(page.getByRole('heading', { name: 'Enter Lightframe Studio' })).toBeAttached();
-      await expect(page.getByRole('button', { name: 'Start with camera' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
     },
   },
@@ -253,7 +253,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     setup: async (page) => {
       await expect(page.getByRole('dialog')).toHaveCount(0);
       await expect(
-        page.getByRole('button', { name: 'Start Camera + Mic', exact: true }),
+        page.getByRole('button', { name: 'Record New Video', exact: true }),
       ).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toContainText('Studio idle');
     },
@@ -282,10 +282,10 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'ai-experience-choice',
     setup: async (page) => {
       const controls = page.getByLabel('Studio session controls');
-      await controls.getByRole('button', { name: 'Start Camera + Mic' }).click();
+      await controls.getByRole('button', { name: 'Record New Video' }).click();
       await expect(page.getByLabel('Live local camera preview')).toBeVisible();
       await controls.getByRole('button', { name: 'Start AI' }).click();
-      await expect(page.getByRole('dialog', { name: 'Choose AI experience' })).toBeVisible();
+      await expect(page.getByRole('dialog', { name: 'Choose live AI experience' })).toBeVisible();
     },
   },
   'selected-character-ai-live': {
@@ -293,7 +293,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     setup: async (page) => {
       await selectSeededCharacter(page);
       await page
-        .getByRole('button', { name: 'Start Camera + Mic', exact: true })
+        .getByRole('button', { name: 'Record New Video', exact: true })
         .click({ force: true });
       await expect(page.getByLabel('Live local camera preview')).toBeVisible();
       await closeRecipeDockWhenOverlaid(page);
@@ -362,7 +362,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       const { dialog } = await selectVisualVideo(page);
       await addVisualStep(dialog, 'lucy-latest', 'Transform into a documentary field presenter.');
       await expect(dialog).toContainText('1 planned Decart submission');
-      await expect(dialog.getByRole('button', { name: 'Swap Character' })).toHaveAttribute(
+      await expect(dialog.getByRole('button', { name: 'Character Swap' })).toHaveAttribute(
         'aria-pressed',
         'true',
       );

@@ -31,6 +31,14 @@ The entry does not mount `StudioApp`, request capabilities, acquire media, load 
 WebSocket, or contact a provider. `StudioApp.tsx` remains the sole runtime composition boundary.
 There is no second product shell, media session, global client store, or provider client.
 
+Studio initializes the session draft in Local Camera mode and the media lifecycle at `idle`.
+Entry intent may open the upload panel, but it never starts camera, microphone, AI, or provider
+work. The control-bar **Record New Video** action and upload-panel **Record a local video** action
+both explicitly acquire local media and mark the finalized local artifact for adoption by the
+existing-video editor. Dock-started local preview and Character/VTO starts retain the advanced
+live-session and Latest Take paths; post-recording workflow state is not mixed into provider
+session orchestration.
+
 The mounted Studio owns focused controllers for:
 
 - local/realtime media and per-mode drafts;
@@ -104,7 +112,7 @@ Character Builder exclusively owns character create/edit, its resumable IndexedD
 reference upload, prompt optimization, image generation/edit/composition, durable save journal,
 and Shelf persistence. Its completion handoff is destination-specific: general Studio entry
 atomically preloads the Lucy Dock, while uploaded-video entry hydrates and selects the saved
-character in the originating unsubmitted Swap Character step.
+character in the originating unsubmitted Character Swap step.
 
 Prompt Workshop owns only Add, Replace, and Restyle structured object recipes. Recipe Shelf owns
 saved/recent/character metadata and atomic reuse. Neither owns Character generation or a media
@@ -133,6 +141,12 @@ Recording composes a new stream from borrowed live tracks:
 
 The chosen track identities and take metadata are pinned at Start. Recording never owns or stops
 source tracks.
+
+For the primary record flow, a healthy normalized local artifact is adopted by the existing-video
+workflow after finalization and the editor reopens with Character Swap, Virtual Try On, and Voice.
+For Dock-started local and live AI recordings, the existing Latest Take review remains
+authoritative. Both paths borrow the same stage-owned recording lifecycle and preserve its
+cleanup ordering.
 
 Recording orchestration owns the `MediaRecorder` instances, chunks, optional audio sidecar,
 warning/cap timer, MediaBunny conversion, and finalization:

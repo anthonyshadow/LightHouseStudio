@@ -63,18 +63,18 @@ describe('AppRouter', () => {
     renderApplication();
 
     expect(screen.getByRole('heading', { name: 'Enter Lightframe Studio' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start with camera' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upload existing video' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Record New Video' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Upload Video' })).toBeInTheDocument();
     expect(screen.queryByText('Studio route')).not.toBeInTheDocument();
     expect(appHarness.renderCount).toBe(0);
     expect(document.title).toBe('Enter Lightframe Studio');
     expect(document.querySelectorAll('meta[name="description"]')).toHaveLength(1);
-    expect(description?.content).toContain('Enter Lightframe Studio');
+    expect(description?.content).toContain('Record or upload a video');
   });
 
-  it('pushes Studio from the camera entry without starting camera and hands focus to its main landmark', async () => {
+  it('pushes Studio from Record New Video without starting media and hands focus to its main landmark', async () => {
     const { router } = renderApplication();
-    fireEvent.click(screen.getByRole('button', { name: 'Start with camera' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Record New Video' }));
 
     expect(await screen.findByText('Studio route')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/studio');
@@ -86,7 +86,7 @@ describe('AppRouter', () => {
   it('passes upload intent without selecting a file or mounting Studio on the entry route', async () => {
     const { router } = renderApplication();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Upload existing video' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Upload Video' }));
 
     expect(await screen.findByText('Studio route')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/studio');
@@ -98,12 +98,12 @@ describe('AppRouter', () => {
 
   it('restores focus to the camera entry after browser Back', async () => {
     const { router } = renderApplication();
-    fireEvent.click(screen.getByRole('button', { name: 'Start with camera' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Record New Video' }));
     await screen.findByText('Studio route');
 
     await router.navigate(-1);
 
-    const enter = await screen.findByRole('button', { name: 'Start with camera' });
+    const enter = await screen.findByRole('button', { name: 'Record New Video' });
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     await waitFor(() => expect(enter).toHaveFocus());
   });
@@ -124,7 +124,7 @@ describe('AppRouter', () => {
   ])('replaces the noncanonical path %s with the entry page', async (path) => {
     const { router } = renderApplication(path);
 
-    expect(await screen.findByRole('button', { name: 'Start with camera' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Record New Video' })).toBeInTheDocument();
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     expect(router.state.location.search).toBe('');
     expect(appHarness.renderCount).toBe(0);
@@ -135,7 +135,7 @@ describe('AppRouter', () => {
     async (path) => {
       renderApplication(path);
 
-      expect(await screen.findByRole('button', { name: 'Start with camera' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Record New Video' })).toBeInTheDocument();
       expect(appHarness.renderCount).toBe(0);
     },
   );

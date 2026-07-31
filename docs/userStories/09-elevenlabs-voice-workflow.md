@@ -5,8 +5,8 @@ ever uploading video or replacing the immutable original on failure.
 
 ## Runtime journey
 
-1. Open **Voice treatments** for a take with a usable sidecar, browser audio replacement, and a
-   duration no greater than five minutes.
+1. Open **Voice** in the post-recording editor or **Voice treatments** in Latest Take for a source
+   with a usable sidecar, browser audio replacement, and a duration no greater than five minutes.
 2. Select **Browse saved voices · contacts ElevenLabs**. Browsing is explicit; opening Voice
    treatments alone does not fetch voices.
 3. Search, page, refresh, and preview saved-library voices. Preview contacts ElevenLabs but does

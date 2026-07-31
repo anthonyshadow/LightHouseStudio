@@ -1,6 +1,6 @@
 # Lightframe Studio product state
 
-**Current as of:** 2026-07-30
+**Current as of:** 2026-07-31
 
 **Release frame:** operator-assisted, loopback-only controlled pilot
 
@@ -13,9 +13,10 @@ This is the concise product authority. Implementation details live in
 
 Lightframe Studio is a local-first browser camera studio for one operator:
 
-> Camera or Upload → visual processing → optional Voice → Download
+> Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Download
 
-Character Performance is primary. VTO is a secondary beta. Workshop is an advanced tool.
+Post-recording editing is primary. Live Character/VTO camera transformation and Workshop are
+advanced tools.
 
 The product is local-first, not offline-only. Camera preview, local recording, drafting, uploads,
 saved browser metadata, and local voice effects can run without an external media provider.
@@ -42,6 +43,9 @@ required, but no physical target is qualified yet.
 - `/` is a provider-free entry and `/studio` is the lazy-loaded Studio runtime. They are the only
   registered routes; every other path returns to entry. Detected legacy projects remain
   compatibility-only downloads/deletions within Studio and have no URL entry.
+- Studio starts in neutral Local Camera mode. It does not request camera/microphone permission or
+  start AI until the creator explicitly uses the control bar, upload/record panel, or advanced
+  Dock flow.
 - One persistent stage owns local/AI preview, uploaded-video preview, recording, finalization,
   result comparison, and take playback. Shared overlays never own a second media session.
 - Capture supports device choice, browser-exposed camera switching, and capability-gated zoom.
@@ -50,7 +54,7 @@ required, but no physical target is qualified yet.
 - Recipe Shelf stores sanitized, versioned browser metadata and opaque reference relationships.
 - Character uses exact `lucy-latest`; VTO uses pinned `lucy-vton-latest`.
 - Existing H.264 MP4/MOV and VP8 WebM sources can stay local or run exactly one selected Decart
-  batch model. Swap Character and VTO are mutually exclusive within an uploaded workflow.
+  batch model. Character Swap and VTO are mutually exclusive within an edited-video workflow.
 - OpenAI, BFL, and Wiro are separate startup-selected image-provider passes with no fallback.
   Participant mode disables Wiro.
 - Recording owns an accessible warning at 270 seconds and coalesced Stop/finalize at 300 seconds.
@@ -106,7 +110,8 @@ See [active audit plan](project-audit-implementation-plan.md) and
 
 ## Product decisions
 
-- Keep Character Performance as the pilot promise; do not broaden the first-run story.
+- Keep record/upload, review, and optional post-recording edits as the first-run pilot promise.
+- Preserve live Character/VTO transformation as an explicit advanced flow.
 - Keep provider contact explicit and preserve startup selection with no automatic fallback.
 - Keep the 300-second recording and Decart limits independent.
 - Keep the two-route, one-runtime, one-stage, shared-overlay architecture.
@@ -153,10 +158,10 @@ content-free timing so a percentage never hides a tiny sample.
 ## Questions for the pilot
 
 - Does reusable identity, live transformation, faster capture, or local control drive return use?
-- Where does the Character → Record → Voice → Download path still need operator explanation?
+- Where does the Record/Upload → Review → Edit → Download path still need operator explanation?
 - Does saved-character reuse improve speed or output consistency at the return session?
 - Does Voice materially improve usable output enough to justify cost and complexity?
-- Does VTO solve a distinct job despite its beta limitations?
+- Does VTO solve a distinct job within its stated input and accuracy limitations?
 - Is Download plus local files sufficient, or is portability/history a repeated unmet need?
 
 ## Deferred scope

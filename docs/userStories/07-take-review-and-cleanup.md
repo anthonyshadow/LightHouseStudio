@@ -13,8 +13,9 @@ deliberately release or discard it.
    transcoding to finish. Studio forces H.264 video and AAC audio when present into MP4; the raw
    recorder container is never downloadable.
 4. After the converted MP4 becomes authoritative and live/provider resources release, confirm
-   **Recorded take playback** and compact Download, Discard, Voice, and Release actions on the
-   persistent stage.
+   **Recorded take playback** on the persistent stage. Primary **Record New Video** opens the
+   post-recording editor; Dock-started local and live AI recordings retain compact Download,
+   Discard, Voice, and Release actions.
 5. Select **Take** to inspect mode, sources, start time, dimensions/frame rate when known, duration,
    size, and MIME type. The panel does not create another player.
 6. Optionally apply a voice treatment. Playback and download remain locked until processing

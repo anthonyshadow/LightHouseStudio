@@ -174,7 +174,7 @@ for (const viewport of representativeViewports) {
 
     await expect(page.getByRole('main')).toBeVisible();
     await expect(page.getByRole('complementary', { name: 'First take guide' })).toContainText(
-      'Start camera → choose Character → Record → optional Voice → Download',
+      'Record New Video or Upload Video → review',
     );
     await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
 
@@ -340,7 +340,7 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
   await alert.getByRole('button', { name: 'Capture settings' }).click();
   await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
   await page.getByRole('button', { name: 'Close panel' }).click();
-  await page.getByRole('button', { name: 'Start Camera + Mic' }).click();
+  await page.getByRole('button', { name: 'Record New Video' }).click();
   await expect(page.getByRole('alert')).toContainText(
     'Camera or microphone access was not allowed.',
   );

@@ -52,7 +52,7 @@ export const PrivateIdleStage: Story = {
     lifecycle: 'idle',
     recording: false,
     recordingSeconds: 0,
-    idleAction: <Button variant="primary">Start Camera + Mic</Button>,
+    idleAction: <Button variant="primary">Record New Video</Button>,
   },
   render: (args) => stageFrame(<MediaStage {...args} />),
 };

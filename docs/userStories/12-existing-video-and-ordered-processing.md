@@ -1,4 +1,4 @@
-# Existing video and single visual processing
+# Record or upload and edit a video
 
 ## Goal
 
@@ -8,10 +8,10 @@ then edit either base, download, start over, or discard.
 
 ## Journey
 
-1. From `/`, the creator chooses **Upload existing video**. Direct `/studio` visits keep the
-   camera-first default. Studio lazy-loads before the browser file picker opens.
-2. The creator may also choose **Upload video** from the idle Studio control bar. Neither path
-   needs camera permission, provider credentials, a Decart SDK, or external traffic.
+1. From `/`, the creator chooses **Record New Video** or **Upload Video**. Direct `/studio` visits
+   keep neutral Local Camera mode with camera, microphone, and AI off.
+2. The idle Studio control bar exposes the same **Record New Video** and **Upload Video** actions.
+   Upload needs no camera permission, provider credentials, Decart SDK, or external traffic.
 3. Studio accepts a file picker or drop, validates browser metadata and decode, and publishes a
    playable temporary source on the persistent stage and the upload panel's accessible inline
    player. Both expose play/pause, seek, volume, and fullscreen where supported. The inline player
@@ -20,28 +20,28 @@ then edit either base, download, start over, or discard.
    filename, size, duration, resolution, orientation, codec, and audio availability.
    Once a video is selected, backdrop clicks cannot dismiss the panel; the creator must use an
    explicit close action or complete the workflow.
-4. Instead of selecting a file, the creator may explicitly choose **Record a local video**. Camera
-   and microphone start only after that action. The panel closes immediately; the one persistent
-   stage owns live preview, Start, Stop, the independent 270/300-second warning/limit,
-   finalization, and initial playback review. After a healthy finalization, Studio validates and
-   adopts the normalized recording as the source, then returns to the editor. The inline player is
-   not mounted for live preview, recording, finalization, or initial recording review.
+4. Instead of selecting a file, the creator may choose control-bar **Record New Video** or panel
+   **Record a local video**. Camera and microphone start only after that action. The one persistent
+   stage owns live preview, Record, Stop, the independent 270/300-second warning/limit, and
+   finalization. After a healthy finalization, Studio validates and adopts the normalized
+   recording as the source, then opens the editor. The inline player is not mounted during live
+   preview, recording, or finalization.
 5. The creator may replace or remove the source, then choose zero or one visual transformation:
-   **Swap Character** (Lucy 2.5) or **Virtual Try On**, never both. Both selectors remain available
+   **Character Swap** (Lucy 2.5) or **Virtual Try On**, never both. Both selectors remain available
    before submission so the creator can switch the single active choice directly. Only the active
    transformation owns the submitted prompt, prompt-enhancement switch, and optional validated
    reference. Saved characters and
    outfits open in a keyboard-operable custom chooser with an optional local thumbnail, recipe
    name, and a two-line prompt summary. The saved-character chooser ends with
    **Create A Character**. That action opens Character Builder; a successful save returns to this
-   panel with the new saved character selected and its prompt/reference filled into the same Swap
-   Character step. An attached reference renders a local preview with replace and remove actions.
+   panel with the new saved character selected and its prompt/reference filled into the same
+   Character Swap step. An attached reference renders a local preview with replace and remove actions.
    Explicitly closing the panel retains the tab-local selection and plan; an **Edit video** action
    in the recorded-take controls reopens the same workflow.
 6. VTO uses exactly one input mode. **Saved or recent outfit** selects a saved recipe or tab-local
    recent import; **Reference image** prefers a local JPEG/PNG/WebP and reveals its HTTPS URL field
    only after **Use an image URL instead**; **Prompt** alone exposes Enhance Prompt. Switching
-   modes clears incompatible fields. VTO retains a calm beta/pilot, consent, one-garment,
+   modes clears incompatible fields. VTO retains calm controlled-pilot, consent, one-garment,
    plain-background, and no-fit/sizing/purchase-accuracy disclosure.
 7. **Add voice change** lazily loads saved ElevenLabs voices. Selection alone transfers no take.
    Review truthfully summarizes no provider work, one Decart submission, one ElevenLabs conversion,
@@ -62,7 +62,7 @@ then edit either base, download, start over, or discard.
     the moderated participant submission counters. The creator can choose either model again.
 12. Confirmed **Discard video** in the panel, or **Discard** in the recorded-take control bar,
     revokes the uploaded source and all generated results. The control bar returns from **Edit
-    video** to **Upload video**, and the next panel open starts at **Choose an existing video** with
+    video** to **Upload Video**, and the next panel open starts at **Choose an existing video** with
     no retained plan, chooser state, or prior source.
 
 ## Validation and failure behavior

@@ -6,8 +6,8 @@ This file contains incomplete work only. Resolved runtime findings are in
 passes for the same release candidate.
 
 Scope is fixed by the [controlled-pilot contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md): moderated,
-loopback-only, at most five participants, Character primary, VTO beta, touch/mobile required, a
-300-second take maximum, and no provider fallback.
+loopback-only, at most five participants, record/upload post-editing primary, live AI and Workshop
+advanced, touch/mobile required, a 300-second take maximum, and no provider fallback.
 
 ## Phase 0 — Existing-video single-processing acceptance
 

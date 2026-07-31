@@ -1,11 +1,12 @@
 # Virtual try-on session
 
-**Outcome:** deliberately preview and optionally record a `lucy-vton-latest` garment transformation.
-VTO remains a secondary beta.
+**Outcome:** deliberately preview and optionally record an advanced live `lucy-vton-latest`
+garment transformation. Post-recording Virtual Try On is also available in the primary editor.
 
 ## Journey
 
-1. Select **Start Camera + Mic**, then **Start AI** and **Virtual Try-On Beta**.
+1. Explicitly start local media from **Record New Video** or Dock **Start local preview**, then
+   select **Start AI** and **Virtual Try-On**.
 2. If no VTO recipe is ready, open the Dock or choose a saved Try-On recipe. Until an outfit
    recipe has content, the stage control bar keeps local **Record** as its primary action and does
    not present **Start AI**.
@@ -32,8 +33,8 @@ the pinned `lucy-vton-latest` model.
 - Invalid or oversized images are rejected before provider contact. Dock images remain
   tab-ephemeral and are revoked when replaced or cleared.
 - Studio makes no fit, sizing, fabric-behavior, or purchase-accuracy claim.
-- Upload Existing Video presents beta/pilot and consent/garment guidance as calm disclosure, not a
-  warning alert. This presentation change does not remove the controlled-pilot policy.
+- Upload Existing Video presents controlled-pilot, consent, garment, and accuracy guidance as calm
+  disclosure, not a warning alert.
 - Expected 300-second completion preserves the recipe and local preview; early end/disconnect is a
   distinct safe recovery state.
 - An active take finalizes once before source resources release.
