@@ -8,20 +8,21 @@ This document separates current runtime behavior from the approved pilot operati
 
 ## Current data inventory
 
-| Data                                                                          | Current location and lifetime                                                                               | External transfer                                                                                 |
-| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| Saved/recent recipes, character metadata, opaque reference IDs                | Sanitized/versioned Recipe Shelf v4 in this browser profile’s `localStorage`                                | None                                                                                              |
-| Active Character Builder draft/save journal                                   | One sanitized/versioned IndexedDB record until Reset, successful Save, site-data removal, or eviction       | Only after explicit optimization/image action                                                     |
-| Legacy Guided projects/media                                                  | Versioned IndexedDB records until manager deletion, site-data removal, or eviction                          | None                                                                                              |
-| Uploaded/generated/edited/composed references and metadata                    | Immutable owner-scoped files under `LIGHTFRAME_DATA_DIR` until operator retirement                          | Upload/direct save: none; provider image actions: prompt/options and source bytes when applicable |
-| Active mode text/enhancement, capture preferences, temporary portrait/garment | Tab memory until reset/reload/unmount                                                                       | Decart only after matching Start/Apply                                                            |
-| Camera/microphone streams                                                     | Browser memory while live                                                                                   | None in Local; Decart during explicit AI session                                                  |
-| Decart client credential/timing                                               | Browser memory for the connection/session                                                                   | Decart connection only                                                                            |
-| Current converted original take, sidecar, processed result                    | Browser memory until Release/Discard/reload/crash/close; raw recorder input exists only during finalization | Sidecar only after explicit ElevenLabs Apply                                                      |
-| Uploaded video, one selected visual recipe, visual result                     | Browser tab memory until replacement, Release/Discard, reload/crash/close                                   | Decart receives synthetic-named media and recipe only after explicit submit                       |
-| Active batch input/reference/output                                           | Generated private paths under `LIGHTFRAME_DATA_DIR/.tmp/video-jobs`; process-temporary, 60-minute cap       | Decart during explicit submit/status/content; no provider cancellation or deletion is claimed     |
-| Saved-voice pages/selection                                                   | React memory                                                                                                | ElevenLabs metadata after explicit Browse                                                         |
-| Voice preview audio                                                           | Bounded, short-lived Blob URL; revoked on replacement/unmount                                               | ElevenLabs preview request; never the take                                                        |
+| Data                                                                          | Current location and lifetime                                                                               | External transfer                                                                                                                   |
+| ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
+| Saved/recent recipes, character metadata, opaque reference IDs                | Sanitized/versioned Recipe Shelf v4 in this browser profile’s `localStorage`                                | None                                                                                                                                |
+| Active Character Builder draft/save journal                                   | One sanitized/versioned IndexedDB record until Reset, successful Save, site-data removal, or eviction       | Only after explicit optimization/image action                                                                                       |
+| Legacy Guided projects/media                                                  | Versioned IndexedDB records until manager deletion, site-data removal, or eviction                          | None                                                                                                                                |
+| Uploaded/generated/edited/composed references and metadata                    | Immutable owner-scoped files under `LIGHTFRAME_DATA_DIR` until operator retirement                          | Upload/direct save: none; provider image actions: prompt/options and source bytes when applicable                                   |
+| Active mode text/enhancement, capture preferences, temporary portrait/garment | Tab memory until reset/reload/unmount                                                                       | Decart only after matching Start/Apply                                                                                              |
+| Camera/microphone streams                                                     | Browser memory while live                                                                                   | None in Local; Decart during explicit AI session                                                                                    |
+| Decart client credential/timing                                               | Browser memory for the connection/session                                                                   | Decart connection only                                                                                                              |
+| Current converted original take, sidecar, processed result                    | Browser memory until Release/Discard/reload/crash/close; raw recorder input exists only during finalization | Sidecar only after explicit ElevenLabs Apply                                                                                        |
+| Uploaded/recorded video, selected edit plan, latest healthy result            | Browser tab memory until replacement, Release/Discard, reload/crash/close                                   | Decart receives synthetic-named media/recipe after visual submit; ElevenLabs receives only immutable source audio after voice Apply |
+| Remote VTO reference import URL and bytes                                     | URL exists only in request memory; validated bytes return no-store and become a tab-local `File`            | Public HTTPS origin receives one bounded GET; Decart receives validated bytes only on later submit, never the URL                   |
+| Active batch input/reference/output                                           | Generated private paths under `LIGHTFRAME_DATA_DIR/.tmp/video-jobs`; process-temporary, 60-minute cap       | Decart during explicit submit/status/content; no provider cancellation or deletion is claimed                                       |
+| Saved-voice pages/selection                                                   | React memory                                                                                                | ElevenLabs metadata after explicit Browse                                                                                           |
+| Voice preview audio                                                           | Bounded, short-lived Blob URL; revoked on replacement/unmount                                               | ElevenLabs preview request; never the take                                                                                          |
 
 The backend has no accounts, product database, take history, or session history. Its only durable
 product data is the immutable reference store and its versioned metadata/idempotency mappings.
@@ -44,6 +45,7 @@ provider payloads/errors are neither retained as product data nor returned to th
 | Browse saved voices               | ElevenLabs receives a saved-library metadata request; no take                                                                                                                        |
 | Preview voice                     | ElevenLabs preview request; no take                                                                                                                                                  |
 | Apply ElevenLabs voice            | ElevenLabs receives only the immutable original audio sidecar, not video                                                                                                             |
+| Import VTO reference URL          | Loopback broker fetches one explicit public HTTPS URL with DNS/redirect/byte/content controls; the URL is not sent to Decart                                                         |
 
 Provider actions may incur usage. Reference image providers never fall back to another provider or
 automatically repeat an initial billable submission. An optimizer failure may continue with the
@@ -58,9 +60,10 @@ the optional AAC WASM encoder entirely on the device. Local Voice uses Web Audio
 
 - Studio owns one temporary take. Download starts a browser download but does not prove completion.
   Release or confirmed Discard revokes take URLs and returns to idle. A completed uploaded-video
-  workflow downloads its generated result directly. **Start over** revokes generated visual/voice
-  URLs but retains the uploaded source; confirmed **Discard video** releases the source and results
-  and returns to the local upload picker.
+  workflow downloads its generated result directly. Only the immutable source and latest healthy
+  Result are retained after success; a visual remains temporarily while a following voice change
+  runs. **Start over** revokes generated URLs but retains the source; confirmed **Discard video**
+  releases the source, result, and recent outfits and returns to the local upload picker.
 - A take survives overlay closure, but not reload, crash, tab closure, or device restart.
 - Uploaded workflow/job recovery is intentionally unsupported across reload, crash, tab closure, or
   broker restart. The broker purges its dedicated job temp root at startup and expires jobs after
@@ -123,7 +126,7 @@ Local cleanup must never be described as provider-side deletion.
 
 The API is a trusted local broker: it binds to loopback, rejects non-loopback Host values, requires
 exact loopback Origin/Host for provider/reference mutations, requires explicit voice/video intent
-for ElevenLabs and Decart batch contact, validates/bounds inputs and outputs, owner-scopes
+for ElevenLabs, Decart batch contact, and remote reference import, validates/bounds inputs and outputs, owner-scopes
 references/jobs, and sanitizes errors. It has no public authentication or authorization.
 
 Do not expose it through LAN binding, a tunnel, proxy, container ingress, or public hostname.

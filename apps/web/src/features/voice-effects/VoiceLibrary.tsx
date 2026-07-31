@@ -9,6 +9,7 @@ export type VoiceLibraryProps = {
   clipDurationLabel: string;
   modelId?: string | null;
   onApply: (voice: VoiceSummary) => void;
+  mode?: 'apply' | 'select';
 };
 
 const stackStyles = (theme: Theme): CSSObject => ({ display: 'grid', gap: theme.space.sm });
@@ -47,6 +48,7 @@ export const VoiceLibrary = ({
   clipDurationLabel,
   modelId,
   onApply,
+  mode = 'apply',
 }: VoiceLibraryProps) => {
   const theme = useTheme();
   const library = useVoiceLibrary();
@@ -135,10 +137,19 @@ export const VoiceLibrary = ({
       {library.selected ? (
         <>
           <StatusNotice id="elevenlabs-apply-disclosure" title="Provider usage">
-            Clip duration: {clipDurationLabel}. Apply sends only the immutable original audio
-            sidecar to ElevenLabs
-            {modelId ? ` using ${modelId}` : ''} and may use provider credits. Zero-retention
-            eligibility is required; provider refusal is final for this request.
+            {mode === 'select' ? (
+              <>
+                Selecting a voice does not upload this video. Starting the edit later sends only the
+                immutable original audio sidecar to ElevenLabs.
+              </>
+            ) : (
+              <>
+                Clip duration: {clipDurationLabel}. Apply sends only the immutable original audio
+                sidecar to ElevenLabs
+                {modelId ? ` using ${modelId}` : ''} and may use provider credits. Zero-retention
+                eligibility is required; provider refusal is final for this request.
+              </>
+            )}
           </StatusNotice>
           <Button
             variant="primary"
@@ -146,7 +157,9 @@ export const VoiceLibrary = ({
             aria-describedby="elevenlabs-apply-disclosure"
             onClick={applySelectedVoice}
           >
-            Apply {library.selected.voice.name} to recorded audio
+            {mode === 'select'
+              ? `Use ${library.selected.voice.name} for this edit`
+              : `Apply ${library.selected.voice.name} to recorded audio`}
           </Button>
         </>
       ) : null}

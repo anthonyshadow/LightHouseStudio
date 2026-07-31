@@ -8,6 +8,7 @@ import type { RecordingController } from '../../features/recording/types';
 const adapters = vi.hoisted(() => ({
   convertRecordingVoice: vi.fn(),
   replaceRecordingAudio: vi.fn(),
+  transcodeRecordingToMp4: vi.fn(),
 }));
 
 vi.mock('../../adapters/api-client/voicesApi', () => ({
@@ -16,6 +17,10 @@ vi.mock('../../adapters/api-client/voicesApi', () => ({
 
 vi.mock('../../adapters/media-processing/replaceAudioTrack', () => ({
   replaceRecordingAudio: adapters.replaceRecordingAudio,
+}));
+
+vi.mock('../../adapters/media-processing/transcodeRecording', () => ({
+  transcodeRecordingToMp4: adapters.transcodeRecordingToMp4,
 }));
 
 vi.mock('../../adapters/media-processing/audioEffects', () => ({
@@ -74,6 +79,7 @@ const recordingController = (): RecordingController => {
     sidecar: readySidecar(),
     recordingError: null,
     processingState: 'idle',
+    processingOperation: null,
     processingError: null,
     elapsedSeconds: 1,
     downloaded: false,
@@ -94,6 +100,9 @@ const recordingController = (): RecordingController => {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  adapters.transcodeRecordingToMp4.mockImplementation((blob: Blob) =>
+    Promise.resolve({ blob, mimeType: 'video/mp4' }),
+  );
 });
 
 describe('useVoiceProcessing operation ownership', () => {
@@ -157,8 +166,10 @@ describe('useVoiceProcessing operation ownership', () => {
     expect(recording.completeProcessing).toHaveBeenCalledTimes(1);
     expect(recording.completeProcessing).toHaveBeenCalledWith(
       expect.any(Blob),
-      'video/webm',
-      'voice',
+      'video/mp4',
+      'voice-New voice',
+      recording.original,
+      undefined,
     );
     expect(result.current.selection).toEqual({
       kind: 'elevenlabs',

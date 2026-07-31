@@ -2,10 +2,10 @@
 
 ## Current runtime
 
-Studio keeps one immutable recorded or uploaded source, an optional source-audio sidecar, the
-latest successful visual result, and at most one voiced result in browser memory. Presentation is
-always `voiced → visual → source`; replacing the source or an already-run recipe invalidates every
-downstream layer.
+Studio keeps one immutable recorded or uploaded source, an optional source-audio sidecar, and one
+latest healthy Result in browser memory. During a combined visual-plus-voice edit, the healthy
+visual remains the Result while voice work runs; a healthy voiced replacement commits before the
+visual URL is revoked. Replacing the source invalidates every downstream layer.
 
 The runtime:
 
@@ -17,6 +17,11 @@ The runtime:
 - publishes a valid converted main video when the sidecar fails or times out;
 - commits a healthy visual or voiced replacement before revoking the superseded URL; and
 - releases artifact URLs only on downstream invalidation, Release, Discard, or unmount.
+
+Upload Existing Video also has the sole secondary `<video>` element. It borrows the existing
+source/result artifact URL and adds no encoded copy, track, or provider session. It never handles
+live preview, recording, or finalization; it pauses, detaches `src`, and removes its binding on
+close, replacement, or unmount.
 
 Peak finalization memory therefore includes recorder chunks, the raw assembled input, the
 in-progress encoded output, the final MP4 Blob, and the optional sidecar until conversion returns
@@ -44,8 +49,8 @@ For every required device/browser row in
 2. Complete the required 300-second Local, Character, and VTO paths. Confirm the warning,
    automatic finalization, playable original, responsive controls, and cleanup indicators.
 3. Complete maximum-size uploaded local, Lucy, and VTO paths as separate workflows. Measure before
-   submission, after the visual result, after local Voice, after ElevenLabs Voice when qualified,
-   and after Release/Discard.
+   submission, after the visual result, during ordered visual-plus-voice replacement, after local
+   Voice, after ElevenLabs Voice when qualified, and after Release/Discard.
 4. Record recorder-settlement, H.264/AAC transcode, and Voice-processing durations plus whether the
    browser evicted, terminated, or materially degraded the tab.
 5. Play every downloaded result outside Studio and verify duration, video, and audio.

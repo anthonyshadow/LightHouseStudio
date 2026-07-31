@@ -70,6 +70,7 @@ const createRecording = (
   sidecar: { state: 'unavailable', blob: null, mimeType: null, error: null },
   recordingError: null,
   processingState: 'idle',
+  processingOperation: null,
   processingError: null,
   elapsedSeconds: 0,
   downloaded: false,

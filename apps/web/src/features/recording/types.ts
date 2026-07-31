@@ -33,6 +33,20 @@ export type RecordingAudioSidecar = {
 
 export type VoiceProcessingState = 'idle' | 'processing' | 'ready' | 'error';
 
+export type RecordingProcessingOperation = Readonly<{
+  kind:
+    | 'source-validation'
+    | 'visual-upload'
+    | 'visual-generation'
+    | 'visual-retrieval'
+    | 'audio-restoration'
+    | 'transcoding'
+    | 'voice-conversion'
+    | 'voice-composition';
+  title: string;
+  detail: string;
+}>;
+
 export type RecordingSource = {
   stream: MediaStream;
   videoSource: 'local' | 'transformed';
@@ -80,6 +94,10 @@ export type TakeMetadata = RecordedTakeMetadata | UploadedTakeMetadata;
  */
 export type PersistedRecordingArtifactMetadata = Readonly<{
   id: string;
+  name?: string;
+  createdAt?: string;
+  kind?: RecordingArtifact['kind'];
+  parentArtifactId?: string | null;
   mimeType: string;
   filename: string;
   sourceModeId: StudioMode;
@@ -137,6 +155,7 @@ export type RecordingController = {
   sidecar: RecordingAudioSidecar;
   recordingError: string | null;
   processingState: VoiceProcessingState;
+  processingOperation: RecordingProcessingOperation | null;
   processingError: string | null;
   elapsedSeconds: number;
   downloaded: boolean;
@@ -145,10 +164,21 @@ export type RecordingController = {
   restorePersistedOriginal: (input: RestorePersistedOriginalInput) => RecordingArtifact;
   discard: () => void;
   markDownloaded: () => void;
-  beginProcessing: () => void;
+  beginProcessing: (operation?: RecordingProcessingOperation) => void;
   cancelProcessing: () => void;
-  completeVisualProcessing: (blob: Blob, mimeType: string, label: string) => RecordingArtifact;
-  completeProcessing: (blob: Blob, mimeType: string, label: string) => RecordingArtifact;
+  completeVisualProcessing: (
+    blob: Blob,
+    mimeType: string,
+    label: string,
+    source?: RecordingArtifact,
+  ) => RecordingArtifact;
+  completeProcessing: (
+    blob: Blob,
+    mimeType: string,
+    label: string,
+    source?: RecordingArtifact,
+    replaceExistingResult?: boolean,
+  ) => RecordingArtifact;
   failProcessing: (message: string) => void;
   clearVisualProcessing: () => void;
   restoreOriginal: () => void;

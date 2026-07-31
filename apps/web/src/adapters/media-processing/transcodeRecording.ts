@@ -28,6 +28,7 @@ export const transcodeRecordingToMp4 = async (
     Conversion,
     Input,
     Mp4OutputFormat,
+    MP4,
     Output,
     canEncodeAudio,
     canEncodeVideo,
@@ -56,6 +57,18 @@ export const transcodeRecordingToMp4 = async (
     }
     if (audioTrack) {
       await ensureAacEncodingSupport(() => canEncodeAudio('aac'));
+    }
+    const sourceWidth = await videoTrack.getDisplayWidth();
+    const sourceHeight = await videoTrack.getDisplayHeight();
+    const sourceDuration =
+      (await input.getDurationFromMetadata()) ?? (await input.computeDuration());
+    if (
+      sourceWidth <= 0 ||
+      sourceHeight <= 0 ||
+      !Number.isFinite(sourceDuration) ||
+      sourceDuration <= 0
+    ) {
+      throw new Error('The recording source failed duration or orientation validation.');
     }
     signal.throwIfAborted();
 
@@ -111,10 +124,44 @@ export const transcodeRecordingToMp4 = async (
       throw new Error('The converted recording was empty.');
     }
 
-    return {
-      blob: new Blob([target.buffer], { type: 'video/mp4' }),
-      mimeType: 'video/mp4',
-    };
+    const blob = new Blob([target.buffer], { type: 'video/mp4' });
+    const outputInput = new Input({ formats: ALL_FORMATS, source: new BlobSource(blob) });
+    try {
+      if (!(await outputInput.canRead()) || (await outputInput.getFormat()) !== MP4) {
+        throw new Error('The converted recording is not a readable MP4.');
+      }
+      const [outputVideo, outputAudio] = await Promise.all([
+        outputInput.getPrimaryVideoTrack(),
+        outputInput.getPrimaryAudioTrack(),
+      ]);
+      if (!outputVideo || (await outputVideo.getCodec()) !== 'avc') {
+        throw new Error('The converted recording is missing its H.264 video track.');
+      }
+      if (requireAudio && (!outputAudio || (await outputAudio.getCodec()) !== 'aac')) {
+        throw new Error('The converted recording is missing its AAC audio track.');
+      }
+      if (outputAudio && (await outputAudio.getCodec()) !== 'aac') {
+        throw new Error('The converted recording contains an unexpected audio codec.');
+      }
+      const outputWidth = await outputVideo.getDisplayWidth();
+      const outputHeight = await outputVideo.getDisplayHeight();
+      const outputDuration =
+        (await outputInput.getDurationFromMetadata()) ?? (await outputInput.computeDuration());
+      if (
+        outputWidth <= 0 ||
+        outputHeight <= 0 ||
+        !Number.isFinite(outputDuration) ||
+        outputDuration <= 0 ||
+        Math.abs(outputDuration - sourceDuration) > 0.5 ||
+        outputWidth > outputHeight !== sourceWidth > sourceHeight
+      ) {
+        throw new Error('The converted recording failed duration or orientation validation.');
+      }
+    } finally {
+      outputInput.dispose();
+    }
+
+    return { blob, mimeType: 'video/mp4' };
   } catch (error) {
     if (conversion && conversion.state !== 'done' && conversion.state !== 'canceled') {
       await conversion.cancel().catch(() => undefined);

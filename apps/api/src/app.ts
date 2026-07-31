@@ -12,7 +12,10 @@ import {
   type ReferenceImageAssetStore,
 } from './features/reference-images/asset-store.js';
 import { translateReferenceImageError } from './features/reference-images/error-mapper.js';
-import { registerReferenceImageRoutes } from './features/reference-images/routes.js';
+import {
+  registerReferenceImageRoutes,
+  type RemoteReferenceImageDownloader,
+} from './features/reference-images/routes.js';
 import { ReferenceImageService } from './features/reference-images/reference-image-service.js';
 import { translateVoiceServiceError } from './features/voices/error-mapper.js';
 import { registerVoiceRoutes, SUPPORTED_AUDIO_CONTENT_TYPES } from './features/voices/routes.js';
@@ -58,6 +61,7 @@ export interface AppDependencies {
   readonly referenceImageProvider?: ReferenceImageProvider | null;
   readonly characterPromptOptimizer?: CharacterPromptOptimizer | null;
   readonly referenceImageAssetStore?: ReferenceImageAssetStore;
+  readonly remoteImageDownloader?: RemoteReferenceImageDownloader;
   readonly fetchImplementation?: typeof fetch;
   readonly logger?: boolean;
   readonly staticRoot?: string;
@@ -229,7 +233,11 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   });
   registerRealtimeRoutes(app, decartProvider);
   registerVideoJobRoutes(app, videoJobService);
-  registerReferenceImageRoutes(app, referenceImageService);
+  registerReferenceImageRoutes(app, referenceImageService, {
+    ...(dependencies.remoteImageDownloader
+      ? { remoteImageDownloader: dependencies.remoteImageDownloader }
+      : {}),
+  });
   registerVoiceRoutes(app, voiceService);
   app.addHook('onClose', async () => {
     await videoJobService.close();

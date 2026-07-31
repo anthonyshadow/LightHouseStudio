@@ -4,6 +4,7 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
 import type { RecordingArtifact, RecordingController } from '../recording/types';
+import type { VoiceProcessingController } from '../voice-effects/types';
 
 const adapters = vi.hoisted(() => ({
   validateExistingVideo: vi.fn(),
@@ -13,6 +14,7 @@ const adapters = vi.hoisted(() => ({
   releaseVideoJob: vi.fn(),
   replaceRecordingAudio: vi.fn(),
   stripRecordingAudio: vi.fn(),
+  transcodeRecordingToMp4: vi.fn(),
 }));
 
 vi.mock('./videoValidation', () => ({
@@ -27,6 +29,9 @@ vi.mock('../../adapters/api-client/videoJobsApi', () => ({
 vi.mock('../../adapters/media-processing/replaceAudioTrack', () => ({
   replaceRecordingAudio: adapters.replaceRecordingAudio,
   stripRecordingAudio: adapters.stripRecordingAudio,
+}));
+vi.mock('../../adapters/media-processing/transcodeRecording', () => ({
+  transcodeRecordingToMp4: adapters.transcodeRecordingToMp4,
 }));
 
 import { useExistingVideoWorkflow } from './useExistingVideoWorkflow';
@@ -56,6 +61,7 @@ const recordingController = (): RecordingController => {
     sidecar: { state: 'unavailable', blob: null, mimeType: null, error: null },
     recordingError: null,
     processingState: 'idle',
+    processingOperation: null,
     processingError: null,
     elapsedSeconds: 1,
     downloaded: false,
@@ -83,6 +89,15 @@ const recordingController = (): RecordingController => {
   };
   return recording;
 };
+
+const processingController = (): VoiceProcessingController => ({
+  selection: { kind: 'none' },
+  applyLocal: vi.fn().mockResolvedValue(undefined),
+  applyElevenLabs: vi.fn().mockResolvedValue(undefined),
+  applyElevenLabsTo: vi.fn().mockResolvedValue({ status: 'canceled' }),
+  restoreOriginal: vi.fn(),
+  cancel: vi.fn(),
+});
 
 const inspected = (file: File) => ({
   file,
@@ -139,6 +154,9 @@ beforeEach(() => {
     blob: resultBlob,
     mimeType: 'video/mp4',
   });
+  adapters.transcodeRecordingToMp4.mockImplementation((blob: Blob) =>
+    Promise.resolve({ blob, mimeType: 'video/mp4' }),
+  );
 });
 
 describe('useExistingVideoWorkflow', () => {
@@ -151,6 +169,7 @@ describe('useExistingVideoWorkflow', () => {
     const { result, unmount } = renderHook(() =>
       useExistingVideoWorkflow({
         recording,
+        processing: processingController(),
         publishUploadedVideo,
         onSubmissionAccepted,
       }),
@@ -209,6 +228,88 @@ describe('useExistingVideoWorkflow', () => {
     unmount();
   });
 
+  it('runs a captured visual plan before the selected voice conversion', async () => {
+    const events: string[] = [];
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    const recording = recordingController();
+    const originalComplete = recording.completeVisualProcessing;
+    recording.completeVisualProcessing = vi.fn(
+      (blob: Blob, mimeType: string, label: string, source?: RecordingArtifact) => {
+        events.push('visual-commit');
+        return originalComplete(blob, mimeType, label, source);
+      },
+    );
+    const processing = processingController();
+    processing.applyElevenLabsTo = vi.fn(
+      (video: RecordingArtifact, _voiceId: string, _voiceName: string) => {
+        events.push(`voice:${video.id}`);
+        return Promise.resolve({ status: 'ready' as const, artifact: video });
+      },
+    );
+    const { result, unmount } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        processing,
+        publishUploadedVideo: vi.fn().mockReturnValue(recording.original),
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => {
+      result.current.addStep('lucy-2.5');
+      result.current.selectVoice('voice-northstar', 'Northstar Narrator');
+    });
+    act(() =>
+      result.current.updateStep(result.current.steps[0]!.id, {
+        prompt: 'Swap the character',
+      }),
+    );
+    await act(async () => result.current.submitPlan());
+
+    expect(events).toEqual(['visual-commit', expect.stringMatching(/^voice:visual-lucy/u)]);
+    const voiceCall = vi.mocked(processing.applyElevenLabsTo).mock.calls[0];
+    expect(voiceCall?.[0].id).toMatch(/^visual-lucy/u);
+    expect(voiceCall?.slice(1)).toEqual([
+      'voice-northstar',
+      'Northstar Narrator',
+      { replaceExistingResult: true },
+    ]);
+    unmount();
+  });
+
+  it('supports a voice-only plan without contacting Decart', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    const recording = recordingController();
+    const processing = processingController();
+    processing.applyElevenLabsTo = vi.fn().mockResolvedValue({
+      status: 'ready',
+      artifact: recording.original,
+    });
+    const { result, unmount } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        processing,
+        publishUploadedVideo: vi.fn().mockReturnValue(recording.original),
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => result.current.selectVoice('voice-northstar', 'Northstar Narrator'));
+    await act(async () => result.current.submitPlan());
+
+    expect(adapters.submitVideoJob).not.toHaveBeenCalled();
+    expect(processing.applyElevenLabsTo).toHaveBeenCalledWith(
+      recording.original,
+      'voice-northstar',
+      'Northstar Narrator',
+      { replaceExistingResult: true },
+    );
+    expect(result.current.phase).toBe('complete');
+    unmount();
+  });
+
   it('preserves editable drafts while an accepted job status check can be resumed', async () => {
     const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
     adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
@@ -223,6 +324,7 @@ describe('useExistingVideoWorkflow', () => {
     const { result, unmount } = renderHook(() =>
       useExistingVideoWorkflow({
         recording,
+        processing: processingController(),
         publishUploadedVideo: vi.fn(),
       }),
     );
@@ -259,6 +361,7 @@ describe('useExistingVideoWorkflow', () => {
     const { result, unmount } = renderHook(() =>
       useExistingVideoWorkflow({
         recording: recordingController(),
+        processing: processingController(),
         publishUploadedVideo: vi.fn(),
       }),
     );
@@ -307,6 +410,7 @@ describe('useExistingVideoWorkflow', () => {
     const { result, unmount } = renderHook(() =>
       useExistingVideoWorkflow({
         recording: recordingController(),
+        processing: processingController(),
         publishUploadedVideo: vi.fn(),
       }),
     );

@@ -186,14 +186,26 @@ describe('MediaStage', () => {
 
     view.rerender(
       stage({
-        presentation: { kind: 'playback', artifact: processed, controlsLocked: true },
+        presentation: {
+          kind: 'playback',
+          artifact: processed,
+          controlsLocked: true,
+          processingOperation: {
+            kind: 'voice-conversion',
+            title: 'Applying Northstar Narrator…',
+            detail: 'Converting the immutable original audio for the selected result.',
+          },
+        },
         lifecycle: 'idle',
       }),
     );
 
     expect(firstVideo?.controls).toBe(false);
     expect(firstVideo).toHaveAttribute('aria-disabled', 'true');
-    expect(screen.getByText('Processing voice treatment…')).toBeInTheDocument();
+    expect(screen.getByText('Applying Northstar Narrator…')).toBeInTheDocument();
+    expect(
+      screen.getByText('Converting the immutable original audio for the selected result.'),
+    ).toBeInTheDocument();
 
     view.rerender(stage());
     expect(view.container.querySelector('video')).toBe(firstVideo);

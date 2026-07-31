@@ -46,6 +46,7 @@ const recording = (): RecordingController => {
     sidecar: { state: 'unavailable', blob: null, mimeType: null, error: null },
     recordingError: null,
     processingState: 'idle',
+    processingOperation: null,
     processingError: null,
     elapsedSeconds: 2,
     downloaded: false,
@@ -68,6 +69,7 @@ const processing: VoiceProcessingController = {
   selection: { kind: 'none' },
   applyLocal: vi.fn().mockResolvedValue(undefined),
   applyElevenLabs: vi.fn().mockResolvedValue(undefined),
+  applyElevenLabsTo: vi.fn().mockResolvedValue({ status: 'ready', artifact: artifact() }),
   restoreOriginal: vi.fn(),
   cancel: vi.fn(),
 };

@@ -2,8 +2,9 @@
 
 ## Goal
 
-Use a compatible browser-local video as the immutable take source, optionally apply either Lucy
-2.5 or VTO 3, compare the result with the source, then download, start over, or discard.
+Use an uploaded or newly recorded browser-local video as the immutable source, optionally apply
+either Lucy 2.5 or VTO 3 and/or a saved voice, compare the latest healthy result with the source,
+then edit either base, download, start over, or discard.
 
 ## Journey
 
@@ -12,12 +13,20 @@ Use a compatible browser-local video as the immutable take source, optionally ap
 2. The creator may also choose **Upload video** from the idle Studio control bar. Neither path
    needs camera permission, provider credentials, a Decart SDK, or external traffic.
 3. Studio accepts a file picker or drop, validates browser metadata and decode, and publishes a
-   playable temporary source on the one persistent stage. The upload panel shows a locally
-   extracted first-frame image when available, otherwise a stable placeholder, alongside the
-   local-only filename, size, duration, resolution, orientation, codec, and audio availability.
+   playable temporary source on the persistent stage and the upload panel's accessible inline
+   player. Both expose play/pause, seek, volume, and fullscreen where supported. The inline player
+   is the sole second-video exception: it borrows source/result artifact URLs, owns no
+   tracks/session, and detaches on replacement or close. The panel also shows local-only
+   filename, size, duration, resolution, orientation, codec, and audio availability.
    Once a video is selected, backdrop clicks cannot dismiss the panel; the creator must use an
    explicit close action or complete the workflow.
-4. The creator may replace or remove the file, then choose zero or one visual transformation:
+4. Instead of selecting a file, the creator may explicitly choose **Record a local video**. Camera
+   and microphone start only after that action. The panel closes immediately; the one persistent
+   stage owns live preview, Start, Stop, the independent 270/300-second warning/limit,
+   finalization, and initial playback review. After a healthy finalization, Studio validates and
+   adopts the normalized recording as the source, then returns to the editor. The inline player is
+   not mounted for live preview, recording, finalization, or initial recording review.
+5. The creator may replace or remove the source, then choose zero or one visual transformation:
    **Swap Character** (Lucy 2.5) or **Virtual Try On**, never both. Both selectors remain available
    before submission so the creator can switch the single active choice directly. Only the active
    transformation owns the submitted prompt, prompt-enhancement switch, and optional validated
@@ -29,23 +38,29 @@ Use a compatible browser-local video as the immutable take source, optionally ap
    Character step. An attached reference renders a local preview with replace and remove actions.
    Explicitly closing the panel retains the tab-local selection and plan; an **Edit video** action
    in the recorded-take controls reopens the same workflow.
-5. Review shows the selected model and one planned Decart submission. No visual transformation
-   finishes locally. A visual submission requires compatible server inspection, exact model
-   availability, provider disclosure, and explicit action.
-6. Studio uploads one job, displays truthful app-owned stages and elapsed time, retrieves a
-   size-bounded inspected 720p result, and restores the immutable source audio.
-7. At **Result ready**, **Original** presents the immutable upload and **Result** presents the
-   generated visual on the same shared stage. Neither comparison action deletes or replaces an
-   artifact. **Download** directly downloads the generated visual result.
-8. If the source has usable audio, the creator may close the upload panel and apply a
-   [local Voice treatment](08-local-voice-treatments.md) or a
-   [saved ElevenLabs voice](09-elevenlabs-voice-workflow.md). Processing starts from immutable
-   source audio, applies to the latest visual or source layer, and preserves the last valid artifact
-   on failure.
-9. **Start over** revokes generated visual and voice URLs, retains and presents the uploaded
-   original, clears the selected transformation, and returns to **Visual plan**. It does not reset
-   the moderated participant submission counters. The creator can choose either model again.
-10. Confirmed **Discard video** revokes the uploaded source and all generated results and returns
+6. VTO uses exactly one input mode. **Saved or recent outfit** selects a saved recipe or tab-local
+   recent import; **Reference image** prefers a local JPEG/PNG/WebP and reveals its HTTPS URL field
+   only after **Use an image URL instead**; **Prompt** alone exposes Enhance Prompt. Switching
+   modes clears incompatible fields. VTO retains a calm beta/pilot, consent, one-garment,
+   plain-background, and no-fit/sizing/purchase-accuracy disclosure.
+7. **Add voice change** lazily loads saved ElevenLabs voices. Selection alone transfers no take.
+   Review truthfully summarizes no provider work, one Decart submission, one ElevenLabs conversion,
+   or Decart followed by ElevenLabs.
+8. Studio executes one immutable captured plan: visual submit/poll/retrieve → restore immutable
+   source audio → H.264/AAC MP4 transcode/validate/commit → convert immutable source sidecar →
+   compose/transcode/validate/commit voiced result. Voice-only uses the selected video's frames.
+   Every operation publishes truthful stage copy and never retries a billable submission.
+9. **Original** and conditional **Result** update both players. **Edit original** snapshots the
+   immutable source; **Edit result** snapshots the latest result as the next frame source. Only the
+   immutable source plus latest healthy Result remain after successful replacement. A voice failure
+   after visual success retains the visual Result.
+10. Every source/result has a UUID, app-owned name, timestamp, kind, and parent lineage. Generated
+    downloads use operation, UTC timestamp, and UUID suffix. Uploaded originals remain unchanged;
+    recorded and all generated results pass the local H.264/AAC MP4 gate before publication.
+11. **Start over** revokes generated visual and voice URLs, retains and presents the uploaded
+    original, clears the selected transformation, and returns to **Visual plan**. It does not reset
+    the moderated participant submission counters. The creator can choose either model again.
+12. Confirmed **Discard video** revokes the uploaded source and all generated results and returns
     the open panel to **Choose an existing video**. The ordinary Latest Take controls remain
     available after explicitly closing the upload panel.
 
@@ -62,6 +77,12 @@ Use a compatible browser-local video as the immutable take source, optionally ap
   remain within 500 ms of source duration before it can become authoritative.
 - Visual failure preserves the source and selected draft. Voice failure preserves the last
   visual/source layer.
+- Every generated result is revalidated after transcoding for a non-empty MP4, H.264 video, AAC
+  when audio is required, duration, orientation, and playable tracks. An unconverted fallback is
+  never published.
+- Remote reference import accepts public HTTPS only, rejects credentials/private/link-local/mixed
+  DNS and unsafe redirects, pins DNS per hop, caps redirects/bytes, validates actual decoded
+  JPEG/PNG/WebP contents, supports abort, and never persists, logs, echoes, or forwards the URL.
 - Retrying status, content retrieval, inspection, or audio composition reuses the accepted job.
   Retrying a provider submission is a new explicit potentially billable action.
 - If an accepted job's status or content request is interrupted, prompt, reference, enhancement,

@@ -24,6 +24,7 @@ const step = (modelId: VideoTransformStep['modelId']): VideoTransformStep => ({
   prompt: 'Transform the subject',
   hasReferenceImage: false,
   enhancePrompt: false,
+  inputKind: modelId === 'lucy-vton-3' ? 'prompt' : 'character',
 });
 
 describe('uploaded video policy', () => {
@@ -66,6 +67,33 @@ describe('single visual policy', () => {
     const empty = { ...step('lucy-2.5'), prompt: '' };
     expect(validateVideoTransformPlan([empty])).toEqual([
       'Character needs a prompt, reference image, or both.',
+    ]);
+  });
+
+  it('enforces mutually exclusive VTO input modes and enhancement rules', () => {
+    expect(
+      validateVideoTransformPlan([
+        {
+          ...step('lucy-vton-3'),
+          inputKind: 'reference-image',
+          prompt: 'must be cleared',
+          hasReferenceImage: true,
+        },
+      ]),
+    ).toEqual(['Reference-image input cannot include prompt text or enhancement.']);
+    expect(
+      validateVideoTransformPlan([
+        {
+          ...step('lucy-vton-3'),
+          inputKind: 'saved-outfit',
+          enhancePrompt: true,
+        },
+      ]),
+    ).toEqual(['Saved outfits cannot enable prompt enhancement.']);
+    const legacyVtoStep = { ...step('lucy-vton-3') };
+    delete legacyVtoStep.inputKind;
+    expect(validateVideoTransformPlan([legacyVtoStep])).toEqual([
+      'Choose a Virtual Try-On input type.',
     ]);
   });
 

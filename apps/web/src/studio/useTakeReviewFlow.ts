@@ -12,7 +12,10 @@ type RecordingController = ReturnType<typeof useRecording>;
 
 type TakeStagePresentationInput = {
   readonly reviewReady: boolean;
-  readonly recording: Pick<RecordingController, 'lifecycle' | 'presented' | 'processingState'>;
+  readonly recording: Pick<
+    RecordingController,
+    'lifecycle' | 'presented' | 'processingState' | 'processingOperation'
+  >;
   readonly finalizingStartedAt: number | null;
   readonly finalizingStream: MediaStream | null;
   readonly displayStream: MediaStream | null;
@@ -34,6 +37,9 @@ export const deriveTakeStagePresentation = ({
       kind: 'playback',
       artifact: recording.presented,
       controlsLocked: recording.processingState === 'processing',
+      ...(recording.processingOperation
+        ? { processingOperation: recording.processingOperation }
+        : {}),
     };
   }
   if (recording.lifecycle === 'stopping' || finalizingStartedAt !== null) {

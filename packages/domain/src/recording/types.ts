@@ -17,6 +17,14 @@ export type RecordingDurationTiming = Readonly<{
 
 export interface RecordingArtifact<TMedia = unknown> {
   readonly id: string;
+  /** App-owned, human-readable identity. Optional for restored legacy artifacts. */
+  readonly name?: string;
+  /** Creation time for this exact artifact revision. Optional for legacy artifacts. */
+  readonly createdAt?: string;
+  /** Describes how this artifact entered the current temporary take pipeline. */
+  readonly kind?: 'uploaded' | 'recorded' | 'visual' | 'voice';
+  /** The artifact used as input for this revision, when it was generated. */
+  readonly parentArtifactId?: string | null;
   /** Browser adapters may specialize this generic as Blob; the domain never inspects it. */
   readonly media: TMedia;
   readonly objectUrl: string;

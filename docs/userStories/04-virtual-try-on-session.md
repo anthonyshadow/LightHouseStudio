@@ -9,6 +9,9 @@ VTO remains a secondary beta.
 2. If no VTO recipe is ready, open the Dock or choose a saved Try-On recipe.
 3. In **Try-On recipe**, provide garment direction, a temporary JPEG/PNG/WebP image up to 10 MiB,
    or both. Prompt enhancement is optional and off by default.
+   In Upload Existing Video, the corresponding batch recipe instead requires exactly one mode:
+   saved/recent outfit, reference image, or prompt. Reference mode prefers upload and hides its
+   public-HTTPS URL importer until explicitly revealed; enhancement exists only in Prompt mode.
 4. Read the one-garment/plain-background guidance and Decart transfer, cost, Stop, and 300-second
    disclosure, then select **Start Virtual Try-On**.
 5. Wait for usable transformed video; recording remains unavailable and local fallback stays
@@ -27,6 +30,8 @@ the pinned `lucy-vton-3` model.
 - Invalid or oversized images are rejected before provider contact. Dock images remain
   tab-ephemeral and are revoked when replaced or cleared.
 - Studio makes no fit, sizing, fabric-behavior, or purchase-accuracy claim.
+- Upload Existing Video presents beta/pilot and consent/garment guidance as calm disclosure, not a
+  warning alert. This presentation change does not remove the controlled-pilot policy.
 - Expected 300-second completion preserves the recipe and local preview; early end/disconnect is a
   distinct safe recovery state.
 - An active take finalizes once before source resources release.

@@ -1,7 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 import { VIDEO_PROVIDER_INTENT_VALUE } from '@studio/contracts';
 import { installFakeVideoJobRoutes, loadH264VideoFixture } from './support/existingVideoHarness';
-import { expectNoDocumentOverflow } from './support/studioHarness';
+import {
+  expectNoDocumentOverflow,
+  expectNoExternalProviderTraffic,
+  installSuccessfulStudioHarness,
+} from './support/studioHarness';
 import { installProviderNetworkDriver } from './support/studioHarness.network';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
@@ -78,6 +82,51 @@ const selectExistingVideo = async (
   await expect(dialog).toContainText('MP4 · H.264');
 };
 
+test('Record a local video closes the panel and keeps capture on the persistent stage', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Upload existing video' }).click();
+
+  const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
+  const stageVideo = page.getByLabel('Studio media stage').locator('video');
+  await expect(dialog).toBeVisible();
+  await expect(stageVideo).toHaveCount(1);
+  await stageVideo.evaluate((video) => {
+    (
+      window as typeof window & { __lightframeExistingVideoStage?: HTMLVideoElement }
+    ).__lightframeExistingVideoStage = video as HTMLVideoElement;
+  });
+
+  await dialog.getByRole('button', { name: 'Record a local video' }).click();
+
+  await expect(dialog).toBeHidden();
+  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
+  await expect(page.locator('video')).toHaveCount(1);
+  expect(
+    await stageVideo.evaluate(
+      (video) =>
+        (window as typeof window & { __lightframeExistingVideoStage?: HTMLVideoElement })
+          .__lightframeExistingVideoStage === video,
+    ),
+  ).toBe(true);
+
+  const controls = page.getByLabel('Studio session controls');
+  await controls.getByRole('button', { name: 'Record' }).click();
+  await expect(controls.getByRole('button', { name: 'Stop recording' })).toBeVisible();
+  await expect(dialog).toBeHidden();
+  await expect(page.locator('video')).toHaveCount(1);
+  expect(
+    await stageVideo.evaluate(
+      (video) =>
+        (window as typeof window & { __lightframeExistingVideoStage?: HTMLVideoElement })
+          .__lightframeExistingVideoStage === video,
+    ),
+  ).toBe(true);
+  expectNoExternalProviderTraffic(network);
+});
+
 test('provider-free upload previews and enters the existing take/download surface', async ({
   page,
 }) => {
@@ -151,9 +200,7 @@ test('the upload editor and open saved-character chooser reflow at every support
     const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
     await dialog.getByRole('button', { name: 'Swap Character' }).click();
     await expectNoDocumentOverflow(page);
-    await expect(
-      dialog.locator('figure[aria-label="Video preview for responsive-source.mp4"]'),
-    ).toBeAttached();
+    await expect(dialog.getByLabel('Video preview for responsive-source.mp4')).toBeAttached();
 
     const trigger = dialog.getByRole('button', { name: /Choose a Saved Character/u });
     await trigger.click();

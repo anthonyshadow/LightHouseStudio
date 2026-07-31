@@ -3,8 +3,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const media = vi.hoisted(() => {
-  const videoTrack = { kind: 'video' };
-  const audioTrack = { kind: 'audio' };
+  const videoTrack = {
+    kind: 'video',
+    getCodec: vi.fn().mockResolvedValue('avc'),
+    getDisplayWidth: vi.fn().mockResolvedValue(1_280),
+    getDisplayHeight: vi.fn().mockResolvedValue(720),
+  };
+  const audioTrack = { kind: 'audio', getCodec: vi.fn().mockResolvedValue('aac') };
   const initialBuffer = (): ArrayBuffer | null => new Uint8Array([1, 2, 3]).buffer;
   const initialOptions = (): unknown => null;
   return {
@@ -31,11 +36,16 @@ vi.mock('@mediabunny/aac-encoder', () => ({
 }));
 
 vi.mock('mediabunny', () => {
+  const MP4 = { name: 'mp4' };
   class Input {
     getPrimaryVideoTrack = vi.fn().mockResolvedValue(media.videoTrack);
     getPrimaryAudioTrack = vi
       .fn()
       .mockImplementation(() => Promise.resolve(media.includeAudio ? media.audioTrack : null));
+    canRead = vi.fn().mockResolvedValue(true);
+    getFormat = vi.fn().mockResolvedValue(MP4);
+    getDurationFromMetadata = vi.fn().mockResolvedValue(1);
+    computeDuration = vi.fn().mockResolvedValue(1);
     dispose = media.dispose;
   }
   class BufferTarget {
@@ -83,6 +93,7 @@ vi.mock('mediabunny', () => {
     Mp4OutputFormat: class {
       constructor(readonly options: unknown) {}
     },
+    MP4,
     Output,
     canEncodeAudio: vi.fn(() => Promise.resolve(media.canEncodeAudio)),
     canEncodeVideo: vi.fn(() => Promise.resolve(media.canEncodeVideo)),
@@ -131,7 +142,7 @@ describe('transcodeRecordingToMp4', () => {
     expect(media.outputOptions).toMatchObject({
       format: { options: { fastStart: false } },
     });
-    expect(media.dispose).toHaveBeenCalledOnce();
+    expect(media.dispose).toHaveBeenCalledTimes(2);
     expect(media.cancel).not.toHaveBeenCalled();
   });
 
@@ -147,7 +158,7 @@ describe('transcodeRecordingToMp4', () => {
     });
 
     expect(media.registerAacEncoder).toHaveBeenCalledOnce();
-    expect(media.dispose).toHaveBeenCalledOnce();
+    expect(media.dispose).toHaveBeenCalledTimes(2);
   });
 
   it('rejects instead of returning an unconverted file when H.264 encoding is unavailable', async () => {

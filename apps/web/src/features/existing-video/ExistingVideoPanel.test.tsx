@@ -9,10 +9,12 @@ import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
 
 const api = vi.hoisted(() => ({
   hydrateReferenceImage: vi.fn(),
+  importRemoteReferenceImage: vi.fn(),
 }));
 
 vi.mock('../../adapters/api-client/apiClient', () => ({
   hydrateReferenceImage: api.hydrateReferenceImage,
+  importRemoteReferenceImage: api.importRemoteReferenceImage,
 }));
 
 const originalCreateObjectUrl = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
@@ -29,22 +31,33 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   acceptedSubmission: false,
   pendingVisual: null,
   retryJob: null,
+  original: null,
   result: null,
+  editBase: null,
+  voiceSelection: null,
+  voiceAvailable: false,
   comparison: 'result',
   elapsedSeconds: 0,
+  operation: null,
   active: false,
   providerActive: false,
   selectFile: vi.fn(),
+  adoptRecordedArtifact: vi.fn(),
   addStep: vi.fn(),
   updateStep: vi.fn(),
   removeStep: vi.fn(),
   submitStep: vi.fn(),
+  submitPlan: vi.fn(),
   retryFinalization: vi.fn(),
   retryExistingJob: vi.fn(),
   cancelBeforeAcceptance: vi.fn(),
   downloadResult: vi.fn(),
   reset: vi.fn(),
   startOver: vi.fn(),
+  setVtonInputKind: vi.fn(),
+  selectVoice: vi.fn(),
+  clearVoice: vi.fn(),
+  editSelected: vi.fn(),
   showOriginal: vi.fn(),
   showResult: vi.fn(),
   ...overrides,
@@ -67,6 +80,7 @@ const resultArtifact = (): RecordingArtifact => {
 
 beforeEach(() => {
   api.hydrateReferenceImage.mockReset();
+  api.importRemoteReferenceImage.mockReset();
   Object.defineProperty(URL, 'createObjectURL', {
     configurable: true,
     value: vi.fn(() => {
@@ -111,6 +125,85 @@ describe('ExistingVideoPanel', () => {
     expect(screen.queryByText(/Decart submission/u)).not.toBeInTheDocument();
   });
 
+  it('hands Record a local video to the stage-owned recording flow without rendering inline capture', () => {
+    const onRecordVideo = vi.fn();
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow()}
+          videoProcessingAvailable={false}
+          onFinish={vi.fn()}
+          recordingSupported
+          onRecordVideo={onRecordVideo}
+        />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.queryByLabelText('Local camera preview')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Record a local video' }));
+    expect(onRecordVideo).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: 'Start recording' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Stop recording' })).not.toBeInTheDocument();
+  });
+
+  it('shows exactly one VTO input mode and keeps the image URL hidden until requested', () => {
+    const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+    const setVtonInputKind = vi.fn();
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: null,
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-07-30T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: null,
+                durationMs: 30_000,
+                width: 1_280,
+                height: 720,
+                sizeBytes: source.size,
+                hasAudio: false,
+              },
+            },
+            phase: 'ready',
+            steps: [
+              {
+                id: 'vto',
+                modelId: 'lucy-vton-3',
+                savedRecipeId: null,
+                prompt: '',
+                enhancePrompt: false,
+                referenceImage: null,
+                inputKind: 'reference-image',
+              },
+            ],
+            setVtonInputKind,
+          })}
+          videoProcessingAvailable
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByText(/controlled-pilot beta/u)).toBeVisible();
+    expect(screen.queryByRole('textbox', { name: 'Prompt' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('textbox', { name: 'Public HTTPS image URL' }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Use an image URL instead' }));
+    expect(screen.getByRole('textbox', { name: 'Public HTTPS image URL' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: 'Prompt' }));
+    expect(setVtonInputKind).toHaveBeenCalledWith('vto', 'prompt');
+  });
+
   it('shows metadata and keeps the visual choices mutually exclusive', () => {
     const addStep = vi.fn();
     const source = new File(['video'], 'a very long local source name.mp4', {
@@ -145,6 +238,7 @@ describe('ExistingVideoPanel', () => {
           prompt: 'Change the scene',
           enhancePrompt: false,
           referenceImage: null,
+          inputKind: 'character',
         },
       ],
       phase: 'ready',
@@ -156,7 +250,7 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    expect(screen.getByText(source.name)).toHaveAttribute('title', source.name);
+    expect(screen.getByTitle(source.name)).toHaveTextContent(source.name);
     expect(screen.getByLabelText(`Video preview for ${source.name}`)).toBeVisible();
     expect(screen.getByText('1920 × 1080')).toBeInTheDocument();
     expect(screen.getByText(/1 planned Decart submission: Swap Character/u)).toBeInTheDocument();
@@ -214,6 +308,7 @@ describe('ExistingVideoPanel', () => {
                 prompt: '',
                 enhancePrompt: false,
                 referenceImage: null,
+                inputKind: 'character',
               },
             ],
             phase: 'ready',
@@ -288,6 +383,7 @@ describe('ExistingVideoPanel', () => {
                 prompt: '',
                 enhancePrompt: false,
                 referenceImage: null,
+                inputKind: 'character',
               },
             ],
             phase: 'ready',
@@ -364,6 +460,7 @@ describe('ExistingVideoPanel', () => {
                 prompt: 'Use this portrait',
                 enhancePrompt: false,
                 referenceImage: reference,
+                inputKind: 'character',
               },
             ],
             phase: 'ready',
@@ -413,6 +510,7 @@ describe('ExistingVideoPanel', () => {
           prompt: 'Change the scene',
           enhancePrompt: false,
           referenceImage: null,
+          inputKind: 'character',
         },
       ],
       phase: 'error',
@@ -449,6 +547,7 @@ describe('ExistingVideoPanel', () => {
     const reset = vi.fn();
     const startOver = vi.fn();
     const downloadResult = vi.fn();
+    const editSelected = vi.fn();
     const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const source = new File(['video'], 'completed-source.mp4', { type: 'video/mp4' });
 
@@ -480,6 +579,7 @@ describe('ExistingVideoPanel', () => {
             result: resultArtifact(),
             startOver,
             downloadResult,
+            editSelected,
             reset,
           })}
           videoProcessingAvailable
@@ -489,6 +589,10 @@ describe('ExistingVideoPanel', () => {
     );
 
     const download = screen.getByRole('link', { name: 'Download' });
+    expect(screen.getByRole('button', { name: 'Original' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Result' })).toHaveAttribute('aria-pressed', 'true');
+    fireEvent.click(screen.getByRole('button', { name: 'Edit result' }));
+    expect(editSelected).toHaveBeenCalledOnce();
     expect(download).toHaveAttribute('href', 'blob:generated-result');
     expect(download).toHaveAttribute('download', 'source-lucy-1.mp4');
     fireEvent.click(download);

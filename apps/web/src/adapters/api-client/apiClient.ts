@@ -10,6 +10,8 @@ import {
   REFERENCE_IMAGE_MAX_BYTES,
   REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
   uploadReferenceImageResponseSchema,
+  VIDEO_PROVIDER_INTENT_HEADER,
+  VIDEO_PROVIDER_INTENT_VALUE,
   type ComposeReferenceImageRequest,
   type CreateReferenceImageRequest,
   type EditReferenceImageRequest,
@@ -191,6 +193,48 @@ export const uploadReferenceImage = async (
     invalidApiResponse('The uploaded reference response was invalid.', 'invalid_image_upload'),
   );
   return payload.asset;
+};
+
+export const importRemoteReferenceImage = async (
+  url: string,
+  signal?: AbortSignal,
+): Promise<File> => {
+  const response = await apiFetch('/api/reference-images/import', {
+    method: 'POST',
+    cache: 'no-store',
+    ...(signal ? { signal } : {}),
+    headers: {
+      'Content-Type': 'application/json',
+      Accept: 'image/jpeg, image/png, image/webp',
+      [VIDEO_PROVIDER_INTENT_HEADER]: VIDEO_PROVIDER_INTENT_VALUE,
+    },
+    body: JSON.stringify({ url }),
+  });
+  const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim();
+  if (!contentType || !['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
+    throw new ApiClientError(
+      'The imported image response was invalid.',
+      502,
+      'invalid_remote_image',
+    );
+  }
+  const blob = await response.blob();
+  if (blob.size <= 0 || blob.size > REFERENCE_IMAGE_UPLOAD_MAX_BYTES) {
+    throw new ApiClientError(
+      'The imported image response was invalid.',
+      502,
+      'invalid_remote_image',
+    );
+  }
+  const disposition = response.headers.get('content-disposition');
+  const responseName = /filename="([a-zA-Z0-9._-]+)"/u.exec(disposition ?? '')?.[1];
+  const extension =
+    contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
+  return new File(
+    [blob],
+    responseName ?? `imported-reference-${crypto.randomUUID().slice(0, 8)}.${extension}`,
+    { type: contentType },
+  );
 };
 
 export const optimizeCharacterReferencePrompt = async (

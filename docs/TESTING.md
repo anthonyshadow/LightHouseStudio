@@ -51,10 +51,12 @@ The retained suite protects:
   H.264/AAC MP4 configuration, no-raw-fallback failure, playback, Download, Release, and confirmed
   Discard;
 - immutable-original local and ElevenLabs Voice processing;
+- upload/record inline playback, Original/Result edit-base synchronization, lazy voice selection,
+  strict visual-before-voice ordering, latest-result cleanup, and post-generation MP4 validation;
 - versioned/sanitized Recipe Shelf and Character Builder persistence, recovery, and destructive
   actions;
 - loopback Host/Origin, explicit provider intent, bounded response/stream handling, SSRF-resistant
-  image downloads, safe errors, and no provider fallback;
+  image downloads/imports, DNS pinning, redirect/byte/content limits, safe errors, and no provider fallback;
 - one persistent media stage, shared overlay focus/inert/Escape behavior, dominant recording Stop,
   200% text, and constrained mobile scrolling; and
 - unexpected external HTTP and WebSocket denial in ordinary automated tests.
@@ -71,9 +73,10 @@ The touch project runs that smoke plus the dedicated control-timeout/recording-S
 browser-specific test must be tagged in its title with `@cross-browser` or `@touch`; do not run
 every desktop journey under every engine by default.
 
-The current visual matrix contains 24 cases within the 29-case review budget. It retains Local live
+The current visual matrix contains 28 cases within the 29-case review budget. It retains Local live
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,
-Shelf, playback, existing-video, VTO, Voice, finalizing, and permission-error compositions. Visual
+Shelf, playback, existing-video setup at all five viewports, processing/result, VTO, Voice,
+finalizing, and permission-error compositions. Visual
 tests are not part of `pnpm test`, `pnpm quality`, or ordinary push/pull-request CI.
 
 Run `pnpm test:visual` when:

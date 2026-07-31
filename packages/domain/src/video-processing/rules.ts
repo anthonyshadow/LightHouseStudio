@@ -84,6 +84,28 @@ export const validateVideoTransformPlan = (
         `${step.modelId === 'lucy-2.5' ? 'Character' : 'Virtual Try-On'} needs a prompt, reference image, or both.`,
       );
     }
+    if (step.modelId === 'lucy-2.5') {
+      if (step.inputKind !== undefined && step.inputKind !== 'character') {
+        issues.push('Character edits must use character input.');
+      }
+      continue;
+    }
+    if (step.inputKind === undefined) {
+      issues.push('Choose a Virtual Try-On input type.');
+      continue;
+    }
+    if (step.inputKind === 'character') {
+      issues.push('Choose a Virtual Try-On input type.');
+    } else if (
+      step.inputKind === 'reference-image' &&
+      (!step.hasReferenceImage || step.prompt.trim() || step.enhancePrompt)
+    ) {
+      issues.push('Reference-image input cannot include prompt text or enhancement.');
+    } else if (step.inputKind === 'prompt' && (!step.prompt.trim() || step.hasReferenceImage)) {
+      issues.push('Prompt input cannot include a reference image.');
+    } else if (step.inputKind === 'saved-outfit' && step.enhancePrompt) {
+      issues.push('Saved outfits cannot enable prompt enhancement.');
+    }
   }
   return issues;
 };

@@ -575,6 +575,7 @@ export const useRecording = ({
       sidecar: artifacts.sidecar,
       recordingError: artifacts.recordingError,
       processingState: artifacts.processingState,
+      processingOperation: artifacts.processingOperation,
       processingError: artifacts.processingError,
       elapsedSeconds,
       downloaded: artifacts.downloaded,

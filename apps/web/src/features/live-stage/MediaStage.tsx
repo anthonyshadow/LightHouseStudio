@@ -269,6 +269,8 @@ export const MediaStage = ({
   const copy = emptyCopy(stageMode);
   const statusTone = presentation.kind === 'playback' ? 'accent' : lifecycleTone(lifecycle);
   const playbackLocked = presentation.kind === 'playback' && presentation.controlsLocked;
+  const playbackOperation =
+    presentation.kind === 'playback' ? presentation.processingOperation : null;
   const isFinalizing = presentation.kind === 'finalizing';
   const hasVisibleMedia = details.hasLiveVideo;
   const controlsAutoHideContext =
@@ -684,8 +686,11 @@ export const MediaStage = ({
         >
           <span css={blockingCardStyles(theme)}>
             <span css={activityIndicatorStyles(theme)} aria-hidden="true" />
-            <strong>Processing voice treatment…</strong>
-            <span>Playback is paused until the current treatment is ready.</span>
+            <strong>{playbackOperation?.title ?? 'Processing video…'}</strong>
+            <span>
+              {playbackOperation?.detail ??
+                'Playback is paused until the current operation is ready.'}
+            </span>
           </span>
         </div>
       ) : null}

@@ -1,4 +1,5 @@
 import type { LocalVoiceEffectId as DomainLocalVoiceEffectId } from '@studio/domain';
+import type { RecordingArtifact } from '../recording/types';
 
 export type { VoiceLibraryItem } from '../../application/types';
 
@@ -13,9 +14,20 @@ export type VoiceProcessingController = {
   selection: VoiceEffectSelection;
   applyLocal: (effect: LocalVoiceEffectId) => Promise<void>;
   applyElevenLabs: (voiceId: string, voiceName: string) => Promise<void>;
+  applyElevenLabsTo: (
+    artifact: RecordingArtifact,
+    voiceId: string,
+    voiceName: string,
+    options?: { readonly replaceExistingResult?: boolean },
+  ) => Promise<VoiceProcessingOutcome>;
   restoreOriginal: () => void;
   cancel: () => void;
 };
+
+export type VoiceProcessingOutcome =
+  | { readonly status: 'ready'; readonly artifact: RecordingArtifact }
+  | { readonly status: 'canceled' }
+  | { readonly status: 'error'; readonly message: string };
 
 export const LOCAL_EFFECTS: ReadonlyArray<{
   id: LocalVoiceEffectId;

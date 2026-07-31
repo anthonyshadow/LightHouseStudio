@@ -49,6 +49,9 @@ old story, or intended design.
 - Split at ownership/lifecycle boundaries, not an arbitrary line count.
 - Do not add a second media node/session, modal system, saved-character store, provider client, or
   generic repository spanning stores with different transaction models.
+- The Upload Existing Video panel is the sole approved second-video exception: its inline player
+  may borrow the current stream or artifact URL for capture/review, but it never owns tracks,
+  creates a media/provider session, or replaces the persistent `MediaStage`.
 - Browser storage is untrusted: schema-validate/sanitize, version persisted data, preserve opaque
   IDs/provenance/timestamps, and add migration tests.
 - Temporary state may be session-only only when the current product contract says so. Never treat

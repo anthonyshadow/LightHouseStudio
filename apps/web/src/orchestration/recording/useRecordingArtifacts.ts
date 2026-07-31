@@ -3,6 +3,7 @@ import { revokeArtifactUrl } from '../../features/recording/recordingHelpers';
 import type {
   RecordingArtifact,
   RecordingAudioSidecar,
+  RecordingProcessingOperation,
   RestorePersistedOriginalInput,
   VoiceProcessingState,
 } from '../../features/recording/types';
@@ -19,6 +20,8 @@ export const useRecordingArtifacts = () => {
   const [sidecar, setSidecar] = useState<RecordingAudioSidecar>(IDLE_AUDIO_SIDECAR);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [processingState, setProcessingState] = useState<VoiceProcessingState>('idle');
+  const [processingOperation, setProcessingOperation] =
+    useState<RecordingProcessingOperation | null>(null);
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [downloaded, setDownloaded] = useState(false);
   const originalRef = useRef<RecordingArtifact | null>(null);
@@ -39,6 +42,7 @@ export const useRecordingArtifacts = () => {
       setSidecar(nextSidecar);
       setRecordingError(null);
       setProcessingState('idle');
+      setProcessingOperation(null);
       setProcessingError(null);
       setDownloaded(false);
     },
@@ -72,13 +76,19 @@ export const useRecordingArtifacts = () => {
     setSidecar(IDLE_AUDIO_SIDECAR);
     setRecordingError(null);
     setProcessingState('idle');
+    setProcessingOperation(null);
     setProcessingError(null);
     setDownloaded(false);
   }, []);
 
   const completeVisualProcessing = useCallback(
-    (blob: Blob, mimeType: string, label: string): RecordingArtifact => {
-      const source = originalRef.current;
+    (
+      blob: Blob,
+      mimeType: string,
+      label: string,
+      explicitSource?: RecordingArtifact,
+    ): RecordingArtifact => {
+      const source = explicitSource ?? originalRef.current;
       if (!source) throw new Error('Original recording is unavailable.');
       const artifact = createProcessedRecordingArtifact(source, blob, mimeType, label);
       revokeArtifactUrl(visualRef.current, 'replacement');
@@ -88,6 +98,7 @@ export const useRecordingArtifacts = () => {
       setVisual(artifact);
       setProcessed(null);
       setProcessingState('ready');
+      setProcessingOperation(null);
       setProcessingError(null);
       setDownloaded(false);
       return artifact;
@@ -96,14 +107,26 @@ export const useRecordingArtifacts = () => {
   );
 
   const completeProcessing = useCallback(
-    (blob: Blob, mimeType: string, label: string): RecordingArtifact => {
-      const source = visualRef.current ?? originalRef.current;
+    (
+      blob: Blob,
+      mimeType: string,
+      label: string,
+      explicitSource?: RecordingArtifact,
+      replaceExistingResult = false,
+    ): RecordingArtifact => {
+      const source = explicitSource ?? visualRef.current ?? originalRef.current;
       if (!source) throw new Error('Original recording is unavailable.');
       const artifact = createProcessedRecordingArtifact(source, blob, mimeType, label);
+      if (replaceExistingResult) {
+        revokeArtifactUrl(visualRef.current, 'replacement');
+        visualRef.current = null;
+        setVisual(null);
+      }
       revokeArtifactUrl(processedRef.current, 'replacement');
       processedRef.current = artifact;
       setProcessed(artifact);
       setProcessingState('ready');
+      setProcessingOperation(null);
       setProcessingError(null);
       setDownloaded(false);
       return artifact;
@@ -116,6 +139,7 @@ export const useRecordingArtifacts = () => {
     processedRef.current = null;
     setProcessed(null);
     setProcessingState('idle');
+    setProcessingOperation(null);
     setProcessingError(null);
     setDownloaded(false);
   }, []);
@@ -128,6 +152,7 @@ export const useRecordingArtifacts = () => {
     setVisual(null);
     setProcessed(null);
     setProcessingState('idle');
+    setProcessingOperation(null);
     setProcessingError(null);
     setDownloaded(false);
   }, []);
@@ -149,16 +174,25 @@ export const useRecordingArtifacts = () => {
   const clearRecordingError = useCallback(() => setRecordingError(null), []);
   const reportRecordingError = useCallback((message: string) => setRecordingError(message), []);
   const markDownloaded = useCallback(() => setDownloaded(true), []);
-  const beginProcessing = useCallback(() => {
+  const beginProcessing = useCallback((operation?: RecordingProcessingOperation) => {
     setProcessingState('processing');
+    setProcessingOperation(
+      operation ?? {
+        kind: 'voice-composition',
+        title: 'Processing video…',
+        detail: 'Playback is paused until a complete replacement is ready.',
+      },
+    );
     setProcessingError(null);
   }, []);
   const cancelProcessing = useCallback(() => {
     setProcessingState(processedRef.current ? 'ready' : 'idle');
+    setProcessingOperation(null);
     setProcessingError(null);
   }, []);
   const failProcessing = useCallback((message: string) => {
     setProcessingState('error');
+    setProcessingOperation(null);
     setProcessingError(message);
   }, []);
 
@@ -189,6 +223,7 @@ export const useRecordingArtifacts = () => {
       sidecar,
       recordingError,
       processingState,
+      processingOperation,
       processingError,
       downloaded,
       originalRef,
@@ -215,6 +250,7 @@ export const useRecordingArtifacts = () => {
       sidecar,
       recordingError,
       processingState,
+      processingOperation,
       processingError,
       downloaded,
       publishOriginal,

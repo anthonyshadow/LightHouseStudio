@@ -61,6 +61,7 @@ const createRecording = (
     },
     recordingError: null,
     processingState,
+    processingOperation: null,
     processingError: null,
     elapsedSeconds: 2,
     downloaded: false,
@@ -83,6 +84,7 @@ const createProcessing = (): VoiceProcessingController => ({
   selection: { kind: 'local', effect: 'warm-studio' },
   applyLocal: vi.fn().mockResolvedValue(undefined),
   applyElevenLabs: vi.fn().mockResolvedValue(undefined),
+  applyElevenLabsTo: vi.fn().mockResolvedValue({ status: 'ready', artifact: createOriginal() }),
   restoreOriginal: vi.fn(),
   cancel: vi.fn(),
 });

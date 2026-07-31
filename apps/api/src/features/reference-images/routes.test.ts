@@ -29,6 +29,7 @@ import type {
 import { ReferenceImageProviderError } from '../../providers/openai/reference-image-provider.js';
 import { testConfig } from '../../test/fakes.js';
 import { LocalReferenceImageAssetStore } from './asset-store.js';
+import type { RemoteReferenceImageDownloader } from './routes.js';
 
 const localHeaders = { origin: 'http://localhost:5173', host: 'localhost:5173' };
 const requestId = '37d15fec-43a3-47b2-8330-7fb410698564';
@@ -112,6 +113,7 @@ describe('reference image API', () => {
   const setup = async (
     provider: ReferenceImageProvider | null,
     characterPromptOptimizer: CharacterPromptOptimizer | null = null,
+    remoteImageDownloader?: RemoteReferenceImageDownloader,
   ) => {
     const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-reference-api-'));
     directories.push(directory);
@@ -120,10 +122,69 @@ describe('reference image API', () => {
       referenceImageProvider: provider,
       characterPromptOptimizer,
       referenceImageAssetStore: new LocalReferenceImageAssetStore(directory),
+      ...(remoteImageDownloader ? { remoteImageDownloader } : {}),
     });
     apps.push(app);
     return app;
   };
+
+  it('imports public HTTPS image bytes only with explicit intent and never echoes the URL', async () => {
+    const bytes = await sharp({
+      create: { width: 24, height: 24, channels: 3, background: '#405060' },
+    })
+      .webp()
+      .toBuffer();
+    const remoteImageDownloader: RemoteReferenceImageDownloader = {
+      download: vi.fn().mockResolvedValue({ bytes, mimeType: 'image/webp' }),
+    };
+    const app = await setup(null, null, remoteImageDownloader);
+    const sourceUrl = 'https://images.example.test/private-name.webp';
+
+    const missingIntent = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/import',
+      headers: localHeaders,
+      payload: { url: sourceUrl },
+    });
+    expect(missingIntent.statusCode).toBe(403);
+    expect(remoteImageDownloader.download).not.toHaveBeenCalled();
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/import',
+      headers: { ...localHeaders, 'x-lightframe-provider-intent': 'video' },
+      payload: { url: sourceUrl },
+    });
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toContain('image/webp');
+    expect(response.headers['cache-control']).toBe('no-store');
+    expect(response.headers['content-disposition']).toMatch(
+      /^attachment; filename="imported-reference-[0-9a-f]{8}\.webp"$/u,
+    );
+    expect(response.rawPayload).toEqual(bytes);
+    expect(response.body).not.toContain(sourceUrl);
+    expect(remoteImageDownloader.download).toHaveBeenCalledWith(sourceUrl, expect.any(AbortSignal));
+  });
+
+  it('returns a safe error when imported bytes do not match the declared image type', async () => {
+    const sourceUrl = 'https://images.example.test/do-not-echo.webp';
+    const app = await setup(null, null, {
+      download: vi.fn().mockResolvedValue({
+        bytes: Buffer.from('not-an-image'),
+        mimeType: 'image/webp',
+      }),
+    });
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/reference-images/import',
+      headers: { ...localHeaders, 'x-lightframe-provider-intent': 'video' },
+      payload: { url: sourceUrl },
+    });
+
+    expect(response.statusCode).toBe(422);
+    expect(response.json<ApiErrorResponse>().error.code).toBe('invalid_remote_image');
+    expect(response.body).not.toContain(sourceUrl);
+  });
 
   it('optimizes first, routes the exact optimized prompt, and returns stored Lucy audit metadata', async () => {
     const providerInputs: GenerateReferenceImageProviderInput[] = [];

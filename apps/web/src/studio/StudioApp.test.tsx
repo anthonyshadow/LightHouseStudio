@@ -341,13 +341,19 @@ vi.mock('./CreativeWorkspace', () => ({
 import { StudioApp } from './StudioApp';
 import { StudioDesignProvider } from '../ui';
 
-const renderStudio = () =>
+const renderStudio = (initialIntent?: 'camera' | 'upload') =>
   render(
     <StudioDesignProvider>
       <RouterProvider
-        router={createMemoryRouter([{ path: '/studio', element: <StudioApp /> }], {
-          initialEntries: ['/studio'],
-        })}
+        router={createMemoryRouter(
+          [
+            {
+              path: '/studio',
+              element: <StudioApp {...(initialIntent ? { initialIntent } : {})} />,
+            },
+          ],
+          { initialEntries: ['/studio'] },
+        )}
       />
     </StudioDesignProvider>,
   );
@@ -359,6 +365,7 @@ describe('StudioApp composition lifecycle', () => {
     window.history.replaceState(null, '', '/');
     harness.latestWorkspace = null;
     harness.promptCommitted = null;
+    harness.session.startLocal.mockClear();
     harness.session.replaceRecipeDraft.mockClear();
     harness.repository.recordSuccessfulPrompt.mockClear();
     harness.repository.enrichNewestMatchingRecent.mockClear();
@@ -384,6 +391,20 @@ describe('StudioApp composition lifecycle', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Toggle shelf' }));
     expect(screen.getByTestId('creative-panel')).toHaveTextContent('shelf');
+    expect(screen.getByTestId('media-stage')).toBe(stage);
+    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
+  });
+
+  it('closes Upload existing video and hands local recording to the persistent stage', () => {
+    renderStudio('upload');
+    const stage = screen.getByTestId('media-stage');
+
+    expect(screen.getByRole('region', { name: 'Upload existing video' })).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Record a local video' }));
+
+    expect(screen.queryByRole('region', { name: 'Upload existing video' })).not.toBeInTheDocument();
+    expect(harness.session.startLocal).toHaveBeenCalledOnce();
     expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
   });

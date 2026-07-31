@@ -4,6 +4,7 @@ import { validateReferenceImage } from '../../adapters/browser-media/imageValida
 import { hydrateReferenceImage } from '../../adapters/api-client/apiClient';
 import { Button, StatusNotice, Surface } from '../../ui';
 import { formatBytes, formatDuration } from '../recording';
+import { VoiceLibrary } from '../voice-effects/VoiceLibrary';
 import {
   ExistingVideoRecipeChooser,
   type ExistingVideoSavedRecipe,
@@ -15,9 +16,13 @@ import type { ExistingVideoStep, ExistingVideoWorkflow } from './useExistingVide
 type ExistingVideoPanelProps = {
   readonly workflow: ExistingVideoWorkflow;
   readonly videoProcessingAvailable: boolean;
+  readonly elevenLabsAvailable?: boolean;
+  readonly elevenLabsModel?: string | null;
   readonly onFinish: () => void;
   readonly savedRecipes?: readonly ExistingVideoSavedRecipe[];
   readonly onCreateCharacter?: (stepId: string) => void;
+  readonly recordingSupported?: boolean;
+  readonly onRecordVideo?: () => void;
 };
 
 const panelStyles = (theme: Theme): CSSObject => ({
@@ -166,6 +171,16 @@ const stepStyles = (theme: Theme): CSSObject => ({
     background: theme.colors.surfaceStrong,
     font: 'inherit',
   },
+  '& select, & input[type="url"]': {
+    width: '100%',
+    minHeight: '2.75rem',
+    padding: theme.space.xs,
+    border: `1px solid ${theme.colors.borderStrong}`,
+    borderRadius: theme.radii.small,
+    color: theme.colors.text,
+    background: theme.colors.surfaceStrong,
+    font: 'inherit',
+  },
   '& label': { display: 'grid', gap: theme.space.xxs },
   '& input[type="checkbox"]': { width: '1.2rem', height: '1.2rem' },
 });
@@ -176,20 +191,37 @@ const modelLabel = (step: ExistingVideoStep): string =>
 const stepHeading = (step: ExistingVideoStep): string =>
   step.modelId === 'lucy-2.5' ? 'Swap Character (Lucy 2.5)' : 'Virtual Try On';
 
+const stepIsComplete = (step: ExistingVideoStep): boolean => {
+  if (step.modelId === 'lucy-2.5') {
+    return Boolean(step.prompt.trim() || step.referenceImage);
+  }
+  if (step.inputKind === 'prompt') return Boolean(step.prompt.trim());
+  if (step.inputKind === 'reference-image') return step.referenceImage !== null;
+  return Boolean(step.savedRecipeId || step.referenceImage || step.prompt.trim());
+};
+
 const Orientation = ({ width, height }: { width: number; height: number }) =>
   width > height ? 'Landscape 16:9' : 'Portrait 9:16';
 
 export const ExistingVideoPanel = ({
   workflow,
   videoProcessingAvailable,
+  elevenLabsAvailable = false,
+  elevenLabsModel = null,
   onFinish,
   savedRecipes = [],
   onCreateCharacter,
+  recordingSupported = false,
+  onRecordVideo,
 }: ExistingVideoPanelProps) => {
   const theme = useTheme();
   const pickerRef = useRef<HTMLInputElement>(null);
   const [referenceError, setReferenceError] = useState<string | null>(null);
   const [recipeLoading, setRecipeLoading] = useState(false);
+  const [voiceChooserOpen, setVoiceChooserOpen] = useState(false);
+  const [recentOutfits, setRecentOutfits] = useState<
+    readonly Readonly<{ id: string; file: File }>[]
+  >([]);
   const structureLocked = workflow.acceptedSubmission || workflow.active;
   const recipeLocked =
     workflow.active ||
@@ -210,6 +242,8 @@ export const ExistingVideoPanel = ({
       return;
     }
     setReferenceError(null);
+    setRecentOutfits([]);
+    setVoiceChooserOpen(false);
     workflow.reset(true);
   };
 
@@ -227,6 +261,12 @@ export const ExistingVideoPanel = ({
     }
     setReferenceError(null);
     workflow.updateStep(step.id, { referenceImage: file });
+    if (step.modelId === 'lucy-vton-3') {
+      setRecentOutfits((current) => [
+        { id: crypto.randomUUID(), file },
+        ...current.filter((item) => item.file !== file),
+      ]);
+    }
   };
 
   const applySavedRecipe = async (step: ExistingVideoStep, recipeId: string) => {
@@ -244,6 +284,9 @@ export const ExistingVideoPanel = ({
         savedRecipeId: recipe.id,
         prompt: recipe.prompt,
         referenceImage: referenceImage?.file ?? null,
+        ...(step.modelId === 'lucy-vton-3'
+          ? { inputKind: 'saved-outfit' as const, enhancePrompt: false }
+          : {}),
       });
     } catch {
       setReferenceError(
@@ -253,6 +296,9 @@ export const ExistingVideoPanel = ({
         savedRecipeId: recipe.id,
         prompt: recipe.prompt,
         referenceImage: null,
+        ...(step.modelId === 'lucy-vton-3'
+          ? { inputKind: 'saved-outfit' as const, enhancePrompt: false }
+          : {}),
       });
     } finally {
       setRecipeLoading(false);
@@ -286,13 +332,20 @@ export const ExistingVideoPanel = ({
             disabled={workflow.phase === 'validating'}
             onChange={(event) => chooseFiles(event.currentTarget.files)}
           />
-          <Button
-            variant="primary"
-            busy={workflow.phase === 'validating'}
-            onClick={() => pickerRef.current?.click()}
-          >
-            Select video
-          </Button>
+          <div css={rowStyles(theme)}>
+            <Button
+              variant="primary"
+              busy={workflow.phase === 'validating'}
+              onClick={() => pickerRef.current?.click()}
+            >
+              Select video
+            </Button>
+            {onRecordVideo ? (
+              <Button variant="secondary" disabled={!recordingSupported} onClick={onRecordVideo}>
+                Record a local video
+              </Button>
+            ) : null}
+          </div>
           <span>or drop it here</span>
         </div>
       </div>
@@ -300,11 +353,12 @@ export const ExistingVideoPanel = ({
   }
 
   const metadata = selected.metadata;
+  const voiceSourceAvailable = workflow.voiceAvailable;
 
   return (
     <div css={panelStyles(theme)}>
       <header>
-        <h2>Uploaded source</h2>
+        <h2>{workflow.original?.kind === 'recorded' ? 'Recorded source' : 'Uploaded source'}</h2>
         <p>
           The source, recipes, and results stay in this tab. Refreshing or closing it loses the
           workflow.
@@ -312,7 +366,14 @@ export const ExistingVideoPanel = ({
       </header>
 
       <div css={sourceOverviewStyles(theme)}>
-        <ExistingVideoSourcePreview file={selected.file} displayName={metadata.displayName} />
+        <ExistingVideoSourcePreview
+          artifact={workflow.comparison === 'result' ? workflow.result : workflow.original}
+          displayName={
+            workflow.comparison === 'result' && workflow.result
+              ? (workflow.result.name ?? workflow.result.filename)
+              : metadata.displayName
+          }
+        />
         <div css={panelStyles(theme)}>
           <h3>Source details</h3>
           <dl css={metadataStyles(theme)}>
@@ -355,9 +416,38 @@ export const ExistingVideoPanel = ({
         </div>
       </div>
 
+      {workflow.result ? (
+        <div css={rowStyles(theme)} role="group" aria-label="Compare and edit video">
+          <Button
+            variant={workflow.comparison === 'original' ? 'primary' : 'secondary'}
+            aria-pressed={workflow.comparison === 'original'}
+            onClick={workflow.showOriginal}
+          >
+            Original
+          </Button>
+          <Button
+            variant={workflow.comparison === 'result' ? 'primary' : 'secondary'}
+            aria-pressed={workflow.comparison === 'result'}
+            onClick={workflow.showResult}
+          >
+            Result
+          </Button>
+          {!workflow.active ? (
+            <Button variant="secondary" onClick={workflow.editSelected}>
+              Edit {workflow.comparison === 'original' ? 'original' : 'result'}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
+
       {workflow.message ? (
         <StatusNotice tone={workflow.phase === 'error' ? 'danger' : 'neutral'} role="status">
           {workflow.message}
+        </StatusNotice>
+      ) : null}
+      {workflow.active && workflow.operation ? (
+        <StatusNotice tone="neutral" role="status" title={workflow.operation.title}>
+          {workflow.operation.detail}
         </StatusNotice>
       ) : null}
       {referenceError ? (
@@ -411,75 +501,155 @@ export const ExistingVideoPanel = ({
                   <span>1 Decart submission</span>
                 </header>
                 {step.modelId === 'lucy-vton-3' ? (
-                  <StatusNotice tone="warning">
-                    VTO is beta. Confirm you have rights and consent for the person and garment
-                    media before submitting it to Decart.
-                  </StatusNotice>
+                  <>
+                    <p>
+                      Virtual Try On is a controlled-pilot beta. Use media you have rights and
+                      consent to submit. One clearly visible garment on a plain background works
+                      best; results do not predict fit, sizing, or purchase accuracy.
+                    </p>
+                    <div css={rowStyles(theme)} role="group" aria-label="Outfit input type">
+                      {(
+                        [
+                          ['saved-outfit', 'Saved or recent outfit'],
+                          ['reference-image', 'Reference image'],
+                          ['prompt', 'Prompt'],
+                        ] as const
+                      ).map(([kind, label]) => (
+                        <Button
+                          key={kind}
+                          variant={step.inputKind === kind ? 'primary' : 'secondary'}
+                          aria-pressed={step.inputKind === kind}
+                          disabled={recipeLocked}
+                          onClick={() => workflow.setVtonInputKind(step.id, kind)}
+                        >
+                          {label}
+                        </Button>
+                      ))}
+                    </div>
+                    {step.inputKind === 'saved-outfit' ? (
+                      <label>
+                        Saved or recently uploaded outfit
+                        <select
+                          value={
+                            step.savedRecipeId
+                              ? `saved:${step.savedRecipeId}`
+                              : recentOutfits.find((item) => item.file === step.referenceImage)
+                                ? `recent:${recentOutfits.find((item) => item.file === step.referenceImage)!.id}`
+                                : ''
+                          }
+                          disabled={recipeLocked || recipeLoading}
+                          onChange={(event) => {
+                            const value = event.currentTarget.value;
+                            if (value.startsWith('saved:')) {
+                              void applySavedRecipe(step, value.slice(6));
+                              return;
+                            }
+                            const recent = recentOutfits.find(
+                              (item) => `recent:${item.id}` === value,
+                            );
+                            if (recent) {
+                              workflow.updateStep(step.id, {
+                                savedRecipeId: null,
+                                prompt: '',
+                                enhancePrompt: false,
+                                referenceImage: recent.file,
+                              });
+                            }
+                          }}
+                        >
+                          <option value="">Choose an outfit</option>
+                          {savedRecipes
+                            .filter((recipe) => recipe.modelId === 'lucy-vton-3')
+                            .map((recipe) => (
+                              <option key={recipe.id} value={`saved:${recipe.id}`}>
+                                {recipe.label}
+                              </option>
+                            ))}
+                          {recentOutfits.map((outfit) => (
+                            <option key={outfit.id} value={`recent:${outfit.id}`}>
+                              Recent · {outfit.file.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    ) : null}
+                  </>
                 ) : (
-                  <p>Confirm you have rights and consent for submitted media before continuing.</p>
+                  <>
+                    <p>
+                      Confirm you have rights and consent for submitted media before continuing.
+                    </p>
+                    <ExistingVideoRecipeChooser
+                      modelId={step.modelId}
+                      recipes={savedRecipes.filter((recipe) => recipe.modelId === step.modelId)}
+                      selectedRecipeId={step.savedRecipeId}
+                      disabled={recipeLocked}
+                      loading={recipeLoading}
+                      onChoose={(recipeId) => void applySavedRecipe(step, recipeId)}
+                      {...(onCreateCharacter
+                        ? { onCreateCharacter: () => onCreateCharacter(step.id) }
+                        : {})}
+                    />
+                  </>
                 )}
-                <ExistingVideoRecipeChooser
-                  modelId={step.modelId}
-                  recipes={savedRecipes.filter((recipe) => recipe.modelId === step.modelId)}
-                  selectedRecipeId={step.savedRecipeId}
-                  disabled={recipeLocked}
-                  loading={recipeLoading}
-                  onChoose={(recipeId) => void applySavedRecipe(step, recipeId)}
-                  {...(step.modelId === 'lucy-2.5' && onCreateCharacter
-                    ? { onCreateCharacter: () => onCreateCharacter(step.id) }
-                    : {})}
-                />
-                <label>
-                  Prompt
-                  <textarea
-                    value={step.prompt}
-                    maxLength={1_200}
+                {step.modelId === 'lucy-2.5' || step.inputKind === 'prompt' ? (
+                  <>
+                    <label>
+                      Prompt
+                      <textarea
+                        value={step.prompt}
+                        maxLength={1_200}
+                        disabled={recipeLocked}
+                        placeholder={
+                          step.modelId === 'lucy-2.5'
+                            ? 'Describe the character or visual edit'
+                            : 'Describe the garment and desired appearance'
+                        }
+                        onChange={(event) =>
+                          workflow.updateStep(step.id, {
+                            savedRecipeId: null,
+                            prompt: event.currentTarget.value,
+                          })
+                        }
+                      />
+                      <span>{step.prompt.length}/1,200</span>
+                    </label>
+                    <label>
+                      <span>
+                        <input
+                          type="checkbox"
+                          checked={step.enhancePrompt}
+                          disabled={recipeLocked}
+                          onChange={(event) =>
+                            workflow.updateStep(step.id, {
+                              enhancePrompt: event.currentTarget.checked,
+                            })
+                          }
+                        />{' '}
+                        Enhance prompt
+                      </span>
+                    </label>
+                  </>
+                ) : null}
+                {step.modelId === 'lucy-2.5' || step.inputKind === 'reference-image' ? (
+                  <ExistingVideoReferenceField
+                    modelId={step.modelId}
+                    file={step.referenceImage}
                     disabled={recipeLocked}
-                    placeholder={
-                      step.modelId === 'lucy-2.5'
-                        ? 'Describe the character or visual edit'
-                        : 'Describe the garment and desired fit'
-                    }
-                    onChange={(event) =>
+                    allowUrlImport={step.modelId === 'lucy-vton-3'}
+                    onSelectFile={(file) => {
+                      workflow.updateStep(step.id, { savedRecipeId: null });
+                      void chooseReference(step, file);
+                    }}
+                    onRemove={() => {
+                      setReferenceError(null);
                       workflow.updateStep(step.id, {
                         savedRecipeId: null,
-                        prompt: event.currentTarget.value,
-                      })
-                    }
+                        referenceImage: null,
+                      });
+                    }}
                   />
-                  <span>{step.prompt.length}/1,200</span>
-                </label>
-                <ExistingVideoReferenceField
-                  modelId={step.modelId}
-                  file={step.referenceImage}
-                  disabled={recipeLocked}
-                  onSelectFile={(file) => {
-                    workflow.updateStep(step.id, { savedRecipeId: null });
-                    void chooseReference(step, file);
-                  }}
-                  onRemove={() => {
-                    setReferenceError(null);
-                    workflow.updateStep(step.id, {
-                      savedRecipeId: null,
-                      referenceImage: null,
-                    });
-                  }}
-                />
-                <label>
-                  <span>
-                    <input
-                      type="checkbox"
-                      checked={step.enhancePrompt}
-                      disabled={recipeLocked}
-                      onChange={(event) =>
-                        workflow.updateStep(step.id, {
-                          enhancePrompt: event.currentTarget.checked,
-                        })
-                      }
-                    />{' '}
-                    Enhance prompt
-                  </span>
-                </label>
+                ) : null}
                 <div css={rowStyles(theme)}>
                   <Button
                     variant="danger"
@@ -493,13 +663,80 @@ export const ExistingVideoPanel = ({
             ))}
           </section>
 
+          <section css={panelStyles(theme)} aria-labelledby="voice-plan-heading">
+            <div css={visualPlanHeaderStyles(theme)}>
+              <div>
+                <h2 id="voice-plan-heading">Voice change</h2>
+                <p>
+                  Optional. The saved ElevenLabs library loads only when you open it. Combined edits
+                  always finish the visual change before applying the selected voice.
+                </p>
+              </div>
+              <div css={rowStyles(theme)}>
+                <Button
+                  variant={workflow.voiceSelection ? 'primary' : 'secondary'}
+                  aria-expanded={voiceChooserOpen}
+                  disabled={!voiceSourceAvailable || structureLocked}
+                  onClick={() => setVoiceChooserOpen((open) => !open)}
+                >
+                  {workflow.voiceSelection ? 'Change selected voice' : 'Add voice change'}
+                </Button>
+                {workflow.voiceSelection ? (
+                  <Button
+                    variant="quiet"
+                    onClick={() => {
+                      workflow.clearVoice();
+                      setVoiceChooserOpen(false);
+                    }}
+                  >
+                    No voice change
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+            {!voiceSourceAvailable ? (
+              <StatusNotice tone="neutral">
+                Voice change is unavailable because the immutable source has no usable audio
+                sidecar.
+              </StatusNotice>
+            ) : null}
+            {workflow.voiceSelection ? (
+              <StatusNotice tone="neutral">
+                Selected voice: <strong>{workflow.voiceSelection.voiceName}</strong>. Selection
+                alone does not upload audio.
+              </StatusNotice>
+            ) : null}
+            {voiceChooserOpen ? (
+              elevenLabsAvailable ? (
+                <VoiceLibrary
+                  mode="select"
+                  disabled={structureLocked}
+                  clipDurationLabel={formatDuration(metadata.durationMs / 1_000)}
+                  modelId={elevenLabsModel}
+                  onApply={(voice) => {
+                    workflow.selectVoice(voice.voiceId, voice.name);
+                    setVoiceChooserOpen(false);
+                  }}
+                />
+              ) : (
+                <StatusNotice tone="warning">
+                  ElevenLabs is unavailable. Configure it before selecting a saved voice.
+                </StatusNotice>
+              )
+            ) : null}
+          </section>
+
           <Surface tone="soft" padding="compact">
             <div css={panelStyles(theme)}>
               <h2>Review transfer</h2>
               <p>
-                {workflow.steps.length === 0
-                  ? 'No provider transfer. Keep the uploaded video local and continue to Voice or Download.'
-                  : `1 planned Decart submission: ${modelLabel(workflow.steps[0]!)}.`}
+                {workflow.steps.length > 0 && workflow.voiceSelection
+                  ? `1 Decart submission (${modelLabel(workflow.steps[0]!)}) followed by 1 ElevenLabs conversion (${workflow.voiceSelection.voiceName}).`
+                  : workflow.steps.length > 0
+                    ? `1 planned Decart submission: ${modelLabel(workflow.steps[0]!)}.`
+                    : workflow.voiceSelection
+                      ? `1 planned ElevenLabs conversion: ${workflow.voiceSelection.voiceName}.`
+                      : 'No provider transfer. Keep the video local and continue to review.'}
               </p>
               {!videoProcessingAvailable && workflow.steps.length > 0 ? (
                 <StatusNotice tone="warning">
@@ -513,7 +750,7 @@ export const ExistingVideoPanel = ({
                 </p>
               ) : null}
               <div css={rowStyles(theme)}>
-                {workflow.steps.length === 0 ? (
+                {workflow.steps.length === 0 && !workflow.voiceSelection ? (
                   <Button variant="primary" onClick={onFinish}>
                     Continue locally
                   </Button>
@@ -523,14 +760,16 @@ export const ExistingVideoPanel = ({
                     busy={workflow.active}
                     disabled={
                       structureLocked ||
-                      !videoProcessingAvailable ||
-                      workflow.steps.some(
-                        (step) => !step.prompt.trim() && step.referenceImage === null,
-                      )
+                      (workflow.steps.length > 0 && !videoProcessingAvailable) ||
+                      workflow.steps.some((step) => !stepIsComplete(step))
                     }
-                    onClick={() => void workflow.submitStep(workflow.completedStepCount)}
+                    onClick={() => void workflow.submitPlan()}
                   >
-                    Start · 1 Decart submission
+                    {workflow.steps.length > 0 && workflow.voiceSelection
+                      ? 'Start visual, then voice'
+                      : workflow.steps.length > 0
+                        ? 'Start · 1 Decart submission'
+                        : 'Start · 1 ElevenLabs conversion'}
                   </Button>
                 )}
                 {!workflow.acceptedSubmission ? (
@@ -548,7 +787,11 @@ export const ExistingVideoPanel = ({
                 <Button
                   variant="danger"
                   disabled={structureLocked}
-                  onClick={() => workflow.reset(true)}
+                  onClick={() => {
+                    setRecentOutfits([]);
+                    setVoiceChooserOpen(false);
+                    workflow.reset(true);
+                  }}
                 >
                   Remove
                 </Button>
@@ -583,22 +826,6 @@ export const ExistingVideoPanel = ({
             Compare the uploaded original with the generated result on the shared stage. Download
             saves the result; Start over keeps the original uploaded.
           </p>
-          <div css={rowStyles(theme)} role="group" aria-label="Compare source and result">
-            <Button
-              variant={workflow.comparison === 'original' ? 'primary' : 'secondary'}
-              aria-pressed={workflow.comparison === 'original'}
-              onClick={workflow.showOriginal}
-            >
-              Original
-            </Button>
-            <Button
-              variant={workflow.comparison === 'result' ? 'primary' : 'secondary'}
-              aria-pressed={workflow.comparison === 'result'}
-              onClick={workflow.showResult}
-            >
-              Result
-            </Button>
-          </div>
           <div css={resultActionStyles(theme)}>
             {workflow.result ? (
               <a

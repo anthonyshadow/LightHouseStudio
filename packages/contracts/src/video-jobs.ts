@@ -5,6 +5,13 @@ export const VIDEO_PROVIDER_INTENT_VALUE = 'video' as const;
 
 export const VIDEO_TRANSFORM_MODEL_IDS = ['lucy-2.5', 'lucy-vton-3'] as const;
 export const videoTransformModelIdSchema = z.enum(VIDEO_TRANSFORM_MODEL_IDS);
+export const VIDEO_TRANSFORM_INPUT_KINDS = [
+  'character',
+  'saved-outfit',
+  'reference-image',
+  'prompt',
+] as const;
+export const videoTransformInputKindSchema = z.enum(VIDEO_TRANSFORM_INPUT_KINDS);
 
 export const VIDEO_INPUT_MAX_DURATION_SECONDS = 300;
 export const VIDEO_INPUT_MAX_BYTES = 300_000_000;
@@ -48,6 +55,7 @@ export const videoJobErrorCodeSchema = z.enum(VIDEO_JOB_ERROR_CODES);
 export const videoTransformRecipeSchema = z
   .object({
     modelId: videoTransformModelIdSchema,
+    inputKind: videoTransformInputKindSchema.optional(),
     prompt: z
       .string()
       .max(1_200)
@@ -57,12 +65,63 @@ export const videoTransformRecipeSchema = z
   })
   .strict()
   .superRefine((value, context) => {
-    if (value.prompt || value.hasReferenceImage) return;
-    context.addIssue({
-      code: 'custom',
-      path: ['prompt'],
-      message: 'A prompt, reference image, or both is required.',
-    });
+    if (!value.prompt && !value.hasReferenceImage) {
+      context.addIssue({
+        code: 'custom',
+        path: ['prompt'],
+        message: 'A prompt, reference image, or both is required.',
+      });
+      return;
+    }
+    if (value.modelId === 'lucy-2.5') {
+      if (value.inputKind !== undefined && value.inputKind !== 'character') {
+        context.addIssue({
+          code: 'custom',
+          path: ['inputKind'],
+          message: 'Character edits must use character input.',
+        });
+      }
+      return;
+    }
+    if (value.inputKind === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['inputKind'],
+        message: 'Choose a Virtual Try-On input type.',
+      });
+      return;
+    }
+    if (value.inputKind === 'character') {
+      context.addIssue({
+        code: 'custom',
+        path: ['inputKind'],
+        message: 'Choose a Virtual Try-On input type.',
+      });
+    }
+    if (
+      value.inputKind === 'reference-image' &&
+      (!value.hasReferenceImage || value.prompt || value.enhancePrompt)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['inputKind'],
+        message: 'Reference-image input cannot include prompt text or enhancement.',
+      });
+    }
+    if (value.inputKind === 'prompt' && (!value.prompt || value.hasReferenceImage)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['inputKind'],
+        message: 'Prompt input cannot include a reference image.',
+      });
+    }
+    if (value.inputKind === 'saved-outfit' && value.enhancePrompt) {
+      context.addIssue({
+        code: 'custom',
+        path: ['enhancePrompt'],
+        message: 'Saved outfits cannot enable prompt enhancement.',
+      });
+    }
   });
 
 export const videoJobParamsSchema = z.object({ jobId: z.uuid() }).strict();
@@ -106,6 +165,7 @@ export const videoJobStatusResponseSchema = z
   .strict();
 
 export type VideoTransformModelId = z.infer<typeof videoTransformModelIdSchema>;
+export type VideoTransformInputKind = z.infer<typeof videoTransformInputKindSchema>;
 export type VideoInputMimeType = z.infer<typeof videoInputMimeTypeSchema>;
 export type VideoTransformRecipe = z.infer<typeof videoTransformRecipeSchema>;
 export type VideoJobStatus = z.infer<typeof videoJobStatusSchema>;

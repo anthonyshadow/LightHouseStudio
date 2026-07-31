@@ -19,6 +19,7 @@ export type VideoTransformStep = Readonly<{
   prompt: string;
   hasReferenceImage: boolean;
   enhancePrompt: boolean;
+  inputKind?: 'character' | 'saved-outfit' | 'reference-image' | 'prompt';
 }>;
 
 export type UploadedVideoValidationCode =

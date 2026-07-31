@@ -36,6 +36,37 @@ const requireNonEmptyText = (value: string, field: string): string => {
   return normalized;
 };
 
+const artifactTimestamp = (value: string | number | Date): string => {
+  const date = value instanceof Date ? value : new Date(value);
+  const safeDate = Number.isFinite(date.valueOf()) ? date : new Date();
+  return safeDate
+    .toISOString()
+    .replace(/[-:]/gu, '')
+    .replace(/\.\d{3}Z$/u, 'Z');
+};
+
+const artifactSlug = (value: string): string =>
+  value
+    .trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/gu, '-')
+    .replace(/^-+|-+$/gu, '')
+    .slice(0, 48) || 'video';
+
+const createRuntimeArtifactIdentity = (
+  label: string,
+  createdAt = new Date().toISOString(),
+): Readonly<{ id: string; name: string; createdAt: string; suffix: string }> => {
+  const uuid = crypto.randomUUID();
+  const suffix = uuid.slice(0, 8);
+  return {
+    id: `video-${uuid}`,
+    name: `${label} · ${artifactTimestamp(createdAt)} · ${suffix}`,
+    createdAt,
+    suffix,
+  };
+};
+
 /**
  * Rebuilds runtime-owned recording objects from IndexedDB-safe data. Object
  * URLs are always created here so callers never persist or transfer their
@@ -83,6 +114,10 @@ export const createPersistedOriginalRecording = (
 
   const artifact = Object.freeze({
     id,
+    name: input.artifactMetadata.name ?? `Restored video · ${id.slice(-8)}`,
+    createdAt: input.artifactMetadata.createdAt ?? startedAt,
+    kind: input.artifactMetadata.kind ?? 'uploaded',
+    parentArtifactId: input.artifactMetadata.parentArtifactId ?? null,
     media: input.blob,
     objectUrl: createArtifactObjectUrl(input.blob),
     mimeType,
@@ -103,12 +138,23 @@ export const createOriginalRecordingArtifact = (
 ): RecordingArtifact | null => {
   if (blob.size === 0) return null;
 
+  const identity = createRuntimeArtifactIdentity(
+    `${attempt.mode === 'local' ? 'Local' : attempt.mode === 'lucy-2.5' ? 'Character' : 'Virtual Try-On'} take`,
+    attempt.startedAt.toISOString(),
+  );
+  const recordingFilename = createRecordingFilename(attempt.mode, attempt.startedAt, mimeType);
+  const uniqueFilename = recordingFilename.replace(/(\.[a-z0-9]+)$/iu, `-${identity.suffix}$1`);
+
   return {
-    id: `${attempt.mode}-${attempt.startedAt.toISOString()}-${attempt.startTime}`,
+    id: identity.id,
+    name: identity.name,
+    createdAt: identity.createdAt,
+    kind: 'recorded',
+    parentArtifactId: null,
     media: blob,
     objectUrl: createArtifactObjectUrl(blob),
     mimeType,
-    filename: createRecordingFilename(attempt.mode, attempt.startedAt, mimeType),
+    filename: uniqueFilename,
     sourceModeId: attempt.mode,
     startedAt: attempt.startedAt.toISOString(),
     durationMs: Math.max(0, mainStoppedAt - attempt.startTime),
@@ -177,13 +223,19 @@ export const createProcessedRecordingArtifact = (
       ? 'mov'
       : 'webm';
   const base = source.filename.replace(/\.(mp4|mov|webm)$/i, '');
+  const createdAt = new Date().toISOString();
+  const identity = createRuntimeArtifactIdentity(label, createdAt);
   return {
     ...source,
-    id: `${source.id}-${label}`,
+    id: identity.id,
+    name: identity.name,
+    createdAt,
+    kind: label === 'voice' || label.startsWith('voice-') ? 'voice' : 'visual',
+    parentArtifactId: source.id,
     media: blob,
     objectUrl: createArtifactObjectUrl(blob),
     mimeType,
-    filename: `${base}-${label}.${extension}`,
+    filename: `${artifactSlug(base)}-${artifactSlug(label)}-${artifactTimestamp(createdAt)}-${identity.suffix}.${extension}`,
     sizeBytes: blob.size,
   };
 };

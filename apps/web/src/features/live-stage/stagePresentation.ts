@@ -1,11 +1,16 @@
-import type { RecordingArtifact } from '../recording/types';
+import type { RecordingArtifact, RecordingProcessingOperation } from '../recording/types';
 import type { StudioMode } from '../media-session';
 
 export type StagePresentation =
   | { kind: 'idle'; mode: StudioMode }
   | { kind: 'live'; stream: MediaStream; origin: 'local' | 'provider'; mirrored: boolean }
   | { kind: 'finalizing'; retainedStream: MediaStream | null; startedAt: number }
-  | { kind: 'playback'; artifact: RecordingArtifact; controlsLocked: boolean };
+  | {
+      kind: 'playback';
+      artifact: RecordingArtifact;
+      controlsLocked: boolean;
+      processingOperation?: RecordingProcessingOperation | null;
+    };
 
 export type StreamDetails = {
   hasLiveVideo: boolean;

@@ -118,6 +118,10 @@ export const VISUAL_CASE_MATRIX = [
   { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[4] },
   { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[5] },
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[6] },
+  ...VISUAL_VIEWPORTS.filter((viewport) => viewport.id !== 'desktop').map((viewport) => ({
+    viewport,
+    scenario: FOCUSED_VISUAL_SCENARIOS[6],
+  })),
   { viewport: compactViewport, scenario: FOCUSED_VISUAL_SCENARIOS[7] },
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[8] },
   ...DESKTOP_VISUAL_SCENARIOS.map((scenario) => ({ viewport: desktopViewport, scenario })),

@@ -5,11 +5,17 @@ import { deriveTakeStagePresentation, finalizeTakeForReview } from './useTakeRev
 type RecordingController = ReturnType<typeof useRecording>;
 
 const recordingState = (
-  overrides: Partial<Pick<RecordingController, 'lifecycle' | 'presented' | 'processingState'>> = {},
-): Pick<RecordingController, 'lifecycle' | 'presented' | 'processingState'> => ({
+  overrides: Partial<
+    Pick<RecordingController, 'lifecycle' | 'presented' | 'processingState' | 'processingOperation'>
+  > = {},
+): Pick<
+  RecordingController,
+  'lifecycle' | 'presented' | 'processingState' | 'processingOperation'
+> => ({
   lifecycle: 'idle',
   presented: null,
   processingState: 'idle',
+  processingOperation: null,
   ...overrides,
 });
 

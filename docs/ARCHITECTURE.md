@@ -42,7 +42,10 @@ The mounted Studio owns focused controllers for:
 `MediaStage` stays mounted once and owns one `<video>` element. A discriminated presentation state
 switches among idle, live, finalizing, and playback. Live media uses `srcObject`; playback uses
 `src`. Opening or closing a tool must not replace the player, restart media, alter playback time,
-or create a second take player.
+or create a second take player. The sole exception is the Upload Existing Video panel's inline
+source/result `<video>`. It borrows a controller-owned artifact URL, never handles a live stream,
+recording, or finalization, and detaches listeners and `src` on replacement or unmount.
+Original/Result comparison drives both this inline player and the stage.
 
 All tools use the shared `OverlayPanel` portal. It owns focus trap, inert background, Escape,
 topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. The portal
@@ -150,21 +153,28 @@ Download therefore remain unavailable while transcoding.
 
 Recorded and uploaded media publish through one artifact boundary:
 
-`immutable source → latest successful visual → optional voiced layer → presented artifact`.
+`immutable source → latest healthy result`.
 
 The finalized or validated source replaces live media on the same persistent stage. The artifact
 owner creates and revokes every source/visual/voice URL. Changing source invalidates downstream
-layers; restoring Original voice removes only the voice layer and returns to the latest visual.
-Every Voice treatment reads immutable source audio and remuxes it onto `visual ?? source`.
-Existing-video comparison selects the immutable source or visual result for presentation without
-changing artifact ownership. Its source-preserving Start over revokes the visual and optional
-voice layers, retains the source, and returns presentation to that source.
+layers. During a combined edit, the healthy visual remains available while voice conversion runs;
+a healthy voiced result then replaces it. Every Voice treatment reads immutable source audio and
+remuxes it onto the explicitly selected Original or Result video. Existing-video comparison
+selects the immutable source or latest result without changing artifact ownership. Its
+source-preserving Start over revokes the latest result, retains the source, and returns
+presentation to that source. Every artifact has a UUID, app-owned name, creation time, kind, and
+parent lineage; generated filenames include the operation, UTC timestamp, and UUID suffix.
 
 The existing-video controller uses Mediabunny plus browser decode confirmation for an early check.
 The API streams bytes to generated private paths and performs authoritative
 container/track/codec/duration/aspect/size inspection before Decart contact. One app job runs at a
 time. An uploaded workflow can switch its single active choice between Lucy and VTO before
 submission, and only that active model is submitted.
+VTO recipes carry an explicit input discriminator for saved/recent outfit, reference image, or
+prompt. An explicit remote reference import goes through the loopback API: HTTPS-only URL parsing,
+credential/private/mixed-address rejection, per-hop DNS pinning, bounded redirects/bytes,
+JPEG/PNG/WebP header and decoded-content validation, cancellation, no-store bytes, and sanitized
+errors. The URL is neither persisted nor forwarded to Decart.
 
 ## Persistence
 
@@ -201,14 +211,14 @@ bodies, URLs, prompts, credentials, causes, and arbitrary codes never reach clie
 `operator-qualification` mode is required for technical Wiro evidence with no participant
 present. This is an access boundary, not provider fallback.
 
-| Boundary                    | Routes                                                                                                                                                                           |
-| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local status                | `GET /api/health`, `GET /api/capabilities`                                                                                                                                       |
-| Decart                      | `POST /api/realtime-token`                                                                                                                                                       |
-| Decart batch video          | `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, `DELETE /api/video-jobs/:jobId`                                                |
-| Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions` |
-| Local reference storage     | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                         |
-| ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `POST /api/elevenlabs/voice-changer/recording`                                                      |
+| Boundary                    | Routes                                                                                                                                                                                                                |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local status                | `GET /api/health`, `GET /api/capabilities`                                                                                                                                                                            |
+| Decart                      | `POST /api/realtime-token`                                                                                                                                                                                            |
+| Decart batch video          | `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, `DELETE /api/video-jobs/:jobId`                                                                                     |
+| Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/import`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions` |
+| Local reference storage     | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                                                              |
+| ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `POST /api/elevenlabs/voice-changer/recording`                                                                                           |
 
 Capabilities report configuration presence only. The backend has process-local temporary video
 jobs but no accounts, analytics, durable job database or queue, SQL database, or session history.

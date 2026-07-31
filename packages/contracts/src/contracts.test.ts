@@ -19,8 +19,10 @@ import {
   optimizeCharacterReferencePromptResponseSchema,
   realtimeTokenRequestSchema,
   realtimeTokenResponseSchema,
+  remoteReferenceImageImportRequestSchema,
   referenceImageAssetSchema,
   uploadReferenceImageResponseSchema,
+  videoTransformRecipeSchema,
   supportedModelIdSchema,
   voiceChangerQuerySchema,
   voiceConversionContentTypeSchema,
@@ -99,6 +101,53 @@ describe('health and capabilities contracts', () => {
             version: 'lucy-character-reference-v1',
           },
         },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('existing-video input contracts', () => {
+  it('requires one explicit VTO input mode and rejects incompatible fields', () => {
+    const base = {
+      modelId: 'lucy-vton-3' as const,
+      prompt: '',
+      enhancePrompt: false,
+      hasReferenceImage: true,
+    };
+    expect(
+      videoTransformRecipeSchema.safeParse({ ...base, inputKind: 'reference-image' }).success,
+    ).toBe(true);
+    expect(videoTransformRecipeSchema.safeParse(base).success).toBe(false);
+    expect(
+      videoTransformRecipeSchema.safeParse({
+        ...base,
+        inputKind: 'reference-image',
+        prompt: 'incompatible prompt',
+      }).success,
+    ).toBe(false);
+    expect(
+      videoTransformRecipeSchema.safeParse({
+        ...base,
+        inputKind: 'prompt',
+        prompt: 'A blue jacket',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts only public-shaped HTTPS remote image import requests', () => {
+    expect(
+      remoteReferenceImageImportRequestSchema.safeParse({
+        url: 'https://images.example.test/outfit.webp',
+      }).success,
+    ).toBe(true);
+    expect(
+      remoteReferenceImageImportRequestSchema.safeParse({
+        url: 'http://images.example.test/outfit.webp',
+      }).success,
+    ).toBe(false);
+    expect(
+      remoteReferenceImageImportRequestSchema.safeParse({
+        url: 'https://user:password@images.example.test/outfit.webp',
       }).success,
     ).toBe(false);
   });

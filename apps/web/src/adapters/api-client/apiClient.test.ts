@@ -15,6 +15,7 @@ import {
   editReferenceImage,
   fetchProviderAvailability,
   hydrateReferenceImage,
+  importRemoteReferenceImage,
   optimizeCharacterReferencePrompt,
   requestRealtimeToken,
   uploadReferenceImage,
@@ -364,6 +365,38 @@ describe('reference image API client', () => {
     expect(init.body).toBe(file);
     expect(new Headers(init.headers).get('Content-Type')).toBe('image/png');
     expect(new Headers(init.headers).get('Idempotency-Key')).toBe(requestId);
+  });
+
+  it('imports a remote image through the explicit same-origin video-intent endpoint', async () => {
+    const response = new Response(new Blob([jpegBytes], { type: 'image/jpeg' }), {
+      status: 200,
+      headers: {
+        'Content-Type': 'image/jpeg',
+        'Content-Disposition': 'attachment; filename="imported-reference-ab12cd34.jpg"',
+      },
+    });
+    const fetchMock = vi.fn().mockResolvedValue(response);
+    vi.stubGlobal('fetch', fetchMock);
+    const controller = new AbortController();
+    const sourceUrl = 'https://images.example.test/outfit.jpg';
+
+    const imported = await importRemoteReferenceImage(sourceUrl, controller.signal);
+
+    expect(imported.name).toBe('imported-reference-ab12cd34.jpg');
+    expect(imported.type).toBe('image/jpeg');
+    expect(fetchMock).toHaveBeenCalledWith(
+      '/api/reference-images/import',
+      expect.objectContaining({
+        method: 'POST',
+        cache: 'no-store',
+        signal: controller.signal,
+        body: JSON.stringify({ url: sourceUrl }),
+      }),
+    );
+    const headers = new Headers(
+      (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].headers,
+    );
+    expect(headers.get('x-lightframe-provider-intent')).toBe('video');
   });
 
   it('composes a generated asset from an opaque uploaded source identity', async () => {

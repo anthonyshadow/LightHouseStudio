@@ -152,6 +152,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   } = useStudioOverlayController(initialIntent === 'upload' ? 'video-upload' : null);
   const [dismissedNotices, setDismissedNotices] = useState<ReadonlySet<string>>(new Set());
   const [firstSuccessGuideVisible, setFirstSuccessGuideVisible] = useState(true);
+  const [recordingForExistingVideo, setRecordingForExistingVideo] = useState(false);
+  const adoptingExistingVideoRecordingRef = useRef<string | null>(null);
   const [recipeShelfEntryIntent, setRecipeShelfEntryIntent] =
     useState<RecipeShelfEntryIntent | null>(null);
   const [characterBuilderDestination, setCharacterBuilderDestination] =
@@ -199,18 +201,48 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   });
   const existingVideo = useExistingVideoWorkflow({
     recording,
+    processing,
     publishUploadedVideo,
     onSubmissionAccepted: recordAcceptedBatchStep,
   });
   const comparedExistingVideoArtifact =
-    existingVideo.comparison === 'original' ? recording.original : recording.visual;
+    existingVideo.comparison === 'original'
+      ? recording.original
+      : (recording.processed ?? recording.visual);
   const stagePresentation =
     activeOverlay === 'video-upload' &&
-    existingVideo.phase === 'complete' &&
+    existingVideo.selection !== null &&
     takeStagePresentation.kind === 'playback' &&
     comparedExistingVideoArtifact
       ? { ...takeStagePresentation, artifact: comparedExistingVideoArtifact }
       : takeStagePresentation;
+
+  useEffect(() => {
+    const artifact = recording.original;
+    if (
+      !recordingForExistingVideo ||
+      !artifact ||
+      existingVideo.selection ||
+      takeStagePresentation.kind !== 'playback' ||
+      adoptingExistingVideoRecordingRef.current === artifact.id
+    ) {
+      return;
+    }
+
+    adoptingExistingVideoRecordingRef.current = artifact.id;
+    void existingVideo.adoptRecordedArtifact().then(() => {
+      if (adoptingExistingVideoRecordingRef.current !== artifact.id) return;
+      adoptingExistingVideoRecordingRef.current = null;
+      setRecordingForExistingVideo(false);
+      openOverlay('video-upload');
+    });
+  }, [
+    existingVideo,
+    openOverlay,
+    recording.original,
+    recordingForExistingVideo,
+    takeStagePresentation.kind,
+  ]);
 
   useEffect(() => {
     if (initialIntent !== 'camera' || initialCameraIntentHandledRef.current) return;
@@ -540,6 +572,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     void session.startModel();
   };
   const discardTemporaryWork = useCallback(() => {
+    adoptingExistingVideoRecordingRef.current = null;
+    setRecordingForExistingVideo(false);
     existingVideo.reset(false);
     processing.cancel();
     recording.discard();
@@ -549,7 +583,17 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     existingVideo.showResult();
     openOverlay('take-review');
   }, [existingVideo, openOverlay]);
-  const openExistingVideo = useCallback(() => openOverlay('video-upload'), [openOverlay]);
+  const openExistingVideo = useCallback(() => {
+    setRecordingForExistingVideo(false);
+    openOverlay('video-upload');
+  }, [openOverlay]);
+  const startExistingVideoRecording = useCallback(() => {
+    if (!browser.mediaRecorder || !browser.mediaDevices || !browser.secureContext) return;
+    setRecordingForExistingVideo(true);
+    closeOverlay();
+    window.requestAnimationFrame(() => mainRef.current?.focus());
+    void session.startLocal();
+  }, [browser, closeOverlay, session]);
   const closeExistingVideo = useCallback(() => {
     if (existingVideo.providerActive) return;
     if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
@@ -736,9 +780,15 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           <ExistingVideoPanel
             workflow={existingVideo}
             videoProcessingAvailable={Boolean(availability.videoProcessing)}
+            elevenLabsAvailable={availability.elevenLabs}
+            elevenLabsModel={availability.elevenLabsModel}
             savedRecipes={existingVideoSavedRecipes}
             onCreateCharacter={createCharacterForExistingVideo}
             onFinish={finishExistingVideoSetup}
+            recordingSupported={
+              browser.mediaRecorder && browser.mediaDevices && browser.secureContext
+            }
+            onRecordVideo={startExistingVideoRecording}
           />
         </OverlayPanel>
 

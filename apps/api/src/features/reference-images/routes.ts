@@ -13,16 +13,44 @@ import {
   REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
   referenceImageMimeTypeSchema,
   referenceImageRequestIdSchema,
+  remoteReferenceImageImportRequestSchema,
   uploadReferenceImageResponseSchema,
+  VIDEO_PROVIDER_INTENT_HEADER,
+  VIDEO_PROVIDER_INTENT_VALUE,
 } from '@studio/contracts';
+import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/errors.js';
 import { localOwnerIdForRequest, requireTrustedOrigin } from '../../http/security.js';
 import { withRequestLifetime } from '../../http/streaming.js';
+import { SafeRemoteImageDownloader } from '../../providers/transport/safe-remote-image-downloader.js';
+import {
+  InvalidReferenceImageUploadError,
+  validateUploadedReferenceImage,
+} from './image-validation.js';
 import type { ReferenceImageService } from './reference-image-service.js';
+
+export interface RemoteReferenceImageDownloader {
+  download: (
+    url: string,
+    signal: AbortSignal,
+  ) => Promise<Readonly<{ bytes: Buffer; mimeType: 'image/jpeg' | 'image/png' | 'image/webp' }>>;
+}
 
 const verifyGenerationOrigin = (request: FastifyRequest): Promise<void> => {
   requireTrustedOrigin(request);
+  return Promise.resolve();
+};
+
+const verifyRemoteImportIntent = (request: FastifyRequest): Promise<void> => {
+  requireTrustedOrigin(request);
+  if (request.headers[VIDEO_PROVIDER_INTENT_HEADER] !== VIDEO_PROVIDER_INTENT_VALUE) {
+    throw new AppError(
+      403,
+      'forbidden_origin',
+      'Remote reference import requires explicit local Studio intent.',
+    );
+  }
   return Promise.resolve();
 };
 
@@ -66,7 +94,69 @@ const requireUploadMimeType = (headers: FastifyRequest['headers']) => {
 export const registerReferenceImageRoutes = (
   app: FastifyInstance,
   service: ReferenceImageService,
+  options: { readonly remoteImageDownloader?: RemoteReferenceImageDownloader } = {},
 ): void => {
+  const remoteImageDownloader =
+    options.remoteImageDownloader ??
+    new SafeRemoteImageDownloader({
+      policy: {
+        maxRedirects: 3,
+        maxBytes: REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
+        acceptedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+      },
+      createError: () =>
+        new AppError(
+          422,
+          'invalid_remote_image',
+          'The public HTTPS image could not be imported safely.',
+        ),
+    });
+
+  app.post(
+    '/api/reference-images/import',
+    { bodyLimit: 4 * 1_024, onRequest: verifyRemoteImportIntent },
+    async (request, reply) => {
+      const parsed = remoteReferenceImageImportRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw new AppError(
+          400,
+          'validation_error',
+          'Provide a public HTTPS image URL without credentials or a fragment.',
+        );
+      }
+      return withRequestLifetime(request, reply, async (signal) => {
+        const downloaded = await remoteImageDownloader.download(parsed.data.url, signal);
+        let validated;
+        try {
+          validated = await validateUploadedReferenceImage(downloaded.bytes, downloaded.mimeType);
+        } catch (error) {
+          if (error instanceof InvalidReferenceImageUploadError) {
+            throw new AppError(
+              422,
+              'invalid_remote_image',
+              'The imported resource is not a safe, decodable JPEG, PNG, or WebP image.',
+            );
+          }
+          throw error;
+        }
+        const extension =
+          validated.mimeType === 'image/png'
+            ? 'png'
+            : validated.mimeType === 'image/webp'
+              ? 'webp'
+              : 'jpg';
+        void reply.header('Content-Type', validated.mimeType);
+        void reply.header('Content-Length', validated.bytes.byteLength);
+        void reply.header(
+          'Content-Disposition',
+          `attachment; filename="imported-reference-${randomUUID().slice(0, 8)}.${extension}"`,
+        );
+        void reply.header('X-Content-Type-Options', 'nosniff');
+        return reply.send(validated.bytes);
+      });
+    },
+  );
+
   app.post(
     '/api/reference-images/optimize',
     { bodyLimit: 64 * 1024, onRequest: verifyGenerationOrigin },

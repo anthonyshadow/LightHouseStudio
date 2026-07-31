@@ -10,6 +10,25 @@ export const REFERENCE_IMAGE_PROMPT_MAX_LENGTH = 4_000;
 export const REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH = 32_000;
 export const REFERENCE_IMAGE_CHANGE_INSTRUCTIONS_MAX_LENGTH = 2_000;
 
+export const remoteReferenceImageImportRequestSchema = z
+  .object({
+    url: z.url().max(2_048),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      !value.url.startsWith('https://') ||
+      value.url.includes('#') ||
+      /^https:\/\/[^/?#]*@/u.test(value.url)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['url'],
+        message: 'Use a public HTTPS image URL without credentials or a fragment.',
+      });
+    }
+  });
+
 export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_MODEL = 'gpt-5.6' as const;
 export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_REASONING = 'medium' as const;
 export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_VERSION = 'lucy-character-reference-v1' as const;
@@ -374,6 +393,9 @@ export type ReferenceImageSize = z.infer<typeof referenceImageSizeSchema>;
 export type CreateReferenceImageRequest = z.infer<typeof createReferenceImageRequestSchema>;
 export type EditReferenceImageRequest = z.infer<typeof editReferenceImageRequestSchema>;
 export type ComposeReferenceImageRequest = z.infer<typeof composeReferenceImageRequestSchema>;
+export type RemoteReferenceImageImportRequest = z.infer<
+  typeof remoteReferenceImageImportRequestSchema
+>;
 export type ReferenceImageAssetParams = z.infer<typeof referenceImageAssetParamsSchema>;
 export type EditReferenceImageParams = z.infer<typeof editReferenceImageParamsSchema>;
 export type ReferenceImageDerivation = z.infer<typeof referenceImageDerivationSchema>;

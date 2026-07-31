@@ -12,11 +12,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { convertRecordingVoice } from '../../adapters/api-client/voicesApi';
 import { decodeAudioBlob, renderLocalEffect } from '../../adapters/media-processing/audioEffects';
 import { replaceRecordingAudio } from '../../adapters/media-processing/replaceAudioTrack';
+import { transcodeRecordingToMp4 } from '../../adapters/media-processing/transcodeRecording';
 import type { RecordingArtifact, RecordingController } from '../../features/recording/types';
 import type {
   LocalVoiceEffectId,
   VoiceEffectSelection,
   VoiceProcessingController,
+  VoiceProcessingOutcome,
 } from '../../features/voice-effects/types';
 
 const safeProcessingMessage = (error: unknown): string => {
@@ -61,7 +63,7 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
   }, []);
 
   const prepare = useCallback(
-    (domainSelection: DomainVoiceEffectSelection) => {
+    (domainSelection: DomainVoiceEffectSelection, explicitVideo?: RecordingArtifact) => {
       cancel();
       const current = recordingRef.current;
       if (!current.original || !current.sidecar.blob) {
@@ -75,11 +77,18 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
       domainStateRef.current = beginVoiceProcessing(domainState, domainSelection, operationId);
       const controller = new AbortController();
       abortRef.current = controller;
-      current.beginProcessing();
+      const voiceName = domainSelection.kind === 'elevenlabs' ? domainSelection.voiceName : null;
+      current.beginProcessing({
+        kind: 'voice-conversion',
+        title: voiceName ? `Applying ${voiceName}…` : 'Rendering voice treatment…',
+        detail: 'The immutable original audio is being prepared for this video.',
+      });
+      const videoArtifact = explicitVideo ?? current.visual ?? current.original;
       return {
         controller,
         operationId,
-        video: (current.visual ?? current.original).media,
+        videoArtifact,
+        video: videoArtifact.media,
         sidecar: current.sidecar.blob,
       };
     },
@@ -119,12 +128,22 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
         const decoded = await decodeAudioBlob(sidecar);
         const rendered = await renderLocalEffect(decoded, effect, controller.signal);
         const result = await replaceRecordingAudio(video, rendered, controller.signal);
+        recordingRef.current.beginProcessing({
+          kind: 'transcoding',
+          title: 'Transcoding voice result…',
+          detail: 'Normalizing the completed video to H.264/AAC MP4.',
+        });
+        const normalized = await transcodeRecordingToMp4(result.blob, {
+          requireAudio: true,
+          signal: controller.signal,
+        });
         controller.signal.throwIfAborted();
         if (abortRef.current !== controller) return;
         const artifact = recordingRef.current.completeProcessing(
-          result.blob,
-          result.mimeType,
+          normalized.blob,
+          normalized.mimeType,
           effect,
+          prepared.videoArtifact,
         );
         completeDomainOperation(operationId, artifact, { kind: 'local', effect });
       } catch (error) {
@@ -143,43 +162,79 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
     [completeDomainOperation, failDomainOperation, prepare],
   );
 
-  const applyElevenLabs = useCallback(
-    async (voiceId: string, voiceName: string) => {
+  const applyElevenLabsTo = useCallback(
+    async (
+      videoArtifact: RecordingArtifact,
+      voiceId: string,
+      voiceName: string,
+      options?: { readonly replaceExistingResult?: boolean },
+    ): Promise<VoiceProcessingOutcome> => {
       let controller: AbortController | null = null;
       let operationId: string | null = null;
       try {
-        const prepared = prepare({ kind: 'elevenlabs', voiceId, voiceName });
+        const prepared = prepare({ kind: 'elevenlabs', voiceId, voiceName }, videoArtifact);
         controller = prepared.controller;
         operationId = prepared.operationId;
         const { video, sidecar } = prepared;
         const converted = await convertRecordingVoice(voiceId, sidecar, controller.signal);
+        recordingRef.current.beginProcessing({
+          kind: 'voice-composition',
+          title: `Composing ${voiceName}…`,
+          detail: 'Combining the converted voice with the selected video.',
+        });
         const result = await replaceRecordingAudio(video, converted, controller.signal);
+        recordingRef.current.beginProcessing({
+          kind: 'transcoding',
+          title: 'Transcoding voice result…',
+          detail: 'Normalizing the completed video to H.264/AAC MP4.',
+        });
+        const normalized = await transcodeRecordingToMp4(result.blob, {
+          requireAudio: true,
+          signal: controller.signal,
+        });
         controller.signal.throwIfAborted();
-        if (abortRef.current !== controller) return;
+        if (abortRef.current !== controller) return { status: 'canceled' };
         const artifact = recordingRef.current.completeProcessing(
-          result.blob,
-          result.mimeType,
-          'voice',
+          normalized.blob,
+          normalized.mimeType,
+          `voice-${voiceName}`,
+          videoArtifact,
+          options?.replaceExistingResult,
         );
         completeDomainOperation(operationId, artifact, {
           kind: 'elevenlabs',
           voiceId,
           voiceName,
         });
+        return { status: 'ready', artifact };
       } catch (error) {
-        if (controller && abortRef.current !== controller) return;
+        if (controller && abortRef.current !== controller) return { status: 'canceled' };
         if (error instanceof DOMException && error.name === 'AbortError') {
           recordingRef.current.cancelProcessing();
-          return;
+          return { status: 'canceled' };
         }
         const message = safeProcessingMessage(error);
         if (operationId) failDomainOperation(operationId, message);
         recordingRef.current.failProcessing(message);
+        return { status: 'error', message };
       } finally {
         if (controller && abortRef.current === controller) abortRef.current = null;
       }
     },
     [completeDomainOperation, failDomainOperation, prepare],
+  );
+
+  const applyElevenLabs = useCallback(
+    async (voiceId: string, voiceName: string) => {
+      const current = recordingRef.current;
+      const videoArtifact = current.visual ?? current.original;
+      if (!videoArtifact) {
+        current.failProcessing('A completed recording is required.');
+        return;
+      }
+      await applyElevenLabsTo(videoArtifact, voiceId, voiceName);
+    },
+    [applyElevenLabsTo],
   );
 
   const restoreOriginal = useCallback(() => {
@@ -199,5 +254,12 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
 
   useEffect(() => cancel, [cancel]);
 
-  return { selection, applyLocal, applyElevenLabs, restoreOriginal, cancel };
+  return {
+    selection,
+    applyLocal,
+    applyElevenLabs,
+    applyElevenLabsTo,
+    restoreOriginal,
+    cancel,
+  };
 };

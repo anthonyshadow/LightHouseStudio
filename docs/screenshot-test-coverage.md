@@ -11,18 +11,18 @@ accessibility, physical-device, and live-provider behavior belongs to other test
 
 ## Matrix
 
-The current matrix has 24 Chromium cases:
+The current matrix has 28 Chromium cases:
 
-| Group             | States | Viewports                       | Cases |
-| ----------------- | -----: | ------------------------------- | ----: |
-| Entry             |      1 | small mobile                    |     1 |
-| Core Studio       |      2 | all five                        |    10 |
-| Studio idle       |      1 | desktop                         |     1 |
-| Focused high-risk |      8 | one risk-selected viewport each |     8 |
-| Desktop-specific  |      2 | desktop                         |     2 |
-| Small-mobile risk |      2 | small mobile                    |     2 |
+| Group             | States | Viewports                    | Cases |
+| ----------------- | -----: | ---------------------------- | ----: |
+| Entry             |      1 | small mobile                 |     1 |
+| Core Studio       |      2 | all five                     |    10 |
+| Studio idle       |      1 | desktop                      |     1 |
+| Focused high-risk |      8 | risk-selected viewport pairs |    12 |
+| Desktop-specific  |      2 | desktop                      |     2 |
+| Small-mobile risk |      2 | small mobile                 |     2 |
 
-Twenty-nine is the review budget, not the definition of correctness. The current matrix uses 24
+Twenty-nine is the review budget, not the definition of correctness. The current matrix uses 28
 of those cases. The executable invariants require unique paths, all five viewport IDs, and every
 local-live/recording state/viewport pair.
 
@@ -47,7 +47,7 @@ local-live/recording state/viewport pair.
 | Desktop       | `03-character-library/saved-character-selection.png` |
 | Small mobile  | `04-take-review/playback-review-settled.png`         |
 | Small mobile  | `07-existing-video/chooser.png`                      |
-| Desktop       | `07-existing-video/validated-setup.png`              |
+| All viewports | `07-existing-video/validated-setup.png`              |
 | Compact       | `07-existing-video/processing.png`                   |
 | Desktop       | `07-existing-video/result.png`                       |
 | Desktop       | `05-virtual-try-on/prepared-with-reference.png`      |
@@ -81,9 +81,9 @@ Platform-specific baselines live under:
 screenshots/chromium-<platform>/<viewport>/<scenario>
 ```
 
-The repository currently contains all 24 Darwin baselines and 20 Linux baselines. Linux is missing
-the four existing-video baselines: chooser, validated setup, processing, and result. Font
-rasterization is why the two platform sets remain separate.
+The repository contains platform-specific baselines tracked by the executable matrix. Linux
+existing-video coverage may require generation on Linux because font rasterization prevents safe
+cross-platform copying. The pruning inventory reports exact missing paths before any deletion.
 
 The pruning script derives its inventory from the matrix and refuses deletion while any required
 baseline is missing:
