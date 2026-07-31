@@ -164,7 +164,6 @@ export type CreativePanelContentProps = Pick<
   | 'workshopDrafts'
   | 'repository'
   | 'recordingActive'
-  | 'sessionModeLocked'
   | 'recipeInsertionBlocked'
   | 'hasReferenceImage'
   | 'referenceUsePending'
@@ -172,7 +171,6 @@ export type CreativePanelContentProps = Pick<
   | 'activeRecipe'
   | 'legacyManagerToggleRef'
   | 'legacyProjectCount'
-  | 'onLibraryModeChange'
   | 'onWorkshopDraftChange'
   | 'onUseWorkshop'
   | 'onSaveWorkshop'
@@ -194,7 +192,6 @@ export const CreativePanelContent = ({
   workshopDrafts,
   repository,
   recordingActive,
-  sessionModeLocked,
   recipeInsertionBlocked,
   hasReferenceImage,
   referenceUsePending,
@@ -202,7 +199,6 @@ export const CreativePanelContent = ({
   activeRecipe,
   legacyManagerToggleRef,
   legacyProjectCount = 0,
-  onLibraryModeChange,
   onWorkshopDraftChange,
   onUseWorkshop,
   onSaveWorkshop,
@@ -242,31 +238,26 @@ export const CreativePanelContent = ({
         </Suspense>
       ) : (
         <>
-          <div css={libraryModeStyles(theme)}>
-            <SegmentedControl
-              label="Recipe model"
-              value={libraryMode}
-              options={libraryModeOptions}
-              disabled={sessionModeLocked}
-              onChange={onLibraryModeChange}
-            />
-            {recipeInsertionBlocked ? (
-              <StatusNotice role="status" tone="warning">
-                {recordingActive
-                  ? 'Finish the take before inserting a recipe. You can keep browsing and editing this shelf.'
-                  : 'Release camera & mic before inserting a recipe for another model. You can keep browsing and editing this shelf.'}
-              </StatusNotice>
-            ) : null}
-            {legacyProjectCount > 0 && onOpenLegacyProjects ? (
-              <Button
-                ref={legacyManagerToggleRef}
-                variant="secondary"
-                onClick={onOpenLegacyProjects}
-              >
-                Manage Legacy Projects ({legacyProjectCount})
-              </Button>
-            ) : null}
-          </div>
+          {recipeInsertionBlocked || (legacyProjectCount > 0 && onOpenLegacyProjects) ? (
+            <div css={libraryModeStyles(theme)}>
+              {recipeInsertionBlocked ? (
+                <StatusNotice role="status" tone="warning">
+                  {recordingActive
+                    ? 'Finish the take before inserting a recipe. You can keep browsing and editing this shelf.'
+                    : 'Release camera & mic before inserting a recipe for another model. You can keep browsing and editing this shelf.'}
+                </StatusNotice>
+              ) : null}
+              {legacyProjectCount > 0 && onOpenLegacyProjects ? (
+                <Button
+                  ref={legacyManagerToggleRef}
+                  variant="secondary"
+                  onClick={onOpenLegacyProjects}
+                >
+                  Manage Legacy Projects ({legacyProjectCount})
+                </Button>
+              ) : null}
+            </div>
+          ) : null}
           <Suspense fallback={deferredWorkspaceFallback}>
             <RecipeShelfView
               activeMode={libraryMode}
@@ -375,7 +366,11 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
 
   return (
     <>
-      <nav css={toolRailStyles(theme)} aria-label="Creative workspace tools">
+      <nav
+        data-studio-tool-rail=""
+        css={toolRailStyles(theme)}
+        aria-label="Creative workspace tools"
+      >
         <Button
           ref={dockToggleRef}
           variant={activeTool === 'dock' ? 'primary' : 'secondary'}
@@ -462,8 +457,20 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
             ? 'Build one clear Add, Replace, or Restyle direction.'
             : 'Browse and manage browser-local Character and Try-On recipes.'
         }
+        headerActions={
+          panel === 'shelf' ? (
+            <SegmentedControl
+              label="Recipe model"
+              value={libraryMode}
+              options={libraryModeOptions}
+              disabled={sessionModeLocked}
+              onChange={onLibraryModeChange}
+            />
+          ) : undefined
+        }
         placement={panel === 'shelf' ? 'bottom' : 'right'}
         size="wide"
+        height={panel === 'shelf' ? 'tall' : 'standard'}
         bodyMode="contained"
         closeLabel="Close creative tool"
         returnFocusRef={panel === 'workshop' ? workshopToggleRef : shelfToggleRef}
@@ -477,7 +484,6 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
             workshopDrafts={workshopDrafts}
             repository={repository}
             recordingActive={recordingActive}
-            sessionModeLocked={sessionModeLocked}
             recipeInsertionBlocked={recipeInsertionBlocked}
             hasReferenceImage={hasReferenceImage}
             referenceUsePending={referenceUsePending}
@@ -485,7 +491,6 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
             {...(activeRecipe !== undefined ? { activeRecipe } : {})}
             {...(legacyManagerToggleRef ? { legacyManagerToggleRef } : {})}
             legacyProjectCount={legacyProjectCount}
-            onLibraryModeChange={onLibraryModeChange}
             onWorkshopDraftChange={onWorkshopDraftChange}
             onUseWorkshop={onUseWorkshop}
             onSaveWorkshop={onSaveWorkshop}

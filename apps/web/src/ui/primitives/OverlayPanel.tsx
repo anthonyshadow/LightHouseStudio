@@ -13,6 +13,7 @@ import { createPortal } from 'react-dom';
 import { IconButton } from './IconButton';
 import type {
   OverlayPanelBodyMode,
+  OverlayPanelHeight,
   OverlayPanelInitialFocus,
   OverlayPanelPlacement,
   OverlayPanelSize,
@@ -23,6 +24,9 @@ import {
   bodyStyles,
   descriptionStyles,
   footerStyles,
+  headerActionsStyles,
+  headerCloseStyles,
+  headerCopyStyles,
   headerStyles,
   headingStyles,
   panelStyles,
@@ -38,6 +42,7 @@ import {
 
 export type {
   OverlayPanelBodyMode,
+  OverlayPanelHeight,
   OverlayPanelInitialFocus,
   OverlayPanelPlacement,
   OverlayPanelSize,
@@ -50,8 +55,10 @@ export interface OverlayPanelProps {
   description?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
+  headerActions?: ReactNode;
   placement?: OverlayPanelPlacement;
   size?: OverlayPanelSize;
+  height?: OverlayPanelHeight;
   closeLabel?: string;
   closeDisabled?: boolean;
   closeOnBackdrop?: boolean;
@@ -75,8 +82,10 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
     description,
     children,
     footer,
+    headerActions,
     placement = 'right',
     size = 'standard',
+    height = 'standard',
     closeLabel = 'Close panel',
     closeDisabled = false,
     closeOnBackdrop = true,
@@ -102,6 +111,9 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
   const returnFocusTargetRef = useRef(returnFocusRef);
   const [present, setPresent] = useState(open && typeof document !== 'undefined');
   const [phase, setPhase] = useState<OverlayPhase>('entering');
+  const [portalHost, setPortalHost] = useState<Element | null>(() =>
+    typeof document === 'undefined' ? null : (document.fullscreenElement ?? document.body),
+  );
 
   onCloseRef.current = onClose;
   openRef.current = open;
@@ -130,6 +142,15 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
 
     return () => window.clearTimeout(exitTimer);
   }, [open, present]);
+
+  useEffect(() => {
+    const updatePortalHost = () => {
+      setPortalHost(document.fullscreenElement ?? document.body);
+    };
+    updatePortalHost();
+    document.addEventListener('fullscreenchange', updatePortalHost);
+    return () => document.removeEventListener('fullscreenchange', updatePortalHost);
+  }, []);
 
   useLayoutEffect(() => {
     if (!present) return;
@@ -204,9 +225,9 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
         else focusTopmostDialog();
       });
     };
-  }, [initialFocus, overlayId, present]);
+  }, [initialFocus, overlayId, portalHost, present]);
 
-  if (!present || typeof document === 'undefined') return null;
+  if (!present || typeof document === 'undefined' || !portalHost) return null;
 
   const requestClose = () => {
     if (openRef.current && !closeDisabledRef.current && isTopmostOverlay(overlayId))
@@ -247,10 +268,10 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        css={panelStyles(theme, placement, size, phase)}
+        css={panelStyles(theme, placement, size, height, phase)}
       >
-        <header css={headerStyles(theme)}>
-          <div css={{ minWidth: 0 }}>
+        <header css={headerStyles(theme, Boolean(headerActions))}>
+          <div data-overlay-header-copy="" css={headerCopyStyles()}>
             <h2 ref={headingRef} id={titleId} tabIndex={-1} css={headingStyles(theme)}>
               {title}
             </h2>
@@ -260,16 +281,23 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
               </p>
             ) : null}
           </div>
-          <IconButton
-            label={closeLabel}
-            variant="quiet"
-            disabled={closeDisabled}
-            onClick={requestClose}
-          >
-            <span aria-hidden="true" css={{ fontSize: '1.5rem', lineHeight: 1 }}>
-              ×
-            </span>
-          </IconButton>
+          {headerActions ? (
+            <div data-overlay-header-actions="" css={headerActionsStyles()}>
+              {headerActions}
+            </div>
+          ) : null}
+          <div data-overlay-header-close="" css={headerCloseStyles()}>
+            <IconButton
+              label={closeLabel}
+              variant="quiet"
+              disabled={closeDisabled}
+              onClick={requestClose}
+            >
+              <span aria-hidden="true" css={{ fontSize: '1.5rem', lineHeight: 1 }}>
+                ×
+              </span>
+            </IconButton>
+          </div>
         </header>
 
         <div
@@ -283,6 +311,6 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
         {footer ? <footer css={footerStyles(theme)}>{footer}</footer> : null}
       </div>
     </div>,
-    document.body,
+    portalHost,
   );
 });

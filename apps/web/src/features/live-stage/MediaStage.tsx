@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTheme } from '@emotion/react';
 import { getRecordingDurationTiming } from '@studio/domain';
 import { formatDuration } from '../recording/recordingHelpers';
@@ -41,6 +41,7 @@ export type MediaStageProps = {
   experienceLabel?: string | undefined;
   notices?: readonly StageNotice[];
   onPlaybackError?: (message: string) => void;
+  fullscreenTargetRef?: RefObject<HTMLElement | null>;
 };
 
 export type StageControlVisibility = {
@@ -233,6 +234,7 @@ export const MediaStage = ({
   experienceLabel,
   notices = [],
   onPlaybackError,
+  fullscreenTargetRef,
 }: MediaStageProps) => {
   const theme = useTheme();
   const figureRef = useRef<HTMLElement>(null);
@@ -407,10 +409,13 @@ export const MediaStage = ({
 
   useEffect(() => {
     if (!fullscreenSupported) return;
-    const update = () => setFullscreen(document.fullscreenElement === figureRef.current);
+    const update = () =>
+      setFullscreen(
+        document.fullscreenElement === (fullscreenTargetRef?.current ?? figureRef.current),
+      );
     document.addEventListener('fullscreenchange', update);
     return () => document.removeEventListener('fullscreenchange', update);
-  }, [fullscreenSupported]);
+  }, [fullscreenSupported, fullscreenTargetRef]);
 
   useEffect(() => {
     const clearIdleTimer = () => {
@@ -461,13 +466,13 @@ export const MediaStage = ({
   }, [stageControlsVisibilityContext]);
 
   const toggleFullscreen = () => {
-    const stage = figureRef.current;
-    if (!stage) return;
-    if (document.fullscreenElement === stage) {
+    const fullscreenTarget = fullscreenTargetRef?.current ?? figureRef.current;
+    if (!fullscreenTarget) return;
+    if (document.fullscreenElement === fullscreenTarget) {
       void document.exitFullscreen().catch(() => undefined);
       return;
     }
-    void stage.requestFullscreen().catch(() => undefined);
+    void fullscreenTarget.requestFullscreen().catch(() => undefined);
   };
 
   const handlePlaybackError = () => {

@@ -2,6 +2,7 @@ import type { CSSObject, Theme } from '@emotion/react';
 import { overlayBackdropAnimationStyles, overlayPanelAnimationStyles } from '../animationStyles';
 import type {
   OverlayPanelBodyMode,
+  OverlayPanelHeight,
   OverlayPanelPlacement,
   OverlayPanelSize,
   OverlayPhase,
@@ -43,13 +44,23 @@ export const panelStyles = (
   theme: Theme,
   placement: OverlayPanelPlacement,
   size: OverlayPanelSize,
+  height: OverlayPanelHeight,
   phase: OverlayPhase,
 ): CSSObject => ({
   width: panelWidth(theme, placement, size),
   height:
-    placement === 'right' || placement === 'fullscreen' ? '100%' : theme.layout.overlays.bottom,
+    placement === 'right' || placement === 'fullscreen'
+      ? '100%'
+      : height === 'tall'
+        ? '75dvh'
+        : theme.layout.overlays.bottom,
   maxWidth: '100%',
-  maxHeight: placement === 'bottom' ? theme.layout.overlays.bottom : '100dvh',
+  maxHeight:
+    placement === 'bottom'
+      ? height === 'tall'
+        ? '75dvh'
+        : theme.layout.overlays.bottom
+      : '100dvh',
   minWidth: 0,
   minHeight: 0,
   display: 'grid',
@@ -70,8 +81,18 @@ export const panelStyles = (
       placement === 'right' && size === 'wide'
         ? theme.layout.overlays.drawerWideCompact
         : undefined,
-    height: placement === 'bottom' ? theme.layout.overlays.bottomCompact : undefined,
-    maxHeight: placement === 'bottom' ? theme.layout.overlays.bottomCompact : undefined,
+    height:
+      placement === 'bottom'
+        ? height === 'tall'
+          ? '75dvh'
+          : theme.layout.overlays.bottomCompact
+        : undefined,
+    maxHeight:
+      placement === 'bottom'
+        ? height === 'tall'
+          ? '75dvh'
+          : theme.layout.overlays.bottomCompact
+        : undefined,
   },
   '@media (min-width: 40rem) and (max-width: 63.99rem)': {
     width:
@@ -82,11 +103,15 @@ export const panelStyles = (
         : undefined,
     height:
       placement === 'bottom' || (placement === 'right' && size === 'wide')
-        ? theme.layout.overlays.bottomTablet
+        ? placement === 'bottom' && height === 'tall'
+          ? '75dvh'
+          : theme.layout.overlays.bottomTablet
         : undefined,
     maxHeight:
       placement === 'bottom' || (placement === 'right' && size === 'wide')
-        ? theme.layout.overlays.bottomTablet
+        ? placement === 'bottom' && height === 'tall'
+          ? '75dvh'
+          : theme.layout.overlays.bottomTablet
         : undefined,
     border:
       placement === 'right' && size === 'wide' ? `1px solid ${theme.colors.border}` : undefined,
@@ -105,20 +130,38 @@ export const panelStyles = (
   },
 });
 
-export const headerStyles = (theme: Theme): CSSObject => ({
+export const headerStyles = (theme: Theme, hasActions = false): CSSObject => ({
   minWidth: 0,
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  gridTemplateColumns: hasActions
+    ? 'minmax(0, 1fr) minmax(18rem, 34rem) auto'
+    : 'minmax(0, 1fr) auto',
   alignItems: 'start',
   gap: theme.space.md,
   padding: `max(${theme.space.md}, env(safe-area-inset-top)) max(${theme.space.md}, env(safe-area-inset-right)) ${theme.space.md} max(${theme.space.md}, env(safe-area-inset-left))`,
   borderBlockEnd: `1px solid ${theme.colors.border}`,
   background: theme.colors.overlaySurface,
+  '@media (max-width: 56rem)': hasActions
+    ? {
+        gridTemplateColumns: 'minmax(0, 1fr) auto',
+        '& > [data-overlay-header-copy]': { gridColumn: '1' },
+        '& > [data-overlay-header-actions]': { gridColumn: '1 / -1', gridRow: '2' },
+        '& > [data-overlay-header-close]': { gridColumn: '2', gridRow: '1' },
+      }
+    : undefined,
   '@media (max-height: 36rem)': {
     alignItems: 'center',
     padding: `max(${theme.space.sm}, env(safe-area-inset-top)) max(${theme.space.sm}, env(safe-area-inset-right)) ${theme.space.sm} max(${theme.space.sm}, env(safe-area-inset-left))`,
   },
 });
+
+export const headerCopyStyles = (): CSSObject => ({ minWidth: 0 });
+
+export const headerActionsStyles = (): CSSObject => ({
+  minWidth: 0,
+});
+
+export const headerCloseStyles = (): CSSObject => ({});
 
 export const headingStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,

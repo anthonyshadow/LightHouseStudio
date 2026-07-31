@@ -15,8 +15,8 @@ const captureSurfaceStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
   height: '100%',
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  display: 'flex',
+  justifyContent: 'space-between',
   alignItems: 'center',
   gap: theme.space.sm,
   padding: `${theme.space.xs} ${theme.space.sm}`,
@@ -117,6 +117,7 @@ export const RecordingControls = ({
   return (
     <Surface
       as="section"
+      data-capture-controls=""
       padding="compact"
       aria-labelledby="capture-heading"
       css={captureSurfaceStyles(theme)}

@@ -5,9 +5,11 @@ projects.
 
 ## Journey
 
-1. Select **Shelf**. Character-selection entries open the same Shelf directly on **Characters**.
-2. Choose the Character or Try-On model, then **Saved**, **Recent**, or Character-only
-   **Characters**.
+1. Select **Shelf**. The bottom Shelf uses up to 75% of the viewport on larger screens so its
+   library results remain visible; narrow screens use the established fullscreen overlay.
+   Character-selection entries open the same Shelf directly on **Characters**.
+2. Choose **Character recipes** or **Try-On recipes** in the Shelf header, then **Saved**,
+   **Recent**, or Character-only **Characters**.
 3. Search by name/title, prompt, note, or tag; Saved and Characters also support tag filtering.
 4. **New character recipe** and true-character **Edit** open Character Builder. Generic Try-On
    recipes use the inline editor; legacy Add/Replace/Restyle records open Workshop.
@@ -28,3 +30,5 @@ projects.
   be lost when the tab closes.
 - Browser storage contains allowlisted metadata, provenance, and opaque reference IDs—not image
   bytes, recordings, device IDs, or provider secrets.
+- In browser fullscreen, the video fills the viewport and the bottom tool and capture rails are
+  hidden. Any panel triggered from the stage overlays the video.

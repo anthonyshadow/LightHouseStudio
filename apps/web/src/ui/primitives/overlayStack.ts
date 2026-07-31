@@ -129,8 +129,16 @@ const synchronizeModalIsolation = (): void => {
   const targets = new Set<HTMLElement>();
 
   if (topmost) {
-    for (const child of Array.from(document.body.children)) {
-      if (child !== topmost.root && isBackgroundElement(child)) targets.add(child);
+    let foreground: Element = topmost.root;
+    let parent = foreground.parentElement;
+
+    while (parent) {
+      for (const child of Array.from(parent.children)) {
+        if (child !== foreground && isBackgroundElement(child)) targets.add(child);
+      }
+      if (parent === document.body) break;
+      foreground = parent;
+      parent = parent.parentElement;
     }
 
     for (const entry of overlayStack) {

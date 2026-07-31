@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { useRef, useState } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -14,6 +14,8 @@ import {
 afterEach(() => {
   cleanup();
   document.body.style.removeProperty('overflow');
+  document.querySelectorAll('[data-test-fullscreen-host]').forEach((element) => element.remove());
+  Reflect.deleteProperty(document, 'fullscreenElement');
 });
 
 interface HarnessProps {
@@ -307,6 +309,59 @@ describe('OverlayPanel', () => {
     const body = document.querySelector<HTMLElement>('[data-overlay-body-mode="contained"]');
     expect(body).not.toBeNull();
     expect(body).toHaveStyle({ overflow: 'hidden' });
+  });
+
+  it('renders caller actions in the panel header', () => {
+    render(
+      <StudioDesignProvider>
+        <OverlayPanel
+          open
+          title="Recipe Shelf"
+          headerActions={<button type="button">Character recipes</button>}
+          onClose={vi.fn()}
+        >
+          Shelf contents
+        </OverlayPanel>
+      </StudioDesignProvider>,
+    );
+
+    const dialog = screen.getByRole('dialog', { name: 'Recipe Shelf' });
+    expect(within(dialog).getByRole('button', { name: 'Character recipes' })).toBeInTheDocument();
+  });
+
+  it('portals into the active fullscreen element without isolating its ancestor', async () => {
+    const fullscreenHost = document.createElement('section');
+    fullscreenHost.setAttribute('data-test-fullscreen-host', '');
+    document.body.append(fullscreenHost);
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: fullscreenHost,
+    });
+
+    const result = render(
+      <StudioDesignProvider>
+        <OverlayPanel open title="Fullscreen tools" onClose={vi.fn()}>
+          Panel content
+        </OverlayPanel>
+      </StudioDesignProvider>,
+    );
+
+    expect(fullscreenHost).toContainElement(
+      screen.getByRole('dialog', { name: 'Fullscreen tools' }),
+    );
+    expect(fullscreenHost).not.toHaveAttribute('aria-hidden');
+    expect(fullscreenHost).not.toHaveAttribute('inert');
+    expect(result.container).toHaveAttribute('aria-hidden', 'true');
+
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      value: null,
+    });
+    fireEvent(document, new Event('fullscreenchange'));
+
+    await waitFor(() =>
+      expect(document.body.querySelector(':scope > [data-overlay-panel-root]')).toBeInTheDocument(),
+    );
   });
 
   it('can place initial focus on the dialog heading', async () => {

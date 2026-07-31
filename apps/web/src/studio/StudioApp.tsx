@@ -88,6 +88,7 @@ interface StudioExperienceProps {
 
 const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceProps) => {
   const theme = useTheme();
+  const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const repository = useMemo(() => createCreativeAssetRepository(), []);
   const repositoryState = useCreativeAssetRepository(repository);
@@ -530,7 +531,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         </div>
 
         <main ref={mainRef} id="studio-main" tabIndex={-1} css={mainGridStyles()}>
-          <div css={stageColumnStyles(theme)}>
+          <div ref={fullscreenWorkspaceRef} css={stageColumnStyles(theme)}>
             <MediaStage
               presentation={stagePresentation}
               mode={session.draft.mode}
@@ -590,6 +591,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                 />
               )}
               notices={stageNotices}
+              fullscreenTargetRef={fullscreenWorkspaceRef}
             />
             {creativeWorkspace}
             <RecordingControls

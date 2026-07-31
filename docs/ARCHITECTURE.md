@@ -45,10 +45,13 @@ switches among idle, live, finalizing, and playback. Live media uses `srcObject`
 or create a second take player.
 
 All tools use the shared `OverlayPanel` portal. It owns focus trap, inert background, Escape,
-topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. Each overlay
-has one named internal scroll region; the document does not scroll. Character Builder is
-fullscreen and uses one preview/generation DOM. Narrow screens reveal that same region through
-**Review & Generate** instead of duplicating stateful controls.
+topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. The portal
+follows the active browser fullscreen element. In stage fullscreen, the existing media stage fills
+the viewport and the bottom tool and capture rails are hidden. A panel triggered from the stage
+still renders above the full-screen video. Each overlay has one named internal scroll region; the
+document does not scroll. Character Builder is fullscreen and uses one preview/generation DOM.
+Narrow screens reveal that same region through **Review & Generate** instead of duplicating
+stateful controls.
 
 `StudioExitGuard` blocks navigation leaving `/studio` while recording or finalization is active.
 A temporary take, active Voice process, or dirty Shelf form requires confirmed discard before the

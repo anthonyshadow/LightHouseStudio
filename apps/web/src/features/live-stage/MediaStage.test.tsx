@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { useRef } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import type { RecordingArtifact } from '../recording/types';
@@ -101,6 +102,10 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.restoreAllMocks();
+  Reflect.deleteProperty(document, 'fullscreenEnabled');
+  Reflect.deleteProperty(document, 'fullscreenElement');
+  Reflect.deleteProperty(document, 'exitFullscreen');
+  Reflect.deleteProperty(Element.prototype, 'requestFullscreen');
 });
 
 describe('MediaStage', () => {
@@ -211,6 +216,75 @@ describe('MediaStage', () => {
     );
 
     expect(screen.getByRole('button', { name: 'Review action' })).toBeInTheDocument();
+  });
+
+  it('uses the supplied stage workspace as the fullscreen boundary', () => {
+    Object.defineProperty(document, 'fullscreenEnabled', {
+      configurable: true,
+      value: true,
+    });
+    Object.defineProperty(document, 'fullscreenElement', {
+      configurable: true,
+      writable: true,
+      value: null,
+    });
+    const requestFullscreen = vi.fn(function (this: Element) {
+      Object.defineProperty(document, 'fullscreenElement', {
+        configurable: true,
+        writable: true,
+        value: this,
+      });
+      document.dispatchEvent(new Event('fullscreenchange'));
+      return Promise.resolve();
+    });
+    const exitFullscreen = vi.fn(() => {
+      Object.defineProperty(document, 'fullscreenElement', {
+        configurable: true,
+        writable: true,
+        value: null,
+      });
+      document.dispatchEvent(new Event('fullscreenchange'));
+      return Promise.resolve();
+    });
+    Object.defineProperty(Element.prototype, 'requestFullscreen', {
+      configurable: true,
+      value: requestFullscreen,
+    });
+    Object.defineProperty(document, 'exitFullscreen', {
+      configurable: true,
+      value: exitFullscreen,
+    });
+
+    const FullscreenHarness = () => {
+      const fullscreenTargetRef = useRef<HTMLDivElement>(null);
+      return (
+        <StudioDesignProvider>
+          <div ref={fullscreenTargetRef} data-testid="fullscreen-workspace">
+            <MediaStage {...defaultProps} fullscreenTargetRef={fullscreenTargetRef} />
+          </div>
+        </StudioDesignProvider>
+      );
+    };
+
+    render(<FullscreenHarness />);
+    const fullscreenButton = screen.getByRole('button', { name: 'View stage fullscreen' });
+    const fullscreenWorkspace = screen.getByTestId('fullscreen-workspace');
+
+    fireEvent.click(fullscreenButton);
+
+    expect(requestFullscreen).toHaveBeenCalledOnce();
+    expect(requestFullscreen.mock.instances[0]).toBe(fullscreenWorkspace);
+    expect(screen.getByRole('button', { name: 'Exit stage fullscreen' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Exit stage fullscreen' }));
+    expect(exitFullscreen).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'View stage fullscreen' })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
   });
 
   it('owns the idle timeout and restores controls from pointer, touch, focus, and keyboard activity', () => {

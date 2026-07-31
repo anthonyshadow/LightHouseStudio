@@ -245,12 +245,30 @@ export const mainGridStyles = (): CSSObject => ({
 });
 
 export const stageColumnStyles = (theme: Theme): CSSObject => ({
+  position: 'relative',
+  isolation: 'isolate',
   display: 'grid',
   gridTemplateRows: 'minmax(0, 1fr) 3.4rem 3rem',
   gap: theme.space.sm,
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
+  '&:fullscreen': {
+    display: 'block',
+    padding: 0,
+    background: theme.colors.canvas,
+  },
+  '&:fullscreen > figure': {
+    position: 'absolute',
+    inset: 0,
+    width: '100%',
+    height: '100%',
+    border: 0,
+    borderRadius: 0,
+  },
+  '&:fullscreen > [data-studio-tool-rail], &:fullscreen > [data-capture-controls]': {
+    display: 'none',
+  },
   '@media (max-width: 80rem), (max-height: 48rem)': {
     gap: theme.space.xs,
     gridTemplateRows: 'minmax(0, 1fr) 3.15rem 2.85rem',
