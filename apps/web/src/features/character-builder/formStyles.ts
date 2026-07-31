@@ -207,17 +207,6 @@ export const sectionStackStyles = (theme: Theme): CSSObject => ({
   gap: theme.space.lg,
 });
 
-export const choiceSectionStyles = (theme: Theme): CSSObject => ({
-  minWidth: 0,
-  display: 'grid',
-  gap: theme.space.sm,
-  paddingBlockEnd: theme.space.lg,
-  borderBlockEnd: `1px solid ${theme.colors.border}`,
-  '&:last-of-type': { borderBlockEnd: 0, paddingBlockEnd: 0 },
-  '& h3': { margin: 0, fontSize: theme.fontSizes.label },
-  '& p': { margin: 0, color: theme.colors.textMuted, fontSize: theme.fontSizes.metadata },
-});
-
 export const directChoiceSectionStyles = (theme: Theme): CSSObject => ({
   ...fieldSectionStyles(theme),
   paddingBlockEnd: 0,
@@ -227,56 +216,6 @@ export const directChoiceSectionStyles = (theme: Theme): CSSObject => ({
     fontSize: theme.fontSizes.caption,
     fontWeight: 800,
   },
-});
-
-export const choiceDrawerStyles = (theme: Theme): CSSObject => ({
-  minWidth: 0,
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.radii.medium,
-  background: theme.colors.surfaceSoft,
-  overflow: 'clip',
-  '&[open]': { borderColor: theme.colors.borderStrong },
-  '&[open] summary [data-drawer-chevron]': { transform: 'rotate(180deg)' },
-});
-
-export const choiceDrawerSummaryStyles = (theme: Theme): CSSObject => ({
-  minHeight: '3.5rem',
-  display: 'flex',
-  alignItems: 'center',
-  justifyContent: 'space-between',
-  gap: theme.space.sm,
-  padding: theme.space.sm,
-  color: theme.colors.text,
-  cursor: 'pointer',
-  listStyle: 'none',
-  '&::-webkit-details-marker': { display: 'none' },
-  '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '-3px' },
-  '& [role="heading"]': { display: 'block', fontWeight: 850 },
-  '& [data-drawer-description]': {
-    display: 'block',
-    marginBlockStart: theme.space.xxs,
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSizes.caption,
-    lineHeight: 1.4,
-    overflowWrap: 'anywhere',
-  },
-  '& > span:first-of-type': { minWidth: 0 },
-  '& [data-drawer-chevron]': {
-    flex: '0 0 auto',
-    fontSize: '1.25rem',
-    transition: 'transform 160ms ease',
-  },
-  '@media (prefers-reduced-motion: reduce)': {
-    '& [data-drawer-chevron]': { transition: 'none' },
-  },
-});
-
-export const choiceDrawerContentStyles = (theme: Theme): CSSObject => ({
-  minWidth: 0,
-  display: 'grid',
-  gap: theme.space.sm,
-  padding: `${theme.space.xs} ${theme.space.sm} ${theme.space.sm}`,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
 });
 
 export const optionGridStyles = (theme: Theme): CSSObject => ({

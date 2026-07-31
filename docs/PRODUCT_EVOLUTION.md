@@ -90,11 +90,15 @@ store, or durable job database. Recorded and uploaded sources now enter one temp
 immutable source, latest successful visual result, optional voiced result, and the presented
 highest valid layer.
 
-Batch Lucy and VTO are exact, server-mediated, asynchronous jobs. Each may run once in either
-order. A chain pauses after the first result because the next step is another billable submission;
-only explicit Continue creates it. The UI reports submission count rather than guessing credits or
-currency. Status/download/local-finalization retries reuse the accepted job, while a provider
-submission retry is a new explicit action.
+The initial batch design used exact, server-mediated, asynchronous Lucy and VTO jobs and allowed
+each to run once in either order. That chain paused after the first result because Continue was
+another billable submission. Status/download/local-finalization retries reused the accepted job,
+while a provider submission retry remained a new explicit action.
+
+On 2026-07-30, that ordered-chain design was superseded by a zero-or-one visual policy. The current
+workflow keeps Lucy and VTO mutually exclusive, lets the creator switch the one active choice
+before submission, and submits only that selected exact model. Start over retains the immutable
+source and clears the visual choice before another explicit plan.
 
 The accepted H.264/VP8 subset, 720p result checks, source-audio restoration, 500 ms duration
 tolerance, temporary storage, and four-submission participant limit are app-owned conservative

@@ -165,8 +165,9 @@ graphify query "<question>"
 
 Use `graphify path "<A>" "<B>"` for impact/relationships and
 `graphify explain "<concept>"` for focused concepts. Use `graphify-out/wiki/index.md` for broad
-navigation; read `GRAPH_REPORT.md` only when scoped commands are insufficient. Dirty graph output
-is expected and not a reason to skip it. After code changes run:
+navigation when that optional export exists; otherwise read `graphify-out/GRAPH_REPORT.md` only
+when scoped commands are insufficient. Dirty graph output is expected and not a reason to skip it.
+After code changes run:
 
 ```bash
 graphify update .

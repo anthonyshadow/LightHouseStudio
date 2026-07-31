@@ -89,7 +89,7 @@ export const useExistingVideoWorkflow = ({
   onSubmissionAccepted,
 }: UseExistingVideoWorkflowOptions) => {
   const [selection, setSelection] = useState<ValidatedExistingVideo | null>(null);
-  const [steps, setSteps] = useState<readonly ExistingVideoStep[]>([]);
+  const [step, setStep] = useState<ExistingVideoStep | null>(null);
   const [phase, setPhase] = useState<ExistingVideoWorkflowPhase>('empty');
   const [message, setMessage] = useState<string | null>(null);
   const [status, setStatus] = useState<VideoJobStatusResponse | null>(null);
@@ -107,6 +107,7 @@ export const useExistingVideoWorkflow = ({
   const controllerRef = useRef<AbortController | null>(null);
   const generationRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
+  const steps = useMemo<readonly ExistingVideoStep[]>(() => (step ? [step] : []), [step]);
 
   const clearOperation = useCallback(() => {
     controllerRef.current?.abort();
@@ -125,7 +126,7 @@ export const useExistingVideoWorkflow = ({
       clearOperation();
       if (discardTake) recording.discard();
       setSelection(null);
-      setSteps([]);
+      setStep(null);
       setPhase('empty');
       setMessage(null);
       setCompletedStepCount(0);
@@ -146,7 +147,7 @@ export const useExistingVideoWorkflow = ({
       try {
         const validated = await validateExistingVideo(
           file,
-          steps.some((step) => step.modelId === 'lucy-vton-3'),
+          step?.modelId === 'lucy-vton-3',
           controller.signal,
         );
         if (controller.signal.aborted || generation !== generationRef.current) return;
@@ -176,7 +177,7 @@ export const useExistingVideoWorkflow = ({
         if (controllerRef.current === controller) controllerRef.current = null;
       }
     },
-    [acceptedSubmission, clearOperation, publishUploadedVideo, steps],
+    [acceptedSubmission, clearOperation, publishUploadedVideo, step],
   );
 
   const addStep = useCallback(
@@ -192,19 +193,17 @@ export const useExistingVideoWorkflow = ({
         setMessage('Videos used with Virtual Try-On must be 200 MB or smaller.');
         return;
       }
-      setSteps((current) =>
-        current[0]?.modelId === modelId
+      setStep((current) =>
+        current?.modelId === modelId
           ? current
-          : [
-              {
-                id: crypto.randomUUID(),
-                modelId,
-                savedRecipeId: null,
-                prompt: '',
-                enhancePrompt: false,
-                referenceImage: null,
-              },
-            ],
+          : {
+              id: crypto.randomUUID(),
+              modelId,
+              savedRecipeId: null,
+              prompt: '',
+              enhancePrompt: false,
+              referenceImage: null,
+            },
       );
       setMessage(null);
     },
@@ -214,7 +213,7 @@ export const useExistingVideoWorkflow = ({
   const updateStep = useCallback(
     (id: string, patch: Partial<Omit<ExistingVideoStep, 'id' | 'modelId'>>) => {
       if (acceptedSubmission && (phase !== 'error' || retryJob === null)) return;
-      setSteps((current) => current.map((step) => (step.id === id ? { ...step, ...patch } : step)));
+      setStep((current) => (current?.id === id ? { ...current, ...patch } : current));
     },
     [acceptedSubmission, phase, retryJob],
   );
@@ -222,7 +221,7 @@ export const useExistingVideoWorkflow = ({
   const removeStep = useCallback(
     (id: string) => {
       if (acceptedSubmission) return;
-      setSteps((current) => current.filter((step) => step.id !== id));
+      setStep((current) => (current?.id === id ? null : current));
     },
     [acceptedSubmission],
   );
@@ -288,8 +287,7 @@ export const useExistingVideoWorkflow = ({
       setComparison('result');
       setPendingVisual(null);
       setRetryJob(null);
-      const nextCompleted = stepIndex + 1;
-      setCompletedStepCount(nextCompleted);
+      setCompletedStepCount(stepIndex + 1);
       setAcceptedSubmission(false);
       setPhase('complete');
       setMessage('Visual processing is complete. The result is ready to compare and download.');
@@ -507,7 +505,7 @@ export const useExistingVideoWorkflow = ({
     if (!selection || phase !== 'complete') return;
     clearOperation();
     recording.clearVisualProcessing();
-    setSteps([]);
+    setStep(null);
     setPhase('ready');
     setMessage(selection.audioUnavailableReason);
     setCompletedStepCount(0);

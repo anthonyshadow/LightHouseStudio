@@ -20,14 +20,6 @@ The persistent Studio shell must remain in React and is not a safe draft compone
 - Extractable props: `variant`, `size`, `busy`, `disabled`.
 - Hardcoded: tokenized colors, focus ring, touch dimensions.
 
-## CharacterChoiceDrawer
-
-- Source: `apps/web/src/features/character-builder/CharacterChoiceDrawer.tsx`
-- Category: basic
-- Description: Native details/summary disclosure used for each character category.
-- Extractable props: `title`, `description`, `currentLabel`, `defaultOpen`.
-- Hardcoded: native disclosure semantics and chevron behavior.
-
 ## CharacterOptionButton
 
 - Source: `apps/web/src/features/character-builder/CharacterVisualChoiceSection.tsx`

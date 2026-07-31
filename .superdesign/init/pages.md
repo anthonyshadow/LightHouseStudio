@@ -24,7 +24,6 @@ Entry: `apps/web/src/studio/StudioApp.tsx`
         - `apps/web/src/ui/primitives/overlayStack.ts`
       - `apps/web/src/features/character-builder/CharacterBuilderForm.tsx`
         - `apps/web/src/features/character-builder/CharacterDirectionPreview.tsx`
-        - `apps/web/src/features/character-builder/CharacterChoiceDrawer.tsx`
         - `apps/web/src/features/character-builder/CharacterVisualChoiceSection.tsx`
         - `apps/web/src/features/character-builder/catalog.ts`
         - `apps/web/src/features/character-builder/characterModel.ts`

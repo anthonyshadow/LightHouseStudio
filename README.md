@@ -207,9 +207,10 @@ Finalization settles the video and optional sidecar, transcodes the main recordi
 H.264/AAC MP4, and publishes that downloadable artifact before live resources release. Raw
 recorder output never receives a download URL.
 
-The backend has no account database, jobs, or session history. Its only durable runtime data is the
-owner-scoped immutable reference-asset store. Read [architecture and ownership](docs/ARCHITECTURE.md)
-for the full dependency, lifecycle, persistence, and HTTP boundaries.
+The backend has process-local temporary video jobs but no account database, durable job database or
+queue, or session history. Its only durable runtime data is the owner-scoped immutable
+reference-asset store. Read [architecture and ownership](docs/ARCHITECTURE.md) for the full
+dependency, lifecycle, persistence, and HTTP boundaries.
 
 ## Documentation
 

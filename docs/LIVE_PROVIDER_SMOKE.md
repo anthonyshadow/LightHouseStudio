@@ -104,8 +104,8 @@ For each exact batch model:
    rights, retention, and submission disclosure is visible before action.
 3. Submit once. Confirm the broker's multipart input maps to Decart's documented `data`, `prompt`,
    optional `reference_image`, `resolution=720p`, and `enhance_prompt` fields; uses synthetic
-   filenames and exact `lucy-2.5`; and makes no provider request before authoritative server
-   inspection.
+   filenames and the selected exact model (`lucy-2.5` or `lucy-vton-3`); and makes no
+   provider request before authoritative server inspection.
 4. Observe validating, submitting, queued, processing, retrieving, and ready as applicable. The UI
    may show elapsed time but never a fabricated percentage or provider ID/URL/body.
 5. Download the completed result. Verify 1280×720 or 720×1280 orientation, duration within 500 ms,

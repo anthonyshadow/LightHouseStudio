@@ -175,9 +175,6 @@ const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<Netwo
         transition: none !important;
         caret-color: transparent !important;
       }
-      [data-stage-audio="true"] > span[aria-hidden="true"] {
-        --audio-level: 48% !important;
-      }
     `,
   });
   return network;

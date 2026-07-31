@@ -116,7 +116,7 @@ See [active audit plan](project-audit-implementation-plan.md) and
 - Do not turn loopback identifiers, device IDs, storage paths, or provider IDs into future user
   identity.
 
-## 17. Recommended success metrics
+## Controlled-pilot success metrics
 
 These are small-cohort hypotheses, not release criteria. Record numerator, denominator, and
 content-free timing so a percentage never hides a tiny sample.

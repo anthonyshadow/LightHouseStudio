@@ -7,7 +7,6 @@ import { CharacterBuilderForm } from '@web/features/character-builder/CharacterB
 import { createEmptyGuidedDesign } from '@web/features/character-builder/characterModel';
 import { CharacterBuilderCoordinator } from '@web/features/character-builder/CharacterBuilderCoordinator';
 import { CharacterBuilderPanel } from '@web/features/character-builder/CharacterBuilderPanel';
-import { CharacterChoiceDrawer } from '@web/features/character-builder/CharacterChoiceDrawer';
 import {
   CharacterDirectionPreview,
   type CharacterDirectionPreviewSelection,
@@ -29,7 +28,6 @@ const meta = {
   title: 'Features/Character Builder/Builder',
   component: CharacterBuilderForm,
   subcomponents: {
-    CharacterChoiceDrawer,
     CharacterDirectionPreview,
     ReferenceOptionsFields,
     ConfirmationDialog,

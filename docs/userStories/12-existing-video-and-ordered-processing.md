@@ -37,12 +37,17 @@ Use a compatible browser-local video as the immutable take source, optionally ap
 7. At **Result ready**, **Original** presents the immutable upload and **Result** presents the
    generated visual on the same shared stage. Neither comparison action deletes or replaces an
    artifact. **Download** directly downloads the generated visual result.
-8. **Start over** revokes generated visual and voice URLs, retains and presents the uploaded
+8. If the source has usable audio, the creator may close the upload panel and apply a
+   [local Voice treatment](08-local-voice-treatments.md) or a
+   [saved ElevenLabs voice](09-elevenlabs-voice-workflow.md). Processing starts from immutable
+   source audio, applies to the latest visual or source layer, and preserves the last valid artifact
+   on failure.
+9. **Start over** revokes generated visual and voice URLs, retains and presents the uploaded
    original, clears the selected transformation, and returns to **Visual plan**. It does not reset
    the moderated participant submission counters. The creator can choose either model again.
-9. Confirmed **Discard video** revokes the uploaded source and all generated results and returns
-   the open panel to **Choose an existing video**. The ordinary Latest Take controls remain
-   available after explicitly closing the upload panel.
+10. Confirmed **Discard video** revokes the uploaded source and all generated results and returns
+    the open panel to **Choose an existing video**. The ordinary Latest Take controls remain
+    available after explicitly closing the upload panel.
 
 ## Validation and failure behavior
 

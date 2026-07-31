@@ -1,6 +1,8 @@
 import type {
   RecordingArtifact as DomainRecordingArtifact,
   RecordingLifecycleStatus,
+  UploadedVideoCodec,
+  UploadedVideoContainer,
 } from '@studio/domain';
 import type { StudioMode } from '../../application/types';
 import type { CameraPermissionState } from '../../adapters/browser-media/browserMedia';
@@ -60,8 +62,8 @@ export type UploadedTakeMetadata = Readonly<{
   mode: 'local';
   selectedAt: string;
   displayName: string;
-  container: 'mp4' | 'quicktime' | 'webm';
-  videoCodec: 'avc' | 'vp8';
+  container: UploadedVideoContainer;
+  videoCodec: UploadedVideoCodec;
   audioCodec: string | null;
   durationMs: number;
   width: number;

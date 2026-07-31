@@ -5,7 +5,6 @@ import {
   type ReferenceImageSize,
 } from '@studio/contracts';
 import sharp from 'sharp';
-import { decodeCanonicalBase64 } from '../../application/strict-base64.js';
 import {
   dimensionsForReferenceImageSize,
   MAX_PROVIDER_IMAGE_BYTES,
@@ -42,17 +41,6 @@ export class InvalidReferenceImageUploadError extends Error {
     this.name = 'InvalidReferenceImageUploadError';
   }
 }
-
-export const decodeStrictBase64 = (encoded: string): Buffer => {
-  const decoded = decodeCanonicalBase64(encoded, MAX_PROVIDER_IMAGE_BYTES);
-  if (!decoded.ok && decoded.reason === 'shape') {
-    throw new InvalidReferenceImageError('The provider returned malformed base64 image data.');
-  }
-  if (!decoded.ok) {
-    throw new InvalidReferenceImageError('The provider returned invalid base64 image data.');
-  }
-  return decoded.bytes;
-};
 
 const mimeTypeForFormat = (format: string | undefined): ValidReferenceImageMimeType => {
   switch (format) {
@@ -143,12 +131,6 @@ export const validateReferenceImageBytes = async (
     height: dimensions.height,
   };
 };
-
-export const validateReferenceImage = async (
-  encoded: string,
-  expectedSize: ReferenceImageSize = '1024x1024',
-): Promise<ValidatedReferenceImage> =>
-  validateReferenceImageBytes(decodeStrictBase64(encoded), expectedSize);
 
 export const validateUploadedReferenceImage = async (
   bytes: Buffer,

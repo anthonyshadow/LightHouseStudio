@@ -487,24 +487,9 @@ export class ReferenceImageService {
     }
   }
 
-  #storedProviderAudit(safeUsage: Readonly<Record<string, number>> | undefined): {
-    readonly providerSettings?:
-      | {
-          readonly safetyTolerance: number;
-          readonly disablePromptUpsampling: boolean;
-        }
-      | {
-          readonly owner: 'ByteDance';
-          readonly resolution: '2k';
-          readonly maxImages: 1;
-          readonly watermark: false;
-        };
-    readonly providerUsage?: {
-      readonly cost?: number;
-      readonly inputMegapixels?: number;
-      readonly outputMegapixels?: number;
-    };
-  } {
+  #storedProviderAudit(
+    safeUsage: Readonly<Record<string, number>> | undefined,
+  ): Pick<GeneratedReferenceImageStoreInput, 'providerSettings' | 'providerUsage'> {
     if (this.#providerDescriptor.providerId === 'wiro') {
       const { owner, resolution, maxImages, watermark } =
         this.#providerDescriptor.effectiveSettings;

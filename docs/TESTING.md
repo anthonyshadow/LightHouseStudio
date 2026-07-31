@@ -71,10 +71,10 @@ The touch project runs that smoke plus the dedicated control-timeout/recording-S
 browser-specific test must be tagged in its title with `@cross-browser` or `@touch`; do not run
 every desktop journey under every engine by default.
 
-The visual matrix contains 20 cases. It retains Local live and recording at all five canonical
-viewports, plus selected entry, idle, Character, Builder, Shelf, playback, VTO, Voice, finalizing,
-and permission-error compositions. Visual tests are not part of `pnpm test`, `pnpm quality`, or
-ordinary push/pull-request CI.
+The current visual matrix contains 24 cases within the 29-case review budget. It retains Local live
+and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,
+Shelf, playback, existing-video, VTO, Voice, finalizing, and permission-error compositions. Visual
+tests are not part of `pnpm test`, `pnpm quality`, or ordinary push/pull-request CI.
 
 Run `pnpm test:visual` when:
 

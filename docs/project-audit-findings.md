@@ -1,6 +1,6 @@
 # Project audit findings
 
-**Current as of:** 2026-07-29
+**Current as of:** 2026-07-30
 
 This register contains unresolved findings only. Current behavior is defined by
 [Architecture](ARCHITECTURE.md) and the [user stories](userStories/README.md). Execution order
@@ -16,14 +16,14 @@ The original runtime blockers have been implemented with deterministic coverage.
 pilot work is candidate verification, physical-device/accessibility evidence, live-provider
 qualification, and per-participant operating evidence.
 
-At this audit the qualification validator reports **0/10 provider/local** and **0/45 physical**
+At this audit the qualification validator reports **0/9 provider/local** and **0/45 physical**
 passes because no completed evidence records are checked in.
 
 ## Active controlled-pilot findings
 
 | Finding                                                                                                         | Current state                                                                                                                                                                                                                                 | Completion evidence                                                                                                                                                  |
 | --------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ARCH-001`, `DOC-001`, `TEST-004`, `TEST-007` — live provider qualification                                     | Decart clock/end handling, batch broker/state, safe errors, provider finalization order, and synthetic journeys are implemented. Live entitlement, exact-model behavior, batch output/retention, and five-minute boundary evidence is absent. | Pass all ten provider/local rows for the exact candidate, including batch Lucy, batch VTO, and both checkpointed orders.                                             |
+| `ARCH-001`, `DOC-001`, `TEST-004`, `TEST-007` — live provider qualification                                     | Decart clock/end handling, batch broker/state, safe errors, provider finalization order, and synthetic journeys are implemented. Live entitlement, exact-model behavior, batch output/retention, and five-minute boundary evidence is absent. | Pass all nine provider/local rows for the exact candidate, including batch Lucy and batch VTO.                                                                       |
 | `UX-001`, `UX-003`, `UX-006`, `TEST-001`, `TEST-008`, `TEST-009`, `TEST-011` — physical touch and accessibility | Touch/pointer/focus/keyboard recovery, dominant recording Stop, narrow Builder access, reflow, synthetic WebKit, axe, and focus tests exist. No named physical row is qualified.                                                              | Pass every required physical browser/device row, including safe areas, keyboard, 200% text, focus/status, screen reader, and real media behavior.                    |
 | `PERF-001`, `TEST-005` — real 300-second media evidence                                                         | The independent 270/300-second warning and coalesced Stop/finalize path are implemented for Local, Character, and VTO. Browser memory, codecs, interruption, remux, and cleanup remain unmeasured on required targets.                        | Record successful one- and five-minute checkpoints, finalization, local/ElevenLabs processing, download, background/foreground, and cleanup for all claimed targets. |
 | `SEC-004` — participant data retirement                                                                         | Detach/retention copy, isolated-directory policy, checklist, and disposable cleanup drill are implemented. No real participant environment has completed the procedure.                                                                       | Pass the drill before admission and complete the content-free checklist for every participant profile/data directory through final retirement.                       |

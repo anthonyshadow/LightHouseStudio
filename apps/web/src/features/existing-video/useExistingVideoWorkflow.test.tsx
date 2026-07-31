@@ -253,6 +253,41 @@ describe('useExistingVideoWorkflow', () => {
     unmount();
   });
 
+  it('does not resubmit a completed step when replacement validation fails', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    const { result, unmount } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording: recordingController(),
+        publishUploadedVideo: vi.fn(),
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => result.current.addStep('lucy-2.5'));
+    act(() =>
+      result.current.updateStep(result.current.steps[0]!.id, {
+        prompt: 'Keep the completed recipe pinned',
+      }),
+    );
+    await act(async () => result.current.submitStep(0));
+    await waitFor(() => expect(result.current.phase).toBe('complete'));
+
+    adapters.validateExistingVideo.mockRejectedValueOnce(new Error('Replacement is invalid.'));
+    await act(async () =>
+      result.current.selectFile(
+        new File(['replacement'], 'replacement.mp4', { type: 'video/mp4' }),
+      ),
+    );
+
+    expect(result.current.phase).toBe('error');
+    expect(result.current.completedStepCount).toBe(1);
+    expect(result.current.selection?.file).toBe(sourceFile);
+    await act(async () => result.current.submitStep(result.current.completedStepCount));
+    expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
   it('clears a resume action when the accepted provider job reports terminal failure', async () => {
     const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
     adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));

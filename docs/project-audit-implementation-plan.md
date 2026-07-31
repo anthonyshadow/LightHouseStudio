@@ -144,7 +144,7 @@ During and after the engagement:
 
 - follow the content/refusal/support policy;
 - collect only the content-free measures in
-  [product state](product-state.md#17-recommended-success-metrics);
+  [product state](product-state.md#controlled-pilot-success-metrics);
 - test comprehension of provider contact, Download, and Detach-versus-delete;
 - complete the planned return session, withdrawal, or cancellation path; and
 - retire the environment within the approved deadline using the signed checklist.

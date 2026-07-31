@@ -33,17 +33,17 @@ provider payloads/errors are neither retained as product data nor returned to th
 
 ## Explicit transfer boundaries
 
-| Action                            | Recipient and data                                                                                                                                                  |
-| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `GET /api/capabilities`           | Local broker configuration only; no provider request                                                                                                                |
-| Upload/direct image save          | Local broker/store only                                                                                                                                             |
-| Start/Apply Character or VTO      | Decart receives live camera/microphone media and the complete applied recipe/reference                                                                              |
-| Submit uploaded visual step       | Decart receives a synthetic-named compatible video, normalized prompt/options, and optional validated reference; Continue is a separate explicit submission         |
-| Optimize/Re-optimize              | OpenAI receives the raw character direction and selected reference options; response storage is disabled                                                            |
-| Generate/Combined/Regenerate/Edit | Startup-selected OpenAI/BFL/Wiro image provider receives the optimized or documented raw-fallback prompt; composition/editing also receives the owner-scoped source |
-| Browse saved voices               | ElevenLabs receives a saved-library metadata request; no take                                                                                                       |
-| Preview voice                     | ElevenLabs preview request; no take                                                                                                                                 |
-| Apply ElevenLabs voice            | ElevenLabs receives only the immutable original audio sidecar, not video                                                                                            |
+| Action                            | Recipient and data                                                                                                                                                                   |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `GET /api/capabilities`           | Local broker configuration only; no provider request                                                                                                                                 |
+| Upload/direct image save          | Local broker/store only                                                                                                                                                              |
+| Start/Apply Character or VTO      | Decart receives live camera/microphone media and the complete applied recipe/reference                                                                                               |
+| Submit selected upload visual     | Decart receives a synthetic-named compatible video, normalized prompt/options, and optional validated reference for the one active Lucy or VTO choice; selecting neither stays local |
+| Optimize/Re-optimize              | OpenAI receives the raw character direction and selected reference options; response storage is disabled                                                                             |
+| Generate/Combined/Regenerate/Edit | Startup-selected OpenAI/BFL/Wiro image provider receives the optimized or documented raw-fallback prompt; composition/editing also receives the owner-scoped source                  |
+| Browse saved voices               | ElevenLabs receives a saved-library metadata request; no take                                                                                                                        |
+| Preview voice                     | ElevenLabs preview request; no take                                                                                                                                                  |
+| Apply ElevenLabs voice            | ElevenLabs receives only the immutable original audio sidecar, not video                                                                                                             |
 
 Provider actions may incur usage. Reference image providers never fall back to another provider or
 automatically repeat an initial billable submission. An optimizer failure may continue with the

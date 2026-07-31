@@ -9,7 +9,6 @@ import {
   getVisualOptionAlt,
   getVisualOptionImageSrc,
   getVisibleOptions,
-  preserveChoiceForProfile,
   resolveGuidedChoice,
   VISUAL_CATALOG,
 } from './catalog';
@@ -230,7 +229,7 @@ describe('guided character visual catalog', () => {
     const pixie = getSuggestedOptions('hair', 'woman')[0];
     expect(pixie).toBeDefined();
     const choice = { optionId: pixie?.id ?? '' };
-    const preserved = preserveChoiceForProfile('hair', 'man', choice);
+    const preserved = resolveGuidedChoice('hair', 'man', choice);
     const visible = getVisibleOptions('hair', 'man', choice, false);
 
     expect(preserved.choice).toEqual(choice);

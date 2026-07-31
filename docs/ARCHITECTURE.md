@@ -210,8 +210,9 @@ present. This is an access boundary, not provider fallback.
 | Local reference storage     | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                         |
 | ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `POST /api/elevenlabs/voice-changer/recording`                                                      |
 
-Capabilities report configuration presence only. The backend has no accounts, analytics, jobs,
-SQL database, or session history. Host-derived owner IDs are a local namespace, not identity.
+Capabilities report configuration presence only. The backend has process-local temporary video
+jobs but no accounts, analytics, durable job database or queue, SQL database, or session history.
+Host-derived owner IDs are a local namespace, not identity.
 
 ## Resource ownership
 
@@ -224,7 +225,7 @@ The creator of a resource owns idempotent cleanup.
 | Recording/review      | Recorders, chunks, conversion abort, immutable source/sidecar, visual/voice artifact URLs, cap timer, unload protection |
 | Existing-video flow   | Validation generations, one ephemeral visual draft, provider polling/download                                           |
 | Voice processing      | Abort controllers, Web Audio/Mediabunny resources, temporary processed URLs                                             |
-| Media stage           | DOM media attachment, metering, control-visibility timer                                                                |
+| Media stage           | DOM media attachment and control-visibility timer                                                                       |
 | Overlay               | Focus/inert/scroll state only; never media                                                                              |
 | API request/service   | Request abort, upstream streams, shared-operation subscribers, provider deadline                                        |
 | Video-job service     | In-memory owner/job map, exact-once submission, private temp paths, expiry and result cleanup                           |

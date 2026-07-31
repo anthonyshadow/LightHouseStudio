@@ -54,8 +54,9 @@ Authority: [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT
 - Participant mode disables Wiro even when configured; operator-qualification mode is explicit.
 - Reference actions use truthful Detach/retention language.
 - The retirement checklist and disposable exact-leaf drill protect shared roots and siblings.
-- A strict qualification matrix and validator require ten provider/local rows and 45 physical
-  browser/device rows for one exact commit. Evidence rejects extra or content-bearing fields.
+- The initial strict qualification matrix and validator required ten provider/local rows,
+  including the then-approved ordered-chain checkpoint, and 45 physical browser/device rows for
+  one exact commit. Evidence rejects extra or content-bearing fields.
 - Release coverage now includes deterministic provider-free and provider-lifecycle journeys,
   accessibility/reflow checks, Storybook, curated visuals, production smoke, and full/production
   dependency-audit jobs.
@@ -71,6 +72,8 @@ accounts, remote exposure, cloud persistence, billing, or public data handling.
 
 ## Current qualification boundary
 
-No completed qualification records are checked in. At this documentation audit the validator
-reports **0/10 provider/local** and **0/45 physical** passes. Historical test runs and implemented
-automation do not replace the exact-candidate work in the active plan.
+The 2026-07-30 single-processing decision retired the ordered-chain checkpoint, so the current
+matrix has nine provider/local rows. No completed qualification records are checked in. At this
+documentation audit the validator reports **0/9 provider/local** and **0/45 physical** passes.
+Historical test runs and implemented automation do not replace the exact-candidate work in the
+active plan.

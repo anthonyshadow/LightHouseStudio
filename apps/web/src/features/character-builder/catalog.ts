@@ -354,12 +354,6 @@ export const resolveGuidedChoice = (
   };
 };
 
-export const preserveChoiceForProfile = (
-  category: VisualCatalogCategory,
-  profile: VisualProfile,
-  choice: GuidedChoiceValue | null | undefined,
-): ResolvedGuidedChoice => resolveGuidedChoice(category, profile, choice);
-
 export const getVisibleOptions = (
   category: VisualCatalogCategory,
   profile: VisualProfile,

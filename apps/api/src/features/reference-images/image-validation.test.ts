@@ -4,38 +4,29 @@ import { REFERENCE_IMAGE_MAX_BYTES, REFERENCE_IMAGE_UPLOAD_MAX_BYTES } from '@st
 import {
   InvalidReferenceImageError,
   InvalidReferenceImageUploadError,
-  decodeStrictBase64,
-  validateReferenceImage,
+  validateReferenceImageBytes,
   validateUploadedReferenceImage,
 } from './image-validation.js';
 
-const imageBase64 = async (
+const imageBytes = async (
   width = 1024,
   height = 1024,
   format: 'jpeg' | 'png' | 'webp' = 'jpeg',
-): Promise<string> => {
+): Promise<Buffer> => {
   const pipeline = sharp({
     create: { width, height, channels: 3, background: '#345678' },
   });
-  const bytes =
-    format === 'jpeg'
-      ? await pipeline.jpeg({ quality: 90 }).toBuffer()
-      : format === 'png'
-        ? await pipeline.png().toBuffer()
-        : await pipeline.webp().toBuffer();
-  return bytes.toString('base64');
+  return format === 'jpeg'
+    ? pipeline.jpeg({ quality: 90 }).toBuffer()
+    : format === 'png'
+      ? pipeline.png().toBuffer()
+      : pipeline.webp().toBuffer();
 };
 
 describe('reference image validation', () => {
-  it('rejects every noncanonical base64 shape', () => {
-    for (const encoded of ['aW1hZ2U', 'aW1h Z2U=', 'aW1hZ2U_', '====']) {
-      expect(() => decodeStrictBase64(encoded)).toThrow(InvalidReferenceImageError);
-    }
-  });
-
   it('fully decodes every supported 1024-square format', async () => {
     for (const format of ['jpeg', 'png', 'webp'] as const) {
-      const result = await validateReferenceImage(await imageBase64(1024, 1024, format));
+      const result = await validateReferenceImageBytes(await imageBytes(1024, 1024, format));
 
       expect(result, format).toMatchObject({
         width: 1024,
@@ -51,25 +42,25 @@ describe('reference image validation', () => {
       ['1024x1536', 1024, 1536],
       ['1536x1024', 1536, 1024],
     ] as const) {
-      const result = await validateReferenceImage(await imageBase64(width, height), size);
+      const result = await validateReferenceImageBytes(await imageBytes(width, height), size);
       expect(result, size).toMatchObject({ width, height, mimeType: 'image/jpeg' });
       await expect(
-        validateReferenceImage(await imageBase64(height, width), size),
+        validateReferenceImageBytes(await imageBytes(height, width), size),
         size,
       ).rejects.toThrow(`exactly ${width} by ${height}`);
     }
   });
 
   it('rejects an image that is not exactly 1024 by 1024', async () => {
-    await expect(validateReferenceImage(await imageBase64(512, 512))).rejects.toThrow(
+    await expect(validateReferenceImageBytes(await imageBytes(512, 512))).rejects.toThrow(
       'exactly 1024 by 1024',
     );
   });
 
-  it('rejects canonical base64 that is not a decodable supported image', async () => {
-    await expect(
-      validateReferenceImage(Buffer.from('not an image').toString('base64')),
-    ).rejects.toBeInstanceOf(InvalidReferenceImageError);
+  it('rejects bytes that are not a decodable supported image', async () => {
+    await expect(validateReferenceImageBytes(Buffer.from('not an image'))).rejects.toBeInstanceOf(
+      InvalidReferenceImageError,
+    );
   });
 
   it('normalizes an oversized valid image once as JPEG quality 90', async () => {
@@ -83,7 +74,7 @@ describe('reference image validation', () => {
     const oversized = Buffer.concat([source, Buffer.alloc(REFERENCE_IMAGE_MAX_BYTES, 0x41)]);
 
     expect(oversized.byteLength).toBeGreaterThanOrEqual(REFERENCE_IMAGE_MAX_BYTES);
-    const result = await validateReferenceImage(oversized.toString('base64'));
+    const result = await validateReferenceImageBytes(oversized);
 
     expect(result.mimeType).toBe('image/jpeg');
     expect(result.bytes.byteLength).toBeLessThan(REFERENCE_IMAGE_MAX_BYTES);
@@ -98,7 +89,7 @@ describe('reference image validation', () => {
 describe('uploaded reference image validation', () => {
   it('preserves decoded upload bytes and metadata for every supported format', async () => {
     for (const format of ['jpeg', 'png', 'webp'] as const) {
-      const bytes = Buffer.from(await imageBase64(800, 1200, format), 'base64');
+      const bytes = await imageBytes(800, 1200, format);
       const result = await validateUploadedReferenceImage(bytes, `image/${format}`);
 
       expect(result).toEqual({
@@ -111,7 +102,7 @@ describe('uploaded reference image validation', () => {
   });
 
   it('rejects declared and decoded MIME mismatches and corrupt bytes', async () => {
-    const jpeg = Buffer.from(await imageBase64(800, 1200, 'jpeg'), 'base64');
+    const jpeg = await imageBytes(800, 1200, 'jpeg');
 
     await expect(validateUploadedReferenceImage(jpeg, 'image/png')).rejects.toThrow(
       /do(?:es)? not match/u,
