@@ -54,7 +54,10 @@ export const ExistingVideoVoiceEditor = ({
               variant={active ? 'primary' : 'secondary'}
               aria-pressed={active}
               disabled={locked}
-              onClick={() => workflow.selectLocalVoice(effect.id, effect.name)}
+              onClick={() => {
+                workflow.selectLocalVoice(effect.id, effect.name);
+                setVoiceLibraryOpen(false);
+              }}
             >
               <strong>{effect.name}</strong>
               <small>{effect.description}</small>
@@ -109,6 +112,8 @@ export const ExistingVideoVoiceEditor = ({
           disabled={locked}
           clipDurationLabel={formatDuration(durationMs / 1_000)}
           modelId={elevenLabsModel}
+          selectedVoiceId={selected?.kind === 'elevenlabs' ? selected.voiceId : null}
+          onSelect={(voice) => workflow.selectVoice(voice.voiceId, voice.name)}
           onApply={(voice) => {
             workflow.selectVoice(voice.voiceId, voice.name);
             setVoiceLibraryOpen(false);

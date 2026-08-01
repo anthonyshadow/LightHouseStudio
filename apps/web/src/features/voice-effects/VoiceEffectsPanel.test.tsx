@@ -177,6 +177,7 @@ describe('VoiceLibrary accessibility', () => {
   it('previews and applies only a voice returned by the saved library endpoint', async () => {
     const user = userEvent.setup();
     const onApply = vi.fn();
+    const onSelect = vi.fn();
     voiceApi.listWorkspaceVoices.mockResolvedValue({
       ...emptyPage,
       voices: [
@@ -201,6 +202,7 @@ describe('VoiceLibrary accessibility', () => {
         clipDurationLabel="0:05"
         modelId="eleven_multilingual_sts_v2"
         onApply={onApply}
+        onSelect={onSelect}
       />,
     );
     await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
@@ -214,6 +216,14 @@ describe('VoiceLibrary accessibility', () => {
     );
     expect(await screen.findByLabelText('Listen to Saved Star preview')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Select Saved Star' }));
+    expect(onSelect).toHaveBeenCalledWith({
+      voiceId: 'saved-voice',
+      name: 'Saved Star',
+      category: 'featured',
+      description: 'Bright delivery',
+      labels: {},
+      previewAvailable: true,
+    });
     expect(screen.getByText(/Clip duration: 0:05/)).toHaveTextContent(
       'using eleven_multilingual_sts_v2',
     );

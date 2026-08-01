@@ -257,11 +257,34 @@ export const sectionHeadingStyles = (theme: Theme): CSSObject => ({
   '& p': { color: theme.colors.textMuted, lineHeight: 1.5 },
 });
 
-export const toolGridStyles = (theme: Theme): CSSObject => ({
+export const toolGroupsStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+  gridTemplateColumns: 'minmax(0, 2fr) minmax(0, 1fr)',
   gap: theme.space.xs,
   '@media (max-width: 34rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
+});
+
+export const toolGroupStyles = (theme: Theme, columns: number): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  gridTemplateRows: 'auto 1fr',
+  gap: theme.space.xxs,
+  '& > p': {
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSizes.caption,
+    lineHeight: 1.35,
+  },
+  '& > p strong': { color: theme.colors.text, fontSize: theme.fontSizes.metadata },
+  '& > div': {
+    minWidth: 0,
+    display: 'grid',
+    gridTemplateColumns: `repeat(${columns}, minmax(0, 1fr))`,
+    gap: theme.space.xs,
+  },
+  '& > div > button': { height: '100%' },
+  '@media (max-width: 34rem)': {
+    '& > div': { gridTemplateColumns: 'minmax(0, 1fr)' },
+  },
 });
 
 export const toolCardStyles = (theme: Theme, active: boolean, unavailable: boolean): CSSObject => ({
@@ -299,6 +322,10 @@ export const toolStatusStyles = (theme: Theme, active: boolean): CSSObject => ({
   background: active ? theme.colors.accent : theme.colors.surfaceStrong,
   fontSize: theme.fontSizes.caption,
   fontWeight: 760,
+});
+
+export const activeConfigurationStyles = (): CSSObject => ({
+  scrollMarginBlockStart: '7rem',
 });
 
 export const configCardStyles = (theme: Theme): CSSObject => ({

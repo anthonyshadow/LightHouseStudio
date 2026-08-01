@@ -9,6 +9,8 @@ export type VoiceLibraryProps = {
   clipDurationLabel: string;
   modelId?: string | null;
   onApply: (voice: VoiceSummary) => void;
+  onSelect?: (voice: VoiceSummary) => void;
+  selectedVoiceId?: string | null;
   mode?: 'apply' | 'select';
 };
 
@@ -48,14 +50,21 @@ export const VoiceLibrary = ({
   clipDurationLabel,
   modelId,
   onApply,
+  onSelect,
+  selectedVoiceId,
   mode = 'apply',
 }: VoiceLibraryProps) => {
   const theme = useTheme();
   const library = useVoiceLibrary();
+  const selected =
+    library.selected ??
+    (selectedVoiceId
+      ? (library.voices.find((item) => item.voice.voiceId === selectedVoiceId) ?? null)
+      : null);
 
   const applySelectedVoice = () => {
-    if (!library.selected) return;
-    onApply(library.selected.voice);
+    if (!selected) return;
+    onApply(selected.voice);
   };
 
   return (
@@ -108,9 +117,12 @@ export const VoiceLibrary = ({
 
       <VoiceList
         voices={library.voices}
-        selected={library.selected}
+        selected={selected}
         loading={library.loading}
-        onSelect={library.setSelected}
+        onSelect={(item) => {
+          library.setSelected(item);
+          onSelect?.(item.voice);
+        }}
         onPreviewError={(item) =>
           library.setError(`The preview for ${item.voice.name} could not be played.`)
         }
@@ -134,7 +146,7 @@ export const VoiceLibrary = ({
         Refresh voices
       </Button>
 
-      {library.selected ? (
+      {selected ? (
         <>
           <StatusNotice id="elevenlabs-apply-disclosure" title="Provider usage">
             {mode === 'select' ? (
@@ -158,8 +170,8 @@ export const VoiceLibrary = ({
             onClick={applySelectedVoice}
           >
             {mode === 'select'
-              ? `Use ${library.selected.voice.name} for this edit`
-              : `Apply ${library.selected.voice.name} to recorded audio`}
+              ? `Use ${selected.voice.name} for this edit`
+              : `Apply ${selected.voice.name} to recorded audio`}
           </Button>
         </>
       ) : null}

@@ -2,6 +2,7 @@ import type { ExistingVideoStep, ExistingVideoWorkflow } from './useExistingVide
 
 export type ExistingVideoEditorPhase = 'source' | 'edit' | 'review';
 export type ExistingVideoToolId = 'character' | 'vton' | 'voice';
+export type ExistingVideoVisualToolId = Exclude<ExistingVideoToolId, 'voice'>;
 
 export const existingVideoEditorPhase = (
   workflow: Pick<ExistingVideoWorkflow, 'selection' | 'phase'>,
@@ -19,10 +20,24 @@ export const existingVideoStepIsComplete = (step: ExistingVideoStep): boolean =>
   return Boolean(step.savedRecipeId || step.referenceImage || step.prompt.trim());
 };
 
-export const toolForStep = (step: ExistingVideoStep | undefined): ExistingVideoToolId | null => {
+export const toolForStep = (
+  step: ExistingVideoStep | undefined,
+): ExistingVideoVisualToolId | null => {
   if (!step) return null;
   return step.modelId === 'lucy-latest' ? 'character' : 'vton';
 };
+
+export const visualToolName = (tool: ExistingVideoVisualToolId): string =>
+  tool === 'character' ? 'Character Swap' : 'Virtual Try On';
+
+export const visualStepHasSettings = (step: ExistingVideoStep): boolean =>
+  Boolean(
+    step.savedRecipeId ||
+    step.prompt.trim() ||
+    step.enhancePrompt ||
+    step.referenceImage ||
+    (step.modelId === 'lucy-vton-latest' && step.inputKind !== 'prompt'),
+  );
 
 export const visualToolLabel = (step: ExistingVideoStep): string =>
   step.modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On';

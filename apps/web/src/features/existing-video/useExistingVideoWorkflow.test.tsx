@@ -177,11 +177,17 @@ describe('useExistingVideoWorkflow', () => {
     );
 
     await act(async () => result.current.selectFile(sourceFile));
-    act(() => result.current.addStep('lucy-latest'));
+    act(() => {
+      result.current.addStep('lucy-latest');
+    });
     expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-latest']);
-    act(() => result.current.addStep('lucy-vton-latest'));
+    act(() => {
+      result.current.addStep('lucy-vton-latest');
+    });
     expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-vton-latest']);
-    act(() => result.current.addStep('lucy-latest'));
+    act(() => {
+      result.current.addStep('lucy-latest');
+    });
     expect(result.current.steps.map(({ modelId }) => modelId)).toEqual(['lucy-latest']);
     act(() =>
       result.current.updateStep(result.current.steps[0]!.id, {
@@ -214,7 +220,9 @@ describe('useExistingVideoWorkflow', () => {
     expect(result.current.completedStepCount).toBe(0);
     expect(result.current.submittedModels).toEqual(['lucy-latest']);
 
-    act(() => result.current.addStep('lucy-vton-latest'));
+    act(() => {
+      result.current.addStep('lucy-vton-latest');
+    });
     act(() =>
       result.current.updateStep(result.current.steps[0]!.id, {
         prompt: 'Second submission from the retained original',
@@ -278,6 +286,40 @@ describe('useExistingVideoWorkflow', () => {
       'Northstar Narrator',
       { replaceExistingResult: true },
     ]);
+    unmount();
+  });
+
+  it('keeps the selected Voice while switching between visual edits until it is cleared', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    const { result, unmount } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording: recordingController(),
+        processing: processingController(),
+        publishUploadedVideo: vi.fn(),
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => result.current.selectVoice('voice-northstar', 'Northstar Narrator'));
+    expect(result.current.voiceSelection).toEqual({
+      kind: 'elevenlabs',
+      voiceId: 'voice-northstar',
+      voiceName: 'Northstar Narrator',
+    });
+
+    act(() => {
+      result.current.addStep('lucy-latest');
+    });
+    expect(result.current.voiceSelection?.voiceName).toBe('Northstar Narrator');
+
+    act(() => {
+      result.current.addStep('lucy-vton-latest');
+    });
+    expect(result.current.voiceSelection?.voiceName).toBe('Northstar Narrator');
+
+    act(() => result.current.clearVoice());
+    expect(result.current.voiceSelection).toBeNull();
     unmount();
   });
 
@@ -363,7 +405,9 @@ describe('useExistingVideoWorkflow', () => {
     );
 
     await act(async () => result.current.selectFile(sourceFile));
-    act(() => result.current.addStep('lucy-latest'));
+    act(() => {
+      result.current.addStep('lucy-latest');
+    });
     const stepId = result.current.steps[0]!.id;
     act(() => result.current.updateStep(stepId, { prompt: 'Original accepted prompt' }));
 
@@ -400,7 +444,9 @@ describe('useExistingVideoWorkflow', () => {
     );
 
     await act(async () => result.current.selectFile(sourceFile));
-    act(() => result.current.addStep('lucy-latest'));
+    act(() => {
+      result.current.addStep('lucy-latest');
+    });
     act(() =>
       result.current.updateStep(result.current.steps[0]!.id, {
         prompt: 'Keep the completed recipe pinned',
@@ -449,7 +495,9 @@ describe('useExistingVideoWorkflow', () => {
     );
 
     await act(async () => result.current.selectFile(sourceFile));
-    act(() => result.current.addStep('lucy-latest'));
+    act(() => {
+      result.current.addStep('lucy-latest');
+    });
     act(() =>
       result.current.updateStep(result.current.steps[0]!.id, {
         prompt: 'Change the lighting',

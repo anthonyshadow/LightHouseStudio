@@ -118,7 +118,10 @@ For each exact batch model:
    without claiming provider cancellation or provider-side deletion.
 
 Confirm that Lucy and VTO remain available as a mutually exclusive selector before submission.
-Switch in both directions and verify there is still only one active recipe and one submitted model.
+Switch in both directions with an empty visual setup and confirm the change is immediate. Repeat
+with configured fields and confirm the topmost warning preserves everything on cancel, clears only
+the previous visual fields on confirmation, and leaves configured Voice untouched. Verify there is
+still only one active visual recipe and one submitted model.
 
 Do not exceed four participant batch submissions or two submissions for either model. Broker
 restart, 60-minute expiry, ambiguous responses, unavailable

@@ -1,20 +1,30 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import type { RecordingArtifact } from '../recording/types';
 import { ExistingVideoPanel } from './ExistingVideoPanel';
-import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
+import type {
+  ExistingVideoVoiceSelection,
+  ExistingVideoWorkflow,
+} from './useExistingVideoWorkflow';
 
 const api = vi.hoisted(() => ({
   hydrateReferenceImage: vi.fn(),
   importRemoteReferenceImage: vi.fn(),
+  listWorkspaceVoices: vi.fn(),
+  fetchVoicePreview: vi.fn(),
 }));
 
 vi.mock('../../adapters/api-client/apiClient', () => ({
   hydrateReferenceImage: api.hydrateReferenceImage,
   importRemoteReferenceImage: api.importRemoteReferenceImage,
+}));
+vi.mock('../../adapters/api-client/voicesApi', () => ({
+  listWorkspaceVoices: api.listWorkspaceVoices,
+  fetchVoicePreview: api.fetchVoicePreview,
 }));
 
 const originalCreateObjectUrl = Object.getOwnPropertyDescriptor(URL, 'createObjectURL');
@@ -44,7 +54,7 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   providerActive: false,
   selectFile: vi.fn(),
   adoptRecordedArtifact: vi.fn(),
-  addStep: vi.fn(),
+  addStep: vi.fn(() => true),
   updateStep: vi.fn(),
   removeStep: vi.fn(),
   submitStep: vi.fn(),
@@ -83,6 +93,8 @@ const resultArtifact = (): RecordingArtifact => {
 beforeEach(() => {
   api.hydrateReferenceImage.mockReset();
   api.importRemoteReferenceImage.mockReset();
+  api.listWorkspaceVoices.mockReset();
+  api.fetchVoicePreview.mockReset();
   Object.defineProperty(URL, 'createObjectURL', {
     configurable: true,
     value: vi.fn(() => {
@@ -206,8 +218,8 @@ describe('ExistingVideoPanel', () => {
     expect(setVtonInputKind).toHaveBeenCalledWith('vto', 'prompt');
   });
 
-  it('shows metadata and keeps the visual choices mutually exclusive', () => {
-    const addStep = vi.fn();
+  it('confirms before replacing configured visual settings and preserves them on cancel', async () => {
+    const addStep = vi.fn(() => true);
     const source = new File(['video'], 'a very long local source name.mp4', {
       type: 'video/mp4',
     });
@@ -246,6 +258,7 @@ describe('ExistingVideoPanel', () => {
       phase: 'ready',
       addStep,
       voiceAvailable: true,
+      voiceSelection: { kind: 'local', effect: 'warm-studio', voiceName: 'Warm studio' },
     });
     render(
       <StudioDesignProvider>
@@ -267,11 +280,351 @@ describe('ExistingVideoPanel', () => {
       'false',
     );
     expect(screen.getByRole('button', { name: /^Voice/u })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: /^Virtual Try On/u }));
+    expect(addStep).not.toHaveBeenCalled();
+    expect(screen.getByRole('dialog', { name: 'Switch to Virtual Try On?' })).toBeVisible();
+    expect(
+      screen.getAllByText(
+        'Switching will clear your current Character Swap settings. Your Voice settings will not be affected, and Voice can still be combined with Virtual Try On.',
+      )[0],
+    ).toBeVisible();
+    expect(screen.getByDisplayValue('Change the scene')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Keep Character Swap' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
+    expect(addStep).not.toHaveBeenCalled();
+    expect(screen.getByDisplayValue('Change the scene')).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Character Swap/u })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: /^Virtual Try On/u })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Virtual Try On/u }));
+    fireEvent.click(screen.getByRole('button', { name: 'Clear and switch' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument());
     expect(addStep).toHaveBeenCalledWith('lucy-vton-latest');
+    expect(screen.getByRole('button', { name: /^Character Swap/u })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(screen.getByRole('button', { name: /^Virtual Try On/u })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('button', { name: 'Move up' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Move down' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Apply Character Swap' })).toBeEnabled();
+    expect(
+      screen.getByRole('button', { name: 'Apply Character Swap, then Warm studio' }),
+    ).toBeEnabled();
+  });
+
+  it('switches an empty visual setup immediately without a warning', () => {
+    const addStep = vi.fn(() => true);
+    const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: null,
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-07-30T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: null,
+                durationMs: 30_000,
+                width: 1_280,
+                height: 720,
+                sizeBytes: source.size,
+                hasAudio: false,
+              },
+            },
+            steps: [
+              {
+                id: 'lucy',
+                modelId: 'lucy-latest',
+                savedRecipeId: null,
+                prompt: '',
+                enhancePrompt: false,
+                referenceImage: null,
+                inputKind: 'character',
+              },
+            ],
+            phase: 'ready',
+            addStep,
+          })}
+          videoProcessingAvailable
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Virtual Try On/u }));
+
+    expect(addStep).toHaveBeenCalledWith('lucy-vton-latest');
+    expect(screen.queryByRole('dialog', { name: /Switch to/u })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Character Swap/u })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
+    expect(screen.getByRole('button', { name: /^Virtual Try On/u })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+  });
+
+  it('uses contextual confirmation copy when replacing Virtual Try On settings', () => {
+    const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: null,
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-07-30T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: null,
+                durationMs: 30_000,
+                width: 1_280,
+                height: 720,
+                sizeBytes: source.size,
+                hasAudio: false,
+              },
+            },
+            steps: [
+              {
+                id: 'vto',
+                modelId: 'lucy-vton-latest',
+                savedRecipeId: null,
+                prompt: 'A tailored green jacket',
+                enhancePrompt: false,
+                referenceImage: null,
+                inputKind: 'prompt',
+              },
+            ],
+            phase: 'ready',
+          })}
+          videoProcessingAvailable
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Character Swap/u }));
+
+    expect(screen.getByRole('dialog', { name: 'Switch to Character Swap?' })).toBeVisible();
+    expect(
+      screen.getAllByText(
+        'Switching will clear your current Virtual Try On settings. Your Voice settings will not be affected, and Voice can still be combined with Character Swap.',
+      )[0],
+    ).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Keep Virtual Try On' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Clear and switch' })).toBeVisible();
+  });
+
+  it('keeps configured Voice selected while either visual edit is viewed', () => {
+    const source = new File(['video'], 'source-with-audio.mp4', { type: 'video/mp4' });
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: {
+                blob: new Blob(['audio'], { type: 'audio/webm' }),
+                mimeType: 'audio/webm',
+              },
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-07-30T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: 'aac',
+                durationMs: 30_000,
+                width: 1_280,
+                height: 720,
+                sizeBytes: source.size,
+                hasAudio: true,
+              },
+            },
+            steps: [
+              {
+                id: 'lucy',
+                modelId: 'lucy-latest',
+                savedRecipeId: null,
+                prompt: 'Use the saved character',
+                enhancePrompt: false,
+                referenceImage: null,
+                inputKind: 'character',
+              },
+            ],
+            phase: 'ready',
+            voiceAvailable: true,
+            voiceSelection: { kind: 'local', effect: 'warm-studio', voiceName: 'Warm studio' },
+          })}
+          videoProcessingAvailable
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    expect(
+      screen.getByText(
+        'Choose one visual edit: Character Swap or Virtual Try On. Voice is independent, so you can add it to either visual edit or use it on its own.',
+      ),
+    ).toBeVisible();
+    expect(screen.getByText('Visual edit')).toBeVisible();
+    expect(screen.getAllByText('Voice')[0]).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Character Swap/u })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: /^Voice/u }));
+    expect(screen.getByRole('heading', { name: 'Configure Voice' })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Character Swap/u })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
+
+    fireEvent.click(screen.getByRole('button', { name: /^Character Swap/u }));
+    expect(screen.getByRole('heading', { name: 'Configure Character Swap' })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
+  });
+
+  it('retains a saved Voice selection and its browser state while viewing a visual edit', async () => {
+    api.listWorkspaceVoices.mockResolvedValue({
+      voices: [
+        {
+          kind: 'workspace',
+          voice: {
+            voiceId: 'saved-star',
+            name: 'Saved Star',
+            category: 'featured',
+            description: 'Bright delivery',
+            labels: {},
+            previewAvailable: false,
+          },
+        },
+      ],
+      hasMore: false,
+      nextPageToken: null,
+      total: 1,
+    });
+    const source = new File(['video'], 'source-with-audio.mp4', { type: 'video/mp4' });
+
+    const StatefulPanel = () => {
+      const [voiceSelection, setVoiceSelection] = useState<ExistingVideoVoiceSelection | null>(
+        null,
+      );
+      return (
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: {
+                blob: new Blob(['audio'], { type: 'audio/webm' }),
+                mimeType: 'audio/webm',
+              },
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-07-30T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: 'aac',
+                durationMs: 30_000,
+                width: 1_280,
+                height: 720,
+                sizeBytes: source.size,
+                hasAudio: true,
+              },
+            },
+            steps: [
+              {
+                id: 'lucy',
+                modelId: 'lucy-latest',
+                savedRecipeId: null,
+                prompt: 'Use the saved character',
+                enhancePrompt: false,
+                referenceImage: null,
+                inputKind: 'character',
+              },
+            ],
+            phase: 'ready',
+            voiceAvailable: true,
+            voiceSelection,
+            selectVoice: (voiceId, voiceName) =>
+              setVoiceSelection({ kind: 'elevenlabs', voiceId, voiceName }),
+            clearVoice: () => setVoiceSelection(null),
+          })}
+          videoProcessingAvailable
+          elevenLabsAvailable
+          onFinish={vi.fn()}
+        />
+      );
+    };
+
+    render(
+      <StudioDesignProvider>
+        <StatefulPanel />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /^Voice/u }));
+    fireEvent.click(screen.getByRole('button', { name: 'Browse saved voices' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Select Saved Star' }));
+    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByText('Saved Star', { selector: 'strong' })).toBeVisible();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Character Swap/u }));
+    expect(screen.getByRole('heading', { name: 'Configure Character Swap' })).toBeVisible();
+    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.getByRole('button', { name: 'Apply Character Swap, then Saved Star' }),
+    ).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: /^Voice/u }));
+    expect(screen.getByRole('button', { name: 'Selected Saved Star' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Voice setup' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Character Swap/u }));
+    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute(
+      'aria-pressed',
+      'false',
+    );
   });
 
   it('offers local voice treatments inline and labels the local-only apply action', () => {

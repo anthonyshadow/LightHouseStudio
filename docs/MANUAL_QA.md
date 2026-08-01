@@ -141,6 +141,12 @@ preview/generation region; **Review & Generate** moves focus to it without dupli
   Confirm the full accessible filename is available without being sent to the server/provider.
 - Verify source duration/aspect/byte boundaries, no-audio visual use, Voice-disabled explanation,
   VTO's lower input cap, exact 720p result orientation, and the 500 ms synchronization tolerance.
+- In **Choose your edits**, verify Character Swap and Virtual Try On behave as one-of-two visual
+  choices while Voice remains independently selectable. Empty visual setups switch immediately;
+  configured setups require a topmost confirmation whose cancel path preserves every value and
+  whose confirm path clears only the previous visual settings, never Voice. Select a saved Voice,
+  visit both visual editors, and return to Voice; confirm the saved Voice and browser state remain
+  selected until **Clear Voice setup** is used.
 - Interrupt upload before provider acceptance, background/foreground during polling, restart the
   broker, expire a result, retry status/content/local finalization, and race source replacement.
   No path may create an automatic paid resubmission or discard the last valid artifact.

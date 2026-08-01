@@ -5,6 +5,7 @@ import { validateReferenceImage } from '../../adapters/browser-media/imageValida
 import { Button, ConfirmationDialog, StatusNotice, Surface } from '../../ui';
 import { ExistingVideoActionBar } from './ExistingVideoActionBar';
 import {
+  activeConfigurationStyles,
   dropActionStyles,
   dropZoneStyles,
   editorColumnStyles,
@@ -23,8 +24,11 @@ import { ExistingVideoToolCards } from './ExistingVideoToolCards';
 import {
   existingVideoEditorPhase,
   toolForStep,
+  visualStepHasSettings,
+  visualToolName,
   visualToolLabel,
   type ExistingVideoToolId,
+  type ExistingVideoVisualToolId,
 } from './existingVideoPresentation';
 import { ExistingVideoVisualEditor, type RecentOutfit } from './ExistingVideoVisualEditor';
 import { ExistingVideoVoiceEditor } from './ExistingVideoVoiceEditor';
@@ -45,6 +49,11 @@ type ExistingVideoPanelProps = {
 const initialActiveTool = (workflow: ExistingVideoWorkflow): ExistingVideoToolId | null =>
   toolForStep(workflow.steps[0]) ?? (workflow.voiceSelection ? 'voice' : null);
 
+type PendingVisualSwitch = Readonly<{
+  from: ExistingVideoVisualToolId;
+  to: ExistingVideoVisualToolId;
+}>;
+
 export const ExistingVideoPanel = ({
   workflow,
   videoProcessingAvailable,
@@ -61,6 +70,7 @@ export const ExistingVideoPanel = ({
   const replacementPickerAuthorizedRef = useRef(false);
   const replaceButtonRef = useRef<HTMLButtonElement>(null);
   const discardButtonRef = useRef<HTMLButtonElement>(null);
+  const visualSwitchInvokerRef = useRef<HTMLButtonElement>(null);
   const [activeTool, setActiveTool] = useState<ExistingVideoToolId | null>(() =>
     initialActiveTool(workflow),
   );
@@ -69,6 +79,8 @@ export const ExistingVideoPanel = ({
   const [recentOutfits, setRecentOutfits] = useState<readonly RecentOutfit[]>([]);
   const [replaceConfirmationOpen, setReplaceConfirmationOpen] = useState(false);
   const [discardConfirmationOpen, setDiscardConfirmationOpen] = useState(false);
+  const [pendingVisualSwitch, setPendingVisualSwitch] = useState<PendingVisualSwitch | null>(null);
+  const [visualSwitchConfirmationOpen, setVisualSwitchConfirmationOpen] = useState(false);
   const [pendingDroppedFile, setPendingDroppedFile] = useState<File | null>(null);
   const structureLocked = workflow.acceptedSubmission || workflow.active;
   const recipeLocked =
@@ -156,13 +168,49 @@ export const ExistingVideoPanel = ({
     }
   };
 
-  const selectTool = (tool: ExistingVideoToolId) => {
-    if (tool === 'character') workflow.addStep('lucy-latest');
-    if (tool === 'vton') workflow.addStep('lucy-vton-latest');
-    setActiveTool(tool);
+  const focusActiveConfiguration = () => {
     window.requestAnimationFrame(() => {
-      document.getElementById('existing-video-active-configuration')?.focus();
+      const configuration = document.getElementById('existing-video-active-configuration');
+      if (!configuration) return;
+      configuration.focus({ preventScroll: true });
+      const { top } = configuration.getBoundingClientRect();
+      const visibleBottom = window.innerHeight - Math.min(160, window.innerHeight * 0.25);
+      if ((top < 0 || top > visibleBottom) && typeof configuration.scrollIntoView === 'function') {
+        configuration.scrollIntoView({ block: 'start' });
+      }
     });
+  };
+
+  const activateVisualTool = (tool: ExistingVideoVisualToolId) => {
+    const selected = workflow.addStep(tool === 'character' ? 'lucy-latest' : 'lucy-vton-latest');
+    if (!selected) return;
+    setReferenceError(null);
+    setActiveTool(tool);
+    focusActiveConfiguration();
+  };
+
+  const selectTool = (tool: ExistingVideoToolId, trigger: HTMLButtonElement) => {
+    if (tool === 'voice') {
+      setActiveTool(tool);
+      focusActiveConfiguration();
+      return;
+    }
+
+    const currentStep = workflow.steps[0];
+    const currentVisualTool = toolForStep(currentStep);
+    if (
+      currentStep &&
+      currentVisualTool &&
+      currentVisualTool !== tool &&
+      visualStepHasSettings(currentStep)
+    ) {
+      visualSwitchInvokerRef.current = trigger;
+      setPendingVisualSwitch({ from: currentVisualTool, to: tool });
+      setVisualSwitchConfirmationOpen(true);
+      return;
+    }
+
+    activateVisualTool(tool);
   };
 
   const clearVisualStep = (stepId: string) => {
@@ -321,8 +369,8 @@ export const ExistingVideoPanel = ({
               <header css={sectionHeadingStyles(theme)}>
                 <h2>Choose your edits</h2>
                 <p>
-                  Visual edits are optional and mutually exclusive. Voice can be used alone or
-                  applied after the selected visual edit.
+                  Choose one visual edit: Character Swap or Virtual Try On. Voice is independent, so
+                  you can add it to either visual edit or use it on its own.
                 </p>
               </header>
 
@@ -355,48 +403,62 @@ export const ExistingVideoPanel = ({
                   </div>
                 </section>
               ) : (
-                <div id="existing-video-active-configuration" tabIndex={-1}>
-                  {activeTool === 'character' && activeStep?.modelId === 'lucy-latest' ? (
-                    <ExistingVideoVisualEditor
-                      step={activeStep}
-                      savedRecipes={savedRecipes}
-                      recentOutfits={recentOutfits}
-                      structureLocked={structureLocked}
-                      recipeLocked={recipeLocked}
-                      recipeLoading={recipeLoading}
-                      onApplySavedRecipe={(step, recipeId) => void applySavedRecipe(step, recipeId)}
-                      onChooseReference={(step, file) => void chooseReference(step, file)}
-                      {...(onCreateCharacter ? { onCreateCharacter } : {})}
-                      onUpdate={workflow.updateStep}
-                      onSetVtonInputKind={workflow.setVtonInputKind}
-                      onClear={clearVisualStep}
-                      onClearReferenceError={() => setReferenceError(null)}
-                    />
+                <div
+                  id="existing-video-active-configuration"
+                  css={activeConfigurationStyles()}
+                  tabIndex={-1}
+                >
+                  {activeStep?.modelId === 'lucy-latest' ? (
+                    <div hidden={activeTool !== 'character'}>
+                      <ExistingVideoVisualEditor
+                        step={activeStep}
+                        savedRecipes={savedRecipes}
+                        recentOutfits={recentOutfits}
+                        structureLocked={structureLocked}
+                        recipeLocked={recipeLocked}
+                        recipeLoading={recipeLoading}
+                        onApplySavedRecipe={(step, recipeId) =>
+                          void applySavedRecipe(step, recipeId)
+                        }
+                        onChooseReference={(step, file) => void chooseReference(step, file)}
+                        {...(onCreateCharacter ? { onCreateCharacter } : {})}
+                        onUpdate={workflow.updateStep}
+                        onSetVtonInputKind={workflow.setVtonInputKind}
+                        onClear={clearVisualStep}
+                        onClearReferenceError={() => setReferenceError(null)}
+                      />
+                    </div>
                   ) : null}
-                  {activeTool === 'vton' && activeStep?.modelId === 'lucy-vton-latest' ? (
-                    <ExistingVideoVisualEditor
-                      step={activeStep}
-                      savedRecipes={savedRecipes}
-                      recentOutfits={recentOutfits}
-                      structureLocked={structureLocked}
-                      recipeLocked={recipeLocked}
-                      recipeLoading={recipeLoading}
-                      onApplySavedRecipe={(step, recipeId) => void applySavedRecipe(step, recipeId)}
-                      onChooseReference={(step, file) => void chooseReference(step, file)}
-                      onUpdate={workflow.updateStep}
-                      onSetVtonInputKind={workflow.setVtonInputKind}
-                      onClear={clearVisualStep}
-                      onClearReferenceError={() => setReferenceError(null)}
-                    />
+                  {activeStep?.modelId === 'lucy-vton-latest' ? (
+                    <div hidden={activeTool !== 'vton'}>
+                      <ExistingVideoVisualEditor
+                        step={activeStep}
+                        savedRecipes={savedRecipes}
+                        recentOutfits={recentOutfits}
+                        structureLocked={structureLocked}
+                        recipeLocked={recipeLocked}
+                        recipeLoading={recipeLoading}
+                        onApplySavedRecipe={(step, recipeId) =>
+                          void applySavedRecipe(step, recipeId)
+                        }
+                        onChooseReference={(step, file) => void chooseReference(step, file)}
+                        onUpdate={workflow.updateStep}
+                        onSetVtonInputKind={workflow.setVtonInputKind}
+                        onClear={clearVisualStep}
+                        onClearReferenceError={() => setReferenceError(null)}
+                      />
+                    </div>
                   ) : null}
-                  {activeTool === 'voice' ? (
-                    <ExistingVideoVoiceEditor
-                      workflow={workflow}
-                      durationMs={metadata.durationMs}
-                      elevenLabsAvailable={elevenLabsAvailable}
-                      elevenLabsModel={elevenLabsModel}
-                      locked={structureLocked}
-                    />
+                  {workflow.voiceAvailable ? (
+                    <div hidden={activeTool !== 'voice'}>
+                      <ExistingVideoVoiceEditor
+                        workflow={workflow}
+                        durationMs={metadata.durationMs}
+                        elevenLabsAvailable={elevenLabsAvailable}
+                        elevenLabsModel={elevenLabsModel}
+                        locked={structureLocked}
+                      />
+                    </div>
                   ) : null}
                   {!activeTool ? (
                     <Surface tone="soft" padding="compact">
@@ -440,6 +502,30 @@ export const ExistingVideoPanel = ({
         }}
       />
 
+      <ConfirmationDialog
+        open={visualSwitchConfirmationOpen}
+        title={
+          pendingVisualSwitch
+            ? `Switch to ${visualToolName(pendingVisualSwitch.to)}?`
+            : 'Switch visual edit?'
+        }
+        description={
+          pendingVisualSwitch
+            ? `Switching will clear your current ${visualToolName(pendingVisualSwitch.from)} settings. Your Voice settings will not be affected, and Voice can still be combined with ${visualToolName(pendingVisualSwitch.to)}.`
+            : ''
+        }
+        confirmLabel="Clear and switch"
+        cancelLabel={
+          pendingVisualSwitch ? `Keep ${visualToolName(pendingVisualSwitch.from)}` : 'Keep editing'
+        }
+        returnFocusRef={visualSwitchInvokerRef}
+        onCancel={() => setVisualSwitchConfirmationOpen(false)}
+        onConfirm={() => {
+          const pending = pendingVisualSwitch;
+          setVisualSwitchConfirmationOpen(false);
+          if (pending) activateVisualTool(pending.to);
+        }}
+      />
       <ConfirmationDialog
         open={replaceConfirmationOpen}
         title="Replace source video?"

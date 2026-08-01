@@ -283,8 +283,8 @@ export const useExistingVideoWorkflow = ({
   }, [acceptedSubmission, clearOperation, publishUploadedVideo, recording]);
 
   const addStep = useCallback(
-    (modelId: VideoTransformModelId) => {
-      if (acceptedSubmission) return;
+    (modelId: VideoTransformModelId): boolean => {
+      if (acceptedSubmission) return false;
       if (
         selection &&
         modelId === 'lucy-vton-latest' &&
@@ -293,7 +293,7 @@ export const useExistingVideoWorkflow = ({
         )
       ) {
         setMessage('Videos used with Virtual Try-On must be 200 MB or smaller.');
-        return;
+        return false;
       }
       setStep((current) =>
         current?.modelId === modelId
@@ -309,6 +309,7 @@ export const useExistingVideoWorkflow = ({
             },
       );
       setMessage(null);
+      return true;
     },
     [acceptedSubmission, selection],
   );

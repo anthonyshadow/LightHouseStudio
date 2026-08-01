@@ -32,7 +32,12 @@ then edit either base, download, start over, or discard.
 5. The creator may use confirmed **Replace source video** or **Discard source video**, then choose
    zero or one visual transformation from status-bearing tool cards:
    **Character Swap** (Lucy 2.5) or **Virtual Try On**, never both. Both selectors remain available
-   before submission so the creator can switch the single active choice directly. Only the active
+   before submission. The currently viewed visual edit is selected; after any visual value is
+   entered or selected, that card remains selected while Voice is viewed. Switching away from an
+   empty visual edit is immediate. Switching away from a visual edit with settings requires a
+   topmost confirmation that names the settings to be cleared and states that Voice is compatible
+   with the replacement and will not be affected. Cancel preserves the original visual settings
+   and configuration view; confirm clears them and selects the replacement. Only the active
    transformation owns the submitted prompt, prompt-enhancement switch, and optional validated
    reference. Saved characters and
    outfits open in a keyboard-operable custom chooser with an optional local thumbnail, recipe
@@ -48,9 +53,14 @@ then edit either base, download, start over, or discard.
    modes clears incompatible fields. VTO retains calm controlled-pilot, consent, one-garment,
    plain-background, and no-fit/sizing/purchase-accuracy disclosure.
 7. **Voice** exposes browser-local effects first and lazily loads saved ElevenLabs voices only when
-   the creator chooses **Browse saved voices**. Selection alone transfers no take. Local effects
-   identify their no-provider path; review truthfully summarizes no provider work, one Decart
-   submission, one local voice render, one ElevenLabs conversion, or Decart followed by voice.
+   the creator chooses **Browse saved voices**. Selecting a saved voice stores it in the current
+   edit plan immediately but transfers no take; its browser selection and search state survive
+   viewing either visual editor. The selection remains until **Clear Voice setup** or a broader
+   explicit source/plan reset. Local effects identify their no-provider path. Voice is independent
+   of the mutually exclusive visual choice: it appears selected while viewed, remains selected
+   after configuration, and never clears or replaces Character Swap or Virtual Try On. Review
+   truthfully summarizes no provider work, one Decart submission, one local voice render, one
+   ElevenLabs conversion, or Decart followed by voice.
 8. Studio executes one immutable captured plan: visual submit/poll/retrieve → validate → restore
    immutable source audio where required → H.264/AAC MP4 transcode/validate/commit → convert
    immutable source sidecar → compose/transcode/validate/commit voiced result. A validated H.264
