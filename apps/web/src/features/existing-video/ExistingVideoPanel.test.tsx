@@ -33,6 +33,7 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   retryJob: null,
   original: null,
   result: null,
+  downloaded: false,
   editBase: null,
   voiceSelection: null,
   voiceAvailable: false,
@@ -55,6 +56,7 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   reset: vi.fn(),
   startOver: vi.fn(),
   setVtonInputKind: vi.fn(),
+  selectLocalVoice: vi.fn(),
   selectVoice: vi.fn(),
   clearVoice: vi.fn(),
   editSelected: vi.fn(),
@@ -120,7 +122,7 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    expect(screen.getByRole('button', { name: 'Select video' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Upload from device' })).toBeEnabled();
     expect(screen.getByText(/MP4\/H.264/u)).toBeInTheDocument();
     expect(screen.queryByText(/Decart submission/u)).not.toBeInTheDocument();
   });
@@ -193,7 +195,7 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    expect(screen.getByText(/For the controlled pilot/u)).toBeVisible();
+    expect(screen.getByText(/Use media you have rights and consent to submit/u)).toBeVisible();
     expect(screen.queryByRole('textbox', { name: 'Prompt' })).not.toBeInTheDocument();
     expect(
       screen.queryByRole('textbox', { name: 'Public HTTPS image URL' }),
@@ -251,26 +253,73 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    expect(screen.getByTitle(source.name)).toHaveTextContent(source.name);
+    expect(screen.getAllByTitle(source.name)[0]).toHaveTextContent(source.name);
     expect(screen.getByLabelText(`Video preview for ${source.name}`)).toBeVisible();
-    expect(screen.getByText('1920 × 1080')).toBeInTheDocument();
-    expect(screen.getByText(/1 planned Decart submission: Character Swap/u)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Character Swap' })).toHaveAttribute(
+    expect(screen.getAllByText('1920 × 1080')[0]).toBeInTheDocument();
+    expect(screen.getByText(/Apply Character Swap/u)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^Character Swap/u })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeEnabled();
-    expect(screen.getByRole('button', { name: 'Virtual Try On' })).toHaveAttribute(
+    expect(screen.getByRole('button', { name: /^Virtual Try On/u })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /^Virtual Try On/u })).toHaveAttribute(
       'aria-pressed',
       'false',
     );
-    expect(screen.getByRole('heading', { name: 'Voice' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Add voice change' })).toBeEnabled();
-    fireEvent.click(screen.getByRole('button', { name: 'Virtual Try On' }));
+    expect(screen.getByRole('button', { name: /^Voice/u })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: /^Virtual Try On/u }));
     expect(addStep).toHaveBeenCalledWith('lucy-vton-latest');
     expect(screen.queryByRole('button', { name: 'Move up' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Move down' })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Start · 1 Decart submission' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Apply Character Swap' })).toBeEnabled();
+  });
+
+  it('offers local voice treatments inline and labels the local-only apply action', () => {
+    const source = new File(['video'], 'source-with-audio.mp4', { type: 'video/mp4' });
+    const selectLocalVoice = vi.fn();
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: {
+                blob: new Blob(['audio'], { type: 'audio/webm' }),
+                mimeType: 'audio/webm',
+              },
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-07-30T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: 'aac',
+                durationMs: 30_000,
+                width: 1_280,
+                height: 720,
+                sizeBytes: source.size,
+                hasAudio: true,
+              },
+            },
+            phase: 'ready',
+            voiceAvailable: true,
+            voiceSelection: { kind: 'local', effect: 'warm-studio', voiceName: 'Warm studio' },
+            selectLocalVoice,
+          })}
+          videoProcessingAvailable
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByRole('heading', { name: 'Configure Voice' })).toBeVisible();
+    fireEvent.click(screen.getByRole('button', { name: /^Clear presenter/u }));
+    expect(selectLocalVoice).toHaveBeenCalledWith('clear-presenter', 'Clear presenter');
+    expect(screen.getByRole('button', { name: 'Apply Warm studio locally' })).toBeEnabled();
+    expect(screen.getByText(/Rendered in this browser without provider transfer/u)).toBeVisible();
   });
 
   it('shows image-rich saved characters with clamped prompt copy and applies the selected item', async () => {
@@ -536,14 +585,11 @@ describe('ExistingVideoPanel', () => {
       savedRecipeId: null,
       prompt: 'Make the character a robot',
     });
-    expect(screen.getAllByRole('button', { name: 'Remove' })).toEqual([
-      expect.objectContaining({ disabled: true }),
-      expect.objectContaining({ disabled: true }),
-    ]);
+    expect(screen.getByRole('button', { name: 'Clear Character Swap setup' })).toBeDisabled();
     expect(
       screen.getByRole('button', { name: 'Resume accepted job · no new submission' }),
     ).toBeEnabled();
-    expect(screen.getByText(/checks and downloads the original accepted recipe/u)).toBeVisible();
+    expect(screen.getByText(/resuming checks the accepted job/u)).toBeVisible();
   });
 
   it('downloads the result, starts over with the source, or discards the completed video', () => {
@@ -551,7 +597,6 @@ describe('ExistingVideoPanel', () => {
     const startOver = vi.fn();
     const downloadResult = vi.fn();
     const editSelected = vi.fn();
-    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(true);
     const source = new File(['video'], 'completed-source.mp4', { type: 'video/mp4' });
 
     render(
@@ -591,7 +636,7 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    const download = screen.getByRole('link', { name: 'Download' });
+    const download = screen.getByRole('link', { name: 'Download result' });
     expect(screen.getByRole('button', { name: 'Original' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Result' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Edit result' }));
@@ -602,14 +647,12 @@ describe('ExistingVideoPanel', () => {
     expect(downloadResult).toHaveBeenCalledOnce();
     expect(screen.queryByRole('button', { name: /Review Voice/u })).not.toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Start over' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Start over from original' }));
     expect(startOver).toHaveBeenCalledOnce();
 
+    fireEvent.click(screen.getByRole('button', { name: 'Discard video and result' }));
+    expect(screen.getByRole('dialog', { name: 'Discard this video?' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Discard video' }));
-
-    expect(confirm).toHaveBeenCalledWith(
-      'Discard this uploaded video and its results? They cannot be recovered after this tab releases them.',
-    );
     expect(reset).toHaveBeenCalledWith(true);
   });
 });

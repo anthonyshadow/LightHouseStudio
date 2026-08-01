@@ -93,6 +93,7 @@ const recordingController = (): RecordingController => {
 const processingController = (): VoiceProcessingController => ({
   selection: { kind: 'none' },
   applyLocal: vi.fn().mockResolvedValue(undefined),
+  applyLocalTo: vi.fn().mockResolvedValue({ status: 'canceled' }),
   applyElevenLabs: vi.fn().mockResolvedValue(undefined),
   applyElevenLabsTo: vi.fn().mockResolvedValue({ status: 'canceled' }),
   restoreOriginal: vi.fn(),
@@ -192,6 +193,8 @@ describe('useExistingVideoWorkflow', () => {
     await waitFor(() => expect(result.current.phase).toBe('complete'));
 
     expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
+    expect(adapters.stripRecordingAudio).not.toHaveBeenCalled();
+    expect(adapters.transcodeRecordingToMp4).not.toHaveBeenCalled();
     expect(recording.completeVisualProcessing).toHaveBeenCalledTimes(1);
     expect(onSubmissionAccepted).toHaveBeenCalledTimes(1);
     expect(result.current.completedStepCount).toBe(1);
@@ -306,6 +309,36 @@ describe('useExistingVideoWorkflow', () => {
       'Northstar Narrator',
       { replaceExistingResult: true },
     );
+    expect(result.current.phase).toBe('complete');
+    unmount();
+  });
+
+  it('applies a selected local voice effect without contacting a provider', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    const recording = recordingController();
+    const processing = processingController();
+    processing.applyLocalTo = vi.fn().mockResolvedValue({
+      status: 'ready',
+      artifact: recording.original,
+    });
+    const { result, unmount } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        processing,
+        publishUploadedVideo: vi.fn().mockReturnValue(recording.original),
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => result.current.selectLocalVoice('warm-studio', 'Warm studio'));
+    await act(async () => result.current.submitPlan());
+
+    expect(adapters.submitVideoJob).not.toHaveBeenCalled();
+    expect(processing.applyElevenLabsTo).not.toHaveBeenCalled();
+    expect(processing.applyLocalTo).toHaveBeenCalledWith(recording.original, 'warm-studio', {
+      replaceExistingResult: true,
+    });
     expect(result.current.phase).toBe('complete');
     unmount();
   });

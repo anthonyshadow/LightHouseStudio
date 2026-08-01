@@ -437,15 +437,15 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
   });
 
-  it('closes Upload existing video and hands local recording to the persistent stage', () => {
+  it('closes Use existing video and hands local recording to the persistent stage', () => {
     renderStudio('upload');
     const stage = screen.getByTestId('media-stage');
 
-    expect(screen.getByRole('region', { name: 'Upload existing video' })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Use existing video' })).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Record a local video' }));
 
-    expect(screen.queryByRole('region', { name: 'Upload existing video' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Use existing video' })).not.toBeInTheDocument();
     expect(harness.session.startLocal).toHaveBeenCalledOnce();
     expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
@@ -463,7 +463,7 @@ describe('StudioApp composition lifecycle', () => {
 
     await waitFor(() => expect(harness.existingVideo.adoptRecordedArtifact).toHaveBeenCalledOnce());
     await waitFor(() =>
-      expect(screen.getByRole('region', { name: 'Upload existing video' })).toHaveTextContent(
+      expect(screen.getByRole('region', { name: 'Use existing video' })).toHaveTextContent(
         'Post-recording editor',
       ),
     );

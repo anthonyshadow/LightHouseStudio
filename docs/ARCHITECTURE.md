@@ -50,7 +50,7 @@ The mounted Studio owns focused controllers for:
 `MediaStage` stays mounted once and owns one `<video>` element. A discriminated presentation state
 switches among idle, live, finalizing, and playback. Live media uses `srcObject`; playback uses
 `src`. Opening or closing a tool must not replace the player, restart media, alter playback time,
-or create a second take player. The sole exception is the Upload Existing Video panel's inline
+or create a second take player. The sole exception is the **Use existing video** panel's inline
 source/result `<video>`. It borrows a controller-owned artifact URL, never handles a live stream,
 recording, or finalization, and detaches listeners and `src` on replacement or unmount.
 Original/Result comparison drives both this inline player and the stage.

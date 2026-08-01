@@ -13,6 +13,11 @@ export type VoiceEffectSelection =
 export type VoiceProcessingController = {
   selection: VoiceEffectSelection;
   applyLocal: (effect: LocalVoiceEffectId) => Promise<void>;
+  applyLocalTo: (
+    artifact: RecordingArtifact,
+    effect: LocalVoiceEffectId,
+    options?: { readonly replaceExistingResult?: boolean },
+  ) => Promise<VoiceProcessingOutcome>;
   applyElevenLabs: (voiceId: string, voiceName: string) => Promise<void>;
   applyElevenLabsTo: (
     artifact: RecordingArtifact,

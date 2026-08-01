@@ -87,12 +87,14 @@ export const createRecordingSource = (): RecordingSource => ({
 });
 
 const restorePersistedOriginal: RecordingController['restorePersistedOriginal'] = (input) =>
-  createTakeArtifact({
-    media: input.blob,
-    ...input.artifactMetadata,
-    objectUrl: 'blob:restored-take',
-    sizeBytes: input.blob.size,
-  });
+  Object.assign(
+    createTakeArtifact({
+      media: input.blob,
+      objectUrl: 'blob:restored-take',
+      sizeBytes: input.blob.size,
+    }),
+    input.artifactMetadata,
+  );
 
 const completeProcessing: RecordingController['completeProcessing'] = (blob, mimeType, label) =>
   createTakeArtifact({
@@ -120,34 +122,39 @@ const completeVisualProcessing: RecordingController['completeVisualProcessing'] 
 
 export const createRecordingController = (
   overrides: Partial<RecordingController> = {},
-): RecordingController => ({
-  lifecycle: 'idle',
-  activeSource: null,
-  metadata: null,
-  original: null,
-  visual: null,
-  processed: null,
-  presented: null,
-  sidecar: { state: 'unavailable', blob: null, mimeType: null, error: null },
-  recordingError: null,
-  processingState: 'idle',
-  processingError: null,
-  elapsedSeconds: 0,
-  downloaded: false,
-  start: fn(() => Promise.resolve()),
-  stop: fn(() => Promise.resolve(null)),
-  restorePersistedOriginal: fn(restorePersistedOriginal),
-  discard: fn(),
-  markDownloaded: fn(),
-  beginProcessing: fn(),
-  cancelProcessing: fn(),
-  completeVisualProcessing: fn(completeVisualProcessing),
-  completeProcessing: fn(completeProcessing),
-  failProcessing: fn(),
-  clearVisualProcessing: fn(),
-  restoreOriginal: fn(),
-  ...overrides,
-});
+): RecordingController => {
+  const controller: RecordingController = {
+    lifecycle: 'idle',
+    activeSource: null,
+    metadata: null,
+    original: null,
+    visual: null,
+    processed: null,
+    presented: null,
+    sidecar: { state: 'unavailable', blob: null, mimeType: null, error: null },
+    recordingError: null,
+    processingState: 'idle',
+    processingOperation: null,
+    processingError: null,
+    elapsedSeconds: 0,
+    downloaded: false,
+    start: fn(() => Promise.resolve()),
+    stop: fn(() => Promise.resolve(null)),
+    restorePersistedOriginal: fn(restorePersistedOriginal),
+    discard: fn(),
+    markDownloaded: fn(),
+    beginProcessing: fn(),
+    cancelProcessing: fn(),
+    completeVisualProcessing: fn(completeVisualProcessing),
+    completeProcessing: fn(completeProcessing),
+    failProcessing: fn(),
+    clearVisualProcessing: fn(),
+    restoreOriginal: fn(),
+  };
+
+  Object.assign(controller, overrides);
+  return controller;
+};
 
 export const createRecordedController = (
   overrides: Partial<RecordingController> = {},
@@ -181,14 +188,24 @@ export const createRecordedController = (
 
 export const createVoiceProcessingController = (
   overrides: Partial<VoiceProcessingController> = {},
-): VoiceProcessingController => ({
-  selection: { kind: 'local', effect: 'warm-studio' },
-  applyLocal: fn(() => Promise.resolve()),
-  applyElevenLabs: fn(() => Promise.resolve()),
-  restoreOriginal: fn(),
-  cancel: fn(),
-  ...overrides,
-});
+): VoiceProcessingController => {
+  const cancelLocalProcessing: VoiceProcessingController['applyLocalTo'] = () =>
+    Promise.resolve({ status: 'canceled' });
+  const cancelElevenLabsProcessing: VoiceProcessingController['applyElevenLabsTo'] = () =>
+    Promise.resolve({ status: 'canceled' });
+  const controller: VoiceProcessingController = {
+    selection: { kind: 'local', effect: 'warm-studio' },
+    applyLocal: fn(() => Promise.resolve()),
+    applyLocalTo: fn(cancelLocalProcessing),
+    applyElevenLabs: fn(() => Promise.resolve()),
+    applyElevenLabsTo: fn(cancelElevenLabsProcessing),
+    restoreOriginal: fn(),
+    cancel: fn(),
+  };
+
+  Object.assign(controller, overrides);
+  return controller;
+};
 
 export const createCapturePreferencesController = (
   overrides: Partial<CapturePreferencesController> = {},

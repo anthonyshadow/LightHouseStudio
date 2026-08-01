@@ -22,7 +22,7 @@ import {
 } from '../../adapters/media-processing/replaceAudioTrack';
 import { transcodeRecordingToMp4 } from '../../adapters/media-processing/transcodeRecording';
 import type { RecordingArtifact, RecordingController } from '../recording/types';
-import type { VoiceProcessingController } from '../voice-effects/types';
+import type { LocalVoiceEffectId, VoiceProcessingController } from '../voice-effects/types';
 import { validateExistingVideo, type ValidatedExistingVideo } from './videoValidation';
 
 export type ExistingVideoStep = Readonly<{
@@ -35,10 +35,17 @@ export type ExistingVideoStep = Readonly<{
   inputKind: 'character' | 'saved-outfit' | 'reference-image' | 'prompt';
 }>;
 
-export type ExistingVideoVoiceSelection = Readonly<{
-  voiceId: string;
-  voiceName: string;
-}>;
+export type ExistingVideoVoiceSelection =
+  | Readonly<{
+      kind: 'local';
+      effect: LocalVoiceEffectId;
+      voiceName: string;
+    }>
+  | Readonly<{
+      kind: 'elevenlabs';
+      voiceId: string;
+      voiceName: string;
+    }>;
 
 export type ExistingVideoWorkflowPhase =
   | 'empty'
@@ -166,11 +173,7 @@ export const useExistingVideoWorkflow = ({
         detail: 'Validating playback, duration, orientation, tracks, and codec locally.',
       });
       try {
-        const validated = await validateExistingVideo(
-          file,
-          step?.modelId === 'lucy-vton-latest',
-          controller.signal,
-        );
+        const validated = await validateExistingVideo(file, false, controller.signal);
         if (controller.signal.aborted) {
           if (generation === generationRef.current) recording.cancelProcessing();
           return;
@@ -196,6 +199,7 @@ export const useExistingVideoWorkflow = ({
         });
         setSelection(validated);
         setEditBase(sourceArtifact);
+        setStep(null);
         setVoiceSelection(null);
         setCompletedStepCount(0);
         setComparison('original');
@@ -213,7 +217,7 @@ export const useExistingVideoWorkflow = ({
         if (controllerRef.current === controller) controllerRef.current = null;
       }
     },
-    [acceptedSubmission, clearOperation, publishUploadedVideo, recording, step],
+    [acceptedSubmission, clearOperation, publishUploadedVideo, recording],
   );
 
   const adoptRecordedArtifact = useCallback(async () => {
@@ -232,11 +236,7 @@ export const useExistingVideoWorkflow = ({
     });
     try {
       const file = new File([draft.media], draft.filename, { type: draft.mimeType });
-      const validated = await validateExistingVideo(
-        file,
-        step?.modelId === 'lucy-vton-latest',
-        controller.signal,
-      );
+      const validated = await validateExistingVideo(file, false, controller.signal);
       if (controller.signal.aborted || generation !== generationRef.current) return;
       const sourceArtifact = publishUploadedVideo({
         blob: draft.media,
@@ -263,6 +263,7 @@ export const useExistingVideoWorkflow = ({
       });
       setSelection(validated);
       setEditBase(sourceArtifact);
+      setStep(null);
       setVoiceSelection(null);
       setCompletedStepCount(0);
       setComparison('original');
@@ -279,7 +280,7 @@ export const useExistingVideoWorkflow = ({
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
     }
-  }, [acceptedSubmission, clearOperation, publishUploadedVideo, recording, step]);
+  }, [acceptedSubmission, clearOperation, publishUploadedVideo, recording]);
 
   const addStep = useCallback(
     (modelId: VideoTransformModelId) => {
@@ -339,9 +340,9 @@ export const useExistingVideoWorkflow = ({
       if (!selection) throw new Error('The immutable source video is unavailable.');
       setPhase('finalizing');
       recording.beginProcessing({
-        kind: 'audio-restoration',
-        title: 'Restoring source audio…',
-        detail: 'Combining the visual result with the immutable original audio.',
+        kind: 'visual-retrieval',
+        title: 'Validating visual result…',
+        detail: 'Checking the retrieved video before it can replace the current result.',
       });
       const validatedResult = await validateExistingVideo(
         new File([resultBlob], 'result.mp4', { type: mimeType || resultBlob.type || 'video/mp4' }),
@@ -361,43 +362,58 @@ export const useExistingVideoWorkflow = ({
           'The visual result could not be synchronized safely with the immutable source.',
         );
       }
-      let composed;
-      try {
-        if (selection.metadata.hasAudio) {
-          if (!recording.sidecar.blob) {
-            setPendingVisual({ blob: resultBlob, mimeType, stepIndex });
-            throw new Error(
-              'The visual result is retained for a local retry, but source audio was unavailable.',
+      const resultCanCommitDirectly =
+        !selection.metadata.hasAudio &&
+        !validatedResult.metadata.hasAudio &&
+        validatedResult.metadata.container === 'mp4' &&
+        validatedResult.metadata.videoCodec === 'avc';
+      let normalized: { blob: Blob; mimeType: string };
+      if (resultCanCommitDirectly) {
+        normalized = { blob: resultBlob, mimeType: 'video/mp4' };
+      } else {
+        recording.beginProcessing({
+          kind: 'audio-restoration',
+          title: 'Restoring source audio…',
+          detail: 'Combining the visual result with the immutable original audio.',
+        });
+        let composed;
+        try {
+          if (selection.metadata.hasAudio) {
+            if (!recording.sidecar.blob) {
+              setPendingVisual({ blob: resultBlob, mimeType, stepIndex });
+              throw new Error(
+                'The visual result is retained for a local retry, but source audio was unavailable.',
+              );
+            }
+            composed = await replaceRecordingAudio(
+              resultBlob,
+              recording.sidecar.blob,
+              controller.signal,
             );
+          } else {
+            composed = await stripRecordingAudio(resultBlob, controller.signal);
           }
-          composed = await replaceRecordingAudio(
-            resultBlob,
-            recording.sidecar.blob,
-            controller.signal,
-          );
-        } else {
-          composed = await stripRecordingAudio(resultBlob, controller.signal);
+        } catch (error) {
+          setPendingVisual({ blob: resultBlob, mimeType, stepIndex });
+          throw error;
         }
-      } catch (error) {
-        setPendingVisual({ blob: resultBlob, mimeType, stepIndex });
-        throw error;
+        controller.signal.throwIfAborted();
+        if (generation !== generationRef.current) return null;
+        setPhase('transcoding');
+        recording.beginProcessing({
+          kind: 'transcoding',
+          title: 'Transcoding visual result…',
+          detail: 'Normalizing the generated video to H.264/AAC MP4.',
+        });
+        normalized = await transcodeRecordingToMp4(composed.blob, {
+          requireAudio: selection.metadata.hasAudio,
+          signal: controller.signal,
+        });
       }
       controller.signal.throwIfAborted();
       if (generation !== generationRef.current) return null;
       const step = steps[stepIndex];
       if (!step) throw new Error('The completed visual recipe is unavailable.');
-      setPhase('transcoding');
-      recording.beginProcessing({
-        kind: 'transcoding',
-        title: 'Transcoding visual result…',
-        detail: 'Normalizing the generated video to H.264/AAC MP4.',
-      });
-      const normalized = await transcodeRecordingToMp4(composed.blob, {
-        requireAudio: selection.metadata.hasAudio,
-        signal: controller.signal,
-      });
-      controller.signal.throwIfAborted();
-      if (generation !== generationRef.current) return null;
       const artifact = recording.completeVisualProcessing(
         normalized.blob,
         normalized.mimeType,
@@ -498,12 +514,17 @@ export const useExistingVideoWorkflow = ({
   const applySelectedVoice = useCallback(
     async (videoArtifact: RecordingArtifact, selectedVoice: ExistingVideoVoiceSelection) => {
       setPhase('voice-processing');
-      const outcome = await processing.applyElevenLabsTo(
-        videoArtifact,
-        selectedVoice.voiceId,
-        selectedVoice.voiceName,
-        { replaceExistingResult: true },
-      );
+      const outcome =
+        selectedVoice.kind === 'local'
+          ? await processing.applyLocalTo(videoArtifact, selectedVoice.effect, {
+              replaceExistingResult: true,
+            })
+          : await processing.applyElevenLabsTo(
+              videoArtifact,
+              selectedVoice.voiceId,
+              selectedVoice.voiceName,
+              { replaceExistingResult: true },
+            );
       if (outcome.status === 'ready') {
         setComparison('result');
         setPhase('complete');
@@ -720,7 +741,12 @@ export const useExistingVideoWorkflow = ({
     }
     if (acceptedSubmission) return;
     controllerRef.current?.abort();
-  }, [acceptedSubmission, phase, processing, recording.processed, recording.visual]);
+    recording.cancelProcessing();
+    setPhase(selection ? 'ready' : 'empty');
+    setMessage(
+      selection ? 'The pending operation was canceled. Your current video is safe.' : null,
+    );
+  }, [acceptedSubmission, phase, processing, recording, selection]);
 
   const startOver = useCallback(() => {
     if (!selection || phase !== 'complete') return;
@@ -814,6 +840,7 @@ export const useExistingVideoWorkflow = ({
       retryJob,
       original: recording.original,
       result: recording.processed ?? recording.visual,
+      downloaded: recording.downloaded,
       editBase,
       voiceSelection,
       voiceAvailable: recording.sidecar.state === 'ready' && recording.sidecar.blob !== null,
@@ -844,8 +871,10 @@ export const useExistingVideoWorkflow = ({
       reset,
       startOver,
       setVtonInputKind,
+      selectLocalVoice: (effect: LocalVoiceEffectId, voiceName: string) =>
+        setVoiceSelection({ kind: 'local', effect, voiceName }),
       selectVoice: (voiceId: string, voiceName: string) =>
-        setVoiceSelection({ voiceId, voiceName }),
+        setVoiceSelection({ kind: 'elevenlabs', voiceId, voiceName }),
       clearVoice: () => setVoiceSelection(null),
       editSelected,
       showOriginal: () => setComparison('original'),
@@ -868,6 +897,7 @@ export const useExistingVideoWorkflow = ({
       retryJob,
       phase,
       recording.markDownloaded,
+      recording.downloaded,
       recording.original,
       recording.processingOperation,
       recording.sidecar.blob,

@@ -38,7 +38,7 @@ claim that qualification has passed.
 
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio` owns the
 one persistent stage; creative tools open as overlays without remounting it or creating another
-media session. Upload Existing Video alone also renders a secondary inline source/result player
+media session. **Use existing video** alone also renders a secondary inline source/result player
 that borrows existing artifact URLs without owning tracks or sessions. Live preview, recording,
 and finalization always stay on the main stage. Those are the only registered application routes;
 every other path returns to `/`.

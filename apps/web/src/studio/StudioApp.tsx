@@ -798,8 +798,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         <OverlayPanel
           open={activeOverlay === 'video-upload'}
           onClose={closeExistingVideo}
-          title="Upload existing video"
-          description="Review locally, then apply Character Swap, Virtual Try On, and/or Voice."
+          title="Use existing video"
+          description="Add a source, choose optional edits, then compare and download the result."
           placement="right"
           size="wide"
           bodyMode="scroll"

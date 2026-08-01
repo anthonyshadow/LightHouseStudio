@@ -7,6 +7,8 @@ import type { RecordingController } from '../../features/recording/types';
 
 const adapters = vi.hoisted(() => ({
   convertRecordingVoice: vi.fn(),
+  decodeAudioBlob: vi.fn(),
+  renderLocalEffect: vi.fn(),
   replaceRecordingAudio: vi.fn(),
   transcodeRecordingToMp4: vi.fn(),
 }));
@@ -24,8 +26,8 @@ vi.mock('../../adapters/media-processing/transcodeRecording', () => ({
 }));
 
 vi.mock('../../adapters/media-processing/audioEffects', () => ({
-  decodeAudioBlob: vi.fn(),
-  renderLocalEffect: vi.fn(),
+  decodeAudioBlob: adapters.decodeAudioBlob,
+  renderLocalEffect: adapters.renderLocalEffect,
 }));
 
 import { useVoiceProcessing } from './useVoiceProcessing';
@@ -243,6 +245,56 @@ describe('useVoiceProcessing operation ownership', () => {
       expect.any(AbortSignal),
     );
 
+    unmount();
+  });
+
+  it('applies a local effect to an explicit workflow artifact', async () => {
+    const recording = recordingController();
+    const explicitVideo = {
+      ...originalArtifact(),
+      id: 'workflow-visual',
+      media: new Blob(['workflow-visual'], { type: 'video/mp4' }),
+      objectUrl: 'blob:workflow-visual',
+      mimeType: 'video/mp4',
+      filename: 'workflow-visual.mp4',
+    };
+    const decoded = { duration: 1 };
+    const renderedAudio = new Blob(['local-audio'], { type: 'audio/wav' });
+    const composedVideo = new Blob(['local-video'], { type: 'video/mp4' });
+    adapters.decodeAudioBlob.mockResolvedValue(decoded);
+    adapters.renderLocalEffect.mockResolvedValue(renderedAudio);
+    adapters.replaceRecordingAudio.mockResolvedValue({
+      blob: composedVideo,
+      mimeType: 'video/mp4',
+    });
+    const { result, unmount } = renderHook(() => useVoiceProcessing(recording));
+
+    let outcome;
+    await act(async () => {
+      outcome = await result.current.applyLocalTo(explicitVideo, 'robot', {
+        replaceExistingResult: true,
+      });
+    });
+
+    expect(adapters.decodeAudioBlob).toHaveBeenCalledWith(recording.sidecar.blob);
+    expect(adapters.renderLocalEffect).toHaveBeenCalledWith(
+      decoded,
+      'robot',
+      expect.any(AbortSignal),
+    );
+    expect(adapters.replaceRecordingAudio).toHaveBeenCalledWith(
+      explicitVideo.media,
+      renderedAudio,
+      expect.any(AbortSignal),
+    );
+    expect(recording.completeProcessing).toHaveBeenCalledWith(
+      composedVideo,
+      'video/mp4',
+      'robot',
+      explicitVideo,
+      true,
+    );
+    expect(outcome).toEqual({ status: 'ready', artifact: recording.original });
     unmount();
   });
 });

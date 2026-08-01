@@ -14,10 +14,13 @@ then edit either base, download, start over, or discard.
    Upload needs no camera permission, provider credentials, Decart SDK, or external traffic.
 3. Studio accepts a file picker or drop, validates browser metadata and decode, and publishes a
    playable temporary source on the persistent stage and the upload panel's accessible inline
-   player. Both expose play/pause, seek, volume, and fullscreen where supported. The inline player
+   player. Both expose play/pause, seek, volume, and fullscreen where supported. **Use existing
+   video** presents a compact **Source → Edit → Review** progress indicator, a stable source
+   preview, and the next action without requiring the creator to scan the whole form. The inline player
    is the sole second-video exception: it borrows source/result artifact URLs, owns no
    tracks/session, and detaches on replacement or close. The panel also shows local-only
-   filename, size, duration, resolution, orientation, codec, and audio availability.
+   duration, resolution, and audio availability. Filename, size, orientation, and codec remain
+   available under **Technical details**.
    Once a video is selected, backdrop clicks cannot dismiss the panel; the creator must use an
    explicit close action or complete the workflow.
 4. Instead of selecting a file, the creator may choose control-bar **Record New Video** or panel
@@ -26,7 +29,8 @@ then edit either base, download, start over, or discard.
    finalization. After a healthy finalization, Studio validates and adopts the normalized
    recording as the source, then opens the editor. The inline player is not mounted during live
    preview, recording, or finalization.
-5. The creator may replace or remove the source, then choose zero or one visual transformation:
+5. The creator may use confirmed **Replace source video** or **Discard source video**, then choose
+   zero or one visual transformation from status-bearing tool cards:
    **Character Swap** (Lucy 2.5) or **Virtual Try On**, never both. Both selectors remain available
    before submission so the creator can switch the single active choice directly. Only the active
    transformation owns the submitted prompt, prompt-enhancement switch, and optional validated
@@ -43,26 +47,32 @@ then edit either base, download, start over, or discard.
    only after **Use an image URL instead**; **Prompt** alone exposes Enhance Prompt. Switching
    modes clears incompatible fields. VTO retains calm controlled-pilot, consent, one-garment,
    plain-background, and no-fit/sizing/purchase-accuracy disclosure.
-7. **Add voice change** lazily loads saved ElevenLabs voices. Selection alone transfers no take.
-   Review truthfully summarizes no provider work, one Decart submission, one ElevenLabs conversion,
-   or Decart followed by ElevenLabs.
-8. Studio executes one immutable captured plan: visual submit/poll/retrieve → restore immutable
-   source audio → H.264/AAC MP4 transcode/validate/commit → convert immutable source sidecar →
-   compose/transcode/validate/commit voiced result. Voice-only uses the selected video's frames.
-   Every operation publishes truthful stage copy and never retries a billable submission.
+7. **Voice** exposes browser-local effects first and lazily loads saved ElevenLabs voices only when
+   the creator chooses **Browse saved voices**. Selection alone transfers no take. Local effects
+   identify their no-provider path; review truthfully summarizes no provider work, one Decart
+   submission, one local voice render, one ElevenLabs conversion, or Decart followed by voice.
+8. Studio executes one immutable captured plan: visual submit/poll/retrieve → validate → restore
+   immutable source audio where required → H.264/AAC MP4 transcode/validate/commit → convert
+   immutable source sidecar → compose/transcode/validate/commit voiced result. A validated H.264
+   MP4 result with no audio may commit directly only when the immutable source also has no audio;
+   this avoids a redundant decoder pass without weakening the publication gate. Voice-only uses
+   the selected video's frames. Every operation publishes truthful stage copy and never retries a
+   billable submission.
 9. **Original** and conditional **Result** update both players. **Edit original** snapshots the
-   immutable source; **Edit result** snapshots the latest result as the next frame source. Only the
+   immutable source; **Edit result** snapshots the latest result as the next frame source. Review
+   keeps **Download result**, the selected edit summary, and the destructive action visible. Only the
    immutable source plus latest healthy Result remain after successful replacement. A voice failure
    after visual success retains the visual Result.
 10. Every source/result has a UUID, app-owned name, timestamp, kind, and parent lineage. Generated
     downloads use operation, UTC timestamp, and UUID suffix. Uploaded originals remain unchanged;
     recorded and all generated results pass the local H.264/AAC MP4 gate before publication.
-11. **Start over** revokes generated visual and voice URLs, retains and presents the uploaded
-    original, clears the selected transformation, and returns to **Visual plan**. It does not reset
+11. **Start over from original** revokes generated visual and voice URLs, retains and presents the uploaded
+    original, clears the selected transformation and voice selection, and returns to **Choose your
+    edits**. It does not reset
     the moderated participant submission counters. The creator can choose either model again.
-12. Confirmed **Discard video** in the panel, or **Discard** in the recorded-take control bar,
+12. Confirmed **Discard video and result** in the panel, or **Discard** in the recorded-take control bar,
     revokes the uploaded source and all generated results. The control bar returns from **Edit
-    video** to **Upload Video**, and the next panel open starts at **Choose an existing video** with
+    video** to **Upload Video**, and the next panel open starts at **Add a video** with
     no retained plan, chooser state, or prior source.
 
 ## Validation and failure behavior

@@ -153,7 +153,7 @@ preview/generation region; **Review & Generate** moves focus to it without dupli
 - A conversion failure or dropped primary video/audio track exposes no raw recorder URL or
   downloadable fallback.
 - Playback stays on the persistent stage; Latest Take opens only through **Take** and contains no
-  duplicate player. Upload Existing Video is the sole exception and borrows the same artifact URL
+  duplicate player. **Use existing video** is the sole exception and borrows the same artifact URL
   or local stream in its inline player without owning/stopping tracks.
 - While review owns a take, new capture/mode/device changes are blocked. Exit is
   Download-then-Release or confirmed Discard.

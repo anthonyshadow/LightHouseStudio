@@ -68,6 +68,7 @@ const recording = (): RecordingController => {
 const processing: VoiceProcessingController = {
   selection: { kind: 'none' },
   applyLocal: vi.fn().mockResolvedValue(undefined),
+  applyLocalTo: vi.fn().mockResolvedValue({ status: 'ready', artifact: artifact() }),
   applyElevenLabs: vi.fn().mockResolvedValue(undefined),
   applyElevenLabsTo: vi.fn().mockResolvedValue({ status: 'ready', artifact: artifact() }),
   restoreOriginal: vi.fn(),

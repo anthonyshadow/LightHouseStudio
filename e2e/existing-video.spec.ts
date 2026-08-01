@@ -70,15 +70,15 @@ const selectExistingVideo = async (
 ): Promise<void> => {
   await page.getByRole('button', { name: 'Upload Video' }).click();
   await expect(page).toHaveURL(/\/studio$/u);
-  const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
+  const dialog = page.getByRole('dialog', { name: 'Use existing video' });
   await expect(dialog).toBeVisible();
   await dialog.locator('input[type="file"]').first().setInputFiles({
     name: filename,
     mimeType: 'video/mp4',
     buffer: bytes,
   });
-  await expect(dialog.getByRole('heading', { name: 'Uploaded source' })).toBeVisible();
-  await expect(dialog.getByTitle(filename)).toHaveText(filename);
+  await expect(dialog.getByRole('heading', { name: 'Current video' })).toBeVisible();
+  await expect(dialog.getByTitle(filename).first()).toHaveText(filename);
   await expect(dialog).toContainText('1280 × 720');
   await expect(dialog).toContainText('MP4 · H.264');
 };
@@ -90,7 +90,7 @@ test('Record a local video closes the panel and keeps capture on the persistent 
   await page.goto('/');
   await page.getByRole('button', { name: 'Upload Video' }).click();
 
-  const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
+  const dialog = page.getByRole('dialog', { name: 'Use existing video' });
   const stageVideo = page.getByLabel('Studio media stage').locator('video');
   await expect(dialog).toBeVisible();
   await expect(stageVideo).toHaveCount(1);
@@ -128,10 +128,10 @@ test('Record a local video closes the panel and keeps capture on the persistent 
   await controls.getByRole('button', { name: 'Stop recording' }).click();
 
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByRole('heading', { name: 'Recorded source' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Character Swap' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Virtual Try On' })).toBeVisible();
-  await expect(dialog.getByRole('heading', { name: 'Voice' })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Current video' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Character Swap', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Virtual Try On', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /^Voice/u })).toBeVisible();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
   expectNoExternalProviderTraffic(network);
 });
@@ -153,11 +153,11 @@ test('Record New Video starts only from the control bar and adopts the local tak
   await controls.getByRole('button', { name: 'Record' }).click();
   await controls.getByRole('button', { name: 'Stop recording' }).click();
 
-  const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
-  await expect(dialog.getByRole('heading', { name: 'Recorded source' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Character Swap' })).toBeVisible();
-  await expect(dialog.getByRole('button', { name: 'Virtual Try On' })).toBeVisible();
-  await expect(dialog.getByRole('heading', { name: 'Voice' })).toBeVisible();
+  const dialog = page.getByRole('dialog', { name: 'Use existing video' });
+  await expect(dialog.getByRole('heading', { name: 'Current video' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Character Swap', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Virtual Try On', exact: true })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: /^Voice/u })).toBeVisible();
   expect((await readBrowserState(page)).cameraCalls).toBe(1);
   expectNoExternalProviderTraffic(network);
 });
@@ -171,9 +171,9 @@ test('provider-free upload previews and enters the existing take/download surfac
   const fixture = await loadH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'local-only.mp4');
-  const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
-  await expect(dialog).toContainText('No provider transfer');
-  await dialog.getByRole('button', { name: 'Continue locally' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Use existing video' });
+  await expect(dialog).toContainText('Keep the video local');
+  await dialog.getByRole('button', { name: 'Review and download' }).click();
 
   const review = page.getByRole('dialog', { name: 'Latest take' });
   await expect(review).toBeVisible();
@@ -199,7 +199,7 @@ test('a selected upload ignores backdrop dismissal and can be reopened after an 
   const fixture = await loadH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'resume-source.mp4');
-  const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
+  const dialog = page.getByRole('dialog', { name: 'Use existing video' });
   const backdrop = page.locator('[data-overlay-panel-root]').filter({ has: dialog });
 
   await backdrop.click({ position: { x: 16, y: 120 } });
@@ -212,7 +212,7 @@ test('a selected upload ignores backdrop dismissal and can be reopened after an 
   await expect(editVideo).toBeVisible();
   await editVideo.click();
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByTitle('resume-source.mp4')).toHaveText('resume-source.mp4');
+  await expect(dialog.getByTitle('resume-source.mp4').first()).toHaveText('resume-source.mp4');
 });
 
 test('the upload editor and open saved-character chooser reflow at every supported viewport', async ({
@@ -232,8 +232,8 @@ test('the upload editor and open saved-character chooser reflow at every support
     await page.setViewportSize(viewport);
     await page.goto('/');
     await selectExistingVideo(page, fixture, 'responsive-source.mp4');
-    const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
-    await dialog.getByRole('button', { name: 'Character Swap' }).click();
+    const dialog = page.getByRole('dialog', { name: 'Use existing video' });
+    await dialog.getByRole('button', { name: 'Character Swap', exact: true }).click();
     await expectNoDocumentOverflow(page);
     await expect(dialog.getByLabel('Video preview for responsive-source.mp4')).toBeAttached();
 
@@ -271,8 +271,8 @@ test('Create A Character returns to the upload plan with the new character selec
   const fixture = await loadH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'character-source.mp4');
-  const upload = page.getByRole('dialog', { name: 'Upload existing video' });
-  await upload.getByRole('button', { name: 'Character Swap' }).click();
+  const upload = page.getByRole('dialog', { name: 'Use existing video' });
+  await upload.getByRole('button', { name: 'Character Swap', exact: true }).click();
   const characterChooser = upload.getByRole('button', { name: 'Choose a Saved Character' });
   await characterChooser.click();
   const options = upload.getByRole('option');
@@ -323,18 +323,21 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
     });
 
     await selectExistingVideo(page, fixture);
-    const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
+    const dialog = page.getByRole('dialog', { name: 'Use existing video' });
     await dialog
       .getByRole('button', {
         name: modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
+        exact: true,
       })
       .click();
     const selectedButton = dialog.getByRole('button', {
       name: modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
+      exact: true,
     });
     const alternateModelId = modelId === 'lucy-latest' ? 'lucy-vton-latest' : 'lucy-latest';
     const alternateButton = dialog.getByRole('button', {
       name: alternateModelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
+      exact: true,
     });
     await expect(selectedButton).toHaveAttribute('aria-pressed', 'true');
     await expect(alternateButton).toBeEnabled();
@@ -346,8 +349,12 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
     const steps = dialog.locator('article');
     await expect(steps).toHaveCount(1);
     await steps.locator('textarea').fill(`Prompt for ${modelId}`);
-    await dialog.getByRole('button', { name: 'Start · 1 Decart submission' }).click();
-    await expect(dialog.getByRole('heading', { name: 'Result ready' })).toBeVisible({
+    await dialog
+      .getByRole('button', {
+        name: modelId === 'lucy-latest' ? 'Apply Character Swap' : 'Apply Virtual Try On',
+      })
+      .click();
+    await expect(dialog.getByRole('heading', { name: 'Your result is ready' })).toBeVisible({
       timeout: 15_000,
     });
     await expect(dialog.getByRole('button', { name: 'Review Voice and Download' })).toHaveCount(0);
@@ -363,16 +370,16 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
       const resultUrl = await playback.getAttribute('src');
       expect(resultUrl).toMatch(/^blob:/u);
 
-      await dialog.getByRole('button', { name: 'Original' }).click();
+      await dialog.getByRole('button', { name: 'Original', exact: true }).click();
       const originalUrl = await playback.getAttribute('src');
       expect(originalUrl).toMatch(/^blob:/u);
       expect(originalUrl).not.toBe(resultUrl);
 
-      await dialog.getByRole('button', { name: 'Result' }).click();
+      await dialog.getByRole('button', { name: 'Result', exact: true }).click();
       await expect(playback).toHaveAttribute('src', resultUrl!);
 
       const downloadPromise = page.waitForEvent('download');
-      await dialog.getByRole('link', { name: 'Download' }).click();
+      await dialog.getByRole('link', { name: 'Download result' }).click();
       const download = await downloadPromise;
       expect(download.suggestedFilename()).toMatch(/\.mp4$/u);
 
@@ -380,11 +387,11 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
         await page.setViewportSize(viewport);
         await expectNoDocumentOverflow(page);
         for (const control of [
-          dialog.getByRole('button', { name: 'Original' }),
-          dialog.getByRole('button', { name: 'Result' }),
-          dialog.getByRole('link', { name: 'Download' }),
-          dialog.getByRole('button', { name: 'Start over' }),
-          dialog.getByRole('button', { name: 'Discard video' }),
+          dialog.getByRole('button', { name: 'Original', exact: true }),
+          dialog.getByRole('button', { name: 'Result', exact: true }),
+          dialog.getByRole('link', { name: 'Download result' }),
+          dialog.getByRole('button', { name: 'Start over from original' }),
+          dialog.getByRole('button', { name: 'Discard video and result' }),
         ]) {
           const box = await control.boundingBox();
           expect(box?.height).toBeGreaterThanOrEqual(44);
@@ -393,27 +400,27 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
         }
       }
 
-      await dialog.getByRole('button', { name: 'Start over' }).click();
-      await expect(dialog.getByRole('heading', { name: 'Visual plan' })).toBeVisible();
-      await expect(dialog.getByTitle('creator-source.mp4')).toHaveText('creator-source.mp4');
-      await expect(dialog.getByRole('heading', { name: 'Result ready' })).toHaveCount(0);
+      await dialog.getByRole('button', { name: 'Start over from original' }).click();
+      await expect(dialog.getByRole('heading', { name: 'Choose your edits' })).toBeVisible();
+      await expect(dialog.getByTitle('creator-source.mp4').first()).toHaveText(
+        'creator-source.mp4',
+      );
+      await expect(dialog.getByRole('heading', { name: 'Your result is ready' })).toHaveCount(0);
       await expect(playback).toHaveAttribute('src', originalUrl!);
-      await expect(dialog.getByRole('button', { name: 'Character Swap' })).toHaveAttribute(
-        'aria-pressed',
-        'false',
-      );
-      await expect(dialog.getByRole('button', { name: 'Virtual Try On' })).toHaveAttribute(
-        'aria-pressed',
-        'false',
-      );
+      await expect(
+        dialog.getByRole('button', { name: 'Character Swap', exact: true }),
+      ).toHaveAttribute('aria-pressed', 'false');
+      await expect(
+        dialog.getByRole('button', { name: 'Virtual Try On', exact: true }),
+      ).toHaveAttribute('aria-pressed', 'false');
 
-      await dialog.getByRole('button', { name: 'Virtual Try On' }).click();
+      await dialog.getByRole('button', { name: 'Virtual Try On', exact: true }).click();
       await dialog
         .locator('article')
         .getByRole('textbox', { name: /^Prompt/u })
         .fill('Second submission from the retained original');
-      await dialog.getByRole('button', { name: 'Start · 1 Decart submission' }).click();
-      await expect(dialog.getByRole('heading', { name: 'Result ready' })).toBeVisible({
+      await dialog.getByRole('button', { name: 'Apply Virtual Try On' }).click();
+      await expect(dialog.getByRole('heading', { name: 'Your result is ready' })).toBeVisible({
         timeout: 15_000,
       });
       expect(
@@ -422,13 +429,11 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
           .map(({ modelId: submittedModel }) => submittedModel),
       ).toEqual(['lucy-latest', 'lucy-vton-latest']);
     } else {
-      page.once('dialog', async (confirmation) => {
-        expect(confirmation.message()).toContain('Discard this uploaded video and its results?');
-        await confirmation.accept();
-      });
-      await dialog.getByRole('button', { name: 'Discard video' }).click();
-      await expect(dialog.getByRole('heading', { name: 'Choose an existing video' })).toBeVisible();
-      await expect(dialog.getByRole('button', { name: 'Select video' })).toBeEnabled();
+      await dialog.getByRole('button', { name: 'Discard video and result' }).click();
+      const confirmation = page.getByRole('dialog', { name: 'Discard this video?' });
+      await confirmation.getByRole('button', { name: 'Discard video' }).click();
+      await expect(dialog.getByRole('heading', { name: 'Add a video' })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Upload from device' })).toBeEnabled();
       await expect(page.getByLabel('Recorded take playback')).toBeHidden();
     }
     expect(await cameraCalls(page)).toBe(0);

@@ -12,7 +12,7 @@ garment transformation. Post-recording Virtual Try On is also available in the p
    not present **Start AI**.
 3. In **Try-On recipe**, provide garment direction, a temporary JPEG/PNG/WebP image up to 10 MiB,
    or both. Prompt enhancement is optional and off by default.
-   In Upload Existing Video, the corresponding batch recipe instead requires exactly one mode:
+   In **Use existing video**, the corresponding batch recipe instead requires exactly one mode:
    saved/recent outfit, reference image, or prompt. Reference mode prefers upload and hides its
    public-HTTPS URL importer until explicitly revealed; enhancement exists only in Prompt mode.
 4. Read the one-garment/plain-background guidance and Decart transfer, cost, Stop, and 300-second
@@ -33,8 +33,8 @@ the pinned `lucy-vton-latest` model.
 - Invalid or oversized images are rejected before provider contact. Dock images remain
   tab-ephemeral and are revoked when replaced or cleared.
 - Studio makes no fit, sizing, fabric-behavior, or purchase-accuracy claim.
-- Upload Existing Video presents controlled-pilot, consent, garment, and accuracy guidance as calm
-  disclosure, not a warning alert.
+- **Use existing video** presents consent, garment, and accuracy guidance contextually as calm
+  disclosure, without overemphasizing pilot status or presenting it as a warning alert.
 - Expected 300-second completion preserves the recipe and local preview; early end/disconnect is a
   distinct safe recovery state.
 - An active take finalizes once before source resources release.

@@ -18,7 +18,7 @@ The runtime:
 - commits a healthy visual or voiced replacement before revoking the superseded URL; and
 - releases artifact URLs only on downstream invalidation, Release, Discard, or unmount.
 
-Upload Existing Video also has the sole secondary `<video>` element. It borrows the existing
+**Use existing video** also has the sole secondary `<video>` element. It borrows the existing
 source/result artifact URL and adds no encoded copy, track, or provider session. It never handles
 live preview, recording, or finalization; it pauses, detaches `src`, and removes its binding on
 close, replacement, or unmount.

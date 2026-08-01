@@ -7,12 +7,16 @@ Record or Upload → Review → optional Virtual Try On, Character Swap, and/or 
 `/studio` starts in neutral Local Camera mode with camera, microphone, and AI off until an explicit
 action. It is a fixed-viewport workspace with one persistent media stage; tools are focus-managed
 overlays and must never remount the media. Live AI camera transformation is an advanced flow.
-Character Builder creates a reusable Lucy 2.5 character
-from approachable visual choices, an optional upload, and an optional paid reference generation.
+Character Builder creates a reusable Lucy 2.5 character from approachable visual choices, an
+optional upload, and an optional paid reference generation. The post-recording editor adopts a
+validated upload or normalized local recording as an immutable source, then allows zero or one
+visual edit (Character Swap or Virtual Try On) and an optional Voice edit before comparison and
+download.
 
-The Character builder must be immediately legible to first-time users: choose a starting point,
-adjust only what matters, optionally preview, then save and use. Provider cost/retention disclosure
-remains clear at the moment of generation without dominating the main path.
+The post-recording editor must be immediately legible to first-time users: confirm the source,
+choose an optional edit, configure only that edit, run it deliberately, then compare and download.
+Provider cost/retention disclosure remains clear at the moment of submission without dominating
+the local review path.
 
 ## Visual character
 
@@ -55,6 +59,34 @@ card/button language.
   disclosure close to its action.
 - Preserve native semantics, focus trap, Escape/return focus, live status, approximately 44px
   targets, safe areas, 200% reflow, and no document scrolling.
+
+## Post-recording editor UX direction
+
+- Keep the current video visually stable and prominent. The upload-panel player may borrow the
+  current artifact URL, but the persistent Studio stage remains mounted and authoritative.
+- Present one understandable progression: Source → Edit → Review. Show the current phase and the
+  next meaningful action without turning the flow into a rigid wizard.
+- Once a source is ready, summarize its technical metadata compactly instead of allowing details
+  to compete with editing tools. Replacement and discard remain clearly distinct destructive
+  actions with confirmation.
+- Treat Character Swap, Virtual Try On, and Voice as scannable tool choices with explicit states:
+  available, selected, needs setup, ready, processing, applied, failed, or unavailable.
+- Reveal configuration only for the selected tool. Keep saved assets, prompt/reference choices,
+  advanced prompt enhancement, URL import, and provider disclosures contextual.
+- Keep a single contextual primary action reachable at short heights and on touch screens. Its
+  label must state the actual local/provider consequence; never imply a save, submission, retry,
+  cancellation, percentage, or provider deletion the runtime does not own.
+- During processing, emphasize the immutable accepted plan, current operation, elapsed time,
+  cancel/resume boundary, and last healthy video. Hide irrelevant setup chrome without discarding
+  editable recovery state.
+- In result review, prioritize Original/Result comparison and Download. Start over keeps the
+  immutable source; Discard removes source and results after confirmation.
+- Desktop uses a stable preview beside a compact planning/configuration column inside the existing
+  wide drawer. Tablet and mobile use one reading order with a compact phase header and reachable
+  action footer; they are not compressed desktop grids.
+- Preserve the shared overlay focus trap, Escape/return focus, one named internal scroller,
+  approximately 44px targets, visible focus, reduced motion, safe areas, 200% reflow, and no
+  document scrolling.
 
 ## Responsive contract
 

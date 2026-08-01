@@ -208,7 +208,7 @@ const selectSeededCharacter = async (page: Page): Promise<void> => {
 
 const openExistingVideoChooser = async (page: Page) => {
   await page.getByRole('button', { name: 'Upload Video' }).click();
-  const dialog = page.getByRole('dialog', { name: 'Upload existing video' });
+  const dialog = page.getByRole('dialog', { name: 'Use existing video' });
   await expect(dialog).toBeVisible();
   return dialog;
 };
@@ -221,7 +221,7 @@ const selectVisualVideo = async (page: Page) => {
     mimeType: 'video/mp4',
     buffer: fixture,
   });
-  await expect(dialog.getByRole('heading', { name: 'Uploaded source' })).toBeVisible();
+  await expect(dialog.getByRole('heading', { name: 'Current video' })).toBeVisible();
   await expect(dialog).toContainText('1280 × 720');
   return { dialog, fixture };
 };
@@ -234,6 +234,7 @@ const addVisualStep = async (
   await dialog
     .getByRole('button', {
       name: modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
+      exact: true,
     })
     .click();
   await dialog.locator('article').last().locator('textarea').fill(prompt);
@@ -352,7 +353,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'upload-chooser',
     setup: async (page) => {
       const dialog = await openExistingVideoChooser(page);
-      await expect(dialog.getByRole('button', { name: 'Select video' })).toBeVisible();
+      await expect(dialog.getByRole('button', { name: 'Upload from device' })).toBeVisible();
       await expect(dialog).toContainText('MP4/H.264, MOV/H.264, or WebM/VP8');
     },
   },
@@ -361,12 +362,13 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     setup: async (page) => {
       const { dialog } = await selectVisualVideo(page);
       await addVisualStep(dialog, 'lucy-latest', 'Transform into a documentary field presenter.');
-      await expect(dialog).toContainText('1 planned Decart submission');
-      await expect(dialog.getByRole('button', { name: 'Character Swap' })).toHaveAttribute(
-        'aria-pressed',
-        'true',
-      );
-      await expect(dialog.getByRole('button', { name: 'Virtual Try On' })).toBeEnabled();
+      await expect(dialog).toContainText('One Decart submission');
+      await expect(
+        dialog.getByRole('button', { name: 'Character Swap', exact: true }),
+      ).toHaveAttribute('aria-pressed', 'true');
+      await expect(
+        dialog.getByRole('button', { name: 'Virtual Try On', exact: true }),
+      ).toBeEnabled();
     },
   },
   'upload-processing': {
@@ -375,8 +377,8 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       const { dialog, fixture } = await selectVisualVideo(page);
       await installFakeVideoJobRoutes(page, fixture, { processingReadsBeforeReady: 100 });
       await addVisualStep(dialog, 'lucy-latest', 'Transform into a documentary field presenter.');
-      await dialog.getByRole('button', { name: 'Start · 1 Decart submission' }).click();
-      await expect(dialog.getByText(/Stage: processing/u)).toBeVisible();
+      await dialog.getByRole('button', { name: 'Apply Character Swap' }).click();
+      await expect(dialog.getByRole('heading', { name: 'Generating lucy…' })).toBeVisible();
     },
   },
   'upload-result': {
@@ -385,8 +387,8 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       const { dialog, fixture } = await selectVisualVideo(page);
       await installFakeVideoJobRoutes(page, fixture);
       await addVisualStep(dialog, 'lucy-latest', 'Transform into a documentary field presenter.');
-      await dialog.getByRole('button', { name: 'Start · 1 Decart submission' }).click();
-      await expect(dialog.getByRole('heading', { name: 'Result ready' })).toBeVisible();
+      await dialog.getByRole('button', { name: 'Apply Character Swap' }).click();
+      await expect(dialog.getByRole('heading', { name: 'Your result is ready' })).toBeVisible();
     },
   },
   'vton-prepared-with-reference': {

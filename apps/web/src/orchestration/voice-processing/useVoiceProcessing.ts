@@ -116,12 +116,16 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
     );
   }, []);
 
-  const applyLocal = useCallback(
-    async (effect: LocalVoiceEffectId) => {
+  const applyLocalTo = useCallback(
+    async (
+      videoArtifact: RecordingArtifact,
+      effect: LocalVoiceEffectId,
+      options?: { readonly replaceExistingResult?: boolean },
+    ): Promise<VoiceProcessingOutcome> => {
       let controller: AbortController | null = null;
       let operationId: string | null = null;
       try {
-        const prepared = prepare({ kind: 'local', effectId: effect });
+        const prepared = prepare({ kind: 'local', effectId: effect }, videoArtifact);
         controller = prepared.controller;
         operationId = prepared.operationId;
         const { video, sidecar } = prepared;
@@ -138,28 +142,44 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
           signal: controller.signal,
         });
         controller.signal.throwIfAborted();
-        if (abortRef.current !== controller) return;
+        if (abortRef.current !== controller) return { status: 'canceled' };
         const artifact = recordingRef.current.completeProcessing(
           normalized.blob,
           normalized.mimeType,
           effect,
           prepared.videoArtifact,
+          options?.replaceExistingResult,
         );
         completeDomainOperation(operationId, artifact, { kind: 'local', effect });
+        return { status: 'ready', artifact };
       } catch (error) {
-        if (controller && abortRef.current !== controller) return;
+        if (controller && abortRef.current !== controller) return { status: 'canceled' };
         if (error instanceof DOMException && error.name === 'AbortError') {
           recordingRef.current.cancelProcessing();
-          return;
+          return { status: 'canceled' };
         }
         const message = safeProcessingMessage(error);
         if (operationId) failDomainOperation(operationId, message);
         recordingRef.current.failProcessing(message);
+        return { status: 'error', message };
       } finally {
         if (controller && abortRef.current === controller) abortRef.current = null;
       }
     },
     [completeDomainOperation, failDomainOperation, prepare],
+  );
+
+  const applyLocal = useCallback(
+    async (effect: LocalVoiceEffectId) => {
+      const current = recordingRef.current;
+      const videoArtifact = current.visual ?? current.original;
+      if (!videoArtifact) {
+        current.failProcessing('A completed recording is required.');
+        return;
+      }
+      await applyLocalTo(videoArtifact, effect);
+    },
+    [applyLocalTo],
   );
 
   const applyElevenLabsTo = useCallback(
@@ -257,6 +277,7 @@ export const useVoiceProcessing = (recording: RecordingController): VoiceProcess
   return {
     selection,
     applyLocal,
+    applyLocalTo,
     applyElevenLabs,
     applyElevenLabsTo,
     restoreOriginal,
