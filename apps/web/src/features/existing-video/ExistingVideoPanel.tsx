@@ -33,12 +33,14 @@ import {
 import { ExistingVideoVisualEditor, type RecentOutfit } from './ExistingVideoVisualEditor';
 import { ExistingVideoVoiceEditor } from './ExistingVideoVoiceEditor';
 import type { ExistingVideoStep, ExistingVideoWorkflow } from './useExistingVideoWorkflow';
+import type { VoiceBrowserCapabilities } from '../voice-effects/VoiceEffectsPanel';
 
 type ExistingVideoPanelProps = {
   readonly workflow: ExistingVideoWorkflow;
   readonly videoProcessingAvailable: boolean;
   readonly elevenLabsAvailable?: boolean;
   readonly elevenLabsModel?: string | null;
+  readonly browserCapabilities?: VoiceBrowserCapabilities;
   readonly onFinish: () => void;
   readonly savedRecipes?: readonly ExistingVideoSavedRecipe[];
   readonly onCreateCharacter?: (stepId: string) => void;
@@ -59,6 +61,7 @@ export const ExistingVideoPanel = ({
   videoProcessingAvailable,
   elevenLabsAvailable = false,
   elevenLabsModel = null,
+  browserCapabilities,
   onFinish,
   savedRecipes = [],
   onCreateCharacter,
@@ -457,6 +460,7 @@ export const ExistingVideoPanel = ({
                         elevenLabsAvailable={elevenLabsAvailable}
                         elevenLabsModel={elevenLabsModel}
                         locked={structureLocked}
+                        {...(browserCapabilities ? { browserCapabilities } : {})}
                       />
                     </div>
                   ) : null}

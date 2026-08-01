@@ -414,17 +414,12 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await page.getByRole('button', { name: 'Voice treatments' }).click();
       const treatments = page.getByRole('dialog', { name: 'Voice Treatments' });
       await expect(
-        treatments.getByRole('heading', { name: 'Choose a voice treatment', exact: true }),
+        treatments.getByRole('heading', { name: 'Select Treatment', exact: true }),
       ).toBeVisible();
-      await treatments
-        .getByRole('button', {
-          name: 'Browse saved voices · contacts ElevenLabs',
-        })
-        .click();
-      const browser = page.getByRole('dialog', { name: 'Voice Browser' });
-      await expect(browser).toBeVisible();
-      await expect(browser.getByText('Northstar Narrator', { exact: true })).toBeVisible();
-      await expect(browser.getByText('Loading voices…', { exact: true })).toHaveCount(0);
+      await treatments.getByRole('button', { name: /Saved AI Voice/u }).click();
+      await expect(treatments.getByRole('heading', { name: 'Saved Voices Library' })).toBeVisible();
+      await expect(treatments.getByText('Northstar Narrator', { exact: true })).toBeVisible();
+      await expect(treatments.getByText('Loading saved voices…', { exact: true })).toHaveCount(0);
     },
   },
   'take-finalizing': {

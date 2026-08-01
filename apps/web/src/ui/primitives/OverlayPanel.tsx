@@ -53,6 +53,7 @@ export interface OverlayPanelProps {
   onClose: () => void;
   title: string;
   description?: ReactNode;
+  headerEyebrow?: ReactNode;
   children: ReactNode;
   footer?: ReactNode;
   headerActions?: ReactNode;
@@ -66,6 +67,7 @@ export interface OverlayPanelProps {
   initialFocusRef?: RefObject<HTMLElement | null>;
   returnFocusRef?: RefObject<HTMLElement | null>;
   bodyMode?: OverlayPanelBodyMode;
+  centered?: boolean;
 }
 
 const OVERLAY_EXIT_DURATION_MS = 220;
@@ -80,6 +82,7 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
     onClose,
     title,
     description,
+    headerEyebrow,
     children,
     footer,
     headerActions,
@@ -93,6 +96,7 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
     initialFocusRef,
     returnFocusRef,
     bodyMode = 'scroll',
+    centered = false,
   },
   forwardedRef,
 ) {
@@ -248,7 +252,7 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
       role="presentation"
       data-overlay-panel-root=""
       data-overlay-state={phase}
-      css={backdropStyles(theme, placement, size, phase)}
+      css={backdropStyles(theme, placement, size, phase, centered)}
       onPointerDownCapture={(event) => {
         if (event.target !== event.currentTarget) return;
         interceptBackdropEvent(event);
@@ -268,10 +272,11 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
         aria-labelledby={titleId}
         aria-describedby={description ? descriptionId : undefined}
         tabIndex={-1}
-        css={panelStyles(theme, placement, size, height, phase)}
+        css={panelStyles(theme, placement, size, height, phase, centered)}
       >
         <header css={headerStyles(theme, Boolean(headerActions))}>
           <div data-overlay-header-copy="" css={headerCopyStyles()}>
+            {headerEyebrow}
             <h2 ref={headingRef} id={titleId} tabIndex={-1} css={headingStyles(theme)}>
               {title}
             </h2>

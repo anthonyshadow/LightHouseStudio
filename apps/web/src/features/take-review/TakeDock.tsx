@@ -1,5 +1,5 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { Button, StatusNotice, Surface } from '../../ui';
+import { StatusNotice, Surface } from '../../ui';
 import { formatBytes, formatDuration } from '../recording';
 import type { RecordedTakeMetadata, RecordingController, TakeMetadata } from '../recording/types';
 import type { VoiceProcessingController } from '../voice-effects/types';
@@ -20,7 +20,6 @@ export type TakeDockProps = {
   onDiscardTake?: () => void;
   onEditVideo?: () => void;
   onOpenVoiceTreatments?: () => void;
-  onBackToTake?: () => void;
 };
 
 const gridStyles = (theme: Theme, view: NonNullable<TakeDockProps['view']>): CSSObject => ({
@@ -201,90 +200,92 @@ export const TakeDock = ({
   onDiscardTake,
   onEditVideo,
   onOpenVoiceTreatments,
-  onBackToTake,
 }: TakeDockProps) => {
   const theme = useTheme();
   const artifact = recording.presented;
   const captureChips = captureMetadataChips(recording.metadata);
 
   if (!artifact) return null;
+  if (view === 'voice') {
+    return (
+      <VoiceEffectsPanel
+        recording={recording}
+        processing={processing}
+        elevenLabsAvailable={elevenLabsAvailable}
+        elevenLabsModel={elevenLabsModel}
+        {...(browserCapabilities ? { browserCapabilities } : {})}
+      />
+    );
+  }
 
   return (
     <Surface
       as="section"
       data-scroll-region="take-review"
       tabIndex={0}
-      aria-labelledby={view === 'voice' ? 'voice-treatment-heading' : 'take-heading'}
+      aria-labelledby="take-heading"
       tone="soft"
       padding="compact"
       css={takeSurfaceStyles(theme)}
     >
       <div css={gridStyles(theme, view)}>
-        {view !== 'voice' ? (
-          <div css={latestPanelStyles()}>
-            <header>
-              <h2 id="take-heading" tabIndex={-1} css={headingStyles(theme)}>
-                Latest take
-              </h2>
-              <p role="status" aria-live="polite" aria-atomic="true" css={introStyles(theme)}>
-                Playback remains on the main stage. Download this temporary take before releasing
-                it.
-              </p>
-            </header>
-            <div css={reviewBodyStyles(theme)}>
-              <div css={reviewDetailsStyles()}>
-                {captureChips.length > 0 ? (
-                  <div css={metadataStyles(theme)} role="list" aria-label="Capture metadata">
-                    {captureChips.map((chip) =>
-                      chip.dateTime ? (
-                        <time
-                          key={chip.key}
-                          role="listitem"
-                          dateTime={chip.dateTime}
-                          title={chip.title}
-                        >
-                          {chip.label}
-                        </time>
-                      ) : (
-                        <span key={chip.key} role="listitem" title={chip.title}>
-                          {chip.label}
-                        </span>
-                      ),
-                    )}
-                  </div>
-                ) : null}
-                <div css={metadataStyles(theme)} role="list" aria-label="Take file details">
-                  <span role="listitem">{formatDuration(artifact.durationMs / 1000)}</span>
-                  <span role="listitem">{formatBytes(artifact.sizeBytes)}</span>
-                  {artifact.mimeType ? (
-                    <span role="listitem" title={artifact.mimeType}>
-                      {artifact.mimeType}
-                    </span>
-                  ) : null}
+        <div css={latestPanelStyles()}>
+          <header>
+            <h2 id="take-heading" tabIndex={-1} css={headingStyles(theme)}>
+              Latest take
+            </h2>
+            <p role="status" aria-live="polite" aria-atomic="true" css={introStyles(theme)}>
+              Playback remains on the main stage. Download this temporary take before releasing it.
+            </p>
+          </header>
+          <div css={reviewBodyStyles(theme)}>
+            <div css={reviewDetailsStyles()}>
+              {captureChips.length > 0 ? (
+                <div css={metadataStyles(theme)} role="list" aria-label="Capture metadata">
+                  {captureChips.map((chip) =>
+                    chip.dateTime ? (
+                      <time
+                        key={chip.key}
+                        role="listitem"
+                        dateTime={chip.dateTime}
+                        title={chip.title}
+                      >
+                        {chip.label}
+                      </time>
+                    ) : (
+                      <span key={chip.key} role="listitem" title={chip.title}>
+                        {chip.label}
+                      </span>
+                    ),
+                  )}
                 </div>
-                <TakeReviewActions
-                  recording={recording}
-                  {...(onCloseTake ? { onCloseTake } : {})}
-                  {...(onDiscardTake ? { onDiscardTake } : {})}
-                  {...(onEditVideo ? { onEditVideo } : {})}
-                  {...(onOpenVoiceTreatments ? { onOpenVoiceTreatments } : {})}
-                />
+              ) : null}
+              <div css={metadataStyles(theme)} role="list" aria-label="Take file details">
+                <span role="listitem">{formatDuration(artifact.durationMs / 1000)}</span>
+                <span role="listitem">{formatBytes(artifact.sizeBytes)}</span>
+                {artifact.mimeType ? (
+                  <span role="listitem" title={artifact.mimeType}>
+                    {artifact.mimeType}
+                  </span>
+                ) : null}
               </div>
+              <TakeReviewActions
+                recording={recording}
+                {...(onCloseTake ? { onCloseTake } : {})}
+                {...(onDiscardTake ? { onDiscardTake } : {})}
+                {...(onEditVideo ? { onEditVideo } : {})}
+                {...(onOpenVoiceTreatments ? { onOpenVoiceTreatments } : {})}
+              />
             </div>
-            {recording.downloaded ? (
-              <StatusNotice role="status" aria-live="polite" tone="success">
-                A download was started. This tab still owns the temporary take.
-              </StatusNotice>
-            ) : null}
           </div>
-        ) : null}
+          {recording.downloaded ? (
+            <StatusNotice role="status" aria-live="polite" tone="success">
+              A download was started. This tab still owns the temporary take.
+            </StatusNotice>
+          ) : null}
+        </div>
         {view !== 'take' ? (
           <div>
-            {onBackToTake ? (
-              <Button size="small" variant="quiet" onClick={onBackToTake}>
-                Back to take review
-              </Button>
-            ) : null}
             <VoiceEffectsPanel
               recording={recording}
               processing={processing}

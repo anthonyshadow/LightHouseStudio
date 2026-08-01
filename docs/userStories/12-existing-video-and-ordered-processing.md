@@ -52,15 +52,19 @@ then edit either base, download, start over, or discard.
    only after **Use an image URL instead**; **Prompt** alone exposes Enhance Prompt. Switching
    modes clears incompatible fields. VTO retains calm controlled-pilot, consent, one-garment,
    plain-background, and no-fit/sizing/purchase-accuracy disclosure.
-7. **Voice** exposes browser-local effects first and lazily loads saved ElevenLabs voices only when
-   the creator chooses **Browse saved voices**. Selecting a saved voice stores it in the current
-   edit plan immediately but transfers no take; its browser selection and search state survive
-   viewing either visual editor. The selection remains until **Clear Voice setup** or a broader
-   explicit source/plan reset. Local effects identify their no-provider path. Voice is independent
-   of the mutually exclusive visual choice: it appears selected while viewed, remains selected
-   after configuration, and never clears or replaces Character Swap or Virtual Try On. Review
-   truthfully summarizes no provider work, one Decart submission, one local voice render, one
-   ElevenLabs conversion, or Decart followed by voice.
+7. **Voice** opens the same cohesive treatment workspace used by Latest Take; the existing-video
+   editor does not introduce a second Voice entry or nested browser. It exposes browser-local
+   effects first and lazily loads saved ElevenLabs voices only when the creator chooses **Saved AI
+   Voice**. Preview and row selection are distinct, with one active provider-sample player. The
+   creator must confirm **Use this voice for the edit** or **Use this treatment for the edit** before it is stored in the edit
+   plan. That confirmation transfers no take and starts no processing; the outer **Start edit**
+   action executes the captured plan. Library search and selection state survive returning to the
+   treatment pane and viewing either visual editor. The confirmed selection remains until **Use
+   original audio** or a broader explicit source/plan reset. Local effects identify their
+   no-provider path. Voice is independent of the mutually exclusive visual choice: it appears
+   selected while viewed, remains selected after configuration, and never clears or replaces
+   Character Swap or Virtual Try On. Review truthfully summarizes no provider work, one Decart
+   submission, one local voice render, one ElevenLabs conversion, or Decart followed by voice.
 8. Studio executes one immutable captured plan: visual submit/poll/retrieve → validate → restore
    immutable source audio where required → H.264/AAC MP4 transcode/validate/commit → convert
    immutable source sidecar → compose/transcode/validate/commit voiced result. A validated H.264

@@ -280,7 +280,7 @@ describe('ExistingVideoPanel', () => {
       'false',
     );
     expect(screen.getByRole('button', { name: /^Voice/u })).toBeEnabled();
-    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Voice' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: /^Virtual Try On/u }));
     expect(addStep).not.toHaveBeenCalled();
     expect(screen.getByRole('dialog', { name: 'Switch to Virtual Try On?' })).toBeVisible();
@@ -316,7 +316,7 @@ describe('ExistingVideoPanel', () => {
       'aria-pressed',
       'true',
     );
-    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Voice' })).toHaveAttribute('aria-pressed', 'true');
     expect(screen.queryByRole('button', { name: 'Move up' })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Move down' })).not.toBeInTheDocument();
     expect(
@@ -505,17 +505,17 @@ describe('ExistingVideoPanel', () => {
     );
     expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
 
-    fireEvent.click(screen.getByRole('button', { name: /^Voice/u }));
+    fireEvent.click(screen.getByRole('button', { name: 'Voice' }));
     expect(screen.getByRole('heading', { name: 'Configure Voice' })).toBeVisible();
     expect(screen.getByRole('button', { name: /^Character Swap/u })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
-    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Voice' })).toHaveAttribute('aria-pressed', 'true');
 
     fireEvent.click(screen.getByRole('button', { name: /^Character Swap/u }));
     expect(screen.getByRole('heading', { name: 'Configure Character Swap' })).toBeVisible();
-    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Voice' })).toHaveAttribute('aria-pressed', 'true');
   });
 
   it('retains a saved Voice selection and its browser state while viewing a visual edit', async () => {
@@ -589,6 +589,7 @@ describe('ExistingVideoPanel', () => {
           })}
           videoProcessingAvailable
           elevenLabsAvailable
+          browserCapabilities={{ webAudio: true, offlineAudio: true }}
           onFinish={vi.fn()}
         />
       );
@@ -600,31 +601,33 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /^Voice/u }));
-    fireEvent.click(screen.getByRole('button', { name: 'Browse saved voices' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Voice' }));
+    fireEvent.click(screen.getByRole('button', { name: /Saved AI Voice/u }));
     fireEvent.click(await screen.findByRole('button', { name: 'Select Saved Star' }));
-    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
-    expect(screen.getByText('Saved Star', { selector: 'strong' })).toBeVisible();
-
-    fireEvent.click(screen.getByRole('button', { name: /^Character Swap/u }));
-    expect(screen.getByRole('heading', { name: 'Configure Character Swap' })).toBeVisible();
-    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute('aria-pressed', 'true');
-    expect(
-      screen.getByRole('button', { name: 'Apply Character Swap, then Saved Star' }),
-    ).toBeEnabled();
-
-    fireEvent.click(screen.getByRole('button', { name: /^Voice/u }));
-    expect(screen.getByRole('button', { name: 'Selected Saved Star' })).toHaveAttribute(
+    fireEvent.click(screen.getByRole('button', { name: 'Use this voice for the edit' }));
+    expect(screen.getByRole('button', { name: 'Voice' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: /Saved AI Voice/u })).toHaveAttribute(
       'aria-pressed',
       'true',
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Clear Voice setup' }));
     fireEvent.click(screen.getByRole('button', { name: /^Character Swap/u }));
-    expect(screen.getByRole('button', { name: /^Voice/u })).toHaveAttribute(
+    expect(screen.getByRole('heading', { name: 'Configure Character Swap' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Voice' })).toHaveAttribute('aria-pressed', 'true');
+    expect(
+      screen.getByRole('button', { name: 'Apply Character Swap, then Saved Star' }),
+    ).toBeEnabled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Voice' }));
+    expect(screen.getByRole('button', { name: /Saved AI Voice/u })).toHaveAttribute(
       'aria-pressed',
-      'false',
+      'true',
     );
+
+    fireEvent.click(screen.getByRole('button', { name: /No voice/u }));
+    fireEvent.click(screen.getByRole('button', { name: 'Use original audio' }));
+    fireEvent.click(screen.getByRole('button', { name: /^Character Swap/u }));
+    expect(screen.getByRole('button', { name: 'Voice' })).toHaveAttribute('aria-pressed', 'false');
   });
 
   it('offers local voice treatments inline and labels the local-only apply action', () => {
@@ -663,6 +666,7 @@ describe('ExistingVideoPanel', () => {
             selectLocalVoice,
           })}
           videoProcessingAvailable
+          browserCapabilities={{ webAudio: true, offlineAudio: true }}
           onFinish={vi.fn()}
         />
       </StudioDesignProvider>,
@@ -670,9 +674,11 @@ describe('ExistingVideoPanel', () => {
 
     expect(screen.getByRole('heading', { name: 'Configure Voice' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: /^Clear presenter/u }));
+    expect(selectLocalVoice).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button', { name: 'Use this treatment for the edit' }));
     expect(selectLocalVoice).toHaveBeenCalledWith('clear-presenter', 'Clear presenter');
     expect(screen.getByRole('button', { name: 'Apply Warm studio locally' })).toBeEnabled();
-    expect(screen.getByText(/Rendered in this browser without provider transfer/u)).toBeVisible();
+    expect(screen.getByText(/Plan-only until the outer Start edit action/u)).toBeVisible();
   });
 
   it('shows image-rich saved characters with clamped prompt copy and applies the selected item', async () => {

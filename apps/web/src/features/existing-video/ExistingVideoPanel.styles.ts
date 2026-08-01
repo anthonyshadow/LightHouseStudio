@@ -409,21 +409,6 @@ export const advancedStyles = (theme: Theme): CSSObject => ({
   '& > div': { padding: `0 ${theme.space.sm} ${theme.space.sm}` },
 });
 
-export const localEffectGridStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
-  gap: theme.space.xs,
-  '@media (max-width: 34rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
-  '& button': {
-    minHeight: '4.5rem',
-    display: 'grid',
-    alignContent: 'center',
-    gap: theme.space.xxs,
-    textAlign: 'start',
-  },
-  '& small': { color: theme.colors.textMuted, lineHeight: 1.35 },
-});
-
 export const processingStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.md,

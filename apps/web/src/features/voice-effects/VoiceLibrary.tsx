@@ -1,180 +1,241 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type { VoiceSummary } from '@studio/contracts';
 import { Button, StatusNotice, TextField } from '../../ui';
-import { VoiceList } from './VoiceList';
 import { useVoiceLibrary } from '../../orchestration/voice-library/useVoiceLibrary';
+import { VoiceList } from './VoiceList';
+import { VoicePreview, useVoicePreviewController } from './VoicePreview';
 
 export type VoiceLibraryProps = {
   disabled: boolean;
-  clipDurationLabel: string;
-  modelId?: string | null;
-  onApply: (voice: VoiceSummary) => void;
-  onSelect?: (voice: VoiceSummary) => void;
+  onSelect: (voice: VoiceSummary) => void;
   selectedVoiceId?: string | null;
-  mode?: 'apply' | 'select';
 };
 
-const stackStyles = (theme: Theme): CSSObject => ({ display: 'grid', gap: theme.space.sm });
-const pageStyles = (theme: Theme): CSSObject => ({
+const libraryStyles = (): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  alignContent: 'start',
+  gap: '0.75rem',
+});
+
+const libraryHeaderStyles = (theme: Theme): CSSObject => ({
+  position: 'sticky',
+  top: `calc(-1 * ${theme.space.lg})`,
+  zIndex: 2,
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) minmax(12rem, 16rem)',
+  alignItems: 'end',
+  gap: theme.space.md,
+  marginBlockStart: `calc(-1 * ${theme.space.lg})`,
+  paddingBlock: theme.space.lg,
+  borderBlockEnd: `1px solid ${theme.colors.border}`,
+  background: theme.colors.canvas,
+  '& h4': { fontFamily: theme.type.display, fontSize: theme.fontSizes.section },
+  '@media (max-width: 48rem)': {
+    top: `calc(-1 * ${theme.space.md})`,
+    marginBlockStart: `calc(-1 * ${theme.space.md})`,
+    paddingBlock: theme.space.md,
+  },
+  '@media (max-width: 34rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
+  '@media (max-width: 40rem)': {
+    position: 'static',
+    marginBlockStart: 0,
+    paddingBlockStart: 0,
+  },
+});
+
+const filterStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
-  justifyContent: 'space-between',
+  gap: theme.space.xs,
+  marginBlockStart: theme.space.md,
+  overflowX: 'auto',
+  scrollbarWidth: 'none',
+  '& button': {
+    minHeight: '2rem',
+    flex: '0 0 auto',
+    padding: `0.35rem ${theme.space.sm}`,
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.radii.round,
+    color: theme.colors.textMuted,
+    background: theme.colors.canvasRaised,
+    fontSize: theme.fontSizes.caption,
+    fontWeight: 650,
+    cursor: 'pointer',
+  },
+  '& button[aria-pressed="true"]': {
+    borderColor: theme.colors.borderStrong,
+    color: theme.colors.text,
+    background: theme.colors.surfaceStrong,
+  },
+  '& button:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '2px' },
+});
+
+const searchStyles = (): CSSObject => ({
+  minWidth: 0,
+  '& label': { margin: 0 },
+});
+
+const safePreviewStyles = (theme: Theme): CSSObject => ({
+  color: theme.colors.textMuted,
+  fontSize: theme.fontSizes.caption,
+  '& strong': { color: theme.colors.accentStrong },
+});
+
+const resultsStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  alignContent: 'start',
   gap: theme.space.sm,
 });
-const searchFormStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) auto',
-  gap: theme.space.xs,
-  '@media (max-width: 31rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
-});
-const searchButtonStyles = (): CSSObject => ({ alignSelf: 'end' });
-const libraryDetailsStyles = (theme: Theme): CSSObject => ({
-  padding: `0 ${theme.space.sm}`,
-  border: `1px solid ${theme.colors.border}`,
-  borderRadius: theme.radii.medium,
-  color: theme.colors.textMuted,
-  background: theme.colors.surfaceSoft,
-  fontSize: theme.fontSizes.caption,
-  '& summary': {
-    minHeight: '2.75rem',
-    display: 'flex',
-    alignItems: 'center',
-    color: theme.colors.text,
-    cursor: 'pointer',
-    fontWeight: 760,
-  },
-  '& p': { margin: `0 0 ${theme.space.sm}` },
+
+const pageStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'space-between',
+  gap: theme.space.sm,
+  paddingBlockStart: theme.space.xs,
+  borderBlockStart: `1px solid ${theme.colors.border}`,
 });
 
-export const VoiceLibrary = ({
-  disabled,
-  clipDurationLabel,
-  modelId,
-  onApply,
-  onSelect,
-  selectedVoiceId,
-  mode = 'apply',
-}: VoiceLibraryProps) => {
+const FILTERS = [
+  { label: 'All Accents', query: '' },
+  { label: 'British', query: 'British' },
+  { label: 'American', query: 'American' },
+  { label: 'Professional', query: 'Professional' },
+] as const;
+
+export const VoiceLibrary = ({ disabled, onSelect, selectedVoiceId }: VoiceLibraryProps) => {
   const theme = useTheme();
   const library = useVoiceLibrary();
+  const preview = useVoicePreviewController((item) =>
+    library.setError(`The preview for ${item.voice.name} could not be played.`),
+  );
   const selected =
-    library.selected ??
-    (selectedVoiceId
-      ? (library.voices.find((item) => item.voice.voiceId === selectedVoiceId) ?? null)
-      : null);
-
-  const applySelectedVoice = () => {
-    if (!selected) return;
-    onApply(selected.voice);
-  };
+    selectedVoiceId !== undefined
+      ? selectedVoiceId
+        ? (library.voices.find((item) => item.voice.voiceId === selectedVoiceId) ??
+          (library.selected?.voice.voiceId === selectedVoiceId ? library.selected : null))
+        : null
+      : library.selected;
 
   return (
-    <div css={stackStyles(theme)}>
-      <details css={libraryDetailsStyles(theme)}>
-        <summary>Where these voices come from</summary>
-        <p>
-          Only voices currently saved in your ElevenLabs library are shown. Manage library
-          membership in ElevenLabs, then refresh this list.
-        </p>
-      </details>
-      <form css={searchFormStyles(theme)} onSubmit={library.submitSearch}>
-        <TextField
-          label="Search voices"
-          value={library.query}
-          maxLength={100}
-          placeholder="Name, style, accent…"
-          onChange={(event) => library.setQuery(event.target.value)}
-        />
-        <Button type="submit" css={searchButtonStyles()}>
-          Search
-        </Button>
-      </form>
+    <div css={libraryStyles()}>
+      <header css={libraryHeaderStyles(theme)}>
+        <div>
+          <h4>Saved Voices Library</h4>
+          <div aria-label="Voice library filters" css={filterStyles(theme)}>
+            {FILTERS.map((filter) => (
+              <button
+                key={filter.label}
+                type="button"
+                aria-pressed={library.search === filter.query}
+                onClick={() => library.applySearch(filter.query)}
+              >
+                {filter.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        <form css={searchStyles()} onSubmit={library.submitSearch}>
+          <TextField
+            label="Search saved voices"
+            value={library.query}
+            maxLength={100}
+            placeholder="Search voices..."
+            onChange={(event) => library.setQuery(event.target.value)}
+          />
+        </form>
+      </header>
 
-      {library.error ? (
-        <StatusNotice role="alert" tone="danger">
-          {library.error}
-          <Button
-            size="small"
-            variant="quiet"
-            onClick={() => {
-              library.setError(null);
-              library.refresh();
-            }}
-          >
-            Retry
-          </Button>
-        </StatusNotice>
-      ) : null}
-      {library.loading ? (
-        <StatusNotice role="status" aria-live="polite" aria-atomic="true">
-          Loading voices…
-        </StatusNotice>
-      ) : null}
-      {!library.loading && library.voices.length === 0 && !library.error ? (
-        <StatusNotice role="status" aria-live="polite">
-          No matching voices in your ElevenLabs library.
-        </StatusNotice>
-      ) : null}
+      <p css={safePreviewStyles(theme)}>
+        <strong>Safe preview:</strong> provider sample only—your recording is never uploaded.
+      </p>
 
-      <VoiceList
-        voices={library.voices}
-        selected={selected}
-        loading={library.loading}
-        onSelect={(item) => {
-          library.setSelected(item);
-          onSelect?.(item.voice);
-        }}
-        onPreviewError={(item) =>
-          library.setError(`The preview for ${item.voice.name} could not be played.`)
-        }
+      <VoicePreview
+        item={preview.item}
+        objectUrl={preview.objectUrl}
+        attachAudio={preview.attachAudio}
+        setPlaying={preview.setPlaying}
+        reportPlaybackError={preview.reportPlaybackError}
       />
 
-      <div css={pageStyles(theme)}>
-        <Button
-          size="small"
-          variant="quiet"
-          disabled={library.previousDisabled}
-          onClick={library.previous}
-        >
-          Previous
-        </Button>
-        <Button size="small" variant="quiet" disabled={!library.hasMore} onClick={library.next}>
-          Next
-        </Button>
-      </div>
-
-      <Button size="small" variant="quiet" disabled={library.loading} onClick={library.refresh}>
-        Refresh voices
-      </Button>
-
-      {selected ? (
-        <>
-          <StatusNotice id="elevenlabs-apply-disclosure" title="Provider usage">
-            {mode === 'select' ? (
-              <>
-                Selecting a voice does not upload this video. Starting the edit later sends only the
-                immutable original audio sidecar to ElevenLabs.
-              </>
+      <div css={resultsStyles(theme)}>
+        {library.error ? (
+          <StatusNotice role="alert" tone="danger">
+            {library.error}
+            <Button
+              size="small"
+              variant="quiet"
+              onClick={() => {
+                library.setError(null);
+                library.refresh();
+              }}
+            >
+              Retry
+            </Button>
+          </StatusNotice>
+        ) : null}
+        {library.loading ? (
+          <StatusNotice role="status" aria-live="polite" aria-atomic="true">
+            Loading saved voices…
+          </StatusNotice>
+        ) : null}
+        {!library.loading && library.voices.length === 0 && !library.error ? (
+          <StatusNotice role="status" aria-live="polite">
+            {library.search
+              ? `No saved voices match “${library.search}”.`
+              : 'No saved voices are available in this ElevenLabs library.'}
+            {library.search ? (
+              <Button size="small" variant="quiet" onClick={library.resetSearch}>
+                Clear search
+              </Button>
             ) : (
-              <>
-                Clip duration: {clipDurationLabel}. Apply sends only the immutable original audio
-                sidecar to ElevenLabs
-                {modelId ? ` using ${modelId}` : ''} and may use provider credits. Zero-retention
-                eligibility is required; provider refusal is final for this request.
-              </>
+              <Button size="small" variant="quiet" onClick={library.refresh}>
+                Refresh
+              </Button>
             )}
           </StatusNotice>
-          <Button
-            variant="primary"
-            disabled={disabled}
-            aria-describedby="elevenlabs-apply-disclosure"
-            onClick={applySelectedVoice}
-          >
-            {mode === 'select'
-              ? `Use ${selected.voice.name} for this edit`
-              : `Apply ${selected.voice.name} to recorded audio`}
-          </Button>
-        </>
-      ) : null}
+        ) : null}
+
+        <VoiceList
+          voices={library.voices}
+          selected={selected}
+          loading={library.loading}
+          disabled={disabled}
+          previewVoiceId={preview.item?.voice.voiceId ?? null}
+          previewLoadingVoiceId={preview.loadingVoiceId}
+          previewPlaying={preview.playing}
+          onPreview={(item) => void preview.toggle(item)}
+          onSelect={(item) => {
+            library.setSelected(item);
+            onSelect(item.voice);
+          }}
+        />
+
+        {library.voices.length > 0 ? (
+          <div css={pageStyles(theme)} aria-label="Voice library navigation">
+            <Button
+              size="small"
+              variant="quiet"
+              disabled={library.previousDisabled}
+              onClick={library.previous}
+            >
+              Previous
+            </Button>
+            <Button
+              size="small"
+              variant="quiet"
+              disabled={library.loading}
+              onClick={library.refresh}
+            >
+              Refresh
+            </Button>
+            <Button size="small" variant="quiet" disabled={!library.hasMore} onClick={library.next}>
+              Next
+            </Button>
+          </div>
+        ) : null}
+      </div>
     </div>
   );
 };

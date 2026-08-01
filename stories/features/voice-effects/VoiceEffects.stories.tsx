@@ -81,8 +81,12 @@ export const VoiceListSelection: Story = {
           voices={[workspaceVoice]}
           selected={workspaceVoice}
           loading={false}
+          disabled={false}
+          previewVoiceId={null}
+          previewLoadingVoiceId={null}
+          previewPlaying={false}
           onSelect={fn()}
-          onPreviewError={fn()}
+          onPreview={fn()}
         />
       </StorySection>
     </StoryColumn>

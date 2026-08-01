@@ -544,20 +544,13 @@ test('saved voice preview, Apply, remux, Download, and Restore Original stay exp
   await takeDialog.getByRole('button', { name: 'Voice treatments' }).click();
   const voiceTreatments = page.getByRole('dialog', { name: 'Voice Treatments' });
   await expect(voiceTreatments).toBeVisible();
-  await voiceTreatments
-    .getByRole('button', { name: 'Browse saved voices · contacts ElevenLabs' })
-    .click();
+  await voiceTreatments.getByRole('button', { name: /Saved AI Voice/u }).click();
 
-  const voiceBrowser = page.getByRole('dialog', { name: 'Voice Browser' });
-  await expect(voiceBrowser.getByRole('list', { name: 'Available voices' })).toContainText(
+  await expect(voiceTreatments.getByRole('list', { name: 'Available voices' })).toContainText(
     'Northstar Narrator',
   );
-  await voiceBrowser
-    .getByRole('button', {
-      name: 'Load Northstar Narrator preview · contacts provider',
-    })
-    .click();
-  await expect(voiceBrowser.getByLabel('Listen to Northstar Narrator preview')).toHaveAttribute(
+  await voiceTreatments.getByRole('button', { name: 'Preview Northstar Narrator' }).click();
+  await expect(voiceTreatments.getByLabel('Listen to Northstar Narrator preview')).toHaveAttribute(
     'src',
     /^blob:/u,
   );
@@ -583,20 +576,12 @@ test('saved voice preview, Apply, remux, Download, and Restore Original stay exp
     },
   ]);
 
-  await voiceBrowser.getByRole('button', { name: 'Select Northstar Narrator' }).click();
+  await voiceTreatments.getByRole('button', { name: 'Select Northstar Narrator' }).click();
   await expect(
-    voiceBrowser.getByRole('button', {
-      name: 'Apply Northstar Narrator to recorded audio',
-    }),
-  ).toHaveAccessibleDescription(/immutable original audio sidecar/u);
-  await voiceBrowser
-    .getByRole('button', { name: 'Apply Northstar Narrator to recorded audio' })
-    .click();
-  await voiceBrowser.getByRole('button', { name: 'Close voice browser' }).click();
-
-  await expect(
-    voiceTreatments.getByRole('status').filter({ hasText: 'Voice treatment ready' }),
-  ).toBeVisible();
+    voiceTreatments.getByRole('button', { name: 'Apply treatment' }),
+  ).toHaveAccessibleDescription(/Original audio.+provider credits/u);
+  await voiceTreatments.getByRole('button', { name: 'Apply treatment' }).click();
+  await expect(voiceTreatments.getByRole('button', { name: 'Treatment applied' })).toBeDisabled();
   await voiceTreatments.getByRole('button', { name: 'Back to take review' }).click();
   const processedTakeDialog = page.getByRole('dialog', { name: 'Latest Take' });
   const processedDownload = processedTakeDialog.getByRole('link', { name: 'Download take' });
@@ -624,6 +609,7 @@ test('saved voice preview, Apply, remux, Download, and Restore Original stay exp
   await processedTakeDialog.getByRole('button', { name: 'Voice treatments' }).click();
   const restoredVoiceTreatments = page.getByRole('dialog', { name: 'Voice Treatments' });
   await restoredVoiceTreatments.getByRole('button', { name: 'Original' }).click();
+  await restoredVoiceTreatments.getByRole('button', { name: 'Restore original audio' }).click();
   await restoredVoiceTreatments.getByRole('button', { name: 'Back to take review' }).click();
   await expect(
     page.getByRole('dialog', { name: 'Latest Take' }).getByRole('link', { name: 'Download take' }),

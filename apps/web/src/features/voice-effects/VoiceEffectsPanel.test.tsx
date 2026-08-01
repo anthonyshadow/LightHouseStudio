@@ -105,7 +105,7 @@ afterEach(() => {
 });
 
 describe('VoiceEffectsPanel', () => {
-  it('does not browse voices until the user intentionally opens the stacked browser', async () => {
+  it('does not browse voices until the user intentionally opens the integrated library', async () => {
     const user = userEvent.setup();
     renderWithTheme(
       <VoiceEffectsPanel
@@ -117,10 +117,10 @@ describe('VoiceEffectsPanel', () => {
     );
 
     expect(voiceApi.listWorkspaceVoices).not.toHaveBeenCalled();
-    await user.click(screen.getByText(/Browse saved voices/));
+    await user.click(screen.getByRole('button', { name: /Saved AI Voice/u }));
 
-    expect(screen.getByRole('dialog', { name: 'Voice Browser' })).toBeInTheDocument();
-    expect(screen.getByText(/Take review → Voice treatments → Saved voices/)).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Saved Voices Library' })).toBeVisible();
+    expect(screen.getByText(/provider sample only/u)).toBeVisible();
     await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
   });
 
@@ -134,9 +134,8 @@ describe('VoiceEffectsPanel', () => {
       />,
     );
 
-    expect(screen.getByText('Take review → Voice treatments')).toBeVisible();
-    expect(screen.getByText('Browser compatibility details')).toBeVisible();
-    expect(screen.getByText(/failed replacement never overwrites the original/)).not.toBeVisible();
+    expect(screen.getByText(/Compatibility & Help/u)).toBeVisible();
+    expect(screen.getByText(/AI voices require ElevenLabs/u)).not.toBeVisible();
   });
 
   it('keeps Original available while processing so restoration is immediate', async () => {
@@ -167,7 +166,7 @@ describe('VoiceEffectsPanel', () => {
       />,
     );
 
-    expect(screen.getByText('Voice replacement unavailable')).toBeInTheDocument();
+    expect(screen.getByText('Voice unavailable')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Warm studio' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Original' })).toBeEnabled();
   });
@@ -176,7 +175,6 @@ describe('VoiceEffectsPanel', () => {
 describe('VoiceLibrary accessibility', () => {
   it('previews and applies only a voice returned by the saved library endpoint', async () => {
     const user = userEvent.setup();
-    const onApply = vi.fn();
     const onSelect = vi.fn();
     voiceApi.listWorkspaceVoices.mockResolvedValue({
       ...emptyPage,
@@ -196,24 +194,14 @@ describe('VoiceLibrary accessibility', () => {
       total: 1,
     });
 
-    renderWithTheme(
-      <VoiceLibrary
-        disabled={false}
-        clipDurationLabel="0:05"
-        modelId="eleven_multilingual_sts_v2"
-        onApply={onApply}
-        onSelect={onSelect}
-      />,
-    );
+    renderWithTheme(<VoiceLibrary disabled={false} onSelect={onSelect} />);
     await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
 
     vi.stubGlobal('URL', {
       createObjectURL: vi.fn(() => 'blob:voice-preview'),
       revokeObjectURL: vi.fn(),
     });
-    await user.click(
-      screen.getByRole('button', { name: 'Load Saved Star preview · contacts provider' }),
-    );
+    await user.click(screen.getByRole('button', { name: 'Preview Saved Star' }));
     expect(await screen.findByLabelText('Listen to Saved Star preview')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Select Saved Star' }));
     expect(onSelect).toHaveBeenCalledWith({
@@ -224,24 +212,7 @@ describe('VoiceLibrary accessibility', () => {
       labels: {},
       previewAvailable: true,
     });
-    expect(screen.getByText(/Clip duration: 0:05/)).toHaveTextContent(
-      'using eleven_multilingual_sts_v2',
-    );
-    expect(
-      screen.getByRole('button', { name: 'Apply Saved Star to recorded audio' }),
-    ).toHaveAccessibleDescription(
-      /may use provider credits.*Zero-retention eligibility is required/i,
-    );
-    await user.click(screen.getByRole('button', { name: 'Apply Saved Star to recorded audio' }));
-
-    expect(onApply).toHaveBeenCalledWith({
-      voiceId: 'saved-voice',
-      name: 'Saved Star',
-      category: 'featured',
-      description: 'Bright delivery',
-      labels: {},
-      previewAvailable: true,
-    });
+    expect(screen.getByText('Selected')).toBeVisible();
     expect(screen.queryByText(/public library|import|add & apply/i)).not.toBeInTheDocument();
   });
 });

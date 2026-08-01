@@ -5,19 +5,23 @@ ever uploading video or replacing the immutable original on failure.
 
 ## Runtime journey
 
-1. Open **Voice** in the post-recording editor or **Voice treatments** in Latest Take for a source
+1. Open **Voice** in the existing-video editor or **Voice treatments** in Latest Take for a source
    with a usable sidecar, browser audio replacement, and a duration no greater than five minutes.
-2. Select **Browse saved voices · contacts ElevenLabs**. Browsing is explicit; opening Voice
-   treatments alone does not fetch voices.
-3. Search, page, refresh, and preview saved-library voices. Preview contacts ElevenLabs but does
-   not upload the take.
-4. Select a voice and read the exact clip duration, configured model, possible credit use, and
-   zero-retention requirement.
-5. Select **Apply [voice] to recorded audio**. Studio revalidates saved-library membership and
+2. Select **Saved AI Voice** in the shared Voice workspace. The saved library replaces the treatment
+   detail pane instead of opening a nested dialog. Loading remains lazy: opening Voice treatments
+   alone does not fetch voices.
+3. Search, page, refresh, and preview saved-library voices. One dedicated player owns the active
+   provider sample, and replacing it aborts/releases the prior preview. Preview contacts
+   ElevenLabs but does not upload the take.
+4. Select a voice separately from previewing it. Search and selection state remain available when
+   moving between the treatment and library panes. The confirmation area states the exact clip
+   duration, configured model, possible credit use, and zero-retention requirement.
+5. From Latest Take, select **Apply treatment**. Studio revalidates saved-library membership and
    model support, then sends only the immutable original audio sidecar through the same-origin
-   broker.
-6. On success, Studio remuxes the converted audio with local video. Return to Take Review to
-   download, release, or discard.
+   broker. In the existing-video editor, **Use this voice for the edit** only updates the captured
+   plan; conversion waits for the outer **Start edit** action.
+6. On success, Studio remuxes the converted audio with local video. Return to treatments or Take
+   Review to download, release, or discard.
 
 ## Guards and recovery
 

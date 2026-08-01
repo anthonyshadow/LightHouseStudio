@@ -813,6 +813,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             videoProcessingAvailable={Boolean(availability.videoProcessing)}
             elevenLabsAvailable={availability.elevenLabs}
             elevenLabsModel={availability.elevenLabsModel}
+            browserCapabilities={browser}
             savedRecipes={existingVideoSavedRecipes}
             onCreateCharacter={createCharacterForExistingVideo}
             onFinish={finishExistingVideoSetup}
@@ -978,9 +979,31 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           open={activeOverlay === 'voice-treatments' && Boolean(recording.presented)}
           onClose={closeOverlay}
           title="Voice Treatments"
-          description="Every treatment starts from the immutable original audio."
+          description="Every treatment starts from the immutable original audio sidecar."
+          headerEyebrow={
+            <button
+              type="button"
+              css={{
+                minHeight: '2.75rem',
+                display: 'inline-flex',
+                alignItems: 'center',
+                padding: 0,
+                border: 0,
+                color: theme.colors.accent,
+                background: 'transparent',
+                fontSize: theme.fontSizes.caption,
+                fontWeight: 760,
+                cursor: 'pointer',
+              }}
+              onClick={() => openOverlay('take-review')}
+            >
+              ‹ Back to take review
+            </button>
+          }
           placement="bottom"
           size="wide"
+          height="tall"
+          centered
           bodyMode="contained"
           returnFocusRef={recording.presented ? takeToggleRef : dockToggleRef}
         >
@@ -992,7 +1015,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               elevenLabsAvailable={availability.elevenLabs}
               elevenLabsModel={availability.elevenLabsModel}
               browserCapabilities={browser}
-              onBackToTake={() => openOverlay('take-review')}
             />
           </Suspense>
         </OverlayPanel>

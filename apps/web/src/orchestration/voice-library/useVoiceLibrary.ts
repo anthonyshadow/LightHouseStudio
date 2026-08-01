@@ -21,6 +21,7 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
   const [selected, setSelected] = useState<VoiceLibraryItem | null>(null);
   const [settledRequest, setSettledRequest] = useState<object | null>(null);
   const [pageError, setPageError] = useState<{ request: object; message: string } | null>(null);
+  const [interactionError, setInteractionError] = useState<string | null>(null);
   const [hasMore, setHasMore] = useState(false);
   const [workspaceTokens, setWorkspaceTokens] = useState<Array<string | null>>([null]);
   const [workspaceIndex, setWorkspaceIndex] = useState(0);
@@ -37,7 +38,7 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
     [client, revision, search, workspaceIndex, workspaceTokens],
   );
   const loading = settledRequest !== request;
-  const error = pageError?.request === request ? pageError.message : null;
+  const error = interactionError ?? (pageError?.request === request ? pageError.message : null);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -69,17 +70,21 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
     return () => controller.abort();
   }, [request]);
 
-  const submitSearch = (event: FormEvent) => {
-    event.preventDefault();
+  const applySearch = (nextSearch: string) => {
     setWorkspaceTokens([null]);
     setWorkspaceIndex(0);
-    setSearch(query.trim());
-    setSelected(null);
+    setQuery(nextSearch);
+    setSearch(nextSearch.trim());
+    setInteractionError(null);
     setRevision((value) => value + 1);
   };
 
+  const submitSearch = (event: FormEvent) => {
+    event.preventDefault();
+    applySearch(query);
+  };
+
   const next = () => {
-    setSelected(null);
     if (nextToken) {
       setWorkspaceTokens((current) => [...current.slice(0, workspaceIndex + 1), nextToken]);
       setWorkspaceIndex((value) => value + 1);
@@ -87,17 +92,26 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
   };
 
   const previous = () => {
-    setSelected(null);
     setWorkspaceIndex((value) => Math.max(0, value - 1));
   };
 
   const refresh = () => setRevision((value) => value + 1);
-  const clearError = (nextError: string | null) => {
+  const resetSearch = () => {
+    setQuery('');
+    setSearch('');
+    setWorkspaceTokens([null]);
+    setWorkspaceIndex(0);
+    setInteractionError(null);
+    setRevision((value) => value + 1);
+  };
+  const setError = (nextError: string | null) => {
+    setInteractionError(nextError);
     if (nextError === null) setPageError(null);
   };
 
   return {
     query,
+    search,
     voices,
     selected,
     loading,
@@ -106,10 +120,12 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
     previousDisabled: workspaceIndex === 0,
     setQuery,
     setSelected,
-    setError: clearError,
+    setError,
+    applySearch,
     submitSearch,
     next,
     previous,
     refresh,
+    resetSearch,
   } as const;
 };

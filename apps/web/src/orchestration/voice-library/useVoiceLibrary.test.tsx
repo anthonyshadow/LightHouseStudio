@@ -51,4 +51,31 @@ describe('useVoiceLibrary', () => {
 
     expect(requestSignal?.aborted).toBe(true);
   });
+
+  it('preserves the chosen voice while search results change', async () => {
+    const savedVoice = {
+      kind: 'workspace' as const,
+      voice: {
+        voiceId: 'northstar',
+        name: 'Northstar',
+        category: 'professional',
+        description: 'Grounded narration',
+        labels: {},
+        previewAvailable: true,
+      },
+    };
+    const client = createClient();
+    vi.mocked(client.listWorkspaceVoices)
+      .mockResolvedValueOnce(emptyWorkspacePage({ voices: [savedVoice], total: 1 }))
+      .mockResolvedValueOnce(emptyWorkspacePage());
+    const { result } = renderHook(() => useVoiceLibrary(client));
+
+    await waitFor(() => expect(result.current.voices).toEqual([savedVoice]));
+    act(() => result.current.setSelected(savedVoice));
+    act(() => result.current.setQuery('another voice'));
+    act(() => result.current.submitSearch({ preventDefault: vi.fn() } as never));
+
+    await waitFor(() => expect(result.current.voices).toEqual([]));
+    expect(result.current.selected).toEqual(savedVoice);
+  });
 });
