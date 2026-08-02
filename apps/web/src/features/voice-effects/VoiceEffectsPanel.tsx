@@ -1,11 +1,11 @@
 import { canUseVoiceEffects } from '@studio/domain';
-import type { BrowserCapabilities } from '../media-session';
 import { formatDuration } from '../recording';
 import type { RecordingController } from '../recording/types';
 import type { VoiceProcessingController } from './types';
+import { detectVoiceBrowserCapabilities, type VoiceBrowserCapabilities } from './voiceCapabilities';
 import { VoiceWorkspace } from './VoiceWorkspace';
 
-export type VoiceBrowserCapabilities = Pick<BrowserCapabilities, 'webAudio' | 'offlineAudio'>;
+export type { VoiceBrowserCapabilities } from './voiceCapabilities';
 
 export type VoiceEffectsPanelProps = {
   recording: RecordingController;
@@ -14,11 +14,6 @@ export type VoiceEffectsPanelProps = {
   elevenLabsModel?: string | null;
   browserCapabilities?: VoiceBrowserCapabilities;
 };
-
-const detectVoiceBrowserCapabilities = (): VoiceBrowserCapabilities => ({
-  webAudio: 'AudioContext' in window || 'webkitAudioContext' in window,
-  offlineAudio: 'OfflineAudioContext' in window || 'webkitOfflineAudioContext' in window,
-});
 
 export const VoiceEffectsPanel = ({
   recording,

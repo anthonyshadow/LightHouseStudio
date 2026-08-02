@@ -64,8 +64,8 @@ data is unaffected.
   remembered with prompt outfits. A selected image remains tab-temporary until final Save, when
   the existing idempotent local upload endpoint makes it durable; Save never starts media or
   contacts Decart or an image provider.
-- `Lucy-latest` and pinned `lucy-vton-latest` start only after explicit user action. Decart receives live
-  media and the applied prompt/reference snapshot.
+- `lucy-latest` and pinned `lucy-vton-latest` start only after explicit user action. Decart receives
+  live media and the applied prompt/reference snapshot.
 - Batch Lucy/VTO uses server-mediated exact-model jobs with fixed 720p output, explicit
   submit/status/content stages, inspected size/duration/orientation, and no automatic retry of a
   billable submission. The UI shows request count, not invented credits or percentages.
@@ -156,6 +156,7 @@ quota. Missing optional configuration disables only the corresponding feature.
 | `pnpm test:all`                                                                          | All automated test categories, including visual regression             |
 | `pnpm audit:all`                                                                         | Complete dependency audit                                              |
 | `pnpm audit:prod`                                                                        | Production dependency audit                                            |
+| `pnpm check:dead-code:production`                                                        | Production files and dependency reachability                           |
 | `pnpm storybook`                                                                         | Local component catalog on port 6006                                   |
 | `pnpm pilot:qualification:check --commit <full-sha> --verbose`                           | Validate content-free pilot evidence                                   |
 | `pnpm pilot:data-retirement:drill`                                                       | Verify participant-data retirement                                     |

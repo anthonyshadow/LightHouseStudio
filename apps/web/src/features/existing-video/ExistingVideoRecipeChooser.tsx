@@ -1,7 +1,8 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react';
-import type { ExistingVideoStep } from './useExistingVideoWorkflow';
+import { referenceImageContentUrl } from '../../adapters/api-client/referenceImageRoutes';
 import type { VtonInputKind } from '../creative-assets/types';
+import type { ExistingVideoStep } from './useExistingVideoWorkflow';
 
 export type ExistingVideoSavedRecipe = Readonly<{
   id: string;
@@ -152,9 +153,6 @@ const createOptionStyles = (theme: Theme): CSSObject => ({
     gap: theme.space.xs,
   },
 });
-
-const referenceImageContentUrl = (assetId: string) =>
-  `/api/reference-images/${encodeURIComponent(assetId)}/content`;
 
 const chooserCopy = (modelId: ExistingVideoStep['modelId']) =>
   modelId === 'lucy-latest'

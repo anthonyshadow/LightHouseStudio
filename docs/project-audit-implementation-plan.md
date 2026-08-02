@@ -32,6 +32,15 @@ Acceptance:
   rule and failure branch in the existing-video user story;
 - all five canonical viewports and 200% reflow preserve the stage, focus, high-consequence actions,
   and named internal scrolling;
+- one immutable deadline set when the broker accepts a job remains exactly
+  `acceptedAt + 60 minutes` across every active and ready state, without extension by polling,
+  retry, retrieval, or completion;
+- successful delivery, explicit release, and shutdown may clean local state earlier; a content
+  stream admitted before the deadline may finish after it, while no new content starts at or after
+  the deadline;
+- deterministic service and route tests cover the exact deadline boundary, active and ready
+  expiry, delivery/expiry races, release, shutdown, late async results, owner isolation, and
+  filesystem cleanup without claiming provider cancellation or deletion;
 - the exact-model live rows and all affected physical rows pass for the same commit;
 - `graphify update .` reflects the final ownership/dependency graph; and
 - every Phase 1 release command passes without paid traffic or weakened assertions.
@@ -68,7 +77,10 @@ Acceptance:
 - no registry advisory is bypassed with a forced downgrade; and
 - the candidate is frozen before evidence collection.
 
-This documentation audit did not run the full release suite or registry-backed audits.
+The 2026-08-02 audit ran the full release command list and registry-backed audits. This phase
+remains incomplete because functional/visual recording paths still hit the synthetic transcode
+limitation, nine Linux baselines are missing, and the complete audit retains one low-severity
+development-tool advisory.
 
 ## Phase 2 — Provider and local qualification
 

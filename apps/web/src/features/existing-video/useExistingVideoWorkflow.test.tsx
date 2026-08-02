@@ -160,6 +160,31 @@ beforeEach(() => {
   );
 });
 
+const configuredVisualWorkflow = async () => {
+  const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+  adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+  const recording = recordingController();
+  const hook = renderHook(() =>
+    useExistingVideoWorkflow({
+      recording,
+      processing: processingController(),
+      publishUploadedVideo: vi.fn(),
+    }),
+  );
+
+  await act(async () => hook.result.current.selectFile(sourceFile));
+  act(() => {
+    hook.result.current.addStep('lucy-latest');
+  });
+  act(() =>
+    hook.result.current.updateStep(hook.result.current.steps[0]!.id, {
+      prompt: 'Change the lighting',
+    }),
+  );
+
+  return { ...hook, recording, sourceFile };
+};
+
 describe('useExistingVideoWorkflow', () => {
   it('uses a saved character reference without its stored prompt', () => {
     const reference = new File(['portrait'], 'portrait.png', { type: 'image/png' });
@@ -442,6 +467,97 @@ describe('useExistingVideoWorkflow', () => {
     expect(result.current.phase).toBe('complete');
     unmount();
   });
+
+  it.each([
+    { surface: 'status', code: 'job_expired', status: 410 },
+    { surface: 'status', code: 'not_found', status: 404 },
+    { surface: 'content', code: 'job_expired', status: 410 },
+    { surface: 'content', code: 'not_found', status: 404 },
+  ] as const)(
+    'treats $code from $surface as terminal without another submission',
+    async ({ surface, code, status }) => {
+      const error = new ApiClientError('Temporary job unavailable.', status, code);
+      if (surface === 'status') adapters.fetchVideoJob.mockRejectedValueOnce(error);
+      else adapters.downloadVideoJobResult.mockRejectedValueOnce(error);
+      const { result, recording, unmount } = await configuredVisualWorkflow();
+
+      await act(async () => result.current.submitStep(0));
+
+      expect(result.current.phase).toBe('error');
+      expect(result.current.acceptedSubmission).toBe(false);
+      expect(result.current.retryJob).toBeNull();
+      expect(result.current.message).toContain(
+        code === 'job_expired' ? 'temporary video job expired' : 'no longer available',
+      );
+      expect(result.current.message).toContain('new explicit provider submission');
+      expect(result.current.message).toContain('may incur additional provider usage');
+      expect(recording.presented).toBe(recording.original);
+      expect(result.current.result).toBeNull();
+      expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
+
+      await act(async () => result.current.retryExistingJob());
+      expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
+      unmount();
+    },
+  );
+
+  it('uses the same terminal copy for an expired status response', async () => {
+    adapters.fetchVideoJob.mockImplementationOnce((jobId: string) =>
+      Promise.resolve({
+        ...jobStatus(jobId),
+        status: 'expired',
+        result: null,
+        error: {
+          code: 'job_expired',
+          message: 'This temporary video job expired.',
+        },
+      }),
+    );
+    const { result, recording, unmount } = await configuredVisualWorkflow();
+
+    await act(async () => result.current.submitStep(0));
+
+    expect(result.current.phase).toBe('error');
+    expect(result.current.acceptedSubmission).toBe(false);
+    expect(result.current.retryJob).toBeNull();
+    expect(result.current.message).toContain('new explicit provider submission');
+    expect(result.current.message).toContain('may incur additional provider usage');
+    expect(recording.presented).toBe(recording.original);
+    expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it.each([
+    {
+      surface: 'status',
+      error: new ApiClientError('Temporary server failure.', 503, 'internal_error'),
+    },
+    {
+      surface: 'content',
+      error: new ApiClientError('Temporary request timeout.', 504, 'request_timeout'),
+    },
+  ] as const)(
+    'resumes a transient $surface failure without another submission',
+    async ({ surface, error }) => {
+      if (surface === 'status') adapters.fetchVideoJob.mockRejectedValueOnce(error);
+      else adapters.downloadVideoJobResult.mockRejectedValueOnce(error);
+      const { result, recording, unmount } = await configuredVisualWorkflow();
+
+      await act(async () => result.current.submitStep(0));
+
+      expect(result.current.phase).toBe('error');
+      expect(result.current.acceptedSubmission).toBe(true);
+      expect(result.current.retryJob).not.toBeNull();
+      expect(result.current.message).toContain('resuming it does not create another submission');
+      expect(recording.presented).toBe(recording.original);
+      expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
+
+      await act(async () => result.current.retryExistingJob());
+      await waitFor(() => expect(result.current.phase).toBe('complete'));
+      expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
+      unmount();
+    },
+  );
 
   it('preserves editable drafts while an accepted job status check can be resumed', async () => {
     const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });

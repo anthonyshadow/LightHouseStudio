@@ -1,7 +1,8 @@
-import { mkdtemp, readFile, readdir, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
 import type {
   DecartVideoJobProvider,
   DecartQueueStatus,
@@ -40,6 +41,99 @@ class FakeVideoProvider implements DecartVideoJobProvider {
     });
   }
 }
+
+class ManualDeadlineScheduler {
+  nowMs = Date.parse('2026-08-02T12:00:00.000Z');
+  unrefCalls = 0;
+  readonly #tasks: Array<{
+    readonly at: number;
+    readonly callback: () => Promise<void>;
+    canceled: boolean;
+  }> = [];
+
+  readonly now = (): number => this.nowMs;
+
+  readonly scheduleDeadline = (callback: () => Promise<void>, delayMs: number) => {
+    const task = {
+      at: this.nowMs + delayMs,
+      callback,
+      canceled: false,
+    };
+    this.#tasks.push(task);
+    return {
+      cancel: () => {
+        task.canceled = true;
+      },
+      unref: () => {
+        this.unrefCalls += 1;
+      },
+    };
+  };
+
+  async advanceTo(timestamp: number): Promise<void> {
+    this.nowMs = timestamp;
+    while (true) {
+      const next = this.#tasks
+        .filter((task) => !task.canceled && task.at <= this.nowMs)
+        .sort((left, right) => left.at - right.at)[0];
+      if (!next) return;
+      next.canceled = true;
+      await next.callback();
+    }
+  }
+}
+
+const deferred = <Value>() => {
+  let resolve!: (value: Value | PromiseLike<Value>) => void;
+  const promise = new Promise<Value>((complete) => {
+    resolve = complete;
+  });
+  return { promise, resolve };
+};
+
+const pathExists = async (filePath: string): Promise<boolean> => {
+  try {
+    await stat(filePath);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+const startJob = async (service: VideoJobService, jobId: string, ownerId: string) => {
+  const paths = await service.prepareJobDirectory(jobId);
+  await writeFile(paths.inputPath, Buffer.from(VIDEO_FIXTURE_BASE64, 'base64'), {
+    flag: 'wx',
+    mode: 0o600,
+  });
+  const status = await service.start({
+    jobId,
+    ownerId,
+    recipe: {
+      modelId: 'lucy-latest',
+      prompt: 'Change the lighting',
+      enhancePrompt: false,
+      hasReferenceImage: false,
+    },
+    directory: paths.directory,
+    inputPath: paths.inputPath,
+    referencePath: null,
+    referenceMimeType: null,
+  });
+  return { paths, status };
+};
+
+const makeReady = async (
+  service: VideoJobService,
+  provider: FakeVideoProvider,
+  jobId: string,
+  ownerId: string,
+) => {
+  await waitFor(service, jobId, ownerId, 'queued');
+  provider.nextStatus = 'completed';
+  await service.status(jobId, ownerId);
+  return waitFor(service, jobId, ownerId, 'ready');
+};
 
 const waitFor = async (
   service: VideoJobService,
@@ -91,7 +185,7 @@ describe('VideoJobService', () => {
 
     await waitFor(service, jobId, ownerId, 'queued');
     expect(provider.submissions).toEqual([{ modelId: 'lucy-latest', videoMimeType: 'video/mp4' }]);
-    expect(service.existing(jobId, ownerId)?.jobId).toBe(jobId);
+    expect((await service.existing(jobId, ownerId))?.jobId).toBe(jobId);
 
     provider.nextStatus = 'completed';
     await service.status(jobId, ownerId);
@@ -101,9 +195,10 @@ describe('VideoJobService', () => {
       height: 720,
       videoCodec: 'avc',
     });
-    const content = service.content(jobId, ownerId);
+    const content = await service.content(jobId, ownerId);
     expect(await readdir(path.dirname(content.path))).toContain('result.video');
     expect((await readFile(content.path)).byteLength).toBeGreaterThan(0);
+    await content.settle(true);
     expect(provider.submissions).toHaveLength(1);
   });
 
@@ -141,5 +236,245 @@ describe('VideoJobService', () => {
       message: 'Decart could not complete this visual processing request.',
     });
     expect(provider.submit).toHaveBeenCalledOnce();
+  });
+
+  it('expires abandoned ready output at the immutable accepted-at deadline without resubmitting', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-expiry-'));
+    const provider = new FakeVideoProvider();
+    const clock = new ManualDeadlineScheduler();
+    const service = new VideoJobService(provider, root, true, {
+      now: clock.now,
+      scheduleDeadline: clock.scheduleDeadline,
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-expiry';
+    const { paths, status: accepted } = await startJob(service, jobId, ownerId);
+    const deadline = clock.nowMs + VIDEO_JOB_TTL_MS;
+
+    expect(accepted.createdAt).toBe(new Date(clock.nowMs).toISOString());
+    expect(accepted.expiresAt).toBe(new Date(deadline).toISOString());
+    await makeReady(service, provider, jobId, ownerId);
+    await clock.advanceTo(deadline - 1);
+    expect((await service.status(jobId, ownerId)).status).toBe('ready');
+
+    await clock.advanceTo(deadline);
+
+    const expired = await service.status(jobId, ownerId);
+    expect(expired).toMatchObject({
+      status: 'expired',
+      expiresAt: new Date(deadline).toISOString(),
+      result: null,
+      error: { code: 'job_expired' },
+    });
+    expect(await pathExists(paths.directory)).toBe(false);
+    expect((await service.existing(jobId, ownerId))?.status).toBe('expired');
+    await expect(service.content(jobId, ownerId)).rejects.toMatchObject({
+      code: 'job_expired',
+    });
+
+    const duplicate = await service.start({
+      jobId,
+      ownerId,
+      recipe: {
+        modelId: 'lucy-latest',
+        prompt: 'A changed retry draft',
+        enhancePrompt: false,
+        hasReferenceImage: false,
+      },
+      directory: paths.directory,
+      inputPath: paths.inputPath,
+      referencePath: null,
+      referenceMimeType: null,
+    });
+    expect(duplicate.status).toBe('expired');
+    expect(provider.submissions).toHaveLength(1);
+    expect(clock.unrefCalls).toBeGreaterThan(0);
+  });
+
+  it('leases pre-deadline content through expiry and cleans it when the delivery closes', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-lease-'));
+    const provider = new FakeVideoProvider();
+    const clock = new ManualDeadlineScheduler();
+    const service = new VideoJobService(provider, root, true, {
+      now: clock.now,
+      scheduleDeadline: clock.scheduleDeadline,
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-lease';
+    const { paths } = await startJob(service, jobId, ownerId);
+    await makeReady(service, provider, jobId, ownerId);
+    const lease = await service.content(jobId, ownerId);
+
+    await clock.advanceTo(clock.nowMs + VIDEO_JOB_TTL_MS);
+
+    expect((await service.status(jobId, ownerId)).status).toBe('expired');
+    expect(await pathExists(lease.path)).toBe(true);
+    await expect(service.content(jobId, ownerId)).rejects.toMatchObject({
+      code: 'job_expired',
+    });
+
+    await lease.settle(false);
+    await lease.settle(false);
+
+    expect(await pathExists(paths.directory)).toBe(false);
+    expect((await service.existing(jobId, ownerId))?.status).toBe('expired');
+  });
+
+  it('keeps an interrupted pre-deadline delivery retryable and removes a delivered result once', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-retry-'));
+    const provider = new FakeVideoProvider();
+    const service = new VideoJobService(provider, root);
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-retry';
+    const { paths } = await startJob(service, jobId, ownerId);
+    await makeReady(service, provider, jobId, ownerId);
+
+    const interrupted = await service.content(jobId, ownerId);
+    await interrupted.settle(false);
+    expect(await pathExists(interrupted.path)).toBe(true);
+
+    const retry = await service.content(jobId, ownerId);
+    await retry.settle(true);
+    await retry.settle(true);
+
+    expect(await pathExists(paths.directory)).toBe(false);
+    expect(await service.existing(jobId, ownerId)).toBeNull();
+  });
+
+  it('owner-scopes and explicitly releases ready output before its deadline', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-release-'));
+    const provider = new FakeVideoProvider();
+    const service = new VideoJobService(provider, root);
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-release';
+    const { paths } = await startJob(service, jobId, ownerId);
+    await makeReady(service, provider, jobId, ownerId);
+
+    await expect(service.status(jobId, 'different-owner')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'not_found',
+    });
+    await expect(service.content(jobId, 'different-owner')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'not_found',
+    });
+    await expect(service.release(jobId, 'different-owner')).rejects.toMatchObject({
+      statusCode: 404,
+      code: 'not_found',
+    });
+    expect(await pathExists(paths.directory)).toBe(true);
+
+    await service.release(jobId, ownerId);
+
+    expect(await pathExists(paths.directory)).toBe(false);
+    expect(await service.existing(jobId, ownerId)).toBeNull();
+  });
+
+  it('does not let a late provider download resurrect an expired job', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-late-'));
+    const provider = new FakeVideoProvider();
+    const clock = new ManualDeadlineScheduler();
+    const downloadGate = deferred<void>();
+    provider.download = vi.fn(async (_providerJobId: string, destinationPath: string) => {
+      await downloadGate.promise;
+      await mkdir(path.dirname(destinationPath), { recursive: true });
+      await writeFile(destinationPath, Buffer.from(VIDEO_FIXTURE_BASE64, 'base64'), {
+        flag: 'wx',
+        mode: 0o600,
+      });
+    });
+    const service = new VideoJobService(provider, root, true, {
+      now: clock.now,
+      scheduleDeadline: clock.scheduleDeadline,
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-late';
+    const { paths } = await startJob(service, jobId, ownerId);
+    await waitFor(service, jobId, ownerId, 'queued');
+    provider.nextStatus = 'completed';
+    await service.status(jobId, ownerId);
+    await vi.waitFor(() => expect(provider.download).toHaveBeenCalledOnce());
+
+    await clock.advanceTo(clock.nowMs + VIDEO_JOB_TTL_MS);
+    downloadGate.resolve();
+
+    await vi.waitFor(async () => {
+      expect((await service.status(jobId, ownerId)).status).toBe('expired');
+      expect(await pathExists(paths.directory)).toBe(false);
+    });
+  });
+
+  it('rejects a provider completion that resolves at the deadline before the timer callback', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-deadline-race-'));
+    const provider = new FakeVideoProvider();
+    const clock = new ManualDeadlineScheduler();
+    const service = new VideoJobService(provider, root, true, {
+      now: clock.now,
+      scheduleDeadline: clock.scheduleDeadline,
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-deadline-race';
+    const { paths, status: accepted } = await startJob(service, jobId, ownerId);
+    await waitFor(service, jobId, ownerId, 'queued');
+
+    const statusGate = deferred<{ status: DecartQueueStatus }>();
+    provider.status = vi.fn(() => statusGate.promise);
+    provider.download = vi.fn(
+      (_providerJobId: string, _destinationPath: string, _signal: AbortSignal): Promise<void> =>
+        Promise.resolve(),
+    );
+    const polling = service.status(jobId, ownerId);
+    await vi.waitFor(() => expect(provider.status).toHaveBeenCalledOnce());
+
+    clock.nowMs = Date.parse(accepted.expiresAt);
+    statusGate.resolve({ status: 'completed' });
+
+    await expect(polling).resolves.toMatchObject({
+      status: 'expired',
+      result: null,
+      error: { code: 'job_expired' },
+    });
+    expect(provider.download).not.toHaveBeenCalled();
+    expect(await pathExists(paths.directory)).toBe(false);
+  });
+
+  it('purges the temp root without a provider and waits out late work during idempotent close', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-close-'));
+    const tempRoot = path.join(root, '.tmp', 'video-jobs');
+    const stalePath = path.join(tempRoot, 'stale', 'result.video');
+    await mkdir(path.dirname(stalePath), { recursive: true });
+    await writeFile(stalePath, 'stale');
+
+    const unavailable = new VideoJobService(null, root);
+    services.push(unavailable);
+    await vi.waitFor(async () => expect(await pathExists(stalePath)).toBe(false));
+    await mkdir(tempRoot, { recursive: true });
+    await writeFile(path.join(tempRoot, 'shutdown-stale'), 'stale');
+    await Promise.all([unavailable.close(), unavailable.close()]);
+    expect(await pathExists(tempRoot)).toBe(false);
+
+    const provider = new FakeVideoProvider();
+    const submitGate = deferred<void>();
+    provider.submit = vi.fn(async () => {
+      await submitGate.promise;
+      return { providerJobId: 'late-provider-job', status: 'pending' as const };
+    });
+    const closing = new VideoJobService(provider, root);
+    services.push(closing);
+    const jobId = crypto.randomUUID();
+    await startJob(closing, jobId, 'owner-close');
+    await vi.waitFor(() => expect(provider.submit).toHaveBeenCalledOnce());
+    const closePromise = closing.close();
+    submitGate.resolve();
+    await closePromise;
+
+    expect(await closing.existing(jobId, 'owner-close')).toBeNull();
+    expect(await pathExists(tempRoot)).toBe(false);
   });
 });

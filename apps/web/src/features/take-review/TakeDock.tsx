@@ -3,10 +3,8 @@ import { StatusNotice, Surface } from '../../ui';
 import { formatBytes, formatDuration } from '../recording';
 import type { RecordedTakeMetadata, RecordingController, TakeMetadata } from '../recording/types';
 import type { VoiceProcessingController } from '../voice-effects/types';
-import {
-  VoiceEffectsPanel,
-  type VoiceBrowserCapabilities,
-} from '../voice-effects/VoiceEffectsPanel';
+import type { VoiceBrowserCapabilities } from '../voice-effects/voiceCapabilities';
+import { VoiceEffectsPanel } from '../voice-effects/VoiceEffectsPanel';
 import { TakeReviewActions } from './TakeReviewActions';
 
 export type TakeDockProps = {

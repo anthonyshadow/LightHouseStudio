@@ -20,6 +20,7 @@ import type { CharacterSaveStage } from '../features/character-builder/character
 import { persistCharacterSaveSnapshot } from '../features/character-builder/persistCharacterSaveSnapshot';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
 import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
+import { savedPromptToRecipeSelection } from '../features/creative-assets/recipeSelection';
 import type { RecentPrompt, SavedPrompt } from '../features/creative-assets/types';
 import { useCreativeAssetRepository } from '../features/creative-assets/useCreativeAssetRepository';
 import { OutfitBuilder } from '../features/creative-assets/OutfitBuilder';
@@ -691,15 +692,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const selectSavedOutfit = useCallback(
     (outfit: SavedPrompt) => {
       updateOutfitBuilderDirty(false);
-      applyRecipeSelection({
-        origin: 'saved-prompt',
-        assetId: outfit.id,
-        prompt: outfit.prompt,
-        modelModeId: outfit.modelModeId,
-        referenceImageAssetId: outfit.referenceImageAssetId,
-        vtonInputKind: outfit.vtonInputKind,
-        enhancePrompt: outfit.enhancePrompt,
-      });
+      applyRecipeSelection(savedPromptToRecipeSelection(outfit));
     },
     [applyRecipeSelection, updateOutfitBuilderDirty],
   );

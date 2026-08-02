@@ -1,5 +1,10 @@
 import { createHash } from 'node:crypto';
-import { VOICE_PROVIDER_INTENT_HEADER, VOICE_PROVIDER_INTENT_VALUE } from '@studio/contracts';
+import {
+  VIDEO_PROVIDER_INTENT_HEADER,
+  VIDEO_PROVIDER_INTENT_VALUE,
+  VOICE_PROVIDER_INTENT_HEADER,
+  VOICE_PROVIDER_INTENT_VALUE,
+} from '@studio/contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from './errors.js';
 
@@ -88,6 +93,15 @@ export const requireVoiceProviderIntent = (request: FastifyRequest): void => {
       'forbidden_origin',
       'This voice provider action requires explicit local Studio intent.',
     );
+  }
+};
+
+export const requireVideoProviderIntent = (
+  request: FastifyRequest,
+  message = 'This video provider action requires explicit local Studio intent.',
+): void => {
+  if (request.headers[VIDEO_PROVIDER_INTENT_HEADER] !== VIDEO_PROVIDER_INTENT_VALUE) {
+    throw new AppError(403, 'forbidden_origin', message);
   }
 };
 

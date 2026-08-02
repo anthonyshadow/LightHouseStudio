@@ -118,6 +118,13 @@ For each exact batch model:
    described as another potentially billable submission.
 7. Release terminal state and inspect the dedicated temporary root. Local cleanup must complete
    without claiming provider cancellation or provider-side deletion.
+8. Record the broker's first accepted status and confirm `expiresAt` is exactly 60 minutes after
+   acceptance. It must remain unchanged through polling, retrieval, and ready. Start one content
+   stream just before the deadline and allow it to finish after the deadline; it must complete and
+   then clean its local output. At and after the deadline, a new status/content attempt must expose
+   safe expiry behavior, must not start another content stream, and must not create another provider
+   submission. Also verify that successful delivery, explicit release, and broker shutdown can
+   remove local state before the deadline.
 
 Confirm that Lucy and VTO remain available as a mutually exclusive selector before submission.
 Switch in both directions with an empty visual setup and confirm the change is immediate. Repeat
@@ -126,8 +133,11 @@ the previous visual fields on confirmation, and leaves configured Voice untouche
 still only one active visual recipe and one submitted model.
 
 Do not exceed four participant batch submissions or two submissions for either model. Broker
-restart, 60-minute expiry, ambiguous responses, unavailable
+restart, the immutable accepted-at-plus-60-minute deadline, ambiguous responses, unavailable
 credentials, and background/foreground recovery must fail safely without automatic resubmission.
+Deterministic lifecycle coverage does not qualify the live row: record the exact candidate's
+deadline, pre-deadline delivery, blocked post-deadline admission, earlier cleanup paths, and
+temporary-root result. Local expiry still does not prove provider cancellation or deletion.
 
 Decart documents submit/poll/content retrieval but no qualified cancellation operation for this
 flow. Do not label browser abort, local cleanup, or DELETE as provider cancellation.

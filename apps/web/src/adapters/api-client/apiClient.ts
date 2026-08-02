@@ -22,6 +22,9 @@ import {
 } from '@studio/contracts';
 import type { ModelMode, ProviderAvailability } from '../../application/types';
 import { validateReferenceImage } from '../browser-media/imageValidation';
+import { referenceImageContentUrl } from './referenceImageRoutes';
+
+export { referenceImageContentUrl } from './referenceImageRoutes';
 
 export class ApiClientError extends Error {
   readonly status: number;
@@ -108,9 +111,6 @@ export const fetchProviderAvailability = async (
     referenceImageOptimizerVersion: payload.referenceImages.optimizer.version,
   };
 };
-
-export const referenceImageContentUrl = (assetId: string): string =>
-  `/api/reference-images/${encodeURIComponent(assetId)}/content`;
 
 export const createReferenceImage = async (
   request: CreateReferenceImageRequest,

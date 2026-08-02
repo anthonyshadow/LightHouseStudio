@@ -24,25 +24,25 @@
       "ignoreExportsUsedInFile": true
     },
     "apps/api": {
-      "entry": ["src/**/*.test.ts"],
-      "project": ["src/**/*.ts"],
+      "entry": ["src/server.ts!", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts!", "!src/test/**!"],
       "ignoreExportsUsedInFile": true
     },
     "apps/web": {
-      "entry": ["src/**/*.test.{ts,tsx}"],
-      "project": ["src/**/*.{ts,tsx}", "vite.config{,.test}.ts"],
+      "entry": ["src/main.tsx!", "src/**/*.test.{ts,tsx}"],
+      "project": ["src/**/*.{ts,tsx}!", "vite.config{,.test}.ts"],
       "ignoreExportsUsedInFile": true
     },
     "packages/contracts": {
-      "entry": ["src/index.ts", "src/**/*.test.ts"],
-      "project": ["src/**/*.ts"],
+      "entry": ["src/index.ts!", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts!"],
       "ignoreIssues": {
         "src/reference-images.ts": ["duplicates"]
       }
     },
     "packages/domain": {
-      "entry": ["src/index.ts", "src/**/*.test.ts"],
-      "project": ["src/**/*.ts"]
+      "entry": ["src/index.ts!", "src/**/*.test.ts"],
+      "project": ["src/**/*.ts!"]
     }
   }
 }

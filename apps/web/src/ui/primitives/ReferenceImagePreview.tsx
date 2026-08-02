@@ -1,5 +1,6 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { useState } from 'react';
+import { referenceImageContentUrl } from '../../adapters/api-client/referenceImageRoutes';
 import { Button } from './Button';
 import { OverlayPanel } from './OverlayPanel';
 
@@ -10,9 +11,6 @@ export interface ReferenceImagePreviewProps {
   size?: 'thumbnail' | 'panel';
   onUnavailable?: (() => void) | undefined;
 }
-
-const referenceImageContentUrl = (assetId: string) =>
-  `/api/reference-images/${encodeURIComponent(assetId)}/content`;
 
 const frameStyles = (theme: Theme, size: 'thumbnail' | 'panel'): CSSObject => ({
   position: 'relative',

@@ -15,18 +15,21 @@ import {
   referenceImageRequestIdSchema,
   remoteReferenceImageImportRequestSchema,
   uploadReferenceImageResponseSchema,
-  VIDEO_PROVIDER_INTENT_HEADER,
-  VIDEO_PROVIDER_INTENT_VALUE,
 } from '@studio/contracts';
 import { randomUUID } from 'node:crypto';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/errors.js';
-import { localOwnerIdForRequest, requireTrustedOrigin } from '../../http/security.js';
+import {
+  localOwnerIdForRequest,
+  requireTrustedOrigin,
+  requireVideoProviderIntent,
+} from '../../http/security.js';
 import { withRequestLifetime } from '../../http/streaming.js';
 import { SafeRemoteImageDownloader } from '../../providers/transport/safe-remote-image-downloader.js';
 import {
   InvalidReferenceImageUploadError,
   validateUploadedReferenceImage,
+  type ValidReferenceImageMimeType,
 } from './image-validation.js';
 import type { ReferenceImageService } from './reference-image-service.js';
 
@@ -34,7 +37,7 @@ export interface RemoteReferenceImageDownloader {
   download: (
     url: string,
     signal: AbortSignal,
-  ) => Promise<Readonly<{ bytes: Buffer; mimeType: 'image/jpeg' | 'image/png' | 'image/webp' }>>;
+  ) => Promise<Readonly<{ bytes: Buffer; mimeType: ValidReferenceImageMimeType }>>;
 }
 
 const verifyGenerationOrigin = (request: FastifyRequest): Promise<void> => {
@@ -44,13 +47,10 @@ const verifyGenerationOrigin = (request: FastifyRequest): Promise<void> => {
 
 const verifyRemoteImportIntent = (request: FastifyRequest): Promise<void> => {
   requireTrustedOrigin(request);
-  if (request.headers[VIDEO_PROVIDER_INTENT_HEADER] !== VIDEO_PROVIDER_INTENT_VALUE) {
-    throw new AppError(
-      403,
-      'forbidden_origin',
-      'Remote reference import requires explicit local Studio intent.',
-    );
-  }
+  requireVideoProviderIntent(
+    request,
+    'Remote reference import requires explicit local Studio intent.',
+  );
   return Promise.resolve();
 };
 
@@ -102,7 +102,7 @@ export const registerReferenceImageRoutes = (
       policy: {
         maxRedirects: 3,
         maxBytes: REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
-        acceptedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+        acceptedMimeTypes: referenceImageMimeTypeSchema.options,
       },
       createError: () =>
         new AppError(

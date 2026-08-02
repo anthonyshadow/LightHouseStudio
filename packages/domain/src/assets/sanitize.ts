@@ -68,6 +68,44 @@ const sourceForCharacter = (value: unknown): SavedCharacterPromptSource | null =
 const vtonInputKind = (value: unknown): VtonInputKind | null =>
   value === 'prompt' || value === 'saved-outfit' ? value : null;
 
+type SanitizedVtonConfiguration = Readonly<{
+  inputKind: VtonInputKind | null;
+  enhancePrompt: boolean;
+  invalid: boolean;
+}>;
+
+const sanitizeVtonConfiguration = (
+  value: Record<string, unknown>,
+  modelModeId: ModelModeId | null,
+  persistedReferenceImageAssetId: string | null,
+  includeVtonConfiguration: boolean,
+): SanitizedVtonConfiguration => {
+  const storedInputKind = includeVtonConfiguration ? vtonInputKind(value.vtonInputKind) : null;
+  const invalidInputKind =
+    includeVtonConfiguration &&
+    (modelModeId === 'lucy-vton-latest'
+      ? value.vtonInputKind !== undefined && !storedInputKind
+      : value.vtonInputKind !== undefined && value.vtonInputKind !== null);
+  const inputKind =
+    modelModeId === 'lucy-vton-latest'
+      ? includeVtonConfiguration
+        ? (storedInputKind ?? (persistedReferenceImageAssetId ? 'saved-outfit' : 'prompt'))
+        : persistedReferenceImageAssetId
+          ? 'saved-outfit'
+          : 'prompt'
+      : null;
+  const invalidEnhancePrompt =
+    includeVtonConfiguration &&
+    value.enhancePrompt !== undefined &&
+    typeof value.enhancePrompt !== 'boolean';
+  return {
+    inputKind,
+    enhancePrompt:
+      inputKind === 'prompt' && includeVtonConfiguration ? value.enhancePrompt === true : false,
+    invalid: invalidInputKind || invalidEnhancePrompt,
+  };
+};
+
 const promptIntent = (value: unknown): PromptIntent | null =>
   PROMPT_INTENTS.some((intent) => intent === value) ? (value as PromptIntent) : null;
 
@@ -142,31 +180,18 @@ const sanitizeSavedPrompt = (
   const persistedReferenceImageAssetId = includeReferenceImage
     ? referenceImageAssetId(value.referenceImageAssetId)
     : null;
-  const storedVtonInputKind = includeVtonConfiguration ? vtonInputKind(value.vtonInputKind) : null;
-  const hasInvalidStoredVtonInputKind =
-    includeVtonConfiguration &&
-    (modelModeId === 'lucy-vton-latest'
-      ? value.vtonInputKind !== undefined && !storedVtonInputKind
-      : value.vtonInputKind !== undefined && value.vtonInputKind !== null);
-  const resolvedVtonInputKind =
-    modelModeId === 'lucy-vton-latest'
-      ? includeVtonConfiguration
-        ? (storedVtonInputKind ??
-          (persistedReferenceImageAssetId ? ('saved-outfit' as const) : ('prompt' as const)))
-        : persistedReferenceImageAssetId
-          ? ('saved-outfit' as const)
-          : ('prompt' as const)
-      : null;
-  const enhancePrompt =
-    resolvedVtonInputKind === 'prompt' && includeVtonConfiguration
-      ? value.enhancePrompt === true
-      : false;
+  const vtonConfiguration = sanitizeVtonConfiguration(
+    value,
+    modelModeId,
+    persistedReferenceImageAssetId,
+    includeVtonConfiguration,
+  );
   const hasPrompt = containsMeaningfulText(prompt);
   const validRecipe =
     modelModeId === 'lucy-vton-latest'
-      ? resolvedVtonInputKind === 'prompt'
+      ? vtonConfiguration.inputKind === 'prompt'
         ? hasPrompt && persistedReferenceImageAssetId === null
-        : resolvedVtonInputKind === 'saved-outfit' && persistedReferenceImageAssetId !== null
+        : vtonConfiguration.inputKind === 'saved-outfit' && persistedReferenceImageAssetId !== null
       : hasPrompt &&
         (!includeVtonConfiguration ||
           ((value.vtonInputKind === undefined || value.vtonInputKind === null) &&
@@ -176,10 +201,7 @@ const sanitizeSavedPrompt = (
     !containsMeaningfulText(title) ||
     !modelModeId ||
     !validRecipe ||
-    hasInvalidStoredVtonInputKind ||
-    (includeVtonConfiguration &&
-      value.enhancePrompt !== undefined &&
-      typeof value.enhancePrompt !== 'boolean') ||
+    vtonConfiguration.invalid ||
     !source ||
     !createdAt ||
     !updatedAt ||
@@ -194,8 +216,8 @@ const sanitizeSavedPrompt = (
     modelModeId,
     source,
     referenceImageAssetId: persistedReferenceImageAssetId,
-    vtonInputKind: resolvedVtonInputKind,
-    enhancePrompt,
+    vtonInputKind: vtonConfiguration.inputKind,
+    enhancePrompt: vtonConfiguration.enhancePrompt,
     tags: readTags(value.tags),
     createdAt,
     updatedAt,
@@ -231,25 +253,12 @@ const sanitizeRecentPrompt = (
     ? referenceImageAssetId(value.referenceImageAssetId)
     : null;
   const hasPrompt = containsMeaningfulText(prompt);
-  const storedVtonInputKind = includeVtonConfiguration ? vtonInputKind(value.vtonInputKind) : null;
-  const hasInvalidStoredVtonInputKind =
-    includeVtonConfiguration &&
-    (modelModeId === 'lucy-vton-latest'
-      ? value.vtonInputKind !== undefined && !storedVtonInputKind
-      : value.vtonInputKind !== undefined && value.vtonInputKind !== null);
-  const resolvedVtonInputKind =
-    modelModeId === 'lucy-vton-latest'
-      ? includeVtonConfiguration
-        ? (storedVtonInputKind ??
-          (persistedReferenceImageAssetId ? ('saved-outfit' as const) : ('prompt' as const)))
-        : persistedReferenceImageAssetId
-          ? ('saved-outfit' as const)
-          : ('prompt' as const)
-      : null;
-  const enhancePrompt =
-    resolvedVtonInputKind === 'prompt' && includeVtonConfiguration
-      ? value.enhancePrompt === true
-      : false;
+  const vtonConfiguration = sanitizeVtonConfiguration(
+    value,
+    modelModeId,
+    persistedReferenceImageAssetId,
+    includeVtonConfiguration,
+  );
   const validImageOnlyCharacter =
     !hasPrompt &&
     modelModeId === 'lucy-latest' &&
@@ -257,9 +266,9 @@ const sanitizeRecentPrompt = (
     containsMeaningfulText(characterName);
   const validVtonRecipe =
     modelModeId === 'lucy-vton-latest' &&
-    (resolvedVtonInputKind === 'prompt'
+    (vtonConfiguration.inputKind === 'prompt'
       ? hasPrompt && persistedReferenceImageAssetId === null
-      : resolvedVtonInputKind === 'saved-outfit' && persistedReferenceImageAssetId !== null);
+      : vtonConfiguration.inputKind === 'saved-outfit' && persistedReferenceImageAssetId !== null);
   const validNonVtonRecipe =
     modelModeId !== 'lucy-vton-latest' &&
     (hasPrompt || validImageOnlyCharacter) &&
@@ -270,10 +279,7 @@ const sanitizeRecentPrompt = (
     !id ||
     !modelModeId ||
     (!validVtonRecipe && !validNonVtonRecipe) ||
-    hasInvalidStoredVtonInputKind ||
-    (includeVtonConfiguration &&
-      value.enhancePrompt !== undefined &&
-      typeof value.enhancePrompt !== 'boolean') ||
+    vtonConfiguration.invalid ||
     !usedAt ||
     (value.savedPromptId !== undefined && !savedPromptId) ||
     (includeCharacterIdentity &&
@@ -290,8 +296,8 @@ const sanitizeRecentPrompt = (
     ...(savedCharacterPromptId ? { savedCharacterPromptId } : {}),
     ...(containsMeaningfulText(characterName) ? { characterName } : {}),
     referenceImageAssetId: persistedReferenceImageAssetId,
-    vtonInputKind: resolvedVtonInputKind,
-    enhancePrompt,
+    vtonInputKind: vtonConfiguration.inputKind,
+    enhancePrompt: vtonConfiguration.enhancePrompt,
     usedAt,
   };
 };

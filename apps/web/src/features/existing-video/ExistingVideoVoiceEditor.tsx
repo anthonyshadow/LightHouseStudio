@@ -1,6 +1,9 @@
 import { formatDuration } from '../recording';
-import type { VoiceBrowserCapabilities } from '../voice-effects/VoiceEffectsPanel';
 import type { VoiceEffectSelection } from '../voice-effects/types';
+import {
+  detectVoiceBrowserCapabilities,
+  type VoiceBrowserCapabilities,
+} from '../voice-effects/voiceCapabilities';
 import { VoiceWorkspace } from '../voice-effects/VoiceWorkspace';
 import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
 
@@ -12,11 +15,6 @@ export interface ExistingVideoVoiceEditorProps {
   readonly locked: boolean;
   readonly browserCapabilities?: VoiceBrowserCapabilities;
 }
-
-const detectVoiceBrowserCapabilities = (): VoiceBrowserCapabilities => ({
-  webAudio: 'AudioContext' in window || 'webkitAudioContext' in window,
-  offlineAudio: 'OfflineAudioContext' in window || 'webkitOfflineAudioContext' in window,
-});
 
 export const ExistingVideoVoiceEditor = ({
   workflow,

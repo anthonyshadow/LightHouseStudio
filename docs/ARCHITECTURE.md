@@ -238,14 +238,14 @@ errors. The URL is neither persisted nor forwarded to Decart.
 
 ## Persistence
 
-| Store                       | Data                                                                                                | Lifetime and trust boundary                                                                                                    |
-| --------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Recipe Shelf `localStorage` | Versioned v5 allowlisted prompt/character/outfit metadata and opaque asset IDs                      | Sanitized on read; v1-v4 migration; degrades to session memory on failure; never stores image bytes                            |
-| Character Builder IndexedDB | One resumable draft and save journal                                                                | Compare-and-swap autosave; prevents duplicate save/preload after retry or reload                                               |
-| Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings                                       | Owner-scoped under `LIGHTFRAME_DATA_DIR`; no ordinary deletion route                                                           |
-| Legacy project IndexedDB    | Compatibility project metadata and media Blobs                                                      | List/download/delete plus one-time valid character-design seeding; Guided is not restored                                      |
-| Session memory              | Streams, tokens, files, direct-import outfit recents, device IDs, recordings, sidecars, voice state | Cleaned on replacement, release/discard, unmount, or tab close as applicable                                                   |
-| Video-job temp root         | Streamed input/reference and inspected provider output                                              | Process-temporary; inputs drop after acceptance, output after delivery, jobs expire at 60 minutes, and startup purges the root |
+| Store                       | Data                                                                                                | Lifetime and trust boundary                                                                                                                                                                                                               |
+| --------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recipe Shelf `localStorage` | Versioned v5 allowlisted prompt/character/outfit metadata and opaque asset IDs                      | Sanitized on read; v1-v4 migration; degrades to session memory on failure; never stores image bytes                                                                                                                                       |
+| Character Builder IndexedDB | One resumable draft and save journal                                                                | Compare-and-swap autosave; prevents duplicate save/preload after retry or reload                                                                                                                                                          |
+| Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings                                       | Owner-scoped under `LIGHTFRAME_DATA_DIR`; no ordinary deletion route                                                                                                                                                                      |
+| Legacy project IndexedDB    | Compatibility project metadata and media Blobs                                                      | List/download/delete plus one-time valid character-design seeding; Guided is not restored                                                                                                                                                 |
+| Session memory              | Streams, tokens, files, direct-import outfit recents, device IDs, recordings, sidecars, voice state | Cleaned on replacement, release/discard, unmount, or tab close as applicable                                                                                                                                                              |
+| Video-job temp root         | Streamed input/reference and inspected provider output                                              | Process-temporary; one immutable accepted-at-plus-60-minute deadline covers active and ready jobs. Delivery, release, or shutdown may clean earlier; a pre-deadline content stream may finish after the boundary; startup purges the root |
 
 Browser storage is untrusted and schema-migrated. Opaque IDs, provenance, and timestamps are
 preserved. The filesystem store uses atomic publication and never exposes internal paths,
@@ -253,6 +253,15 @@ provider URLs, credentials, or raw payloads. Detached reference assets are retai
 runtime lacks a complete relationship graph and deletion route.
 
 See [privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) for the user-facing data contract.
+
+The broker assigns one immutable deadline when it accepts a job: `acceptedAt + 60 minutes`. That
+same deadline covers validating, submitting, queued, processing, retrieving, and ready states;
+status reads, retries, and the transition to ready never extend it. A service-owned nearest-deadline
+timer enforces expiry without requiring another request, preserves an expired in-memory tombstone,
+and guards late provider work from restoring state or bytes. Successful delivery, explicit release,
+or broker shutdown may delete local state earlier. A content stream admitted before the deadline
+may finish after it, but no new content stream may start at or after the deadline. This is local
+lifecycle cleanup only, not Decart cancellation or provider-side deletion.
 
 ## Backend boundary
 

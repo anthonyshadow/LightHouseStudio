@@ -1,12 +1,89 @@
 # Maintainability audit
 
-**Current as of:** 2026-07-30
+**Current as of:** 2026-08-02
 
 This document records the repository-wide behavior-preserving cleanup and the placement rules that
 follow from it. Product behavior remains defined by [Architecture](ARCHITECTURE.md), the
 [product state](product-state.md), and the [user stories](userStories/README.md).
 
-## Outcome
+## 2026-08-02 follow-up audit
+
+A fresh top-to-bottom audit compared the current repository with the 2026-07-30 cleanup, traced
+the changed runtime through Graphify and source/tests, and re-ran static, unit, integration,
+browser, visual, dependency, asset, link, and build inventories. The architecture remains sound;
+no broad migration, large-file split, provider merge, route change, persisted-shape change, or
+dependency removal was justified.
+
+The behavior-preserving cleanup:
+
+- centralizes browser Voice capability detection while retaining the prior exported type;
+- gives reference-image content URLs one narrow, zero-side-effect route builder while retaining
+  the existing API-client export;
+- reuses one exact saved-prompt-to-selection mapping and one visual-completion branch while
+  preserving the submitted Voice snapshot and retry behavior;
+- centralizes saved/recent VTO migration parsing without merging their distinct validity rules;
+- moves the repeated video-intent check to the HTTP security boundary, preserving exact route
+  messages and Origin checks, and reuses the contract-owned reference-image MIME allowlist;
+- makes production-only file/dependency Knip analysis usable, removes ineffective Graphify ignore
+  patterns, and patches the high-severity `brace-expansion` development-tool chain within its
+  compatible release line; and
+- corrects stale E2E locators and documentation for exact model IDs, capture settings, Storybook,
+  the 29-case visual matrix, and current retention behavior.
+
+No public route, HTTP payload, persisted schema, provider selection/fallback, recording limit,
+rendered UI, CSS selector, media node, or cleanup owner changed.
+
+### Current deferred and approval-required findings
+
+- `StudioApp`, `MediaStage`, existing-video orchestration, provider adapters, and persistence
+  modules remain cohesive at their current ownership boundaries. Line count alone does not justify
+  lifecycle-sensitive decomposition.
+- Recent-prompt and character selection mappings remain separate because they intentionally carry
+  different attribution fields. Cross-feature reference-image UI placement, outfit-copy seed
+  typing, prompt-recipe equality, and test-only compatibility exports need separate scoped work.
+- The full audit still has one low-severity Windows development-server advisory through
+  `tsup`'s declared `esbuild@0.27.x` range. Forcing `0.28.1` underneath that incompatible range is
+  not an acceptable cleanup.
+- Nine Linux visual baselines are missing and none are removable. Live/paid provider, physical
+  device, real-codec, memory, assistive-technology, and moderated-pilot evidence remain open.
+
+### 2026-08-02 validation
+
+- `pnpm quality` passed: types, Storybook types, ESLint, Prettier, normal Knip, a 458-file / 1,340-edge
+  module graph with zero cycles, 118 Vitest files and 918 tests, all builds, and static Storybook.
+- `pnpm check:dead-code:production` passed for production files, dependencies, unlisted imports,
+  and unresolved imports. The full production export view still contains deliberate test/Storybook
+  seams and is not used as an automatic removal list.
+- `pnpm test:coverage` passed with 82.23% statements, 73.32% branches, 83.61% functions, and 84.88%
+  lines. `pnpm test:production` passed 1/1, and the participant-data retirement drill passed.
+- `pnpm test:e2e` improved from the 43-pass / 16-failure baseline to 44 passes / 15 failures. Every
+  remaining failure reaches the known synthetic recorder-to-H.264/AAC transcode limitation; the
+  stale locator no longer masks that boundary.
+- `pnpm test:visual` passed 27/29. The two setup failures hit the same recording-transcode boundary
+  before screenshot comparison; no baseline was regenerated. Inventory still reports exactly nine
+  missing Linux baselines and zero removable baselines.
+- `pnpm audit:prod` passed with no known vulnerabilities. `pnpm audit:all` now reports only the one
+  low-severity `esbuild` development-tool advisory described above.
+- `graphify update .` completed with 4,280 nodes, 9,896 edges, and 238 communities after the source
+  changes.
+
+No live provider calls, physical/manual qualification, or participant evidence collection was
+performed.
+
+### SEC-008 retention follow-up
+
+After the Product Owner selected Decision A, the video-job service implemented one immutable
+`acceptedAt + 60 minutes` deadline for active and ready states. One unreferenced nearest-deadline
+timer enforces abandoned-job cleanup; request-time checks defend the boundary; delivery leases
+protect streams admitted before expiry; expired tombstones prevent duplicate job IDs; tracked and
+guarded asynchronous work cannot resurrect expired or closed jobs; and startup/shutdown purge the
+temporary root whether or not Decart is configured. The browser treats expired/missing accepted
+jobs as terminal, preserves the last healthy video, and requires another explicit provider
+submission. Deterministic service, route, and workflow tests cover expiry, delivery, release,
+owner isolation, late completion, shutdown, and no automatic resubmission. This local cleanup does
+not claim provider cancellation or provider-side deletion.
+
+## 2026-07-30 outcome
 
 The repository already had sound dependency direction, feature locality, test placement, and
 resource ownership. The audit found no defensible reason for a broad folder migration, framework
@@ -81,9 +158,10 @@ complete proof required for removal, so package manifests and the lockfile were 
   the domain package.
 - Reference-image provider audit metadata now derives its return type from the store input instead
   of repeating the provider settings and usage shape.
-- Current documents now distinguish process-local video jobs from a durable job system, the
+- The 2026-07-30 documents distinguished process-local video jobs from a durable job system, the
   zero-or-one upload transformation from the retired ordered chain, the nine-row qualification
-  matrix from its historical ten-row form, and the 24-case visual matrix from its 29-case budget.
+  matrix from its historical ten-row form, and the then-current 24-case visual matrix from its
+  29-case budget.
 
 ## Deferred findings
 
@@ -106,7 +184,7 @@ were not split merely by line count. Accounts, remote exposure, cloud persistenc
 route expansion, and storage-model changes remain product/architecture decisions requiring
 separate approval.
 
-## Validation record
+## 2026-07-30 validation record
 
 Before cleanup, `pnpm quality` and the built production smoke passed. Functional E2E had 41 passes
 and 12 recording-path failures; the repeated finalization failures reported that the browser

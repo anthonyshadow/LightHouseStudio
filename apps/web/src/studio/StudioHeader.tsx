@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import { referenceImageContentUrl } from '../adapters/api-client/apiClient';
+import { referenceImageContentUrl } from '../adapters/api-client/referenceImageRoutes';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
 import type { RefObject } from 'react';
 import { Button } from '../ui';

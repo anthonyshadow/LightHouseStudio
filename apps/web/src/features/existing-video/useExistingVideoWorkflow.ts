@@ -102,6 +102,19 @@ class RetryExistingVideoJobError extends Error {
   }
 }
 
+const explicitResubmissionNotice =
+  'The previous video is safe. Starting again requires a new explicit provider submission and may incur additional provider usage.';
+
+const terminalJobMessage = (code: string | undefined): string | null => {
+  if (code === 'job_expired') {
+    return `This temporary video job expired. ${explicitResubmissionNotice}`;
+  }
+  if (code === 'not_found') {
+    return `This temporary video job is no longer available. ${explicitResubmissionNotice}`;
+  }
+  return null;
+};
+
 const acceptedJobInterruptionMessage = (error: unknown, fallback: string): string => {
   if (error instanceof ApiClientError) {
     return `${error.message} Decart already accepted this submission; resuming it does not create another submission.`;
@@ -439,6 +452,21 @@ export const useExistingVideoWorkflow = ({
     [editBase, recording, selection, steps],
   );
 
+  const jobInterruption = useCallback(
+    (error: unknown, jobId: string, stepIndex: number, fallback: string): Error => {
+      const terminalMessage =
+        error instanceof ApiClientError ? terminalJobMessage(error.code) : null;
+      if (terminalMessage) {
+        setRetryJob(null);
+        setAcceptedSubmission(false);
+        return new Error(terminalMessage);
+      }
+      setRetryJob({ jobId, stepIndex });
+      return new RetryExistingVideoJobError(acceptedJobInterruptionMessage(error, fallback));
+    },
+    [],
+  );
+
   const pollAndFinalize = useCallback(
     async (
       jobId: string,
@@ -453,12 +481,11 @@ export const useExistingVideoWorkflow = ({
           current = await fetchVideoJob(jobId, controller.signal);
         } catch (error) {
           if (controller.signal.aborted) throw error;
-          setRetryJob({ jobId, stepIndex });
-          throw new RetryExistingVideoJobError(
-            acceptedJobInterruptionMessage(
-              error,
-              'The status check was interrupted. Retry status without creating another Decart submission.',
-            ),
+          throw jobInterruption(
+            error,
+            jobId,
+            stepIndex,
+            'The status check was interrupted. Retry status without creating another Decart submission.',
           );
         }
         if (generation !== generationRef.current) return null;
@@ -481,7 +508,8 @@ export const useExistingVideoWorkflow = ({
         setRetryJob(null);
         await releaseVideoJob(jobId).catch(() => undefined);
         throw new Error(
-          current.error?.message ??
+          terminalJobMessage(current.error?.code) ??
+            current.error?.message ??
             'The visual provider could not complete this request. The previous video is safe.',
         );
       }
@@ -496,12 +524,11 @@ export const useExistingVideoWorkflow = ({
         blob = await downloadVideoJobResult(jobId, controller.signal);
       } catch (error) {
         if (controller.signal.aborted) throw error;
-        setRetryJob({ jobId, stepIndex });
-        throw new RetryExistingVideoJobError(
-          acceptedJobInterruptionMessage(
-            error,
-            'The result download was interrupted. Retry it without creating another Decart submission.',
-          ),
+        throw jobInterruption(
+          error,
+          jobId,
+          stepIndex,
+          'The result download was interrupted. Retry it without creating another Decart submission.',
         );
       }
       await releaseVideoJob(jobId).catch(() => undefined);
@@ -515,7 +542,7 @@ export const useExistingVideoWorkflow = ({
         generation,
       );
     },
-    [finalizeVisual, recording, status, steps],
+    [finalizeVisual, jobInterruption, recording, status, steps],
   );
 
   const applySelectedVoice = useCallback(
@@ -551,6 +578,21 @@ export const useExistingVideoWorkflow = ({
     setPhase('complete');
     setMessage('Visual processing is complete. The result is ready to compare and download.');
   }, []);
+
+  const completeVisualArtifact = useCallback(
+    async (
+      artifact: RecordingArtifact | null,
+      selectedVoice: ExistingVideoVoiceSelection | null,
+    ) => {
+      if (!artifact) return;
+      if (selectedVoice) {
+        await applySelectedVoice(artifact, selectedVoice);
+        return;
+      }
+      completeVisualPlan();
+    },
+    [applySelectedVoice, completeVisualPlan],
+  );
 
   const submitStep = useCallback(
     async (stepIndex: number) => {
@@ -615,11 +657,7 @@ export const useExistingVideoWorkflow = ({
         }
         setStatus(submitted);
         const visualArtifact = await pollAndFinalize(jobId, stepIndex, controller, generation);
-        if (visualArtifact && selectedVoice) {
-          await applySelectedVoice(visualArtifact, selectedVoice);
-        } else if (visualArtifact) {
-          completeVisualPlan();
-        }
+        await completeVisualArtifact(visualArtifact, selectedVoice);
       } catch (error) {
         if (controller.signal.aborted && !acceptedSubmission) {
           recording.cancelProcessing();
@@ -642,9 +680,8 @@ export const useExistingVideoWorkflow = ({
     },
     [
       acceptedSubmission,
-      applySelectedVoice,
       clearOperation,
-      completeVisualPlan,
+      completeVisualArtifact,
       editBase,
       pollAndFinalize,
       onSubmissionAccepted,
@@ -703,8 +740,7 @@ export const useExistingVideoWorkflow = ({
         controller,
         generation,
       );
-      if (artifact && voiceSelection) await applySelectedVoice(artifact, voiceSelection);
-      else if (artifact) completeVisualPlan();
+      await completeVisualArtifact(artifact, voiceSelection);
     } catch (error) {
       const safeMessage =
         error instanceof Error ? error.message : 'Local visual finalization failed.';
@@ -714,14 +750,7 @@ export const useExistingVideoWorkflow = ({
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
     }
-  }, [
-    applySelectedVoice,
-    completeVisualPlan,
-    finalizeVisual,
-    pendingVisual,
-    recording,
-    voiceSelection,
-  ]);
+  }, [completeVisualArtifact, finalizeVisual, pendingVisual, recording, voiceSelection]);
 
   const retryExistingJob = useCallback(async () => {
     if (!retryJob) return;
@@ -745,8 +774,7 @@ export const useExistingVideoWorkflow = ({
         controller,
         generation,
       );
-      if (artifact && voiceSelection) await applySelectedVoice(artifact, voiceSelection);
-      else if (artifact) completeVisualPlan();
+      await completeVisualArtifact(artifact, voiceSelection);
     } catch (error) {
       if (!(error instanceof RetryExistingVideoJobError)) {
         setAcceptedSubmission(false);
@@ -760,9 +788,8 @@ export const useExistingVideoWorkflow = ({
       if (controllerRef.current === controller) controllerRef.current = null;
     }
   }, [
-    applySelectedVoice,
     clearOperation,
-    completeVisualPlan,
+    completeVisualArtifact,
     pollAndFinalize,
     recording,
     retryJob,

@@ -1,6 +1,7 @@
 import { useTheme } from '@emotion/react';
 import { useState } from 'react';
 import type { RecipeSelection } from './RecipeShelf.types';
+import { savedPromptToRecipeSelection } from './recipeSelection';
 import type { CreativeAssetRepository, RecentPrompt, SavedPrompt } from './types';
 import { Button, SegmentedControl, StatusNotice, Surface } from '../../ui';
 
@@ -40,16 +41,15 @@ export const OutfitSelector = ({
   const saved = store.savedPrompts.filter((item) => item.modelModeId === 'lucy-vton-latest');
   const recent = store.recentPrompts.filter((item) => item.modelModeId === 'lucy-vton-latest');
   const choose = (item: SavedPrompt | RecentPrompt) => {
-    const isSaved = 'title' in item;
+    if ('title' in item) {
+      onSelect(savedPromptToRecipeSelection(item));
+      return;
+    }
     onSelect({
-      origin: isSaved ? 'saved-prompt' : 'recent-prompt',
+      origin: 'recent-prompt',
       prompt: item.prompt,
       modelModeId: 'lucy-vton-latest',
-      ...(isSaved
-        ? { assetId: item.id }
-        : item.savedPromptId
-          ? { assetId: item.savedPromptId }
-          : {}),
+      ...(item.savedPromptId ? { assetId: item.savedPromptId } : {}),
       referenceImageAssetId: item.referenceImageAssetId,
       vtonInputKind: item.vtonInputKind,
       enhancePrompt: item.enhancePrompt,

@@ -971,7 +971,7 @@ test('Space records and finishes only outside editable controls', async ({ page 
   expect((await readBrowserState(page)).recorderStarts).toBe(0);
 
   page.once('dialog', (dialog) => dialog.accept());
-  await page.getByRole('button', { name: 'Close creative tool' }).click();
+  await page.getByRole('button', { name: 'Close panel' }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Recipe Shelf' })).toBeHidden();
   await expect(shelfLauncher).toBeFocused();

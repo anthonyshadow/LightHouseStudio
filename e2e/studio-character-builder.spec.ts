@@ -263,7 +263,7 @@ test('saved-character selection survives reload and completes Use through Start'
     }),
   ).toBeVisible();
   await page.getByRole('button', { name: 'Record New Video' }).click();
-  await expect(page.getByLabel('Local camera preview')).toBeVisible();
+  await expect(page.getByLabel('Live local camera preview', { exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Start AI', exact: true }).click();
   let chooser = page.getByRole('dialog', { name: 'Choose live AI experience' });
   await expect(chooser.getByLabel('Decart start disclosure')).toContainText('at most 300 seconds');
@@ -284,7 +284,7 @@ test('saved-character selection survives reload and completes Use through Start'
 
   await page.reload();
   await page.getByRole('button', { name: 'Record New Video' }).click();
-  await expect(page.getByLabel('Local camera preview')).toBeVisible();
+  await expect(page.getByLabel('Live local camera preview', { exact: true })).toBeVisible();
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
   shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });

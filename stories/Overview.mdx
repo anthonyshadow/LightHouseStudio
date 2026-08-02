@@ -15,6 +15,7 @@ provider sessions. It is organized by maintenance boundary:
 - **Studio** documents shell chrome and cross-feature workspace compositions.
 - **Flows** links components into deterministic user journeys.
 
-Autodocs, controls, accessibility checks, interaction tests, and Chromium component tests are
-enabled globally. Stories that contain provider-facing actions use typed local doubles; a click
-never silently starts real media or spends provider credits.
+Autodocs, controls, and accessibility inspection are enabled globally. Selected story `play`
+functions remain interactive review examples rather than a separate automated browser sweep.
+Stories that contain provider-facing actions use typed local doubles; a click never silently
+starts real media or spends provider credits.

@@ -23,19 +23,20 @@ opens those stories.
 
 ## Commands
 
-| Command                    | Scope                                                                             |
-| -------------------------- | --------------------------------------------------------------------------------- |
-| `pnpm test`                | Default essential non-visual Vitest suite, including API integration tests        |
-| `pnpm test:unit`           | Domain, contracts, web adapters, components, and controllers                      |
-| `pnpm test:integration`    | API routes/providers, Vite integration, and repository utility scripts            |
-| `pnpm test:coverage`       | Explicit coverage gate using the retained Vitest suite                            |
-| `pnpm test:e2e`            | Focused functional browser journeys                                               |
-| `pnpm test:production`     | Built loopback static-serving smoke; run `pnpm build` first                       |
-| `pnpm test:visual`         | Explicit curated visual regression suite                                          |
-| `pnpm test:visual:update`  | Intentionally regenerate curated baselines for an approved visual change          |
-| `pnpm screenshots:capture` | Broad non-baseline screenshot artifact for manual design review                   |
-| `pnpm test:all`            | Vitest, build, production smoke, functional E2E, and visual regression            |
-| `pnpm quality`             | Normal implementation gate: types, lint, format, architecture, Vitest, and builds |
+| Command                           | Scope                                                                             |
+| --------------------------------- | --------------------------------------------------------------------------------- |
+| `pnpm test`                       | Default essential non-visual Vitest suite, including API integration tests        |
+| `pnpm test:unit`                  | Domain, contracts, web adapters, components, and controllers                      |
+| `pnpm test:integration`           | API routes/providers, Vite integration, and repository utility scripts            |
+| `pnpm test:coverage`              | Explicit coverage gate using the retained Vitest suite                            |
+| `pnpm test:e2e`                   | Focused functional browser journeys                                               |
+| `pnpm test:production`            | Built loopback static-serving smoke; run `pnpm build` first                       |
+| `pnpm test:visual`                | Explicit curated visual regression suite                                          |
+| `pnpm test:visual:update`         | Intentionally regenerate curated baselines for an approved visual change          |
+| `pnpm screenshots:capture`        | Broad non-baseline screenshot artifact for manual design review                   |
+| `pnpm test:all`                   | Vitest, build, production smoke, functional E2E, and visual regression            |
+| `pnpm quality`                    | Normal implementation gate: types, lint, format, architecture, Vitest, and builds |
+| `pnpm check:dead-code:production` | Production file/dependency reachability; excludes test-only exports               |
 
 `test:unit` and `test:integration` are useful focused subsets; `pnpm test` runs both categories
 once through a single Vitest invocation.
@@ -77,7 +78,7 @@ The touch project runs that smoke plus the dedicated control-timeout/recording-S
 browser-specific test must be tagged in its title with `@cross-browser` or `@touch`; do not run
 every desktop journey under every engine by default.
 
-The current visual matrix contains 28 cases within the 29-case review budget. It retains Local live
+The current visual matrix contains 29 cases within the 29-case review budget. It retains Local live
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,
 Shelf, playback, existing-video setup at all five viewports, processing/result, VTO, Voice,
 finalizing, and permission-error compositions. Visual

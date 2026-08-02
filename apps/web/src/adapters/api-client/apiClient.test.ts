@@ -17,6 +17,7 @@ import {
   hydrateReferenceImage,
   importRemoteReferenceImage,
   optimizeCharacterReferencePrompt,
+  referenceImageContentUrl,
   requestRealtimeToken,
   uploadReferenceImage,
 } from './apiClient';
@@ -168,6 +169,12 @@ describe('realtime API client', () => {
 });
 
 describe('reference image API client', () => {
+  it('preserves the canonical encoded content route export', () => {
+    expect(referenceImageContentUrl('asset/with spaces')).toBe(
+      '/api/reference-images/asset%2Fwith%20spaces/content',
+    );
+  });
+
   it('normalizes malformed JSON through the endpoint invalid-response contract', async () => {
     vi.stubGlobal(
       'fetch',

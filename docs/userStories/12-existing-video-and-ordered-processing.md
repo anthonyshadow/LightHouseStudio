@@ -137,6 +137,14 @@ server stores generated paths and safe job state only while validating, submitti
 retrieving; it never persists prompts or original filenames. Cleanup is local and does not claim
 provider cancellation or provider-side deletion.
 
+The broker assigns one immutable deadline when it accepts the job, exactly
+`acceptedAt + 60 minutes`, and the same deadline covers every active state and ready output without
+sliding. Successful delivery, explicit release, or shutdown may remove local state earlier. If a
+content stream starts before the deadline, it may finish after the deadline; no new content stream
+may start at or after it. Expiry preserves a safe process-memory tombstone to prevent the same job
+ID from creating another provider submission, while removing its local media. None of these local
+events means Decart cancellation or provider-side deletion.
+
 After Decart accepts a batch VTO submission, a persistent prompt or explicitly saved-image outfit
 records an exact Recipe Shelf recent. Directly uploaded or imported reference files enter only the
 bounded tab-local recent registry and are never automatically persisted.
@@ -148,7 +156,9 @@ batch submissions per participant, at most two for either exact model.
 
 Automated tests use deterministic local media and fake provider responses. They prove contract,
 mutual exclusion, single submission, source/result stage comparison, result-download initiation,
-source-preserving Start over, responsive controls, failure preservation, and cleanup behavior, but
-not live model entitlement/output, real mobile pickers, H.264 MOV interoperability, five-minute
-memory, or physical downloads. Those remain gates in
+source-preserving Start over, responsive controls, failure preservation, immutable active/ready
+expiry, pre-deadline delivery leases, denied post-deadline content, explicit release, shutdown,
+owner isolation, and protection against late-result resurrection. Live model entitlement/output,
+real mobile pickers, H.264 MOV interoperability, five-minute memory, and physical downloads remain
+gates in
 [Manual QA](../MANUAL_QA.md) and [Live provider smoke](../LIVE_PROVIDER_SMOKE.md).

@@ -5,8 +5,6 @@ import { finished } from 'node:stream/promises';
 import {
   REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
   VIDEO_INPUT_MAX_BYTES,
-  VIDEO_PROVIDER_INTENT_HEADER,
-  VIDEO_PROVIDER_INTENT_VALUE,
   VTON_VIDEO_INPUT_MAX_BYTES,
   videoJobParamsSchema,
   videoTransformRecipeSchema,
@@ -14,7 +12,11 @@ import {
 } from '@studio/contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/app-error.js';
-import { localOwnerIdForRequest, requireTrustedOrigin } from '../../http/security.js';
+import {
+  localOwnerIdForRequest,
+  requireTrustedOrigin,
+  requireVideoProviderIntent,
+} from '../../http/security.js';
 import {
   InvalidReferenceImageUploadError,
   validateUploadedReferenceImage,
@@ -24,13 +26,7 @@ import type { VideoJobService } from './video-job-service.js';
 
 const verifyVideoProviderIntent = (request: FastifyRequest): Promise<void> => {
   requireTrustedOrigin(request);
-  if (request.headers[VIDEO_PROVIDER_INTENT_HEADER] !== VIDEO_PROVIDER_INTENT_VALUE) {
-    throw new AppError(
-      403,
-      'forbidden_origin',
-      'This video provider action requires explicit local Studio intent.',
-    );
-  }
+  requireVideoProviderIntent(request);
   return Promise.resolve();
 };
 
@@ -85,7 +81,7 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
         );
       }
       const ownerId = localOwnerIdForRequest(request);
-      const duplicate = service.existing(parsedParams.data.jobId, ownerId);
+      const duplicate = await service.existing(parsedParams.data.jobId, ownerId);
       if (duplicate) {
         await reply.status(202).send(duplicate);
         return;
@@ -207,13 +203,27 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
     async (request, reply) => {
       const parsed = videoJobParamsSchema.safeParse(request.params);
       if (!parsed.success) throw new AppError(400, 'validation_error', 'Use a valid video job ID.');
-      const result = service.content(parsed.data.jobId, localOwnerIdForRequest(request));
+      const ownerId = localOwnerIdForRequest(request);
+      const result = await service.content(parsed.data.jobId, ownerId);
       void reply.header('Content-Length', String(result.media.sizeBytes));
       void reply.type(result.media.mimeType);
+      let settled = false;
+      const settle = (delivered: boolean): void => {
+        if (settled) return;
+        settled = true;
+        void result.settle(delivered);
+      };
       reply.raw.once('finish', () => {
-        void service.release(parsed.data.jobId, localOwnerIdForRequest(request));
+        settle(true);
       });
-      return reply.send(createReadStream(result.path));
+      reply.raw.once('close', () => {
+        settle(reply.raw.writableFinished);
+      });
+      const stream = createReadStream(result.path);
+      stream.once('error', () => {
+        settle(false);
+      });
+      return reply.send(stream);
     },
   );
 

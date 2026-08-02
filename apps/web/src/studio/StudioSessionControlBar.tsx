@@ -1,6 +1,6 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import type { RefObject } from 'react';
-import { referenceImageContentUrl } from '../adapters/api-client/apiClient';
+import { referenceImageContentUrl } from '../adapters/api-client/referenceImageRoutes';
 import { Button } from '../ui';
 import { fadingVisibilityAnimationStyles } from '../ui/animationStyles';
 import type { StudioMode, StudioSessionController } from '../features/media-session';

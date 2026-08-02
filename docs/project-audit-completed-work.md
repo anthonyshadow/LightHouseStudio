@@ -87,3 +87,19 @@ active plan.
   preserving Dock-started local and live AI recordings in their existing Latest Take flow.
 - Presented Character Swap, Virtual Try On, and Voice as post-recording edits and removed the old
   VTO feature-status qualifier while retaining rights, consent, input, provider, and accuracy limits.
+
+## 2026-08-02 — Temporary video-job deadline
+
+- Fixed one immutable accepted-at-plus-60-minute deadline across active and ready video-job states;
+  polling, retrieval, retry, and readiness never extend it.
+- Added a service-owned nearest-deadline timer, request-time checks, expired tombstones, guarded
+  late work, idempotent shutdown, and credential-independent startup/shutdown temp-root cleanup.
+- Added delivery leases so content admitted before expiry may finish safely while no new content is
+  admitted at or after the deadline; successful delivery and explicit release still clean earlier.
+- Made expired or missing accepted jobs terminal in the browser without automatic provider
+  resubmission, while preserving the original or latest healthy video.
+- Added deterministic service, route, and workflow coverage for active/ready expiry, exact-boundary
+  races, delivery, release, owner isolation, late provider results, shutdown, and retry semantics.
+
+This closes `SEC-008` as an implementation finding. Exact-model live output/retention and physical
+qualification remain in the active plan. Local cleanup is not provider cancellation or deletion.

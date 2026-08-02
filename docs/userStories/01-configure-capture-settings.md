@@ -31,12 +31,12 @@ for browser-reported front/rear modes and hardware zoom only when the track repo
 
 ## Guards and recovery
 
-- **Discard** restores the last applied preferences without changing live media.
 - If a selected device disappears, Studio retains the choice, explains that the browser default
   will be used, and allows reselection after reconnection.
 - A failed live replacement leaves the current preview active and reports **Settings unchanged**.
-- If a camera cannot satisfy the selected aspect ratio, Start or Apply fails safely instead of
-  silently recording the previous format. Active capture reports the browser-negotiated result.
+- If a camera cannot satisfy the selected aspect ratio, Start or automatic live replacement fails
+  safely instead of silently recording the previous format. Active capture reports the
+  browser-negotiated result.
 - Settings are disabled during AI start/live, recording/finalization, and take review.
 - Preferences are in-memory for the tab; device IDs are not written to Recipe Shelf storage.
 

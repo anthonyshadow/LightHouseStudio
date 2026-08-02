@@ -38,7 +38,7 @@ import {
   type ExistingVideoStep,
   type ExistingVideoWorkflow,
 } from './useExistingVideoWorkflow';
-import type { VoiceBrowserCapabilities } from '../voice-effects/VoiceEffectsPanel';
+import type { VoiceBrowserCapabilities } from '../voice-effects/voiceCapabilities';
 
 type ExistingVideoPanelProps = {
   readonly workflow: ExistingVideoWorkflow;

@@ -7,6 +7,7 @@ import {
 import { CreativeAssetError } from './repository';
 import type { EditAction, ShelfCategory } from './RecipeCards';
 import type { RecipeShelfProps } from './RecipeShelf.types';
+import { savedPromptToRecipeSelection } from './recipeSelection';
 import type { RecentPrompt, SavedCharacterPrompt, SavedPrompt } from './types';
 import { useCreativeAssetRepository } from './useCreativeAssetRepository';
 
@@ -260,17 +261,7 @@ export const useRecipeShelfController = ({
     });
 
   const selectSaved = (item: SavedPrompt) =>
-    runAfterFormCheck(() =>
-      onUsePrompt({
-        origin: 'saved-prompt',
-        prompt: item.prompt,
-        modelModeId: item.modelModeId,
-        assetId: item.id,
-        referenceImageAssetId: item.referenceImageAssetId,
-        vtonInputKind: item.vtonInputKind,
-        enhancePrompt: item.enhancePrompt,
-      }),
-    );
+    runAfterFormCheck(() => onUsePrompt(savedPromptToRecipeSelection(item)));
 
   const selectRecent = (item: RecentPrompt) =>
     runAfterFormCheck(() =>
