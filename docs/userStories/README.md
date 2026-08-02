@@ -5,20 +5,20 @@ references, not release-readiness claims or future requirements.
 
 ## Journeys
 
-| Flow                                         | Story                                                                                      |
-| -------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Record or upload, then edit and download     | [Existing video and single visual processing](12-existing-video-and-ordered-processing.md) |
-| Choose camera, microphone, and local quality | [Configure capture settings](01-configure-capture-settings.md)                             |
-| Preview and record without provider work     | [Local camera capture](02-local-camera-capture.md)                                         |
-| Run and record live Lucy 2.5                 | [Character AI session](03-character-ai-session.md)                                         |
-| Run and record live VTON 3                   | [Virtual try-on session](04-virtual-try-on-session.md)                                     |
-| Build Add, Replace, or Restyle directions    | [Structured prompt workshop](05-structured-prompt-workshop.md)                             |
-| Save and reuse recipes                       | [Recipe Shelf](06-recipe-shelf.md)                                                         |
-| Review, download, and release a take         | [Take review and cleanup](07-take-review-and-cleanup.md)                                   |
-| Apply browser-local voice effects            | [Local voice treatments](08-local-voice-treatments.md)                                     |
-| Apply a saved ElevenLabs voice               | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                               |
-| Recover from missing capabilities            | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md)             |
-| Build and preload a reusable character       | [Studio character builder](11-studio-character-builder.md)                                 |
+| Flow                                                 | Story                                                                                      |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Record or upload, then edit and download             | [Existing video and single visual processing](12-existing-video-and-ordered-processing.md) |
+| Choose camera, microphone, local format, and quality | [Configure capture settings](01-configure-capture-settings.md)                             |
+| Preview and record without provider work             | [Local camera capture](02-local-camera-capture.md)                                         |
+| Run and record live Lucy 2.5                         | [Character AI session](03-character-ai-session.md)                                         |
+| Run and record live VTON 3                           | [Virtual try-on session](04-virtual-try-on-session.md)                                     |
+| Build Add, Replace, or Restyle directions            | [Structured prompt workshop](05-structured-prompt-workshop.md)                             |
+| Save and reuse recipes                               | [Recipe Shelf](06-recipe-shelf.md)                                                         |
+| Review, download, and release a take                 | [Take review and cleanup](07-take-review-and-cleanup.md)                                   |
+| Apply browser-local voice effects                    | [Local voice treatments](08-local-voice-treatments.md)                                     |
+| Apply a saved ElevenLabs voice                       | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                               |
+| Recover from missing capabilities                    | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md)             |
+| Build and preload a reusable character               | [Studio character builder](11-studio-character-builder.md)                                 |
 
 ## Shared runtime rules
 

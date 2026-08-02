@@ -72,6 +72,7 @@ export const acquireLocalMedia = async (requirements: MediaRequirements): Promis
   const video: MediaTrackConstraints = {
     width: { ideal: requirements.width },
     height: { ideal: requirements.height },
+    aspectRatio: { exact: requirements.width / requirements.height },
     frameRate: { ideal: requirements.frameRate },
   };
   if (requirements.facingMode) video.facingMode = { exact: requirements.facingMode };

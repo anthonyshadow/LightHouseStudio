@@ -146,6 +146,7 @@ export const useOwnedLocalMedia = ({
           await track?.applyConstraints({
             width: { ideal: requirements.width },
             height: { ideal: requirements.height },
+            aspectRatio: { exact: requirements.width / requirements.height },
             frameRate: { ideal: requirements.frameRate },
           });
           if (operationRef.current !== operation || streamRef.current !== existing) {

@@ -26,8 +26,9 @@ claim that qualification has passed.
 2. Studio opens in neutral **Local Camera** mode. Camera and microphone remain off until the
    creator explicitly starts them from the control bar or **Record a local video** in the upload
    panel. No AI model, provider session, or remote processing starts on entry or refresh.
-3. Record locally on the persistent stage, or select a compatible device-local file. A healthy
-   local recording is normalized on device and becomes the editor source after finalization.
+3. Choose a landscape 16:9 or portrait 9:16 local format in Capture Settings, then record on the
+   persistent stage, or select a compatible device-local file. A healthy local recording is
+   normalized on device and becomes the editor source after finalization.
 4. Review the source, then optionally choose exactly one visual transformation—**Character Swap**
    or **Virtual Try On**—and/or **Voice**. Combined work completes and validates the visual result
    before voice conversion.

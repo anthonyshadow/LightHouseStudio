@@ -716,6 +716,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               lifecycle={session.lifecycle}
               recording={recording.lifecycle === 'recording'}
               recordingSeconds={recording.elapsedSeconds}
+              aspectRatio={
+                session.draft.mode === 'local'
+                  ? session.capturePreferences.applied.aspectRatio
+                  : '16:9'
+              }
               realtimeSessionTiming={session.realtimeSessionTiming}
               idleAction={
                 stagePresentation.kind === 'idle' && firstSuccessGuideVisible ? (
@@ -931,7 +936,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           open={activeOverlay === 'capture-settings'}
           onClose={closeOverlay}
           title="Capture Settings"
-          description="Choose session-only sources and a local capture target without starting media."
+          description="Choose session-only sources, video format, and a local capture target without starting media."
           placement="right"
           bodyMode="contained"
         >

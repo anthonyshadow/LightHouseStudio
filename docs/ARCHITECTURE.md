@@ -102,7 +102,10 @@ before AI/local resources release; otherwise Studio returns to local preview wit
 draft preserved.
 
 Capture preferences are tab-memory state, not recipe data. Device enumeration does not request
-permission and device IDs are not persisted. Apply during local preview performs atomic stream
+permission and device IDs are not persisted. Local format is an app-owned 16:9 or 9:16 choice:
+orchestration swaps the selected quality profile's width/height, the browser adapter constrains
+the camera aspect, and the persistent stage follows the applied format. Recording continues to
+borrow that same negotiated source track. Apply during local preview performs atomic stream
 replacement. Source changes are blocked while AI or recording owns the source. Facing-mode and
 track zoom controls appear only when the active camera exposes those capabilities.
 

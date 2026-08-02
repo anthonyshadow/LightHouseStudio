@@ -1,15 +1,22 @@
 import type { CSSObject, Theme } from '@emotion/react';
 import { rotatingSpinnerAnimationStyles } from '../../ui/animationStyles';
 
-export const stageStyles = (theme: Theme, recording: boolean): CSSObject => ({
+export const stageStyles = (
+  theme: Theme,
+  recording: boolean,
+  aspectRatio: '16:9' | '9:16',
+): CSSObject => ({
   position: 'relative',
   isolation: 'isolate',
   display: 'grid',
-  width: '100%',
-  height: '100%',
+  placeSelf: 'center',
+  width: aspectRatio === '16:9' ? '100%' : 'auto',
+  height: aspectRatio === '16:9' ? 'auto' : '100%',
+  maxWidth: '100%',
+  maxHeight: '100%',
   minWidth: 0,
   minHeight: 0,
-  aspectRatio: '16 / 9',
+  aspectRatio: aspectRatio === '16:9' ? '16 / 9' : '9 / 16',
   margin: 0,
   overflow: 'hidden',
   border: `1px solid ${recording ? theme.colors.recording : theme.colors.border}`,

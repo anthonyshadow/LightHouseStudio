@@ -1,4 +1,4 @@
-import type { LocalCaptureProfileId } from '../../application/types';
+import type { LocalCaptureAspectRatio, LocalCaptureProfileId } from '../../application/types';
 import type { MediaRequirements } from '../../adapters/browser-media/browserMedia';
 
 export const LOCAL_MEDIA_REQUIREMENTS: MediaRequirements = {
@@ -16,5 +16,12 @@ export const LOCAL_MEDIA_PROFILES: Record<LocalCaptureProfileId, MediaRequiremen
   },
 };
 
-export const localMediaRequirements = (profile: LocalCaptureProfileId): MediaRequirements =>
-  LOCAL_MEDIA_PROFILES[profile];
+export const localMediaRequirements = (
+  profile: LocalCaptureProfileId,
+  aspectRatio: LocalCaptureAspectRatio,
+): MediaRequirements => {
+  const landscape = LOCAL_MEDIA_PROFILES[profile];
+  return aspectRatio === '16:9'
+    ? landscape
+    : { ...landscape, width: landscape.height, height: landscape.width };
+};

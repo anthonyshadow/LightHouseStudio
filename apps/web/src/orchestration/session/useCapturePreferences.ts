@@ -7,7 +7,7 @@ import {
   subscribeToMediaDeviceChanges,
   supportsLocal1080pProfile,
 } from '../../adapters/browser-media/browserMedia';
-import type { CapturePreferences } from '../../application/types';
+import type { CapturePreferences, LocalCaptureAspectRatio } from '../../application/types';
 import type {
   CaptureDeviceOption,
   CapturePreferencesController,
@@ -18,6 +18,7 @@ export const DEFAULT_CAPTURE_PREFERENCES: CapturePreferences = {
   videoDeviceId: null,
   audioDeviceId: null,
   profile: '720p30',
+  aspectRatio: '16:9',
 };
 
 export type UseCapturePreferencesOptions = {
@@ -47,7 +48,8 @@ const deviceOptions = (
 const samePreferences = (left: CapturePreferences, right: CapturePreferences): boolean =>
   left.videoDeviceId === right.videoDeviceId &&
   left.audioDeviceId === right.audioDeviceId &&
-  left.profile === right.profile;
+  left.profile === right.profile &&
+  left.aspectRatio === right.aspectRatio;
 
 const selectedDeviceUnavailable = (
   devicesState: CapturePreferencesController['devicesState'],
@@ -158,6 +160,12 @@ export const useCapturePreferences = ({
     [supportedProfiles],
   );
 
+  const updateAspectRatio = useCallback((aspectRatio: LocalCaptureAspectRatio) => {
+    if (aspectRatio !== '16:9' && aspectRatio !== '9:16') return;
+    setApplyError(null);
+    setDraft((current) => ({ ...current, aspectRatio }));
+  }, []);
+
   const apply = useCallback((): Promise<boolean> => {
     if (applyInFlightRef.current) return applyInFlightRef.current;
     if (samePreferences(draft, applied)) return Promise.resolve(true);
@@ -260,6 +268,7 @@ export const useCapturePreferences = ({
     updateVideoDeviceId,
     updateAudioDeviceId,
     updateProfile,
+    updateAspectRatio,
     reportVideoDeviceUnavailable,
     dismissVideoFallbackNotice,
     apply,

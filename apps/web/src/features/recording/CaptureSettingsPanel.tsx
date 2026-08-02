@@ -5,6 +5,7 @@ import { Button, SelectField, StatusNotice } from '../../ui';
 import type {
   CaptureDeviceOption,
   CapturePreferencesController,
+  LocalCaptureAspectRatio,
   LocalCaptureProfileId,
 } from './types';
 
@@ -160,6 +161,11 @@ const footerStyles = (theme: Theme): CSSObject => ({
 const profileLabels: Record<LocalCaptureProfileId, string> = {
   '720p30': '720p · 30 fps',
   '1080p30': '1080p · 30 fps',
+};
+
+const aspectRatioLabels: Record<LocalCaptureAspectRatio, string> = {
+  '16:9': 'Landscape · 16:9',
+  '9:16': 'Portrait · 9:16',
 };
 
 const selectedDeviceAvailable = (
@@ -356,21 +362,40 @@ export const CaptureSettingsPanel = ({
           </SelectField>
 
           {localMode ? (
-            <SelectField
-              label="Local preview quality"
-              value={controller.draft.profile}
-              disabled={controlsDisabled}
-              hint="The browser may negotiate a lower setting when the camera cannot meet the target."
-              onChange={(event) =>
-                controller.updateProfile(event.currentTarget.value as LocalCaptureProfileId)
-              }
-            >
-              {controller.supportedProfiles.map((profile) => (
-                <option key={profile} value={profile}>
-                  {profileLabels[profile]}
-                </option>
-              ))}
-            </SelectField>
+            <>
+              <SelectField
+                label="Video format"
+                value={controller.draft.aspectRatio}
+                disabled={controlsDisabled}
+                hint="Sets the camera shape for both local preview and recording. Unsupported formats leave the current preview unchanged."
+                onChange={(event) =>
+                  controller.updateAspectRatio(event.currentTarget.value as LocalCaptureAspectRatio)
+                }
+              >
+                {(Object.keys(aspectRatioLabels) as LocalCaptureAspectRatio[]).map(
+                  (aspectRatio) => (
+                    <option key={aspectRatio} value={aspectRatio}>
+                      {aspectRatioLabels[aspectRatio]}
+                    </option>
+                  ),
+                )}
+              </SelectField>
+              <SelectField
+                label="Local preview quality"
+                value={controller.draft.profile}
+                disabled={controlsDisabled}
+                hint="The browser may negotiate a lower setting when the camera cannot meet the target."
+                onChange={(event) =>
+                  controller.updateProfile(event.currentTarget.value as LocalCaptureProfileId)
+                }
+              >
+                {controller.supportedProfiles.map((profile) => (
+                  <option key={profile} value={profile}>
+                    {profileLabels[profile]}
+                  </option>
+                ))}
+              </SelectField>
+            </>
           ) : (
             <StatusNotice tone="neutral" title="Provider-managed quality">
               Character AI and Virtual Try-On use the active model&apos;s required capture size.

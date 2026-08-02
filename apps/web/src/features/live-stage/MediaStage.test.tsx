@@ -123,6 +123,7 @@ describe('MediaStage', () => {
 
     expect(firstVideo).not.toBeNull();
     expect(firstVideo).toHaveAttribute('data-media-fit', 'contain');
+    expect(firstStage).toHaveAttribute('data-stage-aspect-ratio', '16:9');
 
     view.rerender(
       stage({
@@ -213,6 +214,19 @@ describe('MediaStage', () => {
     expect(firstVideo?.srcObject).toBeNull();
     expect(firstVideo).not.toHaveAttribute('src');
     expect(screen.getByText('Your private creative stage.')).toBeInTheDocument();
+  });
+
+  it('switches the persistent stage frame to portrait without replacing its video node', () => {
+    const view = render(stage());
+    const video = view.container.querySelector('video');
+
+    view.rerender(stage({ aspectRatio: '9:16' }));
+
+    expect(view.container.querySelector('video')).toBe(video);
+    expect(screen.getByRole('figure', { name: 'Studio media stage' })).toHaveAttribute(
+      'data-stage-aspect-ratio',
+      '9:16',
+    );
   });
 
   it('keeps supplied stage controls mounted over recorded playback', () => {

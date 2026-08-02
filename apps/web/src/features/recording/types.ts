@@ -10,6 +10,7 @@ import type {
   CaptureDeviceOption,
   CapturePreferences,
   CaptureStreamSettings,
+  LocalCaptureAspectRatio,
   LocalCaptureProfileId,
 } from '../../application/types';
 
@@ -17,6 +18,7 @@ export type {
   CaptureDeviceOption,
   CapturePreferences,
   CaptureStreamSettings,
+  LocalCaptureAspectRatio,
   LocalCaptureProfileId,
 } from '../../application/types';
 
@@ -138,6 +140,7 @@ export type CapturePreferencesController = {
   updateVideoDeviceId: (deviceId: string | null) => void;
   updateAudioDeviceId: (deviceId: string | null) => void;
   updateProfile: (profile: LocalCaptureProfileId) => void;
+  updateAspectRatio: (aspectRatio: LocalCaptureAspectRatio) => void;
   reportVideoDeviceUnavailable: (deviceId: string) => void;
   dismissVideoFallbackNotice: () => void;
   apply: () => Promise<boolean>;

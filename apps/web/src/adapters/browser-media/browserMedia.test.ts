@@ -97,6 +97,7 @@ describe('browser media capture settings', () => {
         videoDeviceId: 'camera-2',
         audioDeviceId: 'microphone-2',
         profile: '1080p30',
+        aspectRatio: '16:9',
       },
     );
     await expect(acquireLocalMedia(requirements)).resolves.toBe(stream);
@@ -105,6 +106,7 @@ describe('browser media capture settings', () => {
       video: {
         width: { ideal: 1_920 },
         height: { ideal: 1_080 },
+        aspectRatio: { exact: 16 / 9 },
         frameRate: { ideal: 30 },
         deviceId: { exact: 'camera-2' },
       },

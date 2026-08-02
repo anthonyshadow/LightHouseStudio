@@ -186,6 +186,7 @@ describe('useStudioSession explicit-start boundaries', () => {
       result.current.capturePreferences.updateVideoDeviceId('camera-2');
       result.current.capturePreferences.updateAudioDeviceId('microphone-2');
       result.current.capturePreferences.updateProfile('1080p30');
+      result.current.capturePreferences.updateAspectRatio('9:16');
     });
     await act(async () => {
       await result.current.capturePreferences.apply();
@@ -196,8 +197,8 @@ describe('useStudioSession explicit-start boundaries', () => {
       await result.current.startLocal();
     });
     expect(adapters.acquireLocalMedia).toHaveBeenCalledWith({
-      width: 1_920,
-      height: 1_080,
+      width: 1_080,
+      height: 1_920,
       frameRate: 30,
       deviceId: 'camera-2',
       audioDeviceId: 'microphone-2',
@@ -549,6 +550,7 @@ describe('useStudioSession explicit-start boundaries', () => {
     expect(local.getVideoTracks()[0]?.applyConstraints).toHaveBeenCalledWith({
       width: { ideal: 1_280 },
       height: { ideal: 720 },
+      aspectRatio: { exact: 16 / 9 },
       frameRate: { ideal: 30 },
     });
     expect(options?.localStream).toBe(local);

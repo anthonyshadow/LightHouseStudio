@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTheme } from '@emotion/react';
 import { getRecordingDurationTiming } from '@studio/domain';
+import type { LocalCaptureAspectRatio } from '../../application/types';
 import { formatDuration } from '../recording/recordingHelpers';
 import {
   type RealtimeSessionTiming,
@@ -35,6 +36,7 @@ export type MediaStageProps = {
   lifecycle: SessionLifecycle;
   recording: boolean;
   recordingSeconds: number;
+  aspectRatio?: LocalCaptureAspectRatio;
   realtimeSessionTiming?: RealtimeSessionTiming | null;
   controls?: ReactNode | ((state: StageControlVisibility) => ReactNode);
   idleAction?: ReactNode;
@@ -228,6 +230,7 @@ export const MediaStage = ({
   lifecycle,
   recording,
   recordingSeconds,
+  aspectRatio = '16:9',
   realtimeSessionTiming = null,
   controls,
   idleAction,
@@ -546,7 +549,7 @@ export const MediaStage = ({
   return (
     <figure
       ref={figureRef}
-      css={stageStyles(theme, recording || isFinalizing)}
+      css={stageStyles(theme, recording || isFinalizing, aspectRatio)}
       aria-label="Studio media stage"
       aria-busy={
         isFinalizing ||
@@ -555,6 +558,7 @@ export const MediaStage = ({
       }
       data-recording={recording ? 'true' : 'false'}
       data-stage-presentation={presentation.kind}
+      data-stage-aspect-ratio={aspectRatio}
     >
       <video
         ref={videoRef}

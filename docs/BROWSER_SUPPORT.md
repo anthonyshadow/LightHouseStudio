@@ -66,6 +66,12 @@ Before permission, labels and device lists may be generic or incomplete. Opening
 Settings enumerates devices without calling `getUserMedia`; a successful explicit Start triggers a
 post-permission rescan.
 
+Local Capture Settings offers 16:9 landscape and 9:16 portrait. The selected format changes the
+persistent preview frame and is sent as an exact camera aspect constraint with the selected
+quality target; recording borrows the resulting track. A camera/browser that cannot satisfy the
+format may reject Start or Apply, and **Active capture** remains the source of truth for negotiated
+dimensions. Physical portrait support is not qualified until the device matrix passes.
+
 **Switch camera** appears only when the active track and post-permission capabilities expose both
 `user` and `environment`. It requests the exact opposite facing mode and never cycles desktop
 webcams or Continuity Camera. Zoom controls appear only for numeric track zoom capability.

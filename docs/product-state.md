@@ -1,6 +1,6 @@
 # Lightframe Studio product state
 
-**Current as of:** 2026-07-31
+**Current as of:** 2026-08-01
 
 **Release frame:** operator-assisted, loopback-only controlled pilot
 
@@ -48,7 +48,8 @@ required, but no physical target is qualified yet.
   Dock flow.
 - One persistent stage owns local/AI preview, uploaded-video preview, recording, finalization,
   result comparison, and take playback. Shared overlays never own a second media session.
-- Capture supports device choice, browser-exposed camera switching, and capability-gated zoom.
+- Local capture supports 16:9 landscape or 9:16 portrait preview/recording, device choice,
+  browser-exposed camera switching, and capability-gated zoom.
 - Character Builder supports prompt-only, direct upload, image-only, generated, and combined
   references with recoverable draft/save state.
 - Recipe Shelf stores sanitized, versioned browser metadata and opaque reference relationships.

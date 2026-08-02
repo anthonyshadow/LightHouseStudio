@@ -80,9 +80,24 @@ const harness = vi.hoisted(() => {
     search: vi.fn(() => ({ savedPrompts: [], recentPrompts: [], savedCharacterPrompts: [] })),
   };
   const capturePreferences = {
-    draft: { videoDeviceId: null, audioDeviceId: null, profile: '720p30' as const },
-    applied: { videoDeviceId: null, audioDeviceId: null, profile: '720p30' as const },
-    effectiveApplied: { videoDeviceId: null, audioDeviceId: null, profile: '720p30' as const },
+    draft: {
+      videoDeviceId: null,
+      audioDeviceId: null,
+      profile: '720p30' as const,
+      aspectRatio: '16:9' as const,
+    },
+    applied: {
+      videoDeviceId: null,
+      audioDeviceId: null,
+      profile: '720p30' as const,
+      aspectRatio: '16:9' as const,
+    },
+    effectiveApplied: {
+      videoDeviceId: null,
+      audioDeviceId: null,
+      profile: '720p30' as const,
+      aspectRatio: '16:9' as const,
+    },
     cameraDevices: [],
     microphoneDevices: [],
     supportedProfiles: ['720p30' as const],
@@ -98,6 +113,7 @@ const harness = vi.hoisted(() => {
     updateVideoDeviceId: vi.fn(),
     updateAudioDeviceId: vi.fn(),
     updateProfile: vi.fn(),
+    updateAspectRatio: vi.fn(),
     reportVideoDeviceUnavailable: vi.fn(),
     dismissVideoFallbackNotice: vi.fn(),
     apply: vi.fn(() => Promise.resolve(true)),

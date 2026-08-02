@@ -64,6 +64,7 @@ describe('CaptureSettingsPanel', () => {
     expect(getUserMedia).not.toHaveBeenCalled();
     await user.selectOptions(screen.getByLabelText('Camera'), 'camera-2');
     await user.selectOptions(screen.getByLabelText('Microphone'), 'microphone-2');
+    await user.selectOptions(screen.getByLabelText('Video format'), '9:16');
     await user.selectOptions(screen.getByLabelText('Local preview quality'), '1080p30');
     await user.click(screen.getByRole('button', { name: 'Apply settings' }));
 
@@ -71,6 +72,7 @@ describe('CaptureSettingsPanel', () => {
       videoDeviceId: 'camera-2',
       audioDeviceId: 'microphone-2',
       profile: '1080p30',
+      aspectRatio: '9:16',
     });
     expect(getUserMedia).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Apply settings' })).toBeDisabled();

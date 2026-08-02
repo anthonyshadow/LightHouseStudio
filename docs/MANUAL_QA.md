@@ -125,6 +125,9 @@ preview/generation region; **Review & Generate** moves focus to it without dupli
 
 - Opening Capture Settings before Start may enumerate devices but must not call `getUserMedia` or
   prompt. Applied preferences are tab-only and disappear on reload.
+- Apply 16:9 and 9:16 at every physical target. Verify the same persistent stage changes shape,
+  Active capture reports the matching negotiated dimensions, recorded metadata/playback retains
+  the orientation, and an unsupported format fails without replacing the healthy preview.
 - After permission, verify the rescan can reveal newly labeled/front/rear/phone cameras and Active
   capture reports negotiated settings rather than targets.
 - Exact device replacement is atomic. Acquisition failure preserves the current stream.

@@ -4,7 +4,8 @@
 
 ## Journey
 
-1. Optionally stage sources in **Device settings**.
+1. Optionally stage sources in **Device settings**, including **Landscape · 16:9** or
+   **Portrait · 9:16** for both local preview and recording.
 2. Entering Studio leaves camera and microphone off. Select **Record New Video** in the control
    bar (or Dock **Start local preview**) and grant browser permission.
 3. Confirm **Live local camera preview**. Use the mic/camera toggles and any capability-gated
@@ -27,6 +28,8 @@
 
 - Permission/device failures show safe guidance and a **Capture settings** action; retry remains an
   explicit Start.
+- An unsupported selected aspect ratio fails safely; Studio does not silently claim that a
+  differently shaped negotiated track was recorded.
 - **Close** before recording releases camera and microphone.
 - A sidecar failure does not invalidate a playable main video.
 - Invalid final output returns Studio to idle with an error instead of retaining a partial live

@@ -141,6 +141,7 @@ describe('useCapturePreferences', () => {
     });
 
     act(() => result.current.updateVideoDeviceId('camera-2'));
+    act(() => result.current.updateAspectRatio('9:16'));
 
     let first!: Promise<boolean>;
     let second!: Promise<boolean>;
@@ -155,6 +156,7 @@ describe('useCapturePreferences', () => {
       videoDeviceId: 'camera-2',
       audioDeviceId: null,
       profile: '720p30',
+      aspectRatio: '9:16',
     });
     expect(result.current.applying).toBe(true);
 

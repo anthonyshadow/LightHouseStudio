@@ -152,7 +152,7 @@ export const useStudioSession = ({
 
       const baseRequirements =
         draftRef.current.mode === 'local'
-          ? localMediaRequirements(preferences.profile)
+          ? localMediaRequirements(preferences.profile, preferences.aspectRatio)
           : (currentRequirements ?? LOCAL_MEDIA_REQUIREMENTS);
       const requirements = withPreferredFacingMode(
         baseRequirements,
@@ -325,7 +325,10 @@ export const useStudioSession = ({
     setApplied(null);
     await beginMedia(
       withPreferredFacingMode(
-        localMediaRequirements(effectiveCapturePreferences.profile),
+        localMediaRequirements(
+          effectiveCapturePreferences.profile,
+          effectiveCapturePreferences.aspectRatio,
+        ),
         effectiveCapturePreferences,
         preferredFacingModeRef.current,
       ),

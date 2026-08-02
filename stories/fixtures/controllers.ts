@@ -214,16 +214,19 @@ export const createCapturePreferencesController = (
     videoDeviceId: 'camera-1',
     audioDeviceId: 'microphone-1',
     profile: '1080p30',
+    aspectRatio: '9:16',
   },
   applied: {
     videoDeviceId: 'camera-1',
     audioDeviceId: 'microphone-1',
     profile: '720p30',
+    aspectRatio: '16:9',
   },
   effectiveApplied: {
     videoDeviceId: 'camera-1',
     audioDeviceId: 'microphone-1',
     profile: '720p30',
+    aspectRatio: '16:9',
   },
   cameraDevices: [
     { deviceId: 'camera-1', label: 'Studio Camera' },
@@ -255,6 +258,7 @@ export const createCapturePreferencesController = (
   updateVideoDeviceId: fn(),
   updateAudioDeviceId: fn(),
   updateProfile: fn(),
+  updateAspectRatio: fn(),
   reportVideoDeviceUnavailable: fn(),
   dismissVideoFallbackNotice: fn(),
   apply: fn(() => Promise.resolve(true)),

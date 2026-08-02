@@ -44,12 +44,14 @@ export type BrowserCapabilities = {
 };
 
 export type LocalCaptureProfileId = '720p30' | '1080p30';
+export type LocalCaptureAspectRatio = '16:9' | '9:16';
 export type CameraFacingMode = 'user' | 'environment';
 
 export type CapturePreferences = {
   videoDeviceId: string | null;
   audioDeviceId: string | null;
   profile: LocalCaptureProfileId;
+  aspectRatio: LocalCaptureAspectRatio;
 };
 
 export type CaptureDeviceOption = {
