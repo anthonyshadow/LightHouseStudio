@@ -22,10 +22,12 @@
    at 5:00.
 8. Wait for the main recorder and optional audio sidecar to settle. Studio releases live tracks
    and shows **Recorded take playback** on the same stage.
-9. A control-bar **Record New Video** take becomes the source in the post-recording editor, where
+9. Every finalized playback enables **Edit Video** in the creative tool rail. A control-bar
+   **Record New Video** take is already retained as the post-recording editor source, where
    Character Swap, Virtual Try On, and Voice are available. A Dock-started local take keeps the
    compact Download, Discard, Voice, Release, and [detailed review](07-take-review-and-cleanup.md)
-   path used by advanced live sessions.
+   path used by advanced live sessions; **Edit Video** opens the existing-video source chooser
+   without silently adopting that take.
 
 ## Guards and recovery
 

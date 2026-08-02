@@ -19,7 +19,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'CreativeWorkspace owns the desktop Character, Outfit, and Workshop preparation rail plus Dock, Take, and Shelf, responsive overlay placement, and cross-feature locks. The story uses the real Recipe Shelf controller with local-only fixture data.',
+          'CreativeWorkspace owns the desktop Character, Outfit, and Workshop preparation rail plus Dock, Edit Video, and Shelf, responsive overlay placement, and cross-feature locks. The story uses the real Recipe Shelf controller with local-only fixture data.',
       },
     },
   },
@@ -32,7 +32,7 @@ const WorkspaceHarness = () => {
   const repository = useMemo(() => createSeededCreativeAssetRepository(), []);
   const [panel, setPanel] = useState<AuxiliaryPanel>('shelf');
   const dockToggleRef = useRef<HTMLButtonElement>(null);
-  const takeToggleRef = useRef<HTMLButtonElement>(null);
+  const editVideoToggleRef = useRef<HTMLButtonElement>(null);
   const characterToggleRef = useRef<HTMLButtonElement>(null);
   const outfitToggleRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
@@ -53,11 +53,11 @@ const WorkspaceHarness = () => {
     referenceUseFailure: null,
     legacyProjectCount: 2,
     recipeShelfEntryIntent: null,
-    hasTake: true,
+    hasPlaybackVideo: true,
   };
   const actions: CreativeWorkspaceActions = {
     onOpenDock: fn(),
-    onOpenTake: fn(),
+    onOpenEditVideo: fn(),
     onOpenCharacter: fn(),
     onOpenOutfit: fn(),
     onOpenWorkshop: () => setPanel('workshop'),
@@ -94,7 +94,7 @@ const WorkspaceHarness = () => {
           actions={actions}
           refs={{
             dockToggleRef,
-            takeToggleRef,
+            editVideoToggleRef,
             characterToggleRef,
             outfitToggleRef,
             workshopToggleRef,

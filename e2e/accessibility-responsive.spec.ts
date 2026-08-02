@@ -281,7 +281,7 @@ test('phone and tablet use one Select AI preparation chooser and keep the four-t
         .locator('button')
         .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
     )
-    .toEqual(['Dock', 'Take', 'Select Character', 'Select Outfit', 'Workshop', 'Shelf']);
+    .toEqual(['Dock', 'Edit Video', 'Select Character', 'Select Outfit', 'Workshop', 'Shelf']);
   await expect(page.getByRole('button', { name: /Open Select AI options/u })).toHaveCount(0);
 
   for (const viewport of [

@@ -210,7 +210,9 @@ test('a selected upload ignores backdrop dismissal and can be reopened after an 
   await dialog.getByRole('button', { name: 'Close panel' }).click();
   await expect(dialog).toBeHidden();
 
-  const editVideo = page.getByRole('button', { name: 'Edit video' });
+  const editVideo = page
+    .getByRole('navigation', { name: 'Creative workspace tools' })
+    .getByRole('button', { name: 'Edit Video', exact: true });
   await expect(editVideo).toBeVisible();
   await editVideo.click();
   await expect(dialog).toBeVisible();
@@ -257,7 +259,9 @@ test('the upload editor and open saved-character chooser reflow at every support
     await expect(dialog.getByRole('listbox', { name: 'Saved Character' })).toBeHidden();
     await page.keyboard.press('Escape');
     await expect(dialog).toBeHidden();
-    const editVideo = page.getByRole('button', { name: 'Edit video' });
+    const editVideo = page
+      .getByRole('navigation', { name: 'Creative workspace tools' })
+      .getByRole('button', { name: 'Edit Video', exact: true });
     await expect(editVideo).toBeVisible();
     expect((await editVideo.boundingBox())?.height).toBeGreaterThanOrEqual(44);
     await expectNoDocumentOverflow(page);

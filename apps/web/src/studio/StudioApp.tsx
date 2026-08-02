@@ -224,7 +224,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const shelfToggleRef = useRef<HTMLButtonElement>(null);
   const legacyManagerToggleRef = useRef<HTMLButtonElement>(null);
   const dockToggleRef = useRef<HTMLButtonElement>(null);
-  const takeToggleRef = useRef<HTMLButtonElement>(null);
+  const editVideoToggleRef = useRef<HTMLButtonElement>(null);
   const uploadToggleRef = useRef<HTMLButtonElement>(null);
   const closeTakeReview = useCallback(() => {
     closeOverlay();
@@ -544,11 +544,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     openOverlay('recipe-dock');
   };
 
-  const openTake = () => {
-    if (!recording.presented || recordingActive) return;
-    openOverlay('take-review');
-  };
-
   const openCaptureSettings = () => {
     if (recordingActive) return;
     if (desktopStudioLayout) {
@@ -572,8 +567,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const activeCreativeTool =
     activeOverlay === 'recipe-dock'
       ? 'dock'
-      : activeOverlay === 'take-review' || activeOverlay === 'voice-treatments'
-        ? 'take'
+      : activeOverlay === 'video-upload'
+        ? 'edit-video'
         : activeOverlay === 'character-selector'
           ? 'character'
           : activeOverlay === 'outfit-selector' || activeOverlay === 'outfit-builder'
@@ -770,6 +765,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     setRecordingForExistingVideo(false);
     openOverlay('video-upload');
   }, [openOverlay]);
+  const openPlaybackEditor = useCallback(() => {
+    if (!recording.presented || recordingActive) return;
+    openExistingVideo();
+  }, [openExistingVideo, recording.presented, recordingActive]);
   const startExistingVideoRecording = useCallback(() => {
     if (!browser.mediaRecorder || !browser.mediaDevices || !browser.secureContext) return;
     setRecordingForExistingVideo(true);
@@ -822,20 +821,20 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         legacyProjectCount,
         activeRecipe,
         recipeShelfEntryIntent,
-        hasTake: Boolean(recording.presented),
+        hasPlaybackVideo: Boolean(recording.presented),
       }}
       refs={{
         workshopToggleRef,
         shelfToggleRef,
         dockToggleRef,
-        takeToggleRef,
+        editVideoToggleRef,
         characterToggleRef: characterSelectorRef,
         outfitToggleRef,
         legacyManagerToggleRef,
       }}
       actions={{
         onOpenDock: openDock,
-        onOpenTake: openTake,
+        onOpenEditVideo: openPlaybackEditor,
         onOpenCharacter: openCharacterSelector,
         onOpenOutfit: openOutfitSelector,
         onOpenWorkshop: openWorkshop,
@@ -957,7 +956,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                   onChooseAiExperience={() => openOverlay('ai-experience')}
                   onChangeExperience={() => openOverlay('ai-experience')}
                   onUploadVideo={openExistingVideo}
-                  {...(existingVideo.selection ? { onEditVideo: openExistingVideo } : {})}
                   uploadButtonRef={uploadToggleRef}
                 />
               )}
@@ -1026,7 +1024,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           bodyMode="scroll"
           closeDisabled={existingVideo.providerActive}
           closeOnBackdrop={!existingVideo.selection}
-          returnFocusRef={uploadToggleRef}
+          returnFocusRef={recording.presented ? editVideoToggleRef : uploadToggleRef}
         >
           <ExistingVideoPanel
             key={existingVideo.selection?.metadata.selectedAt ?? 'empty-existing-video'}
@@ -1256,7 +1254,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           placement="bottom"
           size="wide"
           bodyMode="contained"
-          returnFocusRef={recording.presented ? takeToggleRef : dockToggleRef}
+          returnFocusRef={recording.presented ? editVideoToggleRef : dockToggleRef}
         >
           <Suspense fallback={deferredPanelFallback}>
             <TakeDock
@@ -1304,7 +1302,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           height="tall"
           centered
           bodyMode="contained"
-          returnFocusRef={recording.presented ? takeToggleRef : dockToggleRef}
+          returnFocusRef={recording.presented ? editVideoToggleRef : dockToggleRef}
         >
           <Suspense fallback={deferredPanelFallback}>
             <TakeDock
@@ -1328,7 +1326,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                 : {})}
               returnFocusRef={
                 characterBuilderDestination.kind === 'existing-video'
-                  ? uploadToggleRef
+                  ? editVideoToggleRef
                   : characterSelectorRef
               }
               generationAvailable={Boolean(availability.referenceImages)}

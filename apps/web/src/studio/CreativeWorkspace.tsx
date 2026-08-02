@@ -41,7 +41,8 @@ const RecipeShelfView = lazy(() =>
 );
 const deferredWorkspaceFallback = <p role="status">Loading studio tool…</p>;
 
-type ToolIconName = 'dock' | 'take' | 'character' | 'outfit' | 'workshop' | 'shelf' | 'privacy';
+type ToolIconName =
+  'dock' | 'editVideo' | 'character' | 'outfit' | 'workshop' | 'shelf' | 'privacy';
 
 const ToolIcon = ({ name }: { name: ToolIconName }) => {
   const paths: Record<ToolIconName, ReactNode> = {
@@ -51,7 +52,7 @@ const ToolIcon = ({ name }: { name: ToolIconName }) => {
         <path d="M9 3v18M9 10h12" />
       </>
     ),
-    take: (
+    editVideo: (
       <>
         <rect x="3" y="5" width="18" height="14" rx="3" />
         <path d="M8 5v14M16 5v14M3 10h5M16 10h5M3 15h5M16 15h5" />
@@ -114,7 +115,7 @@ const libraryModeOptions = [
 
 export type CreativeWorkspaceState = {
   panel: AuxiliaryPanel;
-  activeTool: 'dock' | 'take' | 'character' | 'outfit' | 'workshop' | 'shelf' | null;
+  activeTool: 'dock' | 'edit-video' | 'character' | 'outfit' | 'workshop' | 'shelf' | null;
   showDesktopAiTools: boolean;
   activeCharacterLabel?: string | undefined;
   activeOutfitLabel?: string | undefined;
@@ -135,12 +136,12 @@ export type CreativeWorkspaceState = {
   legacyProjectCount?: number | undefined;
   activeRecipe?: ActiveRecipeIdentity | undefined;
   recipeShelfEntryIntent: RecipeShelfEntryIntent | null;
-  hasTake: boolean;
+  hasPlaybackVideo: boolean;
 };
 
 export type CreativeWorkspaceActions = {
   onOpenDock: () => void;
-  onOpenTake: () => void;
+  onOpenEditVideo: () => void;
   onOpenCharacter: () => void;
   onOpenOutfit: () => void;
   onOpenWorkshop: () => void;
@@ -166,7 +167,7 @@ export type CreativeWorkspaceRefs = {
   workshopToggleRef: RefObject<HTMLButtonElement | null>;
   shelfToggleRef: RefObject<HTMLButtonElement | null>;
   dockToggleRef: RefObject<HTMLButtonElement | null>;
-  takeToggleRef: RefObject<HTMLButtonElement | null>;
+  editVideoToggleRef: RefObject<HTMLButtonElement | null>;
   characterToggleRef: RefObject<HTMLButtonElement | null>;
   outfitToggleRef: RefObject<HTMLButtonElement | null>;
   legacyManagerToggleRef?: RefObject<HTMLButtonElement | null> | undefined;
@@ -349,11 +350,11 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     legacyProjectCount = 0,
     activeRecipe,
     recipeShelfEntryIntent,
-    hasTake,
+    hasPlaybackVideo,
   } = state;
   const {
     onOpenDock,
-    onOpenTake,
+    onOpenEditVideo,
     onOpenCharacter,
     onOpenOutfit,
     onOpenWorkshop,
@@ -378,7 +379,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     workshopToggleRef,
     shelfToggleRef,
     dockToggleRef,
-    takeToggleRef,
+    editVideoToggleRef,
     characterToggleRef,
     outfitToggleRef,
     legacyManagerToggleRef,
@@ -427,19 +428,19 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
           </span>
         </Button>
         <Button
-          ref={takeToggleRef}
-          variant={activeTool === 'take' ? 'primary' : 'secondary'}
-          disabled={!hasTake || recordingActive}
-          aria-label="Take"
-          aria-describedby="take-tool-description"
-          aria-current={activeTool === 'take' ? 'page' : undefined}
+          ref={editVideoToggleRef}
+          variant={activeTool === 'edit-video' ? 'primary' : 'secondary'}
+          disabled={!hasPlaybackVideo || recordingActive}
+          aria-label="Edit Video"
+          aria-describedby="edit-video-tool-description"
+          aria-current={activeTool === 'edit-video' ? 'page' : undefined}
           aria-haspopup="dialog"
-          onClick={onOpenTake}
+          onClick={onOpenEditVideo}
         >
-          <ToolIcon name="take" />
+          <ToolIcon name="editVideo" />
           <span data-tool-label>
-            <strong>Take</strong>
-            <small id="take-tool-description">Review and download</small>
+            <strong>Edit Video</strong>
+            <small id="edit-video-tool-description">Open the video editor</small>
           </span>
         </Button>
         {showDesktopAiTools ? (

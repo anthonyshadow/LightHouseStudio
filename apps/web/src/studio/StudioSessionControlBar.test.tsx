@@ -121,7 +121,6 @@ const renderBar = (
   options: {
     experienceLabel?: string;
     onDiscardTake?: () => void;
-    onEditVideo?: () => void;
     onStartLocalRecording?: () => void;
     recordingMode?: StudioSessionController['draft']['mode'];
   } = {},
@@ -145,7 +144,6 @@ const renderBar = (
         onOpenVoiceTreatments={onOpenVoiceTreatments}
         onChooseAiExperience={onChooseAiExperience}
         onChangeExperience={onChooseAiExperience}
-        {...(options.onEditVideo ? { onEditVideo: options.onEditVideo } : {})}
       />
     </StudioDesignProvider>,
   );
@@ -165,6 +163,7 @@ describe('StudioSessionControlBar', () => {
     const session = createSession();
     const view = renderBar(session);
 
+    expect(screen.getByRole('button', { name: 'Upload Video' })).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Record New Video' }));
     expect(session.startLocal).toHaveBeenCalledOnce();
 
@@ -367,7 +366,6 @@ describe('StudioSessionControlBar', () => {
     const artifact = takeArtifact();
     const onCloseTakeReview = vi.fn();
     const onOpenVoiceTreatments = vi.fn();
-    const onEditVideo = vi.fn();
     const reviewedRecording = createRecording('recorded', {
       original: artifact,
       presented: artifact,
@@ -381,7 +379,6 @@ describe('StudioSessionControlBar', () => {
       true,
       onCloseTakeReview,
       onOpenVoiceTreatments,
-      { onEditVideo },
     );
 
     const controls = screen.getByRole('region', { name: 'Studio session controls' });
@@ -389,13 +386,11 @@ describe('StudioSessionControlBar', () => {
     expect(screen.getByRole('group', { name: 'Recorded take controls' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Edit video' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Edit video' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Voice' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Release' })).toBeDisabled();
     expect(screen.queryByRole('button', { name: 'Record New Video' })).not.toBeInTheDocument();
 
-    await user.click(screen.getByRole('button', { name: 'Edit video' }));
-    expect(onEditVideo).toHaveBeenCalledOnce();
     await user.click(screen.getByRole('button', { name: 'Voice' }));
     expect(onOpenVoiceTreatments).toHaveBeenCalledOnce();
     const download = screen.getByRole('link', { name: 'Download' });

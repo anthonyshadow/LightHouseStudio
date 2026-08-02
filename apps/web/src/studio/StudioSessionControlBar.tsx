@@ -31,7 +31,6 @@ type StudioSessionControlBarProps = {
   onChooseAiExperience: () => void;
   onChangeExperience: () => void;
   onUploadVideo?: () => void;
-  onEditVideo?: () => void;
   uploadButtonRef?: RefObject<HTMLButtonElement | null>;
 };
 
@@ -306,7 +305,6 @@ export const StudioSessionControlBar = ({
   onChooseAiExperience,
   onChangeExperience,
   onUploadVideo,
-  onEditVideo,
   uploadButtonRef,
 }: StudioSessionControlBarProps) => {
   const theme = useTheme();
@@ -362,7 +360,6 @@ export const StudioSessionControlBar = ({
           presentation="control-bar"
           onCloseTake={onCloseTakeReview}
           {...(onDiscardTake ? { onDiscardTake } : {})}
-          {...(onEditVideo ? { onEditVideo, editVideoButtonRef: uploadButtonRef } : {})}
           onOpenVoiceTreatments={onOpenVoiceTreatments}
         />
       ) : (
@@ -466,10 +463,10 @@ export const StudioSessionControlBar = ({
                 data-upload-action="true"
                 variant="secondary"
                 disabled={controlsLocked || Boolean(transition)}
-                onClick={onEditVideo ?? onUploadVideo}
+                onClick={onUploadVideo}
               >
                 <UploadIcon />
-                <span data-upload-label>{onEditVideo ? 'Edit video' : 'Upload Video'}</span>
+                <span data-upload-label>Upload Video</span>
               </Button>
             </div>
           ) : transition && !aiStarting ? (

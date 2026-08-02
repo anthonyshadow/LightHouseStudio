@@ -17,13 +17,17 @@ deliberately release or discard it.
    post-recording editor; Dock-started local and live AI recordings retain compact Download,
    Discard, Voice, and Release actions directly beneath the video. They never overlay the take or
    its native playback controls, and the narrowest supported viewport wraps them into a second row.
-5. Select **Take** to inspect mode, sources, start time, dimensions/frame rate when known, duration,
-   size, and MIME type. The panel does not create another player.
-6. Optionally apply a voice treatment. Playback and download remain locked until processing
+5. Confirm **Edit Video** is enabled in the creative tool rail for any finalized playback. An
+   editor-backed upload or recording reopens its retained editor state; a Dock/live-AI take opens
+   the existing-video source chooser without automatically adopting the take.
+6. When the detailed **Latest Take** surface opens after finishing an editor flow or returning from
+   Voice, inspect mode, sources, start time, dimensions/frame rate when known, duration, size, and
+   MIME type. The panel does not create another player and has no dedicated tool-rail launcher.
+7. Optionally apply a voice treatment. Playback and download remain locked until processing
    settles or is cancelled.
-7. Select **Download**. Studio records only that download initiation was requested; it cannot
+8. Select **Download**. Studio records only that download initiation was requested; it cannot
    verify browser save completion.
-8. Verify the browser saved the file, then select **Release**. Or select **Discard** and confirm
+9. Verify the browser saved the file, then select **Release**. Or select **Discard** and confirm
    irreversible removal without a download.
 
 ## Guards and recovery

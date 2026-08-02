@@ -1,13 +1,16 @@
 // @vitest-environment jsdom
 
 import { createRef } from 'react';
-import { cleanup, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../ui';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
 import { CreativeWorkspace, type CreativeWorkspaceProps } from './CreativeWorkspace';
 
-const createProps = (showDesktopAiTools: boolean) =>
+const createProps = (
+  showDesktopAiTools: boolean,
+  stateOverrides: Partial<CreativeWorkspaceProps['state']> = {},
+) =>
   ({
     repository: createCreativeAssetRepository({ storage: null }),
     state: {
@@ -24,11 +27,12 @@ const createProps = (showDesktopAiTools: boolean) =>
       referenceUsePending: false,
       referenceUseFailure: null,
       recipeShelfEntryIntent: null,
-      hasTake: true,
+      hasPlaybackVideo: true,
+      ...stateOverrides,
     },
     actions: {
       onOpenDock: vi.fn(),
-      onOpenTake: vi.fn(),
+      onOpenEditVideo: vi.fn(),
       onOpenCharacter: vi.fn(),
       onOpenOutfit: vi.fn(),
       onOpenWorkshop: vi.fn(),
@@ -52,7 +56,7 @@ const createProps = (showDesktopAiTools: boolean) =>
       workshopToggleRef: createRef<HTMLButtonElement>(),
       shelfToggleRef: createRef<HTMLButtonElement>(),
       dockToggleRef: createRef<HTMLButtonElement>(),
-      takeToggleRef: createRef<HTMLButtonElement>(),
+      editVideoToggleRef: createRef<HTMLButtonElement>(),
       characterToggleRef: createRef<HTMLButtonElement>(),
       outfitToggleRef: createRef<HTMLButtonElement>(),
     },
@@ -72,7 +76,7 @@ describe('CreativeWorkspace responsive tools', () => {
       within(rail)
         .getAllByRole('button')
         .map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Dock', 'Take', 'Select Character', 'Select Outfit', 'Workshop', 'Shelf']);
+    ).toEqual(['Dock', 'Edit Video', 'Select Character', 'Select Outfit', 'Workshop', 'Shelf']);
   });
 
   it('keeps the four-button phone and tablet row unchanged', () => {
@@ -86,6 +90,47 @@ describe('CreativeWorkspace responsive tools', () => {
       within(rail)
         .getAllByRole('button')
         .map((button) => button.getAttribute('aria-label')),
-    ).toEqual(['Dock', 'Take', 'Workshop', 'Shelf']);
+    ).toEqual(['Dock', 'Edit Video', 'Workshop', 'Shelf']);
+  });
+
+  it('enables Edit Video only for inactive playback and invokes the editor action', () => {
+    const props = createProps(true);
+    const view = render(
+      <StudioDesignProvider>
+        <CreativeWorkspace {...props} />
+      </StudioDesignProvider>,
+    );
+
+    const editVideo = screen.getByRole('button', { name: 'Edit Video' });
+    expect(editVideo).toBeEnabled();
+    fireEvent.click(editVideo);
+    expect(props.actions.onOpenEditVideo).toHaveBeenCalledOnce();
+
+    view.rerender(
+      <StudioDesignProvider>
+        <CreativeWorkspace {...createProps(true, { hasPlaybackVideo: false })} />
+      </StudioDesignProvider>,
+    );
+    expect(screen.getByRole('button', { name: 'Edit Video' })).toBeDisabled();
+
+    view.rerender(
+      <StudioDesignProvider>
+        <CreativeWorkspace {...createProps(true, { recordingActive: true })} />
+      </StudioDesignProvider>,
+    );
+    expect(screen.getByRole('button', { name: 'Edit Video' })).toBeDisabled();
+  });
+
+  it('marks Edit Video as the active dialog launcher while the editor is open', () => {
+    render(
+      <StudioDesignProvider>
+        <CreativeWorkspace {...createProps(true, { activeTool: 'edit-video' })} />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Edit Video' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
   });
 });

@@ -160,7 +160,7 @@ const harness = vi.hoisted(() => {
     original: null as null | { id: string },
     visual: null,
     processed: null,
-    presented: null,
+    presented: null as null | { id: string },
     sidecar: { state: 'idle' as const, artifact: null, error: null },
     recordingError: null,
     processingState: 'idle' as const,
@@ -357,6 +357,13 @@ vi.mock('./CreativeWorkspace', () => ({
         <button type="button" onClick={props.actions.onOpenDock}>
           Open dock
         </button>
+        <button
+          type="button"
+          disabled={!props.state.hasPlaybackVideo}
+          onClick={props.actions.onOpenEditVideo}
+        >
+          Edit Video rail
+        </button>
         <button type="button" onClick={props.actions.onToggleShelf}>
           Toggle shelf
         </button>
@@ -420,6 +427,8 @@ describe('StudioApp composition lifecycle', () => {
     harness.latestWorkspace = null;
     harness.promptCommitted = null;
     harness.recording.original = null;
+    harness.recording.presented = null;
+    harness.existingVideo.selection = null;
     harness.takeStagePresentation = { kind: 'idle', mode: 'lucy-latest' };
     harness.session.startLocal.mockClear();
     harness.session.startLocal.mockImplementation(() => Promise.resolve());
@@ -483,6 +492,20 @@ describe('StudioApp composition lifecycle', () => {
         'Post-recording editor',
       ),
     );
+  });
+
+  it('opens the existing-video chooser for finalized playback without adopting a Dock take', () => {
+    harness.recording.presented = { id: 'dock-take' };
+    harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
+    renderStudio();
+
+    const editVideo = screen.getByRole('button', { name: 'Edit Video rail' });
+    expect(editVideo).toBeEnabled();
+    fireEvent.click(editVideo);
+
+    expect(screen.getByRole('region', { name: 'Use existing video' })).toBeInTheDocument();
+    expect(harness.existingVideo.adoptRecordedArtifact).not.toHaveBeenCalled();
+    expect(harness.latestWorkspace?.state.activeTool).toBe('edit-video');
   });
 
   it('hydrates and atomically hands a saved reference recipe to the session', async () => {
