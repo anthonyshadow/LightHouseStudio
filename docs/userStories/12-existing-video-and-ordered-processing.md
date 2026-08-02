@@ -50,8 +50,12 @@ then edit either base, download, start over, or discard.
 6. VTO uses exactly one input mode. **Saved or recent outfit** selects a saved recipe or tab-local
    recent import; **Reference image** prefers a local JPEG/PNG/WebP and reveals its HTTPS URL field
    only after **Use an image URL instead**; **Prompt** alone exposes Enhance Prompt. Switching
-   modes clears incompatible fields. VTO retains calm controlled-pilot, consent, one-garment,
-   plain-background, and no-fit/sizing/purchase-accuracy disclosure.
+   modes clears incompatible fields. Saved prompt outfits restore Prompt mode and their exact
+   enhancement setting; saved-image and migrated combined outfits restore Saved outfit mode with
+   enhancement off. New, edit, and Save a copy outfit library actions route through Outfit Builder.
+   A missing saved image exposes Retry and, only when a usable prompt remains, **Continue without
+   reference**; image-only outfits expose Retry or removal. VTO retains calm controlled-pilot,
+   consent, one-garment, plain-background, and no-fit/sizing/purchase-accuracy disclosure.
 7. **Voice** opens the same cohesive treatment workspace used by Latest Take; the existing-video
    editor does not introduce a second Voice entry or nested browser. It exposes browser-local
    effects first and lazily loads saved ElevenLabs voices only when the creator chooses **Saved AI
@@ -124,6 +128,10 @@ The workflow is tab/process-temporary. Refresh, crash, or API restart does not r
 server stores generated paths and safe job state only while validating, submitting, polling, or
 retrieving; it never persists prompts or original filenames. Cleanup is local and does not claim
 provider cancellation or provider-side deletion.
+
+After Decart accepts a batch VTO submission, a persistent prompt or explicitly saved-image outfit
+records an exact Recipe Shelf recent. Directly uploaded or imported reference files enter only the
+bounded tab-local recent registry and are never automatically persisted.
 
 The UI reports one planned submission, not credits or currency. The controlled pilot allows four
 batch submissions per participant, at most two for either exact model.

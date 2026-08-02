@@ -8,19 +8,20 @@ import {
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
   openRecipeDockWhenOverlaid,
+  openCharacterOptions,
   startLocalPreview,
   type NetworkJourneyState,
 } from './support/studioHarness';
 import { VISUAL_CASE_MATRIX, type VisualScenarioId } from './studioVisualMatrix';
 
 const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
 const REFERENCE_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 );
 const SEEDED_CHARACTER_STORE = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   savedPrompts: [],
   recentPrompts: [],
   savedCharacterPrompts: [
@@ -219,13 +220,13 @@ const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<Netwo
 };
 
 const openCharacterBuilder = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: /Open character options/u }).click();
+  await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Create new character' }).click();
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
 };
 
 const openSavedCharacters = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: /Open character options/u }).click();
+  await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
   const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
   await expect(shelf).toBeVisible();

@@ -90,6 +90,45 @@ const resultArtifact = (): RecordingArtifact => {
   };
 };
 
+const readyVtonWorkflow = (updateStep: ReturnType<typeof vi.fn>): ExistingVideoWorkflow => {
+  const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+  return workflow({
+    selection: {
+      file: source,
+      mimeType: 'video/mp4',
+      audioSidecar: null,
+      audioUnavailableReason: null,
+      metadata: {
+        kind: 'uploaded',
+        mode: 'local',
+        selectedAt: '2026-08-02T12:00:00.000Z',
+        displayName: source.name,
+        container: 'mp4',
+        videoCodec: 'avc',
+        audioCodec: null,
+        durationMs: 30_000,
+        width: 1_920,
+        height: 1_080,
+        sizeBytes: source.size,
+        hasAudio: false,
+      },
+    },
+    steps: [
+      {
+        id: 'vton',
+        modelId: 'lucy-vton-latest',
+        savedRecipeId: null,
+        prompt: '',
+        enhancePrompt: false,
+        referenceImage: null,
+        inputKind: 'saved-outfit',
+      },
+    ],
+    phase: 'ready',
+    updateStep: updateStep as ExistingVideoWorkflow['updateStep'],
+  });
+};
+
 beforeEach(() => {
   api.hydrateReferenceImage.mockReset();
   api.importRemoteReferenceImage.mockReset();
@@ -734,6 +773,8 @@ describe('ExistingVideoPanel', () => {
               prompt:
                 'A professional anchor in a well-lit studio with a dark blazer and soft cinematic lighting.',
               referenceImageAssetId: 'asset-anchor',
+              vtonInputKind: null,
+              enhancePrompt: false,
             },
           ]}
           onFinish={vi.fn()}
@@ -807,6 +848,8 @@ describe('ExistingVideoPanel', () => {
               modelId: 'lucy-latest',
               prompt: 'A professional anchor.',
               referenceImageAssetId: null,
+              vtonInputKind: null,
+              enhancePrompt: false,
             },
           ]}
           onCreateCharacter={onCreateCharacter}
@@ -820,6 +863,233 @@ describe('ExistingVideoPanel', () => {
     expect(options.at(-1)).toHaveAccessibleName('Create A Character');
     fireEvent.click(options.at(-1)!);
     expect(onCreateCharacter).toHaveBeenCalledWith('lucy');
+  });
+
+  it('restores a saved prompt outfit in Prompt mode with its enhancement setting', async () => {
+    const updateStep = vi.fn();
+    const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: null,
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-08-02T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: null,
+                durationMs: 30_000,
+                width: 1_920,
+                height: 1_080,
+                sizeBytes: source.size,
+                hasAudio: false,
+              },
+            },
+            steps: [
+              {
+                id: 'vton',
+                modelId: 'lucy-vton-latest',
+                savedRecipeId: null,
+                prompt: '',
+                enhancePrompt: false,
+                referenceImage: null,
+                inputKind: 'saved-outfit',
+              },
+            ],
+            phase: 'ready',
+            updateStep,
+          })}
+          videoProcessingAvailable
+          savedRecipes={[
+            {
+              id: 'prompt-outfit',
+              label: 'Copper overshirt',
+              modelId: 'lucy-vton-latest',
+              prompt: 'A copper linen overshirt.',
+              referenceImageAssetId: null,
+              vtonInputKind: 'prompt',
+              enhancePrompt: true,
+            },
+          ]}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.change(screen.getByLabelText('Saved or recently uploaded outfit'), {
+      target: { value: 'saved:prompt-outfit' },
+    });
+    await waitFor(() =>
+      expect(updateStep).toHaveBeenCalledWith('vton', {
+        savedRecipeId: 'prompt-outfit',
+        prompt: 'A copper linen overshirt.',
+        referenceImage: null,
+        inputKind: 'prompt',
+        enhancePrompt: true,
+      }),
+    );
+    expect(api.hydrateReferenceImage).not.toHaveBeenCalled();
+  });
+
+  it('restores a saved image outfit in Saved outfit mode with enhancement off', async () => {
+    const updateStep = vi.fn();
+    const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+    const reference = new File(['image'], 'coat.png', { type: 'image/png' });
+    api.hydrateReferenceImage.mockResolvedValue({ file: reference });
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: null,
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-08-02T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: null,
+                durationMs: 30_000,
+                width: 1_920,
+                height: 1_080,
+                sizeBytes: source.size,
+                hasAudio: false,
+              },
+            },
+            steps: [
+              {
+                id: 'vton',
+                modelId: 'lucy-vton-latest',
+                savedRecipeId: null,
+                prompt: '',
+                enhancePrompt: false,
+                referenceImage: null,
+                inputKind: 'saved-outfit',
+              },
+            ],
+            phase: 'ready',
+            updateStep,
+          })}
+          videoProcessingAvailable
+          savedRecipes={[
+            {
+              id: 'image-outfit',
+              label: 'Archive coat',
+              modelId: 'lucy-vton-latest',
+              prompt: '',
+              referenceImageAssetId: 'opaque-coat',
+              vtonInputKind: 'saved-outfit',
+              enhancePrompt: false,
+            },
+          ]}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.change(screen.getByLabelText('Saved or recently uploaded outfit'), {
+      target: { value: 'saved:image-outfit' },
+    });
+    await waitFor(() =>
+      expect(updateStep).toHaveBeenCalledWith('vton', {
+        savedRecipeId: 'image-outfit',
+        prompt: '',
+        referenceImage: reference,
+        inputKind: 'saved-outfit',
+        enhancePrompt: false,
+      }),
+    );
+  });
+
+  it('requires an explicit prompt fallback when a saved outfit image is missing', async () => {
+    const updateStep = vi.fn();
+    api.hydrateReferenceImage.mockRejectedValue(new Error('missing'));
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={readyVtonWorkflow(updateStep)}
+          videoProcessingAvailable
+          savedRecipes={[
+            {
+              id: 'combined-outfit',
+              label: 'Migrated coat',
+              modelId: 'lucy-vton-latest',
+              prompt: 'A structured wool coat.',
+              referenceImageAssetId: 'missing-coat',
+              vtonInputKind: 'saved-outfit',
+              enhancePrompt: false,
+            },
+          ]}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.change(screen.getByLabelText('Saved or recently uploaded outfit'), {
+      target: { value: 'saved:combined-outfit' },
+    });
+    await screen.findByRole('button', { name: 'Continue without reference' });
+    expect(updateStep).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Continue without reference' }));
+    expect(updateStep).toHaveBeenCalledWith('vton', {
+      savedRecipeId: 'combined-outfit',
+      prompt: 'A structured wool coat.',
+      referenceImage: null,
+      inputKind: 'prompt',
+      enhancePrompt: false,
+    });
+  });
+
+  it('offers only retry or removal for a missing image-only outfit', async () => {
+    const updateStep = vi.fn();
+    api.hydrateReferenceImage.mockRejectedValue(new Error('missing'));
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={readyVtonWorkflow(updateStep)}
+          videoProcessingAvailable
+          savedRecipes={[
+            {
+              id: 'image-only-outfit',
+              label: 'Image coat',
+              modelId: 'lucy-vton-latest',
+              prompt: '',
+              referenceImageAssetId: 'missing-image-only',
+              vtonInputKind: 'saved-outfit',
+              enhancePrompt: false,
+            },
+          ]}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.change(screen.getByLabelText('Saved or recently uploaded outfit'), {
+      target: { value: 'saved:image-only-outfit' },
+    });
+    await screen.findByRole('button', { name: 'Retry image' });
+    expect(screen.queryByRole('button', { name: 'Continue without reference' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove outfit' }));
+    expect(updateStep).toHaveBeenCalledWith('vton', {
+      savedRecipeId: null,
+      prompt: '',
+      referenceImage: null,
+      inputKind: 'saved-outfit',
+      enhancePrompt: false,
+    });
   });
 
   it('renders and releases the attached reference image preview', async () => {

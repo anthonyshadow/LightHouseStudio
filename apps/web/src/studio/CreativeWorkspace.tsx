@@ -12,7 +12,9 @@ import {
 } from '../features/creative-assets/useRecipeShelfController';
 import type {
   CreativeAssetRepository,
+  RecentPrompt,
   SavedCharacterPrompt,
+  SavedPrompt,
 } from '../features/creative-assets/types';
 import type { StudioMode } from '../features/media-session';
 import type {
@@ -39,7 +41,7 @@ const RecipeShelfView = lazy(() =>
 );
 const deferredWorkspaceFallback = <p role="status">Loading studio tool…</p>;
 
-type ToolIconName = 'dock' | 'take' | 'workshop' | 'shelf' | 'privacy';
+type ToolIconName = 'dock' | 'take' | 'character' | 'outfit' | 'workshop' | 'shelf' | 'privacy';
 
 const ToolIcon = ({ name }: { name: ToolIconName }) => {
   const paths: Record<ToolIconName, ReactNode> = {
@@ -53,6 +55,18 @@ const ToolIcon = ({ name }: { name: ToolIconName }) => {
       <>
         <rect x="3" y="5" width="18" height="14" rx="3" />
         <path d="M8 5v14M16 5v14M3 10h5M16 10h5M3 15h5M16 15h5" />
+      </>
+    ),
+    character: (
+      <>
+        <circle cx="12" cy="8" r="4" />
+        <path d="M5 21a7 7 0 0 1 14 0M19 3v4M17 5h4" />
+      </>
+    ),
+    outfit: (
+      <>
+        <path d="m8 4 4 2 4-2 4 4-3 3v9H7v-9L4 8z" />
+        <path d="M10 5a2 2 0 0 0 4 0" />
       </>
     ),
     workshop: (
@@ -100,7 +114,10 @@ const libraryModeOptions = [
 
 export type CreativeWorkspaceState = {
   panel: AuxiliaryPanel;
-  activeTool: 'dock' | 'take' | 'workshop' | 'shelf' | null;
+  activeTool: 'dock' | 'take' | 'character' | 'outfit' | 'workshop' | 'shelf' | null;
+  showDesktopAiTools: boolean;
+  activeCharacterLabel?: string | undefined;
+  activeOutfitLabel?: string | undefined;
   activeSessionMode: StudioMode;
   libraryMode: ModelMode;
   workshopDraft?: PromptBuilderDraft | undefined;
@@ -113,7 +130,7 @@ export type CreativeWorkspaceState = {
   referenceUseFailure: {
     message: string;
     onRetry: () => void;
-    onContinueWithoutReference: () => void;
+    onContinueWithoutReference?: (() => void) | undefined;
   } | null;
   legacyProjectCount?: number | undefined;
   activeRecipe?: ActiveRecipeIdentity | undefined;
@@ -124,6 +141,8 @@ export type CreativeWorkspaceState = {
 export type CreativeWorkspaceActions = {
   onOpenDock: () => void;
   onOpenTake: () => void;
+  onOpenCharacter: () => void;
+  onOpenOutfit: () => void;
   onOpenWorkshop: () => void;
   onToggleShelf: () => void;
   onClose: (source: Exclude<AuxiliaryPanel, 'closed'>) => void;
@@ -136,6 +155,9 @@ export type CreativeWorkspaceActions = {
   onUseRecipe: (selection: RecipeSelection) => void;
   onCreateCharacter?: (() => void) | undefined;
   onEditCharacter?: ((asset: SavedCharacterPrompt) => void) | undefined;
+  onCreateOutfit: () => void;
+  onEditOutfit: (asset: SavedPrompt) => void;
+  onSaveOutfitCopy: (asset: SavedPrompt | RecentPrompt) => void;
   onOpenSavedWorkshop: (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => void;
   onOpenLegacyProjects?: (() => void) | undefined;
 };
@@ -145,10 +167,12 @@ export type CreativeWorkspaceRefs = {
   shelfToggleRef: RefObject<HTMLButtonElement | null>;
   dockToggleRef: RefObject<HTMLButtonElement | null>;
   takeToggleRef: RefObject<HTMLButtonElement | null>;
+  characterToggleRef: RefObject<HTMLButtonElement | null>;
+  outfitToggleRef: RefObject<HTMLButtonElement | null>;
   legacyManagerToggleRef?: RefObject<HTMLButtonElement | null> | undefined;
 };
 
-type CreativeWorkspaceProps = {
+export type CreativeWorkspaceProps = {
   repository: CreativeAssetRepository;
   state: CreativeWorkspaceState;
   actions: CreativeWorkspaceActions;
@@ -289,13 +313,15 @@ export const CreativePanelContent = ({
             <Button size="small" variant="secondary" onClick={referenceUseFailure.onRetry}>
               Retry
             </Button>
-            <Button
-              size="small"
-              variant="quiet"
-              onClick={referenceUseFailure.onContinueWithoutReference}
-            >
-              Continue without reference
-            </Button>
+            {referenceUseFailure.onContinueWithoutReference ? (
+              <Button
+                size="small"
+                variant="quiet"
+                onClick={referenceUseFailure.onContinueWithoutReference}
+              >
+                Continue without reference
+              </Button>
+            ) : null}
           </div>
         </StatusNotice>
       ) : null}
@@ -307,6 +333,9 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
   const {
     panel,
     activeTool,
+    showDesktopAiTools,
+    activeCharacterLabel,
+    activeOutfitLabel,
     activeSessionMode,
     libraryMode,
     workshopDraft,
@@ -325,6 +354,8 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
   const {
     onOpenDock,
     onOpenTake,
+    onOpenCharacter,
+    onOpenOutfit,
     onOpenWorkshop,
     onToggleShelf,
     onClose,
@@ -337,6 +368,9 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     onUseRecipe,
     onCreateCharacter,
     onEditCharacter,
+    onCreateOutfit,
+    onEditOutfit,
+    onSaveOutfitCopy,
     onOpenSavedWorkshop,
     onOpenLegacyProjects,
   } = actions;
@@ -345,6 +379,8 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     shelfToggleRef,
     dockToggleRef,
     takeToggleRef,
+    characterToggleRef,
+    outfitToggleRef,
     legacyManagerToggleRef,
   } = refs;
   const theme = useTheme();
@@ -357,6 +393,9 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     onUsePrompt: onUseRecipe,
     ...(onCreateCharacter ? { onCreateCharacter } : {}),
     ...(onEditCharacter ? { onEditCharacter } : {}),
+    onCreateOutfit,
+    onEditOutfit,
+    onSaveOutfitCopy,
     onOpenCharacterWorkshop: onOpenSavedWorkshop,
     onDirtyChange: onShelfDirtyChange,
     ...(activeRecipe !== undefined ? { activeRecipe } : {}),
@@ -403,6 +442,48 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
             <small id="take-tool-description">Review and download</small>
           </span>
         </Button>
+        {showDesktopAiTools ? (
+          <>
+            <Button
+              ref={characterToggleRef}
+              variant={activeTool === 'character' ? 'primary' : 'secondary'}
+              disabled={recordingActive}
+              aria-label={
+                activeCharacterLabel
+                  ? `Selected character: ${activeCharacterLabel}. Open character options`
+                  : 'Select Character'
+              }
+              aria-current={activeTool === 'character' ? 'page' : undefined}
+              aria-haspopup="dialog"
+              onClick={onOpenCharacter}
+            >
+              <ToolIcon name="character" />
+              <span data-tool-label>
+                <strong>{activeCharacterLabel ?? 'Select Character'}</strong>
+                <small>Choose or build an AI character</small>
+              </span>
+            </Button>
+            <Button
+              ref={outfitToggleRef}
+              variant={activeTool === 'outfit' ? 'primary' : 'secondary'}
+              disabled={recordingActive}
+              aria-label={
+                activeOutfitLabel
+                  ? `Selected outfit: ${activeOutfitLabel}. Open outfit options`
+                  : 'Select Outfit'
+              }
+              aria-current={activeTool === 'outfit' ? 'page' : undefined}
+              aria-haspopup="dialog"
+              onClick={onOpenOutfit}
+            >
+              <ToolIcon name="outfit" />
+              <span data-tool-label>
+                <strong>{activeOutfitLabel ?? 'Select Outfit'}</strong>
+                <small>Choose or build a try-on outfit</small>
+              </span>
+            </Button>
+          </>
+        ) : null}
         <Button
           ref={workshopToggleRef}
           variant={activeTool === 'workshop' ? 'primary' : 'secondary'}

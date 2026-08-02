@@ -21,7 +21,7 @@ const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
 const SCREENSHOT_ROOT = path.resolve(
   process.env.LIGHTFRAME_SCREENSHOT_ROOT ?? path.join(process.cwd(), 'test-results', 'captures'),
 );
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
 const FIXED_WEBP = Buffer.from(
   'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v3AgAA=',
   'base64',
@@ -36,7 +36,7 @@ const VIEWPORTS = [
 ] as const;
 
 const SEEDED_SHELF = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   savedPrompts: [
     {
       id: 'character-amber-host',
@@ -45,6 +45,8 @@ const SEEDED_SHELF = {
       modelModeId: 'lucy-latest',
       source: 'manual',
       referenceImageAssetId: null,
+      vtonInputKind: null,
+      enhancePrompt: false,
       tags: ['editorial', 'warm'],
       createdAt: '2026-07-15T14:30:00.000Z',
       updatedAt: '2026-07-18T14:30:00.000Z',
@@ -58,6 +60,8 @@ const SEEDED_SHELF = {
       modelModeId: 'lucy-vton-latest',
       source: 'manual',
       referenceImageAssetId: null,
+      vtonInputKind: 'prompt',
+      enhancePrompt: false,
       tags: ['outerwear', 'amber'],
       createdAt: '2026-07-14T14:30:00.000Z',
       updatedAt: '2026-07-17T14:30:00.000Z',
@@ -71,6 +75,8 @@ const SEEDED_SHELF = {
       prompt: 'An adult stop-motion science presenter in a practical studio.',
       modelModeId: 'lucy-latest',
       referenceImageAssetId: null,
+      vtonInputKind: null,
+      enhancePrompt: false,
       usedAt: '2026-07-18T13:00:00.000Z',
     },
     {
@@ -78,6 +84,8 @@ const SEEDED_SHELF = {
       prompt: 'A tailored linen travel overshirt in soft copper.',
       modelModeId: 'lucy-vton-latest',
       referenceImageAssetId: null,
+      vtonInputKind: 'prompt',
+      enhancePrompt: false,
       usedAt: '2026-07-17T13:00:00.000Z',
     },
   ],

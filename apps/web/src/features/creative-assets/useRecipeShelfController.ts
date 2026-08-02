@@ -40,6 +40,9 @@ type ControllerOptions = Pick<
   | 'onUsePrompt'
   | 'onCreateCharacter'
   | 'onEditCharacter'
+  | 'onCreateOutfit'
+  | 'onEditOutfit'
+  | 'onSaveOutfitCopy'
   | 'onOpenCharacterWorkshop'
   | 'onDirtyChange'
 >;
@@ -53,6 +56,9 @@ export const useRecipeShelfController = ({
   onUsePrompt,
   onCreateCharacter,
   onEditCharacter,
+  onCreateOutfit,
+  onEditOutfit,
+  onSaveOutfitCopy,
   onOpenCharacterWorkshop,
   onDirtyChange,
 }: ControllerOptions) => {
@@ -261,6 +267,8 @@ export const useRecipeShelfController = ({
         modelModeId: item.modelModeId,
         assetId: item.id,
         referenceImageAssetId: item.referenceImageAssetId,
+        vtonInputKind: item.vtonInputKind,
+        enhancePrompt: item.enhancePrompt,
       }),
     );
 
@@ -276,6 +284,8 @@ export const useRecipeShelfController = ({
           : {}),
         ...(item.characterName ? { characterName: item.characterName } : {}),
         referenceImageAssetId: item.referenceImageAssetId,
+        vtonInputKind: item.vtonInputKind,
+        enhancePrompt: item.enhancePrompt,
       }),
     );
 
@@ -306,6 +316,24 @@ export const useRecipeShelfController = ({
   const editCharacter = (item: SavedCharacterPrompt) => {
     if (!onEditCharacter) return;
     runAfterFormCheck(() => onEditCharacter(item));
+  };
+  const createOutfit = () => runAfterFormCheck(() => onCreateOutfit?.());
+  const editSaved = (item: SavedPrompt) => {
+    if (item.modelModeId === 'lucy-vton-latest' && onEditOutfit) {
+      runAfterFormCheck(() => onEditOutfit(item));
+      return;
+    }
+    startEditing(
+      { kind: 'saved', id: item.id, action: 'edit' },
+      { title: item.title, prompt: item.prompt, tags: item.tags },
+    );
+  };
+  const saveRecentCopy = (item: RecentPrompt) => {
+    if (item.modelModeId === 'lucy-vton-latest' && onSaveOutfitCopy) {
+      runAfterFormCheck(() => onSaveOutfitCopy(item));
+      return;
+    }
+    openCreate({ prompt: item.prompt }, item.referenceImageAssetId);
   };
 
   const chooseCategory = (next: ShelfCategory) =>
@@ -377,6 +405,10 @@ export const useRecipeShelfController = ({
     openCharacterWorkshop,
     canEditCharacter: Boolean(onEditCharacter),
     editCharacter,
+    canCreateOutfit: Boolean(onCreateOutfit),
+    createOutfit,
+    editSaved,
+    saveRecentCopy,
     perform,
   };
 };

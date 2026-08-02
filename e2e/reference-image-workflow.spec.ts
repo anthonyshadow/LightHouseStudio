@@ -2,14 +2,15 @@ import { expect, test, type Page } from '@playwright/test';
 import {
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
+  openCharacterOptions,
   openRecipeDockWhenOverlaid,
   readBrowserState,
 } from './support/studioHarness';
 
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
 
 const openCharacterBuilder = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: /Open character options/u }).click();
+  await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Create new character' }).click();
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
   await page.getByRole('button', { name: 'Adult', exact: true }).click();
@@ -232,7 +233,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
       localStorage.setItem(
         storageKey,
         JSON.stringify({
-          schemaVersion: 4,
+          schemaVersion: 5,
           savedPrompts: [],
           recentPrompts: [
             {
@@ -240,6 +241,8 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
               prompt,
               modelModeId: 'lucy-latest',
               referenceImageAssetId: assetId,
+              vtonInputKind: null,
+              enhancePrompt: false,
               usedAt: '2030-01-02T00:00:00.000Z',
             },
           ],

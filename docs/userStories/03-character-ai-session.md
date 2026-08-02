@@ -5,10 +5,13 @@ retaining local preview as the fallback.
 
 ## Journey
 
-1. Create or choose a saved character. Saving preloads it but never starts AI.
-   The header selection exposes an adjacent **Unselect character** action, and the Character panel
-   exposes the same option. Unselecting returns the session draft to **Local Camera**, removes
-   **Start AI** from the stage controls, and restores local **Record**.
+1. Create or choose a saved character. On desktop, **Select Character** is the first AI preparation
+   action in the creative-tool rail, immediately before **Select Outfit** and **Workshop**. On
+   phones and tablets, header **Select AI** opens a provider-free chooser and **Character** routes
+   to the same Character panel. Saving preloads the character but never starts AI. The responsive
+   trigger shows the selected name, and the Character panel exposes **Unselect character**.
+   Unselecting returns the session draft to **Local Camera**, removes **Start AI** from the stage
+   controls, and restores local **Record**.
 2. Explicitly start local media from **Record New Video** or Dock **Start local preview**, then
    select **Start AI** and the advanced **Character Transformation** experience.
 3. Review the Decart disclosure and select **Start with [character]**. If no character is ready,

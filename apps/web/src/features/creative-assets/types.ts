@@ -1,5 +1,6 @@
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
+  EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
@@ -13,22 +14,26 @@ import {
   type SavedPrompt as DomainSavedPrompt,
   type SavedPromptSource,
   type StorageHealth as DomainStorageHealth,
+  type VtonInputKind as DomainVtonInputKind,
 } from '@studio/domain';
 import type { PromptBuilderDraft, PromptIntent } from '../prompt-authoring';
 
 export {
   CREATIVE_ASSET_SCHEMA_VERSION,
+  EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
 };
-export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
-export const PREVIOUS_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
-export const OLDER_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
+export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
+export const PREVIOUS_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
+export const OLDER_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
+export const EARLIER_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
 export const LEGACY_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
 
 export type ModelModeId = DomainModelModeId;
 export type AssetSource = SavedPromptSource;
+export type VtonInputKind = DomainVtonInputKind;
 export type ReferenceImageStatus = DomainReferenceImageStatus;
 export type StorageHealth = DomainStorageHealth;
 export type GuidedDesignV1 = DomainGuidedDesignV1;
@@ -56,6 +61,8 @@ export interface CreateSavedPromptInput {
   readonly modelModeId: ModelModeId;
   readonly source?: AssetSource;
   readonly referenceImageAssetId?: string | null;
+  readonly vtonInputKind?: VtonInputKind | null;
+  readonly enhancePrompt?: boolean;
   readonly tags?: readonly string[];
 }
 
@@ -63,6 +70,8 @@ export interface UpdateSavedPromptInput {
   readonly title?: string;
   readonly prompt?: string;
   readonly referenceImageAssetId?: string | null;
+  readonly vtonInputKind?: VtonInputKind | null;
+  readonly enhancePrompt?: boolean;
   readonly tags?: readonly string[];
 }
 
@@ -109,6 +118,8 @@ export interface RecordSuccessfulPromptInput {
   readonly savedCharacterPromptId?: string;
   readonly characterName?: string;
   readonly referenceImageAssetId?: string | null;
+  readonly vtonInputKind?: VtonInputKind | null;
+  readonly enhancePrompt?: boolean;
 }
 
 export interface CreativeAssetRepository {

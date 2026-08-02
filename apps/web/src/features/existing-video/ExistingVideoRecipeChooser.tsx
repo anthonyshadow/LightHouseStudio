@@ -1,6 +1,7 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { useId, useRef, useState, type FocusEvent, type KeyboardEvent } from 'react';
 import type { ExistingVideoStep } from './useExistingVideoWorkflow';
+import type { VtonInputKind } from '../creative-assets/types';
 
 export type ExistingVideoSavedRecipe = Readonly<{
   id: string;
@@ -8,6 +9,8 @@ export type ExistingVideoSavedRecipe = Readonly<{
   modelId: ExistingVideoStep['modelId'];
   prompt: string;
   referenceImageAssetId: string | null;
+  vtonInputKind: VtonInputKind | null;
+  enhancePrompt: boolean;
 }>;
 
 const chooserStyles = (theme: Theme): CSSObject => ({

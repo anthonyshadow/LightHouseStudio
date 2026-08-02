@@ -413,6 +413,22 @@ test('persistent controls preserve local media across VTON choice, AI stop, trac
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/studio');
 
+  await page.getByRole('button', { name: /Open Select AI options/u }).click();
+  await page
+    .getByRole('dialog', { name: 'Select AI' })
+    .getByRole('button', { name: 'Select Outfit' })
+    .click();
+  await page
+    .getByRole('dialog', { name: 'Outfit' })
+    .getByRole('button', { name: 'Create new outfit' })
+    .click();
+  const outfitBuilder = page.getByRole('dialog', { name: 'Create a new outfit' });
+  await outfitBuilder.getByLabel('Garment direction').fill('A structured amber field jacket');
+  await outfitBuilder.getByRole('button', { name: 'Continue to save' }).click();
+  await outfitBuilder.getByLabel('Outfit name').fill('Amber field jacket');
+  await outfitBuilder.getByRole('button', { name: 'Save & Select' }).click();
+  await expect(outfitBuilder).toBeHidden();
+
   const controls = page.getByLabel('Studio session controls');
   await controls.getByRole('button', { name: 'Record New Video' }).click();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
@@ -425,15 +441,8 @@ test('persistent controls preserve local media across VTON choice, AI stop, trac
   await expect(chooser.getByRole('heading', { name: 'Virtual Try-On' })).toBeVisible();
   await expectNoDocumentOverflow(page);
 
-  await chooser.getByRole('button', { name: 'Configure Virtual Try-On' }).click();
-  const dock = page.getByRole('dialog', { name: 'Recipe Dock' });
-  await expect(dock).toBeVisible();
-  await expect(page.getByLabel('Live local camera preview')).toBeVisible();
-  await page.getByLabel('Garment direction').fill('A structured amber field jacket');
-  await page.getByRole('button', { name: 'Start Virtual Try-On AI' }).click();
+  await chooser.getByRole('button', { name: 'Start Virtual Try-On' }).click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
-  await page.keyboard.press('Escape');
-  await expect(dock).toBeHidden();
 
   await controls.getByRole('button', { name: 'Stop AI' }).click();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
@@ -477,9 +486,10 @@ test('no-key Local Camera records and finalizes without provider HTTP, WebSocket
   await page.getByRole('button', { name: 'Shelf' }).click();
   await page.getByRole('button', { name: 'Try-on recipes' }).click();
   await page.getByRole('button', { name: 'New garment recipe' }).click();
-  await page.getByLabel(/^Name/).fill('Local blocked recipe');
-  await page.getByLabel(/^Prompt text/).fill('Apply the field host linen overshirt.');
-  await page.getByRole('button', { name: 'Save recipe' }).click();
+  await page.getByLabel('Garment direction').fill('Apply the field host linen overshirt.');
+  await page.getByRole('button', { name: 'Continue to save' }).click();
+  await page.getByLabel('Outfit name').fill('Local blocked recipe');
+  await page.getByRole('button', { name: 'Save outfit' }).click();
   await page.getByRole('button', { name: 'Close creative tool' }).click();
 
   await openRecipeDockWhenOverlaid(page);
@@ -923,13 +933,16 @@ test('Space records and finishes only outside editable controls', async ({ page 
   await shelfLauncher.click();
   await page.getByRole('button', { name: 'Try-on recipes' }).click();
   await page.getByRole('button', { name: 'New garment recipe' }).click();
-  const nameInput = page.getByLabel(/^Name/);
+  await page.getByLabel('Garment direction').fill('A keyboard-safe field jacket.');
+  await page.getByRole('button', { name: 'Continue to save' }).click();
+  const nameInput = page.getByLabel('Outfit name');
   await nameInput.fill('Keyboard guard');
   await nameInput.press('Space');
   await expect(nameInput).toHaveValue('Keyboard guard ');
   expect((await readBrowserState(page)).recorderStarts).toBe(0);
 
-  await page.getByRole('button', { name: 'Cancel' }).click();
+  page.once('dialog', (dialog) => dialog.accept());
+  await page.getByRole('button', { name: 'Close creative tool' }).click();
   await page.keyboard.press('Escape');
   await expect(page.getByRole('dialog', { name: 'Recipe Shelf' })).toBeHidden();
   await expect(shelfLauncher).toBeFocused();

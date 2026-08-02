@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
+import { openCharacterOptions } from './support/studioHarness';
 
 type MockStudioState = {
   apiRequests: string[];
@@ -244,7 +245,7 @@ test('small-mobile Builder steps survive 200% text and keep one preview', async 
     document.documentElement.style.fontSize = '200%';
   });
 
-  await page.getByRole('button', { name: /Open character options/u }).click();
+  await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Create new character' }).click();
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   const previewStep = dialog.getByRole('button', {
@@ -261,6 +262,87 @@ test('small-mobile Builder steps survive 200% text and keep one preview', async 
   await expect(dialog.getByRole('complementary')).toHaveCount(1);
   await expectNoDocumentOverflow(page);
   await expectNoAxeViolations(page);
+  expect(await cameraCalls(page)).toBe(0);
+  expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
+  expect(network.blockedExternalRequests).toEqual([]);
+  expect(network.blockedExternalWebSockets).toEqual([]);
+});
+
+test('phone and tablet use one Select AI preparation chooser and keep the four-tool row', async ({
+  page,
+}) => {
+  const network = await installProviderFreeStudio(page);
+  await page.setViewportSize(STUDIO_VIEWPORT_SIZES.compactDesktop);
+  await page.goto('/studio');
+  const desktopRail = page.getByRole('navigation', { name: 'Creative workspace tools' });
+  await expect
+    .poll(() =>
+      desktopRail
+        .locator('button')
+        .evaluateAll((buttons) => buttons.map((button) => button.getAttribute('aria-label'))),
+    )
+    .toEqual(['Dock', 'Take', 'Select Character', 'Select Outfit', 'Workshop', 'Shelf']);
+  await expect(page.getByRole('button', { name: /Open Select AI options/u })).toHaveCount(0);
+
+  for (const viewport of [
+    STUDIO_VIEWPORT_SIZES.tabletPortrait,
+    STUDIO_VIEWPORT_SIZES.mobilePortrait,
+  ]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/studio');
+    const selectAi = page.getByRole('button', { name: /No AI selected\. Open Select AI options/u });
+    await expect(selectAi.locator('[data-character-label]')).toHaveText('Select AI');
+    const rail = page.getByRole('navigation', { name: 'Creative workspace tools' });
+    await expect(rail.getByRole('button')).toHaveCount(4);
+    await expect(rail.getByRole('button', { name: 'Select Character' })).toHaveCount(0);
+    await expect(rail.getByRole('button', { name: 'Select Outfit' })).toHaveCount(0);
+    await selectAi.click();
+    const chooser = page.getByRole('dialog', { name: 'Select AI' });
+    await expect(chooser.getByRole('button', { name: 'Select Character' })).toBeVisible();
+    await expect(chooser.getByRole('button', { name: 'Select Outfit' })).toBeVisible();
+    await chooser.getByRole('button', { name: 'Select Outfit' }).click();
+    await expect(page.getByRole('dialog', { name: 'Outfit' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(selectAi).toBeFocused();
+
+    await selectAi.click();
+    await page
+      .getByRole('dialog', { name: 'Select AI' })
+      .getByRole('button', { name: 'Select Character' })
+      .click();
+    await expect(page.getByRole('dialog', { name: 'Character' })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(selectAi).toBeFocused();
+  }
+  expect(await cameraCalls(page)).toBe(0);
+  expect(network.blockedExternalRequests).toEqual([]);
+  expect(network.blockedExternalWebSockets).toEqual([]);
+});
+
+test('desktop Outfit Builder saves and selects a prompt outfit without media or provider work', async ({
+  page,
+}) => {
+  const network = await installProviderFreeStudio(page);
+  await page.setViewportSize(STUDIO_VIEWPORT_SIZES.compactDesktop);
+  await page.goto('/studio');
+
+  await page.getByRole('button', { name: 'Select Outfit', exact: true }).click();
+  const selector = page.getByRole('dialog', { name: 'Outfit' });
+  await selector.getByRole('button', { name: 'Create new outfit' }).click();
+  const builder = page.getByRole('dialog', { name: 'Create a new outfit' });
+  await builder.getByLabel('Garment direction').fill('A structured copper linen overshirt.');
+  await builder.getByRole('checkbox', { name: 'Enhance prompt' }).check();
+  await builder.getByRole('button', { name: 'Continue to save' }).click();
+  await builder.getByLabel('Outfit name').fill('Copper overshirt');
+  await builder.getByRole('button', { name: 'Save & Select' }).click();
+
+  await expect(builder).toBeHidden();
+  const selectedOutfit = page.getByRole('button', {
+    name: 'Selected outfit: Copper overshirt. Open outfit options',
+  });
+  await expect(selectedOutfit).toBeVisible();
+  await selectedOutfit.click();
+  await expect(page.getByRole('dialog', { name: 'Outfit' })).toContainText('Copper overshirt');
   expect(await cameraCalls(page)).toBe(0);
   expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
   expect(network.blockedExternalRequests).toEqual([]);

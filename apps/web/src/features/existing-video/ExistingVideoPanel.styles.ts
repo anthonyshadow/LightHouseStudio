@@ -8,6 +8,13 @@ export const panelStackStyles = (theme: Theme): CSSObject => ({
   '& h2, & h3, & p': { margin: 0 },
 });
 
+export const recoveryActionStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  flexWrap: 'wrap',
+  gap: theme.space.xs,
+  marginBlockStart: theme.space.sm,
+});
+
 export const dropZoneStyles = (theme: Theme): CSSObject => ({
   minHeight: 'min(28rem, 68dvh)',
   display: 'grid',

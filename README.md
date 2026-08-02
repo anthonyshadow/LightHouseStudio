@@ -34,8 +34,11 @@ claim that qualification has passed.
    before voice conversion.
 5. Preview **Original** and **Result**, revise the plan or edit base, then download the latest
    healthy result or start over while retaining the immutable source.
-6. For advanced live work, explicitly start local media, choose Character or Virtual Try-On from
-   **Start AI** or the Dock, and record the transformed stream through the existing live flow.
+6. Prepare advanced live work without starting media: desktop places **Select Character** and
+   **Select Outfit** immediately before **Workshop** in the creative-tool rail; phones and tablets
+   expose one header **Select AI** action that routes to either preparation flow. A saved selection
+   can then be started explicitly from **Start AI** or the Dock and recorded through the existing
+   live flow.
 
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio` owns the
 one persistent stage; creative tools open as overlays without remounting it or creating another
@@ -47,7 +50,8 @@ Existing compatibility projects can still be downloaded or deleted from Recipe S
 detects them, but they have no URL entry.
 
 Leaving Studio is blocked during recording/finalization. A temporary take, active Voice work, or
-dirty Recipe Shelf edit requires confirmed discard; saved origin-scoped browser data is unaffected.
+dirty Recipe Shelf/Outfit Builder edit requires confirmed discard; saved origin-scoped browser
+data is unaffected.
 
 ## Capabilities and provider boundaries
 
@@ -56,6 +60,10 @@ dirty Recipe Shelf edit requires confirmed discard; saved origin-scoped browser 
   external media traffic.
 - Character Builder saves browser-local character metadata and immutable reference assets under
   `LIGHTFRAME_DATA_DIR`. Prompt-only save and upload do not generate images.
+- Outfit Builder creates reusable prompt or reference-image VTO recipes. Prompt enhancement is
+  remembered with prompt outfits. A selected image remains tab-temporary until final Save, when
+  the existing idempotent local upload endpoint makes it durable; Save never starts media or
+  contacts Decart or an image provider.
 - `Lucy-latest` and pinned `lucy-vton-latest` start only after explicit user action. Decart receives live
   media and the applied prompt/reference snapshot.
 - Batch Lucy/VTO uses server-mediated exact-model jobs with fixed 720p output, explicit

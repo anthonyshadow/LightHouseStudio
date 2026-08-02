@@ -10,11 +10,12 @@ This document separates current runtime behavior from the approved pilot operati
 
 | Data                                                                          | Current location and lifetime                                                                               | External transfer                                                                                                                   |
 | ----------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------- |
-| Saved/recent recipes, character metadata, opaque reference IDs                | Sanitized/versioned Recipe Shelf v4 in this browser profile’s `localStorage`                                | None                                                                                                                                |
+| Saved/recent recipes, character/outfit metadata, opaque reference IDs         | Sanitized/versioned Recipe Shelf v5 in this browser profile’s `localStorage`                                | None                                                                                                                                |
 | Active Character Builder draft/save journal                                   | One sanitized/versioned IndexedDB record until Reset, successful Save, site-data removal, or eviction       | Only after explicit optimization/image action                                                                                       |
 | Legacy Guided projects/media                                                  | Versioned IndexedDB records until manager deletion, site-data removal, or eviction                          | None                                                                                                                                |
 | Uploaded/generated/edited/composed references and metadata                    | Immutable owner-scoped files under `LIGHTFRAME_DATA_DIR` until operator retirement                          | Upload/direct save: none; provider image actions: prompt/options and source bytes when applicable                                   |
 | Active mode text/enhancement, capture preferences, temporary portrait/garment | Tab memory until reset/reload/unmount                                                                       | Decart only after matching Start/Apply                                                                                              |
+| Unsaved Outfit Builder image and directly uploaded/imported outfit recents    | Bounded tab memory until replacement, discard, reload, or tab close; final Save stores bytes locally        | Import fetches the explicit public HTTPS origin; no Decart or image-provider transfer on Save                                       |
 | Camera/microphone streams                                                     | Browser memory while live                                                                                   | None in Local; Decart during explicit AI session                                                                                    |
 | Decart client credential/timing                                               | Browser memory for the connection/session                                                                   | Decart connection only                                                                                                              |
 | Current converted original take, sidecar, processed result                    | Browser memory until Release/Discard/reload/crash/close; raw recorder input exists only during finalization | Sidecar only after explicit ElevenLabs Apply                                                                                        |
@@ -71,6 +72,10 @@ the optional AAC WASM encoder entirely on the device. Local Voice uses Web Audio
 - Legacy projects remain in IndexedDB until explicit manager deletion, site-data clearing, private
   session closure, eviction, or profile retirement.
 - Recipe Dock portrait/garment files are tab-ephemeral.
+- Outfit Builder files remain tab-ephemeral until final Save. Successful final Save uses the
+  idempotent local reference-upload endpoint, then stores only the opaque asset ID in Recipe Shelf
+  v5. Directly uploaded/imported recent outfits stay bounded and tab-only; successful prompt uses
+  and explicitly saved image outfits may create persistent Recipe Shelf recents.
 - Character Builder references are immutable local assets. Remove/Detach, draft reset,
   regeneration, stale-preview rejection, and character deletion remove relationships only; they do
   not delete bytes.

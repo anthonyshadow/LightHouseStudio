@@ -44,7 +44,7 @@ The mounted Studio owns focused controllers for:
 - local/realtime media and per-mode drafts;
 - recording, review, and voice processing;
 - existing-video selection, local inspection, and one mutually exclusive batch transformation;
-- Character Builder, Prompt Workshop, and Recipe Shelf handoff;
+- Character Builder, Outfit Builder, Prompt Workshop, and Recipe Shelf handoff;
 - overlays and the data-triggered compatibility project manager.
 
 `MediaStage` stays mounted once and owns one `<video>` element. A discriminated presentation state
@@ -71,6 +71,14 @@ change never leaves two mounted settings forms. Capture choices auto-apply, devi
 on mount and `devicechange`, and failed live replacement restores the last applied draft while
 preserving the visible safe error. There are no manual Apply, Refresh, or Discard actions.
 
+At the existing `64rem` desktop breakpoint, the header has no AI selection control. The
+creative-tool rail owns **Select Character**, **Select Outfit**, then **Workshop** as three ordered
+preparation actions. Below that breakpoint the four-button bottom tool row remains Dock, Take,
+Workshop, and Shelf; a single header **Select AI** action opens a provider-free preparation chooser
+for Character or Virtual Try-On. These responsive presentations share the same overlay controller,
+recipe handoff, selected-state labels, activity locks, and return-focus behavior. They never mount
+duplicate stateful selectors or start media/provider work.
+
 All tools use the shared `OverlayPanel` portal. It owns focus trap, inert background, Escape,
 topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. The portal
 follows the active browser fullscreen element. In stage fullscreen, the existing media stage fills
@@ -82,9 +90,10 @@ Narrow screens reveal that same region through **Review & Generate** instead of 
 stateful controls.
 
 `StudioExitGuard` blocks navigation leaving `/studio` while recording or finalization is active.
-A temporary take, active Voice process, or dirty Shelf form requires confirmed discard before the
-route proceeds. Hard unload receives the matching browser warning, while future navigation among
-`/studio/*` children is deliberately exempt so a shared runtime layout can remain mounted.
+A temporary take, active Voice process, or dirty Shelf or Outfit Builder form requires confirmed
+discard before the route proceeds. Hard unload receives the matching browser warning, while future
+navigation among `/studio/*` children is deliberately exempt so a shared runtime layout can remain
+mounted.
 
 The shell is viewport-bound with safe-area padding and deliberate support for `1440×960`,
 `1280×720`, `834×1112`, `390×844`, and `320×568`. The stage, responsive tool/session regions, and
@@ -137,6 +146,15 @@ character in the originating unsubmitted Character Swap step.
 Prompt Workshop owns only Add, Replace, and Restyle structured object recipes. Recipe Shelf owns
 saved/recent/character metadata and atomic reuse. Neither owns Character generation or a media
 session.
+
+Outfit Builder exclusively owns reusable VTO recipe creation, edit, copy, naming, prompt/image mode
+exclusion, prompt enhancement, temporary reference files, and idempotent final-save upload. It
+uses the same validated JPEG/PNG/WebP picker and explicit public-HTTPS importer as existing-video
+VTO. New outfits are prompt-or-image; migrated combined prompt/reference outfits remain usable and
+editable. Selector-originated Save creates and selects the recipe without acquiring media,
+loading Decart, or contacting a provider. Shelf edit updates the existing ID; Save a copy creates a
+new ID. Recipe Shelf remains the metadata repository and immutable reference storage remains the
+local broker's responsibility.
 
 Character references follow these rules:
 
@@ -204,22 +222,26 @@ The API streams bytes to generated private paths and performs authoritative
 container/track/codec/duration/aspect/size inspection before Decart contact. One app job runs at a
 time. An uploaded workflow can switch its single active choice between Lucy and VTO before
 submission, and only that active model is submitted.
-VTO recipes carry an explicit input discriminator for saved/recent outfit, reference image, or
-prompt. An explicit remote reference import goes through the loopback API: HTTPS-only URL parsing,
+VTO recipes carry an explicit batch input discriminator for saved/recent outfit, direct reference
+image, or prompt. Saved and recent recipe records separately persist `vtonInputKind` as `prompt` or
+`saved-outfit` plus `enhancePrompt`; image-only records are valid only with an opaque persisted
+reference ID. Prompt recipes restore Prompt mode and enhancement. Saved-image and migrated combined
+recipes restore Saved outfit mode with enhancement off. An explicit remote reference import goes
+through the loopback API: HTTPS-only URL parsing,
 credential/private/mixed-address rejection, per-hop DNS pinning, bounded redirects/bytes,
 JPEG/PNG/WebP header and decoded-content validation, cancellation, no-store bytes, and sanitized
 errors. The URL is neither persisted nor forwarded to Decart.
 
 ## Persistence
 
-| Store                       | Data                                                                  | Lifetime and trust boundary                                                                                                    |
-| --------------------------- | --------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Recipe Shelf `localStorage` | Versioned, allowlisted prompt/character metadata and opaque asset IDs | Sanitized on read; degrades to session memory on failure; never stores image bytes                                             |
-| Character Builder IndexedDB | One resumable draft and save journal                                  | Compare-and-swap autosave; prevents duplicate save/preload after retry or reload                                               |
-| Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings         | Owner-scoped under `LIGHTFRAME_DATA_DIR`; no ordinary deletion route                                                           |
-| Legacy project IndexedDB    | Compatibility project metadata and media Blobs                        | List/download/delete plus one-time valid character-design seeding; Guided is not restored                                      |
-| Session memory              | Streams, tokens, files, device IDs, recordings, sidecars, voice state | Cleaned on replacement, release/discard, unmount, or tab close as applicable                                                   |
-| Video-job temp root         | Streamed input/reference and inspected provider output                | Process-temporary; inputs drop after acceptance, output after delivery, jobs expire at 60 minutes, and startup purges the root |
+| Store                       | Data                                                                                                | Lifetime and trust boundary                                                                                                    |
+| --------------------------- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Recipe Shelf `localStorage` | Versioned v5 allowlisted prompt/character/outfit metadata and opaque asset IDs                      | Sanitized on read; v1-v4 migration; degrades to session memory on failure; never stores image bytes                            |
+| Character Builder IndexedDB | One resumable draft and save journal                                                                | Compare-and-swap autosave; prevents duplicate save/preload after retry or reload                                               |
+| Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings                                       | Owner-scoped under `LIGHTFRAME_DATA_DIR`; no ordinary deletion route                                                           |
+| Legacy project IndexedDB    | Compatibility project metadata and media Blobs                                                      | List/download/delete plus one-time valid character-design seeding; Guided is not restored                                      |
+| Session memory              | Streams, tokens, files, direct-import outfit recents, device IDs, recordings, sidecars, voice state | Cleaned on replacement, release/discard, unmount, or tab close as applicable                                                   |
+| Video-job temp root         | Streamed input/reference and inspected provider output                                              | Process-temporary; inputs drop after acceptance, output after delivery, jobs expire at 60 minutes, and startup purges the root |
 
 Browser storage is untrusted and schema-migrated. Opaque IDs, provenance, and timestamps are
 preserved. The filesystem store uses atomic publication and never exposes internal paths,

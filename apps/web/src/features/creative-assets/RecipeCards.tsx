@@ -51,6 +51,9 @@ const recentPromptReferenceLabel = (item: RecentPrompt, imageOnly: boolean): str
     return item.savedPromptId ? 'Linked to saved recipe' : 'Recent text only';
   }
   if (!imageOnly) return 'Reference image attached';
+  if (item.modelModeId === 'lucy-vton-latest') {
+    return item.savedPromptId ? 'Linked to saved outfit' : 'Image-only outfit';
+  }
   return item.savedCharacterPromptId ? 'Linked to saved character' : 'Image-only character';
 };
 
@@ -70,6 +73,8 @@ export const SavedPromptCard = ({
   onAction: (action: EditAction) => void;
 }) => {
   const theme = useTheme();
+  const promptLabel =
+    item.prompt || (item.modelModeId === 'lucy-vton-latest' ? 'Image outfit' : 'Image character');
   return (
     <article css={cardStyles(theme, selected)} data-selected={selected || undefined}>
       <header css={cardHeaderStyles(theme)}>
@@ -103,8 +108,8 @@ export const SavedPromptCard = ({
         />
       ) : null}
       <div>
-        <p title={item.prompt} css={promptStyles(theme)}>
-          {item.prompt}
+        <p title={promptLabel} css={promptStyles(theme)}>
+          {promptLabel}
         </p>
         <Tags tags={item.tags} />
       </div>
@@ -179,8 +184,12 @@ export const RecentPromptCard = ({
 }) => {
   const theme = useTheme();
   const imageOnly = !item.prompt.trim() && Boolean(item.referenceImageAssetId);
-  const title = item.characterName ?? 'Recent direction';
+  const title =
+    item.characterName ??
+    (item.modelModeId === 'lucy-vton-latest' ? 'Recent outfit' : 'Recent direction');
   const referenceLabel = recentPromptReferenceLabel(item, imageOnly);
+  const imageOnlyLabel =
+    item.modelModeId === 'lucy-vton-latest' ? 'Image outfit' : 'Image character';
   return (
     <article css={cardStyles(theme, selected)} data-selected={selected || undefined}>
       <header css={cardHeaderStyles(theme)}>
@@ -209,15 +218,15 @@ export const RecentPromptCard = ({
       {item.referenceImageAssetId ? (
         <ReferenceImagePreview
           assetId={item.referenceImageAssetId}
-          alt="Recent character reference"
+          alt={`Recent ${item.modelModeId === 'lucy-vton-latest' ? 'outfit' : 'character'} reference`}
         />
       ) : null}
-      <p title={item.prompt || 'Image-only character'} css={promptStyles(theme)}>
-        {item.prompt || 'Image-only character'}
+      <p title={item.prompt || imageOnlyLabel} css={promptStyles(theme)}>
+        {item.prompt || imageOnlyLabel}
       </p>
       <div css={actionStyles(theme)}>
         <Button
-          aria-label={`Use recent ${imageOnly ? `character: ${title}` : `prompt: ${item.prompt}`}`}
+          aria-label={`Use recent ${imageOnly ? `${item.modelModeId === 'lucy-vton-latest' ? 'outfit' : 'character'}: ${title}` : `prompt: ${item.prompt}`}`}
           variant="primary"
           size="small"
           disabled={useDisabled}
@@ -231,7 +240,9 @@ export const RecentPromptCard = ({
         >
           Use
         </Button>
-        {!item.savedPromptId && !item.savedCharacterPromptId && !imageOnly ? (
+        {!item.savedPromptId &&
+        !item.savedCharacterPromptId &&
+        (!imageOnly || item.modelModeId === 'lucy-vton-latest') ? (
           <Button
             aria-label={`Save a copy of recent prompt: ${item.prompt}`}
             variant="quiet"

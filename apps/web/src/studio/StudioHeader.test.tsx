@@ -23,7 +23,7 @@ const browser = {
 afterEach(cleanup);
 
 describe('StudioHeader', () => {
-  it('places an accessible unselect action next to the selected character', async () => {
+  it('places an accessible unselect action next to the selected AI recipe', async () => {
     const user = userEvent.setup();
     const onClearCharacter = vi.fn();
     render(
@@ -33,6 +33,7 @@ describe('StudioHeader', () => {
           browser={browser}
           capabilityState="ready"
           characterSelectorRef={{ current: null }}
+          selectorLabel="Select AI"
           activeCharacterName="Business man"
           onOpenCharacterSelector={vi.fn()}
           onClearCharacter={onClearCharacter}
@@ -40,7 +41,7 @@ describe('StudioHeader', () => {
       </StudioDesignProvider>,
     );
 
-    await user.click(screen.getByRole('button', { name: 'Unselect character: Business man' }));
+    await user.click(screen.getByRole('button', { name: 'Unselect AI: Business man' }));
     expect(onClearCharacter).toHaveBeenCalledOnce();
   });
 
@@ -52,13 +53,32 @@ describe('StudioHeader', () => {
           browser={browser}
           capabilityState="ready"
           characterSelectorRef={{ current: null }}
+          selectorLabel="Select AI"
           onOpenCharacterSelector={vi.fn()}
           onClearCharacter={vi.fn()}
         />
       </StudioDesignProvider>,
     );
 
-    expect(screen.getByRole('button', { name: /No character selected/u })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: /Unselect character/u })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /No AI selected/u })).toHaveTextContent('Select AI');
+    expect(screen.queryByRole('button', { name: /Unselect AI/u })).not.toBeInTheDocument();
+  });
+
+  it('omits the header selector for the desktop rail layout', () => {
+    render(
+      <StudioDesignProvider>
+        <StudioHeader
+          availability={availability}
+          browser={browser}
+          capabilityState="ready"
+          characterSelectorRef={{ current: null }}
+          showAiSelector={false}
+          selectorLabel="Select AI"
+          onOpenCharacterSelector={vi.fn()}
+          onClearCharacter={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+    expect(screen.queryByRole('button', { name: /Select AI options/u })).not.toBeInTheDocument();
   });
 });

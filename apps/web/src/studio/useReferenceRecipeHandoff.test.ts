@@ -34,6 +34,8 @@ const savedPrompt: SavedPrompt = {
   modelModeId: 'lucy-latest',
   source: 'manual',
   referenceImageAssetId: 'reference-1',
+  vtonInputKind: null,
+  enhancePrompt: false,
   tags: [],
   createdAt: '2026-07-21T12:00:00.000Z',
   updatedAt: '2026-07-21T12:00:00.000Z',
@@ -54,6 +56,10 @@ const exactFingerprint = {
   referenceImageAssetId: 'reference-1',
   assetPrompt: 'A calm documentary presenter',
   assetReferenceImageAssetId: 'reference-1',
+  vtonInputKind: null,
+  enhancePrompt: false,
+  assetVtonInputKind: null,
+  assetEnhancePrompt: false,
 } as const;
 
 const uploadedAsset: UploadedReferenceImageAsset = {
@@ -293,7 +299,7 @@ describe('reference recipe handoff', () => {
       useCount: 0,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [character],
@@ -336,6 +342,8 @@ describe('reference recipe handoff', () => {
       referenceImageAssetId: uploadedAsset.assetId,
       savedCharacterPromptId: character.id,
       characterName: character.name,
+      vtonInputKind: null,
+      enhancePrompt: false,
     });
   });
 
@@ -361,7 +369,7 @@ describe('reference recipe handoff', () => {
       useCount: 0,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [character],
@@ -410,7 +418,7 @@ describe('reference recipe handoff', () => {
       useCount: 0,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [character],
@@ -464,7 +472,7 @@ describe('reference recipe handoff', () => {
       useCount: 0,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [character],
@@ -498,7 +506,7 @@ describe('reference recipe handoff', () => {
 
   it('retains a deleted image-only character name when reusing its standalone Recent recipe', async () => {
     const store: CreativeAssetStore = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       savedPrompts: [],
       recentPrompts: [
         {
@@ -507,6 +515,8 @@ describe('reference recipe handoff', () => {
           modelModeId: 'lucy-latest',
           characterName: 'Deleted archive character',
           referenceImageAssetId: uploadedAsset.assetId,
+          vtonInputKind: null,
+          enhancePrompt: false,
           usedAt: '2026-07-21T12:00:00.000Z',
         },
       ],
@@ -537,12 +547,14 @@ describe('reference recipe handoff', () => {
       modelModeId: 'lucy-latest',
       referenceImageAssetId: uploadedAsset.assetId,
       characterName: 'Deleted archive character',
+      vtonInputKind: null,
+      enhancePrompt: false,
     });
   });
 
   it('retains the exact failed selection for owner-scoped retry and commits only once', async () => {
     const store: CreativeAssetStore = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       savedPrompts: [savedPrompt],
       recentPrompts: [],
       savedCharacterPrompts: [],
@@ -599,7 +611,7 @@ describe('reference recipe handoff', () => {
         }),
     );
     const store: CreativeAssetStore = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       savedPrompts: [savedPrompt],
       recentPrompts: [],
       savedCharacterPrompts: [],
@@ -633,7 +645,7 @@ describe('reference recipe handoff', () => {
       return new Promise<UploadedReferenceImageAsset>(() => undefined);
     });
     const store: CreativeAssetStore = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       savedPrompts: [savedPrompt],
       recentPrompts: [],
       savedCharacterPrompts: [],
@@ -665,7 +677,7 @@ describe('reference recipe handoff', () => {
       referenceImageAssetId: uploadedAsset.assetId,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       savedPrompts: [exactSavedPrompt],
       recentPrompts: [],
       savedCharacterPrompts: [],
@@ -730,7 +742,7 @@ describe('reference recipe handoff', () => {
       useCount: 0,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 4,
+      schemaVersion: 5,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [character],
@@ -780,10 +792,66 @@ describe('reference recipe handoff', () => {
     });
   });
 
+  it('restores and attributes an enhanced prompt outfit without media or reference hydration', async () => {
+    const outfit: SavedPrompt = {
+      ...savedPrompt,
+      id: 'prompt-outfit',
+      title: 'Copper overshirt',
+      prompt: 'A copper linen overshirt.',
+      modelModeId: 'lucy-vton-latest',
+      referenceImageAssetId: null,
+      vtonInputKind: 'prompt',
+      enhancePrompt: true,
+    };
+    const harness = renderHandoff({
+      store: {
+        schemaVersion: 5,
+        savedPrompts: [outfit],
+        recentPrompts: [],
+        savedCharacterPrompts: [],
+      },
+      referenceAsset: uploadedAsset,
+    });
+
+    act(() => {
+      harness.result.current.actions.useRecipe({
+        origin: 'saved-prompt',
+        assetId: outfit.id,
+        prompt: outfit.prompt,
+        modelModeId: outfit.modelModeId,
+        referenceImageAssetId: null,
+        vtonInputKind: 'prompt',
+        enhancePrompt: true,
+      });
+    });
+    await waitFor(() =>
+      expect(harness.replaceRecipeDraft).toHaveBeenCalledWith({
+        mode: 'lucy-vton-latest',
+        prompt: outfit.prompt,
+        referenceImage: null,
+        enhance: true,
+      }),
+    );
+    expect(fetchReferenceImageMetadata).not.toHaveBeenCalled();
+    expect(harness.result.current.state.activeRecipeLabel).toBe('Copper overshirt');
+
+    act(() => {
+      harness.result.current.actions.recordCommittedPrompt('lucy-vton-latest', outfit.prompt, null);
+    });
+    expect(harness.recordSuccessfulPrompt).toHaveBeenCalledWith({
+      prompt: outfit.prompt,
+      modelModeId: 'lucy-vton-latest',
+      savedPromptId: outfit.id,
+      referenceImageAssetId: null,
+      vtonInputKind: 'prompt',
+      enhancePrompt: true,
+    });
+  });
+
   it('preserves Character Builder blocking precedence across Shelf and hydration state', () => {
     const externalBlock = renderHandoff({
       store: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         savedPrompts: [],
         recentPrompts: [],
         savedCharacterPrompts: [],
@@ -798,7 +866,7 @@ describe('reference recipe handoff', () => {
 
     const shelfBlock = renderHandoff({
       store: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         savedPrompts: [],
         recentPrompts: [],
         savedCharacterPrompts: [],
@@ -814,7 +882,7 @@ describe('reference recipe handoff', () => {
 
     const sessionBlock = renderHandoff({
       store: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         savedPrompts: [],
         recentPrompts: [],
         savedCharacterPrompts: [],
@@ -831,7 +899,7 @@ describe('reference recipe handoff', () => {
     );
     const pendingBlock = renderHandoff({
       store: {
-        schemaVersion: 4,
+        schemaVersion: 5,
         savedPrompts: [
           {
             ...savedPrompt,

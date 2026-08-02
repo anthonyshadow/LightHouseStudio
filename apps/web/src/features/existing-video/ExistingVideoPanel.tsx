@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import { useRef, useState, type DragEvent } from 'react';
+import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { hydrateReferenceImage } from '../../adapters/api-client/apiClient';
 import { validateReferenceImage } from '../../adapters/browser-media/imageValidation';
 import { Button, ConfirmationDialog, StatusNotice, Surface } from '../../ui';
@@ -12,6 +12,7 @@ import {
   panelStackStyles,
   processingStyles,
   resultStyles,
+  recoveryActionStyles,
   sectionHeadingStyles,
   sourceColumnStyles,
   workspaceStyles,
@@ -56,6 +57,11 @@ type PendingVisualSwitch = Readonly<{
   to: ExistingVideoVisualToolId;
 }>;
 
+type MissingVtonReferenceRecovery = Readonly<{
+  stepId: string;
+  recipe: ExistingVideoSavedRecipe;
+}>;
+
 export const ExistingVideoPanel = ({
   workflow,
   videoProcessingAvailable,
@@ -78,8 +84,11 @@ export const ExistingVideoPanel = ({
     initialActiveTool(workflow),
   );
   const [referenceError, setReferenceError] = useState<string | null>(null);
+  const [missingVtonReference, setMissingVtonReference] =
+    useState<MissingVtonReferenceRecovery | null>(null);
   const [recipeLoading, setRecipeLoading] = useState(false);
   const [recentOutfits, setRecentOutfits] = useState<readonly RecentOutfit[]>([]);
+  const acceptedRecentKeyRef = useRef<string | null>(null);
   const [replaceConfirmationOpen, setReplaceConfirmationOpen] = useState(false);
   const [discardConfirmationOpen, setDiscardConfirmationOpen] = useState(false);
   const [pendingVisualSwitch, setPendingVisualSwitch] = useState<PendingVisualSwitch | null>(null);
@@ -93,6 +102,7 @@ export const ExistingVideoPanel = ({
 
   const selectFile = (file: File) => {
     setReferenceError(null);
+    setMissingVtonReference(null);
     setActiveTool(null);
     void workflow.selectFile(file);
   };
@@ -120,6 +130,7 @@ export const ExistingVideoPanel = ({
   };
 
   const chooseReference = async (step: ExistingVideoStep, file: File) => {
+    setMissingVtonReference(null);
     const validation = await validateReferenceImage(file, step.modelId);
     if (validation.blockingError) {
       setReferenceError(validation.blockingError);
@@ -127,13 +138,33 @@ export const ExistingVideoPanel = ({
     }
     setReferenceError(null);
     workflow.updateStep(step.id, { referenceImage: file });
-    if (step.modelId === 'lucy-vton-latest') {
-      setRecentOutfits((current) => [
-        { id: crypto.randomUUID(), file },
-        ...current.filter((item) => item.file !== file),
-      ]);
-    }
   };
+
+  useEffect(() => {
+    const acceptedStep = workflow.steps[0];
+    if (
+      !workflow.acceptedSubmission ||
+      acceptedStep?.modelId !== 'lucy-vton-latest' ||
+      acceptedStep.inputKind !== 'reference-image' ||
+      !acceptedStep.referenceImage
+    ) {
+      return;
+    }
+    const file = acceptedStep.referenceImage;
+    const key = `${acceptedStep.id}:${file.name}:${file.size}:${file.lastModified}`;
+    if (acceptedRecentKeyRef.current === key) return;
+    acceptedRecentKeyRef.current = key;
+    setRecentOutfits((current) =>
+      [
+        { id: crypto.randomUUID(), file },
+        ...current.filter(
+          (item) =>
+            `${item.file.name}:${item.file.size}:${item.file.lastModified}` !==
+            `${file.name}:${file.size}:${file.lastModified}`,
+        ),
+      ].slice(0, 12),
+    );
+  }, [workflow.acceptedSubmission, workflow.steps]);
 
   const applySavedRecipe = async (step: ExistingVideoStep, recipeId: string) => {
     const recipe = savedRecipes.find(
@@ -142,6 +173,7 @@ export const ExistingVideoPanel = ({
     if (!recipe) return;
     setRecipeLoading(true);
     setReferenceError(null);
+    setMissingVtonReference(null);
     try {
       const referenceImage = recipe.referenceImageAssetId
         ? await hydrateReferenceImage(recipe.referenceImageAssetId)
@@ -151,21 +183,31 @@ export const ExistingVideoPanel = ({
         prompt: recipe.prompt,
         referenceImage: referenceImage?.file ?? null,
         ...(step.modelId === 'lucy-vton-latest'
-          ? { inputKind: 'saved-outfit' as const, enhancePrompt: false }
+          ? {
+              inputKind:
+                recipe.vtonInputKind === 'prompt' ? ('prompt' as const) : ('saved-outfit' as const),
+              enhancePrompt: recipe.vtonInputKind === 'prompt' && recipe.enhancePrompt,
+            }
           : {}),
       });
     } catch {
-      setReferenceError(
-        'The saved recipe text is still available, but its reference image could not be loaded.',
-      );
-      workflow.updateStep(step.id, {
-        savedRecipeId: recipe.id,
-        prompt: recipe.prompt,
-        referenceImage: null,
-        ...(step.modelId === 'lucy-vton-latest'
-          ? { inputKind: 'saved-outfit' as const, enhancePrompt: false }
-          : {}),
-      });
+      if (step.modelId === 'lucy-vton-latest') {
+        setReferenceError(
+          recipe.prompt.trim()
+            ? 'This outfit image could not be loaded. Retry, continue with its garment direction, or remove the outfit.'
+            : 'This outfit image could not be loaded. Retry or remove the outfit.',
+        );
+        setMissingVtonReference({ stepId: step.id, recipe });
+      } else {
+        setReferenceError(
+          'The saved recipe text is still available, but its reference image could not be loaded.',
+        );
+        workflow.updateStep(step.id, {
+          savedRecipeId: recipe.id,
+          prompt: recipe.prompt,
+          referenceImage: null,
+        });
+      }
     } finally {
       setRecipeLoading(false);
     }
@@ -184,10 +226,16 @@ export const ExistingVideoPanel = ({
     });
   };
 
+  const clearReferenceRecovery = () => {
+    setReferenceError(null);
+    setMissingVtonReference(null);
+  };
+
   const activateVisualTool = (tool: ExistingVideoVisualToolId) => {
     const selected = workflow.addStep(tool === 'character' ? 'lucy-latest' : 'lucy-vton-latest');
     if (!selected) return;
     setReferenceError(null);
+    setMissingVtonReference(null);
     setActiveTool(tool);
     focusActiveConfiguration();
   };
@@ -341,6 +389,61 @@ export const ExistingVideoPanel = ({
           {referenceError ? (
             <StatusNotice tone="danger" role="alert">
               {referenceError}
+              {missingVtonReference ? (
+                <div css={recoveryActionStyles(theme)}>
+                  <Button
+                    size="small"
+                    variant="secondary"
+                    disabled={recipeLoading}
+                    onClick={() => {
+                      const step = workflow.steps.find(
+                        (candidate) => candidate.id === missingVtonReference.stepId,
+                      );
+                      if (step) void applySavedRecipe(step, missingVtonReference.recipe.id);
+                    }}
+                  >
+                    Retry image
+                  </Button>
+                  {missingVtonReference.recipe.prompt.trim() ? (
+                    <Button
+                      size="small"
+                      variant="secondary"
+                      disabled={recipeLoading}
+                      onClick={() => {
+                        workflow.updateStep(missingVtonReference.stepId, {
+                          savedRecipeId: missingVtonReference.recipe.id,
+                          prompt: missingVtonReference.recipe.prompt,
+                          referenceImage: null,
+                          inputKind: 'prompt',
+                          enhancePrompt: missingVtonReference.recipe.enhancePrompt,
+                        });
+                        setReferenceError(null);
+                        setMissingVtonReference(null);
+                      }}
+                    >
+                      Continue without reference
+                    </Button>
+                  ) : null}
+                  <Button
+                    size="small"
+                    variant="quiet"
+                    disabled={recipeLoading}
+                    onClick={() => {
+                      workflow.updateStep(missingVtonReference.stepId, {
+                        savedRecipeId: null,
+                        prompt: '',
+                        referenceImage: null,
+                        inputKind: 'saved-outfit',
+                        enhancePrompt: false,
+                      });
+                      setReferenceError(null);
+                      setMissingVtonReference(null);
+                    }}
+                  >
+                    Remove outfit
+                  </Button>
+                </div>
+              ) : null}
             </StatusNotice>
           ) : null}
           {workflow.phase === 'error' && workflow.acceptedSubmission && workflow.retryJob ? (
@@ -428,7 +531,7 @@ export const ExistingVideoPanel = ({
                         onUpdate={workflow.updateStep}
                         onSetVtonInputKind={workflow.setVtonInputKind}
                         onClear={clearVisualStep}
-                        onClearReferenceError={() => setReferenceError(null)}
+                        onClearReferenceError={clearReferenceRecovery}
                       />
                     </div>
                   ) : null}
@@ -448,7 +551,7 @@ export const ExistingVideoPanel = ({
                         onUpdate={workflow.updateStep}
                         onSetVtonInputKind={workflow.setVtonInputKind}
                         onClear={clearVisualStep}
-                        onClearReferenceError={() => setReferenceError(null)}
+                        onClearReferenceError={clearReferenceRecovery}
                       />
                     </div>
                   ) : null}

@@ -13,6 +13,7 @@ import { canonicalPrompt } from '../common/text';
 import { createEmptyCreativeAssetStore } from './operations';
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
+  EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
   GUIDED_CHOICE_KEYS,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
@@ -31,6 +32,7 @@ import {
   type SavedCharacterPromptSource,
   type SavedPrompt,
   type SavedPromptSource,
+  type VtonInputKind,
 } from './types';
 
 const isRecord = (value: unknown): value is Record<string, unknown> =>
@@ -62,6 +64,9 @@ const sourceForPrompt = (value: unknown): SavedPromptSource | null =>
 
 const sourceForCharacter = (value: unknown): SavedCharacterPromptSource | null =>
   value === 'manual' || value === 'generator' ? value : null;
+
+const vtonInputKind = (value: unknown): VtonInputKind | null =>
+  value === 'prompt' || value === 'saved-outfit' ? value : null;
 
 const promptIntent = (value: unknown): PromptIntent | null =>
   PROMPT_INTENTS.some((intent) => intent === value) ? (value as PromptIntent) : null;
@@ -120,6 +125,7 @@ export const sanitizeGuidedDesignV1 = (value: unknown): GuidedDesignV1 | null =>
 const sanitizeSavedPrompt = (
   value: unknown,
   includeReferenceImage: boolean,
+  includeVtonConfiguration: boolean,
 ): SavedPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
@@ -133,11 +139,47 @@ const sanitizeSavedPrompt = (
   const createdAt = validDate(value.createdAt);
   const updatedAt = validDate(value.updatedAt);
   const lastUsedAt = nullableDate(value.lastUsedAt);
+  const persistedReferenceImageAssetId = includeReferenceImage
+    ? referenceImageAssetId(value.referenceImageAssetId)
+    : null;
+  const storedVtonInputKind = includeVtonConfiguration ? vtonInputKind(value.vtonInputKind) : null;
+  const hasInvalidStoredVtonInputKind =
+    includeVtonConfiguration &&
+    (modelModeId === 'lucy-vton-latest'
+      ? value.vtonInputKind !== undefined && !storedVtonInputKind
+      : value.vtonInputKind !== undefined && value.vtonInputKind !== null);
+  const resolvedVtonInputKind =
+    modelModeId === 'lucy-vton-latest'
+      ? includeVtonConfiguration
+        ? (storedVtonInputKind ??
+          (persistedReferenceImageAssetId ? ('saved-outfit' as const) : ('prompt' as const)))
+        : persistedReferenceImageAssetId
+          ? ('saved-outfit' as const)
+          : ('prompt' as const)
+      : null;
+  const enhancePrompt =
+    resolvedVtonInputKind === 'prompt' && includeVtonConfiguration
+      ? value.enhancePrompt === true
+      : false;
+  const hasPrompt = containsMeaningfulText(prompt);
+  const validRecipe =
+    modelModeId === 'lucy-vton-latest'
+      ? resolvedVtonInputKind === 'prompt'
+        ? hasPrompt && persistedReferenceImageAssetId === null
+        : resolvedVtonInputKind === 'saved-outfit' && persistedReferenceImageAssetId !== null
+      : hasPrompt &&
+        (!includeVtonConfiguration ||
+          ((value.vtonInputKind === undefined || value.vtonInputKind === null) &&
+            (value.enhancePrompt === undefined || value.enhancePrompt === false)));
   if (
     !id ||
     !containsMeaningfulText(title) ||
-    !containsMeaningfulText(prompt) ||
     !modelModeId ||
+    !validRecipe ||
+    hasInvalidStoredVtonInputKind ||
+    (includeVtonConfiguration &&
+      value.enhancePrompt !== undefined &&
+      typeof value.enhancePrompt !== 'boolean') ||
     !source ||
     !createdAt ||
     !updatedAt ||
@@ -151,9 +193,9 @@ const sanitizeSavedPrompt = (
     prompt,
     modelModeId,
     source,
-    referenceImageAssetId: includeReferenceImage
-      ? referenceImageAssetId(value.referenceImageAssetId)
-      : null,
+    referenceImageAssetId: persistedReferenceImageAssetId,
+    vtonInputKind: resolvedVtonInputKind,
+    enhancePrompt,
     tags: readTags(value.tags),
     createdAt,
     updatedAt,
@@ -166,6 +208,7 @@ const sanitizeRecentPrompt = (
   value: unknown,
   includeReferenceImage: boolean,
   includeCharacterIdentity: boolean,
+  includeVtonConfiguration: boolean,
 ): RecentPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
@@ -188,15 +231,49 @@ const sanitizeRecentPrompt = (
     ? referenceImageAssetId(value.referenceImageAssetId)
     : null;
   const hasPrompt = containsMeaningfulText(prompt);
+  const storedVtonInputKind = includeVtonConfiguration ? vtonInputKind(value.vtonInputKind) : null;
+  const hasInvalidStoredVtonInputKind =
+    includeVtonConfiguration &&
+    (modelModeId === 'lucy-vton-latest'
+      ? value.vtonInputKind !== undefined && !storedVtonInputKind
+      : value.vtonInputKind !== undefined && value.vtonInputKind !== null);
+  const resolvedVtonInputKind =
+    modelModeId === 'lucy-vton-latest'
+      ? includeVtonConfiguration
+        ? (storedVtonInputKind ??
+          (persistedReferenceImageAssetId ? ('saved-outfit' as const) : ('prompt' as const)))
+        : persistedReferenceImageAssetId
+          ? ('saved-outfit' as const)
+          : ('prompt' as const)
+      : null;
+  const enhancePrompt =
+    resolvedVtonInputKind === 'prompt' && includeVtonConfiguration
+      ? value.enhancePrompt === true
+      : false;
   const validImageOnlyCharacter =
     !hasPrompt &&
     modelModeId === 'lucy-latest' &&
     persistedReferenceImageAssetId !== null &&
     containsMeaningfulText(characterName);
+  const validVtonRecipe =
+    modelModeId === 'lucy-vton-latest' &&
+    (resolvedVtonInputKind === 'prompt'
+      ? hasPrompt && persistedReferenceImageAssetId === null
+      : resolvedVtonInputKind === 'saved-outfit' && persistedReferenceImageAssetId !== null);
+  const validNonVtonRecipe =
+    modelModeId !== 'lucy-vton-latest' &&
+    (hasPrompt || validImageOnlyCharacter) &&
+    (!includeVtonConfiguration ||
+      ((value.vtonInputKind === undefined || value.vtonInputKind === null) &&
+        (value.enhancePrompt === undefined || value.enhancePrompt === false)));
   if (
     !id ||
-    (!hasPrompt && !validImageOnlyCharacter) ||
     !modelModeId ||
+    (!validVtonRecipe && !validNonVtonRecipe) ||
+    hasInvalidStoredVtonInputKind ||
+    (includeVtonConfiguration &&
+      value.enhancePrompt !== undefined &&
+      typeof value.enhancePrompt !== 'boolean') ||
     !usedAt ||
     (value.savedPromptId !== undefined && !savedPromptId) ||
     (includeCharacterIdentity &&
@@ -213,6 +290,8 @@ const sanitizeRecentPrompt = (
     ...(savedCharacterPromptId ? { savedCharacterPromptId } : {}),
     ...(containsMeaningfulText(characterName) ? { characterName } : {}),
     referenceImageAssetId: persistedReferenceImageAssetId,
+    vtonInputKind: resolvedVtonInputKind,
+    enhancePrompt,
     usedAt,
   };
 };
@@ -343,21 +422,26 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
     (value.schemaVersion !== CREATIVE_ASSET_SCHEMA_VERSION &&
       value.schemaVersion !== PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION &&
       value.schemaVersion !== OLDER_CREATIVE_ASSET_SCHEMA_VERSION &&
+      value.schemaVersion !== EARLIER_CREATIVE_ASSET_SCHEMA_VERSION &&
       value.schemaVersion !== LEGACY_CREATIVE_ASSET_SCHEMA_VERSION)
   ) {
     return { store: createEmptyCreativeAssetStore(), recovered: true, droppedRecords: 0 };
   }
 
-  const includeReferenceImages = value.schemaVersion !== LEGACY_CREATIVE_ASSET_SCHEMA_VERSION;
-  const includeGuidedDesign =
-    value.schemaVersion === CREATIVE_ASSET_SCHEMA_VERSION ||
-    value.schemaVersion === PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION;
-  const includeReferenceProvenance = value.schemaVersion === CREATIVE_ASSET_SCHEMA_VERSION;
+  const includeReferenceImages = value.schemaVersion >= EARLIER_CREATIVE_ASSET_SCHEMA_VERSION;
+  const includeGuidedDesign = value.schemaVersion >= OLDER_CREATIVE_ASSET_SCHEMA_VERSION;
+  const includeReferenceProvenance = value.schemaVersion >= PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION;
+  const includeVtonConfiguration = value.schemaVersion === CREATIVE_ASSET_SCHEMA_VERSION;
   const savedInput = sanitizeArray(value.savedPrompts, (record) =>
-    sanitizeSavedPrompt(record, includeReferenceImages),
+    sanitizeSavedPrompt(record, includeReferenceImages, includeVtonConfiguration),
   );
   const recentInput = sanitizeArray(value.recentPrompts, (record) =>
-    sanitizeRecentPrompt(record, includeReferenceImages, includeReferenceProvenance),
+    sanitizeRecentPrompt(
+      record,
+      includeReferenceImages,
+      includeReferenceProvenance,
+      includeVtonConfiguration,
+    ),
   );
   const characterInput = sanitizeArray(value.savedCharacterPrompts, (record) =>
     sanitizeSavedCharacterPrompt(
@@ -383,7 +467,7 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
   const recentPrompts = [...recentInput.records]
     .sort((left, right) => right.usedAt.localeCompare(left.usedAt))
     .filter((recent) => {
-      const key = `${recent.modelModeId}\u0000${canonicalPrompt(recent.prompt)}\u0000${recent.referenceImageAssetId ?? ''}\u0000${recent.savedCharacterPromptId ?? recent.characterName ?? ''}`;
+      const key = `${recent.modelModeId}\u0000${canonicalPrompt(recent.prompt)}\u0000${recent.referenceImageAssetId ?? ''}\u0000${recent.vtonInputKind ?? ''}\u0000${recent.enhancePrompt ? '1' : '0'}\u0000${recent.savedCharacterPromptId ?? recent.characterName ?? ''}`;
       if (recentKeys.has(key)) return false;
       recentKeys.add(key);
       return true;
@@ -405,6 +489,8 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
           prompt: recent.prompt,
           modelModeId: recent.modelModeId,
           referenceImageAssetId: recent.referenceImageAssetId,
+          vtonInputKind: recent.vtonInputKind,
+          enhancePrompt: recent.enhancePrompt,
           ...(recent.characterName ? { characterName: recent.characterName } : {}),
           usedAt: recent.usedAt,
         };
@@ -414,7 +500,9 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
       if (
         saved?.modelModeId === recent.modelModeId &&
         canonicalPrompt(saved.prompt) === canonicalPrompt(recent.prompt) &&
-        saved.referenceImageAssetId === recent.referenceImageAssetId
+        saved.referenceImageAssetId === recent.referenceImageAssetId &&
+        saved.vtonInputKind === recent.vtonInputKind &&
+        saved.enhancePrompt === recent.enhancePrompt
       ) {
         return recent;
       }
@@ -423,6 +511,8 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
         prompt: recent.prompt,
         modelModeId: recent.modelModeId,
         referenceImageAssetId: recent.referenceImageAssetId,
+        vtonInputKind: recent.vtonInputKind,
+        enhancePrompt: recent.enhancePrompt,
         ...(recent.characterName ? { characterName: recent.characterName } : {}),
         usedAt: recent.usedAt,
       };

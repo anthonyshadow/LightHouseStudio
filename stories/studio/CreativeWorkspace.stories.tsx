@@ -19,7 +19,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'CreativeWorkspace owns the Dock, Take, Workshop, and Shelf tool rail plus the responsive overlay placement and cross-feature locks. The story uses the real Recipe Shelf controller with local-only fixture data.',
+          'CreativeWorkspace owns the desktop Character, Outfit, and Workshop preparation rail plus Dock, Take, and Shelf, responsive overlay placement, and cross-feature locks. The story uses the real Recipe Shelf controller with local-only fixture data.',
       },
     },
   },
@@ -33,12 +33,15 @@ const WorkspaceHarness = () => {
   const [panel, setPanel] = useState<AuxiliaryPanel>('shelf');
   const dockToggleRef = useRef<HTMLButtonElement>(null);
   const takeToggleRef = useRef<HTMLButtonElement>(null);
+  const characterToggleRef = useRef<HTMLButtonElement>(null);
+  const outfitToggleRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
   const shelfToggleRef = useRef<HTMLButtonElement>(null);
 
   const state: CreativeWorkspaceState = {
     panel,
     activeTool: panel === 'closed' ? 'dock' : panel,
+    showDesktopAiTools: true,
     activeSessionMode: 'local',
     libraryMode: 'lucy-latest',
     workshopDrafts: {},
@@ -55,6 +58,8 @@ const WorkspaceHarness = () => {
   const actions: CreativeWorkspaceActions = {
     onOpenDock: fn(),
     onOpenTake: fn(),
+    onOpenCharacter: fn(),
+    onOpenOutfit: fn(),
     onOpenWorkshop: () => setPanel('workshop'),
     onToggleShelf: () => setPanel((value) => (value === 'shelf' ? 'closed' : 'shelf')),
     onClose: () => setPanel('closed'),
@@ -65,6 +70,9 @@ const WorkspaceHarness = () => {
     onShelfDirtyChange: fn(),
     onRecipeShelfEntryIntentConsumed: fn(),
     onUseRecipe: fn(),
+    onCreateOutfit: fn(),
+    onEditOutfit: fn(),
+    onSaveOutfitCopy: fn(),
     onOpenSavedWorkshop: fn(),
     onOpenLegacyProjects: fn(),
   };
@@ -84,7 +92,14 @@ const WorkspaceHarness = () => {
           repository={repository}
           state={state}
           actions={actions}
-          refs={{ dockToggleRef, takeToggleRef, workshopToggleRef, shelfToggleRef }}
+          refs={{
+            dockToggleRef,
+            takeToggleRef,
+            characterToggleRef,
+            outfitToggleRef,
+            workshopToggleRef,
+            shelfToggleRef,
+          }}
         />
       </div>
     </StoryColumn>

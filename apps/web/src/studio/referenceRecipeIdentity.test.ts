@@ -13,6 +13,8 @@ const prompt: SavedPrompt = {
   modelModeId: 'lucy-latest',
   source: 'manual',
   referenceImageAssetId: null,
+  vtonInputKind: null,
+  enhancePrompt: false,
   tags: [],
   createdAt: '2026-07-21T12:00:00.000Z',
   updatedAt: '2026-07-21T12:00:00.000Z',
@@ -21,7 +23,7 @@ const prompt: SavedPrompt = {
 };
 
 const store: CreativeAssetStore = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   savedPrompts: [prompt],
   recentPrompts: [],
   savedCharacterPrompts: [],

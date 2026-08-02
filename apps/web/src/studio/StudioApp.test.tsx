@@ -58,7 +58,7 @@ const referenceAsset: ReferenceImageAsset = {
 
 const harness = vi.hoisted(() => {
   const store = {
-    schemaVersion: 4 as const,
+    schemaVersion: 5 as const,
     savedPrompts: [],
     recentPrompts: [],
     savedCharacterPrompts: [],
@@ -382,7 +382,7 @@ vi.mock('./CreativeWorkspace', () => ({
         </button>
         <button
           type="button"
-          onClick={() => props.state.referenceUseFailure?.onContinueWithoutReference()}
+          onClick={() => props.state.referenceUseFailure?.onContinueWithoutReference?.()}
         >
           Continue reference handoff without image
         </button>
@@ -560,6 +560,8 @@ describe('StudioApp composition lifecycle', () => {
       prompt: 'A newly committed presenter',
       modelModeId: 'lucy-latest',
       referenceImageAssetId: null,
+      vtonInputKind: null,
+      enhancePrompt: false,
     });
   });
 
@@ -569,6 +571,7 @@ describe('StudioApp composition lifecycle', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Mark shelf dirty' }));
     fireEvent.click(screen.getByRole('button', { name: 'Character selector' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Select Character' }));
     fireEvent.click(screen.getByRole('button', { name: 'Choose saved character' }));
 
     expect(window.confirm).toHaveBeenCalledWith(

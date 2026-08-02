@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { createPromptBuilderDraft } from '../prompts';
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
+  EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   RECENT_PROMPT_LIMIT,
@@ -95,6 +96,87 @@ describe('sanitizeGuidedDesignV1', () => {
 });
 
 describe('creative asset CRUD and use', () => {
+  it('validates prompt and saved-image outfits and keeps enhancement in recent identity', () => {
+    let store = createSavedPrompt(
+      createEmptyCreativeAssetStore(),
+      {
+        title: 'Copper overshirt',
+        prompt: 'A tailored copper linen overshirt.',
+        modelModeId: 'lucy-vton-latest',
+        source: 'manual',
+        vtonInputKind: 'prompt',
+        enhancePrompt: true,
+      },
+      context('prompt-outfit'),
+    );
+    store = createSavedPrompt(
+      store,
+      {
+        title: 'Archive coat',
+        prompt: '',
+        modelModeId: 'lucy-vton-latest',
+        source: 'manual',
+        vtonInputKind: 'saved-outfit',
+        referenceImageAssetId: 'opaque-outfit-image',
+        enhancePrompt: true,
+      },
+      context('image-outfit', 1),
+    );
+
+    expect(store.savedPrompts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          id: 'prompt-outfit',
+          vtonInputKind: 'prompt',
+          enhancePrompt: true,
+          referenceImageAssetId: null,
+        }),
+        expect.objectContaining({
+          id: 'image-outfit',
+          prompt: '',
+          vtonInputKind: 'saved-outfit',
+          enhancePrompt: false,
+          referenceImageAssetId: 'opaque-outfit-image',
+        }),
+      ]),
+    );
+    expect(() =>
+      createSavedPrompt(
+        store,
+        {
+          title: 'Broken image outfit',
+          prompt: '',
+          modelModeId: 'lucy-vton-latest',
+          source: 'manual',
+          vtonInputKind: 'saved-outfit',
+        },
+        context('broken'),
+      ),
+    ).toThrow(/persisted reference image/u);
+
+    store = recordSuccessfulPromptUse(
+      store,
+      {
+        prompt: 'A tailored copper linen overshirt.',
+        modelModeId: 'lucy-vton-latest',
+        vtonInputKind: 'prompt',
+        enhancePrompt: true,
+      },
+      context('recent-enhanced', 2),
+    );
+    store = recordSuccessfulPromptUse(
+      store,
+      {
+        prompt: 'A tailored copper linen overshirt.',
+        modelModeId: 'lucy-vton-latest',
+        vtonInputKind: 'prompt',
+        enhancePrompt: false,
+      },
+      context('recent-plain', 3),
+    );
+    expect(store.recentPrompts).toHaveLength(2);
+  });
+
   it('creates, normalizes, updates, uses, searches, and deletes saved prompts', () => {
     let store = createSavedPrompt(
       createEmptyCreativeAssetStore(),
@@ -649,7 +731,7 @@ describe('creative asset sanitation and recovery', () => {
 
   it('migrates v2 records, preserving references while defaulting new draft fields and provenance', () => {
     const result = sanitizeCreativeAssetStore({
-      schemaVersion: OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
+      schemaVersion: EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [
@@ -706,7 +788,7 @@ describe('creative asset sanitation and recovery', () => {
 
   it('migrates v3 image-backed characters as generated references', () => {
     const result = sanitizeCreativeAssetStore({
-      schemaVersion: PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+      schemaVersion: OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [
@@ -735,6 +817,66 @@ describe('creative asset sanitation and recovery', () => {
       referenceImageAssetId: 'reference-v3',
       uploadedReferenceImageAssetId: null,
       finalReferenceKind: 'generated',
+    });
+  });
+
+  it('migrates v4 VTO records to explicit prompt or saved-outfit configuration', () => {
+    const base = {
+      source: 'manual',
+      tags: [],
+      createdAt: timestamp(),
+      updatedAt: timestamp(),
+      lastUsedAt: null,
+      useCount: 0,
+    } as const;
+    const result = sanitizeCreativeAssetStore({
+      schemaVersion: PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+      savedPrompts: [
+        {
+          ...base,
+          id: 'prompt-v4',
+          title: 'Prompt outfit',
+          prompt: 'A moss green field jacket.',
+          modelModeId: 'lucy-vton-latest',
+          referenceImageAssetId: null,
+        },
+        {
+          ...base,
+          id: 'combined-v4',
+          title: 'Combined outfit',
+          prompt: 'Preserve the brass buttons.',
+          modelModeId: 'lucy-vton-latest',
+          referenceImageAssetId: 'opaque-v4-outfit',
+        },
+      ],
+      recentPrompts: [
+        {
+          id: 'image-recent-v4',
+          prompt: '',
+          modelModeId: 'lucy-vton-latest',
+          referenceImageAssetId: 'opaque-v4-recent',
+          usedAt: timestamp(),
+        },
+      ],
+      savedCharacterPrompts: [],
+    });
+
+    expect(result.store.savedPrompts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ id: 'prompt-v4', vtonInputKind: 'prompt', enhancePrompt: false }),
+        expect.objectContaining({
+          id: 'combined-v4',
+          vtonInputKind: 'saved-outfit',
+          enhancePrompt: false,
+          prompt: 'Preserve the brass buttons.',
+        }),
+      ]),
+    );
+    expect(result.store.recentPrompts[0]).toMatchObject({
+      id: 'image-recent-v4',
+      prompt: '',
+      vtonInputKind: 'saved-outfit',
+      enhancePrompt: false,
     });
   });
 

@@ -27,6 +27,12 @@ export const createPendingReferenceRecipeUse = (
   store: CreativeAssetStore,
 ): PendingReferenceRecipeUse => {
   const selectedReferenceAssetId = selection.referenceImageAssetId ?? null;
+  const selectedVtonInputKind =
+    selection.modelModeId === 'lucy-vton-latest'
+      ? (selection.vtonInputKind ?? (selectedReferenceAssetId ? 'saved-outfit' : 'prompt'))
+      : null;
+  const selectedEnhancePrompt =
+    selectedVtonInputKind === 'prompt' ? Boolean(selection.enhancePrompt) : false;
   const linkedRecentPrompt =
     selection.origin === 'recent-prompt' && selection.assetId
       ? store.savedPrompts.find(
@@ -34,7 +40,9 @@ export const createPendingReferenceRecipeUse = (
             candidate.id === selection.assetId &&
             candidate.modelModeId === selection.modelModeId &&
             canonicalPrompt(candidate.prompt) === canonicalPrompt(selection.prompt) &&
-            candidate.referenceImageAssetId === selectedReferenceAssetId,
+            candidate.referenceImageAssetId === selectedReferenceAssetId &&
+            candidate.vtonInputKind === selectedVtonInputKind &&
+            candidate.enhancePrompt === selectedEnhancePrompt,
         )
       : null;
   const linkedRecentCharacter =
@@ -51,6 +59,8 @@ export const createPendingReferenceRecipeUse = (
     mode: selection.modelModeId,
     prompt: selection.prompt,
     referenceImageAssetId: selectedReferenceAssetId,
+    vtonInputKind: selectedVtonInputKind,
+    enhancePrompt: selectedEnhancePrompt,
     preserveCurrentReference: false,
     destination: 'shelf',
     ...(selection.builderDraft ? { builderDraft: selection.builderDraft } : {}),
@@ -129,11 +139,22 @@ export const useReferenceRecipeAttribution = ({
 
   const recordCommittedPrompt = useCallback<PromptCommittedHandler>(
     (mode, prompt, committedReferenceAssetId) => {
+      const committedVtonInputKind =
+        mode === 'lucy-vton-latest'
+          ? (activeFingerprint?.vtonInputKind ??
+            (committedReferenceAssetId ? 'saved-outfit' : 'prompt'))
+          : null;
+      const committedEnhancePrompt =
+        committedVtonInputKind === 'prompt'
+          ? (activeFingerprint?.enhancePrompt ?? session.draft.enhance)
+          : false;
       const activeRecipeStillMatches = Boolean(
         activeFingerprint &&
         activeFingerprint.mode === mode &&
         canonicalPrompt(activeFingerprint.prompt) === canonicalPrompt(prompt) &&
         activeFingerprint.referenceImageAssetId === committedReferenceAssetId &&
+        activeFingerprint.vtonInputKind === committedVtonInputKind &&
+        activeFingerprint.enhancePrompt === committedEnhancePrompt &&
         activeFingerprint.referenceImageAssetId === activeFingerprint.assetReferenceImageAssetId,
       );
       const standaloneRecentCharacter =
@@ -147,6 +168,8 @@ export const useReferenceRecipeAttribution = ({
           activeRecipeStillMatches && activeFingerprint ? activeFingerprint.assetPrompt : prompt,
         modelModeId: mode,
         referenceImageAssetId: committedReferenceAssetId,
+        vtonInputKind: committedVtonInputKind,
+        enhancePrompt: committedEnhancePrompt,
         ...(activeRecipeStillMatches && selectedSavedPromptRef.current
           ? { savedPromptId: selectedSavedPromptRef.current }
           : {}),
@@ -160,7 +183,7 @@ export const useReferenceRecipeAttribution = ({
             : {}),
       });
     },
-    [activeCharacterName, activeFingerprint, repository],
+    [activeCharacterName, activeFingerprint, repository, session.draft.enhance],
   );
 
   useEffect(() => {
@@ -195,6 +218,10 @@ export const useReferenceRecipeAttribution = ({
         sourceMode === pending.mode &&
         canonicalPrompt(sourceAsset.prompt) === canonicalPrompt(pending.prompt) &&
         sourceAsset.referenceImageAssetId === pending.referenceImageAssetId &&
+        ('vtonInputKind' in sourceAsset ? sourceAsset.vtonInputKind : null) ===
+          (pending.vtonInputKind ?? null) &&
+        ('enhancePrompt' in sourceAsset ? sourceAsset.enhancePrompt : false) ===
+          Boolean(pending.enhancePrompt) &&
         appliedReferenceIdentity === sourceAsset.referenceImageAssetId,
       );
       const exactSavedPromptId =
@@ -229,6 +256,12 @@ export const useReferenceRecipeAttribution = ({
             referenceImageAssetId: appliedReferenceIdentity,
             assetPrompt: sourceAsset?.prompt ?? pending.prompt,
             assetReferenceImageAssetId: sourceAsset?.referenceImageAssetId ?? null,
+            vtonInputKind: pending.vtonInputKind ?? null,
+            enhancePrompt: Boolean(pending.enhancePrompt),
+            assetVtonInputKind:
+              sourceAsset && 'vtonInputKind' in sourceAsset ? sourceAsset.vtonInputKind : null,
+            assetEnhancePrompt:
+              sourceAsset && 'enhancePrompt' in sourceAsset ? sourceAsset.enhancePrompt : false,
           },
         });
       } else {
@@ -260,6 +293,10 @@ export const useReferenceRecipeAttribution = ({
           referenceImageAssetId: referenceImage?.assetId ?? null,
           assetPrompt: snapshot.prompt,
           assetReferenceImageAssetId: referenceImage?.assetId ?? null,
+          vtonInputKind: null,
+          enhancePrompt: false,
+          assetVtonInputKind: null,
+          assetEnhancePrompt: false,
         },
       });
     },

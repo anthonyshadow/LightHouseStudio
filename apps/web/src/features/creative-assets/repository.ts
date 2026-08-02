@@ -19,6 +19,8 @@ import {
 } from '@studio/domain';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
+  EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
+  EARLIER_CREATIVE_ASSET_STORAGE_KEY,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   LEGACY_CREATIVE_ASSET_STORAGE_KEY,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
@@ -121,6 +123,7 @@ const isSupportedLegacyPayload = (serialized: string): boolean => {
       value !== null &&
       'schemaVersion' in value &&
       (value.schemaVersion === LEGACY_CREATIVE_ASSET_SCHEMA_VERSION ||
+        value.schemaVersion === EARLIER_CREATIVE_ASSET_SCHEMA_VERSION ||
         value.schemaVersion === OLDER_CREATIVE_ASSET_SCHEMA_VERSION ||
         value.schemaVersion === PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION)
     );
@@ -207,6 +210,7 @@ export const createCreativeAssetRepository = (
         ? [
             PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
             OLDER_CREATIVE_ASSET_STORAGE_KEY,
+            EARLIER_CREATIVE_ASSET_STORAGE_KEY,
             LEGACY_CREATIVE_ASSET_STORAGE_KEY,
           ]
         : []
@@ -361,6 +365,8 @@ export const createCreativeAssetRepository = (
           modelModeId: input.modelModeId,
           source: input.source ?? 'manual',
           referenceImageAssetId: input.referenceImageAssetId ?? null,
+          ...(input.vtonInputKind === undefined ? {} : { vtonInputKind: input.vtonInputKind }),
+          enhancePrompt: input.enhancePrompt ?? false,
           tags: input.tags ?? [],
         },
         { ...context, createId: () => id },
@@ -384,6 +390,8 @@ export const createCreativeAssetRepository = (
           ...(input.referenceImageAssetId === undefined
             ? {}
             : { referenceImageAssetId: input.referenceImageAssetId }),
+          ...(input.vtonInputKind === undefined ? {} : { vtonInputKind: input.vtonInputKind }),
+          ...(input.enhancePrompt === undefined ? {} : { enhancePrompt: input.enhancePrompt }),
           ...(input.tags === undefined ? {} : { tags: input.tags }),
         },
         timestamp(),
@@ -519,6 +527,8 @@ export const createCreativeAssetRepository = (
           : {}),
         ...(input.characterName ? { characterName: input.characterName } : {}),
         referenceImageAssetId: input.referenceImageAssetId ?? null,
+        ...(input.vtonInputKind === undefined ? {} : { vtonInputKind: input.vtonInputKind }),
+        enhancePrompt: input.enhancePrompt ?? false,
       },
       context,
     );

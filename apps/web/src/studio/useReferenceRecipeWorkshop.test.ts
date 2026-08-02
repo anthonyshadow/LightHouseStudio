@@ -32,7 +32,7 @@ const character: SavedCharacterPrompt = {
   useCount: 0,
 };
 const store: CreativeAssetStore = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   savedPrompts: [],
   recentPrompts: [],
   savedCharacterPrompts: [character],

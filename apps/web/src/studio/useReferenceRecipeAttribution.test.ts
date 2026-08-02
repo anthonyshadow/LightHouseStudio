@@ -25,6 +25,8 @@ const prompt: SavedPrompt = {
   modelModeId: 'lucy-latest',
   source: 'manual',
   referenceImageAssetId: '8f45ea24-c274-41a5-a988-aa0602115191',
+  vtonInputKind: null,
+  enhancePrompt: false,
   tags: [],
   createdAt: '2026-07-21T12:00:00.000Z',
   updatedAt: '2026-07-21T12:00:00.000Z',
@@ -32,7 +34,7 @@ const prompt: SavedPrompt = {
   useCount: 0,
 };
 const store: CreativeAssetStore = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   savedPrompts: [prompt],
   recentPrompts: [],
   savedCharacterPrompts: [],
@@ -134,6 +136,10 @@ describe('reference recipe attribution', () => {
         referenceImageAssetId: asset.assetId,
         assetPrompt: prompt.prompt,
         assetReferenceImageAssetId: asset.assetId,
+        vtonInputKind: null,
+        enhancePrompt: false,
+        assetVtonInputKind: null,
+        assetEnhancePrompt: false,
       },
     });
   });

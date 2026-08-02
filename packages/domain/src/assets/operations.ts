@@ -22,6 +22,7 @@ import {
   type SavedCharacterPromptInput,
   type SavedPrompt,
   type SavedPromptInput,
+  type VtonInputKind,
 } from './types';
 
 export const createEmptyCreativeAssetStore = (): CreativeAssetStore => ({
@@ -58,6 +59,47 @@ const normalizeReferenceImageAssetId = (value: string | null | undefined): strin
     throw new AssetRuleError('invalid-id', 'A reference image asset ID cannot be empty.');
   }
   return assetId;
+};
+
+const normalizeVtonRecipe = (input: {
+  readonly prompt: string;
+  readonly modelModeId: ModelModeId;
+  readonly referenceImageAssetId?: string | null;
+  readonly vtonInputKind?: VtonInputKind | null;
+  readonly enhancePrompt?: boolean;
+}) => {
+  const referenceImageAssetId = normalizeReferenceImageAssetId(input.referenceImageAssetId);
+  if (input.modelModeId !== 'lucy-vton-latest') {
+    return {
+      prompt: requirePrompt(input.prompt),
+      referenceImageAssetId,
+      vtonInputKind: null,
+      enhancePrompt: false,
+    } as const;
+  }
+
+  const vtonInputKind = input.vtonInputKind ?? (referenceImageAssetId ? 'saved-outfit' : 'prompt');
+  const prompt = normalizeAuthoredPrompt(input.prompt);
+  if (vtonInputKind === 'prompt') {
+    if (!containsMeaningfulText(prompt)) {
+      throw new AssetRuleError('invalid-prompt', 'A prompt outfit needs garment direction.');
+    }
+    return {
+      prompt,
+      referenceImageAssetId: null,
+      vtonInputKind,
+      enhancePrompt: Boolean(input.enhancePrompt),
+    } as const;
+  }
+  if (!referenceImageAssetId) {
+    throw new AssetRuleError('invalid-id', 'An image outfit needs a persisted reference image.');
+  }
+  return {
+    prompt,
+    referenceImageAssetId,
+    vtonInputKind,
+    enhancePrompt: false,
+  } as const;
 };
 
 const normalizeCharacterReference = (input: {
@@ -127,6 +169,8 @@ const unlinkRecentPrompt = (recent: RecentPrompt, savedPromptId: string): Recent
     prompt: recent.prompt,
     modelModeId: recent.modelModeId,
     referenceImageAssetId: recent.referenceImageAssetId,
+    vtonInputKind: recent.vtonInputKind,
+    enhancePrompt: recent.enhancePrompt,
     usedAt: recent.usedAt,
   };
 };
@@ -143,6 +187,8 @@ const unlinkRecentCharacter = (
     ...(recent.savedPromptId ? { savedPromptId: recent.savedPromptId } : {}),
     ...(recent.characterName ? { characterName: recent.characterName } : {}),
     referenceImageAssetId: recent.referenceImageAssetId,
+    vtonInputKind: recent.vtonInputKind,
+    enhancePrompt: recent.enhancePrompt,
     usedAt: recent.usedAt,
   };
 };
@@ -153,13 +199,16 @@ export const createSavedPrompt = (
   context: AssetMutationContext,
 ): CreativeAssetStore => {
   const now = assertTimestamp(context.now);
+  const recipe = normalizeVtonRecipe(input);
   const asset: SavedPrompt = {
     id: requireName(context.createId(), 'Asset', 'invalid-id'),
     title: requireName(input.title, 'Saved prompt'),
-    prompt: requirePrompt(input.prompt),
+    prompt: recipe.prompt,
     modelModeId: input.modelModeId,
     source: input.source,
-    referenceImageAssetId: normalizeReferenceImageAssetId(input.referenceImageAssetId),
+    referenceImageAssetId: recipe.referenceImageAssetId,
+    vtonInputKind: recipe.vtonInputKind,
+    enhancePrompt: recipe.enhancePrompt,
     tags: normalizeTags(input.tags ?? []),
     createdAt: now,
     updatedAt: now,
@@ -176,7 +225,16 @@ export const updateSavedPrompt = (
   store: CreativeAssetStore,
   id: string,
   patch: Partial<
-    Pick<SavedPromptInput, 'title' | 'prompt' | 'source' | 'referenceImageAssetId' | 'tags'>
+    Pick<
+      SavedPromptInput,
+      | 'title'
+      | 'prompt'
+      | 'source'
+      | 'referenceImageAssetId'
+      | 'vtonInputKind'
+      | 'enhancePrompt'
+      | 'tags'
+    >
   >,
   nowValue: string,
 ): CreativeAssetStore => {
@@ -185,20 +243,29 @@ export const updateSavedPrompt = (
   const savedPrompts = store.savedPrompts.map((asset) => {
     if (asset.id !== id) return asset;
     found = true;
-    const nextPrompt = patch.prompt === undefined ? asset.prompt : requirePrompt(patch.prompt);
+    const nextPrompt = patch.prompt === undefined ? asset.prompt : patch.prompt;
     const promptChanged = canonicalPrompt(nextPrompt) !== canonicalPrompt(asset.prompt);
-    const nextReferenceImageAssetId =
+    const requestedReferenceImageAssetId =
       patch.referenceImageAssetId === undefined
-        ? promptChanged
+        ? promptChanged && asset.modelModeId !== 'lucy-vton-latest'
           ? null
           : asset.referenceImageAssetId
         : normalizeReferenceImageAssetId(patch.referenceImageAssetId);
+    const recipe = normalizeVtonRecipe({
+      prompt: nextPrompt,
+      modelModeId: asset.modelModeId,
+      referenceImageAssetId: requestedReferenceImageAssetId,
+      vtonInputKind: patch.vtonInputKind === undefined ? asset.vtonInputKind : patch.vtonInputKind,
+      enhancePrompt: patch.enhancePrompt === undefined ? asset.enhancePrompt : patch.enhancePrompt,
+    });
     return {
       ...asset,
       ...(patch.title === undefined ? {} : { title: requireName(patch.title, 'Saved prompt') }),
-      ...(patch.prompt === undefined ? {} : { prompt: nextPrompt }),
+      prompt: recipe.prompt,
       ...(patch.source === undefined ? {} : { source: patch.source }),
-      referenceImageAssetId: nextReferenceImageAssetId,
+      referenceImageAssetId: recipe.referenceImageAssetId,
+      vtonInputKind: recipe.vtonInputKind,
+      enhancePrompt: recipe.enhancePrompt,
       ...(patch.tags === undefined ? {} : { tags: normalizeTags(patch.tags) }),
       updatedAt: now,
     };
@@ -213,7 +280,9 @@ export const updateSavedPrompt = (
       (!updated ||
         recent.modelModeId !== updated.modelModeId ||
         canonicalPrompt(recent.prompt) !== canonicalPrompt(updated.prompt) ||
-        recent.referenceImageAssetId !== updated.referenceImageAssetId)
+        recent.referenceImageAssetId !== updated.referenceImageAssetId ||
+        recent.vtonInputKind !== updated.vtonInputKind ||
+        recent.enhancePrompt !== updated.enhancePrompt)
         ? unlinkRecentPrompt(recent, id)
         : recent,
     ),
@@ -257,6 +326,8 @@ export const recordSuccessfulPromptUse = (
     readonly savedCharacterPromptId?: string;
     readonly characterName?: string;
     readonly referenceImageAssetId?: string | null;
+    readonly vtonInputKind?: VtonInputKind | null;
+    readonly enhancePrompt?: boolean;
   },
   context: AssetMutationContext,
 ): CreativeAssetStore => {
@@ -264,6 +335,11 @@ export const recordSuccessfulPromptUse = (
   const now = assertTimestamp(context.now);
   const promptKey = canonicalPrompt(prompt);
   const referenceImageAssetId = normalizeReferenceImageAssetId(input.referenceImageAssetId);
+  const vtonInputKind =
+    input.modelModeId === 'lucy-vton-latest'
+      ? (input.vtonInputKind ?? (referenceImageAssetId ? 'saved-outfit' : 'prompt'))
+      : null;
+  const enhancePrompt = vtonInputKind === 'prompt' ? Boolean(input.enhancePrompt) : false;
   const matchingCharacter =
     input.modelModeId === 'lucy-latest' && input.savedCharacterPromptId
       ? store.savedCharacterPrompts.find(
@@ -275,8 +351,13 @@ export const recordSuccessfulPromptUse = (
       : undefined;
   const characterName = matchingCharacter?.name ?? input.characterName;
   const hasPrompt = containsMeaningfulText(prompt);
+  const validImageOnlyOutfit =
+    input.modelModeId === 'lucy-vton-latest' &&
+    vtonInputKind === 'saved-outfit' &&
+    referenceImageAssetId !== null;
   if (
     !hasPrompt &&
+    !validImageOnlyOutfit &&
     (!referenceImageAssetId ||
       input.modelModeId !== 'lucy-latest' ||
       !characterName ||
@@ -284,26 +365,31 @@ export const recordSuccessfulPromptUse = (
   ) {
     return store;
   }
-  const matchingSaved = hasPrompt
-    ? (store.savedPrompts.find(
-        (asset) =>
-          asset.modelModeId === input.modelModeId &&
-          asset.id === input.savedPromptId &&
-          canonicalPrompt(asset.prompt) === promptKey &&
-          asset.referenceImageAssetId === referenceImageAssetId,
-      ) ??
-      store.savedPrompts.find(
-        (asset) =>
-          asset.modelModeId === input.modelModeId &&
-          canonicalPrompt(asset.prompt) === promptKey &&
-          asset.referenceImageAssetId === referenceImageAssetId,
-      ))
-    : undefined;
+  const matchingSaved =
+    store.savedPrompts.find(
+      (asset) =>
+        asset.modelModeId === input.modelModeId &&
+        asset.id === input.savedPromptId &&
+        canonicalPrompt(asset.prompt) === promptKey &&
+        asset.referenceImageAssetId === referenceImageAssetId &&
+        asset.vtonInputKind === vtonInputKind &&
+        asset.enhancePrompt === enhancePrompt,
+    ) ??
+    store.savedPrompts.find(
+      (asset) =>
+        asset.modelModeId === input.modelModeId &&
+        canonicalPrompt(asset.prompt) === promptKey &&
+        asset.referenceImageAssetId === referenceImageAssetId &&
+        asset.vtonInputKind === vtonInputKind &&
+        asset.enhancePrompt === enhancePrompt,
+    );
   const existingRecent = store.recentPrompts.find(
     (recent) =>
       recent.modelModeId === input.modelModeId &&
       canonicalPrompt(recent.prompt) === promptKey &&
       recent.referenceImageAssetId === referenceImageAssetId &&
+      recent.vtonInputKind === vtonInputKind &&
+      recent.enhancePrompt === enhancePrompt &&
       (matchingCharacter
         ? recent.savedCharacterPromptId === matchingCharacter.id
         : recent.characterName === characterName),
@@ -316,6 +402,8 @@ export const recordSuccessfulPromptUse = (
     ...(matchingCharacter ? { savedCharacterPromptId: matchingCharacter.id } : {}),
     ...(characterName ? { characterName: requireName(characterName, 'Character') } : {}),
     referenceImageAssetId,
+    vtonInputKind,
+    enhancePrompt,
     usedAt: now,
   };
   const recentPrompts = [
@@ -326,6 +414,8 @@ export const recordSuccessfulPromptUse = (
           candidate.modelModeId === input.modelModeId &&
           canonicalPrompt(candidate.prompt) === promptKey &&
           candidate.referenceImageAssetId === referenceImageAssetId &&
+          candidate.vtonInputKind === vtonInputKind &&
+          candidate.enhancePrompt === enhancePrompt &&
           (matchingCharacter
             ? candidate.savedCharacterPromptId === matchingCharacter.id
             : candidate.characterName === characterName)

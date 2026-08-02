@@ -10,9 +10,9 @@ import {
 import { installProviderNetworkDriver } from './support/studioHarness.network';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
 const SEEDED_UPLOAD_RECIPES = {
-  schemaVersion: 4,
+  schemaVersion: 5,
   savedPrompts: [
     {
       id: 'character-anchor',
@@ -22,6 +22,8 @@ const SEEDED_UPLOAD_RECIPES = {
       modelModeId: 'lucy-latest',
       source: 'manual',
       referenceImageAssetId: null,
+      vtonInputKind: null,
+      enhancePrompt: false,
       tags: ['anchor'],
       createdAt: '2026-07-30T12:00:00.000Z',
       updatedAt: '2026-07-30T12:00:00.000Z',

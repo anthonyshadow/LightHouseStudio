@@ -9,6 +9,7 @@ import type {
   SessionReferenceImage,
   StudioMode,
 } from '../features/media-session/types';
+import type { VtonInputKind } from '../features/creative-assets/types';
 
 export type ActiveStudioRecipe = {
   origin: 'character-prompt' | 'saved-prompt';
@@ -21,6 +22,10 @@ export type ActiveRecipeFingerprint = {
   referenceImageAssetId: string | null;
   assetPrompt: string;
   assetReferenceImageAssetId: string | null;
+  vtonInputKind?: VtonInputKind | null;
+  enhancePrompt?: boolean;
+  assetVtonInputKind?: VtonInputKind | null;
+  assetEnhancePrompt?: boolean;
 };
 
 export type RecipeAsset = SavedCharacterPrompt | SavedPrompt;
@@ -54,7 +59,8 @@ export const activeRecipeReducer = (
 type ExactActiveRecipeInput = {
   readonly fingerprint: ActiveRecipeFingerprint;
   readonly asset: RecipeAsset;
-  readonly draft: Pick<SessionDraft, 'mode' | 'prompt' | 'referenceImage'>;
+  readonly draft: Pick<SessionDraft, 'mode' | 'prompt' | 'referenceImage'> &
+    Partial<Pick<SessionDraft, 'enhance'>>;
 };
 
 const EPHEMERAL_REFERENCE_IDENTITY = 'session:ephemeral-reference';
@@ -71,6 +77,15 @@ export const isExactActiveRecipe = ({
   draft,
 }: ExactActiveRecipeInput): boolean => {
   const assetMode = 'modelModeId' in asset ? asset.modelModeId : 'lucy-latest';
+  const draftVtonInputKind =
+    draft.mode === 'lucy-vton-latest' ? (draft.referenceImage ? 'saved-outfit' : 'prompt') : null;
+  const assetVtonInputKind = 'vtonInputKind' in asset ? asset.vtonInputKind : null;
+  const assetEnhancePrompt = 'enhancePrompt' in asset ? asset.enhancePrompt : false;
+  const draftEnhancePrompt = draft.mode === 'lucy-vton-latest' ? (draft.enhance ?? false) : false;
+  const fingerprintEnhancePrompt =
+    fingerprint.mode === 'lucy-vton-latest' ? (fingerprint.enhancePrompt ?? false) : false;
+  const fingerprintAssetEnhancePrompt =
+    fingerprint.mode === 'lucy-vton-latest' ? (fingerprint.assetEnhancePrompt ?? false) : false;
   return (
     draft.mode === fingerprint.mode &&
     canonicalPrompt(draft.prompt) === canonicalPrompt(fingerprint.prompt) &&
@@ -78,7 +93,14 @@ export const isExactActiveRecipe = ({
     assetMode === fingerprint.mode &&
     canonicalPrompt(asset.prompt) === canonicalPrompt(fingerprint.assetPrompt) &&
     asset.referenceImageAssetId === fingerprint.assetReferenceImageAssetId &&
-    fingerprint.referenceImageAssetId === fingerprint.assetReferenceImageAssetId
+    fingerprint.referenceImageAssetId === fingerprint.assetReferenceImageAssetId &&
+    draftVtonInputKind === (fingerprint.vtonInputKind ?? null) &&
+    draftEnhancePrompt === fingerprintEnhancePrompt &&
+    assetVtonInputKind === (fingerprint.assetVtonInputKind ?? null) &&
+    (assetMode === 'lucy-vton-latest' ? assetEnhancePrompt : false) ===
+      fingerprintAssetEnhancePrompt &&
+    (fingerprint.vtonInputKind ?? null) === (fingerprint.assetVtonInputKind ?? null) &&
+    fingerprintEnhancePrompt === fingerprintAssetEnhancePrompt
   );
 };
 
@@ -99,7 +121,8 @@ export type ResolvedActiveRecipe = {
 export const resolveActiveRecipe = (
   state: ActiveRecipeState,
   store: CreativeAssetStore,
-  draft: Pick<SessionDraft, 'mode' | 'prompt' | 'referenceImage'>,
+  draft: Pick<SessionDraft, 'mode' | 'prompt' | 'referenceImage'> &
+    Partial<Pick<SessionDraft, 'enhance'>>,
 ): ResolvedActiveRecipe => {
   const { recipe, fingerprint } = state;
   if (!recipe) {

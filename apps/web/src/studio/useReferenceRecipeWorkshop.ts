@@ -73,6 +73,8 @@ export const useReferenceRecipeWorkshop = ({
         mode: 'lucy-latest',
         prompt: action.prompt,
         referenceImageAssetId: action.referenceImageAssetId,
+        vtonInputKind: null,
+        enhancePrompt: false,
         preserveCurrentReference,
         builderDraft: action.draft,
         destination: 'workshop',

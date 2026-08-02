@@ -94,7 +94,7 @@ export const useReferenceRecipeHandoff = ({
         mode: result.pending.mode,
         prompt: result.appliedPrompt,
         referenceImage: result.referenceImage,
-        enhance: result.enhance,
+        enhance: result.pending.enhancePrompt || result.enhance,
       });
       if (!committed) return false;
 
@@ -131,6 +131,15 @@ export const useReferenceRecipeHandoff = ({
     dispatchActiveRecipe({ type: 'clear' });
     return true;
   }, [activeRecipe.character, session, sessionModeLocked]);
+  const clearActiveRecipe = useCallback((): boolean => {
+    const hasPreparedAi =
+      activeRecipe.recipe !== null ||
+      (session.draft.mode !== 'local' &&
+        Boolean(session.draft.prompt.trim() || session.draft.referenceImage));
+    if (!hasPreparedAi || sessionModeLocked || !session.selectMode('local')) return false;
+    dispatchActiveRecipe({ type: 'clear' });
+    return true;
+  }, [activeRecipe.recipe, session, sessionModeLocked]);
 
   const applyWorkshopPrompt = useCallback(
     (action: PromptWorkshopAction) => {
@@ -153,6 +162,7 @@ export const useReferenceRecipeHandoff = ({
       workshopDrafts: workshop.drafts,
       referenceUsePending: hydration.pending,
       referenceUseFailureMessage: hydration.failureMessage,
+      canContinueReferenceUseWithoutImage: hydration.canContinueWithoutReference,
       shelfDirty,
       recipeInsertionBlocked,
       characterBuilderSaveBlockedReason: attribution.characterBuilderSaveBlockedReason,
@@ -164,6 +174,7 @@ export const useReferenceRecipeHandoff = ({
       setShelfDirty: library.setDirty,
       useRecipe,
       clearActiveCharacter,
+      clearActiveRecipe,
       retryReferenceUse: hydration.retry,
       continueReferenceUseWithoutImage: hydration.continueWithoutReference,
       saveBuiltCharacter: attribution.saveBuiltCharacter,

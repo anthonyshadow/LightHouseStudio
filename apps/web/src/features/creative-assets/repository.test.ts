@@ -4,6 +4,7 @@ import { createCreativeAssetRepository } from './repository';
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
   CREATIVE_ASSET_STORAGE_KEY,
+  EARLIER_CREATIVE_ASSET_STORAGE_KEY,
   LEGACY_CREATIVE_ASSET_STORAGE_KEY,
   OLDER_CREATIVE_ASSET_STORAGE_KEY,
   PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
@@ -312,7 +313,7 @@ describe('createCreativeAssetRepository', () => {
     ]);
   });
 
-  it('migrates the legacy v1 key to v4 and hydrates null references after refresh', () => {
+  it('migrates the legacy v1 key to v5 and hydrates null references after refresh', () => {
     const storage = new MemoryStorage();
     storage.records.set(
       LEGACY_CREATIVE_ASSET_STORAGE_KEY,
@@ -354,7 +355,7 @@ describe('createCreativeAssetRepository', () => {
   it('prefers and migrates the v2 key while preserving reference identities', () => {
     const storage = new MemoryStorage();
     storage.records.set(
-      OLDER_CREATIVE_ASSET_STORAGE_KEY,
+      EARLIER_CREATIVE_ASSET_STORAGE_KEY,
       JSON.stringify({
         schemaVersion: 2,
         savedPrompts: [],
@@ -408,7 +409,7 @@ describe('createCreativeAssetRepository', () => {
   it('prefers and migrates the v3 key with generated reference provenance', () => {
     const storage = new MemoryStorage();
     storage.records.set(
-      PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
+      OLDER_CREATIVE_ASSET_STORAGE_KEY,
       JSON.stringify({
         schemaVersion: 3,
         savedPrompts: [],
@@ -446,6 +447,47 @@ describe('createCreativeAssetRepository', () => {
       ],
     });
     expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
+  });
+
+  it('prefers and migrates the v4 key with explicit VTO mode inference', () => {
+    const storage = new MemoryStorage();
+    storage.records.set(
+      PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: 4,
+        savedPrompts: [
+          {
+            id: 'v4-image-outfit',
+            title: 'V4 image outfit',
+            prompt: '',
+            modelModeId: 'lucy-vton-latest',
+            source: 'manual',
+            referenceImageAssetId: 'opaque-v4-outfit',
+            tags: [],
+            createdAt: '2026-07-14T12:00:00.000Z',
+            updatedAt: '2026-07-14T12:00:00.000Z',
+            lastUsedAt: null,
+            useCount: 0,
+          },
+        ],
+        recentPrompts: [],
+        savedCharacterPrompts: [],
+      }),
+    );
+
+    expect(createCreativeAssetRepository({ storage }).getSnapshot()).toMatchObject({
+      health: 'ready',
+      store: {
+        schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+        savedPrompts: [
+          expect.objectContaining({
+            id: 'v4-image-outfit',
+            vtonInputKind: 'saved-outfit',
+            enhancePrompt: false,
+          }),
+        ],
+      },
+    });
   });
 
   it('recovers rather than silently treating a corrupt legacy payload as a migration', () => {

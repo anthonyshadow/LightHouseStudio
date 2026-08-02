@@ -1,15 +1,17 @@
 import type { PromptBuilderDraft, PromptIntent } from '../prompts';
 import type { ModelModeId } from '../session';
 
-export const CREATIVE_ASSET_SCHEMA_VERSION = 4 as const;
-export const PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION = 3 as const;
-export const OLDER_CREATIVE_ASSET_SCHEMA_VERSION = 2 as const;
+export const CREATIVE_ASSET_SCHEMA_VERSION = 5 as const;
+export const PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION = 4 as const;
+export const OLDER_CREATIVE_ASSET_SCHEMA_VERSION = 3 as const;
+export const EARLIER_CREATIVE_ASSET_SCHEMA_VERSION = 2 as const;
 export const LEGACY_CREATIVE_ASSET_SCHEMA_VERSION = 1 as const;
 export const SAVED_PROMPT_LIMIT = 100;
 export const RECENT_PROMPT_LIMIT = 30;
 export const SAVED_CHARACTER_PROMPT_LIMIT = 50;
 
 export type SavedPromptSource = 'manual' | 'generated';
+export type VtonInputKind = 'prompt' | 'saved-outfit';
 export type SavedCharacterPromptSource = 'manual' | 'generator';
 export type ReferenceImageStatus =
   | 'prompt-only'
@@ -56,6 +58,10 @@ export interface SavedPrompt {
   readonly modelModeId: ModelModeId;
   readonly source: SavedPromptSource;
   readonly referenceImageAssetId: string | null;
+  /** Null for Character recipes; explicit preparation mode for Virtual Try-On outfits. */
+  readonly vtonInputKind: VtonInputKind | null;
+  /** Only meaningful for prompt-based Virtual Try-On outfits. */
+  readonly enhancePrompt: boolean;
   readonly tags: readonly string[];
   readonly createdAt: string;
   readonly updatedAt: string;
@@ -71,6 +77,8 @@ export interface RecentPrompt {
   readonly savedCharacterPromptId?: string;
   readonly characterName?: string;
   readonly referenceImageAssetId: string | null;
+  readonly vtonInputKind: VtonInputKind | null;
+  readonly enhancePrompt: boolean;
   readonly usedAt: string;
 }
 
@@ -110,6 +118,8 @@ export interface SavedPromptInput {
   readonly modelModeId: ModelModeId;
   readonly source: SavedPromptSource;
   readonly referenceImageAssetId?: string | null;
+  readonly vtonInputKind?: VtonInputKind | null;
+  readonly enhancePrompt?: boolean;
   readonly tags?: readonly string[];
 }
 

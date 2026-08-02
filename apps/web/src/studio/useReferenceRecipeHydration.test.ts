@@ -113,6 +113,33 @@ describe('useReferenceRecipeHydration', () => {
     );
   });
 
+  it('does not allow missing image-only outfits to continue without their reference', async () => {
+    fetchReferenceImageMetadata.mockRejectedValueOnce(new Error('missing'));
+    const onCommit = vi.fn(() => true);
+    const { result } = renderHook(() =>
+      useReferenceRecipeHydration({
+        canStart: () => true,
+        currentReferenceImage: () => null,
+        onCommit,
+      }),
+    );
+    act(() => {
+      result.current.useRecipe({
+        mode: 'lucy-vton-latest',
+        prompt: '',
+        referenceImageAssetId: asset.assetId,
+        vtonInputKind: 'saved-outfit',
+        enhancePrompt: false,
+        preserveCurrentReference: false,
+        destination: 'shelf',
+      });
+    });
+    await waitFor(() => expect(result.current.failureMessage).not.toBeNull());
+    expect(result.current.canContinueWithoutReference).toBe(false);
+    act(() => result.current.continueWithoutReference());
+    expect(onCommit).not.toHaveBeenCalled();
+  });
+
   it('invalidates an aborted operation token even when the transport resolves late', async () => {
     let resolveMetadata: ((value: UploadedReferenceImageAsset) => void) | undefined;
     fetchReferenceImageMetadata.mockImplementationOnce(

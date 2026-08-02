@@ -20,7 +20,10 @@ import type { CharacterSaveStage } from '../features/character-builder/character
 import { persistCharacterSaveSnapshot } from '../features/character-builder/persistCharacterSaveSnapshot';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
 import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
+import type { RecentPrompt, SavedPrompt } from '../features/creative-assets/types';
 import { useCreativeAssetRepository } from '../features/creative-assets/useCreativeAssetRepository';
+import { OutfitBuilder } from '../features/creative-assets/OutfitBuilder';
+import { OutfitSelector } from '../features/creative-assets/OutfitSelector';
 import { ExistingVideoPanel } from '../features/existing-video/ExistingVideoPanel';
 import { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import { MediaStage } from '../features/live-stage';
@@ -46,6 +49,7 @@ import {
 } from './StudioApp.styles';
 import { CreativeWorkspace, type AuxiliaryPanel, type ModelMode } from './CreativeWorkspace';
 import { AIExperienceChooser } from './AIExperienceChooser';
+import { AIPreparationChooser } from './AIPreparationChooser';
 import { StudioExitGuard } from './StudioExitGuard';
 import { StudioHeader } from './StudioHeader';
 import { StudioSessionControlBar } from './StudioSessionControlBar';
@@ -98,6 +102,13 @@ const focusDesktopCaptureSettings = () => {
 type CharacterBuilderDestination =
   Readonly<{ kind: 'studio' }> | Readonly<{ kind: 'existing-video'; stepId: string }>;
 
+type OutfitBuilderLaunch = Readonly<{
+  outfit?: SavedPrompt;
+  saveAsCopy: boolean;
+  saveAndSelect: boolean;
+  destination: 'selector' | 'shelf';
+}>;
+
 interface StudioExperienceProps {
   focusMainOnMount: boolean;
   initialIntent?: 'upload';
@@ -118,6 +129,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         modelId: recipe.modelModeId,
         prompt: recipe.prompt,
         referenceImageAssetId: recipe.referenceImageAssetId,
+        vtonInputKind: recipe.vtonInputKind,
+        enhancePrompt: recipe.enhancePrompt,
       })),
       ...repositoryState.store.savedCharacterPrompts.map((character) => ({
         id: character.id,
@@ -125,16 +138,38 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         modelId: 'lucy-latest' as const,
         prompt: character.prompt,
         referenceImageAssetId: character.referenceImageAssetId,
+        vtonInputKind: null,
+        enhancePrompt: false,
       })),
     ],
     [repositoryState.store],
   );
   const recordAcceptedBatchStep = useCallback(
-    (step: { readonly modelId: ModelMode; readonly prompt: string }) => {
-      if (!step.prompt.trim()) return;
+    (step: {
+      readonly modelId: ModelMode;
+      readonly prompt: string;
+      readonly savedRecipeId: string | null;
+      readonly referenceImage: File | null;
+      readonly inputKind: 'character' | 'saved-outfit' | 'reference-image' | 'prompt';
+      readonly enhancePrompt: boolean;
+    }) => {
+      const saved = step.savedRecipeId
+        ? repository.getSnapshot().store.savedPrompts.find((item) => item.id === step.savedRecipeId)
+        : undefined;
+      if (!step.prompt.trim() && !saved?.referenceImageAssetId) return;
       repository.recordSuccessfulPrompt({
-        prompt: step.prompt,
+        prompt: saved?.prompt ?? step.prompt,
         modelModeId: step.modelId,
+        ...(saved ? { savedPromptId: saved.id } : {}),
+        referenceImageAssetId: saved?.referenceImageAssetId ?? null,
+        vtonInputKind:
+          step.modelId === 'lucy-vton-latest'
+            ? (saved?.vtonInputKind ?? (step.inputKind === 'prompt' ? 'prompt' : 'saved-outfit'))
+            : null,
+        enhancePrompt:
+          step.modelId === 'lucy-vton-latest'
+            ? (saved?.enhancePrompt ?? (step.inputKind === 'prompt' && step.enhancePrompt))
+            : false,
       });
     },
     [repository],
@@ -170,9 +205,21 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     useState<RecipeShelfEntryIntent | null>(null);
   const [characterBuilderDestination, setCharacterBuilderDestination] =
     useState<CharacterBuilderDestination>({ kind: 'studio' });
+  const [outfitBuilderLaunch, setOutfitBuilderLaunch] = useState<OutfitBuilderLaunch>({
+    saveAsCopy: false,
+    saveAndSelect: true,
+    destination: 'selector',
+  });
+  const [outfitBuilderDirty, setOutfitBuilderDirty] = useState(false);
+  const outfitBuilderDirtyRef = useRef(false);
+  const updateOutfitBuilderDirty = useCallback((dirty: boolean) => {
+    outfitBuilderDirtyRef.current = dirty;
+    setOutfitBuilderDirty(dirty);
+  }, []);
   const nextRecipeShelfEntryIntentIdRef = useRef(0);
   const promptCommittedHandlerRef = useRef<PromptCommittedHandler>(noopPromptCommitted);
   const characterSelectorRef = useRef<HTMLButtonElement>(null);
+  const outfitToggleRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
   const shelfToggleRef = useRef<HTMLButtonElement>(null);
   const legacyManagerToggleRef = useRef<HTMLButtonElement>(null);
@@ -336,6 +383,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     workshopDrafts,
     referenceUsePending,
     referenceUseFailureMessage,
+    canContinueReferenceUseWithoutImage,
     shelfDirty,
     recipeInsertionBlocked,
     characterBuilderSaveBlockedReason,
@@ -345,8 +393,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     changeLibraryMode,
     rememberWorkshopDraft,
     setShelfDirty,
-    useRecipe,
+    useRecipe: applyRecipeSelection,
     clearActiveCharacter,
+    clearActiveRecipe,
     retryReferenceUse,
     continueReferenceUseWithoutImage,
     saveBuiltCharacter,
@@ -510,6 +559,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   };
 
   const openCharacterSelector = () => openOverlay('character-selector');
+  const openOutfitSelector = () => openOverlay('outfit-selector');
 
   const openLegacyProjects = () => openOverlay('legacy-projects');
 
@@ -524,9 +574,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       ? 'dock'
       : activeOverlay === 'take-review' || activeOverlay === 'voice-treatments'
         ? 'take'
-        : creativePanel === 'closed'
-          ? null
-          : creativePanel;
+        : activeOverlay === 'character-selector'
+          ? 'character'
+          : activeOverlay === 'outfit-selector' || activeOverlay === 'outfit-builder'
+            ? 'outfit'
+            : creativePanel === 'closed'
+              ? null
+              : creativePanel;
   const captureBlockedReason = reviewLocked
     ? REVIEW_LOCK_REASON
     : shelfDirty
@@ -561,21 +615,97 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       )
     : undefined;
   const characterRemovalBlockedReason = recordingActive
-    ? 'Finish recording before removing the selected character.'
+    ? 'Finish recording before changing the selected AI recipe.'
     : finalizingStartedAt !== null || finalizingStream !== null
-      ? 'Wait for the current take to finish finalizing before removing the selected character.'
+      ? 'Wait for the current take to finish finalizing before changing the selected AI recipe.'
       : reviewLocked
-        ? 'Release or discard the current take before removing the selected character.'
+        ? 'Release or discard the current take before changing the selected AI recipe.'
         : aiSessionActive
-          ? 'Stop AI before removing the selected character.'
+          ? 'Stop AI before changing the selected AI recipe.'
           : session.lifecycle === 'disconnected'
-            ? 'Wait for the current session cleanup before removing the selected character.'
+            ? 'Wait for the current session cleanup before changing the selected AI recipe.'
             : undefined;
   const unselectCharacter = useCallback(() => {
     if (!clearActiveCharacter()) return;
     closeOverlayIf(['character-selector']);
     window.requestAnimationFrame(() => characterSelectorRef.current?.focus());
   }, [clearActiveCharacter, closeOverlayIf]);
+  const unselectAi = useCallback(() => {
+    if (!clearActiveRecipe()) return;
+    closeOverlayIf(['character-selector', 'outfit-selector', 'ai-preparation']);
+    window.requestAnimationFrame(() => characterSelectorRef.current?.focus());
+  }, [clearActiveRecipe, closeOverlayIf]);
+  const openNewOutfitBuilder = useCallback(
+    (saveAndSelect: boolean, destination: OutfitBuilderLaunch['destination']) => {
+      if (characterBuilderOpenBlockedReason) return;
+      setOutfitBuilderLaunch({ saveAsCopy: false, saveAndSelect, destination });
+      updateOutfitBuilderDirty(false);
+      openOverlay('outfit-builder');
+    },
+    [characterBuilderOpenBlockedReason, openOverlay, updateOutfitBuilderDirty],
+  );
+  const openOutfitEditor = useCallback(
+    (outfit: SavedPrompt, saveAsCopy: boolean, destination: OutfitBuilderLaunch['destination']) => {
+      if (characterBuilderOpenBlockedReason) return;
+      setOutfitBuilderLaunch({ outfit, saveAsCopy, saveAndSelect: false, destination });
+      updateOutfitBuilderDirty(false);
+      openOverlay('outfit-builder');
+    },
+    [characterBuilderOpenBlockedReason, openOverlay, updateOutfitBuilderDirty],
+  );
+  const openOutfitCopy = useCallback(
+    (outfit: SavedPrompt | RecentPrompt, destination: OutfitBuilderLaunch['destination']) => {
+      if ('title' in outfit) {
+        openOutfitEditor(outfit, true, destination);
+        return;
+      }
+      openOutfitEditor(
+        {
+          id: outfit.id,
+          title: 'Outfit',
+          prompt: outfit.prompt,
+          modelModeId: 'lucy-vton-latest',
+          source: 'manual',
+          referenceImageAssetId: outfit.referenceImageAssetId,
+          vtonInputKind: outfit.vtonInputKind,
+          enhancePrompt: outfit.enhancePrompt,
+          tags: [],
+          createdAt: outfit.usedAt,
+          updatedAt: outfit.usedAt,
+          lastUsedAt: outfit.usedAt,
+          useCount: 1,
+        },
+        true,
+        destination,
+      );
+    },
+    [openOutfitEditor],
+  );
+  const closeOutfitBuilder = useCallback(() => {
+    if (
+      outfitBuilderDirtyRef.current &&
+      !window.confirm('Discard the unfinished outfit changes? The draft cannot be recovered.')
+    ) {
+      return;
+    }
+    updateOutfitBuilderDirty(false);
+    openOverlay(outfitBuilderLaunch.destination === 'shelf' ? 'recipe-shelf' : 'outfit-selector');
+  }, [openOverlay, outfitBuilderLaunch.destination, updateOutfitBuilderDirty]);
+  const selectSavedOutfit = useCallback(
+    (outfit: SavedPrompt) => {
+      updateOutfitBuilderDirty(false);
+      applyRecipeSelection({
+        origin: 'saved-prompt',
+        assetId: outfit.id,
+        prompt: outfit.prompt,
+        modelModeId: outfit.modelModeId,
+        referenceImageAssetId: outfit.referenceImageAssetId,
+        vtonInputKind: outfit.vtonInputKind,
+        enhancePrompt: outfit.enhancePrompt,
+      });
+    },
+    [applyRecipeSelection, updateOutfitBuilderDirty],
+  );
   const startAdvancedModel = useCallback(() => {
     setRecordingForExistingVideo(false);
     return session.startModel();
@@ -627,7 +757,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     processing.cancel();
     recording.discard();
     setShelfDirty(false);
-  }, [existingVideo, processing, recording, setShelfDirty]);
+    updateOutfitBuilderDirty(false);
+  }, [existingVideo, processing, recording, setShelfDirty, updateOutfitBuilderDirty]);
   const discardExistingVideoSelection = useCallback(() => {
     if (existingVideo.selection) existingVideo.reset(false);
   }, [existingVideo]);
@@ -664,6 +795,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       state={{
         panel: creativePanel,
         activeTool: activeCreativeTool,
+        showDesktopAiTools: desktopStudioLayout,
+        activeCharacterLabel: activeCharacterName,
+        activeOutfitLabel:
+          session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
+            ? (activeRecipeLabel ?? 'Configured VTO')
+            : undefined,
         activeSessionMode: session.draft.mode,
         libraryMode,
         workshopDraft,
@@ -677,7 +814,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           ? {
               message: referenceUseFailureMessage,
               onRetry: retryReferenceUse,
-              onContinueWithoutReference: continueReferenceUseWithoutImage,
+              ...(canContinueReferenceUseWithoutImage
+                ? { onContinueWithoutReference: continueReferenceUseWithoutImage }
+                : {}),
             }
           : null,
         legacyProjectCount,
@@ -690,11 +829,15 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         shelfToggleRef,
         dockToggleRef,
         takeToggleRef,
+        characterToggleRef: characterSelectorRef,
+        outfitToggleRef,
         legacyManagerToggleRef,
       }}
       actions={{
         onOpenDock: openDock,
         onOpenTake: openTake,
+        onOpenCharacter: openCharacterSelector,
+        onOpenOutfit: openOutfitSelector,
         onOpenWorkshop: openWorkshop,
         onToggleShelf: () => toggleOverlay('recipe-shelf'),
         onOpenLegacyProjects: openLegacyProjects,
@@ -705,9 +848,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         onSaveWorkshop: saveWorkshopPrompt,
         onShelfDirtyChange: setShelfDirty,
         onRecipeShelfEntryIntentConsumed: consumeRecipeShelfEntryIntent,
-        onUseRecipe: useRecipe,
+        onUseRecipe: applyRecipeSelection,
         onCreateCharacter: openCharacterBuilder,
         onEditCharacter: editCharacter,
+        onCreateOutfit: () => openNewOutfitBuilder(false, 'shelf'),
+        onEditOutfit: (outfit) => openOutfitEditor(outfit, false, 'shelf'),
+        onSaveOutfitCopy: (outfit) => openOutfitCopy(outfit, 'shelf'),
         onOpenSavedWorkshop: openSavedWorkshop,
       }}
     />
@@ -725,10 +871,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             browser={browser}
             capabilityState={capabilityState}
             characterSelectorRef={characterSelectorRef}
-            {...(activeCharacterName ? { activeCharacterName } : {})}
-            activeCharacterImageAssetId={activeCharacter?.referenceImageAssetId}
-            onOpenCharacterSelector={openCharacterSelector}
-            onClearCharacter={unselectCharacter}
+            showAiSelector={!desktopStudioLayout}
+            selectorLabel="Select AI"
+            {...(currentExperienceLabel ? { activeCharacterName: currentExperienceLabel } : {})}
+            activeCharacterImageAssetId={currentExperienceImageAssetId}
+            onOpenCharacterSelector={() => openOverlay('ai-preparation')}
+            onClearCharacter={unselectAi}
             {...(characterRemovalBlockedReason
               ? { clearCharacterDisabledReason: characterRemovalBlockedReason }
               : {})}
@@ -864,7 +1012,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           }
           hasTemporaryTake={Boolean(recording.presented)}
           voiceProcessingActive={recording.processingState === 'processing'}
-          shelfDirty={shelfDirty}
+          shelfDirty={shelfDirty || outfitBuilderDirty}
           onDiscardTemporaryWork={discardTemporaryWork}
         />
 
@@ -895,6 +1043,86 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             }
             onRecordVideo={startExistingVideoRecording}
           />
+        </OverlayPanel>
+
+        <AIPreparationChooser
+          open={activeOverlay === 'ai-preparation'}
+          returnFocusRef={characterSelectorRef}
+          disabledReason={characterBuilderOpenBlockedReason}
+          onClose={closeOverlay}
+          onChooseCharacter={openCharacterSelector}
+          onChooseOutfit={openOutfitSelector}
+        />
+
+        <OverlayPanel
+          open={activeOverlay === 'outfit-selector'}
+          onClose={closeOverlay}
+          title="Outfit"
+          description="Create an outfit, or select a saved or recently used Virtual Try-On recipe."
+          placement="right"
+          bodyMode="scroll"
+          returnFocusRef={desktopStudioLayout ? outfitToggleRef : characterSelectorRef}
+        >
+          {activeOverlay === 'outfit-selector' ? (
+            <OutfitSelector
+              repository={repository}
+              activeOutfitLabel={
+                session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
+                  ? (activeRecipeLabel ?? 'Configured VTO')
+                  : undefined
+              }
+              onClear={unselectAi}
+              disabledReason={
+                recipeInsertionBlocked
+                  ? 'Release the active media session before selecting another outfit.'
+                  : characterBuilderOpenBlockedReason
+              }
+              onCreate={() => openNewOutfitBuilder(true, 'selector')}
+              onEdit={(outfit) => openOutfitEditor(outfit, false, 'selector')}
+              onSaveCopy={(outfit) => openOutfitEditor(outfit, true, 'selector')}
+              onSelect={applyRecipeSelection}
+            />
+          ) : null}
+        </OverlayPanel>
+
+        <OverlayPanel
+          open={activeOverlay === 'outfit-builder'}
+          onClose={closeOutfitBuilder}
+          title={outfitBuilderLaunch.outfit ? 'Edit outfit' : 'Create a new outfit'}
+          description="Choose Prompt or Reference image, then name and save the reusable outfit."
+          placement="right"
+          bodyMode="scroll"
+          closeOnBackdrop={false}
+          returnFocusRef={
+            outfitBuilderLaunch.destination === 'shelf'
+              ? shelfToggleRef
+              : desktopStudioLayout
+                ? outfitToggleRef
+                : characterSelectorRef
+          }
+        >
+          {activeOverlay === 'outfit-builder' ? (
+            <OutfitBuilder
+              key={`${outfitBuilderLaunch.outfit?.id ?? 'new'}:${outfitBuilderLaunch.saveAsCopy ? 'copy' : 'edit'}`}
+              repository={repository}
+              {...(outfitBuilderLaunch.outfit ? { initialOutfit: outfitBuilderLaunch.outfit } : {})}
+              saveAsCopy={outfitBuilderLaunch.saveAsCopy}
+              saveAndSelect={outfitBuilderLaunch.saveAndSelect}
+              disabledReason={characterBuilderOpenBlockedReason}
+              onDirtyChange={updateOutfitBuilderDirty}
+              onCancel={closeOutfitBuilder}
+              onSaved={(outfit) => {
+                if (outfitBuilderLaunch.saveAndSelect) {
+                  selectSavedOutfit(outfit);
+                  return;
+                }
+                updateOutfitBuilderDirty(false);
+                openOverlay(
+                  outfitBuilderLaunch.destination === 'shelf' ? 'recipe-shelf' : 'outfit-selector',
+                );
+              }}
+            />
+          ) : null}
         </OverlayPanel>
 
         <OverlayPanel

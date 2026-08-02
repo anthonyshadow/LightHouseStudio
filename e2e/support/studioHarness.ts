@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import { expect, type Page } from '@playwright/test';
 import { installSyntheticBrowserMedia } from './studioHarness.browser.js';
 import { installProviderNetworkDriver } from './studioHarness.network.js';
 import type { NetworkJourneyState, StudioHarnessOptions } from './studioHarness.types.js';
@@ -9,6 +9,23 @@ export const installSuccessfulStudioHarness = async (
 ): Promise<NetworkJourneyState> => {
   await installSyntheticBrowserMedia(page, options);
   return installProviderNetworkDriver(page, options);
+};
+
+export const openCharacterOptions = async (page: Page): Promise<void> => {
+  const desktopTrigger = page
+    .getByRole('navigation', { name: 'Creative workspace tools' })
+    .getByRole('button', { name: /^(Select Character|Selected character:)/u });
+  const mobileTrigger = page.getByRole('button', { name: /Open Select AI options/u });
+  await expect(desktopTrigger.or(mobileTrigger).first()).toBeVisible();
+  if (await desktopTrigger.isVisible()) {
+    await desktopTrigger.click();
+    return;
+  }
+  await mobileTrigger.click();
+  await page
+    .getByRole('dialog', { name: 'Select AI' })
+    .getByRole('button', { name: 'Select Character' })
+    .click();
 };
 
 export {

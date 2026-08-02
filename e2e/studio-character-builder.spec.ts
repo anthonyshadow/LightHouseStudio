@@ -1,14 +1,19 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { installSuccessfulStudioHarness, readBrowserState } from './support/studioHarness';
+import {
+  expectNoExternalProviderTraffic,
+  installSuccessfulStudioHarness,
+  openCharacterOptions,
+  readBrowserState,
+} from './support/studioHarness';
 
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
 const REFERENCE_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 );
 
 const openBuilder = async (page: Page): Promise<void> => {
-  await page.getByRole('button', { name: /Open character options/u }).click();
+  await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Create new character' }).click();
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
 };
@@ -208,7 +213,7 @@ test('prompt-only save performs no image request and immediately preloads the Do
   ).toBeDisabled();
 });
 
-test('both saved-character entries open Characters and complete Use through Start', async ({
+test('saved-character selection survives reload and completes Use through Start', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -230,10 +235,8 @@ test('both saved-character entries open Characters and complete Use through Star
   expect(savedPrompt).toBeTruthy();
 
   await page.reload();
-  await expect(
-    page.getByRole('button', { name: 'No character selected. Open character options' }),
-  ).toBeVisible();
-  await page.getByRole('button', { name: /Open character options/u }).click();
+  await expect(page.getByRole('button', { name: 'Select Character', exact: true })).toBeVisible();
+  await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
   let shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
   await expect(shelf.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
@@ -244,7 +247,7 @@ test('both saved-character entries open Characters and complete Use through Star
   await expect(shelf).toBeHidden();
   await expect(page.getByRole('button', { name: 'Shelf', exact: true })).toBeFocused();
 
-  await page.getByRole('button', { name: /Open character options/u }).click();
+  await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Choose saved character' }).click();
   shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
   await expect(shelf.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
@@ -282,9 +285,8 @@ test('both saved-character entries open Characters and complete Use through Star
   await page.reload();
   await page.getByRole('button', { name: 'Record New Video' }).click();
   await expect(page.getByLabel('Local camera preview')).toBeVisible();
-  await page.getByRole('button', { name: 'Start AI', exact: true }).click();
-  chooser = page.getByRole('dialog', { name: 'Choose live AI experience' });
-  await chooser.getByRole('button', { name: 'Choose Saved Character' }).click();
+  await openCharacterOptions(page);
+  await page.getByRole('button', { name: 'Choose saved character' }).click();
   shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
   await expect(shelf.getByRole('button', { name: /^Characters/u })).toHaveAttribute(
     'aria-pressed',
@@ -768,25 +770,44 @@ test('editing a character requires explicit discard of a different unfinished dr
   await expect(page.getByLabel('Optional Custom Constraints')).toHaveValue('');
 });
 
-test('unfinished Shelf edits block character Save without blocking builder editing', async ({
+test('unfinished Outfit Builder work requires confirmed discard before returning to Shelf', async ({
   page,
 }) => {
-  await installSuccessfulStudioHarness(page);
+  const network = await installSuccessfulStudioHarness(page);
   await page.goto('/studio');
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
   const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
   await shelf.getByRole('button', { name: 'Try-on recipes' }).click();
   await shelf.getByRole('button', { name: 'New garment recipe' }).click();
-  await shelf.getByLabel(/^Name/u).fill('Unfinished garment recipe');
-  await shelf.getByRole('button', { name: 'Close creative tool' }).click();
+  const builder = page.getByRole('dialog', { name: 'Create a new outfit' });
+  await builder.getByLabel('Garment direction').fill('An unfinished garment direction.');
+  await expect(builder.locator('[data-outfit-builder-dirty]')).toHaveAttribute(
+    'data-outfit-builder-dirty',
+    'true',
+  );
 
-  await openBuilder(page);
-  await chooseAdultCharacterDirection(page, false);
-  const save = page.getByRole('button', { name: 'Save Character', exact: true });
-  await expect(save).toHaveAttribute('aria-disabled', 'true');
-  await expect(
-    page.getByText(
-      'Save or discard the unfinished Recipe Shelf changes before saving this character.',
+  await page.evaluate(() => {
+    const testWindow = window as typeof window & { __outfitConfirmMessages?: string[] };
+    testWindow.__outfitConfirmMessages = [];
+    window.confirm = (message) => {
+      testWindow.__outfitConfirmMessages?.push(String(message ?? ''));
+      return false;
+    };
+  });
+  await builder.getByRole('button', { name: 'Close panel' }).click();
+  await expect(builder).toBeVisible();
+  expect(
+    await page.evaluate(
+      () =>
+        (window as typeof window & { __outfitConfirmMessages?: string[] }).__outfitConfirmMessages,
     ),
-  ).toBeVisible();
+  ).toEqual(['Discard the unfinished outfit changes? The draft cannot be recovered.']);
+
+  await page.evaluate(() => {
+    window.confirm = () => true;
+  });
+  await builder.getByRole('button', { name: 'Close panel' }).click();
+  await expect(shelf).toBeVisible();
+  expect((await readBrowserState(page)).cameraCalls).toBe(0);
+  expectNoExternalProviderTraffic(network);
 });

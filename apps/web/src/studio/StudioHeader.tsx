@@ -19,6 +19,8 @@ type StudioHeaderProps = {
   browser: BrowserCapabilities;
   capabilityState: CapabilityState;
   characterSelectorRef: RefObject<HTMLButtonElement | null>;
+  showAiSelector?: boolean;
+  selectorLabel?: string;
   activeCharacterName?: string | undefined;
   activeCharacterImageAssetId?: string | null | undefined;
   onOpenCharacterSelector: () => void;
@@ -61,6 +63,8 @@ export const StudioHeader = ({
   onOpenCharacterSelector,
   onClearCharacter,
   clearCharacterDisabledReason,
+  showAiSelector = true,
+  selectorLabel = 'Select Character',
 }: StudioHeaderProps) => {
   const theme = useTheme();
   const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
@@ -91,41 +95,45 @@ export const StudioHeader = ({
           <span>Local-first studio</span>
         </div>
       </div>
-      <div css={characterSelectorStyles(theme)}>
-        <Button
-          ref={characterSelectorRef}
-          variant="secondary"
-          aria-haspopup="dialog"
-          aria-label={
-            activeCharacterName
-              ? `Selected character: ${activeCharacterName}. Open character options`
-              : 'No character selected. Open character options'
-          }
-          onClick={onOpenCharacterSelector}
-        >
-          {characterImageUrl ? (
-            <img src={characterImageUrl} alt="" width="26" height="26" />
-          ) : (
-            <span data-character-placeholder aria-hidden="true">
-              ✦
-            </span>
-          )}
-          <span data-character-label>{activeCharacterName ?? 'Select Character'}</span>
-          <ChevronDownIcon />
-        </Button>
-        {activeCharacterName ? (
+      {showAiSelector ? (
+        <div css={characterSelectorStyles(theme)}>
           <Button
-            data-clear-character="true"
-            variant="quiet"
-            aria-label={`Unselect character: ${activeCharacterName}`}
-            title={clearCharacterDisabledReason ?? `Unselect ${activeCharacterName}`}
-            disabled={Boolean(clearCharacterDisabledReason)}
-            onClick={onClearCharacter}
+            ref={characterSelectorRef}
+            variant="secondary"
+            aria-haspopup="dialog"
+            aria-label={
+              activeCharacterName
+                ? `Selected AI: ${activeCharacterName}. Open ${selectorLabel} options`
+                : `No AI selected. Open ${selectorLabel} options`
+            }
+            onClick={onOpenCharacterSelector}
           >
-            <span aria-hidden="true">×</span>
+            {characterImageUrl ? (
+              <img src={characterImageUrl} alt="" width="26" height="26" />
+            ) : (
+              <span data-character-placeholder aria-hidden="true">
+                ✦
+              </span>
+            )}
+            <span data-character-label>{activeCharacterName ?? selectorLabel}</span>
+            <ChevronDownIcon />
           </Button>
-        ) : null}
-      </div>
+          {activeCharacterName ? (
+            <Button
+              data-clear-character="true"
+              variant="quiet"
+              aria-label={`Unselect AI: ${activeCharacterName}`}
+              title={clearCharacterDisabledReason ?? `Unselect ${activeCharacterName}`}
+              disabled={Boolean(clearCharacterDisabledReason)}
+              onClick={onClearCharacter}
+            >
+              <span aria-hidden="true">×</span>
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <span aria-hidden="true" />
+      )}
       <details css={capabilityStyles(theme)} aria-label="Integration availability">
         <summary>
           <span css={systemStatusDotStyles(theme, systemState)} aria-hidden="true" />

@@ -9,11 +9,14 @@ import {
 import type { ModelMode } from '../application/types';
 import type { SessionReferenceImage } from '../features/media-session/types';
 import type { PromptBuilderDraft } from '../features/prompt-authoring/model';
+import type { VtonInputKind } from '../features/creative-assets/types';
 
 export type PendingReferenceRecipeUse = {
   readonly mode: ModelMode;
   readonly prompt: string;
   readonly referenceImageAssetId: string | null;
+  readonly vtonInputKind?: VtonInputKind | null;
+  readonly enhancePrompt?: boolean;
   readonly preserveCurrentReference: boolean;
   readonly builderDraft?: PromptBuilderDraft;
   readonly savedPromptId?: string;
@@ -34,28 +37,42 @@ export type ReferenceRecipeHydrationResult = {
 type HydrationState = {
   readonly pending: boolean;
   readonly failureMessage: string | null;
+  readonly canContinueWithoutReference: boolean;
 };
 
 type HydrationAction =
   | { readonly type: 'start' }
-  | { readonly type: 'fail'; readonly message: string }
+  | {
+      readonly type: 'fail';
+      readonly message: string;
+      readonly canContinueWithoutReference?: boolean;
+    }
   | { readonly type: 'complete' };
 
 const INITIAL_HYDRATION_STATE: HydrationState = {
   pending: false,
   failureMessage: null,
+  canContinueWithoutReference: false,
 };
 
 const hydrationReducer = (state: HydrationState, action: HydrationAction): HydrationState => {
-  if (action.type === 'start') return { pending: true, failureMessage: null };
-  if (action.type === 'fail') return { pending: false, failureMessage: action.message };
+  if (action.type === 'start') {
+    return { pending: true, failureMessage: null, canContinueWithoutReference: false };
+  }
+  if (action.type === 'fail') {
+    return {
+      pending: false,
+      failureMessage: action.message,
+      canContinueWithoutReference: action.canContinueWithoutReference ?? false,
+    };
+  }
   return state === INITIAL_HYDRATION_STATE ? state : INITIAL_HYDRATION_STATE;
 };
 
 export const referenceHydrationError = (error: unknown): string =>
   error instanceof ApiClientError && error.code === 'not_found'
-    ? 'This local reference asset is no longer available. Retry after restoring the data directory, or continue without it.'
-    : 'The exact local reference could not be validated. Retry, or continue without the reference.';
+    ? 'This local reference asset is no longer available. Retry after restoring the data directory.'
+    : 'The exact local reference could not be validated. Retry the reference handoff.';
 
 const RECIPE_COMMIT_BLOCKED_MESSAGE =
   'Release the active camera or AI session, then retry this complete recipe handoff.';
@@ -161,7 +178,13 @@ export const useReferenceRecipeHydration = ({
         dispatch({ type: 'complete' });
       } catch (error) {
         if (!isCurrent()) return;
-        dispatch({ type: 'fail', message: referenceHydrationError(error) });
+        dispatch({
+          type: 'fail',
+          message: referenceHydrationError(error),
+          canContinueWithoutReference: Boolean(
+            pending.referenceImageAssetId && pending.prompt.trim(),
+          ),
+        });
       } finally {
         if (activeOperationRef.current?.generation === generation) {
           activeOperationRef.current = null;
@@ -185,12 +208,13 @@ export const useReferenceRecipeHydration = ({
 
   const continueWithoutReference = useCallback(() => {
     const pending = pendingUseRef.current;
-    if (pending) void start(pending, true);
+    if (pending?.prompt.trim()) void start(pending, true);
   }, [start]);
 
   return {
     pending: state.pending,
     failureMessage: state.failureMessage,
+    canContinueWithoutReference: state.canContinueWithoutReference,
     useRecipe,
     retry,
     continueWithoutReference,

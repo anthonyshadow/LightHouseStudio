@@ -1,5 +1,12 @@
 import type { PromptBuilderDraft } from '../prompt-authoring';
-import type { CreativeAssetRepository, ModelModeId, SavedCharacterPrompt } from './types';
+import type {
+  CreativeAssetRepository,
+  ModelModeId,
+  RecentPrompt,
+  SavedPrompt,
+  SavedCharacterPrompt,
+  VtonInputKind,
+} from './types';
 
 export type RecipeShelfCategory = 'saved' | 'recent' | 'characters';
 
@@ -14,6 +21,8 @@ export interface RecipeSelection {
   modelModeId: ModelModeId;
   /** Stable identity of the generated reference to hydrate before committing this recipe. */
   referenceImageAssetId?: string | null;
+  vtonInputKind?: VtonInputKind | null;
+  enhancePrompt?: boolean;
   /** Recipe record identity used for usage tracking. */
   assetId?: string;
   /** Exact saved-character identity retained by an image-only or character Recent item. */
@@ -40,6 +49,9 @@ export interface RecipeShelfProps {
   onUsePrompt: (selection: RecipeSelection) => void;
   onCreateCharacter?: () => void;
   onEditCharacter?: (asset: SavedCharacterPrompt) => void;
+  onCreateOutfit?: () => void;
+  onEditOutfit?: (asset: SavedPrompt) => void;
+  onSaveOutfitCopy?: (asset: SavedPrompt | RecentPrompt) => void;
   onOpenCharacterWorkshop?: (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => void;
   onDirtyChange?: (dirty: boolean) => void;
 }

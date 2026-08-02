@@ -41,10 +41,12 @@ export const SavedRecipeList = ({
                 onSelect={() => controller.selectRecipe({ kind: 'saved', id: item.id })}
                 onUse={() => controller.selectSaved(item)}
                 onAction={(action) =>
-                  controller.startEditing(
-                    { kind: 'saved', id: item.id, action },
-                    { title: item.title, prompt: item.prompt, tags: item.tags },
-                  )
+                  action === 'edit'
+                    ? controller.editSaved(item)
+                    : controller.startEditing(
+                        { kind: 'saved', id: item.id, action },
+                        { title: item.title, prompt: item.prompt, tags: item.tags },
+                      )
                 }
               />
             </li>
