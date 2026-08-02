@@ -5,16 +5,25 @@ without starting media or contacting a provider.
 
 ## Journey
 
-1. Open **Device settings** (**Open capture settings**).
-2. Wait for device discovery or select **Refresh**. Listing devices does not request permission;
-   labels may stay generic until a later explicit camera start.
-3. Choose a camera and microphone. In Local Camera, choose **Landscape · 16:9** or
-   **Portrait · 9:16**, then choose `720p · 30 fps` or, when supported, `1080p · 30 fps`. AI modes
-   use provider-required dimensions.
-4. Select **Apply settings**. With no preview, the choices apply to the next Start. During a ready
-   local preview, Studio commits a healthy replacement before releasing the old stream.
-5. Confirm the negotiated sources and resolution under **Active capture**. The persistent stage
-   uses the applied format, and the recorder borrows that same camera track.
+1. On a large desktop, use the persistent **Capture settings** region beside the stage. On tablet
+   and mobile, open **Device settings** (**Open capture settings**) to use the same controller in a
+   compact overlay.
+2. Wait for automatic device discovery. Listing devices does not request permission; labels may
+   stay generic until a later explicit camera start. Studio rescans after a successful Start and
+   when the browser reports `devicechange`.
+3. Choose a camera and microphone. In Local Camera, use the always-visible **Video format** choices
+   to switch between **Landscape · 16:9** and **Portrait · 9:16**, then choose `720p · 30 fps` or,
+   when supported, `1080p · 30 fps`. A new phone or tablet session defaults to portrait; a new
+   desktop session defaults to landscape. The explicit session choice remains selected if the
+   viewport later changes. AI modes use provider-required dimensions.
+4. Change a setting. Studio applies it automatically. With no preview, the choice applies to the
+   next Start. During a ready local preview, Studio commits a healthy replacement before releasing
+   the old stream; a failed replacement restores the applied choice and reports **Settings
+   unchanged**.
+5. Confirm the negotiated sources and resolution under **Active capture**. Device discovery runs
+   when the settings surface mounts and again on browser `devicechange`; there are no Apply,
+   Refresh, or Discard actions. The stage uses the applied format, and the recorder borrows that
+   same camera track.
 
 The list refreshes on `devicechange` and after a successful Start. Studio never auto-selects a
 newly attached phone. During an eligible local preview, the stage exposes **Switch camera** only

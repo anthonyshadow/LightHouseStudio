@@ -86,6 +86,44 @@ const settlePage = async (page: Page): Promise<void> => {
   });
 };
 
+const expectStandardStudioLayout = async (
+  page: Page,
+  viewport: { width: number; height: number },
+): Promise<void> => {
+  const stage = page.getByLabel('Studio media stage');
+  if ((await stage.count()) === 0) return;
+
+  const frame = stage.locator('[data-stage-frame]');
+  const controls = stage.locator('[data-stage-controls-region]');
+  const toolRail = page.locator('[data-studio-tool-rail]');
+  const capture = page.locator('[data-capture-controls]');
+  const [stageBox, frameBox, controlsBox, toolRailBox, captureBox] = await Promise.all([
+    stage.boundingBox(),
+    frame.boundingBox(),
+    controls.boundingBox(),
+    toolRail.boundingBox(),
+    capture.boundingBox(),
+  ]);
+
+  expect(stageBox).not.toBeNull();
+  expect(frameBox).not.toBeNull();
+  expect(controlsBox).not.toBeNull();
+  expect(toolRailBox).not.toBeNull();
+  expect(captureBox).not.toBeNull();
+  if (!stageBox || !frameBox || !controlsBox || !toolRailBox || !captureBox) return;
+
+  expect(controlsBox.y).toBeGreaterThanOrEqual(frameBox.y + frameBox.height - 1);
+  expect(controlsBox.y + controlsBox.height).toBeLessThanOrEqual(viewport.height + 1);
+
+  if (viewport.width >= 1_024) {
+    expect(toolRailBox.x + toolRailBox.width).toBeLessThanOrEqual(stageBox.x);
+    expect(captureBox.x).toBeGreaterThanOrEqual(stageBox.x + stageBox.width);
+  } else {
+    expect(toolRailBox.y).toBeGreaterThanOrEqual(stageBox.y + stageBox.height - 1);
+    expect(captureBox.y).toBeGreaterThanOrEqual(toolRailBox.y + toolRailBox.height - 1);
+  }
+};
+
 const stabilizeActiveStageVideo = async (page: Page): Promise<void> => {
   const video = page.locator('figure video[aria-hidden="false"]');
   if ((await video.count()) === 0) return;
@@ -125,10 +163,10 @@ const stabilizeActiveStageVideo = async (page: Page): Promise<void> => {
 
   await video.evaluate((element) => {
     const media = element as HTMLVideoElement;
-    const stage = media.closest('figure');
-    if (!stage) throw new Error('The active video is not inside the studio stage.');
+    const frame = media.closest('[data-stage-frame]');
+    if (!frame) throw new Error('The active video is not inside the studio stage frame.');
 
-    const syntheticFrameSize = Math.min(stage.clientWidth, stage.clientHeight);
+    const syntheticFrameSize = Math.min(frame.clientWidth, frame.clientHeight);
     media.pause();
     media.srcObject = null;
     media.style.setProperty('inset', '0 auto 0 50%', 'important');
@@ -259,24 +297,99 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await expect(page.getByLabel('Studio media stage')).toContainText('Studio idle');
     },
   },
+  'studio-initial-portrait': {
+    id: 'studio-initial-portrait',
+    setup: async (page) => {
+      const settings = page.locator('[data-desktop-capture-settings]');
+      await settings.getByText('Portrait · 9:16', { exact: true }).click();
+      const stage = page.getByLabel('Studio media stage');
+      await expect(stage).toHaveAttribute('data-stage-aspect-ratio', '9:16');
+      await settings.locator('[data-scroll-region="capture-settings"]').evaluate((element) => {
+        element.scrollTop = 0;
+      });
+      await expect(stage.getByText('Your private creative stage.')).toBeVisible();
+      await expect(stage.getByText('Create a video', { exact: true })).toBeVisible();
+      await expect(
+        stage.getByText('Record New Video or Upload Video → review', { exact: true }),
+      ).toBeVisible();
+      await expect(
+        stage.getByText('Virtual Try On · Character Swap · Voice → Download', { exact: true }),
+      ).toBeVisible();
+      const guideTitle = stage.locator('[data-guide-title]');
+      await expect(guideTitle).toHaveCSS('white-space', 'nowrap');
+      const guideTitleBox = await guideTitle.evaluate((element) => ({
+        clientWidth: element.clientWidth,
+        clientHeight: element.clientHeight,
+        scrollWidth: element.scrollWidth,
+        scrollHeight: element.scrollHeight,
+      }));
+      expect(guideTitleBox.scrollWidth).toBe(guideTitleBox.clientWidth);
+      expect(guideTitleBox.scrollHeight).toBe(guideTitleBox.clientHeight);
+      const frameBox = await stage.locator('[data-stage-frame]').boundingBox();
+      const guideBox = await stage.locator('[data-first-success-guide]').boundingBox();
+      expect(frameBox).not.toBeNull();
+      expect(guideBox).not.toBeNull();
+      expect(guideBox!.x).toBeGreaterThanOrEqual(frameBox!.x);
+      expect(guideBox!.x + guideBox!.width).toBeLessThanOrEqual(frameBox!.x + frameBox!.width);
+      expect(guideBox!.y).toBeGreaterThanOrEqual(frameBox!.y);
+      expect(guideBox!.y + guideBox!.height).toBeLessThanOrEqual(frameBox!.y + frameBox!.height);
+    },
+  },
   'local-camera-live': {
     id: 'local-camera-live',
     setup: async (page) => {
+      const desktop = (page.viewportSize()?.width ?? 1_024) >= 1_024;
+      const defaultAspectRatio = desktop ? '16:9' : '9:16';
       await startLocalPreview(page);
       await expect(page.getByLabel('Live local camera preview')).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
         'data-stage-presentation',
         'live',
       );
+      await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
+        'data-stage-aspect-ratio',
+        defaultAspectRatio,
+      );
+      if (desktop) {
+        await expect(page.locator('[data-desktop-capture-settings]')).toBeVisible();
+        await expect(page.getByText('Landscape · 16:9', { exact: true })).toBeVisible();
+        await expect(page.getByRole('button', { name: 'Open capture settings' })).toHaveCount(0);
+      } else {
+        await expect(page.locator('[data-desktop-capture-settings]')).toHaveCount(0);
+        await expect(page.getByRole('button', { name: 'Open capture settings' })).toBeVisible();
+      }
     },
   },
   'recording-active': {
     id: 'recording-active',
     setup: async (page) => {
+      const desktop = (page.viewportSize()?.width ?? 1_024) >= 1_024;
+      const switchedAspectRatio = desktop ? '9:16' : '16:9';
+      if (!desktop) await page.getByRole('button', { name: 'Open capture settings' }).click();
+      const captureSettings = desktop
+        ? page.locator('[data-desktop-capture-settings]')
+        : page.getByRole('dialog', { name: 'Capture Settings' });
+      await captureSettings
+        .getByText(switchedAspectRatio === '9:16' ? 'Portrait · 9:16' : 'Landscape · 16:9', {
+          exact: true,
+        })
+        .click();
+      await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
+        'data-stage-aspect-ratio',
+        switchedAspectRatio,
+      );
+      if (!desktop) {
+        await page.keyboard.press('Escape');
+        await expect(captureSettings).toBeHidden();
+      }
       await startLocalPreview(page);
       await page.getByRole('button', { name: 'Record' }).click();
       await expect(page.getByRole('button', { name: 'Stop recording' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toHaveAttribute('data-recording', 'true');
+      await expect(page.getByLabel('Studio media stage')).toHaveAttribute(
+        'data-stage-aspect-ratio',
+        switchedAspectRatio,
+      );
     },
   },
   'ai-experience-choice': {
@@ -476,6 +589,7 @@ test.describe('curated Studio visual regression', () => {
       await stabilizeActiveStageVideo(page);
       await expect(page.getByText('Loading studio tool…', { exact: true })).toHaveCount(0);
       await expectNoDocumentOverflow(page);
+      await expectStandardStudioLayout(page, viewport);
       expectNoExternalProviderTraffic(network);
 
       await expect(page).toHaveScreenshot([viewport.folder, ...baseline.split('/')], {

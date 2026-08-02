@@ -1,4 +1,5 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
+import type { ReactNode } from 'react';
 import { Button, Surface } from '../../ui';
 import { formatDuration } from './recordingHelpers';
 import type { RecordingController, RecordingSource } from './types';
@@ -9,9 +10,10 @@ export type RecordingControlsProps = {
   source: RecordingSource | null;
   mode: StudioMode;
   onOpenSettings?: () => void;
+  desktopSettings?: ReactNode;
 };
 
-const captureSurfaceStyles = (theme: Theme): CSSObject => ({
+const captureSurfaceStyles = (theme: Theme, hasDesktopSettings: boolean): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
   height: '100%',
@@ -30,6 +32,36 @@ const captureSurfaceStyles = (theme: Theme): CSSObject => ({
     padding: theme.space.xs,
   },
   '@media (max-width: 39.99rem)': { paddingInline: theme.space.xs },
+  '@media (min-width: 64rem)': {
+    display: 'grid',
+    padding: hasDesktopSettings ? 0 : theme.space.md,
+    borderColor: theme.colors.surfaceStrong,
+    borderRadius: theme.radii.large,
+    background: theme.colors.canvasRaised,
+  },
+  '@media (min-width: 64rem) and (max-height: 48rem)': {
+    gap: theme.space.sm,
+    padding: theme.space.sm,
+  },
+});
+
+const compactCaptureContentStyles = (hasDesktopSettings: boolean): CSSObject => ({
+  minWidth: 0,
+  display: 'contents',
+  ...(hasDesktopSettings
+    ? {
+        '@media (min-width: 64rem)': { display: 'none' },
+      }
+    : {}),
+});
+
+const desktopSettingsStyles = (): CSSObject => ({
+  display: 'none',
+  minWidth: 0,
+  minHeight: 0,
+  height: '100%',
+  overflow: 'hidden',
+  '@media (min-width: 64rem)': { display: 'grid' },
 });
 
 const detailsStyles = (theme: Theme): CSSObject => ({
@@ -40,14 +72,84 @@ const detailsStyles = (theme: Theme): CSSObject => ({
   textOverflow: 'ellipsis',
   whiteSpace: 'nowrap',
   '& strong': { color: theme.colors.text, fontWeight: 760 },
+  '@media (min-width: 64rem)': {
+    padding: theme.space.sm,
+    overflow: 'visible',
+    border: `1px solid ${theme.colors.surfaceStrong}`,
+    borderRadius: theme.radii.medium,
+    background: theme.colors.surface,
+    lineHeight: 1.45,
+    textOverflow: 'clip',
+    whiteSpace: 'normal',
+  },
 });
-const headingStyles = (): CSSObject => ({
+const headingStyles = (theme: Theme): CSSObject => ({
   position: 'absolute',
   width: '1px',
   height: '1px',
   margin: '-1px',
   overflow: 'hidden',
   clip: 'rect(0 0 0 0)',
+  '@media (min-width: 64rem)': {
+    position: 'static',
+    width: 'auto',
+    height: 'auto',
+    margin: 0,
+    overflow: 'visible',
+    clip: 'auto',
+    color: theme.colors.textFaint,
+    fontSize: '0.68rem',
+    fontWeight: 850,
+    letterSpacing: '0.12em',
+    textTransform: 'uppercase',
+  },
+});
+
+const desktopDeviceListStyles = (theme: Theme): CSSObject => ({
+  display: 'none',
+  '@media (min-width: 64rem)': {
+    display: 'grid',
+    gap: theme.space.sm,
+    padding: theme.space.sm,
+    border: `1px solid ${theme.colors.surfaceStrong}`,
+    borderRadius: theme.radii.medium,
+    background: theme.colors.surface,
+  },
+});
+
+const desktopDeviceRowStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  gridTemplateColumns: '2.25rem minmax(0, 1fr)',
+  alignItems: 'center',
+  gap: theme.space.sm,
+  paddingBlock: theme.space.xs,
+  '& + &': { borderBlockStart: `1px solid ${theme.colors.surfaceStrong}` },
+  '& > span:first-of-type': {
+    width: '2.25rem',
+    height: '2.25rem',
+    display: 'grid',
+    placeItems: 'center',
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.radii.small,
+    color: theme.colors.accent,
+    background: theme.colors.surfaceSoft,
+  },
+  '& svg': { width: '1.05rem', height: '1.05rem' },
+  '& > span:last-of-type': { minWidth: 0, display: 'grid', gap: theme.space.xxs },
+  '& strong': {
+    overflow: 'hidden',
+    color: theme.colors.text,
+    fontSize: theme.fontSizes.metadata,
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  '& small': { color: theme.colors.textMuted, fontSize: '0.68rem' },
+});
+
+const compactDeviceSummaryStyles = (theme: Theme): CSSObject => ({
+  ...detailsStyles(theme),
+  '@media (min-width: 64rem)': { display: 'none' },
 });
 const settingsActionStyles = (theme: Theme): CSSObject => ({
   minHeight: '2.75rem',
@@ -69,6 +171,13 @@ const settingsActionStyles = (theme: Theme): CSSObject => ({
     padding: 0,
     fontSize: 0,
     '&::before': { content: '"⚙"', fontSize: '1rem' },
+  },
+  '@media (min-width: 64rem)': {
+    width: '100%',
+    minHeight: '2.75rem',
+    justifyContent: 'center',
+    borderColor: theme.colors.border,
+    background: theme.colors.surfaceStrong,
   },
 });
 
@@ -101,11 +210,28 @@ const captureResolutionLabel = (
   return `${settings.width}×${settings.height}${frameRate}`;
 };
 
+const DeviceIcon = ({ type }: { type: 'camera' | 'microphone' }) => (
+  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
+    {type === 'camera' ? (
+      <>
+        <rect x="3.5" y="6.5" width="12" height="11" rx="2" stroke="currentColor" />
+        <path d="m15.5 10 4-2v8l-4-2" stroke="currentColor" strokeLinejoin="round" />
+      </>
+    ) : (
+      <>
+        <rect x="9" y="3" width="6" height="11" rx="3" stroke="currentColor" />
+        <path d="M6.5 11.5a5.5 5.5 0 0 0 11 0M12 17v4M9 21h6" stroke="currentColor" />
+      </>
+    )}
+  </svg>
+);
+
 export const RecordingControls = ({
   recording,
   source,
   mode,
   onOpenSettings,
+  desktopSettings,
 }: RecordingControlsProps) => {
   const theme = useTheme();
   const active = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
@@ -119,46 +245,71 @@ export const RecordingControls = ({
       as="section"
       data-capture-controls=""
       padding="compact"
-      aria-labelledby="capture-heading"
-      css={captureSurfaceStyles(theme)}
+      aria-label="Session and device information"
+      css={captureSurfaceStyles(theme, Boolean(desktopSettings))}
     >
-      <h2 id="capture-heading" css={headingStyles()}>
-        Session and device information
-      </h2>
-      {active ? (
-        <div
-          role="timer"
-          aria-live="off"
-          aria-label={`Recording elapsed time ${formatDuration(recording.elapsedSeconds)}`}
-          css={[detailsStyles(theme), recordingStatusStyles(theme)]}
-        >
-          Recording {formatDuration(recording.elapsedSeconds)}
-        </div>
-      ) : source ? (
-        <div
-          css={detailsStyles(theme)}
-          title={`${videoTrack?.label || source.videoSource} · ${audioTrack?.label || source.audioSource} · ${resolution}`}
-        >
-          <strong>{videoTrack?.label || source.videoSource}</strong>
-          {' · '}
-          {audioTrack?.label || source.audioSource}
-          {' · '}
-          {resolution}
-        </div>
-      ) : (
-        <div css={detailsStyles(theme)}>Camera and microphone are off</div>
-      )}
-      {onOpenSettings ? (
-        <Button
-          variant="secondary"
-          aria-label="Open capture settings"
-          css={settingsActionStyles(theme)}
-          disabled={active}
-          onClick={onOpenSettings}
-        >
-          Device settings
-        </Button>
-      ) : null}
+      <div css={compactCaptureContentStyles(Boolean(desktopSettings))}>
+        <h2 id="capture-heading" css={headingStyles(theme)}>
+          Session and device information
+        </h2>
+        {active ? (
+          <div
+            role="timer"
+            aria-live="off"
+            aria-label={`Recording elapsed time ${formatDuration(recording.elapsedSeconds)}`}
+            css={[detailsStyles(theme), recordingStatusStyles(theme)]}
+          >
+            Recording {formatDuration(recording.elapsedSeconds)}
+          </div>
+        ) : source ? (
+          <>
+            <div
+              css={compactDeviceSummaryStyles(theme)}
+              title={`${videoTrack?.label || source.videoSource} · ${audioTrack?.label || source.audioSource} · ${resolution}`}
+            >
+              <strong>{videoTrack?.label || source.videoSource}</strong>
+              {' · '}
+              {audioTrack?.label || source.audioSource}
+              {' · '}
+              {resolution}
+            </div>
+            <div css={desktopDeviceListStyles(theme)} data-active-capture-details="">
+              <div css={desktopDeviceRowStyles(theme)}>
+                <span>
+                  <DeviceIcon type="camera" />
+                </span>
+                <span>
+                  <strong>{videoTrack?.label || source.videoSource}</strong>
+                  <small>{resolution}</small>
+                </span>
+              </div>
+              <div css={desktopDeviceRowStyles(theme)}>
+                <span>
+                  <DeviceIcon type="microphone" />
+                </span>
+                <span>
+                  <strong>{audioTrack?.label || source.audioSource}</strong>
+                  <small>{audioTrack ? 'Active input' : 'No audio track'}</small>
+                </span>
+              </div>
+            </div>
+          </>
+        ) : (
+          <div css={detailsStyles(theme)}>Camera and microphone are off</div>
+        )}
+        {onOpenSettings ? (
+          <Button
+            variant="secondary"
+            aria-label="Open capture settings"
+            css={settingsActionStyles(theme)}
+            disabled={active}
+            onClick={onOpenSettings}
+          >
+            Device settings
+          </Button>
+        ) : null}
+      </div>
+      {desktopSettings ? <div css={desktopSettingsStyles()}>{desktopSettings}</div> : null}
     </Surface>
   );
 };

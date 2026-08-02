@@ -1,7 +1,23 @@
 import type { CSSObject, Theme } from '@emotion/react';
 import { rotatingSpinnerAnimationStyles } from '../../ui/animationStyles';
 
-export const stageStyles = (
+export const stageStyles = (theme: Theme): CSSObject => ({
+  position: 'relative',
+  width: '100%',
+  height: '100%',
+  minWidth: 0,
+  minHeight: 0,
+  margin: 0,
+  display: 'grid',
+  gridTemplateRows: 'minmax(0, 1fr) auto',
+  gap: theme.space.sm,
+  overflow: 'hidden',
+  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+    gap: theme.space.xs,
+  },
+});
+
+export const stageFrameStyles = (
   theme: Theme,
   recording: boolean,
   aspectRatio: '16:9' | '9:16',
@@ -54,6 +70,12 @@ export const stageStyles = (
   },
 });
 
+export const stageControlsRegionStyles = (): CSSObject => ({
+  width: 'min(48rem, 100%)',
+  minWidth: 0,
+  justifySelf: 'center',
+});
+
 export const videoStyles = (
   theme: Theme,
   visible: boolean,
@@ -75,6 +97,9 @@ export const videoStyles = (
 
 export const emptyStyles = (theme: Theme): CSSObject => ({
   zIndex: theme.layers.stageContent,
+  width: '100%',
+  maxWidth: '100%',
+  minWidth: 0,
   placeSelf: 'center',
   display: 'grid',
   justifyItems: 'center',
@@ -82,7 +107,7 @@ export const emptyStyles = (theme: Theme): CSSObject => ({
   textAlign: 'center',
   color: theme.colors.textMuted,
   textWrap: 'balance',
-  '& strong': {
+  '& > strong': {
     display: 'block',
     marginBlock: `${theme.space.lg} ${theme.space.sm}`,
     color: theme.colors.text,
@@ -90,19 +115,57 @@ export const emptyStyles = (theme: Theme): CSSObject => ({
     fontSize: 'clamp(1.5rem, 3vw, 2.35rem)',
     lineHeight: 1.12,
   },
-  '& p': {
+  '& > p': {
     maxWidth: '31rem',
     margin: 0,
     fontSize: 'clamp(0.82rem, 1.2vw, 1rem)',
     lineHeight: 1.55,
   },
+  '& > div': { width: '100%', minWidth: 0 },
+  '& [data-guide-title]': { maxWidth: 'none', whiteSpace: 'nowrap' },
+  '@media (max-width: 22.49rem)': {
+    '& [data-guide-title]': { whiteSpace: 'normal' },
+  },
+  '[data-stage-aspect-ratio="9:16"] &': {
+    padding: 'clamp(0.75rem, 5vw, 1.5rem)',
+    '& > strong': {
+      maxWidth: '12ch',
+      marginBlock: `${theme.space.md} ${theme.space.sm}`,
+      fontSize: 'clamp(1.2rem, 5vw, 2rem)',
+    },
+    '& > p': {
+      maxWidth: '22rem',
+      paddingInline: theme.space.xs,
+      fontSize: 'clamp(0.76rem, 1.1vw, 0.92rem)',
+      lineHeight: 1.45,
+    },
+  },
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
     padding: theme.space.md,
-    '& strong': {
+    '& > strong': {
       marginBlock: `${theme.space.sm} ${theme.space.xs}`,
       fontSize: 'clamp(1.05rem, 6vw, 1.4rem)',
     },
-    '& p': { fontSize: '0.75rem', lineHeight: 1.4 },
+    '& > p': { fontSize: '0.75rem', lineHeight: 1.4 },
+  },
+  '@media (max-height: 36rem)': {
+    '[data-stage-aspect-ratio="9:16"] &': {
+      placeSelf: 'stretch',
+      alignContent: 'end',
+      padding: '3rem 0.35rem 0.4rem',
+      '& > strong': {
+        maxWidth: '12ch',
+        marginBlock: '0 0.2rem',
+        fontSize: '0.82rem',
+        lineHeight: 1.12,
+      },
+      '& > p': {
+        maxWidth: '100%',
+        paddingInline: 0,
+        fontSize: '0.54rem',
+        lineHeight: 1.25,
+      },
+    },
   },
 });
 
@@ -117,10 +180,13 @@ export const emptyIconStyles = (theme: Theme): CSSObject => ({
   background: `linear-gradient(145deg, ${theme.colors.accentSoft}, ${theme.colors.canvasRaised})`,
   boxShadow: `0 1.5rem 3rem ${theme.colors.shadow}`,
   '& svg': { width: '2rem', height: '2rem' },
+  '[data-stage-aspect-ratio="9:16"] &': {
+    width: '3.75rem',
+    height: '3.75rem',
+    '& svg': { width: '1.7rem', height: '1.7rem' },
+  },
   '@media (max-height: 36rem)': {
-    width: '3rem',
-    height: '3rem',
-    '& svg': { width: '1.45rem', height: '1.45rem' },
+    '[data-stage-aspect-ratio="9:16"] &': { display: 'none' },
   },
 });
 
@@ -213,6 +279,11 @@ export const badgeStyles = (
     minWidth: 0,
     overflow: 'hidden',
     textOverflow: 'ellipsis',
+  },
+  '& [data-stage-status-short]': { display: 'none' },
+  '@media (max-width: 22.49rem)': {
+    '[data-stage-aspect-ratio="9:16"] & [data-stage-status-long]': { display: 'none' },
+    '[data-stage-aspect-ratio="9:16"] & [data-stage-status-short]': { display: 'inline' },
   },
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
     minHeight: '1.8rem',

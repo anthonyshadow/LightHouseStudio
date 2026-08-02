@@ -60,6 +60,7 @@ import { useLegacyProjectAvailability } from './useLegacyProjectAvailability';
 import { useProviderAvailability } from './useProviderAvailability';
 import { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 import { useTakeReviewFlow } from './useTakeReviewFlow';
+import { useDesktopStudioLayout } from './useDesktopStudioLayout';
 import { useStudioOverlayController } from './useStudioOverlayController';
 
 const CharacterBuilderCoordinator = lazy(() =>
@@ -88,6 +89,12 @@ const REVIEW_LOCK_REASON =
 
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
+const focusDesktopCaptureSettings = () => {
+  window.requestAnimationFrame(() => {
+    document.querySelector<HTMLElement>('[data-desktop-capture-settings]')?.focus();
+  });
+};
+
 type CharacterBuilderDestination =
   Readonly<{ kind: 'studio' }> | Readonly<{ kind: 'existing-video'; stepId: string }>;
 
@@ -100,6 +107,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const theme = useTheme();
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
+  const desktopStudioLayout = useDesktopStudioLayout();
   const repository = useMemo(() => createCreativeAssetRepository(), []);
   const repositoryState = useCreativeAssetRepository(repository);
   const existingVideoSavedRecipes = useMemo(
@@ -150,6 +158,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     closeIf: closeOverlayIf,
     toggle: toggleOverlay,
   } = useStudioOverlayController(initialIntent === 'upload' ? 'video-upload' : null);
+
+  useEffect(() => {
+    if (desktopStudioLayout) closeOverlayIf(['capture-settings']);
+  }, [closeOverlayIf, desktopStudioLayout]);
   const [dismissedNotices, setDismissedNotices] = useState<ReadonlySet<string>>(new Set());
   const [firstSuccessGuideVisible, setFirstSuccessGuideVisible] = useState(true);
   const [recordingForExistingVideo, setRecordingForExistingVideo] = useState(false);
@@ -422,8 +434,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   }, []);
   const openCaptureSettingsForRecovery = useCallback(() => {
     clearSessionError();
+    if (desktopStudioLayout) {
+      focusDesktopCaptureSettings();
+      return;
+    }
     openOverlay('capture-settings');
-  }, [clearSessionError, openOverlay]);
+  }, [clearSessionError, desktopStudioLayout, openOverlay]);
 
   const stageNotices = useMemo(
     () => [
@@ -486,6 +502,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
   const openCaptureSettings = () => {
     if (recordingActive) return;
+    if (desktopStudioLayout) {
+      focusDesktopCaptureSettings();
+      return;
+    }
     openOverlay('capture-settings');
   };
 
@@ -512,6 +532,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     : shelfDirty
       ? 'Save or discard Recipe Shelf changes before recording.'
       : undefined;
+  const captureSettingsDisabledReason = reviewLocked
+    ? REVIEW_LOCK_REASON
+    : recordingActive
+      ? 'Finish the current take before changing capture settings.'
+      : aiSessionActive
+        ? 'Stop AI before changing camera or microphone sources.'
+        : undefined;
   const activeRecordingSource = recordingActive
     ? recording.activeSource
     : reviewLocked
@@ -724,12 +751,24 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               realtimeSessionTiming={session.realtimeSessionTiming}
               idleAction={
                 stagePresentation.kind === 'idle' && firstSuccessGuideVisible ? (
-                  <aside aria-label="First take guide" css={firstSuccessGuideStyles(theme)}>
-                    <strong>Create a video</strong>
+                  <aside
+                    aria-label="First take guide"
+                    data-first-success-guide=""
+                    css={firstSuccessGuideStyles(theme)}
+                  >
+                    <strong data-guide-title>Create a video</strong>
                     <span data-guide-copy>
-                      <span>Record New Video or Upload Video → review</span>
+                      <span data-guide-primary-long>
+                        <span data-guide-step-number aria-hidden="true">
+                          1
+                        </span>
+                        <span>Record New Video or Upload Video → review</span>
+                      </span>
                       <span data-guide-upload>
-                        Virtual Try On · Character Swap · Voice → Download
+                        <span data-guide-step-number aria-hidden="true">
+                          2
+                        </span>
+                        <span>Virtual Try On · Character Swap · Voice → Download</span>
                       </span>
                     </span>
                     <Button
@@ -782,7 +821,36 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               recording={recording}
               source={activeRecordingSource}
               mode={effectiveRecordingMode}
-              onOpenSettings={openCaptureSettings}
+              {...(!desktopStudioLayout ? { onOpenSettings: openCaptureSettings } : {})}
+              desktopSettings={
+                desktopStudioLayout ? (
+                  <div
+                    tabIndex={-1}
+                    data-desktop-capture-settings=""
+                    css={{
+                      minWidth: 0,
+                      minHeight: 0,
+                      height: '100%',
+                      overflow: 'hidden',
+                      borderRadius: 'inherit',
+                      '&:focus-visible': {
+                        outline: `2px solid ${theme.colors.focus}`,
+                        outlineOffset: '-2px',
+                      },
+                    }}
+                  >
+                    <CaptureSettingsPanel
+                      controller={session.capturePreferences}
+                      mode={session.draft.mode}
+                      presentation="sidebar"
+                      disabled={mediaLocked || aiSessionActive}
+                      {...(captureSettingsDisabledReason
+                        ? { disabledReason: captureSettingsDisabledReason }
+                        : {})}
+                    />
+                  </div>
+                ) : undefined
+              }
             />
           </div>
         </main>
@@ -933,25 +1001,23 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         </OverlayPanel>
 
         <OverlayPanel
-          open={activeOverlay === 'capture-settings'}
+          open={activeOverlay === 'capture-settings' && !desktopStudioLayout}
           onClose={closeOverlay}
           title="Capture Settings"
           description="Choose session-only sources, video format, and a local capture target without starting media."
           placement="right"
           bodyMode="contained"
         >
-          <CaptureSettingsPanel
-            controller={session.capturePreferences}
-            mode={session.draft.mode}
-            disabled={mediaLocked || aiSessionActive}
-            {...(reviewLocked
-              ? { disabledReason: REVIEW_LOCK_REASON }
-              : recordingActive
-                ? { disabledReason: 'Finish the current take before changing capture settings.' }
-                : aiSessionActive
-                  ? { disabledReason: 'Stop AI before changing camera or microphone sources.' }
-                  : {})}
-          />
+          {!desktopStudioLayout ? (
+            <CaptureSettingsPanel
+              controller={session.capturePreferences}
+              mode={session.draft.mode}
+              disabled={mediaLocked || aiSessionActive}
+              {...(captureSettingsDisabledReason
+                ? { disabledReason: captureSettingsDisabledReason }
+                : {})}
+            />
+          ) : null}
         </OverlayPanel>
 
         <OverlayPanel

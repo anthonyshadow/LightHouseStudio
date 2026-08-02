@@ -6,6 +6,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useCapturePreferences } from './useCapturePreferences';
 
 const originalMediaDevices = Object.getOwnPropertyDescriptor(navigator, 'mediaDevices');
+const originalMatchMedia = Object.getOwnPropertyDescriptor(window, 'matchMedia');
 
 const device = (
   kind: MediaDeviceKind,
@@ -30,6 +31,8 @@ const streamWithLiveVideo = {
 afterEach(() => {
   if (originalMediaDevices) Object.defineProperty(navigator, 'mediaDevices', originalMediaDevices);
   else Reflect.deleteProperty(navigator, 'mediaDevices');
+  if (originalMatchMedia) Object.defineProperty(window, 'matchMedia', originalMatchMedia);
+  else Reflect.deleteProperty(window, 'matchMedia');
 });
 
 const deferred = <T,>() => {
@@ -43,6 +46,31 @@ const deferred = <T,>() => {
 };
 
 describe('useCapturePreferences', () => {
+  it.each([
+    { desktop: false, expected: '9:16' as const },
+    { desktop: true, expected: '16:9' as const },
+  ])(
+    'uses the responsive $expected session default when desktop is $desktop',
+    ({ desktop, expected }) => {
+      Object.defineProperty(window, 'matchMedia', {
+        configurable: true,
+        value: vi.fn().mockReturnValue({ matches: desktop }),
+      });
+
+      const { result, rerender } = renderHook(() =>
+        useCapturePreferences({ stream: null, onApply: vi.fn().mockResolvedValue(undefined) }),
+      );
+
+      expect(result.current.draft.aspectRatio).toBe(expected);
+      expect(result.current.applied.aspectRatio).toBe(expected);
+      expect(result.current.hasPendingChanges).toBe(false);
+
+      act(() => result.current.updateAspectRatio(expected === '9:16' ? '16:9' : '9:16'));
+      rerender();
+      expect(result.current.draft.aspectRatio).toBe(expected === '9:16' ? '16:9' : '9:16');
+    },
+  );
+
   it('refreshes on device changes without selecting a newly discovered phone', async () => {
     let devices = [device('videoinput', 'camera-1', 'Built-in Camera')];
     let deviceChangeListener: EventListener | null = null;

@@ -37,6 +37,15 @@ const actionStyles = (
       fontSize: presentation === 'control-bar' ? theme.fontSizes.caption : undefined,
     },
   },
+  '@media (max-width: 22.49rem)': {
+    ...(presentation === 'control-bar'
+      ? {
+          display: 'grid',
+          gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+          '& > *:first-of-type': { gridColumn: 'span 2' },
+        }
+      : {}),
+  },
 });
 
 const downloadStyles = (
@@ -66,6 +75,10 @@ const downloadStyles = (
   '&:focus-visible': {
     outline: `2px solid ${theme.colors.focus}`,
     outlineOffset: '3px',
+  },
+  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+    paddingInline: presentation === 'control-bar' ? theme.space.xs : undefined,
+    fontSize: presentation === 'control-bar' ? theme.fontSizes.caption : undefined,
   },
 });
 

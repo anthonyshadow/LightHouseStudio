@@ -570,4 +570,34 @@ describe('StudioSessionControlBar', () => {
     expect(screen.queryByRole('button', { name: 'Close' })).not.toBeInTheDocument();
     expect(controls.querySelector('[data-recording-controls="dominant"]')).not.toBeNull();
   });
+
+  it('keeps below-stage take actions visible after playback chrome becomes idle', () => {
+    const artifact = takeArtifact();
+    render(
+      <StudioDesignProvider>
+        <StudioSessionControlBar
+          session={createSession()}
+          recording={createRecording('recorded', {
+            original: artifact,
+            presented: artifact,
+          })}
+          recordingMode="local"
+          recordingSource={null}
+          recordingSupported
+          reviewingTake
+          visible={false}
+          onStopRecording={vi.fn().mockResolvedValue(undefined)}
+          onCloseTakeReview={vi.fn()}
+          onOpenVoiceTreatments={vi.fn()}
+          onChooseAiExperience={vi.fn()}
+          onChangeExperience={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const controls = screen.getByRole('region', { name: 'Studio session controls' });
+    expect(controls).toHaveAttribute('data-control-visibility', 'visible');
+    expect(controls).not.toHaveAttribute('aria-hidden');
+    expect(screen.getByRole('group', { name: 'Recorded take controls' })).toBeVisible();
+  });
 });

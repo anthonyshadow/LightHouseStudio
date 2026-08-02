@@ -10,16 +10,19 @@
    bar (or Dock **Start local preview**) and grant browser permission.
 3. Confirm **Live local camera preview**. Use the mic/camera toggles and any capability-gated
    front/rear or zoom controls.
-4. With no Character or Virtual Try-On recipe selected, the stage control bar presents **Record**
+4. Confirm that the session control bar is directly beneath the video frame in either landscape or
+   portrait format. On large desktops the creative tools and session/device information flank the
+   centered stage; tablet and mobile stack those same regions without duplicating controls.
+5. With no Character or Virtual Try-On recipe selected, the stage control bar presents **Record**
    as its primary action and does not present **Start AI**. Select **Record**, or press Space while
    focus is outside interactive/editable content.
-5. Select the dominant **Stop recording** action. It remains visible and focusable throughout
+6. Select the dominant **Stop recording** action. It remains visible and focusable throughout
    recording.
-6. If recording continues, Studio warns at 4:30 and invokes the same coalesced Stop/finalize path
+7. If recording continues, Studio warns at 4:30 and invokes the same coalesced Stop/finalize path
    at 5:00.
-7. Wait for the main recorder and optional audio sidecar to settle. Studio releases live tracks
+8. Wait for the main recorder and optional audio sidecar to settle. Studio releases live tracks
    and shows **Recorded take playback** on the same stage.
-8. A control-bar **Record New Video** take becomes the source in the post-recording editor, where
+9. A control-bar **Record New Video** take becomes the source in the post-recording editor, where
    Character Swap, Virtual Try On, and Voice are available. A Dock-started local take keeps the
    compact Download, Discard, Voice, Release, and [detailed review](07-take-review-and-cleanup.md)
    path used by advanced live sessions.

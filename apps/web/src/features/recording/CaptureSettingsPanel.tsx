@@ -1,5 +1,5 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { useEffect, type FormEvent } from 'react';
+import { useEffect, useRef } from 'react';
 import type { StudioMode } from '../../application/types';
 import { Button, SelectField, StatusNotice } from '../../ui';
 import type {
@@ -14,28 +14,44 @@ export type CaptureSettingsPanelProps = {
   mode: StudioMode;
   disabled?: boolean;
   disabledReason?: string;
+  presentation?: 'overlay' | 'sidebar';
 };
 
-const panelStyles = (theme: Theme): CSSObject => ({
+const panelStyles = (theme: Theme, presentation: 'overlay' | 'sidebar'): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
   height: '100%',
   display: 'grid',
-  gridTemplateRows: 'minmax(0, 1fr) auto',
+  gridTemplateRows: 'minmax(0, 1fr)',
   overflow: 'hidden',
   color: theme.colors.text,
+  ...(presentation === 'sidebar'
+    ? {
+        border: 0,
+        borderRadius: 'inherit',
+        background: theme.colors.canvasRaised,
+      }
+    : {}),
 });
 
-const bodyStyles = (theme: Theme): CSSObject => ({
+const bodyStyles = (theme: Theme, presentation: 'overlay' | 'sidebar'): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
   display: 'grid',
   alignContent: 'start',
-  gap: theme.space.md,
-  padding: `calc(${theme.space.md} + 3px)`,
+  gap: presentation === 'sidebar' ? theme.space.sm : theme.space.md,
+  padding: presentation === 'sidebar' ? theme.space.sm : `calc(${theme.space.md} + 3px)`,
   overflowY: 'auto',
   overflowX: 'hidden',
   overscrollBehavior: 'contain',
+  scrollbarWidth: 'thin',
+  scrollbarColor: `${theme.colors.borderStrong} transparent`,
+  '&::-webkit-scrollbar': { width: '0.45rem' },
+  '&::-webkit-scrollbar-track': { background: 'transparent' },
+  '&::-webkit-scrollbar-thumb': {
+    borderRadius: '999px',
+    background: theme.colors.borderStrong,
+  },
   '& > *': { minWidth: 0 },
 });
 
@@ -55,14 +71,91 @@ const introductionStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-const settingsGroupStyles = (theme: Theme): CSSObject => ({
+const settingsGroupStyles = (theme: Theme, presentation: 'overlay' | 'sidebar'): CSSObject => ({
   minWidth: 0,
   display: 'grid',
-  gap: theme.space.md,
-  padding: theme.space.md,
+  gap: presentation === 'sidebar' ? theme.space.sm : theme.space.md,
+  padding: presentation === 'sidebar' ? theme.space.sm : theme.space.md,
   border: `1px solid ${theme.colors.border}`,
   borderRadius: theme.radii.medium,
   background: theme.colors.surfaceSoft,
+});
+
+const aspectRatioFieldsetStyles = (theme: Theme): CSSObject => ({
+  minWidth: 0,
+  display: 'grid',
+  gap: theme.space.xs,
+  margin: 0,
+  padding: 0,
+  border: 0,
+  '& legend': {
+    marginBlockEnd: theme.space.xs,
+    color: theme.colors.text,
+    fontSize: theme.fontSizes.metadata,
+    fontWeight: 760,
+  },
+  '& > div': {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+    gap: theme.space.xs,
+  },
+  '& label': {
+    position: 'relative',
+    minWidth: 0,
+    minHeight: '3.5rem',
+    display: 'grid',
+    gridTemplateColumns: '1.5rem minmax(0, 1fr)',
+    alignItems: 'center',
+    gap: theme.space.sm,
+    padding: theme.space.sm,
+    border: `1px solid ${theme.colors.border}`,
+    borderRadius: theme.radii.medium,
+    color: theme.colors.textMuted,
+    background: theme.colors.canvasRaised,
+    cursor: 'pointer',
+  },
+  '& label[data-selected="true"]': {
+    borderColor: theme.colors.accent,
+    color: theme.colors.text,
+    background: theme.colors.accentSoft,
+  },
+  '& label:focus-within': {
+    outline: `2px solid ${theme.colors.focus}`,
+    outlineOffset: '2px',
+  },
+  '& label:has(input:disabled)': { cursor: 'not-allowed', opacity: 0.56 },
+  '& input': {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    opacity: 0,
+  },
+  '& [data-format-preview]': {
+    justifySelf: 'center',
+    border: `2px solid ${theme.colors.accent}`,
+    borderRadius: '0.2rem',
+  },
+  '& [data-format-preview="16:9"]': { width: '1.5rem', aspectRatio: '16 / 9' },
+  '& [data-format-preview="9:16"]': { height: '1.5rem', aspectRatio: '9 / 16' },
+  '& [data-format-label]': { minWidth: 0, display: 'grid', gap: theme.space.xxs },
+  '& strong': { fontSize: theme.fontSizes.metadata },
+  '& small': { color: theme.colors.textFaint, fontSize: theme.fontSizes.caption },
+  '& > p': {
+    margin: 0,
+    color: theme.colors.textFaint,
+    fontSize: theme.fontSizes.caption,
+    lineHeight: 1.45,
+  },
+  '@media (max-width: 22rem)': {
+    '& > div': { gridTemplateColumns: 'minmax(0, 1fr)' },
+  },
+  '&[data-sidebar-layout="true"] > div': {
+    gridTemplateColumns: 'minmax(0, 1fr)',
+  },
+  '&[data-sidebar-layout="true"] label': {
+    minHeight: '3.25rem',
+    padding: theme.space.sm,
+  },
 });
 
 const cameraSectionStyles = (theme: Theme): CSSObject => ({
@@ -142,22 +235,6 @@ const actualSettingsStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-const footerStyles = (theme: Theme): CSSObject => ({
-  minWidth: 0,
-  display: 'grid',
-  gridTemplateColumns: 'auto minmax(0, 1fr) auto',
-  gap: theme.space.xs,
-  padding: theme.space.md,
-  paddingBlockEnd: `max(${theme.space.md}, env(safe-area-inset-bottom))`,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
-  background: theme.colors.canvasRaised,
-  '& button': { minWidth: 0, whiteSpace: 'nowrap' },
-  '@media (max-width: 22rem)': {
-    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-    '& button:last-of-type': { gridColumn: '1 / -1', gridRow: 1 },
-  },
-});
-
 const profileLabels: Record<LocalCaptureProfileId, string> = {
   '720p30': '720p · 30 fps',
   '1080p30': '1080p · 30 fps',
@@ -195,21 +272,39 @@ export const CaptureSettingsPanel = ({
   mode,
   disabled = false,
   disabledReason,
+  presentation = 'overlay',
 }: CaptureSettingsPanelProps) => {
   const theme = useTheme();
   const localMode = mode === 'local';
   const controlsDisabled = disabled || controller.applying;
   const { devicesState, refreshDevices } = controller;
+  const lastAutoApplyRef = useRef<string | null>(null);
+  const draftSignature = [
+    controller.draft.videoDeviceId ?? '',
+    controller.draft.audioDeviceId ?? '',
+    controller.draft.profile,
+    controller.draft.aspectRatio,
+  ].join('|');
 
   useEffect(() => {
     if (devicesState === 'idle') void refreshDevices();
   }, [devicesState, refreshDevices]);
 
-  const submit = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    if (disabled) return;
-    await controller.apply();
-  };
+  useEffect(() => {
+    if (
+      disabled ||
+      controller.applying ||
+      !controller.hasPendingChanges ||
+      lastAutoApplyRef.current === draftSignature
+    ) {
+      return;
+    }
+
+    lastAutoApplyRef.current = draftSignature;
+    void controller.apply().then((applied) => {
+      if (!applied) controller.discardPending(true);
+    });
+  }, [controller, disabled, draftSignature]);
 
   const cameraSelectionAvailable = selectedDeviceAvailable(
     controller.draft.videoDeviceId,
@@ -225,13 +320,13 @@ export const CaptureSettingsPanel = ({
   const showMacContinuityHelp = isMacDesktop();
 
   return (
-    <form css={panelStyles(theme)} onSubmit={(event) => void submit(event)}>
-      <div data-scroll-region="capture-settings" css={bodyStyles(theme)}>
+    <form css={panelStyles(theme, presentation)} data-capture-settings-presentation={presentation}>
+      <div data-scroll-region="capture-settings" css={bodyStyles(theme, presentation)}>
         <header css={introductionStyles(theme)}>
-          <h3>Sources and quality</h3>
+          {presentation === 'sidebar' ? <h2>Capture settings</h2> : <h3>Sources and quality</h3>}
           <p>
             Device choices stay in this tab. Listing devices does not start the camera or
-            microphone.
+            microphone. Changes apply automatically.
           </p>
         </header>
 
@@ -248,6 +343,12 @@ export const CaptureSettingsPanel = ({
         {controller.applyError ? (
           <StatusNotice tone="danger" role="alert" title="Settings unchanged">
             {controller.applyError}
+          </StatusNotice>
+        ) : null}
+        {controller.applying ? (
+          <StatusNotice tone="neutral" role="status" title="Applying settings">
+            The change is being applied automatically. A live preview stays active until its
+            replacement is ready.
           </StatusNotice>
         ) : null}
         {controller.videoFallbackNotice ? (
@@ -267,7 +368,7 @@ export const CaptureSettingsPanel = ({
           </StatusNotice>
         ) : null}
 
-        <div css={settingsGroupStyles(theme)}>
+        <div css={settingsGroupStyles(theme, presentation)}>
           <section aria-label="Camera settings" css={cameraSectionStyles(theme)}>
             <SelectField
               label="Camera"
@@ -297,8 +398,9 @@ export const CaptureSettingsPanel = ({
 
             {controller.cameraPermissionState === 'denied' ? (
               <StatusNotice tone="warning" role="status" title="Camera permission blocked">
-                Allow camera access in browser or system settings, then select Refresh. Opening this
-                panel never requests permission.
+                Allow camera access in browser or system settings. Studio rescans after a successful
+                Start or a browser-reported device change. Opening this panel never requests
+                permission.
               </StatusNotice>
             ) : controller.cameraPermissionState === 'prompt' ? (
               <StatusNotice tone="neutral" role="status" title="Camera permission not granted">
@@ -310,7 +412,7 @@ export const CaptureSettingsPanel = ({
             {controller.devicesState === 'ready' && controller.cameraDevices.length === 0 ? (
               <StatusNotice tone="warning" role="status" title="No camera available">
                 No camera is currently exposed to this browser. Connect or enable a camera, review
-                permission, then select Refresh.
+                permission, and Studio will update when the browser reports the device change.
               </StatusNotice>
             ) : null}
 
@@ -363,23 +465,43 @@ export const CaptureSettingsPanel = ({
 
           {localMode ? (
             <>
-              <SelectField
-                label="Video format"
-                value={controller.draft.aspectRatio}
-                disabled={controlsDisabled}
-                hint="Sets the camera shape for both local preview and recording. Unsupported formats leave the current preview unchanged."
-                onChange={(event) =>
-                  controller.updateAspectRatio(event.currentTarget.value as LocalCaptureAspectRatio)
-                }
+              <fieldset
+                css={aspectRatioFieldsetStyles(theme)}
+                data-sidebar-layout={presentation === 'sidebar' ? 'true' : undefined}
               >
-                {(Object.keys(aspectRatioLabels) as LocalCaptureAspectRatio[]).map(
-                  (aspectRatio) => (
-                    <option key={aspectRatio} value={aspectRatio}>
-                      {aspectRatioLabels[aspectRatio]}
-                    </option>
-                  ),
-                )}
-              </SelectField>
+                <legend>Video format</legend>
+                <div>
+                  {(Object.keys(aspectRatioLabels) as LocalCaptureAspectRatio[]).map(
+                    (aspectRatio) => (
+                      <label
+                        key={aspectRatio}
+                        data-selected={
+                          controller.draft.aspectRatio === aspectRatio ? 'true' : 'false'
+                        }
+                      >
+                        <input
+                          type="radio"
+                          name="capture-aspect-ratio"
+                          value={aspectRatio}
+                          checked={controller.draft.aspectRatio === aspectRatio}
+                          disabled={controlsDisabled}
+                          aria-label={aspectRatioLabels[aspectRatio]}
+                          onChange={() => controller.updateAspectRatio(aspectRatio)}
+                        />
+                        <span data-format-preview={aspectRatio} aria-hidden="true" />
+                        <span data-format-label>
+                          <strong>{aspectRatioLabels[aspectRatio]}</strong>
+                          <small>{aspectRatio === '16:9' ? 'Wide frame' : 'Vertical frame'}</small>
+                        </span>
+                      </label>
+                    ),
+                  )}
+                </div>
+                <p>
+                  Sets the shape for local preview and recording. Unsupported formats leave the
+                  current preview unchanged.
+                </p>
+              </fieldset>
               <SelectField
                 label="Local preview quality"
                 value={controller.draft.profile}
@@ -424,39 +546,6 @@ export const CaptureSettingsPanel = ({
           </dl>
         </div>
       </div>
-
-      <footer css={footerStyles(theme)}>
-        <Button
-          type="button"
-          size="small"
-          variant="quiet"
-          aria-label="Refresh media devices"
-          disabled={controlsDisabled || controller.devicesState === 'loading'}
-          busy={controller.devicesState === 'loading'}
-          onClick={() => void controller.refreshDevices()}
-        >
-          Refresh
-        </Button>
-        <Button
-          type="button"
-          size="small"
-          variant="quiet"
-          aria-label="Discard capture setting changes"
-          disabled={controlsDisabled || !controller.hasPendingChanges}
-          onClick={controller.discardPending}
-        >
-          Discard
-        </Button>
-        <Button
-          type="submit"
-          size="small"
-          variant="primary"
-          busy={controller.applying}
-          disabled={disabled || !controller.hasPendingChanges}
-        >
-          Apply settings
-        </Button>
-      </footer>
     </form>
   );
 };

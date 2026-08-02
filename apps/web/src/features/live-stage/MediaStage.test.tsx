@@ -229,7 +229,7 @@ describe('MediaStage', () => {
     );
   });
 
-  it('keeps supplied stage controls mounted over recorded playback', () => {
+  it('keeps supplied stage controls mounted below and outside the video frame', () => {
     render(
       stage({
         presentation: {
@@ -241,7 +241,14 @@ describe('MediaStage', () => {
       }),
     );
 
-    expect(screen.getByRole('button', { name: 'Review action' })).toBeInTheDocument();
+    const mediaStage = screen.getByRole('figure', { name: 'Studio media stage' });
+    const stageFrame = mediaStage.querySelector('[data-stage-frame]');
+    const controlsRegion = mediaStage.querySelector('[data-stage-controls-region]');
+    const reviewAction = screen.getByRole('button', { name: 'Review action' });
+
+    expect(stageFrame).not.toBeNull();
+    expect(controlsRegion).toContainElement(reviewAction);
+    expect(stageFrame).not.toContainElement(reviewAction);
   });
 
   it('uses the supplied stage workspace as the fullscreen boundary', () => {

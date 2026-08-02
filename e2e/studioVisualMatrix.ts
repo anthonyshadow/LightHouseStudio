@@ -43,6 +43,11 @@ export const STUDIO_INITIAL_VISUAL_SCENARIO = {
   baseline: '01-studio/initial-closed.png',
 } as const;
 
+export const STUDIO_PORTRAIT_INITIAL_VISUAL_SCENARIO = {
+  id: 'studio-initial-portrait',
+  baseline: '01-studio/initial-portrait.png',
+} as const;
+
 export const FOCUSED_VISUAL_SCENARIOS = [
   { id: 'ai-experience-choice', baseline: '01-studio/ai-experience-choice.png' },
   { id: 'selected-character-ai-live', baseline: '01-studio/selected-character-ai-live.png' },
@@ -92,6 +97,7 @@ export const SMALL_MOBILE_VISUAL_SCENARIOS = [
 export type VisualScenarioId =
   | (typeof ENTRY_VISUAL_SCENARIO)['id']
   | (typeof STUDIO_INITIAL_VISUAL_SCENARIO)['id']
+  | (typeof STUDIO_PORTRAIT_INITIAL_VISUAL_SCENARIO)['id']
   | (typeof CORE_VISUAL_SCENARIOS)[number]['id']
   | (typeof FOCUSED_VISUAL_SCENARIOS)[number]['id']
   | (typeof DESKTOP_VISUAL_SCENARIOS)[number]['id']
@@ -112,6 +118,7 @@ export const VISUAL_CASE_MATRIX = [
     CORE_VISUAL_SCENARIOS.map((scenario) => ({ viewport, scenario })),
   ),
   { viewport: desktopViewport, scenario: STUDIO_INITIAL_VISUAL_SCENARIO },
+  { viewport: desktopViewport, scenario: STUDIO_PORTRAIT_INITIAL_VISUAL_SCENARIO },
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[1] },
   { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[2] },
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[3] },

@@ -15,7 +15,8 @@ deliberately release or discard it.
 4. After the converted MP4 becomes authoritative and live/provider resources release, confirm
    **Recorded take playback** on the persistent stage. Primary **Record New Video** opens the
    post-recording editor; Dock-started local and live AI recordings retain compact Download,
-   Discard, Voice, and Release actions.
+   Discard, Voice, and Release actions directly beneath the video. They never overlay the take or
+   its native playback controls, and the narrowest supported viewport wraps them into a second row.
 5. Select **Take** to inspect mode, sources, start time, dimensions/frame rate when known, duration,
    size, and MIME type. The panel does not create another player.
 6. Optionally apply a voice treatment. Playback and download remain locked until processing

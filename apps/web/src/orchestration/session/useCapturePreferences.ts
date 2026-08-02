@@ -21,6 +21,18 @@ export const DEFAULT_CAPTURE_PREFERENCES: CapturePreferences = {
   aspectRatio: '16:9',
 };
 
+const DESKTOP_CAPTURE_FORMAT_QUERY = '(min-width: 64rem)';
+
+export const defaultLocalCaptureAspectRatio = (): LocalCaptureAspectRatio => {
+  if (typeof window === 'undefined' || typeof window.matchMedia !== 'function') return '16:9';
+  return window.matchMedia(DESKTOP_CAPTURE_FORMAT_QUERY).matches ? '16:9' : '9:16';
+};
+
+const initialCapturePreferences = (): CapturePreferences => ({
+  ...DEFAULT_CAPTURE_PREFERENCES,
+  aspectRatio: defaultLocalCaptureAspectRatio(),
+});
+
 export type UseCapturePreferencesOptions = {
   stream: MediaStream | null;
   onApply: (preferences: CapturePreferences) => Promise<void>;
@@ -64,8 +76,9 @@ export const useCapturePreferences = ({
   stream,
   onApply,
 }: UseCapturePreferencesOptions): CapturePreferencesController => {
-  const [draft, setDraft] = useState<CapturePreferences>(DEFAULT_CAPTURE_PREFERENCES);
-  const [applied, setApplied] = useState<CapturePreferences>(DEFAULT_CAPTURE_PREFERENCES);
+  const [initialPreferences] = useState(initialCapturePreferences);
+  const [draft, setDraft] = useState<CapturePreferences>(initialPreferences);
+  const [applied, setApplied] = useState<CapturePreferences>(initialPreferences);
   const [cameraDevices, setCameraDevices] = useState<CaptureDeviceOption[]>([]);
   const [microphoneDevices, setMicrophoneDevices] = useState<CaptureDeviceOption[]>([]);
   const [devicesState, setDevicesState] =
@@ -213,10 +226,13 @@ export const useCapturePreferences = ({
     return request;
   }, [applied, cameraDevices, devicesState, draft, microphoneDevices, onApply]);
 
-  const discardPending = useCallback(() => {
-    setApplyError(null);
-    setDraft(applied);
-  }, [applied]);
+  const discardPending = useCallback(
+    (preserveApplyError = false) => {
+      if (!preserveApplyError) setApplyError(null);
+      setDraft(applied);
+    },
+    [applied],
+  );
 
   const appliedVideoUnavailable =
     Boolean(applied.videoDeviceId) &&

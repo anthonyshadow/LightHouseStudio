@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { CreativeAssetStore } from '@studio/domain';
 import {
   closeRecipeDockWhenOverlaid,
@@ -439,9 +439,8 @@ const SCENARIOS: readonly Scenario[] = [
     filename: 'local-before-preview.png',
     preparationOnly: true,
     setup: async (page) => {
-      await page.getByRole('button', { name: 'Open capture settings' }).click();
-      await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
-      await expect(page.getByRole('heading', { name: 'Sources and quality' })).toBeVisible();
+      const settings = await openCaptureSettingsSurface(page);
+      await expect(settings).toBeVisible();
       await expectCaptureDevicesSettled(page);
       await expect(page.getByText('Available after preview starts')).toBeVisible();
     },
@@ -451,8 +450,8 @@ const SCENARIOS: readonly Scenario[] = [
     filename: 'local-active-capture.png',
     setup: async (page) => {
       await startLocalPreview(page);
-      await page.getByRole('button', { name: 'Open capture settings' }).click();
-      await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
+      const settings = await openCaptureSettingsSurface(page);
+      await expect(settings).toBeVisible();
       await expectCaptureDevicesSettled(page);
       await expect(page.getByRole('heading', { name: 'Active capture' })).toBeVisible();
       expect((await readBrowserState(page)).cameraCalls).toBe(1);
@@ -467,8 +466,8 @@ const SCENARIOS: readonly Scenario[] = [
       await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
       await page.getByLabel('Character direction').fill('An adult editorial field presenter');
       await closeRecipeDockWhenOverlaid(page);
-      await page.getByRole('button', { name: 'Open capture settings' }).click();
-      await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
+      const settings = await openCaptureSettingsSurface(page);
+      await expect(settings).toBeVisible();
       await expectCaptureDevicesSettled(page);
       await expect(page.getByText('Provider-managed quality')).toBeVisible();
     },
@@ -527,6 +526,16 @@ const settlePage = async (page: Page): Promise<void> => {
 const expectCaptureDevicesSettled = async (page: Page): Promise<void> => {
   await expect(page.getByText('Looking for available cameras…', { exact: true })).toBeHidden();
   await expect(page.getByText('Looking for available microphones…', { exact: true })).toBeHidden();
+};
+
+const openCaptureSettingsSurface = async (page: Page): Promise<Locator> => {
+  const inlineSettings = page.locator('[data-desktop-capture-settings]');
+  if ((await inlineSettings.count()) > 0) return inlineSettings;
+
+  await page.getByRole('button', { name: 'Open capture settings' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Capture Settings' });
+  await expect(dialog).toBeVisible();
+  return dialog;
 };
 
 const expectActiveStageVideo = async (page: Page): Promise<void> => {

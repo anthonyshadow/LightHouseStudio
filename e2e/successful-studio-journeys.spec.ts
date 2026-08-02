@@ -889,15 +889,20 @@ test('switches to a browser-exposed phone camera while Capture Settings stays op
   });
   await startLocalPreview(page);
 
-  await page.getByRole('button', { name: 'Open capture settings' }).click();
-  const settingsDialog = page.getByRole('dialog', { name: 'Capture Settings' });
-  const cameraSelector = page.getByLabel('Camera', { exact: true });
-  await expect(settingsDialog).toBeVisible();
+  const inlineSettings = page.locator('[data-desktop-capture-settings]');
+  if ((await inlineSettings.count()) === 0) {
+    await page.getByRole('button', { name: 'Open capture settings' }).click();
+  }
+  const settingsSurface =
+    (await inlineSettings.count()) > 0
+      ? inlineSettings
+      : page.getByRole('dialog', { name: 'Capture Settings' });
+  const cameraSelector = settingsSurface.getByLabel('Camera', { exact: true });
+  await expect(settingsSurface).toBeVisible();
   await expect(cameraSelector).toContainText('Creator’s iPhone Camera');
   await cameraSelector.selectOption('phone-camera');
-  await page.getByRole('button', { name: 'Apply settings' }).click();
 
-  await expect(settingsDialog).toBeVisible();
+  await expect(settingsSurface).toBeVisible();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();
   await expect.poll(async () => (await readBrowserState(page)).cameraCalls).toBe(2);
   expect((await readBrowserState(page)).lifecycleEvents).toContain('local-video-stopped');

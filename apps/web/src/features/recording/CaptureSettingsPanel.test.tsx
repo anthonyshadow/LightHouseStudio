@@ -62,20 +62,34 @@ describe('CaptureSettingsPanel', () => {
 
     await waitFor(() => expect(enumerateDevices).toHaveBeenCalledOnce());
     expect(getUserMedia).not.toHaveBeenCalled();
+    const landscape = screen.getByRole('radio', { name: 'Landscape · 16:9' });
+    expect(landscape).toBeInTheDocument();
+    expect(landscape.closest('label')).toHaveAttribute('data-selected', 'true');
+    expect(screen.getByRole('radio', { name: 'Portrait · 9:16' })).toBeInTheDocument();
+    expect(screen.getByText('Landscape · 16:9')).toBeVisible();
+    expect(screen.getByText('Portrait · 9:16')).toBeVisible();
     await user.selectOptions(screen.getByLabelText('Camera'), 'camera-2');
+    await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
     await user.selectOptions(screen.getByLabelText('Microphone'), 'microphone-2');
-    await user.selectOptions(screen.getByLabelText('Video format'), '9:16');
+    await waitFor(() => expect(onApply).toHaveBeenCalledTimes(2));
+    await user.click(screen.getByText('Portrait · 9:16'));
+    await waitFor(() => expect(onApply).toHaveBeenCalledTimes(3));
     await user.selectOptions(screen.getByLabelText('Local preview quality'), '1080p30');
-    await user.click(screen.getByRole('button', { name: 'Apply settings' }));
 
-    expect(onApply).toHaveBeenCalledWith({
-      videoDeviceId: 'camera-2',
-      audioDeviceId: 'microphone-2',
-      profile: '1080p30',
-      aspectRatio: '9:16',
-    });
+    await waitFor(() =>
+      expect(onApply).toHaveBeenLastCalledWith({
+        videoDeviceId: 'camera-2',
+        audioDeviceId: 'microphone-2',
+        profile: '1080p30',
+        aspectRatio: '9:16',
+      }),
+    );
     expect(getUserMedia).not.toHaveBeenCalled();
-    expect(screen.getByRole('button', { name: 'Apply settings' })).toBeDisabled();
+    expect(screen.queryByRole('button', { name: 'Apply settings' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Refresh media devices' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Discard capture setting changes' }),
+    ).not.toBeInTheDocument();
   });
 
   it('renders every browser camera label, including varied Continuity Camera names', async () => {
@@ -110,6 +124,32 @@ describe('CaptureSettingsPanel', () => {
     expect(camera).toHaveTextContent('Continuity Camera (Desk)');
     expect(camera).toHaveTextContent('OBS Virtual Camera');
     expect(screen.queryByText('Use a phone as a camera')).not.toBeInTheDocument();
+  });
+
+  it('restores the applied choice after an automatic live replacement fails', async () => {
+    const user = userEvent.setup();
+    installMediaDevices({
+      enumerateDevices: vi.fn().mockResolvedValue([]),
+      getSupportedConstraints: () => ({}),
+    });
+    const onApply = vi.fn().mockRejectedValue(new Error('replacement failed'));
+
+    const Harness = () => {
+      const controller = useCapturePreferences({ stream: null, onApply });
+      return (
+        <StudioDesignProvider>
+          <CaptureSettingsPanel controller={controller} mode="local" />
+        </StudioDesignProvider>
+      );
+    };
+    render(<Harness />);
+
+    await user.click(screen.getByText('Portrait · 9:16'));
+
+    expect(await screen.findByText('Settings unchanged')).toBeVisible();
+    expect(screen.getByRole('radio', { name: 'Landscape · 16:9' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Portrait · 9:16' })).not.toBeChecked();
+    expect(onApply).toHaveBeenCalledOnce();
   });
 
   it('explains denied permission and an empty browser camera list without requesting access', async () => {
@@ -180,5 +220,34 @@ describe('CaptureSettingsPanel', () => {
     expect(screen.getByText('FaceTime HD Camera')).toBeInTheDocument();
     expect(screen.getByText('MacBook Microphone')).toBeInTheDocument();
     expect(screen.getByText('1280×720 · 30 fps')).toBeInTheDocument();
+  });
+
+  it('renders the complete settings workflow in the desktop sidebar presentation', () => {
+    installMediaDevices({
+      enumerateDevices: vi.fn().mockResolvedValue([]),
+      getSupportedConstraints: () => ({}),
+    });
+
+    const Harness = () => {
+      const controller = useCapturePreferences({
+        stream: null,
+        onApply: vi.fn().mockResolvedValue(undefined),
+      });
+      return (
+        <StudioDesignProvider>
+          <CaptureSettingsPanel controller={controller} mode="local" presentation="sidebar" />
+        </StudioDesignProvider>
+      );
+    };
+    render(<Harness />);
+
+    expect(screen.getByRole('heading', { name: 'Capture settings' })).toBeVisible();
+    expect(screen.getByRole('radio', { name: 'Landscape · 16:9' })).toBeInTheDocument();
+    expect(screen.getByRole('radio', { name: 'Portrait · 9:16' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Refresh media devices' })).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole('button', { name: 'Discard capture setting changes' }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Apply settings' })).not.toBeInTheDocument();
   });
 });

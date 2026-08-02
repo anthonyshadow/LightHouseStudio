@@ -176,6 +176,23 @@ for (const viewport of representativeViewports) {
     await expect(page.getByRole('complementary', { name: 'First take guide' })).toContainText(
       'Record New Video or Upload Video → review',
     );
+    await expect(
+      page
+        .getByRole('complementary', { name: 'First take guide' })
+        .getByText('Virtual Try On · Character Swap · Voice → Download', { exact: true }),
+    ).toBeVisible();
+    const stageFrameBox = await page.locator('[data-stage-frame]').boundingBox();
+    const guideBox = await page.locator('[data-first-success-guide]').boundingBox();
+    expect(stageFrameBox).not.toBeNull();
+    expect(guideBox).not.toBeNull();
+    expect(guideBox!.x).toBeGreaterThanOrEqual(stageFrameBox!.x);
+    expect(guideBox!.x + guideBox!.width).toBeLessThanOrEqual(
+      stageFrameBox!.x + stageFrameBox!.width,
+    );
+    expect(guideBox!.y).toBeGreaterThanOrEqual(stageFrameBox!.y);
+    expect(guideBox!.y + guideBox!.height).toBeLessThanOrEqual(
+      stageFrameBox!.y + stageFrameBox!.height,
+    );
     await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
 
     const skipLink = page.getByRole('link', { name: 'Skip to studio' });
@@ -338,8 +355,13 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
   expect(network.apiRequests).not.toContain('/api/realtime-token');
 
   await alert.getByRole('button', { name: 'Capture settings' }).click();
-  await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
-  await page.getByRole('button', { name: 'Close panel' }).click();
+  const inlineSettings = page.locator('[data-desktop-capture-settings]');
+  if ((await inlineSettings.count()) > 0) {
+    await expect(inlineSettings).toBeVisible();
+  } else {
+    await expect(page.getByRole('dialog', { name: 'Capture Settings' })).toBeVisible();
+    await page.getByRole('button', { name: 'Close panel' }).click();
+  }
   await page.getByRole('button', { name: 'Record New Video' }).click();
   await expect(page.getByRole('alert')).toContainText(
     'Camera or microphone access was not allowed.',

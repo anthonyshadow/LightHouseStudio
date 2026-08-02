@@ -11,19 +11,19 @@ accessibility, physical-device, and live-provider behavior belongs to other test
 
 ## Matrix
 
-The current matrix has 28 Chromium cases:
+The current matrix has 29 Chromium cases:
 
 | Group             | States | Viewports                    | Cases |
 | ----------------- | -----: | ---------------------------- | ----: |
 | Entry             |      1 | small mobile                 |     1 |
 | Core Studio       |      2 | all five                     |    10 |
-| Studio idle       |      1 | desktop                      |     1 |
+| Studio idle       |      2 | desktop                      |     2 |
 | Focused high-risk |      8 | risk-selected viewport pairs |    12 |
 | Desktop-specific  |      2 | desktop                      |     2 |
 | Small-mobile risk |      2 | small mobile                 |     2 |
 
-Twenty-nine is the review budget, not the definition of correctness. The current matrix uses 28
-of those cases. The executable invariants require unique paths, all five viewport IDs, and every
+Twenty-nine is the review budget, not the definition of correctness. The current matrix uses all
+29 cases. The executable invariants require unique paths, all five viewport IDs, and every
 local-live/recording state/viewport pair.
 
 | Viewport ID    |       Size |
@@ -40,6 +40,7 @@ local-live/recording state/viewport pair.
 | ------------- | ---------------------------------------------------- |
 | Small mobile  | `00-entry/initial.png`                               |
 | Desktop       | `01-studio/initial-closed.png`                       |
+| Desktop       | `01-studio/initial-portrait.png`                     |
 | All viewports | `01-studio/local-camera-live.png`                    |
 | All viewports | `01-studio/recording-active.png`                     |
 | Desktop       | `01-studio/selected-character-ai-live.png`           |

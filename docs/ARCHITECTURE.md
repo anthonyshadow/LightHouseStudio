@@ -55,12 +55,29 @@ source/result `<video>`. It borrows a controller-owned artifact URL, never handl
 recording, or finalization, and detaches listeners and `src` on replacement or unmount.
 Original/Result comparison drives both this inline player and the stage.
 
+The standard Studio workspace uses that same persistent stage for both landscape and portrait
+capture. At large desktop widths it is centered between the existing creative-tool rail and the
+session/device region; tablet and mobile stack those same regions below it. The session control
+bar is an in-flow sibling immediately below the bounded video frame, so Record, Stop, and take
+actions never cover the video or compete with native playback chrome. This is a presentation-only
+reflow: it does not duplicate controls, media nodes, controller state, or capture ownership.
+New phone and tablet sessions start with the local 9:16 format; desktop sessions start with 16:9.
+That viewport-sensitive choice is only the initial session value. The explicit format controls in
+Capture Settings can switch either way and are never overwritten by a later viewport resize.
+At the desktop breakpoint, the right-side session/device region renders the single Capture
+Settings form inline. Below that breakpoint the inline form unmounts and the same controller is
+presented through the shared overlay; the compact capture strip is the launcher. A breakpoint
+change never leaves two mounted settings forms. Capture choices auto-apply, device discovery runs
+on mount and `devicechange`, and failed live replacement restores the last applied draft while
+preserving the visible safe error. There are no manual Apply, Refresh, or Discard actions.
+
 All tools use the shared `OverlayPanel` portal. It owns focus trap, inert background, Escape,
 topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. The portal
 follows the active browser fullscreen element. In stage fullscreen, the existing media stage fills
-the viewport and the bottom tool and capture rails are hidden. A panel triggered from the stage
-still renders above the full-screen video. Each overlay has one named internal scroll region; the
-document does not scroll. Character Builder is fullscreen and uses one preview/generation DOM.
+the viewport and the creative-tool and session/device regions are hidden; the stage control bar
+remains beneath the video frame. A panel triggered from the stage still renders above the
+full-screen video. Each overlay has one named internal scroll region; the document does not scroll.
+Character Builder is fullscreen and uses one preview/generation DOM.
 Narrow screens reveal that same region through **Review & Generate** instead of duplicating
 stateful controls.
 
@@ -70,9 +87,9 @@ route proceeds. Hard unload receives the matching browser warning, while future 
 `/studio/*` children is deliberately exempt so a shared runtime layout can remain mounted.
 
 The shell is viewport-bound with safe-area padding and deliberate support for `1440×960`,
-`1280×720`, `834×1112`, `390×844`, and `320×568`. The stage, capture strip, and primary actions
-must remain reachable at short heights, touch sizes, and 200% text. Stage notices overlay the
-player rather than changing its geometry.
+`1280×720`, `834×1112`, `390×844`, and `320×568`. The stage, responsive tool/session regions, and
+primary actions must remain reachable at short heights, touch sizes, and 200% text. Stage notices
+overlay the video frame rather than changing its geometry.
 
 ## Session lifecycle
 

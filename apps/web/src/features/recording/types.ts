@@ -144,7 +144,7 @@ export type CapturePreferencesController = {
   reportVideoDeviceUnavailable: (deviceId: string) => void;
   dismissVideoFallbackNotice: () => void;
   apply: () => Promise<boolean>;
-  discardPending: () => void;
+  discardPending: (preserveApplyError?: boolean) => void;
 };
 
 export type RecordingController = {

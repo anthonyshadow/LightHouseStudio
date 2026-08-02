@@ -82,11 +82,10 @@ const StopIcon = () => (
 );
 
 const barStyles = (theme: Theme, visible: boolean): CSSObject => ({
-  position: 'absolute',
+  position: 'relative',
   zIndex: theme.layers.stageChrome,
-  insetInline: 0,
-  insetBlockEnd: 'clamp(0.65rem, 1.4vw, 1rem)',
-  width: 'min(48rem, calc(100% - 1.3rem))',
+  width: '100%',
+  maxWidth: '48rem',
   marginInline: 'auto',
   display: 'grid',
   gap: theme.space.xs,
@@ -98,13 +97,11 @@ const barStyles = (theme: Theme, visible: boolean): CSSObject => ({
   backdropFilter: 'blur(16px)',
   ...fadingVisibilityAnimationStyles(theme, visible, 'translateY(0)', 'translateY(0.75rem)'),
   '&[data-session-state="idle"]': {
-    width: 'min(34rem, calc(100% - 1.3rem))',
+    maxWidth: '34rem',
     padding: theme.space.xs,
     borderRadius: '1.4rem',
   },
   '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    width: 'calc(100% - 0.8rem)',
-    insetBlockEnd: '0.4rem',
     padding: '0.35rem',
     borderRadius: theme.radii.medium,
   },
@@ -321,7 +318,7 @@ export const StudioSessionControlBar = ({
   const localActive = Boolean(session.localStream);
   const recordingActive = recording.lifecycle === 'recording' || recording.lifecycle === 'stopping';
   const takeReviewActive = reviewingTake && Boolean(recording.presented);
-  const controlsVisible = visible || recordingActive;
+  const controlsVisible = visible || recordingActive || takeReviewActive;
   const cameraControls = session.cameraControls;
   const cameraZoom = cameraControls?.zoom ?? null;
   const switchCameraLabel = cameraControls?.nextFacingMode
