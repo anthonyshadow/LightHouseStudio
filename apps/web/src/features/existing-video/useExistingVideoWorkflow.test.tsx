@@ -34,7 +34,7 @@ vi.mock('../../adapters/media-processing/transcodeRecording', () => ({
   transcodeRecordingToMp4: adapters.transcodeRecordingToMp4,
 }));
 
-import { useExistingVideoWorkflow } from './useExistingVideoWorkflow';
+import { savedCharacterStepInput, useExistingVideoWorkflow } from './useExistingVideoWorkflow';
 
 const artifact = (id: string, media: Blob): RecordingArtifact => ({
   id,
@@ -161,6 +161,19 @@ beforeEach(() => {
 });
 
 describe('useExistingVideoWorkflow', () => {
+  it('uses a saved character reference without its stored prompt', () => {
+    const reference = new File(['portrait'], 'portrait.png', { type: 'image/png' });
+
+    expect(savedCharacterStepInput('Stored character prompt', reference)).toEqual({
+      prompt: '',
+      referenceImage: reference,
+    });
+    expect(savedCharacterStepInput('Prompt-only character', null)).toEqual({
+      prompt: 'Prompt-only character',
+      referenceImage: null,
+    });
+  });
+
   it('keeps visual choices mutually exclusive and submits only the selected model', async () => {
     const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
     adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
@@ -286,6 +299,51 @@ describe('useExistingVideoWorkflow', () => {
       'Northstar Narrator',
       { replaceExistingResult: true },
     ]);
+    unmount();
+  });
+
+  it('retries Voice against the completed visual without resubmitting Decart', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    const recording = recordingController();
+    const processing = processingController();
+    processing.applyElevenLabsTo = vi
+      .fn()
+      .mockResolvedValueOnce({ status: 'error', message: 'Voice conversion was interrupted.' })
+      .mockImplementationOnce((video: RecordingArtifact) =>
+        Promise.resolve({ status: 'ready' as const, artifact: video }),
+      );
+    const { result, unmount } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        processing,
+        publishUploadedVideo: vi.fn().mockReturnValue(recording.original),
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => {
+      result.current.addStep('lucy-latest');
+      result.current.selectVoice('voice-northstar', 'Northstar Narrator');
+    });
+    act(() =>
+      result.current.updateStep(result.current.steps[0]!.id, {
+        prompt: 'Swap the character',
+      }),
+    );
+
+    await act(async () => result.current.submitPlan());
+    expect(result.current.phase).toBe('error');
+    expect(result.current.completedStepCount).toBe(1);
+    const visual = recording.visual;
+    expect(visual).not.toBeNull();
+
+    await act(async () => result.current.submitPlan());
+
+    expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
+    expect(processing.applyElevenLabsTo).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(processing.applyElevenLabsTo).mock.calls[1]?.[0]).toBe(visual);
+    expect(result.current.phase).toBe('complete');
     unmount();
   });
 

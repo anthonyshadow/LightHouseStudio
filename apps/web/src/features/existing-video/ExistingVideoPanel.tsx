@@ -33,7 +33,11 @@ import {
 } from './existingVideoPresentation';
 import { ExistingVideoVisualEditor, type RecentOutfit } from './ExistingVideoVisualEditor';
 import { ExistingVideoVoiceEditor } from './ExistingVideoVoiceEditor';
-import type { ExistingVideoStep, ExistingVideoWorkflow } from './useExistingVideoWorkflow';
+import {
+  savedCharacterStepInput,
+  type ExistingVideoStep,
+  type ExistingVideoWorkflow,
+} from './useExistingVideoWorkflow';
 import type { VoiceBrowserCapabilities } from '../voice-effects/VoiceEffectsPanel';
 
 type ExistingVideoPanelProps = {
@@ -180,8 +184,12 @@ export const ExistingVideoPanel = ({
         : null;
       workflow.updateStep(step.id, {
         savedRecipeId: recipe.id,
-        prompt: recipe.prompt,
-        referenceImage: referenceImage?.file ?? null,
+        ...(step.modelId === 'lucy-latest'
+          ? savedCharacterStepInput(recipe.prompt, referenceImage?.file ?? null)
+          : {
+              prompt: recipe.prompt,
+              referenceImage: referenceImage?.file ?? null,
+            }),
         ...(step.modelId === 'lucy-vton-latest'
           ? {
               inputKind:
@@ -200,13 +208,8 @@ export const ExistingVideoPanel = ({
         setMissingVtonReference({ stepId: step.id, recipe });
       } else {
         setReferenceError(
-          'The saved recipe text is still available, but its reference image could not be loaded.',
+          'This saved character reference image could not be loaded. Choose the character again to retry, or write a different prompt manually.',
         );
-        workflow.updateStep(step.id, {
-          savedRecipeId: recipe.id,
-          prompt: recipe.prompt,
-          referenceImage: null,
-        });
       }
     } finally {
       setRecipeLoading(false);

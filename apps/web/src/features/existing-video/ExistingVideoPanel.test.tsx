@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import type { RecordingArtifact } from '../recording/types';
 import { ExistingVideoPanel } from './ExistingVideoPanel';
+import { ExistingVideoReferenceField } from './ExistingVideoReferenceField';
 import type {
   ExistingVideoVoiceSelection,
   ExistingVideoWorkflow,
@@ -122,6 +123,49 @@ const readyVtonWorkflow = (updateStep: ReturnType<typeof vi.fn>): ExistingVideoW
         enhancePrompt: false,
         referenceImage: null,
         inputKind: 'saved-outfit',
+      },
+    ],
+    phase: 'ready',
+    updateStep: updateStep as ExistingVideoWorkflow['updateStep'],
+  });
+};
+
+const readyCharacterWorkflow = (
+  updateStep: ReturnType<typeof vi.fn>,
+  step: Partial<ExistingVideoWorkflow['steps'][number]> = {},
+): ExistingVideoWorkflow => {
+  const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+  return workflow({
+    selection: {
+      file: source,
+      mimeType: 'video/mp4',
+      audioSidecar: null,
+      audioUnavailableReason: null,
+      metadata: {
+        kind: 'uploaded',
+        mode: 'local',
+        selectedAt: '2026-07-30T12:00:00.000Z',
+        displayName: source.name,
+        container: 'mp4',
+        videoCodec: 'avc',
+        audioCodec: null,
+        durationMs: 30_000,
+        width: 1_920,
+        height: 1_080,
+        sizeBytes: source.size,
+        hasAudio: false,
+      },
+    },
+    steps: [
+      {
+        id: 'lucy',
+        modelId: 'lucy-latest',
+        savedRecipeId: null,
+        prompt: '',
+        enhancePrompt: false,
+        referenceImage: null,
+        inputKind: 'character',
+        ...step,
       },
     ],
     phase: 'ready',
@@ -255,6 +299,36 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByRole('textbox', { name: 'Public HTTPS image URL' })).toBeVisible();
     fireEvent.click(screen.getByRole('button', { name: 'Prompt' }));
     expect(setVtonInputKind).toHaveBeenCalledWith('vto', 'prompt');
+  });
+
+  it('imports a Character Swap reference from the shared public HTTPS URL flow', async () => {
+    const imported = new File(['portrait'], 'remote-character.webp', { type: 'image/webp' });
+    const onSelectFile = vi.fn();
+    api.importRemoteReferenceImage.mockResolvedValue(imported);
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoReferenceField
+          modelId="lucy-latest"
+          file={null}
+          disabled={false}
+          allowUrlImport
+          onSelectFile={onSelectFile}
+          onRemove={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Use an image URL instead' }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Public HTTPS image URL' }), {
+      target: { value: 'https://images.example.test/character.webp' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Import image' }));
+
+    await waitFor(() => expect(onSelectFile).toHaveBeenCalledWith(imported));
+    expect(api.importRemoteReferenceImage).toHaveBeenCalledWith(
+      'https://images.example.test/character.webp',
+      expect.any(AbortSignal),
+    );
   });
 
   it('confirms before replacing configured visual settings and preserves them on cancel', async () => {
@@ -791,12 +865,120 @@ describe('ExistingVideoPanel', () => {
     await waitFor(() =>
       expect(updateStep).toHaveBeenCalledWith('lucy', {
         savedRecipeId: 'anchor',
-        prompt:
-          'A professional anchor in a well-lit studio with a dark blazer and soft cinematic lighting.',
+        prompt: '',
         referenceImage: reference,
       }),
     );
     expect(api.hydrateReferenceImage).toHaveBeenCalledWith('asset-anchor');
+  });
+
+  it('fills the prompt only for a prompt-only saved character', async () => {
+    const updateStep = vi.fn();
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={readyCharacterWorkflow(updateStep)}
+          videoProcessingAvailable
+          savedRecipes={[
+            {
+              id: 'prompt-character',
+              label: 'Prompt Character',
+              modelId: 'lucy-latest',
+              prompt: 'A prompt-only saved character.',
+              referenceImageAssetId: null,
+              vtonInputKind: null,
+              enhancePrompt: false,
+            },
+          ]}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a Saved Character' }));
+    fireEvent.click(screen.getByRole('option', { name: /Prompt Character/u }));
+
+    await waitFor(() =>
+      expect(updateStep).toHaveBeenCalledWith('lucy', {
+        savedRecipeId: 'prompt-character',
+        prompt: 'A prompt-only saved character.',
+        referenceImage: null,
+      }),
+    );
+    expect(api.hydrateReferenceImage).not.toHaveBeenCalled();
+  });
+
+  it('keeps a saved image character selected while a different prompt is written', () => {
+    const updateStep = vi.fn();
+    const reference = new File(['portrait'], 'anchor.png', { type: 'image/png' });
+    Object.defineProperty(URL, 'createObjectURL', {
+      configurable: true,
+      value: vi.fn(() => 'blob:anchor-preview'),
+    });
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={readyCharacterWorkflow(updateStep, {
+            savedRecipeId: 'anchor',
+            referenceImage: reference,
+          })}
+          videoProcessingAvailable
+          savedRecipes={[
+            {
+              id: 'anchor',
+              label: 'Professional Anchor',
+              modelId: 'lucy-latest',
+              prompt: 'Stored prompt that should not be copied.',
+              referenceImageAssetId: 'asset-anchor',
+              vtonInputKind: null,
+              enhancePrompt: false,
+            },
+          ]}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.change(screen.getByRole('textbox', { name: /^Prompt/u }), {
+      target: { value: 'Use a different scene direction.' },
+    });
+
+    expect(updateStep).toHaveBeenCalledWith('lucy', {
+      savedRecipeId: 'anchor',
+      prompt: 'Use a different scene direction.',
+    });
+  });
+
+  it('does not fall back to a saved character prompt when its image cannot load', async () => {
+    const updateStep = vi.fn();
+    api.hydrateReferenceImage.mockRejectedValue(new Error('missing'));
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={readyCharacterWorkflow(updateStep)}
+          videoProcessingAvailable
+          savedRecipes={[
+            {
+              id: 'missing-anchor',
+              label: 'Missing Anchor',
+              modelId: 'lucy-latest',
+              prompt: 'Do not use this stored fallback.',
+              referenceImageAssetId: 'missing-asset',
+              vtonInputKind: null,
+              enhancePrompt: false,
+            },
+          ]}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Choose a Saved Character' }));
+    fireEvent.click(screen.getByRole('option', { name: /Missing Anchor/u }));
+
+    await screen.findByText(/reference image could not be loaded/u);
+    expect(updateStep).not.toHaveBeenCalled();
+    expect(screen.getByRole('textbox', { name: /^Prompt/u })).toHaveValue('');
   });
 
   it('places Create A Character last and opens the builder for the current Character Swap step', () => {

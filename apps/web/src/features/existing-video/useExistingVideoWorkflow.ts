@@ -62,6 +62,14 @@ export type ExistingVideoWorkflowPhase =
 
 export type ExistingVideoWorkflow = ReturnType<typeof useExistingVideoWorkflow>;
 
+export const savedCharacterStepInput = (
+  prompt: string,
+  referenceImage: File | null,
+): Pick<ExistingVideoStep, 'prompt' | 'referenceImage'> => ({
+  prompt: referenceImage ? '' : prompt,
+  referenceImage,
+});
+
 type UseExistingVideoWorkflowOptions = {
   readonly recording: RecordingController;
   readonly processing: VoiceProcessingController;
@@ -426,8 +434,6 @@ export const useExistingVideoWorkflow = ({
       setRetryJob(null);
       setCompletedStepCount(stepIndex + 1);
       setAcceptedSubmission(false);
-      setPhase('complete');
-      setMessage('Visual processing is complete. The result is ready to compare and download.');
       return artifact;
     },
     [editBase, recording, selection, steps],
@@ -541,6 +547,11 @@ export const useExistingVideoWorkflow = ({
     [processing],
   );
 
+  const completeVisualPlan = useCallback(() => {
+    setPhase('complete');
+    setMessage('Visual processing is complete. The result is ready to compare and download.');
+  }, []);
+
   const submitStep = useCallback(
     async (stepIndex: number) => {
       const baseArtifact = editBase ?? recording.original;
@@ -606,6 +617,8 @@ export const useExistingVideoWorkflow = ({
         const visualArtifact = await pollAndFinalize(jobId, stepIndex, controller, generation);
         if (visualArtifact && selectedVoice) {
           await applySelectedVoice(visualArtifact, selectedVoice);
+        } else if (visualArtifact) {
+          completeVisualPlan();
         }
       } catch (error) {
         if (controller.signal.aborted && !acceptedSubmission) {
@@ -631,6 +644,7 @@ export const useExistingVideoWorkflow = ({
       acceptedSubmission,
       applySelectedVoice,
       clearOperation,
+      completeVisualPlan,
       editBase,
       pollAndFinalize,
       onSubmissionAccepted,
@@ -648,7 +662,10 @@ export const useExistingVideoWorkflow = ({
       await submitStep(stepIndex);
       return;
     }
-    const baseArtifact = editBase ?? recording.original;
+    const baseArtifact =
+      completedStepCount > 0
+        ? (recording.visual ?? recording.processed)
+        : (editBase ?? recording.original);
     if (!baseArtifact || !voiceSelection) return;
     clearOperation();
     startedAtRef.current = performance.now();
@@ -660,6 +677,8 @@ export const useExistingVideoWorkflow = ({
     completedStepCount,
     editBase,
     recording.original,
+    recording.processed,
+    recording.visual,
     steps,
     submitStep,
     voiceSelection,
@@ -685,6 +704,7 @@ export const useExistingVideoWorkflow = ({
         generation,
       );
       if (artifact && voiceSelection) await applySelectedVoice(artifact, voiceSelection);
+      else if (artifact) completeVisualPlan();
     } catch (error) {
       const safeMessage =
         error instanceof Error ? error.message : 'Local visual finalization failed.';
@@ -694,7 +714,14 @@ export const useExistingVideoWorkflow = ({
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
     }
-  }, [applySelectedVoice, finalizeVisual, pendingVisual, recording, voiceSelection]);
+  }, [
+    applySelectedVoice,
+    completeVisualPlan,
+    finalizeVisual,
+    pendingVisual,
+    recording,
+    voiceSelection,
+  ]);
 
   const retryExistingJob = useCallback(async () => {
     if (!retryJob) return;
@@ -719,6 +746,7 @@ export const useExistingVideoWorkflow = ({
         generation,
       );
       if (artifact && voiceSelection) await applySelectedVoice(artifact, voiceSelection);
+      else if (artifact) completeVisualPlan();
     } catch (error) {
       if (!(error instanceof RetryExistingVideoJobError)) {
         setAcceptedSubmission(false);
@@ -731,7 +759,15 @@ export const useExistingVideoWorkflow = ({
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
     }
-  }, [applySelectedVoice, clearOperation, pollAndFinalize, recording, retryJob, voiceSelection]);
+  }, [
+    applySelectedVoice,
+    clearOperation,
+    completeVisualPlan,
+    pollAndFinalize,
+    recording,
+    retryJob,
+    voiceSelection,
+  ]);
 
   const cancelBeforeAcceptance = useCallback(() => {
     if (phase === 'voice-processing') {

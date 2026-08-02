@@ -74,8 +74,9 @@ data is unaffected.
   provider fallback.
 - ElevenLabs lists voices already saved in the configured account. Preview does not upload the
   take; Apply sends only the immutable original audio sidecar.
-- Explicit VTO image-URL import uses the loopback broker, accepts public HTTPS JPEG/PNG/WebP only,
-  pins public DNS across bounded redirects, validates decoded contents, and never retains the URL.
+- Explicit Character Swap/VTO image-URL import uses the loopback broker, accepts public HTTPS
+  JPEG/PNG/WebP only, pins public DNS across bounded redirects, validates decoded contents, and
+  never retains the URL.
 - Provider credentials remain server-side. API contracts and errors are app-owned and sanitized.
 
 See [privacy and temporary data](docs/PRIVACY_AND_TEMPORARY_DATA.md) for the complete storage,

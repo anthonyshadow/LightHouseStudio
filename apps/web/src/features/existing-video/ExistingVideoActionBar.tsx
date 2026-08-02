@@ -27,6 +27,9 @@ export interface ExistingVideoActionBarProps {
 const readyActionLabel = (workflow: ExistingVideoWorkflow): string => {
   const step = workflow.steps[0];
   const voice = workflow.voiceSelection;
+  if (step && voice && workflow.phase === 'error' && workflow.completedStepCount > 0) {
+    return `Retry ${voice.voiceName} on ${visualToolLabel(step)} result`;
+  }
   const retryPrefix = workflow.phase === 'error' ? 'Start new submission · ' : '';
   if (step && voice) return `${retryPrefix}Apply ${visualToolLabel(step)}, then ${voice.voiceName}`;
   if (step) return `${retryPrefix}Apply ${visualToolLabel(step)}`;

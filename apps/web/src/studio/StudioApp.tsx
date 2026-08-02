@@ -25,7 +25,10 @@ import { useCreativeAssetRepository } from '../features/creative-assets/useCreat
 import { OutfitBuilder } from '../features/creative-assets/OutfitBuilder';
 import { OutfitSelector } from '../features/creative-assets/OutfitSelector';
 import { ExistingVideoPanel } from '../features/existing-video/ExistingVideoPanel';
-import { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
+import {
+  savedCharacterStepInput,
+  useExistingVideoWorkflow,
+} from '../features/existing-video/useExistingVideoWorkflow';
 import { MediaStage } from '../features/live-stage';
 import {
   confirmModeReplacement,
@@ -445,8 +448,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         : null;
       existingVideo.updateStep(step.id, {
         savedRecipeId: characterId,
-        prompt: snapshot.prompt,
-        referenceImage: reference?.file ?? null,
+        ...savedCharacterStepInput(snapshot.prompt, reference?.file ?? null),
       });
       await progress.markStudioPreloaded();
     },

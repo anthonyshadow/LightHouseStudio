@@ -43,8 +43,11 @@ then edit either base, download, start over, or discard.
    outfits open in a keyboard-operable custom chooser with an optional local thumbnail, recipe
    name, and a two-line prompt summary. The saved-character chooser ends with
    **Create A Character**. That action opens Character Builder; a successful save returns to this
-   panel with the new saved character selected and its prompt/reference filled into the same
-   Character Swap step. An attached reference renders a local preview with replace and remove actions.
+   panel with the new saved character selected in the same Character Swap step. Selecting any
+   saved character with a reference attaches only that image and leaves Prompt empty so the
+   creator may write a different prompt. A prompt-only saved character fills Prompt. Character
+   and VTO reference fields accept local JPEG/PNG/WebP or the explicitly revealed public-HTTPS URL
+   importer. An attached reference renders a local preview with replace and remove actions.
    Explicitly closing the panel retains the tab-local selection and plan; an **Edit video** action
    in the recorded-take controls reopens the same workflow. Whenever a playback is retained and
    **Edit Video** is available, the main Studio tool row/column disables its live-only **Select
@@ -78,8 +81,9 @@ then edit either base, download, start over, or discard.
    immutable source sidecar → compose/transcode/validate/commit voiced result. A validated H.264
    MP4 result with no audio may commit directly only when the immutable source also has no audio;
    this avoids a redundant decoder pass without weakening the publication gate. Voice-only uses
-   the selected video's frames. Every operation publishes truthful stage copy and never retries a
-   billable submission.
+   the selected video's frames. A combined plan is ready only after Voice commits. If Voice fails
+   after visual success, its explicit retry uses the retained visual frames and does not resubmit
+   Decart. Every operation publishes truthful stage copy and never retries a billable submission.
 9. **Original** and conditional **Result** update both players. **Edit original** snapshots the
    immutable source; **Edit result** snapshots the latest result as the next frame source. Review
    keeps **Download result**, the selected edit summary, and the destructive action visible. Only the

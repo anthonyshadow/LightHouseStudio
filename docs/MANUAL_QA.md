@@ -149,7 +149,13 @@ preview/generation region; **Review & Generate** moves focus to it without dupli
   configured setups require a topmost confirmation whose cancel path preserves every value and
   whose confirm path clears only the previous visual settings, never Voice. Select a saved Voice,
   visit both visual editors, and return to Voice; confirm the saved Voice and browser state remain
-  selected until **Clear Voice setup** is used.
+  selected until **Clear Voice setup** is used. Run a combined Character/VTO plus Voice plan and
+  confirm the visual commits first, the result remains locked until Voice finishes, and a Voice
+  retry uses that visual without another Decart submission.
+- In Character Swap, choose a saved image character and confirm only its reference is attached;
+  Prompt stays empty but accepts a different manual direction. Choose a prompt-only character and
+  confirm its prompt fills the field. Import both Character and VTO references through the hidden
+  public-HTTPS URL control and confirm the resulting local preview can be replaced or removed.
 - Interrupt upload before provider acceptance, background/foreground during polling, restart the
   broker, expire a result, retry status/content/local finalization, and race source replacement.
   No path may create an automatic paid resubmission or discard the last valid artifact.

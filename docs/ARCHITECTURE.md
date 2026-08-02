@@ -141,7 +141,9 @@ Character Builder exclusively owns character create/edit, its resumable IndexedD
 reference upload, prompt optimization, image generation/edit/composition, durable save journal,
 and Shelf persistence. Its completion handoff is destination-specific: general Studio entry
 atomically preloads the Lucy Dock, while uploaded-video entry hydrates and selects the saved
-character in the originating unsubmitted Character Swap step.
+character in the originating unsubmitted Character Swap step. A saved character with a reference
+hydrates only that image into the step; its stored prompt is not copied, though the creator may
+write a different prompt. A prompt-only character copies its prompt.
 
 Prompt Workshop owns only Add, Replace, and Restyle structured object recipes. Recipe Shelf owns
 saved/recent/character metadata and atomic reuse. Neither owns Character generation or a media
@@ -149,8 +151,8 @@ session.
 
 Outfit Builder exclusively owns reusable VTO recipe creation, edit, copy, naming, prompt/image mode
 exclusion, prompt enhancement, temporary reference files, and idempotent final-save upload. It
-uses the same validated JPEG/PNG/WebP picker and explicit public-HTTPS importer as existing-video
-VTO. New outfits are prompt-or-image; migrated combined prompt/reference outfits remain usable and
+uses the same validated JPEG/PNG/WebP picker and explicit public-HTTPS importer as the
+existing-video Character Swap/VTO reference fields. New outfits are prompt-or-image; migrated combined prompt/reference outfits remain usable and
 editable. Selector-originated Save creates and selects the recipe without acquiring media,
 loading Decart, or contacting a provider. Shelf edit updates the existing ID; Save a copy creates a
 new ID. Recipe Shelf remains the metadata repository and immutable reference storage remains the
@@ -210,7 +212,9 @@ Recorded and uploaded media publish through one artifact boundary:
 The finalized or validated source replaces live media on the same persistent stage. The artifact
 owner creates and revokes every source/visual/voice URL. Changing source invalidates downstream
 layers. During a combined edit, the healthy visual remains available while voice conversion runs;
-a healthy voiced result then replaces it. Every Voice treatment reads immutable source audio and
+a healthy voiced result then replaces it, and the combined plan is not reported complete before
+that voice result commits. A Voice retry after visual success continues from the retained visual,
+not the original frame source. Every Voice treatment reads immutable source audio and
 remuxes it onto the explicitly selected Original or Result video. Existing-video comparison
 selects the immutable source or latest result without changing artifact ownership. Its
 source-preserving Start over revokes the latest result, retains the source, and returns
@@ -226,8 +230,8 @@ VTO recipes carry an explicit batch input discriminator for saved/recent outfit,
 image, or prompt. Saved and recent recipe records separately persist `vtonInputKind` as `prompt` or
 `saved-outfit` plus `enhancePrompt`; image-only records are valid only with an opaque persisted
 reference ID. Prompt recipes restore Prompt mode and enhancement. Saved-image and migrated combined
-recipes restore Saved outfit mode with enhancement off. An explicit remote reference import goes
-through the loopback API: HTTPS-only URL parsing,
+recipes restore Saved outfit mode with enhancement off. An explicit Character Swap or VTO remote
+reference import goes through the loopback API: HTTPS-only URL parsing,
 credential/private/mixed-address rejection, per-hop DNS pinning, bounded redirects/bytes,
 JPEG/PNG/WebP header and decoded-content validation, cancellation, no-store bytes, and sanitized
 errors. The URL is neither persisted nor forwarded to Decart.

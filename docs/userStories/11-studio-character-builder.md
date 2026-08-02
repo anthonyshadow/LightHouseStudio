@@ -26,8 +26,9 @@ handoff from an unsubmitted edited-video Character Swap step.
 4. Name and save. Edit updates the existing character ID and preserves unrelated Shelf metadata.
 5. Builder closes and returns to its originating context:
    - general Studio entry preloads/selects the character in Lucy 2.5, Dock, and Shelf; or
-   - uploaded-video entry reopens the upload panel with the new character selected and its prompt
-     and optional reference filled into the originating Character Swap step.
+   - uploaded-video entry reopens the upload panel with the new character selected. When the saved
+     character has a reference, only that image fills the originating Character Swap step and the
+     creator may write a different prompt; a prompt-only character fills the prompt instead.
 
    Neither path starts/applies AI, creates a Recent item, or increments use count.
 

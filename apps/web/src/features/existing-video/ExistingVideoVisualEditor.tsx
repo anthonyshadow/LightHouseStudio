@@ -175,7 +175,10 @@ export const ExistingVideoVisualEditor = ({
               }
               onChange={(event) =>
                 onUpdate(step.id, {
-                  savedRecipeId: null,
+                  savedRecipeId:
+                    step.modelId === 'lucy-latest' && step.referenceImage
+                      ? step.savedRecipeId
+                      : null,
                   prompt: event.currentTarget.value,
                 })
               }
@@ -208,7 +211,7 @@ export const ExistingVideoVisualEditor = ({
           modelId={step.modelId}
           file={step.referenceImage}
           disabled={recipeLocked}
-          allowUrlImport={step.modelId === 'lucy-vton-latest'}
+          allowUrlImport
           onSelectFile={(file) => {
             onUpdate(step.id, { savedRecipeId: null });
             onChooseReference(step, file);
