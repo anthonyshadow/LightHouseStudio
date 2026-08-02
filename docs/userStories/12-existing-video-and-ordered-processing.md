@@ -46,7 +46,11 @@ then edit either base, download, start over, or discard.
    panel with the new saved character selected and its prompt/reference filled into the same
    Character Swap step. An attached reference renders a local preview with replace and remove actions.
    Explicitly closing the panel retains the tab-local selection and plan; an **Edit video** action
-   in the recorded-take controls reopens the same workflow.
+   in the recorded-take controls reopens the same workflow. Whenever a playback is retained and
+   **Edit Video** is available, the main Studio tool row/column disables its live-only **Select
+   Character**, **Select Outfit**, **Workshop**, and **Shelf** launchers. The editor's own Character
+   Swap, Virtual Try On, Voice, recipe, and builder controls remain governed only by the editor
+   workflow and stay available when their existing step-specific requirements are met.
 6. VTO uses exactly one input mode. **Saved or recent outfit** selects a saved recipe or tab-local
    recent import; **Reference image** prefers a local JPEG/PNG/WebP and reveals its HTTPS URL field
    only after **Use an image URL instead**; **Prompt** alone exposes Enhance Prompt. Switching

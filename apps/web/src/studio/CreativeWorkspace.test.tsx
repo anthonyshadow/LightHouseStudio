@@ -133,4 +133,41 @@ describe('CreativeWorkspace responsive tools', () => {
       'page',
     );
   });
+
+  it('disables live-video tools while playback is available for editing', () => {
+    const view = render(
+      <StudioDesignProvider>
+        <CreativeWorkspace {...createProps(true)} />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Select Character' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Workshop' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Shelf' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit Video' })).toBeEnabled();
+
+    view.rerender(
+      <StudioDesignProvider>
+        <CreativeWorkspace {...createProps(true, { hasPlaybackVideo: false })} />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Select Character' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Workshop' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Shelf' })).toBeEnabled();
+  });
+
+  it('disables the live Workshop and Shelf buttons in the compact tool row during playback', () => {
+    render(
+      <StudioDesignProvider>
+        <CreativeWorkspace {...createProps(false)} />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Workshop' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Shelf' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Edit Video' })).toBeEnabled();
+  });
 });

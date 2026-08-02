@@ -19,7 +19,10 @@ deliberately release or discard it.
    its native playback controls, and the narrowest supported viewport wraps them into a second row.
 5. Confirm **Edit Video** is enabled in the creative tool rail for any finalized playback. An
    editor-backed upload or recording reopens its retained editor state; a Dock/live-AI take opens
-   the existing-video source chooser without automatically adopting the take.
+   the existing-video source chooser without automatically adopting the take. While playback is
+   retained, the rail's live-only **Select Character**, **Select Outfit**, **Workshop**, and
+   **Shelf** actions are disabled. This rail lock does not disable Character Swap, Virtual Try On,
+   Voice, recipe selection, or other controls inside the open existing-video editor.
 6. When the detailed **Latest Take** surface opens after finishing an editor flow or returning from
    Voice, inspect mode, sources, start time, dimensions/frame rate when known, duration, size, and
    MIME type. The panel does not create another player and has no dedicated tool-rail launcher.

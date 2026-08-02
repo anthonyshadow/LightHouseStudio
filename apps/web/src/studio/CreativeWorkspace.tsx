@@ -386,7 +386,10 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
   } = refs;
   const theme = useTheme();
   const characterWorkshopBlocked =
-    recordingActive || (activeSessionMode !== 'lucy-latest' && sessionModeLocked);
+    hasPlaybackVideo ||
+    recordingActive ||
+    (activeSessionMode !== 'lucy-latest' && sessionModeLocked);
+  const liveVideoToolBlocked = hasPlaybackVideo || recordingActive;
   const activePanel = panel === 'closed' ? null : panel;
   const shelfController = useRecipeShelfController({
     repository,
@@ -448,7 +451,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
             <Button
               ref={characterToggleRef}
               variant={activeTool === 'character' ? 'primary' : 'secondary'}
-              disabled={recordingActive}
+              disabled={liveVideoToolBlocked}
               aria-label={
                 activeCharacterLabel
                   ? `Selected character: ${activeCharacterLabel}. Open character options`
@@ -467,7 +470,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
             <Button
               ref={outfitToggleRef}
               variant={activeTool === 'outfit' ? 'primary' : 'secondary'}
-              disabled={recordingActive}
+              disabled={liveVideoToolBlocked}
               aria-label={
                 activeOutfitLabel
                   ? `Selected outfit: ${activeOutfitLabel}. Open outfit options`
@@ -509,7 +512,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
         <Button
           ref={shelfToggleRef}
           variant={activeTool === 'shelf' ? 'primary' : 'secondary'}
-          disabled={recordingActive}
+          disabled={liveVideoToolBlocked}
           aria-label="Shelf"
           aria-describedby="shelf-tool-description"
           aria-expanded={panel === 'shelf'}
