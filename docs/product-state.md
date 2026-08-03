@@ -1,13 +1,14 @@
 # Lightframe Studio product state
 
-**Current as of:** 2026-08-01
+**Current as of:** 2026-08-03
 
-**Release frame:** operator-assisted, loopback-only controlled pilot
+**Release frame:** local-first, single-operator development runtime
 
 This is the concise product authority. Implementation details live in
 [Architecture](ARCHITECTURE.md), [Privacy](PRIVACY_AND_TEMPORARY_DATA.md), and the
-[observable user stories](userStories/README.md). The
-[controlled-pilot contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) owns approved operating policy.
+[observable user stories](userStories/README.md). The former
+[controlled-pilot contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) is historical and does not gate
+current application features or project validation.
 
 ## Product
 
@@ -54,8 +55,9 @@ required, but no physical target is qualified yet.
   references with recoverable draft/save state.
 - Recipe Shelf stores sanitized, versioned browser metadata and opaque reference relationships.
 - Character uses exact `lucy-latest`; VTO uses pinned `lucy-vton-latest`.
-- Existing H.264 MP4/MOV and VP8 WebM sources can stay local or run exactly one selected Decart
-  batch model. Character Swap and VTO are mutually exclusive within an edited-video workflow.
+- Existing H.264 MP4/MOV and VP8 WebM sources can stay local or run exactly one selected visual
+  operation. Character Swap uses startup-selected Decart or Pruna; VTO remains Decart. The two
+  operations are mutually exclusive within an edited-video workflow.
 - OpenAI, BFL, and Wiro are separate startup-selected image-provider passes with no fallback.
   Participant mode disables Wiro.
 - Recording owns an accessible warning at 270 seconds and coalesced Stop/finalize at 300 seconds.
@@ -78,51 +80,37 @@ required, but no physical target is qualified yet.
   is unqualified.
 - Video-job state is process-local and temporary; refresh, crash, restart, or expiry does not
   recover an upload workflow, and local cleanup is not provider-side deletion.
-- Reference assets have no relationship-aware per-asset deletion route. The pilot promise is
-  isolated whole-environment retirement.
+- Reference assets have no relationship-aware per-asset deletion route. Use a dedicated local data
+  directory when whole-environment retirement is required.
 - Host-derived ownership, filesystem persistence, and process-local coordination are valid only
   for the supported single-operator deployment.
 
-## Controlled-pilot status
+## Validation status
 
 The runtime and deterministic tests cover touch/pointer control recovery, never-hidden recording
 Stop, saved-character entry, permission recovery, provider disclosures, truthful capability copy,
 the independent Decart and recording time boundaries, immutable take processing, bounded
 ElevenLabs output, responsive/reflow behavior, and provider-free network denial.
 
-That is not release qualification. At this audit, the repository contains no completed evidence
-records; the validator reports:
-
-- provider/local requirements: **0/9**;
-- physical target/browser requirements: **0/45**.
-
-The remaining release gates are:
-
-1. run the exact-candidate quality, coverage, E2E, production, visual, and audit gates;
-2. qualify all 45 physical rows, including touch, accessibility, safe areas, real media, the
-   300-second take, memory, interruption, processing, download, and cleanup;
-3. qualify Local no-key plus live and batch Lucy 2.5, live and batch VTO 3, ElevenLabs, OpenAI,
-   BFL, and operator-only Wiro under the approved accounts/settings;
-4. run the isolation/retirement procedure for every real participant environment; and
-5. record moderated comprehension and value evidence without collecting content.
-
-See [active audit plan](project-audit-implementation-plan.md) and
-[qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md).
+The former pilot validator and evidence thresholds are retired. Normal project quality remains the
+automated implementation gate. Physical-device, accessibility, long-take memory, and live-provider
+checks remain valuable manual evidence, but they do not disable configured features or block normal
+project validation.
 
 ## Product decisions
 
-- Keep record/upload, review, and optional post-recording edits as the first-run pilot promise.
+- Keep record/upload, review, and optional post-recording edits as the first-run product promise.
 - Preserve live Character/VTO transformation as an explicit advanced flow.
 - Keep provider contact explicit and preserve startup selection with no automatic fallback.
 - Keep the 300-second recording and Decart limits independent.
 - Keep the two-route, one-runtime, one-stage, shared-overlay architecture.
 - Keep downloaded files outside the Lightframe dataset and describe Download as the durable
   handoff.
-- Use truthful Detach/retention language and whole-environment retirement for the pilot.
+- Use truthful Detach/retention language and support deliberate whole-environment retirement.
 - Do not turn loopback identifiers, device IDs, storage paths, or provider IDs into future user
   identity.
 
-## Controlled-pilot success metrics
+## Archived controlled-pilot success metrics
 
 These are small-cohort hypotheses, not release criteria. Record numerator, denominator, and
 content-free timing so a percentage never hides a tiny sample.
@@ -156,7 +144,7 @@ content-free timing so a percentage never hides a tiny sample.
   and provider cost per usable Download. Never record prompts, media, raw errors, URLs,
   credentials, provider payloads, or device identifiers.
 
-## Questions for the pilot
+## Archived pilot questions
 
 - Does reusable identity, live transformation, faster capture, or local control drive return use?
 - Where does the Record/Upload → Review → Edit → Download path still need operator explanation?

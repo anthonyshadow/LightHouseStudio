@@ -476,7 +476,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     setup: async (page) => {
       const { dialog } = await selectVisualVideo(page);
       await addVisualStep(dialog, 'lucy-latest', 'Transform into a documentary field presenter.');
-      await expect(dialog).toContainText('One Decart submission');
+      await expect(dialog).toContainText('One visual-processing submission');
       await expect(
         dialog.getByRole('button', { name: 'Character Swap', exact: true }),
       ).toHaveAttribute('aria-pressed', 'true');
@@ -492,7 +492,9 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await installFakeVideoJobRoutes(page, fixture, { processingReadsBeforeReady: 100 });
       await addVisualStep(dialog, 'lucy-latest', 'Transform into a documentary field presenter.');
       await dialog.getByRole('button', { name: 'Apply Character Swap' }).click();
-      await expect(dialog.getByRole('heading', { name: 'Generating lucy…' })).toBeVisible();
+      await expect(
+        dialog.getByRole('heading', { name: 'Generating character swap…' }),
+      ).toBeVisible();
     },
   },
   'upload-result': {

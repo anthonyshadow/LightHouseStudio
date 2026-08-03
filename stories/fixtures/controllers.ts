@@ -148,6 +148,7 @@ export const createRecordingController = (
     completeVisualProcessing: fn(completeVisualProcessing),
     completeProcessing: fn(completeProcessing),
     failProcessing: fn(),
+    repairPresentedObjectUrl: fn(() => false),
     clearVisualProcessing: fn(),
     restoreOriginal: fn(),
   };

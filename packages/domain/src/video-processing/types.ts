@@ -13,6 +13,8 @@ export type UploadedVideoFacts = Readonly<{
   hasAudio: boolean;
 }>;
 
+export type VideoTransformOperationId = 'character-swap' | 'virtual-try-on';
+
 export type VideoTransformStep = Readonly<{
   id: string;
   modelId: ModelModeId;

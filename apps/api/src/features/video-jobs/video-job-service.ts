@@ -1,6 +1,5 @@
 import path from 'node:path';
 import { mkdir, rm } from 'node:fs/promises';
-import { canSubmitPilotBatchJob } from '@studio/domain';
 import {
   VIDEO_JOB_TTL_MS,
   videoJobStatusResponseSchema,
@@ -8,13 +7,16 @@ import {
   type VideoJobErrorCode,
   type VideoJobStatus,
   type VideoJobStatusResponse,
+  type VideoTransformOperationId,
   type VideoTransformRecipe,
 } from '@studio/contracts';
 import { AppError } from '../../http/app-error.js';
 import {
-  DecartVideoProviderError,
-  type DecartVideoJobProvider,
-} from '../../providers/decart/video-job-provider.js';
+  type ExistingVideoJobProvider,
+  type ExistingVideoOperationBinding,
+  type ExistingVideoProviderRegistry,
+  VideoJobProviderError,
+} from '../../providers/video-jobs/video-job-provider.js';
 import { inspectVideoFile } from './media-inspection.js';
 
 interface ScheduledVideoJobDeadline {
@@ -33,13 +35,15 @@ interface VideoJobServiceOptions {
 type VideoJobRecord = {
   readonly jobId: string;
   readonly ownerId: string;
-  readonly modelId: VideoTransformRecipe['modelId'];
+  readonly operation: VideoTransformOperationId;
+  readonly binding: ExistingVideoOperationBinding;
   status: VideoJobStatus;
   readonly createdAt: string;
   updatedAt: string;
   readonly expiresAt: string;
   readonly expiresAtMs: number;
   providerJobId: string | null;
+  providerOutputLocation: string | null;
   result: InspectedVideo | null;
   error: { code: VideoJobErrorCode; message: string } | null;
   readonly directory: string;
@@ -53,7 +57,6 @@ type VideoJobRecord = {
   retrievalAttempts: number;
   refreshPromise: Promise<void> | null;
   readonly operationController: AbortController;
-  submissionCounted: boolean;
   activeDeliveries: number;
   admissionsClosed: boolean;
   cleanupPending: boolean;
@@ -85,16 +88,17 @@ const scheduleSystemDeadline = (
 const safeProviderFailure = (
   error: unknown,
 ): { readonly code: VideoJobErrorCode; readonly message: string } => {
-  if (!(error instanceof DecartVideoProviderError)) {
+  if (!(error instanceof VideoJobProviderError)) {
     return {
       code: 'provider_rejected',
-      message: 'Decart could not complete this visual processing request.',
+      message: 'Visual processing could not complete this request.',
     };
   }
   if (error.reason === 'timeout') {
     return {
       code: 'provider_timeout',
-      message: 'Decart took too long to respond. The previous valid video is still available.',
+      message:
+        'Visual processing took too long to respond. The previous valid video is still available.',
     };
   }
   if (error.reason === 'result-too-large') {
@@ -106,22 +110,57 @@ const safeProviderFailure = (
   if (error.reason === 'authentication') {
     return {
       code: 'provider_unavailable',
-      message: 'Decart video processing is unavailable until its server credential is corrected.',
+      message: 'Visual processing is unavailable until its server configuration is corrected.',
+    };
+  }
+  if (error.reason === 'billing') {
+    return {
+      code: 'provider_rejected',
+      message: 'Visual processing stopped because the configured service account needs attention.',
+    };
+  }
+  if (error.reason === 'quota') {
+    return {
+      code: 'provider_rejected',
+      message: 'Visual processing stopped because the configured service account reached a limit.',
+    };
+  }
+  if (error.reason === 'policy') {
+    return {
+      code: 'provider_rejected',
+      message:
+        'Visual processing could not complete because content safeguards rejected the request.',
+    };
+  }
+  if (error.reason === 'rejected') {
+    return {
+      code: 'provider_rejected',
+      message: 'Visual processing rejected the submitted media or replacement instructions.',
+    };
+  }
+  if (error.reason === 'generation-failed') {
+    return {
+      code: 'provider_rejected',
+      message: 'The visual provider reported that generation failed before producing a result.',
+    };
+  }
+  if (error.reason === 'aborted') {
+    return {
+      code: 'provider_rejected',
+      message: 'Visual processing ended before a result was available.',
     };
   }
   return {
     code: 'provider_rejected',
-    message: 'Decart rejected or could not complete this visual processing request.',
+    message: 'Visual processing rejected or could not complete this request.',
   };
 };
 
 export class VideoJobService {
-  readonly #provider: DecartVideoJobProvider | null;
+  readonly #providers: ExistingVideoProviderRegistry;
   readonly #root: string;
   readonly #jobs = new Map<string, VideoJobRecord>();
-  readonly #submittedModelsByOwner = new Map<string, VideoTransformRecipe['modelId'][]>();
   readonly #ready: Promise<void>;
-  readonly #enforceParticipantLimit: boolean;
   readonly #now: () => number;
   readonly #scheduleDeadline: NonNullable<VideoJobServiceOptions['scheduleDeadline']>;
   readonly #operations = new Set<Promise<void>>();
@@ -130,25 +169,50 @@ export class VideoJobService {
   #closePromise: Promise<void> | null = null;
 
   constructor(
-    provider: DecartVideoJobProvider | null,
+    configuredProviders: ExistingVideoProviderRegistry | ExistingVideoJobProvider | null,
     lightframeDataDir: string,
-    enforceParticipantLimit = true,
     options: VideoJobServiceOptions = {},
   ) {
-    this.#provider = provider;
-    this.#enforceParticipantLimit = enforceParticipantLimit;
+    const providers: ExistingVideoProviderRegistry =
+      configuredProviders === null
+        ? { 'character-swap': null, 'virtual-try-on': null }
+        : 'submit' in configuredProviders
+          ? {
+              'character-swap': {
+                provider: configuredProviders,
+                outputResolution: '720p',
+                outputSizing: 'exact-canonical',
+                inputPreparation: 'none',
+                referencePolicy: 'optional',
+                promptEnhancement: true,
+              },
+              'virtual-try-on': {
+                provider: configuredProviders,
+                outputResolution: '720p',
+                outputSizing: 'exact-canonical',
+                inputPreparation: 'none',
+                referencePolicy: 'optional',
+                promptEnhancement: true,
+              },
+            }
+          : configuredProviders;
+    this.#providers = providers;
     this.#now = options.now ?? Date.now;
     this.#scheduleDeadline = options.scheduleDeadline ?? scheduleSystemDeadline;
     this.#root = path.resolve(lightframeDataDir, '.tmp', 'video-jobs');
     this.#ready = rm(this.#root, { recursive: true, force: true }).then(async () => {
-      if (provider !== null && !this.#closed) {
+      if (Object.values(providers).some((binding) => binding !== null) && !this.#closed) {
         await mkdir(this.#root, { recursive: true, mode: 0o700 });
       }
     });
   }
 
   get available(): boolean {
-    return this.#provider !== null;
+    return Object.values(this.#providers).some((binding) => binding !== null);
+  }
+
+  availableFor(operation: VideoTransformOperationId): boolean {
+    return this.#providers[operation] !== null;
   }
 
   async existing(jobId: string, ownerId: string): Promise<VideoJobStatusResponse | null> {
@@ -178,7 +242,7 @@ export class VideoJobService {
   #snapshot(job: VideoJobRecord): VideoJobStatusResponse {
     return videoJobStatusResponseSchema.parse({
       jobId: job.jobId,
-      modelId: job.modelId,
+      operation: job.operation,
       status: job.status,
       createdAt: job.createdAt,
       updatedAt: job.updatedAt,
@@ -301,12 +365,29 @@ export class VideoJobService {
       }
       return this.#snapshot(duplicate);
     }
-    if (this.#closed || !this.#provider) {
+    const binding = this.#providers[input.recipe.operation];
+    if (this.#closed || !binding) {
       await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
       throw new AppError(
         503,
         'provider_unavailable',
-        'Decart batch video processing is unavailable until DECART_API_KEY is configured.',
+        'This visual processing operation is unavailable until its server configuration is complete.',
+      );
+    }
+    if (binding.referencePolicy === 'required' && !input.recipe.hasReferenceImage) {
+      await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
+      throw new AppError(
+        400,
+        'validation_error',
+        'Character Swap requires a reference image in this configuration.',
+      );
+    }
+    if (!binding.promptEnhancement && input.recipe.enhancePrompt) {
+      await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
+      throw new AppError(
+        400,
+        'validation_error',
+        'Prompt enhancement is unavailable for Character Swap in this configuration.',
       );
     }
     const active = [...this.#jobs.values()].find(
@@ -320,32 +401,21 @@ export class VideoJobService {
         'Finish the active video job before starting another.',
       );
     }
-    const submittedModels = this.#submittedModelsByOwner.get(input.ownerId) ?? [];
-    if (
-      this.#enforceParticipantLimit &&
-      !canSubmitPilotBatchJob(submittedModels, input.recipe.modelId)
-    ) {
-      await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
-      throw new AppError(
-        409,
-        'provider_rejected',
-        'This moderated participant has reached the temporary batch submission limit.',
-      );
-    }
-
     const acceptedAt = this.#now();
     const expiresAtMs = acceptedAt + VIDEO_JOB_TTL_MS;
     const timestamp = new Date(acceptedAt).toISOString();
     const job: VideoJobRecord = {
       jobId: input.jobId,
       ownerId: input.ownerId,
-      modelId: input.recipe.modelId,
+      operation: input.recipe.operation,
+      binding,
       status: 'validating',
       createdAt: timestamp,
       updatedAt: timestamp,
       expiresAt: new Date(expiresAtMs).toISOString(),
       expiresAtMs,
       providerJobId: null,
+      providerOutputLocation: null,
       result: null,
       error: null,
       directory: input.directory,
@@ -359,7 +429,6 @@ export class VideoJobService {
       retrievalAttempts: 0,
       refreshPromise: null,
       operationController: new AbortController(),
-      submissionCounted: false,
       activeDeliveries: 0,
       admissionsClosed: false,
       cleanupPending: false,
@@ -371,16 +440,16 @@ export class VideoJobService {
     return this.#snapshot(job);
   }
 
-  #recordSubmission(job: VideoJobRecord): void {
-    if (this.#closed || job.submissionCounted) return;
-    job.submissionCounted = true;
-    const submittedModels = this.#submittedModelsByOwner.get(job.ownerId) ?? [];
-    this.#submittedModelsByOwner.set(job.ownerId, [...submittedModels, job.modelId]);
-  }
-
   async #submit(job: VideoJobRecord, recipe: VideoTransformRecipe): Promise<void> {
     try {
-      const inspected = await inspectVideoFile(job.inputPath, job.modelId);
+      const inspected = await inspectVideoFile(job.inputPath, job.operation);
+      if (job.binding.inputPreparation === 'h264-mp4' && inspected.mimeType !== 'video/mp4') {
+        throw new AppError(
+          400,
+          'unsupported_container',
+          'Character Swap requires locally prepared H.264 MP4 input in this configuration.',
+        );
+      }
       if (!this.#ownsMutableJob(job)) {
         await this.#cleanupFiles(job);
         return;
@@ -388,8 +457,8 @@ export class VideoJobService {
       job.sourceDurationMs = inspected.durationMs;
       job.sourceOrientation = inspected.width > inspected.height ? 'landscape' : 'portrait';
       this.#touch(job, 'submitting');
-      const submitted = await this.#provider!.submit({
-        modelId: job.modelId,
+      const submitted = await job.binding.provider.submit({
+        operation: job.operation,
         recipe,
         videoPath: job.inputPath,
         videoMimeType: inspected.mimeType,
@@ -397,12 +466,12 @@ export class VideoJobService {
         referenceImageMimeType: job.referenceMimeType,
         signal: job.operationController.signal,
       });
-      this.#recordSubmission(job);
       if (!this.#ownsMutableJob(job)) {
         await this.#cleanupFiles(job);
         return;
       }
       job.providerJobId = submitted.providerJobId;
+      job.providerOutputLocation = submitted.outputLocation ?? null;
       this.#touch(job, submitted.status === 'processing' ? 'processing' : 'queued');
       await this.#cleanupFiles(job, true);
     } catch (error) {
@@ -422,17 +491,20 @@ export class VideoJobService {
   async #retrieve(job: VideoJobRecord): Promise<void> {
     try {
       job.retrievalAttempts += 1;
-      await this.#provider!.download(
+      await job.binding.provider.download(
         job.providerJobId!,
         job.outputPath,
         job.operationController.signal,
+        job.providerOutputLocation,
       );
       if (!this.#ownsMutableJob(job)) {
         await this.#cleanupFiles(job);
         return;
       }
-      const result = await inspectVideoFile(job.outputPath, job.modelId, {
+      const result = await inspectVideoFile(job.outputPath, job.operation, {
         requireProviderOutputSize: true,
+        expectedResolution: job.binding.outputResolution,
+        outputSizing: job.binding.outputSizing,
         ...(job.sourceDurationMs === null ? {} : { expectedDurationMs: job.sourceDurationMs }),
         ...(job.sourceOrientation === null ? {} : { expectedOrientation: job.sourceOrientation }),
       });
@@ -447,11 +519,7 @@ export class VideoJobService {
         await this.#cleanupFiles(job);
         return;
       }
-      if (
-        error instanceof DecartVideoProviderError &&
-        (error.reason === 'timeout' || error.reason === 'upstream') &&
-        job.retrievalAttempts < 3
-      ) {
+      if (error instanceof VideoJobProviderError && error.retryable && job.retrievalAttempts < 3) {
         await rm(job.outputPath, { force: true }).catch(() => undefined);
         this.#touch(job, 'queued');
         return;
@@ -478,18 +546,20 @@ export class VideoJobService {
     if (job.refreshPromise) return job.refreshPromise;
     job.refreshPromise = (async () => {
       try {
-        const providerStatus = await this.#provider!.status(
+        const providerStatus = await job.binding.provider.status(
           job.providerJobId!,
           job.operationController.signal,
         );
         if (!this.#ownsMutableJob(job)) return;
         job.statusReadFailures = 0;
+        if (providerStatus.outputLocation !== undefined) {
+          job.providerOutputLocation = providerStatus.outputLocation;
+        }
         if (providerStatus.status === 'failed') {
           this.#touch(job, 'failed');
-          job.error = {
-            code: 'provider_rejected',
-            message: 'Decart could not complete this visual processing request.',
-          };
+          job.error = safeProviderFailure(
+            new VideoJobProviderError(providerStatus.failureReason ?? 'upstream'),
+          );
           await this.#cleanupFiles(job);
           return;
         }
@@ -502,8 +572,8 @@ export class VideoJobService {
       } catch (error) {
         if (!this.#ownsMutableJob(job)) return;
         if (
-          error instanceof DecartVideoProviderError &&
-          (error.reason === 'timeout' || error.reason === 'upstream') &&
+          error instanceof VideoJobProviderError &&
+          error.retryable &&
           job.statusReadFailures < 2
         ) {
           job.statusReadFailures += 1;
@@ -610,7 +680,6 @@ export class VideoJobService {
     this.#deadline = null;
     for (const job of this.#jobs.values()) job.operationController.abort();
     this.#jobs.clear();
-    this.#submittedModelsByOwner.clear();
     await this.#ready.catch(() => undefined);
     while (this.#operations.size > 0) {
       await Promise.allSettled([...this.#operations]);

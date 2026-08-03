@@ -56,7 +56,22 @@ test.beforeEach(async ({ page }) => {
       contentType: 'application/json',
       body: JSON.stringify({
         realtimeVideo: { available: true, models: ['lucy-latest', 'lucy-vton-latest'] },
-        videoProcessing: { available: false, models: [] },
+        videoProcessing: {
+          characterSwap: {
+            available: false,
+            inputPreparation: 'none',
+            referencePolicy: 'optional',
+            promptEnhancement: true,
+            terminalFailureRelease: 'automatic',
+          },
+          virtualTryOn: {
+            available: false,
+            inputPreparation: 'none',
+            referencePolicy: 'optional',
+            promptEnhancement: true,
+            terminalFailureRelease: 'automatic',
+          },
+        },
         elevenLabs: { available: false, modelId: null },
         referenceImages: {
           available: false,

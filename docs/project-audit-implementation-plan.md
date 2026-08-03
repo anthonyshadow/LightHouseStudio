@@ -5,23 +5,24 @@ This file contains incomplete work only. Resolved runtime findings are in
 [findings](project-audit-findings.md). Remove a phase only after every listed acceptance condition
 passes for the same release candidate.
 
-Scope is fixed by the [controlled-pilot contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md): moderated,
-loopback-only, at most five participants, record/upload post-editing primary, live AI and Workshop
-advanced, touch/mobile required, a 300-second take maximum, and no provider fallback.
+The former controlled-pilot release gate is paused and does not block application use or normal
+project validation. Remaining implementation items retain their technical value, but pilot-only
+admission, evidence, and retirement acceptance criteria must be redesigned before reuse.
 
 ## Phase 0 — Existing-video single-processing acceptance
 
-**Objective:** qualify the new first-class upload source and exact-model batch workflow before
+**Objective:** qualify the new first-class upload source and startup-selected batch workflow before
 freezing a release candidate.
 
 Implementation scope:
 
 - one source/visual/voice take pipeline shared by recording and upload;
 - authoritative H.264 MP4/MOV and VP8 WebM inspection with the app-owned duration, aspect, byte,
-  720p orientation, and synchronization limits;
-- strict same-origin video-job contracts, a server-only exact-model Decart adapter, one in-memory
+  provider-approved 720p/1080p orientation, and synchronization limits;
+- strict same-origin operation contracts, isolated Decart/Pruna adapters, a startup-only provider
+  factory, one in-memory
   active job, temporary filesystem ownership, and safe errors;
-- zero or one visual transformation, with Lucy and VTO mutually exclusive and no automatic paid
+- zero or one visual transformation, with Character Swap and VTO mutually exclusive and no automatic paid
   resubmission; and
 - provider-free upload/preview/download plus accessible keyboard/touch configuration in the
   existing persistent stage and overlay system.
@@ -46,7 +47,7 @@ Acceptance:
 - every Phase 1 release command passes without paid traffic or weakened assertions.
 
 Keep this phase incomplete until automated, live, and physical evidence all pass. Deterministic
-implementation does not by itself qualify Decart output, mobile pickers, codecs, memory, or
+implementation does not by itself qualify Decart/Pruna output, mobile pickers, codecs, memory, or
 provider retention.
 
 ## Phase 1 — Exact-candidate automated gate
@@ -62,7 +63,6 @@ Complete:
 - `pnpm test:visual`
 - `pnpm audit:prod`
 - `pnpm audit:all`
-- `pnpm pilot:data-retirement:drill`
 - visual baseline inventory and review for every changed Darwin/Linux image
 
 These exact-candidate commands are explicit release work. Coverage and visual regression are not
@@ -84,7 +84,7 @@ development-tool advisory.
 
 ## Phase 2 — Provider and local qualification
 
-**Objective:** close the nine content-free provider/local rows for the Phase 1 commit.
+**Objective:** close the eleven content-free provider/local rows for the Phase 1 commit.
 
 Run the approved procedures in [live provider smoke](LIVE_PROVIDER_SMOKE.md) and record only the
 schema in [qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md).
@@ -96,15 +96,16 @@ Required rows:
 3. Decart `lucy-vton-latest`;
 4. Decart batch `lucy-latest`;
 5. Decart batch `lucy-vton-latest`;
-6. ElevenLabs saved-voice browse, preview, Apply, remux, Download, and original restore;
-7. OpenAI optimization/reference generation;
-8. BFL reference generation as the startup-selected provider; and
-9. Wiro as a separate operator-qualification pass with required cleanup.
+6. Pruna Character Swap `p-video-replace` at 720p;
+7. Pruna Character Swap `p-video-replace` at 1080p;
+8. ElevenLabs saved-voice browse, preview, Apply, remux, Download, and original restore;
+9. OpenAI optimization/reference generation;
+10. BFL reference generation as the startup-selected provider; and
+11. Wiro as a separate startup-selected provider pass with required cleanup.
 
 Acceptance:
 
-- `pnpm pilot:qualification:check --commit <full-sha> --verbose` reports `9/9`;
-- models, settings, access mode, retention, entitlements, billing authorization, and content policy
+- models, settings, retention, entitlements, billing authorization, and content policy
   match the release contract;
 - every initial billable submission is explicit, has no fallback, and is not automatically
   retried;

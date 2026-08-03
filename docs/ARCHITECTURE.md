@@ -53,6 +53,8 @@ switches among idle, live, finalizing, and playback. Live media uses `srcObject`
 or create a second take player. The sole exception is the **Use existing video** panel's inline
 source/result `<video>`. It borrows a controller-owned artifact URL, never handles a live stream,
 recording, or finalization, and detaches listeners and `src` on replacement or unmount.
+The recording-artifact owner may repair one stale playback URL from its retained Blob after a media
+error. `MediaStage` reports the error but never creates or owns the replacement URL.
 Original/Result comparison drives both this inline player and the stage.
 
 The standard Studio workspace uses that same persistent stage for both landscape and portrait
@@ -223,9 +225,30 @@ parent lineage; generated filenames include the operation, UTC timestamp, and UU
 
 The existing-video controller uses Mediabunny plus browser decode confirmation for an early check.
 The API streams bytes to generated private paths and performs authoritative
-container/track/codec/duration/aspect/size inspection before Decart contact. One app job runs at a
-time. An uploaded workflow can switch its single active choice between Lucy and VTO before
-submission, and only that active model is submitted.
+container/track/codec/duration/aspect/size inspection before visual-provider contact. One app job
+runs at a time. An uploaded workflow can switch its single active choice between Character Swap
+and VTO before submission, and only that active operation is submitted. Browser and HTTP contracts
+use `character-swap` and `virtual-try-on`; Lucy model identifiers remain inside Decart/live and
+saved-recipe mappings.
+
+Startup configuration selects the existing-video Character Swap provider through one centralized
+factory. The default Decart binding keeps its exact Lucy endpoint, multipart fields, fixed 720p
+output, and retry behavior. The Pruna binding is Character Swap only: it requires one reference,
+requires H.264 MP4 submission input, disables prompt enhancement, pins `p-video-replace`, and pins
+the documented approximate 1 MP (`720p`) or 2 MP (`1080p`) output class. Its server-only sizing
+policy logs a content-free warning for non-canonical dimensions and continues with the inspected
+result; Decart keeps exact canonical 720p validation. Virtual Try-On always resolves
+independently to Decart. The shared
+server provider contract normalizes submit, queued/processing/completed/failed status, opaque
+output location, bounded download, retryable failure classification, output resolution, and
+optional cancellation. Environment reads do not enter UI or orchestration.
+
+`GET /api/capabilities` exposes availability, `none | h264-mp4` input preparation,
+`optional | required` reference policy, prompt-enhancement support, and terminal-failure release
+ownership per operation. It exposes no batch model/provider name. When H.264 MP4 preparation is required, the browser converts MOV/WebM at
+explicit Start, revalidates the ephemeral Blob, submits it, and leaves the immutable source and
+audio sidecar unchanged. MP4 remains pass-through. Downloaded metadata is compared with the
+server-approved result rather than a browser-hard-coded 720p size.
 VTO recipes carry an explicit batch input discriminator for saved/recent outfit, direct reference
 image, or prompt. Saved and recent recipe records separately persist `vtonInputKind` as `prompt` or
 `saved-outfit` plus `enhancePrompt`; image-only records are valid only with an opaque persisted
@@ -234,7 +257,7 @@ recipes restore Saved outfit mode with enhancement off. An explicit Character Sw
 reference import goes through the loopback API: HTTPS-only URL parsing,
 credential/private/mixed-address rejection, per-hop DNS pinning, bounded redirects/bytes,
 JPEG/PNG/WebP header and decoded-content validation, cancellation, no-store bytes, and sanitized
-errors. The URL is neither persisted nor forwarded to Decart.
+errors. The URL is neither persisted nor forwarded to a visual provider.
 
 ## Persistence
 
@@ -261,7 +284,11 @@ timer enforces expiry without requiring another request, preserves an expired in
 and guards late provider work from restoring state or bytes. Successful delivery, explicit release,
 or broker shutdown may delete local state earlier. A content stream admitted before the deadline
 may finish after it, but no new content stream may start at or after the deadline. This is local
-lifecycle cleanup only, not Decart cancellation or provider-side deletion.
+lifecycle cleanup only, not provider cancellation or provider-side deletion. Pruna uploads expire
+after approximately 30 minutes and generated delivery content is typically available for 24 hours;
+no documented Pruna cancellation/deletion endpoint is treated as part of local cleanup.
+Pruna terminal failures remain visible through their safe app-owned status until explicit user
+discard/replacement or the fixed deadline; browser polling does not issue an automatic DELETE.
 
 ## Backend boundary
 
@@ -269,22 +296,22 @@ Fastify binds to `127.0.0.1`, rejects non-loopback Host headers, and requires ex
 checks for provider or reference mutations. Browsers may omit `Origin` on same-origin `GET`
 requests, so provider reads accept an exact loopback `Origin` or referrer, or browser
 `Sec-Fetch-Site: same-origin`; their explicit provider-intent header remains mandatory. ElevenLabs
-provider-contact routes require `X-Lightframe-Provider-Intent: voice`; Decart batch routes require
+provider-contact routes require `X-Lightframe-Provider-Intent: voice`; visual batch routes require
 `X-Lightframe-Provider-Intent: video`. Responses are `no-store`.
 
 Permanent keys remain in server environment memory. App-owned schemas validate every HTTP
 boundary. Provider adapters normalize upstream data into allowlisted safe codes; raw messages,
 bodies, URLs, prompts, credentials, causes, and arbitrary codes never reach clients or logs.
 
-`PILOT_ACCESS_MODE=participant` server-disables Wiro even when configured. The separate
-`operator-qualification` mode is required for technical Wiro evidence with no participant
-present. This is an access boundary, not provider fallback.
+Wiro availability follows the startup-selected reference provider and its required server-only
+credentials. There is no separate pilot access mode. Missing configuration disables only that
+provider path and never causes provider fallback.
 
 | Boundary                    | Routes                                                                                                                                                                                                                |
 | --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Local status                | `GET /api/health`, `GET /api/capabilities`                                                                                                                                                                            |
 | Decart                      | `POST /api/realtime-token`                                                                                                                                                                                            |
-| Decart batch video          | `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, `DELETE /api/video-jobs/:jobId`                                                                                     |
+| Existing-video processing   | `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, `DELETE /api/video-jobs/:jobId`                                                                                     |
 | Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/import`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions` |
 | Local reference storage     | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                                                              |
 | ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `POST /api/elevenlabs/voice-changer/recording`                                                                                           |

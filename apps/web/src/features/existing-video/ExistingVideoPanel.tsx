@@ -1,4 +1,5 @@
 import { useTheme } from '@emotion/react';
+import type { CapabilitiesResponse } from '@studio/contracts';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
 import { hydrateReferenceImage } from '../../adapters/api-client/apiClient';
 import { validateReferenceImage } from '../../adapters/browser-media/imageValidation';
@@ -43,6 +44,7 @@ import type { VoiceBrowserCapabilities } from '../voice-effects/voiceCapabilitie
 type ExistingVideoPanelProps = {
   readonly workflow: ExistingVideoWorkflow;
   readonly videoProcessingAvailable: boolean;
+  readonly videoProcessingCapabilities?: CapabilitiesResponse['videoProcessing'];
   readonly elevenLabsAvailable?: boolean;
   readonly elevenLabsModel?: string | null;
   readonly browserCapabilities?: VoiceBrowserCapabilities;
@@ -69,6 +71,7 @@ type MissingVtonReferenceRecovery = Readonly<{
 export const ExistingVideoPanel = ({
   workflow,
   videoProcessingAvailable,
+  videoProcessingCapabilities,
   elevenLabsAvailable = false,
   elevenLabsModel = null,
   browserCapabilities,
@@ -79,6 +82,23 @@ export const ExistingVideoPanel = ({
   onRecordVideo,
 }: ExistingVideoPanelProps) => {
   const theme = useTheme();
+  const visualCapabilities: CapabilitiesResponse['videoProcessing'] =
+    videoProcessingCapabilities ?? {
+      characterSwap: {
+        available: videoProcessingAvailable,
+        inputPreparation: 'none',
+        referencePolicy: 'optional',
+        promptEnhancement: true,
+        terminalFailureRelease: 'automatic',
+      },
+      virtualTryOn: {
+        available: videoProcessingAvailable,
+        inputPreparation: 'none',
+        referencePolicy: 'optional',
+        promptEnhancement: true,
+        terminalFailureRelease: 'automatic',
+      },
+    };
   const pickerRef = useRef<HTMLInputElement>(null);
   const replacementPickerAuthorizedRef = useRef(false);
   const replaceButtonRef = useRef<HTMLButtonElement>(null);
@@ -451,8 +471,8 @@ export const ExistingVideoPanel = ({
           ) : null}
           {workflow.phase === 'error' && workflow.acceptedSubmission && workflow.retryJob ? (
             <StatusNotice tone="warning">
-              Decart accepted the original recipe. Changes below are saved for a possible later
-              submission; resuming checks the accepted job without submitting those changes.
+              Visual processing accepted the original recipe. Changes below are saved for a possible
+              later submission; resuming checks the accepted job without submitting those changes.
             </StatusNotice>
           ) : null}
 
@@ -487,6 +507,8 @@ export const ExistingVideoPanel = ({
                 workflow={workflow}
                 activeTool={activeTool}
                 locked={structureLocked}
+                characterSwapAvailable={visualCapabilities.characterSwap.available}
+                virtualTryOnAvailable={visualCapabilities.virtualTryOn.available}
                 onSelect={selectTool}
               />
 
@@ -526,6 +548,12 @@ export const ExistingVideoPanel = ({
                         structureLocked={structureLocked}
                         recipeLocked={recipeLocked}
                         recipeLoading={recipeLoading}
+                        referenceRequired={
+                          visualCapabilities.characterSwap.referencePolicy === 'required'
+                        }
+                        promptEnhancementSupported={
+                          visualCapabilities.characterSwap.promptEnhancement
+                        }
                         onApplySavedRecipe={(step, recipeId) =>
                           void applySavedRecipe(step, recipeId)
                         }
@@ -547,6 +575,10 @@ export const ExistingVideoPanel = ({
                         structureLocked={structureLocked}
                         recipeLocked={recipeLocked}
                         recipeLoading={recipeLoading}
+                        referenceRequired={false}
+                        promptEnhancementSupported={
+                          visualCapabilities.virtualTryOn.promptEnhancement
+                        }
                         onApplySavedRecipe={(step, recipeId) =>
                           void applySavedRecipe(step, recipeId)
                         }
@@ -588,6 +620,14 @@ export const ExistingVideoPanel = ({
       <ExistingVideoActionBar
         workflow={workflow}
         videoProcessingAvailable={videoProcessingAvailable}
+        {...(activeStep
+          ? {
+              activeVisualCapability:
+                activeStep.modelId === 'lucy-latest'
+                  ? visualCapabilities.characterSwap
+                  : visualCapabilities.virtualTryOn,
+            }
+          : {})}
         onFinish={onFinish}
         onEditSelected={() => {
           setActiveTool(null);

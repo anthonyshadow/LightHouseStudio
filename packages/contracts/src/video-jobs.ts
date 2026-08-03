@@ -5,6 +5,8 @@ export const VIDEO_PROVIDER_INTENT_VALUE = 'video' as const;
 
 export const VIDEO_TRANSFORM_MODEL_IDS = ['lucy-latest', 'lucy-vton-latest'] as const;
 export const videoTransformModelIdSchema = z.enum(VIDEO_TRANSFORM_MODEL_IDS);
+export const VIDEO_TRANSFORM_OPERATION_IDS = ['character-swap', 'virtual-try-on'] as const;
+export const videoTransformOperationIdSchema = z.enum(VIDEO_TRANSFORM_OPERATION_IDS);
 export const VIDEO_TRANSFORM_INPUT_KINDS = [
   'character',
   'saved-outfit',
@@ -54,7 +56,7 @@ export const videoJobErrorCodeSchema = z.enum(VIDEO_JOB_ERROR_CODES);
 
 export const videoTransformRecipeSchema = z
   .object({
-    modelId: videoTransformModelIdSchema,
+    operation: videoTransformOperationIdSchema,
     inputKind: videoTransformInputKindSchema.optional(),
     prompt: z
       .string()
@@ -73,7 +75,7 @@ export const videoTransformRecipeSchema = z
       });
       return;
     }
-    if (value.modelId === 'lucy-latest') {
+    if (value.operation === 'character-swap') {
       if (value.inputKind !== undefined && value.inputKind !== 'character') {
         context.addIssue({
           code: 'custom',
@@ -154,7 +156,7 @@ export const videoJobSafeErrorSchema = z
 export const videoJobStatusResponseSchema = z
   .object({
     jobId: z.uuid(),
-    modelId: videoTransformModelIdSchema,
+    operation: videoTransformOperationIdSchema,
     status: videoJobStatusSchema,
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
@@ -165,6 +167,7 @@ export const videoJobStatusResponseSchema = z
   .strict();
 
 export type VideoTransformModelId = z.infer<typeof videoTransformModelIdSchema>;
+export type VideoTransformOperationId = z.infer<typeof videoTransformOperationIdSchema>;
 export type VideoTransformInputKind = z.infer<typeof videoTransformInputKindSchema>;
 export type VideoInputMimeType = z.infer<typeof videoInputMimeTypeSchema>;
 export type VideoTransformRecipe = z.infer<typeof videoTransformRecipeSchema>;

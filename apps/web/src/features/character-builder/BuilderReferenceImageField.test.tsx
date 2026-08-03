@@ -50,7 +50,7 @@ describe('BuilderReferenceImageField presentation', () => {
     expect(input).toHaveAccessibleName('Upload imageDrag & drop or choose a file');
     expect(input).toHaveAttribute('accept', 'image/jpeg,image/png,image/webp');
     expect(input).toHaveAccessibleDescription(
-      'Optional character referenceJPEG, PNG, or WebP up to 10 MiB and 40 megapixels. Selecting a file stores an immutable local asset until this participant environment is retired. Detaching it later removes the relationship, not the stored bytes.',
+      'Optional character referenceJPEG, PNG, or WebP up to 10 MiB and 40 megapixels. Selecting a file stores an immutable local asset in the configured data directory. Detaching it later removes the relationship, not the stored bytes.',
     );
     await user.tab();
     expect(input).toHaveFocus();

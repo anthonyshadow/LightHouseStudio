@@ -73,8 +73,8 @@ accounts, remote exposure, cloud persistence, billing, or public data handling.
 ## Current qualification boundary
 
 The 2026-07-30 single-processing decision retired the ordered-chain checkpoint, so the current
-matrix has nine provider/local rows. No completed qualification records are checked in. At this
-documentation audit the validator reports **0/9 provider/local** and **0/45 physical** passes.
+matrix has eleven provider/local rows. No completed qualification records are checked in. At this
+documentation audit the validator reports **0/11 provider/local** and **0/45 physical** passes.
 Historical test runs and implemented automation do not replace the exact-candidate work in the
 active plan.
 

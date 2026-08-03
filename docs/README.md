@@ -8,30 +8,34 @@ Use the narrowest authoritative document. Do not copy detailed rules into severa
 | ----------------------------------------------------------- | ------------------------------------------------------------------------------------- |
 | [Project README](../README.md)                              | Product overview, setup, configuration, commands, and release posture                 |
 | [Repository working guide](../AGENTS.md)                    | Required engineering boundaries, validation, and stop conditions                      |
-| [Product state](product-state.md)                           | Current product, limitations, pilot status, decisions, and success hypotheses         |
+| [Product state](product-state.md)                           | Current product, limitations, decisions, and success hypotheses                       |
 | [Architecture](ARCHITECTURE.md)                             | Current dependency, ownership, lifecycle, persistence, API, and deployment boundaries |
 | [User stories](userStories/README.md)                       | Observable current journeys and their evidence limits                                 |
 | [Privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) | Data location, provider contact, retention, deletion, and cost boundaries             |
 
-## Controlled-pilot release
+## Historical controlled-pilot material
 
-| Document                                                           | Use                                                                                           |
-| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------------- |
-| [Release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md)           | Approved cohort, device/provider matrix, limits, data promise, roles, metrics, and escalation |
-| [Active implementation plan](project-audit-implementation-plan.md) | Incomplete exact-candidate, provider, physical, and moderated-pilot gates only                |
-| [Open findings](project-audit-findings.md)                         | Unresolved release findings and deferred public-product blockers                              |
-| [Completed work](project-audit-completed-work.md)                  | Durable summary of implemented audit outcomes; not release evidence                           |
-| [Qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md)          | Content-free evidence schema and validator contract                                           |
-| [Manual QA](MANUAL_QA.md)                                          | Physical device, touch, accessibility, media, and cleanup protocol                            |
-| [Live provider smoke](LIVE_PROVIDER_SMOKE.md)                      | Authorized, opt-in, cost-bearing provider qualification                                       |
-| [Data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md)    | Per-participant isolation and whole-environment cleanup                                       |
-| [Recording memory policy](RECORDING_MEMORY_POLICY.md)              | Real 300-second measurement and support gate                                                  |
-| [Browser support](BROWSER_SUPPORT.md)                              | Claimed browser/device support and current qualification status                               |
-| [Testing strategy](TESTING.md)                                     | Layer ownership, commands, CI scope, visual policy, and new-test guidance                     |
-| [Screenshot coverage](screenshot-test-coverage.md)                 | Curated visual matrix, baselines, and readiness rules                                         |
+The former controlled-pilot scope and its validator/drill commands were retired on 2026-08-03.
+These documents preserve rationale and possible future qualification inputs; they are not current
+runtime or release gates.
 
-The release contract changes only through an explicit product-owner decision. A runtime test or
-responsive layout does not qualify a physical target or live provider.
+| Document                                                           | Use                                                                                     |
+| ------------------------------------------------------------------ | --------------------------------------------------------------------------------------- |
+| [Release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md)           | Historical cohort, device/provider matrix, data promise, roles, metrics, and escalation |
+| [Active implementation plan](project-audit-implementation-plan.md) | Incomplete implementation and validation work; former pilot phases are paused           |
+| [Open findings](project-audit-findings.md)                         | Unresolved release findings and deferred public-product blockers                        |
+| [Completed work](project-audit-completed-work.md)                  | Durable summary of implemented audit outcomes; not release evidence                     |
+| [Qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md)          | Content-free evidence schema and validator contract                                     |
+| [Manual QA](MANUAL_QA.md)                                          | Physical device, touch, accessibility, media, and cleanup protocol                      |
+| [Live provider smoke](LIVE_PROVIDER_SMOKE.md)                      | Authorized, opt-in, cost-bearing provider qualification                                 |
+| [Data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md)    | Per-participant isolation and whole-environment cleanup                                 |
+| [Recording memory policy](RECORDING_MEMORY_POLICY.md)              | Real 300-second measurement and support gate                                            |
+| [Browser support](BROWSER_SUPPORT.md)                              | Claimed browser/device support and current qualification status                         |
+| [Testing strategy](TESTING.md)                                     | Layer ownership, commands, CI scope, visual policy, and new-test guidance               |
+| [Screenshot coverage](screenshot-test-coverage.md)                 | Curated visual matrix, baselines, and readiness rules                                   |
+
+Physical and live-provider results remain useful evidence but do not gate configured runtime
+features under the current scope.
 
 ## Focused technical references
 

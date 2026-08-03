@@ -7,50 +7,24 @@ import { z } from 'zod';
 import {
   VIDEO_RESULT_MAX_BYTES,
   type VideoInputMimeType,
-  type VideoTransformModelId,
+  type VideoTransformOperationId,
   type VideoTransformRecipe,
 } from '@studio/contracts';
+import {
+  type ExistingVideoJobProvider,
+  VideoJobProviderError,
+  type VideoJobProviderFailureReason,
+  type VideoJobProviderStatus,
+} from '../video-jobs/video-job-provider.js';
 
-export type DecartQueueStatus = 'pending' | 'processing' | 'completed' | 'failed';
+export type DecartQueueStatus = VideoJobProviderStatus;
+export type DecartVideoJobProvider = ExistingVideoJobProvider;
+export type DecartVideoProviderFailureReason = VideoJobProviderFailureReason;
 
-export interface DecartVideoJobProvider {
-  submit(input: {
-    readonly modelId: VideoTransformModelId;
-    readonly recipe: VideoTransformRecipe;
-    readonly videoPath: string;
-    readonly videoMimeType: VideoInputMimeType;
-    readonly referenceImagePath: string | null;
-    readonly referenceImageMimeType: 'image/jpeg' | 'image/png' | 'image/webp' | null;
-    readonly signal: AbortSignal;
-  }): Promise<{ readonly providerJobId: string; readonly status: DecartQueueStatus }>;
-  status(
-    providerJobId: string,
-    signal: AbortSignal,
-  ): Promise<{ readonly status: DecartQueueStatus }>;
-  download(providerJobId: string, destinationPath: string, signal: AbortSignal): Promise<void>;
-}
-
-export type DecartVideoProviderFailureReason =
-  | 'aborted'
-  | 'timeout'
-  | 'authentication'
-  | 'billing'
-  | 'quota'
-  | 'policy'
-  | 'rejected'
-  | 'invalid-response'
-  | 'result-too-large'
-  | 'upstream';
-
-export class DecartVideoProviderError extends Error {
-  readonly reason: DecartVideoProviderFailureReason;
-  readonly upstreamStatus?: number;
-
+export class DecartVideoProviderError extends VideoJobProviderError {
   constructor(reason: DecartVideoProviderFailureReason, upstreamStatus?: number) {
-    super('Decart video request failed.');
+    super(reason, upstreamStatus);
     this.name = 'DecartVideoProviderError';
-    this.reason = reason;
-    if (upstreamStatus !== undefined) this.upstreamStatus = upstreamStatus;
   }
 }
 
@@ -116,7 +90,7 @@ export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
   }
 
   async submit(input: {
-    readonly modelId: VideoTransformModelId;
+    readonly operation: VideoTransformOperationId;
     readonly recipe: VideoTransformRecipe;
     readonly videoPath: string;
     readonly videoMimeType: VideoInputMimeType;
@@ -152,8 +126,9 @@ export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
         `reference.${referenceExtension}`,
       );
     }
+    const modelId = input.operation === 'character-swap' ? 'lucy-latest' : 'lucy-vton-latest';
     const response = await this.#requestJson(
-      `${this.#baseUrl}/v1/jobs/${input.modelId}`,
+      `${this.#baseUrl}/v1/jobs/${modelId}`,
       {
         method: 'POST',
         headers: { 'X-API-KEY': this.#apiKey },

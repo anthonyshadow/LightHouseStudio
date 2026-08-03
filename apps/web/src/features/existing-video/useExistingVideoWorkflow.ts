@@ -1,13 +1,12 @@
 import {
+  type CapabilitiesResponse,
+  type InspectedVideo,
   type VideoJobStatusResponse,
   type VideoTransformModelId,
+  type VideoTransformOperationId,
   type VideoTransformRecipe,
 } from '@studio/contracts';
-import {
-  canSubmitPilotBatchJob,
-  validateUploadedVideoFacts,
-  validateVideoTransformPlan,
-} from '@studio/domain';
+import { validateUploadedVideoFacts, validateVideoTransformPlan } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   downloadVideoJobResult,
@@ -77,6 +76,7 @@ type UseExistingVideoWorkflowOptions = {
     input: Parameters<RecordingController['restorePersistedOriginal']>[0],
   ) => RecordingArtifact;
   readonly onSubmissionAccepted?: (step: ExistingVideoStep) => void;
+  readonly videoProcessingCapabilities?: CapabilitiesResponse['videoProcessing'];
 };
 
 const waitForPoll = (signal: AbortSignal): Promise<void> =>
@@ -92,8 +92,33 @@ const waitForPoll = (signal: AbortSignal): Promise<void> =>
     );
   });
 
+const operationForModel = (modelId: VideoTransformModelId): VideoTransformOperationId =>
+  modelId === 'lucy-latest' ? 'character-swap' : 'virtual-try-on';
+
+const capabilityForModel = (
+  modelId: VideoTransformModelId,
+  capabilities: CapabilitiesResponse['videoProcessing'],
+) => (modelId === 'lucy-latest' ? capabilities.characterSwap : capabilities.virtualTryOn);
+
 const stepLabel = (modelId: VideoTransformModelId): string =>
-  modelId === 'lucy-latest' ? 'Lucy' : 'VTO';
+  modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try-On';
+
+const defaultVideoProcessingCapabilities: CapabilitiesResponse['videoProcessing'] = {
+  characterSwap: {
+    available: true,
+    inputPreparation: 'none',
+    referencePolicy: 'optional',
+    promptEnhancement: true,
+    terminalFailureRelease: 'automatic',
+  },
+  virtualTryOn: {
+    available: true,
+    inputPreparation: 'none',
+    referencePolicy: 'optional',
+    promptEnhancement: true,
+    terminalFailureRelease: 'automatic',
+  },
+};
 
 class RetryExistingVideoJobError extends Error {
   constructor(message: string) {
@@ -117,7 +142,7 @@ const terminalJobMessage = (code: string | undefined): string | null => {
 
 const acceptedJobInterruptionMessage = (error: unknown, fallback: string): string => {
   if (error instanceof ApiClientError) {
-    return `${error.message} Decart already accepted this submission; resuming it does not create another submission.`;
+    return `${error.message} Visual processing already accepted this job; resuming it does not create another submission.`;
   }
   return fallback;
 };
@@ -127,6 +152,7 @@ export const useExistingVideoWorkflow = ({
   processing,
   publishUploadedVideo,
   onSubmissionAccepted,
+  videoProcessingCapabilities = defaultVideoProcessingCapabilities,
 }: UseExistingVideoWorkflowOptions) => {
   const [selection, setSelection] = useState<ValidatedExistingVideo | null>(null);
   const [step, setStep] = useState<ExistingVideoStep | null>(null);
@@ -134,12 +160,12 @@ export const useExistingVideoWorkflow = ({
   const [message, setMessage] = useState<string | null>(null);
   const [status, setStatus] = useState<VideoJobStatusResponse | null>(null);
   const [completedStepCount, setCompletedStepCount] = useState(0);
-  const [submittedModels, setSubmittedModels] = useState<readonly VideoTransformModelId[]>([]);
   const [acceptedSubmission, setAcceptedSubmission] = useState(false);
   const [pendingVisual, setPendingVisual] = useState<{
     blob: Blob;
     mimeType: string;
     stepIndex: number;
+    expectedResult: InspectedVideo;
   } | null>(null);
   const [retryJob, setRetryJob] = useState<{ jobId: string; stepIndex: number } | null>(null);
   const [comparison, setComparison] = useState<'original' | 'result'>('result');
@@ -147,6 +173,7 @@ export const useExistingVideoWorkflow = ({
   const [voiceSelection, setVoiceSelection] = useState<ExistingVideoVoiceSelection | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const controllerRef = useRef<AbortController | null>(null);
+  const retainedJobIdRef = useRef<string | null>(null);
   const generationRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
   const steps = useMemo<readonly ExistingVideoStep[]>(() => (step ? [step] : []), [step]);
@@ -163,8 +190,16 @@ export const useExistingVideoWorkflow = ({
     setRetryJob(null);
   }, []);
 
+  const releaseRetainedJob = useCallback(() => {
+    const jobId = retainedJobIdRef.current;
+    if (!jobId) return;
+    retainedJobIdRef.current = null;
+    void releaseVideoJob(jobId).catch(() => undefined);
+  }, []);
+
   const reset = useCallback(
     (discardTake = false) => {
+      releaseRetainedJob();
       clearOperation();
       if (discardTake) recording.discard();
       setSelection(null);
@@ -176,12 +211,13 @@ export const useExistingVideoWorkflow = ({
       setEditBase(null);
       setVoiceSelection(null);
     },
-    [clearOperation, recording],
+    [clearOperation, recording, releaseRetainedJob],
   );
 
   const selectFile = useCallback(
     async (file: File) => {
       if (acceptedSubmission) return;
+      releaseRetainedJob();
       clearOperation();
       const generation = generationRef.current;
       const controller = new AbortController();
@@ -238,12 +274,13 @@ export const useExistingVideoWorkflow = ({
         if (controllerRef.current === controller) controllerRef.current = null;
       }
     },
-    [acceptedSubmission, clearOperation, publishUploadedVideo, recording],
+    [acceptedSubmission, clearOperation, publishUploadedVideo, recording, releaseRetainedJob],
   );
 
   const adoptRecordedArtifact = useCallback(async () => {
     const draft = recording.original;
     if (!draft || recording.lifecycle !== 'recorded' || acceptedSubmission) return;
+    releaseRetainedJob();
     clearOperation();
     const generation = generationRef.current;
     const controller = new AbortController();
@@ -301,7 +338,7 @@ export const useExistingVideoWorkflow = ({
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
     }
-  }, [acceptedSubmission, clearOperation, publishUploadedVideo, recording]);
+  }, [acceptedSubmission, clearOperation, publishUploadedVideo, recording, releaseRetainedJob]);
 
   const addStep = useCallback(
     (modelId: VideoTransformModelId): boolean => {
@@ -309,7 +346,7 @@ export const useExistingVideoWorkflow = ({
       if (
         selection &&
         modelId === 'lucy-vton-latest' &&
-        validateUploadedVideoFacts(selection.metadata, [{ modelId }]).some(
+        validateUploadedVideoFacts(selection.metadata, ['virtual-try-on']).some(
           (issue) => issue.code === 'payload-too-large',
         )
       ) {
@@ -358,6 +395,7 @@ export const useExistingVideoWorkflow = ({
       stepIndex: number,
       controller: AbortController,
       generation: number,
+      expectedResult: InspectedVideo,
     ): Promise<RecordingArtifact | null> => {
       if (!selection) throw new Error('The immutable source video is unavailable.');
       setPhase('finalizing');
@@ -366,17 +404,28 @@ export const useExistingVideoWorkflow = ({
         title: 'Validating visual result…',
         detail: 'Checking the retrieved video before it can replace the current result.',
       });
-      const validatedResult = await validateExistingVideo(
-        new File([resultBlob], 'result.mp4', { type: mimeType || resultBlob.type || 'video/mp4' }),
-        false,
-        controller.signal,
-      );
+      let validatedResult: Awaited<ReturnType<typeof validateExistingVideo>>;
+      try {
+        validatedResult = await validateExistingVideo(
+          new File([resultBlob], 'result.mp4', {
+            type: mimeType || resultBlob.type || 'video/mp4',
+          }),
+          false,
+          controller.signal,
+          'server-approved-result',
+        );
+      } catch (error) {
+        controller.signal.throwIfAborted();
+        throw new Error(
+          'The downloaded visual result did not meet the app-owned media requirements.',
+          { cause: error },
+        );
+      }
       if (
         Math.abs(validatedResult.metadata.durationMs - selection.metadata.durationMs) > 500 ||
-        !(
-          (validatedResult.metadata.width === 1_280 && validatedResult.metadata.height === 720) ||
-          (validatedResult.metadata.width === 720 && validatedResult.metadata.height === 1_280)
-        ) ||
+        validatedResult.metadata.width !== expectedResult.width ||
+        validatedResult.metadata.height !== expectedResult.height ||
+        Math.abs(validatedResult.metadata.durationMs - expectedResult.durationMs) > 1 ||
         validatedResult.metadata.width > validatedResult.metadata.height !==
           selection.metadata.width > selection.metadata.height
       ) {
@@ -402,7 +451,7 @@ export const useExistingVideoWorkflow = ({
         try {
           if (selection.metadata.hasAudio) {
             if (!recording.sidecar.blob) {
-              setPendingVisual({ blob: resultBlob, mimeType, stepIndex });
+              setPendingVisual({ blob: resultBlob, mimeType, stepIndex, expectedResult });
               throw new Error(
                 'The visual result is retained for a local retry, but source audio was unavailable.',
               );
@@ -416,7 +465,7 @@ export const useExistingVideoWorkflow = ({
             composed = await stripRecordingAudio(resultBlob, controller.signal);
           }
         } catch (error) {
-          setPendingVisual({ blob: resultBlob, mimeType, stepIndex });
+          setPendingVisual({ blob: resultBlob, mimeType, stepIndex, expectedResult });
           throw error;
         }
         controller.signal.throwIfAborted();
@@ -439,7 +488,7 @@ export const useExistingVideoWorkflow = ({
       const artifact = recording.completeVisualProcessing(
         normalized.blob,
         normalized.mimeType,
-        `${stepLabel(step.modelId).toLowerCase()}-${stepIndex + 1}`,
+        `${operationForModel(step.modelId)}-${stepIndex + 1}`,
         editBase ?? recording.original ?? undefined,
       );
       setComparison('result');
@@ -485,7 +534,7 @@ export const useExistingVideoWorkflow = ({
             error,
             jobId,
             stepIndex,
-            'The status check was interrupted. Retry status without creating another Decart submission.',
+            'The status check was interrupted. Retry status without creating another visual-processing submission.',
           );
         }
         if (generation !== generationRef.current) return null;
@@ -498,7 +547,7 @@ export const useExistingVideoWorkflow = ({
             current.status === 'retrieving'
               ? 'Retrieving visual result…'
               : `Generating ${currentStep ? stepLabel(currentStep.modelId).toLowerCase() : 'visual edit'}…`,
-          detail: 'Decart is processing the single accepted visual submission.',
+          detail: 'Visual processing is running for the single accepted job.',
         });
         if (!['ready', 'failed', 'expired'].includes(current.status)) {
           await waitForPoll(controller.signal);
@@ -506,7 +555,16 @@ export const useExistingVideoWorkflow = ({
       }
       if (current.status !== 'ready') {
         setRetryJob(null);
-        await releaseVideoJob(jobId).catch(() => undefined);
+        const currentStep = steps[stepIndex];
+        const terminalFailureRelease = currentStep
+          ? capabilityForModel(currentStep.modelId, videoProcessingCapabilities)
+              .terminalFailureRelease
+          : 'automatic';
+        if (terminalFailureRelease === 'explicit-user') {
+          retainedJobIdRef.current = jobId;
+        } else {
+          await releaseVideoJob(jobId).catch(() => undefined);
+        }
         throw new Error(
           terminalJobMessage(current.error?.code) ??
             current.error?.message ??
@@ -517,7 +575,7 @@ export const useExistingVideoWorkflow = ({
       recording.beginProcessing({
         kind: 'visual-retrieval',
         title: 'Retrieving visual result…',
-        detail: 'Downloading and validating the accepted Decart result.',
+        detail: 'Downloading and validating the accepted visual result.',
       });
       let blob: Blob;
       try {
@@ -528,21 +586,24 @@ export const useExistingVideoWorkflow = ({
           error,
           jobId,
           stepIndex,
-          'The result download was interrupted. Retry it without creating another Decart submission.',
+          'The result download was interrupted. Retry it without creating another visual-processing submission.',
         );
       }
-      await releaseVideoJob(jobId).catch(() => undefined);
       setRetryJob(null);
       setStatus(null);
+      if (!current.result) {
+        throw new Error('The accepted visual result metadata was unavailable.');
+      }
       return finalizeVisual(
         blob,
         blob.type || current.result?.mimeType || 'video/mp4',
         stepIndex,
         controller,
         generation,
+        current.result,
       );
     },
-    [finalizeVisual, jobInterruption, recording, status, steps],
+    [finalizeVisual, jobInterruption, recording, status, steps, videoProcessingCapabilities],
   );
 
   const applySelectedVoice = useCallback(
@@ -600,6 +661,23 @@ export const useExistingVideoWorkflow = ({
       const source = baseArtifact?.media;
       const step = steps[stepIndex];
       if (!selection || !source || !step || acceptedSubmission) return;
+      const operation = operationForModel(step.modelId);
+      const capability = capabilityForModel(step.modelId, videoProcessingCapabilities);
+      if (!capability.available) {
+        setPhase('error');
+        setMessage(`${stepLabel(step.modelId)} is unavailable in this server configuration.`);
+        return;
+      }
+      if (capability.referencePolicy === 'required' && !step.referenceImage) {
+        setPhase('error');
+        setMessage('Character Swap requires a reference image in this configuration.');
+        return;
+      }
+      if (!capability.promptEnhancement && step.enhancePrompt) {
+        setPhase('error');
+        setMessage('Prompt enhancement is unavailable for Character Swap in this configuration.');
+        return;
+      }
       const planIssues = validateVideoTransformPlan(
         steps.map((candidate) => ({
           ...candidate,
@@ -611,13 +689,7 @@ export const useExistingVideoWorkflow = ({
         setMessage(planIssues[0]);
         return;
       }
-      if (!canSubmitPilotBatchJob(submittedModels, step.modelId)) {
-        setPhase('error');
-        setMessage(
-          'This moderated participant has reached the four-submission batch limit or the two-submission model limit.',
-        );
-        return;
-      }
+      releaseRetainedJob();
       clearOperation();
       const generation = generationRef.current;
       const controller = new AbortController();
@@ -630,26 +702,53 @@ export const useExistingVideoWorkflow = ({
       recording.beginProcessing({
         kind: 'visual-upload',
         title: `Uploading ${stepLabel(step.modelId).toLowerCase()} edit…`,
-        detail: 'Sending the selected video and recipe to Decart.',
+        detail: 'Preparing the selected video and recipe for visual processing.',
       });
       const recipe: VideoTransformRecipe = {
-        modelId: step.modelId,
+        operation,
         inputKind: step.inputKind,
         prompt: step.prompt.trim(),
         enhancePrompt: step.enhancePrompt,
         hasReferenceImage: step.referenceImage !== null,
       };
       try {
+        let submissionSource = source;
+        if (capability.inputPreparation === 'h264-mp4' && source.type !== 'video/mp4') {
+          setPhase('transcoding');
+          recording.beginProcessing({
+            kind: 'transcoding',
+            title: 'Preparing H.264 MP4 source…',
+            detail: 'Converting a temporary submission copy while preserving the immutable source.',
+          });
+          const converted = await transcodeRecordingToMp4(source, {
+            requireAudio: selection.metadata.hasAudio,
+            signal: controller.signal,
+          });
+          const validatedPrepared = await validateExistingVideo(
+            new File([converted.blob], 'character-swap-source.mp4', {
+              type: converted.mimeType,
+            }),
+            false,
+            controller.signal,
+          );
+          if (
+            validatedPrepared.metadata.container !== 'mp4' ||
+            validatedPrepared.metadata.videoCodec !== 'avc'
+          ) {
+            throw new Error('The temporary Character Swap source could not be prepared safely.');
+          }
+          submissionSource = validatedPrepared.file;
+          setPhase('uploading');
+        }
         const submitted = await submitVideoJob(
           jobId,
           recipe,
-          source,
+          submissionSource,
           step.referenceImage,
           controller.signal,
         );
         if (generation !== generationRef.current) return;
         setAcceptedSubmission(true);
-        setSubmittedModels((current) => [...current, step.modelId]);
         try {
           onSubmissionAccepted?.(step);
         } catch {
@@ -686,9 +785,10 @@ export const useExistingVideoWorkflow = ({
       pollAndFinalize,
       onSubmissionAccepted,
       recording,
+      releaseRetainedJob,
       selection,
       steps,
-      submittedModels,
+      videoProcessingCapabilities,
       voiceSelection,
     ],
   );
@@ -739,6 +839,7 @@ export const useExistingVideoWorkflow = ({
         pendingVisual.stepIndex,
         controller,
         generation,
+        pendingVisual.expectedResult,
       );
       await completeVisualArtifact(artifact, voiceSelection);
     } catch (error) {
@@ -765,7 +866,7 @@ export const useExistingVideoWorkflow = ({
     recording.beginProcessing({
       kind: 'visual-generation',
       title: 'Resuming visual generation…',
-      detail: 'Checking the accepted Decart job without creating a new submission.',
+      detail: 'Checking the accepted visual-processing job without creating a new submission.',
     });
     try {
       const artifact = await pollAndFinalize(
@@ -898,7 +999,6 @@ export const useExistingVideoWorkflow = ({
       message,
       status,
       completedStepCount,
-      submittedModels,
       acceptedSubmission,
       pendingVisual,
       retryJob,
@@ -980,7 +1080,6 @@ export const useExistingVideoWorkflow = ({
       steps,
       submitStep,
       submitPlan,
-      submittedModels,
       updateStep,
       voiceSelection,
     ],

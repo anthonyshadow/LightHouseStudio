@@ -109,8 +109,22 @@ before submission, and submits only that selected exact model. Start over retain
 source and clears the visual choice before another explicit plan.
 
 The accepted H.264/VP8 subset, 720p result checks, source-audio restoration, 500 ms duration
-tolerance, temporary storage, and four-submission participant limit are app-owned conservative
-policy until exact-model live and physical qualification is complete.
+tolerance, and temporary storage are app-owned conservative policy until exact-model live and
+physical qualification is complete.
+
+On 2026-08-03, fixed participant-total and per-operation visual batch submission counters were
+removed from both browser orchestration and the loopback broker. Submissions remain explicit,
+potentially billable, operator-approved actions; the one-active-job rule and prohibition on
+automatic billable retry or provider fallback remain unchanged.
+
+On 2026-08-02, existing-video Character Swap gained a startup-selected Pruna
+`p-video-replace` alternative while realtime Character and all VTO work remained on Decart. The
+browser/API boundary moved from batch model identifiers to provider-neutral Character Swap/VTO
+operation capabilities. Pruna requires one identity reference, disables prompt enhancement, and
+uses locally prepared ephemeral H.264 MP4 for compatible MOV/WebM sources. Decart retains exact
+Lucy endpoints and 720p output; Pruna qualification is split into pinned 720p and 1080p rows. There
+is no UI provider selector, fallback, automatic initial retry, or claim that local cleanup deletes
+Pruna inputs/results.
 
 ## Scope remains intentionally local
 

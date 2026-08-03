@@ -5,8 +5,22 @@ import type { CapabilityState } from './StudioHeader';
 
 const unavailableProviders: ProviderAvailability = {
   decart: false,
-  videoProcessing: false,
-  videoProcessingModels: [],
+  videoProcessing: {
+    characterSwap: {
+      available: false,
+      inputPreparation: 'none',
+      referencePolicy: 'optional',
+      promptEnhancement: false,
+      terminalFailureRelease: 'automatic',
+    },
+    virtualTryOn: {
+      available: false,
+      inputPreparation: 'none',
+      referencePolicy: 'optional',
+      promptEnhancement: false,
+      terminalFailureRelease: 'automatic',
+    },
+  },
   elevenLabs: false,
   elevenLabsModel: null,
   referenceImages: false,

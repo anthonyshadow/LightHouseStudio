@@ -77,7 +77,7 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
         throw new AppError(
           503,
           'provider_unavailable',
-          'Decart batch video processing is unavailable until DECART_API_KEY is configured.',
+          'Visual processing is unavailable until its server configuration is complete.',
         );
       }
       const ownerId = localOwnerIdForRequest(request);
@@ -131,7 +131,7 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
             await writePart(
               part.file,
               paths.inputPath,
-              recipe.modelId === 'lucy-vton-latest'
+              recipe.operation === 'virtual-try-on'
                 ? VTON_VIDEO_INPUT_MAX_BYTES
                 : VIDEO_INPUT_MAX_BYTES,
             );

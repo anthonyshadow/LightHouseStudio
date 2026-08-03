@@ -221,8 +221,20 @@ describe('reference image API client', () => {
           JSON.stringify({
             realtimeVideo: { available: true, models: ['lucy-latest'] },
             videoProcessing: {
-              available: true,
-              models: ['lucy-latest', 'lucy-vton-latest'],
+              characterSwap: {
+                available: true,
+                inputPreparation: 'h264-mp4',
+                referencePolicy: 'required',
+                promptEnhancement: false,
+                terminalFailureRelease: 'explicit-user',
+              },
+              virtualTryOn: {
+                available: true,
+                inputPreparation: 'none',
+                referencePolicy: 'optional',
+                promptEnhancement: true,
+                terminalFailureRelease: 'automatic',
+              },
             },
             elevenLabs: { available: false, modelId: null },
             referenceImages: {
@@ -245,6 +257,15 @@ describe('reference image API client', () => {
     );
 
     await expect(fetchProviderAvailability()).resolves.toMatchObject({
+      videoProcessing: {
+        characterSwap: {
+          available: true,
+          inputPreparation: 'h264-mp4',
+          referencePolicy: 'required',
+          promptEnhancement: false,
+          terminalFailureRelease: 'explicit-user',
+        },
+      },
       referenceImages: true,
       referenceImageEditAvailable: true,
       referenceImageProvider: 'openai',

@@ -1,5 +1,8 @@
 # Controlled-pilot release contract
 
+> Historical scope: retired on 2026-08-03. This contract is not a current runtime or release gate;
+> pilot-specific access modes, submission caps, validators, and cleanup jobs have been removed.
+
 **Approved:** 2026-07-28
 
 **Scope:** Moderated, local, single-operator, loopback-only pilot
@@ -30,8 +33,9 @@ automated, physical-device, accessibility, memory, cleanup, and live-provider ev
 The exact executable matrix is
 [`qualification/required-matrix.json`](qualification/required-matrix.json):
 
-- `9` provider/local requirements: no-key Local; realtime Decart Character and VTO; batch
-  `lucy-latest`; batch `lucy-vton-latest`; ElevenLabs; OpenAI; BFL; and operator-only Wiro.
+- `11` provider/local requirements: no-key Local; realtime Decart Character and VTO; Decart batch
+  `lucy-latest`; Decart batch `lucy-vton-latest`; Pruna Character Swap at 720p and 1080p;
+  ElevenLabs; OpenAI; BFL; and operator-only Wiro.
 - `45` physical device/browser rows across one desktop, Apple/Android phones, and
   Apple/Android tablets.
 
@@ -58,11 +62,7 @@ Use [Manual QA](MANUAL_QA.md), [live provider smoke](LIVE_PROVIDER_SMOKE.md), th
 [evidence contract](PILOT_QUALIFICATION_EVIDENCE.md). Responsive emulation, fakes, and evidence
 from another commit do not qualify a physical/live row.
 
-Current repository evidence is open: there are no committed pass records. Re-run:
-
-```bash
-pnpm pilot:qualification:check --commit "$(git rev-parse HEAD)" --verbose
-```
+Current repository evidence remains historical; the pilot validator command has been removed.
 
 ## Independent five-minute boundaries
 
@@ -95,11 +95,15 @@ The two clocks are independent even though they share a number.
 ### Uploaded video and batch processing
 
 - The accepted pilot subset is MP4 or MOV with H.264 and WebM with VP8, at 16:9 or 9:16, no
-  longer than 300 seconds. Local/Lucy-only input is at most 300,000,000 bytes; any VTO workflow is
+  longer than 300 seconds. Local/Character Swap input is at most 300,000,000 bytes; any VTO workflow is
   at most 200,000,000 bytes.
-- A workflow may select Lucy or VTO as its single active batch transformation, never both. The
-  creator may switch the active choice before submission; only the active model is submitted.
-- The UI reports one planned Decart submission, never fabricated percentages or hard-coded
+- A workflow may select Character Swap or VTO as its single active batch transformation, never
+  both. The creator may switch the active choice before submission; only the active operation is
+  submitted. Character Swap uses the startup-selected Decart or Pruna provider; VTO remains Decart.
+- Pruna Character Swap requires one identity reference and locally prepared H.264 MP4. MP4 is
+  pass-through; compatible MOV/WebM is converted and revalidated only at explicit Start. Prompt
+  enhancement is unavailable. The UI exposes no provider choice or name.
+- The UI reports one planned visual-processing submission, never fabricated percentages or hard-coded
   credit/currency pricing.
 - Visual results must retain orientation, differ from source duration by no more than 500 ms, and
   restore immutable source audio before promotion. ElevenLabs receives source audio only.
@@ -125,6 +129,9 @@ The two clocks are independent even though they share a number.
 - Retain only aggregated content-free counts after cleanup, with no participant lookup key.
 - Local cleanup is not provider-side deletion. Review the exact provider account terms/settings
   before contact and disclose that boundary.
+- Pruna documents uploaded input availability of approximately 30 minutes and generated delivery
+  availability typically lasting 24 hours. No documented cancellation/deletion endpoint is part
+  of this contract; qualification records observed retention without claiming remote deletion.
 
 Follow the [data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md) for every participant.
 Any uncertain path, shared profile/root, unresolved relationship, or provider-cleanup warning
@@ -136,17 +143,19 @@ All permanent credentials are least-privilege, server-only, and operator-owned. 
 providers are separate startup-selected passes with no provider fallback or automatic retry of an
 initial billable submission.
 
-| Provider          | Approved configuration                                                                                    | Participant rule                                                |
-| ----------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| Decart Character  | Exact `lucy-latest`; model/origin-scoped token; 300-second active limit                                   | After disclosure and live qualification                         |
-| Decart VTO        | Exact `lucy-vton-latest`; no moving alias                                                                 | One garment/plain background; no fit/sizing/purchase claim      |
-| Decart batch Lucy | Exact `lucy-latest`; asynchronous submit/status/content; fixed 720p; no automatic initial retry           | One explicit submission per step after disclosure               |
-| Decart batch VTO  | Exact `lucy-vton-latest`; asynchronous submit/status/content; fixed 720p; no automatic initial retry      | Rights, consent, and limitations before each submission         |
-| OpenAI optimizer  | `gpt-5.6`, `medium`, version `lucy-character-reference-v1`, 120-second timeout, response storage disabled | Explicit optimize/generate path only                            |
-| OpenAI image      | `gpt-image-2`, `high`, one result, 150-second timeout, zero SDK retries                                   | Explicit image action only                                      |
-| BFL image         | `flux-2-pro`, safety tolerance `2`, prompt upsampling disabled, one 150-second deadline                   | Separate live qualification                                     |
-| Wiro image        | `seedream-v5-lite-uncensored`, one 2k result, watermark off, one 180-second deadline, `InputOutputDelete` | Operator qualification only; never external participants        |
-| ElevenLabs        | Saved voices; `eleven_multilingual_sts_v2`; `ELEVENLABS_ENABLE_LOGGING=false`; restricted key             | Participant Apply requires confirmed zero-retention eligibility |
+| Provider              | Approved configuration                                                                                              | Participant rule                                                                                             |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| Decart Character      | Exact `lucy-latest`; model/origin-scoped token; 300-second active limit                                             | After disclosure and live qualification                                                                      |
+| Decart VTO            | Exact `lucy-vton-latest`; no moving alias                                                                           | One garment/plain background; no fit/sizing/purchase claim                                                   |
+| Decart batch Lucy     | Exact `lucy-latest`; asynchronous submit/status/content; fixed 720p; no automatic initial retry                     | One explicit submission per step after disclosure                                                            |
+| Decart batch VTO      | Exact `lucy-vton-latest`; asynchronous submit/status/content; fixed 720p; no automatic initial retry                | Rights, consent, and limitations before each submission                                                      |
+| Pruna Character 720p  | Exact `p-video-replace`; one reference; MP4 driver; `save_audio=true`; no webhook/fallback; $0.03/s published price | Separate pricing, entitlement, dimensions, retention, and recovery qualification                             |
+| Pruna Character 1080p | Exact `p-video-replace`; one reference; MP4 driver; `save_audio=true`; no webhook/fallback; $0.06/s published price | Separate pricing, entitlement, dimensions, retention, and recovery qualification; no quantified timing claim |
+| OpenAI optimizer      | `gpt-5.6`, `medium`, version `lucy-character-reference-v1`, 120-second timeout, response storage disabled           | Explicit optimize/generate path only                                                                         |
+| OpenAI image          | `gpt-image-2`, `high`, one result, 150-second timeout, zero SDK retries                                             | Explicit image action only                                                                                   |
+| BFL image             | `flux-2-pro`, safety tolerance `2`, prompt upsampling disabled, one 150-second deadline                             | Separate live qualification                                                                                  |
+| Wiro image            | `seedream-v5-lite-uncensored`, one 2k result, watermark off, one 180-second deadline, `InputOutputDelete`           | Operator qualification only; never external participants                                                     |
+| ElevenLabs            | Saved voices; `eleven_multilingual_sts_v2`; `ELEVENLABS_ENABLE_LOGGING=false`; restricted key                       | Participant Apply requires confirmed zero-retention eligibility                                              |
 
 Stop the pass if a model, safety/retention setting, entitlement, or account capability differs.
 Do not follow aliases, loosen safety, enable provider logging, switch provider, or resubmit a paid
@@ -179,13 +188,14 @@ One person may hold several roles, but every live pass records the authorizing/w
 Limits per participant:
 
 - 30 cumulative connected Decart minutes across Character and VTO;
-- 4 Decart batch submissions, at most 2 for either exact batch model;
 - 10 image generation/edit/composition submissions across all separately selected provider passes;
 - 3 ElevenLabs conversions;
 - stop a provider path after two requests that may have incurred cost; and
 - provider work only while the operator is present and the Billing Authorizer approves.
 
-These are moderated operator limits, not runtime entitlements or billing truth.
+These are moderated operator limits, not runtime entitlements or billing truth. Visual batch
+processing has no participant-total or per-operation submission-count cap; each submission still
+requires an explicit creator action and operator-approved provider work.
 
 ## Evidence, support, and release gate
 
@@ -203,7 +213,5 @@ exposure, isolation doubt, or cleanup failure:
 4. revoke affected credentials and retire the environment when exposure is possible; and
 5. resume only after the responsible role records a safe disposition.
 
-Pilot release remains blocked until the normal release commands pass and the exact candidate has
-`9/9` provider/local plus `45/45` physical rows, complete accessibility/memory/cleanup evidence,
-and a passed retirement record for every participant. Accounts, cloud ownership/portability,
-billing, public sharing, and remote operations remain deferred.
+This former release gate no longer blocks current application use or project validation. Accounts,
+cloud ownership/portability, billing, public sharing, and remote operations remain deferred.

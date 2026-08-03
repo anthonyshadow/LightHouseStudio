@@ -95,6 +95,7 @@ const recordingController = (): RecordingController => {
     completeVisualProcessing: vi.fn().mockReturnValue(original),
     completeProcessing: vi.fn().mockReturnValue(original),
     failProcessing: vi.fn(),
+    repairPresentedObjectUrl: vi.fn().mockReturnValue(false),
     clearVisualProcessing: vi.fn(),
     restoreOriginal: vi.fn(),
   };

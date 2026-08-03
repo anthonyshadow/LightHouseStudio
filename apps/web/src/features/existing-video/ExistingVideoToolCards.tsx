@@ -41,6 +41,8 @@ export interface ExistingVideoToolCardsProps {
   readonly workflow: ExistingVideoWorkflow;
   readonly activeTool: ExistingVideoToolId | null;
   readonly locked: boolean;
+  readonly characterSwapAvailable?: boolean;
+  readonly virtualTryOnAvailable?: boolean;
   readonly onSelect: (tool: ExistingVideoToolId, trigger: HTMLButtonElement) => void;
 }
 
@@ -48,6 +50,8 @@ export const ExistingVideoToolCards = ({
   workflow,
   activeTool,
   locked,
+  characterSwapAvailable = true,
+  virtualTryOnAvailable = true,
   onSelect,
 }: ExistingVideoToolCardsProps) => {
   const theme = useTheme();
@@ -56,7 +60,10 @@ export const ExistingVideoToolCards = ({
   const selectedVisualTool = viewedVisualTool ?? configuredVisualTool;
 
   const renderTool = (tool: ToolDefinition) => {
-    const unavailable = tool.id === 'voice' && !workflow.voiceAvailable;
+    const unavailable =
+      (tool.id === 'voice' && !workflow.voiceAvailable) ||
+      (tool.id === 'character' && !characterSwapAvailable) ||
+      (tool.id === 'vton' && !virtualTryOnAvailable);
     const selected =
       tool.id === 'voice'
         ? activeTool === 'voice' || workflow.voiceSelection !== null
@@ -65,7 +72,9 @@ export const ExistingVideoToolCards = ({
     const descriptionId = `existing-video-tool-${tool.id}-description`;
     const statusId = `existing-video-tool-${tool.id}-status`;
     const description = unavailable
-      ? 'The source has no usable audio.'
+      ? tool.id === 'voice'
+        ? 'The source has no usable audio.'
+        : 'This visual operation is unavailable in the current server configuration.'
       : tool.id !== 'voice' &&
           configuredVisualTool &&
           configuredVisualTool !== tool.id &&
@@ -89,7 +98,7 @@ export const ExistingVideoToolCards = ({
           <small id={descriptionId}>{description}</small>
         </span>
         <span id={statusId} css={toolStatusStyles(theme, selected)}>
-          {status}
+          {unavailable ? 'Unavailable' : status}
         </span>
       </button>
     );

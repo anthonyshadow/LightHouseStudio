@@ -21,21 +21,14 @@ pnpm audit:all
 pnpm audit:prod
 ```
 
-Then obtain the exact required rows/check IDs:
-
-```bash
-pnpm pilot:qualification:check --commit "$(git rev-parse HEAD)" --verbose
-```
-
 Use the devices and browser versions in
 [`qualification/required-matrix.json`](qualification/required-matrix.json). Record only the fields
-allowed by [qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md). Never attach credentials,
+allowed by the historical [qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md). Never attach credentials,
 tokens, participant codes, personal media, raw provider responses, URLs, headers, device IDs, or
 network archives.
 
-Provider checks use the separate [gated live procedure](LIVE_PROVIDER_SMOKE.md). OpenAI, BFL, and
-Wiro require separate startups; Wiro is operator-only. Participant ElevenLabs Apply requires
-confirmed zero-retention eligibility.
+Provider checks use the separate [gated live procedure](LIVE_PROVIDER_SMOKE.md). Pruna 720p,
+Pruna 1080p, OpenAI, BFL, and Wiro require separate startup-selected passes.
 
 ## Per-row physical protocol
 
@@ -52,7 +45,7 @@ primary flows in [user stories](userStories/README.md) and record every applicab
 | `vto-capture`                  | Exact pinned VTO Start/Apply, image-only does not invent text, short playable take                                                                                                                                                |
 | `upload-select-replace-remove` | Native picker and drop publish compatible media without camera/provider work; replace/remove revokes only owned URLs                                                                                                              |
 | `upload-local-download`        | A zero-step H.264 MP4/MOV or VP8 WebM source previews and downloads with no external request                                                                                                                                      |
-| `upload-single-visual-step`    | Lucy/VTO selector switches both ways; only the active model submits once, returns inspected 720p output, and restores source audio                                                                                                |
+| `upload-single-visual-step`    | Character Swap/VTO selector switches both ways; only the active operation submits once, returns the configured exact or bounded resolution-class result, and restores source audio                                                |
 | `upload-voice`                 | Local and ElevenLabs Voice use immutable uploaded source audio and apply to the latest visual result                                                                                                                              |
 | `upload-record-to-source`      | Control-bar and panel Record intents use the persistent stage, warn/stop at 270/300 seconds, finalize, and adopt the normalized local artifact into the editor without provider traffic; no inline player participates in capture |
 | `upload-compare-edit`          | Inline player and shared stage follow Original/Result; Result is conditional; Edit snapshots the selected base; superseded URLs release only after healthy commit                                                                 |
@@ -143,7 +136,15 @@ preview/generation region; **Review & Generate** moves focus to it without dupli
 - Exercise accepted H.264 MP4, H.264 MOV, and VP8 WebM plus rejected HEVC/ProRes/VP9/alias cases.
   Confirm the full accessible filename is available without being sent to the server/provider.
 - Verify source duration/aspect/byte boundaries, no-audio visual use, Voice-disabled explanation,
-  VTO's lower input cap, exact 720p result orientation, and the 500 ms synchronization tolerance.
+  VTO's lower input cap, server-approved 720p/1080p result class and orientation, and the 500 ms
+  synchronization tolerance. With a fake or controlled nonconforming result, confirm the safe
+  failure identifies actual and expected result dimensions instead of blaming the valid source
+  aspect ratio; the browser must show result-specific guidance with no provider details.
+  Confirm exact-size operations still reject non-canonical dimensions, while the megapixel-budget
+  policy warns and continues with inspected dimensions when the source orientation agrees.
+  Source-file selection must continue rejecting non-9:16/16:9 input. Confirm a Pruna terminal
+  failure issues no DELETE until explicit user discard/replacement, while Decart retains automatic
+  terminal-failure release.
 - In **Choose your edits**, verify Character Swap and Virtual Try On behave as one-of-two visual
   choices while Voice remains independently selectable. Empty visual setups switch immediately;
   configured setups require a topmost confirmation whose cancel path preserves every value and
@@ -151,17 +152,20 @@ preview/generation region; **Review & Generate** moves focus to it without dupli
   visit both visual editors, and return to Voice; confirm the saved Voice and browser state remain
   selected until **Clear Voice setup** is used. Run a combined Character/VTO plus Voice plan and
   confirm the visual commits first, the result remains locked until Voice finishes, and a Voice
-  retry uses that visual without another Decart submission.
+  retry uses that visual without another visual-processing submission.
 - In Character Swap, choose a saved image character and confirm only its reference is attached;
   Prompt stays empty but accepts a different manual direction. Choose a prompt-only character and
-  confirm its prompt fills the field. Import both Character and VTO references through the hidden
+  confirm its prompt fills the field. In the reference-required configuration, confirm prompt-only
+  recipes cannot Start until a reference is attached and Enhance Prompt is disabled with generic
+  guidance. Confirm compatible MOV/WebM converts locally at Start, MP4 passes through, the source
+  remains immutable, and no provider name/selector appears. Import both Character and VTO references through the hidden
   public-HTTPS URL control and confirm the resulting local preview can be replaced or removed.
 - Interrupt upload before provider acceptance, background/foreground during polling, restart the
   broker, expire a result, retry status/content/local finalization, and race source replacement.
   No path may create an automatic paid resubmission or discard the last valid artifact.
 - Confirm provider-active processing blocks source/visual-choice mutation and Studio exit; refresh warns
   but does not promise tab/process recovery. Repeated cleanup is idempotent and never claims
-  provider cancellation.
+  provider cancellation or deletion.
 - Recording pins source identity. Model recording is unavailable before live transformed video.
 - Final main video remains valid if the sidecar fails or reaches its grace timeout, but review and
   Download remain unavailable until MediaBunny finishes the required H.264/AAC MP4.
@@ -197,5 +201,5 @@ Using keyboard and a screen reader:
 
 A passing JSON record must contain every required check for the exact row and commit. A blocked or
 failed record is valid evidence but does not satisfy release. Re-run the validator after recording
-results; release remains open until it reports `9/9` provider/local and `45/45` physical rows with
+results; release remains open until it reports `11/11` provider/local and `45/45` physical rows with
 no invalid records.

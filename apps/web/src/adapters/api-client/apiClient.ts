@@ -97,8 +97,7 @@ export const fetchProviderAvailability = async (
   );
   return {
     decart: payload.realtimeVideo.available,
-    videoProcessing: payload.videoProcessing.available,
-    videoProcessingModels: payload.videoProcessing.models,
+    videoProcessing: payload.videoProcessing,
     elevenLabs: payload.elevenLabs.available,
     elevenLabsModel: payload.elevenLabs.modelId ?? null,
     referenceImages: payload.referenceImages.available,

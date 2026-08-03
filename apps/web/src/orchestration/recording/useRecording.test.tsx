@@ -308,6 +308,55 @@ describe('useRecording recorder construction failures', () => {
     unmount();
   });
 
+  it('repairs a stale presented object URL once from its retained media blob', () => {
+    installRecorderHarness();
+    vi.mocked(URL.createObjectURL)
+      .mockReturnValueOnce('blob:stale-original')
+      .mockReturnValueOnce('blob:repaired-original');
+    const video = new Blob(['persisted-video'], { type: 'video/mp4' });
+    const { result, unmount } = renderHook(() => useRecording());
+
+    act(() => {
+      result.current.restorePersistedOriginal({
+        blob: video,
+        artifactMetadata: {
+          id: 'take-needs-url-repair',
+          mimeType: 'video/mp4',
+          filename: 'saved-take.mp4',
+          sourceModeId: 'local',
+          startedAt: '2026-08-03T04:00:00.000Z',
+          durationMs: 5_000,
+        },
+        takeMetadata: {
+          mode: 'local',
+          startedAt: '2026-08-03T04:00:00.000Z',
+          videoSource: 'local',
+          audioSource: 'none',
+          width: 748,
+          height: 1_328,
+        },
+      });
+    });
+
+    let repaired = false;
+    act(() => {
+      repaired = result.current.repairPresentedObjectUrl();
+    });
+
+    expect(repaired).toBe(true);
+    expect(result.current.presented?.objectUrl).toBe('blob:repaired-original');
+    expect(URL.createObjectURL).toHaveBeenLastCalledWith(video);
+
+    act(() => {
+      repaired = result.current.repairPresentedObjectUrl();
+    });
+    expect(repaired).toBe(false);
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(2);
+
+    unmount();
+    expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:repaired-original');
+  });
+
   it('revokes the prior original and processed URLs when a persisted original replaces them', () => {
     installRecorderHarness();
     vi.mocked(URL.createObjectURL)

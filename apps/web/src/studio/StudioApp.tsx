@@ -267,6 +267,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     processing,
     publishUploadedVideo,
     onSubmissionAccepted: recordAcceptedBatchStep,
+    ...(availability.videoProcessing
+      ? { videoProcessingCapabilities: availability.videoProcessing }
+      : {}),
   });
   const comparedExistingVideoArtifact =
     existingVideo.comparison === 'original'
@@ -955,6 +958,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                 />
               )}
               notices={stageNotices}
+              onPlaybackError={recording.repairPresentedObjectUrl}
               fullscreenTargetRef={fullscreenWorkspaceRef}
             />
             {creativeWorkspace}
@@ -1024,7 +1028,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           <ExistingVideoPanel
             key={existingVideo.selection?.metadata.selectedAt ?? 'empty-existing-video'}
             workflow={existingVideo}
-            videoProcessingAvailable={Boolean(availability.videoProcessing)}
+            videoProcessingAvailable={Boolean(
+              availability.videoProcessing?.characterSwap.available ||
+              availability.videoProcessing?.virtualTryOn.available,
+            )}
+            {...(availability.videoProcessing
+              ? { videoProcessingCapabilities: availability.videoProcessing }
+              : {})}
             elevenLabsAvailable={availability.elevenLabs}
             elevenLabsModel={availability.elevenLabsModel}
             browserCapabilities={browser}

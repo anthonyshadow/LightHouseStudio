@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import {
-  canSubmitPilotBatchJob,
   validateUploadedVideoFacts,
   validateVideoTransformPlan,
   type UploadedVideoFacts,
@@ -29,12 +28,12 @@ const step = (modelId: VideoTransformStep['modelId']): VideoTransformStep => ({
 
 describe('uploaded video policy', () => {
   it('accepts the conservative five-minute H.264 policy', () => {
-    expect(validateUploadedVideoFacts(video(), [step('lucy-latest')])).toEqual([]);
+    expect(validateUploadedVideoFacts(video(), ['character-swap'])).toEqual([]);
   });
 
   it('uses the lower size limit for a selected VTO transformation', () => {
     const issues = validateUploadedVideoFacts(video({ sizeBytes: 200_000_001 }), [
-      step('lucy-vton-latest'),
+      'virtual-try-on',
     ]);
     expect(issues).toHaveLength(1);
     expect(issues[0]?.code).toBe('payload-too-large');
@@ -95,16 +94,5 @@ describe('single visual policy', () => {
     expect(validateVideoTransformPlan([legacyVtoStep])).toEqual([
       'Choose a Virtual Try-On input type.',
     ]);
-  });
-
-  it('enforces four total and two per model in the pilot', () => {
-    expect(canSubmitPilotBatchJob(['lucy-latest'], 'lucy-latest')).toBe(true);
-    expect(canSubmitPilotBatchJob(['lucy-latest', 'lucy-latest'], 'lucy-latest')).toBe(false);
-    expect(
-      canSubmitPilotBatchJob(
-        ['lucy-latest', 'lucy-vton-latest', 'lucy-latest', 'lucy-vton-latest'],
-        'lucy-vton-latest',
-      ),
-    ).toBe(false);
   });
 });

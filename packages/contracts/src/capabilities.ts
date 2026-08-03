@@ -1,7 +1,19 @@
 import { z } from 'zod';
 import { supportedModelIdSchema } from './realtime';
 import { REFERENCE_IMAGE_SIZES } from './reference-images';
-import { videoTransformModelIdSchema } from './video-jobs';
+
+export const videoInputPreparationSchema = z.enum(['none', 'h264-mp4']);
+export const videoReferencePolicySchema = z.enum(['optional', 'required']);
+export const videoTerminalFailureReleaseSchema = z.enum(['automatic', 'explicit-user']);
+export const videoProcessingOperationCapabilitySchema = z
+  .object({
+    available: z.boolean(),
+    inputPreparation: videoInputPreparationSchema,
+    referencePolicy: videoReferencePolicySchema,
+    promptEnhancement: z.boolean(),
+    terminalFailureRelease: videoTerminalFailureReleaseSchema,
+  })
+  .strict();
 
 export const capabilitiesResponseSchema = z
   .object({
@@ -13,8 +25,8 @@ export const capabilitiesResponseSchema = z
       .strict(),
     videoProcessing: z
       .object({
-        available: z.boolean(),
-        models: z.array(videoTransformModelIdSchema).max(2),
+        characterSwap: videoProcessingOperationCapabilitySchema,
+        virtualTryOn: videoProcessingOperationCapabilitySchema,
       })
       .strict(),
     elevenLabs: z
@@ -44,3 +56,9 @@ export const capabilitiesResponseSchema = z
   .strict();
 
 export type CapabilitiesResponse = z.infer<typeof capabilitiesResponseSchema>;
+export type VideoInputPreparation = z.infer<typeof videoInputPreparationSchema>;
+export type VideoReferencePolicy = z.infer<typeof videoReferencePolicySchema>;
+export type VideoTerminalFailureRelease = z.infer<typeof videoTerminalFailureReleaseSchema>;
+export type VideoProcessingOperationCapability = z.infer<
+  typeof videoProcessingOperationCapabilitySchema
+>;

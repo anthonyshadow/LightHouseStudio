@@ -1,11 +1,14 @@
 # Controlled-pilot qualification evidence
 
+> Historical scope: the validator and pilot evidence gate were retired on 2026-08-03. This file
+> remains only as a reference for a possible future qualification design.
+
 Deterministic tests protect implementation behavior; they do not qualify live entitlements,
 provider output, physical codecs/memory, browser interruption, or hardware cleanup indicators.
 Release requires content-free evidence from the exact candidate commit for every row in
 [`qualification/required-matrix.json`](qualification/required-matrix.json).
 
-**Current repository state:** no committed pass records; the gate is `0/9` provider/local and
+**Current repository state:** no committed pass records; the gate is `0/11` provider/local and
 `0/45` physical rows.
 
 ## Record a result
@@ -17,18 +20,11 @@ Release requires content-free evidence from the exact candidate commit for every
 3. Copy
    [`qualification/evidence/example.local-no-key.json.example`](qualification/evidence/example.local-no-key.json.example)
    to a new `.json` record in that directory.
-4. Obtain the exact requirement/configuration/access-mode/check IDs from:
+4. Obtain requirement/configuration/check IDs from the historical matrix.
+5. Mark every check `pass`, `fail`, or `blocked` if reusing this format for manual notes.
 
-   ```bash
-   pnpm pilot:qualification:check --commit "$(git rev-parse HEAD)" --verbose
-   ```
-
-5. Mark every check `pass`, `fail`, or `blocked`. A satisfying record has only passing checks.
-6. Re-run the validator. Release requires `9/9`, `45/45`, no invalid records, and the requested
-   commit on every record.
-
-The validator is deliberately outside `pnpm quality`; ordinary development and CI must not need
-credentials, paid calls, or physical devices.
+There is no current automated validator or release threshold. Ordinary development and CI do not
+need credentials, paid calls, or physical devices.
 
 ## Safe record boundary
 

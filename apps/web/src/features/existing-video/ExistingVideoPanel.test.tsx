@@ -38,7 +38,6 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   message: null,
   status: null,
   completedStepCount: 0,
-  submittedModels: [],
   acceptedSubmission: false,
   pendingVisual: null,
   retryJob: null,
@@ -220,6 +219,75 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByRole('button', { name: 'Upload from device' })).toBeEnabled();
     expect(screen.getByText(/MP4\/H.264/u)).toBeInTheDocument();
     expect(screen.queryByText(/Decart submission/u)).not.toBeInTheDocument();
+  });
+
+  it('applies provider-neutral Character Swap capability limits independently from VTO', () => {
+    const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: null,
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-08-02T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: null,
+                durationMs: 30_000,
+                width: 1_280,
+                height: 720,
+                sizeBytes: source.size,
+                hasAudio: false,
+              },
+            },
+            phase: 'ready',
+            steps: [
+              {
+                id: 'character',
+                modelId: 'lucy-latest',
+                savedRecipeId: null,
+                prompt: 'Use this character direction',
+                enhancePrompt: false,
+                referenceImage: null,
+                inputKind: 'character',
+              },
+            ],
+          })}
+          videoProcessingAvailable
+          videoProcessingCapabilities={{
+            characterSwap: {
+              available: true,
+              inputPreparation: 'h264-mp4',
+              referencePolicy: 'required',
+              promptEnhancement: false,
+              terminalFailureRelease: 'explicit-user',
+            },
+            virtualTryOn: {
+              available: false,
+              inputPreparation: 'none',
+              referencePolicy: 'optional',
+              promptEnhancement: true,
+              terminalFailureRelease: 'automatic',
+            },
+          }}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByText(/requires one identity reference image/u)).toBeVisible();
+    expect(screen.getByRole('checkbox', { name: /^Enhance prompt/u })).toBeDisabled();
+    expect(screen.getByText(/Prompt enhancement is unavailable for Character Swap/u)).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Apply Character Swap' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeDisabled();
+    expect(document.body.textContent).not.toMatch(/Decart|Pruna|Lucy|p-video/u);
   });
 
   it('hands Record a local video to the stage-owned recording flow without rendering inline capture', () => {

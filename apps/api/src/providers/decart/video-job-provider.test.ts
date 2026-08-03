@@ -25,9 +25,10 @@ describe('DecartHttpVideoJobProvider', () => {
     );
 
     await provider.submit({
-      modelId: 'lucy-vton-latest',
+      operation: 'virtual-try-on',
       recipe: {
-        modelId: 'lucy-vton-latest',
+        operation: 'virtual-try-on',
+        inputKind: 'reference-image',
         prompt: 'Apply the jacket',
         enhancePrompt: false,
         hasReferenceImage: true,
@@ -66,9 +67,9 @@ describe('DecartHttpVideoJobProvider', () => {
 
     await expect(
       provider.submit({
-        modelId: 'lucy-latest',
+        operation: 'character-swap',
         recipe: {
-          modelId: 'lucy-latest',
+          operation: 'character-swap',
           prompt: 'Change the lighting',
           enhancePrompt: false,
           hasReferenceImage: false,

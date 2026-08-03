@@ -183,6 +183,7 @@ export type RecordingController = {
     replaceExistingResult?: boolean,
   ) => RecordingArtifact;
   failProcessing: (message: string) => void;
+  repairPresentedObjectUrl: () => boolean;
   clearVisualProcessing: () => void;
   restoreOriginal: () => void;
 };

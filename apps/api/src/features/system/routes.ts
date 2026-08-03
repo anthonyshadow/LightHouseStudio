@@ -3,13 +3,16 @@ import {
   healthResponseSchema,
   REFERENCE_IMAGE_SIZES,
   SUPPORTED_MODEL_IDS,
-  VIDEO_TRANSFORM_MODEL_IDS,
 } from '@studio/contracts';
 import type { FastifyInstance } from 'fastify';
+import type { ExistingVideoOperationBinding } from '../../providers/video-jobs/video-job-provider.js';
 
 export interface CapabilityAvailability {
   readonly decartAvailable: boolean;
-  readonly decartVideoAvailable: boolean;
+  readonly videoProcessing: {
+    readonly characterSwap: ExistingVideoOperationBinding | null;
+    readonly virtualTryOn: ExistingVideoOperationBinding | null;
+  };
   readonly elevenLabsAvailable: boolean;
   readonly elevenLabsModelId: string;
   readonly referenceImagesAvailable: boolean;
@@ -35,8 +38,23 @@ export const registerSystemRoutes = (
         models: [...SUPPORTED_MODEL_IDS],
       },
       videoProcessing: {
-        available: availability.decartVideoAvailable,
-        models: [...VIDEO_TRANSFORM_MODEL_IDS],
+        characterSwap: {
+          available: availability.videoProcessing.characterSwap !== null,
+          inputPreparation: availability.videoProcessing.characterSwap?.inputPreparation ?? 'none',
+          referencePolicy:
+            availability.videoProcessing.characterSwap?.referencePolicy ?? 'optional',
+          promptEnhancement: availability.videoProcessing.characterSwap?.promptEnhancement ?? false,
+          terminalFailureRelease:
+            availability.videoProcessing.characterSwap?.terminalFailureRelease ?? 'automatic',
+        },
+        virtualTryOn: {
+          available: availability.videoProcessing.virtualTryOn !== null,
+          inputPreparation: availability.videoProcessing.virtualTryOn?.inputPreparation ?? 'none',
+          referencePolicy: availability.videoProcessing.virtualTryOn?.referencePolicy ?? 'optional',
+          promptEnhancement: availability.videoProcessing.virtualTryOn?.promptEnhancement ?? false,
+          terminalFailureRelease:
+            availability.videoProcessing.virtualTryOn?.terminalFailureRelease ?? 'automatic',
+        },
       },
       elevenLabs: {
         available: availability.elevenLabsAvailable,

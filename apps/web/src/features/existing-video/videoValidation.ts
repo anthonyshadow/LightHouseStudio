@@ -10,6 +10,16 @@ export type ValidatedExistingVideo = Readonly<{
   audioUnavailableReason: string | null;
 }>;
 
+export const firstExistingVideoValidationIssue = (
+  facts: Parameters<typeof validateUploadedVideoFacts>[0],
+  includesVton: boolean,
+  validationContext: 'source' | 'server-approved-result',
+): ReturnType<typeof validateUploadedVideoFacts>[number] | undefined =>
+  validateUploadedVideoFacts(facts, includesVton ? ['virtual-try-on'] : []).find(
+    (issue) =>
+      validationContext !== 'server-approved-result' || issue.code !== 'unsupported-aspect-ratio',
+  );
+
 const waitForPlayableVideo = async (blob: Blob, signal: AbortSignal): Promise<void> => {
   const objectUrl = URL.createObjectURL(blob);
   const video = document.createElement('video');
@@ -104,6 +114,7 @@ export const validateExistingVideo = async (
   file: File,
   includesVton: boolean,
   signal: AbortSignal,
+  validationContext: 'source' | 'server-approved-result' = 'source',
 ): Promise<ValidatedExistingVideo> => {
   if (!(file instanceof File) || file.size <= 0) {
     throw new Error('Choose a non-empty video file.');
@@ -139,11 +150,8 @@ export const validateExistingVideo = async (
       sizeBytes: file.size,
       hasAudio: audioTrack !== null,
     };
-    const issues = validateUploadedVideoFacts(
-      facts,
-      includesVton ? [{ modelId: 'lucy-vton-latest' }] : [],
-    );
-    if (issues[0]) throw new Error(issues[0].message);
+    const firstIssue = firstExistingVideoValidationIssue(facts, includesVton, validationContext);
+    if (firstIssue) throw new Error(firstIssue.message);
     signal.throwIfAborted();
     await waitForPlayableVideo(file, signal);
 

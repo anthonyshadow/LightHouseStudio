@@ -18,6 +18,8 @@ describe('parseEnvironment', () => {
       nodeEnv: 'development',
       host: '127.0.0.1',
       port: DEFAULT_API_PORT,
+      existingVideoCharacterSwapProvider: 'decart',
+      prunaVideoReplaceEnabled: false,
       elevenLabsModelId: DEFAULT_ELEVENLABS_STS_MODEL_ID,
       elevenLabsEnableLogging: false,
       lightframeDataDir: DEFAULT_LIGHTFRAME_DATA_DIR,
@@ -35,7 +37,6 @@ describe('parseEnvironment', () => {
       bflReferenceImageTimeoutMs: DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
       wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
       wiroReferenceImageTimeoutMs: DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
-      pilotAccessMode: 'participant',
     });
   });
 
@@ -62,7 +63,6 @@ describe('parseEnvironment', () => {
         WIRO_API_SECRET: ' wiro-secret-placeholder ',
         WIRO_REFERENCE_IMAGE_MODEL: ' seedream-v5-lite-uncensored ',
         WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '170000',
-        PILOT_ACCESS_MODE: ' operator-qualification ',
         ELEVENLABS_API_KEY: '  eleven-placeholder  ',
         ELEVENLABS_STS_MODEL_ID: ' custom-sts ',
         ELEVENLABS_ENABLE_LOGGING: 'false',
@@ -89,12 +89,18 @@ describe('parseEnvironment', () => {
       wiroApiSecret: 'wiro-secret-placeholder',
       wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
       wiroReferenceImageTimeoutMs: 170_000,
-      pilotAccessMode: 'operator-qualification',
       referenceImageTimeoutMs: 140_000,
       elevenLabsApiKey: 'eleven-placeholder',
       elevenLabsModelId: 'custom-sts',
       elevenLabsEnableLogging: false,
       lightframeDataDir: '/tmp/lightframe-test',
+    });
+  });
+
+  it('accepts an explicit Decart Character Swap selection without Pruna initialization values', () => {
+    expect(parseEnvironment({ EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: 'decart' })).toMatchObject({
+      existingVideoCharacterSwapProvider: 'decart',
+      prunaVideoReplaceEnabled: false,
     });
   });
 
@@ -117,12 +123,54 @@ describe('parseEnvironment', () => {
       { WIRO_REFERENCE_IMAGE_MODEL: 'seedream-v5-lite' },
       { WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '9999' },
       { WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '180001' },
-      { PILOT_ACCESS_MODE: 'public' },
+      { EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: 'automatic' },
+      { PRUNA_VIDEO_REPLACE_ENABLED: 'TRUE' },
+      { PRUNA_VIDEO_REPLACE_MODEL: 'p-video-replace-latest' },
+      { PRUNA_VIDEO_REPLACE_RESOLUTION: '4k' },
     ]) {
       expect(() => parseEnvironment(environment), JSON.stringify(environment)).toThrow(
         EnvironmentValidationError,
       );
     }
+  });
+
+  it.each(['720p', '1080p'] as const)(
+    'accepts explicit Pruna Character Swap at %s',
+    (resolution) => {
+      expect(
+        parseEnvironment({
+          EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: 'pruna',
+          PRUNA_VIDEO_REPLACE_ENABLED: 'true',
+          PRUNA_API_KEY: ' pruna-secret ',
+          PRUNA_VIDEO_REPLACE_MODEL: ' p-video-replace ',
+          PRUNA_VIDEO_REPLACE_RESOLUTION: resolution,
+        }),
+      ).toMatchObject({
+        existingVideoCharacterSwapProvider: 'pruna',
+        prunaVideoReplaceEnabled: true,
+        prunaApiKey: 'pruna-secret',
+        prunaVideoReplaceModel: 'p-video-replace',
+        prunaVideoReplaceResolution: resolution,
+      });
+    },
+  );
+
+  it.each([
+    ['PRUNA_VIDEO_REPLACE_ENABLED', { PRUNA_VIDEO_REPLACE_ENABLED: 'false' }],
+    ['PRUNA_API_KEY', { PRUNA_API_KEY: '' }],
+    ['PRUNA_VIDEO_REPLACE_MODEL', { PRUNA_VIDEO_REPLACE_MODEL: '' }],
+    ['PRUNA_VIDEO_REPLACE_RESOLUTION', { PRUNA_VIDEO_REPLACE_RESOLUTION: '' }],
+  ] as const)('names missing Pruna requirement %s when selected', (variable, override) => {
+    expect(() =>
+      parseEnvironment({
+        EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: 'pruna',
+        PRUNA_VIDEO_REPLACE_ENABLED: 'true',
+        PRUNA_API_KEY: 'pruna-secret',
+        PRUNA_VIDEO_REPLACE_MODEL: 'p-video-replace',
+        PRUNA_VIDEO_REPLACE_RESOLUTION: '720p',
+        ...override,
+      }),
+    ).toThrow(variable);
   });
 
   it('selects Wiro independently and uses its timeout without requiring OpenAI image credentials', () => {
@@ -132,7 +180,6 @@ describe('parseEnvironment', () => {
         WIRO_API_KEY: ' wiro-key ',
         WIRO_API_SECRET: ' wiro-secret ',
         WIRO_REFERENCE_IMAGE_TIMEOUT_MS: '175000',
-        PILOT_ACCESS_MODE: 'operator-qualification',
       }),
     ).toMatchObject({
       referenceImageProvider: 'wiro',
@@ -140,7 +187,6 @@ describe('parseEnvironment', () => {
       wiroApiSecret: 'wiro-secret',
       wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
       wiroReferenceImageTimeoutMs: 175_000,
-      pilotAccessMode: 'operator-qualification',
       referenceImageTimeoutMs: 175_000,
     });
   });

@@ -26,10 +26,7 @@ import {
   DecartSdkTokenProvider,
   type DecartTokenProvider,
 } from './providers/decart/token-provider.js';
-import {
-  DecartHttpVideoJobProvider,
-  type DecartVideoJobProvider,
-} from './providers/decart/video-job-provider.js';
+import type { DecartVideoJobProvider } from './providers/decart/video-job-provider.js';
 import { ElevenLabsHttpProvider } from './providers/elevenlabs/http-provider.js';
 import type { ElevenLabsProvider } from './providers/elevenlabs/types.js';
 import { translateProviderError } from './providers/error-mapper.js';
@@ -45,6 +42,8 @@ import {
   createConfiguredReferenceImageProvider,
 } from './providers/reference-images/provider-factory.js';
 import { type ReferenceImageProvider } from './providers/reference-images/reference-image-provider.js';
+import type { ExistingVideoJobProvider } from './providers/video-jobs/video-job-provider.js';
+import { createExistingVideoProviderRegistry } from './providers/video-jobs/provider-factory.js';
 
 export const OPENAI_CONNECTION_TIMEOUT_MARGIN_MS = 100_000;
 export const SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES = [
@@ -57,6 +56,7 @@ export interface AppDependencies {
   readonly config: RuntimeConfig;
   readonly decartProvider?: DecartTokenProvider | null;
   readonly decartVideoProvider?: DecartVideoJobProvider | null;
+  readonly prunaVideoProvider?: ExistingVideoJobProvider | null;
   readonly elevenLabsProvider?: ElevenLabsProvider | null;
   readonly referenceImageProvider?: ReferenceImageProvider | null;
   readonly characterPromptOptimizer?: CharacterPromptOptimizer | null;
@@ -133,14 +133,17 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
       ? null
       : new DecartSdkTokenProvider(dependencies.config.decartApiKey),
   );
-  const decartVideoProvider = resolveOptionalProvider(dependencies.decartVideoProvider, () =>
-    dependencies.config.decartApiKey === undefined
-      ? null
-      : new DecartHttpVideoJobProvider(
-          dependencies.config.decartApiKey,
-          dependencies.fetchImplementation,
-        ),
-  );
+  const videoJobProviders = createExistingVideoProviderRegistry(dependencies.config, {
+    ...(dependencies.fetchImplementation === undefined
+      ? {}
+      : { fetchImplementation: dependencies.fetchImplementation }),
+    ...(dependencies.decartVideoProvider === undefined
+      ? {}
+      : { decartProvider: dependencies.decartVideoProvider }),
+    ...(dependencies.prunaVideoProvider === undefined
+      ? {}
+      : { prunaProvider: dependencies.prunaVideoProvider }),
+  });
 
   const elevenLabsProvider = resolveOptionalProvider(dependencies.elevenLabsProvider, () =>
     dependencies.config.elevenLabsApiKey === undefined
@@ -161,29 +164,23 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
           dependencies.config.elevenLabsEnableLogging,
         );
 
-  const wiroAllowedForAccessMode =
-    dependencies.config.referenceImageProvider !== 'wiro' ||
-    dependencies.config.pilotAccessMode === 'operator-qualification';
-  const configuredReferenceImageProvider = resolveOptionalProvider(
-    dependencies.referenceImageProvider,
-    () =>
-      createConfiguredReferenceImageProvider(dependencies.config, {
-        ...(dependencies.fetchImplementation === undefined
-          ? {}
-          : { fetchImplementation: dependencies.fetchImplementation }),
-        observeBflLifecycle: (event) => {
-          app.log.info(event, 'BFL reference image lifecycle');
-        },
-        observeWiroLifecycle: (event) => {
-          if (event.stage === 'cleanup_failed') {
-            app.log.warn(event, 'Wiro remote artifact cleanup failed');
-            return;
-          }
-          app.log.info(event, 'Wiro reference image lifecycle');
-        },
-      }),
+  const referenceImageProvider = resolveOptionalProvider(dependencies.referenceImageProvider, () =>
+    createConfiguredReferenceImageProvider(dependencies.config, {
+      ...(dependencies.fetchImplementation === undefined
+        ? {}
+        : { fetchImplementation: dependencies.fetchImplementation }),
+      observeBflLifecycle: (event) => {
+        app.log.info(event, 'BFL reference image lifecycle');
+      },
+      observeWiroLifecycle: (event) => {
+        if (event.stage === 'cleanup_failed') {
+          app.log.warn(event, 'Wiro remote artifact cleanup failed');
+          return;
+        }
+        app.log.info(event, 'Wiro reference image lifecycle');
+      },
+    }),
   );
-  const referenceImageProvider = wiroAllowedForAccessMode ? configuredReferenceImageProvider : null;
   const characterPromptOptimizer = resolveOptionalProvider(
     dependencies.characterPromptOptimizer,
     () =>
@@ -212,14 +209,16 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     },
   );
   const videoJobService = new VideoJobService(
-    decartVideoProvider,
+    videoJobProviders,
     dependencies.config.lightframeDataDir,
-    dependencies.config.pilotAccessMode === 'participant',
   );
 
   registerSystemRoutes(app, {
     decartAvailable: decartProvider !== null,
-    decartVideoAvailable: decartVideoProvider !== null,
+    videoProcessing: {
+      characterSwap: videoJobProviders['character-swap'],
+      virtualTryOn: videoJobProviders['virtual-try-on'],
+    },
     elevenLabsAvailable: elevenLabsProvider !== null,
     elevenLabsModelId: dependencies.config.elevenLabsModelId,
     referenceImagesAvailable: referenceImageService.generationAvailable,

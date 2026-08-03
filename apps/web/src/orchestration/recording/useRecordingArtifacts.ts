@@ -27,6 +27,7 @@ export const useRecordingArtifacts = () => {
   const originalRef = useRef<RecordingArtifact | null>(null);
   const visualRef = useRef<RecordingArtifact | null>(null);
   const processedRef = useRef<RecordingArtifact | null>(null);
+  const repairedPlaybackArtifactIdRef = useRef<string | null>(null);
 
   const publishOriginal = useCallback(
     (artifact: RecordingArtifact, nextSidecar: RecordingAudioSidecar) => {
@@ -36,6 +37,7 @@ export const useRecordingArtifacts = () => {
       originalRef.current = artifact;
       visualRef.current = null;
       processedRef.current = null;
+      repairedPlaybackArtifactIdRef.current = null;
       setOriginal(artifact);
       setVisual(null);
       setProcessed(null);
@@ -70,6 +72,7 @@ export const useRecordingArtifacts = () => {
     originalRef.current = null;
     visualRef.current = null;
     processedRef.current = null;
+    repairedPlaybackArtifactIdRef.current = null;
     setOriginal(null);
     setVisual(null);
     setProcessed(null);
@@ -95,6 +98,7 @@ export const useRecordingArtifacts = () => {
       revokeArtifactUrl(processedRef.current, 'replacement');
       visualRef.current = artifact;
       processedRef.current = null;
+      repairedPlaybackArtifactIdRef.current = null;
       setVisual(artifact);
       setProcessed(null);
       setProcessingState('ready');
@@ -124,6 +128,7 @@ export const useRecordingArtifacts = () => {
       }
       revokeArtifactUrl(processedRef.current, 'replacement');
       processedRef.current = artifact;
+      repairedPlaybackArtifactIdRef.current = null;
       setProcessed(artifact);
       setProcessingState('ready');
       setProcessingOperation(null);
@@ -196,6 +201,33 @@ export const useRecordingArtifacts = () => {
     setProcessingError(message);
   }, []);
 
+  const repairPresentedObjectUrl = useCallback((): boolean => {
+    const current = processedRef.current ?? visualRef.current ?? originalRef.current;
+    if (!current || repairedPlaybackArtifactIdRef.current === current.id) return false;
+
+    let objectUrl: string;
+    try {
+      objectUrl = URL.createObjectURL(current.media);
+    } catch {
+      return false;
+    }
+    if (!objectUrl) return false;
+
+    const repaired = { ...current, objectUrl };
+    repairedPlaybackArtifactIdRef.current = current.id;
+    if (processedRef.current?.id === current.id) {
+      processedRef.current = repaired;
+      setProcessed(repaired);
+    } else if (visualRef.current?.id === current.id) {
+      visualRef.current = repaired;
+      setVisual(repaired);
+    } else {
+      originalRef.current = repaired;
+      setOriginal(repaired);
+    }
+    return true;
+  }, []);
+
   useEffect(() => {
     const protectTake = (event: BeforeUnloadEvent) => {
       if (!originalRef.current) return;
@@ -240,6 +272,7 @@ export const useRecordingArtifacts = () => {
       completeVisualProcessing,
       completeProcessing,
       failProcessing,
+      repairPresentedObjectUrl,
       clearVisualProcessing,
       restoreOriginal,
     }),
@@ -266,6 +299,7 @@ export const useRecordingArtifacts = () => {
       completeVisualProcessing,
       completeProcessing,
       failProcessing,
+      repairPresentedObjectUrl,
       clearVisualProcessing,
       restoreOriginal,
     ],

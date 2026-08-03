@@ -88,6 +88,48 @@
       ]
     },
     {
+      "id": "pruna-character-swap-720p",
+      "configurationId": "pruna:p-video-replace:720p:300s",
+      "accessMode": "participant",
+      "checks": [
+        "pricing-approval",
+        "entitlement",
+        "reference-required",
+        "upload-h264-mp4",
+        "local-prepare-h264-mov",
+        "local-prepare-vp8-webm",
+        "exact-model-pin",
+        "exact-720p",
+        "source-audio-restore",
+        "single-prediction",
+        "status-download-recovery",
+        "provider-retention-observed",
+        "no-fallback",
+        "cleanup"
+      ]
+    },
+    {
+      "id": "pruna-character-swap-1080p",
+      "configurationId": "pruna:p-video-replace:1080p:300s",
+      "accessMode": "participant",
+      "checks": [
+        "pricing-approval",
+        "entitlement",
+        "reference-required",
+        "upload-h264-mp4",
+        "local-prepare-h264-mov",
+        "local-prepare-vp8-webm",
+        "exact-model-pin",
+        "exact-1080p",
+        "source-audio-restore",
+        "single-prediction",
+        "status-download-recovery",
+        "provider-retention-observed",
+        "no-fallback",
+        "cleanup"
+      ]
+    },
+    {
       "id": "elevenlabs-saved-voice",
       "configurationId": "elevenlabs:eleven_multilingual_sts_v2:saved-only:logging-false",
       "accessMode": "participant",

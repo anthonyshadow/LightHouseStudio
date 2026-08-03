@@ -1,5 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { RefObject } from 'react';
+import type { VideoProcessingOperationCapability } from '@studio/contracts';
 import { Button } from '../../ui';
 import {
   actionBarStyles,
@@ -17,6 +18,7 @@ import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
 export interface ExistingVideoActionBarProps {
   readonly workflow: ExistingVideoWorkflow;
   readonly videoProcessingAvailable: boolean;
+  readonly activeVisualCapability?: VideoProcessingOperationCapability;
   readonly onFinish: () => void;
   readonly onEditSelected: () => void;
   readonly onStartOver: () => void;
@@ -40,6 +42,7 @@ const readyActionLabel = (workflow: ExistingVideoWorkflow): string => {
 export const ExistingVideoActionBar = ({
   workflow,
   videoProcessingAvailable,
+  activeVisualCapability,
   onFinish,
   onEditSelected,
   onStartOver,
@@ -49,8 +52,16 @@ export const ExistingVideoActionBar = ({
   const theme = useTheme();
   const step = workflow.steps[0];
   const plan = planSummary(workflow);
-  const stepIncomplete = Boolean(step && !existingVideoStepIsComplete(step));
-  const visualUnavailable = Boolean(step && !videoProcessingAvailable);
+  const stepIncomplete = Boolean(
+    step &&
+    !existingVideoStepIsComplete(
+      step,
+      step.modelId === 'lucy-latest' && activeVisualCapability?.referencePolicy === 'required',
+    ),
+  );
+  const visualUnavailable = Boolean(
+    step && !(activeVisualCapability?.available ?? videoProcessingAvailable),
+  );
 
   if (workflow.phase === 'complete') {
     return (
@@ -93,7 +104,7 @@ export const ExistingVideoActionBar = ({
       <div css={actionBarStyles(theme)} aria-label="Accepted job recovery">
         <div css={actionSummaryStyles(theme)}>
           <strong>Accepted job interrupted</strong>
-          <span>Resume checks the same Decart job and creates no new submission.</span>
+          <span>Resume checks the same accepted job and creates no new submission.</span>
         </div>
         <div css={actionButtonsStyles(theme)}>
           <Button variant="primary" onClick={() => void workflow.retryExistingJob()}>
@@ -161,7 +172,7 @@ export const ExistingVideoActionBar = ({
         </strong>
         <span>
           {visualUnavailable
-            ? 'Decart batch processing is unavailable. The source can still be reviewed and downloaded.'
+            ? 'Visual processing is unavailable. The source can still be reviewed and downloaded.'
             : plan.detail}
         </span>
       </div>

@@ -26,7 +26,22 @@ describe('API shell', () => {
     expect(health.json()).toEqual({ ok: true });
     expect(capabilities.json()).toEqual({
       realtimeVideo: { available: false, models: ['lucy-latest', 'lucy-vton-latest'] },
-      videoProcessing: { available: false, models: ['lucy-latest', 'lucy-vton-latest'] },
+      videoProcessing: {
+        characterSwap: {
+          available: false,
+          inputPreparation: 'none',
+          referencePolicy: 'optional',
+          promptEnhancement: false,
+          terminalFailureRelease: 'automatic',
+        },
+        virtualTryOn: {
+          available: false,
+          inputPreparation: 'none',
+          referencePolicy: 'optional',
+          promptEnhancement: false,
+          terminalFailureRelease: 'automatic',
+        },
+      },
       elevenLabs: { available: true, modelId: 'eleven_multilingual_sts_v2' },
       referenceImages: {
         available: false,
@@ -71,11 +86,58 @@ describe('API shell', () => {
     expect(capabilities.json()).toMatchObject({
       realtimeVideo: { available: false },
       videoProcessing: {
-        available: true,
-        models: ['lucy-latest', 'lucy-vton-latest'],
+        characterSwap: {
+          available: true,
+          inputPreparation: 'none',
+          referencePolicy: 'optional',
+          promptEnhancement: true,
+          terminalFailureRelease: 'automatic',
+        },
+        virtualTryOn: {
+          available: true,
+          inputPreparation: 'none',
+          referencePolicy: 'optional',
+          promptEnhancement: true,
+          terminalFailureRelease: 'automatic',
+        },
       },
     });
     expect(capabilities.body).not.toContain('server-only-secret');
+  });
+
+  it('reports operation-specific Pruna requirements without exposing provider selection', async () => {
+    const provider = {} as NonNullable<Parameters<typeof createApp>[0]['prunaVideoProvider']>;
+    const app = createApp({
+      config: testConfig({
+        existingVideoCharacterSwapProvider: 'pruna',
+        prunaVideoReplaceEnabled: true,
+        prunaApiKey: 'pruna-server-secret',
+        prunaVideoReplaceModel: 'p-video-replace',
+        prunaVideoReplaceResolution: '1080p',
+      }),
+      prunaVideoProvider: provider,
+      decartVideoProvider: null,
+    });
+    apps.push(app);
+
+    const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
+
+    expect(capabilities.json()).toMatchObject({
+      videoProcessing: {
+        characterSwap: {
+          available: true,
+          inputPreparation: 'h264-mp4',
+          referencePolicy: 'required',
+          promptEnhancement: false,
+          terminalFailureRelease: 'explicit-user',
+        },
+        virtualTryOn: { available: false },
+      },
+    });
+    expect(capabilities.body.toLowerCase()).not.toContain('pruna');
+    expect(capabilities.body.toLowerCase()).not.toContain('decart');
+    expect(capabilities.body).not.toContain('p-video-replace');
+    expect(capabilities.body).not.toContain('pruna-server-secret');
   });
 
   it('reports the selected BFL image provider while keeping OpenAI optimization independent', async () => {
@@ -129,7 +191,6 @@ describe('API shell', () => {
         referenceImageProvider: 'wiro',
         wiroApiKey: 'wiro-key',
         wiroApiSecret: 'wiro-secret',
-        pilotAccessMode: 'operator-qualification',
       }),
     });
     apps.push(app);
@@ -143,29 +204,6 @@ describe('API shell', () => {
         providerId: 'wiro',
         modelId: 'seedream-v5-lite-uncensored',
         optimizer: { available: false },
-      },
-    });
-  });
-
-  it('server-disables Wiro for participant access even when credentials are configured', async () => {
-    const app = createApp({
-      config: testConfig({
-        referenceImageProvider: 'wiro',
-        wiroApiKey: 'wiro-key',
-        wiroApiSecret: 'wiro-secret',
-        pilotAccessMode: 'participant',
-      }),
-    });
-    apps.push(app);
-
-    const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
-
-    expect(capabilities.json()).toMatchObject({
-      referenceImages: {
-        available: false,
-        editAvailable: false,
-        providerId: 'wiro',
-        modelId: 'seedream-v5-lite-uncensored',
       },
     });
   });

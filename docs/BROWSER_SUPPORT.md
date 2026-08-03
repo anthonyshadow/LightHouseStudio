@@ -38,20 +38,23 @@ areas, the software keyboard, browser chrome changes, or physical 200% text/refl
 
 ## Capability and degradation
 
-| Capability        | Requirement                                                            | Safe degradation                                                                       |
-| ----------------- | ---------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
-| Local preparation | React; browser storage for durable Shelf/Builder data                  | Session-only work with warning where storage fails                                     |
-| Camera preview    | `navigator.mediaDevices.getUserMedia` and permission                   | Actionable blocked state; no provider contact                                          |
-| Device selection  | `enumerateDevices`; labels may need prior permission                   | Browser default remains available                                                      |
-| Front/rear switch | Active `facingMode` plus exposed opposite capability                   | Control omitted; current camera remains                                                |
-| Camera zoom       | Numeric track zoom capability and `applyConstraints`                   | Control omitted; no CSS crop substitute                                                |
-| Recording         | Live video, `MediaRecorder`, decodable capture, H.264 WebCodecs encode | No raw download fallback; conversion fails safely and the session remains controllable |
-| Existing video    | File input/drop, Blob playback, supported H.264/VP8 file               | Local validation explains export needs; camera stays optional                          |
-| Decart output     | Local capture, WebRTC, provider reachability/entitlement               | Local preview remains the fallback                                                     |
-| Batch visual      | Supported source, broker, exact model availability                     | Local preview/download remains available without a key                                 |
-| Local Voice       | Web Audio, offline render, AAC encoder, MP4 remux                      | Original take remains usable                                                           |
-| ElevenLabs Voice  | Sidecar, broker, saved voice/model/account support                     | Original/local effects remain usable                                                   |
-| Download          | Blob URL plus browser download handling                                | Mobile may open/share rather than save directly                                        |
+| Capability        | Requirement                                                                            | Safe degradation                                                                       |
+| ----------------- | -------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| Local preparation | React; browser storage for durable Shelf/Builder data                                  | Session-only work with warning where storage fails                                     |
+| Camera preview    | `navigator.mediaDevices.getUserMedia` and permission                                   | Actionable blocked state; no provider contact                                          |
+| Device selection  | `enumerateDevices`; labels may need prior permission                                   | Browser default remains available                                                      |
+| Front/rear switch | Active `facingMode` plus exposed opposite capability                                   | Control omitted; current camera remains                                                |
+| Camera zoom       | Numeric track zoom capability and `applyConstraints`                                   | Control omitted; no CSS crop substitute                                                |
+| Recording         | Live video, `MediaRecorder`, decodable capture, H.264 WebCodecs encode                 | No raw download fallback; conversion fails safely and the session remains controllable |
+| Existing video    | File input/drop, Blob playback, supported H.264/VP8 file                               | Local validation explains export needs; camera stays optional                          |
+| Decart output     | Local capture, WebRTC, provider reachability/entitlement                               | Local preview remains the fallback                                                     |
+| Batch visual      | Supported source, broker, operation capability; WebCodecs for required MP4 preparation | Local preview/download remains available without a configured operation                |
+| Local Voice       | Web Audio, offline render, AAC encoder, MP4 remux                                      | Original take remains usable                                                           |
+| ElevenLabs Voice  | Sidecar, broker, saved voice/model/account support                                     | Original/local effects remain usable                                                   |
+| Download          | Blob URL plus browser download handling                                                | Mobile may open/share rather than save directly                                        |
+
+A retained recording gets one owner-controlled object-URL repair attempt after a playback error.
+This covers a stale Blob URL without turning a genuinely undecodable file into a retry loop.
 
 `GET /api/capabilities` reports configuration presence only. It does not prove browser codec
 support, provider reachability, quota, entitlement, or output quality.
@@ -119,7 +122,10 @@ is authoritative before provider contact. HEVC, ProRes, VP9, AV1, container alia
 undocumented codecs are rejected with H.264 export guidance; Studio does not silently transcode
 them. Visual processing remains available without source audio, but Voice is disabled if a usable
 immutable audio sidecar cannot be extracted. Provider results must be 1280×720 or 720×1280, retain
-the source orientation, and differ from the input duration by no more than 500 ms.
+the source orientation, and differ from the input duration by no more than 500 ms when Decart owns
+the operation. Pruna Character Swap uses its documented approximate 1 MP/2 MP class and accepts
+the inspected result dimensions after emitting a content-free server warning when they differ from
+the canonical target; the browser must match the server-approved result metadata exactly.
 
 ## Known physical risks
 
@@ -141,7 +147,8 @@ the source orientation, and differ from the input duration by no more than 500 m
 ## Qualification rule
 
 Every required row must physically pass permission allow/deny/revoke; Local/Character/VTO capture;
-uploaded-video pick, replace, local download, mutually exclusive batch Lucy and batch VTO; the
+uploaded-video pick, replace, local download, mutually exclusive Character Swap and batch VTO,
+including capability-required local MOV/WebM preparation; the
 270/300-second warning and finalization; local and ElevenLabs Voice;
 download/playback; background/foreground recovery; memory checkpoints; and cleanup. Touch rows
 also require native file pickers, portrait/landscape, safe areas, browser chrome, software

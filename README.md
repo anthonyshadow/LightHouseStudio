@@ -12,13 +12,9 @@ public, or multi-user deployment.
 ## Status
 
 The core workflow is implemented and automated tests cover local, Character, VTO, recording,
-review, and voice paths. A controlled pilot is still blocked on the incomplete gates in the
-[active plan](docs/project-audit-implementation-plan.md), including physical-device,
-300-second recording, live-provider, data-retirement, and operational evidence.
-
-The [controlled-pilot contract](docs/CONTROLLED_PILOT_RELEASE_CONTRACT.md) fixes the cohort,
-limits, provider rules, evidence matrix, and owner roles. It describes the release target, not a
-claim that qualification has passed.
+review, and voice paths. The former controlled-pilot scope is not a current runtime or release
+gate. Physical-device and live-provider evidence remain useful validation inputs, but their
+absence does not disable configured application features.
 
 ## Product flow
 
@@ -66,9 +62,23 @@ data is unaffected.
   contacts Decart or an image provider.
 - `lucy-latest` and pinned `lucy-vton-latest` start only after explicit user action. Decart receives
   live media and the applied prompt/reference snapshot.
-- Batch Lucy/VTO uses server-mediated exact-model jobs with fixed 720p output, explicit
-  submit/status/content stages, inspected size/duration/orientation, and no automatic retry of a
-  billable submission. The UI shows request count, not invented credits or percentages.
+- Existing-video Character Swap uses one startup-selected server provider: Decart
+  `lucy-latest` by default or Pruna `p-video-replace`. Virtual Try-On remains on Decart
+  `lucy-vton-latest`, independently of that Character Swap choice. Decart output remains fixed
+  720p; Pruna output is startup-pinned to its documented approximate 1 MP (`720p`) or 2 MP
+  (`1080p`) resolution class while retaining source orientation. A non-canonical Pruna result size
+  produces a content-free server warning and continues with the inspected dimensions; Decart
+  remains exact-canonical.
+  Both paths use explicit submit/status/content stages, inspected size/duration/orientation, and
+  no automatic retry of a billable submission. The browser sees only operation capabilities and
+  provider-neutral copy. Pruna non-2xx responses log only the numeric upstream status server-side.
+  Its status endpoint can also return HTTP 200 with a terminal `failed` prediction; Lightframe logs
+  that safe terminal category separately and tells the browser that no result was produced.
+  Provider bodies remain private.
+- Pruna Character Swap requires one identity reference and H.264 MP4 input. H.264 MOV and VP8
+  WebM are converted locally at explicit Start into an ephemeral submission Blob; the immutable
+  source is unchanged. MP4 input passes through. Prompt enhancement is unavailable in this
+  configuration.
 - Reference generation uses one startup-selected provider: OpenAI `gpt-image-2`, BFL
   `flux-2-pro`, or Wiro `seedream-v5-lite-uncensored`. There is no automatic billable retry or
   provider fallback.
@@ -122,19 +132,22 @@ Open <http://127.0.0.1:4100>. Production startup fails when `apps/web/dist` is a
 All credentials are read by `apps/api`; never place secrets in `VITE_*` variables. `.env.example`
 is the maintained list of defaults and tunables.
 
-| Variable                          | Purpose                                                                                   |
-| --------------------------------- | ----------------------------------------------------------------------------------------- |
-| `DECART_API_KEY`                  | Realtime scoped credentials and server-mediated exact-model batch video jobs              |
-| `OPENAI_API_KEY`                  | Character prompt optimization and OpenAI image work                                       |
-| `REFERENCE_IMAGE_PROVIDER`        | Startup choice: `openai` (default), `bfl`, or `wiro`                                      |
-| `BFL_API_KEY`                     | BFL image work when BFL is selected                                                       |
-| `WIRO_API_KEY`, `WIRO_API_SECRET` | Wiro image work when Wiro is selected                                                     |
-| `PILOT_ACCESS_MODE`               | `participant` by default; `operator-qualification` is required for the separate Wiro pass |
-| `ELEVENLABS_API_KEY`              | Saved-voice listing, preview, and Voice Changer                                           |
-| `ELEVENLABS_ENABLE_LOGGING`       | Defaults to `false`; participant conversion requires confirmed zero-retention eligibility |
-| `LIGHTFRAME_DATA_DIR`             | Immutable local reference assets; defaults to `./.lightframe-data`                        |
-| `PORT`                            | Loopback API port; defaults to `4100`                                                     |
-| `NODE_ENV`                        | `development`, `test`, or `production`                                                    |
+| Variable                                       | Purpose                                                                               |
+| ---------------------------------------------- | ------------------------------------------------------------------------------------- |
+| `DECART_API_KEY`                               | Realtime scoped credentials, Decart Character Swap, and Decart-only Virtual Try-On    |
+| `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`       | Startup Character Swap choice: `decart` (default) or `pruna`; never exposed in the UI |
+| `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY` | Required enablement and server credential when Pruna is selected                      |
+| `PRUNA_VIDEO_REPLACE_MODEL`                    | Exact pinned `p-video-replace` literal; required when Pruna is selected               |
+| `PRUNA_VIDEO_REPLACE_RESOLUTION`               | Required `720p` or `1080p` Pruna output; `.env.example` uses `720p` for comparison    |
+| `OPENAI_API_KEY`                               | Character prompt optimization and OpenAI image work                                   |
+| `REFERENCE_IMAGE_PROVIDER`                     | Startup choice: `openai` (default), `bfl`, or `wiro`                                  |
+| `BFL_API_KEY`                                  | BFL image work when BFL is selected                                                   |
+| `WIRO_API_KEY`, `WIRO_API_SECRET`              | Wiro image work when Wiro is selected                                                 |
+| `ELEVENLABS_API_KEY`                           | Saved-voice listing, preview, and Voice Changer                                       |
+| `ELEVENLABS_ENABLE_LOGGING`                    | Provider retention choice; defaults to `false`                                        |
+| `LIGHTFRAME_DATA_DIR`                          | Immutable local reference assets; defaults to `./.lightframe-data`                    |
+| `PORT`                                         | Loopback API port; defaults to `4100`                                                 |
+| `NODE_ENV`                                     | `development`, `test`, or `production`                                                |
 
 `GET /api/capabilities` reports configuration presence, not provider reachability, entitlement, or
 quota. Missing optional configuration disables only the corresponding feature.
@@ -158,8 +171,6 @@ quota. Missing optional configuration disables only the corresponding feature.
 | `pnpm audit:prod`                                                                        | Production dependency audit                                            |
 | `pnpm check:dead-code:production`                                                        | Production files and dependency reachability                           |
 | `pnpm storybook`                                                                         | Local component catalog on port 6006                                   |
-| `pnpm pilot:qualification:check --commit <full-sha> --verbose`                           | Validate content-free pilot evidence                                   |
-| `pnpm pilot:data-retirement:drill`                                                       | Verify participant-data retirement                                     |
 | `pnpm recording:memory:estimate --duration-seconds 300 --main-mib-per-minute <measured>` | Estimate recording memory from measured output                         |
 
 Install Playwright browsers once with `pnpm exec playwright install`. Default tests use synthetic
@@ -184,7 +195,6 @@ pnpm test:production
 pnpm test:visual
 pnpm audit:prod
 pnpm audit:all
-pnpm pilot:data-retirement:drill
 ```
 
 Review the visual baseline inventory for every changed Darwin/Linux image. The exact-candidate
@@ -217,6 +227,8 @@ pure policy         runtime HTTP schemas
 
 The creator of a stream, recorder, timer, listener, object URL, audio context, transcoder, or
 provider client owns idempotent cleanup. Recording borrows source tracks and never stops them.
+If a retained playback Blob outlives a stale browser object URL, the artifact owner may rebuild
+that URL once; repeated decode failures are not retried in a loop.
 Finalization settles the video and optional sidecar, transcodes the main recording on-device to
 H.264/AAC MP4, and publishes that downloadable artifact before live resources release. Raw
 recorder output never receives a download URL.
@@ -233,7 +245,7 @@ Start with the [documentation map](docs/README.md). Key references:
 - [Implemented journeys](docs/userStories/README.md)
 - [Architecture and ownership](docs/ARCHITECTURE.md)
 - [Privacy and temporary data](docs/PRIVACY_AND_TEMPORARY_DATA.md)
-- [Controlled-pilot release contract](docs/CONTROLLED_PILOT_RELEASE_CONTRACT.md)
+- [Historical controlled-pilot release contract](docs/CONTROLLED_PILOT_RELEASE_CONTRACT.md)
 - [Active implementation plan](docs/project-audit-implementation-plan.md)
 - [Browser support](docs/BROWSER_SUPPORT.md)
 - [Manual QA](docs/MANUAL_QA.md)

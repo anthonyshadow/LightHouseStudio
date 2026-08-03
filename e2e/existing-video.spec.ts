@@ -369,8 +369,8 @@ test('Create A Character returns to the upload plan with the new character selec
   expect(await cameraCalls(page)).toBe(0);
 });
 
-for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
-  test(`upload uses only ${modelId} when that visual option is selected`, async ({ page }) => {
+for (const operation of ['character-swap', 'virtual-try-on'] as const) {
+  test(`upload uses only ${operation} when that visual option is selected`, async ({ page }) => {
     await installCameraSentinel(page);
     await installProviderNetworkDriver(page);
     await page.goto('/');
@@ -383,17 +383,17 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
     const dialog = page.getByRole('dialog', { name: 'Use existing video' });
     await dialog
       .getByRole('button', {
-        name: modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
+        name: operation === 'character-swap' ? 'Character Swap' : 'Virtual Try On',
         exact: true,
       })
       .click();
     const selectedButton = dialog.getByRole('button', {
-      name: modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
+      name: operation === 'character-swap' ? 'Character Swap' : 'Virtual Try On',
       exact: true,
     });
-    const alternateModelId = modelId === 'lucy-latest' ? 'lucy-vton-latest' : 'lucy-latest';
+    const alternateOperation = operation === 'character-swap' ? 'virtual-try-on' : 'character-swap';
     const alternateButton = dialog.getByRole('button', {
-      name: alternateModelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try On',
+      name: alternateOperation === 'character-swap' ? 'Character Swap' : 'Virtual Try On',
       exact: true,
     });
     await expect(selectedButton).toHaveAttribute('aria-pressed', 'true');
@@ -405,10 +405,10 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
     await expect(selectedButton).toHaveAttribute('aria-pressed', 'true');
     const steps = dialog.locator('article');
     await expect(steps).toHaveCount(1);
-    await steps.locator('textarea').fill(`Prompt for ${modelId}`);
+    await steps.locator('textarea').fill(`Prompt for ${operation}`);
     await dialog
       .getByRole('button', {
-        name: modelId === 'lucy-latest' ? 'Apply Character Swap' : 'Apply Virtual Try On',
+        name: operation === 'character-swap' ? 'Apply Character Swap' : 'Apply Virtual Try On',
       })
       .click();
     await expect(dialog.getByRole('heading', { name: 'Your result is ready' })).toBeVisible({
@@ -417,12 +417,12 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
     await expect(dialog.getByRole('button', { name: 'Review Voice and Download' })).toHaveCount(0);
 
     const submissions = calls.filter(({ method }) => method === 'PUT');
-    expect(submissions.map((submission) => submission.modelId)).toEqual([modelId]);
+    expect(submissions.map((submission) => submission.operation)).toEqual([operation]);
     expect(
       submissions.every(({ providerIntent }) => providerIntent === VIDEO_PROVIDER_INTENT_VALUE),
     ).toBe(true);
     expect(submissions.every(({ exposedOriginalFilename }) => !exposedOriginalFilename)).toBe(true);
-    if (modelId === 'lucy-latest') {
+    if (operation === 'character-swap') {
       const playback = page.getByLabel('Recorded take playback');
       const resultUrl = await playback.getAttribute('src');
       expect(resultUrl).toMatch(/^blob:/u);
@@ -483,8 +483,8 @@ for (const modelId of ['lucy-latest', 'lucy-vton-latest'] as const) {
       expect(
         calls
           .filter(({ method }) => method === 'PUT')
-          .map(({ modelId: submittedModel }) => submittedModel),
-      ).toEqual(['lucy-latest', 'lucy-vton-latest']);
+          .map(({ operation: submittedOperation }) => submittedOperation),
+      ).toEqual(['character-swap', 'virtual-try-on']);
     } else {
       await dialog.getByRole('button', { name: 'Discard video and result' }).click();
       const confirmation = page.getByRole('dialog', { name: 'Discard this video?' });

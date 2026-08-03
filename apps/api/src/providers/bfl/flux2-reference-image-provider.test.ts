@@ -11,7 +11,7 @@ const jsonResponse = (value: unknown, status = 200): Response =>
   });
 
 describe('BflFlux2ReferenceImageProvider', () => {
-  it('aligns direct construction with the pilot safety defaults', () => {
+  it('aligns direct construction with the configured safety defaults', () => {
     const provider = new BflFlux2ReferenceImageProvider('bfl-secret');
 
     expect(provider.descriptor.effectiveSettings).toEqual({

@@ -117,14 +117,14 @@ const buildReferenceGenerationDisclosure = ({
   if (referenceImageProvider === 'wiro') {
     const model = referenceImageModel ?? 'selected model';
     if (generationAvailable) {
-      return `${optimizerContact}Wiro (${model}) creates the image in this explicit operator-qualification run. Wiro is unavailable for participant generation. This may use provider credits; successful output remains local until this operator environment is retired.`;
+      return `${optimizerContact}Wiro (${model}) creates the image. This may use provider credits. The result is stored as an immutable local asset. Upload and Save without generation do not contact image or optimizer providers.`;
     }
-    return `Wiro (${model}) is restricted to explicit operator-qualification runs and is unavailable for participant generation. This configured generation path is currently unavailable. Upload and Save without generation remain local.`;
+    return `Wiro (${model}) is unavailable because this configured generation path is not ready. Upload and Save without generation remain local.`;
   }
 
   const provider = referenceProviderLabel(referenceImageProvider);
   const model = referenceImageModel ? ` (${referenceImageModel})` : '';
-  return `${optimizerContact}${provider}${model} creates the image. This may use provider credits. The result is stored as an immutable local asset until this participant environment is retired. Upload and Save without generation do not contact image or optimizer providers.`;
+  return `${optimizerContact}${provider}${model} creates the image. This may use provider credits. The result is stored as an immutable local asset. Upload and Save without generation do not contact image or optimizer providers.`;
 };
 
 const characterSaveLabel = (state: CharacterBuilderState): string => {

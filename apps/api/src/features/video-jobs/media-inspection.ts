@@ -3,11 +3,12 @@ import {
   inspectedVideoSchema,
   VIDEO_RESULT_DURATION_TOLERANCE_MS,
   type InspectedVideo,
-  type VideoTransformModelId,
+  type VideoTransformOperationId,
 } from '@studio/contracts';
 import { validateUploadedVideoFacts } from '@studio/domain';
 import { ALL_FORMATS, FilePathSource, Input, MP4, QTFF, WEBM } from 'mediabunny';
 import { AppError } from '../../http/app-error.js';
+import type { VideoJobOutputSizing } from '../../providers/video-jobs/video-job-provider.js';
 
 const containerDetails = (
   format: Awaited<ReturnType<Input['getFormat']>>,
@@ -32,13 +33,93 @@ const appErrorForValidation = (
   return new AppError(statusCode, code, issue.message);
 };
 
+const appErrorForProviderOutputValidation = (
+  issue: ReturnType<typeof validateUploadedVideoFacts>[number],
+): AppError => {
+  if (issue.code === 'payload-too-large') {
+    return new AppError(
+      502,
+      'result_too_large',
+      'The visual result exceeded the app-owned 300 MB safety limit.',
+    );
+  }
+  if (issue.code === 'duration-exceeded') {
+    return new AppError(
+      502,
+      'result_invalid',
+      'The visual result exceeded the app-owned 300-second limit.',
+    );
+  }
+  return new AppError(
+    502,
+    'result_invalid',
+    'The visual result did not meet the app-owned media requirements.',
+  );
+};
+
+export const expectedProviderOutputDimensions = (
+  resolution: '720p' | '1080p',
+  orientation: 'landscape' | 'portrait',
+): Readonly<{ width: number; height: number }> => {
+  const landscape =
+    resolution === '1080p' ? { width: 1_920, height: 1_080 } : { width: 1_280, height: 720 };
+  return orientation === 'landscape'
+    ? landscape
+    : { width: landscape.height, height: landscape.width };
+};
+
+export const assertProviderOutputDimensions = (
+  actual: Pick<InspectedVideo, 'width' | 'height'>,
+  resolution: '720p' | '1080p',
+  outputSizing: VideoJobOutputSizing,
+  expectedOrientation?: 'landscape' | 'portrait',
+): void => {
+  const orientations =
+    expectedOrientation === undefined
+      ? (['landscape', 'portrait'] as const)
+      : ([expectedOrientation] as const);
+  const expected = orientations.map((orientation) =>
+    expectedProviderOutputDimensions(resolution, orientation),
+  );
+  const valid = expected.some(
+    (dimensions) => actual.width === dimensions.width && actual.height === dimensions.height,
+  );
+  if (valid) return;
+
+  const expectedLabel = expected
+    .map((dimensions) => `${dimensions.width} × ${dimensions.height}`)
+    .join(' or ');
+  if (outputSizing === 'megapixel-budget') {
+    console.warn(
+      '[video-jobs] Visual result dimensions differ from the approximate resolution target; continuing with the inspected result.',
+      {
+        actualWidth: actual.width,
+        actualHeight: actual.height,
+        expectedDimensions: expectedLabel,
+        resolution,
+        expectedOrientation: expectedOrientation ?? 'unspecified',
+      },
+    );
+    return;
+  }
+  throw new AppError(
+    502,
+    'result_invalid',
+    `The visual result dimensions were ${actual.width} × ${actual.height}; expected ${expectedLabel}${
+      expectedOrientation ? ' for the source orientation' : ''
+    }.`,
+  );
+};
+
 export const inspectVideoFile = async (
   filePath: string,
-  modelId: VideoTransformModelId,
+  operation: VideoTransformOperationId,
   options: {
     readonly expectedDurationMs?: number;
     readonly expectedOrientation?: 'landscape' | 'portrait';
     readonly requireProviderOutputSize?: boolean;
+    readonly expectedResolution?: '720p' | '1080p';
+    readonly outputSizing?: VideoJobOutputSizing;
   } = {},
 ): Promise<InspectedVideo> => {
   const file = await stat(filePath).catch(() => null);
@@ -73,35 +154,28 @@ export const inspectVideoFile = async (
       sizeBytes: file.size,
       hasAudio: audioTrack !== null,
     });
-    const issues = validateUploadedVideoFacts(inspected, [
-      {
-        modelId,
-      },
-    ]);
-    if (issues[0]) throw appErrorForValidation(issues[0]);
-
     if (options.requireProviderOutputSize) {
-      const validResolution =
-        (inspected.width === 1_280 && inspected.height === 720) ||
-        (inspected.width === 720 && inspected.height === 1_280);
-      if (!validResolution) {
-        throw new AppError(
-          502,
-          'result_invalid',
-          'The visual provider returned an unexpected output resolution.',
-        );
-      }
-      if (
-        options.expectedOrientation !== undefined &&
-        (inspected.width > inspected.height ? 'landscape' : 'portrait') !==
-          options.expectedOrientation
-      ) {
-        throw new AppError(
-          502,
-          'result_invalid',
-          'The visual provider returned the wrong 720p orientation.',
-        );
-      }
+      assertProviderOutputDimensions(
+        inspected,
+        options.expectedResolution ?? '720p',
+        options.outputSizing ?? 'exact-canonical',
+        options.expectedOrientation,
+      );
+    }
+    const issues = validateUploadedVideoFacts(
+      inspected,
+      options.requireProviderOutputSize ? [] : [operation],
+    );
+    const firstIssue = issues.find(
+      (issue) =>
+        !options.requireProviderOutputSize ||
+        options.outputSizing !== 'megapixel-budget' ||
+        issue.code !== 'unsupported-aspect-ratio',
+    );
+    if (firstIssue) {
+      throw options.requireProviderOutputSize
+        ? appErrorForProviderOutputValidation(firstIssue)
+        : appErrorForValidation(firstIssue);
     }
     if (
       options.expectedDurationMs !== undefined &&

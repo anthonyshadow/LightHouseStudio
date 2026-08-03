@@ -133,7 +133,7 @@ describe('video job route boundary', () => {
     expect(unavailable.statusCode).toBe(503);
     expect(unavailable.json<ApiErrorResponse>().error).toEqual({
       code: 'provider_unavailable',
-      message: 'Decart batch video processing is unavailable until DECART_API_KEY is configured.',
+      message: 'Visual processing is unavailable until its server configuration is complete.',
     });
   });
 
@@ -197,7 +197,7 @@ describe('video job route boundary', () => {
     const jobId = crypto.randomUUID();
     const existing = vi.fn().mockResolvedValue({
       jobId,
-      modelId: 'lucy-latest',
+      operation: 'character-swap',
       status: 'expired',
       createdAt: '2026-08-02T12:00:00.000Z',
       updatedAt: '2026-08-02T13:00:00.000Z',

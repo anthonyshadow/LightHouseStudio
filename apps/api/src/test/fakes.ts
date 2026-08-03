@@ -14,6 +14,8 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   nodeEnv: 'test',
   host: '127.0.0.1',
   port: 4100,
+  existingVideoCharacterSwapProvider: 'decart',
+  prunaVideoReplaceEnabled: false,
   elevenLabsModelId: 'eleven_multilingual_sts_v2',
   elevenLabsEnableLogging: false,
   providerTimeoutMs: 1_000,
@@ -31,7 +33,6 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   bflReferenceImageTimeoutMs: 1_000,
   wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
   wiroReferenceImageTimeoutMs: 1_000,
-  pilotAccessMode: 'participant',
   lightframeDataDir: './.lightframe-data-test',
   ...overrides,
 });

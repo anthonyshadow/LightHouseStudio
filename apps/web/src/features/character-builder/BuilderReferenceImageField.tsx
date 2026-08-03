@@ -27,7 +27,7 @@ export const BuilderReferenceImageField = ({
         kind: 'heading',
         text: 'Optional character reference',
         description:
-          'JPEG, PNG, or WebP up to 10 MiB and 40 megapixels. Selecting a file stores an immutable local asset until this participant environment is retired. Detaching it later removes the relationship, not the stored bytes.',
+          'JPEG, PNG, or WebP up to 10 MiB and 40 megapixels. Selecting a file stores an immutable local asset in the configured data directory. Detaching it later removes the relationship, not the stored bytes.',
       }}
       picker={{
         action: pending ? 'Uploading image…' : reference ? 'Replace image' : 'Upload image',

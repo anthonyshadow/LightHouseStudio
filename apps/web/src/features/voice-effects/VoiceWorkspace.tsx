@@ -431,7 +431,9 @@ export const VoiceWorkspace = ({
                       Nothing is uploaded now. Start edit sends only {clipDurationLabel} of Original
                       audio{elevenLabsModel ? ` using ${elevenLabsModel}` : ''}.
                     </span>
-                    <strong>May consume provider credits · zero-retention required</strong>
+                    <strong>
+                      May consume provider credits · retention follows server settings
+                    </strong>
                   </>
                 ) : (
                   <>
@@ -439,7 +441,9 @@ export const VoiceWorkspace = ({
                       Applying sends {clipDurationLabel} of the immutable Original audio sidecar
                       {elevenLabsModel ? ` using ${elevenLabsModel}` : ''}.
                     </span>
-                    <strong>May consume provider credits · zero-retention required</strong>
+                    <strong>
+                      May consume provider credits · retention follows server settings
+                    </strong>
                   </>
                 )
               ) : draftSelection.kind === 'local' ? (

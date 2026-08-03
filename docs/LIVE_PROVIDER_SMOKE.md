@@ -1,7 +1,7 @@
 # Gated live provider smoke
 
 Live checks are manual, opt-in, cost-bearing, and excluded from normal test/quality commands.
-Current repository evidence is `0/9`; no provider/local row is qualified.
+Current repository evidence is `0/11`; no provider/local row is qualified.
 
 Use only authorized, least-privilege test credentials, non-sensitive disposable media, understood
 account retention/quota, and an approved spend. Never run this procedure in CI, Storybook,
@@ -17,8 +17,9 @@ screenshots, ordinary tests, shared environments, or with a participant where th
    if they differ from the approved configuration.
 4. Configure only the provider under test using repository-root `.env` and `.env.example`; restart
    the API.
-5. Verify `GET /api/capabilities` reports the expected configured provider/model. This is not a
-   reachability, entitlement, policy, quota, or billing check.
+5. Verify `GET /api/capabilities` reports the expected operation availability/input/reference/
+   enhancement capabilities without a provider or batch model name. This is not a reachability,
+   entitlement, policy, quota, or billing check.
 6. Close competing camera apps and keep short samples short. Run a full five-minute pass only where
    this procedure requires it and the Billing Authorizer approves it.
 
@@ -34,6 +35,8 @@ provider bodies, signed/polling URLs, personal media, or full network archives.
 | Decart VTO        | SDK `0.1.17`, exact `lucy-vton-latest`, 300-second session                    |
 | Decart batch Lucy | Queue HTTP, exact `lucy-latest`, fixed `720p`, 300-second input               |
 | Decart batch VTO  | Queue HTTP, exact `lucy-vton-latest`, fixed `720p`, 300-second input          |
+| Pruna Character   | `p-video-replace`, `720p`, one reference, MP4 driver, `save_audio=true`       |
+| Pruna Character   | `p-video-replace`, `1080p`, one reference, MP4 driver, `save_audio=true`      |
 | ElevenLabs        | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false` |
 | OpenAI image      | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                      |
 | BFL image         | `flux-2-pro`, safety `2`, prompt upsampling off                               |
@@ -126,14 +129,15 @@ For each exact batch model:
    submission. Also verify that successful delivery, explicit release, and broker shutdown can
    remove local state before the deadline.
 
-Confirm that Lucy and VTO remain available as a mutually exclusive selector before submission.
+Confirm that Character Swap and VTO remain available as a mutually exclusive selector before submission.
 Switch in both directions with an empty visual setup and confirm the change is immediate. Repeat
 with configured fields and confirm the topmost warning preserves everything on cancel, clears only
 the previous visual fields on confirmation, and leaves configured Voice untouched. Verify there is
-still only one active visual recipe and one submitted model.
+still only one active visual recipe and one submitted operation.
 
-Do not exceed four participant batch submissions or two submissions for either model. Broker
-restart, the immutable accepted-at-plus-60-minute deadline, ambiguous responses, unavailable
+Each batch submission must remain explicit and operator-approved; there is no participant-total or
+per-operation submission-count cap. Broker restart, the immutable accepted-at-plus-60-minute
+deadline, ambiguous responses, unavailable
 credentials, and background/foreground recovery must fail safely without automatic resubmission.
 Deterministic lifecycle coverage does not qualify the live row: record the exact candidate's
 deadline, pre-deadline delivery, blocked post-deadline admission, earlier cleanup paths, and
@@ -141,6 +145,53 @@ temporary-root result. Local expiry still does not prove provider cancellation o
 
 Decart documents submit/poll/content retrieval but no qualified cancellation operation for this
 flow. Do not label browser abort, local cleanup, or DELETE as provider cancellation.
+
+## Pruna Character Swap
+
+Run two separate startups with `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER=pruna`,
+`PRUNA_VIDEO_REPLACE_ENABLED=true`, the exact `PRUNA_VIDEO_REPLACE_MODEL=p-video-replace`, and
+`PRUNA_VIDEO_REPLACE_RESOLUTION=720p` then `1080p`. Keep Decart independently configured only if
+the VTO capability is under test. Review the current
+[P-Video-Replace documentation](https://docs.pruna.ai/en/stable/docs_pruna_endpoints/performance_models/p-video-replace.html)
+and [async/file/delivery API](https://docs.api.pruna.ai/apis/models-api-0/versions/a80cf098-b7a8-4f6e-b1e0-43b06bfa4038/operations/getPredictionStatus)
+before spending.
+
+For each resolution row:
+
+1. Obtain Billing Authorizer approval for the published $0.03/s 720p or $0.06/s 1080p price and
+   confirm account entitlement. Treat the documented 3.58 seconds generation per source second as
+   a 720p benchmark only; do not claim a quantified 1080p processing time.
+2. Confirm Character Swap requires one JPEG/PNG/WebP identity reference, prompt-only recipes stay
+   selectable but cannot Start without it, Enhance Prompt is disabled with generic guidance, and
+   no provider/model selector or provider name appears. Confirm VTO never contacts Pruna.
+3. Submit H.264 MP4 as pass-through. Separately Start from H.264 MOV and VP8 WebM, confirm local
+   H.264 MP4 preparation/revalidation occurs before upload, and confirm the immutable source and
+   original audio remain unchanged. Keep the app-owned 300-second, 300 MB, 16:9/9:16, consent,
+   duration-sync, and content-policy limits; Pruna publishes no exact source-size or platform
+   duration maximum.
+4. Confirm exactly two `/v1/files` uploads and exactly one `/v1/predictions` request with synthetic
+   names, `Model: p-video-replace`, one `images` entry, configured `resolution`, `save_audio=true`,
+   and raw prompt or the app-owned default when blank. There must be no webhook, initial retry,
+   fallback, raw identifier/URL/body leakage, or second prediction during Voice retry.
+5. Observe starting/processing/succeeded and a controlled failed/canceled mapping. Interrupt status
+   and result retrieval, then resume the accepted job without another prediction. Confirm Voice
+   runs only after the visual result and its retry does not resubmit visual processing. For a
+   failed prediction, confirm the private provider `error` is reduced to an allowlisted safe class,
+   never reaches the response/UI/log, and never triggers an automatic prediction retry.
+6. Download only through the authenticated allowlisted Pruna delivery origin/path. Treat `720p`
+   and `1080p` as the documented approximate 1 MP and 2 MP resolution classes, not promises of
+   exact canonical dimensions. Record the inspected dimensions; if they differ from the canonical
+   target, confirm a content-free server warning appears and the job continues without a browser
+   DELETE. Also verify duration tolerance, source orientation, source-audio restoration, and browser
+   metadata agreement with the server-approved result.
+7. Confirm uploaded inputs expire after approximately 30 minutes and generated delivery content is
+   typically available for 24 hours under the tested account. No documented cancellation/deletion
+   endpoint is relied upon. A Pruna terminal failure must remain visible until explicit user
+   discard/replacement or the 60-minute broker deadline; only that explicit user action may issue
+   the local 204 DELETE. For a non-2xx Pruna response, confirm the API console records only its
+   numeric upstream status. For an HTTP 200 status response whose prediction status is `failed`,
+   confirm the console instead records the safe `generation-failed` category and the browser says
+   no result was produced. Lightframe local cleanup must not be described as provider deletion.
 
 ## Reference image providers
 
@@ -170,12 +221,12 @@ Provider-specific checks:
   retry.
 - **BFL:** report `bfl`/`flux-2-pro`; one initial task per action, trusted polling/download within
   one deadline, source-guided work without public upload, no signed URL/source base64 leakage.
-- **Wiro:** start with `PILOT_ACCESS_MODE=operator-qualification` and no participant. Confirm
-  participant mode disables generation, one Run per action, all orientations normalize to exact
-  dimensions, source work uses no public upload, and `InputOutputDelete` succeeds after local
-  persistence. Logs may contain only safe lifecycle fields.
+- **Wiro:** select Wiro at startup with both required credentials. Confirm one Run per action, all
+  orientations normalize to exact dimensions, source work uses no public upload, and
+  `InputOutputDelete` succeeds after local persistence. Logs may contain only safe lifecycle
+  fields.
 
-Wiro cleanup failure or participant availability fails the row.
+Wiro cleanup failure fails the check.
 
 ## ElevenLabs
 
@@ -192,26 +243,20 @@ Wiro cleanup failure or participant availability fails the row.
 7. Confirm preview stays within 2 MiB and the five-minute `mp3_44100_128` result within the
    inclusive 8 MiB ceiling. Oversize/malformed/cancelled output must not replace the take.
 
-Participant conversion requires confirmed zero-retention eligibility. A non-eligible account may
-be used only for separately authorized operator diagnosis after an informed retention decision.
+Confirm the configured `ELEVENLABS_ENABLE_LOGGING` choice matches the reviewed account retention
+setting. A zero-retention request may require an eligible provider account.
 
 ## Evidence and cleanup
 
-Write one strict content-free record per requirement as described in
-[qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md), then run:
-
-```bash
-pnpm pilot:qualification:check --commit "$(git rev-parse HEAD)" --verbose
-```
+Record only content-free outcomes. The former pilot evidence validator has been removed and is not
+a current release gate.
 
 After each pass, Stop AI/camera, release or discard test takes, close Studio, verify media/WebRTC
 indicators are gone, remove credentials when no longer needed, and restart to confirm optional
 integrations disable cleanly.
 
 References remain immutable in `LIGHTFRAME_DATA_DIR`. Never remove a shared directory as routine
-cleanup. Use a dedicated disposable directory and the
-[pilot data retirement checklist](PILOT_DATA_RETIREMENT_CHECKLIST.md); run
-`pnpm pilot:data-retirement:drill` before the first retained-data pass.
+cleanup. Use a dedicated disposable directory when testing cleanup.
 
 Missing credentials, entitlement, approved account settings, device access, quota, firewall/NAT,
 or provider availability is `blocked`. Capture only the safe app-owned code and stop; never weaken

@@ -11,9 +11,14 @@ export const existingVideoEditorPhase = (
   return workflow.phase === 'complete' ? 'review' : 'edit';
 };
 
-export const existingVideoStepIsComplete = (step: ExistingVideoStep): boolean => {
+export const existingVideoStepIsComplete = (
+  step: ExistingVideoStep,
+  referenceRequired = false,
+): boolean => {
   if (step.modelId === 'lucy-latest') {
-    return Boolean(step.prompt.trim() || step.referenceImage);
+    return referenceRequired
+      ? step.referenceImage !== null
+      : Boolean(step.prompt.trim() || step.referenceImage);
   }
   if (step.inputKind === 'prompt') return Boolean(step.prompt.trim());
   if (step.inputKind === 'reference-image') return step.referenceImage !== null;
@@ -75,13 +80,13 @@ export const planSummary = (
       voice.kind === 'local' ? 'a local voice treatment' : 'one ElevenLabs conversion';
     return {
       title: `${visualToolLabel(step)}, then ${voice.voiceName}`,
-      detail: `One Decart submission followed by ${provider}.`,
+      detail: `One visual-processing submission followed by ${provider}.`,
     };
   }
   if (step) {
     return {
       title: visualToolLabel(step),
-      detail: 'One Decart submission. No automatic billable retry.',
+      detail: 'One visual-processing submission. No automatic billable retry.',
     };
   }
   if (voice) {

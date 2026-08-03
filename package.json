@@ -38,8 +38,6 @@
     "check:dead-code:production": "knip --production --no-progress --include files,dependencies,unlisted,unresolved --reporter compact",
     "check:modules": "node scripts/check-module-graph.mjs",
     "recording:memory:estimate": "node scripts/estimate-recording-memory.mjs",
-    "pilot:data-retirement:drill": "node scripts/verify-pilot-data-retirement.mjs",
-    "pilot:qualification:check": "node scripts/validate-pilot-qualification.mjs",
     "screenshots:capture": "playwright test --config playwright.screenshots.config.ts",
     "quality": "pnpm typecheck && pnpm storybook:typecheck && pnpm lint && pnpm format:check && pnpm check:dead-code && pnpm check:modules && pnpm test && pnpm build && pnpm storybook:build"
   },

@@ -93,4 +93,5 @@ garbage-collection flow.
 Create/edit, all save variants, draft restore/reset, stale preview, optimizer fallback, combined
 generation, regeneration/edit, idempotent save, and responsive single-preview behavior have
 automated coverage. Live OpenAI/BFL/Wiro work, physical touch/mobile, assistive technology,
-retention cleanup, and provider-output qualification remain controlled-pilot gates.
+retention cleanup, and provider-output qualification remain manual validation areas, not runtime
+feature gates.

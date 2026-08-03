@@ -33,7 +33,12 @@ export const submitVideoJob = async (
   form.append('request', JSON.stringify(recipe));
   form.append('data', video, video.type.includes('webm') ? 'input.webm' : 'input.mp4');
   if (referenceImage) {
-    const extension = referenceImage.type === 'image/png' ? 'png' : 'jpg';
+    const extension =
+      referenceImage.type === 'image/png'
+        ? 'png'
+        : referenceImage.type === 'image/webp'
+          ? 'webp'
+          : 'jpg';
     form.append('reference_image', referenceImage, `reference.${extension}`);
   }
   return parseStatus(

@@ -1,5 +1,8 @@
 # Controlled-pilot data retirement
 
+> Historical scope: the pilot retirement drill was removed on 2026-08-03. This checklist is not a
+> current application or project gate.
+
 Complete this checklist for every participant. Detach, Reset, and character deletion do not remove
 immutable reference bytes; only this whole-environment procedure satisfies the
 [pilot deletion promise](CONTROLLED_PILOT_RELEASE_CONTRACT.md#participant-data-promise).
@@ -15,8 +18,7 @@ root, unresolved variable/glob, or symbolic link.
       operator-controlled pilot root.
 - [ ] Verify the leaf is an absolute, non-symbolic-link path, is not shared, and contains no other
       participant’s data; set that exact path as `LIGHTFRAME_DATA_DIR`.
-- [ ] Start with `PILOT_ACCESS_MODE=participant`; verify Wiro is unavailable and the provider-free
-      Local/upload/direct-save/local-Voice path still works.
+- [ ] Verify the provider-free Local/upload/direct-save/local-Voice path still works.
 
 Do not record names, email, prompts, media, device/provider IDs, bodies, URLs, headers, or
 credentials.
@@ -61,11 +63,5 @@ Any path, profile, relationship, or provider-cleanup ambiguity blocks the next p
 | Support & Escalation Owner initials/time      |                               |
 | Final outcome                                 | Pass / Block next participant |
 
-Before admitting participant data, and after changing this procedure, run:
-
-```bash
-pnpm pilot:data-retirement:drill
-```
-
-The drill uses disposable temporary data to prove exact-leaf retirement, retired-ID absence, and
-shared-root/sibling preservation. It does not replace the real checklist.
+The former disposable drill has been removed. If this checklist is reused later, a replacement
+drill must be designed and reviewed before it becomes a gate again.

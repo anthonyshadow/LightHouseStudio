@@ -589,6 +589,7 @@ export const useRecording = ({
       completeVisualProcessing: artifacts.completeVisualProcessing,
       completeProcessing: artifacts.completeProcessing,
       failProcessing: artifacts.failProcessing,
+      repairPresentedObjectUrl: artifacts.repairPresentedObjectUrl,
       clearVisualProcessing: artifacts.clearVisualProcessing,
       restoreOriginal: artifacts.restoreOriginal,
     }),

@@ -1,10 +1,10 @@
 import { readFile } from 'node:fs/promises';
 import type { Page } from '@playwright/test';
-import { VIDEO_PROVIDER_INTENT_HEADER, type VideoTransformModelId } from '@studio/contracts';
+import { VIDEO_PROVIDER_INTENT_HEADER, type VideoTransformOperationId } from '@studio/contracts';
 
 export type FakeVideoJobRequest = {
   method: string;
-  modelId: VideoTransformModelId | null;
+  operation: VideoTransformOperationId | null;
   providerIntent: string | null;
   exposedOriginalFilename: boolean;
 };
@@ -29,7 +29,7 @@ export const installFakeVideoJobRoutes = async (
   } = {},
 ): Promise<FakeVideoJobRequest[]> => {
   const calls: FakeVideoJobRequest[] = [];
-  const jobs = new Map<string, VideoTransformModelId>();
+  const jobs = new Map<string, VideoTransformOperationId>();
   const statusReads = new Map<string, number>();
   await page.route(
     (url) => url.pathname.startsWith('/api/video-jobs/'),
@@ -41,13 +41,13 @@ export const installFakeVideoJobRoutes = async (
       const providerIntent = request.headers()[VIDEO_PROVIDER_INTENT_HEADER] ?? null;
       if (request.method() === 'PUT') {
         const body = request.postDataBuffer()?.toString('latin1') ?? '';
-        const modelId: VideoTransformModelId = body.includes('lucy-vton-latest')
-          ? 'lucy-vton-latest'
-          : 'lucy-latest';
-        jobs.set(jobId, modelId);
+        const operation: VideoTransformOperationId = body.includes('virtual-try-on')
+          ? 'virtual-try-on'
+          : 'character-swap';
+        jobs.set(jobId, operation);
         calls.push({
           method: 'PUT',
-          modelId,
+          operation,
           providerIntent,
           exposedOriginalFilename: options.originalFilename
             ? body.includes(options.originalFilename)
@@ -58,7 +58,7 @@ export const installFakeVideoJobRoutes = async (
           contentType: 'application/json',
           body: JSON.stringify({
             jobId,
-            modelId,
+            operation,
             status: 'queued',
             createdAt: '2030-01-01T00:00:00.000Z',
             updatedAt: '2030-01-01T00:00:00.000Z',
@@ -70,10 +70,10 @@ export const installFakeVideoJobRoutes = async (
         return;
       }
 
-      const modelId = jobs.get(jobId) ?? 'lucy-latest';
+      const operation = jobs.get(jobId) ?? 'character-swap';
       calls.push({
         method: request.method(),
-        modelId,
+        operation,
         providerIntent,
         exposedOriginalFilename: false,
       });
@@ -101,7 +101,7 @@ export const installFakeVideoJobRoutes = async (
         contentType: 'application/json',
         body: JSON.stringify({
           jobId,
-          modelId,
+          operation,
           status: shouldFail ? 'failed' : stillProcessing ? 'processing' : 'ready',
           createdAt: '2030-01-01T00:00:00.000Z',
           updatedAt: '2030-01-01T00:00:01.000Z',

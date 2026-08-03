@@ -1,11 +1,14 @@
-import type { UploadedVideoFacts, UploadedVideoValidationIssue, VideoTransformStep } from './types';
+import type {
+  UploadedVideoFacts,
+  UploadedVideoValidationIssue,
+  VideoTransformOperationId,
+  VideoTransformStep,
+} from './types';
 
 export const VIDEO_DURATION_LIMIT_MS = 300_000;
 export const GENERAL_VIDEO_SIZE_LIMIT_BYTES = 300_000_000;
 export const VTON_VIDEO_SIZE_LIMIT_BYTES = 200_000_000;
 export const VIDEO_ASPECT_TOLERANCE = 0.01;
-export const PILOT_BATCH_SUBMISSION_LIMIT = 4;
-export const PILOT_PER_MODEL_BATCH_SUBMISSION_LIMIT = 2;
 
 const supportedAspect = (width: number, height: number): boolean => {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
@@ -20,7 +23,7 @@ const supportedAspect = (width: number, height: number): boolean => {
 
 export const validateUploadedVideoFacts = (
   facts: UploadedVideoFacts,
-  steps: readonly Pick<VideoTransformStep, 'modelId'>[],
+  operations: readonly VideoTransformOperationId[],
 ): readonly UploadedVideoValidationIssue[] => {
   const issues: UploadedVideoValidationIssue[] = [];
   if (
@@ -60,7 +63,7 @@ export const validateUploadedVideoFacts = (
       message: 'Use a 16:9 landscape or 9:16 portrait video.',
     });
   }
-  const includesVton = steps.some((step) => step.modelId === 'lucy-vton-latest');
+  const includesVton = operations.includes('virtual-try-on');
   const maximumBytes = includesVton ? VTON_VIDEO_SIZE_LIMIT_BYTES : GENERAL_VIDEO_SIZE_LIMIT_BYTES;
   if (facts.sizeBytes > maximumBytes) {
     issues.push({
@@ -109,11 +112,3 @@ export const validateVideoTransformPlan = (
   }
   return issues;
 };
-
-export const canSubmitPilotBatchJob = (
-  submittedModels: readonly ('lucy-latest' | 'lucy-vton-latest')[],
-  candidate: 'lucy-latest' | 'lucy-vton-latest',
-): boolean =>
-  submittedModels.length < PILOT_BATCH_SUBMISSION_LIMIT &&
-  submittedModels.filter((model) => model === candidate).length <
-    PILOT_PER_MODEL_BATCH_SUBMISSION_LIMIT;

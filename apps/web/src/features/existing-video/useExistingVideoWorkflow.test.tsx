@@ -80,6 +80,7 @@ const recordingController = (): RecordingController => {
     }),
     completeProcessing: vi.fn().mockReturnValue(source),
     failProcessing: vi.fn(),
+    repairPresentedObjectUrl: vi.fn().mockReturnValue(false),
     clearVisualProcessing: vi.fn(() => {
       recording.visual = null;
       recording.processed = null;
@@ -123,7 +124,7 @@ const inspected = (file: File) => ({
 
 const jobStatus = (jobId: string) => ({
   jobId,
-  modelId: 'lucy-latest' as const,
+  operation: 'character-swap' as const,
   status: 'ready' as const,
   createdAt: '2026-07-30T12:00:00.000Z',
   updatedAt: '2026-07-30T12:00:01.000Z',
@@ -199,7 +200,151 @@ describe('useExistingVideoWorkflow', () => {
     });
   });
 
-  it('keeps visual choices mutually exclusive and submits only the selected model', async () => {
+  it('requires a reference and locally prepares MOV as an ephemeral MP4 only when requested', async () => {
+    const sourceFile = new File(['mov-source'], 'source.mov', { type: 'video/quicktime' });
+    const preparedFile = new File(['prepared-mp4'], 'character-swap-source.mp4', {
+      type: 'video/mp4',
+    });
+    const resultFile = new File(['result'], 'result.mp4', { type: 'video/mp4' });
+    const movInspection = {
+      ...inspected(sourceFile),
+      mimeType: 'video/quicktime' as const,
+      metadata: {
+        ...inspected(sourceFile).metadata,
+        container: 'quicktime' as const,
+        displayName: sourceFile.name,
+      },
+    };
+    adapters.validateExistingVideo
+      .mockResolvedValueOnce(movInspection)
+      .mockResolvedValueOnce(inspected(preparedFile))
+      .mockResolvedValueOnce(inspected(resultFile));
+    adapters.transcodeRecordingToMp4.mockResolvedValueOnce({
+      blob: preparedFile,
+      mimeType: 'video/mp4',
+    });
+    const recording = recordingController();
+    const sourceArtifact = artifact('immutable-mov-source', sourceFile);
+    const publishUploadedVideo = vi.fn().mockReturnValue(sourceArtifact);
+    const { result } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        processing: processingController(),
+        publishUploadedVideo,
+        videoProcessingCapabilities: {
+          characterSwap: {
+            available: true,
+            inputPreparation: 'h264-mp4',
+            referencePolicy: 'required',
+            promptEnhancement: false,
+            terminalFailureRelease: 'explicit-user',
+          },
+          virtualTryOn: {
+            available: true,
+            inputPreparation: 'none',
+            referencePolicy: 'optional',
+            promptEnhancement: true,
+            terminalFailureRelease: 'automatic',
+          },
+        },
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => {
+      result.current.addStep('lucy-latest');
+    });
+    const reference = new File(['identity'], 'identity.png', { type: 'image/png' });
+    act(() => {
+      result.current.updateStep(result.current.steps[0]!.id, { referenceImage: reference });
+    });
+    await act(async () => result.current.submitStep(0));
+
+    expect(adapters.transcodeRecordingToMp4).toHaveBeenCalledWith(
+      sourceFile,
+      expect.objectContaining({ requireAudio: false }),
+    );
+    expect(adapters.submitVideoJob.mock.calls[0]?.[2]).toBe(preparedFile);
+    expect(adapters.submitVideoJob.mock.calls[0]?.[1]).toMatchObject({
+      operation: 'character-swap',
+      enhancePrompt: false,
+      hasReferenceImage: true,
+    });
+    expect(sourceArtifact.media).toBe(sourceFile);
+    expect(recording.original?.media).not.toBe(preparedFile);
+  });
+
+  it('blocks prompt-only Character Swap generically when the active capability requires a reference', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    const recording = recordingController();
+    const { result } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        processing: processingController(),
+        publishUploadedVideo: vi.fn(),
+        videoProcessingCapabilities: {
+          characterSwap: {
+            available: true,
+            inputPreparation: 'h264-mp4',
+            referencePolicy: 'required',
+            promptEnhancement: false,
+            terminalFailureRelease: 'explicit-user',
+          },
+          virtualTryOn: {
+            available: true,
+            inputPreparation: 'none',
+            referencePolicy: 'optional',
+            promptEnhancement: true,
+            terminalFailureRelease: 'automatic',
+          },
+        },
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => {
+      result.current.addStep('lucy-latest');
+    });
+    act(() => {
+      result.current.updateStep(result.current.steps[0]!.id, {
+        prompt: 'Use the saved character direction',
+      });
+    });
+    await act(async () => result.current.submitStep(0));
+
+    expect(result.current.message).toBe(
+      'Character Swap requires a reference image in this configuration.',
+    );
+    expect(adapters.submitVideoJob).not.toHaveBeenCalled();
+  });
+
+  it('never reports source-upload guidance when downloaded result validation fails', async () => {
+    const { result, recording, unmount } = await configuredVisualWorkflow();
+    adapters.validateExistingVideo.mockRejectedValueOnce(
+      new Error('Use a 16:9 landscape or 9:16 portrait video.'),
+    );
+
+    await act(async () => result.current.submitStep(0));
+
+    expect(result.current.phase).toBe('error');
+    expect(result.current.message).toBe(
+      'The downloaded visual result did not meet the app-owned media requirements.',
+    );
+    expect(result.current.message).not.toContain('Use a 16:9 landscape or 9:16 portrait video.');
+    expect(adapters.validateExistingVideo).toHaveBeenLastCalledWith(
+      expect.any(File),
+      false,
+      expect.any(AbortSignal),
+      'server-approved-result',
+    );
+    expect(adapters.submitVideoJob).toHaveBeenCalledOnce();
+    expect(adapters.releaseVideoJob).not.toHaveBeenCalled();
+    expect(recording.completeVisualProcessing).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  it('keeps visual choices mutually exclusive and permits repeated explicit submissions', async () => {
     const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
     adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
     const recording = recordingController();
@@ -242,9 +387,11 @@ describe('useExistingVideoWorkflow', () => {
     expect(recording.completeVisualProcessing).toHaveBeenCalledTimes(1);
     expect(onSubmissionAccepted).toHaveBeenCalledTimes(1);
     expect(result.current.completedStepCount).toBe(1);
-    expect(adapters.submitVideoJob.mock.calls[0]![1]).toMatchObject({ modelId: 'lucy-latest' });
+    expect(adapters.submitVideoJob.mock.calls[0]![1]).toMatchObject({
+      operation: 'character-swap',
+    });
 
-    expect(result.current.result?.objectUrl).toContain('blob:visual-lucy');
+    expect(result.current.result?.objectUrl).toContain('blob:visual-character-swap');
     act(() => result.current.downloadResult());
     expect(recording.markDownloaded).toHaveBeenCalledOnce();
 
@@ -256,7 +403,6 @@ describe('useExistingVideoWorkflow', () => {
     expect(result.current.result).toBeNull();
     expect(result.current.comparison).toBe('original');
     expect(result.current.completedStepCount).toBe(0);
-    expect(result.current.submittedModels).toEqual(['lucy-latest']);
 
     act(() => {
       result.current.addStep('lucy-vton-latest');
@@ -271,9 +417,27 @@ describe('useExistingVideoWorkflow', () => {
 
     expect(adapters.submitVideoJob).toHaveBeenCalledTimes(2);
     expect(adapters.submitVideoJob.mock.calls[1]![1]).toMatchObject({
-      modelId: 'lucy-vton-latest',
+      operation: 'virtual-try-on',
       prompt: 'Second submission from the retained original',
     });
+
+    for (let submissionNumber = 3; submissionNumber <= 5; submissionNumber += 1) {
+      act(() => result.current.startOver());
+      act(() => {
+        result.current.addStep('lucy-latest');
+      });
+      act(() =>
+        result.current.updateStep(result.current.steps[0]!.id, {
+          prompt: `Explicit submission ${submissionNumber}`,
+        }),
+      );
+      await act(async () => result.current.submitStep(0));
+      await waitFor(() => expect(result.current.phase).toBe('complete'));
+    }
+
+    expect(adapters.submitVideoJob).toHaveBeenCalledTimes(5);
+    expect(onSubmissionAccepted).toHaveBeenCalledTimes(5);
+    expect(result.current.message).not.toContain('submission limit');
     unmount();
   });
 
@@ -316,9 +480,12 @@ describe('useExistingVideoWorkflow', () => {
     );
     await act(async () => result.current.submitPlan());
 
-    expect(events).toEqual(['visual-commit', expect.stringMatching(/^voice:visual-lucy/u)]);
+    expect(events).toEqual([
+      'visual-commit',
+      expect.stringMatching(/^voice:visual-character-swap/u),
+    ]);
     const voiceCall = vi.mocked(processing.applyElevenLabsTo).mock.calls[0];
-    expect(voiceCall?.[0].id).toMatch(/^visual-lucy/u);
+    expect(voiceCall?.[0].id).toMatch(/^visual-character-swap/u);
     expect(voiceCall?.slice(1)).toEqual([
       'voice-northstar',
       'Northstar Narrator',
@@ -687,6 +854,66 @@ describe('useExistingVideoWorkflow', () => {
       'Decart could not complete this visual processing request.',
     );
     expect(adapters.releaseVideoJob).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('retains an explicit-user terminal failure until the user discards it', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    adapters.fetchVideoJob.mockImplementation((jobId: string) =>
+      Promise.resolve({
+        ...jobStatus(jobId),
+        status: 'failed',
+        result: null,
+        error: {
+          code: 'provider_rejected',
+          message: 'Visual processing rejected the submitted media.',
+        },
+      }),
+    );
+    const recording = recordingController();
+    const { result, unmount } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        processing: processingController(),
+        publishUploadedVideo: vi.fn(),
+        videoProcessingCapabilities: {
+          characterSwap: {
+            available: true,
+            inputPreparation: 'h264-mp4',
+            referencePolicy: 'required',
+            promptEnhancement: false,
+            terminalFailureRelease: 'explicit-user',
+          },
+          virtualTryOn: {
+            available: true,
+            inputPreparation: 'none',
+            referencePolicy: 'optional',
+            promptEnhancement: true,
+            terminalFailureRelease: 'automatic',
+          },
+        },
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => {
+      result.current.addStep('lucy-latest');
+    });
+    act(() => {
+      result.current.updateStep(result.current.steps[0]!.id, {
+        referenceImage: new File(['identity'], 'identity.png', { type: 'image/png' }),
+      });
+    });
+    await act(async () => result.current.submitStep(0));
+
+    expect(result.current.phase).toBe('error');
+    expect(result.current.message).toBe('Visual processing rejected the submitted media.');
+    expect(adapters.releaseVideoJob).not.toHaveBeenCalled();
+
+    act(() => result.current.reset(true));
+    expect(adapters.releaseVideoJob).toHaveBeenCalledOnce();
+    expect(recording.discard).toHaveBeenCalledOnce();
     unmount();
   });
 });

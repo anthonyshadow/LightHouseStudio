@@ -49,7 +49,22 @@ describe('health and capabilities contracts', () => {
     expect(
       capabilitiesResponseSchema.parse({
         realtimeVideo: { available: true, models: [...SUPPORTED_MODEL_IDS] },
-        videoProcessing: { available: true, models: ['lucy-latest', 'lucy-vton-latest'] },
+        videoProcessing: {
+          characterSwap: {
+            available: true,
+            inputPreparation: 'h264-mp4',
+            referencePolicy: 'required',
+            promptEnhancement: false,
+            terminalFailureRelease: 'explicit-user',
+          },
+          virtualTryOn: {
+            available: true,
+            inputPreparation: 'none',
+            referencePolicy: 'optional',
+            promptEnhancement: true,
+            terminalFailureRelease: 'automatic',
+          },
+        },
         elevenLabs: { available: false, modelId: null },
         referenceImages: {
           available: true,
@@ -67,7 +82,22 @@ describe('health and capabilities contracts', () => {
       }),
     ).toEqual({
       realtimeVideo: { available: true, models: ['lucy-latest', 'lucy-vton-latest'] },
-      videoProcessing: { available: true, models: ['lucy-latest', 'lucy-vton-latest'] },
+      videoProcessing: {
+        characterSwap: {
+          available: true,
+          inputPreparation: 'h264-mp4',
+          referencePolicy: 'required',
+          promptEnhancement: false,
+          terminalFailureRelease: 'explicit-user',
+        },
+        virtualTryOn: {
+          available: true,
+          inputPreparation: 'none',
+          referencePolicy: 'optional',
+          promptEnhancement: true,
+          terminalFailureRelease: 'automatic',
+        },
+      },
       elevenLabs: { available: false, modelId: null },
       referenceImages: {
         available: true,
@@ -109,7 +139,7 @@ describe('health and capabilities contracts', () => {
 describe('existing-video input contracts', () => {
   it('requires one explicit VTO input mode and rejects incompatible fields', () => {
     const base = {
-      modelId: 'lucy-vton-latest' as const,
+      operation: 'virtual-try-on' as const,
       prompt: '',
       enhancePrompt: false,
       hasReferenceImage: true,

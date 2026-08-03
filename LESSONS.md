@@ -71,3 +71,9 @@ Keep only lessons that should constrain future work.
   provider input and retrieved output.
 - Source audio is an immutable composition input. Visual providers may replace video, but they do
   not become the source of truth for final audio.
+- Keep provider/model selection at the server startup boundary. Browser orchestration should use
+  app-owned operation capabilities, while adapters own exact model fields, response states,
+  allowlisted delivery locations, and provider-specific input preparation requirements.
+- Capability-required transcoding creates an ephemeral submission resource at explicit Start; it
+  must be revalidated and cleaned without replacing the immutable source or implying remote
+  deletion.

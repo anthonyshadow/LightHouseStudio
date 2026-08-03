@@ -6,6 +6,7 @@ import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
 import type {
   DecartVideoJobProvider,
   DecartQueueStatus,
+  DecartVideoProviderFailureReason,
 } from '../../providers/decart/video-job-provider.js';
 import { VideoJobService } from './video-job-service.js';
 
@@ -13,21 +14,28 @@ const VIDEO_FIXTURE_BASE64 =
   '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';
 
 class FakeVideoProvider implements DecartVideoJobProvider {
-  readonly submissions: Array<{ modelId: string; videoMimeType: string }> = [];
+  readonly submissions: Array<{ operation: string; videoMimeType: string }> = [];
   nextStatus: DecartQueueStatus = 'pending';
+  nextFailureReason: DecartVideoProviderFailureReason | undefined;
 
   submit(
     input: Parameters<DecartVideoJobProvider['submit']>[0],
   ): Promise<{ providerJobId: string; status: DecartQueueStatus }> {
-    this.submissions.push({ modelId: input.modelId, videoMimeType: input.videoMimeType });
+    this.submissions.push({ operation: input.operation, videoMimeType: input.videoMimeType });
     return Promise.resolve({
       providerJobId: `provider-${this.submissions.length}`,
       status: this.nextStatus,
     });
   }
 
-  status(): Promise<{ status: DecartQueueStatus }> {
-    return Promise.resolve({ status: this.nextStatus });
+  status(): Promise<{
+    status: DecartQueueStatus;
+    failureReason?: DecartVideoProviderFailureReason;
+  }> {
+    return Promise.resolve({
+      status: this.nextStatus,
+      ...(this.nextFailureReason === undefined ? {} : { failureReason: this.nextFailureReason }),
+    });
   }
 
   async download(
@@ -110,7 +118,7 @@ const startJob = async (service: VideoJobService, jobId: string, ownerId: string
     jobId,
     ownerId,
     recipe: {
-      modelId: 'lucy-latest',
+      operation: 'character-swap',
       prompt: 'Change the lighting',
       enhancePrompt: false,
       hasReferenceImage: false,
@@ -155,6 +163,53 @@ describe('VideoJobService', () => {
     await Promise.all(services.splice(0).map((service) => service.close()));
   });
 
+  it('enforces operation-specific reference requirements before provider submission', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-reference-'));
+    const provider = new FakeVideoProvider();
+    const service = new VideoJobService(
+      {
+        'character-swap': {
+          provider,
+          outputResolution: '1080p',
+          outputSizing: 'exact-canonical',
+          inputPreparation: 'h264-mp4',
+          referencePolicy: 'required',
+          promptEnhancement: false,
+        },
+        'virtual-try-on': null,
+      },
+      root,
+    );
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const paths = await service.prepareJobDirectory(jobId);
+    await writeFile(paths.inputPath, Buffer.from(VIDEO_FIXTURE_BASE64, 'base64'), {
+      flag: 'wx',
+      mode: 0o600,
+    });
+
+    await expect(
+      service.start({
+        jobId,
+        ownerId: 'owner-reference',
+        recipe: {
+          operation: 'character-swap',
+          prompt: 'Replace the person',
+          enhancePrompt: false,
+          hasReferenceImage: false,
+        },
+        directory: paths.directory,
+        inputPath: paths.inputPath,
+        referencePath: null,
+        referenceMimeType: null,
+      }),
+    ).rejects.toMatchObject({
+      code: 'validation_error',
+      message: 'Character Swap requires a reference image in this configuration.',
+    });
+    expect(provider.submissions).toEqual([]);
+  });
+
   it('inspects, pins, and submits a client job exactly once before safe retrieval', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-'));
     const provider = new FakeVideoProvider();
@@ -172,7 +227,7 @@ describe('VideoJobService', () => {
       jobId,
       ownerId,
       recipe: {
-        modelId: 'lucy-latest',
+        operation: 'character-swap',
         prompt: 'Change the lighting',
         enhancePrompt: false,
         hasReferenceImage: false,
@@ -184,7 +239,9 @@ describe('VideoJobService', () => {
     });
 
     await waitFor(service, jobId, ownerId, 'queued');
-    expect(provider.submissions).toEqual([{ modelId: 'lucy-latest', videoMimeType: 'video/mp4' }]);
+    expect(provider.submissions).toEqual([
+      { operation: 'character-swap', videoMimeType: 'video/mp4' },
+    ]);
     expect((await service.existing(jobId, ownerId))?.jobId).toBe(jobId);
 
     provider.nextStatus = 'completed';
@@ -199,6 +256,130 @@ describe('VideoJobService', () => {
     expect(await readdir(path.dirname(content.path))).toContain('result.video');
     expect((await readFile(content.path)).byteLength).toBeGreaterThan(0);
     await content.settle(true);
+    expect(provider.submissions).toHaveLength(1);
+  });
+
+  it('allows more than four sequential explicit submissions for one owner', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-repeat-'));
+    const provider = new FakeVideoProvider();
+    const service = new VideoJobService(provider, root);
+    services.push(service);
+    const ownerId = 'owner-repeat';
+
+    for (let submissionNumber = 1; submissionNumber <= 5; submissionNumber += 1) {
+      provider.nextStatus = 'pending';
+      const jobId = crypto.randomUUID();
+      await startJob(service, jobId, ownerId);
+      await waitFor(service, jobId, ownerId, 'queued');
+
+      provider.nextStatus = 'completed';
+      await service.status(jobId, ownerId);
+      await waitFor(service, jobId, ownerId, 'ready');
+      const content = await service.content(jobId, ownerId);
+      await content.settle(true);
+    }
+
+    expect(provider.submissions).toHaveLength(5);
+  });
+
+  it('reports provider-output dimensions without blaming a valid source aspect ratio', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-dimensions-'));
+    const provider = new FakeVideoProvider();
+    const service = new VideoJobService(
+      {
+        'character-swap': {
+          provider,
+          outputResolution: '1080p',
+          outputSizing: 'exact-canonical',
+          inputPreparation: 'h264-mp4',
+          referencePolicy: 'optional',
+          promptEnhancement: false,
+        },
+        'virtual-try-on': null,
+      },
+      root,
+    );
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-output-dimensions';
+    const { paths } = await startJob(service, jobId, ownerId);
+
+    await waitFor(service, jobId, ownerId, 'queued');
+    provider.nextStatus = 'completed';
+    await service.status(jobId, ownerId);
+    const failed = await waitFor(service, jobId, ownerId, 'failed');
+
+    expect(failed.error).toEqual({
+      code: 'result_invalid',
+      message:
+        'The visual result dimensions were 1280 × 720; expected 1920 × 1080 for the source orientation.',
+    });
+    expect(failed.error?.message).not.toContain('Use a 16:9 landscape or 9:16 portrait video.');
+    await vi.waitFor(async () => expect(await pathExists(paths.directory)).toBe(false));
+    expect(provider.submissions).toHaveLength(1);
+  });
+
+  it('warns and publishes a non-canonical megapixel-budget result', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-megapixel-'));
+    const provider = new FakeVideoProvider();
+    const service = new VideoJobService(
+      {
+        'character-swap': {
+          provider,
+          outputResolution: '1080p',
+          outputSizing: 'megapixel-budget',
+          inputPreparation: 'h264-mp4',
+          referencePolicy: 'optional',
+          promptEnhancement: false,
+          terminalFailureRelease: 'explicit-user',
+        },
+        'virtual-try-on': null,
+      },
+      root,
+    );
+    services.push(service);
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-megapixel-result';
+
+    await startJob(service, jobId, ownerId);
+    await waitFor(service, jobId, ownerId, 'queued');
+    provider.nextStatus = 'completed';
+    await service.status(jobId, ownerId);
+    const ready = await waitFor(service, jobId, ownerId, 'ready');
+
+    expect(ready.result).toMatchObject({ width: 1_280, height: 720 });
+    expect(warning).toHaveBeenCalledWith(
+      expect.stringContaining('continuing with the inspected result'),
+      expect.objectContaining({
+        actualWidth: 1_280,
+        actualHeight: 720,
+        resolution: '1080p',
+      }),
+    );
+    warning.mockRestore();
+  });
+
+  it('returns only a classified safe error when an accepted provider job fails', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-provider-failure-'));
+    const provider = new FakeVideoProvider();
+    const service = new VideoJobService(provider, root);
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-provider-failure';
+    const { paths } = await startJob(service, jobId, ownerId);
+
+    await waitFor(service, jobId, ownerId, 'queued');
+    provider.nextFailureReason = 'policy';
+    provider.nextStatus = 'failed';
+    const failed = await waitFor(service, jobId, ownerId, 'failed');
+
+    expect(failed.error).toEqual({
+      code: 'provider_rejected',
+      message:
+        'Visual processing could not complete because content safeguards rejected the request.',
+    });
+    expect(await pathExists(paths.directory)).toBe(false);
     expect(provider.submissions).toHaveLength(1);
   });
 
@@ -219,7 +400,8 @@ describe('VideoJobService', () => {
       jobId,
       ownerId: 'owner-two',
       recipe: {
-        modelId: 'lucy-vton-latest',
+        operation: 'virtual-try-on',
+        inputKind: 'prompt',
         prompt: 'Apply the garment',
         enhancePrompt: false,
         hasReferenceImage: false,
@@ -233,16 +415,40 @@ describe('VideoJobService', () => {
     const failed = await waitFor(service, jobId, 'owner-two', 'failed');
     expect(failed.error).toEqual({
       code: 'provider_rejected',
-      message: 'Decart could not complete this visual processing request.',
+      message: 'Visual processing could not complete this request.',
     });
     expect(provider.submit).toHaveBeenCalledOnce();
+  });
+
+  it('distinguishes a terminal provider generation failure from an HTTP request failure', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-terminal-failure-'));
+    const provider = new FakeVideoProvider();
+    const service = new VideoJobService(provider, root);
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-terminal-generation-failure';
+
+    await startJob(service, jobId, ownerId);
+    await waitFor(service, jobId, ownerId, 'queued');
+    provider.nextFailureReason = 'generation-failed';
+    provider.nextStatus = 'failed';
+
+    const failed = await service.status(jobId, ownerId);
+
+    expect(failed).toMatchObject({
+      status: 'failed',
+      error: {
+        code: 'provider_rejected',
+        message: 'The visual provider reported that generation failed before producing a result.',
+      },
+    });
   });
 
   it('expires abandoned ready output at the immutable accepted-at deadline without resubmitting', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-expiry-'));
     const provider = new FakeVideoProvider();
     const clock = new ManualDeadlineScheduler();
-    const service = new VideoJobService(provider, root, true, {
+    const service = new VideoJobService(provider, root, {
       now: clock.now,
       scheduleDeadline: clock.scheduleDeadline,
     });
@@ -277,7 +483,7 @@ describe('VideoJobService', () => {
       jobId,
       ownerId,
       recipe: {
-        modelId: 'lucy-latest',
+        operation: 'character-swap',
         prompt: 'A changed retry draft',
         enhancePrompt: false,
         hasReferenceImage: false,
@@ -296,7 +502,7 @@ describe('VideoJobService', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-lease-'));
     const provider = new FakeVideoProvider();
     const clock = new ManualDeadlineScheduler();
-    const service = new VideoJobService(provider, root, true, {
+    const service = new VideoJobService(provider, root, {
       now: clock.now,
       scheduleDeadline: clock.scheduleDeadline,
     });
@@ -387,7 +593,7 @@ describe('VideoJobService', () => {
         mode: 0o600,
       });
     });
-    const service = new VideoJobService(provider, root, true, {
+    const service = new VideoJobService(provider, root, {
       now: clock.now,
       scheduleDeadline: clock.scheduleDeadline,
     });
@@ -413,7 +619,7 @@ describe('VideoJobService', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-deadline-race-'));
     const provider = new FakeVideoProvider();
     const clock = new ManualDeadlineScheduler();
-    const service = new VideoJobService(provider, root, true, {
+    const service = new VideoJobService(provider, root, {
       now: clock.now,
       scheduleDeadline: clock.scheduleDeadline,
     });

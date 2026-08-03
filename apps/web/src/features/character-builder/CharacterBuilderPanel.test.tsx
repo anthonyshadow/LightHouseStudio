@@ -150,7 +150,7 @@ describe('CharacterBuilderPanel Wave 5 trust boundary', () => {
     expect(onGenerate).toHaveBeenCalledOnce();
   });
 
-  it('keeps participant Wiro generation unavailable while preserving local save', async () => {
+  it('keeps unconfigured Wiro generation unavailable while preserving local save', async () => {
     const user = userEvent.setup();
     const { onGenerate } = renderPanel({
       generationAvailable: false,
@@ -160,9 +160,7 @@ describe('CharacterBuilderPanel Wave 5 trust boundary', () => {
     });
 
     await user.click(screen.getByRole('button', { name: /^Preview/i }));
-    expect(screen.getByText(/restricted to explicit operator-qualification runs/i)).toBeVisible();
-    expect(screen.getByText(/unavailable for participant generation/i)).toBeVisible();
-    expect(screen.getByText(/configured generation path is currently unavailable/i)).toBeVisible();
+    expect(screen.getByText(/Wiro.*configured generation path is not ready/i)).toBeVisible();
     const generate = screen.getByRole('button', { name: 'Generate Preview' });
     expect(generate).toHaveAttribute('aria-disabled', 'true');
     await user.click(generate);

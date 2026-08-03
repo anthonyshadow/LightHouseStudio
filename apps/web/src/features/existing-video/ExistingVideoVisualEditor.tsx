@@ -23,6 +23,8 @@ export interface ExistingVideoVisualEditorProps {
   readonly structureLocked: boolean;
   readonly recipeLocked: boolean;
   readonly recipeLoading: boolean;
+  readonly referenceRequired?: boolean;
+  readonly promptEnhancementSupported?: boolean;
   readonly onApplySavedRecipe: (step: ExistingVideoStep, recipeId: string) => void;
   readonly onChooseReference: (step: ExistingVideoStep, file: File) => void;
   readonly onCreateCharacter?: (stepId: string) => void;
@@ -54,6 +56,8 @@ export const ExistingVideoVisualEditor = ({
   structureLocked,
   recipeLocked,
   recipeLoading,
+  referenceRequired = false,
+  promptEnhancementSupported = true,
   onApplySavedRecipe,
   onChooseReference,
   onCreateCharacter,
@@ -69,7 +73,7 @@ export const ExistingVideoVisualEditor = ({
     <article css={configCardStyles(theme)} aria-labelledby={`existing-video-step-${step.id}`}>
       <header css={configHeaderStyles(theme)}>
         <h3 id={`existing-video-step-${step.id}`}>{heading(step)}</h3>
-        <span>1 Decart submission</span>
+        <span>1 visual-processing submission</span>
       </header>
 
       {step.modelId === 'lucy-vton-latest' ? (
@@ -148,6 +152,14 @@ export const ExistingVideoVisualEditor = ({
       ) : (
         <>
           <p>Confirm you have rights and consent for submitted media before continuing.</p>
+          {referenceRequired ? (
+            <Surface tone="soft" padding="compact">
+              <p>
+                This Character Swap configuration requires one identity reference image. Prompt-only
+                recipes need a reference before processing can start.
+              </p>
+            </Surface>
+          ) : null}
           <ExistingVideoRecipeChooser
             modelId={step.modelId}
             recipes={savedRecipes.filter((recipe) => recipe.modelId === step.modelId)}
@@ -185,15 +197,21 @@ export const ExistingVideoVisualEditor = ({
             />
             <span>{step.prompt.length}/1,200</span>
           </label>
-          <details css={advancedStyles(theme)} open={step.enhancePrompt || undefined}>
+          {!promptEnhancementSupported ? (
+            <p>Prompt enhancement is unavailable for Character Swap in this configuration.</p>
+          ) : null}
+          <details
+            css={advancedStyles(theme)}
+            open={(promptEnhancementSupported && step.enhancePrompt) || undefined}
+          >
             <summary>Advanced</summary>
             <div>
               <label>
                 <span>
                   <input
                     type="checkbox"
-                    checked={step.enhancePrompt}
-                    disabled={recipeLocked}
+                    checked={promptEnhancementSupported && step.enhancePrompt}
+                    disabled={recipeLocked || !promptEnhancementSupported}
                     onChange={(event) =>
                       onUpdate(step.id, { enhancePrompt: event.currentTarget.checked })
                     }

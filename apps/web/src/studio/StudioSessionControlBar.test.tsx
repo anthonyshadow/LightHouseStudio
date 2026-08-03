@@ -84,6 +84,7 @@ const createRecording = (
   completeVisualProcessing: vi.fn(),
   completeProcessing: vi.fn(),
   failProcessing: vi.fn(),
+  repairPresentedObjectUrl: vi.fn().mockReturnValue(false),
   clearVisualProcessing: vi.fn(),
   restoreOriginal: vi.fn(),
   ...overrides,

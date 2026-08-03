@@ -1,4 +1,9 @@
-import type { ReferenceImageSize, VoiceSummary, WorkspaceVoicesResponse } from '@studio/contracts';
+import type {
+  CapabilitiesResponse,
+  ReferenceImageSize,
+  VoiceSummary,
+  WorkspaceVoicesResponse,
+} from '@studio/contracts';
 import type { ModelModeId, SessionLifecycleStatus, SessionModeId } from '@studio/domain';
 
 export type StudioMode = SessionModeId;
@@ -21,8 +26,7 @@ export type RealtimeSessionTiming = Readonly<{
 
 export type ProviderAvailability = {
   decart: boolean;
-  videoProcessing?: boolean;
-  videoProcessingModels?: readonly ModelModeId[];
+  videoProcessing?: CapabilitiesResponse['videoProcessing'];
   elevenLabs: boolean;
   elevenLabsModel: string | null;
   referenceImages?: boolean;

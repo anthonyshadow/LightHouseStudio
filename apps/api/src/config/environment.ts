@@ -17,6 +17,7 @@ export const DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS = 120_000;
 export const MAX_PROMPT_OPTIMIZER_TIMEOUT_MS = 180_000;
 export const BFL_REFERENCE_IMAGE_MODEL = 'flux-2-pro' as const;
 export const WIRO_REFERENCE_IMAGE_MODEL = 'seedream-v5-lite-uncensored' as const;
+export const PRUNA_VIDEO_REPLACE_MODEL = 'p-video-replace' as const;
 export const DEFAULT_BFL_SAFETY_TOLERANCE = 2;
 export const DEFAULT_BFL_DISABLE_PROMPT_UPSAMPLING = true;
 
@@ -55,63 +56,103 @@ const strictBooleanSchema = (defaultValue: boolean) =>
     return value;
   }, z.boolean());
 
-const environmentSchema = z.object({
-  NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: portSchema,
-  DECART_API_KEY: optionalSecretSchema,
-  OPENAI_API_KEY: optionalSecretSchema,
-  OPENAI_PROMPT_OPTIMIZER_MODEL: optionalModelSchema,
-  OPENAI_PROMPT_OPTIMIZER_REASONING: z.preprocess(
-    normalizeOptionalString,
-    z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
-  ),
-  OPENAI_PROMPT_OPTIMIZER_VERSION: optionalModelSchema,
-  OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: timeoutSchema(DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS),
-  OPENAI_REFERENCE_IMAGE_MODEL: optionalModelSchema,
-  OPENAI_REFERENCE_IMAGE_QUALITY: z.preprocess(
-    normalizeOptionalString,
-    z.enum(['high', 'medium']).optional(),
-  ),
-  REFERENCE_IMAGE_PROVIDER: z.preprocess(
-    normalizeOptionalString,
-    z.enum(['openai', 'bfl', 'wiro']).default('openai'),
-  ),
-  BFL_API_KEY: optionalSecretSchema,
-  BFL_REFERENCE_IMAGE_MODEL: z.preprocess(
-    normalizeOptionalString,
-    z.literal(BFL_REFERENCE_IMAGE_MODEL).default(BFL_REFERENCE_IMAGE_MODEL),
-  ),
-  BFL_SAFETY_TOLERANCE: z.preprocess(
-    (value) => (value === undefined || value === '' ? DEFAULT_BFL_SAFETY_TOLERANCE : value),
-    z.coerce.number().int().min(0).max(5),
-  ),
-  BFL_DISABLE_PROMPT_UPSAMPLING: strictBooleanSchema(DEFAULT_BFL_DISABLE_PROMPT_UPSAMPLING),
-  BFL_REFERENCE_IMAGE_TIMEOUT_MS: timeoutSchema(DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS),
-  WIRO_API_KEY: optionalSecretSchema,
-  WIRO_API_SECRET: optionalSecretSchema,
-  WIRO_REFERENCE_IMAGE_MODEL: z.preprocess(
-    normalizeOptionalString,
-    z.literal(WIRO_REFERENCE_IMAGE_MODEL).default(WIRO_REFERENCE_IMAGE_MODEL),
-  ),
-  WIRO_REFERENCE_IMAGE_TIMEOUT_MS: timeoutSchema(DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS),
-  PILOT_ACCESS_MODE: z.preprocess(
-    normalizeOptionalString,
-    z.enum(['participant', 'operator-qualification']).default('participant'),
-  ),
-  ELEVENLABS_API_KEY: optionalSecretSchema,
-  ELEVENLABS_STS_MODEL_ID: optionalModelSchema,
-  ELEVENLABS_ENABLE_LOGGING: strictBooleanSchema(false),
-  LIGHTFRAME_DATA_DIR: z.preprocess(
-    (value) => (value === undefined || value === '' ? DEFAULT_LIGHTFRAME_DATA_DIR : value),
-    z.string().trim().min(1),
-  ),
-});
+const environmentSchema = z
+  .object({
+    NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
+    PORT: portSchema,
+    DECART_API_KEY: optionalSecretSchema,
+    EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: z.preprocess(
+      normalizeOptionalString,
+      z.enum(['decart', 'pruna']).default('decart'),
+    ),
+    PRUNA_VIDEO_REPLACE_ENABLED: strictBooleanSchema(false),
+    PRUNA_API_KEY: optionalSecretSchema,
+    PRUNA_VIDEO_REPLACE_MODEL: z.preprocess(
+      normalizeOptionalString,
+      z.literal(PRUNA_VIDEO_REPLACE_MODEL).optional(),
+    ),
+    PRUNA_VIDEO_REPLACE_RESOLUTION: z.preprocess(
+      normalizeOptionalString,
+      z.enum(['720p', '1080p']).optional(),
+    ),
+    OPENAI_API_KEY: optionalSecretSchema,
+    OPENAI_PROMPT_OPTIMIZER_MODEL: optionalModelSchema,
+    OPENAI_PROMPT_OPTIMIZER_REASONING: z.preprocess(
+      normalizeOptionalString,
+      z.enum(['none', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max']).optional(),
+    ),
+    OPENAI_PROMPT_OPTIMIZER_VERSION: optionalModelSchema,
+    OPENAI_PROMPT_OPTIMIZER_TIMEOUT_MS: timeoutSchema(DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS),
+    OPENAI_REFERENCE_IMAGE_MODEL: optionalModelSchema,
+    OPENAI_REFERENCE_IMAGE_QUALITY: z.preprocess(
+      normalizeOptionalString,
+      z.enum(['high', 'medium']).optional(),
+    ),
+    REFERENCE_IMAGE_PROVIDER: z.preprocess(
+      normalizeOptionalString,
+      z.enum(['openai', 'bfl', 'wiro']).default('openai'),
+    ),
+    BFL_API_KEY: optionalSecretSchema,
+    BFL_REFERENCE_IMAGE_MODEL: z.preprocess(
+      normalizeOptionalString,
+      z.literal(BFL_REFERENCE_IMAGE_MODEL).default(BFL_REFERENCE_IMAGE_MODEL),
+    ),
+    BFL_SAFETY_TOLERANCE: z.preprocess(
+      (value) => (value === undefined || value === '' ? DEFAULT_BFL_SAFETY_TOLERANCE : value),
+      z.coerce.number().int().min(0).max(5),
+    ),
+    BFL_DISABLE_PROMPT_UPSAMPLING: strictBooleanSchema(DEFAULT_BFL_DISABLE_PROMPT_UPSAMPLING),
+    BFL_REFERENCE_IMAGE_TIMEOUT_MS: timeoutSchema(DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS),
+    WIRO_API_KEY: optionalSecretSchema,
+    WIRO_API_SECRET: optionalSecretSchema,
+    WIRO_REFERENCE_IMAGE_MODEL: z.preprocess(
+      normalizeOptionalString,
+      z.literal(WIRO_REFERENCE_IMAGE_MODEL).default(WIRO_REFERENCE_IMAGE_MODEL),
+    ),
+    WIRO_REFERENCE_IMAGE_TIMEOUT_MS: timeoutSchema(DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS),
+    ELEVENLABS_API_KEY: optionalSecretSchema,
+    ELEVENLABS_STS_MODEL_ID: optionalModelSchema,
+    ELEVENLABS_ENABLE_LOGGING: strictBooleanSchema(false),
+    LIGHTFRAME_DATA_DIR: z.preprocess(
+      (value) => (value === undefined || value === '' ? DEFAULT_LIGHTFRAME_DATA_DIR : value),
+      z.string().trim().min(1),
+    ),
+  })
+  .superRefine((value, context) => {
+    if (value.EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER !== 'pruna') return;
+    const required: ReadonlyArray<readonly [keyof typeof value, boolean, string]> = [
+      [
+        'PRUNA_VIDEO_REPLACE_ENABLED',
+        value.PRUNA_VIDEO_REPLACE_ENABLED,
+        'Set PRUNA_VIDEO_REPLACE_ENABLED=true when selecting Pruna.',
+      ],
+      ['PRUNA_API_KEY', value.PRUNA_API_KEY !== undefined, 'Set PRUNA_API_KEY.'],
+      [
+        'PRUNA_VIDEO_REPLACE_MODEL',
+        value.PRUNA_VIDEO_REPLACE_MODEL !== undefined,
+        `Set PRUNA_VIDEO_REPLACE_MODEL=${PRUNA_VIDEO_REPLACE_MODEL}.`,
+      ],
+      [
+        'PRUNA_VIDEO_REPLACE_RESOLUTION',
+        value.PRUNA_VIDEO_REPLACE_RESOLUTION !== undefined,
+        'Set PRUNA_VIDEO_REPLACE_RESOLUTION=720p or 1080p.',
+      ],
+    ];
+    for (const [variable, valid, message] of required) {
+      if (!valid) context.addIssue({ code: 'custom', path: [variable], message });
+    }
+  });
 
 export interface RuntimeConfig {
   readonly nodeEnv: 'development' | 'test' | 'production';
   readonly host: '127.0.0.1';
   readonly port: number;
   readonly decartApiKey?: string;
+  readonly existingVideoCharacterSwapProvider: 'decart' | 'pruna';
+  readonly prunaVideoReplaceEnabled: boolean;
+  readonly prunaApiKey?: string;
+  readonly prunaVideoReplaceModel?: typeof PRUNA_VIDEO_REPLACE_MODEL;
+  readonly prunaVideoReplaceResolution?: '720p' | '1080p';
   readonly openAiApiKey?: string;
   readonly openAiPromptOptimizerModel: string;
   readonly openAiPromptOptimizerReasoning:
@@ -130,7 +171,6 @@ export interface RuntimeConfig {
   readonly wiroApiSecret?: string;
   readonly wiroReferenceImageModel: typeof WIRO_REFERENCE_IMAGE_MODEL;
   readonly wiroReferenceImageTimeoutMs: number;
-  readonly pilotAccessMode: 'participant' | 'operator-qualification';
   readonly elevenLabsApiKey?: string;
   readonly elevenLabsModelId: string;
   readonly elevenLabsEnableLogging: boolean;
@@ -224,6 +264,15 @@ export const parseEnvironment = (
     ...(result.data.DECART_API_KEY === undefined
       ? {}
       : { decartApiKey: result.data.DECART_API_KEY }),
+    existingVideoCharacterSwapProvider: result.data.EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER,
+    prunaVideoReplaceEnabled: result.data.PRUNA_VIDEO_REPLACE_ENABLED,
+    ...(result.data.PRUNA_API_KEY === undefined ? {} : { prunaApiKey: result.data.PRUNA_API_KEY }),
+    ...(result.data.PRUNA_VIDEO_REPLACE_MODEL === undefined
+      ? {}
+      : { prunaVideoReplaceModel: result.data.PRUNA_VIDEO_REPLACE_MODEL }),
+    ...(result.data.PRUNA_VIDEO_REPLACE_RESOLUTION === undefined
+      ? {}
+      : { prunaVideoReplaceResolution: result.data.PRUNA_VIDEO_REPLACE_RESOLUTION }),
     ...(result.data.OPENAI_API_KEY === undefined
       ? {}
       : { openAiApiKey: result.data.OPENAI_API_KEY }),
@@ -249,7 +298,6 @@ export const parseEnvironment = (
       : { wiroApiSecret: result.data.WIRO_API_SECRET }),
     wiroReferenceImageModel: result.data.WIRO_REFERENCE_IMAGE_MODEL,
     wiroReferenceImageTimeoutMs: result.data.WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
-    pilotAccessMode: result.data.PILOT_ACCESS_MODE,
     ...(result.data.ELEVENLABS_API_KEY === undefined
       ? {}
       : { elevenLabsApiKey: result.data.ELEVENLABS_API_KEY }),
