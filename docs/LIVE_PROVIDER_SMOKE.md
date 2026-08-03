@@ -148,10 +148,11 @@ flow. Do not label browser abort, local cleanup, or DELETE as provider cancellat
 
 ## Pruna Character Swap
 
-Run two separate startups with `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER=pruna`,
+Start with `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER=pruna`,
 `PRUNA_VIDEO_REPLACE_ENABLED=true`, the exact `PRUNA_VIDEO_REPLACE_MODEL=p-video-replace`, and
-`PRUNA_VIDEO_REPLACE_RESOLUTION=720p` then `1080p`. Keep Decart independently configured only if
-the VTO capability is under test. Review the current
+the required server credential. Keep Decart independently configured only if the VTO capability is
+under test. In the editor, run one explicitly approved `720p` submission and one separately
+approved `1080p` submission. Review the current
 [P-Video-Replace documentation](https://docs.pruna.ai/en/stable/docs_pruna_endpoints/performance_models/p-video-replace.html)
 and [async/file/delivery API](https://docs.api.pruna.ai/apis/models-api-0/versions/a80cf098-b7a8-4f6e-b1e0-43b06bfa4038/operations/getPredictionStatus)
 before spending.
@@ -163,16 +164,20 @@ For each resolution row:
    a 720p benchmark only; do not claim a quantified 1080p processing time.
 2. Confirm Character Swap requires one JPEG/PNG/WebP identity reference, prompt-only recipes stay
    selectable but cannot Start without it, Enhance Prompt is disabled with generic guidance, and
-   no provider/model selector or provider name appears. Confirm VTO never contacts Pruna.
+   no provider/model selector or provider name appears. Confirm the editor offers `720p` and
+   `1080p`, defaults a new Character Swap setup to `720p`, and locks the choice after submission.
+   Confirm VTO never contacts Pruna.
 3. Submit H.264 MP4 as pass-through. Separately Start from H.264 MOV and VP8 WebM, confirm local
    H.264 MP4 preparation/revalidation occurs before upload, and confirm the immutable source and
    original audio remain unchanged. Keep the app-owned 300-second, 300 MB, 16:9/9:16, consent,
    duration-sync, and content-policy limits; Pruna publishes no exact source-size or platform
    duration maximum.
 4. Confirm exactly two `/v1/files` uploads and exactly one `/v1/predictions` request with synthetic
-   names, `Model: p-video-replace`, one `images` entry, configured `resolution`, `save_audio=true`,
-   and raw prompt or the app-owned default when blank. There must be no webhook, initial retry,
-   fallback, raw identifier/URL/body leakage, or second prediction during Voice retry.
+   names, `Model: p-video-replace`, one `images` entry, the editor-selected `resolution`, `seed=0`,
+   `turbo=false`, `target_fps=original`, `save_audio=true`, `ignore_audio=false`,
+   `disable_safety_checker=false`, and raw prompt or the app-owned default when blank. There must be
+   no webhook, initial retry, fallback, raw identifier/URL/body leakage, or second prediction during
+   Voice retry.
 5. Observe starting/processing/succeeded and a controlled failed/canceled mapping. Interrupt status
    and result retrieval, then resume the accepted job without another prediction. Confirm Voice
    runs only after the visual result and its retry does not resubmit visual processing. For a

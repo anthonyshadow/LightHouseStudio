@@ -65,8 +65,9 @@ data is unaffected.
 - Existing-video Character Swap uses one startup-selected server provider: Decart
   `lucy-latest` by default or Pruna `p-video-replace`. Virtual Try-On remains on Decart
   `lucy-vton-latest`, independently of that Character Swap choice. Decart output remains fixed
-  720p; Pruna output is startup-pinned to its documented approximate 1 MP (`720p`) or 2 MP
-  (`1080p`) resolution class while retaining source orientation. A non-canonical Pruna result size
+  720p; when Pruna is active, the editor lets the creator choose its documented approximate 1 MP
+  (`720p`) or 2 MP (`1080p`) resolution class for each submission while retaining source
+  orientation. A non-canonical Pruna result size
   produces a content-free server warning and continues with the inspected dimensions; Decart
   remains exact-canonical.
   Both paths use explicit submit/status/content stages, inspected size/duration/orientation, and
@@ -77,8 +78,9 @@ data is unaffected.
   Provider bodies remain private.
 - Pruna Character Swap requires one identity reference and H.264 MP4 input. H.264 MOV and VP8
   WebM are converted locally at explicit Start into an ephemeral submission Blob; the immutable
-  source is unchanged. MP4 input passes through. Prompt enhancement is unavailable in this
-  configuration.
+  source is unchanged. MP4 input passes through. Every prediction explicitly pins seed `0`, turbo
+  off, original frame rate, source-audio conditioning/output, and the enabled safety checker.
+  Prompt enhancement is unavailable in this configuration.
 - Reference generation uses one startup-selected provider: OpenAI `gpt-image-2`, BFL
   `flux-2-pro`, or Wiro `seedream-v5-lite-uncensored`. There is no automatic billable retry or
   provider fallback.
@@ -138,7 +140,6 @@ is the maintained list of defaults and tunables.
 | `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`       | Startup Character Swap choice: `decart` (default) or `pruna`; never exposed in the UI |
 | `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY` | Required enablement and server credential when Pruna is selected                      |
 | `PRUNA_VIDEO_REPLACE_MODEL`                    | Exact pinned `p-video-replace` literal; required when Pruna is selected               |
-| `PRUNA_VIDEO_REPLACE_RESOLUTION`               | Required `720p` or `1080p` Pruna output; `.env.example` uses `720p` for comparison    |
 | `OPENAI_API_KEY`                               | Character prompt optimization and OpenAI image work                                   |
 | `REFERENCE_IMAGE_PROVIDER`                     | Startup choice: `openai` (default), `bfl`, or `wiro`                                  |
 | `BFL_API_KEY`                                  | BFL image work when BFL is selected                                                   |

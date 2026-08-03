@@ -13,14 +13,14 @@ export interface ExistingVideoProviderFactoryOptions {
   readonly prunaProvider?: ExistingVideoJobProvider | null;
   readonly createPrunaProvider?: (
     apiKey: string,
-    resolution: '720p' | '1080p',
     fetchImplementation?: typeof fetch,
   ) => ExistingVideoJobProvider;
 }
 
 const decartBinding = (provider: ExistingVideoJobProvider): ExistingVideoOperationBinding => ({
   provider,
-  outputResolution: '720p',
+  outputResolutions: ['720p'],
+  defaultOutputResolution: '720p',
   outputSizing: 'exact-canonical',
   inputPreparation: 'none',
   referencePolicy: 'optional',
@@ -48,15 +48,16 @@ export const createExistingVideoProviderRegistry = (
         ? options.prunaProvider
         : (
             options.createPrunaProvider ??
-            ((apiKey, resolution, fetchImplementation) =>
-              new PrunaVideoReplaceProvider(apiKey, resolution, fetchImplementation))
-          )(config.prunaApiKey!, config.prunaVideoReplaceResolution!, options.fetchImplementation);
+            ((apiKey, fetchImplementation) =>
+              new PrunaVideoReplaceProvider(apiKey, fetchImplementation))
+          )(config.prunaApiKey!, options.fetchImplementation);
     characterSwap =
       pruna === null
         ? null
         : {
             provider: pruna,
-            outputResolution: config.prunaVideoReplaceResolution!,
+            outputResolutions: ['720p', '1080p'],
+            defaultOutputResolution: '720p',
             outputSizing: 'megapixel-budget',
             inputPreparation: 'h264-mp4',
             referencePolicy: 'required',

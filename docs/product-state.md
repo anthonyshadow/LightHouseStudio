@@ -57,7 +57,8 @@ required, but no physical target is qualified yet.
 - Character uses exact `lucy-latest`; VTO uses pinned `lucy-vton-latest`.
 - Existing H.264 MP4/MOV and VP8 WebM sources can stay local or run exactly one selected visual
   operation. Character Swap uses startup-selected Decart or Pruna; VTO remains Decart. The two
-  operations are mutually exclusive within an edited-video workflow.
+  operations are mutually exclusive within an edited-video workflow. When Pruna is active, the
+  Character Swap editor exposes a per-submission `720p`/`1080p` output choice.
 - OpenAI, BFL, and Wiro are separate startup-selected image-provider passes with no fallback.
   Participant mode disables Wiro.
 - Recording owns an accessible warning at 270 seconds and coalesced Stop/finalize at 300 seconds.

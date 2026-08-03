@@ -114,12 +114,16 @@ then edit either base, download, start over, or discard.
   Character Swap capability requires H.264 MP4, H.264 MOV or VP8 WebM is converted locally only
   at explicit Start. The converted Blob is revalidated, remains ephemeral, and never replaces the
   immutable source. MP4 passes through.
-- Decart results must be 1280×720 or 720×1280. Pruna's configured `720p`/`1080p` value is an
+- Decart results must be 1280×720 or 720×1280. When Pruna Character Swap is active, the editor
+  offers `720p` and `1080p` for each submission; the selected value is an
   approximate 1 MP/2 MP budget. A different inspected width/height emits a content-free server
   warning and continues instead of failing the job. Every result still preserves orientation, stays under
   300,000,000 bytes, and remains within 500 ms of source duration; the browser compares downloaded
   metadata with the server-approved result rather than hard-coding 720p. Provider-output inspection
   keeps exact dimensions fatal for Decart and never reuses source-upload aspect-ratio guidance.
+- Every Pruna prediction pins seed `0`, turbo off, the original frame rate, saved and conditioned
+  source audio, and the enabled safety checker alongside the editor-selected resolution and exact
+  model.
 - Visual failure preserves the source and selected draft. Voice failure preserves the last
   visual/source layer.
 - Pruna non-2xx responses log the numeric upstream HTTP status server-side without forwarding its

@@ -1,4 +1,5 @@
 import { useTheme } from '@emotion/react';
+import type { VideoOutputResolution } from '@studio/contracts';
 import { Button, Surface } from '../../ui';
 import {
   advancedStyles,
@@ -25,6 +26,7 @@ export interface ExistingVideoVisualEditorProps {
   readonly recipeLoading: boolean;
   readonly referenceRequired?: boolean;
   readonly promptEnhancementSupported?: boolean;
+  readonly outputResolutions?: readonly VideoOutputResolution[];
   readonly onApplySavedRecipe: (step: ExistingVideoStep, recipeId: string) => void;
   readonly onChooseReference: (step: ExistingVideoStep, file: File) => void;
   readonly onCreateCharacter?: (stepId: string) => void;
@@ -58,6 +60,7 @@ export const ExistingVideoVisualEditor = ({
   recipeLoading,
   referenceRequired = false,
   promptEnhancementSupported = true,
+  outputResolutions = ['720p'],
   onApplySavedRecipe,
   onChooseReference,
   onCreateCharacter,
@@ -159,6 +162,27 @@ export const ExistingVideoVisualEditor = ({
                 recipes need a reference before processing can start.
               </p>
             </Surface>
+          ) : null}
+          {outputResolutions.length > 1 ? (
+            <label>
+              Output resolution
+              <select
+                value={step.outputResolution ?? outputResolutions[0] ?? '720p'}
+                disabled={recipeLocked}
+                onChange={(event) =>
+                  onUpdate(step.id, {
+                    outputResolution: event.currentTarget.value as VideoOutputResolution,
+                  })
+                }
+              >
+                {outputResolutions.map((resolution) => (
+                  <option key={resolution} value={resolution}>
+                    {resolution}
+                  </option>
+                ))}
+              </select>
+              <span>Higher resolution may take longer and cost more provider usage.</span>
+            </label>
           ) : null}
           <ExistingVideoRecipeChooser
             modelId={step.modelId}

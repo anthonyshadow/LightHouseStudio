@@ -14,14 +14,22 @@ const VIDEO_FIXTURE_BASE64 =
   'AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAARnbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAA+gAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAA5J0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAA+gAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAABQAAAALQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAPoAAAEAAABAAAAAAMKbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAAyAAAAMgBVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAACtW1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAnVzdGJsAAAAwXN0c2QAAAAAAAAAAQAAALFhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAABQAC0ABIAAAASAAAAAAAAAABFUxhdmM2Mi4xMS4xMDAgbGlieDI2NAAAAAAAAAAAAAAAGP//AAAAN2F2Y0MBZAAf/+EAGmdkAB+s2UBQBbsBEAAAAwAQAAADAyDxgxlgAQAGaOvjyyLA/fj4AAAAABBwYXNwAAAAAQAAAAEAAAAUYnRydAAAAAAAADnYAAAAAAAAABhzdHRzAAAAAAAAAAEAAAAZAAACAAAAABRzdHNzAAAAAAAAAAEAAAABAAAA2GN0dHMAAAAAAAAAGQAAAAEAAAQAAAAAAQAACgAAAAABAAAEAAAAAAEAAAAAAAAAAQAAAgAAAAABAAAKAAAAAAEAAAQAAAAAAQAAAAAAAAABAAACAAAAAAEAAAoAAAAAAQAABAAAAAABAAAAAAAAAAEAAAIAAAAAAQAACgAAAAABAAAEAAAAAAEAAAAAAAAAAQAAAgAAAAABAAAKAAAAAAEAAAQAAAAAAQAAAAAAAAABAAACAAAAAAEAAAoAAAAAAQAABAAAAAABAAAAAAAAAAEAAAIAAAAAHHN0c2MAAAAAAAAAAQAAAAEAAAAZAAAAAQAAAHhzdHN6AAAAAAAAAAAAAAAZAAADigAAACgAAAAlAAAAJQAAACUAAAAuAAAAJwAAACUAAAAlAAAALgAAACcAAAAlAAAAJQAAAC4AAAAnAAAAJQAAACUAAAAuAAAAJwAAACUAAAAlAAAALQAAACcAAAAlAAAAJQAAABRzdGNvAAAAAAAAAAEAAASXAAAAYXVkdGEAAABZbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAsaWxzdAAAACSpdG9vAAAAHGRhdGEAAAABAAAAAExhdmY2Mi4zLjEwMAAAAAhmcmVlAAAHQ21kYXQAAAKvBgX//6vcRem95tlIt5Ys2CDZI+7veDI2NCAtIGNvcmUgMTY1IHIzMjIyIGIzNTYwNWEgLSBILjI2NC9NUEVHLTQgQVZDIGNvZGVjIC0gQ29weWxlZnQgMjAwMy0yMDI1IC0gaHR0cDovL3d3dy52aWRlb2xhbi5vcmcveDI2NC5odG1sIC0gb3B0aW9uczogY2FiYWM9MSByZWY9MyBkZWJsb2NrPTE6MDowIGFuYWx5c2U9MHgzOjB4MTEzIG1lPWhleCBzdWJtZT03IHBzeT0xIHBzeV9yZD0xLjAwOjAuMDAgbWl4ZWRfcmVmPTEgbWVfcmFuZ2U9MTYgY2hyb21hX21lPTEgdHJlbGxpcz0xIDh4OGRjdD0xIGNxbT0wIGRlYWR6b25lPTIxLDExIGZhc3RfcHNraXA9MSBjaHJvbWFfcXBfb2Zmc2V0PS0yIHRocmVhZHM9MTUgbG9va2FoZWFkX3RocmVhZHM9MiBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTI1IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAA02WIhAA7//73Tr8Cm1TCKgOSVwr2yqQmWblSawHypgAAAwAAAwAAAwAAAwAKW2oohWn0yb00AAADAAADAXUAAVUAAiYABNQADUAAMkAA4gAD+AATIACGgAPsABigAOsAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAA2cAAAAkQZokbEO//qmWAAADAAADAAADAAADAAADAAADAAADAAADABgwAAAAIUGeQniF/wAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAccQAAACEBnmF0Qr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuAAAAAhAZ5jakK/AAADAAADAAADAAADAAADAAADAAADAAADACbhAAAAKkGaaEmoQWiZTAh3//6plgAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAYMQAAACNBnoZFESwv/wAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAccQAAACEBnqV0Qr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuEAAAAhAZ6nakK/AAADAAADAAADAAADAAADAAADAAADAAADACbgAAAAKkGarEmoQWyZTAh3//6plgAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAYMAAAACNBnspFFSwv/wAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAccQAAACEBnul0Qr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuAAAAAhAZ7rakK/AAADAAADAAADAAADAAADAAADAAADAAADACbgAAAAKkGa8EmoQWyZTAhv//6nhAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAwIQAAACNBnw5FFSwv/wAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAccQAAACEBny10Qr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuEAAAAhAZ8vakK/AAADAAADAAADAAADAAADAAADAAADAAADACbgAAAAKkGbNEmoQWyZTAhn//6eEAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwC7gAAAACNBn1JFFSwv/wAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAccQAAACEBn3F0Qr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuAAAAAhAZ9zakK/AAADAAADAAADAAADAAADAAADAAADAAADACbgAAAAKUGbeEmoQWyZTAhX//44QAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwLbAAAAI0GflkUVLC//AAADAAADAAADAAADAAADAAADAAADAAADABxwAAAAIQGftXRCvwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAm4QAAACEBn7dqQr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuE=';
 
 class FakeVideoProvider implements DecartVideoJobProvider {
-  readonly submissions: Array<{ operation: string; videoMimeType: string }> = [];
+  readonly submissions: Array<{
+    operation: string;
+    videoMimeType: string;
+    outputResolution: string;
+  }> = [];
   nextStatus: DecartQueueStatus = 'pending';
   nextFailureReason: DecartVideoProviderFailureReason | undefined;
 
   submit(
     input: Parameters<DecartVideoJobProvider['submit']>[0],
   ): Promise<{ providerJobId: string; status: DecartQueueStatus }> {
-    this.submissions.push({ operation: input.operation, videoMimeType: input.videoMimeType });
+    this.submissions.push({
+      operation: input.operation,
+      videoMimeType: input.videoMimeType,
+      outputResolution: input.outputResolution,
+    });
     return Promise.resolve({
       providerJobId: `provider-${this.submissions.length}`,
       status: this.nextStatus,
@@ -108,7 +116,12 @@ const pathExists = async (filePath: string): Promise<boolean> => {
   }
 };
 
-const startJob = async (service: VideoJobService, jobId: string, ownerId: string) => {
+const startJob = async (
+  service: VideoJobService,
+  jobId: string,
+  ownerId: string,
+  outputResolution?: '720p' | '1080p',
+) => {
   const paths = await service.prepareJobDirectory(jobId);
   await writeFile(paths.inputPath, Buffer.from(VIDEO_FIXTURE_BASE64, 'base64'), {
     flag: 'wx',
@@ -122,6 +135,7 @@ const startJob = async (service: VideoJobService, jobId: string, ownerId: string
       prompt: 'Change the lighting',
       enhancePrompt: false,
       hasReferenceImage: false,
+      ...(outputResolution ? { outputResolution } : {}),
     },
     directory: paths.directory,
     inputPath: paths.inputPath,
@@ -163,6 +177,69 @@ describe('VideoJobService', () => {
     await Promise.all(services.splice(0).map((service) => service.close()));
   });
 
+  it('passes the request-selected output resolution to the provider', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-resolution-'));
+    const provider = new FakeVideoProvider();
+    const service = new VideoJobService(
+      {
+        'character-swap': {
+          provider,
+          outputResolutions: ['720p', '1080p'],
+          defaultOutputResolution: '720p',
+          outputSizing: 'megapixel-budget',
+          inputPreparation: 'none',
+          referencePolicy: 'optional',
+          promptEnhancement: false,
+        },
+        'virtual-try-on': null,
+      },
+      root,
+    );
+    services.push(service);
+    const jobId = crypto.randomUUID();
+
+    await startJob(service, jobId, 'owner-resolution', '1080p');
+    await waitFor(service, jobId, 'owner-resolution', 'queued');
+
+    expect(provider.submissions[0]?.outputResolution).toBe('1080p');
+  });
+
+  it('rejects an output resolution not supported by the active operation', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-resolution-reject-'));
+    const provider = new FakeVideoProvider();
+    const service = new VideoJobService(provider, root);
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const paths = await service.prepareJobDirectory(jobId);
+    await writeFile(paths.inputPath, Buffer.from(VIDEO_FIXTURE_BASE64, 'base64'), {
+      flag: 'wx',
+      mode: 0o600,
+    });
+
+    await expect(
+      service.start({
+        jobId,
+        ownerId: 'owner-unsupported-resolution',
+        recipe: {
+          operation: 'character-swap',
+          prompt: 'Change the lighting',
+          enhancePrompt: false,
+          hasReferenceImage: false,
+          outputResolution: '1080p',
+        },
+        directory: paths.directory,
+        inputPath: paths.inputPath,
+        referencePath: null,
+        referenceMimeType: null,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'validation_error',
+      message: 'Choose a supported output resolution for this visual processing operation.',
+    });
+    expect(provider.submissions).toHaveLength(0);
+  });
+
   it('enforces operation-specific reference requirements before provider submission', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-reference-'));
     const provider = new FakeVideoProvider();
@@ -170,7 +247,8 @@ describe('VideoJobService', () => {
       {
         'character-swap': {
           provider,
-          outputResolution: '1080p',
+          outputResolutions: ['720p', '1080p'],
+          defaultOutputResolution: '1080p',
           outputSizing: 'exact-canonical',
           inputPreparation: 'h264-mp4',
           referencePolicy: 'required',
@@ -240,7 +318,11 @@ describe('VideoJobService', () => {
 
     await waitFor(service, jobId, ownerId, 'queued');
     expect(provider.submissions).toEqual([
-      { operation: 'character-swap', videoMimeType: 'video/mp4' },
+      {
+        operation: 'character-swap',
+        videoMimeType: 'video/mp4',
+        outputResolution: '720p',
+      },
     ]);
     expect((await service.existing(jobId, ownerId))?.jobId).toBe(jobId);
 
@@ -289,7 +371,8 @@ describe('VideoJobService', () => {
       {
         'character-swap': {
           provider,
-          outputResolution: '1080p',
+          outputResolutions: ['720p', '1080p'],
+          defaultOutputResolution: '1080p',
           outputSizing: 'exact-canonical',
           inputPreparation: 'h264-mp4',
           referencePolicy: 'optional',
@@ -326,7 +409,8 @@ describe('VideoJobService', () => {
       {
         'character-swap': {
           provider,
-          outputResolution: '1080p',
+          outputResolutions: ['720p', '1080p'],
+          defaultOutputResolution: '1080p',
           outputSizing: 'megapixel-budget',
           inputPreparation: 'h264-mp4',
           referencePolicy: 'optional',

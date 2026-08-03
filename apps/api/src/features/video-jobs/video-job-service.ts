@@ -7,6 +7,7 @@ import {
   type VideoJobErrorCode,
   type VideoJobStatus,
   type VideoJobStatusResponse,
+  type VideoOutputResolution,
   type VideoTransformOperationId,
   type VideoTransformRecipe,
 } from '@studio/contracts';
@@ -37,6 +38,7 @@ type VideoJobRecord = {
   readonly ownerId: string;
   readonly operation: VideoTransformOperationId;
   readonly binding: ExistingVideoOperationBinding;
+  readonly outputResolution: VideoOutputResolution;
   status: VideoJobStatus;
   readonly createdAt: string;
   updatedAt: string;
@@ -180,7 +182,8 @@ export class VideoJobService {
           ? {
               'character-swap': {
                 provider: configuredProviders,
-                outputResolution: '720p',
+                outputResolutions: ['720p'],
+                defaultOutputResolution: '720p',
                 outputSizing: 'exact-canonical',
                 inputPreparation: 'none',
                 referencePolicy: 'optional',
@@ -188,7 +191,8 @@ export class VideoJobService {
               },
               'virtual-try-on': {
                 provider: configuredProviders,
-                outputResolution: '720p',
+                outputResolutions: ['720p'],
+                defaultOutputResolution: '720p',
                 outputSizing: 'exact-canonical',
                 inputPreparation: 'none',
                 referencePolicy: 'optional',
@@ -390,6 +394,15 @@ export class VideoJobService {
         'Prompt enhancement is unavailable for Character Swap in this configuration.',
       );
     }
+    const outputResolution = input.recipe.outputResolution ?? binding.defaultOutputResolution;
+    if (!binding.outputResolutions.includes(outputResolution)) {
+      await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
+      throw new AppError(
+        400,
+        'validation_error',
+        'Choose a supported output resolution for this visual processing operation.',
+      );
+    }
     const active = [...this.#jobs.values()].find(
       (job) => job.ownerId === input.ownerId && !terminal(job.status),
     );
@@ -409,6 +422,7 @@ export class VideoJobService {
       ownerId: input.ownerId,
       operation: input.recipe.operation,
       binding,
+      outputResolution,
       status: 'validating',
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -464,6 +478,7 @@ export class VideoJobService {
         videoMimeType: inspected.mimeType,
         referenceImagePath: job.referencePath,
         referenceImageMimeType: job.referenceMimeType,
+        outputResolution: job.outputResolution,
         signal: job.operationController.signal,
       });
       if (!this.#ownsMutableJob(job)) {
@@ -503,7 +518,7 @@ export class VideoJobService {
       }
       const result = await inspectVideoFile(job.outputPath, job.operation, {
         requireProviderOutputSize: true,
-        expectedResolution: job.binding.outputResolution,
+        expectedResolution: job.outputResolution,
         outputSizing: job.binding.outputSizing,
         ...(job.sourceDurationMs === null ? {} : { expectedDurationMs: job.sourceDurationMs }),
         ...(job.sourceOrientation === null ? {} : { expectedOrientation: job.sourceOrientation }),

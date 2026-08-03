@@ -156,6 +156,7 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
               referencePolicy: 'optional',
               promptEnhancement: true,
               terminalFailureRelease: 'automatic',
+              outputResolutions: ['720p'],
             },
             virtualTryOn: {
               available: false,
@@ -163,6 +164,7 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
               referencePolicy: 'optional',
               promptEnhancement: true,
               terminalFailureRelease: 'automatic',
+              outputResolutions: ['720p'],
             },
           },
           elevenLabs: { available: true, modelId: 'eleven_multilingual_sts_v2' },

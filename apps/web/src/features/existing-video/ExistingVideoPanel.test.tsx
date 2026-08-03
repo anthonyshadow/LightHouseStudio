@@ -223,6 +223,7 @@ describe('ExistingVideoPanel', () => {
 
   it('applies provider-neutral Character Swap capability limits independently from VTO', () => {
     const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+    const updateStep = vi.fn();
     render(
       <StudioDesignProvider>
         <ExistingVideoPanel
@@ -248,6 +249,7 @@ describe('ExistingVideoPanel', () => {
               },
             },
             phase: 'ready',
+            updateStep,
             steps: [
               {
                 id: 'character',
@@ -268,6 +270,7 @@ describe('ExistingVideoPanel', () => {
               referencePolicy: 'required',
               promptEnhancement: false,
               terminalFailureRelease: 'explicit-user',
+              outputResolutions: ['720p', '1080p'],
             },
             virtualTryOn: {
               available: false,
@@ -275,6 +278,7 @@ describe('ExistingVideoPanel', () => {
               referencePolicy: 'optional',
               promptEnhancement: true,
               terminalFailureRelease: 'automatic',
+              outputResolutions: ['720p'],
             },
           }}
           onFinish={vi.fn()}
@@ -285,6 +289,11 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByText(/requires one identity reference image/u)).toBeVisible();
     expect(screen.getByRole('checkbox', { name: /^Enhance prompt/u })).toBeDisabled();
     expect(screen.getByText(/Prompt enhancement is unavailable for Character Swap/u)).toBeVisible();
+    expect(screen.getByRole('combobox', { name: /Output resolution/u })).toHaveValue('720p');
+    fireEvent.change(screen.getByRole('combobox', { name: /Output resolution/u }), {
+      target: { value: '1080p' },
+    });
+    expect(updateStep).toHaveBeenCalledWith('character', { outputResolution: '1080p' });
     expect(screen.getByRole('button', { name: 'Apply Character Swap' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeDisabled();
     expect(document.body.textContent).not.toMatch(/Decart|Pruna|Lucy|p-video/u);

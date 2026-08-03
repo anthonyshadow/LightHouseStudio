@@ -126,7 +126,6 @@ describe('parseEnvironment', () => {
       { EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: 'automatic' },
       { PRUNA_VIDEO_REPLACE_ENABLED: 'TRUE' },
       { PRUNA_VIDEO_REPLACE_MODEL: 'p-video-replace-latest' },
-      { PRUNA_VIDEO_REPLACE_RESOLUTION: '4k' },
     ]) {
       expect(() => parseEnvironment(environment), JSON.stringify(environment)).toThrow(
         EnvironmentValidationError,
@@ -134,32 +133,26 @@ describe('parseEnvironment', () => {
     }
   });
 
-  it.each(['720p', '1080p'] as const)(
-    'accepts explicit Pruna Character Swap at %s',
-    (resolution) => {
-      expect(
-        parseEnvironment({
-          EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: 'pruna',
-          PRUNA_VIDEO_REPLACE_ENABLED: 'true',
-          PRUNA_API_KEY: ' pruna-secret ',
-          PRUNA_VIDEO_REPLACE_MODEL: ' p-video-replace ',
-          PRUNA_VIDEO_REPLACE_RESOLUTION: resolution,
-        }),
-      ).toMatchObject({
-        existingVideoCharacterSwapProvider: 'pruna',
-        prunaVideoReplaceEnabled: true,
-        prunaApiKey: 'pruna-secret',
-        prunaVideoReplaceModel: 'p-video-replace',
-        prunaVideoReplaceResolution: resolution,
-      });
-    },
-  );
+  it('accepts explicit Pruna Character Swap without a server-pinned output resolution', () => {
+    expect(
+      parseEnvironment({
+        EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: 'pruna',
+        PRUNA_VIDEO_REPLACE_ENABLED: 'true',
+        PRUNA_API_KEY: ' pruna-secret ',
+        PRUNA_VIDEO_REPLACE_MODEL: ' p-video-replace ',
+      }),
+    ).toMatchObject({
+      existingVideoCharacterSwapProvider: 'pruna',
+      prunaVideoReplaceEnabled: true,
+      prunaApiKey: 'pruna-secret',
+      prunaVideoReplaceModel: 'p-video-replace',
+    });
+  });
 
   it.each([
     ['PRUNA_VIDEO_REPLACE_ENABLED', { PRUNA_VIDEO_REPLACE_ENABLED: 'false' }],
     ['PRUNA_API_KEY', { PRUNA_API_KEY: '' }],
     ['PRUNA_VIDEO_REPLACE_MODEL', { PRUNA_VIDEO_REPLACE_MODEL: '' }],
-    ['PRUNA_VIDEO_REPLACE_RESOLUTION', { PRUNA_VIDEO_REPLACE_RESOLUTION: '' }],
   ] as const)('names missing Pruna requirement %s when selected', (variable, override) => {
     expect(() =>
       parseEnvironment({
@@ -167,7 +160,6 @@ describe('parseEnvironment', () => {
         PRUNA_VIDEO_REPLACE_ENABLED: 'true',
         PRUNA_API_KEY: 'pruna-secret',
         PRUNA_VIDEO_REPLACE_MODEL: 'p-video-replace',
-        PRUNA_VIDEO_REPLACE_RESOLUTION: '720p',
         ...override,
       }),
     ).toThrow(variable);

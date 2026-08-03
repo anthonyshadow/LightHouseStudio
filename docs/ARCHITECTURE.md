@@ -234,10 +234,14 @@ saved-recipe mappings.
 Startup configuration selects the existing-video Character Swap provider through one centralized
 factory. The default Decart binding keeps its exact Lucy endpoint, multipart fields, fixed 720p
 output, and retry behavior. The Pruna binding is Character Swap only: it requires one reference,
-requires H.264 MP4 submission input, disables prompt enhancement, pins `p-video-replace`, and pins
-the documented approximate 1 MP (`720p`) or 2 MP (`1080p`) output class. Its server-only sizing
-policy logs a content-free warning for non-canonical dimensions and continues with the inspected
-result; Decart keeps exact canonical 720p validation. Virtual Try-On always resolves
+requires H.264 MP4 submission input, disables prompt enhancement, pins `p-video-replace`, and
+advertises the documented approximate 1 MP (`720p`) and 2 MP (`1080p`) output classes through the
+provider-neutral capabilities contract. The editor stores one resolution on the visual step and
+the broker validates it against that operation binding before passing it to Pruna. Its prediction
+input also pins `seed=0`, `turbo=false`, `target_fps=original`, `save_audio=true`,
+`ignore_audio=false`, and `disable_safety_checker=false`. Its server-only sizing policy logs a
+content-free warning for non-canonical dimensions and continues with the inspected result; Decart
+keeps exact canonical 720p validation. Virtual Try-On always resolves
 independently to Decart. The shared
 server provider contract normalizes submit, queued/processing/completed/failed status, opaque
 output location, bounded download, retryable failure classification, output resolution, and

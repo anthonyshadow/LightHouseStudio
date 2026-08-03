@@ -72,6 +72,7 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
                 referencePolicy: 'optional',
                 promptEnhancement: true,
                 terminalFailureRelease: 'automatic',
+                outputResolutions: ['720p'],
               },
               virtualTryOn: {
                 available: false,
@@ -79,6 +80,7 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
                 referencePolicy: 'optional',
                 promptEnhancement: true,
                 terminalFailureRelease: 'automatic',
+                outputResolutions: ['720p'],
               },
             },
             elevenLabs: { available: false, modelId: null },

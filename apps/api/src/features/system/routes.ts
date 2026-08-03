@@ -46,6 +46,9 @@ export const registerSystemRoutes = (
           promptEnhancement: availability.videoProcessing.characterSwap?.promptEnhancement ?? false,
           terminalFailureRelease:
             availability.videoProcessing.characterSwap?.terminalFailureRelease ?? 'automatic',
+          outputResolutions: availability.videoProcessing.characterSwap?.outputResolutions ?? [
+            '720p',
+          ],
         },
         virtualTryOn: {
           available: availability.videoProcessing.virtualTryOn !== null,
@@ -54,6 +57,9 @@ export const registerSystemRoutes = (
           promptEnhancement: availability.videoProcessing.virtualTryOn?.promptEnhancement ?? false,
           terminalFailureRelease:
             availability.videoProcessing.virtualTryOn?.terminalFailureRelease ?? 'automatic',
+          outputResolutions: availability.videoProcessing.virtualTryOn?.outputResolutions ?? [
+            '720p',
+          ],
         },
       },
       elevenLabs: {

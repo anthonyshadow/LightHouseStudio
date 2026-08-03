@@ -24,6 +24,7 @@ const submission = (
   videoPath: string,
   referencePath: string,
   signal = new AbortController().signal,
+  outputResolution: '720p' | '1080p' = '720p',
 ) => ({
   operation: 'character-swap' as const,
   recipe: {
@@ -37,72 +38,85 @@ const submission = (
   videoMimeType: 'video/mp4' as const,
   referenceImagePath: referencePath,
   referenceImageMimeType: 'image/png' as const,
+  outputResolution,
   signal,
 });
 
 describe('PrunaVideoReplaceProvider', () => {
-  it('uploads synthetic-named media and submits the pinned model exactly once', async () => {
-    const { videoPath, referencePath } = await fixture();
-    const fetchImplementation = vi.fn<typeof fetch>();
-    fetchImplementation
-      .mockResolvedValueOnce(
-        jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-video' } }, 201),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-reference' } }, 201),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse(
-          {
-            id: 'prediction-one',
-            get_url: 'https://api.pruna.ai/v1/predictions/status/prediction-one',
-          },
-          201,
+  it.each(['720p', '1080p'] as const)(
+    'uploads synthetic-named media and submits the editor-selected %s resolution exactly once',
+    async (resolution) => {
+      const { videoPath, referencePath } = await fixture();
+      const fetchImplementation = vi.fn<typeof fetch>();
+      fetchImplementation
+        .mockResolvedValueOnce(
+          jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-video' } }, 201),
+        )
+        .mockResolvedValueOnce(
+          jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-reference' } }, 201),
+        )
+        .mockResolvedValueOnce(
+          jsonResponse(
+            {
+              id: 'prediction-one',
+              get_url: 'https://api.pruna.ai/v1/predictions/status/prediction-one',
+            },
+            201,
+          ),
+        );
+      const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
+
+      await expect(
+        provider.submit(
+          submission(videoPath, referencePath, new AbortController().signal, resolution),
         ),
-      );
-    const provider = new PrunaVideoReplaceProvider('server-secret', '720p', fetchImplementation);
+      ).resolves.toEqual({
+        providerJobId: 'prediction-one',
+        status: 'pending',
+      });
 
-    await expect(provider.submit(submission(videoPath, referencePath))).resolves.toEqual({
-      providerJobId: 'prediction-one',
-      status: 'pending',
-    });
+      expect(fetchImplementation).toHaveBeenCalledTimes(3);
+      for (const call of fetchImplementation.mock.calls.slice(0, 2)) {
+        expect(call[0]).toBe('https://api.pruna.ai/v1/files');
+        expect(call[1]?.headers).toEqual({ apikey: 'server-secret' });
+      }
+      const videoForm = fetchImplementation.mock.calls[0]![1]?.body;
+      const referenceForm = fetchImplementation.mock.calls[1]![1]?.body;
+      expect(videoForm).toBeInstanceOf(FormData);
+      expect(referenceForm).toBeInstanceOf(FormData);
+      if (!(videoForm instanceof FormData) || !(referenceForm instanceof FormData)) {
+        throw new Error('Expected upload multipart bodies.');
+      }
+      expect((videoForm.get('content') as File).name).toBe('character-swap-source.mp4');
+      expect((referenceForm.get('content') as File).name).toBe('character-swap-reference.png');
 
-    expect(fetchImplementation).toHaveBeenCalledTimes(3);
-    for (const call of fetchImplementation.mock.calls.slice(0, 2)) {
-      expect(call[0]).toBe('https://api.pruna.ai/v1/files');
-      expect(call[1]?.headers).toEqual({ apikey: 'server-secret' });
-    }
-    const videoForm = fetchImplementation.mock.calls[0]![1]?.body;
-    const referenceForm = fetchImplementation.mock.calls[1]![1]?.body;
-    expect(videoForm).toBeInstanceOf(FormData);
-    expect(referenceForm).toBeInstanceOf(FormData);
-    if (!(videoForm instanceof FormData) || !(referenceForm instanceof FormData)) {
-      throw new Error('Expected upload multipart bodies.');
-    }
-    expect((videoForm.get('content') as File).name).toBe('character-swap-source.mp4');
-    expect((referenceForm.get('content') as File).name).toBe('character-swap-reference.png');
-
-    const [predictionUrl, predictionInit] = fetchImplementation.mock.calls[2]!;
-    expect(predictionUrl).toBe('https://api.pruna.ai/v1/predictions');
-    expect(predictionInit?.headers).toEqual({
-      apikey: 'server-secret',
-      'Content-Type': 'application/json',
-      Model: 'p-video-replace',
-    });
-    if (typeof predictionInit?.body !== 'string') {
-      throw new Error('Expected prediction request JSON.');
-    }
-    expect(JSON.parse(predictionInit.body)).toEqual({
-      input: {
-        video: 'https://api.pruna.ai/v1/files/file-video',
-        images: ['https://api.pruna.ai/v1/files/file-reference'],
-        instruction_prompt:
-          'Replace the person in the source video with the identity from reference image 1. Keep lip sync, motion, audio, and camera from the source video.',
-        resolution: '720p',
-        save_audio: true,
-      },
-    });
-  });
+      const [predictionUrl, predictionInit] = fetchImplementation.mock.calls[2]!;
+      expect(predictionUrl).toBe('https://api.pruna.ai/v1/predictions');
+      expect(predictionInit?.headers).toEqual({
+        apikey: 'server-secret',
+        'Content-Type': 'application/json',
+        Model: 'p-video-replace',
+      });
+      if (typeof predictionInit?.body !== 'string') {
+        throw new Error('Expected prediction request JSON.');
+      }
+      expect(JSON.parse(predictionInit.body)).toEqual({
+        input: {
+          seed: 0,
+          turbo: false,
+          video: 'https://api.pruna.ai/v1/files/file-video',
+          images: ['https://api.pruna.ai/v1/files/file-reference'],
+          resolution,
+          save_audio: true,
+          target_fps: 'original',
+          ignore_audio: false,
+          instruction_prompt:
+            'Replace the person in the source video with the identity from reference image 1. Keep lip sync, motion, audio, and camera from the source video.',
+          disable_safety_checker: false,
+        },
+      });
+    },
+  );
 
   it.each([
     ['starting', 'pending', undefined],
@@ -118,7 +132,7 @@ describe('PrunaVideoReplaceProvider', () => {
         .mockResolvedValue(
           jsonResponse({ status: providerStatus, message: 'private status detail' }),
         );
-      const provider = new PrunaVideoReplaceProvider('server-secret', '1080p', fetchImplementation);
+      const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
 
       await expect(provider.status('opaque-id', new AbortController().signal)).resolves.toEqual({
         status: expectedStatus,
@@ -152,7 +166,7 @@ describe('PrunaVideoReplaceProvider', () => {
     const fetchImplementation = vi
       .fn<typeof fetch>()
       .mockResolvedValue(jsonResponse({ status: 'failed', error }));
-    const provider = new PrunaVideoReplaceProvider('server-secret', '1080p', fetchImplementation);
+    const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
 
     const status = await provider.status('opaque-id', new AbortController().signal);
 
@@ -182,7 +196,7 @@ describe('PrunaVideoReplaceProvider', () => {
           headers: { 'content-length': '15', 'content-type': 'video/mp4' },
         }),
       );
-    const provider = new PrunaVideoReplaceProvider('server-secret', '1080p', fetchImplementation);
+    const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
 
     const status = await provider.status('prediction-one', new AbortController().signal);
     expect(status).toEqual({
@@ -210,7 +224,7 @@ describe('PrunaVideoReplaceProvider', () => {
     const fetchImplementation = vi
       .fn<typeof fetch>()
       .mockResolvedValue(jsonResponse({ status: 'succeeded', generation_url: generationUrl }));
-    const provider = new PrunaVideoReplaceProvider('server-secret', '720p', fetchImplementation);
+    const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
 
     await expect(provider.status('prediction', new AbortController().signal)).rejects.toMatchObject(
       {
@@ -232,7 +246,7 @@ describe('PrunaVideoReplaceProvider', () => {
         jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-reference' } }, 201),
       )
       .mockResolvedValueOnce(new Response('', { status: 503 }));
-    const provider = new PrunaVideoReplaceProvider('server-secret', '720p', fetchImplementation);
+    const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
 
     await expect(provider.submit(submission(videoPath, referencePath))).rejects.toMatchObject({
       reason: 'upstream',
@@ -254,7 +268,7 @@ describe('PrunaVideoReplaceProvider', () => {
     fetchImplementation.mockResolvedValueOnce(
       new Response('x', { status: 200, headers: { 'content-length': '1048577' } }),
     );
-    const provider = new PrunaVideoReplaceProvider('server-secret', '720p', fetchImplementation);
+    const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
     await expect(provider.status('prediction', new AbortController().signal)).rejects.toEqual(
       expect.objectContaining<Partial<VideoJobProviderError>>({ reason: 'invalid-response' }),
     );
@@ -279,7 +293,7 @@ describe('PrunaVideoReplaceProvider', () => {
           );
         }),
     );
-    const provider = new PrunaVideoReplaceProvider('server-secret', '720p', fetchImplementation, {
+    const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation, {
       uploadMs: 5,
       statusMs: 5,
       downloadMs: 5,

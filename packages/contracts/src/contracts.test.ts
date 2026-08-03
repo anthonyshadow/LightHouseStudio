@@ -56,6 +56,7 @@ describe('health and capabilities contracts', () => {
             referencePolicy: 'required',
             promptEnhancement: false,
             terminalFailureRelease: 'explicit-user',
+            outputResolutions: ['720p', '1080p'],
           },
           virtualTryOn: {
             available: true,
@@ -63,6 +64,7 @@ describe('health and capabilities contracts', () => {
             referencePolicy: 'optional',
             promptEnhancement: true,
             terminalFailureRelease: 'automatic',
+            outputResolutions: ['720p'],
           },
         },
         elevenLabs: { available: false, modelId: null },
@@ -89,6 +91,7 @@ describe('health and capabilities contracts', () => {
           referencePolicy: 'required',
           promptEnhancement: false,
           terminalFailureRelease: 'explicit-user',
+          outputResolutions: ['720p', '1080p'],
         },
         virtualTryOn: {
           available: true,
@@ -96,6 +99,7 @@ describe('health and capabilities contracts', () => {
           referencePolicy: 'optional',
           promptEnhancement: true,
           terminalFailureRelease: 'automatic',
+          outputResolutions: ['720p'],
         },
       },
       elevenLabs: { available: false, modelId: null },
@@ -137,6 +141,23 @@ describe('health and capabilities contracts', () => {
 });
 
 describe('existing-video input contracts', () => {
+  it('accepts only supported output resolution choices', () => {
+    const recipe = {
+      operation: 'character-swap' as const,
+      inputKind: 'character' as const,
+      prompt: 'Use this character direction',
+      enhancePrompt: false,
+      hasReferenceImage: false,
+    };
+
+    expect(
+      videoTransformRecipeSchema.safeParse({ ...recipe, outputResolution: '1080p' }).success,
+    ).toBe(true);
+    expect(
+      videoTransformRecipeSchema.safeParse({ ...recipe, outputResolution: '4k' }).success,
+    ).toBe(false);
+  });
+
   it('requires one explicit VTO input mode and rejects incompatible fields', () => {
     const base = {
       operation: 'virtual-try-on' as const,

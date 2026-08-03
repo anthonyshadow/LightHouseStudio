@@ -1,11 +1,12 @@
 import type {
   VideoInputMimeType,
+  VideoOutputResolution,
   VideoTransformOperationId,
   VideoTransformRecipe,
 } from '@studio/contracts';
 
 export type VideoJobProviderStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type VideoJobOutputResolution = '720p' | '1080p';
+export type VideoJobOutputResolution = VideoOutputResolution;
 export type VideoJobOutputSizing = 'exact-canonical' | 'megapixel-budget';
 
 export type VideoJobProviderFailureReason =
@@ -45,6 +46,7 @@ export interface ExistingVideoJobProvider {
     readonly videoMimeType: VideoInputMimeType;
     readonly referenceImagePath: string | null;
     readonly referenceImageMimeType: 'image/jpeg' | 'image/png' | 'image/webp' | null;
+    readonly outputResolution: VideoJobOutputResolution;
     readonly signal: AbortSignal;
   }): Promise<{
     readonly providerJobId: string;
@@ -70,7 +72,8 @@ export interface ExistingVideoJobProvider {
 
 export interface ExistingVideoOperationBinding {
   readonly provider: ExistingVideoJobProvider;
-  readonly outputResolution: VideoJobOutputResolution;
+  readonly outputResolutions: readonly VideoJobOutputResolution[];
+  readonly defaultOutputResolution: VideoJobOutputResolution;
   readonly outputSizing: VideoJobOutputSizing;
   readonly inputPreparation: 'none' | 'h264-mp4';
   readonly referencePolicy: 'optional' | 'required';

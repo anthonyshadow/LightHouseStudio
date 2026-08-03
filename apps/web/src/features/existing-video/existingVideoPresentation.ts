@@ -41,6 +41,7 @@ export const visualStepHasSettings = (step: ExistingVideoStep): boolean =>
     step.prompt.trim() ||
     step.enhancePrompt ||
     step.referenceImage ||
+    (step.outputResolution !== undefined && step.outputResolution !== '720p') ||
     (step.modelId === 'lucy-vton-latest' && step.inputKind !== 'prompt'),
   );
 

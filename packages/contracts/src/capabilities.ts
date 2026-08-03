@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { supportedModelIdSchema } from './realtime';
 import { REFERENCE_IMAGE_SIZES } from './reference-images';
+import { videoOutputResolutionSchema } from './video-jobs';
 
 export const videoInputPreparationSchema = z.enum(['none', 'h264-mp4']);
 export const videoReferencePolicySchema = z.enum(['optional', 'required']);
@@ -12,6 +13,7 @@ export const videoProcessingOperationCapabilitySchema = z
     referencePolicy: videoReferencePolicySchema,
     promptEnhancement: z.boolean(),
     terminalFailureRelease: videoTerminalFailureReleaseSchema,
+    outputResolutions: z.array(videoOutputResolutionSchema).min(1).max(2),
   })
   .strict();
 

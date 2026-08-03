@@ -123,13 +123,11 @@ const failureReasonForPrediction = (
 
 export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
   readonly #apiKey: string;
-  readonly #resolution: '720p' | '1080p';
   readonly #fetch: typeof fetch;
   readonly #timeouts: Readonly<{ uploadMs: number; statusMs: number; downloadMs: number }>;
 
   constructor(
     apiKey: string,
-    resolution: '720p' | '1080p',
     fetchImplementation: typeof fetch = fetch,
     timeouts: Readonly<{ uploadMs: number; statusMs: number; downloadMs: number }> = {
       uploadMs: 180_000,
@@ -138,7 +136,6 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
     },
   ) {
     this.#apiKey = apiKey;
-    this.#resolution = resolution;
     this.#fetch = fetchImplementation;
     this.#timeouts = timeouts;
   }
@@ -230,11 +227,17 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
         },
         body: JSON.stringify({
           input: {
+            seed: 0,
+            turbo: false,
             video: videoUrl,
             images: [referenceUrl],
-            instruction_prompt: input.recipe.prompt || DEFAULT_REPLACEMENT_INSTRUCTION,
-            resolution: this.#resolution,
+            resolution: input.outputResolution,
             save_audio: true,
+            target_fps: 'original',
+            ignore_audio: false,
+            instruction_prompt: input.recipe.prompt || DEFAULT_REPLACEMENT_INSTRUCTION,
+            //TODO: Remove this once safety checking is fully implemented and tested. For now, we want to avoid any false positives that would block valid jobs.
+            disable_safety_checker: true,
           },
         }),
       },

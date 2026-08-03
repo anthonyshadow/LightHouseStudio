@@ -117,12 +117,17 @@ removed from both browser orchestration and the loopback broker. Submissions rem
 potentially billable, operator-approved actions; the one-active-job rule and prohibition on
 automatic billable retry or provider fallback remain unchanged.
 
+On 2026-08-03, Pruna Character Swap resolution moved from startup environment configuration to a
+provider-neutral editor setting. When the active Character Swap capability supports both classes,
+the creator chooses `720p` or `1080p` for each explicit submission; the broker validates the choice
+and Pruna receives it with that job. Provider selection remains startup-only and hidden.
+
 On 2026-08-02, existing-video Character Swap gained a startup-selected Pruna
 `p-video-replace` alternative while realtime Character and all VTO work remained on Decart. The
 browser/API boundary moved from batch model identifiers to provider-neutral Character Swap/VTO
 operation capabilities. Pruna requires one identity reference, disables prompt enhancement, and
 uses locally prepared ephemeral H.264 MP4 for compatible MOV/WebM sources. Decart retains exact
-Lucy endpoints and 720p output; Pruna qualification is split into pinned 720p and 1080p rows. There
+Lucy endpoints and 720p output; Pruna qualification is split into 720p and 1080p rows. There
 is no UI provider selector, fallback, automatic initial retry, or claim that local cleanup deletes
 Pruna inputs/results.
 

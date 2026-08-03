@@ -90,6 +90,7 @@ export const ExistingVideoPanel = ({
         referencePolicy: 'optional',
         promptEnhancement: true,
         terminalFailureRelease: 'automatic',
+        outputResolutions: ['720p'],
       },
       virtualTryOn: {
         available: videoProcessingAvailable,
@@ -97,6 +98,7 @@ export const ExistingVideoPanel = ({
         referencePolicy: 'optional',
         promptEnhancement: true,
         terminalFailureRelease: 'automatic',
+        outputResolutions: ['720p'],
       },
     };
   const pickerRef = useRef<HTMLInputElement>(null);
@@ -554,6 +556,7 @@ export const ExistingVideoPanel = ({
                         promptEnhancementSupported={
                           visualCapabilities.characterSwap.promptEnhancement
                         }
+                        outputResolutions={visualCapabilities.characterSwap.outputResolutions}
                         onApplySavedRecipe={(step, recipeId) =>
                           void applySavedRecipe(step, recipeId)
                         }

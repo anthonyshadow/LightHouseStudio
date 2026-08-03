@@ -7,6 +7,8 @@ export const VIDEO_TRANSFORM_MODEL_IDS = ['lucy-latest', 'lucy-vton-latest'] as 
 export const videoTransformModelIdSchema = z.enum(VIDEO_TRANSFORM_MODEL_IDS);
 export const VIDEO_TRANSFORM_OPERATION_IDS = ['character-swap', 'virtual-try-on'] as const;
 export const videoTransformOperationIdSchema = z.enum(VIDEO_TRANSFORM_OPERATION_IDS);
+export const VIDEO_OUTPUT_RESOLUTIONS = ['720p', '1080p'] as const;
+export const videoOutputResolutionSchema = z.enum(VIDEO_OUTPUT_RESOLUTIONS);
 export const VIDEO_TRANSFORM_INPUT_KINDS = [
   'character',
   'saved-outfit',
@@ -64,6 +66,7 @@ export const videoTransformRecipeSchema = z
       .transform((value) => value.trim()),
     enhancePrompt: z.boolean().default(false),
     hasReferenceImage: z.boolean(),
+    outputResolution: videoOutputResolutionSchema.optional(),
   })
   .strict()
   .superRefine((value, context) => {
@@ -168,6 +171,7 @@ export const videoJobStatusResponseSchema = z
 
 export type VideoTransformModelId = z.infer<typeof videoTransformModelIdSchema>;
 export type VideoTransformOperationId = z.infer<typeof videoTransformOperationIdSchema>;
+export type VideoOutputResolution = z.infer<typeof videoOutputResolutionSchema>;
 export type VideoTransformInputKind = z.infer<typeof videoTransformInputKindSchema>;
 export type VideoInputMimeType = z.infer<typeof videoInputMimeTypeSchema>;
 export type VideoTransformRecipe = z.infer<typeof videoTransformRecipeSchema>;

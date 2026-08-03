@@ -33,6 +33,7 @@ describe('API shell', () => {
           referencePolicy: 'optional',
           promptEnhancement: false,
           terminalFailureRelease: 'automatic',
+          outputResolutions: ['720p'],
         },
         virtualTryOn: {
           available: false,
@@ -40,6 +41,7 @@ describe('API shell', () => {
           referencePolicy: 'optional',
           promptEnhancement: false,
           terminalFailureRelease: 'automatic',
+          outputResolutions: ['720p'],
         },
       },
       elevenLabs: { available: true, modelId: 'eleven_multilingual_sts_v2' },
@@ -92,6 +94,7 @@ describe('API shell', () => {
           referencePolicy: 'optional',
           promptEnhancement: true,
           terminalFailureRelease: 'automatic',
+          outputResolutions: ['720p'],
         },
         virtualTryOn: {
           available: true,
@@ -99,6 +102,7 @@ describe('API shell', () => {
           referencePolicy: 'optional',
           promptEnhancement: true,
           terminalFailureRelease: 'automatic',
+          outputResolutions: ['720p'],
         },
       },
     });
@@ -113,7 +117,6 @@ describe('API shell', () => {
         prunaVideoReplaceEnabled: true,
         prunaApiKey: 'pruna-server-secret',
         prunaVideoReplaceModel: 'p-video-replace',
-        prunaVideoReplaceResolution: '1080p',
       }),
       prunaVideoProvider: provider,
       decartVideoProvider: null,
@@ -130,6 +133,7 @@ describe('API shell', () => {
           referencePolicy: 'required',
           promptEnhancement: false,
           terminalFailureRelease: 'explicit-user',
+          outputResolutions: ['720p', '1080p'],
         },
         virtualTryOn: { available: false },
       },

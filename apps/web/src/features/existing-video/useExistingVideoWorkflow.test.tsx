@@ -238,6 +238,7 @@ describe('useExistingVideoWorkflow', () => {
             referencePolicy: 'required',
             promptEnhancement: false,
             terminalFailureRelease: 'explicit-user',
+            outputResolutions: ['720p', '1080p'],
           },
           virtualTryOn: {
             available: true,
@@ -245,6 +246,7 @@ describe('useExistingVideoWorkflow', () => {
             referencePolicy: 'optional',
             promptEnhancement: true,
             terminalFailureRelease: 'automatic',
+            outputResolutions: ['720p'],
           },
         },
       }),
@@ -256,7 +258,10 @@ describe('useExistingVideoWorkflow', () => {
     });
     const reference = new File(['identity'], 'identity.png', { type: 'image/png' });
     act(() => {
-      result.current.updateStep(result.current.steps[0]!.id, { referenceImage: reference });
+      result.current.updateStep(result.current.steps[0]!.id, {
+        referenceImage: reference,
+        outputResolution: '1080p',
+      });
     });
     await act(async () => result.current.submitStep(0));
 
@@ -269,6 +274,7 @@ describe('useExistingVideoWorkflow', () => {
       operation: 'character-swap',
       enhancePrompt: false,
       hasReferenceImage: true,
+      outputResolution: '1080p',
     });
     expect(sourceArtifact.media).toBe(sourceFile);
     expect(recording.original?.media).not.toBe(preparedFile);
@@ -290,6 +296,7 @@ describe('useExistingVideoWorkflow', () => {
             referencePolicy: 'required',
             promptEnhancement: false,
             terminalFailureRelease: 'explicit-user',
+            outputResolutions: ['720p', '1080p'],
           },
           virtualTryOn: {
             available: true,
@@ -297,6 +304,7 @@ describe('useExistingVideoWorkflow', () => {
             referencePolicy: 'optional',
             promptEnhancement: true,
             terminalFailureRelease: 'automatic',
+            outputResolutions: ['720p'],
           },
         },
       }),
@@ -884,6 +892,7 @@ describe('useExistingVideoWorkflow', () => {
             referencePolicy: 'required',
             promptEnhancement: false,
             terminalFailureRelease: 'explicit-user',
+            outputResolutions: ['720p', '1080p'],
           },
           virtualTryOn: {
             available: true,
@@ -891,6 +900,7 @@ describe('useExistingVideoWorkflow', () => {
             referencePolicy: 'optional',
             promptEnhancement: true,
             terminalFailureRelease: 'automatic',
+            outputResolutions: ['720p'],
           },
         },
       }),

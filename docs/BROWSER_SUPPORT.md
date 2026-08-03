@@ -125,7 +125,8 @@ immutable audio sidecar cannot be extracted. Provider results must be 1280×720 
 the source orientation, and differ from the input duration by no more than 500 ms when Decart owns
 the operation. Pruna Character Swap uses its documented approximate 1 MP/2 MP class and accepts
 the inspected result dimensions after emitting a content-free server warning when they differ from
-the canonical target; the browser must match the server-approved result metadata exactly.
+the canonical target; the browser must match the server-approved result metadata exactly. The Pruna
+resolution class is selected in the Character Swap editor for each submission.
 
 ## Known physical risks
 

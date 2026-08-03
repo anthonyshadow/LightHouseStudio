@@ -227,6 +227,7 @@ describe('reference image API client', () => {
                 referencePolicy: 'required',
                 promptEnhancement: false,
                 terminalFailureRelease: 'explicit-user',
+                outputResolutions: ['720p', '1080p'],
               },
               virtualTryOn: {
                 available: true,
@@ -234,6 +235,7 @@ describe('reference image API client', () => {
                 referencePolicy: 'optional',
                 promptEnhancement: true,
                 terminalFailureRelease: 'automatic',
+                outputResolutions: ['720p'],
               },
             },
             elevenLabs: { available: false, modelId: null },
@@ -264,6 +266,7 @@ describe('reference image API client', () => {
           referencePolicy: 'required',
           promptEnhancement: false,
           terminalFailureRelease: 'explicit-user',
+          outputResolutions: ['720p', '1080p'],
         },
       },
       referenceImages: true,

@@ -71,10 +71,6 @@ const environmentSchema = z
       normalizeOptionalString,
       z.literal(PRUNA_VIDEO_REPLACE_MODEL).optional(),
     ),
-    PRUNA_VIDEO_REPLACE_RESOLUTION: z.preprocess(
-      normalizeOptionalString,
-      z.enum(['720p', '1080p']).optional(),
-    ),
     OPENAI_API_KEY: optionalSecretSchema,
     OPENAI_PROMPT_OPTIMIZER_MODEL: optionalModelSchema,
     OPENAI_PROMPT_OPTIMIZER_REASONING: z.preprocess(
@@ -132,11 +128,6 @@ const environmentSchema = z
         value.PRUNA_VIDEO_REPLACE_MODEL !== undefined,
         `Set PRUNA_VIDEO_REPLACE_MODEL=${PRUNA_VIDEO_REPLACE_MODEL}.`,
       ],
-      [
-        'PRUNA_VIDEO_REPLACE_RESOLUTION',
-        value.PRUNA_VIDEO_REPLACE_RESOLUTION !== undefined,
-        'Set PRUNA_VIDEO_REPLACE_RESOLUTION=720p or 1080p.',
-      ],
     ];
     for (const [variable, valid, message] of required) {
       if (!valid) context.addIssue({ code: 'custom', path: [variable], message });
@@ -152,7 +143,6 @@ export interface RuntimeConfig {
   readonly prunaVideoReplaceEnabled: boolean;
   readonly prunaApiKey?: string;
   readonly prunaVideoReplaceModel?: typeof PRUNA_VIDEO_REPLACE_MODEL;
-  readonly prunaVideoReplaceResolution?: '720p' | '1080p';
   readonly openAiApiKey?: string;
   readonly openAiPromptOptimizerModel: string;
   readonly openAiPromptOptimizerReasoning:
@@ -270,9 +260,6 @@ export const parseEnvironment = (
     ...(result.data.PRUNA_VIDEO_REPLACE_MODEL === undefined
       ? {}
       : { prunaVideoReplaceModel: result.data.PRUNA_VIDEO_REPLACE_MODEL }),
-    ...(result.data.PRUNA_VIDEO_REPLACE_RESOLUTION === undefined
-      ? {}
-      : { prunaVideoReplaceResolution: result.data.PRUNA_VIDEO_REPLACE_RESOLUTION }),
     ...(result.data.OPENAI_API_KEY === undefined
       ? {}
       : { openAiApiKey: result.data.OPENAI_API_KEY }),

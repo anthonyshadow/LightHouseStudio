@@ -2,6 +2,7 @@ import {
   type CapabilitiesResponse,
   type InspectedVideo,
   type VideoJobStatusResponse,
+  type VideoOutputResolution,
   type VideoTransformModelId,
   type VideoTransformOperationId,
   type VideoTransformRecipe,
@@ -32,6 +33,7 @@ export type ExistingVideoStep = Readonly<{
   enhancePrompt: boolean;
   referenceImage: File | null;
   inputKind: 'character' | 'saved-outfit' | 'reference-image' | 'prompt';
+  outputResolution?: VideoOutputResolution;
 }>;
 
 export type ExistingVideoVoiceSelection =
@@ -110,6 +112,7 @@ const defaultVideoProcessingCapabilities: CapabilitiesResponse['videoProcessing'
     referencePolicy: 'optional',
     promptEnhancement: true,
     terminalFailureRelease: 'automatic',
+    outputResolutions: ['720p'],
   },
   virtualTryOn: {
     available: true,
@@ -117,6 +120,7 @@ const defaultVideoProcessingCapabilities: CapabilitiesResponse['videoProcessing'
     referencePolicy: 'optional',
     promptEnhancement: true,
     terminalFailureRelease: 'automatic',
+    outputResolutions: ['720p'],
   },
 };
 
@@ -364,12 +368,15 @@ export const useExistingVideoWorkflow = ({
               enhancePrompt: false,
               referenceImage: null,
               inputKind: modelId === 'lucy-vton-latest' ? 'prompt' : 'character',
+              outputResolution:
+                capabilityForModel(modelId, videoProcessingCapabilities).outputResolutions[0] ??
+                '720p',
             },
       );
       setMessage(null);
       return true;
     },
-    [acceptedSubmission, selection],
+    [acceptedSubmission, selection, videoProcessingCapabilities],
   );
 
   const updateStep = useCallback(
@@ -710,6 +717,7 @@ export const useExistingVideoWorkflow = ({
         prompt: step.prompt.trim(),
         enhancePrompt: step.enhancePrompt,
         hasReferenceImage: step.referenceImage !== null,
+        outputResolution: step.outputResolution ?? capability.outputResolutions[0] ?? '720p',
       };
       try {
         let submissionSource = source;

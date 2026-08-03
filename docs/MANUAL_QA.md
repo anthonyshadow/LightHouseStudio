@@ -28,7 +28,8 @@ tokens, participant codes, personal media, raw provider responses, URLs, headers
 network archives.
 
 Provider checks use the separate [gated live procedure](LIVE_PROVIDER_SMOKE.md). Pruna 720p,
-Pruna 1080p, OpenAI, BFL, and Wiro require separate startup-selected passes.
+Pruna 1080p, OpenAI, BFL, and Wiro require separately recorded passes; Pruna resolution is chosen
+in the editor while Pruna remains the startup-selected Character Swap provider.
 
 ## Per-row physical protocol
 
@@ -45,7 +46,7 @@ primary flows in [user stories](userStories/README.md) and record every applicab
 | `vto-capture`                  | Exact pinned VTO Start/Apply, image-only does not invent text, short playable take                                                                                                                                                |
 | `upload-select-replace-remove` | Native picker and drop publish compatible media without camera/provider work; replace/remove revokes only owned URLs                                                                                                              |
 | `upload-local-download`        | A zero-step H.264 MP4/MOV or VP8 WebM source previews and downloads with no external request                                                                                                                                      |
-| `upload-single-visual-step`    | Character Swap/VTO selector switches both ways; only the active operation submits once, returns the configured exact or bounded resolution-class result, and restores source audio                                                |
+| `upload-single-visual-step`    | Character Swap/VTO selector switches both ways; only the active operation submits once, returns the selected exact or bounded resolution-class result, and restores source audio                                                  |
 | `upload-voice`                 | Local and ElevenLabs Voice use immutable uploaded source audio and apply to the latest visual result                                                                                                                              |
 | `upload-record-to-source`      | Control-bar and panel Record intents use the persistent stage, warn/stop at 270/300 seconds, finalize, and adopt the normalized local artifact into the editor without provider traffic; no inline player participates in capture |
 | `upload-compare-edit`          | Inline player and shared stage follow Original/Result; Result is conditional; Edit snapshots the selected base; superseded URLs release only after healthy commit                                                                 |

@@ -237,6 +237,7 @@ export const installProviderNetworkDriver = async (
               referencePolicy: 'optional',
               promptEnhancement: true,
               terminalFailureRelease: 'automatic',
+              outputResolutions: ['720p'],
             },
             virtualTryOn: {
               available: options.videoProcessingAvailable ?? true,
@@ -244,6 +245,7 @@ export const installProviderNetworkDriver = async (
               referencePolicy: 'optional',
               promptEnhancement: true,
               terminalFailureRelease: 'automatic',
+              outputResolutions: ['720p'],
             },
           },
           elevenLabs: {

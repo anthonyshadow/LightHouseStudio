@@ -12,6 +12,7 @@ const unavailableProviders: ProviderAvailability = {
       referencePolicy: 'optional',
       promptEnhancement: false,
       terminalFailureRelease: 'automatic',
+      outputResolutions: ['720p'],
     },
     virtualTryOn: {
       available: false,
@@ -19,6 +20,7 @@ const unavailableProviders: ProviderAvailability = {
       referencePolicy: 'optional',
       promptEnhancement: false,
       terminalFailureRelease: 'automatic',
+      outputResolutions: ['720p'],
     },
   },
   elevenLabs: false,
