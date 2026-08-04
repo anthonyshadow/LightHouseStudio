@@ -11,6 +11,8 @@ projects.
 2. Choose **Character recipes** or **Try-On recipes** in the Shelf header, then **Saved**,
    **Recent**, or Character-only **Characters**.
 3. Search by name/title, prompt, note, or tag; Saved and Characters also support tag filtering.
+   The tag filter uses the shared custom chooser, remaining anchored on larger viewports and
+   becoming a safe-area-aware touch sheet on phones without changing the Shelf scroll owner.
 4. **New character recipe** and true-character **Edit** open Character Builder. New, Edit, and
    **Save a copy** Try-On actions open Outfit Builder; legacy Add/Replace/Restyle records open
    Workshop. Outfit edits update the existing ID, while Save a copy creates a new ID.

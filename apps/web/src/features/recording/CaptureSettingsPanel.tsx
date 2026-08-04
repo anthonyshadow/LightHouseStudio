@@ -374,27 +374,28 @@ export const CaptureSettingsPanel = ({
               label="Camera"
               value={controller.draft.videoDeviceId ?? ''}
               disabled={controlsDisabled}
+              options={[
+                { value: '', label: 'Default camera' },
+                ...(!cameraSelectionAvailable && controller.draft.videoDeviceId
+                  ? [
+                      {
+                        value: controller.draft.videoDeviceId,
+                        label: 'Selected camera (unavailable)',
+                      },
+                    ]
+                  : []),
+                ...controller.cameraDevices.map((device) => ({
+                  value: device.deviceId,
+                  label: device.label,
+                })),
+              ]}
               hint={
                 controller.devicesState === 'loading'
                   ? 'Looking for available cameras…'
                   : 'Every camera exposed by the browser appears here. Labels may remain generic until permission is granted.'
               }
-              onChange={(event) =>
-                controller.updateVideoDeviceId(event.currentTarget.value || null)
-              }
-            >
-              <option value="">Default camera</option>
-              {!cameraSelectionAvailable && controller.draft.videoDeviceId ? (
-                <option value={controller.draft.videoDeviceId}>
-                  Selected camera (unavailable)
-                </option>
-              ) : null}
-              {controller.cameraDevices.map((device) => (
-                <option key={device.deviceId} value={device.deviceId}>
-                  {device.label}
-                </option>
-              ))}
-            </SelectField>
+              onValueChange={(value) => controller.updateVideoDeviceId(value || null)}
+            />
 
             {controller.cameraPermissionState === 'denied' ? (
               <StatusNotice tone="warning" role="status" title="Camera permission blocked">
@@ -443,25 +444,28 @@ export const CaptureSettingsPanel = ({
             label="Microphone"
             value={controller.draft.audioDeviceId ?? ''}
             disabled={controlsDisabled}
+            options={[
+              { value: '', label: 'Default microphone' },
+              ...(!microphoneSelectionAvailable && controller.draft.audioDeviceId
+                ? [
+                    {
+                      value: controller.draft.audioDeviceId,
+                      label: 'Selected microphone (unavailable)',
+                    },
+                  ]
+                : []),
+              ...controller.microphoneDevices.map((device) => ({
+                value: device.deviceId,
+                label: device.label,
+              })),
+            ]}
             hint={
               controller.devicesState === 'loading'
                 ? 'Looking for available microphones…'
                 : 'The selected microphone is used for local capture and provider fallback audio.'
             }
-            onChange={(event) => controller.updateAudioDeviceId(event.currentTarget.value || null)}
-          >
-            <option value="">Default microphone</option>
-            {!microphoneSelectionAvailable && controller.draft.audioDeviceId ? (
-              <option value={controller.draft.audioDeviceId}>
-                Selected microphone (unavailable)
-              </option>
-            ) : null}
-            {controller.microphoneDevices.map((device) => (
-              <option key={device.deviceId} value={device.deviceId}>
-                {device.label}
-              </option>
-            ))}
-          </SelectField>
+            onValueChange={(value) => controller.updateAudioDeviceId(value || null)}
+          />
 
           {localMode ? (
             <>
@@ -507,16 +511,12 @@ export const CaptureSettingsPanel = ({
                 value={controller.draft.profile}
                 disabled={controlsDisabled}
                 hint="The browser may negotiate a lower setting when the camera cannot meet the target."
-                onChange={(event) =>
-                  controller.updateProfile(event.currentTarget.value as LocalCaptureProfileId)
-                }
-              >
-                {controller.supportedProfiles.map((profile) => (
-                  <option key={profile} value={profile}>
-                    {profileLabels[profile]}
-                  </option>
-                ))}
-              </SelectField>
+                options={controller.supportedProfiles.map((profile) => ({
+                  value: profile,
+                  label: profileLabels[profile],
+                }))}
+                onValueChange={(value) => controller.updateProfile(value as LocalCaptureProfileId)}
+              />
             </>
           ) : (
             <StatusNotice tone="neutral" title="Provider-managed quality">

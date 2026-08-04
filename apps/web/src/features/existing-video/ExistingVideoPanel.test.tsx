@@ -289,10 +289,10 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByText(/requires one identity reference image/u)).toBeVisible();
     expect(screen.getByRole('checkbox', { name: /^Enhance prompt/u })).toBeDisabled();
     expect(screen.getByText(/Prompt enhancement is unavailable for Character Swap/u)).toBeVisible();
-    expect(screen.getByRole('combobox', { name: /Output resolution/u })).toHaveValue('720p');
-    fireEvent.change(screen.getByRole('combobox', { name: /Output resolution/u }), {
-      target: { value: '1080p' },
-    });
+    const resolution = screen.getByRole('combobox', { name: /Output resolution/u });
+    expect(resolution).toHaveTextContent('720p');
+    fireEvent.click(resolution);
+    fireEvent.click(screen.getByRole('option', { name: '1080p' }));
     expect(updateStep).toHaveBeenCalledWith('character', { outputResolution: '1080p' });
     expect(screen.getByRole('button', { name: 'Apply Character Swap' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeDisabled();
@@ -933,7 +933,7 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: /Choose a Saved Character/u }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Saved Character' }));
     const option = screen.getByRole('option', { name: /Professional Anchor/u });
     expect(option).toContainHTML('/api/reference-images/asset-anchor/content');
     expect(option).toHaveTextContent(/soft cinematic lighting/u);
@@ -972,7 +972,7 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Choose a Saved Character' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Saved Character' }));
     fireEvent.click(screen.getByRole('option', { name: /Prompt Character/u }));
 
     await waitFor(() =>
@@ -1050,7 +1050,7 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Choose a Saved Character' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Saved Character' }));
     fireEvent.click(screen.getByRole('option', { name: /Missing Anchor/u }));
 
     await screen.findByText(/reference image could not be loaded/u);
@@ -1117,7 +1117,7 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Choose a Saved Character' }));
+    fireEvent.click(screen.getByRole('combobox', { name: 'Saved Character' }));
     const options = screen.getAllByRole('option');
     expect(options.at(-1)).toHaveAccessibleName('Create A Character');
     fireEvent.click(options.at(-1)!);
@@ -1182,9 +1182,8 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.change(screen.getByLabelText('Saved or recently uploaded outfit'), {
-      target: { value: 'saved:prompt-outfit' },
-    });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Saved or recently uploaded outfit' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Copper overshirt' }));
     await waitFor(() =>
       expect(updateStep).toHaveBeenCalledWith('vton', {
         savedRecipeId: 'prompt-outfit',
@@ -1257,9 +1256,8 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.change(screen.getByLabelText('Saved or recently uploaded outfit'), {
-      target: { value: 'saved:image-outfit' },
-    });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Saved or recently uploaded outfit' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Archive coat' }));
     await waitFor(() =>
       expect(updateStep).toHaveBeenCalledWith('vton', {
         savedRecipeId: 'image-outfit',
@@ -1295,9 +1293,8 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.change(screen.getByLabelText('Saved or recently uploaded outfit'), {
-      target: { value: 'saved:combined-outfit' },
-    });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Saved or recently uploaded outfit' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Migrated coat' }));
     await screen.findByRole('button', { name: 'Continue without reference' });
     expect(updateStep).not.toHaveBeenCalled();
 
@@ -1335,9 +1332,8 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.change(screen.getByLabelText('Saved or recently uploaded outfit'), {
-      target: { value: 'saved:image-only-outfit' },
-    });
+    fireEvent.click(screen.getByRole('combobox', { name: 'Saved or recently uploaded outfit' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Image coat' }));
     await screen.findByRole('button', { name: 'Retry image' });
     expect(screen.queryByRole('button', { name: 'Continue without reference' })).toBeNull();
 

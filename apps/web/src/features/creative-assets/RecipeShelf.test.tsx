@@ -302,7 +302,12 @@ describe('RecipeShelf', () => {
     renderShelf(repository);
 
     expect(document.querySelector('[data-scroll-region="recipe-shelf"]')).toBeInTheDocument();
-    await user.selectOptions(screen.getByLabelText('Filter by tag'), 'Editorial');
+    await user.click(screen.getByRole('combobox', { name: 'Filter by tag' }));
+    await user.click(
+      within(screen.getByRole('listbox', { name: 'Filter by tag' })).getByRole('option', {
+        name: 'Editorial',
+      }),
+    );
     expect(screen.getByRole('heading', { name: 'Editorial host' })).toBeInTheDocument();
     expect(screen.queryByRole('heading', { name: 'Casual host' })).not.toBeInTheDocument();
 
@@ -343,7 +348,12 @@ describe('RecipeShelf', () => {
       </StudioDesignProvider>,
     );
 
-    await user.selectOptions(screen.getByLabelText('Filter by tag'), 'Editorial');
+    await user.click(screen.getByRole('combobox', { name: 'Filter by tag' }));
+    await user.click(
+      within(screen.getByRole('listbox', { name: 'Filter by tag' })).getByRole('option', {
+        name: 'Editorial',
+      }),
+    );
     await user.type(screen.getByLabelText('Search this mode'), 'editorial');
     view.rerender(
       <StudioDesignProvider>
@@ -358,7 +368,7 @@ describe('RecipeShelf', () => {
 
     const characterHeading = await screen.findByRole('heading', { name: 'Active cartographer' });
     expect(screen.getByLabelText('Search this mode')).toHaveValue('');
-    expect(screen.getByLabelText('Filter by tag')).toHaveValue('');
+    expect(screen.getByRole('combobox', { name: 'Filter by tag' })).toHaveTextContent('All tags');
     expect(within(characterHeading).getByRole('button')).toHaveAttribute('aria-pressed', 'true');
   });
 

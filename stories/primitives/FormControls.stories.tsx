@@ -49,12 +49,26 @@ const FormHarness = () => {
         <SelectField
           label="Experience"
           value={mode}
-          onChange={(event) => setMode(event.currentTarget.value)}
-        >
-          <option value="character">Character AI</option>
-          <option value="vton">Virtual Try-On</option>
-          <option value="local">Local camera</option>
-        </SelectField>
+          options={[
+            {
+              value: 'character',
+              label: 'Character AI',
+              description: 'Transform the live or recorded character.',
+            },
+            {
+              value: 'vton',
+              label: 'Virtual Try-On',
+              description: 'Apply a saved outfit or reference garment.',
+            },
+            {
+              value: 'local',
+              label: 'Local camera',
+              description: 'Record without an AI provider.',
+            },
+          ]}
+          hint="Opens as an anchored list on larger screens and a touch sheet on phones."
+          onValueChange={setMode}
+        />
         <TextField
           label="Unavailable field"
           value="Locked during a live session"

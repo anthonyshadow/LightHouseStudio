@@ -65,55 +65,58 @@ export const ReferenceOptionsFields = ({
           label="Target Lucy framing"
           value={options.framing}
           disabled={disabled}
-          onChange={(event) =>
-            update('framing', event.currentTarget.value as CharacterReferenceFraming)
-          }
-        >
-          <option value="head_and_shoulders">Head and shoulders</option>
-          <option value="waist_up">Waist up</option>
-          <option value="full_body">Full body</option>
-        </SelectField>
+          options={[
+            { value: 'head_and_shoulders', label: 'Head and shoulders' },
+            { value: 'waist_up', label: 'Waist up' },
+            { value: 'full_body', label: 'Full body' },
+          ]}
+          onValueChange={(value) => update('framing', value as CharacterReferenceFraming)}
+        />
         <SelectField
           label="Orientation"
           value={options.orientation}
           disabled={disabled}
-          onChange={(event) =>
-            update('orientation', event.currentTarget.value as CharacterReferenceOrientation)
-          }
-        >
-          <option value="auto">Auto</option>
-          <option value="portrait_9_16">Portrait 9:16</option>
-          <option value="landscape_16_9">Landscape 16:9</option>
-          <option value="square">Square</option>
-        </SelectField>
+          options={[
+            { value: 'auto', label: 'Auto' },
+            { value: 'portrait_9_16', label: 'Portrait 9:16' },
+            { value: 'landscape_16_9', label: 'Landscape 16:9' },
+            { value: 'square', label: 'Square' },
+          ]}
+          onValueChange={(value) => update('orientation', value as CharacterReferenceOrientation)}
+        />
         <SelectField
           label="Rendering"
           value={options.renderingMode}
           disabled={disabled}
-          onChange={(event) =>
-            update('renderingMode', event.currentTarget.value as CharacterReferenceRenderingMode)
+          options={[
+            { value: 'photorealistic', label: 'Photorealistic' },
+            { value: 'faithful_source_style', label: 'Faithful source style' },
+          ]}
+          onValueChange={(value) =>
+            update('renderingMode', value as CharacterReferenceRenderingMode)
           }
-        >
-          <option value="photorealistic">Photorealistic</option>
-          <option value="faithful_source_style">Faithful source style</option>
-        </SelectField>
+        />
         <SelectField
           label="Expression"
           value={options.expression}
           disabled={disabled}
-          onChange={(event) =>
-            update('expression', event.currentTarget.value as CharacterReferenceExpression)
-          }
-        >
-          <option value="neutral">Neutral</option>
-          <option value="subtle_friendly">Subtle friendly</option>
-        </SelectField>
+          options={[
+            { value: 'neutral', label: 'Neutral' },
+            { value: 'subtle_friendly', label: 'Subtle friendly' },
+          ]}
+          onValueChange={(value) => update('expression', value as CharacterReferenceExpression)}
+        />
         <SelectField
           label="Background"
           value={options.background}
           disabled={disabled}
-          onChange={(event) => {
-            const background = event.currentTarget.value as CharacterReferenceBackground;
+          options={[
+            { value: 'neutral_gray', label: 'Neutral gray' },
+            { value: 'off_white', label: 'Off-white' },
+            { value: 'plain_custom', label: 'Custom plain background' },
+          ]}
+          onValueChange={(value) => {
+            const background = value as CharacterReferenceBackground;
             onChange({
               ...options,
               background,
@@ -122,11 +125,7 @@ export const ReferenceOptionsFields = ({
                 : { customBackground: undefined }),
             });
           }}
-        >
-          <option value="neutral_gray">Neutral gray</option>
-          <option value="off_white">Off-white</option>
-          <option value="plain_custom">Custom plain background</option>
-        </SelectField>
+        />
         {options.background === 'plain_custom' ? (
           <TextField
             label="Custom plain background"

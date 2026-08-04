@@ -241,7 +241,7 @@ test('the upload editor and open saved-character chooser reflow at every support
     await expectNoDocumentOverflow(page);
     await expect(dialog.getByLabel('Video preview for responsive-source.mp4')).toBeAttached();
 
-    const trigger = dialog.getByRole('button', { name: /Choose a Saved Character/u });
+    const trigger = dialog.getByRole('combobox', { name: 'Saved Character' });
     await trigger.click();
     const option = dialog.getByRole('option', { name: /Professional Anchor/u });
     await expect(option).toBeVisible();
@@ -330,7 +330,7 @@ test('Create A Character returns to the upload plan with the new character selec
   await selectExistingVideo(page, fixture, 'character-source.mp4');
   const upload = page.getByRole('dialog', { name: 'Use existing video' });
   await upload.getByRole('button', { name: 'Character Swap', exact: true }).click();
-  const characterChooser = upload.getByRole('button', { name: 'Choose a Saved Character' });
+  const characterChooser = upload.getByRole('combobox', { name: 'Saved Character' });
   await characterChooser.click();
   const options = upload.getByRole('option');
   await expect(options.last()).toHaveAccessibleName('Create A Character');

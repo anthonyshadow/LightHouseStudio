@@ -15,7 +15,10 @@ without starting media or contacting a provider.
    to switch between **Landscape · 16:9** and **Portrait · 9:16**, then choose `720p · 30 fps` or,
    when supported, `1080p · 30 fps`. A new phone or tablet session defaults to portrait; a new
    desktop session defaults to landscape. The explicit session choice remains selected if the
-   viewport later changes. AI modes use provider-required dimensions.
+   viewport later changes. Camera, microphone, and quality use the shared custom chooser: an
+   anchored listbox on larger viewports and a safe-area-aware bottom sheet on phones. Arrow keys,
+   Home/End, typeahead, Escape, pointer, and touch all operate the same controlled value. AI modes
+   use provider-required dimensions.
 4. Change a setting. Studio applies it automatically. With no preview, the choice applies to the
    next Start. During a ready local preview, Studio commits a healthy replacement before releasing
    the old stream; a failed replacement restores the applied choice and reports **Settings

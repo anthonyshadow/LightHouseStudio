@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
 import type { VideoOutputResolution } from '@studio/contracts';
-import { Button, Surface } from '../../ui';
+import { Button, SelectField, Surface } from '../../ui';
 import {
   advancedStyles,
   configCardStyles,
@@ -107,49 +107,42 @@ export const ExistingVideoVisualEditor = ({
             ))}
           </div>
           {step.inputKind === 'saved-outfit' ? (
-            <label>
-              Saved or recently uploaded outfit
-              <select
-                value={
-                  step.savedRecipeId
-                    ? `saved:${step.savedRecipeId}`
-                    : recentSelection
-                      ? `recent:${recentSelection.id}`
-                      : ''
-                }
-                disabled={recipeLocked || recipeLoading}
-                onChange={(event) => {
-                  const value = event.currentTarget.value;
-                  if (value.startsWith('saved:')) {
-                    onApplySavedRecipe(step, value.slice(6));
-                    return;
-                  }
-                  const recent = recentOutfits.find((item) => `recent:${item.id}` === value);
-                  if (recent) {
-                    onUpdate(step.id, {
-                      savedRecipeId: null,
-                      prompt: '',
-                      enhancePrompt: false,
-                      referenceImage: recent.file,
-                    });
-                  }
-                }}
-              >
-                <option value="">Choose an outfit</option>
-                {savedRecipes
+            <SelectField
+              label="Saved or recently uploaded outfit"
+              value={
+                step.savedRecipeId
+                  ? `saved:${step.savedRecipeId}`
+                  : recentSelection
+                    ? `recent:${recentSelection.id}`
+                    : ''
+              }
+              disabled={recipeLocked || recipeLoading}
+              options={[
+                { value: '', label: 'Choose an outfit' },
+                ...savedRecipes
                   .filter((recipe) => recipe.modelId === 'lucy-vton-latest')
-                  .map((recipe) => (
-                    <option key={recipe.id} value={`saved:${recipe.id}`}>
-                      {recipe.label}
-                    </option>
-                  ))}
-                {recentOutfits.map((outfit) => (
-                  <option key={outfit.id} value={`recent:${outfit.id}`}>
-                    Recent · {outfit.file.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+                  .map((recipe) => ({ value: `saved:${recipe.id}`, label: recipe.label })),
+                ...recentOutfits.map((outfit) => ({
+                  value: `recent:${outfit.id}`,
+                  label: `Recent · ${outfit.file.name}`,
+                })),
+              ]}
+              onValueChange={(value) => {
+                if (value.startsWith('saved:')) {
+                  onApplySavedRecipe(step, value.slice(6));
+                  return;
+                }
+                const recent = recentOutfits.find((item) => `recent:${item.id}` === value);
+                if (recent) {
+                  onUpdate(step.id, {
+                    savedRecipeId: null,
+                    prompt: '',
+                    enhancePrompt: false,
+                    referenceImage: recent.file,
+                  });
+                }
+              }}
+            />
           ) : null}
         </>
       ) : (
@@ -164,25 +157,19 @@ export const ExistingVideoVisualEditor = ({
             </Surface>
           ) : null}
           {outputResolutions.length > 1 ? (
-            <label>
-              Output resolution
-              <select
-                value={step.outputResolution ?? outputResolutions[0] ?? '720p'}
-                disabled={recipeLocked}
-                onChange={(event) =>
-                  onUpdate(step.id, {
-                    outputResolution: event.currentTarget.value as VideoOutputResolution,
-                  })
-                }
-              >
-                {outputResolutions.map((resolution) => (
-                  <option key={resolution} value={resolution}>
-                    {resolution}
-                  </option>
-                ))}
-              </select>
-              <span>Higher resolution may take longer and cost more provider usage.</span>
-            </label>
+            <SelectField
+              label="Output resolution"
+              value={step.outputResolution ?? outputResolutions[0] ?? '720p'}
+              disabled={recipeLocked}
+              options={outputResolutions.map((resolution) => ({
+                value: resolution,
+                label: resolution,
+              }))}
+              hint="Higher resolution may take longer and cost more provider usage."
+              onValueChange={(value) =>
+                onUpdate(step.id, { outputResolution: value as VideoOutputResolution })
+              }
+            />
           ) : null}
           <ExistingVideoRecipeChooser
             modelId={step.modelId}

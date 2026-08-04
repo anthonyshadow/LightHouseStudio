@@ -41,9 +41,12 @@ then edit either base, download, start over, or discard.
    transformation owns the submitted prompt, capability-supported prompt-enhancement switch, and
    validated reference. Character Swap may require one identity reference and disable prompt
    enhancement; prompt-only saved recipes then remain selectable but cannot Start until a
-   reference is attached. This guidance remains provider-neutral. Saved characters and
-   outfits open in a keyboard-operable custom chooser with an optional local thumbnail, recipe
-   name, and a two-line prompt summary. The saved-character chooser ends with
+   reference is attached. This guidance remains provider-neutral. Saved characters and outfits,
+   output resolution, and saved/recent outfit selection use the same keyboard-operable custom
+   chooser. It is an anchored listbox on larger viewports and a safe-area-aware bottom sheet on
+   phones, with 44px-or-larger touch targets, typeahead, Escape/focus restoration, and no document
+   scrolling. Saved character/outfit options may add a local thumbnail, recipe name, and a
+   two-line prompt summary. The saved-character chooser ends with
    **Create A Character**. That action opens Character Builder; a successful save returns to this
    panel with the new saved character selected in the same Character Swap step. Selecting any
    saved character with a reference attaches only that image and leaves Prompt empty so the

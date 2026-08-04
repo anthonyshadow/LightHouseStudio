@@ -18,6 +18,10 @@ handoff from an unsubmitted edited-video Character Swap step.
    - **Preview:** review the combined direction and optionally generate a reference image.
      Every step label remains enabled and directly clickable. **Back** and **Continue** are
      conveniences, not validation gates.
+     Preview settings use the shared custom chooser for framing, orientation, rendering,
+     expression, and background. The chooser supports keyboard/typeahead and pointer input on an
+     anchored listbox, then adapts to a safe-area-aware touch sheet on phones without adding another
+     Builder scroll owner.
 3. Choose one save path:
    - prompt-only;
    - prompt plus the uploaded image;

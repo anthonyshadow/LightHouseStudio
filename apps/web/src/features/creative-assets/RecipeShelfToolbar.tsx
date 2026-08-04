@@ -56,6 +56,10 @@ export const RecipeShelfToolbar = ({
         label="Filter by tag"
         value={controller.tagFilter}
         disabled={controller.formDirty || controller.visibleCategory === 'recent'}
+        options={[
+          { value: '', label: 'All tags' },
+          ...controller.availableTags.map((tag) => ({ value: tag, label: tag })),
+        ]}
         hint={
           controller.visibleCategory === 'recent'
             ? 'Recent prompts do not store tags.'
@@ -63,15 +67,8 @@ export const RecipeShelfToolbar = ({
               ? 'Tags appear after you add them to a saved recipe.'
               : undefined
         }
-        onChange={(event) => controller.chooseTag(event.currentTarget.value)}
-      >
-        <option value="">All tags</option>
-        {controller.availableTags.map((tag) => (
-          <option key={tag.toLocaleLowerCase()} value={tag}>
-            {tag}
-          </option>
-        ))}
-      </SelectField>
+        onValueChange={controller.chooseTag}
+      />
     </div>
   );
 };

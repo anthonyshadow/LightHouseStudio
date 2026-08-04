@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useCapturePreferences } from '../../orchestration/session/useCapturePreferences';
@@ -32,6 +32,17 @@ const device = (kind: MediaDeviceKind, deviceId: string, label: string): MediaDe
   groupId: '',
   toJSON: () => ({}),
 });
+
+const chooseOption = async (
+  user: ReturnType<typeof userEvent.setup>,
+  label: string,
+  option: string,
+) => {
+  await user.click(screen.getByRole('combobox', { name: label }));
+  await user.click(
+    within(screen.getByRole('listbox', { name: label })).getByRole('option', { name: option }),
+  );
+};
 
 describe('CaptureSettingsPanel', () => {
   it('enumerates safely and applies session-only source and quality preferences', async () => {
@@ -68,13 +79,13 @@ describe('CaptureSettingsPanel', () => {
     expect(screen.getByRole('radio', { name: 'Portrait · 9:16' })).toBeInTheDocument();
     expect(screen.getByText('Landscape · 16:9')).toBeVisible();
     expect(screen.getByText('Portrait · 9:16')).toBeVisible();
-    await user.selectOptions(screen.getByLabelText('Camera'), 'camera-2');
+    await chooseOption(user, 'Camera', 'Studio camera');
     await waitFor(() => expect(onApply).toHaveBeenCalledTimes(1));
-    await user.selectOptions(screen.getByLabelText('Microphone'), 'microphone-2');
+    await chooseOption(user, 'Microphone', 'Desk microphone');
     await waitFor(() => expect(onApply).toHaveBeenCalledTimes(2));
     await user.click(screen.getByText('Portrait · 9:16'));
     await waitFor(() => expect(onApply).toHaveBeenCalledTimes(3));
-    await user.selectOptions(screen.getByLabelText('Local preview quality'), '1080p30');
+    await chooseOption(user, 'Local preview quality', '1080p · 30 fps');
 
     await waitFor(() =>
       expect(onApply).toHaveBeenLastCalledWith({
@@ -118,11 +129,13 @@ describe('CaptureSettingsPanel', () => {
     };
     render(<Harness />);
 
-    const camera = await screen.findByLabelText('Camera');
-    expect(camera).toHaveTextContent('FaceTime HD Camera');
-    expect(camera).toHaveTextContent('Creator’s iPhone Camera');
-    expect(camera).toHaveTextContent('Continuity Camera (Desk)');
-    expect(camera).toHaveTextContent('OBS Virtual Camera');
+    const camera = await screen.findByRole('combobox', { name: 'Camera' });
+    await userEvent.click(camera);
+    const cameraOptions = screen.getByRole('listbox', { name: 'Camera' });
+    expect(cameraOptions).toHaveTextContent('FaceTime HD Camera');
+    expect(cameraOptions).toHaveTextContent('Creator’s iPhone Camera');
+    expect(cameraOptions).toHaveTextContent('Continuity Camera (Desk)');
+    expect(cameraOptions).toHaveTextContent('OBS Virtual Camera');
     expect(screen.queryByText('Use a phone as a camera')).not.toBeInTheDocument();
   });
 
