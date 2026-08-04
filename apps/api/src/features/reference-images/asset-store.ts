@@ -22,7 +22,11 @@ import {
   type StoreReferenceImageInput,
 } from './asset-layout.js';
 
-export type { StoredReferenceImageMetadata, StoreReferenceImageInput } from './asset-layout.js';
+export type {
+  StoredReferenceImageMetadata,
+  StoreGeneratedReferenceImageInput,
+  StoreReferenceImageInput,
+} from './asset-layout.js';
 
 export interface StoredReferenceImageContent {
   readonly metadata: StoredReferenceImageMetadata;

@@ -36,6 +36,9 @@ Keep only lessons that should constrain future work.
 - Remove only app-owned temporary data or an explicitly isolated whole environment. An unlinked
   immutable asset may still have a relationship outside the current process.
 - Keep stores with different transaction models behind separate repositories.
+- Model reusable versions as normalized children and resolve them at the handoff boundary. Do not
+  fork every downstream consumer or persist a preferred version before the referenced bytes have
+  hydrated successfully.
 
 ## Preserve composition invariants
 

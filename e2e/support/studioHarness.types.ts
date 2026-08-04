@@ -1,14 +1,17 @@
 import type {
   ComposeReferenceImageRequest,
   CreateReferenceImageRequest,
+  DerivedReferenceImageAsset,
   EditReferenceImageRequest,
   GeneratedReferenceImageAsset,
   OptimizeCharacterReferencePromptRequest,
   OptimizeCharacterReferencePromptResponse,
+  OutfitTryOnRequest,
   UploadedReferenceImageAsset,
 } from '@studio/contracts';
 
-export type MockReferenceImageAsset = GeneratedReferenceImageAsset | UploadedReferenceImageAsset;
+export type MockReferenceImageAsset =
+  GeneratedReferenceImageAsset | UploadedReferenceImageAsset | DerivedReferenceImageAsset;
 
 export type ModelId = 'lucy-latest' | 'lucy-vton-latest';
 
@@ -40,7 +43,9 @@ export type NetworkJourneyState = {
     contentType: string | null;
     bodyByteSize: number;
   }>;
-  referenceWorkflowCalls: Array<'upload' | 'optimize' | 'generate' | 'compose' | 'edit'>;
+  referenceWorkflowCalls: Array<
+    'upload' | 'optimize' | 'generate' | 'compose' | 'edit' | 'outfit-try-on'
+  >;
   referenceImageUploads: Array<{
     requestId: string;
     assetId: string;
@@ -68,6 +73,7 @@ export type NetworkJourneyState = {
       imagePromptSentToProvider: string;
     }
   >;
+  outfitTryOns: Array<OutfitTryOnRequest & { sourceAssetId: string; assetId: string }>;
   referenceImageMetadataReads: string[];
   referenceImageContentReads: string[];
   providerSdkRequests: string[];
@@ -79,6 +85,7 @@ export type NetworkJourneyState = {
 export type StudioHarnessOptions = {
   stubMediaPlayback?: boolean;
   referenceImagesAvailable?: boolean;
+  wardrobeAddOutfitAvailable?: boolean;
   elevenLabsAvailable?: boolean;
   realtimeVideoAvailable?: boolean;
   videoProcessingAvailable?: boolean;

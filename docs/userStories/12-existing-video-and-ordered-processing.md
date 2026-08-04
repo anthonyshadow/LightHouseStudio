@@ -46,10 +46,11 @@ then edit either base, download, start over, or discard.
    chooser. It is an anchored listbox on larger viewports and a safe-area-aware bottom sheet on
    phones, with 44px-or-larger touch targets, typeahead, Escape/focus restoration, and no document
    scrolling. Saved character/outfit options may add a local thumbnail, recipe name, and a
-   two-line prompt summary. The saved-character chooser ends with
-   **Create A Character**. That action opens Character Builder; a successful save returns to this
-   panel with the new saved character selected in the same Character Swap step. Selecting any
-   saved character with a reference attaches only that image and leaves Prompt empty so the
+   two-line prompt summary. Character Swap first selects a parent character, then uses the shared
+   original/variant version grid. **Create new wardrobe variant** opens that parent's Wardrobe and
+   a successful save returns to the same Character Swap step; **Create A Character** still opens
+   Character Builder and returns with the new parent selected. Selecting any exact saved version
+   with a reference attaches only that version's image and leaves Prompt empty so the
    creator may write a different prompt. A prompt-only saved character fills Prompt. Character
    and VTO reference fields accept local JPEG/PNG/WebP or the explicitly revealed public-HTTPS URL
    importer. An attached reference renders a local preview with replace and remove actions.
@@ -146,6 +147,8 @@ then edit either base, download, start over, or discard.
   an allowlisted failure class (content safeguards, account attention/limit, submitted media,
   cancellation, timeout, or upstream failure), discards the provider text, and exposes only
   provider-neutral guidance. No class triggers an automatic submission retry.
+- Original/variant identity stays local metadata until explicit selection. Character Swap hydrates
+  the exact selected asset; Virtual Try-On recipe/input selection remains unchanged.
 - If an accepted job's status or content request is interrupted, prompt, reference, enhancement,
   and saved-recipe fields remain editable. The UI states that **Resume accepted job** still checks
   the immutable accepted recipe and creates no submission; draft edits apply only after that job

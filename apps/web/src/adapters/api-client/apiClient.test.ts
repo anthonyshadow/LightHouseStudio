@@ -252,6 +252,7 @@ describe('reference image API client', () => {
                 version: 'lucy-character-reference-v1',
               },
             },
+            wardrobe: { addOutfitAvailable: true },
           }),
           { status: 200, headers: { 'Content-Type': 'application/json' } },
         ),
@@ -277,6 +278,7 @@ describe('reference image API client', () => {
       referenceImageOptimizerAvailable: true,
       referenceImageOptimizerModel: 'gpt-5.6',
       referenceImageOptimizerVersion: 'lucy-character-reference-v1',
+      wardrobeAddOutfitAvailable: true,
     });
   });
 

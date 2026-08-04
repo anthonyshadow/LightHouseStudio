@@ -15,13 +15,13 @@ import {
 import { VISUAL_CASE_MATRIX, type VisualScenarioId } from './studioVisualMatrix';
 
 const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
 const REFERENCE_PNG = Buffer.from(
   'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
   'base64',
 );
 const SEEDED_CHARACTER_STORE = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   savedPrompts: [],
   recentPrompts: [],
   savedCharacterPrompts: [
@@ -56,6 +56,7 @@ const SEEDED_CHARACTER_STORE = {
       referenceImageAssetId: null,
       uploadedReferenceImageAssetId: null,
       finalReferenceKind: null,
+      selectedWardrobeVariantId: null,
       notes: 'A grounded host treatment for field stories.',
       tags: ['host', 'editorial'],
       createdAt: '2026-07-16T14:30:00.000Z',
@@ -64,6 +65,7 @@ const SEEDED_CHARACTER_STORE = {
       useCount: 4,
     },
   ],
+  savedCharacterVariants: [],
 } satisfies CreativeAssetStore;
 
 type VisualScenario = {

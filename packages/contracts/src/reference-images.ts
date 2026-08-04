@@ -9,6 +9,9 @@ export const REFERENCE_IMAGE_UPLOAD_MAX_PIXELS = 40_000_000;
 export const REFERENCE_IMAGE_PROMPT_MAX_LENGTH = 4_000;
 export const REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH = 32_000;
 export const REFERENCE_IMAGE_CHANGE_INSTRUCTIONS_MAX_LENGTH = 2_000;
+export const PRUNA_IMAGE_TRY_ON_MODEL = 'p-image-try-on' as const;
+export const WARDROBE_PROVIDER_INTENT_HEADER = 'x-lightframe-provider-intent' as const;
+export const WARDROBE_PROVIDER_INTENT_VALUE = 'wardrobe' as const;
 
 export const remoteReferenceImageImportRequestSchema = z
   .object({
@@ -207,20 +210,34 @@ export const createReferenceImageRequestSchema = z
   })
   .strict();
 
-export const editReferenceImageRequestSchema = z
-  .object({
-    requestId: referenceImageRequestIdSchema,
-    rawPrompt: rawCharacterPromptSchema,
-    changeInstructions: z
-      .string()
-      .trim()
-      .min(1, 'Describe what should change in the reference image.')
-      .max(REFERENCE_IMAGE_CHANGE_INSTRUCTIONS_MAX_LENGTH),
-    options: characterReferenceOptionsSchema,
-    generator: characterReferenceGeneratorSchema.optional(),
-    optimization: referenceImageOptimizationSchema,
-  })
-  .strict();
+const editReferenceImageRequestCommonShape = {
+  requestId: referenceImageRequestIdSchema,
+  changeInstructions: z
+    .string()
+    .trim()
+    .min(1, 'Describe what should change in the reference image.')
+    .max(REFERENCE_IMAGE_CHANGE_INSTRUCTIONS_MAX_LENGTH),
+  options: characterReferenceOptionsSchema,
+  generator: characterReferenceGeneratorSchema.optional(),
+} as const;
+
+export const editReferenceImageRequestSchema = z.union([
+  z
+    .object({
+      ...editReferenceImageRequestCommonShape,
+      sourcePromptMode: z.literal('character-prompt').optional(),
+      rawPrompt: rawCharacterPromptSchema,
+      optimization: referenceImageOptimizationSchema,
+    })
+    .strict(),
+  z
+    .object({
+      ...editReferenceImageRequestCommonShape,
+      sourcePromptMode: z.literal('image-only'),
+      optimization: disabledReferenceImageOptimizationSchema,
+    })
+    .strict(),
+]);
 
 export const composeReferenceImageRequestSchema = z
   .object({
@@ -241,6 +258,14 @@ export const referenceImageAssetParamsSchema = z
 export const editReferenceImageParamsSchema = z
   .object({
     sourceAssetId: referenceImageAssetIdSchema,
+  })
+  .strict();
+
+export const outfitTryOnParamsSchema = editReferenceImageParamsSchema;
+export const outfitTryOnRequestSchema = z
+  .object({
+    requestId: referenceImageRequestIdSchema,
+    garmentAssetId: referenceImageAssetIdSchema,
   })
   .strict();
 
@@ -351,9 +376,44 @@ export const uploadedReferenceImageAssetSchema = z
     }
   });
 
+export const outfitTryOnDerivationSchema = z
+  .object({
+    kind: z.literal('outfit-try-on'),
+    sourceAssetId: referenceImageAssetIdSchema,
+    garmentAssetId: referenceImageAssetIdSchema,
+  })
+  .strict();
+
+export const derivedReferenceImageAssetSchema = z
+  .object({
+    assetId: referenceImageAssetIdSchema,
+    mimeType: referenceImageMimeTypeSchema,
+    byteSize: z.number().int().positive().max(REFERENCE_IMAGE_UPLOAD_MAX_BYTES),
+    source: z.literal('derived'),
+    provider: z.literal('pruna'),
+    model: z.literal(PRUNA_IMAGE_TRY_ON_MODEL),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    derivation: outfitTryOnDerivationSchema,
+    createdAt: z.iso.datetime({ offset: true }),
+    updatedAt: z.iso.datetime({ offset: true }),
+    contentUrl: z.string().regex(/^\/api\/reference-images\/[0-9a-f-]+\/content$/u),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.width * value.height > REFERENCE_IMAGE_UPLOAD_MAX_PIXELS) {
+      context.addIssue({
+        code: 'custom',
+        path: ['width'],
+        message: 'Derived reference image exceeds the decoded-pixel limit.',
+      });
+    }
+  });
+
 export const referenceImageAssetSchema = z.union([
   generatedReferenceImageAssetSchema,
   uploadedReferenceImageAssetSchema,
+  derivedReferenceImageAssetSchema,
 ]);
 
 export const createReferenceImageResponseSchema = z
@@ -368,6 +428,9 @@ export const composeReferenceImageResponseSchema = z
   .strict();
 export const uploadReferenceImageResponseSchema = z
   .object({ asset: uploadedReferenceImageAssetSchema })
+  .strict();
+export const outfitTryOnResponseSchema = z
+  .object({ asset: derivedReferenceImageAssetSchema })
   .strict();
 
 export const referenceImageMetadataResponseSchema = referenceImageAssetSchema;
@@ -398,12 +461,16 @@ export type RemoteReferenceImageImportRequest = z.infer<
 >;
 export type ReferenceImageAssetParams = z.infer<typeof referenceImageAssetParamsSchema>;
 export type EditReferenceImageParams = z.infer<typeof editReferenceImageParamsSchema>;
+export type OutfitTryOnParams = z.infer<typeof outfitTryOnParamsSchema>;
+export type OutfitTryOnRequest = z.infer<typeof outfitTryOnRequestSchema>;
 export type ReferenceImageDerivation = z.infer<typeof referenceImageDerivationSchema>;
 export type GeneratedReferenceImageAsset = z.infer<typeof generatedReferenceImageAssetSchema>;
 export type UploadedReferenceImageAsset = z.infer<typeof uploadedReferenceImageAssetSchema>;
+export type DerivedReferenceImageAsset = z.infer<typeof derivedReferenceImageAssetSchema>;
 export type ReferenceImageAsset = z.infer<typeof referenceImageAssetSchema>;
 export type ReferenceImageMetadataResponse = z.infer<typeof referenceImageMetadataResponseSchema>;
 export type CreateReferenceImageResponse = z.infer<typeof createReferenceImageResponseSchema>;
 export type EditReferenceImageResponse = z.infer<typeof editReferenceImageResponseSchema>;
 export type ComposeReferenceImageResponse = z.infer<typeof composeReferenceImageResponseSchema>;
 export type UploadReferenceImageResponse = z.infer<typeof uploadReferenceImageResponseSchema>;
+export type OutfitTryOnResponse = z.infer<typeof outfitTryOnResponseSchema>;

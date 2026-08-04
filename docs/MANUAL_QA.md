@@ -28,8 +28,9 @@ tokens, participant codes, personal media, raw provider responses, URLs, headers
 network archives.
 
 Provider checks use the separate [gated live procedure](LIVE_PROVIDER_SMOKE.md). Pruna 720p,
-Pruna 1080p, OpenAI, BFL, and Wiro require separately recorded passes; Pruna resolution is chosen
-in the editor while Pruna remains the startup-selected Character Swap provider.
+Pruna 1080p, Pruna Wardrobe try-on, OpenAI, BFL, and Wiro require separately recorded passes;
+Pruna resolution is chosen in the editor while Pruna remains the startup-selected Character Swap
+provider. Wardrobe try-on is separately enabled and is never inferred from Character Swap.
 
 ## Per-row physical protocol
 
@@ -38,28 +39,29 @@ primary flows in [user stories](userStories/README.md) and record every applicab
 
 ### Common checks
 
-| Check                          | Pass condition                                                                                                                                                                                                                    |
-| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `permission-allow-deny-revoke` | Allow, deny, and revoke camera/mic; errors are actionable; no token/provider work precedes healthy local media                                                                                                                    |
-| `local-capture`                | Entry/direct load/refresh show neutral Local Camera with zero media/AI starts; control-bar or panel Record explicitly starts mirrored contained video/audio and capability-gated controls                                         |
-| `character-capture`            | Exact Lucy 2.5 Start/Apply, local fallback until usable remote video, short playable take                                                                                                                                         |
-| `vto-capture`                  | Exact pinned VTO Start/Apply, image-only does not invent text, short playable take                                                                                                                                                |
-| `upload-select-replace-remove` | Native picker and drop publish compatible media without camera/provider work; replace/remove revokes only owned URLs                                                                                                              |
-| `upload-local-download`        | A zero-step H.264 MP4/MOV or VP8 WebM source previews and downloads with no external request                                                                                                                                      |
-| `upload-single-visual-step`    | Character Swap/VTO selector switches both ways; only the active operation submits once, returns the selected exact or bounded resolution-class result, and restores source audio                                                  |
-| `upload-voice`                 | Local and ElevenLabs Voice use immutable uploaded source audio and apply to the latest visual result                                                                                                                              |
-| `upload-record-to-source`      | Control-bar and panel Record intents use the persistent stage, warn/stop at 270/300 seconds, finalize, and adopt the normalized local artifact into the editor without provider traffic; no inline player participates in capture |
-| `upload-compare-edit`          | Inline player and shared stage follow Original/Result; Result is conditional; Edit snapshots the selected base; superseded URLs release only after healthy commit                                                                 |
-| `upload-vto-inputs`            | Saved/recent, reference, and prompt are exclusive; URL stays hidden until requested; safe HTTPS import never forwards or echoes the source URL                                                                                    |
-| `upload-ordered-plan`          | Voice-only performs one conversion; visual-only one submission; combined plan finishes visual restore/transcode before voice; truthful stage copy matches work                                                                    |
-| `record-300-seconds`           | At 270 seconds warning is visible/announced; at 300 seconds Stop coalesces once                                                                                                                                                   |
-| `record-finalize`              | Main recorder and optional sidecar settle, then device-local H.264/AAC MP4 transcode completes before source/provider release; no raw download fallback                                                                           |
-| `local-voice`                  | Warm/Clear/Robot always start from immutable original; success/cancel/failure preserves a valid take                                                                                                                              |
-| `elevenlabs-voice`             | Saved browse/preview sends no take; Apply sends only original sidecar; remux/original recovery works                                                                                                                              |
-| `download-playback`            | Download dispatch leaves review intact; an inspector/player confirms recorded output is MP4 with H.264 and AAC when audio exists; Release works only after dispatch                                                               |
-| `background-foreground`        | Background/foreground, screen lock/call/device interruption recovers safely or finalizes without take loss                                                                                                                        |
-| `memory-checkpoints`           | Complete [300-second memory protocol](RECORDING_MEMORY_POLICY.md) through processing and Release/Discard                                                                                                                          |
-| `cleanup`                      | Camera/mic indicators, WebRTC/provider clients, recorders, timers, listeners, audio contexts, tracks, and superseded URLs terminate once                                                                                          |
+| Check                          | Pass condition                                                                                                                                                                                                                                                             |
+| ------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `permission-allow-deny-revoke` | Allow, deny, and revoke camera/mic; errors are actionable; no token/provider work precedes healthy local media                                                                                                                                                             |
+| `local-capture`                | Entry/direct load/refresh show neutral Local Camera with zero media/AI starts; control-bar or panel Record explicitly starts mirrored contained video/audio and capability-gated controls                                                                                  |
+| `character-capture`            | Exact Lucy 2.5 Start/Apply, local fallback until usable remote video, short playable take                                                                                                                                                                                  |
+| `vto-capture`                  | Exact pinned VTO Start/Apply, image-only does not invent text, short playable take                                                                                                                                                                                         |
+| `upload-select-replace-remove` | Native picker and drop publish compatible media without camera/provider work; replace/remove revokes only owned URLs                                                                                                                                                       |
+| `upload-local-download`        | A zero-step H.264 MP4/MOV or VP8 WebM source previews and downloads with no external request                                                                                                                                                                               |
+| `upload-single-visual-step`    | Character Swap/VTO selector switches both ways; only the active operation submits once, returns the selected exact or bounded resolution-class result, and restores source audio                                                                                           |
+| `upload-voice`                 | Local and ElevenLabs Voice use immutable uploaded source audio and apply to the latest visual result                                                                                                                                                                       |
+| `upload-record-to-source`      | Control-bar and panel Record intents use the persistent stage, warn/stop at 270/300 seconds, finalize, and adopt the normalized local artifact into the editor without provider traffic; no inline player participates in capture                                          |
+| `upload-compare-edit`          | Inline player and shared stage follow Original/Result; Result is conditional; Edit snapshots the selected base; superseded URLs release only after healthy commit                                                                                                          |
+| `upload-vto-inputs`            | Saved/recent, reference, and prompt are exclusive; URL stays hidden until requested; safe HTTPS import never forwards or echoes the source URL                                                                                                                             |
+| `character-wardrobe`           | Original is first; exact variants search/use correctly; Change Features omits the parent prompt when a variant source is selected; Create variant returns to Existing Video when launched there; Add Outfit/Change Features degrade independently; Save never auto-selects |
+| `upload-ordered-plan`          | Voice-only performs one conversion; visual-only one submission; combined plan finishes visual restore/transcode before voice; truthful stage copy matches work                                                                                                             |
+| `record-300-seconds`           | At 270 seconds warning is visible/announced; at 300 seconds Stop coalesces once                                                                                                                                                                                            |
+| `record-finalize`              | Main recorder and optional sidecar settle, then device-local H.264/AAC MP4 transcode completes before source/provider release; no raw download fallback                                                                                                                    |
+| `local-voice`                  | Warm/Clear/Robot always start from immutable original; success/cancel/failure preserves a valid take                                                                                                                                                                       |
+| `elevenlabs-voice`             | Saved browse/preview sends no take; Apply sends only original sidecar; remux/original recovery works                                                                                                                                                                       |
+| `download-playback`            | Download dispatch leaves review intact; an inspector/player confirms recorded output is MP4 with H.264 and AAC when audio exists; Release works only after dispatch                                                                                                        |
+| `background-foreground`        | Background/foreground, screen lock/call/device interruption recovers safely or finalizes without take loss                                                                                                                                                                 |
+| `memory-checkpoints`           | Complete [300-second memory protocol](RECORDING_MEMORY_POLICY.md) through processing and Release/Discard                                                                                                                                                                   |
+| `cleanup`                      | Camera/mic indicators, WebRTC/provider clients, recorders, timers, listeners, audio contexts, tracks, and superseded URLs terminate once                                                                                                                                   |
 
 Repeat the common recording boundary for Local, Character, and VTO. If recording/source/provider
 completion coincide, only one finalization may publish. The stage must hold the last frame while
@@ -114,6 +116,10 @@ error, and each major overlay:
 On small touch targets, repeat with browser chrome open/closed, keyboard open, landscape, safe
 areas, large text, and 200% zoom. Character Builder uses one internal scroller and one
 preview/generation region; **Review & Generate** moves focus to it without duplicating state.
+Wardrobe uses one wide right overlay with an internally scrolling version grid and becomes
+fullscreen at narrow widths. Verify original/variant cards, Search, Use, Create variant, source
+selection, preview, title, and Close remain keyboard/touch reachable with correct selected state,
+focus return, reduced motion, and overlay stacking at every canonical viewport and 200% text.
 
 ## Capture/device checks
 
@@ -161,6 +167,14 @@ preview/generation region; **Review & Generate** moves focus to it without dupli
   guidance. Confirm compatible MOV/WebM converts locally at Start, MP4 passes through, the source
   remains immutable, and no provider name/selector appears. Import both Character and VTO references through the hidden
   public-HTTPS URL control and confirm the resulting local preview can be replaced or removed.
+- Open Wardrobe from a saved card and the active-character control. Use original and an exact
+  variant, reload, and confirm only the successfully hydrated version persisted. With no Pruna
+  configuration, confirm Add Outfit is visibly unavailable while browsing/use and Change Features
+  remain usable. For a prompt-only character, confirm original Use works and both creation paths
+  explain how to add/generate a reference. Exercise outfit upload and public-HTTPS import,
+  regeneration, input changes during generation, cancellation, empty title, Save without
+  auto-selection, and a later explicit Use. Delete the parent and confirm its variants/Recent links
+  disappear while immutable bytes remain retained.
 - Interrupt upload before provider acceptance, background/foreground during polling, restart the
   broker, expire a result, retry status/content/local finalization, and race source replacement.
   No path may create an automatic paid resubmission or discard the last valid artifact.
@@ -202,5 +216,5 @@ Using keyboard and a screen reader:
 
 A passing JSON record must contain every required check for the exact row and commit. A blocked or
 failed record is valid evidence but does not satisfy release. Re-run the validator after recording
-results; release remains open until it reports `11/11` provider/local and `45/45` physical rows with
+results; release remains open until it reports `12/12` provider/local and `45/45` physical rows with
 no invalid records.

@@ -20,6 +20,7 @@ describe('parseEnvironment', () => {
       port: DEFAULT_API_PORT,
       existingVideoCharacterSwapProvider: 'decart',
       prunaVideoReplaceEnabled: false,
+      prunaImageTryOnEnabled: false,
       elevenLabsModelId: DEFAULT_ELEVENLABS_STS_MODEL_ID,
       elevenLabsEnableLogging: false,
       lightframeDataDir: DEFAULT_LIGHTFRAME_DATA_DIR,
@@ -126,6 +127,8 @@ describe('parseEnvironment', () => {
       { EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: 'automatic' },
       { PRUNA_VIDEO_REPLACE_ENABLED: 'TRUE' },
       { PRUNA_VIDEO_REPLACE_MODEL: 'p-video-replace-latest' },
+      { PRUNA_IMAGE_TRY_ON_ENABLED: 'TRUE' },
+      { PRUNA_IMAGE_TRY_ON_MODEL: 'p-image-try-on-latest' },
     ]) {
       expect(() => parseEnvironment(environment), JSON.stringify(environment)).toThrow(
         EnvironmentValidationError,
@@ -160,6 +163,35 @@ describe('parseEnvironment', () => {
         PRUNA_VIDEO_REPLACE_ENABLED: 'true',
         PRUNA_API_KEY: 'pruna-secret',
         PRUNA_VIDEO_REPLACE_MODEL: 'p-video-replace',
+        ...override,
+      }),
+    ).toThrow(variable);
+  });
+
+  it('enables the pinned wardrobe model independently of existing-video provider choice', () => {
+    expect(
+      parseEnvironment({
+        PRUNA_IMAGE_TRY_ON_ENABLED: 'true',
+        PRUNA_API_KEY: ' wardrobe-secret ',
+        PRUNA_IMAGE_TRY_ON_MODEL: ' p-image-try-on ',
+      }),
+    ).toMatchObject({
+      existingVideoCharacterSwapProvider: 'decart',
+      prunaImageTryOnEnabled: true,
+      prunaApiKey: 'wardrobe-secret',
+      prunaImageTryOnModel: 'p-image-try-on',
+    });
+  });
+
+  it.each([
+    ['PRUNA_API_KEY', { PRUNA_API_KEY: '' }],
+    ['PRUNA_IMAGE_TRY_ON_MODEL', { PRUNA_IMAGE_TRY_ON_MODEL: '' }],
+  ] as const)('names missing Wardrobe requirement %s when enabled', (variable, override) => {
+    expect(() =>
+      parseEnvironment({
+        PRUNA_IMAGE_TRY_ON_ENABLED: 'true',
+        PRUNA_API_KEY: 'wardrobe-secret',
+        PRUNA_IMAGE_TRY_ON_MODEL: 'p-image-try-on',
         ...override,
       }),
     ).toThrow(variable);

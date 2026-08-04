@@ -268,6 +268,7 @@ export const CharacterPromptCard = ({
   onUse,
   onOpenWorkshop,
   onEditCharacter,
+  onOpenWardrobe,
   onAction,
 }: {
   item: SavedCharacterPrompt;
@@ -277,6 +278,7 @@ export const CharacterPromptCard = ({
   onUse: () => void;
   onOpenWorkshop?: (() => void) | undefined;
   onEditCharacter?: (() => void) | undefined;
+  onOpenWardrobe?: (() => void) | undefined;
   onAction: (action: EditAction) => void;
 }) => {
   const theme = useTheme();
@@ -345,6 +347,19 @@ export const CharacterPromptCard = ({
         >
           Use
         </Button>
+        {onOpenWardrobe ? (
+          <Button
+            aria-label={`Open ${item.name} wardrobe`}
+            variant="secondary"
+            size="small"
+            onClick={() => {
+              onSelect();
+              onOpenWardrobe();
+            }}
+          >
+            Wardrobe
+          </Button>
+        ) : null}
         {item.builderDraft && onOpenWorkshop ? (
           <Button
             aria-label={`Open ${item.name} in workshop`}

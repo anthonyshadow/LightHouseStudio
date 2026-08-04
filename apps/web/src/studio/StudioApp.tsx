@@ -1,4 +1,5 @@
 import { useTheme } from '@emotion/react';
+import { resolveCharacterVersion } from '@studio/domain';
 import {
   lazy,
   Suspense,
@@ -21,11 +22,17 @@ import { persistCharacterSaveSnapshot } from '../features/character-builder/pers
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
 import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
 import { savedPromptToRecipeSelection } from '../features/creative-assets/recipeSelection';
-import type { RecentPrompt, SavedPrompt } from '../features/creative-assets/types';
+import type {
+  CharacterVersionSelection,
+  RecentPrompt,
+  SavedCharacterPrompt,
+  SavedPrompt,
+} from '../features/creative-assets/types';
 import { useCreativeAssetRepository } from '../features/creative-assets/useCreativeAssetRepository';
 import { OutfitBuilder } from '../features/creative-assets/OutfitBuilder';
 import { OutfitSelector } from '../features/creative-assets/OutfitSelector';
 import { ExistingVideoPanel } from '../features/existing-video/ExistingVideoPanel';
+import type { ExistingVideoSavedRecipe } from '../features/existing-video/ExistingVideoRecipeChooser';
 import {
   savedCharacterStepInput,
   useExistingVideoWorkflow,
@@ -89,6 +96,11 @@ const LegacyProjectManager = lazy(() =>
 const TakeDock = lazy(() =>
   import('../features/take-review/TakeDock').then((module) => ({ default: module.TakeDock })),
 );
+const CharacterWardrobePanel = lazy(() =>
+  import('../features/character-wardrobe/CharacterWardrobePanel').then((module) => ({
+    default: module.CharacterWardrobePanel,
+  })),
+);
 
 const deferredPanelFallback = <p role="status">Loading studio tool…</p>;
 
@@ -125,7 +137,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const desktopStudioLayout = useDesktopStudioLayout();
   const repository = useMemo(() => createCreativeAssetRepository(), []);
   const repositoryState = useCreativeAssetRepository(repository);
-  const existingVideoSavedRecipes = useMemo(
+  const existingVideoSavedRecipes = useMemo<readonly ExistingVideoSavedRecipe[]>(
     () => [
       ...repositoryState.store.savedPrompts.map((recipe) => ({
         id: recipe.id,
@@ -136,15 +148,33 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         vtonInputKind: recipe.vtonInputKind,
         enhancePrompt: recipe.enhancePrompt,
       })),
-      ...repositoryState.store.savedCharacterPrompts.map((character) => ({
-        id: character.id,
-        label: character.name,
-        modelId: 'lucy-latest' as const,
-        prompt: character.prompt,
-        referenceImageAssetId: character.referenceImageAssetId,
-        vtonInputKind: null,
-        enhancePrompt: false,
-      })),
+      ...repositoryState.store.savedCharacterPrompts.flatMap((character) => [
+        {
+          id: character.id,
+          label: `${character.name} · Original`,
+          modelId: 'lucy-latest' as const,
+          prompt: character.prompt,
+          referenceImageAssetId: character.referenceImageAssetId,
+          vtonInputKind: null,
+          enhancePrompt: false,
+          savedCharacterPromptId: character.id,
+          originalCharacterVersion: true,
+        },
+        ...repositoryState.store.savedCharacterVariants
+          .filter((variant) => variant.parentCharacterId === character.id)
+          .map((variant) => ({
+            id: variant.id,
+            label: `${character.name} · ${variant.title}`,
+            modelId: 'lucy-latest' as const,
+            prompt: character.prompt,
+            referenceImageAssetId: variant.referenceImageAssetId,
+            vtonInputKind: null,
+            enhancePrompt: false,
+            savedCharacterPromptId: character.id,
+            savedCharacterVariantId: variant.id,
+            originalCharacterVersion: false,
+          })),
+      ]),
     ],
     [repositoryState.store],
   );
@@ -157,15 +187,25 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       readonly inputKind: 'character' | 'saved-outfit' | 'reference-image' | 'prompt';
       readonly enhancePrompt: boolean;
     }) => {
+      const recipe = step.savedRecipeId
+        ? existingVideoSavedRecipes.find((item) => item.id === step.savedRecipeId)
+        : undefined;
       const saved = step.savedRecipeId
         ? repository.getSnapshot().store.savedPrompts.find((item) => item.id === step.savedRecipeId)
         : undefined;
-      if (!step.prompt.trim() && !saved?.referenceImageAssetId) return;
+      if (!step.prompt.trim() && !recipe?.referenceImageAssetId) return;
       repository.recordSuccessfulPrompt({
-        prompt: saved?.prompt ?? step.prompt,
+        prompt: recipe?.prompt ?? step.prompt,
         modelModeId: step.modelId,
         ...(saved ? { savedPromptId: saved.id } : {}),
-        referenceImageAssetId: saved?.referenceImageAssetId ?? null,
+        ...(recipe?.savedCharacterPromptId
+          ? { savedCharacterPromptId: recipe.savedCharacterPromptId }
+          : {}),
+        ...(recipe?.savedCharacterVariantId
+          ? { savedCharacterVariantId: recipe.savedCharacterVariantId }
+          : {}),
+        ...(recipe?.savedCharacterPromptId ? { characterName: recipe.label.split(' · ')[0] } : {}),
+        referenceImageAssetId: recipe?.referenceImageAssetId ?? null,
         vtonInputKind:
           step.modelId === 'lucy-vton-latest'
             ? (saved?.vtonInputKind ?? (step.inputKind === 'prompt' ? 'prompt' : 'saved-outfit'))
@@ -176,7 +216,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             : false,
       });
     },
-    [repository],
+    [existingVideoSavedRecipes, repository],
   );
   const {
     repository: legacyRepository,
@@ -215,6 +255,16 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     destination: 'selector',
   });
   const [outfitBuilderDirty, setOutfitBuilderDirty] = useState(false);
+  const [wardrobeCharacterId, setWardrobeCharacterId] = useState<string | null>(null);
+  const [wardrobeExistingVideoStepId, setWardrobeExistingVideoStepId] = useState<string | null>(
+    null,
+  );
+  const [wardrobeDirty, setWardrobeDirty] = useState(false);
+  const wardrobeCharacter = wardrobeCharacterId
+    ? (repositoryState.store.savedCharacterPrompts.find(
+        (item) => item.id === wardrobeCharacterId,
+      ) ?? null)
+    : null;
   const outfitBuilderDirtyRef = useRef(false);
   const updateOutfitBuilderDirty = useCallback((dirty: boolean) => {
     outfitBuilderDirtyRef.current = dirty;
@@ -563,6 +613,54 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const openOutfitSelector = () => openOverlay('outfit-selector');
 
   const openLegacyProjects = () => openOverlay('legacy-projects');
+  const openWardrobe = useCallback(
+    (character: SavedCharacterPrompt) => {
+      setWardrobeCharacterId(character.id);
+      setWardrobeExistingVideoStepId(null);
+      setWardrobeDirty(false);
+      openOverlay('character-wardrobe');
+    },
+    [openOverlay],
+  );
+  const openWardrobeForExistingVideo = useCallback(
+    (stepId: string, characterId: string) => {
+      if (existingVideo.providerActive) return;
+      const step = existingVideo.steps.find(
+        (candidate) => candidate.id === stepId && candidate.modelId === 'lucy-latest',
+      );
+      const character = repository
+        .getSnapshot()
+        .store.savedCharacterPrompts.find((candidate) => candidate.id === characterId);
+      if (!step || !character) return;
+      setWardrobeCharacterId(character.id);
+      setWardrobeExistingVideoStepId(stepId);
+      setWardrobeDirty(false);
+      openOverlay('character-wardrobe');
+    },
+    [existingVideo.providerActive, existingVideo.steps, openOverlay, repository],
+  );
+  const closeWardrobe = useCallback(() => {
+    if (wardrobeDirty && !window.confirm('Discard the unfinished wardrobe variant?')) return;
+    setWardrobeDirty(false);
+    if (wardrobeExistingVideoStepId && existingVideo.selection) {
+      setWardrobeExistingVideoStepId(null);
+      openOverlay('video-upload');
+      return;
+    }
+    closeOverlay();
+  }, [
+    closeOverlay,
+    existingVideo.selection,
+    openOverlay,
+    wardrobeDirty,
+    wardrobeExistingVideoStepId,
+  ]);
+  const finishWardrobeVariantForExistingVideo = useCallback(() => {
+    if (!wardrobeExistingVideoStepId || !existingVideo.selection) return;
+    setWardrobeDirty(false);
+    setWardrobeExistingVideoStepId(null);
+    openOverlay('video-upload');
+  }, [existingVideo.selection, openOverlay, wardrobeExistingVideoStepId]);
 
   const creativePanel: AuxiliaryPanel =
     activeOverlay === 'workshop'
@@ -751,6 +849,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     recording.discard();
     setShelfDirty(false);
     updateOutfitBuilderDirty(false);
+    setWardrobeDirty(false);
   }, [existingVideo, processing, recording, setShelfDirty, updateOutfitBuilderDirty]);
   const discardExistingVideoSelection = useCallback(() => {
     if (existingVideo.selection) existingVideo.reset(false);
@@ -848,6 +947,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         onUseRecipe: applyRecipeSelection,
         onCreateCharacter: openCharacterBuilder,
         onEditCharacter: editCharacter,
+        onOpenWardrobe: openWardrobe,
         onCreateOutfit: () => openNewOutfitBuilder(false, 'shelf'),
         onEditOutfit: (outfit) => openOutfitEditor(outfit, false, 'shelf'),
         onSaveOutfitCopy: (outfit) => openOutfitCopy(outfit, 'shelf'),
@@ -1009,7 +1109,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           }
           hasTemporaryTake={Boolean(recording.presented)}
           voiceProcessingActive={recording.processingState === 'processing'}
-          shelfDirty={shelfDirty || outfitBuilderDirty}
+          shelfDirty={shelfDirty || outfitBuilderDirty || wardrobeDirty}
           onDiscardTemporaryWork={discardTemporaryWork}
         />
 
@@ -1040,6 +1140,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             browserCapabilities={browser}
             savedRecipes={existingVideoSavedRecipes}
             onCreateCharacter={createCharacterForExistingVideo}
+            onCreateWardrobeVariant={openWardrobeForExistingVideo}
             onFinish={finishExistingVideoSetup}
             recordingSupported={
               browser.mediaRecorder && browser.mediaDevices && browser.secureContext
@@ -1163,6 +1264,16 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                   Edit {activeCharacterName}
                 </Button>
                 <Button
+                  variant="secondary"
+                  disabled={!activeCharacterRecord || Boolean(characterBuilderOpenBlockedReason)}
+                  title={characterBuilderOpenBlockedReason}
+                  onClick={() => {
+                    if (activeCharacterRecord) openWardrobe(activeCharacterRecord);
+                  }}
+                >
+                  Wardrobe
+                </Button>
+                <Button
                   variant="danger"
                   disabled={Boolean(characterRemovalBlockedReason)}
                   title={characterRemovalBlockedReason}
@@ -1188,6 +1299,55 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               Choose saved character
             </Button>
           </div>
+        </OverlayPanel>
+
+        <OverlayPanel
+          open={activeOverlay === 'character-wardrobe' && Boolean(wardrobeCharacter)}
+          onClose={closeWardrobe}
+          title={wardrobeCharacter ? `${wardrobeCharacter.name} wardrobe` : 'Character wardrobe'}
+          description="Browse the original and saved variants, or create a new version without changing the parent character."
+          placement={desktopStudioLayout ? 'right' : 'fullscreen'}
+          size="wide"
+          bodyMode="contained"
+          closeOnBackdrop={!wardrobeDirty}
+          returnFocusRef={characterSelectorRef}
+        >
+          {wardrobeCharacter ? (
+            <Suspense fallback={deferredPanelFallback}>
+              <CharacterWardrobePanel
+                repository={repository}
+                store={repositoryState.store}
+                character={wardrobeCharacter}
+                addOutfitAvailable={Boolean(availability.wardrobeAddOutfitAvailable)}
+                changeFeaturesAvailable={Boolean(availability.referenceImageEditAvailable)}
+                useDisabled={recipeInsertionBlocked || referenceUsePending}
+                onDirtyChange={setWardrobeDirty}
+                onClose={closeWardrobe}
+                {...(wardrobeExistingVideoStepId
+                  ? { onSaved: finishWardrobeVariantForExistingVideo }
+                  : {})}
+                onUse={(selection: CharacterVersionSelection) => {
+                  const resolved = resolveCharacterVersion(
+                    repository.getSnapshot().store,
+                    selection,
+                  );
+                  if (!resolved) return;
+                  applyRecipeSelection({
+                    origin: 'character-prompt',
+                    prompt: resolved.prompt,
+                    modelModeId: 'lucy-latest',
+                    assetId: resolved.character.id,
+                    characterName: resolved.displayLabel,
+                    referenceImageAssetId: resolved.referenceImageAssetId,
+                    ...(resolved.variant ? { savedCharacterVariantId: resolved.variant.id } : {}),
+                    ...(resolved.character.builderDraft
+                      ? { builderDraft: resolved.character.builderDraft }
+                      : {}),
+                  });
+                }}
+              />
+            </Suspense>
+          ) : null}
         </OverlayPanel>
 
         <AIExperienceChooser

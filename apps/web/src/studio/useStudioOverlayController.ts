@@ -9,6 +9,7 @@ export type ActiveOverlay =
   | 'recipe-shelf'
   | 'character-builder'
   | 'character-selector'
+  | 'character-wardrobe'
   | 'outfit-selector'
   | 'outfit-builder'
   | 'ai-preparation'

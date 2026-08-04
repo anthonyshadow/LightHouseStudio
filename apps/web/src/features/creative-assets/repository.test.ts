@@ -7,6 +7,7 @@ import {
   EARLIER_CREATIVE_ASSET_STORAGE_KEY,
   LEGACY_CREATIVE_ASSET_STORAGE_KEY,
   OLDER_CREATIVE_ASSET_STORAGE_KEY,
+  ORIGINAL_CREATIVE_ASSET_STORAGE_KEY,
   PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
   type GuidedDesignV1,
   type StorageLike,
@@ -194,6 +195,57 @@ describe('createCreativeAssetRepository', () => {
     });
   });
 
+  it('persists normalized wardrobe CRUD, exact Recent attribution, and parent cascade', () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFixture(storage);
+    const character = repository.createSavedCharacterPrompt({
+      name: 'Wardrobe host',
+      prompt: 'Replace the subject with a wardrobe host.',
+      promptIntent: 'character-transform',
+      referenceImageStatus: 'persisted-reference',
+      referenceImageAssetId: 'host-original',
+    });
+    const variant = repository.createSavedCharacterVariant({
+      parentCharacterId: character.id,
+      title: 'Green coat',
+      referenceImageAssetId: 'host-green-coat',
+      creation: {
+        method: 'add-outfit',
+        sourceReferenceImageAssetId: 'host-original',
+        garmentReferenceImageAssetId: 'green-coat',
+      },
+    });
+    repository.recordSuccessfulPrompt({
+      prompt: character.prompt,
+      modelModeId: 'lucy-latest',
+      savedCharacterPromptId: character.id,
+      savedCharacterVariantId: variant.id,
+      referenceImageAssetId: variant.referenceImageAssetId,
+    });
+
+    expect(repositoryFixture(storage).getSnapshot().store).toMatchObject({
+      savedCharacterPrompts: [
+        expect.objectContaining({ selectedWardrobeVariantId: variant.id, useCount: 1 }),
+      ],
+      savedCharacterVariants: [
+        expect.objectContaining({ id: variant.id, parentCharacterId: character.id, useCount: 1 }),
+      ],
+      recentPrompts: [
+        expect.objectContaining({
+          savedCharacterPromptId: character.id,
+          savedCharacterVariantId: variant.id,
+          referenceImageAssetId: variant.referenceImageAssetId,
+        }),
+      ],
+    });
+
+    repository.deleteSavedCharacterPrompt(character.id);
+    expect(repository.getSnapshot().store.savedCharacterVariants).toEqual([]);
+    expect(repository.getSnapshot().store.recentPrompts[0]).not.toHaveProperty(
+      'savedCharacterVariantId',
+    );
+  });
+
   it('increments character use only for the exact saved reference version', () => {
     const repository = repositoryFixture();
     const character = repository.createSavedCharacterPrompt({
@@ -313,10 +365,10 @@ describe('createCreativeAssetRepository', () => {
     ]);
   });
 
-  it('migrates the legacy v1 key to v5 and hydrates null references after refresh', () => {
+  it('migrates the original v1 key to v6 and hydrates null references after refresh', () => {
     const storage = new MemoryStorage();
     storage.records.set(
-      LEGACY_CREATIVE_ASSET_STORAGE_KEY,
+      ORIGINAL_CREATIVE_ASSET_STORAGE_KEY,
       JSON.stringify({
         schemaVersion: 1,
         savedPrompts: [
@@ -355,7 +407,7 @@ describe('createCreativeAssetRepository', () => {
   it('prefers and migrates the v2 key while preserving reference identities', () => {
     const storage = new MemoryStorage();
     storage.records.set(
-      EARLIER_CREATIVE_ASSET_STORAGE_KEY,
+      LEGACY_CREATIVE_ASSET_STORAGE_KEY,
       JSON.stringify({
         schemaVersion: 2,
         savedPrompts: [],
@@ -409,7 +461,7 @@ describe('createCreativeAssetRepository', () => {
   it('prefers and migrates the v3 key with generated reference provenance', () => {
     const storage = new MemoryStorage();
     storage.records.set(
-      OLDER_CREATIVE_ASSET_STORAGE_KEY,
+      EARLIER_CREATIVE_ASSET_STORAGE_KEY,
       JSON.stringify({
         schemaVersion: 3,
         savedPrompts: [],
@@ -452,7 +504,7 @@ describe('createCreativeAssetRepository', () => {
   it('prefers and migrates the v4 key with explicit VTO mode inference', () => {
     const storage = new MemoryStorage();
     storage.records.set(
-      PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
+      OLDER_CREATIVE_ASSET_STORAGE_KEY,
       JSON.stringify({
         schemaVersion: 4,
         savedPrompts: [
@@ -487,6 +539,45 @@ describe('createCreativeAssetRepository', () => {
           }),
         ],
       },
+    });
+  });
+
+  it('migrates the v5 key to an empty wardrobe with original selection', () => {
+    const storage = new MemoryStorage();
+    storage.records.set(
+      PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: 5,
+        savedPrompts: [],
+        recentPrompts: [],
+        savedCharacterPrompts: [
+          {
+            id: 'v5-character',
+            name: 'V5 character',
+            prompt: 'Replace the subject with a presenter.',
+            source: 'generator',
+            promptIntent: 'character-transform',
+            builderDraft: null,
+            guidedDesign: null,
+            referenceImageStatus: 'persisted-reference',
+            referenceImageAssetId: 'v5-reference',
+            uploadedReferenceImageAssetId: null,
+            finalReferenceKind: 'generated',
+            notes: '',
+            tags: [],
+            createdAt: '2026-07-14T12:00:00.000Z',
+            updatedAt: '2026-07-14T12:00:00.000Z',
+            lastUsedAt: null,
+            useCount: 0,
+          },
+        ],
+      }),
+    );
+
+    expect(createCreativeAssetRepository({ storage }).getSnapshot().store).toMatchObject({
+      schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+      savedCharacterPrompts: [expect.objectContaining({ selectedWardrobeVariantId: null })],
+      savedCharacterVariants: [],
     });
   });
 

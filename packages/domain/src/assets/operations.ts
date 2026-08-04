@@ -13,6 +13,7 @@ import {
   CREATIVE_ASSET_SCHEMA_VERSION,
   RECENT_PROMPT_LIMIT,
   SAVED_CHARACTER_PROMPT_LIMIT,
+  SAVED_CHARACTER_VARIANT_LIMIT,
   SAVED_PROMPT_LIMIT,
   type AssetMutationContext,
   type CreativeAssetSearchResults,
@@ -20,6 +21,8 @@ import {
   type RecentPrompt,
   type SavedCharacterPrompt,
   type SavedCharacterPromptInput,
+  type SavedCharacterVariant,
+  type SavedCharacterVariantInput,
   type SavedPrompt,
   type SavedPromptInput,
   type VtonInputKind,
@@ -30,6 +33,7 @@ export const createEmptyCreativeAssetStore = (): CreativeAssetStore => ({
   savedPrompts: [],
   recentPrompts: [],
   savedCharacterPrompts: [],
+  savedCharacterVariants: [],
 });
 
 const requireName = (
@@ -324,6 +328,7 @@ export const recordSuccessfulPromptUse = (
     readonly modelModeId: ModelModeId;
     readonly savedPromptId?: string;
     readonly savedCharacterPromptId?: string;
+    readonly savedCharacterVariantId?: string;
     readonly characterName?: string;
     readonly referenceImageAssetId?: string | null;
     readonly vtonInputKind?: VtonInputKind | null;
@@ -346,7 +351,23 @@ export const recordSuccessfulPromptUse = (
           (asset) =>
             asset.id === input.savedCharacterPromptId &&
             canonicalPrompt(asset.prompt) === promptKey &&
-            asset.referenceImageAssetId === referenceImageAssetId,
+            (input.savedCharacterVariantId
+              ? store.savedCharacterVariants.some(
+                  (variant) =>
+                    variant.id === input.savedCharacterVariantId &&
+                    variant.parentCharacterId === asset.id &&
+                    variant.referenceImageAssetId === referenceImageAssetId,
+                )
+              : asset.referenceImageAssetId === referenceImageAssetId),
+        )
+      : undefined;
+  const matchingVariant =
+    matchingCharacter && input.savedCharacterVariantId
+      ? store.savedCharacterVariants.find(
+          (variant) =>
+            variant.id === input.savedCharacterVariantId &&
+            variant.parentCharacterId === matchingCharacter.id &&
+            variant.referenceImageAssetId === referenceImageAssetId,
         )
       : undefined;
   const characterName = matchingCharacter?.name ?? input.characterName;
@@ -391,7 +412,8 @@ export const recordSuccessfulPromptUse = (
       recent.vtonInputKind === vtonInputKind &&
       recent.enhancePrompt === enhancePrompt &&
       (matchingCharacter
-        ? recent.savedCharacterPromptId === matchingCharacter.id
+        ? recent.savedCharacterPromptId === matchingCharacter.id &&
+          recent.savedCharacterVariantId === matchingVariant?.id
         : recent.characterName === characterName),
   );
   const recent: RecentPrompt = {
@@ -400,6 +422,7 @@ export const recordSuccessfulPromptUse = (
     modelModeId: input.modelModeId,
     ...(matchingSaved ? { savedPromptId: matchingSaved.id } : {}),
     ...(matchingCharacter ? { savedCharacterPromptId: matchingCharacter.id } : {}),
+    ...(matchingVariant ? { savedCharacterVariantId: matchingVariant.id } : {}),
     ...(characterName ? { characterName: requireName(characterName, 'Character') } : {}),
     referenceImageAssetId,
     vtonInputKind,
@@ -417,7 +440,8 @@ export const recordSuccessfulPromptUse = (
           candidate.vtonInputKind === vtonInputKind &&
           candidate.enhancePrompt === enhancePrompt &&
           (matchingCharacter
-            ? candidate.savedCharacterPromptId === matchingCharacter.id
+            ? candidate.savedCharacterPromptId === matchingCharacter.id &&
+              candidate.savedCharacterVariantId === matchingVariant?.id
             : candidate.characterName === characterName)
         ),
     ),
@@ -436,10 +460,22 @@ export const recordSuccessfulPromptUse = (
     savedCharacterPrompts: matchingCharacter
       ? store.savedCharacterPrompts.map((asset) =>
           asset.id === matchingCharacter.id
-            ? { ...asset, useCount: asset.useCount + 1, lastUsedAt: now }
+            ? {
+                ...asset,
+                selectedWardrobeVariantId: matchingVariant?.id ?? null,
+                useCount: asset.useCount + 1,
+                lastUsedAt: now,
+              }
             : asset,
         )
       : store.savedCharacterPrompts,
+    savedCharacterVariants: matchingVariant
+      ? store.savedCharacterVariants.map((variant) =>
+          variant.id === matchingVariant.id
+            ? { ...variant, useCount: variant.useCount + 1, lastUsedAt: now }
+            : variant,
+        )
+      : store.savedCharacterVariants,
   };
 };
 
@@ -511,6 +547,7 @@ export const createSavedCharacterPrompt = (
         ? 'prompt-only'
         : input.referenceImageStatus,
     ...reference,
+    selectedWardrobeVariantId: null,
     notes: normalizeWhitespace(input.notes ?? '', CHARACTER_NOTES_MAX_LENGTH),
     tags: normalizeTags(input.tags ?? []),
     createdAt: now,
@@ -646,7 +683,100 @@ export const deleteSavedCharacterPrompt = (
   ...store,
   savedCharacterPrompts: store.savedCharacterPrompts.filter((asset) => asset.id !== id),
   recentPrompts: store.recentPrompts.map((recent) => unlinkRecentCharacter(recent, id)),
+  savedCharacterVariants: store.savedCharacterVariants.filter(
+    (variant) => variant.parentCharacterId !== id,
+  ),
 });
+
+export const createSavedCharacterVariant = (
+  store: CreativeAssetStore,
+  input: SavedCharacterVariantInput,
+  context: AssetMutationContext,
+): CreativeAssetStore => {
+  const now = assertTimestamp(context.now);
+  if (!store.savedCharacterPrompts.some((character) => character.id === input.parentCharacterId)) {
+    throw new AssetRuleError('not-found', 'The parent character was not found.');
+  }
+  const sourceReferenceImageAssetId = normalizeReferenceImageAssetId(
+    input.creation.sourceReferenceImageAssetId,
+  );
+  const referenceImageAssetId = normalizeReferenceImageAssetId(input.referenceImageAssetId);
+  if (!sourceReferenceImageAssetId || !referenceImageAssetId) {
+    throw new AssetRuleError('invalid-id', 'Wardrobe variants require source and result images.');
+  }
+  const creation =
+    input.creation.method === 'add-outfit'
+      ? {
+          method: 'add-outfit' as const,
+          sourceReferenceImageAssetId,
+          garmentReferenceImageAssetId:
+            normalizeReferenceImageAssetId(input.creation.garmentReferenceImageAssetId) ?? '',
+        }
+      : {
+          method: 'change-features' as const,
+          sourceReferenceImageAssetId,
+          changeInstructions: normalizeAuthoredPrompt(input.creation.changeInstructions),
+        };
+  if (
+    (creation.method === 'add-outfit' && !creation.garmentReferenceImageAssetId) ||
+    (creation.method === 'change-features' && !containsMeaningfulText(creation.changeInstructions))
+  ) {
+    throw new AssetRuleError('invalid-prompt', 'Complete the wardrobe generation details.');
+  }
+  const variant: SavedCharacterVariant = {
+    id: requireName(context.createId(), 'Wardrobe variant', 'invalid-id'),
+    parentCharacterId: input.parentCharacterId,
+    title: requireName(input.title, 'Wardrobe variant'),
+    referenceImageAssetId,
+    creation,
+    createdAt: now,
+    updatedAt: now,
+    lastUsedAt: null,
+    useCount: 0,
+  };
+  const savedCharacterVariants = capByUpdated(
+    [variant, ...store.savedCharacterVariants],
+    SAVED_CHARACTER_VARIANT_LIMIT,
+  );
+  const retainedVariantIds = new Set(savedCharacterVariants.map((candidate) => candidate.id));
+  return {
+    ...store,
+    savedCharacterPrompts: store.savedCharacterPrompts.map((character) =>
+      character.selectedWardrobeVariantId &&
+      !retainedVariantIds.has(character.selectedWardrobeVariantId)
+        ? { ...character, selectedWardrobeVariantId: null }
+        : character,
+    ),
+    savedCharacterVariants,
+  };
+};
+
+export const selectCharacterVersion = (
+  store: CreativeAssetStore,
+  characterId: string,
+  variantId: string | null,
+  nowValue: string,
+): CreativeAssetStore => {
+  const now = assertTimestamp(nowValue);
+  const character = store.savedCharacterPrompts.find((candidate) => candidate.id === characterId);
+  if (!character) throw new AssetRuleError('not-found', 'The character was not found.');
+  if (
+    variantId !== null &&
+    !store.savedCharacterVariants.some(
+      (variant) => variant.id === variantId && variant.parentCharacterId === characterId,
+    )
+  ) {
+    throw new AssetRuleError('not-found', 'The wardrobe variant was not found.');
+  }
+  return {
+    ...store,
+    savedCharacterPrompts: store.savedCharacterPrompts.map((candidate) =>
+      candidate.id === characterId
+        ? { ...candidate, selectedWardrobeVariantId: variantId, updatedAt: now }
+        : candidate,
+    ),
+  };
+};
 
 export const useSavedCharacterPrompt = (
   store: CreativeAssetStore,
@@ -700,6 +830,12 @@ export const searchCreativeAssets = (
         ? []
         : store.savedCharacterPrompts.filter((asset) =>
             matches([asset.name, asset.prompt, asset.notes, ...asset.tags]),
+          ),
+    savedCharacterVariants:
+      modelModeId === 'lucy-vton-latest'
+        ? []
+        : store.savedCharacterVariants.filter((variant) =>
+            matches([variant.title, variant.creation.method]),
           ),
   };
 };

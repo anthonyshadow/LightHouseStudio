@@ -21,8 +21,8 @@ advanced tools.
 
 The product is local-first, not offline-only. Camera preview, local recording, drafting, uploads,
 saved browser metadata, and local voice effects can run without an external media provider.
-Decart, OpenAI optimization/image generation, BFL, Wiro, and ElevenLabs are explicit provider
-actions that may incur usage or cost.
+Decart, Pruna video/try-on, OpenAI optimization/image generation, BFL, Wiro, and ElevenLabs are
+explicit provider actions that may incur usage or cost.
 
 The Fastify server is a loopback integration broker. It is not a public backend and must not be
 exposed through LAN binding, a tunnel, proxy, shared ingress, or public hostname.
@@ -54,6 +54,9 @@ required, but no physical target is qualified yet.
 - Character Builder supports prompt-only, direct upload, image-only, generated, and combined
   references with recoverable draft/save state.
 - Recipe Shelf stores sanitized, versioned browser metadata and opaque reference relationships.
+- Saved Characters include normalized Wardrobe variants. The original remains the default;
+  successful exact-version Use persists selection. Pruna powers explicit Add Outfit only, while
+  Change Features remains on the startup-selected OpenAI/BFL/Wiro image provider.
 - Character uses exact `lucy-latest`; VTO uses pinned `lucy-vton-latest`.
 - Existing H.264 MP4/MOV and VP8 WebM sources can stay local or run exactly one selected visual
   operation. Character Swap uses startup-selected Decart or Pruna; VTO remains Decart. The two
@@ -65,7 +68,7 @@ required, but no physical target is qualified yet.
 - Studio keeps one temporary source/visual/voice pipeline. Download is the durable handoff;
   Release or Discard revokes its URLs.
 - Recording/finalization blocks route exit. A temporary take, active Voice operation, or dirty
-  Shelf form requires confirmed discard before leaving Studio.
+  Shelf, Outfit Builder, or Wardrobe form requires confirmed discard before leaving Studio.
 - Local and ElevenLabs voice treatments always start from immutable originals. ElevenLabs is
   limited to explicitly browsed saved voices and receives only the audio sidecar on Apply.
 - Uploaded and generated references are immutable local assets. Detach, Reset, or browser-record

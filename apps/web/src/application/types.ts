@@ -37,6 +37,7 @@ export type ProviderAvailability = {
   referenceImageOptimizerAvailable?: boolean;
   referenceImageOptimizerModel?: string | null;
   referenceImageOptimizerVersion?: string | null;
+  wardrobeAddOutfitAvailable?: boolean;
 };
 
 export type BrowserCapabilities = {

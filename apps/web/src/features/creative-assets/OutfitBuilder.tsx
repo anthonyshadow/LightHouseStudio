@@ -2,7 +2,7 @@ import { useTheme } from '@emotion/react';
 import { useLayoutEffect, useRef, useState } from 'react';
 import { uploadReferenceImage } from '../../adapters/api-client/apiClient';
 import { validateReferenceImage } from '../../adapters/browser-media/imageValidation';
-import { ExistingVideoReferenceField } from '../existing-video/ExistingVideoReferenceField';
+import { ReferenceImageInputField } from '../reference-images/ReferenceImageInputField';
 import {
   Button,
   SegmentedControl,
@@ -191,8 +191,8 @@ export const OutfitBuilder = ({
                   The currently saved local reference image will be retained unless you replace it.
                 </StatusNotice>
               ) : null}
-              <ExistingVideoReferenceField
-                modelId="lucy-vton-latest"
+              <ReferenceImageInputField
+                kind="garment"
                 file={referenceFile}
                 disabled={saving}
                 allowUrlImport

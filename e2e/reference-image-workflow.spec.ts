@@ -1,13 +1,19 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
   openCharacterOptions,
   openRecipeDockWhenOverlaid,
   readBrowserState,
 } from './support/studioHarness';
+import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
+const REFERENCE_PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
+  'base64',
+);
 
 const openCharacterBuilder = async (page: Page): Promise<void> => {
   await openCharacterOptions(page);
@@ -129,6 +135,101 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
   expectNoExternalProviderTraffic(network);
 });
 
+test('wardrobe uses an exact variant image without its parent prompt and remains reachable at every viewport', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page, {
+    wardrobeAddOutfitAvailable: true,
+  });
+  await page.goto('/studio');
+
+  await openCharacterBuilder(page);
+  await page.getByRole('button', { name: 'Generate Preview' }).click();
+  await expect(page.getByText('This preview matches the current character.')).toBeVisible();
+  await page.getByRole('button', { name: 'Save Character', exact: true }).click();
+  const nameDialog = page.getByRole('dialog', { name: 'Name your character' });
+  await nameDialog.getByRole('textbox', { name: /Character name/u }).fill('Wardrobe source host');
+  await nameDialog.getByRole('button', { name: 'Save Character', exact: true }).click();
+
+  await page.getByRole('button', { name: 'Shelf', exact: true }).click();
+  await page.getByRole('button', { name: /^Characters\b/u }).click();
+  await page.getByRole('button', { name: 'Open Wardrobe source host wardrobe' }).click();
+  const wardrobe = page.getByRole('dialog', { name: 'Wardrobe source host wardrobe' });
+  await wardrobe.getByRole('button', { name: 'Add outfit' }).click();
+  await wardrobe.getByLabel('Garment image').setInputFiles({
+    name: 'travel-jacket.png',
+    mimeType: 'image/png',
+    buffer: REFERENCE_PNG,
+  });
+  await wardrobe.getByRole('button', { name: 'Generate outfit' }).click();
+  await expect(
+    wardrobe.getByRole('button', { name: 'Open larger generated wardrobe preview' }),
+  ).toBeVisible();
+  await wardrobe.getByRole('textbox', { name: /Variant name/u }).fill('Travel jacket');
+  await wardrobe.getByRole('button', { name: 'Save variant' }).click();
+
+  expect(network.outfitTryOns).toHaveLength(1);
+  const outfit = network.outfitTryOns[0];
+  if (!outfit) throw new Error('Expected the deterministic outfit result.');
+
+  await wardrobe.getByRole('button', { name: 'Change features' }).click();
+  const outfitCard = wardrobe.locator('article').filter({ hasText: 'Travel jacket' });
+  await outfitCard.getByRole('button', { name: 'Choose source' }).click();
+
+  for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {
+    await page.setViewportSize(viewport);
+    await expect(wardrobe).toBeVisible();
+    await expectNoDocumentOverflow(page);
+    await wardrobe.getByRole('textbox', { name: /Variant name/u }).scrollIntoViewIfNeeded();
+    await expect(wardrobe.getByRole('textbox', { name: /Variant name/u })).toBeVisible();
+    await wardrobe.getByLabel('Required changes').scrollIntoViewIfNeeded();
+    await expect(wardrobe.getByLabel('Required changes')).toBeVisible();
+    await wardrobe.getByRole('heading', { name: 'Generated preview' }).scrollIntoViewIfNeeded();
+    await expect(wardrobe.getByRole('heading', { name: 'Generated preview' })).toBeVisible();
+    await expect(wardrobe.getByRole('button', { name: 'Save variant' })).toBeVisible();
+  }
+
+  await wardrobe.getByLabel('Required changes').fill('Add a warm expression.');
+  await wardrobe.getByRole('button', { name: 'Generate changes' }).click();
+  await expect.poll(() => network.referenceImageEdits.length).toBe(1);
+  const edit = network.referenceImageEdits[0];
+  expect(edit).toMatchObject({
+    sourceAssetId: outfit.assetId,
+    sourcePromptMode: 'image-only',
+    changeInstructions: 'Add a warm expression.',
+  });
+  expect(edit).not.toHaveProperty('rawPrompt');
+
+  await wardrobe.getByRole('textbox', { name: /Variant name/u }).fill('Travel jacket smile');
+  await wardrobe.getByRole('button', { name: 'Save variant' }).click();
+  const persisted = await page.evaluate((storageKey) => {
+    const serialized = localStorage.getItem(storageKey);
+    if (!serialized) return null;
+    return JSON.parse(serialized) as {
+      savedCharacterPrompts: Array<{ id: string; name: string }>;
+      savedCharacterVariants: Array<{
+        parentCharacterId: string;
+        title: string;
+        creation: { sourceReferenceImageAssetId: string };
+      }>;
+    };
+  }, CREATIVE_ASSET_STORAGE_KEY);
+  const parent = persisted?.savedCharacterPrompts.find(
+    (character) => character.name === 'Wardrobe source host',
+  );
+  expect(parent).toBeDefined();
+  expect(persisted?.savedCharacterVariants).toEqual(
+    expect.arrayContaining([
+      expect.objectContaining({
+        parentCharacterId: parent?.id,
+        title: 'Travel jacket smile',
+        creation: expect.objectContaining({ sourceReferenceImageAssetId: outfit.assetId }),
+      }),
+    ]),
+  );
+  expectNoExternalProviderTraffic(network);
+});
+
 test('saved character opens in Builder and updates its original record after regeneration', async ({
   page,
 }) => {
@@ -233,7 +334,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
       localStorage.setItem(
         storageKey,
         JSON.stringify({
-          schemaVersion: 5,
+          schemaVersion: 6,
           savedPrompts: [],
           recentPrompts: [
             {
@@ -247,6 +348,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
             },
           ],
           savedCharacterPrompts: [],
+          savedCharacterVariants: [],
         }),
       );
     },

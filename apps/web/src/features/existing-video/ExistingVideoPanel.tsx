@@ -51,6 +51,7 @@ type ExistingVideoPanelProps = {
   readonly onFinish: () => void;
   readonly savedRecipes?: readonly ExistingVideoSavedRecipe[];
   readonly onCreateCharacter?: (stepId: string) => void;
+  readonly onCreateWardrobeVariant?: (stepId: string, characterId: string) => void;
   readonly recordingSupported?: boolean;
   readonly onRecordVideo?: () => void;
 };
@@ -78,6 +79,7 @@ export const ExistingVideoPanel = ({
   onFinish,
   savedRecipes = [],
   onCreateCharacter,
+  onCreateWardrobeVariant,
   recordingSupported = false,
   onRecordVideo,
 }: ExistingVideoPanelProps) => {
@@ -562,6 +564,7 @@ export const ExistingVideoPanel = ({
                         }
                         onChooseReference={(step, file) => void chooseReference(step, file)}
                         {...(onCreateCharacter ? { onCreateCharacter } : {})}
+                        {...(onCreateWardrobeVariant ? { onCreateWardrobeVariant } : {})}
                         onUpdate={workflow.updateStep}
                         onSetVtonInputKind={workflow.setVtonInputKind}
                         onClear={clearVisualStep}

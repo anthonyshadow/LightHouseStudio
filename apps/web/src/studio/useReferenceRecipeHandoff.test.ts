@@ -291,6 +291,7 @@ describe('reference recipe handoff', () => {
       referenceImageAssetId: uploadedAsset.assetId,
       uploadedReferenceImageAssetId: uploadedAsset.assetId,
       finalReferenceKind: 'uploaded' as const,
+      selectedWardrobeVariantId: null,
       notes: '',
       tags: [],
       createdAt: '2026-07-21T12:00:00.000Z',
@@ -299,10 +300,11 @@ describe('reference recipe handoff', () => {
       useCount: 0,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [character],
+      savedCharacterVariants: [],
     };
     const harness = renderHandoff({ store, referenceAsset: uploadedAsset });
 
@@ -361,6 +363,7 @@ describe('reference recipe handoff', () => {
       referenceImageAssetId: generatedAsset.assetId,
       uploadedReferenceImageAssetId: uploadedAsset.assetId,
       finalReferenceKind: 'generated' as const,
+      selectedWardrobeVariantId: null,
       notes: '',
       tags: [],
       createdAt: '2026-07-21T12:00:00.000Z',
@@ -369,10 +372,11 @@ describe('reference recipe handoff', () => {
       useCount: 0,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [character],
+      savedCharacterVariants: [],
     };
     const harness = renderHandoff({ store, referenceAsset: generatedAsset });
 
@@ -410,6 +414,7 @@ describe('reference recipe handoff', () => {
       referenceImageAssetId: generatedAsset.assetId,
       uploadedReferenceImageAssetId: null,
       finalReferenceKind: 'generated' as const,
+      selectedWardrobeVariantId: null,
       notes: '',
       tags: [],
       createdAt: '2026-07-21T12:00:00.000Z',
@@ -418,10 +423,11 @@ describe('reference recipe handoff', () => {
       useCount: 0,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [character],
+      savedCharacterVariants: [],
     };
     const harness = renderHandoff({
       store,
@@ -464,6 +470,7 @@ describe('reference recipe handoff', () => {
       referenceImageAssetId: generatedAsset.assetId,
       uploadedReferenceImageAssetId: null,
       finalReferenceKind: 'generated' as const,
+      selectedWardrobeVariantId: null,
       notes: '',
       tags: [],
       createdAt: '2026-07-21T12:00:00.000Z',
@@ -472,10 +479,11 @@ describe('reference recipe handoff', () => {
       useCount: 0,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [character],
+      savedCharacterVariants: [],
     };
     const harness = renderHandoff({ store, referenceAsset: generatedAsset });
 
@@ -506,7 +514,7 @@ describe('reference recipe handoff', () => {
 
   it('retains a deleted image-only character name when reusing its standalone Recent recipe', async () => {
     const store: CreativeAssetStore = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       savedPrompts: [],
       recentPrompts: [
         {
@@ -521,6 +529,7 @@ describe('reference recipe handoff', () => {
         },
       ],
       savedCharacterPrompts: [],
+      savedCharacterVariants: [],
     };
     const harness = renderHandoff({ store, referenceAsset: uploadedAsset });
 
@@ -554,10 +563,11 @@ describe('reference recipe handoff', () => {
 
   it('retains the exact failed selection for owner-scoped retry and commits only once', async () => {
     const store: CreativeAssetStore = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       savedPrompts: [savedPrompt],
       recentPrompts: [],
       savedCharacterPrompts: [],
+      savedCharacterVariants: [],
     };
     fetchReferenceImageMetadata
       .mockRejectedValueOnce(new ApiClientError('missing', 404, 'not_found'))
@@ -611,10 +621,11 @@ describe('reference recipe handoff', () => {
         }),
     );
     const store: CreativeAssetStore = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       savedPrompts: [savedPrompt],
       recentPrompts: [],
       savedCharacterPrompts: [],
+      savedCharacterVariants: [],
     };
     const harness = renderHandoff({ store, referenceAsset: uploadedAsset });
     const selection = {
@@ -645,10 +656,11 @@ describe('reference recipe handoff', () => {
       return new Promise<UploadedReferenceImageAsset>(() => undefined);
     });
     const store: CreativeAssetStore = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       savedPrompts: [savedPrompt],
       recentPrompts: [],
       savedCharacterPrompts: [],
+      savedCharacterVariants: [],
     };
     const harness = renderHandoff({ store, referenceAsset: uploadedAsset });
 
@@ -677,10 +689,11 @@ describe('reference recipe handoff', () => {
       referenceImageAssetId: uploadedAsset.assetId,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       savedPrompts: [exactSavedPrompt],
       recentPrompts: [],
       savedCharacterPrompts: [],
+      savedCharacterVariants: [],
     };
     const harness = renderHandoff({
       store,
@@ -734,6 +747,7 @@ describe('reference recipe handoff', () => {
       referenceImageAssetId: null,
       uploadedReferenceImageAssetId: null,
       finalReferenceKind: null,
+      selectedWardrobeVariantId: null,
       notes: '',
       tags: [],
       createdAt: '2026-07-21T12:00:00.000Z',
@@ -742,10 +756,11 @@ describe('reference recipe handoff', () => {
       useCount: 0,
     };
     const store: CreativeAssetStore = {
-      schemaVersion: 5,
+      schemaVersion: 6,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [character],
+      savedCharacterVariants: [],
     };
     const harness = renderHandoff({ store, referenceAsset: uploadedAsset });
 
@@ -805,10 +820,11 @@ describe('reference recipe handoff', () => {
     };
     const harness = renderHandoff({
       store: {
-        schemaVersion: 5,
+        schemaVersion: 6,
         savedPrompts: [outfit],
         recentPrompts: [],
         savedCharacterPrompts: [],
+        savedCharacterVariants: [],
       },
       referenceAsset: uploadedAsset,
     });
@@ -851,10 +867,11 @@ describe('reference recipe handoff', () => {
   it('preserves Character Builder blocking precedence across Shelf and hydration state', () => {
     const externalBlock = renderHandoff({
       store: {
-        schemaVersion: 5,
+        schemaVersion: 6,
         savedPrompts: [],
         recentPrompts: [],
         savedCharacterPrompts: [],
+        savedCharacterVariants: [],
       },
       referenceAsset: uploadedAsset,
       characterBuilderOpenBlockedReason: 'Finish the current take first.',
@@ -866,10 +883,11 @@ describe('reference recipe handoff', () => {
 
     const shelfBlock = renderHandoff({
       store: {
-        schemaVersion: 5,
+        schemaVersion: 6,
         savedPrompts: [],
         recentPrompts: [],
         savedCharacterPrompts: [],
+        savedCharacterVariants: [],
       },
       referenceAsset: uploadedAsset,
     });
@@ -882,10 +900,11 @@ describe('reference recipe handoff', () => {
 
     const sessionBlock = renderHandoff({
       store: {
-        schemaVersion: 5,
+        schemaVersion: 6,
         savedPrompts: [],
         recentPrompts: [],
         savedCharacterPrompts: [],
+        savedCharacterVariants: [],
       },
       referenceAsset: uploadedAsset,
       canReplaceRecipeDraft: false,
@@ -899,7 +918,7 @@ describe('reference recipe handoff', () => {
     );
     const pendingBlock = renderHandoff({
       store: {
-        schemaVersion: 5,
+        schemaVersion: 6,
         savedPrompts: [
           {
             ...savedPrompt,
@@ -908,6 +927,7 @@ describe('reference recipe handoff', () => {
         ],
         recentPrompts: [],
         savedCharacterPrompts: [],
+        savedCharacterVariants: [],
       },
       referenceAsset: uploadedAsset,
     });

@@ -16,6 +16,7 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   port: 4100,
   existingVideoCharacterSwapProvider: 'decart',
   prunaVideoReplaceEnabled: false,
+  prunaImageTryOnEnabled: false,
   elevenLabsModelId: 'eleven_multilingual_sts_v2',
   elevenLabsEnableLogging: false,
   providerTimeoutMs: 1_000,

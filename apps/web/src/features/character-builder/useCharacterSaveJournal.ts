@@ -162,7 +162,11 @@ export const useCharacterSaveJournal = ({
             !imageOnly && current.preview && !current.preview.stale ? current.preview.asset : null;
           const uploadedReference = current.uploadedReference?.asset ?? null;
           const finalReference = attachPreview ?? uploadedReference;
-          const finalReferenceKind = finalReference?.source ?? null;
+          const finalReferenceKind = finalReference
+            ? finalReference.source === 'uploaded'
+              ? 'uploaded'
+              : 'generated'
+            : null;
           const preserveLegacyPrompt =
             target.kind === 'edit' &&
             !current.revision &&

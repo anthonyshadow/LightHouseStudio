@@ -3,21 +3,26 @@ import { createPromptBuilderDraft } from '../prompts';
 import {
   CREATIVE_ASSET_SCHEMA_VERSION,
   EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
+  LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   RECENT_PROMPT_LIMIT,
+  SAVED_CHARACTER_VARIANT_LIMIT,
   SAVED_PROMPT_LIMIT,
   createEmptyCreativeAssetStore,
   createSavedCharacterPrompt,
+  createSavedCharacterVariant,
   createSavedPrompt,
   deleteSavedCharacterPrompt,
   deleteSavedPrompt,
   enrichNewestMatchingRecentWithReferenceImage,
   parseCreativeAssetStore,
   recordSuccessfulPromptUse,
+  resolveCharacterVersion,
   sanitizeCreativeAssetStore,
   sanitizeGuidedDesignV1,
   searchCreativeAssets,
+  selectCharacterVersion,
   updateSavedPrompt,
   updateSavedCharacterPrompt,
   useSavedCharacterPrompt,
@@ -535,6 +540,142 @@ describe('creative asset CRUD and use', () => {
     expect(store.recentPrompts[0]).not.toHaveProperty('savedCharacterPromptId');
   });
 
+  it('normalizes wardrobe variants, resolves exact images, and persists selection only on exact use', () => {
+    let store = createSavedCharacterPrompt(
+      createEmptyCreativeAssetStore(),
+      {
+        name: 'Field host',
+        prompt: 'Replace the subject with a field host.',
+        source: 'generator',
+        promptIntent: 'character-transform',
+        referenceImageStatus: 'persisted-reference',
+        referenceImageAssetId: 'host-original',
+      },
+      context('host'),
+    );
+    store = createSavedCharacterVariant(
+      store,
+      {
+        parentCharacterId: 'host',
+        title: '  Evening   look ',
+        referenceImageAssetId: 'host-evening',
+        creation: {
+          method: 'add-outfit',
+          sourceReferenceImageAssetId: 'host-original',
+          garmentReferenceImageAssetId: 'garment-one',
+        },
+      },
+      context('variant-one', 1),
+    );
+    store = createSavedCharacterVariant(
+      store,
+      {
+        parentCharacterId: 'host',
+        title: 'Evening look',
+        referenceImageAssetId: 'host-features',
+        creation: {
+          method: 'change-features',
+          sourceReferenceImageAssetId: 'host-evening',
+          changeInstructions: '  Add   silver-rimmed glasses. ',
+        },
+      },
+      context('variant-two', 2),
+    );
+
+    expect(store.savedCharacterVariants).toHaveLength(2);
+    expect(store.savedCharacterVariants[0]).toMatchObject({ title: 'Evening look' });
+    expect(
+      store.savedCharacterVariants.find((item) => item.id === 'variant-two')?.creation,
+    ).toMatchObject({
+      method: 'change-features',
+      changeInstructions: 'Add   silver-rimmed glasses.',
+    });
+    expect(
+      resolveCharacterVersion(store, { characterId: 'host', variantId: 'variant-two' }),
+    ).toMatchObject({
+      displayLabel: 'Field host · Evening look',
+      referenceImageAssetId: 'host-features',
+    });
+
+    store = recordSuccessfulPromptUse(
+      store,
+      {
+        prompt: 'Replace the subject with a field host.',
+        modelModeId: 'lucy-latest',
+        savedCharacterPromptId: 'host',
+        savedCharacterVariantId: 'variant-two',
+        referenceImageAssetId: 'host-features',
+      },
+      context('recent-variant', 3),
+    );
+    expect(store.savedCharacterPrompts[0]).toMatchObject({
+      selectedWardrobeVariantId: 'variant-two',
+      useCount: 1,
+    });
+    expect(store.savedCharacterVariants.find((item) => item.id === 'variant-two')).toMatchObject({
+      useCount: 1,
+      lastUsedAt: timestamp(3),
+    });
+    expect(store.recentPrompts[0]).toMatchObject({
+      savedCharacterPromptId: 'host',
+      savedCharacterVariantId: 'variant-two',
+      referenceImageAssetId: 'host-features',
+    });
+
+    store = selectCharacterVersion(store, 'host', null, timestamp(4));
+    expect(store.savedCharacterPrompts[0]?.selectedWardrobeVariantId).toBeNull();
+    store = deleteSavedCharacterPrompt(store, 'host');
+    expect(store.savedCharacterVariants).toEqual([]);
+    expect(store.recentPrompts[0]).not.toHaveProperty('savedCharacterPromptId');
+    expect(store.recentPrompts[0]).not.toHaveProperty('savedCharacterVariantId');
+  });
+
+  it('caps wardrobe metadata and clears a selected version when that record is evicted', () => {
+    let store = createSavedCharacterPrompt(
+      createEmptyCreativeAssetStore(),
+      {
+        name: 'Bounded host',
+        prompt: 'Replace the subject with a host.',
+        source: 'generator',
+        promptIntent: 'character-transform',
+        referenceImageStatus: 'persisted-reference',
+        referenceImageAssetId: 'bounded-original',
+      },
+      context('bounded-host'),
+    );
+
+    for (let index = 0; index <= SAVED_CHARACTER_VARIANT_LIMIT; index += 1) {
+      store = createSavedCharacterVariant(
+        store,
+        {
+          parentCharacterId: 'bounded-host',
+          title: `Variant ${index}`,
+          referenceImageAssetId: `bounded-result-${index}`,
+          creation: {
+            method: 'add-outfit',
+            sourceReferenceImageAssetId: 'bounded-original',
+            garmentReferenceImageAssetId: `bounded-garment-${index}`,
+          },
+        },
+        context(`bounded-variant-${index}`, index),
+      );
+      if (index === 0) {
+        store = selectCharacterVersion(
+          store,
+          'bounded-host',
+          'bounded-variant-0',
+          timestamp(index),
+        );
+      }
+    }
+
+    expect(store.savedCharacterVariants).toHaveLength(SAVED_CHARACTER_VARIANT_LIMIT);
+    expect(store.savedCharacterVariants).not.toContainEqual(
+      expect.objectContaining({ id: 'bounded-variant-0' }),
+    );
+    expect(store.savedCharacterPrompts[0]?.selectedWardrobeVariantId).toBeNull();
+  });
+
   it('rejects empty character prompts without a consistent uploaded final reference', () => {
     expect(() =>
       createSavedCharacterPrompt(
@@ -731,7 +872,7 @@ describe('creative asset sanitation and recovery', () => {
 
   it('migrates v2 records, preserving references while defaulting new draft fields and provenance', () => {
     const result = sanitizeCreativeAssetStore({
-      schemaVersion: EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
+      schemaVersion: LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [
@@ -788,7 +929,7 @@ describe('creative asset sanitation and recovery', () => {
 
   it('migrates v3 image-backed characters as generated references', () => {
     const result = sanitizeCreativeAssetStore({
-      schemaVersion: OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
+      schemaVersion: EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [
@@ -830,7 +971,7 @@ describe('creative asset sanitation and recovery', () => {
       useCount: 0,
     } as const;
     const result = sanitizeCreativeAssetStore({
-      schemaVersion: PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+      schemaVersion: OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
       savedPrompts: [
         {
           ...base,
@@ -878,6 +1019,95 @@ describe('creative asset sanitation and recovery', () => {
       vtonInputKind: 'saved-outfit',
       enhancePrompt: false,
     });
+  });
+
+  it('migrates v5 characters to an empty wardrobe with the original selected', () => {
+    const result = sanitizeCreativeAssetStore({
+      schemaVersion: PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+      savedPrompts: [],
+      recentPrompts: [],
+      savedCharacterPrompts: [
+        {
+          id: 'v5-character',
+          name: 'V5 presenter',
+          prompt: 'Replace the subject with a presenter.',
+          source: 'generator',
+          promptIntent: 'character-transform',
+          builderDraft: null,
+          guidedDesign: null,
+          referenceImageStatus: 'persisted-reference',
+          referenceImageAssetId: 'reference-v5',
+          uploadedReferenceImageAssetId: null,
+          finalReferenceKind: 'generated',
+          notes: '',
+          tags: [],
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+          lastUsedAt: null,
+          useCount: 0,
+        },
+      ],
+      savedCharacterVariants: [{ id: 'untrusted-v5-variant', parentCharacterId: 'v5-character' }],
+    });
+
+    expect(result.recovered).toBe(true);
+    expect(result.store.savedCharacterVariants).toEqual([]);
+    expect(result.store.savedCharacterPrompts[0]?.selectedWardrobeVariantId).toBeNull();
+  });
+
+  it('drops cross-parent variants and repairs dangling persisted selections', () => {
+    const character = {
+      id: 'parent-a',
+      name: 'Parent A',
+      prompt: 'Replace with parent A.',
+      source: 'generator',
+      promptIntent: 'character-transform',
+      builderDraft: null,
+      guidedDesign: null,
+      referenceImageStatus: 'persisted-reference',
+      referenceImageAssetId: 'original-a',
+      uploadedReferenceImageAssetId: null,
+      finalReferenceKind: 'generated',
+      selectedWardrobeVariantId: 'variant-b',
+      notes: '',
+      tags: [],
+      createdAt: timestamp(),
+      updatedAt: timestamp(),
+      lastUsedAt: null,
+      useCount: 0,
+    } as const;
+    const result = sanitizeCreativeAssetStore({
+      schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+      savedPrompts: [],
+      recentPrompts: [],
+      savedCharacterPrompts: [character, { ...character, id: 'parent-b', name: 'Parent B' }],
+      savedCharacterVariants: [
+        {
+          id: 'variant-b',
+          parentCharacterId: 'parent-b',
+          title: 'Look',
+          referenceImageAssetId: 'variant-image',
+          creation: {
+            method: 'change-features',
+            sourceReferenceImageAssetId: 'original-a',
+            changeInstructions: 'Change hair color.',
+          },
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+          lastUsedAt: null,
+          useCount: 0,
+        },
+      ],
+    });
+
+    expect(
+      result.store.savedCharacterPrompts.find((item) => item.id === 'parent-a')
+        ?.selectedWardrobeVariantId,
+    ).toBeNull();
+    expect(
+      result.store.savedCharacterPrompts.find((item) => item.id === 'parent-b')
+        ?.selectedWardrobeVariantId,
+    ).toBe('variant-b');
   });
 
   it('sanitizes valid image-only recents and removes broken character links without losing the recipe', () => {

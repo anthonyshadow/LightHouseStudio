@@ -8,6 +8,9 @@ import {
   editReferenceImageResponseSchema,
   optimizeCharacterReferencePromptRequestSchema,
   optimizeCharacterReferencePromptResponseSchema,
+  outfitTryOnParamsSchema,
+  outfitTryOnRequestSchema,
+  outfitTryOnResponseSchema,
   referenceImageAssetParamsSchema,
   referenceImageMetadataResponseSchema,
   REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
@@ -23,6 +26,7 @@ import {
   localOwnerIdForRequest,
   requireTrustedOrigin,
   requireVideoProviderIntent,
+  requireWardrobeProviderIntent,
 } from '../../http/security.js';
 import { withRequestLifetime } from '../../http/streaming.js';
 import { SafeRemoteImageDownloader } from '../../providers/transport/safe-remote-image-downloader.js';
@@ -32,6 +36,7 @@ import {
   type ValidReferenceImageMimeType,
 } from './image-validation.js';
 import type { ReferenceImageService } from './reference-image-service.js';
+import type { OutfitTryOnService } from './outfit-try-on-service.js';
 
 export interface RemoteReferenceImageDownloader {
   download: (
@@ -51,6 +56,12 @@ const verifyRemoteImportIntent = (request: FastifyRequest): Promise<void> => {
     request,
     'Remote reference import requires explicit local Studio intent.',
   );
+  return Promise.resolve();
+};
+
+const verifyWardrobeProviderIntent = (request: FastifyRequest): Promise<void> => {
+  requireTrustedOrigin(request);
+  requireWardrobeProviderIntent(request);
   return Promise.resolve();
 };
 
@@ -94,7 +105,10 @@ const requireUploadMimeType = (headers: FastifyRequest['headers']) => {
 export const registerReferenceImageRoutes = (
   app: FastifyInstance,
   service: ReferenceImageService,
-  options: { readonly remoteImageDownloader?: RemoteReferenceImageDownloader } = {},
+  options: {
+    readonly remoteImageDownloader?: RemoteReferenceImageDownloader;
+    readonly outfitTryOnService?: OutfitTryOnService;
+  } = {},
 ): void => {
   const remoteImageDownloader =
     options.remoteImageDownloader ??
@@ -111,6 +125,41 @@ export const registerReferenceImageRoutes = (
           'The public HTTPS image could not be imported safely.',
         ),
     });
+
+  app.post(
+    '/api/reference-images/:sourceAssetId/outfit-try-ons',
+    { bodyLimit: 16 * 1_024, onRequest: verifyWardrobeProviderIntent },
+    async (request, reply) => {
+      const params = outfitTryOnParamsSchema.safeParse(request.params);
+      const body = outfitTryOnRequestSchema.safeParse(request.body);
+      if (!params.success || !body.success) {
+        throw new AppError(
+          400,
+          'validation_error',
+          'Choose valid character and garment reference images and start a new request.',
+        );
+      }
+      const tryOnService = options.outfitTryOnService;
+      if (!tryOnService?.available) {
+        throw new AppError(
+          503,
+          'feature_unavailable',
+          'Add Outfit is unavailable until its server configuration is complete.',
+        );
+      }
+      return withRequestLifetime(request, reply, async (signal) =>
+        outfitTryOnResponseSchema.parse({
+          asset: await tryOnService.tryOn({
+            localOwnerId: localOwnerIdForRequest(request),
+            sourceAssetId: params.data.sourceAssetId,
+            garmentAssetId: body.data.garmentAssetId,
+            requestId: body.data.requestId,
+            signal,
+          }),
+        }),
+      );
+    },
+  );
 
   app.post(
     '/api/reference-images/import',

@@ -2,6 +2,7 @@ import type { CharacterPromptOptimizationResult, ReferenceImageSize } from '@stu
 import { decodeCanonicalBase64 } from '../../application/strict-base64.js';
 
 export type ReferenceImageProviderId = 'openai' | 'bfl' | 'wiro';
+export type ReferenceImageProviderErrorId = ReferenceImageProviderId | 'pruna';
 export type ReferenceImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
 export type ReferenceImageProviderStage = 'submission' | 'polling' | 'download';
 
@@ -65,7 +66,7 @@ export type ReferenceImageProviderFailureReason =
 
 export class ReferenceImageProviderError extends Error {
   readonly reason: ReferenceImageProviderFailureReason;
-  readonly providerId: ReferenceImageProviderId;
+  readonly providerId: ReferenceImageProviderErrorId;
   readonly upstreamStatus?: number;
   readonly providerRequestId?: string;
   readonly providerStage?: ReferenceImageProviderStage;
@@ -73,7 +74,7 @@ export class ReferenceImageProviderError extends Error {
   constructor(
     reason: ReferenceImageProviderFailureReason,
     options?: {
-      readonly providerId?: ReferenceImageProviderId;
+      readonly providerId?: ReferenceImageProviderErrorId;
       readonly upstreamStatus?: number;
       readonly providerRequestId?: string;
       readonly providerStage?: ReferenceImageProviderStage;

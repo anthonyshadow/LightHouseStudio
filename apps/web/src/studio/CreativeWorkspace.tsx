@@ -156,6 +156,7 @@ export type CreativeWorkspaceActions = {
   onUseRecipe: (selection: RecipeSelection) => void;
   onCreateCharacter?: (() => void) | undefined;
   onEditCharacter?: ((asset: SavedCharacterPrompt) => void) | undefined;
+  onOpenWardrobe?: ((asset: SavedCharacterPrompt) => void) | undefined;
   onCreateOutfit: () => void;
   onEditOutfit: (asset: SavedPrompt) => void;
   onSaveOutfitCopy: (asset: SavedPrompt | RecentPrompt) => void;
@@ -203,6 +204,7 @@ export type CreativePanelContentProps = Pick<
   | 'onUseRecipe'
   | 'onCreateCharacter'
   | 'onEditCharacter'
+  | 'onOpenWardrobe'
   | 'onOpenSavedWorkshop'
   | 'onOpenLegacyProjects'
 > & {
@@ -231,6 +233,7 @@ export const CreativePanelContent = ({
   onUseRecipe,
   onCreateCharacter,
   onEditCharacter,
+  onOpenWardrobe,
   onOpenSavedWorkshop,
   onOpenLegacyProjects,
   shelfController,
@@ -295,6 +298,7 @@ export const CreativePanelContent = ({
               onUsePrompt={onUseRecipe}
               {...(onCreateCharacter ? { onCreateCharacter } : {})}
               {...(onEditCharacter ? { onEditCharacter } : {})}
+              {...(onOpenWardrobe ? { onOpenWardrobe } : {})}
               onOpenCharacterWorkshop={onOpenSavedWorkshop}
             />
           </Suspense>
@@ -369,6 +373,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     onUseRecipe,
     onCreateCharacter,
     onEditCharacter,
+    onOpenWardrobe,
     onCreateOutfit,
     onEditOutfit,
     onSaveOutfitCopy,
@@ -397,6 +402,7 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     onUsePrompt: onUseRecipe,
     ...(onCreateCharacter ? { onCreateCharacter } : {}),
     ...(onEditCharacter ? { onEditCharacter } : {}),
+    ...(onOpenWardrobe ? { onOpenWardrobe } : {}),
     onCreateOutfit,
     onEditOutfit,
     onSaveOutfitCopy,

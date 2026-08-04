@@ -1,14 +1,16 @@
 import type { PromptBuilderDraft, PromptIntent } from '../prompts';
 import type { ModelModeId } from '../session';
 
-export const CREATIVE_ASSET_SCHEMA_VERSION = 5 as const;
-export const PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION = 4 as const;
-export const OLDER_CREATIVE_ASSET_SCHEMA_VERSION = 3 as const;
-export const EARLIER_CREATIVE_ASSET_SCHEMA_VERSION = 2 as const;
-export const LEGACY_CREATIVE_ASSET_SCHEMA_VERSION = 1 as const;
+export const CREATIVE_ASSET_SCHEMA_VERSION = 6 as const;
+export const PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION = 5 as const;
+export const OLDER_CREATIVE_ASSET_SCHEMA_VERSION = 4 as const;
+export const EARLIER_CREATIVE_ASSET_SCHEMA_VERSION = 3 as const;
+export const LEGACY_CREATIVE_ASSET_SCHEMA_VERSION = 2 as const;
+export const ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION = 1 as const;
 export const SAVED_PROMPT_LIMIT = 100;
 export const RECENT_PROMPT_LIMIT = 30;
 export const SAVED_CHARACTER_PROMPT_LIMIT = 50;
+export const SAVED_CHARACTER_VARIANT_LIMIT = 500;
 
 export type SavedPromptSource = 'manual' | 'generated';
 export type VtonInputKind = 'prompt' | 'saved-outfit';
@@ -75,6 +77,7 @@ export interface RecentPrompt {
   readonly modelModeId: ModelModeId;
   readonly savedPromptId?: string;
   readonly savedCharacterPromptId?: string;
+  readonly savedCharacterVariantId?: string;
   readonly characterName?: string;
   readonly referenceImageAssetId: string | null;
   readonly vtonInputKind: VtonInputKind | null;
@@ -97,6 +100,8 @@ export interface SavedCharacterPrompt {
   readonly referenceImageAssetId: string | null;
   readonly uploadedReferenceImageAssetId: string | null;
   readonly finalReferenceKind: 'uploaded' | 'generated' | null;
+  /** Null selects the original; otherwise this is a validated child wardrobe variant. */
+  readonly selectedWardrobeVariantId: string | null;
   readonly notes: string;
   readonly tags: readonly string[];
   readonly createdAt: string;
@@ -105,11 +110,51 @@ export interface SavedCharacterPrompt {
   readonly useCount: number;
 }
 
+export type SavedCharacterVariantCreation =
+  | {
+      readonly method: 'add-outfit';
+      readonly sourceReferenceImageAssetId: string;
+      readonly garmentReferenceImageAssetId: string;
+    }
+  | {
+      readonly method: 'change-features';
+      readonly sourceReferenceImageAssetId: string;
+      readonly changeInstructions: string;
+    };
+
+export interface SavedCharacterVariant {
+  readonly id: string;
+  readonly parentCharacterId: string;
+  readonly title: string;
+  readonly referenceImageAssetId: string;
+  readonly creation: SavedCharacterVariantCreation;
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly lastUsedAt: string | null;
+  readonly useCount: number;
+}
+
+export interface CharacterVersionSelection {
+  readonly characterId: string;
+  /** Null identifies the parent's original reference. */
+  readonly variantId: string | null;
+}
+
+export interface ResolvedCharacterVersion {
+  readonly selection: CharacterVersionSelection;
+  readonly character: SavedCharacterPrompt;
+  readonly variant: SavedCharacterVariant | null;
+  readonly displayLabel: string;
+  readonly prompt: string;
+  readonly referenceImageAssetId: string | null;
+}
+
 export interface CreativeAssetStore {
   readonly schemaVersion: typeof CREATIVE_ASSET_SCHEMA_VERSION;
   readonly savedPrompts: readonly SavedPrompt[];
   readonly recentPrompts: readonly RecentPrompt[];
   readonly savedCharacterPrompts: readonly SavedCharacterPrompt[];
+  readonly savedCharacterVariants: readonly SavedCharacterVariant[];
 }
 
 export interface SavedPromptInput {
@@ -138,6 +183,13 @@ export interface SavedCharacterPromptInput {
   readonly tags?: readonly string[];
 }
 
+export interface SavedCharacterVariantInput {
+  readonly parentCharacterId: string;
+  readonly title: string;
+  readonly referenceImageAssetId: string;
+  readonly creation: SavedCharacterVariantCreation;
+}
+
 export interface AssetMutationContext {
   readonly now: string;
   readonly createId: () => string;
@@ -147,6 +199,7 @@ export interface CreativeAssetSearchResults {
   readonly savedPrompts: readonly SavedPrompt[];
   readonly recentPrompts: readonly RecentPrompt[];
   readonly savedCharacterPrompts: readonly SavedCharacterPrompt[];
+  readonly savedCharacterVariants: readonly SavedCharacterVariant[];
 }
 
 export interface SanitizeCreativeAssetResult {

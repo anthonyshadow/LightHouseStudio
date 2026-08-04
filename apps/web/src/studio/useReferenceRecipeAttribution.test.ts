@@ -34,10 +34,11 @@ const prompt: SavedPrompt = {
   useCount: 0,
 };
 const store: CreativeAssetStore = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   savedPrompts: [prompt],
   recentPrompts: [],
   savedCharacterPrompts: [],
+  savedCharacterVariants: [],
 };
 const asset: UploadedReferenceImageAsset = {
   assetId: prompt.referenceImageAssetId!,
@@ -142,5 +143,127 @@ describe('reference recipe attribution', () => {
         assetEnhancePrompt: false,
       },
     });
+  });
+
+  it('commits and persists an exact wardrobe version only after its image is hydrated', () => {
+    const character = {
+      id: 'character-one',
+      name: 'Field host',
+      prompt: 'Replace the subject with a field host.',
+      source: 'generator' as const,
+      promptIntent: 'character-transform' as const,
+      builderDraft: null,
+      guidedDesign: null,
+      referenceImageStatus: 'persisted-reference' as const,
+      referenceImageAssetId: 'original-image',
+      uploadedReferenceImageAssetId: null,
+      finalReferenceKind: 'generated' as const,
+      selectedWardrobeVariantId: null,
+      notes: '',
+      tags: [],
+      createdAt: '2026-07-21T12:00:00.000Z',
+      updatedAt: '2026-07-21T12:00:00.000Z',
+      lastUsedAt: null,
+      useCount: 0,
+    };
+    const variant = {
+      id: 'variant-one',
+      parentCharacterId: character.id,
+      title: 'Green coat',
+      referenceImageAssetId: 'variant-image',
+      creation: {
+        method: 'add-outfit' as const,
+        sourceReferenceImageAssetId: 'original-image',
+        garmentReferenceImageAssetId: 'garment-image',
+      },
+      createdAt: '2026-07-21T12:01:00.000Z',
+      updatedAt: '2026-07-21T12:01:00.000Z',
+      lastUsedAt: null,
+      useCount: 0,
+    };
+    const wardrobeStore: CreativeAssetStore = {
+      schemaVersion: 6,
+      savedPrompts: [],
+      recentPrompts: [],
+      savedCharacterPrompts: [character],
+      savedCharacterVariants: [variant],
+    };
+    const wardrobeAsset: UploadedReferenceImageAsset = {
+      ...asset,
+      assetId: variant.referenceImageAssetId,
+      contentUrl: `/api/reference-images/${variant.referenceImageAssetId}/content`,
+    };
+    const wardrobeReference: SessionReferenceImage = {
+      ...referenceImage,
+      assetId: variant.referenceImageAssetId,
+      contentUrl: wardrobeAsset.contentUrl,
+    };
+    const dispatchActiveRecipe = vi.fn();
+    const selectCharacterVersion = vi.fn();
+    const repository = {
+      getSnapshot: () => ({ store: wardrobeStore, health: 'ready', notice: null }),
+      enrichNewestMatchingRecent: vi.fn(),
+      recordSuccessfulPrompt: vi.fn(),
+      selectCharacterVersion,
+    } as unknown as CreativeAssetRepository;
+    const session = {
+      draft: { mode: 'lucy-latest', prompt: '', referenceImage: null, enhance: false },
+      canReplaceRecipeDraft: vi.fn(() => true),
+    } as unknown as StudioSessionController;
+    const { result } = renderHook(() =>
+      useReferenceRecipeAttribution({
+        repository,
+        session,
+        activeRecipe: null,
+        activeFingerprint: null,
+        activeCharacterName: undefined,
+        dispatchActiveRecipe,
+        characterBuilderOpenBlockedReason: undefined,
+        shelfDirty: false,
+        referenceUsePending: false,
+      }),
+    );
+    const pending = createPendingReferenceRecipeUse(
+      {
+        origin: 'character-prompt',
+        assetId: character.id,
+        savedCharacterVariantId: variant.id,
+        prompt: character.prompt,
+        modelModeId: 'lucy-latest',
+        referenceImageAssetId: variant.referenceImageAssetId,
+      },
+      wardrobeStore,
+    );
+
+    expect(selectCharacterVersion).not.toHaveBeenCalled();
+    act(() => {
+      result.current.commitHydratedRecipe({
+        pending,
+        referenceImage: wardrobeReference,
+        storedReferenceMetadata: wardrobeAsset,
+        appliedPrompt: character.prompt,
+        enhance: false,
+        referenceMatchesPendingPrompt: true,
+      });
+    });
+
+    expect(selectCharacterVersion).toHaveBeenCalledWith({
+      characterId: character.id,
+      variantId: variant.id,
+    });
+    expect(dispatchActiveRecipe).toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: 'commit',
+        recipe: { origin: 'character-prompt', assetId: character.id, variantId: variant.id },
+      }),
+    );
+    expect(dispatchActiveRecipe.mock.lastCall?.[0]).toHaveProperty(
+      'fingerprint.referenceImageAssetId',
+      variant.referenceImageAssetId,
+    );
+    expect(dispatchActiveRecipe.mock.lastCall?.[0]).toHaveProperty(
+      'fingerprint.assetReferenceImageAssetId',
+      variant.referenceImageAssetId,
+    );
   });
 });

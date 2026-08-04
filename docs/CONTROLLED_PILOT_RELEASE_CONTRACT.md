@@ -33,9 +33,9 @@ automated, physical-device, accessibility, memory, cleanup, and live-provider ev
 The exact executable matrix is
 [`qualification/required-matrix.json`](qualification/required-matrix.json):
 
-- `11` provider/local requirements: no-key Local; realtime Decart Character and VTO; Decart batch
+- `12` provider/local requirements: no-key Local; realtime Decart Character and VTO; Decart batch
   `lucy-latest`; Decart batch `lucy-vton-latest`; Pruna Character Swap at 720p and 1080p;
-  ElevenLabs; OpenAI; BFL; and operator-only Wiro.
+  Pruna Character Wardrobe; ElevenLabs; OpenAI; BFL; and operator-only Wiro.
 - `45` physical device/browser rows across one desktop, Apple/Android phones, and
   Apple/Android tablets.
 
@@ -151,6 +151,7 @@ initial billable submission.
 | Decart batch VTO      | Exact `lucy-vton-latest`; asynchronous submit/status/content; fixed 720p; no automatic initial retry                | Rights, consent, and limitations before each submission                                                      |
 | Pruna Character 720p  | Exact `p-video-replace`; one reference; MP4 driver; `save_audio=true`; no webhook/fallback; $0.03/s published price | Separate pricing, entitlement, dimensions, retention, and recovery qualification                             |
 | Pruna Character 1080p | Exact `p-video-replace`; one reference; MP4 driver; `save_audio=true`; no webhook/fallback; $0.06/s published price | Separate pricing, entitlement, dimensions, retention, and recovery qualification; no quantified timing claim |
+| Pruna Wardrobe        | Exact `p-image-try-on`; one person and one garment; turbo off; JPEG 95; preserve input size; no retry/fallback      | Explicit Generate/Regenerate only; separate entitlement, pricing, retention, and output qualification        |
 | OpenAI optimizer      | `gpt-5.6`, `medium`, version `lucy-character-reference-v1`, 120-second timeout, response storage disabled           | Explicit optimize/generate path only                                                                         |
 | OpenAI image          | `gpt-image-2`, `high`, one result, 150-second timeout, zero SDK retries                                             | Explicit image action only                                                                                   |
 | BFL image             | `flux-2-pro`, safety tolerance `2`, prompt upsampling disabled, one 150-second deadline                             | Separate live qualification                                                                                  |

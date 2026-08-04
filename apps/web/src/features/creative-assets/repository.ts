@@ -2,6 +2,7 @@ import {
   ASSET_NAME_MAX_LENGTH,
   AssetRuleError,
   createSavedCharacterPrompt as createDomainCharacterPrompt,
+  createSavedCharacterVariant as createDomainCharacterVariant,
   createEmptyCreativeAssetStore,
   createSavedPrompt as createDomainSavedPrompt,
   deleteSavedCharacterPrompt as deleteDomainCharacterPrompt,
@@ -10,6 +11,7 @@ import {
   parseCreativeAssetStore,
   normalizeWhitespace,
   recordSuccessfulPromptUse,
+  selectCharacterVersion as selectDomainCharacterVersion,
   sanitizeCreativeAssetStore,
   searchCreativeAssets,
   updateSavedCharacterPrompt as updateDomainCharacterPrompt,
@@ -25,15 +27,19 @@ import {
   LEGACY_CREATIVE_ASSET_STORAGE_KEY,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   OLDER_CREATIVE_ASSET_STORAGE_KEY,
+  ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION,
+  ORIGINAL_CREATIVE_ASSET_STORAGE_KEY,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
   type CreateSavedCharacterPromptInput,
+  type CreateSavedCharacterVariantInput,
   type CreateSavedPromptInput,
   type CreativeAssetRepository,
   type CreativeAssetRepositoryState,
   type PersistSavedCharacterPromptInput,
   type RecordSuccessfulPromptInput,
   type SavedCharacterPrompt,
+  type SavedCharacterVariant,
   type SavedPrompt,
   type StorageLike,
   type UpdateSavedCharacterPromptInput,
@@ -123,6 +129,7 @@ const isSupportedLegacyPayload = (serialized: string): boolean => {
       value !== null &&
       'schemaVersion' in value &&
       (value.schemaVersion === LEGACY_CREATIVE_ASSET_SCHEMA_VERSION ||
+        value.schemaVersion === ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION ||
         value.schemaVersion === EARLIER_CREATIVE_ASSET_SCHEMA_VERSION ||
         value.schemaVersion === OLDER_CREATIVE_ASSET_SCHEMA_VERSION ||
         value.schemaVersion === PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION)
@@ -212,6 +219,7 @@ export const createCreativeAssetRepository = (
             OLDER_CREATIVE_ASSET_STORAGE_KEY,
             EARLIER_CREATIVE_ASSET_STORAGE_KEY,
             LEGACY_CREATIVE_ASSET_STORAGE_KEY,
+            ORIGINAL_CREATIVE_ASSET_STORAGE_KEY,
           ]
         : []
       : options.legacyStorageKey === null
@@ -279,6 +287,7 @@ export const createCreativeAssetRepository = (
       ...state.store.savedPrompts.map((item) => item.id),
       ...state.store.recentPrompts.map((item) => item.id),
       ...state.store.savedCharacterPrompts.map((item) => item.id),
+      ...state.store.savedCharacterVariants.map((item) => item.id),
     ]);
     const candidate = idFactory().replace(/\s+/gu, '-').slice(0, 128) || defaultIdFactory();
     if (!existing.has(candidate)) return candidate;
@@ -303,6 +312,17 @@ export const createCreativeAssetRepository = (
         'not-found',
         'The character prompt could not be read after saving.',
       );
+    return item;
+  };
+
+  const createdCharacterVariant = (store: CreativeAssetStore, id: string) => {
+    const item = store.savedCharacterVariants.find((candidate) => candidate.id === id);
+    if (!item) {
+      throw new CreativeAssetError(
+        'not-found',
+        'The wardrobe variant could not be read after saving.',
+      );
+    }
     return item;
   };
 
@@ -436,7 +456,8 @@ export const createCreativeAssetRepository = (
     const candidate = candidateForDurableCharacter(input, createdAt);
     if (
       state.store.savedPrompts.some((item) => item.id === input.id) ||
-      state.store.recentPrompts.some((item) => item.id === input.id)
+      state.store.recentPrompts.some((item) => item.id === input.id) ||
+      state.store.savedCharacterVariants.some((item) => item.id === input.id)
     ) {
       throw new CreativeAssetError(
         'id-conflict',
@@ -514,6 +535,39 @@ export const createCreativeAssetRepository = (
     commit(deleteDomainCharacterPrompt(state.store, id));
   };
 
+  const createSavedCharacterVariant = (
+    input: CreateSavedCharacterVariantInput,
+  ): SavedCharacterVariant => {
+    const context = mutationContext();
+    const id = context.createId();
+    try {
+      const next = createDomainCharacterVariant(state.store, input, {
+        ...context,
+        createId: () => id,
+      });
+      const item = createdCharacterVariant(next, id);
+      commit(next);
+      return item;
+    } catch (error) {
+      return mapDomainError(error);
+    }
+  };
+
+  const selectCharacterVersion: CreativeAssetRepository['selectCharacterVersion'] = (selection) => {
+    try {
+      commit(
+        selectDomainCharacterVersion(
+          state.store,
+          selection.characterId,
+          selection.variantId,
+          timestamp(),
+        ),
+      );
+    } catch (error) {
+      mapDomainError(error);
+    }
+  };
+
   const recordSuccessfulPrompt = (input: RecordSuccessfulPromptInput) => {
     const context = mutationContext();
     const next = recordSuccessfulPromptUse(
@@ -524,6 +578,9 @@ export const createCreativeAssetRepository = (
         ...(input.savedPromptId ? { savedPromptId: input.savedPromptId } : {}),
         ...(input.savedCharacterPromptId
           ? { savedCharacterPromptId: input.savedCharacterPromptId }
+          : {}),
+        ...(input.savedCharacterVariantId
+          ? { savedCharacterVariantId: input.savedCharacterVariantId }
           : {}),
         ...(input.characterName ? { characterName: input.characterName } : {}),
         referenceImageAssetId: input.referenceImageAssetId ?? null,
@@ -567,6 +624,8 @@ export const createCreativeAssetRepository = (
     updateSavedCharacterPrompt,
     renameSavedCharacterPrompt: (id, name) => updateSavedCharacterPrompt(id, { name }),
     deleteSavedCharacterPrompt,
+    createSavedCharacterVariant,
+    selectCharacterVersion,
     recordSuccessfulPrompt,
     enrichNewestMatchingRecent,
     search: (query, modelModeId) => searchCreativeAssets(state.store, query, modelModeId),

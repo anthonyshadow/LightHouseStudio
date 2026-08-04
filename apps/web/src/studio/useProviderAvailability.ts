@@ -33,6 +33,7 @@ const unavailableProviders: ProviderAvailability = {
   referenceImageOptimizerAvailable: false,
   referenceImageOptimizerModel: null,
   referenceImageOptimizerVersion: null,
+  wardrobeAddOutfitAvailable: false,
 };
 
 /**

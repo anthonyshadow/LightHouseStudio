@@ -58,8 +58,29 @@ describe('API shell', () => {
           version: 'lucy-character-reference-v1',
         },
       },
+      wardrobe: { addOutfitAvailable: false },
     });
     expect(capabilities.body).not.toContain('apiKey');
+  });
+
+  it('reports Add Outfit only when its server-selected adapter is enabled', async () => {
+    const app = createApp({
+      config: testConfig({
+        prunaImageTryOnEnabled: true,
+        prunaApiKey: 'server-only-test-key',
+        prunaImageTryOnModel: 'p-image-try-on',
+      }),
+      prunaImageTryOnProvider: {
+        modelId: 'p-image-try-on',
+        tryOn: vi.fn(() => Promise.reject(new Error('not called'))),
+      },
+    });
+    apps.push(app);
+
+    const response = await app.inject({ method: 'GET', url: '/api/capabilities' });
+    expect(response.statusCode).toBe(200);
+    expect(response.json()).toMatchObject({ wardrobe: { addOutfitAvailable: true } });
+    expect(response.body).not.toContain('p-image-try-on');
   });
 
   it('keeps response sockets open beyond the longest configured OpenAI timeout', () => {

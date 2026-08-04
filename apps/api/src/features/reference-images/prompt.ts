@@ -40,17 +40,20 @@ export const REFERENCE_IMAGE_COMPOSITION_PROMPT_TEMPLATE_VERSION =
  * direction and a hash of the user's requested change, never this combined text.
  */
 export const createReferenceImageEditPrompt = (
-  optimizedCharacterPrompt: string,
+  optimizedCharacterPrompt: string | null,
   changeInstructions: string,
 ): string => {
   const prefix =
-    'Edit the supplied character reference image while preserving the same character identity, face, anatomy, visual medium, framing, lighting, and background unless the requested change explicitly requires otherwise.\n\nUse this current character direction as authoritative:\n';
+    'Edit the supplied character reference image while preserving the same character identity, face, anatomy, visual medium, framing, lighting, and background unless the requested change explicitly requires otherwise.';
+  const direction = optimizedCharacterPrompt
+    ? '\n\nUse this current character direction as authoritative:\n'
+    : '';
   const suffix = `\n\nRequested change:\n${changeInstructions}`;
   const availablePromptLength = Math.max(
     0,
-    REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH - prefix.length - suffix.length,
+    REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH - prefix.length - direction.length - suffix.length,
   );
-  return `${prefix}${optimizedCharacterPrompt.slice(0, availablePromptLength)}${suffix}`;
+  return `${prefix}${direction}${optimizedCharacterPrompt?.slice(0, availablePromptLength) ?? ''}${suffix}`;
 };
 
 /** Builds the provider-only first composition instruction for a user-uploaded source image. */

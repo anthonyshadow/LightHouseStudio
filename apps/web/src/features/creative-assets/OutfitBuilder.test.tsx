@@ -11,9 +11,12 @@ const uploadReferenceImage = vi.hoisted(() => vi.fn());
 const validateReferenceImage = vi.hoisted(() => vi.fn());
 
 vi.mock('../../adapters/api-client/apiClient', () => ({ uploadReferenceImage }));
-vi.mock('../../adapters/browser-media/imageValidation', () => ({ validateReferenceImage }));
-vi.mock('../existing-video/ExistingVideoReferenceField', () => ({
-  ExistingVideoReferenceField: ({ onSelectFile }: { onSelectFile: (file: File) => void }) => (
+vi.mock('../../adapters/browser-media/imageValidation', () => ({
+  REFERENCE_IMAGE_ACCEPT: 'image/jpeg,image/png,image/webp',
+  validateReferenceImage,
+}));
+vi.mock('../reference-images/ReferenceImageInputField', () => ({
+  ReferenceImageInputField: ({ onSelectFile }: { onSelectFile: (file: File) => void }) => (
     <button
       type="button"
       onClick={() => onSelectFile(new File(['image'], 'coat.png', { type: 'image/png' }))}

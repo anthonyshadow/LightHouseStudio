@@ -21,6 +21,7 @@ export type PendingReferenceRecipeUse = {
   readonly builderDraft?: PromptBuilderDraft;
   readonly savedPromptId?: string;
   readonly savedCharacterPromptId?: string;
+  readonly savedCharacterVariantId?: string;
   readonly characterName?: string;
   readonly destination: 'shelf' | 'workshop';
 };

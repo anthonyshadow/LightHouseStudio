@@ -11,7 +11,7 @@ import {
 } from '@studio/contracts';
 import {
   type ReferenceImageAssetStore,
-  type StoreReferenceImageInput,
+  type StoreGeneratedReferenceImageInput,
   type StoredReferenceImageContent,
   type StoredReferenceImageMetadata,
 } from './asset-store.js';
@@ -43,6 +43,7 @@ import {
   generationRequestFingerprint,
   type GenerateReferenceImageInput,
   hashReferenceImageEditInstructions,
+  referenceImageEditRawPrompt,
   type PreparedReferenceImageGeneration,
   prepareReferenceImageGeneration,
   recommendedSettingsForOptions,
@@ -57,10 +58,7 @@ export interface UploadReferenceImageInput {
   readonly signal?: AbortSignal;
 }
 
-type GeneratedReferenceImageStoreInput = Exclude<
-  StoreReferenceImageInput,
-  { readonly source: 'uploaded' }
->;
+type GeneratedReferenceImageStoreInput = StoreGeneratedReferenceImageInput;
 type ReferenceImageDerivation = NonNullable<GeneratedReferenceImageStoreInput['derivation']>;
 
 interface ReferenceImageFinalizationOperationMetadata {
@@ -341,7 +339,7 @@ export class ReferenceImageService {
       imageQuality: this.#imageQuality,
     });
     const providerPrompt = createReferenceImageEditPrompt(
-      prepared.prompt,
+      input.sourcePromptMode === 'image-only' ? null : prepared.prompt,
       input.changeInstructions,
     );
     const edited = await this.#callProvider(() =>
@@ -366,7 +364,7 @@ export class ReferenceImageService {
       },
       operation: {
         localOwnerId: input.localOwnerId,
-        originalPrompt: input.rawPrompt,
+        originalPrompt: referenceImageEditRawPrompt(input),
         requestId: input.requestId,
         requestFingerprint,
         prepared,

@@ -24,6 +24,7 @@ const character: SavedCharacterPrompt = {
   referenceImageAssetId: null,
   uploadedReferenceImageAssetId: null,
   finalReferenceKind: null,
+  selectedWardrobeVariantId: null,
   notes: '',
   tags: [],
   createdAt: '2026-07-21T12:00:00.000Z',
@@ -32,10 +33,11 @@ const character: SavedCharacterPrompt = {
   useCount: 0,
 };
 const store: CreativeAssetStore = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   savedPrompts: [],
   recentPrompts: [],
   savedCharacterPrompts: [character],
+  savedCharacterVariants: [],
 };
 
 describe('useReferenceRecipeWorkshop', () => {

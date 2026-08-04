@@ -1,3 +1,4 @@
+import { preferredCharacterVersionSelection, resolveCharacterVersion } from '@studio/domain';
 import { useEffect, useState } from 'react';
 import {
   createRecipeEditorDraft,
@@ -41,6 +42,7 @@ type ControllerOptions = Pick<
   | 'onUsePrompt'
   | 'onCreateCharacter'
   | 'onEditCharacter'
+  | 'onOpenWardrobe'
   | 'onCreateOutfit'
   | 'onEditOutfit'
   | 'onSaveOutfitCopy'
@@ -57,6 +59,7 @@ export const useRecipeShelfController = ({
   onUsePrompt,
   onCreateCharacter,
   onEditCharacter,
+  onOpenWardrobe,
   onCreateOutfit,
   onEditOutfit,
   onSaveOutfitCopy,
@@ -273,6 +276,9 @@ export const useRecipeShelfController = ({
         ...(item.savedCharacterPromptId
           ? { savedCharacterPromptId: item.savedCharacterPromptId }
           : {}),
+        ...(item.savedCharacterVariantId
+          ? { savedCharacterVariantId: item.savedCharacterVariantId }
+          : {}),
         ...(item.characterName ? { characterName: item.characterName } : {}),
         referenceImageAssetId: item.referenceImageAssetId,
         vtonInputKind: item.vtonInputKind,
@@ -280,7 +286,8 @@ export const useRecipeShelfController = ({
       }),
     );
 
-  const selectCharacter = (item: SavedCharacterPrompt) =>
+  const selectCharacter = (item: SavedCharacterPrompt) => {
+    const resolved = resolveCharacterVersion(state.store, preferredCharacterVersionSelection(item));
     runAfterFormCheck(() =>
       onUsePrompt({
         origin: 'character-prompt',
@@ -288,10 +295,12 @@ export const useRecipeShelfController = ({
         modelModeId: 'lucy-latest',
         assetId: item.id,
         characterName: item.name,
-        referenceImageAssetId: item.referenceImageAssetId,
+        referenceImageAssetId: resolved?.referenceImageAssetId ?? item.referenceImageAssetId,
+        ...(resolved?.variant ? { savedCharacterVariantId: resolved.variant.id } : {}),
         ...(item.builderDraft ? { builderDraft: item.builderDraft } : {}),
       }),
     );
+  };
 
   const openCharacterWorkshop = (item: SavedCharacterPrompt) => {
     const draft = item.builderDraft;
@@ -307,6 +316,10 @@ export const useRecipeShelfController = ({
   const editCharacter = (item: SavedCharacterPrompt) => {
     if (!onEditCharacter) return;
     runAfterFormCheck(() => onEditCharacter(item));
+  };
+  const openWardrobe = (item: SavedCharacterPrompt) => {
+    if (!onOpenWardrobe) return;
+    runAfterFormCheck(() => onOpenWardrobe(item));
   };
   const createOutfit = () => runAfterFormCheck(() => onCreateOutfit?.());
   const editSaved = (item: SavedPrompt) => {
@@ -396,6 +409,8 @@ export const useRecipeShelfController = ({
     openCharacterWorkshop,
     canEditCharacter: Boolean(onEditCharacter),
     editCharacter,
+    canOpenWardrobe: Boolean(onOpenWardrobe),
+    openWardrobe,
     canCreateOutfit: Boolean(onCreateOutfit),
     createOutfit,
     editSaved,

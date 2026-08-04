@@ -97,6 +97,7 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
                 version: 'lucy-character-reference-v1',
               },
             },
+            wardrobe: { addOutfitAvailable: false },
           }),
         });
         return;

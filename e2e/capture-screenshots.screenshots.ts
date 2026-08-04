@@ -21,7 +21,7 @@ const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
 const SCREENSHOT_ROOT = path.resolve(
   process.env.LIGHTFRAME_SCREENSHOT_ROOT ?? path.join(process.cwd(), 'test-results', 'captures'),
 );
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
 const FIXED_WEBP = Buffer.from(
   'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v3AgAA=',
   'base64',
@@ -36,7 +36,7 @@ const VIEWPORTS = [
 ] as const;
 
 const SEEDED_SHELF = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   savedPrompts: [
     {
       id: 'character-amber-host',
@@ -121,6 +121,7 @@ const SEEDED_SHELF = {
       referenceImageAssetId: null,
       uploadedReferenceImageAssetId: null,
       finalReferenceKind: null,
+      selectedWardrobeVariantId: null,
       notes: 'A grounded host treatment for field stories.',
       tags: ['host', 'editorial'],
       createdAt: '2026-07-16T14:30:00.000Z',
@@ -129,6 +130,7 @@ const SEEDED_SHELF = {
       useCount: 4,
     },
   ],
+  savedCharacterVariants: [],
 } satisfies CreativeAssetStore;
 
 type Scenario = {
@@ -181,6 +183,7 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
               version: 'lucy-character-reference-v1',
             },
           },
+          wardrobe: { addOutfitAvailable: false },
         }),
       });
     },

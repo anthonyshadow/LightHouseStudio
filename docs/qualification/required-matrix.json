@@ -130,6 +130,28 @@
       ]
     },
     {
+      "id": "pruna-character-wardrobe",
+      "configurationId": "pruna:p-image-try-on:one-garment:preserve-input-size:jpg-95",
+      "accessMode": "participant",
+      "checks": [
+        "pricing-approval",
+        "entitlement",
+        "capability-independent-degradation",
+        "person-and-one-garment",
+        "explicit-generate",
+        "exact-model-payload",
+        "single-prediction",
+        "status-download-recovery",
+        "decoded-output-validation",
+        "immutable-derived-persistence",
+        "exact-lineage",
+        "save-without-selection",
+        "provider-retention-observed",
+        "no-fallback",
+        "cleanup"
+      ]
+    },
+    {
       "id": "elevenlabs-saved-voice",
       "configurationId": "elevenlabs:eleven_multilingual_sts_v2:saved-only:logging-false",
       "accessMode": "participant",
@@ -203,6 +225,7 @@
       "upload-select-replace-remove",
       "upload-local-download",
       "upload-single-visual-step",
+      "character-wardrobe",
       "upload-voice",
       "record-300-seconds",
       "record-finalize",

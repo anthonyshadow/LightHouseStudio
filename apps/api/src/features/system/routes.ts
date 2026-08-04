@@ -23,6 +23,7 @@ export interface CapabilityAvailability {
   readonly promptOptimizerAvailable: boolean;
   readonly promptOptimizerModel: string;
   readonly promptOptimizerVersion: string;
+  readonly wardrobeAddOutfitAvailable: boolean;
 }
 
 export const registerSystemRoutes = (
@@ -78,6 +79,9 @@ export const registerSystemRoutes = (
           model: availability.promptOptimizerModel,
           version: availability.promptOptimizerVersion,
         },
+      },
+      wardrobe: {
+        addOutfitAvailable: availability.wardrobeAddOutfitAvailable,
       },
     }),
   );

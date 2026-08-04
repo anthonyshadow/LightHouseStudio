@@ -23,10 +23,11 @@ const prompt: SavedPrompt = {
 };
 
 const store: CreativeAssetStore = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   savedPrompts: [prompt],
   recentPrompts: [],
   savedCharacterPrompts: [],
+  savedCharacterVariants: [],
 };
 
 describe('active recipe reducer and resolution', () => {

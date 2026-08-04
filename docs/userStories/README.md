@@ -37,6 +37,8 @@ references, not release-readiness claims or future requirements.
   Virtual Try On, and/or Voice. Live Character/VTO transformation and Workshop are advanced flows.
 - Character Builder owns true character creation and editing. Workshop owns only Add, Replace, and
   Restyle object recipes.
+- Saved Character Wardrobe owns normalized original/variant browsing and variant creation while
+  reusing the same Shelf metadata, immutable reference store, and overlay/media ownership.
 - Studio keeps one mounted media stage and one temporary take pipeline. Its immutable source may
   be recorded or uploaded; presentation selects the voiced, visual, or source layer without
   mounting another player.

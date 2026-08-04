@@ -6,6 +6,7 @@ import {
   CHARACTER_PROMPT_OPTIMIZER_DEFAULT_VERSION,
   REFERENCE_IMAGE_MODEL_ID,
   REFERENCE_IMAGE_QUALITY,
+  PRUNA_IMAGE_TRY_ON_MODEL,
 } from '@studio/contracts';
 
 export const DEFAULT_API_PORT = 4100;
@@ -71,6 +72,11 @@ const environmentSchema = z
       normalizeOptionalString,
       z.literal(PRUNA_VIDEO_REPLACE_MODEL).optional(),
     ),
+    PRUNA_IMAGE_TRY_ON_ENABLED: strictBooleanSchema(false),
+    PRUNA_IMAGE_TRY_ON_MODEL: z.preprocess(
+      normalizeOptionalString,
+      z.literal(PRUNA_IMAGE_TRY_ON_MODEL).optional(),
+    ),
     OPENAI_API_KEY: optionalSecretSchema,
     OPENAI_PROMPT_OPTIMIZER_MODEL: optionalModelSchema,
     OPENAI_PROMPT_OPTIMIZER_REASONING: z.preprocess(
@@ -115,19 +121,32 @@ const environmentSchema = z
     ),
   })
   .superRefine((value, context) => {
-    if (value.EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER !== 'pruna') return;
     const required: ReadonlyArray<readonly [keyof typeof value, boolean, string]> = [
-      [
-        'PRUNA_VIDEO_REPLACE_ENABLED',
-        value.PRUNA_VIDEO_REPLACE_ENABLED,
-        'Set PRUNA_VIDEO_REPLACE_ENABLED=true when selecting Pruna.',
-      ],
-      ['PRUNA_API_KEY', value.PRUNA_API_KEY !== undefined, 'Set PRUNA_API_KEY.'],
-      [
-        'PRUNA_VIDEO_REPLACE_MODEL',
-        value.PRUNA_VIDEO_REPLACE_MODEL !== undefined,
-        `Set PRUNA_VIDEO_REPLACE_MODEL=${PRUNA_VIDEO_REPLACE_MODEL}.`,
-      ],
+      ...(value.EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER === 'pruna'
+        ? ([
+            [
+              'PRUNA_VIDEO_REPLACE_ENABLED',
+              value.PRUNA_VIDEO_REPLACE_ENABLED,
+              'Set PRUNA_VIDEO_REPLACE_ENABLED=true when selecting Pruna.',
+            ],
+            ['PRUNA_API_KEY', value.PRUNA_API_KEY !== undefined, 'Set PRUNA_API_KEY.'],
+            [
+              'PRUNA_VIDEO_REPLACE_MODEL',
+              value.PRUNA_VIDEO_REPLACE_MODEL !== undefined,
+              `Set PRUNA_VIDEO_REPLACE_MODEL=${PRUNA_VIDEO_REPLACE_MODEL}.`,
+            ],
+          ] as const)
+        : []),
+      ...(value.PRUNA_IMAGE_TRY_ON_ENABLED
+        ? ([
+            ['PRUNA_API_KEY', value.PRUNA_API_KEY !== undefined, 'Set PRUNA_API_KEY.'],
+            [
+              'PRUNA_IMAGE_TRY_ON_MODEL',
+              value.PRUNA_IMAGE_TRY_ON_MODEL !== undefined,
+              `Set PRUNA_IMAGE_TRY_ON_MODEL=${PRUNA_IMAGE_TRY_ON_MODEL}.`,
+            ],
+          ] as const)
+        : []),
     ];
     for (const [variable, valid, message] of required) {
       if (!valid) context.addIssue({ code: 'custom', path: [variable], message });
@@ -143,6 +162,8 @@ export interface RuntimeConfig {
   readonly prunaVideoReplaceEnabled: boolean;
   readonly prunaApiKey?: string;
   readonly prunaVideoReplaceModel?: typeof PRUNA_VIDEO_REPLACE_MODEL;
+  readonly prunaImageTryOnEnabled: boolean;
+  readonly prunaImageTryOnModel?: typeof PRUNA_IMAGE_TRY_ON_MODEL;
   readonly openAiApiKey?: string;
   readonly openAiPromptOptimizerModel: string;
   readonly openAiPromptOptimizerReasoning:
@@ -260,6 +281,10 @@ export const parseEnvironment = (
     ...(result.data.PRUNA_VIDEO_REPLACE_MODEL === undefined
       ? {}
       : { prunaVideoReplaceModel: result.data.PRUNA_VIDEO_REPLACE_MODEL }),
+    prunaImageTryOnEnabled: result.data.PRUNA_IMAGE_TRY_ON_ENABLED,
+    ...(result.data.PRUNA_IMAGE_TRY_ON_MODEL === undefined
+      ? {}
+      : { prunaImageTryOnModel: result.data.PRUNA_IMAGE_TRY_ON_MODEL }),
     ...(result.data.OPENAI_API_KEY === undefined
       ? {}
       : { openAiApiKey: result.data.OPENAI_API_KEY }),

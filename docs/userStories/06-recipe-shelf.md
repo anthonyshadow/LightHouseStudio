@@ -20,6 +20,18 @@ projects.
    hydrates its opaque local asset, then commits the complete draft.
 6. Rename, edit, delete, or save a copy as available. Character deletion removes the record and
    detaches links but does not delete immutable image bytes.
+7. A saved-character card or the active-character control opens **Wardrobe**. The wide right panel
+   becomes fullscreen on narrow viewports, labels the original first, and searches an internally
+   scrolling grid of original/variant versions. **Use** hydrates the exact image before recording
+   parent/variant usage and persisting that character's selected version. Saving a new variant does
+   not select it.
+8. **Add Outfit** uses the selected original/variant as the person source plus one shared
+   upload/public-HTTPS garment input. Only explicit Generate/Regenerate contacts the independently
+   configured Pruna try-on path. **Change Features** shows the exact source and sends required
+   changes through the configured reference-image edit provider with optimization disabled. The
+   parent prompt accompanies Original-source edits only; variant-source edits send the selected
+   image without the parent prompt. Both show a preview, require a non-empty title, reject stale
+   results, and save only the latest valid result under the original parent character.
 
 ## Guards and recovery
 
@@ -29,12 +41,19 @@ projects.
   recording/take review and by incompatible cross-model changes during active AI.
 - Missing reference bytes pause Use with **Retry**. **Continue without reference** appears only
   when a usable prompt remains; image-only outfits offer Retry or removal.
-- Valid v1-v4 data migrates to Recipe Shelf v5. V4 VTO records with references become saved-image
+- Valid v1-v5 data migrates to Recipe Shelf v6. V4 VTO records with references become saved-image
   outfits, other VTO records become prompt outfits, enhancement defaults false, and Character
-  records use a null VTO kind/false enhancement. Corrupt values are sanitized or repaired.
+  records use a null VTO kind/false enhancement. Older characters receive an empty Wardrobe with
+  the original selected. Dangling/cross-parent/malformed selections are repaired and Wardrobe
+  metadata is capped at 500 records.
 - If `localStorage` is unavailable, the Shelf continues in session-only mode and says changes will
   be lost when the tab closes.
 - Browser storage contains allowlisted metadata, provenance, and opaque reference IDs—not image
   bytes, recordings, device IDs, or provider secrets.
+- Wardrobe browsing and Use remain available when Add Outfit or Change Features is unavailable.
+  Prompt-only originals remain usable, while creation is disabled with Character Builder guidance.
+- Dirty Wardrobe source/input/result/title state and active generation join the existing
+  discard/route-exit guard. Cancel writes no variant metadata; already stored immutable assets
+  follow the existing retention policy.
 - In browser fullscreen, the video fills the viewport and the bottom tool and capture rails are
   hidden. Any panel triggered from the stage overlays the video.

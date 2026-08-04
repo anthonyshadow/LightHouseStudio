@@ -4,6 +4,8 @@ import {
   VIDEO_PROVIDER_INTENT_VALUE,
   VOICE_PROVIDER_INTENT_HEADER,
   VOICE_PROVIDER_INTENT_VALUE,
+  WARDROBE_PROVIDER_INTENT_HEADER,
+  WARDROBE_PROVIDER_INTENT_VALUE,
 } from '@studio/contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from './errors.js';
@@ -102,6 +104,16 @@ export const requireVideoProviderIntent = (
 ): void => {
   if (request.headers[VIDEO_PROVIDER_INTENT_HEADER] !== VIDEO_PROVIDER_INTENT_VALUE) {
     throw new AppError(403, 'forbidden_origin', message);
+  }
+};
+
+export const requireWardrobeProviderIntent = (request: FastifyRequest): void => {
+  if (request.headers[WARDROBE_PROVIDER_INTENT_HEADER] !== WARDROBE_PROVIDER_INTENT_VALUE) {
+    throw new AppError(
+      403,
+      'forbidden_origin',
+      'This wardrobe provider action requires explicit local Studio intent.',
+    );
   }
 };
 

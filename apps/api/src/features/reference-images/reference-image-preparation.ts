@@ -25,11 +25,11 @@ export interface GenerateReferenceImageInput extends CreateReferenceImageRequest
   readonly signal?: AbortSignal;
 }
 
-export interface EditReferenceImageInput extends EditReferenceImageRequest {
+export type EditReferenceImageInput = EditReferenceImageRequest & {
   readonly localOwnerId: string;
   readonly sourceAssetId: string;
   readonly signal?: AbortSignal;
-}
+};
 
 export interface ComposeReferenceImageInput extends ComposeReferenceImageRequest {
   readonly localOwnerId: string;
@@ -58,6 +58,11 @@ type RecommendedSettings = CharacterPromptOptimizationResult['recommendedSetting
 
 const sha256 = (value: string): string => createHash('sha256').update(value, 'utf8').digest('hex');
 const jsonFingerprint = (value: unknown): string => sha256(JSON.stringify(value));
+export const IMAGE_ONLY_EDIT_AUDIT_PROMPT =
+  'The selected source image is the authoritative character reference.';
+
+export const referenceImageEditRawPrompt = (input: EditReferenceImageInput): string =>
+  'rawPrompt' in input ? input.rawPrompt : IMAGE_ONLY_EDIT_AUDIT_PROMPT;
 
 const legacyGenerationRequestFingerprint = (input: GenerateReferenceImageInput): string =>
   jsonFingerprint({
@@ -73,7 +78,8 @@ const legacyEditRequestFingerprint = (input: EditReferenceImageInput): string =>
     kind: 'edit',
     templateVersion: REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION,
     sourceAssetId: input.sourceAssetId,
-    rawPrompt: input.rawPrompt,
+    sourcePromptMode: input.sourcePromptMode ?? 'character-prompt',
+    rawPrompt: 'rawPrompt' in input ? input.rawPrompt : null,
     changeInstructions: input.changeInstructions,
     options: input.options,
     generator: input.generator ?? null,
@@ -126,7 +132,8 @@ export const editRequestFingerprint = (
         provider: providerFingerprint(descriptor),
         templateVersion: REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION,
         sourceAssetId: input.sourceAssetId,
-        rawPrompt: input.rawPrompt,
+        sourcePromptMode: input.sourcePromptMode ?? 'character-prompt',
+        rawPrompt: 'rawPrompt' in input ? input.rawPrompt : null,
         changeInstructions: input.changeInstructions,
         options: input.options,
         generator: input.generator ?? null,
@@ -251,6 +258,7 @@ export const prepareReferenceImageGeneration = (
     readonly imageQuality: 'high' | 'medium';
   },
 ): PreparedReferenceImageGeneration => {
+  const rawPrompt = 'rawPrompt' in input ? input.rawPrompt : IMAGE_ONLY_EDIT_AUDIT_PROMPT;
   if (input.optimization.enabled) {
     if (options.optimizer === null) {
       throw new ReferenceImageGenerationStateError('optimizer-not-configured');
@@ -263,7 +271,7 @@ export const prepareReferenceImageGeneration = (
     }
     const expectedHash = createPromptOptimizationInputHash(
       {
-        rawPrompt: input.rawPrompt,
+        rawPrompt,
         options: input.options,
         ...(input.generator === undefined ? {} : { generator: input.generator }),
       },
@@ -285,7 +293,7 @@ export const prepareReferenceImageGeneration = (
       prompt: input.optimization.result.optimizedImagePrompt,
       size: input.optimization.result.recommendedSettings.size,
       format: input.optimization.result.recommendedSettings.format,
-      promptHash: createWorkshopPromptHash(input.rawPrompt),
+      promptHash: createWorkshopPromptHash(rawPrompt),
       promptAudit: {
         optimizationEnabled: true,
         result: input.optimization.result,
@@ -300,9 +308,9 @@ export const prepareReferenceImageGeneration = (
 
   const size = ORIENTATION_DEFAULTS[input.options.orientation].size;
   const result: CharacterPromptOptimizationResult = {
-    optimizedImagePrompt: input.rawPrompt,
-    lucy25CharacterPrompt: input.rawPrompt,
-    normalizedCharacterDescription: input.rawPrompt,
+    optimizedImagePrompt: rawPrompt,
+    lucy25CharacterPrompt: rawPrompt,
+    normalizedCharacterDescription: rawPrompt,
     preservedCharacterFacts: [],
     technicalDefaultsAdded: [],
     warnings: [],
@@ -314,10 +322,10 @@ export const prepareReferenceImageGeneration = (
     ),
   };
   return {
-    prompt: input.rawPrompt,
+    prompt: rawPrompt,
     size,
     format: 'jpeg',
-    promptHash: createWorkshopPromptHash(input.rawPrompt),
+    promptHash: createWorkshopPromptHash(rawPrompt),
     promptAudit: {
       optimizationEnabled: false,
       result,
@@ -361,6 +369,22 @@ export const toReferenceImageAsset = (
       height: metadata.height,
       byteSize: metadata.byteSize,
       source: metadata.source,
+      createdAt: metadata.createdAt,
+      updatedAt: metadata.updatedAt ?? metadata.createdAt,
+      contentUrl: `/api/reference-images/${metadata.assetId}/content`,
+    });
+  }
+  if (metadata.source === 'derived') {
+    return referenceImageAssetSchema.parse({
+      assetId: metadata.assetId,
+      mimeType: metadata.mimeType,
+      width: metadata.width,
+      height: metadata.height,
+      byteSize: metadata.byteSize,
+      source: metadata.source,
+      provider: metadata.provider,
+      model: metadata.model,
+      derivation: metadata.derivation,
       createdAt: metadata.createdAt,
       updatedAt: metadata.updatedAt ?? metadata.createdAt,
       contentUrl: `/api/reference-images/${metadata.assetId}/content`,

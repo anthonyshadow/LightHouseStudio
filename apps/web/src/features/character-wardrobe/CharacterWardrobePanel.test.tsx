@@ -1,0 +1,285 @@
+// @vitest-environment jsdom
+
+import { ThemeProvider } from '@emotion/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { studioTheme } from '../../ui';
+import type {
+  CreativeAssetRepository,
+  CreativeAssetStore,
+  SavedCharacterPrompt,
+} from '../creative-assets/types';
+import { CharacterWardrobePanel } from './CharacterWardrobePanel';
+
+const api = vi.hoisted(() => ({
+  uploadReferenceImage: vi.fn(),
+  createOutfitTryOn: vi.fn(),
+  fetchReferenceImageMetadata: vi.fn(),
+  editReferenceImage: vi.fn(),
+  createReferenceImage: vi.fn(),
+  composeReferenceImage: vi.fn(),
+  optimizeCharacterReferencePrompt: vi.fn(),
+  importRemoteReferenceImage: vi.fn(),
+}));
+
+vi.mock('../../adapters/api-client/apiClient', () => api);
+vi.mock('../../adapters/browser-media/imageValidation', () => ({
+  REFERENCE_IMAGE_ACCEPT: 'image/jpeg,image/png,image/webp',
+  validateReferenceImage: vi.fn().mockResolvedValue({
+    blockingError: null,
+    warnings: [],
+    width: 512,
+    height: 512,
+  }),
+}));
+
+const character: SavedCharacterPrompt = {
+  id: 'character-one',
+  name: 'Field host',
+  prompt: 'Replace the subject with a field host.',
+  source: 'generator',
+  promptIntent: 'character-transform',
+  builderDraft: null,
+  guidedDesign: null,
+  referenceImageStatus: 'persisted-reference',
+  referenceImageAssetId: 'original-image',
+  uploadedReferenceImageAssetId: null,
+  finalReferenceKind: 'generated',
+  selectedWardrobeVariantId: 'variant-one',
+  notes: '',
+  tags: [],
+  createdAt: '2026-08-01T12:00:00.000Z',
+  updatedAt: '2026-08-01T12:00:00.000Z',
+  lastUsedAt: null,
+  useCount: 0,
+};
+const store: CreativeAssetStore = {
+  schemaVersion: 6,
+  savedPrompts: [],
+  recentPrompts: [],
+  savedCharacterPrompts: [character],
+  savedCharacterVariants: [
+    {
+      id: 'variant-one',
+      parentCharacterId: character.id,
+      title: 'Blue jacket',
+      referenceImageAssetId: 'variant-image',
+      creation: {
+        method: 'add-outfit',
+        sourceReferenceImageAssetId: 'original-image',
+        garmentReferenceImageAssetId: 'garment-old',
+      },
+      createdAt: '2026-08-01T12:10:00.000Z',
+      updatedAt: '2026-08-01T12:10:00.000Z',
+      lastUsedAt: null,
+      useCount: 0,
+    },
+  ],
+};
+
+const renderPanel = (overrides: Partial<Parameters<typeof CharacterWardrobePanel>[0]> = {}) => {
+  const repository = {
+    createSavedCharacterVariant: vi.fn(),
+  } as unknown as CreativeAssetRepository;
+  const onUse = vi.fn();
+  render(
+    <ThemeProvider theme={studioTheme}>
+      <CharacterWardrobePanel
+        repository={repository}
+        store={store}
+        character={character}
+        addOutfitAvailable
+        changeFeaturesAvailable
+        onUse={onUse}
+        onDirtyChange={vi.fn()}
+        onClose={vi.fn()}
+        {...overrides}
+      />
+    </ThemeProvider>,
+  );
+  return { repository, onUse };
+};
+
+describe('CharacterWardrobePanel', () => {
+  afterEach(cleanup);
+  beforeEach(() => {
+    vi.clearAllMocks();
+    api.fetchReferenceImageMetadata.mockResolvedValue({ source: 'uploaded' });
+  });
+
+  it('labels the original first and uses only the explicitly chosen version', async () => {
+    const user = userEvent.setup();
+    const { onUse } = renderPanel();
+    const images = screen.getAllByRole('img');
+    expect(images[0]).toHaveAttribute('src', '/api/reference-images/original-image/content');
+    expect(screen.getByText('Original character')).toBeInTheDocument();
+    expect(screen.getByText('Blue jacket')).toBeInTheDocument();
+
+    await user.click(screen.getByRole('button', { name: 'Use' }));
+    expect(onUse).toHaveBeenCalledWith({ characterId: character.id, variantId: null });
+  });
+
+  it('keeps prompt-only characters visible and disables both creation paths with guidance', () => {
+    const { onUse } = renderPanel({
+      character: {
+        ...character,
+        referenceImageStatus: 'prompt-only',
+        referenceImageAssetId: null,
+        selectedWardrobeVariantId: null,
+      },
+      store: {
+        ...store,
+        savedCharacterPrompts: [
+          {
+            ...character,
+            referenceImageStatus: 'prompt-only',
+            referenceImageAssetId: null,
+            selectedWardrobeVariantId: null,
+          },
+        ],
+        savedCharacterVariants: [],
+      },
+    });
+
+    expect(screen.getByRole('button', { name: 'Add outfit' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Change features' })).toBeDisabled();
+    expect(
+      screen.getByText(/Add or generate a reference image in Character Builder/u),
+    ).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Selected' }));
+    expect(onUse).toHaveBeenCalledWith({ characterId: character.id, variantId: null });
+  });
+
+  it('uploads one garment, generates only from the explicit action, previews, and saves without selecting', async () => {
+    const user = userEvent.setup();
+    const { repository, onUse } = renderPanel();
+    api.uploadReferenceImage.mockResolvedValue({ assetId: 'garment-new' });
+    api.createOutfitTryOn.mockResolvedValue({
+      assetId: 'result-new',
+      source: 'derived',
+      provider: 'pruna',
+      model: 'p-image-try-on',
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Add outfit' }));
+    expect(screen.getByRole('heading', { name: 'Generated preview' })).toBeInTheDocument();
+    expect(screen.getByText('Your generated outfit preview will appear here.')).toBeInTheDocument();
+    expect(screen.getByRole('textbox', { name: /Variant name/u })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save variant' })).toBeDisabled();
+    expect(
+      document.querySelector('[data-scroll-region="character-wardrobe-create"]'),
+    ).toBeInTheDocument();
+    const garment = new File(['garment'], 'jacket.jpg', { type: 'image/jpeg' });
+    fireEvent.change(screen.getByLabelText('Garment image'), { target: { files: [garment] } });
+    expect(api.createOutfitTryOn).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Generate outfit' }));
+    expect(
+      await screen.findByRole('button', { name: 'Open larger generated wardrobe preview' }),
+    ).toBeInTheDocument();
+    await user.type(screen.getByRole('textbox', { name: /Variant name/u }), 'Evening jacket');
+    await user.click(screen.getByRole('button', { name: 'Save variant' }));
+
+    expect(api.uploadReferenceImage).toHaveBeenCalledWith(
+      garment,
+      expect.any(String),
+      expect.any(AbortSignal),
+    );
+    expect(api.createOutfitTryOn).toHaveBeenCalledWith(
+      'variant-image',
+      'garment-new',
+      expect.any(String),
+      expect.any(AbortSignal),
+    );
+    expect(repository.createSavedCharacterVariant).toHaveBeenCalledWith({
+      parentCharacterId: character.id,
+      title: 'Evening jacket',
+      referenceImageAssetId: 'result-new',
+      creation: {
+        method: 'add-outfit',
+        sourceReferenceImageAssetId: 'variant-image',
+        garmentReferenceImageAssetId: 'garment-new',
+      },
+    });
+    expect(onUse).not.toHaveBeenCalled();
+  });
+
+  it('sends the parent prompt only when Original is the Change Features source', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    api.editReferenceImage.mockResolvedValue({
+      assetId: 'features-result',
+      source: 'generated',
+      options: {},
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Change features' }));
+    const originalCard = screen.getByText('Original character').closest('article');
+    if (!originalCard) throw new Error('Expected the original source card.');
+    await user.click(within(originalCard).getByRole('button', { name: 'Choose source' }));
+    await user.type(screen.getByLabelText('Required changes'), 'Add silver glasses.');
+    await user.click(screen.getByRole('button', { name: 'Generate changes' }));
+    await waitFor(() => expect(api.editReferenceImage).toHaveBeenCalledOnce());
+    expect(api.editReferenceImage).toHaveBeenCalledWith(
+      'original-image',
+      expect.objectContaining({
+        rawPrompt: character.prompt,
+        changeInstructions: 'Add silver glasses.',
+        optimization: { enabled: false },
+      }),
+      expect.any(AbortSignal),
+    );
+  });
+
+  it('uses the exact selected variant for Change Features and saves it under the original parent', async () => {
+    const user = userEvent.setup();
+    const yogaVariant = {
+      ...store.savedCharacterVariants[0]!,
+      id: 'variant-yoga',
+      title: 'Yoga outfit',
+      referenceImageAssetId: 'yoga-image',
+      useCount: 1,
+    };
+    const { repository } = renderPanel({
+      store: {
+        ...store,
+        savedCharacterVariants: [...store.savedCharacterVariants, yogaVariant],
+      },
+    });
+    api.editReferenceImage.mockResolvedValue({
+      assetId: 'features-yoga-result',
+      source: 'generated',
+      options: {},
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Change features' }));
+    const yogaCard = screen.getByText('Yoga outfit').closest('article');
+    if (!yogaCard) throw new Error('Expected the Yoga outfit source card.');
+    await user.click(within(yogaCard).getByRole('button', { name: 'Choose source' }));
+    await user.type(screen.getByLabelText('Required changes'), 'Add a warm expression.');
+    await user.click(screen.getByRole('button', { name: 'Generate changes' }));
+
+    await waitFor(() => expect(api.editReferenceImage).toHaveBeenCalledOnce());
+    expect(api.editReferenceImage).toHaveBeenCalledWith(
+      'yoga-image',
+      expect.objectContaining({
+        sourcePromptMode: 'image-only',
+        changeInstructions: 'Add a warm expression.',
+      }),
+      expect.any(AbortSignal),
+    );
+    expect(api.editReferenceImage.mock.calls[0]?.[1]).not.toHaveProperty('rawPrompt');
+    await user.type(screen.getByRole('textbox', { name: /Variant name/u }), 'Yoga smile');
+    await user.click(screen.getByRole('button', { name: 'Save variant' }));
+    expect(repository.createSavedCharacterVariant).toHaveBeenCalledWith({
+      parentCharacterId: character.id,
+      title: 'Yoga smile',
+      referenceImageAssetId: 'features-yoga-result',
+      creation: {
+        method: 'change-features',
+        sourceReferenceImageAssetId: 'yoga-image',
+        changeInstructions: 'Add a warm expression.',
+      },
+    });
+  });
+});

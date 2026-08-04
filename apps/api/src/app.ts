@@ -17,6 +17,7 @@ import {
   type RemoteReferenceImageDownloader,
 } from './features/reference-images/routes.js';
 import { ReferenceImageService } from './features/reference-images/reference-image-service.js';
+import { OutfitTryOnService } from './features/reference-images/outfit-try-on-service.js';
 import { translateVoiceServiceError } from './features/voices/error-mapper.js';
 import { registerVoiceRoutes, SUPPORTED_AUDIO_CONTENT_TYPES } from './features/voices/routes.js';
 import { VoiceService } from './features/voices/voice-service.js';
@@ -36,6 +37,7 @@ import {
   type CharacterPromptOptimizer,
 } from './providers/openai/character-prompt-optimizer.js';
 import { translateOpenAIError } from './providers/openai/error-mapper.js';
+import { translatePrunaImageTryOnError } from './providers/pruna/image-try-on-error-mapper.js';
 import { translateWiroError } from './providers/wiro/error-mapper.js';
 import {
   configuredReferenceImageDescriptor,
@@ -44,6 +46,10 @@ import {
 import { type ReferenceImageProvider } from './providers/reference-images/reference-image-provider.js';
 import type { ExistingVideoJobProvider } from './providers/video-jobs/video-job-provider.js';
 import { createExistingVideoProviderRegistry } from './providers/video-jobs/provider-factory.js';
+import {
+  PrunaImageTryOnProvider,
+  type OutfitTryOnProvider,
+} from './providers/pruna/image-try-on-provider.js';
 
 export const OPENAI_CONNECTION_TIMEOUT_MARGIN_MS = 100_000;
 export const SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES = [
@@ -57,6 +63,7 @@ export interface AppDependencies {
   readonly decartProvider?: DecartTokenProvider | null;
   readonly decartVideoProvider?: DecartVideoJobProvider | null;
   readonly prunaVideoProvider?: ExistingVideoJobProvider | null;
+  readonly prunaImageTryOnProvider?: OutfitTryOnProvider | null;
   readonly elevenLabsProvider?: ElevenLabsProvider | null;
   readonly referenceImageProvider?: ReferenceImageProvider | null;
   readonly characterPromptOptimizer?: CharacterPromptOptimizer | null;
@@ -196,6 +203,16 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   const referenceImageAssetStore =
     dependencies.referenceImageAssetStore ??
     new LocalReferenceImageAssetStore(dependencies.config.lightframeDataDir);
+  const outfitTryOnProvider = resolveOptionalProvider(dependencies.prunaImageTryOnProvider, () =>
+    dependencies.config.prunaImageTryOnEnabled && dependencies.config.prunaApiKey
+      ? new PrunaImageTryOnProvider(dependencies.config.prunaApiKey, {
+          ...(dependencies.fetchImplementation === undefined
+            ? {}
+            : { fetchImplementation: dependencies.fetchImplementation }),
+        })
+      : null,
+  );
+  const outfitTryOnService = new OutfitTryOnService(outfitTryOnProvider, referenceImageAssetStore);
   const configuredReferenceImage = configuredReferenceImageDescriptor(dependencies.config);
   const referenceImageService = new ReferenceImageService(
     referenceImageProvider,
@@ -229,6 +246,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     promptOptimizerAvailable: referenceImageService.optimizationAvailable,
     promptOptimizerModel: dependencies.config.openAiPromptOptimizerModel,
     promptOptimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
+    wardrobeAddOutfitAvailable: outfitTryOnService.available,
   });
   registerRealtimeRoutes(app, decartProvider);
   registerVideoJobRoutes(app, videoJobService);
@@ -236,6 +254,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     ...(dependencies.remoteImageDownloader
       ? { remoteImageDownloader: dependencies.remoteImageDownloader }
       : {}),
+    outfitTryOnService,
   });
   registerVoiceRoutes(app, voiceService);
   app.addHook('onClose', async () => {
@@ -245,6 +264,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     serveSpa: dependencies.staticRoot !== undefined,
     translators: [
       translateReferenceImageError,
+      translatePrunaImageTryOnError,
       translateVoiceServiceError,
       translateBflError,
       translateWiroError,

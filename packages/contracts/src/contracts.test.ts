@@ -81,6 +81,7 @@ describe('health and capabilities contracts', () => {
             version: 'lucy-character-reference-v1',
           },
         },
+        wardrobe: { addOutfitAvailable: true },
       }),
     ).toEqual({
       realtimeVideo: { available: true, models: ['lucy-latest', 'lucy-vton-latest'] },
@@ -116,6 +117,7 @@ describe('health and capabilities contracts', () => {
           version: 'lucy-character-reference-v1',
         },
       },
+      wardrobe: { addOutfitAvailable: true },
     });
     expect(
       capabilitiesResponseSchema.safeParse({
@@ -135,6 +137,7 @@ describe('health and capabilities contracts', () => {
             version: 'lucy-character-reference-v1',
           },
         },
+        wardrobe: { addOutfitAvailable: false },
       }).success,
     ).toBe(false);
   });
@@ -345,6 +348,24 @@ describe('reference image contracts', () => {
     expect(
       editReferenceImageRequestSchema.safeParse({ ...request, sourceImageBytes: 'private' })
         .success,
+    ).toBe(false);
+  });
+
+  it('accepts image-only edits without a character prompt and rejects prompt leakage', () => {
+    const request = {
+      requestId: 'cb6ab812-0ebd-455b-8fe1-3a3665daf158',
+      sourcePromptMode: 'image-only' as const,
+      changeInstructions: 'Make the expression warmer.',
+      options,
+      optimization: { enabled: false as const },
+    };
+
+    expect(editReferenceImageRequestSchema.parse(request)).toEqual(request);
+    expect(
+      editReferenceImageRequestSchema.safeParse({
+        ...request,
+        rawPrompt: 'The parent character prompt must not be sent.',
+      }).success,
     ).toBe(false);
   });
 

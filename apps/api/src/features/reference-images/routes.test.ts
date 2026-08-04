@@ -128,6 +128,24 @@ describe('reference image API', () => {
     return app;
   };
 
+  it('requires explicit Wardrobe intent before reporting Add Outfit availability', async () => {
+    const app = await setup(null);
+    const url = `/api/reference-images/${requestId}/outfit-try-ons`;
+    const payload = { requestId: secondRequestId, garmentAssetId: secondRequestId };
+    const missingIntent = await app.inject({ method: 'POST', url, headers: localHeaders, payload });
+    expect(missingIntent.statusCode).toBe(403);
+
+    const unavailable = await app.inject({
+      method: 'POST',
+      url,
+      headers: { ...localHeaders, 'x-lightframe-provider-intent': 'wardrobe' },
+      payload,
+    });
+    expect(unavailable.statusCode).toBe(503);
+    expect(unavailable.json<ApiErrorResponse>().error.code).toBe('feature_unavailable');
+    expect(unavailable.body).not.toContain('Pruna');
+  });
+
   it('imports public HTTPS image bytes only with explicit intent and never echoes the URL', async () => {
     const bytes = await sharp({
       create: { width: 24, height: 24, channels: 3, background: '#405060' },

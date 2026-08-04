@@ -8,14 +8,15 @@ recovery path without risking a valid artifact.
 1. The header reports **Studio available to try**, **Studio limited**, or **Integration status
    unavailable**.
 2. Local capture availability comes from browser feature detection. `/api/capabilities` reports
-   configured Decart and ElevenLabs paths plus the startup-selected image provider and independent
-   optimizer state.
+   configured Decart and ElevenLabs paths plus the startup-selected image provider, independent
+   optimizer state, and provider-neutral `wardrobe.addOutfitAvailable` state.
 3. The capability response does not contact providers or prove health, quota, entitlement,
    retention, billing, or output quality.
 4. Missing provider configuration degrades independently:
    - local preparation/capture and supported local voice work remain available without keys;
    - Character/VTO preparation remains available without Decart Start;
    - Builder prompt-only and direct-upload saves remain available without image generation;
+   - Wardrobe browsing/use and Change Features remain available when Add Outfit is disabled;
    - Original/local voice choices remain available without ElevenLabs.
 5. If the broker check fails, select the stage notice’s **Retry check**. If device access fails,
    select **Capture settings**, resolve browser/device state, then retry Start explicitly.

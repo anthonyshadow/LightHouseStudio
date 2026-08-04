@@ -27,6 +27,8 @@ export interface RecipeSelection {
   assetId?: string;
   /** Exact saved-character identity retained by an image-only or character Recent item. */
   savedCharacterPromptId?: string;
+  /** Exact normalized wardrobe child; null/omitted identifies the original. */
+  savedCharacterVariantId?: string;
   characterName?: string;
   builderDraft?: PromptBuilderDraft;
 }
@@ -49,6 +51,7 @@ export interface RecipeShelfProps {
   onUsePrompt: (selection: RecipeSelection) => void;
   onCreateCharacter?: () => void;
   onEditCharacter?: (asset: SavedCharacterPrompt) => void;
+  onOpenWardrobe?: (asset: SavedCharacterPrompt) => void;
   onCreateOutfit?: () => void;
   onEditOutfit?: (asset: SavedPrompt) => void;
   onSaveOutfitCopy?: (asset: SavedPrompt | RecentPrompt) => void;

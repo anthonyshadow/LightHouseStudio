@@ -10,9 +10,9 @@ import {
 import { installProviderNetworkDriver } from './support/studioHarness.network';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
 const SEEDED_UPLOAD_RECIPES = {
-  schemaVersion: 5,
+  schemaVersion: 6,
   savedPrompts: [
     {
       id: 'character-anchor',
@@ -33,6 +33,7 @@ const SEEDED_UPLOAD_RECIPES = {
   ],
   recentPrompts: [],
   savedCharacterPrompts: [],
+  savedCharacterVariants: [],
 };
 
 const installCameraSentinel = async (page: Page): Promise<void> => {

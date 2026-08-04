@@ -168,6 +168,7 @@ export const RecipeShelf = (props: RecipeShelfProps) => {
     onUsePrompt: props.onUsePrompt,
     ...(props.onCreateCharacter ? { onCreateCharacter: props.onCreateCharacter } : {}),
     ...(props.onEditCharacter ? { onEditCharacter: props.onEditCharacter } : {}),
+    ...(props.onOpenWardrobe ? { onOpenWardrobe: props.onOpenWardrobe } : {}),
     ...(props.onCreateOutfit ? { onCreateOutfit: props.onCreateOutfit } : {}),
     ...(props.onEditOutfit ? { onEditOutfit: props.onEditOutfit } : {}),
     ...(props.onSaveOutfitCopy ? { onSaveOutfitCopy: props.onSaveOutfitCopy } : {}),

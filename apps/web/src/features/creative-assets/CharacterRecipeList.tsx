@@ -43,6 +43,9 @@ export const CharacterRecipeList = ({
                 useDisabled={useDisabled}
                 onSelect={() => controller.selectRecipe({ kind: 'character', id: item.id })}
                 onUse={() => controller.selectCharacter(item)}
+                {...(controller.canOpenWardrobe
+                  ? { onOpenWardrobe: () => controller.openWardrobe(item) }
+                  : {})}
                 {...(!builderOwned && item.builderDraft && controller.canOpenCharacterWorkshop
                   ? { onOpenWorkshop: () => controller.openCharacterWorkshop(item) }
                   : {})}

@@ -5,22 +5,25 @@
 The browser never calls an image provider or receives provider credentials. It uses the loopback,
 same-origin Fastify broker. `REFERENCE_IMAGE_PROVIDER` selects exactly one image provider at
 startup (`openai`, `bfl`, or `wiro`); there is no browser selector or provider fallback.
+Pruna Wardrobe try-on is a separate optional binding used only by **Add Outfit**; it does not
+change the startup-selected reference-image provider or **Change Features**.
 
 OpenAI prompt optimization is a separate, optional operation. Uploading or directly saving an
 image is local storage work and does not contact the optimizer or an image provider.
 
 ## Routes
 
-| Route                                                    | Purpose and provider contact                                                      |
-| -------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| `GET /api/capabilities`                                  | Reports configured provider/model/optimizer availability; never probes a provider |
-| `POST /api/reference-images/optimize`                    | Sends the validated character direction/options to OpenAI Responses               |
-| `POST /api/reference-images`                             | Generates one new reference with the selected image provider                      |
-| `POST /api/reference-images/uploads`                     | Stores validated raw image bytes locally; no provider contact                     |
-| `POST /api/reference-images/:sourceAssetId/compositions` | Applies the direction to an owner-scoped source                                   |
-| `POST /api/reference-images/:sourceAssetId/edits`        | Applies written changes to an owner-scoped source                                 |
-| `GET /api/reference-images/:assetId`                     | Returns owner-scoped metadata                                                     |
-| `GET /api/reference-images/:assetId/content`             | Returns validated stored bytes with the stored MIME type                          |
+| Route                                                      | Purpose and provider contact                                                      |
+| ---------------------------------------------------------- | --------------------------------------------------------------------------------- |
+| `GET /api/capabilities`                                    | Reports configured provider/model/optimizer availability; never probes a provider |
+| `POST /api/reference-images/optimize`                      | Sends the validated character direction/options to OpenAI Responses               |
+| `POST /api/reference-images`                               | Generates one new reference with the selected image provider                      |
+| `POST /api/reference-images/uploads`                       | Stores validated raw image bytes locally; no provider contact                     |
+| `POST /api/reference-images/:sourceAssetId/compositions`   | Applies the direction to an owner-scoped source                                   |
+| `POST /api/reference-images/:sourceAssetId/edits`          | Applies written changes to an owner-scoped source                                 |
+| `POST /api/reference-images/:sourceAssetId/outfit-try-ons` | Applies one owner-scoped garment through explicit Pruna Wardrobe generation       |
+| `GET /api/reference-images/:assetId`                       | Returns owner-scoped metadata                                                     |
+| `GET /api/reference-images/:assetId/content`               | Returns validated stored bytes with the stored MIME type                          |
 
 The strict request/response schemas in
 [`packages/contracts/src/reference-images.ts`](../packages/contracts/src/reference-images.ts) are
@@ -33,7 +36,14 @@ the payload authority. Important invariants:
   40-megapixel decoded-image limit;
 - source IDs are opaque UUIDs; the server resolves bytes only for the current local owner; and
 - generated output must decode to one advertised exact size: `1024x1024`, `1024x1536`, or
-  `1536x1024`.
+  `1536x1024`; Pruna-derived outfit results instead preserve validated flexible dimensions and
+  record exact source/garment lineage.
+
+The try-on route additionally requires `X-Lightframe-Provider-Intent: wardrobe`, a browser UUID,
+and one garment asset ID. Identical in-flight request IDs coalesce; conflicting request reuse is
+rejected. The adapter performs exactly one initial `p-image-try-on` prediction with
+`person_image`, one `garment_images` entry, `turbo: false`, JPEG quality 95, and input-size
+preservation. It never retries that billable submission or falls back.
 
 ## Browser flow
 
@@ -84,6 +94,8 @@ download retries continue only for that task. A failed provider never triggers a
   payloads, and unsafe provider errors are not returned to the browser.
 - Missing configuration or any provider/storage/validation failure preserves the previous valid
   preview and local upload/text-only alternatives.
+- Pruna person/garment uploads and delivery are provider-temporary. Local abort stops polling only;
+  no provider cancellation or deletion operation is claimed.
 
 See [privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) for lifetime and deletion rules and
 [live provider smoke](LIVE_PROVIDER_SMOKE.md) for cost-bearing qualification.
@@ -95,4 +107,4 @@ See [privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) for lifetime and
 - Routes/service/store: `apps/api/src/features/reference-images/`
 - Provider selection: `apps/api/src/providers/reference-images/provider-factory.ts`
 - Adapters: `apps/api/src/providers/openai/`, `apps/api/src/providers/bfl/`,
-  `apps/api/src/providers/wiro/`
+  `apps/api/src/providers/wiro/`, `apps/api/src/providers/pruna/`

@@ -17,9 +17,11 @@ import {
   GUIDED_CHOICE_KEYS,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
+  ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   RECENT_PROMPT_LIMIT,
   SAVED_CHARACTER_PROMPT_LIMIT,
+  SAVED_CHARACTER_VARIANT_LIMIT,
   SAVED_PROMPT_LIMIT,
   type CreativeAssetStore,
   type GuidedChoiceKey,
@@ -29,6 +31,7 @@ import {
   type ReferenceImageStatus,
   type SanitizeCreativeAssetResult,
   type SavedCharacterPrompt,
+  type SavedCharacterVariant,
   type SavedCharacterPromptSource,
   type SavedPrompt,
   type SavedPromptSource,
@@ -231,6 +234,7 @@ const sanitizeRecentPrompt = (
   includeReferenceImage: boolean,
   includeCharacterIdentity: boolean,
   includeVtonConfiguration: boolean,
+  includeWardrobeIdentity: boolean,
 ): RecentPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
@@ -244,6 +248,10 @@ const sanitizeRecentPrompt = (
   const savedCharacterPromptId =
     includeCharacterIdentity && value.savedCharacterPromptId !== undefined
       ? normalizedId(value.savedCharacterPromptId)
+      : null;
+  const savedCharacterVariantId =
+    includeWardrobeIdentity && value.savedCharacterVariantId !== undefined
+      ? normalizedId(value.savedCharacterVariantId)
       : null;
   const characterName =
     includeCharacterIdentity && typeof value.characterName === 'string'
@@ -284,7 +292,10 @@ const sanitizeRecentPrompt = (
     (value.savedPromptId !== undefined && !savedPromptId) ||
     (includeCharacterIdentity &&
       value.savedCharacterPromptId !== undefined &&
-      !savedCharacterPromptId)
+      !savedCharacterPromptId) ||
+    (includeWardrobeIdentity &&
+      value.savedCharacterVariantId !== undefined &&
+      !savedCharacterVariantId)
   ) {
     return null;
   }
@@ -294,6 +305,7 @@ const sanitizeRecentPrompt = (
     modelModeId,
     ...(savedPromptId ? { savedPromptId } : {}),
     ...(savedCharacterPromptId ? { savedCharacterPromptId } : {}),
+    ...(savedCharacterVariantId ? { savedCharacterVariantId } : {}),
     ...(containsMeaningfulText(characterName) ? { characterName } : {}),
     referenceImageAssetId: persistedReferenceImageAssetId,
     vtonInputKind: vtonConfiguration.inputKind,
@@ -307,6 +319,7 @@ const sanitizeSavedCharacterPrompt = (
   includeReferenceImage: boolean,
   includeGuidedDesign: boolean,
   includeReferenceProvenance: boolean,
+  includeWardrobeSelection: boolean,
 ): SavedCharacterPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
@@ -344,6 +357,9 @@ const sanitizeSavedCharacterPrompt = (
     : persistedReferenceImageAssetId
       ? ('generated' as const)
       : null;
+  const selectedWardrobeVariantId = includeWardrobeSelection
+    ? referenceImageAssetId(value.selectedWardrobeVariantId)
+    : null;
   const validReferenceProvenance =
     finalReferenceKind !== undefined &&
     ((finalReferenceKind === null &&
@@ -390,6 +406,7 @@ const sanitizeSavedCharacterPrompt = (
     referenceImageAssetId: persistedReferenceImageAssetId,
     uploadedReferenceImageAssetId,
     finalReferenceKind,
+    selectedWardrobeVariantId,
     notes:
       typeof value.notes === 'string'
         ? normalizeWhitespace(value.notes, CHARACTER_NOTES_MAX_LENGTH)
@@ -400,6 +417,75 @@ const sanitizeSavedCharacterPrompt = (
     lastUsedAt,
     useCount: count(value.useCount),
   };
+};
+
+const sanitizeSavedCharacterVariant = (value: unknown): SavedCharacterVariant | null => {
+  if (!isRecord(value) || !isRecord(value.creation)) return null;
+  const id = normalizedId(value.id);
+  const parentCharacterId = normalizedId(value.parentCharacterId);
+  const title =
+    typeof value.title === 'string' ? normalizeWhitespace(value.title, ASSET_NAME_MAX_LENGTH) : '';
+  const resultReferenceImageAssetId = referenceImageAssetId(value.referenceImageAssetId);
+  const sourceReferenceImageAssetId = referenceImageAssetId(
+    value.creation.sourceReferenceImageAssetId,
+  );
+  const createdAt = validDate(value.createdAt);
+  const updatedAt = validDate(value.updatedAt);
+  const lastUsedAt = nullableDate(value.lastUsedAt);
+  if (
+    !id ||
+    !parentCharacterId ||
+    !containsMeaningfulText(title) ||
+    !resultReferenceImageAssetId ||
+    !sourceReferenceImageAssetId ||
+    !createdAt ||
+    !updatedAt ||
+    (value.lastUsedAt != null && !lastUsedAt)
+  ) {
+    return null;
+  }
+  const common = {
+    id,
+    parentCharacterId,
+    title,
+    referenceImageAssetId: resultReferenceImageAssetId,
+    createdAt,
+    updatedAt,
+    lastUsedAt,
+    useCount: count(value.useCount),
+  } as const;
+  if (value.creation.method === 'add-outfit') {
+    const garmentReferenceImageAssetId = referenceImageAssetId(
+      value.creation.garmentReferenceImageAssetId,
+    );
+    return garmentReferenceImageAssetId
+      ? {
+          ...common,
+          creation: {
+            method: 'add-outfit',
+            sourceReferenceImageAssetId,
+            garmentReferenceImageAssetId,
+          },
+        }
+      : null;
+  }
+  if (value.creation.method === 'change-features') {
+    const changeInstructions =
+      typeof value.creation.changeInstructions === 'string'
+        ? normalizeAuthoredPrompt(value.creation.changeInstructions)
+        : '';
+    return containsMeaningfulText(changeInstructions)
+      ? {
+          ...common,
+          creation: {
+            method: 'change-features',
+            sourceReferenceImageAssetId,
+            changeInstructions,
+          },
+        }
+      : null;
+  }
+  return null;
 };
 
 const uniqueById = <T extends { readonly id: string }>(records: readonly T[]): readonly T[] => {
@@ -429,15 +515,17 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
       value.schemaVersion !== PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION &&
       value.schemaVersion !== OLDER_CREATIVE_ASSET_SCHEMA_VERSION &&
       value.schemaVersion !== EARLIER_CREATIVE_ASSET_SCHEMA_VERSION &&
-      value.schemaVersion !== LEGACY_CREATIVE_ASSET_SCHEMA_VERSION)
+      value.schemaVersion !== LEGACY_CREATIVE_ASSET_SCHEMA_VERSION &&
+      value.schemaVersion !== ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION)
   ) {
     return { store: createEmptyCreativeAssetStore(), recovered: true, droppedRecords: 0 };
   }
 
-  const includeReferenceImages = value.schemaVersion >= EARLIER_CREATIVE_ASSET_SCHEMA_VERSION;
-  const includeGuidedDesign = value.schemaVersion >= OLDER_CREATIVE_ASSET_SCHEMA_VERSION;
-  const includeReferenceProvenance = value.schemaVersion >= PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION;
-  const includeVtonConfiguration = value.schemaVersion === CREATIVE_ASSET_SCHEMA_VERSION;
+  const includeReferenceImages = value.schemaVersion >= LEGACY_CREATIVE_ASSET_SCHEMA_VERSION;
+  const includeGuidedDesign = value.schemaVersion >= EARLIER_CREATIVE_ASSET_SCHEMA_VERSION;
+  const includeReferenceProvenance = value.schemaVersion >= OLDER_CREATIVE_ASSET_SCHEMA_VERSION;
+  const includeVtonConfiguration = value.schemaVersion >= PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION;
+  const includeWardrobe = value.schemaVersion === CREATIVE_ASSET_SCHEMA_VERSION;
   const savedInput = sanitizeArray(value.savedPrompts, (record) =>
     sanitizeSavedPrompt(record, includeReferenceImages, includeVtonConfiguration),
   );
@@ -447,6 +535,7 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
       includeReferenceImages,
       includeReferenceProvenance,
       includeVtonConfiguration,
+      includeWardrobe,
     ),
   );
   const characterInput = sanitizeArray(value.savedCharacterPrompts, (record) =>
@@ -455,25 +544,44 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
       includeReferenceImages,
       includeGuidedDesign,
       includeReferenceProvenance,
+      includeWardrobe,
     ),
+  );
+  const variantInput = sanitizeArray(value.savedCharacterVariants, (record) =>
+    includeWardrobe ? sanitizeSavedCharacterVariant(record) : null,
   );
 
   const savedPrompts = uniqueById(
     [...savedInput.records].sort((left, right) => right.updatedAt.localeCompare(left.updatedAt)),
   ).slice(0, SAVED_PROMPT_LIMIT);
   const savedById = new Map(savedPrompts.map((saved) => [saved.id, saved]));
-  const savedCharacterPrompts = uniqueById(
+  const parsedCharacters = uniqueById(
     [...characterInput.records].sort((left, right) =>
       right.updatedAt.localeCompare(left.updatedAt),
     ),
   ).slice(0, SAVED_CHARACTER_PROMPT_LIMIT);
+  const parsedCharactersById = new Map(parsedCharacters.map((saved) => [saved.id, saved]));
+  const savedCharacterVariants = uniqueById(
+    [...variantInput.records]
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))
+      .filter((variant) => parsedCharactersById.has(variant.parentCharacterId)),
+  ).slice(0, SAVED_CHARACTER_VARIANT_LIMIT);
+  const variantsById = new Map(savedCharacterVariants.map((variant) => [variant.id, variant]));
+  const savedCharacterPrompts = parsedCharacters.map((character) => {
+    const selected = character.selectedWardrobeVariantId
+      ? variantsById.get(character.selectedWardrobeVariantId)
+      : undefined;
+    return selected?.parentCharacterId === character.id
+      ? character
+      : { ...character, selectedWardrobeVariantId: null };
+  });
   const charactersById = new Map(savedCharacterPrompts.map((saved) => [saved.id, saved]));
 
   const recentKeys = new Set<string>();
   const recentPrompts = [...recentInput.records]
     .sort((left, right) => right.usedAt.localeCompare(left.usedAt))
     .filter((recent) => {
-      const key = `${recent.modelModeId}\u0000${canonicalPrompt(recent.prompt)}\u0000${recent.referenceImageAssetId ?? ''}\u0000${recent.vtonInputKind ?? ''}\u0000${recent.enhancePrompt ? '1' : '0'}\u0000${recent.savedCharacterPromptId ?? recent.characterName ?? ''}`;
+      const key = `${recent.modelModeId}\u0000${canonicalPrompt(recent.prompt)}\u0000${recent.referenceImageAssetId ?? ''}\u0000${recent.vtonInputKind ?? ''}\u0000${recent.enhancePrompt ? '1' : '0'}\u0000${recent.savedCharacterPromptId ?? recent.characterName ?? ''}\u0000${recent.savedCharacterVariantId ?? ''}`;
       if (recentKeys.has(key)) return false;
       recentKeys.add(key);
       return true;
@@ -482,11 +590,18 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
     .map((recent): RecentPrompt => {
       if (recent.savedCharacterPromptId) {
         const character = charactersById.get(recent.savedCharacterPromptId);
+        const variant = recent.savedCharacterVariantId
+          ? variantsById.get(recent.savedCharacterVariantId)
+          : undefined;
+        const expectedReferenceImageAssetId = variant
+          ? variant.referenceImageAssetId
+          : character?.referenceImageAssetId;
         if (
           character &&
+          (!recent.savedCharacterVariantId || variant?.parentCharacterId === character.id) &&
           recent.modelModeId === 'lucy-latest' &&
           canonicalPrompt(character.prompt) === canonicalPrompt(recent.prompt) &&
-          character.referenceImageAssetId === recent.referenceImageAssetId
+          expectedReferenceImageAssetId === recent.referenceImageAssetId
         ) {
           return { ...recent, characterName: character.name };
         }
@@ -524,14 +639,23 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
       };
     });
 
-  const keptCount = savedPrompts.length + recentPrompts.length + savedCharacterPrompts.length;
-  const inputCount = savedInput.inputCount + recentInput.inputCount + characterInput.inputCount;
+  const keptCount =
+    savedPrompts.length +
+    recentPrompts.length +
+    savedCharacterPrompts.length +
+    savedCharacterVariants.length;
+  const inputCount =
+    savedInput.inputCount +
+    recentInput.inputCount +
+    characterInput.inputCount +
+    variantInput.inputCount;
   const droppedRecords = Math.max(0, inputCount - keptCount);
   const store: CreativeAssetStore = {
     schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
     savedPrompts,
     recentPrompts,
     savedCharacterPrompts,
+    savedCharacterVariants,
   };
   let inputMatchesSanitizedStore = false;
   try {

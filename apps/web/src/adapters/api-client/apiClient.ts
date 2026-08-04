@@ -5,11 +5,14 @@ import {
   createReferenceImageResponseSchema,
   editReferenceImageResponseSchema,
   optimizeCharacterReferencePromptResponseSchema,
+  outfitTryOnResponseSchema,
   referenceImageMetadataResponseSchema,
   realtimeTokenResponseSchema,
   REFERENCE_IMAGE_MAX_BYTES,
   REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
   uploadReferenceImageResponseSchema,
+  WARDROBE_PROVIDER_INTENT_HEADER,
+  WARDROBE_PROVIDER_INTENT_VALUE,
   VIDEO_PROVIDER_INTENT_HEADER,
   VIDEO_PROVIDER_INTENT_VALUE,
   type ComposeReferenceImageRequest,
@@ -18,6 +21,7 @@ import {
   type OptimizeCharacterReferencePromptRequest,
   type OptimizeCharacterReferencePromptResponse,
   type ReferenceImageAsset,
+  type DerivedReferenceImageAsset,
   type RealtimeSessionProfile,
 } from '@studio/contracts';
 import type { ModelMode, ProviderAvailability } from '../../application/types';
@@ -108,6 +112,7 @@ export const fetchProviderAvailability = async (
     referenceImageOptimizerAvailable: payload.referenceImages.optimizer.available,
     referenceImageOptimizerModel: payload.referenceImages.optimizer.model,
     referenceImageOptimizerVersion: payload.referenceImages.optimizer.version,
+    wardrobeAddOutfitAvailable: payload.wardrobe.addOutfitAvailable,
   };
 };
 
@@ -190,6 +195,31 @@ export const uploadReferenceImage = async (
     },
     uploadReferenceImageResponseSchema,
     invalidApiResponse('The uploaded reference response was invalid.', 'invalid_image_upload'),
+  );
+  return payload.asset;
+};
+
+export const createOutfitTryOn = async (
+  sourceAssetId: string,
+  garmentAssetId: string,
+  requestId: string,
+  signal?: AbortSignal,
+): Promise<DerivedReferenceImageAsset> => {
+  const payload = await requestJson(
+    `/api/reference-images/${encodeURIComponent(sourceAssetId)}/outfit-try-ons`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      ...(signal ? { signal } : {}),
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        [WARDROBE_PROVIDER_INTENT_HEADER]: WARDROBE_PROVIDER_INTENT_VALUE,
+      },
+      body: JSON.stringify({ requestId, garmentAssetId }),
+    },
+    outfitTryOnResponseSchema,
+    invalidApiResponse('The wardrobe result was invalid.', 'invalid_provider_image'),
   );
   return payload.asset;
 };
@@ -322,9 +352,9 @@ export const hydrateReferenceImage = async (
   }
   const blob = await response.blob();
   const maximumBytes =
-    metadata.source === 'uploaded'
-      ? REFERENCE_IMAGE_UPLOAD_MAX_BYTES
-      : REFERENCE_IMAGE_MAX_BYTES - 1;
+    metadata.source === 'generated'
+      ? REFERENCE_IMAGE_MAX_BYTES - 1
+      : REFERENCE_IMAGE_UPLOAD_MAX_BYTES;
   if (
     blob.type !== metadata.mimeType ||
     blob.size !== metadata.byteSize ||

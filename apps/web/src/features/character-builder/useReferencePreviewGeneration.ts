@@ -23,6 +23,7 @@ export interface ReferencePreviewGenerationInput {
   options: CharacterReferenceOptions;
   sourceAssetId?: string | undefined;
   changeInstructions?: string | undefined;
+  sourcePromptMode?: 'character-prompt' | 'image-only' | undefined;
   attemptOptimization?: boolean | undefined;
   fallbackOnOptimizationFailure?: boolean | undefined;
   forceOptimization?: boolean | undefined;
@@ -149,6 +150,7 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
         requestFingerprint = JSON.stringify({
           kind: edit ? 'edit' : compose ? 'compose' : 'generate',
           sourceAssetId: edit || compose ? input.sourceAssetId : null,
+          sourcePromptMode: edit ? (input.sourcePromptMode ?? 'character-prompt') : null,
           sourceKey,
           changeInstructions,
           optimizationInputHash: optimization?.inputHash ?? null,
@@ -163,13 +165,21 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
           edit && input.sourceAssetId
             ? await editReferenceImage(
                 input.sourceAssetId,
-                {
-                  requestId: providerRequestId,
-                  rawPrompt: input.rawPrompt,
-                  changeInstructions,
-                  options: input.options,
-                  optimization: requestOptimization,
-                },
+                input.sourcePromptMode === 'image-only'
+                  ? {
+                      requestId: providerRequestId,
+                      sourcePromptMode: 'image-only',
+                      changeInstructions,
+                      options: input.options,
+                      optimization: { enabled: false },
+                    }
+                  : {
+                      requestId: providerRequestId,
+                      rawPrompt: input.rawPrompt,
+                      changeInstructions,
+                      options: input.options,
+                      optimization: requestOptimization,
+                    },
                 controller.signal,
               )
             : compose && input.sourceAssetId

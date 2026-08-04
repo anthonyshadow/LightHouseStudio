@@ -131,6 +131,20 @@ Lucy endpoints and 720p output; Pruna qualification is split into 720p and 1080p
 is no UI provider selector, fallback, automatic initial retry, or claim that local cleanup deletes
 Pruna inputs/results.
 
+## Saved characters gained normalized Wardrobes
+
+On 2026-08-03, character versions became normalized children of one saved parent instead of
+duplicated character records. A pure selection resolver now supplies the ordinary prompt, display
+label, and exact original/variant image to Studio and Existing Video. Selection is durable only
+after successful hydration/use; creating a version never switches the active character
+implicitly. The metadata store advanced to v6 with v1-v5 migration, sanitization, parent cascade,
+and a 500-record variant cap while detached immutable image bytes retain their existing policy.
+
+Pruna `p-image-try-on` is dedicated to explicit Wardrobe Add Outfit and remains independently
+disabled by default. Change Features continues through the startup-selected OpenAI/BFL/Wiro edit
+path with optimization off. Both use the same server-mediated immutable reference store, shared
+overlay, and no-retry/no-fallback rule; local abort does not claim remote cancellation or deletion.
+
 ## Scope remains intentionally local
 
 Accounts, remote hosting, cloud projects, take history, collaboration, sharing, billing, and public

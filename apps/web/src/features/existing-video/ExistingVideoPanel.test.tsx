@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
@@ -1122,6 +1122,100 @@ describe('ExistingVideoPanel', () => {
     expect(options.at(-1)).toHaveAccessibleName('Create A Character');
     fireEvent.click(options.at(-1)!);
     expect(onCreateCharacter).toHaveBeenCalledWith('lucy');
+  });
+
+  it('hydrates and applies the exact wardrobe variant selected for a parent character', async () => {
+    const updateStep = vi.fn();
+    const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
+    const variantReference = new File(['variant'], 'evening.jpg', { type: 'image/jpeg' });
+    api.hydrateReferenceImage.mockResolvedValue({ file: variantReference });
+
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: null,
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-08-03T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: null,
+                durationMs: 30_000,
+                width: 1_920,
+                height: 1_080,
+                sizeBytes: source.size,
+                hasAudio: false,
+              },
+            },
+            steps: [
+              {
+                id: 'lucy',
+                modelId: 'lucy-latest',
+                savedRecipeId: null,
+                prompt: '',
+                enhancePrompt: false,
+                referenceImage: null,
+                inputKind: 'character',
+              },
+            ],
+            phase: 'ready',
+            updateStep,
+          })}
+          videoProcessingAvailable
+          savedRecipes={[
+            {
+              id: 'host',
+              label: 'Professional Anchor · Original',
+              modelId: 'lucy-latest',
+              prompt: 'A professional anchor.',
+              referenceImageAssetId: 'host-original',
+              vtonInputKind: null,
+              enhancePrompt: false,
+              savedCharacterPromptId: 'host',
+              originalCharacterVersion: true,
+            },
+            {
+              id: 'host-evening',
+              label: 'Professional Anchor · Evening look',
+              modelId: 'lucy-latest',
+              prompt: 'A professional anchor.',
+              referenceImageAssetId: 'host-evening-asset',
+              vtonInputKind: null,
+              enhancePrompt: false,
+              savedCharacterPromptId: 'host',
+              savedCharacterVariantId: 'host-evening',
+              originalCharacterVersion: false,
+            },
+          ]}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Saved Character' }));
+    fireEvent.click(screen.getByRole('option', { name: /Professional Anchor/u }));
+    const variantCard = screen.getByText('Evening look').closest('article');
+    expect(variantCard).not.toBeNull();
+    fireEvent.click(within(variantCard!).getByRole('button', { name: 'Choose' }));
+
+    await waitFor(() =>
+      expect(api.hydrateReferenceImage).toHaveBeenCalledWith('host-evening-asset'),
+    );
+    expect(updateStep).toHaveBeenCalledWith(
+      'lucy',
+      expect.objectContaining({
+        savedRecipeId: 'host-evening',
+        prompt: '',
+        referenceImage: variantReference,
+      }),
+    );
   });
 
   it('restores a saved prompt outfit in Prompt mode with its enhancement setting', async () => {

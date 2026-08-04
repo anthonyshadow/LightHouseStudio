@@ -3,10 +3,12 @@ import type { Page } from '@playwright/test';
 import type {
   ComposeReferenceImageRequest,
   CreateReferenceImageRequest,
+  DerivedReferenceImageAsset,
   EditReferenceImageRequest,
   GeneratedReferenceImageAsset,
   OptimizeCharacterReferencePromptRequest,
   OptimizeCharacterReferencePromptResponse,
+  OutfitTryOnRequest,
   UploadedReferenceImageAsset,
 } from '@studio/contracts';
 import type {
@@ -75,13 +77,17 @@ const IMAGE_DIMENSIONS_BY_SIZE = {
 
 const createMockReferenceAsset = (
   sequence: number,
-  request: CreateReferenceImageRequest,
+  request: CreateReferenceImageRequest | ComposeReferenceImageRequest | EditReferenceImageRequest,
 ): GeneratedReferenceImageAsset => {
   const assetId = assetIdForSequence(sequence);
   const optimization = request.optimization;
+  const sourcePrompt =
+    'rawPrompt' in request
+      ? request.rawPrompt
+      : 'The selected source image is the authoritative character reference.';
   const generationPrompt = optimization.enabled
     ? optimization.result.optimizedImagePrompt
-    : request.rawPrompt;
+    : sourcePrompt;
   const recommendedSettings = optimization.enabled
     ? optimization.result.recommendedSettings
     : {
@@ -99,19 +105,19 @@ const createMockReferenceAsset = (
     provider: 'openai',
     model: request.generator?.model ?? 'gpt-image-2',
     quality: recommendedSettings.quality,
-    promptHash: promptHash(request.rawPrompt),
+    promptHash: promptHash(sourcePrompt),
     optimizationEnabled: optimization.enabled,
-    originalPrompt: request.rawPrompt,
+    originalPrompt: sourcePrompt,
     optimizedImagePrompt: generationPrompt,
     lucy25CharacterPrompt: optimization.enabled
       ? optimization.result.lucy25CharacterPrompt
-      : request.rawPrompt,
+      : sourcePrompt,
     normalizedCharacterDescription: optimization.enabled
       ? optimization.result.normalizedCharacterDescription
-      : request.rawPrompt,
+      : sourcePrompt,
     preservedCharacterFacts: optimization.enabled
       ? optimization.result.preservedCharacterFacts
-      : [request.rawPrompt],
+      : [sourcePrompt],
     technicalDefaultsAdded: optimization.enabled ? optimization.result.technicalDefaultsAdded : [],
     warnings: optimization.enabled ? optimization.result.warnings : [],
     options: request.options,
@@ -171,6 +177,7 @@ export const installProviderNetworkDriver = async (
     referenceImageGenerations: [],
     referenceImageEdits: [],
     referenceImageCompositions: [],
+    outfitTryOns: [],
     referenceImageMetadataReads: [],
     referenceImageContentReads: [],
     providerSdkRequests: [],
@@ -183,6 +190,7 @@ export const installProviderNetworkDriver = async (
   const assets = new Map<string, MockReferenceImageAsset>();
   const generatedAssetsByRequestId = new Map<string, GeneratedReferenceImageAsset>();
   const uploadedAssetsByRequestId = new Map<string, UploadedReferenceImageAsset>();
+  const outfitAssetsByRequestId = new Map<string, DerivedReferenceImageAsset>();
   let assetSequence = 0;
 
   await page.routeWebSocket(
@@ -264,6 +272,9 @@ export const installProviderNetworkDriver = async (
               model: 'gpt-5.6',
               version: 'lucy-character-reference-v1',
             },
+          },
+          wardrobe: {
+            addOutfitAvailable: options.wardrobeAddOutfitAvailable ?? false,
           },
         }),
       });
@@ -430,6 +441,58 @@ export const installProviderNetworkDriver = async (
       });
       await route.fulfill({
         status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify({ asset }),
+      });
+      return;
+    }
+
+    const outfitTryOnMatch = requestUrl.pathname.match(
+      /^\/api\/reference-images\/([0-9a-f-]+)\/outfit-try-ons$/u,
+    );
+    if (outfitTryOnMatch && route.request().method() === 'POST') {
+      const sourceAssetId = outfitTryOnMatch[1] ?? '';
+      const payload = route.request().postDataJSON() as OutfitTryOnRequest;
+      if (!assets.has(sourceAssetId) || !assets.has(payload.garmentAssetId)) {
+        await route.fulfill({
+          status: 404,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            error: { code: 'not_found', message: 'That local reference image is unavailable.' },
+          }),
+        });
+        return;
+      }
+      let asset = outfitAssetsByRequestId.get(payload.requestId);
+      if (!asset) {
+        assetSequence += 1;
+        const assetId = assetIdForSequence(assetSequence);
+        asset = {
+          assetId,
+          mimeType: 'image/png',
+          byteSize: REFERENCE_PNG.byteLength,
+          source: 'derived',
+          provider: 'pruna',
+          model: 'p-image-try-on',
+          width: 1024,
+          height: 1024,
+          derivation: {
+            kind: 'outfit-try-on',
+            sourceAssetId,
+            garmentAssetId: payload.garmentAssetId,
+          },
+          createdAt: '2030-01-01T00:00:00.000Z',
+          updatedAt: '2030-01-01T00:00:00.000Z',
+          contentUrl: `/api/reference-images/${assetId}/content`,
+        };
+        outfitAssetsByRequestId.set(payload.requestId, asset);
+        assets.set(asset.assetId, asset);
+      }
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.referenceWorkflowCalls.push('outfit-try-on');
+      network.outfitTryOns.push({ ...payload, sourceAssetId, assetId: asset.assetId });
+      await route.fulfill({
+        status: 200,
         contentType: 'application/json',
         body: JSON.stringify({ asset }),
       });

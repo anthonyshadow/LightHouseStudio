@@ -1,7 +1,7 @@
 # Gated live provider smoke
 
 Live checks are manual, opt-in, cost-bearing, and excluded from normal test/quality commands.
-Current repository evidence is `0/11`; no provider/local row is qualified.
+Current repository evidence is `0/12`; no provider/local row is qualified.
 
 Use only authorized, least-privilege test credentials, non-sensitive disposable media, understood
 account retention/quota, and an approved spend. Never run this procedure in CI, Storybook,
@@ -28,19 +28,20 @@ provider bodies, signed/polling URLs, personal media, or full network archives.
 
 ## Required configurations
 
-| Requirement       | Exact configuration                                                           |
-| ----------------- | ----------------------------------------------------------------------------- |
-| Local             | No provider credentials                                                       |
-| Decart Character  | SDK `0.1.17`, exact `lucy-latest`, 300-second session                         |
-| Decart VTO        | SDK `0.1.17`, exact `lucy-vton-latest`, 300-second session                    |
-| Decart batch Lucy | Queue HTTP, exact `lucy-latest`, fixed `720p`, 300-second input               |
-| Decart batch VTO  | Queue HTTP, exact `lucy-vton-latest`, fixed `720p`, 300-second input          |
-| Pruna Character   | `p-video-replace`, `720p`, one reference, MP4 driver, `save_audio=true`       |
-| Pruna Character   | `p-video-replace`, `1080p`, one reference, MP4 driver, `save_audio=true`      |
-| ElevenLabs        | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false` |
-| OpenAI image      | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                      |
-| BFL image         | `flux-2-pro`, safety `2`, prompt upsampling off                               |
-| Wiro image        | `seedream-v5-lite-uncensored`, 2k, watermark off, operator qualification      |
+| Requirement       | Exact configuration                                                              |
+| ----------------- | -------------------------------------------------------------------------------- |
+| Local             | No provider credentials                                                          |
+| Decart Character  | SDK `0.1.17`, exact `lucy-latest`, 300-second session                            |
+| Decart VTO        | SDK `0.1.17`, exact `lucy-vton-latest`, 300-second session                       |
+| Decart batch Lucy | Queue HTTP, exact `lucy-latest`, fixed `720p`, 300-second input                  |
+| Decart batch VTO  | Queue HTTP, exact `lucy-vton-latest`, fixed `720p`, 300-second input             |
+| Pruna Character   | `p-video-replace`, `720p`, one reference, MP4 driver, `save_audio=true`          |
+| Pruna Character   | `p-video-replace`, `1080p`, one reference, MP4 driver, `save_audio=true`         |
+| Pruna Wardrobe    | `p-image-try-on`, one person, one garment, input size preserved, JPEG quality 95 |
+| ElevenLabs        | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false`    |
+| OpenAI image      | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                         |
+| BFL image         | `flux-2-pro`, safety `2`, prompt upsampling off                                  |
+| Wiro image        | `seedream-v5-lite-uncensored`, 2k, watermark off, operator qualification         |
 
 Reference image providers require three separate server startups; there is no fallback.
 
@@ -197,6 +198,43 @@ For each resolution row:
    numeric upstream status. For an HTTP 200 status response whose prediction status is `failed`,
    confirm the console instead records the safe `generation-failed` category and the browser says
    no result was produced. Lightframe local cleanup must not be described as provider deletion.
+
+## Pruna Wardrobe Add Outfit
+
+This is a separate credentialed and billable pass. Set `PRUNA_IMAGE_TRY_ON_ENABLED=true`, the
+shared server-only `PRUNA_API_KEY`, and exact `PRUNA_IMAGE_TRY_ON_MODEL=p-image-try-on`; it does not
+select Pruna Character Swap. Review the current
+[try-on schema](https://docs.api.pruna.ai/apis/models-api-0/versions/d086a242-3813-4148-a087-e724d4b333f8/schemas/p-image-try-on)
+and [asynchronous workflow](https://docs.api.pruna.ai/guides/quickstart) before spending.
+
+1. Obtain separate Billing Authorizer approval and confirm model entitlement, account retention,
+   content policy, and delivery behavior. Use a disposable consenting adult character/person image
+   and one garment image. Record this row as blocked until this live pass is performed.
+2. Confirm capabilities report only `wardrobe.addOutfitAvailable: true`; no provider/model name is
+   rendered. Disable try-on and confirm saved Wardrobe browsing/use and Change Features remain
+   available. A missing shared key or non-exact model literal must fail enabled configuration.
+3. Select an exact original or saved variant as the person source, attach/import one garment, and
+   confirm no Pruna request occurs before explicit **Generate outfit**. Change any source/input
+   during work and confirm the stale result cannot become saveable.
+4. Confirm exactly two `/v1/files` uploads and one `/v1/predictions` submission with
+   `Model: p-image-try-on`, `person_image`, one `garment_images` entry, `turbo: false`,
+   `output_format: "jpg"`, `output_quality: 95`, and `preserve_input_size: true`. There is no
+   automatic initial retry, fallback, raw identifier/URL/body leakage, or model/provider UI copy.
+5. Observe bounded `starting`/`processing` polling and authenticated download only from the
+   allowlisted Pruna delivery path. Interrupt local polling and verify no provider cancellation or
+   deletion claim. Exercise malformed status, unsafe delivery URL, oversized body, invalid MIME,
+   invalid dimensions, and provider failure; all must preserve the prior valid preview and expose
+   only app-owned safe errors.
+6. Confirm the decoded result is stored locally before the browser receives it, with derived
+   `outfit-try-on` lineage naming the exact person and garment asset IDs. Save requires a name and
+   creates variant metadata without selecting it. Only later explicit **Use**, after successful
+   hydration/application, persists selection and exact parent/variant usage.
+7. Retry one ambiguous identical browser request ID and confirm it coalesces/replays without a
+   second prediction. Reuse that ID with a different person or garment and confirm conflict before
+   provider contact. Verify another loopback owner cannot reference either input.
+
+Automated fake-transport coverage is not live qualification. No live Pruna try-on call is part of
+ordinary tests, screenshots, E2E, or this implementation change.
 
 ## Reference image providers
 

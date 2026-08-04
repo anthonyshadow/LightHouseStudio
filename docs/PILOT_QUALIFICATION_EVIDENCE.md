@@ -8,7 +8,7 @@ provider output, physical codecs/memory, browser interruption, or hardware clean
 Release requires content-free evidence from the exact candidate commit for every row in
 [`qualification/required-matrix.json`](qualification/required-matrix.json).
 
-**Current repository state:** no committed pass records; the gate is `0/11` provider/local and
+**Current repository state:** no committed pass records; the gate is `0/12` provider/local and
 `0/45` physical rows.
 
 ## Record a result

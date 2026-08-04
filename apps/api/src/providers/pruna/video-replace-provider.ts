@@ -236,8 +236,7 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
             target_fps: 'original',
             ignore_audio: false,
             instruction_prompt: input.recipe.prompt || DEFAULT_REPLACEMENT_INSTRUCTION,
-            //TODO: Remove this once safety checking is fully implemented and tested. For now, we want to avoid any false positives that would block valid jobs.
-            disable_safety_checker: true,
+            disable_safety_checker: false,
           },
         }),
       },

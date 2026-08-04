@@ -1,0 +1,633 @@
+import type { CharacterReferenceOptions, ReferenceImageAsset } from '@studio/contracts';
+import { useTheme } from '@emotion/react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  createOutfitTryOn,
+  fetchReferenceImageMetadata,
+  uploadReferenceImage,
+} from '../../adapters/api-client/apiClient';
+import { validateReferenceImage } from '../../adapters/browser-media/imageValidation';
+import {
+  Button,
+  ReferenceImagePreview,
+  SegmentedControl,
+  StatusNotice,
+  TextAreaField,
+  TextField,
+} from '../../ui';
+import type {
+  CharacterVersionSelection,
+  CreativeAssetRepository,
+  CreativeAssetStore,
+  SavedCharacterPrompt,
+} from '../creative-assets/types';
+import { ReferenceImageInputField } from '../reference-images/ReferenceImageInputField';
+import { useReferencePreviewGeneration } from '../character-builder/useReferencePreviewGeneration';
+import { CharacterVersionSelector, type CharacterVersionOption } from './CharacterVersionSelector';
+
+const createId = () => crypto.randomUUID();
+const ORIGINAL_VALUE = '__original__';
+const DEFAULT_OPTIONS: CharacterReferenceOptions = {
+  framing: 'full_body',
+  orientation: 'auto',
+  renderingMode: 'faithful_source_style',
+  expression: 'neutral',
+  background: 'neutral_gray',
+  targetUse: 'lucy_2_5_character_reference',
+};
+
+type CreationKind = 'add-outfit' | 'change-features';
+
+export const CharacterWardrobePanel = ({
+  repository,
+  store,
+  character,
+  addOutfitAvailable,
+  changeFeaturesAvailable,
+  useDisabled = false,
+  onUse,
+  onSaved,
+  onDirtyChange,
+  onClose,
+}: {
+  readonly repository: CreativeAssetRepository;
+  readonly store: CreativeAssetStore;
+  readonly character: SavedCharacterPrompt;
+  readonly addOutfitAvailable: boolean;
+  readonly changeFeaturesAvailable: boolean;
+  readonly useDisabled?: boolean;
+  readonly onUse: (selection: CharacterVersionSelection) => void;
+  readonly onSaved?: () => void;
+  readonly onDirtyChange: (dirty: boolean) => void;
+  readonly onClose: () => void;
+}) => {
+  const theme = useTheme();
+  const variants = store.savedCharacterVariants.filter(
+    (variant) => variant.parentCharacterId === character.id,
+  );
+  const [query, setQuery] = useState('');
+  const [creating, setCreating] = useState<CreationKind | null>(null);
+  const [sourceVariantId, setSourceVariantId] = useState<string | null>(
+    character.selectedWardrobeVariantId,
+  );
+  const [garment, setGarment] = useState<File | null>(null);
+  const [instructions, setInstructions] = useState('');
+  const [title, setTitle] = useState('');
+  const [preview, setPreview] = useState<ReferenceImageAsset | null>(null);
+  const [garmentAssetId, setGarmentAssetId] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const operationRef = useRef<{ controller: AbortController; key: string } | null>(null);
+  const retryRef = useRef<{ fingerprint: string; requestId: string } | null>(null);
+
+  const sourceAssetId = sourceVariantId
+    ? (variants.find((variant) => variant.id === sourceVariantId)?.referenceImageAssetId ?? null)
+    : character.referenceImageAssetId;
+  const dirty =
+    creating !== null &&
+    Boolean(
+      sourceVariantId !== character.selectedWardrobeVariantId ||
+      garment ||
+      instructions.trim() ||
+      title.trim() ||
+      preview ||
+      busy,
+    );
+  useLayoutEffect(() => {
+    onDirtyChange(dirty);
+    return () => onDirtyChange(false);
+  }, [dirty, onDirtyChange]);
+  useEffect(() => () => operationRef.current?.controller.abort(), []);
+
+  const featureGeneration = useReferencePreviewGeneration({
+    onPhase: () => setBusy(true),
+    onOptimizationSuccess: () => undefined,
+    onSuccess: (result) => {
+      setPreview(result.asset);
+      setBusy(false);
+      setError(null);
+    },
+    onError: (caught) => {
+      setBusy(false);
+      setError(
+        caught instanceof Error ? caught.message : 'The character features could not be changed.',
+      );
+    },
+  });
+
+  const options = useMemo<CharacterVersionOption[]>(
+    () => [
+      {
+        value: ORIGINAL_VALUE,
+        title: 'Original',
+        referenceImageAssetId: character.referenceImageAssetId,
+        original: true,
+        useCount: character.useCount,
+      },
+      ...variants.map((variant) => ({
+        value: variant.id,
+        title: variant.title,
+        referenceImageAssetId: variant.referenceImageAssetId,
+        original: false,
+        useCount: variant.useCount,
+      })),
+    ],
+    [character.referenceImageAssetId, character.useCount, variants],
+  );
+  const visibleOptions = options.filter((option) =>
+    option.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
+  );
+
+  const invalidatePreview = () => {
+    operationRef.current?.controller.abort();
+    operationRef.current = null;
+    featureGeneration.cancel();
+    setPreview(null);
+    setBusy(false);
+    setError(null);
+  };
+
+  const chooseSource = (value: string) => {
+    invalidatePreview();
+    setSourceVariantId(value === ORIGINAL_VALUE ? null : value);
+  };
+
+  const generateOutfit = async () => {
+    if (!sourceAssetId || !garment || busy || !addOutfitAvailable) return;
+    const key = `${sourceAssetId}:${garment.name}:${garment.size}:${garment.lastModified}`;
+    const controller = new AbortController();
+    operationRef.current = { controller, key };
+    setBusy(true);
+    setError(null);
+    let providerFingerprint: string | null = null;
+    let providerRequestId: string | null = null;
+    try {
+      const validation = await validateReferenceImage(garment, 'lucy-vton-latest');
+      if (validation.blockingError) throw new Error(validation.blockingError);
+      const garmentAsset = garmentAssetId
+        ? { assetId: garmentAssetId }
+        : await uploadReferenceImage(garment, createId(), controller.signal);
+      if (controller.signal.aborted || operationRef.current?.key !== key) return;
+      setGarmentAssetId(garmentAsset.assetId);
+      providerFingerprint = `${key}:${garmentAsset.assetId}`;
+      providerRequestId =
+        retryRef.current?.fingerprint === providerFingerprint
+          ? retryRef.current.requestId
+          : createId();
+      const result = await createOutfitTryOn(
+        sourceAssetId,
+        garmentAsset.assetId,
+        providerRequestId,
+        controller.signal,
+      );
+      if (controller.signal.aborted || operationRef.current?.key !== key) return;
+      retryRef.current = null;
+      setPreview(result);
+    } catch (caught) {
+      if (!controller.signal.aborted) {
+        if (providerFingerprint && providerRequestId) {
+          retryRef.current = { fingerprint: providerFingerprint, requestId: providerRequestId };
+        }
+        setError(caught instanceof Error ? caught.message : 'The outfit could not be generated.');
+      }
+    } finally {
+      if (operationRef.current?.controller === controller) {
+        operationRef.current = null;
+        setBusy(false);
+      }
+    }
+  };
+
+  const generateFeatures = async () => {
+    if (!sourceAssetId || !instructions.trim() || busy || !changeFeaturesAvailable) return;
+    const selectedSourceAssetId = sourceAssetId;
+    const selectedSourcePromptMode = sourceVariantId ? 'image-only' : 'character-prompt';
+    const selectedInstructions = instructions.trim();
+    const key = `features:${selectedSourceAssetId}:${selectedInstructions}`;
+    const controller = new AbortController();
+    operationRef.current = { controller, key };
+    setBusy(true);
+    setError(null);
+    let sourceOptions = DEFAULT_OPTIONS;
+    try {
+      const metadata = await fetchReferenceImageMetadata(selectedSourceAssetId, controller.signal);
+      if (metadata.source === 'generated') sourceOptions = metadata.options;
+    } catch {
+      if (controller.signal.aborted || operationRef.current?.key !== key) return;
+      // The edit call performs the authoritative owner-scoped source validation.
+    }
+    if (controller.signal.aborted || operationRef.current?.key !== key) return;
+    try {
+      await featureGeneration.generate(
+        {
+          rawPrompt:
+            character.prompt.trim() || `Faithful character reference for ${character.name}`,
+          sourceAssetId: selectedSourceAssetId,
+          sourcePromptMode: selectedSourcePromptMode,
+          changeInstructions: selectedInstructions,
+          options: sourceOptions,
+          attemptOptimization: false,
+        },
+        controller.signal,
+      );
+    } finally {
+      if (operationRef.current?.controller === controller) operationRef.current = null;
+    }
+  };
+
+  const save = () => {
+    if (!preview || !sourceAssetId || !title.trim() || !creating) return;
+    repository.createSavedCharacterVariant({
+      parentCharacterId: character.id,
+      title: title.trim(),
+      referenceImageAssetId: preview.assetId,
+      creation:
+        creating === 'add-outfit'
+          ? {
+              method: 'add-outfit',
+              sourceReferenceImageAssetId: sourceAssetId,
+              garmentReferenceImageAssetId: garmentAssetId!,
+            }
+          : {
+              method: 'change-features',
+              sourceReferenceImageAssetId: sourceAssetId,
+              changeInstructions: instructions.trim(),
+            },
+    });
+    onDirtyChange(false);
+    setCreating(null);
+    setTitle('');
+    setGarment(null);
+    setGarmentAssetId(null);
+    setInstructions('');
+    setPreview(null);
+    onSaved?.();
+  };
+
+  if (!creating) {
+    return (
+      <div
+        css={{
+          height: '100%',
+          minHeight: 0,
+          display: 'grid',
+          gridTemplateRows: 'auto auto minmax(0, 1fr)',
+          gap: theme.space.sm,
+        }}
+      >
+        <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.xs }}>
+          <Button
+            variant="primary"
+            disabled={!character.referenceImageAssetId || !addOutfitAvailable}
+            title={
+              !addOutfitAvailable
+                ? 'Add Outfit is unavailable until server configuration is complete.'
+                : undefined
+            }
+            onClick={() => setCreating('add-outfit')}
+          >
+            Add outfit
+          </Button>
+          <Button
+            variant="secondary"
+            disabled={!character.referenceImageAssetId || !changeFeaturesAvailable}
+            title={
+              !changeFeaturesAvailable
+                ? 'Change Features is unavailable from the selected image provider.'
+                : undefined
+            }
+            onClick={() => setCreating('change-features')}
+          >
+            Change features
+          </Button>
+        </div>
+        {!character.referenceImageAssetId ? (
+          <StatusNotice tone="warning">
+            Add or generate a reference image in Character Builder before creating wardrobe
+            variants. The original prompt remains usable.
+          </StatusNotice>
+        ) : !addOutfitAvailable || !changeFeaturesAvailable ? (
+          <StatusNotice tone="neutral">
+            {!addOutfitAvailable ? 'Add Outfit is not configured. ' : ''}
+            {!changeFeaturesAvailable ? 'Change Features is not configured. ' : ''}Saved versions
+            remain available.
+          </StatusNotice>
+        ) : null}
+        <div
+          data-scroll-region="character-wardrobe"
+          css={{
+            minHeight: 0,
+            overflow: 'auto',
+            display: 'grid',
+            alignContent: 'start',
+            gap: theme.space.sm,
+          }}
+        >
+          <TextField
+            label="Search wardrobe"
+            value={query}
+            onChange={(event) => setQuery(event.currentTarget.value)}
+          />
+          {visibleOptions.length ? (
+            <CharacterVersionSelector
+              versions={visibleOptions}
+              selectedValue={character.selectedWardrobeVariantId ?? ORIGINAL_VALUE}
+              disabled={useDisabled}
+              allowPromptOnlyOriginal
+              onSelect={(value) =>
+                onUse({
+                  characterId: character.id,
+                  variantId: value === ORIGINAL_VALUE ? null : value,
+                })
+              }
+            />
+          ) : (
+            <StatusNotice tone="neutral">No wardrobe versions match this search.</StatusNotice>
+          )}
+          {variants.length === 0 ? <p>No variants yet. Create one when you are ready.</p> : null}
+        </div>
+      </div>
+    );
+  }
+
+  const canSave = Boolean(
+    preview && sourceAssetId && title.trim() && (creating !== 'add-outfit' || garmentAssetId),
+  );
+  const saveGuidance = !preview
+    ? 'Generate a preview before saving this variant.'
+    : !title.trim()
+      ? 'Enter a variant name to enable Save variant.'
+      : 'Ready to save. Saving does not select this version.';
+
+  return (
+    <div
+      css={{
+        width: '100%',
+        height: '100%',
+        minWidth: 0,
+        minHeight: 0,
+        display: 'grid',
+        gridTemplateRows: 'auto minmax(0, 1fr) auto',
+        overflow: 'hidden',
+      }}
+    >
+      <div
+        css={{
+          minWidth: 0,
+          display: 'grid',
+          gap: theme.space.sm,
+          paddingBlockEnd: theme.space.sm,
+          borderBlockEnd: `1px solid ${theme.colors.border}`,
+        }}
+      >
+        <Button
+          variant="quiet"
+          disabled={busy}
+          css={{ justifySelf: 'start' }}
+          onClick={() => {
+            invalidatePreview();
+            setCreating(null);
+          }}
+        >
+          ‹ Back to wardrobe
+        </Button>
+        <SegmentedControl
+          label="Create variant"
+          value={creating}
+          options={[
+            { value: 'add-outfit', label: 'Add Outfit' },
+            { value: 'change-features', label: 'Change Features' },
+          ]}
+          disabled={busy}
+          onChange={(value) => {
+            invalidatePreview();
+            setCreating(value);
+          }}
+        />
+      </div>
+
+      <div
+        data-scroll-region="character-wardrobe-create"
+        css={{
+          minWidth: 0,
+          minHeight: 0,
+          overflow: 'auto',
+          overscrollBehavior: 'contain',
+          scrollbarGutter: 'stable',
+          paddingBlock: theme.space.md,
+        }}
+      >
+        <div
+          css={{
+            minWidth: 0,
+            display: 'grid',
+            gridTemplateColumns: 'minmax(0, 1.15fr) minmax(16rem, 0.85fr)',
+            alignItems: 'start',
+            gap: theme.space.lg,
+            '@media (max-width: 48rem)': {
+              gridTemplateColumns: 'minmax(0, 1fr)',
+              gap: theme.space.md,
+            },
+          }}
+        >
+          <section aria-labelledby="wardrobe-variant-details" css={{ minWidth: 0 }}>
+            <h3 id="wardrobe-variant-details" css={{ marginBlockEnd: theme.space.sm }}>
+              Variant details
+            </h3>
+            <div css={{ display: 'grid', gap: theme.space.md }}>
+              <TextField
+                label="Variant name"
+                hint="Required · This name appears in Wardrobe and Existing Video."
+                value={title}
+                maxLength={80}
+                required
+                disabled={busy}
+                onChange={(event) => setTitle(event.currentTarget.value)}
+              />
+              <div>
+                <p css={{ marginBlockEnd: theme.space.xs }}>
+                  <strong>Person source</strong>
+                </p>
+                <CharacterVersionSelector
+                  versions={options}
+                  selectedValue={sourceVariantId ?? ORIGINAL_VALUE}
+                  disabled={busy}
+                  actionLabel="Choose source"
+                  onSelect={chooseSource}
+                />
+              </div>
+              {creating === 'add-outfit' ? (
+                <ReferenceImageInputField
+                  kind="garment"
+                  label="Garment image"
+                  file={garment}
+                  disabled={busy}
+                  allowUrlImport
+                  onSelectFile={(file) => {
+                    invalidatePreview();
+                    setGarmentAssetId(null);
+                    setGarment(file);
+                  }}
+                  onRemove={() => {
+                    invalidatePreview();
+                    setGarmentAssetId(null);
+                    setGarment(null);
+                  }}
+                />
+              ) : (
+                <TextAreaField
+                  label="Required changes"
+                  hint={`${instructions.length}/2,000`}
+                  maxLength={2_000}
+                  value={instructions}
+                  disabled={busy}
+                  onChange={(event) => {
+                    invalidatePreview();
+                    setInstructions(event.currentTarget.value);
+                  }}
+                />
+              )}
+              <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.xs }}>
+                <Button
+                  variant="primary"
+                  busy={busy}
+                  disabled={
+                    creating === 'add-outfit'
+                      ? !garment || !sourceAssetId || !addOutfitAvailable
+                      : !instructions.trim() || !sourceAssetId || !changeFeaturesAvailable
+                  }
+                  onClick={() =>
+                    creating === 'add-outfit' ? void generateOutfit() : void generateFeatures()
+                  }
+                >
+                  {creating === 'add-outfit'
+                    ? preview
+                      ? 'Regenerate outfit'
+                      : 'Generate outfit'
+                    : preview
+                      ? 'Regenerate features'
+                      : 'Generate changes'}
+                </Button>
+                {busy ? (
+                  <Button variant="secondary" onClick={invalidatePreview}>
+                    Cancel generation
+                  </Button>
+                ) : null}
+              </div>
+              {error ? (
+                <StatusNotice tone="danger" role="alert">
+                  {error}
+                </StatusNotice>
+              ) : null}
+            </div>
+          </section>
+
+          <section
+            aria-labelledby="wardrobe-preview-heading"
+            css={{
+              minWidth: 0,
+              position: 'sticky',
+              top: 0,
+              display: 'grid',
+              gap: theme.space.sm,
+              padding: theme.space.md,
+              border: `1px solid ${theme.colors.border}`,
+              borderRadius: theme.radii.large,
+              background: theme.colors.surfaceSoft,
+              '@media (max-width: 48rem)': { position: 'static' },
+            }}
+          >
+            <div>
+              <h3 id="wardrobe-preview-heading" css={{ margin: 0 }}>
+                Generated preview
+              </h3>
+              <p css={{ margin: `${theme.space.xs} 0 0`, color: theme.colors.textMuted }}>
+                Review the latest result before saving. Changing an input clears this preview.
+              </p>
+            </div>
+            {preview ? (
+              <ReferenceImagePreview
+                assetId={preview.assetId}
+                alt={`Generated wardrobe preview for ${character.name}`}
+                label="Open larger generated wardrobe preview"
+                size="panel"
+              />
+            ) : (
+              <div
+                role="status"
+                aria-live="polite"
+                css={{
+                  width: '100%',
+                  minHeight: '12rem',
+                  aspectRatio: '1',
+                  display: 'grid',
+                  placeItems: 'center',
+                  padding: theme.space.md,
+                  border: `1px dashed ${theme.colors.borderStrong}`,
+                  borderRadius: theme.radii.medium,
+                  color: theme.colors.textMuted,
+                  background: theme.colors.canvas,
+                  textAlign: 'center',
+                }}
+              >
+                {busy
+                  ? 'Generating the latest preview…'
+                  : creating === 'add-outfit'
+                    ? 'Your generated outfit preview will appear here.'
+                    : 'Your changed-features preview will appear here.'}
+              </div>
+            )}
+          </section>
+        </div>
+      </div>
+
+      <div
+        css={{
+          minWidth: 0,
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr) auto',
+          alignItems: 'center',
+          gap: theme.space.sm,
+          paddingBlockStart: theme.space.sm,
+          borderBlockStart: `1px solid ${theme.colors.border}`,
+          background: theme.colors.overlaySurface,
+          '@media (max-width: 30rem)': {
+            gridTemplateColumns: 'minmax(0, 1fr)',
+          },
+        }}
+      >
+        <p
+          id="wardrobe-save-guidance"
+          aria-live="polite"
+          css={{ margin: 0, color: theme.colors.textMuted, fontSize: theme.fontSizes.metadata }}
+        >
+          {saveGuidance}
+        </p>
+        <div
+          css={{
+            display: 'flex',
+            flexWrap: 'wrap',
+            justifyContent: 'flex-end',
+            gap: theme.space.xs,
+            '@media (max-width: 30rem)': {
+              display: 'grid',
+              gridTemplateColumns: 'minmax(0, 1fr)',
+            },
+          }}
+        >
+          <Button variant="quiet" disabled={busy} onClick={onClose}>
+            Close wardrobe
+          </Button>
+          <Button
+            variant="primary"
+            disabled={!canSave || busy}
+            aria-describedby="wardrobe-save-guidance"
+            onClick={save}
+          >
+            Save variant
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
+};

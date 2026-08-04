@@ -54,6 +54,11 @@ export const capabilitiesResponseSchema = z
           .strict(),
       })
       .strict(),
+    wardrobe: z
+      .object({
+        addOutfitAvailable: z.boolean(),
+      })
+      .strict(),
   })
   .strict();
 

@@ -1,7 +1,8 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { useState } from 'react';
 import { referenceImageContentUrl } from '../../adapters/api-client/referenceImageRoutes';
-import { SelectField, type SelectOption } from '../../ui';
+import { Button, SelectField, type SelectOption } from '../../ui';
+import { CharacterVersionSelector } from '../character-wardrobe/CharacterVersionSelector';
 import type { VtonInputKind } from '../creative-assets/types';
 import type { ExistingVideoStep } from './useExistingVideoWorkflow';
 
@@ -13,6 +14,9 @@ export type ExistingVideoSavedRecipe = Readonly<{
   referenceImageAssetId: string | null;
   vtonInputKind: VtonInputKind | null;
   enhancePrompt: boolean;
+  savedCharacterPromptId?: string;
+  savedCharacterVariantId?: string;
+  originalCharacterVersion?: boolean;
 }>;
 
 const CREATE_CHARACTER_VALUE = '__create-character__';
@@ -124,6 +128,7 @@ export interface ExistingVideoRecipeChooserProps {
   readonly loading: boolean;
   readonly onChoose: (recipeId: string) => void;
   readonly onCreateCharacter?: () => void;
+  readonly onCreateWardrobeVariant?: (characterId: string) => void;
 }
 
 export const ExistingVideoRecipeChooser = ({
@@ -134,10 +139,21 @@ export const ExistingVideoRecipeChooser = ({
   loading,
   onChoose,
   onCreateCharacter,
+  onCreateWardrobeVariant,
 }: ExistingVideoRecipeChooserProps) => {
   const theme = useTheme();
   const copy = chooserCopy(modelId);
   const canCreateCharacter = modelId === 'lucy-latest' && Boolean(onCreateCharacter);
+  const selectedRecipe = recipes.find((recipe) => recipe.id === selectedRecipeId);
+  const externalCharacterId = selectedRecipe?.savedCharacterPromptId ?? selectedRecipe?.id ?? '';
+  const [localCharacterSelection, setLocalCharacterSelection] = useState({
+    forRecipeId: selectedRecipeId,
+    characterId: externalCharacterId,
+  });
+  const selectedCharacterId =
+    localCharacterSelection.forRecipeId === selectedRecipeId
+      ? localCharacterSelection.characterId
+      : externalCharacterId;
   const options: SelectOption[] = [
     ...recipes.map((recipe) => ({
       value: recipe.id,
@@ -146,6 +162,108 @@ export const ExistingVideoRecipeChooser = ({
     })),
     ...(canCreateCharacter ? [{ value: CREATE_CHARACTER_VALUE, label: 'Create A Character' }] : []),
   ];
+
+  if (modelId === 'lucy-latest') {
+    const parentRecipes = recipes.filter(
+      (recipe, index) =>
+        recipes.findIndex(
+          (candidate) =>
+            (candidate.savedCharacterPromptId ?? candidate.id) ===
+            (recipe.savedCharacterPromptId ?? recipe.id),
+        ) === index,
+    );
+    const parentOptions: SelectOption[] = [
+      ...parentRecipes.map((recipe) => ({
+        value: recipe.savedCharacterPromptId ?? recipe.id,
+        label: recipe.label.split(' · ')[0] ?? recipe.label,
+        description: recipe.prompt,
+      })),
+      ...(canCreateCharacter
+        ? [{ value: CREATE_CHARACTER_VALUE, label: 'Create A Character' }]
+        : []),
+    ];
+    const selectedVersions = recipes.filter(
+      (recipe) => (recipe.savedCharacterPromptId ?? recipe.id) === selectedCharacterId,
+    );
+    return (
+      <div css={{ display: 'grid', gap: theme.space.sm }}>
+        <SelectField
+          label={copy.label}
+          value={selectedCharacterId}
+          options={parentOptions}
+          placeholder={parentOptions.length === 0 ? copy.empty : copy.action}
+          emptyMessage={copy.empty}
+          disabled={disabled || loading || parentOptions.length === 0}
+          busy={loading}
+          onValueChange={(value) => {
+            if (value === CREATE_CHARACTER_VALUE) {
+              onCreateCharacter?.();
+              return;
+            }
+            setLocalCharacterSelection({ forRecipeId: selectedRecipeId, characterId: value });
+            const versions = recipes.filter(
+              (recipe) => (recipe.savedCharacterPromptId ?? recipe.id) === value,
+            );
+            const onlyVersion = versions.length === 1 ? versions[0] : undefined;
+            if (onlyVersion && !onlyVersion.savedCharacterPromptId) {
+              onChoose(onlyVersion.id);
+            }
+          }}
+          renderOption={(option) => {
+            if (option.value === CREATE_CHARACTER_VALUE) {
+              return (
+                <span css={createOptionStyles(theme)}>
+                  <span aria-hidden="true">＋</span>
+                  <span>Create A Character</span>
+                </span>
+              );
+            }
+            const recipe = parentRecipes.find(
+              (candidate) => (candidate.savedCharacterPromptId ?? candidate.id) === option.value,
+            );
+            if (!recipe) return <span>{option.label}</span>;
+            return (
+              <span css={richOptionStyles(theme)}>
+                <RecipeThumbnail recipe={recipe} />
+                <span css={optionTextStyles(theme)}>
+                  <strong title={option.label}>{option.label}</strong>
+                  <span>{recipe.prompt}</span>
+                </span>
+              </span>
+            );
+          }}
+        />
+        {selectedVersions.length ? (
+          <CharacterVersionSelector
+            versions={selectedVersions.map((recipe) => ({
+              value: recipe.id,
+              title: recipe.label.includes(' · ')
+                ? recipe.label.split(' · ').slice(1).join(' · ')
+                : recipe.label,
+              ...(recipe.label.includes(' · ')
+                ? { characterName: recipe.label.split(' · ')[0] }
+                : {}),
+              referenceImageAssetId: recipe.referenceImageAssetId,
+              original: recipe.originalCharacterVersion ?? !recipe.savedCharacterVariantId,
+            }))}
+            selectedValue={selectedRecipeId}
+            disabled={disabled || loading}
+            actionLabel="Choose"
+            onSelect={onChoose}
+          />
+        ) : null}
+        {selectedCharacterId && onCreateWardrobeVariant ? (
+          <Button
+            variant="secondary"
+            disabled={disabled || loading}
+            onClick={() => onCreateWardrobeVariant(selectedCharacterId)}
+          >
+            Create new wardrobe variant
+          </Button>
+        ) : null}
+      </div>
+    );
+  }
 
   return (
     <SelectField

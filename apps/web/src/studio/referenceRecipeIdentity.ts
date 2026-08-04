@@ -1,4 +1,4 @@
-import { canonicalPrompt } from '@studio/domain';
+import { canonicalPrompt, resolveCharacterVersion } from '@studio/domain';
 import type {
   CreativeAssetStore,
   SavedCharacterPrompt,
@@ -14,6 +14,7 @@ import type { VtonInputKind } from '../features/creative-assets/types';
 export type ActiveStudioRecipe = {
   origin: 'character-prompt' | 'saved-prompt';
   assetId: string;
+  variantId?: string | null;
 } | null;
 
 export type ActiveRecipeFingerprint = {
@@ -61,6 +62,7 @@ type ExactActiveRecipeInput = {
   readonly asset: RecipeAsset;
   readonly draft: Pick<SessionDraft, 'mode' | 'prompt' | 'referenceImage'> &
     Partial<Pick<SessionDraft, 'enhance'>>;
+  readonly resolvedAssetReferenceImageAssetId?: string | null;
 };
 
 const EPHEMERAL_REFERENCE_IDENTITY = 'session:ephemeral-reference';
@@ -75,6 +77,7 @@ export const isExactActiveRecipe = ({
   fingerprint,
   asset,
   draft,
+  resolvedAssetReferenceImageAssetId,
 }: ExactActiveRecipeInput): boolean => {
   const assetMode = 'modelModeId' in asset ? asset.modelModeId : 'lucy-latest';
   const draftVtonInputKind =
@@ -92,7 +95,8 @@ export const isExactActiveRecipe = ({
     referenceIdentity(draft.referenceImage) === fingerprint.referenceImageAssetId &&
     assetMode === fingerprint.mode &&
     canonicalPrompt(asset.prompt) === canonicalPrompt(fingerprint.assetPrompt) &&
-    asset.referenceImageAssetId === fingerprint.assetReferenceImageAssetId &&
+    (resolvedAssetReferenceImageAssetId ?? asset.referenceImageAssetId) ===
+      fingerprint.assetReferenceImageAssetId &&
     fingerprint.referenceImageAssetId === fingerprint.assetReferenceImageAssetId &&
     draftVtonInputKind === (fingerprint.vtonInputKind ?? null) &&
     draftEnhancePrompt === fingerprintEnhancePrompt &&
@@ -139,8 +143,25 @@ export const resolveActiveRecipe = (
   const assets =
     recipe.origin === 'character-prompt' ? store.savedCharacterPrompts : store.savedPrompts;
   const asset = assets.find((candidate) => candidate.id === recipe.assetId) ?? null;
+  const resolvedCharacterVersion =
+    recipe.origin === 'character-prompt'
+      ? resolveCharacterVersion(store, {
+          characterId: recipe.assetId,
+          variantId: recipe.variantId ?? null,
+        })
+      : null;
   const exact = Boolean(
-    asset && (!fingerprint || isExactActiveRecipe({ fingerprint, asset, draft })),
+    asset &&
+    (recipe.origin !== 'character-prompt' || resolvedCharacterVersion) &&
+    (!fingerprint ||
+      isExactActiveRecipe({
+        fingerprint,
+        asset,
+        draft,
+        ...(resolvedCharacterVersion
+          ? { resolvedAssetReferenceImageAssetId: resolvedCharacterVersion.referenceImageAssetId }
+          : {}),
+      })),
   );
   if (!exact || !asset) {
     return {
@@ -153,8 +174,9 @@ export const resolveActiveRecipe = (
     };
   }
 
-  const characterName =
-    recipe.origin === 'character-prompt' && 'name' in asset ? asset.name : undefined;
+  const characterName = resolvedCharacterVersion?.variant
+    ? resolvedCharacterVersion.displayLabel
+    : resolvedCharacterVersion?.character.name;
   return {
     recipe,
     fingerprint,
@@ -165,7 +187,8 @@ export const resolveActiveRecipe = (
         ? {
             id: asset.id,
             name: characterName,
-            referenceImageAssetId: asset.referenceImageAssetId,
+            referenceImageAssetId:
+              resolvedCharacterVersion?.referenceImageAssetId ?? asset.referenceImageAssetId,
           }
         : null,
     label: recipe.origin === 'saved-prompt' && 'title' in asset ? asset.title : characterName,

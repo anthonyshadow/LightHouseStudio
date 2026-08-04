@@ -1,4 +1,5 @@
 import { canonicalPrompt } from '@studio/domain';
+import { resolveCharacterVersion } from '@studio/domain';
 import { useCallback, useEffect, useRef, type Dispatch } from 'react';
 import type { PromptCommittedHandler } from '../application/types';
 import type { RecipeSelection } from '../features/creative-assets/RecipeShelf.types';
@@ -51,7 +52,10 @@ export const createPendingReferenceRecipeUse = (
           (candidate) =>
             candidate.id === selection.savedCharacterPromptId &&
             canonicalPrompt(candidate.prompt) === canonicalPrompt(selection.prompt) &&
-            candidate.referenceImageAssetId === selectedReferenceAssetId,
+            resolveCharacterVersion(store, {
+              characterId: candidate.id,
+              variantId: selection.savedCharacterVariantId ?? null,
+            })?.referenceImageAssetId === selectedReferenceAssetId,
         )
       : null;
 
@@ -70,6 +74,9 @@ export const createPendingReferenceRecipeUse = (
       : {}),
     ...(linkedRecentPrompt ? { savedPromptId: linkedRecentPrompt.id } : {}),
     ...(linkedRecentCharacter ? { savedCharacterPromptId: linkedRecentCharacter.id } : {}),
+    ...(selection.savedCharacterVariantId
+      ? { savedCharacterVariantId: selection.savedCharacterVariantId }
+      : {}),
     ...(selection.origin === 'character-prompt' && selection.assetId
       ? { savedCharacterPromptId: selection.assetId }
       : {}),
@@ -135,6 +142,7 @@ export const useReferenceRecipeAttribution = ({
 }: UseReferenceRecipeAttributionOptions) => {
   const selectedSavedPromptRef = useRef<string | undefined>(undefined);
   const selectedCharacterPromptRef = useRef<string | undefined>(undefined);
+  const selectedCharacterVariantRef = useRef<string | undefined>(undefined);
   const standaloneRecentCharacterRef = useRef<StandaloneRecentCharacter | null>(null);
 
   const recordCommittedPrompt = useCallback<PromptCommittedHandler>(
@@ -176,6 +184,9 @@ export const useReferenceRecipeAttribution = ({
         ...(activeRecipeStillMatches && selectedCharacterPromptRef.current
           ? { savedCharacterPromptId: selectedCharacterPromptRef.current }
           : {}),
+        ...(activeRecipeStillMatches && selectedCharacterVariantRef.current
+          ? { savedCharacterVariantId: selectedCharacterVariantRef.current }
+          : {}),
         ...(activeRecipeStillMatches && activeCharacterName
           ? { characterName: activeCharacterName }
           : standaloneRecentCharacter
@@ -190,6 +201,7 @@ export const useReferenceRecipeAttribution = ({
     if (activeRecipe) return;
     selectedSavedPromptRef.current = undefined;
     selectedCharacterPromptRef.current = undefined;
+    selectedCharacterVariantRef.current = undefined;
   }, [activeRecipe]);
 
   const commitHydratedRecipe = useCallback(
@@ -213,16 +225,26 @@ export const useReferenceRecipeAttribution = ({
       const sourceMode =
         sourceAsset && 'modelModeId' in sourceAsset ? sourceAsset.modelModeId : 'lucy-latest';
       const appliedReferenceIdentity = referenceIdentity(referenceImage);
+      const resolvedCharacterSource = pending.savedCharacterPromptId
+        ? resolveCharacterVersion(repositorySnapshot, {
+            characterId: pending.savedCharacterPromptId,
+            variantId: pending.savedCharacterVariantId ?? null,
+          })
+        : null;
+      const sourceReferenceImageAssetId =
+        resolvedCharacterSource?.referenceImageAssetId ??
+        sourceAsset?.referenceImageAssetId ??
+        null;
       const sourceStillMatches = Boolean(
         sourceAsset &&
         sourceMode === pending.mode &&
         canonicalPrompt(sourceAsset.prompt) === canonicalPrompt(pending.prompt) &&
-        sourceAsset.referenceImageAssetId === pending.referenceImageAssetId &&
+        sourceReferenceImageAssetId === pending.referenceImageAssetId &&
         ('vtonInputKind' in sourceAsset ? sourceAsset.vtonInputKind : null) ===
           (pending.vtonInputKind ?? null) &&
         ('enhancePrompt' in sourceAsset ? sourceAsset.enhancePrompt : false) ===
           Boolean(pending.enhancePrompt) &&
-        appliedReferenceIdentity === sourceAsset.referenceImageAssetId,
+        appliedReferenceIdentity === sourceReferenceImageAssetId,
       );
       const exactSavedPromptId =
         sourceStillMatches && pending.savedPromptId ? pending.savedPromptId : undefined;
@@ -232,6 +254,10 @@ export const useReferenceRecipeAttribution = ({
           : undefined;
       selectedSavedPromptRef.current = exactSavedPromptId;
       selectedCharacterPromptRef.current = exactCharacterPromptId;
+      selectedCharacterVariantRef.current =
+        exactCharacterPromptId && pending.savedCharacterVariantId
+          ? pending.savedCharacterVariantId
+          : undefined;
       standaloneRecentCharacterRef.current =
         !exactCharacterPromptId && pending.characterName
           ? {
@@ -242,7 +268,13 @@ export const useReferenceRecipeAttribution = ({
             }
           : null;
       const nextRecipe = exactCharacterPromptId
-        ? ({ origin: 'character-prompt', assetId: exactCharacterPromptId } as const)
+        ? ({
+            origin: 'character-prompt',
+            assetId: exactCharacterPromptId,
+            ...(pending.savedCharacterVariantId
+              ? { variantId: pending.savedCharacterVariantId }
+              : {}),
+          } as const)
         : exactSavedPromptId
           ? ({ origin: 'saved-prompt', assetId: exactSavedPromptId } as const)
           : null;
@@ -255,7 +287,7 @@ export const useReferenceRecipeAttribution = ({
             prompt: appliedPrompt,
             referenceImageAssetId: appliedReferenceIdentity,
             assetPrompt: sourceAsset?.prompt ?? pending.prompt,
-            assetReferenceImageAssetId: sourceAsset?.referenceImageAssetId ?? null,
+            assetReferenceImageAssetId: sourceReferenceImageAssetId,
             vtonInputKind: pending.vtonInputKind ?? null,
             enhancePrompt: Boolean(pending.enhancePrompt),
             assetVtonInputKind:
@@ -266,6 +298,13 @@ export const useReferenceRecipeAttribution = ({
         });
       } else {
         dispatchActiveRecipe({ type: 'clear' });
+      }
+
+      if (exactCharacterPromptId) {
+        repository.selectCharacterVersion({
+          characterId: exactCharacterPromptId,
+          variantId: pending.savedCharacterVariantId ?? null,
+        });
       }
 
       if (storedReferenceMetadata?.source === 'generated' && referenceMatchesPendingPrompt) {
@@ -283,6 +322,7 @@ export const useReferenceRecipeAttribution = ({
     ({ characterId, snapshot, studioPrompt, referenceImage }: PreloadedCharacter) => {
       selectedSavedPromptRef.current = undefined;
       selectedCharacterPromptRef.current = characterId;
+      selectedCharacterVariantRef.current = undefined;
       standaloneRecentCharacterRef.current = null;
       dispatchActiveRecipe({
         type: 'commit',

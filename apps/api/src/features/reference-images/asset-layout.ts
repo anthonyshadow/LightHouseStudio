@@ -10,6 +10,7 @@ import {
   REFERENCE_IMAGE_MAX_BYTES,
   REFERENCE_IMAGE_MODEL_ID,
   REFERENCE_IMAGE_PROMPT_MAX_LENGTH,
+  PRUNA_IMAGE_TRY_ON_MODEL,
   REFERENCE_IMAGE_QUALITY,
   REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
   REFERENCE_IMAGE_UPLOAD_MAX_PIXELS,
@@ -157,9 +158,35 @@ const storedUploadedReferenceImageMetadataSchema = z
     }
   });
 
+const storedDerivedReferenceImageMetadataSchema = z
+  .object({
+    ...storedMetadataCommonShape,
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    byteSize: z.number().int().positive().max(REFERENCE_IMAGE_UPLOAD_MAX_BYTES),
+    source: z.literal('derived'),
+    provider: z.literal('pruna'),
+    model: z.literal(PRUNA_IMAGE_TRY_ON_MODEL),
+    derivation: z
+      .object({
+        kind: z.literal('outfit-try-on'),
+        sourceAssetId: z.uuid(),
+        garmentAssetId: z.uuid(),
+      })
+      .strict(),
+    providerRequestId: z.string().min(1).max(500).optional(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (value.width * value.height > REFERENCE_IMAGE_UPLOAD_MAX_PIXELS) {
+      context.addIssue({ code: 'custom', message: 'Stored derived image exceeds pixel limit.' });
+    }
+  });
+
 const storedReferenceImageMetadataSchema = z.union([
   storedGeneratedReferenceImageMetadataSchema,
   storedUploadedReferenceImageMetadataSchema,
+  storedDerivedReferenceImageMetadataSchema,
 ]);
 
 const idempotencyMappingSchema = z
@@ -241,8 +268,30 @@ export interface StoreUploadedReferenceImageInput {
   readonly requestFingerprint: string;
 }
 
+export interface StoreDerivedReferenceImageInput {
+  readonly localOwnerId: string;
+  readonly bytes: Buffer;
+  readonly mimeType: ValidReferenceImageMimeType;
+  readonly source: 'derived';
+  readonly width: number;
+  readonly height: number;
+  readonly provider: 'pruna';
+  readonly model: typeof PRUNA_IMAGE_TRY_ON_MODEL;
+  readonly derivation: {
+    readonly kind: 'outfit-try-on';
+    readonly sourceAssetId: string;
+    readonly garmentAssetId: string;
+  };
+  readonly requestId: string;
+  readonly requestFingerprint: string;
+  readonly requestFingerprintVersion: 2;
+  readonly providerRequestId?: string;
+}
+
 export type StoreReferenceImageInput =
-  StoreGeneratedReferenceImageInput | StoreUploadedReferenceImageInput;
+  | StoreGeneratedReferenceImageInput
+  | StoreUploadedReferenceImageInput
+  | StoreDerivedReferenceImageInput;
 
 export interface ReferenceImageLayout {
   readonly root: string;
@@ -344,6 +393,18 @@ export const createStoredReferenceImageMetadata = (
   } as const;
   if (input.source === 'uploaded') {
     return storedReferenceImageMetadataSchema.parse({ ...common, source: 'uploaded' });
+  }
+  if (input.source === 'derived') {
+    return storedReferenceImageMetadataSchema.parse({
+      ...common,
+      source: 'derived',
+      provider: input.provider,
+      model: input.model,
+      derivation: input.derivation,
+      ...(input.providerRequestId === undefined
+        ? {}
+        : { providerRequestId: input.providerRequestId }),
+    });
   }
   return storedReferenceImageMetadataSchema.parse({
     ...common,

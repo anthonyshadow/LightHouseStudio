@@ -151,6 +151,25 @@ Prompt Workshop owns only Add, Replace, and Restyle structured object recipes. R
 saved/recent/character metadata and atomic reuse. Neither owns Character generation or a media
 session.
 
+Saved Character Wardrobe extends that repository with normalized version metadata, not another
+character store. Each variant points to one parent and one immutable result asset. A pure resolver
+turns `{ characterId, variantId }` into the ordinary character prompt, label, and exact image ID
+used by Studio and Existing Video. The original remains the default; only successful hydration/use
+persists a different selected version and updates exact parent/variant usage attribution. Parent
+deletion cascades variant metadata and Recent links while retained image bytes follow the existing
+immutable-asset policy. Wardrobe owns no media node or provider client.
+
+Wardrobe **Add Outfit** is an independent optional Pruna operation. The server uploads the
+owner-scoped person and one garment, submits one pinned `p-image-try-on` prediction, polls bounded
+starting/processing states, downloads through the authenticated allowlisted delivery path,
+validates decoded output, and stores a flexible-dimension derived asset before returning. Browser
+abort stops local polling but is not described as provider cancellation or deletion. **Change
+Features** remains an edit through the startup-selected OpenAI/BFL/Wiro adapter with prompt
+optimization disabled. Original-source edits include the parent character prompt. Variant-source
+edits use the selected immutable image as authoritative through the image-only edit contract, so
+the parent prompt is absent from both the browser request and provider prompt. Every saved result
+still points directly to the original parent character as a sibling Wardrobe variant.
+
 Outfit Builder exclusively owns reusable VTO recipe creation, edit, copy, naming, prompt/image mode
 exclusion, prompt enhancement, temporary reference files, and idempotent final-save upload. It
 uses the same validated JPEG/PNG/WebP picker and explicit public-HTTPS importer as the
@@ -267,7 +286,7 @@ errors. The URL is neither persisted nor forwarded to a visual provider.
 
 | Store                       | Data                                                                                                | Lifetime and trust boundary                                                                                                                                                                                                               |
 | --------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Recipe Shelf `localStorage` | Versioned v5 allowlisted prompt/character/outfit metadata and opaque asset IDs                      | Sanitized on read; v1-v4 migration; degrades to session memory on failure; never stores image bytes                                                                                                                                       |
+| Recipe Shelf `localStorage` | Versioned v6 allowlisted prompt/character/outfit/wardrobe metadata and opaque asset IDs             | Sanitized on read; v1-v5 migration; 500-variant metadata cap; degrades to session memory on failure; never stores image bytes                                                                                                             |
 | Character Builder IndexedDB | One resumable draft and save journal                                                                | Compare-and-swap autosave; prevents duplicate save/preload after retry or reload                                                                                                                                                          |
 | Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings                                       | Owner-scoped under `LIGHTFRAME_DATA_DIR`; no ordinary deletion route                                                                                                                                                                      |
 | Legacy project IndexedDB    | Compatibility project metadata and media Blobs                                                      | List/download/delete plus one-time valid character-design seeding; Guided is not restored                                                                                                                                                 |
@@ -301,7 +320,8 @@ checks for provider or reference mutations. Browsers may omit `Origin` on same-o
 requests, so provider reads accept an exact loopback `Origin` or referrer, or browser
 `Sec-Fetch-Site: same-origin`; their explicit provider-intent header remains mandatory. ElevenLabs
 provider-contact routes require `X-Lightframe-Provider-Intent: voice`; visual batch routes require
-`X-Lightframe-Provider-Intent: video`. Responses are `no-store`.
+`X-Lightframe-Provider-Intent: video`; Pruna Wardrobe generation requires the independent
+`X-Lightframe-Provider-Intent: wardrobe`. Responses are `no-store`.
 
 Permanent keys remain in server environment memory. App-owned schemas validate every HTTP
 boundary. Provider adapters normalize upstream data into allowlisted safe codes; raw messages,
@@ -311,14 +331,14 @@ Wiro availability follows the startup-selected reference provider and its requir
 credentials. There is no separate pilot access mode. Missing configuration disables only that
 provider path and never causes provider fallback.
 
-| Boundary                    | Routes                                                                                                                                                                                                                |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local status                | `GET /api/health`, `GET /api/capabilities`                                                                                                                                                                            |
-| Decart                      | `POST /api/realtime-token`                                                                                                                                                                                            |
-| Existing-video processing   | `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, `DELETE /api/video-jobs/:jobId`                                                                                     |
-| Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/import`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions` |
-| Local reference storage     | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                                                              |
-| ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `POST /api/elevenlabs/voice-changer/recording`                                                                                           |
+| Boundary                    | Routes                                                                                                                                                                                                                                                                            |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local status                | `GET /api/health`, `GET /api/capabilities`                                                                                                                                                                                                                                        |
+| Decart                      | `POST /api/realtime-token`                                                                                                                                                                                                                                                        |
+| Existing-video processing   | `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, `DELETE /api/video-jobs/:jobId`                                                                                                                                                 |
+| Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/import`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions`, `POST /api/reference-images/:sourceAssetId/outfit-try-ons` |
+| Local reference storage     | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                                                                                                                          |
+| ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `POST /api/elevenlabs/voice-changer/recording`                                                                                                                                                       |
 
 Capabilities report configuration presence only. The backend has process-local temporary video
 jobs but no accounts, analytics, durable job database or queue, SQL database, or session history.
@@ -334,6 +354,7 @@ The creator of a resource owns idempotent cleanup.
 | Session draft         | Ephemeral files and preview object URLs                                                                                 |
 | Recording/review      | Recorders, chunks, conversion abort, immutable source/sidecar, visual/voice artifact URLs, cap timer, unload protection |
 | Existing-video flow   | Validation generations, one ephemeral visual draft, provider polling/download                                           |
+| Character Wardrobe    | Variant creation draft, generation abort, stale-result rejection, exact version handoff                                 |
 | Voice processing      | Abort controllers, Web Audio/Mediabunny resources, temporary processed URLs                                             |
 | Media stage           | DOM media attachment and control-visibility timer                                                                       |
 | Overlay               | Focus/inert/scroll state only; never media                                                                              |

@@ -3,6 +3,7 @@ import {
   EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
+  ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   type CreativeAssetSearchResults as DomainCreativeAssetSearchResults,
   type CreativeAssetStore as DomainCreativeAssetStore,
@@ -11,6 +12,9 @@ import {
   type RecentPrompt as DomainRecentPrompt,
   type ReferenceImageStatus as DomainReferenceImageStatus,
   type SavedCharacterPrompt as DomainSavedCharacterPrompt,
+  type SavedCharacterVariant as DomainSavedCharacterVariant,
+  type SavedCharacterVariantCreation as DomainSavedCharacterVariantCreation,
+  type CharacterVersionSelection as DomainCharacterVersionSelection,
   type SavedPrompt as DomainSavedPrompt,
   type SavedPromptSource,
   type StorageHealth as DomainStorageHealth,
@@ -23,13 +27,15 @@ export {
   EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
+  ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
 };
-export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
-export const PREVIOUS_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
-export const OLDER_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
-export const EARLIER_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
-export const LEGACY_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
+export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
+export const PREVIOUS_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
+export const OLDER_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
+export const EARLIER_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
+export const LEGACY_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v2';
+export const ORIGINAL_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v1';
 
 export type ModelModeId = DomainModelModeId;
 export type AssetSource = SavedPromptSource;
@@ -40,6 +46,9 @@ export type GuidedDesignV1 = DomainGuidedDesignV1;
 export type SavedPrompt = DomainSavedPrompt;
 export type RecentPrompt = DomainRecentPrompt;
 export type SavedCharacterPrompt = DomainSavedCharacterPrompt;
+export type SavedCharacterVariant = DomainSavedCharacterVariant;
+export type SavedCharacterVariantCreation = DomainSavedCharacterVariantCreation;
+export type CharacterVersionSelection = DomainCharacterVersionSelection;
 export type CreativeAssetStore = DomainCreativeAssetStore;
 export type CreativeAssetSearchResults = DomainCreativeAssetSearchResults;
 
@@ -116,10 +125,18 @@ export interface RecordSuccessfulPromptInput {
   readonly modelModeId: ModelModeId;
   readonly savedPromptId?: string;
   readonly savedCharacterPromptId?: string;
+  readonly savedCharacterVariantId?: string;
   readonly characterName?: string;
   readonly referenceImageAssetId?: string | null;
   readonly vtonInputKind?: VtonInputKind | null;
   readonly enhancePrompt?: boolean;
+}
+
+export interface CreateSavedCharacterVariantInput {
+  readonly parentCharacterId: string;
+  readonly title: string;
+  readonly referenceImageAssetId: string;
+  readonly creation: SavedCharacterVariantCreation;
 }
 
 export interface CreativeAssetRepository {
@@ -141,6 +158,8 @@ export interface CreativeAssetRepository {
   ) => SavedCharacterPrompt;
   renameSavedCharacterPrompt: (id: string, name: string) => SavedCharacterPrompt;
   deleteSavedCharacterPrompt: (id: string) => void;
+  createSavedCharacterVariant: (input: CreateSavedCharacterVariantInput) => SavedCharacterVariant;
+  selectCharacterVersion: (selection: CharacterVersionSelection) => void;
   recordSuccessfulPrompt: (input: RecordSuccessfulPromptInput) => void;
   enrichNewestMatchingRecent: (
     prompt: string,

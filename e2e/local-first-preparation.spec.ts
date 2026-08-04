@@ -88,6 +88,7 @@ test.beforeEach(async ({ page }) => {
             version: 'lucy-character-reference-v1',
           },
         },
+        wardrobe: { addOutfitAvailable: false },
       }),
     });
   });

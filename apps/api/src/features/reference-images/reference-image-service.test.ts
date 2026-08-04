@@ -390,6 +390,41 @@ describe('ReferenceImageService prompt optimization', () => {
 });
 
 describe('ReferenceImageService provider-result finalization parity', () => {
+  it('uses only the selected image and requested changes for an image-only edit', async () => {
+    const generatedBytes = await createGeneratedBytes();
+    const provider = createProvider(generatedBytes);
+    const editProvider = provider.edit;
+    if (!editProvider) throw new Error('Expected the fake edit provider.');
+    const editMock = vi.mocked(editProvider);
+    const store = vi.fn<ReferenceImageAssetStore['store']>((storedInput) =>
+      Promise.resolve(
+        createStoredReferenceImageMetadata(
+          storedInput,
+          '1bd46fbc-3e57-46a3-96b4-b4281f5f39da',
+          '2026-07-27T12:00:00.000Z',
+        ),
+      ),
+    );
+    const service = new ReferenceImageService(provider, createStore(store), {
+      optimizer: configuredOptimizer,
+    });
+
+    await service.edit({
+      localOwnerId,
+      sourceAssetId,
+      requestId: editRequestId,
+      sourcePromptMode: 'image-only',
+      changeInstructions: 'Add a warm expression.',
+      options: input.options,
+      optimization: { enabled: false },
+    });
+
+    const providerPrompt = editMock.mock.calls[0]?.[0].prompt;
+    expect(providerPrompt).toContain('Add a warm expression.');
+    expect(providerPrompt).not.toContain(input.rawPrompt);
+    expect(providerPrompt).not.toContain('current character direction');
+  });
+
   it('persists identical validated provider audit fields with operation-specific lineage', async () => {
     const generatedBytes = await createGeneratedBytes();
     const storedInputs: StoreReferenceImageInput[] = [];
@@ -472,7 +507,7 @@ describe('ReferenceImageService provider-result finalization parity', () => {
           outputMegapixels: 1,
         },
       });
-      if (storedInput.source === 'uploaded') {
+      if (storedInput.source === 'uploaded' || storedInput.source === 'derived') {
         throw new TypeError('Expected generated reference-image metadata.');
       }
       expect(storedInput.promptHash).toMatch(/^[a-f0-9]{64}$/u);

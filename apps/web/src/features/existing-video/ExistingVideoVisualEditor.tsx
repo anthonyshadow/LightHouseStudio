@@ -30,6 +30,7 @@ export interface ExistingVideoVisualEditorProps {
   readonly onApplySavedRecipe: (step: ExistingVideoStep, recipeId: string) => void;
   readonly onChooseReference: (step: ExistingVideoStep, file: File) => void;
   readonly onCreateCharacter?: (stepId: string) => void;
+  readonly onCreateWardrobeVariant?: (stepId: string, characterId: string) => void;
   readonly onUpdate: (
     id: string,
     patch: Partial<Omit<ExistingVideoStep, 'id' | 'modelId'>>,
@@ -64,6 +65,7 @@ export const ExistingVideoVisualEditor = ({
   onApplySavedRecipe,
   onChooseReference,
   onCreateCharacter,
+  onCreateWardrobeVariant,
   onUpdate,
   onSetVtonInputKind,
   onClear,
@@ -179,6 +181,12 @@ export const ExistingVideoVisualEditor = ({
             loading={recipeLoading}
             onChoose={(recipeId) => onApplySavedRecipe(step, recipeId)}
             {...(onCreateCharacter ? { onCreateCharacter: () => onCreateCharacter(step.id) } : {})}
+            {...(onCreateWardrobeVariant
+              ? {
+                  onCreateWardrobeVariant: (characterId: string) =>
+                    onCreateWardrobeVariant(step.id, characterId),
+                }
+              : {})}
           />
         </>
       )}
