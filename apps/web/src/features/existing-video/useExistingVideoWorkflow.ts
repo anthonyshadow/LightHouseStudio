@@ -1188,23 +1188,21 @@ export const useExistingVideoWorkflow = ({
     comparison === 'result' && (recording.processed ?? recording.visual)
       ? (resultMetadata ?? selection?.metadata ?? null)
       : (selection?.metadata ?? null);
+  const workflowActive = [
+    'validating',
+    'uploading',
+    'processing',
+    'retrieving',
+    'finalizing',
+    'voice-processing',
+    'transcoding',
+  ].includes(phase);
+  const trackingElapsedTime = workflowActive && phase !== 'validating';
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 
   useEffect(() => {
-    if (
-      ![
-        'uploading',
-        'processing',
-        'retrieving',
-        'finalizing',
-        'voice-processing',
-        'transcoding',
-      ].includes(phase) ||
-      startedAtRef.current === null
-    ) {
-      return;
-    }
+    if (!trackingElapsedTime || startedAtRef.current === null) return;
     const updateElapsed = () => {
       const startedAt = startedAtRef.current;
       if (startedAt !== null) {
@@ -1214,7 +1212,7 @@ export const useExistingVideoWorkflow = ({
     updateElapsed();
     const timer = window.setInterval(updateElapsed, 1_000);
     return () => window.clearInterval(timer);
-  }, [phase]);
+  }, [phase, trackingElapsedTime]);
 
   return useMemo(
     () => ({
@@ -1239,15 +1237,7 @@ export const useExistingVideoWorkflow = ({
       comparison,
       elapsedSeconds,
       operation: recording.processingOperation,
-      active: [
-        'validating',
-        'uploading',
-        'processing',
-        'retrieving',
-        'finalizing',
-        'voice-processing',
-        'transcoding',
-      ].includes(phase),
+      active: workflowActive,
       providerActive: acceptedSubmission && phase !== 'complete',
       selectFile,
       adoptRecordedArtifact,
@@ -1315,6 +1305,7 @@ export const useExistingVideoWorkflow = ({
       updateStep,
       voiceSelection,
       visualProviderCompatibility,
+      workflowActive,
     ],
   );
 };

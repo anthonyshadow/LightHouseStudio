@@ -39,6 +39,17 @@ const DEFAULT_OPTIONS: CharacterReferenceOptions = {
 
 type CreationKind = 'add-outfit' | 'change-features';
 
+const variantSaveGuidance = (hasPreview: boolean, hasTitle: boolean): string => {
+  if (!hasPreview) return 'Generate a preview before saving this variant.';
+  if (!hasTitle) return 'Enter a variant name to enable Save variant.';
+  return 'Ready to save. Saving does not select this version.';
+};
+
+const generationActionLabel = (kind: CreationKind, hasPreview: boolean): string => {
+  if (kind === 'add-outfit') return hasPreview ? 'Regenerate outfit' : 'Generate outfit';
+  return hasPreview ? 'Regenerate features' : 'Generate changes';
+};
+
 export const CharacterWardrobePanel = ({
   repository,
   store,
@@ -399,11 +410,12 @@ export const CharacterWardrobePanel = ({
   const canSave = Boolean(
     preview && sourceAssetId && title.trim() && (creating !== 'add-outfit' || garmentAssetId),
   );
-  const saveGuidance = !preview
-    ? 'Generate a preview before saving this variant.'
-    : !title.trim()
-      ? 'Enter a variant name to enable Save variant.'
-      : 'Ready to save. Saving does not select this version.';
+  const saveGuidance = variantSaveGuidance(Boolean(preview), Boolean(title.trim()));
+  const creatingOutfit = creating === 'add-outfit';
+  const generationDisabled = creatingOutfit
+    ? !garment || !sourceAssetId || !addOutfitAvailable
+    : !instructions.trim() || !sourceAssetId || !changeFeaturesAvailable;
+  const generateLabel = generationActionLabel(creating, Boolean(preview));
 
   return (
     <div
@@ -572,22 +584,10 @@ export const CharacterWardrobePanel = ({
                 <Button
                   variant="primary"
                   busy={busy}
-                  disabled={
-                    creating === 'add-outfit'
-                      ? !garment || !sourceAssetId || !addOutfitAvailable
-                      : !instructions.trim() || !sourceAssetId || !changeFeaturesAvailable
-                  }
-                  onClick={() =>
-                    creating === 'add-outfit' ? void generateOutfit() : void generateFeatures()
-                  }
+                  disabled={generationDisabled}
+                  onClick={() => (creatingOutfit ? void generateOutfit() : void generateFeatures())}
                 >
-                  {creating === 'add-outfit'
-                    ? preview
-                      ? 'Regenerate outfit'
-                      : 'Generate outfit'
-                    : preview
-                      ? 'Regenerate features'
-                      : 'Generate changes'}
+                  {generateLabel}
                 </Button>
                 {busy ? (
                   <Button variant="secondary" onClick={invalidatePreview}>
@@ -653,7 +653,7 @@ export const CharacterWardrobePanel = ({
               >
                 {busy
                   ? 'Generating the latest preview…'
-                  : creating === 'add-outfit'
+                  : creatingOutfit
                     ? 'Your generated outfit preview will appear here.'
                     : 'Your changed-features preview will appear here.'}
               </div>

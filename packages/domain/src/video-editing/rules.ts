@@ -58,10 +58,16 @@ export const normalizeVideoCrop = (crop: NormalizedVideoCrop): NormalizedVideoCr
 };
 
 const cropAspect = (preset: Exclude<VideoEditCropPreset, 'original' | 'freeform'>): number => {
-  if (preset === '16:9') return 16 / 9;
-  if (preset === '9:16') return 9 / 16;
-  if (preset === '4:5') return 4 / 5;
-  return 1;
+  switch (preset) {
+    case '16:9':
+      return 16 / 9;
+    case '9:16':
+      return 9 / 16;
+    case '4:5':
+      return 4 / 5;
+    case '1:1':
+      return 1;
+  }
 };
 
 export const cropForVideoEditPreset = (

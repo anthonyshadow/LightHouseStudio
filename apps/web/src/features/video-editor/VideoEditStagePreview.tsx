@@ -32,6 +32,28 @@ const formatTime = (milliseconds: number): string => {
 type CropEdge = 'move' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 type CropState = VideoEditStagePreviewContract['spec']['crop'];
 
+const CROP_HANDLES = [
+  ['top-left', 'left', 'top'],
+  ['top-right', 'right', 'top'],
+  ['bottom-left', 'left', 'bottom'],
+  ['bottom-right', 'right', 'bottom'],
+] as const;
+
+const cropKeyboardDelta = (key: string, amount: number): readonly [number, number] | null => {
+  switch (key) {
+    case 'ArrowLeft':
+      return [-amount, 0];
+    case 'ArrowRight':
+      return [amount, 0];
+    case 'ArrowUp':
+      return [0, -amount];
+    case 'ArrowDown':
+      return [0, amount];
+    default:
+      return null;
+  }
+};
+
 const updateCrop = (
   contract: VideoEditStagePreviewContract,
   edge: CropEdge,
@@ -222,16 +244,7 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
   };
   const handleKeyboard = (edge: CropEdge, event: React.KeyboardEvent<HTMLButtonElement>) => {
     const amount = event.shiftKey ? 0.05 : 0.01;
-    const delta: readonly [number, number] | null =
-      event.key === 'ArrowLeft'
-        ? [-amount, 0]
-        : event.key === 'ArrowRight'
-          ? [amount, 0]
-          : event.key === 'ArrowUp'
-            ? [0, -amount]
-            : event.key === 'ArrowDown'
-              ? [0, amount]
-              : null;
+    const delta = cropKeyboardDelta(event.key, amount);
     if (!delta) return;
     event.preventDefault();
     contract.onCropStart();
@@ -289,14 +302,7 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
                 onKeyDown={(event) => handleKeyboard('move', event)}
                 onKeyUp={commitKeyboard}
               />
-              {(
-                [
-                  ['top-left', 'left', 'top'],
-                  ['top-right', 'right', 'top'],
-                  ['bottom-left', 'left', 'bottom'],
-                  ['bottom-right', 'right', 'bottom'],
-                ] as const
-              ).map(([edge, horizontal, vertical]) => (
+              {CROP_HANDLES.map(([edge, horizontal, vertical]) => (
                 <button
                   key={edge}
                   type="button"

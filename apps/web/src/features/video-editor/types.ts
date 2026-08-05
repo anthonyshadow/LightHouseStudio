@@ -13,6 +13,9 @@ export type VideoEditSessionPhase =
   | 'error'
   | 'complete';
 
+export const isVideoEditBusy = (phase: VideoEditSessionPhase): boolean =>
+  phase === 'rendering' || phase === 'validating' || phase === 'committing';
+
 export type VideoEditSource = Readonly<{
   artifact: RecordingArtifact;
   metadata: UploadedTakeMetadata;

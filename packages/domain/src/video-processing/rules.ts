@@ -16,10 +16,11 @@ export type CanonicalVideoTransformInputGeometry = Readonly<{
   aspect: '16:9' | '9:16';
 }>;
 
+const hasValidDimensions = (width: number, height: number): boolean =>
+  Number.isFinite(width) && Number.isFinite(height) && width > 0 && height > 0;
+
 const supportedAspect = (width: number, height: number): boolean => {
-  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
-    return false;
-  }
+  if (!hasValidDimensions(width, height)) return false;
   const ratio = width / height;
   return (
     Math.abs(ratio - 16 / 9) / (16 / 9) <= VIDEO_ASPECT_TOLERANCE ||
@@ -35,12 +36,7 @@ const supportedAspect = (width: number, height: number): boolean => {
 export const canonicalVideoTransformInputGeometry = (
   source: Readonly<{ width: number; height: number }>,
 ): CanonicalVideoTransformInputGeometry => {
-  if (
-    !Number.isFinite(source.width) ||
-    !Number.isFinite(source.height) ||
-    source.width <= 0 ||
-    source.height <= 0
-  ) {
+  if (!hasValidDimensions(source.width, source.height)) {
     throw new Error('Video transform input dimensions must be positive and finite.');
   }
 

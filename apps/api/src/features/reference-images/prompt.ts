@@ -59,9 +59,10 @@ export const createReferenceImageEditPrompt = (
       direction.length -
       requirements.length,
   );
-  return `${requestedChange}${direction}${
-    direction ? (optimizedCharacterPrompt?.slice(0, availablePromptLength) ?? '') : ''
-  }${requirements}`;
+  const characterContext = direction
+    ? (optimizedCharacterPrompt?.slice(0, availablePromptLength) ?? '')
+    : '';
+  return `${requestedChange}${direction}${characterContext}${requirements}`;
 };
 
 /** Builds the provider-only first composition instruction for a user-uploaded source image. */

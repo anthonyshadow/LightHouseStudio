@@ -19,6 +19,33 @@ export const RemoteReferenceImageUrlInput = ({
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 
+  const importUrl = async () => {
+    controllerRef.current?.abort();
+    const controller = new AbortController();
+    controllerRef.current = controller;
+    setImporting(true);
+    onBusyChange?.(true);
+    setError(null);
+    try {
+      const file = await importRemoteReferenceImage(url.trim(), controller.signal);
+      if (!controller.signal.aborted) onSelectFile(file);
+    } catch (caught) {
+      if (!controller.signal.aborted) {
+        setError(
+          caught instanceof Error
+            ? caught.message
+            : 'The remote image could not be imported safely.',
+        );
+      }
+    } finally {
+      if (controllerRef.current === controller) {
+        controllerRef.current = null;
+        setImporting(false);
+        onBusyChange?.(false);
+      }
+    }
+  };
+
   return (
     <div css={{ display: 'grid', gap: '0.5rem' }}>
       <Button
@@ -43,34 +70,7 @@ export const RemoteReferenceImageUrlInput = ({
             variant="secondary"
             busy={importing}
             disabled={disabled || !url.trim()}
-            onClick={() => {
-              controllerRef.current?.abort();
-              const controller = new AbortController();
-              controllerRef.current = controller;
-              setImporting(true);
-              onBusyChange?.(true);
-              setError(null);
-              void importRemoteReferenceImage(url.trim(), controller.signal)
-                .then((file) => {
-                  if (!controller.signal.aborted) onSelectFile(file);
-                })
-                .catch((caught: unknown) => {
-                  if (!controller.signal.aborted) {
-                    setError(
-                      caught instanceof Error
-                        ? caught.message
-                        : 'The remote image could not be imported safely.',
-                    );
-                  }
-                })
-                .finally(() => {
-                  if (controllerRef.current === controller) {
-                    controllerRef.current = null;
-                    setImporting(false);
-                    onBusyChange?.(false);
-                  }
-                });
-            }}
+            onClick={() => void importUrl()}
           >
             Import image
           </Button>

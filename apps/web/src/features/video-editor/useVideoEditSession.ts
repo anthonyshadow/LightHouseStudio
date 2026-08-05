@@ -12,7 +12,12 @@ import {
   type ValidatedExistingVideo,
 } from '../existing-video/videoValidation';
 import { renderVideoEdit, videoEditRenderingSupported } from './renderVideoEdit';
-import type { VideoEditSessionPhase, VideoEditSource, VideoEditTool } from './types';
+import {
+  isVideoEditBusy,
+  type VideoEditSessionPhase,
+  type VideoEditSource,
+  type VideoEditTool,
+} from './types';
 import { videoEditPreviewSupported } from './videoEditShader';
 
 type HistoryState = Readonly<{
@@ -37,18 +42,23 @@ const resetToolSpec = (
   draft: VideoEditSpec,
   baseline: VideoEditSpec,
 ): VideoEditSpec => {
-  if (tool === 'trim') return { ...draft, trim: baseline.trim };
-  if (tool === 'crop') return { ...draft, crop: baseline.crop };
-  if (tool === 'rotate') {
-    return {
-      ...draft,
-      rotation: baseline.rotation,
-      flipHorizontal: baseline.flipHorizontal,
-      flipVertical: baseline.flipVertical,
-    };
+  switch (tool) {
+    case 'trim':
+      return { ...draft, trim: baseline.trim };
+    case 'crop':
+      return { ...draft, crop: baseline.crop };
+    case 'rotate':
+      return {
+        ...draft,
+        rotation: baseline.rotation,
+        flipHorizontal: baseline.flipHorizontal,
+        flipVertical: baseline.flipVertical,
+      };
+    case 'lighting':
+      return { ...draft, adjustments: baseline.adjustments };
+    case 'filters':
+      return { ...draft, filter: baseline.filter };
   }
-  if (tool === 'lighting') return { ...draft, adjustments: baseline.adjustments };
-  return { ...draft, filter: baseline.filter };
 };
 
 export const useVideoEditSession = () => {
@@ -299,7 +309,7 @@ export const useVideoEditSession = () => {
   );
 
   useEffect(() => {
-    if (!dirty && phase !== 'rendering' && phase !== 'validating' && phase !== 'committing') return;
+    if (!dirty && !isVideoEditBusy(phase)) return;
     const protect = (event: BeforeUnloadEvent) => {
       event.preventDefault();
       event.returnValue = '';

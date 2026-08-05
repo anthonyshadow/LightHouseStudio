@@ -90,45 +90,54 @@ export const requireTrustedOrigin = (request: FastifyRequest): string => {
   return requestOrigin;
 };
 
-export const requireVoiceProviderIntent = (request: FastifyRequest): void => {
-  if (request.headers[VOICE_PROVIDER_INTENT_HEADER] !== VOICE_PROVIDER_INTENT_VALUE) {
-    throw new AppError(
-      403,
-      'forbidden_origin',
-      'This voice provider action requires explicit local Studio intent.',
-    );
+const requireProviderIntent = (
+  request: FastifyRequest,
+  header: string,
+  value: string,
+  message: string,
+): void => {
+  if (request.headers[header] !== value) {
+    throw new AppError(403, 'forbidden_origin', message);
   }
+};
+
+export const requireVoiceProviderIntent = (request: FastifyRequest): void => {
+  requireProviderIntent(
+    request,
+    VOICE_PROVIDER_INTENT_HEADER,
+    VOICE_PROVIDER_INTENT_VALUE,
+    'This voice provider action requires explicit local Studio intent.',
+  );
 };
 
 export const requireVideoProviderIntent = (
   request: FastifyRequest,
   message = 'This video provider action requires explicit local Studio intent.',
 ): void => {
-  if (request.headers[VIDEO_PROVIDER_INTENT_HEADER] !== VIDEO_PROVIDER_INTENT_VALUE) {
-    throw new AppError(403, 'forbidden_origin', message);
-  }
+  requireProviderIntent(
+    request,
+    VIDEO_PROVIDER_INTENT_HEADER,
+    VIDEO_PROVIDER_INTENT_VALUE,
+    message,
+  );
 };
 
 export const requireReferenceImageImportIntent = (request: FastifyRequest): void => {
-  if (
-    request.headers[REFERENCE_IMAGE_IMPORT_INTENT_HEADER] !== REFERENCE_IMAGE_IMPORT_INTENT_VALUE
-  ) {
-    throw new AppError(
-      403,
-      'forbidden_origin',
-      'Remote reference import requires explicit local Studio intent.',
-    );
-  }
+  requireProviderIntent(
+    request,
+    REFERENCE_IMAGE_IMPORT_INTENT_HEADER,
+    REFERENCE_IMAGE_IMPORT_INTENT_VALUE,
+    'Remote reference import requires explicit local Studio intent.',
+  );
 };
 
 export const requireWardrobeProviderIntent = (request: FastifyRequest): void => {
-  if (request.headers[WARDROBE_PROVIDER_INTENT_HEADER] !== WARDROBE_PROVIDER_INTENT_VALUE) {
-    throw new AppError(
-      403,
-      'forbidden_origin',
-      'This wardrobe provider action requires explicit local Studio intent.',
-    );
-  }
+  requireProviderIntent(
+    request,
+    WARDROBE_PROVIDER_INTENT_HEADER,
+    WARDROBE_PROVIDER_INTENT_VALUE,
+    'This wardrobe provider action requires explicit local Studio intent.',
+  );
 };
 
 /** Opaque, deterministic owner boundary for the exact local Host (including port). */

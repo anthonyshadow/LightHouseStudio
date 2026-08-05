@@ -38,6 +38,7 @@ import {
   useExistingVideoWorkflow,
 } from '../features/existing-video/useExistingVideoWorkflow';
 import { MediaStage } from '../features/live-stage';
+import { isVideoEditBusy } from '../features/video-editor/types';
 import { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import {
   confirmModeReplacement,
@@ -59,7 +60,12 @@ import {
   skipLinkStyles,
   stageColumnStyles,
 } from './StudioApp.styles';
-import { CreativeWorkspace, type AuxiliaryPanel, type ModelMode } from './CreativeWorkspace';
+import {
+  CreativeWorkspace,
+  type AuxiliaryPanel,
+  type CreativeWorkspaceState,
+  type ModelMode,
+} from './CreativeWorkspace';
 import { AIExperienceChooser } from './AIExperienceChooser';
 import { AIPreparationChooser } from './AIPreparationChooser';
 import { StudioExitGuard } from './StudioExitGuard';
@@ -77,7 +83,7 @@ import { useProviderAvailability } from './useProviderAvailability';
 import { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 import { useTakeReviewFlow } from './useTakeReviewFlow';
 import { useDesktopStudioLayout } from './useDesktopStudioLayout';
-import { useStudioOverlayController } from './useStudioOverlayController';
+import { useStudioOverlayController, type ActiveOverlay } from './useStudioOverlayController';
 
 const CharacterBuilderCoordinator = lazy(() =>
   import('../features/character-builder/CharacterBuilderCoordinator').then((module) => ({
@@ -114,6 +120,33 @@ const REVIEW_LOCK_REASON =
   'Download and release or discard the temporary take before starting or changing media.';
 
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
+
+const creativePanelForOverlay = (overlay: ActiveOverlay): AuxiliaryPanel => {
+  if (overlay === 'workshop') return 'workshop';
+  if (overlay === 'recipe-shelf') return 'shelf';
+  return 'closed';
+};
+
+const creativeToolForOverlay = (
+  overlay: ActiveOverlay,
+  panel: AuxiliaryPanel,
+  videoEditing: boolean,
+): CreativeWorkspaceState['activeTool'] => {
+  if (videoEditing) return 'edit-video';
+  switch (overlay) {
+    case 'recipe-dock':
+      return 'dock';
+    case 'video-upload':
+      return 'edit-video';
+    case 'character-selector':
+      return 'character';
+    case 'outfit-selector':
+    case 'outfit-builder':
+      return 'outfit';
+    default:
+      return panel === 'closed' ? null : panel;
+  }
+};
 
 const focusDesktopCaptureSettings = () => {
   window.requestAnimationFrame(() => {
@@ -334,15 +367,21 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     existingVideo.comparison === 'original'
       ? recording.original
       : (recording.processed ?? recording.visual);
-  const stagePresentation =
-    videoEditing && videoEditor.source && takeStagePresentation.kind === 'playback'
-      ? { ...takeStagePresentation, artifact: videoEditor.source.artifact, controlsLocked: false }
-      : activeOverlay === 'video-upload' &&
-          existingVideo.selection !== null &&
-          takeStagePresentation.kind === 'playback' &&
-          comparedExistingVideoArtifact
-        ? { ...takeStagePresentation, artifact: comparedExistingVideoArtifact }
-        : takeStagePresentation;
+  let stagePresentation = takeStagePresentation;
+  if (videoEditing && videoEditor.source && takeStagePresentation.kind === 'playback') {
+    stagePresentation = {
+      ...takeStagePresentation,
+      artifact: videoEditor.source.artifact,
+      controlsLocked: false,
+    };
+  } else if (
+    activeOverlay === 'video-upload' &&
+    existingVideo.selection !== null &&
+    takeStagePresentation.kind === 'playback' &&
+    comparedExistingVideoArtifact
+  ) {
+    stagePresentation = { ...takeStagePresentation, artifact: comparedExistingVideoArtifact };
+  }
   const videoEditPreview = useMemo(
     () =>
       videoEditing && videoEditor.source
@@ -385,14 +424,14 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       : null;
   const playbackWidth = editedStageGeometry?.width ?? recording.metadata?.width;
   const playbackHeight = editedStageGeometry?.height ?? recording.metadata?.height;
-  const stageAspectRatio =
-    stagePresentation.kind === 'playback' && playbackWidth && playbackHeight
-      ? playbackHeight > playbackWidth
-        ? ('9:16' as const)
-        : ('16:9' as const)
-      : session.draft.mode === 'local'
-        ? session.capturePreferences.applied.aspectRatio
-        : ('16:9' as const);
+  let stageAspectRatio: '16:9' | '9:16';
+  if (stagePresentation.kind === 'playback' && playbackWidth && playbackHeight) {
+    stageAspectRatio = playbackHeight > playbackWidth ? '9:16' : '16:9';
+  } else if (session.draft.mode === 'local') {
+    stageAspectRatio = session.capturePreferences.applied.aspectRatio;
+  } else {
+    stageAspectRatio = '16:9';
+  }
 
   useEffect(() => {
     const artifact = recording.original;
@@ -723,25 +762,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     openOverlay('video-upload');
   }, [existingVideo.selection, openOverlay, wardrobeExistingVideoStepId]);
 
-  const creativePanel: AuxiliaryPanel =
-    activeOverlay === 'workshop'
-      ? 'workshop'
-      : activeOverlay === 'recipe-shelf'
-        ? 'shelf'
-        : 'closed';
-  const activeCreativeTool = videoEditing
-    ? 'edit-video'
-    : activeOverlay === 'recipe-dock'
-      ? 'dock'
-      : activeOverlay === 'video-upload'
-        ? 'edit-video'
-        : activeOverlay === 'character-selector'
-          ? 'character'
-          : activeOverlay === 'outfit-selector' || activeOverlay === 'outfit-builder'
-            ? 'outfit'
-            : creativePanel === 'closed'
-              ? null
-              : creativePanel;
+  const creativePanel = creativePanelForOverlay(activeOverlay);
+  const activeCreativeTool = creativeToolForOverlay(activeOverlay, creativePanel, videoEditing);
   const captureBlockedReason = reviewLocked
     ? REVIEW_LOCK_REASON
     : shelfDirty
@@ -964,7 +986,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     window.requestAnimationFrame(() => editVideoToggleRef.current?.focus());
   }, [openOverlay, videoEditor]);
   const requestVideoEditDiscard = useCallback(() => {
-    if (['rendering', 'validating', 'committing'].includes(videoEditor.phase)) return;
+    if (isVideoEditBusy(videoEditor.phase)) return;
     if (!videoEditor.dirty) {
       returnFromVideoEditor();
       return;
@@ -1263,9 +1285,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             finalizingStream !== null ||
             existingVideo.providerActive
           }
-          videoRenderingActive={['rendering', 'validating', 'committing'].includes(
-            videoEditor.phase,
-          )}
+          videoRenderingActive={isVideoEditBusy(videoEditor.phase)}
           hasTemporaryTake={Boolean(recording.presented)}
           voiceProcessingActive={recording.processingState === 'processing'}
           shelfDirty={shelfDirty || outfitBuilderDirty || wardrobeDirty || videoEditor.dirty}

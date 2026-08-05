@@ -11,7 +11,7 @@ import {
 } from '@studio/domain';
 import { Button, StatusNotice } from '../../ui';
 import type { VideoEditSession } from './useVideoEditSession';
-import type { VideoEditTool } from './types';
+import { isVideoEditBusy, type VideoEditTool } from './types';
 import {
   editSettingsBodyStyles,
   editSettingsStyles,
@@ -304,7 +304,8 @@ export type VideoEditWorkspaceProps = Readonly<{
 
 export const VideoEditWorkspace = ({ session, onRequestDiscard }: VideoEditWorkspaceProps) => {
   const theme = useTheme();
-  const busy = ['rendering', 'validating', 'committing'].includes(session.phase);
+  const busy = isVideoEditBusy(session.phase);
+  const activeToolLabel = TOOLS.find((tool) => tool.id === session.activeTool)?.label;
   return (
     <>
       <nav
@@ -341,7 +342,7 @@ export const VideoEditWorkspace = ({ session, onRequestDiscard }: VideoEditWorks
         data-video-edit-settings=""
       >
         <header>
-          <h2>{TOOLS.find((tool) => tool.id === session.activeTool)?.label} settings</h2>
+          <h2>{activeToolLabel} settings</h2>
           <div data-editor-history="">
             <Button
               size="small"
@@ -366,7 +367,7 @@ export const VideoEditWorkspace = ({ session, onRequestDiscard }: VideoEditWorks
         <div
           css={editSettingsBodyStyles(theme)}
           role="region"
-          aria-label={`${TOOLS.find((tool) => tool.id === session.activeTool)?.label} controls`}
+          aria-label={`${activeToolLabel} controls`}
         >
           <Button
             size="small"

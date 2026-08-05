@@ -16,8 +16,10 @@ import {
 import { ExistingVideoSourcePreview } from './ExistingVideoSourcePreview';
 import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
 
-const orientation = (width: number, height: number): string =>
-  width === height ? 'Square' : width > height ? 'Landscape' : 'Portrait';
+const orientation = (width: number, height: number): string => {
+  if (width === height) return 'Square';
+  return width > height ? 'Landscape' : 'Portrait';
+};
 
 export const ExistingVideoSourceCard = ({
   workflow,

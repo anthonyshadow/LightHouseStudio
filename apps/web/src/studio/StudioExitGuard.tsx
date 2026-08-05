@@ -60,22 +60,28 @@ export const StudioExitGuard = ({
   const activeWorkExitBlocked =
     navigationBlocked && (recordingOrFinalizing || videoRenderingActive);
   const discardConfirmationOpen = navigationBlocked && !activeWorkExitBlocked && hasDiscardableWork;
+  const activeWorkCopy = videoRenderingActive
+    ? {
+        title: 'Cancel the video render before leaving',
+        description:
+          'Studio cannot abandon a local video worker. Stay here, cancel the render, then discard or save the draft before leaving.',
+        detail: 'Return to the edit settings and cancel the active render before leaving Studio.',
+      }
+    : {
+        title: 'Finish the take before leaving',
+        description:
+          'Studio cannot leave while recording or finalization is active. Stay here, finish the take, then try again.',
+        detail:
+          'Stop the recording and wait for the take to finish finalizing before leaving Studio.',
+      };
 
   return (
     <>
       <OverlayPanel
         open={activeWorkExitBlocked}
         onClose={stayInStudio}
-        title={
-          videoRenderingActive
-            ? 'Cancel the video render before leaving'
-            : 'Finish the take before leaving'
-        }
-        description={
-          videoRenderingActive
-            ? 'Studio cannot abandon a local video worker. Stay here, cancel the render, then discard or save the draft before leaving.'
-            : 'Studio cannot leave while recording or finalization is active. Stay here, finish the take, then try again.'
-        }
+        title={activeWorkCopy.title}
+        description={activeWorkCopy.description}
         placement="bottom"
         size="standard"
         closeOnBackdrop={false}
@@ -85,11 +91,7 @@ export const StudioExitGuard = ({
           </Button>
         }
       >
-        <p>
-          {videoRenderingActive
-            ? 'Return to the edit settings and cancel the active render before leaving Studio.'
-            : 'Stop the recording and wait for the take to finish finalizing before leaving Studio.'}
-        </p>
+        <p>{activeWorkCopy.detail}</p>
       </OverlayPanel>
 
       <ConfirmationDialog

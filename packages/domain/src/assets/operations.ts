@@ -179,22 +179,24 @@ const unlinkRecentPrompt = (recent: RecentPrompt, savedPromptId: string): Recent
   };
 };
 
+const withoutRecentCharacterAttribution = (recent: RecentPrompt): RecentPrompt => ({
+  id: recent.id,
+  prompt: recent.prompt,
+  modelModeId: recent.modelModeId,
+  ...(recent.savedPromptId ? { savedPromptId: recent.savedPromptId } : {}),
+  ...(recent.characterName ? { characterName: recent.characterName } : {}),
+  referenceImageAssetId: recent.referenceImageAssetId,
+  vtonInputKind: recent.vtonInputKind,
+  enhancePrompt: recent.enhancePrompt,
+  usedAt: recent.usedAt,
+});
+
 const unlinkRecentCharacter = (
   recent: RecentPrompt,
   savedCharacterPromptId: string,
 ): RecentPrompt => {
   if (recent.savedCharacterPromptId !== savedCharacterPromptId) return recent;
-  return {
-    id: recent.id,
-    prompt: recent.prompt,
-    modelModeId: recent.modelModeId,
-    ...(recent.savedPromptId ? { savedPromptId: recent.savedPromptId } : {}),
-    ...(recent.characterName ? { characterName: recent.characterName } : {}),
-    referenceImageAssetId: recent.referenceImageAssetId,
-    vtonInputKind: recent.vtonInputKind,
-    enhancePrompt: recent.enhancePrompt,
-    usedAt: recent.usedAt,
-  };
+  return withoutRecentCharacterAttribution(recent);
 };
 
 const unlinkRecentCharacterVariant = (
@@ -202,17 +204,7 @@ const unlinkRecentCharacterVariant = (
   savedCharacterVariantId: string,
 ): RecentPrompt => {
   if (recent.savedCharacterVariantId !== savedCharacterVariantId) return recent;
-  return {
-    id: recent.id,
-    prompt: recent.prompt,
-    modelModeId: recent.modelModeId,
-    ...(recent.savedPromptId ? { savedPromptId: recent.savedPromptId } : {}),
-    ...(recent.characterName ? { characterName: recent.characterName } : {}),
-    referenceImageAssetId: recent.referenceImageAssetId,
-    vtonInputKind: recent.vtonInputKind,
-    enhancePrompt: recent.enhancePrompt,
-    usedAt: recent.usedAt,
-  };
+  return withoutRecentCharacterAttribution(recent);
 };
 
 export const createSavedPrompt = (
