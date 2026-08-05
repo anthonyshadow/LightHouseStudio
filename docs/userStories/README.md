@@ -17,7 +17,7 @@ references, not release-readiness claims or future requirements.
 | Save and reuse recipes                               | [Recipe Shelf](06-recipe-shelf.md)                                             |
 | Review, download, and release a take                 | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
 | Apply browser-local voice effects                    | [Local voice treatments](08-local-voice-treatments.md)                         |
-| Apply a saved ElevenLabs voice                       | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
+| Browse, save, manage, and apply ElevenLabs voices    | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
 | Recover from missing capabilities                    | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md) |
 | Build and preload a reusable character               | [Studio character builder](11-studio-character-builder.md)                     |
 

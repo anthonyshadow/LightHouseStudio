@@ -616,6 +616,53 @@ test('saved voice preview, Apply, remux, Download, and Restore Original stay exp
   expectNoExternalProviderTraffic(network);
 });
 
+test('Browse Voices adds once and confirmed Saved removal reconciles both library views', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page, { elevenLabsAvailable: true });
+  await page.goto('/studio');
+  await createLocalTake(page);
+
+  const takeDialog = page.getByRole('dialog', { name: 'Latest Take' });
+  await takeDialog.getByRole('button', { name: 'Voice treatments' }).click();
+  const treatments = page.getByRole('dialog', { name: 'Voice Treatments' });
+  await treatments.getByRole('button', { name: /Saved AI Voice/u }).click();
+  await treatments.getByRole('button', { name: 'Browse Voices' }).click();
+
+  await expect(treatments.getByText('Atlas Community', { exact: true })).toBeVisible();
+  await treatments.getByRole('button', { name: 'Add Atlas Community to Saved Voices' }).click();
+  await expect(
+    treatments.getByRole('button', { name: 'Atlas Community is already saved' }),
+  ).toBeDisabled();
+
+  await treatments.getByRole('button', { name: 'Saved Voices' }).click();
+  await expect(treatments.getByText('Atlas Community', { exact: true })).toBeVisible();
+  await treatments
+    .getByRole('button', { name: 'Remove Atlas Community from Saved Voices' })
+    .click();
+  await expect(page.getByRole('heading', { name: 'Remove saved voice?' })).toBeVisible();
+  await page.getByRole('button', { name: 'Remove voice' }).click();
+  await expect(treatments.getByText('Atlas Community', { exact: true })).toHaveCount(0);
+
+  expect(network.voiceRequests.filter(({ kind }) => kind === 'save')).toEqual([
+    expect.objectContaining({
+      kind: 'save',
+      voiceId: 'atlas-community',
+      providerIntent: 'voice',
+      bodyByteSize: 0,
+    }),
+  ]);
+  expect(network.voiceRequests.filter(({ kind }) => kind === 'delete')).toEqual([
+    expect.objectContaining({
+      kind: 'delete',
+      voiceId: 'atlas-community',
+      providerIntent: 'voice',
+      bodyByteSize: 0,
+    }),
+  ]);
+  expectNoExternalProviderTraffic(network);
+});
+
 test('Edit Video moves to the creative rail for every finalized playback', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/studio');

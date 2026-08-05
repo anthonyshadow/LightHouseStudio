@@ -1,7 +1,9 @@
 import type {
   CapabilitiesResponse,
   ReferenceImageSize,
-  VoiceSummary,
+  SharedVoiceSummary,
+  SharedVoicesResponse,
+  WorkspaceVoiceSummary,
   WorkspaceVoicesResponse,
 } from '@studio/contracts';
 import type { ModelModeId, SessionLifecycleStatus, SessionModeId } from '@studio/domain';
@@ -83,9 +85,27 @@ export type CaptureStreamSettings = {
   audio: CaptureAudioSettings | null;
 };
 
-export type WorkspaceVoiceItem = { readonly kind: 'workspace'; readonly voice: VoiceSummary };
-export type VoiceLibraryItem = WorkspaceVoiceItem;
+export type VoiceFilterCriteria = Readonly<{
+  search: string;
+  language: string;
+  gender: string;
+  age: string;
+  accent: string;
+  useCase: string;
+  descriptive: string;
+}>;
+
+export type WorkspaceVoiceItem = {
+  readonly kind: 'workspace';
+  readonly voice: WorkspaceVoiceSummary;
+};
+export type SharedVoiceItem = { readonly kind: 'shared'; readonly voice: SharedVoiceSummary };
+export type VoiceLibraryItem = WorkspaceVoiceItem | SharedVoiceItem;
 
 export type WorkspaceVoicePage = Omit<WorkspaceVoicesResponse, 'voices'> & {
   voices: WorkspaceVoiceItem[];
+};
+
+export type SharedVoicePage = Omit<SharedVoicesResponse, 'voices'> & {
+  voices: SharedVoiceItem[];
 };

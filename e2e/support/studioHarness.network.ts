@@ -162,6 +162,7 @@ export const installProviderNetworkDriver = async (
   options: StudioHarnessOptions = {},
 ): Promise<NetworkJourneyState> => {
   let remainingCapabilityFailures = options.capabilityFailuresBeforeSuccess ?? 0;
+  let sharedVoiceSaved = false;
   const network: NetworkJourneyState = {
     apiRequests: [],
     voiceRequests: [],
@@ -580,13 +581,127 @@ export const installProviderNetworkDriver = async (
               category: 'professional',
               description: 'Warm, grounded documentary narration',
               labels: { style: 'narration' },
+              traits: {
+                language: 'en',
+                gender: 'neutral',
+                age: 'middle-aged',
+                accent: 'Canadian',
+                useCase: 'narration',
+                descriptive: 'grounded',
+              },
               previewAvailable: true,
+              removable: true,
             },
+            ...(sharedVoiceSaved
+              ? [
+                  {
+                    voiceId: 'atlas-community',
+                    name: 'Atlas Community',
+                    category: 'professional',
+                    description: 'Warm community narration',
+                    labels: { language: 'en' },
+                    traits: {
+                      language: 'en',
+                      gender: 'male',
+                      age: 'middle-aged',
+                      accent: 'American',
+                      useCase: 'narration',
+                      descriptive: 'warm',
+                    },
+                    previewAvailable: true,
+                    removable: true,
+                  },
+                ]
+              : []),
           ],
           hasMore: false,
           nextPageToken: null,
+          total: sharedVoiceSaved ? 2 : 1,
+        }),
+      });
+      return;
+    }
+
+    if (
+      requestUrl.pathname === '/api/elevenlabs/shared-voices' &&
+      route.request().method() === 'GET'
+    ) {
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.voiceRequests.push({
+        kind: 'browse',
+        voiceId: null,
+        providerIntent: route.request().headers()['x-lightframe-provider-intent'] ?? null,
+        contentType: null,
+        bodyByteSize: 0,
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          voices: [
+            {
+              publicOwnerId: 'owner-atlas',
+              voiceId: 'atlas-community',
+              name: 'Atlas Community',
+              category: 'professional',
+              description: 'Warm community narration',
+              labels: { language: 'en' },
+              traits: {
+                language: 'en',
+                gender: 'male',
+                age: 'middle-aged',
+                accent: 'American',
+                useCase: 'narration',
+                descriptive: 'warm',
+              },
+              previewAvailable: true,
+              saved: sharedVoiceSaved,
+            },
+          ],
+          hasMore: false,
+          page: Number(requestUrl.searchParams.get('page') ?? 0),
           total: 1,
         }),
+      });
+      return;
+    }
+
+    const sharedSaveMatch = requestUrl.pathname.match(
+      /^\/api\/elevenlabs\/shared-voices\/([^/]+)\/([^/]+)\/save$/u,
+    );
+    if (sharedSaveMatch && route.request().method() === 'POST') {
+      sharedVoiceSaved = true;
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.voiceRequests.push({
+        kind: 'save',
+        voiceId: decodeURIComponent(sharedSaveMatch[2] ?? ''),
+        providerIntent: route.request().headers()['x-lightframe-provider-intent'] ?? null,
+        contentType: null,
+        bodyByteSize: 0,
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'saved', voiceId: 'atlas-community' }),
+      });
+      return;
+    }
+
+    const voiceDeleteMatch = requestUrl.pathname.match(/^\/api\/elevenlabs\/voices\/([^/]+)$/u);
+    if (voiceDeleteMatch && route.request().method() === 'DELETE') {
+      sharedVoiceSaved = false;
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      network.voiceRequests.push({
+        kind: 'delete',
+        voiceId: decodeURIComponent(voiceDeleteMatch[1] ?? ''),
+        providerIntent: route.request().headers()['x-lightframe-provider-intent'] ?? null,
+        contentType: null,
+        bodyByteSize: 0,
+      });
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'removed', voiceId: 'atlas-community' }),
       });
       return;
     }

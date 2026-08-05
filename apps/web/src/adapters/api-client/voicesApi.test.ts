@@ -7,8 +7,15 @@ import {
   VOICE_PROVIDER_INTENT_HEADER,
   VOICE_PROVIDER_INTENT_VALUE,
 } from '@studio/contracts';
-import type { WorkspaceVoiceItem } from '../../application/types';
-import { convertRecordingVoice, fetchVoicePreview, listWorkspaceVoices } from './voicesApi';
+import type { SharedVoiceItem, WorkspaceVoiceItem } from '../../application/types';
+import {
+  convertRecordingVoice,
+  fetchVoicePreview,
+  listSharedVoices,
+  listWorkspaceVoices,
+  removeWorkspaceVoice,
+  saveSharedVoice,
+} from './voicesApi';
 
 const workspaceVoice: WorkspaceVoiceItem = {
   kind: 'workspace',
@@ -18,8 +25,55 @@ const workspaceVoice: WorkspaceVoiceItem = {
     category: null,
     description: null,
     labels: {},
+    traits: {
+      language: null,
+      gender: null,
+      age: null,
+      accent: null,
+      useCase: null,
+      descriptive: null,
+    },
     previewAvailable: true,
+    removable: false,
   },
+};
+
+const emptyCriteria = {
+  search: '',
+  language: '',
+  gender: '',
+  age: '',
+  accent: '',
+  useCase: '',
+  descriptive: '',
+} as const;
+
+const sharedVoice: SharedVoiceItem = {
+  kind: 'shared',
+  voice: {
+    voiceId: 'shared-voice',
+    publicOwnerId: 'owner-one',
+    name: 'Catalog Star',
+    category: 'professional',
+    description: 'Warm narration',
+    labels: { language: 'en' },
+    traits: {
+      language: 'en',
+      gender: 'female',
+      age: 'middle-aged',
+      accent: 'American',
+      useCase: 'narration',
+      descriptive: 'warm',
+    },
+    previewAvailable: true,
+    saved: false,
+  },
+};
+
+const requestedUrl = (input: RequestInfo | URL | undefined): string => {
+  if (typeof input === 'string') return input;
+  if (input instanceof URL) return input.href;
+  return input?.url ?? '';
 };
 
 afterEach(() => {
@@ -39,9 +93,9 @@ describe('voice API provider intent', () => {
       ),
     );
 
-    await expect(listWorkspaceVoices('', null, new AbortController().signal)).rejects.toThrow(
-      'The saved voice library response was invalid.',
-    );
+    await expect(
+      listWorkspaceVoices(emptyCriteria, null, new AbortController().signal),
+    ).rejects.toThrow('The saved voice library response was invalid.');
   });
 
   it('marks saved-library reads and preserves the workspace discriminant', async () => {
@@ -59,10 +113,64 @@ describe('voice API provider intent', () => {
     vi.stubGlobal('fetch', fetchMock);
     const signal = new AbortController().signal;
 
-    await expect(listWorkspaceVoices('', null, signal)).resolves.toMatchObject({
+    await expect(listWorkspaceVoices(emptyCriteria, null, signal)).resolves.toMatchObject({
       voices: [workspaceVoice],
     });
 
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(new Headers(init?.headers).get(VOICE_PROVIDER_INTENT_HEADER)).toBe(
+        VOICE_PROVIDER_INTENT_VALUE,
+      );
+    }
+  });
+
+  it('maps Browse filters, discriminants, pagination, and mutation routes', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({ voices: [sharedVoice.voice], hasMore: true, page: 2, total: 21 }),
+          { status: 200, headers: { 'Content-Type': 'application/json' } },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: 'saved', voiceId: 'shared-voice' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ status: 'removed', voiceId: 'shared-voice' }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' },
+        }),
+      );
+    vi.stubGlobal('fetch', fetchMock);
+    const criteria = { ...emptyCriteria, search: 'catalog', language: 'en' };
+
+    await expect(
+      listSharedVoices(criteria, 2, 'trending', new AbortController().signal, true),
+    ).resolves.toMatchObject({ voices: [sharedVoice], page: 2 });
+    await expect(saveSharedVoice(sharedVoice, new AbortController().signal)).resolves.toMatchObject(
+      {
+        status: 'saved',
+      },
+    );
+    await expect(
+      removeWorkspaceVoice('shared-voice', new AbortController().signal),
+    ).resolves.toMatchObject({ status: 'removed' });
+
+    const browseUrl = new URL(requestedUrl(fetchMock.mock.calls[0]?.[0]), 'http://localhost');
+    expect(Object.fromEntries(browseUrl.searchParams)).toMatchObject({
+      search: 'catalog',
+      language: 'en',
+      pageSize: '20',
+      page: '2',
+      sort: 'trending',
+      refresh: 'true',
+    });
+    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'POST' });
+    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: 'DELETE' });
     for (const [, init] of fetchMock.mock.calls) {
       expect(new Headers(init?.headers).get(VOICE_PROVIDER_INTENT_HEADER)).toBe(
         VOICE_PROVIDER_INTENT_VALUE,

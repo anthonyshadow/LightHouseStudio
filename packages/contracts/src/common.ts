@@ -58,9 +58,9 @@ export const apiErrorResponseSchema = z
   .strict();
 
 export const providerIdSchema = z.string().trim().min(1).max(200);
-export const opaquePageTokenSchema = z.string().trim().min(1).max(500);
+export const opaquePageTokenSchema = z.string().trim().min(1).max(1_000);
 export const boundedSearchSchema = z.string().trim().max(100).default('');
-export const PAGE_SIZE_LIMIT = 10;
+export const PAGE_SIZE_LIMIT = 20;
 
 export type ApiErrorCode = z.infer<typeof apiErrorCodeSchema>;
 export type ApiErrorDetail = z.infer<typeof apiErrorDetailSchema>;

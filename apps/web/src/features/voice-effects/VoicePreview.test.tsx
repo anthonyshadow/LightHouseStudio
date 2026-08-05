@@ -19,7 +19,16 @@ const item: WorkspaceVoiceItem = {
     category: null,
     description: null,
     labels: {},
+    traits: {
+      language: null,
+      gender: null,
+      age: null,
+      accent: null,
+      useCase: null,
+      descriptive: null,
+    },
     previewAvailable: true,
+    removable: false,
   },
 };
 

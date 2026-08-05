@@ -37,12 +37,10 @@ describe('ElevenLabs voice API', () => {
       voice(),
       voice({ voiceId: 'professional-one', name: 'Pro', category: 'professional' }),
     ];
-    provider.workspaceHasMore = true;
-    provider.workspaceNextPageToken = 'next-opaque';
 
     const response = await app.inject({
       method: 'GET',
-      url: '/api/elevenlabs/voices?search=%20nova%20&pageSize=10&pageToken=current',
+      url: '/api/elevenlabs/voices?search=%20nova%20&pageSize=20',
       headers: intentHeaders,
     });
 
@@ -56,7 +54,16 @@ describe('ElevenLabs voice API', () => {
           category: 'generated',
           description: 'Bright and conversational',
           labels: { accent: 'Canadian' },
+          traits: {
+            language: 'en',
+            gender: 'female',
+            age: 'young',
+            accent: 'Canadian',
+            useCase: 'narration',
+            descriptive: 'bright',
+          },
           previewAvailable: true,
+          removable: true,
         },
         {
           voiceId: 'professional-one',
@@ -64,22 +71,31 @@ describe('ElevenLabs voice API', () => {
           category: 'professional',
           description: 'Bright and conversational',
           labels: { accent: 'Canadian' },
+          traits: {
+            language: 'en',
+            gender: 'female',
+            age: 'young',
+            accent: 'Canadian',
+            useCase: 'narration',
+            descriptive: 'bright',
+          },
           previewAvailable: true,
+          removable: true,
         },
       ],
-      hasMore: true,
-      nextPageToken: 'next-opaque',
+      hasMore: false,
+      nextPageToken: null,
       total: null,
     });
     expect(provider.workspaceSearches[0]).toMatchObject({
       search: 'nova',
-      pageSize: 10,
-      nextPageToken: 'current',
+      pageSize: 20,
+      nextPageToken: null,
     });
 
     const tooLarge = await app.inject({
       method: 'GET',
-      url: '/api/elevenlabs/voices?pageSize=11',
+      url: '/api/elevenlabs/voices?pageSize=21',
       headers: intentHeaders,
     });
     expect(tooLarge.statusCode).toBe(400);
@@ -142,29 +158,105 @@ describe('ElevenLabs voice API', () => {
     const responses = await Promise.all([
       app.inject({ method: 'GET', url: '/api/elevenlabs/voices' }),
       app.inject({ method: 'GET', url: '/api/elevenlabs/voices/voice-one/preview' }),
+      app.inject({ method: 'GET', url: '/api/elevenlabs/shared-voices' }),
+      app.inject({
+        method: 'GET',
+        url: '/api/elevenlabs/shared-voices/owner-one/shared-one/preview',
+      }),
     ]);
 
-    expect(responses.map((response) => response.statusCode)).toEqual([403, 403]);
+    expect(responses.map((response) => response.statusCode)).toEqual([403, 403, 403, 403]);
     expect(provider.workspaceSearches).toHaveLength(0);
     expect(provider.previewUrls).toHaveLength(0);
   });
 
-  it('does not expose public discovery or voice-import routes', async () => {
+  it('exposes eligible shared discovery without exposing provider preview URLs', async () => {
     const { app, provider } = setup();
     const sharedList = await app.inject({
       method: 'GET',
-      url: '/api/elevenlabs/shared-voices',
+      url: '/api/elevenlabs/shared-voices?search=%20atlas%20&sort=trending',
       headers: intentHeaders,
     });
-    const importVoice = await app.inject({
-      method: 'POST',
-      url: '/api/elevenlabs/shared-voices/import',
-      headers: originHeaders,
-      payload: { publicOwnerId: 'owner-one', voiceId: 'voice-one', name: 'My Nova' },
+    expect(sharedList.statusCode).toBe(200);
+    expect(sharedList.body).not.toContain('storage.googleapis.com');
+    expect(sharedList.json()).toMatchObject({
+      voices: [{ voiceId: 'shared-one', publicOwnerId: 'owner-one', saved: false }],
+      page: 0,
+      hasMore: false,
+    });
+    expect(provider.sharedSearches[0]).toMatchObject({
+      search: 'atlas',
+      pageSize: 20,
+      page: 0,
+      sort: 'trending',
+    });
+  });
+
+  it('proxies eligible catalog previews without returning provider URLs', async () => {
+    const { app, provider } = setup();
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/shared-voices/owner-one/shared-one/preview',
+      headers: intentHeaders,
     });
 
-    expect(sharedList.statusCode).toBe(404);
-    expect(importVoice.statusCode).toBe(404);
+    expect(response.statusCode).toBe(200);
+    expect(response.headers['content-type']).toContain('audio/mpeg');
+    expect(response.body).not.toContain('storage.googleapis.com');
+    expect(provider.previewUrls).toHaveLength(1);
+  });
+
+  it('requires trusted origin and provider intent for add and delete mutations', async () => {
+    const addSetup = setup();
+    addSetup.provider.workspaceVoices = [];
+    const addPath = '/api/elevenlabs/shared-voices/owner-one/shared-one/save';
+    const rejectedAdd = await addSetup.app.inject({
+      method: 'POST',
+      url: addPath,
+      headers: intentHeaders,
+    });
+    const acceptedAdd = await addSetup.app.inject({
+      method: 'POST',
+      url: addPath,
+      headers: originHeaders,
+    });
+
+    expect(rejectedAdd.statusCode).toBe(403);
+    expect(acceptedAdd.statusCode).toBe(200);
+    expect(acceptedAdd.json()).toEqual({ status: 'saved', voiceId: 'shared-one' });
+    expect(addSetup.provider.addedVoices).toEqual([
+      { publicOwnerId: 'owner-one', voiceId: 'shared-one', name: 'Atlas' },
+    ]);
+
+    const deleteSetup = setup();
+    const deletePath = '/api/elevenlabs/voices/voice-one';
+    const rejectedDelete = await deleteSetup.app.inject({
+      method: 'DELETE',
+      url: deletePath,
+      headers: intentHeaders,
+    });
+    const acceptedDelete = await deleteSetup.app.inject({
+      method: 'DELETE',
+      url: deletePath,
+      headers: originHeaders,
+    });
+
+    expect(rejectedDelete.statusCode).toBe(403);
+    expect(acceptedDelete.statusCode).toBe(200);
+    expect(acceptedDelete.json()).toEqual({ status: 'removed', voiceId: 'voice-one' });
+    expect(deleteSetup.provider.deletedVoiceIds).toEqual(['voice-one']);
+  });
+
+  it('rejects stale or malformed saved pagination cursors without provider contact', async () => {
+    const { app, provider } = setup();
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/voices?pageToken=not-an-app-cursor',
+      headers: intentHeaders,
+    });
+
+    expect(response.statusCode).toBe(400);
+    expect(response.json<ApiErrorResponse>().error.code).toBe('validation_error');
     expect(provider.workspaceSearches).toHaveLength(0);
   });
 

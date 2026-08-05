@@ -19,7 +19,10 @@ import type {
   ElevenLabsModel,
   ElevenLabsProvider,
   ProviderVoice,
+  ProviderSharedVoice,
+  ProviderSharedVoicePage,
   ProviderWorkspaceVoicePage,
+  SharedVoiceSearchInput,
   VoiceSearchInput,
   VoiceConversionAudio,
 } from './types.js';
@@ -27,6 +30,7 @@ import type {
 const ELEVENLABS_API_ORIGIN = 'https://api.elevenlabs.io';
 const ALLOWED_PREVIEW_HOSTS = new Set(['storage.googleapis.com']);
 const providerIdSchema = z.string().trim().min(1).max(200);
+const ELEVENLABS_PROVIDER_PAGE_LIMIT = 100;
 
 export type ElevenLabsAudioLimits = Readonly<{
   previewBytes: number;
@@ -147,16 +151,60 @@ const workspaceVoiceSchema = z
     description: z.string().nullish(),
     labels: labelsSchema,
     preview_url: z.string().nullish(),
+    is_owner: z.boolean().nullish(),
+    is_bookmarked: z.boolean().nullish(),
+    sharing: z.object({ public_owner_id: providerIdSchema.nullish() }).passthrough().nullish(),
+    verified_languages: z
+      .array(
+        z
+          .object({
+            language: z.string().nullish(),
+            accent: z.string().nullish(),
+          })
+          .passthrough(),
+      )
+      .max(100)
+      .nullish(),
   })
   .passthrough();
 
 const workspaceVoicePageSchema = z
   .object({
-    voices: z.array(workspaceVoiceSchema).max(PAGE_SIZE_LIMIT),
+    voices: z.array(workspaceVoiceSchema).max(ELEVENLABS_PROVIDER_PAGE_LIMIT),
     has_more: z.boolean(),
     next_page_token: z.string().nullish(),
   })
   .passthrough();
+
+const sharedVoiceSchema = z
+  .object({
+    public_owner_id: providerIdSchema,
+    voice_id: providerIdSchema,
+    name: z.string().nullish(),
+    accent: z.string().nullish(),
+    gender: z.string().nullish(),
+    age: z.string().nullish(),
+    descriptive: z.string().nullish(),
+    use_case: z.string().nullish(),
+    category: z.string().nullish(),
+    free_users_allowed: z.boolean(),
+    language: z.string().nullish(),
+    description: z.string().nullish(),
+    preview_url: z.string().nullish(),
+    rate: z.number().finite().nonnegative(),
+  })
+  .passthrough();
+
+const sharedVoicePageSchema = z
+  .object({
+    voices: z.array(z.unknown()).max(ELEVENLABS_PROVIDER_PAGE_LIMIT),
+    has_more: z.boolean(),
+    total_count: z.number().int().nonnegative().default(0),
+  })
+  .passthrough();
+
+const addedVoiceSchema = z.object({ voice_id: providerIdSchema }).passthrough();
+const deletedVoiceSchema = z.object({ status: z.literal('ok') }).passthrough();
 
 const modelSchema = z
   .object({
@@ -195,13 +243,57 @@ const normalizeLabels = (
   return Object.fromEntries(entries);
 };
 
-const normalizeWorkspaceVoice = (voice: z.infer<typeof workspaceVoiceSchema>): ProviderVoice => ({
+const normalizedAttribute = (value: unknown): string | null =>
+  typeof value === 'string' && value.trim() !== '' ? value.trim().slice(0, 80) : null;
+
+const labelAttribute = (
+  labels: Readonly<Record<string, string>>,
+  ...keys: readonly string[]
+): string | null => {
+  for (const key of keys) {
+    const value = normalizedAttribute(labels[key]);
+    if (value !== null) return value;
+  }
+  return null;
+};
+
+const normalizeWorkspaceVoice = (voice: z.infer<typeof workspaceVoiceSchema>): ProviderVoice => {
+  const labels = normalizeLabels(voice.labels);
+  const verifiedLanguage = voice.verified_languages?.[0];
+  return {
+    voiceId: voice.voice_id,
+    name: (voice.name?.trim() || 'Untitled voice').slice(0, 100),
+    category: voice.category?.trim().slice(0, 100) || null,
+    description: voice.description?.trim().slice(0, 500) || null,
+    labels,
+    previewUrl: voice.preview_url?.trim() || null,
+    language: labelAttribute(labels, 'language') ?? normalizedAttribute(verifiedLanguage?.language),
+    gender: labelAttribute(labels, 'gender'),
+    age: labelAttribute(labels, 'age'),
+    accent: labelAttribute(labels, 'accent') ?? normalizedAttribute(verifiedLanguage?.accent),
+    useCase: labelAttribute(labels, 'use_case', 'use case', 'useCase'),
+    descriptive: labelAttribute(labels, 'descriptive', 'tone', 'style'),
+    isOwner: voice.is_owner ?? null,
+    isBookmarked: voice.is_bookmarked ?? null,
+    publicOwnerId: voice.sharing?.public_owner_id?.trim() || null,
+  };
+};
+
+const normalizeSharedVoice = (voice: z.infer<typeof sharedVoiceSchema>): ProviderSharedVoice => ({
+  publicOwnerId: voice.public_owner_id,
   voiceId: voice.voice_id,
   name: (voice.name?.trim() || 'Untitled voice').slice(0, 100),
   category: voice.category?.trim().slice(0, 100) || null,
   description: voice.description?.trim().slice(0, 500) || null,
-  labels: normalizeLabels(voice.labels),
   previewUrl: voice.preview_url?.trim() || null,
+  language: normalizedAttribute(voice.language),
+  gender: normalizedAttribute(voice.gender),
+  age: normalizedAttribute(voice.age),
+  accent: normalizedAttribute(voice.accent),
+  useCase: normalizedAttribute(voice.use_case),
+  descriptive: normalizedAttribute(voice.descriptive),
+  rate: voice.rate,
+  freeUsersAllowed: voice.free_users_allowed,
 });
 
 const parseContentLength = (
@@ -501,6 +593,129 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
     }
     const voice = parsed.data.voices.find((candidate) => candidate.voice_id === voiceId);
     return voice === undefined ? null : normalizeWorkspaceVoice(voice);
+  }
+
+  async getWorkspaceVoicesByIds(
+    voiceIds: readonly string[],
+    signal: AbortSignal,
+  ): Promise<readonly ProviderVoice[]> {
+    const uniqueIds = [...new Set(voiceIds)].slice(0, PAGE_SIZE_LIMIT);
+    if (uniqueIds.length === 0) return [];
+    const url = new URL('/v2/voices', ELEVENLABS_API_ORIGIN);
+    url.searchParams.set('page_size', String(uniqueIds.length));
+    url.searchParams.set('include_total_count', 'false');
+    url.searchParams.set('voice_type', 'saved');
+    for (const voiceId of uniqueIds) url.searchParams.append('voice_ids', voiceId);
+    const data = await this.#json(
+      this.#request(url.pathname + url.search, 'workspace-voices', signal),
+      'workspace-voices',
+    );
+    const parsed = workspaceVoicePageSchema.safeParse(data);
+    if (!parsed.success || parsed.data.voices.length > uniqueIds.length) {
+      throw new ProviderError('workspace-voices', 'invalid-response');
+    }
+    const allowed = new Set(uniqueIds);
+    return parsed.data.voices
+      .filter((voice) => allowed.has(voice.voice_id))
+      .map(normalizeWorkspaceVoice);
+  }
+
+  async listSharedVoices(input: SharedVoiceSearchInput): Promise<ProviderSharedVoicePage> {
+    const url = new URL('/v1/shared-voices', ELEVENLABS_API_ORIGIN);
+    url.searchParams.set('page_size', String(input.pageSize));
+    url.searchParams.set('page', String(input.page));
+    url.searchParams.set('sort', input.sort);
+    url.searchParams.set('include_custom_rates', 'false');
+    if (input.search !== '') url.searchParams.set('search', input.search);
+    if (input.language !== '') url.searchParams.set('language', input.language);
+    if (input.gender !== '') url.searchParams.set('gender', input.gender);
+    if (input.age !== '') url.searchParams.set('age', input.age);
+    if (input.accent !== '') url.searchParams.set('accent', input.accent);
+    if (input.useCase !== '') url.searchParams.append('use_cases', input.useCase);
+    if (input.descriptive !== '') {
+      url.searchParams.append('descriptives', input.descriptive);
+    }
+
+    const data = await this.#json(
+      this.#request(url.pathname + url.search, 'shared-voices', input.signal),
+      'shared-voices',
+    );
+    const parsed = sharedVoicePageSchema.safeParse(data);
+    if (!parsed.success || parsed.data.voices.length > input.pageSize) {
+      throw new ProviderError('shared-voices', 'invalid-response');
+    }
+    const voices = parsed.data.voices.flatMap((candidate) => {
+      const voice = sharedVoiceSchema.safeParse(candidate);
+      return voice.success ? [normalizeSharedVoice(voice.data)] : [];
+    });
+    return {
+      voices,
+      hasMore: parsed.data.has_more,
+      total: parsed.data.total_count,
+    };
+  }
+
+  async getSharedVoice(
+    publicOwnerId: string,
+    voiceId: string,
+    signal: AbortSignal,
+  ): Promise<ProviderSharedVoice | null> {
+    const url = new URL('/v1/shared-voices', ELEVENLABS_API_ORIGIN);
+    url.searchParams.set('page_size', String(PAGE_SIZE_LIMIT));
+    url.searchParams.set('page', '0');
+    url.searchParams.set('owner_id', publicOwnerId);
+    url.searchParams.set('search', voiceId);
+    url.searchParams.set('include_custom_rates', 'false');
+    const data = await this.#json(
+      this.#request(url.pathname + url.search, 'shared-voice', signal),
+      'shared-voice',
+    );
+    const parsed = sharedVoicePageSchema.safeParse(data);
+    if (!parsed.success || parsed.data.voices.length > PAGE_SIZE_LIMIT) {
+      throw new ProviderError('shared-voice', 'invalid-response');
+    }
+    for (const candidate of parsed.data.voices) {
+      const parsedVoice = sharedVoiceSchema.safeParse(candidate);
+      if (
+        parsedVoice.success &&
+        parsedVoice.data.public_owner_id === publicOwnerId &&
+        parsedVoice.data.voice_id === voiceId
+      ) {
+        return normalizeSharedVoice(parsedVoice.data);
+      }
+    }
+    return null;
+  }
+
+  async addSharedVoice(
+    publicOwnerId: string,
+    voiceId: string,
+    name: string,
+    signal: AbortSignal,
+  ): Promise<string> {
+    const path = `/v1/voices/add/${encodeURIComponent(publicOwnerId)}/${encodeURIComponent(voiceId)}`;
+    const data = await this.#json(
+      this.#request(path, 'add-shared-voice', signal, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ new_name: name, bookmarked: true }),
+      }),
+      'add-shared-voice',
+    );
+    const parsed = addedVoiceSchema.safeParse(data);
+    if (!parsed.success) throw new ProviderError('add-shared-voice', 'invalid-response');
+    return parsed.data.voice_id;
+  }
+
+  async deleteWorkspaceVoice(voiceId: string, signal: AbortSignal): Promise<void> {
+    const data = await this.#json(
+      this.#request(`/v1/voices/${encodeURIComponent(voiceId)}`, 'delete-workspace-voice', signal, {
+        method: 'DELETE',
+      }),
+      'delete-workspace-voice',
+    );
+    const parsed = deletedVoiceSchema.safeParse(data);
+    if (!parsed.success) throw new ProviderError('delete-workspace-voice', 'invalid-response');
   }
 
   async fetchPreview(rawUrl: string, signal: AbortSignal): Promise<AudioStream> {

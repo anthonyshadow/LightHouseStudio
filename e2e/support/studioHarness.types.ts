@@ -37,7 +37,7 @@ export type BrowserJourneyState = {
 export type NetworkJourneyState = {
   apiRequests: Array<{ path: string; model: ModelId | null }>;
   voiceRequests: Array<{
-    kind: 'list' | 'preview' | 'convert';
+    kind: 'list' | 'browse' | 'save' | 'delete' | 'preview' | 'convert';
     voiceId: string | null;
     providerIntent: string | null;
     contentType: string | null;

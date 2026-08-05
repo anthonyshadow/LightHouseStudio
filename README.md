@@ -102,8 +102,12 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
 - Reference generation uses one startup-selected provider: OpenAI `gpt-image-2`, BFL
   `flux-2-pro`, or Wiro `seedream-v5-lite-uncensored`. There is no automatic billable retry or
   provider fallback.
-- ElevenLabs lists voices already saved in the configured account. Preview does not upload the
-  take; Apply sends only the immutable original audio sidecar.
+- ElevenLabs provides lazy **Saved Voices** and **Browse Voices** views. Browse exposes only
+  authenticated catalog voices whose provider metadata reports the standard included rate
+  (`rate === 1`) and free-user allowance, and lets the creator add them to Saved Voices. Eligible
+  bookmarked community copies can be removed; owned, cloned, workspace, default, and legacy
+  voices cannot. Preview does not upload the take; Apply sends only the immutable original audio
+  sidecar.
 - Explicit Character Builder, Character Swap, VTO, and Outfit Builder image-URL import uses the
   loopback broker, accepts public HTTPS JPEG/PNG/WebP only, pins public DNS across bounded
   redirects, validates decoded contents, and never retains the URL.

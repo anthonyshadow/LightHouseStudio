@@ -87,12 +87,16 @@ export const translateProviderError: ErrorTranslator = (error) => {
   }
 
   if (error.reason === 'feature-unavailable' || error.reason === 'zero-retention-unavailable') {
+    const browseUnavailable =
+      error.operation === 'shared-voices' || error.operation === 'shared-voice';
     return translate(
       error,
       new AppError(
         502,
         'provider_policy',
-        'ElevenLabs does not make this provider feature available to the configured workspace.',
+        browseUnavailable
+          ? 'Browse Voices is unavailable under the configured ElevenLabs plan.'
+          : 'ElevenLabs does not make this provider feature available to the configured workspace.',
         upstreamOptions(error.upstreamStatus),
       ),
     );
@@ -137,6 +141,14 @@ export const translateProviderError: ErrorTranslator = (error) => {
           options,
         );
       case 402:
+        if (error.operation === 'shared-voices' || error.operation === 'shared-voice') {
+          return new AppError(
+            402,
+            'provider_billing',
+            'Browse Voices is unavailable under the configured ElevenLabs plan.',
+            options,
+          );
+        }
         return new AppError(
           402,
           'provider_billing',
@@ -144,6 +156,14 @@ export const translateProviderError: ErrorTranslator = (error) => {
           options,
         );
       case 403:
+        if (error.operation === 'shared-voices' || error.operation === 'shared-voice') {
+          return new AppError(
+            502,
+            'provider_policy',
+            'Browse Voices is unavailable under the configured ElevenLabs plan.',
+            options,
+          );
+        }
         return new AppError(
           502,
           'provider_policy',

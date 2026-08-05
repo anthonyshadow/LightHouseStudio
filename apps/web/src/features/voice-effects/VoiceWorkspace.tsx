@@ -357,7 +357,7 @@ export const VoiceWorkspace = ({
                         : 'Rendered locally from the immutable Original audio sidecar after Apply.'
                       : draftSelection.kind === 'none'
                         ? 'Ready immediately without rendering or provider contact.'
-                        : 'Open the Saved Voices Library to preview the provider sample.'}
+                        : 'Open the Voice Library to preview the provider sample.'}
                   </p>
                   <small>Source · Original audio · {clipDurationLabel}</small>
                 </div>

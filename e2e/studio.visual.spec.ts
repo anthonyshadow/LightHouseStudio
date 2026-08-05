@@ -545,7 +545,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         treatments.getByRole('heading', { name: 'Select Treatment', exact: true }),
       ).toBeVisible();
       await treatments.getByRole('button', { name: /Saved AI Voice/u }).click();
-      await expect(treatments.getByRole('heading', { name: 'Saved Voices Library' })).toBeVisible();
+      await expect(treatments.getByRole('heading', { name: 'Saved Voices' })).toBeVisible();
       await expect(treatments.getByText('Northstar Narrator', { exact: true })).toBeVisible();
       await expect(treatments.getByText('Loading saved voices…', { exact: true })).toHaveCount(0);
     },

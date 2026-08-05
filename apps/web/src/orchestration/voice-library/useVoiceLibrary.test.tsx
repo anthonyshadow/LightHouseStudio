@@ -1,8 +1,8 @@
 // @vitest-environment jsdom
 
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
-import type { WorkspaceVoicePage } from '../../application/types';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import type { WorkspaceVoiceItem, WorkspaceVoicePage } from '../../application/types';
 import { useVoiceLibrary, type VoiceLibraryClient } from './useVoiceLibrary';
 
 const emptyWorkspacePage = (overrides: Partial<WorkspaceVoicePage> = {}): WorkspaceVoicePage => ({
@@ -15,32 +15,109 @@ const emptyWorkspacePage = (overrides: Partial<WorkspaceVoicePage> = {}): Worksp
 
 const createClient = (): VoiceLibraryClient => ({
   listWorkspaceVoices: vi.fn().mockResolvedValue(emptyWorkspacePage()),
+  listSharedVoices: vi.fn().mockResolvedValue({
+    voices: [],
+    hasMore: false,
+    page: 0,
+    total: 0,
+  }),
+  saveSharedVoice: vi.fn().mockResolvedValue({ status: 'saved', voiceId: 'shared-one' }),
+  removeWorkspaceVoice: vi.fn().mockResolvedValue({ status: 'removed', voiceId: 'voice-one' }),
+});
+
+const savedVoice: WorkspaceVoiceItem = {
+  kind: 'workspace',
+  voice: {
+    voiceId: 'northstar',
+    name: 'Northstar',
+    category: 'professional',
+    description: 'Grounded narration',
+    labels: {},
+    traits: {
+      language: 'en',
+      gender: 'female',
+      age: 'middle-aged',
+      accent: 'Canadian',
+      useCase: 'narration',
+      descriptive: 'grounded',
+    },
+    previewAvailable: true,
+    removable: true,
+  },
+};
+
+const secondSavedVoice: WorkspaceVoiceItem = {
+  ...savedVoice,
+  voice: {
+    ...savedVoice.voice,
+    voiceId: 'daybreak',
+    name: 'Daybreak',
+  },
+};
+
+const deferred = <Value,>() => {
+  let resolve!: (value: Value) => void;
+  const promise = new Promise<Value>((settle) => {
+    resolve = settle;
+  });
+  return { promise, resolve };
+};
+
+afterEach(() => {
+  vi.useRealTimers();
 });
 
 describe('useVoiceLibrary', () => {
-  it('loads and searches saved voices through the injected client', async () => {
+  it('debounces searches for 300 ms after the third character', async () => {
+    vi.useFakeTimers();
     const client = createClient();
     const { result } = renderHook(() => useVoiceLibrary(client));
+    await act(() => Promise.resolve());
 
-    await waitFor(() => expect(result.current.loading).toBe(false));
-    expect(client.listWorkspaceVoices).toHaveBeenCalledWith('', null, expect.any(AbortSignal));
+    expect(client.listWorkspaceVoices).toHaveBeenCalledTimes(1);
+    act(() => result.current.setQuery('na'));
+    expect(result.current.searchHint).toBe('Type at least 3 characters to search.');
+    await act(async () => vi.advanceTimersByTimeAsync(400));
+    expect(client.listWorkspaceVoices).toHaveBeenCalledTimes(1);
 
     act(() => result.current.setQuery('  narrator  '));
-    act(() => result.current.submitSearch({ preventDefault: vi.fn() } as never));
-
-    await waitFor(() =>
-      expect(client.listWorkspaceVoices).toHaveBeenLastCalledWith(
-        'narrator',
-        null,
-        expect.any(AbortSignal),
-      ),
+    await act(async () => vi.advanceTimersByTimeAsync(299));
+    expect(client.listWorkspaceVoices).toHaveBeenCalledTimes(1);
+    await act(async () => vi.advanceTimersByTimeAsync(1));
+    expect(client.listWorkspaceVoices).toHaveBeenLastCalledWith(
+      expect.objectContaining({ search: 'narrator' }),
+      null,
+      expect.any(AbortSignal),
+      false,
     );
+  });
+
+  it('applies clearing immediately and keeps the last settled page for short searches', async () => {
+    vi.useFakeTimers();
+    const client = createClient();
+    vi.mocked(client.listWorkspaceVoices).mockResolvedValue(
+      emptyWorkspacePage({ voices: [savedVoice] }),
+    );
+    const { result } = renderHook(() => useVoiceLibrary(client));
+    await act(() => Promise.resolve());
+
+    act(() => result.current.setQuery('north'));
+    await act(async () => vi.advanceTimersByTimeAsync(300));
+    expect(result.current.voices).toEqual([savedVoice]);
+    act(() => result.current.setQuery('no'));
+    await act(async () => vi.advanceTimersByTimeAsync(500));
+    expect(result.current.voices).toEqual([savedVoice]);
+
+    act(() => result.current.setQuery(''));
+    await act(() => Promise.resolve());
+    expect(result.current.criteria.search).toBe('');
+    expect(result.current.searchHint).toBeNull();
   });
 
   it('aborts an active library request when the owner unmounts', async () => {
     let requestSignal: AbortSignal | undefined;
     const client = createClient();
-    vi.mocked(client.listWorkspaceVoices).mockImplementation((_search, _token, signal) => {
+    vi.mocked(client.listWorkspaceVoices).mockImplementation((_criteria, _token, signal) => {
       requestSignal = signal;
       return new Promise<WorkspaceVoicePage>(() => undefined);
     });
@@ -52,30 +129,70 @@ describe('useVoiceLibrary', () => {
     expect(requestSignal?.aborted).toBe(true);
   });
 
-  it('preserves the chosen voice while search results change', async () => {
-    const savedVoice = {
-      kind: 'workspace' as const,
-      voice: {
-        voiceId: 'northstar',
-        name: 'Northstar',
-        category: 'professional',
-        description: 'Grounded narration',
-        labels: {},
-        previewAvailable: true,
-      },
-    };
+  it('ignores an older response after criteria start a newer request', async () => {
+    const first = deferred<WorkspaceVoicePage>();
+    const second = deferred<WorkspaceVoicePage>();
     const client = createClient();
     vi.mocked(client.listWorkspaceVoices)
-      .mockResolvedValueOnce(emptyWorkspacePage({ voices: [savedVoice], total: 1 }))
-      .mockResolvedValueOnce(emptyWorkspacePage());
+      .mockReturnValueOnce(first.promise)
+      .mockReturnValueOnce(second.promise);
+    const { result } = renderHook(() => useVoiceLibrary(client));
+
+    await waitFor(() => expect(client.listWorkspaceVoices).toHaveBeenCalledTimes(1));
+    act(() => result.current.setFilter('language', 'en'));
+    await waitFor(() => expect(client.listWorkspaceVoices).toHaveBeenCalledTimes(2));
+
+    await act(async () => {
+      second.resolve(emptyWorkspacePage({ voices: [secondSavedVoice] }));
+      await second.promise;
+    });
+    expect(result.current.voices).toEqual([secondSavedVoice]);
+
+    await act(async () => {
+      first.resolve(emptyWorkspacePage({ voices: [savedVoice] }));
+      await first.promise;
+    });
+    expect(result.current.voices).toEqual([secondSavedVoice]);
+  });
+
+  it('reuses a cached Saved page when paging backward', async () => {
+    const client = createClient();
+    vi.mocked(client.listWorkspaceVoices)
+      .mockResolvedValueOnce(
+        emptyWorkspacePage({
+          voices: [savedVoice],
+          hasMore: true,
+          nextPageToken: 'page-two',
+        }),
+      )
+      .mockResolvedValueOnce(emptyWorkspacePage({ voices: [secondSavedVoice] }));
+    const { result } = renderHook(() => useVoiceLibrary(client));
+
+    await waitFor(() => expect(result.current.voices).toEqual([savedVoice]));
+    act(() => result.current.next());
+    await waitFor(() => expect(result.current.voices).toEqual([secondSavedVoice]));
+    act(() => result.current.previous());
+    await waitFor(() => expect(result.current.voices).toEqual([savedVoice]));
+
+    expect(client.listWorkspaceVoices).toHaveBeenCalledTimes(2);
+  });
+
+  it('preserves the chosen voice and each tab state while results change', async () => {
+    const client = createClient();
+    vi.mocked(client.listWorkspaceVoices).mockResolvedValue(
+      emptyWorkspacePage({ voices: [savedVoice], total: 1 }),
+    );
     const { result } = renderHook(() => useVoiceLibrary(client));
 
     await waitFor(() => expect(result.current.voices).toEqual([savedVoice]));
     act(() => result.current.setSelected(savedVoice));
-    act(() => result.current.setQuery('another voice'));
-    act(() => result.current.submitSearch({ preventDefault: vi.fn() } as never));
+    act(() => result.current.setFilter('language', 'en'));
+    act(() => result.current.setTab('browse'));
+    await waitFor(() => expect(result.current.tab).toBe('browse'));
+    act(() => result.current.setFilter('gender', 'female'));
+    act(() => result.current.setTab('saved'));
 
-    await waitFor(() => expect(result.current.voices).toEqual([]));
+    expect(result.current.criteria.language).toBe('en');
     expect(result.current.selected).toEqual(savedVoice);
   });
 });

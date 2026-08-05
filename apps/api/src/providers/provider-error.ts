@@ -1,5 +1,14 @@
 export type ProviderOperation =
-  'token' | 'models' | 'workspace-voices' | 'workspace-voice' | 'preview' | 'conversion';
+  | 'token'
+  | 'models'
+  | 'workspace-voices'
+  | 'workspace-voice'
+  | 'shared-voices'
+  | 'shared-voice'
+  | 'add-shared-voice'
+  | 'delete-workspace-voice'
+  | 'preview'
+  | 'conversion';
 
 export type ProviderFailureReason =
   | 'aborted'

@@ -8,7 +8,10 @@ import type {
   ElevenLabsProvider,
   VoiceConversionAudio,
   ProviderVoice,
+  ProviderSharedVoice,
+  ProviderSharedVoicePage,
   ProviderWorkspaceVoicePage,
+  SharedVoiceSearchInput,
   VoiceSearchInput,
 } from '../providers/elevenlabs/types.js';
 
@@ -52,6 +55,33 @@ export const voice = (overrides: Partial<ProviderVoice> = {}): ProviderVoice => 
   description: 'Bright and conversational',
   labels: { accent: 'Canadian' },
   previewUrl: 'https://storage.googleapis.com/eleven-public-prod/nova.mp3',
+  language: 'en',
+  gender: 'female',
+  age: 'young',
+  accent: 'Canadian',
+  useCase: 'narration',
+  descriptive: 'bright',
+  isOwner: false,
+  isBookmarked: true,
+  publicOwnerId: 'owner-one',
+  ...overrides,
+});
+
+export const sharedVoice = (overrides: Partial<ProviderSharedVoice> = {}): ProviderSharedVoice => ({
+  publicOwnerId: 'owner-one',
+  voiceId: 'shared-one',
+  name: 'Atlas',
+  category: 'professional',
+  description: 'Warm and assured narration',
+  previewUrl: 'https://storage.googleapis.com/eleven-public-prod/atlas.mp3',
+  language: 'en',
+  gender: 'neutral',
+  age: 'middle-aged',
+  accent: 'American',
+  useCase: 'narration',
+  descriptive: 'warm',
+  rate: 1,
+  freeUsersAllowed: true,
   ...overrides,
 });
 
@@ -60,6 +90,9 @@ export class FakeElevenLabsProvider implements ElevenLabsProvider {
   workspaceVoices: readonly ProviderVoice[] = [voice()];
   workspaceHasMore = false;
   workspaceNextPageToken: string | null = null;
+  sharedVoices: readonly ProviderSharedVoice[] = [sharedVoice()];
+  sharedHasMore = false;
+  sharedTotal = 1;
   previewBytes = Buffer.from('preview-audio');
   convertedBytes = Buffer.from('converted-audio');
   previewContentType = 'audio/mpeg';
@@ -75,6 +108,13 @@ export class FakeElevenLabsProvider implements ElevenLabsProvider {
     readonly enableLogging: boolean;
   }> = [];
   readonly previewUrls: string[] = [];
+  readonly sharedSearches: SharedVoiceSearchInput[] = [];
+  readonly addedVoices: Array<{
+    readonly publicOwnerId: string;
+    readonly voiceId: string;
+    readonly name: string;
+  }> = [];
+  readonly deletedVoiceIds: string[] = [];
 
   listModels(_signal: AbortSignal): Promise<readonly ElevenLabsModel[]> {
     return Promise.resolve(this.models);
@@ -94,6 +134,51 @@ export class FakeElevenLabsProvider implements ElevenLabsProvider {
   getWorkspaceVoice(voiceId: string, _signal: AbortSignal): Promise<ProviderVoice | null> {
     const result = this.workspaceVoices.find((candidate) => candidate.voiceId === voiceId);
     return Promise.resolve(result ?? null);
+  }
+
+  getWorkspaceVoicesByIds(
+    voiceIds: readonly string[],
+    _signal: AbortSignal,
+  ): Promise<readonly ProviderVoice[]> {
+    return Promise.resolve(
+      this.workspaceVoices.filter((candidate) => voiceIds.includes(candidate.voiceId)),
+    );
+  }
+
+  listSharedVoices(input: SharedVoiceSearchInput): Promise<ProviderSharedVoicePage> {
+    this.sharedSearches.push(input);
+    return Promise.resolve({
+      voices: this.sharedVoices,
+      hasMore: this.sharedHasMore,
+      total: this.sharedTotal,
+    });
+  }
+
+  getSharedVoice(
+    publicOwnerId: string,
+    voiceId: string,
+    _signal: AbortSignal,
+  ): Promise<ProviderSharedVoice | null> {
+    return Promise.resolve(
+      this.sharedVoices.find(
+        (candidate) => candidate.publicOwnerId === publicOwnerId && candidate.voiceId === voiceId,
+      ) ?? null,
+    );
+  }
+
+  addSharedVoice(
+    publicOwnerId: string,
+    voiceId: string,
+    name: string,
+    _signal: AbortSignal,
+  ): Promise<string> {
+    this.addedVoices.push({ publicOwnerId, voiceId, name });
+    return Promise.resolve(voiceId);
+  }
+
+  deleteWorkspaceVoice(voiceId: string, _signal: AbortSignal): Promise<void> {
+    this.deletedVoiceIds.push(voiceId);
+    return Promise.resolve();
   }
 
   fetchPreview(url: string, _signal: AbortSignal): Promise<AudioStream> {

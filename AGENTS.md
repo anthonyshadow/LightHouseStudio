@@ -65,9 +65,10 @@ old story, or intended design.
   client tokens, lazy SDK loading, atomic full-state updates, explicit Start/Apply, safe normalized
   errors, and complete listener/client/track cleanup. Do not silently follow aliases or add
   provider fallback.
-- ElevenLabs: browser through the same-origin API only; saved-library listing/revalidation only;
-  explicit provider-intent header; preview does not upload the take; Apply sends the immutable
-  original audio sidecar; preserve the original on every failure.
+- ElevenLabs: browser through the same-origin API only; saved-library listing/revalidation plus
+  standard-rate shared-catalog browsing and explicit eligible community add/remove; explicit
+  provider-intent header; preview does not upload the take; Apply sends the immutable original
+  audio sidecar; preserve the original on every failure.
 - OpenAI/BFL/Wiro: select one provider at startup; no automatic retry of initial billable
   submission and no fallback. Upload alone stays local. Keep provider request/poll/download formats
   inside their adapters.

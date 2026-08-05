@@ -1,6 +1,10 @@
 import {
+  sharedVoiceParamsSchema,
+  sharedVoicesQuerySchema,
+  sharedVoicesResponseSchema,
   voiceChangerQuerySchema,
   voiceConversionContentTypeSchema,
+  voiceLibraryMutationResponseSchema,
   VOICE_CONVERSION_CONTENT_TYPES,
   VOICE_CONVERSION_MAX_BYTES,
   workspaceVoiceParamsSchema,
@@ -70,15 +74,22 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
   app.get('/api/elevenlabs/voices', { onRequest: verifyProviderIntent }, async (request, reply) => {
     const parsed = workspaceVoicesQuerySchema.safeParse(request.query);
     if (!parsed.success) {
-      throw validationError('Use a search up to 100 characters and a page size from 1 to 10.');
+      throw validationError('Use valid voice filters and a page size from 1 to 20.');
     }
 
     return withRequestLifetime(request, reply, async (signal) =>
       workspaceVoicesResponseSchema.parse(
         await requireVoiceService(service).listWorkspaceVoices({
           search: parsed.data.search,
+          language: parsed.data.language,
+          gender: parsed.data.gender,
+          age: parsed.data.age,
+          accent: parsed.data.accent,
+          useCase: parsed.data.useCase,
+          descriptive: parsed.data.descriptive,
           pageSize: parsed.data.pageSize,
           nextPageToken: parsed.data.pageToken ?? null,
+          refresh: parsed.data.refresh,
           signal,
         }),
       ),
@@ -93,6 +104,71 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
       if (!parsed.success) throw validationError('Choose a valid saved-library voice.');
       return streamProviderAudio(request, reply, (signal) =>
         requireVoiceService(service).workspacePreview(parsed.data.voiceId, signal),
+      );
+    },
+  );
+
+  app.get(
+    '/api/elevenlabs/shared-voices',
+    { onRequest: verifyProviderIntent },
+    async (request, reply) => {
+      const parsed = sharedVoicesQuerySchema.safeParse(request.query);
+      if (!parsed.success) {
+        throw validationError('Use valid voice filters, sort, page, and a page size from 1 to 20.');
+      }
+
+      return withRequestLifetime(request, reply, async (signal) =>
+        sharedVoicesResponseSchema.parse(
+          await requireVoiceService(service).listSharedVoices({ ...parsed.data, signal }),
+        ),
+      );
+    },
+  );
+
+  app.get(
+    '/api/elevenlabs/shared-voices/:publicOwnerId/:voiceId/preview',
+    { onRequest: verifyProviderIntent },
+    async (request, reply) => {
+      const parsed = sharedVoiceParamsSchema.safeParse(request.params);
+      if (!parsed.success) throw validationError('Choose a valid catalog voice.');
+      return streamProviderAudio(request, reply, (signal) =>
+        requireVoiceService(service).sharedPreview(
+          parsed.data.publicOwnerId,
+          parsed.data.voiceId,
+          signal,
+        ),
+      );
+    },
+  );
+
+  app.post(
+    '/api/elevenlabs/shared-voices/:publicOwnerId/:voiceId/save',
+    { onRequest: verifyProviderOrigin },
+    async (request, reply) => {
+      const parsed = sharedVoiceParamsSchema.safeParse(request.params);
+      if (!parsed.success) throw validationError('Choose a valid catalog voice.');
+      return withRequestLifetime(request, reply, async (signal) =>
+        voiceLibraryMutationResponseSchema.parse(
+          await requireVoiceService(service).saveSharedVoice(
+            parsed.data.publicOwnerId,
+            parsed.data.voiceId,
+            signal,
+          ),
+        ),
+      );
+    },
+  );
+
+  app.delete(
+    '/api/elevenlabs/voices/:voiceId',
+    { onRequest: verifyProviderOrigin },
+    async (request, reply) => {
+      const parsed = workspaceVoiceParamsSchema.safeParse(request.params);
+      if (!parsed.success) throw validationError('Choose a valid saved-library voice.');
+      return withRequestLifetime(request, reply, async (signal) =>
+        voiceLibraryMutationResponseSchema.parse(
+          await requireVoiceService(service).removeWorkspaceVoice(parsed.data.voiceId, signal),
+        ),
       );
     },
   );

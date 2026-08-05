@@ -210,6 +210,16 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
   before revoking the prior processed URL, and never mutate the immutable original.
 - ElevenLabs preview is bounded to 2 MiB and conversion to 8 MiB; oversize/malformed/cancelled
   output preserves the valid take.
+- Open the lazy Voice library and exercise Saved/Browse tab switching, independent search/filter
+  state, 20-item paging, manual refresh, and Back/Next cache reuse. Type one/two/three characters
+  and confirm the minimum-character hint, 300 ms debounce, result announcement, and stale-result
+  protection. Repeat at 200% text and all five canonical viewports; the named region scrolls and
+  Preview/Add/Remove/Select remain approximately 44 px and reachable at short heights.
+- In Browse, confirm only standard-rate plan-visible voices appear, add a disposable eligible
+  voice, and verify **Already saved** prevents a duplicate. In Saved, confirm owned/default/cloned/
+  workspace/legacy voices have no Remove action; confirm an eligible community copy warns before
+  removal, removal is blocked while selected, and successful add/remove updates both tabs. These
+  provider mutations require explicit owner authorization and are not ordinary local QA.
 - Repeated Start/Stop/Reset/processing cycles leave no owned track/client/listener/timer/context or
   stale object URL.
 

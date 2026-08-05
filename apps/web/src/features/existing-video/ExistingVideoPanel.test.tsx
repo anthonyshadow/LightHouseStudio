@@ -16,6 +16,9 @@ const api = vi.hoisted(() => ({
   hydrateReferenceImage: vi.fn(),
   importRemoteReferenceImage: vi.fn(),
   listWorkspaceVoices: vi.fn(),
+  listSharedVoices: vi.fn(),
+  saveSharedVoice: vi.fn(),
+  removeWorkspaceVoice: vi.fn(),
   fetchVoicePreview: vi.fn(),
 }));
 
@@ -25,6 +28,9 @@ vi.mock('../../adapters/api-client/apiClient', () => ({
 }));
 vi.mock('../../adapters/api-client/voicesApi', () => ({
   listWorkspaceVoices: api.listWorkspaceVoices,
+  listSharedVoices: api.listSharedVoices,
+  saveSharedVoice: api.saveSharedVoice,
+  removeWorkspaceVoice: api.removeWorkspaceVoice,
   fetchVoicePreview: api.fetchVoicePreview,
 }));
 
@@ -790,7 +796,16 @@ describe('ExistingVideoPanel', () => {
             category: 'featured',
             description: 'Bright delivery',
             labels: {},
+            traits: {
+              language: null,
+              gender: null,
+              age: null,
+              accent: null,
+              useCase: null,
+              descriptive: null,
+            },
             previewAvailable: false,
+            removable: false,
           },
         },
       ],

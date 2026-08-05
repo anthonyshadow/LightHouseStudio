@@ -282,6 +282,25 @@ source-preserving Start over revokes the latest result, retains the source, and 
 presentation to that source. Every artifact has a UUID, app-owned name, creation time, kind, and
 parent lineage; generated filenames include the operation, UTC timestamp, and UUID suffix.
 
+The lazy ElevenLabs library keeps independent Saved and Browse criteria, pagination, error, and
+cache state inside the existing Voice workspace. Browse uses authenticated `/v1/shared-voices`
+server-side search/filter/sort with fixed 20-item pages. The adapter always sends
+`include_custom_rates=false`, then fails closed unless the exact shared response fields satisfy
+`rate === 1` and `free_users_allowed === true`; authenticated visibility is the account-plan
+entitlement check. `available_for_tiers` and interface labels are not eligibility inputs. Add
+re-fetches the exact `public_owner_id`/`voice_id` candidate before the idempotent bookmarked add.
+Delete re-fetches saved metadata and permits only `is_bookmarked === true`,
+`is_owner !== true`, community copies with a public owner ID. The selected voice is never removed
+from the UI.
+
+Saved search continues through `/v2/voices?voice_type=saved`. Search runs upstream, while exact
+language, gender, age, accent, use-case, and descriptive matching incrementally aggregates cached
+provider cursor pages behind an app-owned opaque cursor. Server metadata caches are bounded to
+five minutes/60 shared entries and 60 seconds/40 saved entries; identical in-flight reads share
+work, failures and aborts are not cached, and mutations invalidate saved membership/pages. The
+browser keeps at most 40 visited pages for five minutes, debounces three-character text search for
+300 ms, aborts superseded requests, and guards against late response commits.
+
 The existing-video controller uses Mediabunny plus browser decode confirmation for an early check.
 The API streams bytes to generated private paths and performs authoritative
 container/track/codec/duration/aspect/size inspection before visual-provider contact. One app job
@@ -410,14 +429,14 @@ Wiro availability follows the startup-selected reference provider and its requir
 credentials. There is no separate runtime access-mode layer. Missing configuration disables only that
 provider path and never causes provider fallback.
 
-| Boundary                    | Routes                                                                                                                                                                                                                                                                            |
-| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local status                | `GET /api/health`, `GET /api/capabilities`                                                                                                                                                                                                                                        |
-| Decart                      | `POST /api/realtime-token`                                                                                                                                                                                                                                                        |
-| Existing-video processing   | `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, `DELETE /api/video-jobs/:jobId`                                                                                                                                                 |
-| Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/import`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions`, `POST /api/reference-images/:sourceAssetId/outfit-try-ons` |
-| Local reference storage     | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                                                                                                                          |
-| ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `POST /api/elevenlabs/voice-changer/recording`                                                                                                                                                       |
+| Boundary                    | Routes                                                                                                                                                                                                                                                                                                                                             |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Local status                | `GET /api/health`, `GET /api/capabilities`                                                                                                                                                                                                                                                                                                         |
+| Decart                      | `POST /api/realtime-token`                                                                                                                                                                                                                                                                                                                         |
+| Existing-video processing   | `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, `DELETE /api/video-jobs/:jobId`                                                                                                                                                                                                                  |
+| Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/import`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions`, `POST /api/reference-images/:sourceAssetId/outfit-try-ons`                                                                  |
+| Local reference storage     | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                                                                                                                                                                                           |
+| ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `DELETE /api/elevenlabs/voices/:voiceId`, `GET /api/elevenlabs/shared-voices`, `GET /api/elevenlabs/shared-voices/:publicOwnerId/:voiceId/preview`, `POST /api/elevenlabs/shared-voices/:publicOwnerId/:voiceId/save`, `POST /api/elevenlabs/voice-changer/recording` |
 
 Capabilities report configuration presence only. The backend has process-local temporary video
 jobs but no accounts, analytics, durable job database or queue, SQL database, or session history.

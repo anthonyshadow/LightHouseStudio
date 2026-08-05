@@ -12,6 +12,9 @@ import { StudioDesignProvider } from '../../ui';
 const voiceApi = vi.hoisted(() => ({
   fetchVoicePreview: vi.fn(),
   listWorkspaceVoices: vi.fn(),
+  listSharedVoices: vi.fn(),
+  saveSharedVoice: vi.fn(),
+  removeWorkspaceVoice: vi.fn(),
 }));
 
 vi.mock('../../adapters/api-client/voicesApi', () => voiceApi);
@@ -98,6 +101,9 @@ const renderWithTheme = (component: ReactNode) =>
 beforeEach(() => {
   vi.clearAllMocks();
   voiceApi.listWorkspaceVoices.mockResolvedValue(emptyPage);
+  voiceApi.listSharedVoices.mockResolvedValue({ voices: [], hasMore: false, page: 0, total: 0 });
+  voiceApi.saveSharedVoice.mockResolvedValue({ status: 'saved', voiceId: 'shared-voice' });
+  voiceApi.removeWorkspaceVoice.mockResolvedValue({ status: 'removed', voiceId: 'saved-voice' });
   voiceApi.fetchVoicePreview.mockResolvedValue(new Blob(['preview'], { type: 'audio/mpeg' }));
 });
 
@@ -121,7 +127,8 @@ describe('VoiceEffectsPanel', () => {
     expect(voiceApi.listWorkspaceVoices).not.toHaveBeenCalled();
     await user.click(screen.getByRole('button', { name: /Saved AI Voice/u }));
 
-    expect(screen.getByRole('heading', { name: 'Saved Voices Library' })).toBeVisible();
+    expect(screen.getByRole('heading', { name: 'Saved Voices' })).toBeVisible();
+    expect(screen.getByRole('button', { name: 'Browse Voices' })).toBeVisible();
     expect(screen.getByText(/provider sample only/u)).toBeVisible();
     await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledTimes(1));
   });
@@ -189,7 +196,16 @@ describe('VoiceLibrary accessibility', () => {
             category: 'featured',
             description: 'Bright delivery',
             labels: {},
+            traits: {
+              language: 'en',
+              gender: 'female',
+              age: 'young',
+              accent: 'Canadian',
+              useCase: 'narration',
+              descriptive: 'bright',
+            },
             previewAvailable: true,
+            removable: true,
           },
         },
       ],
@@ -212,9 +228,114 @@ describe('VoiceLibrary accessibility', () => {
       category: 'featured',
       description: 'Bright delivery',
       labels: {},
+      traits: {
+        language: 'en',
+        gender: 'female',
+        age: 'young',
+        accent: 'Canadian',
+        useCase: 'narration',
+        descriptive: 'bright',
+      },
       previewAvailable: true,
+      removable: true,
     });
     expect(screen.getByText('Selected')).toBeVisible();
     expect(screen.queryByText(/public library|import|add & apply/i)).not.toBeInTheDocument();
+  });
+
+  it('browses eligible voices and prevents duplicate adds after a successful save', async () => {
+    const user = userEvent.setup();
+    voiceApi.listSharedVoices.mockResolvedValue({
+      voices: [
+        {
+          kind: 'shared',
+          voice: {
+            voiceId: 'catalog-voice',
+            publicOwnerId: 'owner-one',
+            name: 'Catalog Star',
+            category: 'professional',
+            description: 'Warm narration',
+            labels: { language: 'en' },
+            traits: {
+              language: 'en',
+              gender: 'female',
+              age: 'middle-aged',
+              accent: 'American',
+              useCase: 'narration',
+              descriptive: 'warm',
+            },
+            previewAvailable: true,
+            saved: false,
+          },
+        },
+      ],
+      hasMore: false,
+      page: 0,
+      total: 1,
+    });
+    voiceApi.saveSharedVoice.mockResolvedValue({ status: 'saved', voiceId: 'catalog-voice' });
+
+    renderWithTheme(<VoiceLibrary disabled={false} onSelect={vi.fn()} />);
+    await waitFor(() => expect(voiceApi.listWorkspaceVoices).toHaveBeenCalledOnce());
+    await user.click(screen.getByRole('button', { name: 'Browse Voices' }));
+    await waitFor(() => expect(voiceApi.listSharedVoices).toHaveBeenCalledOnce());
+
+    await user.click(screen.getByRole('button', { name: 'Add Catalog Star to Saved Voices' }));
+    await waitFor(() => expect(voiceApi.saveSharedVoice).toHaveBeenCalledOnce());
+    expect(screen.getByRole('button', { name: 'Catalog Star is already saved' })).toBeDisabled();
+    expect(screen.getByText('Catalog Star was added to Saved Voices.')).toBeVisible();
+  });
+
+  it('confirms eligible removal and blocks removal of the selected voice', async () => {
+    const user = userEvent.setup();
+    const removablePage = {
+      ...emptyPage,
+      voices: [
+        {
+          kind: 'workspace',
+          voice: {
+            voiceId: 'saved-voice',
+            name: 'Saved Star',
+            category: 'professional',
+            description: 'Warm narration',
+            labels: {},
+            traits: {
+              language: 'en',
+              gender: 'female',
+              age: 'middle-aged',
+              accent: 'American',
+              useCase: 'narration',
+              descriptive: 'warm',
+            },
+            previewAvailable: true,
+            removable: true,
+          },
+        },
+      ],
+      total: 1,
+    };
+    voiceApi.listWorkspaceVoices.mockResolvedValue(removablePage);
+
+    const first = renderWithTheme(<VoiceLibrary disabled={false} onSelect={vi.fn()} />);
+    await screen.findByRole('button', { name: 'Remove Saved Star from Saved Voices' });
+    await user.click(screen.getByRole('button', { name: 'Remove Saved Star from Saved Voices' }));
+    expect(screen.getByRole('heading', { name: 'Remove saved voice?' })).toBeVisible();
+    await user.click(screen.getByRole('button', { name: 'Remove voice' }));
+    await waitFor(() =>
+      expect(voiceApi.removeWorkspaceVoice).toHaveBeenCalledWith(
+        'saved-voice',
+        expect.any(AbortSignal),
+      ),
+    );
+    first.unmount();
+
+    renderWithTheme(
+      <VoiceLibrary disabled={false} selectedVoiceId="saved-voice" onSelect={vi.fn()} />,
+    );
+    expect(
+      await screen.findByRole('button', {
+        name: 'Select Original or another voice before removing Saved Star',
+      }),
+    ).toBeDisabled();
   });
 });

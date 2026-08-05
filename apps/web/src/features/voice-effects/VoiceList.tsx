@@ -104,7 +104,15 @@ const voiceActionStyles = (theme: Theme): CSSObject => ({
 });
 
 const voiceTraits = (item: VoiceLibraryItem): string[] => {
-  const traits = [item.voice.category, ...Object.values(item.voice.labels)]
+  const traits = [
+    item.voice.traits.language,
+    item.voice.traits.gender,
+    item.voice.traits.age,
+    item.voice.traits.accent,
+    item.voice.traits.useCase,
+    item.voice.traits.descriptive,
+    item.voice.category,
+  ]
     .map((value) => value?.trim())
     .filter((value): value is string => Boolean(value));
   return [...new Set(traits)].slice(0, 3);
@@ -118,8 +126,11 @@ type VoiceListProps = {
   previewVoiceId: string | null;
   previewLoadingVoiceId: string | null;
   previewPlaying: boolean;
+  mutationVoiceId: string | null;
   onSelect: (voice: VoiceLibraryItem) => void;
   onPreview: (voice: VoiceLibraryItem) => void;
+  onAdd: (voice: VoiceLibraryItem) => void;
+  onRemove: (voice: VoiceLibraryItem) => void;
 };
 
 export const VoiceList = ({
@@ -130,8 +141,11 @@ export const VoiceList = ({
   previewVoiceId,
   previewLoadingVoiceId,
   previewPlaying,
+  mutationVoiceId,
   onSelect,
   onPreview,
+  onAdd,
+  onRemove,
 }: VoiceListProps) => {
   const theme = useTheme();
   return (
@@ -144,7 +158,14 @@ export const VoiceList = ({
         const previewPlayingThisVoice = previewed && previewPlaying;
         const traits = voiceTraits(item);
         return (
-          <li key={`workspace:${voice.voiceId}`} css={voiceStyles(theme, voiceSelected, previewed)}>
+          <li
+            key={
+              item.kind === 'workspace'
+                ? `workspace:${voice.voiceId}`
+                : `shared:${item.voice.publicOwnerId}:${voice.voiceId}`
+            }
+            css={voiceStyles(theme, voiceSelected, previewed)}
+          >
             {voice.previewAvailable ? (
               <button
                 type="button"
@@ -168,7 +189,10 @@ export const VoiceList = ({
                 {voice.name}
                 {voiceSelected ? <span>Selected</span> : null}
               </h5>
-              <p>{voice.description ?? 'Saved voice sample'}</p>
+              <p>
+                {voice.description ??
+                  (item.kind === 'workspace' ? 'Saved voice sample' : 'Catalog voice sample')}
+              </p>
               {traits.length > 0 ? (
                 <div aria-label={`${voice.name} traits`} css={traitStyles(theme, voiceSelected)}>
                   {traits.map((trait) => (
@@ -195,7 +219,7 @@ export const VoiceList = ({
                       : 'Preview'}
                 </Button>
               ) : null}
-              {!voiceSelected ? (
+              {item.kind === 'workspace' && !voiceSelected ? (
                 <Button
                   size="small"
                   variant="secondary"
@@ -204,6 +228,43 @@ export const VoiceList = ({
                   onClick={() => onSelect(item)}
                 >
                   Select
+                </Button>
+              ) : null}
+              {item.kind === 'workspace' && item.voice.removable ? (
+                <Button
+                  size="small"
+                  variant="quiet"
+                  busy={mutationVoiceId === voice.voiceId}
+                  disabled={disabled || voiceSelected || mutationVoiceId !== null}
+                  aria-label={
+                    voiceSelected
+                      ? `Select Original or another voice before removing ${voice.name}`
+                      : `Remove ${voice.name} from Saved Voices`
+                  }
+                  title={
+                    voiceSelected
+                      ? 'Select Original or another voice before removing this voice.'
+                      : undefined
+                  }
+                  onClick={() => onRemove(item)}
+                >
+                  Remove
+                </Button>
+              ) : null}
+              {item.kind === 'shared' ? (
+                <Button
+                  size="small"
+                  variant={item.voice.saved ? 'quiet' : 'secondary'}
+                  busy={mutationVoiceId === voice.voiceId}
+                  disabled={disabled || item.voice.saved || mutationVoiceId !== null}
+                  aria-label={
+                    item.voice.saved
+                      ? `${voice.name} is already saved`
+                      : `Add ${voice.name} to Saved Voices`
+                  }
+                  onClick={() => onAdd(item)}
+                >
+                  {item.voice.saved ? 'Already saved' : 'Add to Saved'}
                 </Button>
               ) : null}
             </div>

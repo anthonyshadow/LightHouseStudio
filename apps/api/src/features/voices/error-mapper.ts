@@ -39,6 +39,42 @@ export const translateVoiceServiceError: ErrorTranslator = (error) => {
           'That voice is no longer in your ElevenLabs library. Refresh the library and choose another.',
         ),
       );
+    case 'shared-voice-not-found':
+      return translate(
+        error,
+        new AppError(
+          404,
+          'not_found',
+          'That catalog voice is no longer available. Refresh Browse Voices and choose another.',
+        ),
+      );
+    case 'shared-voice-ineligible':
+      return translate(
+        error,
+        new AppError(
+          409,
+          'provider_policy',
+          'That voice is not available at the standard included rate. Refresh Browse Voices and choose another.',
+        ),
+      );
+    case 'voice-removal-not-allowed':
+      return translate(
+        error,
+        new AppError(
+          409,
+          'provider_policy',
+          'Only community voices saved from Browse Voices can be removed here.',
+        ),
+      );
+    case 'invalid-page-token':
+      return translate(
+        error,
+        new AppError(
+          400,
+          'validation_error',
+          'The saved-voice page token is invalid or no longer matches these filters.',
+        ),
+      );
     case 'preview-unavailable':
       return translate(error, new AppError(404, 'not_found', 'This voice has no preview audio.'));
     case 'zero-retention-required':

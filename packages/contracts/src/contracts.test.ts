@@ -18,6 +18,8 @@ import {
   optimizeCharacterReferencePromptResponseSchema,
   realtimeTokenRequestSchema,
   realtimeTokenResponseSchema,
+  sharedVoicesQuerySchema,
+  sharedVoicesResponseSchema,
   remoteReferenceImageImportRequestSchema,
   referenceImageAssetSchema,
   uploadReferenceImageResponseSchema,
@@ -35,7 +37,16 @@ const voice = {
   category: 'generated',
   description: null,
   labels: { accent: 'neutral' },
+  traits: {
+    language: 'en',
+    gender: 'neutral',
+    age: 'middle-aged',
+    accent: 'neutral',
+    useCase: 'narration',
+    descriptive: 'clear',
+  },
   previewAvailable: true,
+  removable: true,
 };
 
 describe('health and capabilities contracts', () => {
@@ -549,17 +560,38 @@ describe('realtime credential contracts', () => {
 });
 
 describe('ElevenLabs contracts', () => {
-  it('trims search and caps workspace pagination at 10', () => {
+  it('trims filters and caps Saved and Browse pagination at 20', () => {
     expect(workspaceVoicesQuerySchema.parse({ search: '  narrator  ' })).toEqual({
       search: 'narrator',
+      language: '',
+      gender: '',
+      age: '',
+      accent: '',
+      useCase: '',
+      descriptive: '',
       pageSize: PAGE_SIZE_LIMIT,
+      refresh: false,
     });
     expect(workspaceVoicesQuerySchema.parse({ pageSize: '3', pageToken: ' next ' })).toEqual({
       search: '',
+      language: '',
+      gender: '',
+      age: '',
+      accent: '',
+      useCase: '',
+      descriptive: '',
       pageSize: 3,
       pageToken: 'next',
+      refresh: false,
     });
-    expect(workspaceVoicesQuerySchema.safeParse({ pageSize: 11 }).success).toBe(false);
+    expect(workspaceVoicesQuerySchema.safeParse({ pageSize: 21 }).success).toBe(false);
+    expect(sharedVoicesQuerySchema.parse({ refresh: 'false' })).toMatchObject({
+      pageSize: 20,
+      page: 0,
+      sort: 'trending',
+      refresh: false,
+    });
+    expect(sharedVoicesQuerySchema.safeParse({ pageSize: 21 }).success).toBe(false);
   });
 
   it('models filtered totals honestly and keeps provider previews app-owned', () => {
@@ -579,6 +611,26 @@ describe('ElevenLabs contracts', () => {
         total: 1,
       }).success,
     ).toBe(false);
+    expect(
+      sharedVoicesResponseSchema.safeParse({
+        voices: [
+          {
+            voiceId: voice.voiceId,
+            name: voice.name,
+            category: voice.category,
+            description: voice.description,
+            labels: voice.labels,
+            traits: voice.traits,
+            previewAvailable: voice.previewAvailable,
+            publicOwnerId: 'owner-1',
+            saved: false,
+          },
+        ],
+        hasMore: false,
+        page: 0,
+        total: 1,
+      }).success,
+    ).toBe(true);
   });
 
   it('validates audio-only conversion parameters and the app-owned byte ceilings', () => {

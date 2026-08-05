@@ -11,6 +11,14 @@ const jsonResponse = (value: unknown, status = 200): Response =>
   });
 
 const signal = (): AbortSignal => new AbortController().signal;
+const emptyVoiceFilters = {
+  language: '',
+  gender: '',
+  age: '',
+  accent: '',
+  useCase: '',
+  descriptive: '',
+} as const;
 const requestedUrl = (input: RequestInfo | URL | undefined): string => {
   if (typeof input === 'string') return input;
   if (input instanceof URL) return input.href;
@@ -54,6 +62,7 @@ describe('ElevenLabsHttpProvider', () => {
 
     await expect(
       provider.listWorkspaceVoices({
+        ...emptyVoiceFilters,
         search: 'warm voice',
         pageSize: 8,
         nextPageToken: 'opaque-current',
@@ -68,6 +77,15 @@ describe('ElevenLabsHttpProvider', () => {
           description: 'Friendly',
           labels: { accent: 'Canadian' },
           previewUrl: 'https://storage.googleapis.com/eleven-public-prod/nova.mp3',
+          language: null,
+          gender: null,
+          age: null,
+          accent: 'Canadian',
+          useCase: null,
+          descriptive: null,
+          isOwner: null,
+          isBookmarked: null,
+          publicOwnerId: null,
         },
       ],
       hasMore: true,
@@ -105,6 +123,7 @@ describe('ElevenLabsHttpProvider', () => {
 
       await expect(
         provider.listWorkspaceVoices({
+          ...emptyVoiceFilters,
           search: '',
           pageSize,
           nextPageToken: null,
@@ -116,6 +135,136 @@ describe('ElevenLabsHttpProvider', () => {
       });
     },
   );
+
+  it('maps every supported shared-catalog filter and fails closed on missing eligibility fields', async () => {
+    const fetchMock = vi.fn<typeof fetch>(() =>
+      Promise.resolve(
+        jsonResponse({
+          voices: [
+            {
+              public_owner_id: 'owner-one',
+              voice_id: 'eligible-one',
+              name: 'Atlas',
+              accent: 'American',
+              gender: 'male',
+              age: 'middle-aged',
+              descriptive: 'warm',
+              use_case: 'narration',
+              category: 'professional',
+              free_users_allowed: true,
+              language: 'en',
+              description: 'Warm narration',
+              preview_url: 'https://storage.googleapis.com/eleven-public-prod/atlas.mp3',
+              rate: 1,
+            },
+            {
+              public_owner_id: 'owner-two',
+              voice_id: 'missing-rate',
+              name: 'Malformed',
+              free_users_allowed: true,
+            },
+            {
+              public_owner_id: 'owner-three',
+              voice_id: 'missing-free-access',
+              name: 'Malformed two',
+              rate: 1,
+            },
+          ],
+          has_more: true,
+          total_count: 3,
+        }),
+      ),
+    );
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+
+    await expect(
+      provider.listSharedVoices({
+        search: 'atlas',
+        language: 'en',
+        gender: 'male',
+        age: 'middle-aged',
+        accent: 'American',
+        useCase: 'narration',
+        descriptive: 'warm',
+        pageSize: 20,
+        page: 2,
+        sort: 'trending',
+        signal: signal(),
+      }),
+    ).resolves.toMatchObject({
+      voices: [
+        {
+          publicOwnerId: 'owner-one',
+          voiceId: 'eligible-one',
+          rate: 1,
+          freeUsersAllowed: true,
+        },
+      ],
+      hasMore: true,
+      total: 3,
+    });
+
+    const request = new URL(requestedUrl(fetchMock.mock.calls[0]?.[0]));
+    expect(request.pathname).toBe('/v1/shared-voices');
+    expect(Object.fromEntries(request.searchParams)).toMatchObject({
+      search: 'atlas',
+      language: 'en',
+      gender: 'male',
+      age: 'middle-aged',
+      accent: 'American',
+      use_cases: 'narration',
+      descriptives: 'warm',
+      page_size: '20',
+      page: '2',
+      sort: 'trending',
+      include_custom_rates: 'false',
+    });
+  });
+
+  it('looks up exact shared metadata and maps documented add and delete operations', async () => {
+    const fetchMock = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          voices: [
+            {
+              public_owner_id: 'owner-one',
+              voice_id: 'shared-one',
+              name: 'Atlas',
+              free_users_allowed: true,
+              rate: 1,
+            },
+          ],
+          has_more: false,
+          total_count: 1,
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ voice_id: 'shared-one' }))
+      .mockResolvedValueOnce(jsonResponse({ status: 'ok' }));
+    const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
+
+    await expect(
+      provider.getSharedVoice('owner-one', 'shared-one', signal()),
+    ).resolves.toMatchObject({ publicOwnerId: 'owner-one', voiceId: 'shared-one', rate: 1 });
+    await expect(
+      provider.addSharedVoice('owner-one', 'shared-one', 'Atlas', signal()),
+    ).resolves.toBe('shared-one');
+    await expect(provider.deleteWorkspaceVoice('shared-one', signal())).resolves.toBeUndefined();
+
+    const exactUrl = new URL(requestedUrl(fetchMock.mock.calls[0]?.[0]));
+    expect(exactUrl.searchParams.get('owner_id')).toBe('owner-one');
+    expect(exactUrl.searchParams.get('search')).toBe('shared-one');
+    expect(exactUrl.searchParams.get('include_custom_rates')).toBe('false');
+    const addInit = fetchMock.mock.calls[1]?.[1];
+    expect(addInit).toMatchObject({ method: 'POST' });
+    expect(typeof addInit?.body).toBe('string');
+    expect(JSON.parse(typeof addInit?.body === 'string' ? addInit.body : '')).toEqual({
+      new_name: 'Atlas',
+      bookmarked: true,
+    });
+    expect(requestedUrl(fetchMock.mock.calls[2]?.[0])).toContain('/v1/voices/shared-one');
+    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: 'DELETE' });
+  });
 
   it('rejects declared oversized successful metadata and cancels before reading', async () => {
     const cancel = vi.fn();

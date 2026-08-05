@@ -83,8 +83,10 @@ source, then edit either base, download, start over, or discard.
    consent, one-garment, plain-background, and no-fit/sizing/purchase-accuracy disclosure.
 8. **Voice** opens the same cohesive treatment workspace used by Latest Take; the existing-video
    editor does not introduce a second Voice entry or nested browser. It exposes browser-local
-   effects first and lazily loads saved ElevenLabs voices only when the creator chooses **Saved AI
-   Voice**. Preview and row selection are distinct, with one active provider-sample player. The
+   effects first and lazily loads the Saved/Browse ElevenLabs library only when the creator chooses
+   **Saved AI Voice**. Preview and row selection are distinct, with one active provider-sample
+   player. Browse can add standard-rate plan-accessible voices; eligible community copies can be
+   removed from Saved only when they are not the current selection. The
    creator must confirm **Use this voice for the edit** or **Use this treatment for the edit** before it is stored in the edit
    plan. That confirmation transfers no take and starts no processing; the outer **Start edit**
    action executes the captured plan. Library search and selection state survive returning to the

@@ -18,7 +18,17 @@ const workspaceVoice = {
     name: 'Warm Narrator',
     category: 'professional',
     description: 'Warm, measured delivery for editorial narration.',
+    labels: {},
+    traits: {
+      language: 'en',
+      gender: 'female',
+      age: 'middle-aged',
+      accent: 'Canadian',
+      useCase: 'narration',
+      descriptive: 'warm',
+    },
     previewAvailable: false,
+    removable: true,
   },
 } as VoiceLibraryItem;
 
@@ -85,8 +95,11 @@ export const VoiceListSelection: Story = {
           previewVoiceId={null}
           previewLoadingVoiceId={null}
           previewPlaying={false}
+          mutationVoiceId={null}
           onSelect={fn()}
           onPreview={fn()}
+          onAdd={fn()}
+          onRemove={fn()}
         />
       </StorySection>
     </StoryColumn>

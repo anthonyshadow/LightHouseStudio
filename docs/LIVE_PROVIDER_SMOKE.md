@@ -25,20 +25,20 @@ provider bodies, signed/polling URLs, personal media, or full network archives.
 
 ## Required configurations
 
-| Requirement       | Exact configuration                                                              |
-| ----------------- | -------------------------------------------------------------------------------- |
-| Local             | No provider credentials                                                          |
-| Decart Character  | SDK `0.1.17`, exact `lucy-latest`, 300-second session                            |
-| Decart VTO        | SDK `0.1.17`, exact `lucy-vton-latest`, 300-second session                       |
-| Decart batch Lucy | Queue HTTP, exact `lucy-latest`, fixed `720p`, 300-second input                  |
-| Decart batch VTO  | Queue HTTP, exact `lucy-vton-latest`, fixed `720p`, 300-second input             |
-| Pruna Character   | `p-video-replace`, `720p`, one reference, MP4 driver, `save_audio=true`          |
-| Pruna Character   | `p-video-replace`, `1080p`, one reference, MP4 driver, `save_audio=true`         |
-| Pruna Wardrobe    | `p-image-try-on`, one person, one garment, input size preserved, JPEG quality 95 |
-| ElevenLabs        | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false`    |
-| OpenAI image      | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                         |
-| BFL image         | `flux-2-pro`, safety `2`, prompt upsampling off                                  |
-| Wiro image        | `seedream-v5-lite-uncensored`, 2k, watermark off                                 |
+| Requirement       | Exact configuration                                                                                    |
+| ----------------- | ------------------------------------------------------------------------------------------------------ |
+| Local             | No provider credentials                                                                                |
+| Decart Character  | SDK `0.1.17`, exact `lucy-latest`, 300-second session                                                  |
+| Decart VTO        | SDK `0.1.17`, exact `lucy-vton-latest`, 300-second session                                             |
+| Decart batch Lucy | Queue HTTP, exact `lucy-latest`, fixed `720p`, 300-second input                                        |
+| Decart batch VTO  | Queue HTTP, exact `lucy-vton-latest`, fixed `720p`, 300-second input                                   |
+| Pruna Character   | `p-video-replace`, `720p`, one reference, MP4 driver, `save_audio=true`                                |
+| Pruna Character   | `p-video-replace`, `1080p`, one reference, MP4 driver, `save_audio=true`                               |
+| Pruna Wardrobe    | `p-image-try-on`, one person, one garment, input size preserved, JPEG quality 95                       |
+| ElevenLabs        | Saved/Browse voices, disposable community copy, `eleven_multilingual_sts_v2`, reviewed logging setting |
+| OpenAI image      | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                                               |
+| BFL image         | `flux-2-pro`, safety `2`, prompt upsampling off                                                        |
+| Wiro image        | `seedream-v5-lite-uncensored`, 2k, watermark off                                                       |
 
 Reference image providers require three separate server startups; there is no fallback.
 
@@ -276,16 +276,30 @@ Wiro cleanup failure fails the check.
 ## ElevenLabs
 
 1. Record a short, non-sensitive take with a usable original sidecar.
-2. Browse/search/page saved voices and preview one. Confirm unsaved voices/add-import controls are
-   absent, every provider request carries the voice-intent header, and preview sends no take.
-3. Select a saved voice. Selection alone must not discover models or convert.
-4. Apply once. Confirm saved membership/model are revalidated and only the immutable original
-   sidecar is uploaded; playback/download remain locked until remux completes.
-5. Remove a disposable saved voice in provider controls; refresh and confirm it disappears. A
-   stale direct request must fail before conversion.
-6. Restore Original with no provider call and exercise one controlled failure. The original/last
+2. Open Saved Voices, then Browse Voices. Search/filter/sort and page both views; confirm no page
+   exceeds 20 voices, one/two characters do not start provider search, three characters wait about
+   300 ms, and every provider request carries the voice-intent header.
+3. Confirm catalog eligibility from the actual shared API metadata: Lightframe sends
+   `include_custom_rates=false` and displays only entries with exact `rate === 1` and
+   `free_users_allowed === true`. Missing fields fail closed. Do not infer eligibility from a UI
+   badge or `available_for_tiers`. A plan/permission rejection must produce only the safe current-
+   plan unavailable state.
+4. Preview one Saved and one Browse voice. Confirm both requests proxy bounded sample audio, expose
+   no provider URL, and send no take.
+5. With explicit authorization, add one disposable eligible community voice. Confirm the broker
+   re-fetches the exact public owner/voice metadata immediately before add, uses the fresh provider
+   name with `bookmarked: true`, shows **Already saved**, and concurrent/repeated clicks create no
+   duplicate.
+6. Select the saved copy. Confirm Remove is unavailable while selected; choose Original or another
+   voice, confirm the unrecoverable-withdrawal warning, then remove it. Confirm owned, cloned,
+   workspace, default, legacy, non-bookmarked, and missing-owner voices cannot be removed and that
+   the broker revalidates metadata immediately before DELETE.
+7. Select a saved voice. Selection alone must not discover models or convert. Apply once and
+   confirm saved membership/model are revalidated and only the immutable original sidecar is
+   uploaded; playback/download remain locked until remux completes.
+8. Restore Original with no provider call and exercise one controlled failure. The original/last
    valid take must survive with sanitized guidance.
-7. Confirm preview stays within 2 MiB and the five-minute `mp3_44100_128` result within the
+9. Confirm preview stays within 2 MiB and the five-minute `mp3_44100_128` result within the
    inclusive 8 MiB ceiling. Oversize/malformed/cancelled output must not replace the take.
 
 Confirm the configured `ELEVENLABS_ENABLE_LOGGING` choice matches the reviewed account retention
