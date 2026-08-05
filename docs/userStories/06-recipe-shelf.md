@@ -30,8 +30,11 @@ projects.
    configured Pruna try-on path. **Change Features** shows the exact source and sends required
    changes through the configured reference-image edit provider with optimization disabled. The
    parent prompt accompanies Original-source edits only; variant-source edits send the selected
-   image without the parent prompt. Both show a preview, require a non-empty title, reject stale
-   results, and save only the latest valid result under the original parent character.
+   image without the parent prompt. Requested feature changes override conflicting source or
+   parent-prompt traits and must all be visible; when no degree is specified, each change is strong,
+   obvious, and realistic while non-conflicting traits preserve character continuity. Both show a
+   preview, require a non-empty title, reject stale results, and save only the latest valid result
+   under the original parent character.
 
 ## Guards and recovery
 

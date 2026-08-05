@@ -65,6 +65,13 @@ preservation. It never retries that billable submission or falls back.
 With an uploaded source, blank regeneration composes from that source again. Written feedback uses
 the edit route and creates a new immutable child. Neither path mutates or deletes the source.
 
+Wardrobe **Change Features** sends the requested change as the highest-priority edit instruction.
+The provider is told to apply every requested change and make an unspecified-strength change
+strong, obvious, and realistic. The request overrides conflicting source or parent-prompt traits,
+while non-conflicting identity, pose, outfit, framing, lighting, background, and style remain
+stable. Original-source edits include the parent character direction as lower-priority context;
+variant-source edits use only the selected image and requested change.
+
 ## Provider configurations
 
 | Operation    | Current configuration                                                                                                                      |

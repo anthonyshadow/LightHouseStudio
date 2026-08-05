@@ -31,7 +31,7 @@ export const createPromptOptimizationInputHash = (
 };
 
 export const REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION =
-  'lucy-character-reference-edit-v1' as const;
+  'lucy-character-reference-edit-v3' as const;
 export const REFERENCE_IMAGE_COMPOSITION_PROMPT_TEMPLATE_VERSION =
   'lucy-character-reference-compose-v1' as const;
 
@@ -43,17 +43,20 @@ export const createReferenceImageEditPrompt = (
   optimizedCharacterPrompt: string | null,
   changeInstructions: string,
 ): string => {
-  const prefix =
-    'Edit the supplied character reference image while preserving the same character identity, face, anatomy, visual medium, framing, lighting, and background unless the requested change explicitly requires otherwise.';
+  const requestedChange = `Edit the person in the supplied image. Apply every requested change:\n${changeInstructions}`;
   const direction = optimizedCharacterPrompt
-    ? '\n\nUse this current character direction as authoritative:\n'
+    ? '\n\nCharacter context for unchanged identity and style details only; ignore anything here that conflicts with a requested change:\n'
     : '';
-  const suffix = `\n\nRequested change:\n${changeInstructions}`;
+  const requirements =
+    '\n\nThe final image must visibly satisfy every requested change. Use the strength and extent stated; when none is stated, make each change strong, obvious, and realistic. Requested changes override the source image and character context. Keep the same recognizable character and preserve pose, outfit, framing, lighting, background, and visual style only where they do not conflict. Do not return an unchanged or near-unchanged image, skip a requested change, or introduce unrelated changes.';
   const availablePromptLength = Math.max(
     0,
-    REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH - prefix.length - direction.length - suffix.length,
+    REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH -
+      requestedChange.length -
+      direction.length -
+      requirements.length,
   );
-  return `${prefix}${direction}${optimizedCharacterPrompt?.slice(0, availablePromptLength) ?? ''}${suffix}`;
+  return `${requestedChange}${direction}${optimizedCharacterPrompt?.slice(0, availablePromptLength) ?? ''}${requirements}`;
 };
 
 /** Builds the provider-only first composition instruction for a user-uploaded source image. */
