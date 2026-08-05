@@ -18,10 +18,8 @@ const resultFacts = (overrides: Record<string, unknown> = {}) => ({
 });
 
 describe('firstExistingVideoValidationIssue', () => {
-  it('keeps the 16:9/9:16 aspect gate for immutable source files', () => {
-    expect(firstExistingVideoValidationIssue(resultFacts(), false, 'source')).toMatchObject({
-      code: 'unsupported-aspect-ratio',
-    });
+  it('accepts non-canonical immutable source aspect ratios', () => {
+    expect(firstExistingVideoValidationIssue(resultFacts(), false, 'source')).toBeUndefined();
   });
 
   it('defers only result aspect to exact server-approved metadata comparison', () => {

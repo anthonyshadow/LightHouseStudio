@@ -23,15 +23,17 @@ absence does not disable configured application features.
    creator explicitly starts them from the control bar or **Record a local video** in the upload
    panel. No AI model, provider session, or remote processing starts on entry or refresh.
 3. Choose a landscape 16:9 or portrait 9:16 local format in Capture Settings, then record on the
-   persistent stage, or select a compatible device-local file. A healthy local recording is
-   normalized on device and becomes the editor source after finalization.
+   persistent stage, or select a compatible device-local file at any aspect ratio. For the best
+   visual-processing experience, use 16:9 or 9:16 or crop to one of those ratios with **Adjust
+   video** after upload. A healthy local recording is normalized on device and becomes the editor
+   source after finalization.
 4. Review the source and optionally use **Adjust video** to trim, crop, rotate, flip, relight, or
    filter it entirely in the browser. A validated export becomes the new immutable source only
    after explicit replacement confirmation.
 5. Optionally choose exactly one visual transformation—**Character Swap** or **Virtual Try On**—
    and/or **Voice**. Combined work completes and validates the visual result before voice
-   conversion. A local square, 4:5, or incompatible Freeform edit keeps Download and Voice but
-   disables Character Swap/VTO before provider contact.
+   conversion. Any non-16:9/9:16 upload or local square, 4:5, or incompatible Freeform edit keeps
+   Download and Voice but disables Character Swap/VTO before provider contact.
 6. Preview **Original** and **Result**, revise the plan or edit base, then download the latest
    healthy result or start over while retaining the immutable source.
 7. Prepare advanced live work without starting media: desktop places **Select Character** and

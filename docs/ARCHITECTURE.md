@@ -259,14 +259,15 @@ with `parentArtifactId`, updates selected-video metadata and compatibility, then
 superseded source/visual/voice URLs. Failure before publication leaves the prior source and draft
 intact. Provider compatibility is derived from edited output geometry; only 16:9 and 9:16 within
 the existing 1% tolerance can create Character Swap or VTO intent, while Voice and Download remain
-available for other ratios.
+available for uploaded or edited sources at other ratios.
 
 The finalized or validated source replaces live media on the same persistent stage. The artifact
 owner creates and revokes every source/visual/voice URL. Changing source invalidates downstream
-layers. During a combined edit, the healthy visual remains available while voice conversion runs;
-a healthy voiced result then replaces it, and the combined plan is not reported complete before
-that voice result commits. A Voice retry after visual success continues from the retained visual,
-not the original frame source. Every Voice treatment reads immutable source audio and
+layers. During a combined edit, the transcoded visual is staged privately while voice conversion
+runs; only the healthy voiced result is published. If Voice fails or is canceled, the healthy
+visual is then published for comparison and retry. The combined plan is not reported complete
+before the voiced result commits. A Voice retry after visual success continues from the retained
+visual, not the original frame source. Every Voice treatment reads immutable source audio and
 remuxes it onto the explicitly selected Original or Result video. Existing-video comparison
 selects the immutable source or latest result without changing artifact ownership. Its
 source-preserving Start over revokes the latest result, retains the source, and returns

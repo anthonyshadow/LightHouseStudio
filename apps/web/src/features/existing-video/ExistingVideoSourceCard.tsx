@@ -15,7 +15,7 @@ import { ExistingVideoSourcePreview } from './ExistingVideoSourcePreview';
 import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
 
 const orientation = (width: number, height: number): string =>
-  width > height ? 'Landscape 16:9' : 'Portrait 9:16';
+  width === height ? 'Square' : width > height ? 'Landscape' : 'Portrait';
 
 export const ExistingVideoSourceCard = ({
   workflow,

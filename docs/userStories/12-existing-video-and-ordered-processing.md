@@ -91,8 +91,10 @@ then edit either base, download, start over, or discard.
    visual-processing job, one local voice render, one ElevenLabs conversion, or visual processing
    followed by voice.
 9. Studio executes one immutable captured plan: visual submit/poll/retrieve → validate → restore
-   immutable source audio where required → H.264/AAC MP4 transcode/validate/commit → convert
-   immutable source sidecar → compose/transcode/validate/commit voiced result. A validated H.264
+   immutable source audio where required → H.264/AAC MP4 transcode/validate/stage → convert
+   immutable source sidecar → compose/transcode/validate/commit voiced result. The staged visual
+   remains private until Voice succeeds; a Voice failure or cancellation publishes that healthy
+   visual for comparison and retry. A validated H.264
    MP4 result with no audio may commit directly only when the immutable source also has no audio;
    this avoids a redundant decoder pass without weakening the publication gate. Voice-only uses
    the selected video's frames. A combined plan is ready only after Voice commits. If Voice fails
@@ -116,13 +118,13 @@ then edit either base, download, start over, or discard.
 
 ## Validation and failure behavior
 
-- Accepted input is H.264 MP4/MOV or VP8 WebM, more than zero and at most 300 seconds, within 1% of
-  16:9 or 9:16. Character Swap/local input is capped at 300,000,000 bytes; any VTO plan is capped at
-  200,000,000 bytes.
-- Initial file selection retains that strict aspect contract. A validated local edit may create
-  1:1, 4:5, or Freeform output; provider compatibility is then derived in the app. Incompatible
-  output disables Character Swap/VTO before provider intent or HTTP while Download and Voice stay
-  available.
+- Accepted input is H.264 MP4/MOV or VP8 WebM, more than zero and at most 300 seconds, at any
+  playable aspect ratio. Character Swap/local input is capped at 300,000,000 bytes; any VTO plan
+  is capped at 200,000,000 bytes.
+- The picker recommends 16:9 or 9:16 for the best experience and directs creators to **Adjust
+  video** to crop after upload. Provider compatibility is derived in the app for uploaded and
+  locally edited sources. Other ratios disable Character Swap/VTO before provider intent or HTTP
+  while Download, local adjustment, and Voice stay available.
 - A playable visual-only source remains useful. Voice explains when no usable source-audio
   sidecar exists.
 - HEVC, ProRes, aliases, and undocumented codecs are blocked with export guidance. When the active

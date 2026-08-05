@@ -5,9 +5,10 @@ a provider, and replace the immutable source only after a validated export and e
 
 ## Journey
 
-1. In **Use existing video**, select **Adjust video** for the currently displayed source or latest
-   healthy result. The side panel closes and Studio enters one `video-edit` workspace around the
-   existing `MediaStage`; its `<video>` node and playback time remain authoritative.
+1. Uploads may use any playable aspect ratio. In **Use existing video**, select **Adjust video** for
+   the currently displayed source or latest healthy result. The side panel closes and Studio
+   enters one `video-edit` workspace around the existing `MediaStage`; its `<video>` node and
+   playback time remain authoritative.
 2. Desktop presents editing categories on the left, the stage in the center, and one named-scroll
    settings panel with sticky actions on the right. Tablet and phone place the stage first, then one
    horizontal category strip and a bounded safe-area-aware settings region. Capture controls are
@@ -42,9 +43,10 @@ a provider, and replace the immutable source only after a validated export and e
 - Publication requires a non-empty playable H.264 MP4, expected primary tracks, exact requested
   even dimensions, duration within 500 ms, and a matching immutable audio sidecar whenever the
   pinned source has audio. A silent source remains silent.
-- 16:9 and 9:16 outputs remain eligible for Character Swap and Virtual Try On within the existing
-  1% tolerance. Square, 4:5, and incompatible Freeform output disables those visual tools before
-  provider intent or HTTP traffic; local download and Voice remain available.
+- 16:9 and 9:16 uploads and edited outputs remain eligible for Character Swap and Virtual Try On
+  within the existing 1% tolerance. Other upload ratios and square, 4:5, or incompatible Freeform
+  output disable those visual tools before provider intent or HTTP traffic; local adjustment,
+  download, and Voice remain available.
 - If WebGL, WebCodecs, OffscreenCanvas, or dedicated workers are unavailable, Studio explains that
   local editing is unsupported. Ordinary playback, download, Voice, and existing provider flows
   remain usable.

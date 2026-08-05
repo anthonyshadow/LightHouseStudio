@@ -220,6 +220,8 @@ describe('ExistingVideoPanel', () => {
 
     expect(screen.getByRole('button', { name: 'Upload from device' })).toBeEnabled();
     expect(screen.getByText(/MP4\/H.264/u)).toBeInTheDocument();
+    expect(screen.getByText(/any aspect ratio/iu)).toBeInTheDocument();
+    expect(screen.getByText(/use Adjust video after upload to crop/iu)).toBeInTheDocument();
     expect(screen.queryByText(/Decart submission/u)).not.toBeInTheDocument();
   });
 
@@ -271,6 +273,7 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByRole('button', { name: 'Character Swap' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Voice' })).toBeEnabled();
+    expect(screen.getByText('Square')).toBeInTheDocument();
     expect(screen.getAllByText(/require a 16:9 or 9:16 source/iu)).not.toHaveLength(0);
   });
 

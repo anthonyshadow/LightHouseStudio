@@ -25,8 +25,14 @@ import {
   stripRecordingAudio,
 } from '../../adapters/media-processing/replaceAudioTrack';
 import { transcodeRecordingToMp4 } from '../../adapters/media-processing/transcodeRecording';
+import { createProcessedRecordingArtifact } from '../../orchestration/recording/recordingArtifacts';
+import { revokeArtifactUrl } from '../recording/recordingHelpers';
 import type { RecordingArtifact, RecordingController } from '../recording/types';
-import type { LocalVoiceEffectId, VoiceProcessingController } from '../voice-effects/types';
+import type {
+  LocalVoiceEffectId,
+  VoiceProcessingController,
+  VoiceProcessingOutcome,
+} from '../voice-effects/types';
 import { validateExistingVideo, type ValidatedExistingVideo } from './videoValidation';
 
 export type ExistingVideoStep = Readonly<{
@@ -66,6 +72,14 @@ export type ExistingVideoWorkflowPhase =
   | 'error';
 
 export type ExistingVideoWorkflow = ReturnType<typeof useExistingVideoWorkflow>;
+
+type FinalizedVisual = Readonly<{
+  blob: Blob;
+  mimeType: string;
+  label: string;
+  source: RecordingArtifact;
+  generation: number;
+}>;
 
 export const savedCharacterStepInput = (
   prompt: string,
@@ -438,7 +452,7 @@ export const useExistingVideoWorkflow = ({
       controller: AbortController,
       generation: number,
       expectedResult: InspectedVideo,
-    ): Promise<RecordingArtifact | null> => {
+    ): Promise<FinalizedVisual | null> => {
       if (!selection) throw new Error('The immutable source video is unavailable.');
       setPhase('finalizing');
       recording.beginProcessing({
@@ -527,18 +541,20 @@ export const useExistingVideoWorkflow = ({
       if (generation !== generationRef.current) return null;
       const step = steps[stepIndex];
       if (!step) throw new Error('The completed visual recipe is unavailable.');
-      const artifact = recording.completeVisualProcessing(
-        normalized.blob,
-        normalized.mimeType,
-        `${operationForModel(step.modelId)}-${stepIndex + 1}`,
-        editBase ?? recording.original ?? undefined,
-      );
       setComparison('result');
       setPendingVisual(null);
       setRetryJob(null);
       setCompletedStepCount(stepIndex + 1);
       setAcceptedSubmission(false);
-      return artifact;
+      const source = editBase ?? recording.original;
+      if (!source) throw new Error('The immutable source video is unavailable.');
+      return {
+        blob: normalized.blob,
+        mimeType: normalized.mimeType,
+        label: `${operationForModel(step.modelId)}-${stepIndex + 1}`,
+        source,
+        generation,
+      };
     },
     [editBase, recording, selection, steps],
   );
@@ -564,7 +580,7 @@ export const useExistingVideoWorkflow = ({
       stepIndex: number,
       controller: AbortController,
       generation: number,
-    ): Promise<RecordingArtifact | null> => {
+    ): Promise<FinalizedVisual | null> => {
       let current = status?.jobId === jobId ? status : null;
       while (!current || !['ready', 'failed', 'expired'].includes(current.status)) {
         controller.signal.throwIfAborted();
@@ -649,7 +665,10 @@ export const useExistingVideoWorkflow = ({
   );
 
   const applySelectedVoice = useCallback(
-    async (videoArtifact: RecordingArtifact, selectedVoice: ExistingVideoVoiceSelection) => {
+    async (
+      videoArtifact: RecordingArtifact,
+      selectedVoice: ExistingVideoVoiceSelection,
+    ): Promise<VoiceProcessingOutcome> => {
       setPhase('voice-processing');
       const outcome =
         selectedVoice.kind === 'local'
@@ -666,13 +685,13 @@ export const useExistingVideoWorkflow = ({
         setComparison('result');
         setPhase('complete');
         setMessage(`${selectedVoice.voiceName} is ready on the generated result.`);
-        return outcome.artifact;
+        return outcome;
       }
       if (outcome.status === 'error') {
         setPhase('error');
         setMessage(outcome.message);
       }
-      return null;
+      return outcome;
     },
     [processing],
   );
@@ -684,17 +703,45 @@ export const useExistingVideoWorkflow = ({
 
   const completeVisualArtifact = useCallback(
     async (
-      artifact: RecordingArtifact | null,
+      finalized: FinalizedVisual | null,
       selectedVoice: ExistingVideoVoiceSelection | null,
     ) => {
-      if (!artifact) return;
-      if (selectedVoice) {
-        await applySelectedVoice(artifact, selectedVoice);
+      if (!finalized) return;
+      if (!selectedVoice) {
+        recording.completeVisualProcessing(
+          finalized.blob,
+          finalized.mimeType,
+          finalized.label,
+          finalized.source,
+        );
+        completeVisualPlan();
         return;
       }
-      completeVisualPlan();
+      const stagedVisual = createProcessedRecordingArtifact(
+        finalized.source,
+        finalized.blob,
+        finalized.mimeType,
+        finalized.label,
+      );
+      try {
+        const outcome = await applySelectedVoice(stagedVisual, selectedVoice);
+        if (outcome.status === 'ready' || finalized.generation !== generationRef.current) return;
+        recording.completeVisualProcessing(
+          finalized.blob,
+          finalized.mimeType,
+          finalized.label,
+          finalized.source,
+        );
+        setComparison('result');
+        if (outcome.status === 'canceled') {
+          setPhase('complete');
+          setMessage('Voice processing was canceled. The healthy visual result is ready.');
+        }
+      } finally {
+        revokeArtifactUrl(stagedVisual, 'replacement');
+      }
     },
-    [applySelectedVoice, completeVisualPlan],
+    [applySelectedVoice, completeVisualPlan, recording],
   );
 
   const submitStep = useCallback(

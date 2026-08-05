@@ -57,7 +57,7 @@ export const validateUploadedVideoFacts = (
       message: 'Choose a video that is 5 minutes or shorter.',
     });
   }
-  if (!supportedAspect(facts.width, facts.height)) {
+  if (operations.length > 0 && !supportedAspect(facts.width, facts.height)) {
     issues.push({
       code: 'unsupported-aspect-ratio',
       message: 'Use a 16:9 landscape or 9:16 portrait video.',

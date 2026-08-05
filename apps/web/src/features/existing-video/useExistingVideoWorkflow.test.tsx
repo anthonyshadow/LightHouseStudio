@@ -510,11 +510,40 @@ describe('useExistingVideoWorkflow', () => {
     unmount();
   });
 
-  it('runs a captured visual plan before the selected voice conversion', async () => {
+  it('stages a transcoded visual plan privately before the selected voice conversion', async () => {
     const events: string[] = [];
     const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
-    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    const sourceAudio = new Blob(['source-audio'], { type: 'audio/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue({
+      ...inspected(sourceFile),
+      audioSidecar: { blob: sourceAudio, mimeType: 'audio/mp4' },
+      metadata: {
+        ...inspected(sourceFile).metadata,
+        hasAudio: true,
+        audioCodec: 'aac',
+      },
+    });
+    adapters.replaceRecordingAudio.mockImplementation(() => {
+      events.push('source-audio-restored');
+      return Promise.resolve({
+        blob: new Blob(['composed'], { type: 'video/mp4' }),
+        mimeType: 'video/mp4',
+      });
+    });
+    adapters.transcodeRecordingToMp4.mockImplementation(() => {
+      events.push('visual-transcoded');
+      return Promise.resolve({
+        blob: new Blob(['normalized-visual'], { type: 'video/mp4' }),
+        mimeType: 'video/mp4',
+      });
+    });
     const recording = recordingController();
+    recording.sidecar = {
+      state: 'ready',
+      blob: sourceAudio,
+      mimeType: sourceAudio.type,
+      error: null,
+    };
     const originalComplete = recording.completeVisualProcessing;
     recording.completeVisualProcessing = vi.fn(
       (blob: Blob, mimeType: string, label: string, source?: RecordingArtifact) => {
@@ -550,11 +579,13 @@ describe('useExistingVideoWorkflow', () => {
     await act(async () => result.current.submitPlan());
 
     expect(events).toEqual([
-      'visual-commit',
-      expect.stringMatching(/^voice:visual-character-swap/u),
+      'source-audio-restored',
+      'visual-transcoded',
+      expect.stringMatching(/^voice:video-/u),
     ]);
+    expect(recording.completeVisualProcessing).not.toHaveBeenCalled();
     const voiceCall = vi.mocked(processing.applyElevenLabsTo).mock.calls[0];
-    expect(voiceCall?.[0].id).toMatch(/^visual-character-swap/u);
+    expect(voiceCall?.[0].media).toEqual(new Blob(['normalized-visual'], { type: 'video/mp4' }));
     expect(voiceCall?.slice(1)).toEqual([
       'voice-northstar',
       'Northstar Narrator',

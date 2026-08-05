@@ -373,7 +373,11 @@ export const ExistingVideoPanel = ({
               </Button>
             ) : null}
           </div>
-          <span>MP4/H.264, MOV/H.264, or WebM/VP8 · 16:9 or 9:16 · up to 5 minutes</span>
+          <span>MP4/H.264, MOV/H.264, or WebM/VP8 · any aspect ratio · up to 5 minutes</span>
+          <span>
+            For the best experience, upload 16:9 or 9:16, or use Adjust video after upload to crop
+            to 16:9 or 9:16.
+          </span>
           <span>Drag and drop a video anywhere in this area</span>
         </div>
       </div>

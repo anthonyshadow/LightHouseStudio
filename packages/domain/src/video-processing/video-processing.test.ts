@@ -40,15 +40,22 @@ describe('uploaded video policy', () => {
     expect(issues[0]?.message).toContain('200 MB');
   });
 
-  it('rejects undocumented codecs, ratios, and overlong clips', () => {
+  it('accepts any upload aspect while rejecting undocumented codecs and overlong clips', () => {
     const issues = validateUploadedVideoFacts(
       video({ videoCodec: 'hevc', width: 1_000, height: 1_000, durationMs: 300_001 }),
       [],
     );
-    expect(issues.map((issue) => issue.code)).toEqual([
-      'unsupported-codec',
-      'duration-exceeded',
-      'unsupported-aspect-ratio',
+    expect(issues.map((issue) => issue.code)).toEqual(['unsupported-codec', 'duration-exceeded']);
+  });
+
+  it('keeps canonical aspect requirements scoped to visual provider operations', () => {
+    expect(
+      validateUploadedVideoFacts(video({ width: 1_000, height: 1_000 }), ['character-swap']),
+    ).toEqual([
+      {
+        code: 'unsupported-aspect-ratio',
+        message: 'Use a 16:9 landscape or 9:16 portrait video.',
+      },
     ]);
   });
 });

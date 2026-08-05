@@ -111,12 +111,16 @@ the primary video and audio tracks, Studio publishes no download artifact.
 
 ## Existing-video formats
 
-The accepted provider-processing subset is intentionally narrow:
+The accepted local upload subset is intentionally narrow by container, codec, and duration:
 
 - MP4 or QuickTime/MOV with an H.264 video track;
 - WebM with a VP8 video track;
-- duration greater than zero and no more than 300 seconds; and
-- displayed aspect within 1% of 16:9 or 9:16.
+- duration greater than zero and no more than 300 seconds.
+
+Uploads may use any playable aspect ratio. Studio recommends 16:9 or 9:16 for the best experience
+and offers **Adjust video** after upload to crop to either ratio. Only sources within 1% of 16:9 or
+9:16 are eligible for Character Swap/VTO; other ratios retain local adjustment, Voice, and
+Download without provider contact.
 
 The browser performs an early metadata and decode check, but the server's streamed byte inspection
 is authoritative before provider contact. HEVC, ProRes, VP9, AV1, container aliases, and
@@ -140,8 +144,8 @@ worker. There is no synchronous main-thread processing fallback.
 A source with audio must export AAC plus a newly extracted matching sidecar; a silent source stays
 silent. Output dimensions are even, exact, and decoded locally before publication. The worker's
 offset-aware stream accumulator rejects output beyond 300,000,000 bytes and releases its chunks on
-cancel/error. Square, 4:5, and incompatible Freeform outputs are valid local sources, but only
-16:9 and 9:16 within 1% are eligible for Character Swap/VTO.
+cancel/error. Square, 4:5, other uploaded ratios, and incompatible Freeform outputs are valid local
+sources, but only 16:9 and 9:16 within 1% are eligible for Character Swap/VTO.
 
 Automated Chromium export or a working preview does not qualify the codec path on another browser.
 Physical rows must exercise real export and cancellation in current Safari, Firefox, and Chrome,
