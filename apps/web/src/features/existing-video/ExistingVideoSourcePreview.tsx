@@ -21,11 +21,12 @@ const playerStyles = (theme: Theme): CSSObject => ({
     background: theme.colors.canvas,
   },
   '& figcaption': {
-    padding: `${theme.space.xs} ${theme.space.sm}`,
-    overflowWrap: 'anywhere',
-    color: theme.colors.textMuted,
-    background: theme.colors.surfaceStrong,
-    fontSize: theme.fontSizes.caption,
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
+    overflow: 'hidden',
+    clip: 'rect(0 0 0 0)',
+    whiteSpace: 'nowrap',
   },
 });
 

@@ -268,7 +268,17 @@ describe('ExistingVideoPanel', () => {
       </StudioDesignProvider>,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'Adjust video' }));
+    const sourceCard = screen.getByRole('heading', { name: 'Current video' }).closest('section');
+    expect(sourceCard).not.toBeNull();
+    const adjustVideo = within(sourceCard as HTMLElement).getByRole('button', {
+      name: 'Adjust video',
+    });
+    expect(
+      within(screen.getByLabelText('Editing tools')).queryByRole('button', {
+        name: 'Adjust video',
+      }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(adjustVideo);
     expect(onAdjustVideo).toHaveBeenCalledOnce();
     expect(screen.getByRole('button', { name: 'Character Swap' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeDisabled();

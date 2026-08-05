@@ -338,6 +338,39 @@ test('the upload editor and open saved-character chooser reflow at every support
     await expectNoDocumentOverflow(page);
     await expect(dialog.getByLabel('Video preview for responsive-source.mp4')).toBeAttached();
 
+    const flow = dialog.locator('[data-scroll-region="existing-video-flow"]');
+    const editor = dialog.getByRole('region', { name: 'Choose edits and configure' });
+    const [flowOverflow, editorOverflow] = await Promise.all([
+      flow.evaluate((element) => getComputedStyle(element).overflowY),
+      editor.evaluate((element) => getComputedStyle(element).overflowY),
+    ]);
+    if (viewport.width >= 1024) {
+      expect(flowOverflow).toBe('hidden');
+      expect(editorOverflow).toBe('auto');
+
+      const source = dialog.getByRole('heading', { name: 'Current video' }).locator('..');
+      const phase = dialog.getByRole('navigation', { name: 'Video editing progress' });
+      const action = dialog.getByRole('button', { name: 'Apply Character Swap' });
+      const before = await Promise.all([
+        phase.boundingBox(),
+        source.boundingBox(),
+        action.boundingBox(),
+      ]);
+      await editor.evaluate((element) => {
+        element.scrollTop = element.scrollHeight;
+      });
+      await expect.poll(() => editor.evaluate((element) => element.scrollTop)).toBeGreaterThan(0);
+      const after = await Promise.all([
+        phase.boundingBox(),
+        source.boundingBox(),
+        action.boundingBox(),
+      ]);
+      expect(after.map((box) => box?.y)).toEqual(before.map((box) => box?.y));
+    } else {
+      expect(flowOverflow).toBe('auto');
+      expect(editorOverflow).toBe('visible');
+    }
+
     const trigger = dialog.getByRole('combobox', { name: 'Saved Character' });
     await trigger.click();
     const option = dialog.getByRole('option', { name: /Professional Anchor/u });

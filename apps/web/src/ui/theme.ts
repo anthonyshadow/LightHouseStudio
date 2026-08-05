@@ -98,6 +98,8 @@ export interface StudioTheme {
       drawerTablet: string;
       drawerWide: string;
       drawerWideCompact: string;
+      drawerWorkspace: string;
+      drawerWorkspaceCompact: string;
       bottom: string;
       bottomCompact: string;
       bottomTablet: string;
@@ -234,6 +236,8 @@ export const studioTheme: StudioTheme = {
       drawerTablet: 'min(30rem, calc(100vw - 2rem))',
       drawerWide: 'min(50rem, calc(100vw - 1rem))',
       drawerWideCompact: 'min(42rem, calc(100vw - 1rem))',
+      drawerWorkspace: 'min(64rem, calc(100vw - 1rem))',
+      drawerWorkspaceCompact: 'min(64rem, calc(100vw - 1rem))',
       bottom: 'min(52dvh, 32rem)',
       bottomCompact: 'min(68dvh, 30rem)',
       bottomTablet: '88dvh',

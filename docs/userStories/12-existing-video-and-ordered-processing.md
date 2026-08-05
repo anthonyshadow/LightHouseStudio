@@ -21,6 +21,11 @@ then edit either base, download, start over, or discard.
    tracks/session, and detaches on replacement or close. The panel also shows local-only
    duration, resolution, and audio availability. Filename, size, orientation, and codec remain
    available under **Technical details**.
+   On laptop and desktop, the overlay keeps its header, progress, source preview and controls, and
+   contextual action bar fixed while only the right-side edit selection and configuration region
+   scrolls. Tablet and phone retain one vertical reading order and one contained panel scroller.
+   **Adjust video** stays with the source preview above Replace/Discard because it changes the
+   immutable base rather than adding a visual or Voice treatment.
    Once a video is selected, backdrop clicks cannot dismiss the panel; the creator must use an
    explicit close action or complete the workflow.
 4. Instead of selecting a file, the creator may choose control-bar **Record New Video** or panel

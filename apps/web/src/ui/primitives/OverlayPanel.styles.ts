@@ -28,7 +28,7 @@ export const backdropStyles = (
   background: theme.colors.scrim,
   ...overlayBackdropAnimationStyles(theme, phase === 'exiting'),
   '@media (min-width: 40rem) and (max-width: 63.99rem)':
-    !centered && placement === 'right' && size === 'wide'
+    !centered && placement === 'right' && size !== 'standard'
       ? { alignItems: 'flex-end', justifyContent: 'stretch' }
       : undefined,
   '@media (max-width: 40rem)': centered
@@ -42,6 +42,7 @@ const panelWidth = (
   size: OverlayPanelSize,
 ): string => {
   if (placement !== 'right') return '100%';
+  if (size === 'workspace') return theme.layout.overlays.drawerWorkspace;
   return size === 'wide' ? theme.layout.overlays.drawerWide : theme.layout.overlays.drawer;
 };
 
@@ -89,8 +90,12 @@ export const panelStyles = (
   ...overlayPanelAnimationStyles(theme, placement, phase === 'exiting'),
   '@media (max-width: 80rem), (max-height: 48rem)': {
     width:
-      !centered && placement === 'right' && size === 'wide'
-        ? theme.layout.overlays.drawerWideCompact
+      !centered && placement === 'right'
+        ? size === 'workspace'
+          ? theme.layout.overlays.drawerWorkspaceCompact
+          : size === 'wide'
+            ? theme.layout.overlays.drawerWideCompact
+            : undefined
         : undefined,
     height: centered
       ? height === 'tall'
@@ -112,28 +117,28 @@ export const panelStyles = (
   '@media (min-width: 40rem) and (max-width: 63.99rem)': {
     width:
       !centered && placement === 'right'
-        ? size === 'wide'
+        ? size !== 'standard'
           ? '100%'
           : theme.layout.overlays.drawerTablet
         : undefined,
     height:
-      !centered && (placement === 'bottom' || (placement === 'right' && size === 'wide'))
+      !centered && (placement === 'bottom' || (placement === 'right' && size !== 'standard'))
         ? placement === 'bottom' && height === 'tall'
           ? '75dvh'
           : theme.layout.overlays.bottomTablet
         : undefined,
     maxHeight:
-      !centered && (placement === 'bottom' || (placement === 'right' && size === 'wide'))
+      !centered && (placement === 'bottom' || (placement === 'right' && size !== 'standard'))
         ? placement === 'bottom' && height === 'tall'
           ? '75dvh'
           : theme.layout.overlays.bottomTablet
         : undefined,
     border:
-      !centered && placement === 'right' && size === 'wide'
+      !centered && placement === 'right' && size !== 'standard'
         ? `1px solid ${theme.colors.border}`
         : undefined,
     borderRadius:
-      !centered && placement === 'right' && size === 'wide'
+      !centered && placement === 'right' && size !== 'standard'
         ? `${theme.radii.large} ${theme.radii.large} 0 0`
         : undefined,
   },

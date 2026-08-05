@@ -43,7 +43,6 @@ export interface ExistingVideoToolCardsProps {
   readonly locked: boolean;
   readonly characterSwapAvailable?: boolean;
   readonly virtualTryOnAvailable?: boolean;
-  readonly onAdjust?: () => void;
   readonly onSelect: (tool: ExistingVideoToolId, trigger: HTMLButtonElement) => void;
 }
 
@@ -53,7 +52,6 @@ export const ExistingVideoToolCards = ({
   locked,
   characterSwapAvailable = true,
   virtualTryOnAvailable = true,
-  onAdjust,
   onSelect,
 }: ExistingVideoToolCardsProps) => {
   const theme = useTheme();
@@ -113,28 +111,6 @@ export const ExistingVideoToolCards = ({
 
   return (
     <div css={toolGroupsStyles(theme)} aria-label="Editing tools">
-      {onAdjust ? (
-        <section css={toolGroupStyles(theme, 1)} aria-labelledby="existing-video-local-tools-label">
-          <p id="existing-video-local-tools-label">
-            <strong>Local edit</strong> · No provider
-          </p>
-          <div>
-            <button
-              type="button"
-              css={toolCardStyles(theme, false, false)}
-              aria-label="Adjust video"
-              disabled={locked}
-              onClick={onAdjust}
-            >
-              <span>
-                <strong>Adjust video</strong>
-                <small>Trim, crop, rotate, relight, or filter on this device.</small>
-              </span>
-              <span css={toolStatusStyles(theme, false)}>Local</span>
-            </button>
-          </div>
-        </section>
-      ) : null}
       <section css={toolGroupStyles(theme, 2)} aria-labelledby="existing-video-visual-tools-label">
         <p id="existing-video-visual-tools-label">
           <strong>Visual edit</strong> · Choose one

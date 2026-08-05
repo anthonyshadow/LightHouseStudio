@@ -1,11 +1,19 @@
 import type { CSSObject, Theme } from '@emotion/react';
 
 export const panelStackStyles = (theme: Theme): CSSObject => ({
+  height: '100%',
   minWidth: 0,
+  minHeight: 0,
   display: 'grid',
+  gridTemplateRows: 'auto minmax(0, 1fr) auto',
   alignContent: 'start',
   gap: theme.space.md,
+  overflow: 'auto',
+  overscrollBehavior: 'contain',
   '& h2, & h3, & p': { margin: 0 },
+  '@media (min-width: 64rem)': {
+    overflow: 'hidden',
+  },
 });
 
 export const recoveryActionStyles = (theme: Theme): CSSObject => ({
@@ -67,6 +75,11 @@ export const phaseNavStyles = (theme: Theme): CSSObject => ({
     position: 'static',
     paddingBlockStart: 0,
   },
+  '@media (min-width: 64rem)': {
+    position: 'static',
+    top: 'auto',
+    paddingBlockStart: 0,
+  },
 });
 
 export const phaseItemStyles = (
@@ -121,11 +134,14 @@ export const phaseItemStyles = (
 
 export const workspaceStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
+  minHeight: 0,
   display: 'grid',
   alignItems: 'start',
   gap: theme.space.lg,
   '@media (min-width: 64rem)': {
-    gridTemplateColumns: 'minmax(17rem, 0.9fr) minmax(22rem, 1.1fr)',
+    height: '100%',
+    gridTemplateColumns: 'minmax(18rem, 0.85fr) minmax(22rem, 1.15fr)',
+    overflow: 'hidden',
   },
 });
 
@@ -135,8 +151,8 @@ export const sourceColumnStyles = (theme: Theme): CSSObject => ({
   alignContent: 'start',
   gap: theme.space.sm,
   '@media (min-width: 64rem)': {
-    position: 'sticky',
-    top: '4.5rem',
+    height: '100%',
+    overflow: 'hidden',
   },
 });
 
@@ -149,6 +165,10 @@ export const sourceCardStyles = (theme: Theme): CSSObject => ({
   borderRadius: theme.radii.large,
   background: theme.colors.surfaceSoft,
   boxShadow: theme.shadows.soft,
+  '@media (min-width: 64rem) and (max-height: 48rem)': {
+    gap: theme.space.xs,
+    padding: theme.space.xs,
+  },
 });
 
 export const sourceHeadingStyles = (theme: Theme): CSSObject => ({
@@ -158,12 +178,19 @@ export const sourceHeadingStyles = (theme: Theme): CSSObject => ({
   justifyContent: 'space-between',
   gap: theme.space.sm,
   '& > div': { minWidth: 0 },
-  '& h2': { fontFamily: theme.type.display, fontSize: theme.fontSizes.section },
-  '& p': {
-    marginBlockStart: theme.space.xxs,
+  '& h2': {
+    position: 'absolute',
+    width: '1px',
+    height: '1px',
     overflow: 'hidden',
-    color: theme.colors.textMuted,
-    fontSize: theme.fontSizes.caption,
+    clip: 'rect(0 0 0 0)',
+    whiteSpace: 'nowrap',
+  },
+  '& p': {
+    overflow: 'hidden',
+    color: theme.colors.text,
+    fontSize: theme.fontSizes.metadata,
+    fontWeight: 720,
     textOverflow: 'ellipsis',
     whiteSpace: 'nowrap',
   },
@@ -181,15 +208,59 @@ export const sourceHeadingStyles = (theme: Theme): CSSObject => ({
 export const sourceFactsStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
   flexWrap: 'wrap',
-  gap: theme.space.xs,
+  gap: `${theme.space.xxs} ${theme.space.xs}`,
+  color: theme.colors.textMuted,
+  fontSize: theme.fontSizes.caption,
   '& span': {
-    padding: `0.25rem ${theme.space.xs}`,
-    border: `1px solid ${theme.colors.border}`,
-    borderRadius: theme.radii.round,
-    color: theme.colors.textMuted,
-    background: theme.colors.surfaceStrong,
-    fontSize: theme.fontSizes.caption,
+    display: 'inline-flex',
+    alignItems: 'center',
+    gap: theme.space.xs,
   },
+  '& span:not(:last-of-type)::after': {
+    content: '"·"',
+    color: theme.colors.textFaint,
+  },
+});
+
+export const sourceAdjustStyles = (theme: Theme): CSSObject => ({
+  width: '100%',
+  minHeight: '4.75rem',
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr) auto',
+  alignItems: 'start',
+  gap: theme.space.sm,
+  padding: theme.space.sm,
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.radii.medium,
+  color: theme.colors.text,
+  background: theme.colors.surface,
+  textAlign: 'start',
+  cursor: 'pointer',
+  '&:hover:not(:disabled)': { borderColor: theme.colors.borderStrong },
+  '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '3px' },
+  '&:disabled': { cursor: 'not-allowed', opacity: 0.48 },
+  '& strong': { display: 'block', fontSize: theme.fontSizes.metadata },
+  '& small': {
+    display: 'block',
+    marginBlockStart: theme.space.xxs,
+    color: theme.colors.textMuted,
+    fontSize: theme.fontSizes.caption,
+    lineHeight: 1.35,
+  },
+  '@media (min-width: 64rem) and (max-height: 48rem)': {
+    minHeight: '3.75rem',
+    padding: theme.space.xs,
+  },
+});
+
+export const sourceAdjustStatusStyles = (theme: Theme): CSSObject => ({
+  padding: `0.18rem ${theme.space.xs}`,
+  borderRadius: theme.radii.round,
+  color: theme.colors.textMuted,
+  background: theme.colors.surfaceStrong,
+  fontSize: theme.fontSizes.caption,
+  fontWeight: 760,
+  textTransform: 'uppercase',
 });
 
 export const sourceDetailsStyles = (theme: Theme): CSSObject => ({
@@ -215,8 +286,6 @@ export const sourceManagementStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
   gap: theme.space.xs,
-  paddingBlockStart: theme.space.xs,
-  borderBlockStart: `1px solid ${theme.colors.border}`,
   '& > *': { minWidth: 0, minHeight: '2.75rem' },
   '@media (max-width: 22rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
 });
@@ -252,16 +321,45 @@ export const comparisonStyles = (theme: Theme): CSSObject => ({
 
 export const editorColumnStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
+  minHeight: 0,
   display: 'grid',
   alignContent: 'start',
   gap: theme.space.md,
+  outline: 'none',
+  '&:focus-visible': {
+    borderRadius: theme.radii.small,
+    boxShadow: theme.shadows.focus,
+  },
+  '@media (min-width: 64rem)': {
+    height: '100%',
+    overflowY: 'auto',
+    overscrollBehavior: 'contain',
+    scrollbarGutter: 'stable',
+    paddingInlineEnd: theme.space.xs,
+    paddingBlockEnd: theme.space.sm,
+  },
 });
 
 export const sectionHeadingStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gap: theme.space.xxs,
-  '& h2': { fontFamily: theme.type.display, fontSize: '1.3rem' },
+  '& h2': {
+    fontFamily: theme.type.sans,
+    fontSize: theme.fontSizes.metadata,
+    letterSpacing: '0.04em',
+    textTransform: 'uppercase',
+  },
   '& p': { color: theme.colors.textMuted, lineHeight: 1.5 },
+  '@media (min-width: 64rem)': {
+    '& p': {
+      position: 'absolute',
+      width: '1px',
+      height: '1px',
+      overflow: 'hidden',
+      clip: 'rect(0 0 0 0)',
+      whiteSpace: 'nowrap',
+    },
+  },
 });
 
 export const toolGroupsStyles = (theme: Theme): CSSObject => ({
@@ -291,6 +389,16 @@ export const toolGroupStyles = (theme: Theme, columns: number): CSSObject => ({
   '& > div > button': { height: '100%' },
   '@media (max-width: 34rem)': {
     '& > div': { gridTemplateColumns: 'minmax(0, 1fr)' },
+  },
+  '@media (min-width: 64rem)': {
+    '& > p': {
+      position: 'absolute',
+      width: '1px',
+      height: '1px',
+      overflow: 'hidden',
+      clip: 'rect(0 0 0 0)',
+      whiteSpace: 'nowrap',
+    },
   },
 });
 
@@ -493,6 +601,14 @@ export const actionBarStyles = (theme: Theme): CSSObject => ({
     marginBlockEnd: `calc(-1 * ${theme.space.md})`,
     boxShadow: 'none',
   },
+  '@media (min-width: 64rem)': {
+    position: 'static',
+    bottom: 'auto',
+    gridTemplateColumns: 'minmax(0, 1fr) auto',
+    alignItems: 'center',
+    marginBlockEnd: `calc(-1 * ${theme.space.md})`,
+    boxShadow: '0 -8px 24px rgba(0, 0, 0, 0.32)',
+  },
 });
 
 export const actionSummaryStyles = (theme: Theme): CSSObject => ({
@@ -514,6 +630,10 @@ export const actionButtonsStyles = (theme: Theme): CSSObject => ({
     display: 'grid',
     gridTemplateColumns: 'minmax(0, 1fr)',
     '& > *': { width: '100%' },
+  },
+  '@media (min-width: 64rem)': {
+    minWidth: '15rem',
+    '& > *': { width: '100%', flex: 'none' },
   },
 });
 

@@ -10,6 +10,8 @@ import {
   sourceFactsStyles,
   sourceHeadingStyles,
   sourceManagementStyles,
+  sourceAdjustStyles,
+  sourceAdjustStatusStyles,
 } from './ExistingVideoPanel.styles';
 import { ExistingVideoSourcePreview } from './ExistingVideoSourcePreview';
 import type { ExistingVideoWorkflow } from './useExistingVideoWorkflow';
@@ -20,6 +22,7 @@ const orientation = (width: number, height: number): string =>
 export const ExistingVideoSourceCard = ({
   workflow,
   locked,
+  onAdjust,
   onRequestReplace,
   onRequestDiscard,
   replaceButtonRef,
@@ -27,6 +30,7 @@ export const ExistingVideoSourceCard = ({
 }: {
   readonly workflow: ExistingVideoWorkflow;
   readonly locked: boolean;
+  readonly onAdjust?: () => void;
   readonly onRequestReplace: () => void;
   readonly onRequestDiscard: () => void;
   readonly replaceButtonRef?: RefObject<HTMLButtonElement | null>;
@@ -46,6 +50,8 @@ export const ExistingVideoSourceCard = ({
 
   return (
     <section css={sourceCardStyles(theme)} aria-labelledby="existing-video-source-heading">
+      <ExistingVideoSourcePreview artifact={artifact} displayName={displayName} />
+
       <header css={sourceHeadingStyles(theme)}>
         <div>
           <h2 id="existing-video-source-heading">Current video</h2>
@@ -53,8 +59,6 @@ export const ExistingVideoSourceCard = ({
         </div>
         <span>{workflow.original?.kind === 'recorded' ? 'Recorded' : 'Uploaded'}</span>
       </header>
-
-      <ExistingVideoSourcePreview artifact={artifact} displayName={displayName} />
 
       {workflow.result ? (
         <div css={comparisonStyles(theme)} role="group" aria-label="Compare original and result">
@@ -80,8 +84,46 @@ export const ExistingVideoSourceCard = ({
         <span>
           {metadata.width} × {metadata.height}
         </span>
+        <span>{formatBytes(metadata.sizeBytes)}</span>
         <span>{metadata.hasAudio ? 'Audio available' : 'No audio'}</span>
       </div>
+
+      {workflow.phase !== 'complete' && onAdjust ? (
+        <button
+          type="button"
+          css={sourceAdjustStyles(theme)}
+          aria-label="Adjust video"
+          disabled={locked}
+          onClick={onAdjust}
+        >
+          <span>
+            <strong>Adjust video</strong>
+            <small>Trim, crop, rotate, relight, or filter on this device.</small>
+          </span>
+          <span css={sourceAdjustStatusStyles(theme)}>Local</span>
+        </button>
+      ) : null}
+
+      {workflow.phase !== 'complete' && !locked ? (
+        <div css={sourceManagementStyles(theme)} aria-label="Source management">
+          <Button
+            ref={replaceButtonRef}
+            variant="secondary"
+            aria-label="Replace source video"
+            onClick={onRequestReplace}
+          >
+            Replace
+          </Button>
+          <Button
+            ref={discardButtonRef}
+            variant="danger"
+            aria-label="Discard source video"
+            onClick={onRequestDiscard}
+          >
+            Discard
+          </Button>
+        </div>
+      ) : null}
 
       <details css={sourceDetailsStyles(theme)}>
         <summary>Technical details</summary>
@@ -120,17 +162,6 @@ export const ExistingVideoSourceCard = ({
           </div>
         </dl>
       </details>
-
-      {workflow.phase !== 'complete' && !locked ? (
-        <div css={sourceManagementStyles(theme)} aria-label="Source management">
-          <Button ref={replaceButtonRef} variant="secondary" onClick={onRequestReplace}>
-            Replace source video
-          </Button>
-          <Button ref={discardButtonRef} variant="danger" onClick={onRequestDiscard}>
-            Discard source video
-          </Button>
-        </div>
-      ) : null}
     </section>
   );
 };

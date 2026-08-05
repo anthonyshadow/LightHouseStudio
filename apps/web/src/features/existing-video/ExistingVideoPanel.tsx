@@ -1,3 +1,4 @@
+/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- The named desktop editor scroller must be keyboard-focusable. */
 import { useTheme } from '@emotion/react';
 import type { CapabilitiesResponse } from '@studio/contracts';
 import { useEffect, useRef, useState, type DragEvent } from 'react';
@@ -325,7 +326,7 @@ export const ExistingVideoPanel = ({
 
   if (!selected) {
     return (
-      <div css={panelStackStyles(theme)}>
+      <div css={panelStackStyles(theme)} data-scroll-region="existing-video-flow">
         {workflow.message ? (
           <StatusNotice tone="danger" role="alert">
             {workflow.message}
@@ -389,7 +390,7 @@ export const ExistingVideoPanel = ({
   const activeStep = workflow.steps[0];
 
   return (
-    <div css={panelStackStyles(theme)}>
+    <div css={panelStackStyles(theme)} data-scroll-region="existing-video-flow">
       <ExistingVideoPhaseIndicator current={currentPhase} />
 
       <div css={workspaceStyles(theme)}>
@@ -397,6 +398,7 @@ export const ExistingVideoPanel = ({
           <ExistingVideoSourceCard
             workflow={workflow}
             locked={structureLocked}
+            {...(onAdjustVideo ? { onAdjust: onAdjustVideo } : {})}
             onRequestReplace={requestReplace}
             onRequestDiscard={() => setDiscardConfirmationOpen(true)}
             replaceButtonRef={replaceButtonRef}
@@ -404,7 +406,13 @@ export const ExistingVideoPanel = ({
           />
         </div>
 
-        <div css={editorColumnStyles(theme)}>
+        <div
+          css={editorColumnStyles(theme)}
+          data-scroll-region="existing-video-editor"
+          role="region"
+          aria-label="Choose edits and configure"
+          tabIndex={0}
+        >
           {workflow.message ? (
             <StatusNotice
               tone={
@@ -519,7 +527,6 @@ export const ExistingVideoPanel = ({
                 locked={structureLocked}
                 characterSwapAvailable={visualCapabilities.characterSwap.available}
                 virtualTryOnAvailable={visualCapabilities.virtualTryOn.available}
-                {...(onAdjustVideo ? { onAdjust: onAdjustVideo } : {})}
                 onSelect={selectTool}
               />
 
