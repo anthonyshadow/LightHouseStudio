@@ -19,20 +19,22 @@ const PreviewHarness = ({
   onCropChange,
   onCropCommit,
   onPlayheadChange = vi.fn(),
+  initialCrop = {
+    preset: 'freeform' as const,
+    rectangle: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
+  },
 }: {
   showingBefore?: boolean;
   onCropStart: () => void;
   onCropChange: (spec: VideoEditSpec) => void;
   onCropCommit: () => void;
   onPlayheadChange?: (playheadMs: number) => void;
+  initialCrop?: VideoEditSpec['crop'];
 }) => {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [spec, setSpec] = useState<VideoEditSpec>({
     ...createDefaultVideoEditSpec(10_000),
-    crop: {
-      preset: 'freeform',
-      rectangle: { x: 0.1, y: 0.1, width: 0.8, height: 0.8 },
-    },
+    crop: initialCrop,
   });
   return (
     <StudioDesignProvider>
@@ -62,6 +64,69 @@ const PreviewHarness = ({
 };
 
 describe('VideoEditStagePreview', () => {
+  it('drags the whole crop selection and keeps a fixed-ratio preset positioned', () => {
+    const onCropStart = vi.fn<() => void>();
+    const onCropChange = vi.fn<(spec: VideoEditSpec) => void>();
+    const onCropCommit = vi.fn<() => void>();
+    const view = render(
+      <PreviewHarness
+        initialCrop={{
+          preset: '1:1',
+          rectangle: { x: 0.2, y: 0, width: 0.5625, height: 1 },
+        }}
+        onCropStart={onCropStart}
+        onCropChange={onCropChange}
+        onCropCommit={onCropCommit}
+      />,
+    );
+    const frame = view.container.querySelector<HTMLElement>('[data-video-edit-frame]')!;
+    const selection = view.container.querySelector<HTMLElement>('[data-crop-selection]')!;
+    vi.spyOn(frame, 'getBoundingClientRect').mockReturnValue({
+      x: 0,
+      y: 0,
+      top: 0,
+      right: 1_000,
+      bottom: 500,
+      left: 0,
+      width: 1_000,
+      height: 500,
+      toJSON: () => ({}),
+    });
+
+    expect(getComputedStyle(selection).pointerEvents).toBe('auto');
+    fireEvent.pointerDown(selection, { pointerId: 1, clientX: 300, clientY: 200 });
+    fireEvent.pointerMove(selection, { pointerId: 1, clientX: 400, clientY: 200 });
+    fireEvent.pointerUp(selection, { pointerId: 1 });
+
+    const movedCrop = onCropChange.mock.calls.at(-1)?.[0].crop;
+    expect(movedCrop?.preset).toBe('1:1');
+    expect(movedCrop?.rectangle.x).toBeCloseTo(0.3);
+    expect(movedCrop?.rectangle).toMatchObject({ y: 0, width: 0.5625, height: 1 });
+    expect(onCropStart).toHaveBeenCalledOnce();
+    expect(onCropCommit).toHaveBeenCalledOnce();
+  });
+
+  it('turns a preset crop into Freeform when a corner resizes it', () => {
+    const onCropChange = vi.fn<(spec: VideoEditSpec) => void>();
+    render(
+      <PreviewHarness
+        initialCrop={{
+          preset: '1:1',
+          rectangle: { x: 0.2, y: 0, width: 0.5625, height: 1 },
+        }}
+        onCropStart={vi.fn()}
+        onCropChange={onCropChange}
+        onCropCommit={vi.fn()}
+      />,
+    );
+
+    const handle = screen.getByRole('button', { name: 'Resize crop from top left' });
+    fireEvent.keyDown(handle, { key: 'ArrowRight' });
+    fireEvent.keyUp(handle, { key: 'ArrowRight' });
+
+    expect(onCropChange.mock.calls.at(-1)?.[0].crop.preset).toBe('freeform');
+  });
+
   it('moves keyboard crop handles by 1%, uses Shift for 5%, and groups each gesture', () => {
     const onCropStart = vi.fn<() => void>();
     const onCropChange = vi.fn<(spec: VideoEditSpec) => void>();

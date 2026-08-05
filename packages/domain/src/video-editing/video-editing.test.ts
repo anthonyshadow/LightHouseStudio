@@ -31,6 +31,19 @@ describe('video editing rules', () => {
     expect(crop.y).toBeGreaterThanOrEqual(0);
   });
 
+  it('preserves a fixed-ratio crop position while keeping its requested aspect', () => {
+    const crop = cropForVideoEditPreset('1:1', source.width, source.height, {
+      x: 0.3,
+      y: 0,
+      width: 0.5625,
+      height: 1,
+    });
+
+    expect(crop.x).toBeCloseTo(0.3);
+    expect(crop).toMatchObject({ y: 0, width: 0.5625, height: 1 });
+    expect((source.width * crop.width) / (source.height * crop.height)).toBeCloseTo(1, 5);
+  });
+
   it('clamps trim, crop, and adjustment values', () => {
     const normalized = normalizeVideoEditSpec(
       {

@@ -15,8 +15,9 @@ a provider, and replace the immutable source only after a validated export and e
 3. Use accessible start/end ranges, the playhead, **Set start to playhead**, and **Set end to
    playhead** to choose a trim of at least 100 ms. Playback loops inside that range.
 4. Choose Original, Freeform, 16:9, 9:16, 1:1, or 4:5 crop. Crop mode shows the full rotated source
-   with the excluded area dimmed. Pointer capture moves/resizes the crop; keyboard arrows move a
-   focused corner by 1%, or 5% with Shift.
+   with the excluded area dimmed. Drag anywhere inside the selected area to position it; fixed-ratio
+   crops keep their ratio while moving. Dragging a corner resizes the selection as Freeform.
+   Keyboard arrows move a focused selection or corner by 1%, or 5% with Shift.
 5. Rotate in 90° increments, flip horizontally or vertically, combine Brightness, Contrast,
    Saturation, Temperature, Highlights, and Shadows values from -100 to 100, and optionally add the
    Original, Vivid, Warm, Cool, Mono, or Fade filter. Filters compose with manual adjustments.

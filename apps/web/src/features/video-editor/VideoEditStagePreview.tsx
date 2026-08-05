@@ -30,14 +30,16 @@ const formatTime = (milliseconds: number): string => {
 };
 
 type CropEdge = 'move' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+type CropState = VideoEditStagePreviewContract['spec']['crop'];
 
 const updateCrop = (
   contract: VideoEditStagePreviewContract,
   edge: CropEdge,
   deltaX: number,
   deltaY: number,
-) => {
-  const current = contract.spec.crop.rectangle;
+  crop: CropState = contract.spec.crop,
+): CropState => {
+  const current = crop.rectangle;
   const next = { ...current };
   if (edge === 'move') {
     next.x += deltaX;
@@ -56,17 +58,27 @@ const updateCrop = (
       next.height += deltaY;
     }
   }
+  const nextCrop = {
+    preset: edge === 'move' ? crop.preset : ('freeform' as const),
+    rectangle: normalizeVideoCrop(next),
+  };
   contract.onCropChange({
     ...contract.spec,
-    crop: { preset: 'freeform', rectangle: normalizeVideoCrop(next) },
+    crop: nextCrop,
   });
+  return nextCrop;
 };
 
 export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
   const theme = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);
-  const dragRef = useRef<Readonly<{ edge: CropEdge; x: number; y: number }> | null>(null);
+  const dragRef = useRef<Readonly<{
+    edge: CropEdge;
+    x: number;
+    y: number;
+    crop: CropState;
+  }> | null>(null);
   const [playing, setPlaying] = useState(false);
   const geometry = useMemo(
     () =>
@@ -182,20 +194,26 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
 
   const beginDrag = (edge: CropEdge, event: React.PointerEvent<HTMLElement>) => {
     contract.onCropStart();
-    dragRef.current = { edge, x: event.clientX, y: event.clientY };
-    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      edge,
+      x: event.clientX,
+      y: event.clientY,
+      crop: contract.spec.crop,
+    };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
   };
   const continueDrag = (event: React.PointerEvent<HTMLElement>) => {
     const drag = dragRef.current;
     const frame = frameRef.current?.getBoundingClientRect();
     if (!drag || !frame?.width || !frame.height) return;
-    updateCrop(
+    const crop = updateCrop(
       contract,
       drag.edge,
       (event.clientX - drag.x) / frame.width,
       (event.clientY - drag.y) / frame.height,
+      drag.crop,
     );
-    dragRef.current = { edge: drag.edge, x: event.clientX, y: event.clientY };
+    dragRef.current = { edge: drag.edge, x: event.clientX, y: event.clientY, crop };
   };
   const finishDrag = () => {
     if (!dragRef.current) return;
@@ -242,11 +260,16 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
   return (
     <div css={previewLayerStyles()} data-video-edit-preview="">
       {!contract.showingBefore ? (
-        <div ref={frameRef} css={canvasFrameStyles(theme, displayGeometry.aspectRatio)}>
+        <div
+          ref={frameRef}
+          css={canvasFrameStyles(theme, displayGeometry.aspectRatio)}
+          data-video-edit-frame=""
+        >
           <canvas ref={canvasRef} aria-hidden="true" />
           {contract.activeTool === 'crop' ? (
             <div
               css={cropSelectionStyles(theme, contract.spec.crop.rectangle)}
+              data-crop-selection=""
               onPointerDown={(event) => beginDrag('move', event)}
               onPointerMove={continueDrag}
               onPointerUp={finishDrag}

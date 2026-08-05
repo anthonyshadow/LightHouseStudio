@@ -75,12 +75,25 @@ export const cropForVideoEditPreset = (
   const sourceAspect = sourceWidth / sourceHeight;
   const targetAspect = cropAspect(preset);
   if (!Number.isFinite(sourceAspect) || sourceAspect <= 0) return FULL_VIDEO_CROP;
+  const normalizedCurrent = normalizeVideoCrop(current);
+  const centerX = normalizedCurrent.x + normalizedCurrent.width / 2;
+  const centerY = normalizedCurrent.y + normalizedCurrent.height / 2;
   if (sourceAspect > targetAspect) {
     const width = targetAspect / sourceAspect;
-    return { x: (1 - width) / 2, y: 0, width, height: 1 };
+    return {
+      x: clamp(centerX - width / 2, 0, 1 - width),
+      y: 0,
+      width,
+      height: 1,
+    };
   }
   const height = sourceAspect / targetAspect;
-  return { x: 0, y: (1 - height) / 2, width: 1, height };
+  return {
+    x: 0,
+    y: clamp(centerY - height / 2, 0, 1 - height),
+    width: 1,
+    height,
+  };
 };
 
 export const normalizeVideoEditSpec = (
