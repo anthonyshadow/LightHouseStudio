@@ -10,6 +10,7 @@ import {
   createCleanSessionDraft,
   getImageQualityWarnings,
   hasPendingRealtimeChanges,
+  imageFileExtension,
   isModelModeId,
   markRealtimeStateApplied,
   revertDraftToAppliedState,
@@ -30,6 +31,12 @@ const image = (overrides: Partial<EphemeralImageDescriptor> = {}): EphemeralImag
 });
 
 describe('session modes and drafts', () => {
+  it('maps supported image MIME types to their canonical file extensions', () => {
+    expect(imageFileExtension('image/jpeg')).toBe('jpg');
+    expect(imageFileExtension('image/png')).toBe('png');
+    expect(imageFileExtension('image/webp')).toBe('webp');
+  });
+
   it('keeps local separate and exposes only the two exact provider modes', () => {
     expect(isModelModeId('local')).toBe(false);
     expect(isModelModeId('lucy-2.1')).toBe(false);

@@ -10,6 +10,7 @@ import {
   installSuccessfulStudioHarness,
   openRecipeDockWhenOverlaid,
   readBrowserState,
+  settleVisualPage,
   startCharacterAi,
   startLocalPreview,
   startVirtualTryOnAi,
@@ -541,16 +542,6 @@ const SCENARIOS: readonly Scenario[] = [
   },
 ];
 
-const settlePage = async (page: Page): Promise<void> => {
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    await new Promise<void>((resolve) => {
-      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
-    });
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-  });
-};
-
 const expectCaptureDevicesSettled = async (page: Page): Promise<void> => {
   await expect(page.getByText('Looking for available cameras…', { exact: true })).toBeHidden();
   await expect(page.getByText('Looking for available microphones…', { exact: true })).toBeHidden();
@@ -641,7 +632,7 @@ const captureStableViewport = async (
     (await page.getByLabel('Studio media stage').getAttribute('data-stage-presentation')) ===
     'playback';
   if (playback) {
-    await settlePage(page);
+    await settleVisualPage(page);
     const png = await page.screenshot({ animations: 'disabled', fullPage: false, scale: 'css' });
     expect(png.byteLength).toBeGreaterThan(100);
     expect(png.readUInt32BE(16)).toBe(viewport.width);
@@ -668,7 +659,7 @@ const captureStableViewport = async (
     }
 
     previous = png;
-    await settlePage(page);
+    await settleVisualPage(page);
   }
 
   throw new Error(`Viewport did not produce two identical frames: ${target}`);
@@ -712,7 +703,7 @@ for (const viewport of VIEWPORTS) {
       });
 
       await scenario.setup(page);
-      await settlePage(page);
+      await settleVisualPage(page);
       await expectActiveStageVideo(page);
       await expectNoDocumentOverflow(page);
       expectNoExternalProviderTraffic(network);

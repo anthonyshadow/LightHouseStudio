@@ -2,6 +2,7 @@ import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { useLayoutEffect, useRef } from 'react';
 import { useNavigate } from 'react-router';
 import { Button } from '../ui/primitives/Button';
+import { visuallyHiddenStyles } from '../ui/primitives/VisuallyHidden';
 import { APP_PATHS } from './paths';
 
 const entryStyles = (theme: Theme): CSSObject => ({
@@ -23,18 +24,6 @@ const entryStyles = (theme: Theme): CSSObject => ({
   '& button': { minHeight: '3rem' },
 });
 
-const visuallyHiddenHeadingStyles = (): CSSObject => ({
-  position: 'absolute',
-  width: '1px',
-  height: '1px',
-  padding: 0,
-  margin: '-1px',
-  overflow: 'hidden',
-  clip: 'rect(0, 0, 0, 0)',
-  whiteSpace: 'nowrap',
-  border: 0,
-});
-
 interface EntryPageProps {
   readonly focusEnterOnMount: boolean;
 }
@@ -52,7 +41,7 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
   return (
     <main css={entryStyles(theme)}>
       <div>
-        <h1 css={visuallyHiddenHeadingStyles()}>Enter Lightframe Studio</h1>
+        <h1 css={visuallyHiddenStyles()}>Enter Lightframe Studio</h1>
         <p>Record or upload a video, then review it and apply optional AI edits.</p>
         <Button
           ref={enterRef}

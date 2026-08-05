@@ -2,6 +2,7 @@ import { lookup as resolveDns } from 'node:dns/promises';
 import type { IncomingMessage } from 'node:http';
 import { request as httpsRequest, type RequestOptions } from 'node:https';
 import { BlockList, isIP, type LookupFunction } from 'node:net';
+import { IMAGE_MIME_TYPES } from '@studio/domain';
 import {
   MAX_PROVIDER_IMAGE_BYTES,
   type ReferenceImageMimeType,
@@ -75,7 +76,7 @@ export interface SafeRemoteImageDownloadPolicy {
 export const SAFE_PROVIDER_IMAGE_DOWNLOAD_POLICY = {
   maxRedirects: 3,
   maxBytes: MAX_PROVIDER_IMAGE_BYTES,
-  acceptedMimeTypes: ['image/jpeg', 'image/png', 'image/webp'],
+  acceptedMimeTypes: IMAGE_MIME_TYPES,
 } as const satisfies SafeRemoteImageDownloadPolicy;
 
 export interface RemoteImageDownloadErrorOptions {

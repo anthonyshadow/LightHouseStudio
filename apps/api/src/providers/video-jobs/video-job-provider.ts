@@ -4,6 +4,7 @@ import type {
   VideoTransformOperationId,
   VideoTransformRecipe,
 } from '@studio/contracts';
+import type { ImageMimeType } from '@studio/domain';
 
 export type VideoJobProviderStatus = 'pending' | 'processing' | 'completed' | 'failed';
 export type VideoJobOutputResolution = VideoOutputResolution;
@@ -21,6 +22,17 @@ export type VideoJobProviderFailureReason =
   | 'invalid-response'
   | 'result-too-large'
   | 'upstream';
+
+export const videoJobFailureReasonForHttpStatus = (
+  status: number,
+): VideoJobProviderFailureReason => {
+  if (status === 401) return 'authentication';
+  if (status === 402) return 'billing';
+  if (status === 403) return 'policy';
+  if (status === 429) return 'quota';
+  if (status === 400 || status === 409 || status === 415 || status === 422) return 'rejected';
+  return 'upstream';
+};
 
 export class VideoJobProviderError extends Error {
   readonly reason: VideoJobProviderFailureReason;
@@ -45,7 +57,7 @@ export interface ExistingVideoJobProvider {
     readonly videoPath: string;
     readonly videoMimeType: VideoInputMimeType;
     readonly referenceImagePath: string | null;
-    readonly referenceImageMimeType: 'image/jpeg' | 'image/png' | 'image/webp' | null;
+    readonly referenceImageMimeType: ImageMimeType | null;
     readonly outputResolution: VideoJobOutputResolution;
     readonly signal: AbortSignal;
   }): Promise<{

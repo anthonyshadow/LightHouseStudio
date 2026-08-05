@@ -1,9 +1,10 @@
 import type { CharacterPromptOptimizationResult, ReferenceImageSize } from '@studio/contracts';
+import type { ImageMimeType } from '@studio/domain';
 import { decodeCanonicalBase64 } from '../../application/strict-base64.js';
 
 export type ReferenceImageProviderId = 'openai' | 'bfl' | 'wiro';
 export type ReferenceImageProviderErrorId = ReferenceImageProviderId | 'pruna';
-export type ReferenceImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
+export type ReferenceImageMimeType = ImageMimeType;
 export type ReferenceImageProviderStage = 'submission' | 'polling' | 'download';
 
 export interface ReferenceImageProviderDescriptor {

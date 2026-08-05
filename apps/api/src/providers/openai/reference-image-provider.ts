@@ -1,6 +1,7 @@
 import OpenAI, { toFile, type Uploadable } from 'openai';
 import type { ImagesResponse } from 'openai/resources/images';
 import { REFERENCE_IMAGE_MODEL_ID, REFERENCE_IMAGE_QUALITY } from '@studio/contracts';
+import { imageFileExtension } from '@studio/domain';
 import {
   decodeProviderBase64,
   mimeTypeForReferenceImageFormat,
@@ -95,14 +96,6 @@ const normalizeOpenAIError = (error: unknown): ReferenceImageProviderError => {
 
 const defaultClientFactory: OpenAIClientFactory = (options) => new OpenAI(options);
 
-const extensionForMimeType = (
-  mimeType: EditReferenceImageProviderInput['source']['mimeType'],
-): string => {
-  if (mimeType === 'image/png') return 'png';
-  if (mimeType === 'image/webp') return 'webp';
-  return 'jpg';
-};
-
 const imagePayload = (
   response: ImagesResponse,
   format: GenerateReferenceImageProviderInput['format'],
@@ -194,7 +187,7 @@ export class OpenAIReferenceImageProvider implements ReferenceImageProvider {
       if (edit === undefined) throw new ReferenceImageProviderError('configuration');
       const source = await toFile(
         input.source.bytes,
-        `reference.${extensionForMimeType(input.source.mimeType)}`,
+        `reference.${imageFileExtension(input.source.mimeType)}`,
         { type: input.source.mimeType },
       );
       const request = {

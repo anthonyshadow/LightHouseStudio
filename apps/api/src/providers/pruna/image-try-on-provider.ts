@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PRUNA_IMAGE_TRY_ON_MODEL, REFERENCE_IMAGE_UPLOAD_MAX_BYTES } from '@studio/contracts';
+import { imageFileExtension } from '@studio/domain';
 import {
   type ReferenceImageMimeType,
   ReferenceImageProviderError,
@@ -96,12 +97,6 @@ const trustedProviderUrl = (candidate: string, pathPrefix: string): URL => {
   return parsed;
 };
 
-const extensionForMimeType = (mimeType: ReferenceImageMimeType): string => {
-  if (mimeType === 'image/png') return 'png';
-  if (mimeType === 'image/webp') return 'webp';
-  return 'jpg';
-};
-
 const readLimitedJson = (response: Response): Promise<unknown> =>
   readBoundedJson(response, (options) => providerError('invalid-response', options));
 
@@ -150,7 +145,7 @@ export class PrunaImageTryOnProvider implements OutfitTryOnProvider {
     body.append(
       'content',
       new Blob([bytes.buffer], { type: image.mimeType }),
-      `wardrobe-${role}.${extensionForMimeType(image.mimeType)}`,
+      `wardrobe-${role}.${imageFileExtension(image.mimeType)}`,
     );
     const response = await this.#fetch(`${PRUNA_API_ORIGIN}${PRUNA_FILES_PATH}`, {
       method: 'POST',

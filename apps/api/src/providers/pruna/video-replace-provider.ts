@@ -4,6 +4,7 @@ import { once } from 'node:events';
 import { finished } from 'node:stream/promises';
 import { z } from 'zod';
 import { VIDEO_RESULT_MAX_BYTES } from '@studio/contracts';
+import { imageFileExtension, type ImageMimeType } from '@studio/domain';
 import { PRUNA_VIDEO_REPLACE_MODEL } from '../../config/environment.js';
 import { readBoundedJson } from '../transport/bounded-provider-transport.js';
 import {
@@ -11,6 +12,7 @@ import {
   VideoJobProviderError,
   type VideoJobProviderFailureReason,
   type VideoJobProviderStatus,
+  videoJobFailureReasonForHttpStatus,
 } from '../video-jobs/video-job-provider.js';
 
 const PRUNA_API_ORIGIN = 'https://api.pruna.ai' as const;
@@ -42,15 +44,6 @@ const statusResponseSchema = z
     error: z.string().max(2_000).nullish(),
   })
   .passthrough();
-
-const reasonForStatus = (status: number): VideoJobProviderFailureReason => {
-  if (status === 401) return 'authentication';
-  if (status === 402) return 'billing';
-  if (status === 403) return 'policy';
-  if (status === 429) return 'quota';
-  if (status === 400 || status === 409 || status === 415 || status === 422) return 'rejected';
-  return 'upstream';
-};
 
 const warnForUpstreamHttpFailure = (status: number): void => {
   console.warn('[pruna-video-replace] Upstream HTTP request failed.', { status });
@@ -154,7 +147,10 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
       const response = await this.#fetch(url, { ...init, signal: request.signal });
       if (!response.ok) {
         warnForUpstreamHttpFailure(response.status);
-        throw new VideoJobProviderError(reasonForStatus(response.status), response.status);
+        throw new VideoJobProviderError(
+          videoJobFailureReasonForHttpStatus(response.status),
+          response.status,
+        );
       }
       return await readBoundedJson(
         response,
@@ -172,7 +168,7 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
 
   async #upload(
     filePath: string,
-    mimeType: 'video/mp4' | 'image/jpeg' | 'image/png' | 'image/webp',
+    mimeType: 'video/mp4' | ImageMimeType,
     fileName: string,
     signal: AbortSignal,
   ): Promise<string> {
@@ -207,16 +203,10 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
       'character-swap-source.mp4',
       input.signal,
     );
-    const referenceExtension =
-      input.referenceImageMimeType === 'image/png'
-        ? 'png'
-        : input.referenceImageMimeType === 'image/webp'
-          ? 'webp'
-          : 'jpg';
     const referenceUrl = await this.#upload(
       input.referenceImagePath,
       input.referenceImageMimeType,
-      `character-swap-reference.${referenceExtension}`,
+      `character-swap-reference.${imageFileExtension(input.referenceImageMimeType)}`,
       input.signal,
     );
     const payload = await this.#json(
@@ -313,7 +303,10 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
       });
       if (!response.ok) {
         warnForUpstreamHttpFailure(response.status);
-        throw new VideoJobProviderError(reasonForStatus(response.status), response.status);
+        throw new VideoJobProviderError(
+          videoJobFailureReasonForHttpStatus(response.status),
+          response.status,
+        );
       }
       if (!response.body) throw new VideoJobProviderError('invalid-response', response.status);
       if (response.headers.get('content-type')?.split(';', 1)[0]?.trim() !== 'video/mp4') {

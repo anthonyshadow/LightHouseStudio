@@ -1,6 +1,7 @@
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
+import { referenceImageMimeTypeSchema } from '@studio/contracts';
 import Fastify, { LogController, type FastifyInstance } from 'fastify';
 import type { RuntimeConfig } from './config/environment.js';
 import { registerRealtimeRoutes } from './features/realtime/routes.js';
@@ -52,11 +53,7 @@ import {
 } from './providers/pruna/image-try-on-provider.js';
 
 export const OPENAI_CONNECTION_TIMEOUT_MARGIN_MS = 100_000;
-export const SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES = [
-  'image/jpeg',
-  'image/png',
-  'image/webp',
-] as const;
+export const SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES = referenceImageMimeTypeSchema.options;
 
 export interface AppDependencies {
   readonly config: RuntimeConfig;

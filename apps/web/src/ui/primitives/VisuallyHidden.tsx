@@ -1,7 +1,7 @@
 import type { CSSObject } from '@emotion/react';
 import type { PropsWithChildren } from 'react';
 
-const visuallyHiddenStyles = (): CSSObject => ({
+export const visuallyHiddenStyles = (): CSSObject => ({
   position: 'absolute',
   width: '1px',
   height: '1px',

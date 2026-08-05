@@ -1,10 +1,48 @@
 # Maintainability audit
 
-**Current as of:** 2026-08-02
+**Current as of:** 2026-08-05
 
 This document records the repository-wide behavior-preserving cleanup and the placement rules that
 follow from it. Product behavior remains defined by [Architecture](ARCHITECTURE.md), the
 [product state](product-state.md), and the [user stories](userStories/README.md).
+
+## 2026-08-05 simplification pass
+
+A repository-wide exact-body audit covered 312 production files and 488 source-and-test files.
+It found seven production clone groups and eight groups in the wider test-aware scan. The
+behavior-preserving cleanup:
+
+- makes the domain image MIME type and filename-extension mapping canonical, then reuses the
+  contract-owned MIME schema at API validation boundaries;
+- shares provider-independent video-job HTTP failure classification while leaving each
+  provider's request, polling, download, and safe-error behavior in its adapter;
+- reuses the video editor's time formatter and exact visually-hidden styling;
+- removes repeated option-grid, option-button, and prompt-issue rendering inside their owning
+  components; and
+- reuses identical test capability setup, Recipe Dock actions, and visual-page settling helpers.
+
+The production exact-clone count fell from seven groups to one. The remaining two-line timestamp
+fallback stays local because its consumers belong to IndexedDB draft persistence and localStorage
+asset persistence with different transaction models. Independent expected-data builders,
+repository fakes, and small deferred-promise fixtures also stay local so tests do not share the
+implementation or accidentally become tautological.
+
+No public route, HTTP payload, persisted schema, provider choice or fallback, recording behavior,
+rendered DOM, CSS selector, media ownership, or cleanup lifecycle changed.
+
+### 2026-08-05 validation
+
+- `pnpm quality` passed: application and Storybook types, ESLint, Prettier, Knip, a 497-file /
+  1,491-edge module graph with zero cycles, 132 Vitest files and 1,063 tests, all builds, and static
+  Storybook.
+- `pnpm test:coverage` passed with 81.49% statements, 73.47% branches, 83.05% functions, and 84.11%
+  lines. The focused responsive/accessibility and local-first Playwright specs passed 11/11.
+- `pnpm test:visual` passed 25/29. A clean checkout of the pre-refactor commit reproduced the same
+  four pixel diffs with the same counts, confirming pre-existing stale baselines for Character
+  Builder, take review, upload chooser, and upload processing. No baseline was regenerated.
+
+No live or paid provider call, physical-device check, assistive-technology pass, or moderated-pilot
+evidence collection was performed.
 
 ## 2026-08-02 follow-up audit
 

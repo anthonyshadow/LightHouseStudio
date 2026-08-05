@@ -1,10 +1,11 @@
 import { createHmac, randomInt } from 'node:crypto';
 import { z } from 'zod';
+import { referenceImageMimeTypeSchema } from '@studio/contracts';
+import { imageFileExtension } from '@studio/domain';
 import {
   type EditReferenceImageProviderInput,
   type GenerateReferenceImageProviderInput,
   type GeneratedReferenceImagePayload,
-  type ReferenceImageMimeType,
   type ReferenceImageProvider,
   ReferenceImageProviderError,
 } from '../reference-images/reference-image-provider.js';
@@ -40,7 +41,7 @@ const submitResponseSchema = z.object({
 
 const outputSchema = z.object({
   name: z.string().max(1_000).optional(),
-  contenttype: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  contenttype: referenceImageMimeTypeSchema,
   size: z.string().regex(/^\d+$/u).optional(),
   url: z.url(),
 });
@@ -176,12 +177,6 @@ const aspectRatioForSize = (
   }
 };
 
-const extensionForMimeType = (mimeType: ReferenceImageMimeType): string => {
-  if (mimeType === 'image/png') return 'png';
-  if (mimeType === 'image/webp') return 'webp';
-  return 'jpg';
-};
-
 const parseCost = (value: string | null | undefined): number | undefined => {
   if (value === undefined || value === null || !/^\d+(?:\.\d+)?$/u.test(value)) return undefined;
   const cost = Number(value);
@@ -245,7 +240,7 @@ export class WiroSeedreamReferenceImageProvider implements ReferenceImageProvide
     body.append(
       'inputImage',
       new Blob([sourceBytes.buffer], { type: input.source.mimeType }),
-      `reference.${extensionForMimeType(input.source.mimeType)}`,
+      `reference.${imageFileExtension(input.source.mimeType)}`,
     );
     this.#appendParameters(body, input);
     return this.#run(input, body);

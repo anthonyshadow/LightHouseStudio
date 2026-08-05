@@ -11,7 +11,7 @@ import {
 } from '@studio/domain';
 import { Button, StatusNotice } from '../../ui';
 import type { VideoEditSession } from './useVideoEditSession';
-import { isVideoEditBusy, type VideoEditTool } from './types';
+import { formatVideoEditTime, isVideoEditBusy, type VideoEditTool } from './types';
 import {
   editSettingsBodyStyles,
   editSettingsStyles,
@@ -57,12 +57,6 @@ const FILTER_LABELS: Record<VideoEditFilter, string> = {
   fade: 'Fade',
 };
 
-const formatTime = (milliseconds: number): string => {
-  const seconds = Math.max(0, Math.floor(milliseconds / 1_000));
-  const minutes = Math.floor(seconds / 60);
-  return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-};
-
 type EditRangeProps = Readonly<{
   label: string;
   value: number;
@@ -89,7 +83,7 @@ const EditRange = ({
     <label css={rangeFieldStyles(theme)}>
       <span>
         <span>{label}</span>
-        <output>{step >= 10 ? formatTime(value) : value}</output>
+        <output>{step >= 10 ? formatVideoEditTime(value) : value}</output>
       </span>
       <input
         type="range"

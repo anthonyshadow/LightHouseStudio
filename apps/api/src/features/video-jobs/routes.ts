@@ -6,6 +6,7 @@ import {
   REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
   VIDEO_INPUT_MAX_BYTES,
   VTON_VIDEO_INPUT_MAX_BYTES,
+  referenceImageMimeTypeSchema,
   videoJobParamsSchema,
   videoTransformRecipeSchema,
   type VideoTransformRecipe,
@@ -142,7 +143,8 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
             recipe.hasReferenceImage &&
             !referenceReceived
           ) {
-            if (!['image/jpeg', 'image/png', 'image/webp'].includes(part.mimetype)) {
+            const parsedMimeType = referenceImageMimeTypeSchema.safeParse(part.mimetype);
+            if (!parsedMimeType.success) {
               part.file.resume();
               throw new AppError(
                 400,
@@ -151,7 +153,7 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
               );
             }
             referenceReceived = true;
-            referenceMimeType = part.mimetype as ValidReferenceImageMimeType;
+            referenceMimeType = parsedMimeType.data;
             await writePart(part.file, paths.referencePath, REFERENCE_IMAGE_UPLOAD_MAX_BYTES);
             continue;
           }

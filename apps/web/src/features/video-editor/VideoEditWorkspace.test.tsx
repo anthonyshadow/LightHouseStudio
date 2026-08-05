@@ -5,6 +5,7 @@ import { createDefaultVideoEditSpec, type VideoEditSpec } from '@studio/domain';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import type { VideoEditSession } from './useVideoEditSession';
+import { formatVideoEditTime } from './types';
 import { VideoEditWorkspace } from './VideoEditWorkspace';
 
 afterEach(cleanup);
@@ -86,6 +87,11 @@ const renderWorkspace = (session: VideoEditSession, onRequestDiscard = vi.fn()) 
   );
 
 describe('VideoEditWorkspace', () => {
+  it('formats editor time consistently for controls and playback', () => {
+    expect(formatVideoEditTime(-1)).toBe('00:00');
+    expect(formatVideoEditTime(65_999)).toBe('01:05');
+  });
+
   it('operates trim, history, before/after, save, reset, discard, and tool navigation controls', () => {
     const session = createSession();
     const onRequestDiscard = vi.fn();

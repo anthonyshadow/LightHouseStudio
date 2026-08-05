@@ -16,6 +16,12 @@ export type VideoEditSessionPhase =
 export const isVideoEditBusy = (phase: VideoEditSessionPhase): boolean =>
   phase === 'rendering' || phase === 'validating' || phase === 'committing';
 
+export const formatVideoEditTime = (milliseconds: number): string => {
+  const seconds = Math.max(0, Math.floor(milliseconds / 1_000));
+  const minutes = Math.floor(seconds / 60);
+  return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
+};
+
 export type VideoEditSource = Readonly<{
   artifact: RecordingArtifact;
   metadata: UploadedTakeMetadata;

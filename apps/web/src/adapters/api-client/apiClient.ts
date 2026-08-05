@@ -24,6 +24,7 @@ import {
   type DerivedReferenceImageAsset,
   type RealtimeSessionProfile,
 } from '@studio/contracts';
+import { imageFileExtension, isImageMimeType } from '@studio/domain';
 import type { ModelMode, ProviderAvailability } from '../../application/types';
 import { validateReferenceImage } from '../browser-media/imageValidation';
 import { referenceImageContentUrl } from './referenceImageRoutes';
@@ -240,7 +241,7 @@ export const importRemoteReferenceImage = async (
     body: JSON.stringify({ url }),
   });
   const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim();
-  if (!contentType || !['image/jpeg', 'image/png', 'image/webp'].includes(contentType)) {
+  if (!contentType || !isImageMimeType(contentType)) {
     throw new ApiClientError(
       'The imported image response was invalid.',
       502,
@@ -257,11 +258,10 @@ export const importRemoteReferenceImage = async (
   }
   const disposition = response.headers.get('content-disposition');
   const responseName = /filename="([a-zA-Z0-9._-]+)"/u.exec(disposition ?? '')?.[1];
-  const extension =
-    contentType === 'image/png' ? 'png' : contentType === 'image/webp' ? 'webp' : 'jpg';
   return new File(
     [blob],
-    responseName ?? `imported-reference-${crypto.randomUUID().slice(0, 8)}.${extension}`,
+    responseName ??
+      `imported-reference-${crypto.randomUUID().slice(0, 8)}.${imageFileExtension(contentType)}`,
     { type: contentType },
   );
 };
@@ -314,12 +314,6 @@ export type PersistedReferenceImage = {
   contentUrl: string;
 };
 
-const extensionForMime = (mimeType: ReferenceImageAsset['mimeType']): string => {
-  if (mimeType === 'image/png') return 'png';
-  if (mimeType === 'image/webp') return 'webp';
-  return 'jpg';
-};
-
 /** Hydrates and browser-validates an immutable local asset before session state is changed. */
 export const hydrateReferenceImage = async (
   assetId: string,
@@ -367,7 +361,7 @@ export const hydrateReferenceImage = async (
       'invalid_provider_image',
     );
   }
-  const file = new File([blob], `reference-${assetId}.${extensionForMime(metadata.mimeType)}`, {
+  const file = new File([blob], `reference-${assetId}.${imageFileExtension(metadata.mimeType)}`, {
     type: metadata.mimeType,
     lastModified: Date.parse(metadata.createdAt),
   });

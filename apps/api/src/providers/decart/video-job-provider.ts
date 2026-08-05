@@ -10,11 +10,13 @@ import {
   type VideoTransformOperationId,
   type VideoTransformRecipe,
 } from '@studio/contracts';
+import { imageFileExtension, type ImageMimeType } from '@studio/domain';
 import {
   type ExistingVideoJobProvider,
   VideoJobProviderError,
   type VideoJobProviderFailureReason,
   type VideoJobProviderStatus,
+  videoJobFailureReasonForHttpStatus,
 } from '../video-jobs/video-job-provider.js';
 
 export type DecartQueueStatus = VideoJobProviderStatus;
@@ -34,15 +36,6 @@ const jobResponseSchema = z
     status: z.enum(['pending', 'processing', 'completed', 'failed']),
   })
   .passthrough();
-
-const providerReason = (status: number): DecartVideoProviderFailureReason => {
-  if (status === 401) return 'authentication';
-  if (status === 402) return 'billing';
-  if (status === 403) return 'policy';
-  if (status === 429) return 'quota';
-  if (status === 400 || status === 409 || status === 415 || status === 422) return 'rejected';
-  return 'upstream';
-};
 
 const safeRequestSignal = (
   caller: AbortSignal,
@@ -77,7 +70,10 @@ export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
     try {
       const response = await this.#fetch(url, { ...init, signal: request.signal });
       if (!response.ok)
-        throw new DecartVideoProviderError(providerReason(response.status), response.status);
+        throw new DecartVideoProviderError(
+          videoJobFailureReasonForHttpStatus(response.status),
+          response.status,
+        );
       const parsed = jobResponseSchema.safeParse(await response.json());
       if (!parsed.success) throw new DecartVideoProviderError('invalid-response');
       return parsed.data;
@@ -95,7 +91,7 @@ export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
     readonly videoPath: string;
     readonly videoMimeType: VideoInputMimeType;
     readonly referenceImagePath: string | null;
-    readonly referenceImageMimeType: 'image/jpeg' | 'image/png' | 'image/webp' | null;
+    readonly referenceImageMimeType: ImageMimeType | null;
     readonly signal: AbortSignal;
   }): Promise<{ readonly providerJobId: string; readonly status: DecartQueueStatus }> {
     const form = new FormData();
@@ -114,16 +110,10 @@ export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
     form.append('resolution', '720p');
     form.append('enhance_prompt', String(input.recipe.enhancePrompt));
     if (input.referenceImagePath && input.referenceImageMimeType) {
-      const referenceExtension =
-        input.referenceImageMimeType === 'image/png'
-          ? 'png'
-          : input.referenceImageMimeType === 'image/webp'
-            ? 'webp'
-            : 'jpg';
       form.append(
         'reference_image',
         await openAsBlob(input.referenceImagePath, { type: input.referenceImageMimeType }),
-        `reference.${referenceExtension}`,
+        `reference.${imageFileExtension(input.referenceImageMimeType)}`,
       );
     }
     const modelId = input.operation === 'character-swap' ? 'lucy-latest' : 'lucy-vton-latest';
@@ -165,7 +155,10 @@ export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
         { headers: { 'X-API-KEY': this.#apiKey }, signal: request.signal },
       );
       if (!response.ok || !response.body) {
-        throw new DecartVideoProviderError(providerReason(response.status), response.status);
+        throw new DecartVideoProviderError(
+          videoJobFailureReasonForHttpStatus(response.status),
+          response.status,
+        );
       }
       const declaredSize = Number(response.headers.get('content-length'));
       if (Number.isFinite(declaredSize) && declaredSize > VIDEO_RESULT_MAX_BYTES) {

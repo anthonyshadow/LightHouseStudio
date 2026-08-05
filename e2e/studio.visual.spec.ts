@@ -13,6 +13,7 @@ import {
   installSuccessfulStudioHarness,
   openRecipeDockWhenOverlaid,
   openCharacterOptions,
+  settleVisualPage,
   startLocalPreview,
   type NetworkJourneyState,
 } from './support/studioHarness';
@@ -81,16 +82,6 @@ type VisualCase = {
   viewport: (typeof VISUAL_CASE_MATRIX)[number]['viewport'];
   scenario: VisualScenario;
   baseline: string;
-};
-
-const settlePage = async (page: Page): Promise<void> => {
-  await page.evaluate(async () => {
-    await document.fonts.ready;
-    await new Promise<void>((resolve) => {
-      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
-    });
-    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
-  });
 };
 
 const expectStandardStudioLayout = async (
@@ -622,7 +613,7 @@ test.describe('curated Studio visual regression', () => {
       await page.setViewportSize({ width: viewport.width, height: viewport.height });
       const network = await prepareVisualPage(page, scenario.id === 'entry-initial');
       await scenario.setup(page);
-      await settlePage(page);
+      await settleVisualPage(page);
       await stabilizeActiveStageVideo(page);
       await expect(page.getByText('Loading studio tool…', { exact: true })).toHaveCount(0);
       await expectNoDocumentOverflow(page);

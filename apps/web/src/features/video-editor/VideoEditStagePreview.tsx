@@ -7,7 +7,7 @@ import {
 } from '@studio/domain';
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { Button } from '../../ui';
-import type { VideoEditStagePreviewContract } from './types';
+import { formatVideoEditTime, type VideoEditStagePreviewContract } from './types';
 import { createVideoEditFrameRenderer } from './videoEditShader';
 import {
   canvasFrameStyles,
@@ -22,12 +22,6 @@ type Props = Readonly<{
   videoRef: RefObject<HTMLVideoElement | null>;
   contract: VideoEditStagePreviewContract;
 }>;
-
-const formatTime = (milliseconds: number): string => {
-  const seconds = Math.max(0, Math.floor(milliseconds / 1_000));
-  const minutes = Math.floor(seconds / 60);
-  return `${String(minutes).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`;
-};
 
 type CropEdge = 'move' | 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
 type CropState = VideoEditStagePreviewContract['spec']['crop'];
@@ -334,8 +328,8 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
         </Button>
         <label>
           <span>
-            <span>{formatTime(contract.playheadMs)}</span>
-            <span>{formatTime(contract.spec.trim.endMs)}</span>
+            <span>{formatVideoEditTime(contract.playheadMs)}</span>
+            <span>{formatVideoEditTime(contract.spec.trim.endMs)}</span>
           </span>
           <input
             type="range"

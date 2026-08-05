@@ -14,12 +14,14 @@ import {
   REFERENCE_IMAGE_QUALITY,
   REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
   REFERENCE_IMAGE_UPLOAD_MAX_PIXELS,
+  referenceImageMimeTypeSchema,
   referenceImageSizeSchema,
   type CharacterPromptOptimizationResult,
   type CharacterReferenceGenerator,
   type CharacterReferenceOptions,
   type ReferenceImageSize,
 } from '@studio/contracts';
+import { imageFileExtension } from '@studio/domain';
 import type { ValidReferenceImageMimeType } from './image-validation.js';
 
 export const REFERENCE_IMAGE_LAYOUT_VERSION = 1;
@@ -67,7 +69,7 @@ const storedMetadataCommonShape = {
   assetId: z.uuid(),
   localOwnerId: z.string().regex(/^[a-f0-9]{64}$/u),
   storageKey: z.string().min(1),
-  mimeType: z.enum(['image/jpeg', 'image/png', 'image/webp']),
+  mimeType: referenceImageMimeTypeSchema,
   requestId: z.uuid(),
   requestFingerprint: z
     .string()
@@ -332,14 +334,7 @@ export const parseReferenceImageAssetId = (assetId: string): string | null => {
 };
 
 export const referenceImageContentExtension = (mimeType: ValidReferenceImageMimeType): string => {
-  switch (mimeType) {
-    case 'image/jpeg':
-      return 'jpg';
-    case 'image/png':
-      return 'png';
-    case 'image/webp':
-      return 'webp';
-  }
+  return imageFileExtension(mimeType);
 };
 
 export const referenceImageContentFilename = (mimeType: ValidReferenceImageMimeType): string =>

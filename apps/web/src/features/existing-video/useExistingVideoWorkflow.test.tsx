@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { act, renderHook, waitFor } from '@testing-library/react';
+import type { CapabilitiesResponse } from '@studio/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
 import type { RecordingArtifact, RecordingController } from '../recording/types';
@@ -35,6 +36,25 @@ vi.mock('../../adapters/media-processing/transcodeRecording', () => ({
 }));
 
 import { savedCharacterStepInput, useExistingVideoWorkflow } from './useExistingVideoWorkflow';
+
+const requiredCharacterSwapCapabilities = {
+  characterSwap: {
+    available: true,
+    inputPreparation: 'h264-mp4',
+    referencePolicy: 'required',
+    promptEnhancement: false,
+    terminalFailureRelease: 'explicit-user',
+    outputResolutions: ['720p', '1080p'],
+  },
+  virtualTryOn: {
+    available: true,
+    inputPreparation: 'none',
+    referencePolicy: 'optional',
+    promptEnhancement: true,
+    terminalFailureRelease: 'automatic',
+    outputResolutions: ['720p'],
+  },
+} satisfies CapabilitiesResponse['videoProcessing'];
 
 const artifact = (id: string, media: Blob): RecordingArtifact => ({
   id,
@@ -380,24 +400,7 @@ describe('useExistingVideoWorkflow', () => {
         recording,
         processing: processingController(),
         publishUploadedVideo,
-        videoProcessingCapabilities: {
-          characterSwap: {
-            available: true,
-            inputPreparation: 'h264-mp4',
-            referencePolicy: 'required',
-            promptEnhancement: false,
-            terminalFailureRelease: 'explicit-user',
-            outputResolutions: ['720p', '1080p'],
-          },
-          virtualTryOn: {
-            available: true,
-            inputPreparation: 'none',
-            referencePolicy: 'optional',
-            promptEnhancement: true,
-            terminalFailureRelease: 'automatic',
-            outputResolutions: ['720p'],
-          },
-        },
+        videoProcessingCapabilities: requiredCharacterSwapCapabilities,
       }),
     );
 
@@ -438,24 +441,7 @@ describe('useExistingVideoWorkflow', () => {
         recording,
         processing: processingController(),
         publishUploadedVideo: vi.fn(),
-        videoProcessingCapabilities: {
-          characterSwap: {
-            available: true,
-            inputPreparation: 'h264-mp4',
-            referencePolicy: 'required',
-            promptEnhancement: false,
-            terminalFailureRelease: 'explicit-user',
-            outputResolutions: ['720p', '1080p'],
-          },
-          virtualTryOn: {
-            available: true,
-            inputPreparation: 'none',
-            referencePolicy: 'optional',
-            promptEnhancement: true,
-            terminalFailureRelease: 'automatic',
-            outputResolutions: ['720p'],
-          },
-        },
+        videoProcessingCapabilities: requiredCharacterSwapCapabilities,
       }),
     );
 
@@ -1065,24 +1051,7 @@ describe('useExistingVideoWorkflow', () => {
         recording,
         processing: processingController(),
         publishUploadedVideo: vi.fn(),
-        videoProcessingCapabilities: {
-          characterSwap: {
-            available: true,
-            inputPreparation: 'h264-mp4',
-            referencePolicy: 'required',
-            promptEnhancement: false,
-            terminalFailureRelease: 'explicit-user',
-            outputResolutions: ['720p', '1080p'],
-          },
-          virtualTryOn: {
-            available: true,
-            inputPreparation: 'none',
-            referencePolicy: 'optional',
-            promptEnhancement: true,
-            terminalFailureRelease: 'automatic',
-            outputResolutions: ['720p'],
-          },
-        },
+        videoProcessingCapabilities: requiredCharacterSwapCapabilities,
       }),
     );
 

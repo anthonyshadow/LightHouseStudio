@@ -11,6 +11,7 @@ import {
   type VideoTransformOperationId,
   type VideoTransformRecipe,
 } from '@studio/contracts';
+import type { ImageMimeType } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
 import {
   type ExistingVideoJobProvider,
@@ -51,7 +52,7 @@ type VideoJobRecord = {
   readonly directory: string;
   readonly inputPath: string;
   readonly referencePath: string | null;
-  readonly referenceMimeType: 'image/jpeg' | 'image/png' | 'image/webp' | null;
+  readonly referenceMimeType: ImageMimeType | null;
   readonly outputPath: string;
   sourceDurationMs: number | null;
   sourceOrientation: 'landscape' | 'portrait' | null;
@@ -359,7 +360,7 @@ export class VideoJobService {
     readonly directory: string;
     readonly inputPath: string;
     readonly referencePath: string | null;
-    readonly referenceMimeType: 'image/jpeg' | 'image/png' | 'image/webp' | null;
+    readonly referenceMimeType: ImageMimeType | null;
   }): Promise<VideoJobStatusResponse> {
     await this.#expireDueJobs();
     const duplicate = this.#jobs.get(input.jobId);

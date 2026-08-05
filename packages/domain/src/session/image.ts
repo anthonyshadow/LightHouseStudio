@@ -45,6 +45,17 @@ export interface ImageQualityWarning {
 export const isImageMimeType = (value: string): value is ImageMimeType =>
   IMAGE_MIME_TYPES.some((type) => type === value);
 
+export const imageFileExtension = (mimeType: ImageMimeType): 'jpg' | 'png' | 'webp' => {
+  switch (mimeType) {
+    case 'image/jpeg':
+      return 'jpg';
+    case 'image/png':
+      return 'png';
+    case 'image/webp':
+      return 'webp';
+  }
+};
+
 export const validateImageDescriptor = (
   image: ImageDescriptorCandidate,
 ): readonly ImageValidationIssue[] => {

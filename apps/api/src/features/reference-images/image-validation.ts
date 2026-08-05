@@ -4,6 +4,7 @@ import {
   REFERENCE_IMAGE_UPLOAD_MAX_PIXELS,
   type ReferenceImageSize,
 } from '@studio/contracts';
+import type { ImageMimeType } from '@studio/domain';
 import sharp from 'sharp';
 import {
   dimensionsForReferenceImageSize,
@@ -12,7 +13,7 @@ import {
 
 const MAX_EDGE_LENGTH = 1536;
 
-export type ValidReferenceImageMimeType = 'image/jpeg' | 'image/png' | 'image/webp';
+export type ValidReferenceImageMimeType = ImageMimeType;
 
 export interface ValidatedReferenceImage {
   readonly bytes: Buffer;

@@ -34,6 +34,7 @@ export {
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   openRecipeDockWhenOverlaid,
+  settleVisualPage,
   startCharacterAi,
   startLocalPreview,
   startVirtualTryOnAi,

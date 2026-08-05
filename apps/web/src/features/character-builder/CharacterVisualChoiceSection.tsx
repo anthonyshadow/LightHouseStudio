@@ -102,6 +102,27 @@ export const CharacterVisualChoiceSection = ({
     onChange(choice?.optionId === option.id ? null : { optionId: option.id });
     setCustomOpen(false);
   };
+  const choicesGridStyles = [
+    optionGridStyles(theme),
+    category === 'adultAge'
+      ? {
+          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
+          '@media (max-width: 32rem)': {
+            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+          },
+        }
+      : {},
+  ];
+  const renderOption = (option: VisualCatalogOption) => (
+    <CharacterOptionButton
+      key={option.id}
+      option={option}
+      profile={profile}
+      selected={choice?.optionId === option.id}
+      disabled={disabled}
+      onSelect={() => select(option)}
+    />
+  );
 
   return (
     <section
@@ -130,59 +151,13 @@ export const CharacterVisualChoiceSection = ({
             grouped[group].length ? (
               <section key={group} aria-label={`${group} ${title} options`}>
                 <p>{group === 'shared' ? 'Shared for every presentation' : group}</p>
-                <div
-                  css={[
-                    optionGridStyles(theme),
-                    category === 'adultAge'
-                      ? {
-                          gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                          '@media (max-width: 32rem)': {
-                            gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                          },
-                        }
-                      : {},
-                  ]}
-                >
-                  {grouped[group].map((option) => (
-                    <CharacterOptionButton
-                      key={option.id}
-                      option={option}
-                      profile={profile}
-                      selected={choice?.optionId === option.id}
-                      disabled={disabled}
-                      onSelect={() => select(option)}
-                    />
-                  ))}
-                </div>
+                <div css={choicesGridStyles}>{grouped[group].map(renderOption)}</div>
               </section>
             ) : null,
           )}
         </div>
       ) : (
-        <div
-          css={[
-            optionGridStyles(theme),
-            category === 'adultAge'
-              ? {
-                  gridTemplateColumns: 'repeat(4, minmax(0, 1fr))',
-                  '@media (max-width: 32rem)': {
-                    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
-                  },
-                }
-              : {},
-          ]}
-        >
-          {visible.suggested.map((option) => (
-            <CharacterOptionButton
-              key={option.id}
-              option={option}
-              profile={profile}
-              selected={choice?.optionId === option.id}
-              disabled={disabled}
-              onSelect={() => select(option)}
-            />
-          ))}
-        </div>
+        <div css={choicesGridStyles}>{visible.suggested.map(renderOption)}</div>
       )}
       {!fixed ? (
         <div css={choiceActionsStyles(theme)}>

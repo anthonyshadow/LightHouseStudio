@@ -1,7 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
-import { openCharacterOptions } from './support/studioHarness';
+import { openCharacterOptions, openRecipeDockWhenOverlaid } from './support/studioHarness';
 
 type MockStudioState = {
   apiRequests: string[];
@@ -158,13 +158,6 @@ const expectNoDocumentOverflow = async (page: Page) => {
 
   expect(dimensions.clientWidth).toBeLessThanOrEqual(dimensions.viewportWidth + 1);
   expect(dimensions.clientHeight).toBeLessThanOrEqual(dimensions.viewportHeight + 1);
-};
-
-const openRecipeDockWhenOverlaid = async (page: Page) => {
-  const launcher = page.getByRole('button', { name: 'Dock' });
-  await expect(launcher).toBeVisible();
-  await launcher.click();
-  await expect(page.getByRole('dialog', { name: 'Recipe Dock' })).toBeVisible();
 };
 
 const expectNoAxeViolations = async (page: Page) => {

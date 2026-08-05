@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test } from '@playwright/test';
 import {
   apiErrorResponseSchema,
   VIDEO_PROVIDER_INTENT_HEADER,
@@ -6,13 +6,7 @@ import {
   VOICE_PROVIDER_INTENT_HEADER,
   VOICE_PROVIDER_INTENT_VALUE,
 } from '@studio/contracts';
-
-const openRecipeDockWhenOverlaid = async (page: Page) => {
-  const launcher = page.getByRole('button', { name: 'Dock' });
-  await expect(launcher).toBeVisible();
-  await launcher.click();
-  await expect(page.getByRole('dialog', { name: 'Recipe Dock' })).toBeVisible();
-};
+import { openRecipeDockWhenOverlaid } from './support/studioHarness';
 
 test.beforeEach(async ({ page }) => {
   await page.addInitScript(() => {

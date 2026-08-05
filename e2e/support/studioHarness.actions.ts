@@ -22,6 +22,16 @@ export const expectNoDocumentOverflow = async (page: Page): Promise<void> => {
   expect(dimensions.bodyHeight).toBeLessThanOrEqual(dimensions.height + 1);
 };
 
+export const settleVisualPage = async (page: Page): Promise<void> => {
+  await page.evaluate(async () => {
+    await document.fonts.ready;
+    await new Promise<void>((resolve) => {
+      window.requestAnimationFrame(() => window.requestAnimationFrame(() => resolve()));
+    });
+    if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
+  });
+};
+
 export const openRecipeDockWhenOverlaid = async (page: Page): Promise<void> => {
   const launcher = page.getByRole('button', { name: 'Dock' });
   await expect(launcher).toBeVisible();
