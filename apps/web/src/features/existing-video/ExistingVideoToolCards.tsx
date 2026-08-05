@@ -43,6 +43,7 @@ export interface ExistingVideoToolCardsProps {
   readonly locked: boolean;
   readonly characterSwapAvailable?: boolean;
   readonly virtualTryOnAvailable?: boolean;
+  readonly onAdjust?: () => void;
   readonly onSelect: (tool: ExistingVideoToolId, trigger: HTMLButtonElement) => void;
 }
 
@@ -52,6 +53,7 @@ export const ExistingVideoToolCards = ({
   locked,
   characterSwapAvailable = true,
   virtualTryOnAvailable = true,
+  onAdjust,
   onSelect,
 }: ExistingVideoToolCardsProps) => {
   const theme = useTheme();
@@ -62,8 +64,10 @@ export const ExistingVideoToolCards = ({
   const renderTool = (tool: ToolDefinition) => {
     const unavailable =
       (tool.id === 'voice' && !workflow.voiceAvailable) ||
-      (tool.id === 'character' && !characterSwapAvailable) ||
-      (tool.id === 'vton' && !virtualTryOnAvailable);
+      (tool.id === 'character' &&
+        (!characterSwapAvailable || !workflow.visualProviderCompatibility.compatible)) ||
+      (tool.id === 'vton' &&
+        (!virtualTryOnAvailable || !workflow.visualProviderCompatibility.compatible));
     const selected =
       tool.id === 'voice'
         ? activeTool === 'voice' || workflow.voiceSelection !== null
@@ -74,7 +78,10 @@ export const ExistingVideoToolCards = ({
     const description = unavailable
       ? tool.id === 'voice'
         ? 'The source has no usable audio.'
-        : 'This visual operation is unavailable in the current server configuration.'
+        : !workflow.visualProviderCompatibility.compatible
+          ? (workflow.visualProviderCompatibility.reason ??
+            'This aspect ratio is unavailable for visual AI.')
+          : 'This visual operation is unavailable in the current server configuration.'
       : tool.id !== 'voice' &&
           configuredVisualTool &&
           configuredVisualTool !== tool.id &&
@@ -106,6 +113,28 @@ export const ExistingVideoToolCards = ({
 
   return (
     <div css={toolGroupsStyles(theme)} aria-label="Editing tools">
+      {onAdjust ? (
+        <section css={toolGroupStyles(theme, 1)} aria-labelledby="existing-video-local-tools-label">
+          <p id="existing-video-local-tools-label">
+            <strong>Local edit</strong> · No provider
+          </p>
+          <div>
+            <button
+              type="button"
+              css={toolCardStyles(theme, false, false)}
+              aria-label="Adjust video"
+              disabled={locked}
+              onClick={onAdjust}
+            >
+              <span>
+                <strong>Adjust video</strong>
+                <small>Trim, crop, rotate, relight, or filter on this device.</small>
+              </span>
+              <span css={toolStatusStyles(theme, false)}>Local</span>
+            </button>
+          </div>
+        </section>
+      ) : null}
       <section css={toolGroupStyles(theme, 2)} aria-labelledby="existing-video-visual-tools-label">
         <p id="existing-video-visual-tools-label">
           <strong>Visual edit</strong> · Choose one

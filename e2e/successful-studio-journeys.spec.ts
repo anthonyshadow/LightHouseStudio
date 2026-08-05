@@ -212,7 +212,7 @@ for (const viewport of exactViewports) {
     await expect(page.getByRole('dialog', { name: 'Voice Treatments' })).toBeVisible();
     const voiceScroll = await expectInternalScrollOwnership(
       page,
-      '[data-scroll-region="take-review"]',
+      '[data-scroll-region="voice-treatments"]',
     );
     expect(voiceScroll.scrollHeight).toBeGreaterThanOrEqual(voiceScroll.clientHeight);
     await expectNoAxeViolations(page);
@@ -287,7 +287,9 @@ test('@cross-browser focused media smoke reaches record, Voice, and review recov
     .getByRole('button', { name: 'Voice' })
     .click();
   await expect(page.getByRole('dialog', { name: 'Voice Treatments' })).toBeVisible();
-  await expect(page.getByText('Take review → Voice treatments')).toBeVisible();
+  await expect(
+    page.getByText('Every treatment starts from the immutable original audio sidecar.'),
+  ).toBeVisible();
   await page.getByRole('button', { name: 'Back to take review' }).click();
   await page
     .getByRole('dialog', { name: 'Latest Take' })
@@ -341,10 +343,7 @@ test('@touch controls recover while recording Stop remains reachable', async ({
   await stopRecording.click();
 
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
-  await expect(controls).toHaveAttribute('data-control-visibility', 'hidden', {
-    timeout: STAGE_CONTROLS_IDLE_TIMEOUT_MS + 2_000,
-  });
-  await mediaStage.tap({ position: { x: 24, y: 96 } });
+  // Focus remains within the stage after Stop, so the replacement review actions must stay visible.
   await expect(controls).toHaveAttribute('data-control-visibility', 'visible');
   const dismissPlaybackError = page.getByRole('button', { name: 'Dismiss Playback unavailable' });
   if (await dismissPlaybackError.isVisible()) await dismissPlaybackError.click();
@@ -798,7 +797,7 @@ test('a Lucy model take finalizes before the provider session is released', asyn
     page
       .getByRole('dialog', { name: 'Recipe Dock' })
       .getByText(
-        'Download and release or discard the recorded take before starting or changing media.',
+        'Download and release or discard the temporary take before starting or changing media.',
         { exact: true },
       ),
   ).toBeVisible();
@@ -927,6 +926,9 @@ test('switches to a browser-exposed phone camera while Capture Settings stays op
     });
   });
   await startLocalPreview(page);
+  await page.evaluate(() => {
+    navigator.mediaDevices.dispatchEvent(new Event('devicechange'));
+  });
 
   const inlineSettings = page.locator('[data-desktop-capture-settings]');
   if ((await inlineSettings.count()) === 0) {
@@ -938,8 +940,10 @@ test('switches to a browser-exposed phone camera while Capture Settings stays op
       : page.getByRole('dialog', { name: 'Capture Settings' });
   const cameraSelector = settingsSurface.getByLabel('Camera', { exact: true });
   await expect(settingsSurface).toBeVisible();
-  await expect(cameraSelector).toContainText('Creator’s iPhone Camera');
-  await cameraSelector.selectOption('phone-camera');
+  await cameraSelector.click();
+  const cameraOptions = page.getByRole('listbox', { name: 'Camera' });
+  await expect(cameraOptions).toContainText('Creator’s iPhone Camera');
+  await cameraOptions.getByRole('option', { name: 'Creator’s iPhone Camera' }).click();
 
   await expect(settingsSurface).toBeVisible();
   await expect(page.getByLabel('Live local camera preview')).toBeVisible();

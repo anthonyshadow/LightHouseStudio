@@ -29,7 +29,14 @@ then edit either base, download, start over, or discard.
    finalization. After a healthy finalization, Studio validates and adopts the normalized
    recording as the source, then opens the editor. The inline player is not mounted during live
    preview, recording, or finalization.
-5. The creator may use confirmed **Replace source video** or **Discard source video**, then choose
+5. The creator may choose provider-free **Adjust video** for the artifact currently displayed.
+   Studio closes the panel and replaces its ordinary tool/capture regions with the local editing
+   workspace around the same persistent stage and video node. Trim, crop, 90° rotation, flips,
+   lighting, filters, Before, reset, and grouped undo/redo remain draft-only until a dedicated
+   worker renders and validates an H.264/AAC MP4. The final dialog can cancel, replace without a
+   download, or initiate download of the pinned pre-edit artifact and replace. A successful edit
+   becomes the immutable source with parent lineage and an updated audio sidecar.
+6. The creator may use confirmed **Replace source video** or **Discard source video**, then choose
    zero or one visual transformation from status-bearing tool cards:
    **Character Swap** or **Virtual Try On**, never both. Availability and input requirements are
    operation-specific; provider selection and model names are never shown. The currently viewed visual edit is selected; after any visual value is
@@ -60,7 +67,7 @@ then edit either base, download, start over, or discard.
    Character**, **Select Outfit**, **Workshop**, and **Shelf** launchers. The editor's own Character
    Swap, Virtual Try On, Voice, recipe, and builder controls remain governed only by the editor
    workflow and stay available when their existing step-specific requirements are met.
-6. VTO uses exactly one input mode. **Saved or recent outfit** selects a saved recipe or tab-local
+7. VTO uses exactly one input mode. **Saved or recent outfit** selects a saved recipe or tab-local
    recent import; **Reference image** prefers a local JPEG/PNG/WebP and reveals its HTTPS URL field
    only after **Use an image URL instead**; **Prompt** alone exposes Enhance Prompt. Switching
    modes clears incompatible fields. Saved prompt outfits restore Prompt mode and their exact
@@ -69,7 +76,7 @@ then edit either base, download, start over, or discard.
    A missing saved image exposes Retry and, only when a usable prompt remains, **Continue without
    reference**; image-only outfits expose Retry or removal. VTO retains calm controlled-pilot,
    consent, one-garment, plain-background, and no-fit/sizing/purchase-accuracy disclosure.
-7. **Voice** opens the same cohesive treatment workspace used by Latest Take; the existing-video
+8. **Voice** opens the same cohesive treatment workspace used by Latest Take; the existing-video
    editor does not introduce a second Voice entry or nested browser. It exposes browser-local
    effects first and lazily loads saved ElevenLabs voices only when the creator chooses **Saved AI
    Voice**. Preview and row selection are distinct, with one active provider-sample player. The
@@ -83,7 +90,7 @@ then edit either base, download, start over, or discard.
    Character Swap or Virtual Try On. Review truthfully summarizes no provider work, one accepted
    visual-processing job, one local voice render, one ElevenLabs conversion, or visual processing
    followed by voice.
-8. Studio executes one immutable captured plan: visual submit/poll/retrieve → validate → restore
+9. Studio executes one immutable captured plan: visual submit/poll/retrieve → validate → restore
    immutable source audio where required → H.264/AAC MP4 transcode/validate/commit → convert
    immutable source sidecar → compose/transcode/validate/commit voiced result. A validated H.264
    MP4 result with no audio may commit directly only when the immutable source also has no audio;
@@ -91,18 +98,18 @@ then edit either base, download, start over, or discard.
    the selected video's frames. A combined plan is ready only after Voice commits. If Voice fails
    after visual success, its explicit retry uses the retained visual frames and does not resubmit
    visual processing. Every operation publishes truthful stage copy and never retries a billable submission.
-9. **Original** and conditional **Result** update both players. **Edit original** snapshots the
-   immutable source; **Edit result** snapshots the latest result as the next frame source. Review
-   keeps **Download result**, the selected edit summary, and the destructive action visible. Only the
-   immutable source plus latest healthy Result remain after successful replacement. A voice failure
-   after visual success retains the visual Result.
-10. Every source/result has a UUID, app-owned name, timestamp, kind, and parent lineage. Generated
+10. **Original** and conditional **Result** update both players. **Edit original** snapshots the
+    immutable source; **Edit result** snapshots the latest result as the next frame source. Review
+    keeps **Download result**, the selected edit summary, and the destructive action visible. Only the
+    immutable source plus latest healthy Result remain after successful replacement. A voice failure
+    after visual success retains the visual Result.
+11. Every source/result has a UUID, app-owned name, timestamp, kind, and parent lineage. Generated
     downloads use operation, UTC timestamp, and UUID suffix. Uploaded originals remain unchanged;
     recorded and all generated results pass the local H.264/AAC MP4 gate before publication.
-11. **Start over from original** revokes generated visual and voice URLs, retains and presents the uploaded
+12. **Start over from original** revokes generated visual and voice URLs, retains and presents the uploaded
     original, clears the selected transformation and voice selection, and returns to **Choose your
     edits**. The creator can choose either operation and make another explicit submission.
-12. Confirmed **Discard video and result** in the panel, or **Discard** in the recorded-take control bar,
+13. Confirmed **Discard video and result** in the panel, or **Discard** in the recorded-take control bar,
     revokes the uploaded source and all generated results. The control bar returns from **Edit
     video** to **Upload Video**, and the next panel open starts at **Add a video** with
     no retained plan, chooser state, or prior source.
@@ -112,6 +119,10 @@ then edit either base, download, start over, or discard.
 - Accepted input is H.264 MP4/MOV or VP8 WebM, more than zero and at most 300 seconds, within 1% of
   16:9 or 9:16. Character Swap/local input is capped at 300,000,000 bytes; any VTO plan is capped at
   200,000,000 bytes.
+- Initial file selection retains that strict aspect contract. A validated local edit may create
+  1:1, 4:5, or Freeform output; provider compatibility is then derived in the app. Incompatible
+  output disables Character Swap/VTO before provider intent or HTTP while Download and Voice stay
+  available.
 - A playable visual-only source remains useful. Voice explains when no usable source-audio
   sidecar exists.
 - HEVC, ProRes, aliases, and undocumented codecs are blocked with export guidance. When the active
@@ -130,6 +141,9 @@ then edit either base, download, start over, or discard.
   model.
 - Visual failure preserves the source and selected draft. Voice failure preserves the last
   visual/source layer.
+- Local render/cancel/validation/replacement failure preserves the pinned pre-edit artifact, draft,
+  sidecar, and every existing object URL. Output requires exact even dimensions, duration within
+  500 ms, H.264 MP4, AAC when audio exists, local decode, and a matching extracted sidecar.
 - Pruna non-2xx responses log the numeric upstream HTTP status server-side without forwarding its
   body, URL, or provider message. A successful HTTP 200 status poll can still report a terminal
   failed prediction; this is logged as a safe `generation-failed` category and shown as a distinct

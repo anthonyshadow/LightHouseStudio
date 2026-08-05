@@ -35,6 +35,7 @@ const GuardHarness = (props: StudioExitGuardProps) => {
 const renderGuard = (overrides: Partial<StudioExitGuardProps> = {}) => {
   const props: StudioExitGuardProps = {
     recordingOrFinalizing: false,
+    videoRenderingActive: false,
     hasTemporaryTake: false,
     voiceProcessingActive: false,
     shelfDirty: false,
@@ -83,6 +84,17 @@ describe('StudioExitGuard', () => {
       ).not.toBeInTheDocument(),
     );
     expect(router.state.location.pathname).toBe('/studio');
+  });
+
+  it('requires explicit worker cancellation before a route exit can discard edits', async () => {
+    const { props, router } = renderGuard({ videoRenderingActive: true, shelfDirty: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Leave Studio' }));
+
+    expect(
+      await screen.findByRole('heading', { name: 'Cancel the video render before leaving' }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe('/studio');
+    expect(props.onDiscardTemporaryWork).not.toHaveBeenCalled();
   });
 
   it.each([{ hasTemporaryTake: true }, { voiceProcessingActive: true }, { shelfDirty: true }])(

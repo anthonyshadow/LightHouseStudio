@@ -7,7 +7,11 @@ import {
   type VideoTransformOperationId,
   type VideoTransformRecipe,
 } from '@studio/contracts';
-import { validateUploadedVideoFacts, validateVideoTransformPlan } from '@studio/domain';
+import {
+  getVideoEditProviderCompatibility,
+  validateUploadedVideoFacts,
+  validateVideoTransformPlan,
+} from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   downloadVideoJobResult,
@@ -181,6 +185,16 @@ export const useExistingVideoWorkflow = ({
   const generationRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
   const steps = useMemo<readonly ExistingVideoStep[]>(() => (step ? [step] : []), [step]);
+  const visualProviderCompatibility = useMemo(
+    () =>
+      selection
+        ? getVideoEditProviderCompatibility({
+            width: selection.metadata.width,
+            height: selection.metadata.height,
+          })
+        : { compatible: true as const, aspect: '16:9' as const, reason: null },
+    [selection],
+  );
 
   const clearOperation = useCallback(() => {
     controllerRef.current?.abort();
@@ -347,6 +361,10 @@ export const useExistingVideoWorkflow = ({
   const addStep = useCallback(
     (modelId: VideoTransformModelId): boolean => {
       if (acceptedSubmission) return false;
+      if (!visualProviderCompatibility.compatible) {
+        setMessage(visualProviderCompatibility.reason);
+        return false;
+      }
       if (
         selection &&
         modelId === 'lucy-vton-latest' &&
@@ -376,7 +394,24 @@ export const useExistingVideoWorkflow = ({
       setMessage(null);
       return true;
     },
-    [acceptedSubmission, selection, videoProcessingCapabilities],
+    [acceptedSubmission, selection, videoProcessingCapabilities, visualProviderCompatibility],
+  );
+
+  const replaceSource = useCallback(
+    (validated: ValidatedExistingVideo, artifact: RecordingArtifact) => {
+      releaseRetainedJob();
+      clearOperation();
+      setSelection(validated);
+      setStep(null);
+      setPhase('ready');
+      setMessage(validated.audioUnavailableReason);
+      setCompletedStepCount(0);
+      setAcceptedSubmission(false);
+      setComparison('original');
+      setEditBase(artifact);
+      setVoiceSelection(null);
+    },
+    [clearOperation, releaseRetainedJob],
   );
 
   const updateStep = useCallback(
@@ -1016,6 +1051,7 @@ export const useExistingVideoWorkflow = ({
       editBase,
       voiceSelection,
       voiceAvailable: recording.sidecar.state === 'ready' && recording.sidecar.blob !== null,
+      visualProviderCompatibility,
       comparison,
       elapsedSeconds,
       operation: recording.processingOperation,
@@ -1031,6 +1067,7 @@ export const useExistingVideoWorkflow = ({
       providerActive: acceptedSubmission && phase !== 'complete',
       selectFile,
       adoptRecordedArtifact,
+      replaceSource,
       addStep,
       updateStep,
       removeStep,
@@ -1083,6 +1120,7 @@ export const useExistingVideoWorkflow = ({
       retryFinalization,
       selectFile,
       adoptRecordedArtifact,
+      replaceSource,
       selection,
       status,
       steps,
@@ -1090,6 +1128,7 @@ export const useExistingVideoWorkflow = ({
       submitPlan,
       updateStep,
       voiceSelection,
+      visualProviderCompatibility,
     ],
   );
 };

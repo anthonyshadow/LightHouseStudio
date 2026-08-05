@@ -63,6 +63,36 @@ const StackedDialogHarness = ({
 };
 
 describe('ConfirmationDialog', () => {
+  it('keeps Cancel initially focused and exposes the optional middle action', async () => {
+    const user = userEvent.setup();
+    const onCancel = vi.fn();
+    const onSecondary = vi.fn();
+    const onConfirm = vi.fn();
+    render(
+      <StudioDesignProvider>
+        <ConfirmationDialog
+          open
+          title="Replace the current video?"
+          description="Choose whether to download the current source first."
+          confirmLabel="Download Original and Replace"
+          cancelLabel="Cancel"
+          secondaryAction={{
+            label: 'Replace Without Downloading',
+            onAction: onSecondary,
+          }}
+          onCancel={onCancel}
+          onConfirm={onConfirm}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus());
+    await user.click(screen.getByRole('button', { name: 'Replace Without Downloading' }));
+    expect(onSecondary).toHaveBeenCalledOnce();
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(onConfirm).not.toHaveBeenCalled();
+  });
+
   it('takes topmost focus, dismisses only itself, and restores the exact invoking control', async () => {
     const user = userEvent.setup();
     const onParentClose = vi.fn();

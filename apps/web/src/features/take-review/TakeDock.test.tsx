@@ -53,6 +53,7 @@ const recording = (): RecordingController => {
     start: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(original),
     restorePersistedOriginal: vi.fn().mockReturnValue(original),
+    replaceSource: vi.fn().mockReturnValue(original),
     discard: vi.fn(),
     markDownloaded: vi.fn(),
     beginProcessing: vi.fn(),

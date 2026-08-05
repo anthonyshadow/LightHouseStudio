@@ -8,6 +8,7 @@ references, not release-readiness claims or future requirements.
 | Flow                                                 | Story                                                                                      |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | Record or upload, then edit and download             | [Existing video and single visual processing](12-existing-video-and-ordered-processing.md) |
+| Trim, crop, relight, filter, and replace a source    | [Local non-destructive video editing](13-local-video-editing.md)                           |
 | Choose camera, microphone, local format, and quality | [Configure capture settings](01-configure-capture-settings.md)                             |
 | Preview and record without provider work             | [Local camera capture](02-local-camera-capture.md)                                         |
 | Run and record live Lucy 2.5                         | [Character AI session](03-character-ai-session.md)                                         |
@@ -29,8 +30,9 @@ references, not release-readiness claims or future requirements.
   provider.
 - When old browser-local project data is detected, Recipe Shelf can open the download/delete-only
   Legacy Projects manager. It has no route and cannot revive the retired Guided experience.
-- Browser navigation cannot abandon recording/finalization. Leaving with a temporary take, active
-  Voice process, or dirty Shelf form requires confirmed discard.
+- Browser navigation cannot abandon recording/finalization or an active video render. Leaving with
+  a temporary take, active Voice process, dirty local video edit, or dirty Shelf form requires
+  confirmed discard.
 - Camera access, provider contact, and billable work require an explicit action. Local Camera does
   not request provider credentials, load the Decart SDK, or send media externally.
 - The primary flow records or uploads a source, reviews it, and optionally applies Character Swap,
@@ -40,8 +42,8 @@ references, not release-readiness claims or future requirements.
 - Saved Character Wardrobe owns normalized original/variant browsing and variant creation while
   reusing the same Shelf metadata, immutable reference store, and overlay/media ownership.
 - Studio keeps one mounted media stage and one temporary take pipeline. Its immutable source may
-  be recorded or uploaded; presentation selects the voiced, visual, or source layer without
-  mounting another player.
+  be recorded, uploaded, or a validated local edit; presentation selects the voiced, visual, or
+  source layer without mounting another player.
 - An uploaded workflow may run either exact batch model once, never both. The creator may switch
   the single active model before submission; only the active choice is used.
 - The recording and Decart session limits are independent: each warns at 270 seconds and ends

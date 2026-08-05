@@ -1,22 +1,28 @@
 import type { Page } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import type {
   BrowserJourneyState,
   SerializedSnapshot,
   StudioHarnessOptions,
 } from './studioHarness.types.js';
 
-// A 64px mint VP8/Opus WebM used by the deterministic MediaRecorder. Keeping a
+// A 320×180 mint VP8/Opus WebM used by the deterministic MediaRecorder. Keeping a
 // real media container here lets the stable main-stage playback exercise the
 // browser's recorded-source path instead of relying on an invalid text blob.
 export const FIXED_WEBM_BASE64 =
-  'GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZwEAAAAAAAPHEU2bdLpNu4tTq4QVSalmU6yBoU27i1OrhBZUrmtTrIHWTbuMU6uEElTDZ1OsggGJTbuMU6uEHFO7a1OsggOx7AEAAAAAAABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVSalmsCrXsYMPQkBNgIxMYXZmNjIuMy4xMDBXQYxMYXZmNjIuMy4xMDBEiYhAagAAAAAAABZUrmtAra4BAAAAAAAAP9eBAXPFiE2mk5i4/Zn+nIEAIrWcg3VuZIiBAIaFVl9WUDiDgQEj44OEC+vCAOCQsIFAuoFAmoECVbCEVbmBAa4BAAAAAAAAXNeBAnPFiJrGl6+a4otJnIEAIrWcg3VuZIiBAIaGQV9PUFVTVqqDYy6gVruEBMS0AIOBAuGRn4EBtYhA53AAAAAAAGJkgRBjopNPcHVzSGVhZAEBOAGAuwAAAAAAElTDZ0DVc3OfY8CAZ8iZRaOHRU5DT0RFUkSHjExhdmY2Mi4zLjEwMHNz1mPAi2PFiE2mk5i4/Zn+Z8ihRaOHRU5DT0RFUkSHlExhdmM2Mi4xMS4xMDAgbGlidnB4Z8ihRaOIRFVSQVRJT05Eh5MwMDowMDowMC4yMDAwMDAwMDAAc3PXY8CLY8WImsaXr5rii0lnyKJFo4dFTkNPREVSRIeVTGF2YzYyLjExLjEwMCBsaWJvcHVzZ8ihRaOIRFVSQVRJT05Eh5MwMDowMDowMC4yMDgwMDAwMDAAH0O2dUFH54EAo6CCAACACIIus9vut8Yiydk1Igkj/XNos8ZUDdGd8vz2MKO6gQAAgBADAJ0BKkAAQAAARwiFhYiFhIgCAgJ08luZhVWRB7sxegD+9fmr0//f7H//f7H//f7H/v50AKOZggAVgAikiHym31yBd+ehDC8B0hVsEPLSMKOWggApgAicj4HpIUJspisqtfWHNlvUQKOTggA9gAicjDp1JdFgdoOprHux2aOUggBRgAicj4HpKUuFVSZIMbH2jsCjk4IAZYAInIwlpyVeaTexeOR+tlCjlIIAeYAInI+B6SlLjAufLYbvtF9Ao5SCAI2ACJyMOnUl0V0DEtfAAWmxyKOSggChgAickgPUbL0GlSYkM3WQo5KCALWACJyPgekpS4VPZkeaNSqgnaGUggDJAAgF64Joa2wKFQPSWqLsI8B1ooQAzf5gHFO7a5G7j7OBALeK94EB8YICZPCBJQ==';
+  'GkXfo59ChoEBQveBAULygQRC84EIQoKEd2VibUKHgQRChYECGFOAZwEAAAAAAAY2EU2bdLpNu4tTq4QVSalmU6yBoU27i1OrhBZUrmtTrIHWTbuMU6uEElTDZ1OsggGKTbuMU6uEHFO7a1OsggYg7AEAAAAAAABZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAVSalmsCrXsYMPQkBNgIxMYXZmNjIuMy4xMDBXQYxMYXZmNjIuMy4xMDBEiYhAagAAAAAAABZUrmtArq4BAAAAAAAAQNeBAXPFiLPYoQJYMxg9nIEAIrWcg3VuZIiBAIaFVl9WUDiDgQEj44OEBfXhAOCRsIIBQLqBtJqBAlWwhFW5gQGuAQAAAAAAAFzXgQJzxYgedUPQY36VYZyBACK1nIN1bmSIgQCGhkFfT1BVU1aqg2MuoFa7hATEtACDgQLhkZ+BAbWIQOdwAAAAAABiZIEQY6KTT3B1c0hlYWQBATgBgLsAAAAAABJUw2dA1XNzn2PAgGfImUWjh0VOQ09ERVJEh4xMYXZmNjIuMy4xMDBzc9ZjwItjxYiz2KECWDMYPWfIoUWjh0VOQ09ERVJEh5RMYXZjNjIuMTEuMTAwIGxpYnZweGfIoUWjiERVUkFUSU9ORIeTMDA6MDA6MDAuMjAwMDAwMDAwAHNz12PAi2PFiB51Q9BjfpVhZ8iiRaOHRU5DT0RFUkSHlUxhdmM2Mi4xMS4xMDAgbGlib3B1c2fIoUWjiERVUkFUSU9ORIeTMDA6MDA6MDAuMjA4MDAwMDAwAB9DtnVDteeBAKPjggAAgHiBp11snpmsAAAICuBXOXgI/qCPyjyOzS0vgTY1mwG99nlHlpNBTNd69f92gvEQocNFoA2SJa/yx8HpuepmeNxXU+l+eupR00ug1eqfB5wAw/b60GJxZZpbNIDYhixFo0CdgQAAgBAPAJ0BKkABtAAARwiFhYiFhIgCAgJ08jo61GHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsnOHsmyD+/YGQKvV5lX/7Xa//7Xa//7Xa/7VyAKPDggAVgHifZwHn/JVNSp63Q+9zs6y9kc3N4UtZ5P2pzLnKUCuoSXql+tJ2JlaaaZ1xT+ced0gQHvRzRbbNbhZG1zBr0KPEggApgHiast91nPxLOjjd6stGSK+pS+sZLiOA2sQB/VIeQLT3F31cHHF8wgOutCjyvWIkX2FiaMxku6AY/uMM4mNLY1+jwoIAPYB4mrLfdZz8SUkQOPQ9okjF8i/AC4iWikt5kcmNBiGPSu9VXNBFYvKMOg4EamCWmhigIwpdJDVHQWVOeSu9T6PJggBRgHiast91nPxF0LPyrcAGadc6RJ/t6CI94tgxCvKgALqCFBsWdvH60+/msvxMcleg8r54uhD7+ExoYsPhSt8KZsYmM/NwTaPAggBlgHiast91nPxJMsjPBpzPqGnLJ6QxQ4TDQ6f8u2W8QJzNA1oZcpSsc5/t/lXSKkHb8Z+CyBjoLCm/4zpDYKOdgQBkALECAAEQEAAYABhYL/QACIAEM1+tck+VgACjvoIAeYB4mrLfdZhKfacmVnS/JM0D6ZqzvLSQEsjqmditSqCC2sCoHNGxeQfvi0QNgB/YNdQ+za1uFkbXMGtFo8mCAI2AeJqy33WYSoMJNTDd1GuE3nVnw9TLUeXjJizkWprHYCAXfWpeun8VMNCu19v/4uWVzIPt0PhQbkJwngLCDv7jDOJjS2Nfo8OCAKGAeJqy33WYSnTQZk40nwpCicplu6OxcCTwhac/Z9kJeVY8KaP8jXBwVtA+A7ZUx8JaUbgbdPOiIao9/E55K71Po7SCALWASJnCX3Mt0i2ecoNNqJn2ppOLerhS5bKE25qC/t/QYytuyqpUVmKkUe5w0wQ9OluUoKqhoYIAyQBIBYqXOi7/7UIvK3fi+/6UFErd+F2Zdt3oDQQinHWihADN/mAcU7trkbuPs4EAt4r3gQHxggJl8IFo';
+
+const FIXED_MP4_BASE64 = readFileSync(
+  new URL('../fixtures/deterministic-recording-mp4.base64', import.meta.url),
+  'utf8',
+).trim();
 
 export const installSyntheticBrowserMedia = async (
   page: Page,
   options: StudioHarnessOptions,
 ): Promise<void> => {
   await page.addInitScript(
-    ({ fixedWebmBase64, stubMediaPlayback, realtimeProvidesVideo }) => {
+    ({ fixedWebmBase64, fixedMp4Base64, stubMediaPlayback, realtimeProvidesVideo }) => {
       type TestModel = 'lucy-latest' | 'lucy-vton-latest';
       type TestSnapshot = { prompt: string; image: File | null; enhance: boolean };
       type TestConnectionOptions = {
@@ -57,6 +63,11 @@ export const installSyntheticBrowserMedia = async (
       const fixedWebm = Uint8Array.from(atob(fixedWebmBase64), (character) =>
         character.charCodeAt(0),
       );
+      const fixedMp4 = Uint8Array.from(atob(fixedMp4Base64), (character) =>
+        character.charCodeAt(0),
+      );
+      const useMp4Recorder =
+        /AppleWebKit/u.test(navigator.userAgent) && !/(Chrome|Chromium)/u.test(navigator.userAgent);
 
       const createSyntheticStream = (owner: 'local' | 'provider'): MediaStream => {
         const canvas = document.createElement('canvas');
@@ -107,7 +118,7 @@ export const installSyntheticBrowserMedia = async (
 
       class DeterministicMediaRecorder extends EventTarget {
         static isTypeSupported(mimeType: string): boolean {
-          return mimeType.includes('webm');
+          return useMp4Recorder ? mimeType.includes('mp4') : mimeType.includes('webm');
         }
 
         readonly mimeType: string;
@@ -115,7 +126,7 @@ export const installSyntheticBrowserMedia = async (
 
         constructor(_stream: MediaStream, options?: MediaRecorderOptions) {
           super();
-          this.mimeType = options?.mimeType ?? 'video/webm';
+          this.mimeType = options?.mimeType ?? (useMp4Recorder ? 'video/mp4' : 'video/webm');
         }
 
         start(): void {
@@ -129,7 +140,7 @@ export const installSyntheticBrowserMedia = async (
           state.recorderStops += 1;
           const dataEvent = new Event('dataavailable');
           Object.defineProperty(dataEvent, 'data', {
-            value: new Blob([fixedWebm], { type: this.mimeType }),
+            value: new Blob([useMp4Recorder ? fixedMp4 : fixedWebm], { type: this.mimeType }),
           });
           this.dispatchEvent(dataEvent);
           this.dispatchEvent(new Event('stop'));
@@ -194,13 +205,13 @@ export const installSyntheticBrowserMedia = async (
       });
       Object.defineProperty(navigator, 'mediaDevices', {
         configurable: true,
-        value: {
+        value: Object.assign(new EventTarget(), {
           getUserMedia: () => {
             state.cameraCalls += 1;
             return Promise.resolve(createSyntheticStream('local'));
           },
           enumerateDevices: () => Promise.resolve([]),
-        },
+        }),
       });
       Object.defineProperty(window, 'createImageBitmap', {
         configurable: true,
@@ -244,6 +255,7 @@ export const installSyntheticBrowserMedia = async (
     },
     {
       fixedWebmBase64: FIXED_WEBM_BASE64,
+      fixedMp4Base64: FIXED_MP4_BASE64,
       stubMediaPlayback: options.stubMediaPlayback ?? true,
       realtimeProvidesVideo: options.realtimeProvidesVideo ?? true,
     },

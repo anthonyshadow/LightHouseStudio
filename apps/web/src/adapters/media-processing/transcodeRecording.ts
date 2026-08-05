@@ -52,10 +52,14 @@ export const transcodeRecordingToMp4 = async (
     if (requireAudio && !audioTrack) {
       throw new Error('The recording is missing its captured audio track.');
     }
-    if (!(await canEncodeVideo('avc'))) {
+    const sourceVideoCodec = await videoTrack.getCodec();
+    const sourceAudioCodec = audioTrack ? await audioTrack.getCodec() : null;
+    const videoRequiresTranscode = sourceVideoCodec !== 'avc';
+    const audioRequiresTranscode = audioTrack !== null && sourceAudioCodec !== 'aac';
+    if (videoRequiresTranscode && !(await canEncodeVideo('avc'))) {
       throw new Error('This browser cannot encode H.264 video.');
     }
-    if (audioTrack) {
+    if (audioRequiresTranscode) {
       await ensureAacEncodingSupport(() => canEncodeAudio('aac'));
     }
     const sourceWidth = await videoTrack.getDisplayWidth();
@@ -83,12 +87,15 @@ export const transcodeRecordingToMp4 = async (
       tracks: 'primary',
       video: {
         codec: 'avc',
-        forceTranscode: true,
-        hardwareAcceleration: 'prefer-hardware',
+        forceTranscode: videoRequiresTranscode,
+        // Let each browser select its available H.264 path. Headless Chromium often
+        // exposes software only, while WebKit and physical browsers may expose a
+        // different acceleration class.
+        hardwareAcceleration: 'no-preference',
       },
       audio: {
         codec: 'aac',
-        forceTranscode: true,
+        forceTranscode: audioRequiresTranscode,
       },
       tags: {},
       showWarnings: false,

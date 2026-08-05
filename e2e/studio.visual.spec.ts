@@ -1,6 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import type { CreativeAssetStore } from '@studio/domain';
-import { installFakeVideoJobRoutes, loadH264VideoFixture } from './support/existingVideoHarness';
+import {
+  installFakeVideoJobRoutes,
+  loadDecodableH264VideoFixture,
+  loadH264VideoFixture,
+} from './support/existingVideoHarness';
 import {
   closeRecipeDockWhenOverlaid,
   createLocalTake,
@@ -98,25 +102,28 @@ const expectStandardStudioLayout = async (
 
   const frame = stage.locator('[data-stage-frame]');
   const controls = stage.locator('[data-stage-controls-region]');
+  const videoEditorActive = (await page.locator('[data-video-edit-active="true"]').count()) > 0;
   const toolRail = page.locator('[data-studio-tool-rail]');
   const capture = page.locator('[data-capture-controls]');
   const [stageBox, frameBox, controlsBox, toolRailBox, captureBox] = await Promise.all([
     stage.boundingBox(),
     frame.boundingBox(),
-    controls.boundingBox(),
+    videoEditorActive ? Promise.resolve(null) : controls.boundingBox(),
     toolRail.boundingBox(),
     capture.boundingBox(),
   ]);
 
   expect(stageBox).not.toBeNull();
   expect(frameBox).not.toBeNull();
-  expect(controlsBox).not.toBeNull();
+  if (!videoEditorActive) expect(controlsBox).not.toBeNull();
   expect(toolRailBox).not.toBeNull();
   expect(captureBox).not.toBeNull();
-  if (!stageBox || !frameBox || !controlsBox || !toolRailBox || !captureBox) return;
+  if (!stageBox || !frameBox || !toolRailBox || !captureBox) return;
 
-  expect(controlsBox.y).toBeGreaterThanOrEqual(frameBox.y + frameBox.height - 1);
-  expect(controlsBox.y + controlsBox.height).toBeLessThanOrEqual(viewport.height + 1);
+  if (controlsBox) {
+    expect(controlsBox.y).toBeGreaterThanOrEqual(frameBox.y + frameBox.height - 1);
+    expect(controlsBox.y + controlsBox.height).toBeLessThanOrEqual(viewport.height + 1);
+  }
 
   if (viewport.width >= 1_024) {
     expect(toolRailBox.x + toolRailBox.width).toBeLessThanOrEqual(stageBox.x);
@@ -254,9 +261,9 @@ const openExistingVideoChooser = async (page: Page) => {
   return dialog;
 };
 
-const selectVisualVideo = async (page: Page) => {
+const selectVisualVideo = async (page: Page, decodable = false) => {
   const dialog = await openExistingVideoChooser(page);
-  const fixture = await loadH264VideoFixture();
+  const fixture = decodable ? await loadDecodableH264VideoFixture() : await loadH264VideoFixture();
   await dialog.locator('input[type="file"]').first().setInputFiles({
     name: 'visual-source.mp4',
     mimeType: 'video/mp4',
@@ -507,6 +514,31 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await addVisualStep(dialog, 'lucy-latest', 'Transform into a documentary field presenter.');
       await dialog.getByRole('button', { name: 'Apply Character Swap' }).click();
       await expect(dialog.getByRole('heading', { name: 'Your result is ready' })).toBeVisible();
+    },
+  },
+  'video-edit-lighting-dirty': {
+    id: 'video-edit-lighting-dirty',
+    setup: async (page) => {
+      const { dialog } = await selectVisualVideo(page, true);
+      await dialog.getByRole('button', { name: 'Adjust video' }).click();
+      await page.getByRole('button', { name: 'Lighting', exact: true }).click();
+      await page.getByRole('slider', { name: 'Brightness' }).fill('34');
+      await expect(page.getByRole('heading', { name: 'Lighting settings' })).toBeVisible();
+      await expect(page.getByRole('slider', { name: 'Brightness' })).toHaveValue('34');
+    },
+  },
+  'video-edit-crop-dirty': {
+    id: 'video-edit-crop-dirty',
+    setup: async (page) => {
+      const { dialog } = await selectVisualVideo(page, true);
+      await dialog.getByRole('button', { name: 'Adjust video' }).click();
+      await page.getByRole('button', { name: 'Crop', exact: true }).click();
+      await page.getByRole('button', { name: '1:1', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Crop settings' })).toBeVisible();
+      await expect(page.getByRole('button', { name: '1:1', exact: true })).toHaveAttribute(
+        'aria-pressed',
+        'true',
+      );
     },
   },
   'vton-prepared-with-reference': {

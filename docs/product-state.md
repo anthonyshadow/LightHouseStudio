@@ -1,6 +1,6 @@
 # Lightframe Studio product state
 
-**Current as of:** 2026-08-03
+**Current as of:** 2026-08-04
 
 **Release frame:** local-first, single-operator development runtime
 
@@ -62,13 +62,18 @@ required, but no physical target is qualified yet.
   operation. Character Swap uses startup-selected Decart or Pruna; VTO remains Decart. The two
   operations are mutually exclusive within an edited-video workflow. When Pruna is active, the
   Character Swap editor exposes a per-submission `720p`/`1080p` output choice.
+- The artifact currently displayed on the stage can be trimmed, cropped to six modes, rotated,
+  flipped, relit, and filtered locally. A dedicated worker publishes a validated H.264/AAC MP4 as
+  a new immutable `edited` source only after explicit replacement confirmation. Non-16:9/9:16
+  edits keep Download and Voice but disable visual-provider intent.
 - OpenAI, BFL, and Wiro are separate startup-selected image-provider passes with no fallback.
   Participant mode disables Wiro.
 - Recording owns an accessible warning at 270 seconds and coalesced Stop/finalize at 300 seconds.
 - Studio keeps one temporary source/visual/voice pipeline. Download is the durable handoff;
   Release or Discard revokes its URLs.
-- Recording/finalization blocks route exit. A temporary take, active Voice operation, or dirty
-  Shelf, Outfit Builder, or Wardrobe form requires confirmed discard before leaving Studio.
+- Recording/finalization and active local video rendering block route exit. A temporary take,
+  active Voice operation, dirty video edit, or dirty Shelf, Outfit Builder, or Wardrobe form
+  requires confirmed discard before leaving Studio.
 - Local and ElevenLabs voice treatments always start from immutable originals. ElevenLabs is
   limited to explicitly browsed saved voices and receives only the audio sidecar on Apply.
 - Uploaded and generated references are immutable local assets. Detach, Reset, or browser-record
@@ -82,6 +87,9 @@ required, but no physical target is qualified yet.
   retention settings.
 - Takes and processing outputs are retained in browser memory; physical codec and memory support
   is unqualified.
+- Local video edits are session-only. Safari/Firefox/Chrome worker codec behavior, real render
+  cancellation, maximum-size/five-minute memory, touch, download, and external playback remain
+  physically unqualified.
 - Video-job state is process-local and temporary; refresh, crash, restart, or expiry does not
   recover an upload workflow, and local cleanup is not provider-side deletion.
 - Reference assets have no relationship-aware per-asset deletion route. Use a dedicated local data

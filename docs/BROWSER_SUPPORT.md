@@ -47,6 +47,7 @@ areas, the software keyboard, browser chrome changes, or physical 200% text/refl
 | Camera zoom       | Numeric track zoom capability and `applyConstraints`                                   | Control omitted; no CSS crop substitute                                                |
 | Recording         | Live video, `MediaRecorder`, decodable capture, H.264 WebCodecs encode                 | No raw download fallback; conversion fails safely and the session remains controllable |
 | Existing video    | File input/drop, Blob playback, supported H.264/VP8 file                               | Local validation explains export needs; camera stays optional                          |
+| Local video edit  | WebGL, dedicated workers, OffscreenCanvas, H.264 WebCodecs encode, AAC when needed     | Playback, Download, Voice, and existing workflows remain usable; no main-thread export |
 | Decart output     | Local capture, WebRTC, provider reachability/entitlement                               | Local preview remains the fallback                                                     |
 | Batch visual      | Supported source, broker, operation capability; WebCodecs for required MP4 preparation | Local preview/download remains available without a configured operation                |
 | Local Voice       | Web Audio, offline render, AAC encoder, MP4 remux                                      | Original take remains usable                                                           |
@@ -128,10 +129,29 @@ the inspected result dimensions after emitting a content-free server warning whe
 the canonical target; the browser must match the server-approved result metadata exactly. The Pruna
 resolution class is selected in the Character Swap editor for each submission.
 
+## Local video editor
+
+The editor checks WebGL preview and dedicated-worker WebCodecs/OffscreenCanvas export support only
+when **Adjust video** opens. It does not use the limited-availability 2D canvas `filter` property.
+Preview and export share a WebGL shader for flips, curated filters, and manual lighting controls;
+MediaBunny performs trim, baked 90° rotation, crop, H.264 encode, and AAC audio preservation in the
+worker. There is no synchronous main-thread processing fallback.
+
+A source with audio must export AAC plus a newly extracted matching sidecar; a silent source stays
+silent. Output dimensions are even, exact, and decoded locally before publication. The worker's
+offset-aware stream accumulator rejects output beyond 300,000,000 bytes and releases its chunks on
+cancel/error. Square, 4:5, and incompatible Freeform outputs are valid local sources, but only
+16:9 and 9:16 within 1% are eligible for Character Swap/VTO.
+
+Automated Chromium export or a working preview does not qualify the codec path on another browser.
+Physical rows must exercise real export and cancellation in current Safari, Firefox, and Chrome,
+including touch, five-minute input, maximum-size memory, browser download, and external playback.
+
 ## Known physical risks
 
-- Safari/iOS can differ in `MediaRecorder` output, Web Audio decode/encode, Blob download,
-  backgrounding, lock/call interruption, and permission recovery.
+- Safari/iOS can differ in `MediaRecorder` output, worker WebCodecs/OffscreenCanvas/WebGL behavior,
+  Web Audio decode/encode, Blob download, backgrounding, lock/call interruption, and permission
+  recovery.
 - Mobile browser chrome, safe areas, keyboards, and legacy viewport-unit behavior can obscure
   controls even when responsive emulation passes.
 - Backgrounding, screen lock, privacy switches, Bluetooth handoff, unplugging, or another app can
@@ -150,7 +170,8 @@ resolution class is selected in the Character Swap editor for each submission.
 Every required row must physically pass permission allow/deny/revoke; Local/Character/VTO capture;
 uploaded-video pick, replace, local download, mutually exclusive Character Swap and batch VTO,
 including capability-required local MOV/WebM preparation; the
-270/300-second warning and finalization; local and ElevenLabs Voice;
+local video editor's preview/render/cancel/replace choices; the 270/300-second warning and
+finalization; local and ElevenLabs Voice;
 download/playback; background/foreground recovery; memory checkpoints; and cleanup. Touch rows
 also require native file pickers, portrait/landscape, safe areas, browser chrome, software
 keyboard, 200% text, touch-control recovery, and camera switching when exposed. Desktop rows

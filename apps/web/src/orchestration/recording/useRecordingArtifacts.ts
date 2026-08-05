@@ -31,9 +31,9 @@ export const useRecordingArtifacts = () => {
 
   const publishOriginal = useCallback(
     (artifact: RecordingArtifact, nextSidecar: RecordingAudioSidecar) => {
-      revokeArtifactUrl(originalRef.current, 'replacement');
-      revokeArtifactUrl(visualRef.current, 'replacement');
-      revokeArtifactUrl(processedRef.current, 'replacement');
+      const previousOriginal = originalRef.current;
+      const previousVisual = visualRef.current;
+      const previousProcessed = processedRef.current;
       originalRef.current = artifact;
       visualRef.current = null;
       processedRef.current = null;
@@ -47,6 +47,9 @@ export const useRecordingArtifacts = () => {
       setProcessingOperation(null);
       setProcessingError(null);
       setDownloaded(false);
+      revokeArtifactUrl(previousProcessed, 'replacement');
+      revokeArtifactUrl(previousVisual, 'replacement');
+      revokeArtifactUrl(previousOriginal, 'replacement');
     },
     [],
   );

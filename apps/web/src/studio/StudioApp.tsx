@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import { resolveCharacterVersion } from '@studio/domain';
+import { getVideoEditOutputGeometry, resolveCharacterVersion } from '@studio/domain';
 import {
   lazy,
   Suspense,
@@ -38,6 +38,7 @@ import {
   useExistingVideoWorkflow,
 } from '../features/existing-video/useExistingVideoWorkflow';
 import { MediaStage } from '../features/live-stage';
+import { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
 import {
   confirmModeReplacement,
   hasDraftContent,
@@ -99,6 +100,11 @@ const TakeDock = lazy(() =>
 const CharacterWardrobePanel = lazy(() =>
   import('../features/character-wardrobe/CharacterWardrobePanel').then((module) => ({
     default: module.CharacterWardrobePanel,
+  })),
+);
+const VideoEditWorkspace = lazy(() =>
+  import('../features/video-editor/VideoEditWorkspace').then((module) => ({
+    default: module.VideoEditWorkspace,
   })),
 );
 
@@ -260,6 +266,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     null,
   );
   const [wardrobeDirty, setWardrobeDirty] = useState(false);
+  const [videoEditDiscardPromptOpen, setVideoEditDiscardPromptOpen] = useState(false);
   const wardrobeCharacter = wardrobeCharacterId
     ? (repositoryState.store.savedCharacterPrompts.find(
         (item) => item.id === wardrobeCharacterId,
@@ -321,17 +328,71 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       ? { videoProcessingCapabilities: availability.videoProcessing }
       : {}),
   });
+  const videoEditor = useVideoEditSession();
+  const videoEditing = videoEditor.phase !== 'closed';
   const comparedExistingVideoArtifact =
     existingVideo.comparison === 'original'
       ? recording.original
       : (recording.processed ?? recording.visual);
   const stagePresentation =
-    activeOverlay === 'video-upload' &&
-    existingVideo.selection !== null &&
-    takeStagePresentation.kind === 'playback' &&
-    comparedExistingVideoArtifact
-      ? { ...takeStagePresentation, artifact: comparedExistingVideoArtifact }
-      : takeStagePresentation;
+    videoEditing && videoEditor.source && takeStagePresentation.kind === 'playback'
+      ? { ...takeStagePresentation, artifact: videoEditor.source.artifact, controlsLocked: false }
+      : activeOverlay === 'video-upload' &&
+          existingVideo.selection !== null &&
+          takeStagePresentation.kind === 'playback' &&
+          comparedExistingVideoArtifact
+        ? { ...takeStagePresentation, artifact: comparedExistingVideoArtifact }
+        : takeStagePresentation;
+  const videoEditPreview = useMemo(
+    () =>
+      videoEditing && videoEditor.source
+        ? {
+            spec: videoEditor.draft,
+            sourceWidth: videoEditor.source.metadata.width,
+            sourceHeight: videoEditor.source.metadata.height,
+            activeTool: videoEditor.activeTool,
+            showingBefore: videoEditor.showingBefore,
+            playheadMs: videoEditor.playheadMs,
+            onPlayheadChange: videoEditor.setPlayheadMs,
+            onCropStart: videoEditor.beginTransaction,
+            onCropChange: videoEditor.previewSpec,
+            onCropCommit: videoEditor.commitTransaction,
+          }
+        : null,
+    [
+      videoEditing,
+      videoEditor.source,
+      videoEditor.draft,
+      videoEditor.activeTool,
+      videoEditor.showingBefore,
+      videoEditor.playheadMs,
+      videoEditor.setPlayheadMs,
+      videoEditor.beginTransaction,
+      videoEditor.previewSpec,
+      videoEditor.commitTransaction,
+    ],
+  );
+  const editedStageGeometry =
+    videoEditing && videoEditor.source
+      ? getVideoEditOutputGeometry(
+          {
+            width: videoEditor.source.metadata.width,
+            height: videoEditor.source.metadata.height,
+            durationMs: videoEditor.source.metadata.durationMs,
+          },
+          videoEditor.draft,
+        )
+      : null;
+  const playbackWidth = editedStageGeometry?.width ?? recording.metadata?.width;
+  const playbackHeight = editedStageGeometry?.height ?? recording.metadata?.height;
+  const stageAspectRatio =
+    stagePresentation.kind === 'playback' && playbackWidth && playbackHeight
+      ? playbackHeight > playbackWidth
+        ? ('9:16' as const)
+        : ('16:9' as const)
+      : session.draft.mode === 'local'
+        ? session.capturePreferences.applied.aspectRatio
+        : ('16:9' as const);
 
   useEffect(() => {
     const artifact = recording.original;
@@ -668,8 +729,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       : activeOverlay === 'recipe-shelf'
         ? 'shelf'
         : 'closed';
-  const activeCreativeTool =
-    activeOverlay === 'recipe-dock'
+  const activeCreativeTool = videoEditing
+    ? 'edit-video'
+    : activeOverlay === 'recipe-dock'
       ? 'dock'
       : activeOverlay === 'video-upload'
         ? 'edit-video'
@@ -850,7 +912,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     setShelfDirty(false);
     updateOutfitBuilderDirty(false);
     setWardrobeDirty(false);
-  }, [existingVideo, processing, recording, setShelfDirty, updateOutfitBuilderDirty]);
+    videoEditor.close();
+  }, [existingVideo, processing, recording, setShelfDirty, updateOutfitBuilderDirty, videoEditor]);
   const discardExistingVideoSelection = useCallback(() => {
     if (existingVideo.selection) existingVideo.reset(false);
   }, [existingVideo]);
@@ -878,6 +941,81 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
     closeOverlay();
   }, [closeOverlay, existingVideo]);
+  const openVideoAdjust = useCallback(() => {
+    const sourceArtifact = comparedExistingVideoArtifact ?? recording.presented;
+    const metadata = existingVideo.selection?.metadata;
+    if (!sourceArtifact || !metadata || recordingActive || existingVideo.providerActive) return;
+    closeOverlay();
+    videoEditor.begin({ artifact: sourceArtifact, metadata });
+    window.requestAnimationFrame(() => mainRef.current?.focus());
+  }, [
+    closeOverlay,
+    comparedExistingVideoArtifact,
+    existingVideo.providerActive,
+    existingVideo.selection?.metadata,
+    recording.presented,
+    recordingActive,
+    videoEditor,
+  ]);
+  const returnFromVideoEditor = useCallback(() => {
+    videoEditor.close();
+    setVideoEditDiscardPromptOpen(false);
+    openOverlay('video-upload');
+    window.requestAnimationFrame(() => editVideoToggleRef.current?.focus());
+  }, [openOverlay, videoEditor]);
+  const requestVideoEditDiscard = useCallback(() => {
+    if (['rendering', 'validating', 'committing'].includes(videoEditor.phase)) return;
+    if (!videoEditor.dirty) {
+      returnFromVideoEditor();
+      return;
+    }
+    setVideoEditDiscardPromptOpen(true);
+  }, [returnFromVideoEditor, videoEditor.dirty, videoEditor.phase]);
+  const commitVideoEdit = useCallback(
+    (downloadCurrent: boolean) => {
+      const source = videoEditor.source;
+      const candidate = videoEditor.candidate;
+      if (!source || !candidate || videoEditor.phase !== 'awaiting-replacement') return;
+      videoEditor.beginCommit();
+      try {
+        if (downloadCurrent) {
+          const anchor = document.createElement('a');
+          anchor.href = source.artifact.objectUrl;
+          anchor.download = source.artifact.filename;
+          anchor.rel = 'noopener';
+          anchor.click();
+        }
+        const validated = candidate.validated;
+        const artifactId = `video-${crypto.randomUUID()}`;
+        const artifact = recording.replaceSource({
+          blob: validated.file,
+          artifactMetadata: {
+            id: artifactId,
+            name: `Edited video · ${validated.metadata.selectedAt} · ${artifactId.slice(-8)}`,
+            createdAt: validated.metadata.selectedAt,
+            kind: 'edited',
+            parentArtifactId: source.artifact.id,
+            mimeType: validated.mimeType,
+            filename: validated.file.name,
+            sourceModeId: 'local',
+            startedAt: validated.metadata.selectedAt,
+            durationMs: validated.metadata.durationMs,
+          },
+          takeMetadata: validated.metadata,
+          audioSidecar: validated.audioSidecar,
+        });
+        existingVideo.replaceSource(validated, artifact);
+        videoEditor.completeCommit(artifact.id);
+        videoEditor.close();
+        openOverlay('video-upload');
+      } catch {
+        videoEditor.failCommit(
+          'The edited video passed rendering but could not replace the current source. The current video remains unchanged.',
+        );
+      }
+    },
+    [existingVideo, openOverlay, recording, videoEditor],
+  );
   const dismissCharacterBuilder = useCallback(() => {
     if (characterBuilderDestination.kind === 'existing-video' && existingVideo.selection) {
       openOverlay('video-upload');
@@ -981,18 +1119,18 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         </div>
 
         <main ref={mainRef} id="studio-main" tabIndex={-1} css={mainGridStyles()}>
-          <div ref={fullscreenWorkspaceRef} css={stageColumnStyles(theme)}>
+          <div
+            ref={fullscreenWorkspaceRef}
+            css={stageColumnStyles(theme)}
+            data-video-edit-active={videoEditing ? 'true' : 'false'}
+          >
             <MediaStage
               presentation={stagePresentation}
               mode={session.draft.mode}
               lifecycle={session.lifecycle}
               recording={recording.lifecycle === 'recording'}
               recordingSeconds={recording.elapsedSeconds}
-              aspectRatio={
-                session.draft.mode === 'local'
-                  ? session.capturePreferences.applied.aspectRatio
-                  : '16:9'
-              }
+              aspectRatio={stageAspectRatio}
               realtimeSessionTiming={session.realtimeSessionTiming}
               idleAction={
                 stagePresentation.kind === 'idle' && firstSuccessGuideVisible ? (
@@ -1031,72 +1169,90 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                 ) : null
               }
               {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}
-              controls={({ visible }) => (
-                <StudioSessionControlBar
-                  session={session}
-                  {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}
-                  experienceImageAssetId={currentExperienceImageAssetId}
-                  recording={recording}
-                  recordingMode={effectiveRecordingMode}
-                  recordingSource={activeRecordingSource}
-                  recordingSupported={browser.mediaRecorder}
-                  {...(captureBlockedReason
-                    ? { recordingBlockedReason: captureBlockedReason }
-                    : {})}
-                  reviewingTake={stagePresentation.kind === 'playback'}
-                  visible={visible}
-                  controlsLocked={reviewLocked || finalizingStartedAt !== null}
-                  onStopRecording={finishTake}
-                  onStartLocalRecording={startExistingVideoRecording}
-                  onCloseTakeReview={closeTakeReview}
-                  onDiscardTake={discardExistingVideoSelection}
-                  onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
-                  onChooseAiExperience={() => openOverlay('ai-experience')}
-                  onChangeExperience={() => openOverlay('ai-experience')}
-                  onUploadVideo={openExistingVideo}
-                  uploadButtonRef={uploadToggleRef}
-                />
-              )}
+              {...(!videoEditing
+                ? {
+                    controls: ({ visible }: { visible: boolean }) => (
+                      <StudioSessionControlBar
+                        session={session}
+                        {...(currentExperienceLabel
+                          ? { experienceLabel: currentExperienceLabel }
+                          : {})}
+                        experienceImageAssetId={currentExperienceImageAssetId}
+                        recording={recording}
+                        recordingMode={effectiveRecordingMode}
+                        recordingSource={activeRecordingSource}
+                        recordingSupported={browser.mediaRecorder}
+                        {...(captureBlockedReason
+                          ? { recordingBlockedReason: captureBlockedReason }
+                          : {})}
+                        reviewingTake={stagePresentation.kind === 'playback'}
+                        visible={visible}
+                        controlsLocked={reviewLocked || finalizingStartedAt !== null}
+                        onStopRecording={finishTake}
+                        onStartLocalRecording={startExistingVideoRecording}
+                        onCloseTakeReview={closeTakeReview}
+                        onDiscardTake={discardExistingVideoSelection}
+                        onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
+                        onChooseAiExperience={() => openOverlay('ai-experience')}
+                        onChangeExperience={() => openOverlay('ai-experience')}
+                        onUploadVideo={openExistingVideo}
+                        uploadButtonRef={uploadToggleRef}
+                      />
+                    ),
+                  }
+                : {})}
               notices={stageNotices}
               onPlaybackError={recording.repairPresentedObjectUrl}
               fullscreenTargetRef={fullscreenWorkspaceRef}
+              {...(videoEditPreview ? { editPreview: videoEditPreview } : {})}
             />
-            {creativeWorkspace}
-            <RecordingControls
-              recording={recording}
-              source={activeRecordingSource}
-              mode={effectiveRecordingMode}
-              {...(!desktopStudioLayout ? { onOpenSettings: openCaptureSettings } : {})}
-              desktopSettings={
-                desktopStudioLayout ? (
-                  <div
-                    tabIndex={-1}
-                    data-desktop-capture-settings=""
-                    css={{
-                      minWidth: 0,
-                      minHeight: 0,
-                      height: '100%',
-                      overflow: 'hidden',
-                      borderRadius: 'inherit',
-                      '&:focus-visible': {
-                        outline: `2px solid ${theme.colors.focus}`,
-                        outlineOffset: '-2px',
-                      },
-                    }}
-                  >
-                    <CaptureSettingsPanel
-                      controller={session.capturePreferences}
-                      mode={session.draft.mode}
-                      presentation="sidebar"
-                      disabled={mediaLocked || aiSessionActive}
-                      {...(captureSettingsDisabledReason
-                        ? { disabledReason: captureSettingsDisabledReason }
-                        : {})}
-                    />
-                  </div>
-                ) : undefined
-              }
-            />
+            {videoEditing ? (
+              <Suspense fallback={deferredPanelFallback}>
+                <VideoEditWorkspace
+                  session={videoEditor}
+                  onRequestDiscard={requestVideoEditDiscard}
+                />
+              </Suspense>
+            ) : (
+              <>
+                {creativeWorkspace}
+                <RecordingControls
+                  recording={recording}
+                  source={activeRecordingSource}
+                  mode={effectiveRecordingMode}
+                  {...(!desktopStudioLayout ? { onOpenSettings: openCaptureSettings } : {})}
+                  desktopSettings={
+                    desktopStudioLayout ? (
+                      <div
+                        tabIndex={-1}
+                        data-desktop-capture-settings=""
+                        css={{
+                          minWidth: 0,
+                          minHeight: 0,
+                          height: '100%',
+                          overflow: 'hidden',
+                          borderRadius: 'inherit',
+                          '&:focus-visible': {
+                            outline: `2px solid ${theme.colors.focus}`,
+                            outlineOffset: '-2px',
+                          },
+                        }}
+                      >
+                        <CaptureSettingsPanel
+                          controller={session.capturePreferences}
+                          mode={session.draft.mode}
+                          presentation="sidebar"
+                          disabled={mediaLocked || aiSessionActive}
+                          {...(captureSettingsDisabledReason
+                            ? { disabledReason: captureSettingsDisabledReason }
+                            : {})}
+                        />
+                      </div>
+                    ) : undefined
+                  }
+                />
+              </>
+            )}
           </div>
         </main>
 
@@ -1107,11 +1263,43 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             finalizingStream !== null ||
             existingVideo.providerActive
           }
+          videoRenderingActive={['rendering', 'validating', 'committing'].includes(
+            videoEditor.phase,
+          )}
           hasTemporaryTake={Boolean(recording.presented)}
           voiceProcessingActive={recording.processingState === 'processing'}
-          shelfDirty={shelfDirty || outfitBuilderDirty || wardrobeDirty}
+          shelfDirty={shelfDirty || outfitBuilderDirty || wardrobeDirty || videoEditor.dirty}
           onDiscardTemporaryWork={discardTemporaryWork}
         />
+
+        <Suspense fallback={null}>
+          <ConfirmationDialog
+            open={videoEditDiscardPromptOpen}
+            title="Discard video edits?"
+            description="Your current video stays unchanged. All trim, crop, rotation, lighting, and filter changes in this edit session will be discarded."
+            confirmLabel="Discard edits"
+            cancelLabel="Keep editing"
+            danger
+            returnFocusRef={mainRef}
+            onCancel={() => setVideoEditDiscardPromptOpen(false)}
+            onConfirm={returnFromVideoEditor}
+          />
+          <ConfirmationDialog
+            open={videoEditor.phase === 'awaiting-replacement'}
+            title="Replace the current video?"
+            description="The validated edit will become the new immutable source for Voice and later video tools. You can download the current source first."
+            confirmLabel="Download Original and Replace"
+            cancelLabel="Cancel"
+            busy={videoEditor.phase === 'committing'}
+            secondaryAction={{
+              label: 'Replace Without Downloading',
+              onAction: () => commitVideoEdit(false),
+            }}
+            returnFocusRef={mainRef}
+            onCancel={videoEditor.resumeEditing}
+            onConfirm={() => commitVideoEdit(true)}
+          />
+        </Suspense>
 
         <OverlayPanel
           open={activeOverlay === 'video-upload'}
@@ -1142,6 +1330,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             onCreateCharacter={createCharacterForExistingVideo}
             onCreateWardrobeVariant={openWardrobeForExistingVideo}
             onFinish={finishExistingVideoSetup}
+            onAdjustVideo={openVideoAdjust}
             recordingSupported={
               browser.mediaRecorder && browser.mediaDevices && browser.secureContext
             }

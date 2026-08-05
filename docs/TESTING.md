@@ -53,6 +53,9 @@ The retained suite protects:
   H.264/AAC MP4 configuration, no-raw-fallback failure, playback, Download, Release, and confirmed
   Discard;
 - immutable-original local and ElevenLabs Voice processing;
+- local video-edit normalization/history, worker progress/cancellation/stale-result handling,
+  offset-aware output limits, persistent-stage preview, keyboard crop, atomic source replacement,
+  downstream Voice sidecars, and pre-provider aspect gating;
 - upload and primary local-record adoption into the editor; discoverable Character Swap, Virtual
   Try On, and Voice; Original/Result synchronization; strict visual-before-voice ordering;
   latest-result cleanup; and post-generation MP4 validation;

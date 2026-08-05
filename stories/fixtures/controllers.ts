@@ -141,6 +141,7 @@ export const createRecordingController = (
     start: fn(() => Promise.resolve()),
     stop: fn(() => Promise.resolve(null)),
     restorePersistedOriginal: fn(restorePersistedOriginal),
+    replaceSource: fn(restorePersistedOriginal),
     discard: fn(),
     markDownloaded: fn(),
     beginProcessing: fn(),

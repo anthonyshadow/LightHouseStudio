@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { useTheme } from '@emotion/react';
 import { getRecordingDurationTiming } from '@studio/domain';
 import type { LocalCaptureAspectRatio } from '../../application/types';
@@ -29,6 +29,13 @@ import {
 import { StageNoticeLayer } from './StageNoticeLayer';
 import type { StageNotice } from './stageNotices';
 import { describeStageMedia, type StagePresentation } from './stagePresentation';
+import type { VideoEditStagePreviewContract } from '../video-editor/types';
+
+const VideoEditStagePreview = lazy(() =>
+  import('../video-editor/VideoEditStagePreview').then((module) => ({
+    default: module.VideoEditStagePreview,
+  })),
+);
 
 export type { StagePresentation } from './stagePresentation';
 
@@ -46,6 +53,7 @@ export type MediaStageProps = {
   notices?: readonly StageNotice[];
   onPlaybackError?: (message: string) => void;
   fullscreenTargetRef?: RefObject<HTMLElement | null>;
+  editPreview?: VideoEditStagePreviewContract;
 };
 
 export type StageControlVisibility = {
@@ -257,6 +265,7 @@ export const MediaStage = ({
   notices = [],
   onPlaybackError,
   fullscreenTargetRef,
+  editPreview,
 }: MediaStageProps) => {
   const theme = useTheme();
   const figureRef = useRef<HTMLElement>(null);
@@ -291,6 +300,7 @@ export const MediaStage = ({
   const copy = emptyCopy(stageMode);
   const statusTone = presentation.kind === 'playback' ? 'accent' : lifecycleTone(lifecycle);
   const playbackLocked = presentation.kind === 'playback' && presentation.controlsLocked;
+  const editingPlayback = presentation.kind === 'playback' && editPreview !== undefined;
   const playbackOperation =
     presentation.kind === 'playback' ? presentation.processingOperation : null;
   const isFinalizing = presentation.kind === 'finalizing';
@@ -348,7 +358,7 @@ export const MediaStage = ({
       if (video.srcObject) video.srcObject = null;
       video.muted = false;
       video.autoplay = false;
-      video.controls = !playbackLocked;
+      video.controls = !playbackLocked && !editingPlayback;
 
       if (boundPlaybackUrlRef.current !== nextUrl || video.getAttribute('src') !== nextUrl) {
         video.src = nextUrl;
@@ -418,7 +428,7 @@ export const MediaStage = ({
         video.removeEventListener('loadedmetadata', restorePlaybackPosition);
       }
     };
-  }, [playbackLocked, playbackUrl, presentation.kind, stream]);
+  }, [editingPlayback, playbackLocked, playbackUrl, presentation.kind, stream]);
 
   useEffect(
     () => () => {
@@ -597,15 +607,17 @@ export const MediaStage = ({
             theme,
             hasVisibleMedia,
             mirrored,
-            presentation.kind === 'playback' && !playbackLocked,
+            presentation.kind === 'playback' && !playbackLocked && !editingPlayback,
           )}
           muted={presentation.kind !== 'playback'}
-          controls={presentation.kind === 'playback' && !playbackLocked}
+          controls={presentation.kind === 'playback' && !playbackLocked && !editingPlayback}
           playsInline
           autoPlay={presentation.kind !== 'playback'}
           preload="metadata"
-          tabIndex={presentation.kind === 'playback' && !playbackLocked ? 0 : -1}
-          aria-hidden={!hasVisibleMedia}
+          tabIndex={
+            presentation.kind === 'playback' && !playbackLocked && !editingPlayback ? 0 : -1
+          }
+          aria-hidden={!hasVisibleMedia || editingPlayback}
           aria-disabled={playbackLocked || undefined}
           aria-label={
             presentation.kind === 'playback'
@@ -621,6 +633,12 @@ export const MediaStage = ({
           data-playback-locked={playbackLocked ? 'true' : 'false'}
           data-playback-artifact-id={playbackArtifact?.id}
         />
+
+        {editingPlayback && editPreview ? (
+          <Suspense fallback={null}>
+            <VideoEditStagePreview videoRef={videoRef} contract={editPreview} />
+          </Suspense>
+        ) : null}
 
         {!hasVisibleMedia ? (
           <div css={emptyStyles(theme)}>

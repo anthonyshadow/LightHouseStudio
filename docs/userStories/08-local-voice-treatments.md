@@ -6,7 +6,8 @@
 
 1. From Latest Take, or the existing-video editor when the corresponding option is available, open
    **Voice** for a source with a usable audio sidecar. Both entries use the same Voice workspace;
-   the existing-video editor does not open a second Voice flow.
+   the existing-video editor does not open a second Voice flow. A confirmed local video edit becomes
+   the immutable source and installs its newly extracted sidecar before Voice can start.
 2. Choose **Original**, **Warm studio**, **Clear presenter**, or **Signal robot** from the treatment
    rail. The source summary remains **Original audio**, and the video remains on the persistent
    stage.
@@ -30,6 +31,8 @@
   existing-video editor's outer Start action owns processing.
 - Encoder/remux failure never overwrites the original. Replacement commits before an old processed
   URL is revoked.
+- Square, 4:5, and incompatible Freeform edited sources keep Voice available when their sidecar is
+  valid even though Character Swap and Virtual Try On are disabled.
 - No local treatment contacts a provider.
 
 ## Evidence status

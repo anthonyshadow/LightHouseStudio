@@ -7,6 +7,8 @@ ever uploading video or replacing the immutable original on failure.
 
 1. Open **Voice** in the existing-video editor or **Voice treatments** in Latest Take for a source
    with a usable sidecar, browser audio replacement, and a duration no greater than five minutes.
+   A confirmed local video edit supplies a newly extracted sidecar from its validated H.264/AAC
+   candidate before this action becomes available.
 2. Select **Saved AI Voice** in the shared Voice workspace. The saved library replaces the treatment
    detail pane instead of opening a nested dialog. Loading remains lazy: opening Voice treatments
    alone does not fetch voices.
@@ -34,6 +36,8 @@ ever uploading video or replacing the immutable original on failure.
 - Preview output is capped at 2 MiB and conversion output at 8 MiB. Empty, malformed, oversized,
   endless, or cancelled output cannot replace the take.
 - Cancel, error, or **Original** preserves/restores the immutable capture.
+- Edited 1:1, 4:5, or incompatible Freeform sources remain eligible when their sidecar is valid
+  even though Character Swap and Virtual Try On are disabled.
 
 ## Controlled-pilot boundary
 

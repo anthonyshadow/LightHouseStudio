@@ -160,6 +160,21 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
   selected until **Clear Voice setup** is used. Run a combined Character/VTO plus Voice plan and
   confirm the visual commits first, the result remains locked until Voice finishes, and a Voice
   retry uses that visual without another visual-processing submission.
+- Open **Adjust video** from Original and again from a visual/voiced Result. Confirm the persistent
+  stage keeps one video node and playback time while capture controls are replaced. Exercise trim
+  looping and Set In/Out; all six crop modes; 90° rotations; both flips; every lighting range and
+  filter; Before; per-tool/all reset; and grouped undo/redo. Use pointer capture and keyboard crop
+  handles (1%, Shift+5%) at all five viewports, safe areas, reduced motion, and 200% text.
+- Cancel a real render, close/reopen after a dirty-discard cancellation, and attempt route exit
+  during render. Verify the worker must be explicitly cancelled, stale completion does not publish,
+  and the draft/pinned artifact survive render or validation failure. Exercise all replacement
+  actions: Cancel, Replace Without Downloading, and Download Original and Replace; verify the
+  download uses the artifact pinned at editor entry even when it was already a visual/voice Result.
+- Inspect edited files locally and in an external player. Require non-empty H.264 MP4, AAC plus a
+  matching sidecar when source audio exists, silent output for silent input, requested even
+  dimensions/orientation, duration within 500 ms, and the 300,000,000-byte maximum. Confirm 16:9
+  and 9:16 enable Character/VTO; 1:1, 4:5, and incompatible Freeform disable both before any HTTP
+  while Download and Voice use the edited source/sidecar.
 - In Character Swap, choose a saved image character and confirm only its reference is attached;
   Prompt stays empty but accepts a different manual direction. Choose a prompt-only character and
   confirm its prompt fills the field. In the reference-required configuration, confirm prompt-only

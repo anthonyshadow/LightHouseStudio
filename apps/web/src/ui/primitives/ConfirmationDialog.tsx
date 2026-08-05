@@ -1,5 +1,5 @@
 import { useEffect, useRef, type RefObject } from 'react';
-import { Button } from './Button';
+import { Button, type ButtonVariant } from './Button';
 import { OverlayPanel } from './OverlayPanel';
 
 export interface ConfirmationDialogProps {
@@ -10,6 +10,11 @@ export interface ConfirmationDialogProps {
   cancelLabel?: string;
   danger?: boolean;
   busy?: boolean;
+  secondaryAction?: Readonly<{
+    label: string;
+    onAction: () => void;
+    variant?: ButtonVariant;
+  }>;
   returnFocusRef?: RefObject<HTMLElement | null>;
   onCancel: () => void;
   onConfirm: () => void;
@@ -23,6 +28,7 @@ export const ConfirmationDialog = ({
   cancelLabel = 'Stay',
   danger = false,
   busy = false,
+  secondaryAction,
   returnFocusRef,
   onCancel,
   onConfirm,
@@ -43,13 +49,22 @@ export const ConfirmationDialog = ({
       size="standard"
       closeDisabled={busy}
       closeOnBackdrop={false}
-      initialFocus="heading"
+      initialFocusRef={cancelRef}
       {...(returnFocusRef ? { returnFocusRef } : {})}
       footer={
         <div css={{ display: 'flex', flexWrap: 'wrap', justifyContent: 'flex-end', gap: '.75rem' }}>
           <Button ref={cancelRef} disabled={busy} variant="quiet" onClick={onCancel}>
             {cancelLabel}
           </Button>
+          {secondaryAction ? (
+            <Button
+              disabled={busy}
+              variant={secondaryAction.variant ?? 'secondary'}
+              onClick={secondaryAction.onAction}
+            >
+              {secondaryAction.label}
+            </Button>
+          ) : null}
           <Button
             busy={busy}
             disabled={busy}

@@ -116,10 +116,12 @@ beforeEach(() => {
   media.outputOptions = null;
   media.registerAacEncoder.mockReset();
   media.retainAudio = true;
+  media.videoTrack.getCodec.mockReset().mockResolvedValue('avc');
+  media.audioTrack.getCodec.mockReset().mockResolvedValue('aac');
 });
 
 describe('transcodeRecordingToMp4', () => {
-  it('forces primary video and audio into H.264/AAC MP4 before returning a Blob', async () => {
+  it('copies matching primary H.264/AAC tracks into the normalized MP4', async () => {
     const result = await transcodeRecordingToMp4(new Blob(['recorded'], { type: 'video/webm' }), {
       requireAudio: true,
       signal: new AbortController().signal,
@@ -132,10 +134,10 @@ describe('transcodeRecordingToMp4', () => {
       tracks: 'primary',
       video: {
         codec: 'avc',
-        forceTranscode: true,
-        hardwareAcceleration: 'prefer-hardware',
+        forceTranscode: false,
+        hardwareAcceleration: 'no-preference',
       },
-      audio: { codec: 'aac', forceTranscode: true },
+      audio: { codec: 'aac', forceTranscode: false },
       tags: {},
       showWarnings: false,
     });
@@ -146,7 +148,23 @@ describe('transcodeRecordingToMp4', () => {
     expect(media.cancel).not.toHaveBeenCalled();
   });
 
+  it('transcodes non-H.264/non-AAC source tracks before publishing', async () => {
+    media.videoTrack.getCodec.mockResolvedValueOnce('vp8').mockResolvedValue('avc');
+    media.audioTrack.getCodec.mockResolvedValueOnce('opus').mockResolvedValue('aac');
+
+    await transcodeRecordingToMp4(new Blob(['recorded'], { type: 'video/webm' }), {
+      requireAudio: true,
+      signal: new AbortController().signal,
+    });
+
+    expect(media.conversionOptions).toMatchObject({
+      video: { codec: 'avc', forceTranscode: true },
+      audio: { codec: 'aac', forceTranscode: true },
+    });
+  });
+
   it('registers MediaBunny AAC fallback support when the browser lacks a native encoder', async () => {
+    media.audioTrack.getCodec.mockResolvedValueOnce('opus').mockResolvedValue('aac');
     media.canEncodeAudio = false;
     media.registerAacEncoder.mockImplementation(() => {
       media.canEncodeAudio = true;
@@ -162,6 +180,7 @@ describe('transcodeRecordingToMp4', () => {
   });
 
   it('rejects instead of returning an unconverted file when H.264 encoding is unavailable', async () => {
+    media.videoTrack.getCodec.mockResolvedValueOnce('vp8').mockResolvedValue('avc');
     media.canEncodeVideo = false;
 
     await expect(

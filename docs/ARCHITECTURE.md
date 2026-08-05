@@ -57,6 +57,13 @@ The recording-artifact owner may repair one stale playback URL from its retained
 error. `MediaStage` reports the error but never creates or owns the replacement URL.
 Original/Result comparison drives both this inline player and the stage.
 
+Local video editing extends the same stage through an optional presentation contract; it does not
+introduce another media node or URL owner. The contract supplies the normalized draft, playback
+bounds, playhead updates, and crop callbacks. A lazily mounted WebGL canvas renders the composed
+preview above the authoritative video. **Before** temporarily removes that canvas without seeking
+or mutating history. Crop mode instead draws the full rotated source and a keyboard/pointer crop
+overlay. The shared color shader is framework-independent and is reused by the export worker.
+
 The standard Studio workspace uses that same persistent stage for both landscape and portrait
 capture. At large desktop widths it is centered between the existing creative-tool rail and the
 session/device region; tablet and mobile stack those same regions below it. The session control
@@ -72,6 +79,12 @@ presented through the shared overlay; the compact capture strip is the launcher.
 change never leaves two mounted settings forms. Capture choices auto-apply, device discovery runs
 on mount and `devicechange`, and failed live replacement restores the last applied draft while
 preserving the visible safe error. There are no manual Apply, Refresh, or Discard actions.
+
+`video-edit` is a Studio-owned workspace mode rather than an overlay. It replaces the capture/tool
+regions while active: desktop uses categories / persistent stage / named-scroll settings columns;
+tablet and mobile use stage / horizontal category strip / bounded settings rows. The settings
+footer remains sticky and safe-area-aware. `useVideoEditSession` is the sole owner of the pinned
+source, baseline, draft, 50-entry grouped history, generation, candidate, and worker cancellation.
 
 At the existing `64rem` desktop breakpoint, the header has no AI selection control. The
 creative-tool rail owns **Select Character**, **Select Outfit**, then **Workshop** as three ordered
@@ -91,11 +104,12 @@ Character Builder is fullscreen and uses one preview/generation DOM.
 Narrow screens reveal that same region through **Review & Generate** instead of duplicating
 stateful controls.
 
-`StudioExitGuard` blocks navigation leaving `/studio` while recording or finalization is active.
-A temporary take, active Voice process, or dirty Shelf or Outfit Builder form requires confirmed
-discard before the route proceeds. Hard unload receives the matching browser warning, while future
-navigation among `/studio/*` children is deliberately exempt so a shared runtime layout can remain
-mounted.
+`StudioExitGuard` blocks navigation leaving `/studio` while recording, finalization, or local video
+render/validation is active. A temporary take, active Voice process, dirty video-edit draft, or
+dirty Shelf or Outfit Builder form requires confirmed discard before the route proceeds. Rendering
+must be cancelled before discard; navigation cannot abandon the worker. Hard unload receives the
+matching browser warning, while future navigation among `/studio/*` children is deliberately
+exempt so a shared runtime layout can remain mounted.
 
 The shell is viewport-bound with safe-area padding and deliberate support for `1440×960`,
 `1280×720`, `834×1112`, `390×844`, and `320×568`. The stage, responsive tool/session regions, and
@@ -230,6 +244,23 @@ Recorded and uploaded media publish through one artifact boundary:
 
 `immutable source → latest healthy result`.
 
+An edited export crosses that boundary only after worker completion, browser-local decode and
+track validation, and a three-action replacement confirmation. The dedicated module worker lazily
+loads MediaBunny and its AAC extension, uses `Conversion` for trim/baked rotation/crop and
+H.264/AAC encoding, and runs the shared WebGL shader after geometric transforms for flips, filters,
+and lighting. Its `StreamTarget` writes into offset-aware 4 MiB blocks with a 300,000,000-byte
+maximum; cancellation and failure release all blocks. There is no synchronous main-thread export
+fallback.
+
+Validation requires non-empty playable H.264/AAC MP4 output, expected primary tracks, exact even
+dimensions and orientation, duration within 500 ms, and a newly extracted immutable audio sidecar
+when the pinned source has audio. A confirmed controller transaction publishes an `edited` child
+with `parentArtifactId`, updates selected-video metadata and compatibility, then releases
+superseded source/visual/voice URLs. Failure before publication leaves the prior source and draft
+intact. Provider compatibility is derived from edited output geometry; only 16:9 and 9:16 within
+the existing 1% tolerance can create Character Swap or VTO intent, while Voice and Download remain
+available for other ratios.
+
 The finalized or validated source replaces live media on the same persistent stage. The artifact
 owner creates and revokes every source/visual/voice URL. Changing source invalidates downstream
 layers. During a combined edit, the healthy visual remains available while voice conversion runs;
@@ -348,19 +379,20 @@ Host-derived owner IDs are a local namespace, not identity.
 
 The creator of a resource owns idempotent cleanup.
 
-| Owner                 | Resources                                                                                                               |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------- |
-| Session orchestration | Owned local/remote streams, cloned provider input, provider client, token abort, active-session clock                   |
-| Session draft         | Ephemeral files and preview object URLs                                                                                 |
-| Recording/review      | Recorders, chunks, conversion abort, immutable source/sidecar, visual/voice artifact URLs, cap timer, unload protection |
-| Existing-video flow   | Validation generations, one ephemeral visual draft, provider polling/download                                           |
-| Character Wardrobe    | Variant creation draft, generation abort, stale-result rejection, exact version handoff                                 |
-| Voice processing      | Abort controllers, Web Audio/Mediabunny resources, temporary processed URLs                                             |
-| Media stage           | DOM media attachment and control-visibility timer                                                                       |
-| Overlay               | Focus/inert/scroll state only; never media                                                                              |
-| API request/service   | Request abort, upstream streams, shared-operation subscribers, provider deadline                                        |
-| Video-job service     | In-memory owner/job map, exact-once submission, private temp paths, expiry and result cleanup                           |
-| Reference store       | Atomic files, metadata, request mappings, conservative temporary cleanup                                                |
+| Owner                 | Resources                                                                                                                      |
+| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ |
+| Session orchestration | Owned local/remote streams, cloned provider input, provider client, token abort, active-session clock                          |
+| Session draft         | Ephemeral files and preview object URLs                                                                                        |
+| Recording/review      | Recorders, chunks, conversion abort, immutable source/sidecar, edited/visual/voice artifact URLs, cap timer, unload protection |
+| Existing-video flow   | Validation generations, one ephemeral visual draft, provider polling/download                                                  |
+| Video edit session    | Pinned source/draft/history, module worker generation, render candidate, chunk accumulator, validation abort                   |
+| Character Wardrobe    | Variant creation draft, generation abort, stale-result rejection, exact version handoff                                        |
+| Voice processing      | Abort controllers, Web Audio/Mediabunny resources, temporary processed URLs                                                    |
+| Media stage           | DOM media attachment and control-visibility timer                                                                              |
+| Overlay               | Focus/inert/scroll state only; never media                                                                                     |
+| API request/service   | Request abort, upstream streams, shared-operation subscribers, provider deadline                                               |
+| Video-job service     | In-memory owner/job map, exact-once submission, private temp paths, expiry and result cleanup                                  |
+| Reference store       | Atomic files, metadata, request mappings, conservative temporary cleanup                                                       |
 
 Late async results check their generation or abort state before commit. A healthy replacement
 commits before the previous owned resource is released. Duplicate Stop coalesces. Recording only

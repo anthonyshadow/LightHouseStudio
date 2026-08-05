@@ -300,11 +300,20 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
     gap: theme.space.xs,
     gridTemplateRows: 'minmax(0, 1fr) 3.15rem 2.85rem',
   },
+  '&[data-video-edit-active="true"]': {
+    gridTemplateRows: 'minmax(8rem, 1fr) 3.15rem minmax(11rem, 38vh)',
+  },
   '@media (max-width: 39.99rem)': {
     gridTemplateRows: 'minmax(0, 1fr) 3.15rem 2.85rem',
+    '&[data-video-edit-active="true"]': {
+      gridTemplateRows: 'minmax(8rem, 1fr) 3.15rem minmax(10.5rem, 42vh)',
+    },
   },
   '@media (max-width: 20rem), (max-height: 36rem)': {
     gridTemplateRows: 'minmax(0, 1fr) 3rem 2.75rem',
+    '&[data-video-edit-active="true"]': {
+      gridTemplateRows: 'minmax(7rem, 1fr) 3rem minmax(9.5rem, 43vh)',
+    },
   },
   '@media (min-width: 64rem)': {
     gridTemplateColumns: 'minmax(12rem, 15rem) minmax(0, 1fr) minmax(18rem, 20rem)',
@@ -313,6 +322,9 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
     '& > [data-media-stage-layout]': { gridColumn: 2, gridRow: 1 },
     '& > [data-studio-tool-rail]': { gridColumn: 1, gridRow: 1 },
     '& > [data-capture-controls]': { gridColumn: 3, gridRow: 1 },
+    '&[data-video-edit-active="true"]': {
+      gridTemplateRows: 'minmax(0, 1fr)',
+    },
   },
   '@media (min-width: 64rem) and (max-height: 48rem)': {
     gap: theme.space.sm,

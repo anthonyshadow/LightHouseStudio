@@ -357,7 +357,7 @@ describe('useRecording recorder construction failures', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:repaired-original');
   });
 
-  it('revokes the prior original and processed URLs when a persisted original replaces them', () => {
+  it('atomically publishes an edited source before releasing prior original and processed URLs', () => {
     installRecorderHarness();
     vi.mocked(URL.createObjectURL)
       .mockReturnValueOnce('blob:first-original')
@@ -386,10 +386,12 @@ describe('useRecording recorder construction failures', () => {
     vi.mocked(URL.revokeObjectURL).mockClear();
 
     act(() => {
-      result.current.restorePersistedOriginal({
+      result.current.replaceSource({
         blob: new Blob(['second'], { type: 'video/webm' }),
         artifactMetadata: {
           id: 'second',
+          kind: 'edited',
+          parentArtifactId: 'first',
           mimeType: 'video/webm',
           filename: 'second.webm',
           sourceModeId: 'local',
@@ -403,6 +405,10 @@ describe('useRecording recorder construction failures', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:first-original');
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:processed');
     expect(result.current.original?.objectUrl).toBe('blob:second-original');
+    expect(result.current.original).toMatchObject({
+      kind: 'edited',
+      parentArtifactId: 'first',
+    });
     expect(result.current.processed).toBeNull();
 
     unmount();

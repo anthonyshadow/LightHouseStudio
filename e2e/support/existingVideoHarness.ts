@@ -19,6 +19,14 @@ export const loadH264VideoFixture = async (): Promise<Buffer> => {
   return Buffer.from(match[1], 'base64');
 };
 
+export const loadDecodableH264VideoFixture = async (): Promise<Buffer> => {
+  const source = await readFile(
+    new URL('../fixtures/decodable-h264-video.base64', import.meta.url),
+    'utf8',
+  );
+  return Buffer.from(source.replaceAll(/\s/gu, ''), 'base64');
+};
+
 export const installFakeVideoJobRoutes = async (
   page: Page,
   resultBytes: Buffer,

@@ -582,6 +582,7 @@ export const useRecording = ({
       start,
       stop,
       restorePersistedOriginal,
+      replaceSource: restorePersistedOriginal,
       discard,
       markDownloaded: artifacts.markDownloaded,
       beginProcessing: artifacts.beginProcessing,

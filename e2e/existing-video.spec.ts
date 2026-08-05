@@ -1,6 +1,10 @@
 import { expect, test, type Page } from '@playwright/test';
 import { VIDEO_PROVIDER_INTENT_VALUE } from '@studio/contracts';
-import { installFakeVideoJobRoutes, loadH264VideoFixture } from './support/existingVideoHarness';
+import {
+  installFakeVideoJobRoutes,
+  loadDecodableH264VideoFixture,
+  loadH264VideoFixture,
+} from './support/existingVideoHarness';
 import {
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
@@ -193,6 +197,98 @@ test('provider-free upload previews and enters the existing take/download surfac
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
 
+test('provider-free Adjust video renders locally and atomically replaces the persistent source', async ({
+  page,
+}) => {
+  await installCameraSentinel(page);
+  const network = await installProviderNetworkDriver(page);
+  await page.goto('/');
+  const fixture = await loadDecodableH264VideoFixture();
+
+  await selectExistingVideo(page, fixture, 'local-edit-source.mp4');
+  const upload = page.getByRole('dialog', { name: 'Use existing video' });
+  const stageVideo = page.getByLabel('Studio media stage').locator('video');
+  await expect(stageVideo).toHaveCount(1);
+  await stageVideo.evaluate((video) => {
+    (
+      window as typeof window & { __lightframeVideoEditorStage?: HTMLVideoElement }
+    ).__lightframeVideoEditorStage = video as HTMLVideoElement;
+  });
+
+  await upload.getByRole('button', { name: 'Adjust video' }).click();
+  await expect(upload).toBeHidden();
+  await expect(page.getByRole('navigation', { name: 'Video editing tools' })).toBeVisible();
+  await expect(page.getByLabel('Video edit settings')).toBeVisible();
+  await expect(page.locator('video')).toHaveCount(1);
+  expect(
+    await stageVideo.evaluate(
+      (video) =>
+        (window as typeof window & { __lightframeVideoEditorStage?: HTMLVideoElement })
+          .__lightframeVideoEditorStage === video,
+    ),
+  ).toBe(true);
+
+  await page.getByRole('button', { name: 'Lighting', exact: true }).click();
+  await page.getByRole('slider', { name: 'Brightness' }).fill('24');
+  const beforeToggle = page.getByRole('button', { name: 'Preview before' });
+  await beforeToggle.click();
+  await expect(page.getByRole('button', { name: 'Showing before' })).toHaveAttribute(
+    'aria-pressed',
+    'true',
+  );
+  await page.getByRole('button', { name: 'Showing before' }).click();
+
+  await page.getByRole('button', { name: 'Save edited video' }).click();
+  const replacement = page.getByRole('dialog', { name: 'Replace the current video?' });
+  await expect(replacement).toBeVisible({ timeout: 60_000 });
+  await expect(replacement.getByRole('button', { name: 'Cancel' })).toBeFocused();
+  await expect(
+    replacement.getByRole('button', { name: 'Download Original and Replace' }),
+  ).toBeVisible();
+  await replacement.getByRole('button', { name: 'Cancel' }).click();
+  await expect(replacement).toBeHidden();
+  await expect(page.getByRole('slider', { name: 'Brightness' })).toHaveValue('24');
+
+  await page.getByRole('button', { name: 'Save edited video' }).click();
+  await expect(replacement).toBeVisible({ timeout: 60_000 });
+  await replacement.getByRole('button', { name: 'Replace Without Downloading' }).click();
+
+  await expect(upload).toBeVisible();
+  await expect(upload.getByTitle(/local-edit-source-edited-/u).first()).toBeVisible();
+  await expect(upload.getByRole('button', { name: 'Character Swap', exact: true })).toBeEnabled();
+  await expect(stageVideo).toHaveCount(1);
+  await expect(upload.locator('video')).toHaveCount(1);
+  expect(
+    await stageVideo.evaluate(
+      (video) =>
+        (window as typeof window & { __lightframeVideoEditorStage?: HTMLVideoElement })
+          .__lightframeVideoEditorStage === video,
+    ),
+  ).toBe(true);
+
+  await upload.getByRole('button', { name: 'Adjust video' }).click();
+  await page.getByRole('button', { name: 'Crop', exact: true }).click();
+  await page.getByRole('button', { name: '1:1', exact: true }).click();
+  await page.getByRole('button', { name: 'Save edited video' }).click();
+  await expect(replacement).toBeVisible({ timeout: 60_000 });
+  const downloadPromise = page.waitForEvent('download');
+  await replacement.getByRole('button', { name: 'Download Original and Replace' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toMatch(/\.mp4$/u);
+
+  await expect(upload).toBeVisible();
+  await expect(upload.getByRole('button', { name: 'Character Swap', exact: true })).toBeDisabled();
+  await expect(upload.getByRole('button', { name: 'Virtual Try On', exact: true })).toBeDisabled();
+  await expect(upload).toContainText('require a 16:9 or 9:16 source');
+  expect(await cameraCalls(page)).toBe(0);
+  expect(new Set(network.apiRequests.map(({ path }) => path))).toEqual(
+    new Set(['/api/capabilities']),
+  );
+  expect(network.providerSdkRequests).toEqual([]);
+  expect(network.blockedExternalRequests).toEqual([]);
+  expect(network.blockedExternalWebSockets).toEqual([]);
+});
+
 test('a selected upload ignores backdrop dismissal and can be reopened after an explicit close', async ({
   page,
 }) => {
@@ -375,7 +471,10 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
     await installCameraSentinel(page);
     await installProviderNetworkDriver(page);
     await page.goto('/');
-    const fixture = await loadH264VideoFixture();
+    // This journey switches the persistent stage between both artifacts. Use the
+    // deterministic decodable fixture so a codec error cannot trigger the stage's
+    // intentional object-URL repair path and obscure source-identity assertions.
+    const fixture = await loadDecodableH264VideoFixture();
     const calls = await installFakeVideoJobRoutes(page, fixture, {
       originalFilename: 'creator-source.mp4',
     });

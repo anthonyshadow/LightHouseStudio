@@ -25,12 +25,16 @@ absence does not disable configured application features.
 3. Choose a landscape 16:9 or portrait 9:16 local format in Capture Settings, then record on the
    persistent stage, or select a compatible device-local file. A healthy local recording is
    normalized on device and becomes the editor source after finalization.
-4. Review the source, then optionally choose exactly one visual transformation—**Character Swap**
-   or **Virtual Try On**—and/or **Voice**. Combined work completes and validates the visual result
-   before voice conversion.
-5. Preview **Original** and **Result**, revise the plan or edit base, then download the latest
+4. Review the source and optionally use **Adjust video** to trim, crop, rotate, flip, relight, or
+   filter it entirely in the browser. A validated export becomes the new immutable source only
+   after explicit replacement confirmation.
+5. Optionally choose exactly one visual transformation—**Character Swap** or **Virtual Try On**—
+   and/or **Voice**. Combined work completes and validates the visual result before voice
+   conversion. A local square, 4:5, or incompatible Freeform edit keeps Download and Voice but
+   disables Character Swap/VTO before provider contact.
+6. Preview **Original** and **Result**, revise the plan or edit base, then download the latest
    healthy result or start over while retaining the immutable source.
-6. Prepare advanced live work without starting media: desktop places **Select Character** and
+7. Prepare advanced live work without starting media: desktop places **Select Character** and
    **Select Outfit** immediately before **Workshop** in the creative-tool rail; phones and tablets
    expose one header **Select AI** action that routes to either preparation flow. A saved selection
    can then be started explicitly from **Start AI** or the Dock and recorded through the existing
@@ -45,15 +49,15 @@ every other path returns to `/`.
 Existing compatibility projects can still be downloaded or deleted from Recipe Shelf when Studio
 detects them, but they have no URL entry.
 
-Leaving Studio is blocked during recording/finalization. A temporary take, active Voice work, or
-dirty Recipe Shelf/Outfit Builder/Wardrobe edit requires confirmed discard; saved origin-scoped
-browser data is unaffected.
+Leaving Studio is blocked during recording/finalization and active local video rendering. A
+temporary take, active Voice work, dirty video edit, or dirty Recipe Shelf/Outfit Builder/Wardrobe
+edit requires confirmed discard; saved origin-scoped browser data is unaffected.
 
 ## Capabilities and provider boundaries
 
-- Local camera, microphone, existing-video validation/preview, recording, on-device MP4
-  transcoding, playback, local voice effects, and download require no provider credentials or
-  external media traffic.
+- Local camera, microphone, existing-video validation/preview, recording, non-destructive trim,
+  crop, rotation, flips, lighting and filters, on-device MP4 transcoding, playback, local voice
+  effects, and download require no provider credentials or external media traffic.
 - Character Builder saves browser-local character metadata and immutable reference assets under
   `LIGHTFRAME_DATA_DIR`. Prompt-only save and upload do not generate images.
 - Saved Characters expose a normalized Wardrobe containing the labelled original plus saved

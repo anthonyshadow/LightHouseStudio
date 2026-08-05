@@ -52,8 +52,10 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   operation: null,
   active: false,
   providerActive: false,
+  visualProviderCompatibility: { compatible: true, aspect: '16:9', reason: null },
   selectFile: vi.fn(),
   adoptRecordedArtifact: vi.fn(),
+  replaceSource: vi.fn(),
   addStep: vi.fn(() => true),
   updateStep: vi.fn(),
   removeStep: vi.fn(),
@@ -219,6 +221,57 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByRole('button', { name: 'Upload from device' })).toBeEnabled();
     expect(screen.getByText(/MP4\/H.264/u)).toBeInTheDocument();
     expect(screen.queryByText(/Decart submission/u)).not.toBeInTheDocument();
+  });
+
+  it('offers local Adjust video and disables visual AI for an incompatible edited aspect', () => {
+    const source = new File(['edited'], 'square-edited.mp4', { type: 'video/mp4' });
+    const onAdjustVideo = vi.fn();
+    render(
+      <StudioDesignProvider>
+        <ExistingVideoPanel
+          workflow={workflow({
+            selection: {
+              file: source,
+              mimeType: 'video/mp4',
+              audioSidecar: { blob: new Blob(['audio']), mimeType: 'audio/mp4' },
+              audioUnavailableReason: null,
+              metadata: {
+                kind: 'uploaded',
+                mode: 'local',
+                selectedAt: '2026-08-04T12:00:00.000Z',
+                displayName: source.name,
+                container: 'mp4',
+                videoCodec: 'avc',
+                audioCodec: 'aac',
+                durationMs: 30_000,
+                width: 1_080,
+                height: 1_080,
+                sizeBytes: source.size,
+                hasAudio: true,
+              },
+            },
+            phase: 'ready',
+            voiceAvailable: true,
+            visualProviderCompatibility: {
+              compatible: false,
+              aspect: 'unsupported',
+              reason:
+                'Character Swap and Virtual Try On require a 16:9 or 9:16 source. Local download and Voice remain available.',
+            },
+          })}
+          videoProcessingAvailable
+          onAdjustVideo={onAdjustVideo}
+          onFinish={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust video' }));
+    expect(onAdjustVideo).toHaveBeenCalledOnce();
+    expect(screen.getByRole('button', { name: 'Character Swap' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Virtual Try On' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Voice' })).toBeEnabled();
+    expect(screen.getAllByText(/require a 16:9 or 9:16 source/iu)).not.toHaveLength(0);
   });
 
   it('applies provider-neutral Character Swap capability limits independently from VTO', () => {

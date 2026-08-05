@@ -18,7 +18,7 @@ The current matrix has 29 Chromium cases:
 | Entry             |      1 | small mobile                 |     1 |
 | Core Studio       |      2 | all five                     |    10 |
 | Studio idle       |      2 | desktop                      |     2 |
-| Focused high-risk |      8 | risk-selected viewport pairs |    12 |
+| Focused high-risk |     10 | risk-selected viewport pairs |    12 |
 | Desktop-specific  |      2 | desktop                      |     2 |
 | Small-mobile risk |      2 | small mobile                 |     2 |
 
@@ -36,29 +36,33 @@ local-live/recording state/viewport pair.
 
 ## Protected states
 
-| Scope         | Baseline                                             |
-| ------------- | ---------------------------------------------------- |
-| Small mobile  | `00-entry/initial.png`                               |
-| Desktop       | `01-studio/initial-closed.png`                       |
-| Desktop       | `01-studio/initial-portrait.png`                     |
-| All viewports | `01-studio/local-camera-live.png`                    |
-| All viewports | `01-studio/recording-active.png`                     |
-| Desktop       | `01-studio/selected-character-ai-live.png`           |
-| Small mobile  | `02-character-builder/combined-reference-ready.png`  |
-| Desktop       | `03-character-library/saved-character-selection.png` |
-| Small mobile  | `04-take-review/playback-review-settled.png`         |
-| Small mobile  | `07-existing-video/chooser.png`                      |
-| All viewports | `07-existing-video/validated-setup.png`              |
-| Compact       | `07-existing-video/processing.png`                   |
-| Desktop       | `07-existing-video/result.png`                       |
-| Desktop       | `05-virtual-try-on/prepared-with-reference.png`      |
-| Desktop       | `06-voice/voice-browser-loaded.png`                  |
-| Small mobile  | `01-studio/take-finalizing.png`                      |
-| Small mobile  | `01-studio/media-permission-error.png`               |
+| Scope                 | Baseline                                             |
+| --------------------- | ---------------------------------------------------- |
+| Small mobile          | `00-entry/initial.png`                               |
+| Desktop               | `01-studio/initial-closed.png`                       |
+| Desktop               | `01-studio/initial-portrait.png`                     |
+| All viewports         | `01-studio/local-camera-live.png`                    |
+| All viewports         | `01-studio/recording-active.png`                     |
+| Desktop               | `01-studio/selected-character-ai-live.png`           |
+| Small mobile          | `02-character-builder/combined-reference-ready.png`  |
+| Desktop               | `03-character-library/saved-character-selection.png` |
+| Small mobile          | `04-take-review/playback-review-settled.png`         |
+| Small mobile          | `07-existing-video/chooser.png`                      |
+| Compact/tablet/mobile | `07-existing-video/validated-setup.png`              |
+| Compact               | `07-existing-video/processing.png`                   |
+| Desktop               | `07-existing-video/result.png`                       |
+| Desktop               | `08-video-editor/lighting-dirty.png`                 |
+| Small mobile          | `08-video-editor/crop-dirty.png`                     |
+| Desktop               | `05-virtual-try-on/prepared-with-reference.png`      |
+| Desktop               | `06-voice/voice-browser-loaded.png`                  |
+| Small mobile          | `01-studio/take-finalizing.png`                      |
+| Small mobile          | `01-studio/media-permission-error.png`               |
 
 The matrix intentionally emphasizes the record/upload first impression, neutral Local Camera
-startup, provider-free live capture, dominant recording Stop, the densest Builder/review states, and representative
-loading/error boundaries.
+startup, provider-free live capture, dominant recording Stop, the densest Builder/review states,
+deterministic dirty Lighting/Crop editor layouts, and representative loading/error boundaries. The
+desktop and small-mobile validated-upload cases were exchanged for those editor states without
+increasing the 29-case review budget.
 
 ## Determinism and readiness
 

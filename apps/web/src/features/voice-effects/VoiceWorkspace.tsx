@@ -1,4 +1,5 @@
 import { useId, useMemo, useState } from 'react';
+/* eslint-disable jsx-a11y/no-noninteractive-tabindex -- Axe requires the named Voice settings scroller to be keyboard-focusable. */
 import { useTheme } from '@emotion/react';
 import type { VoiceSummary } from '@studio/contracts';
 import { Button, StatusNotice } from '../../ui';
@@ -324,7 +325,13 @@ export const VoiceWorkspace = ({
           </details>
         </aside>
 
-        <div css={workspaceContentStyles(theme, embedded)}>
+        <div
+          role="region"
+          data-scroll-region="voice-treatments"
+          aria-label="Voice treatment settings"
+          tabIndex={0}
+          css={workspaceContentStyles(theme, embedded)}
+        >
           {activeView === 'treatments' ? (
             <div css={selectionPanelStyles(theme)}>
               <div css={selectionHeadingStyles(theme)}>
@@ -468,3 +475,4 @@ export const VoiceWorkspace = ({
     </section>
   );
 };
+/* eslint-enable jsx-a11y/no-noninteractive-tabindex */

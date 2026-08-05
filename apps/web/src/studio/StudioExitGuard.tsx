@@ -7,6 +7,7 @@ import { OverlayPanel } from '../ui/primitives/OverlayPanel';
 
 export interface StudioExitGuardProps {
   readonly recordingOrFinalizing: boolean;
+  readonly videoRenderingActive: boolean;
   readonly hasTemporaryTake: boolean;
   readonly voiceProcessingActive: boolean;
   readonly shelfDirty: boolean;
@@ -21,19 +22,21 @@ export const shouldBlockStudioExit = (
 
 export const StudioExitGuard = ({
   recordingOrFinalizing,
+  videoRenderingActive,
   hasTemporaryTake,
   voiceProcessingActive,
   shelfDirty,
   onDiscardTemporaryWork,
 }: StudioExitGuardProps) => {
   const hasDiscardableWork = hasTemporaryTake || voiceProcessingActive || shelfDirty;
-  const unsafeWorkActive = recordingOrFinalizing || hasDiscardableWork;
+  const unsafeWorkActive = recordingOrFinalizing || videoRenderingActive || hasDiscardableWork;
   const blocker = useBlocker(({ currentLocation, nextLocation }) =>
     shouldBlockStudioExit(currentLocation.pathname, nextLocation.pathname, unsafeWorkActive),
   );
 
   useEffect(() => {
-    if (!recordingOrFinalizing && !voiceProcessingActive && !shelfDirty) return;
+    if (!recordingOrFinalizing && !videoRenderingActive && !voiceProcessingActive && !shelfDirty)
+      return;
 
     const protectTransientWork = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -41,7 +44,7 @@ export const StudioExitGuard = ({
     };
     window.addEventListener('beforeunload', protectTransientWork);
     return () => window.removeEventListener('beforeunload', protectTransientWork);
-  }, [recordingOrFinalizing, shelfDirty, voiceProcessingActive]);
+  }, [recordingOrFinalizing, shelfDirty, videoRenderingActive, voiceProcessingActive]);
 
   const stayInStudio = useCallback(() => {
     if (blocker.state === 'blocked') blocker.reset();
@@ -54,16 +57,25 @@ export const StudioExitGuard = ({
   }, [blocker, onDiscardTemporaryWork]);
 
   const navigationBlocked = blocker.state === 'blocked';
-  const recordingExitBlocked = navigationBlocked && recordingOrFinalizing;
-  const discardConfirmationOpen = navigationBlocked && !recordingOrFinalizing && hasDiscardableWork;
+  const activeWorkExitBlocked =
+    navigationBlocked && (recordingOrFinalizing || videoRenderingActive);
+  const discardConfirmationOpen = navigationBlocked && !activeWorkExitBlocked && hasDiscardableWork;
 
   return (
     <>
       <OverlayPanel
-        open={recordingExitBlocked}
+        open={activeWorkExitBlocked}
         onClose={stayInStudio}
-        title="Finish the take before leaving"
-        description="Studio cannot leave while recording or finalization is active. Stay here, finish the take, then try again."
+        title={
+          videoRenderingActive
+            ? 'Cancel the video render before leaving'
+            : 'Finish the take before leaving'
+        }
+        description={
+          videoRenderingActive
+            ? 'Studio cannot abandon a local video worker. Stay here, cancel the render, then discard or save the draft before leaving.'
+            : 'Studio cannot leave while recording or finalization is active. Stay here, finish the take, then try again.'
+        }
         placement="bottom"
         size="standard"
         closeOnBackdrop={false}
@@ -73,13 +85,17 @@ export const StudioExitGuard = ({
           </Button>
         }
       >
-        <p>Stop the recording and wait for the take to finish finalizing before leaving Studio.</p>
+        <p>
+          {videoRenderingActive
+            ? 'Return to the edit settings and cancel the active render before leaving Studio.'
+            : 'Stop the recording and wait for the take to finish finalizing before leaving Studio.'}
+        </p>
       </OverlayPanel>
 
       <ConfirmationDialog
         open={discardConfirmationOpen}
         title="Discard temporary work and leave?"
-        description="Leaving Studio discards the current temporary take, active Voice work, and unsaved Recipe Shelf changes. Saved browser-local items remain available."
+        description="Leaving Studio discards the current temporary take, active Voice work, unsaved video edits, and Recipe Shelf changes. Saved browser-local items remain available."
         confirmLabel="Discard and leave"
         cancelLabel="Stay in Studio"
         danger

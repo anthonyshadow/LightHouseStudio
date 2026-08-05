@@ -79,6 +79,14 @@ export const FOCUSED_VISUAL_SCENARIOS = [
     id: 'upload-result',
     baseline: '07-existing-video/result.png',
   },
+  {
+    id: 'video-edit-lighting-dirty',
+    baseline: '08-video-editor/lighting-dirty.png',
+  },
+  {
+    id: 'video-edit-crop-dirty',
+    baseline: '08-video-editor/crop-dirty.png',
+  },
 ] as const;
 
 export const DESKTOP_VISUAL_SCENARIOS = [
@@ -124,13 +132,13 @@ export const VISUAL_CASE_MATRIX = [
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[3] },
   { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[4] },
   { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[5] },
-  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[6] },
-  ...VISUAL_VIEWPORTS.filter((viewport) => viewport.id !== 'desktop').map((viewport) => ({
-    viewport,
-    scenario: FOCUSED_VISUAL_SCENARIOS[6],
-  })),
+  ...VISUAL_VIEWPORTS.filter(
+    (viewport) => viewport.id !== 'desktop' && viewport.id !== 'small-mobile',
+  ).map((viewport) => ({ viewport, scenario: FOCUSED_VISUAL_SCENARIOS[6] })),
   { viewport: compactViewport, scenario: FOCUSED_VISUAL_SCENARIOS[7] },
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[8] },
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[9] },
+  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[10] },
   ...DESKTOP_VISUAL_SCENARIOS.map((scenario) => ({ viewport: desktopViewport, scenario })),
   ...SMALL_MOBILE_VISUAL_SCENARIOS.map((scenario) => ({
     viewport: smallMobileViewport,

@@ -68,6 +68,7 @@ const recordingController = (): RecordingController => {
     start: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(source),
     restorePersistedOriginal: vi.fn().mockReturnValue(source),
+    replaceSource: vi.fn().mockReturnValue(source),
     discard: vi.fn(),
     markDownloaded: vi.fn(),
     beginProcessing: vi.fn(),
@@ -198,6 +199,66 @@ describe('useExistingVideoWorkflow', () => {
       prompt: 'Prompt-only character',
       referenceImage: null,
     });
+  });
+
+  it('adopts an edited square source, keeps Voice available, and blocks visual provider intent', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    adapters.validateExistingVideo.mockResolvedValue(inspected(sourceFile));
+    const recording = recordingController();
+    const hook = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        processing: processingController(),
+        publishUploadedVideo: vi.fn().mockReturnValue(recording.original),
+      }),
+    );
+    await act(async () => hook.result.current.selectFile(sourceFile));
+    act(() => {
+      hook.result.current.addStep('lucy-latest');
+    });
+
+    const editedFile = new File(['edited'], 'square-edited.mp4', { type: 'video/mp4' });
+    const editedValidation = {
+      ...inspected(editedFile),
+      audioSidecar: { blob: new Blob(['audio'], { type: 'audio/mp4' }), mimeType: 'audio/mp4' },
+      metadata: {
+        ...inspected(editedFile).metadata,
+        width: 1_080,
+        height: 1_080,
+        hasAudio: true,
+        audioCodec: 'aac',
+      },
+    };
+    const editedArtifact = {
+      ...artifact('edited-source', editedFile),
+      kind: 'edited' as const,
+      parentArtifactId: recording.original?.id ?? null,
+    };
+    recording.original = editedArtifact;
+    recording.visual = null;
+    recording.processed = null;
+    recording.presented = editedArtifact;
+    recording.sidecar = {
+      state: 'ready',
+      blob: editedValidation.audioSidecar.blob,
+      mimeType: editedValidation.audioSidecar.mimeType,
+      error: null,
+    };
+    act(() => hook.result.current.replaceSource(editedValidation, editedArtifact));
+
+    expect(hook.result.current.steps).toEqual([]);
+    expect(hook.result.current.voiceAvailable).toBe(true);
+    expect(hook.result.current.visualProviderCompatibility).toMatchObject({
+      compatible: false,
+      aspect: 'unsupported',
+    });
+    let added = true;
+    act(() => {
+      added = hook.result.current.addStep('lucy-latest');
+    });
+    expect(added).toBe(false);
+    expect(hook.result.current.message).toMatch(/16:9 or 9:16/iu);
+    expect(adapters.submitVideoJob).not.toHaveBeenCalled();
   });
 
   it('requires a reference and locally prepares MOV as an ephemeral MP4 only when requested', async () => {

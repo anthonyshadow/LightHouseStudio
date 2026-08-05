@@ -18,6 +18,13 @@ The runtime:
 - commits a healthy visual or voiced replacement before revoking the superseded URL; and
 - releases artifact URLs only on downstream invalidation, Release, Discard, or unmount.
 
+Local video editing pins the displayed artifact and sidecar while a dedicated worker renders. The
+worker writes MediaBunny `StreamTarget` offsets into sparse 4 MiB blocks rather than repeatedly
+growing one `ArrayBuffer`, rejects output above 300,000,000 bytes before publication, and clears all
+blocks on completion, cancel, or error. The candidate Blob and extracted audio sidecar coexist with
+the pinned source only until explicit replacement or discard. The UI thread has no synchronous
+encoding fallback.
+
 **Use existing video** also has the sole secondary `<video>` element. It borrows the existing
 source/result artifact URL and adds no encoded copy, track, or provider session. It never handles
 live preview, recording, or finalization; it pauses, detaches `src`, and removes its binding on
@@ -28,6 +35,11 @@ in-progress encoded output, the final MP4 Blob, and the optional sidecar until c
 and prior temporaries become collectible. MP4 Fast Start is disabled to avoid an additional
 in-memory media-chunk staging copy. Conversion is cancellable on ownership loss but raw chunks are
 never silently evicted to relieve pressure.
+
+Peak local-edit memory includes the pinned source and sidecar, decoded worker frames/GPU surfaces,
+offset-aware encoded blocks, the finalized candidate Blob, and validation/extracted-sidecar data.
+A successful atomic replacement commits the candidate before revoking superseded artifact URLs;
+failure and cancellation keep the prior artifact and draft intact while releasing worker output.
 
 Uploaded source limits are decimal bytes: 300,000,000 for local/Lucy-only workflows and
 200,000,000 when VTO is planned. Downloaded provider output is capped at 300,000,000 bytes.
@@ -48,7 +60,10 @@ For every required device/browser row in
    H.264/AAC output codecs.
 2. Complete the required 300-second Local, Character, and VTO paths. Confirm the warning,
    automatic finalization, playable original, responsive controls, and cleanup indicators.
-3. Complete maximum-size uploaded local, Lucy, and VTO paths as separate workflows. Measure before
+3. Complete maximum-size uploaded local, local-edited, Lucy, and VTO paths as separate workflows.
+   For local edit, exercise render cancellation and 1:1, 4:5, 16:9, 9:16, and representative
+   Freeform output, then verify external H.264/AAC playback and expected provider compatibility.
+   Measure before
    submission, after the visual result, during ordered visual-plus-voice replacement, after local
    Voice, after ElevenLabs Voice when qualified, and after Release/Discard.
 4. Record recorder-settlement, H.264/AAC transcode, and Voice-processing durations plus whether the

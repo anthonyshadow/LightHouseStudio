@@ -10,6 +10,14 @@ export type ValidatedExistingVideo = Readonly<{
   audioUnavailableReason: string | null;
 }>;
 
+export type EditedVideoValidationExpectation = Readonly<{
+  width: number;
+  height: number;
+  durationMs: number;
+  requireAudio: boolean;
+  filename: string;
+}>;
+
 export const firstExistingVideoValidationIssue = (
   facts: Parameters<typeof validateUploadedVideoFacts>[0],
   includesVton: boolean,
@@ -193,5 +201,46 @@ export const validateExistingVideo = async (
     };
   } finally {
     input.dispose();
+  }
+};
+
+export const validateEditedVideoOutput = async (
+  blob: Blob,
+  expectation: EditedVideoValidationExpectation,
+  signal: AbortSignal,
+): Promise<ValidatedExistingVideo> => {
+  if (!(blob instanceof Blob) || blob.size <= 0) {
+    throw new Error('The local editor produced an empty video.');
+  }
+  const file = new File([blob], expectation.filename, { type: 'video/mp4' });
+  const validated = await validateExistingVideo(file, false, signal, 'server-approved-result');
+  signal.throwIfAborted();
+  assertEditedVideoOutput(validated, expectation);
+  return validated;
+};
+
+export const assertEditedVideoOutput = (
+  validated: ValidatedExistingVideo,
+  expectation: EditedVideoValidationExpectation,
+): void => {
+  if (validated.mimeType !== 'video/mp4' || validated.metadata.videoCodec !== 'avc') {
+    throw new Error('The edited video was not encoded as H.264 MP4.');
+  }
+  if (
+    validated.metadata.width !== expectation.width ||
+    validated.metadata.height !== expectation.height
+  ) {
+    throw new Error('The edited video dimensions did not match the requested crop.');
+  }
+  if (Math.abs(validated.metadata.durationMs - expectation.durationMs) > 500) {
+    throw new Error('The edited video duration did not match the requested trim.');
+  }
+  if (
+    expectation.requireAudio &&
+    (!validated.metadata.hasAudio ||
+      validated.metadata.audioCodec !== 'aac' ||
+      !validated.audioSidecar)
+  ) {
+    throw new Error('The edited video could not preserve its required audio track.');
   }
 };

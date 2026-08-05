@@ -54,6 +54,7 @@ type ExistingVideoPanelProps = {
   readonly onCreateWardrobeVariant?: (stepId: string, characterId: string) => void;
   readonly recordingSupported?: boolean;
   readonly onRecordVideo?: () => void;
+  readonly onAdjustVideo?: () => void;
 };
 
 const initialActiveTool = (workflow: ExistingVideoWorkflow): ExistingVideoToolId | null =>
@@ -82,6 +83,7 @@ export const ExistingVideoPanel = ({
   onCreateWardrobeVariant,
   recordingSupported = false,
   onRecordVideo,
+  onAdjustVideo,
 }: ExistingVideoPanelProps) => {
   const theme = useTheme();
   const visualCapabilities: CapabilitiesResponse['videoProcessing'] =
@@ -513,6 +515,7 @@ export const ExistingVideoPanel = ({
                 locked={structureLocked}
                 characterSwapAvailable={visualCapabilities.characterSwap.available}
                 virtualTryOnAvailable={visualCapabilities.virtualTryOn.available}
+                {...(onAdjustVideo ? { onAdjust: onAdjustVideo } : {})}
                 onSelect={selectTool}
               />
 

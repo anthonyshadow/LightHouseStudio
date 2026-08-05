@@ -160,7 +160,7 @@ const harness = vi.hoisted(() => {
     original: null as null | { id: string },
     visual: null,
     processed: null,
-    presented: null as null | { id: string },
+    presented: null as null | Record<string, unknown>,
     sidecar: { state: 'idle' as const, artifact: null, error: null },
     recordingError: null,
     processingState: 'idle' as const,
@@ -168,7 +168,22 @@ const harness = vi.hoisted(() => {
     discard: vi.fn(),
   };
   const existingVideo = {
-    selection: null,
+    selection: null as null | {
+      metadata: {
+        kind: 'uploaded';
+        mode: 'local';
+        selectedAt: string;
+        displayName: string;
+        container: 'mp4';
+        videoCodec: 'avc';
+        audioCodec: null;
+        durationMs: number;
+        width: number;
+        height: number;
+        sizeBytes: number;
+        hasAudio: false;
+      };
+    },
     steps: [],
     comparison: 'result' as const,
     active: false,
@@ -247,8 +262,18 @@ vi.mock('../features/guided-flow/projectRepository', () => ({
 }));
 
 vi.mock('../features/live-stage', () => ({
-  MediaStage: ({ presentation }: { presentation: { kind: string } }) => (
-    <div data-testid="media-stage" data-presentation={presentation.kind} />
+  MediaStage: ({
+    presentation,
+    editPreview,
+  }: {
+    presentation: { kind: string };
+    editPreview?: unknown;
+  }) => (
+    <div
+      data-testid="media-stage"
+      data-presentation={presentation.kind}
+      data-edit-preview={editPreview ? 'true' : 'false'}
+    />
   ),
 }));
 
@@ -258,12 +283,23 @@ vi.mock('../features/recording', () => ({
 }));
 
 vi.mock('../features/existing-video/ExistingVideoPanel', () => ({
-  ExistingVideoPanel: ({ onRecordVideo }: { onRecordVideo?: () => void }) => (
+  ExistingVideoPanel: ({
+    onRecordVideo,
+    onAdjustVideo,
+  }: {
+    onRecordVideo?: () => void;
+    onAdjustVideo?: () => void;
+  }) => (
     <div>
       Post-recording editor
       {onRecordVideo ? (
         <button type="button" onClick={onRecordVideo}>
           Record a local video
+        </button>
+      ) : null}
+      {onAdjustVideo ? (
+        <button type="button" onClick={onAdjustVideo}>
+          Adjust video
         </button>
       ) : null}
     </div>
@@ -337,6 +373,9 @@ vi.mock('../ui', async () => {
   return {
     StudioDesignProvider,
     Button,
+    StatusNotice: ({ title, children }: PropsWithChildren<{ title: string }>) => (
+      <aside aria-label={title}>{children}</aside>
+    ),
     ConfirmationDialog: ({ open }: { open: boolean }) =>
       open ? <section aria-label="Discard temporary work and leave?" /> : null,
     OverlayPanel: ({
@@ -506,6 +545,55 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.getByRole('region', { name: 'Use existing video' })).toBeInTheDocument();
     expect(harness.existingVideo.adoptRecordedArtifact).not.toHaveBeenCalled();
     expect(harness.latestWorkspace?.state.activeTool).toBe('edit-video');
+  });
+
+  it('enters local editing without replacing the persistent stage or duplicating controls', async () => {
+    const media = new Blob(['source'], { type: 'video/mp4' });
+    harness.recording.presented = {
+      id: 'editable-result',
+      media,
+      objectUrl: 'blob:editable-result',
+      mimeType: 'video/mp4',
+      filename: 'editable-result.mp4',
+      sourceModeId: 'local',
+      startedAt: '2026-08-04T12:00:00.000Z',
+      durationMs: 10_000,
+      sizeBytes: media.size,
+    };
+    harness.existingVideo.selection = {
+      metadata: {
+        kind: 'uploaded',
+        mode: 'local',
+        selectedAt: '2026-08-04T12:00:00.000Z',
+        displayName: 'editable-result.mp4',
+        container: 'mp4',
+        videoCodec: 'avc',
+        audioCodec: null,
+        durationMs: 10_000,
+        width: 1_280,
+        height: 720,
+        sizeBytes: media.size,
+        hasAudio: false,
+      },
+    };
+    harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
+    const context = vi
+      .spyOn(HTMLCanvasElement.prototype, 'getContext')
+      .mockImplementation(() => null);
+    renderStudio();
+    const stage = screen.getByTestId('media-stage');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Video rail' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Adjust video' }));
+
+    await waitFor(() =>
+      expect(screen.getByRole('navigation', { name: 'Video editing tools' })).toBeVisible(),
+    );
+    expect(screen.getByTestId('media-stage')).toBe(stage);
+    expect(screen.getByTestId('media-stage')).toHaveAttribute('data-edit-preview', 'true');
+    expect(screen.queryByText('Recording controls')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('creative-panel')).not.toBeInTheDocument();
+    context.mockRestore();
   });
 
   it('hydrates and atomically hands a saved reference recipe to the session', async () => {
