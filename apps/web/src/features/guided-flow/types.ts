@@ -87,8 +87,10 @@ export interface ProjectStorageState {
 export interface LocalProjectRepository {
   initialize(): Promise<ProjectStorageState>;
   getStorageState(): ProjectStorageState;
+  count(): Promise<number>;
   list(): Promise<readonly ProjectSummary[]>;
   load(projectId: string): Promise<ProjectRecordV1 | null>;
+  loadNewestCharacterDesign(): Promise<ProjectRecordV1 | null>;
   readArtifact(projectId: string, artifactId: string): Promise<Blob | null>;
   deleteProject(projectId: string): Promise<void>;
   close(): void;

@@ -124,6 +124,15 @@ describe('LocalReferenceImageAssetStore', () => {
     expect(await readdir(path.join(directory, 'reference-images', 'v1', 'assets'))).toEqual([
       assetId,
     ]);
+    const indexPath = path.join(directory, 'reference-images', 'v1', 'asset-index.json');
+    expect(JSON.parse(await readFile(indexPath, 'utf8'))).toMatchObject({
+      schemaVersion: 1,
+      assets: [stored],
+    });
+    expect((await stat(indexPath)).mode & 0o777).toBe(0o600);
+    await expect(
+      stat(path.join(directory, 'reference-images', 'v1', 'asset-index.dirty')),
+    ).rejects.toMatchObject({ code: 'ENOENT' });
   });
 
   it('replays request IDs after a fresh store instance and isolates reads by local owner', async () => {
@@ -134,6 +143,35 @@ describe('LocalReferenceImageAssetStore', () => {
     await expect(restarted.findByRequestId(ownerId, requestId)).resolves.toMatchObject({ assetId });
     await expect(restarted.getMetadata(otherOwnerId, assetId)).resolves.toBeNull();
     await expect(restarted.getContent(otherOwnerId, assetId)).resolves.toBeNull();
+  });
+
+  it('uses a clean persisted index without reading per-asset metadata or mappings', async () => {
+    const { directory, store } = await setup();
+    await store.store(input);
+    const metadataPath = path.join(
+      directory,
+      'reference-images',
+      'v1',
+      'assets',
+      assetId,
+      'metadata.json',
+    );
+    const mappingPath = path.join(
+      directory,
+      'reference-images',
+      'v1',
+      'idempotency',
+      digest(ownerId),
+      `${digest(requestId)}.json`,
+    );
+    await rm(metadataPath);
+    await mkdir(metadataPath);
+    await rm(mappingPath);
+    await mkdir(mappingPath);
+
+    const restarted = new LocalReferenceImageAssetStore(directory);
+    await expect(restarted.findByRequestId(ownerId, requestId)).resolves.toMatchObject({ assetId });
+    await expect(restarted.getMetadata(ownerId, assetId)).resolves.toMatchObject({ requestId });
   });
 
   it('repairs malformed mappings while ignoring unrelated corrupt asset metadata', async () => {
@@ -148,6 +186,10 @@ describe('LocalReferenceImageAssetStore', () => {
       `${digest(requestId)}.json`,
     );
     await writeFile(mappingPath, '{ malformed mapping');
+    await writeFile(
+      path.join(directory, 'reference-images', 'v1', 'asset-index.json'),
+      '{ malformed index',
+    );
     const corruptAsset = path.join(
       directory,
       'reference-images',
@@ -185,6 +227,10 @@ describe('LocalReferenceImageAssetStore', () => {
     await rm(mappingPath);
     await rm(metadataPath);
     await mkdir(metadataPath);
+    await writeFile(
+      path.join(directory, 'reference-images', 'v1', 'asset-index.dirty'),
+      '{"schemaVersion":1}\n',
+    );
 
     const restarted = new LocalReferenceImageAssetStore(directory);
 
@@ -247,14 +293,16 @@ describe('LocalReferenceImageAssetStore', () => {
       }),
     );
 
-    const legacyMetadata = await store.getMetadata(ownerId, legacyAssetId);
+    await rm(path.join(directory, 'reference-images', 'v1', 'asset-index.json'));
+    const restarted = new LocalReferenceImageAssetStore(directory);
+    const legacyMetadata = await restarted.getMetadata(ownerId, legacyAssetId);
     expect(legacyMetadata).toMatchObject({
       assetId: legacyAssetId,
       originalPrompt: 'Legacy Lucy prompt',
     });
     expect(legacyMetadata).not.toHaveProperty('size');
     expect(legacyMetadata).not.toHaveProperty('promptAudit');
-    await expect(store.getContent(ownerId, legacyAssetId)).resolves.toMatchObject({
+    await expect(restarted.getContent(ownerId, legacyAssetId)).resolves.toMatchObject({
       bytes: legacyBytes,
     });
   });
@@ -270,11 +318,19 @@ describe('LocalReferenceImageAssetStore', () => {
       }),
     ).rejects.toMatchObject({ name: 'ReferenceImageStorageError' });
 
+    const indexRoot = path.join(directory, 'reference-images', 'v1');
+    await expect(stat(path.join(indexRoot, 'asset-index.dirty'))).resolves.toBeDefined();
+
     const assetsRoot = path.join(directory, 'reference-images', 'v1', 'assets');
     expect(await readdir(assetsRoot)).toEqual([assetId]);
     await expect(store.getContent(ownerId, assetId)).resolves.toMatchObject({
       metadata: first,
       bytes: input.bytes,
+    });
+    const restarted = new LocalReferenceImageAssetStore(directory);
+    await expect(restarted.findByRequestId(ownerId, requestId)).resolves.toMatchObject({ assetId });
+    await expect(stat(path.join(indexRoot, 'asset-index.dirty'))).rejects.toMatchObject({
+      code: 'ENOENT',
     });
   });
 });

@@ -90,8 +90,10 @@ export const createLegacyProjectRepository = (): LocalProjectRepository => {
   return {
     initialize: fn(() => Promise.resolve(readyProjectStorage)),
     getStorageState: fn(() => readyProjectStorage),
+    count: fn(() => Promise.resolve(projects.size)),
     list: fn(() => Promise.resolve([...projects.values()].map(toSummary))),
     load: fn(load),
+    loadNewestCharacterDesign: fn(() => Promise.resolve(null)),
     readArtifact: fn(() => Promise.resolve(new Blob(['legacy-video'], { type: 'video/webm' }))),
     deleteProject: fn(deleteProject),
     close: fn(),

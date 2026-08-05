@@ -23,6 +23,7 @@ import { imageFileExtension } from '@studio/domain';
 import type { ValidReferenceImageMimeType } from './image-validation.js';
 
 export const REFERENCE_IMAGE_LAYOUT_VERSION = 1;
+export const REFERENCE_IMAGE_INDEX_VERSION = 1;
 export const REFERENCE_IMAGE_DIRECTORY_MODE = 0o700;
 export const REFERENCE_IMAGE_FILE_MODE = 0o600;
 export const STALE_REFERENCE_IMAGE_TEMP_AGE_MS = 24 * 60 * 60 * 1_000;
@@ -198,8 +199,25 @@ const idempotencyMappingSchema = z
   })
   .strict();
 
+const referenceImageAssetIndexSchema = z
+  .object({
+    schemaVersion: z.literal(REFERENCE_IMAGE_INDEX_VERSION),
+    assets: z.array(storedReferenceImageMetadataSchema),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const assetIds = new Set<string>();
+    for (const asset of value.assets) {
+      if (assetIds.has(asset.assetId)) {
+        context.addIssue({ code: 'custom', message: 'Reference image index repeats an asset ID.' });
+      }
+      assetIds.add(asset.assetId);
+    }
+  });
+
 export type StoredReferenceImageMetadata = z.infer<typeof storedReferenceImageMetadataSchema>;
 export type ReferenceImageIdempotencyMapping = z.infer<typeof idempotencyMappingSchema>;
+export type ReferenceImageAssetIndex = z.infer<typeof referenceImageAssetIndexSchema>;
 
 export interface StoreGeneratedReferenceImageInput {
   readonly localOwnerId: string;
@@ -297,6 +315,8 @@ export interface ReferenceImageLayout {
   readonly root: string;
   readonly assetsRoot: string;
   readonly idempotencyRoot: string;
+  readonly indexPath: string;
+  readonly indexDirtyPath: string;
 }
 
 export const createReferenceImageLayout = (dataDirectory: string): ReferenceImageLayout => {
@@ -309,6 +329,8 @@ export const createReferenceImageLayout = (dataDirectory: string): ReferenceImag
     root,
     assetsRoot: path.join(root, 'assets'),
     idempotencyRoot: path.join(root, 'idempotency'),
+    indexPath: path.join(root, 'asset-index.json'),
+    indexDirtyPath: path.join(root, 'asset-index.dirty'),
   };
 };
 
@@ -356,6 +378,9 @@ export const parseStoredReferenceImageMetadata = (value: unknown): StoredReferen
 export const parseReferenceImageIdempotencyMapping = (
   value: unknown,
 ): ReferenceImageIdempotencyMapping => idempotencyMappingSchema.parse(value);
+
+export const parseReferenceImageAssetIndex = (value: unknown): ReferenceImageAssetIndex =>
+  referenceImageAssetIndexSchema.parse(value);
 
 export const isReferenceImageCodecError = (error: unknown): boolean =>
   error instanceof SyntaxError || error instanceof z.ZodError;
@@ -420,6 +445,14 @@ export const createStoredReferenceImageMetadata = (
 export const serializeStoredReferenceImageMetadata = (
   metadata: StoredReferenceImageMetadata,
 ): string => `${JSON.stringify(metadata)}\n`;
+
+export const serializeReferenceImageAssetIndex = (
+  assets: Iterable<StoredReferenceImageMetadata>,
+): string =>
+  `${JSON.stringify({
+    schemaVersion: REFERENCE_IMAGE_INDEX_VERSION,
+    assets: [...assets].sort((left, right) => left.assetId.localeCompare(right.assetId)),
+  })}\n`;
 
 export const serializeReferenceImageIdempotencyMapping = (
   metadata: StoredReferenceImageMetadata,

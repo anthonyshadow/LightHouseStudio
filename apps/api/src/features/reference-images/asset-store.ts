@@ -5,15 +5,18 @@ import {
   createReferenceImageLayout,
   createStoredReferenceImageMetadata,
   isReferenceImageCodecError,
+  parseReferenceImageAssetIndex,
   parseReferenceImageAssetId,
   parseReferenceImageIdempotencyMapping,
   parseStoredReferenceImageMetadata,
+  REFERENCE_IMAGE_INDEX_VERSION,
   REFERENCE_IMAGE_DIRECTORY_MODE,
   REFERENCE_IMAGE_FILE_MODE,
   referenceImageContentFilename,
   type ReferenceImageLayout,
   referenceImageMappingPath,
   referenceImageStorageKey,
+  serializeReferenceImageAssetIndex,
   serializeReferenceImageIdempotencyMapping,
   serializeStoredReferenceImageMetadata,
   STALE_REFERENCE_IMAGE_TEMP_AGE_MS,
@@ -69,6 +72,7 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
   readonly #createAssetId: () => string;
   readonly #now: () => Date;
   readonly #requestIndex = new Map<string, string>();
+  readonly #metadataIndex = new Map<string, StoredReferenceImageMetadata>();
   #initialized: Promise<void> | undefined;
 
   constructor(
@@ -93,7 +97,9 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
         await chmod(directory, REFERENCE_IMAGE_DIRECTORY_MODE);
       }
       await this.#removeStaleTemporaryDirectories();
-      await this.#buildRequestIndexAndRepairMappings();
+      if (!(await this.#loadPersistedIndex())) {
+        await this.#rebuildIndexFromLegacyAssets();
+      }
     })();
     try {
       await this.#initialized;
@@ -136,7 +142,7 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     return `${localOwnerId}\0${requestId}`;
   }
 
-  async #readMetadata(assetId: string): Promise<StoredReferenceImageMetadata | null> {
+  async #readMetadataFile(assetId: string): Promise<StoredReferenceImageMetadata | null> {
     try {
       return parseStoredReferenceImageMetadata(
         await readJson(path.join(this.#assetDirectory(assetId), 'metadata.json')),
@@ -165,6 +171,12 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
       handle = undefined;
       await rename(temporaryPath, filePath);
       await chmod(filePath, REFERENCE_IMAGE_FILE_MODE);
+      const directoryHandle = await open(path.dirname(filePath), 'r');
+      try {
+        await directoryHandle.sync();
+      } finally {
+        await directoryHandle.close();
+      }
     } catch (error) {
       await handle?.close().catch(() => undefined);
       await rm(temporaryPath, { force: true }).catch(() => undefined);
@@ -172,24 +184,74 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     }
   }
 
-  async #buildRequestIndexAndRepairMappings(): Promise<void> {
-    const entries = await readdir(this.#layout.assetsRoot, { withFileTypes: true });
+  #replaceIndexes(assets: Iterable<StoredReferenceImageMetadata>): void {
+    this.#requestIndex.clear();
+    this.#metadataIndex.clear();
+    for (const metadata of assets) {
+      this.#metadataIndex.set(metadata.assetId, metadata);
+      this.#requestIndex.set(
+        this.#requestKey(metadata.localOwnerId, metadata.requestId),
+        metadata.assetId,
+      );
+    }
+  }
+
+  async #loadPersistedIndex(): Promise<boolean> {
+    try {
+      await stat(this.#layout.indexDirtyPath);
+      return false;
+    } catch (error) {
+      if (!isMissingPathError(error)) throw error;
+    }
+    try {
+      const index = parseReferenceImageAssetIndex(await readJson(this.#layout.indexPath));
+      this.#replaceIndexes(index.assets);
+      return true;
+    } catch (error) {
+      if (isMissingPathError(error) || isReferenceImageCodecError(error)) return false;
+      throw error;
+    }
+  }
+
+  async #persistIndex(assets = this.#metadataIndex.values()): Promise<void> {
+    await this.#writeFileAtomic(this.#layout.indexPath, serializeReferenceImageAssetIndex(assets));
+    await rm(this.#layout.indexDirtyPath, { force: true });
+    const rootHandle = await open(this.#layout.root, 'r');
+    try {
+      await rootHandle.sync();
+    } finally {
+      await rootHandle.close();
+    }
+  }
+
+  async #markIndexDirty(): Promise<void> {
+    await this.#writeFileAtomic(
+      this.#layout.indexDirtyPath,
+      `${JSON.stringify({ schemaVersion: REFERENCE_IMAGE_INDEX_VERSION })}\n`,
+    );
+  }
+
+  async #rebuildIndexFromLegacyAssets(): Promise<void> {
+    const metadataByAssetId = new Map<string, StoredReferenceImageMetadata>();
+    const entries = (await readdir(this.#layout.assetsRoot, { withFileTypes: true })).sort((a, b) =>
+      a.name.localeCompare(b.name),
+    );
     for (const entry of entries) {
       if (!entry.isDirectory() || entry.name.startsWith('.tmp-')) continue;
       let metadata: StoredReferenceImageMetadata | null;
       try {
-        metadata = await this.#readMetadata(entry.name);
+        metadata = await this.#readMetadataFile(entry.name);
       } catch (error) {
         if (isMalformedStoredJsonError(error)) continue;
         throw error;
       }
       if (metadata === null) continue;
-      this.#requestIndex.set(
-        this.#requestKey(metadata.localOwnerId, metadata.requestId),
-        metadata.assetId,
-      );
+      if (metadata.assetId !== entry.name) continue;
+      metadataByAssetId.set(metadata.assetId, metadata);
       await this.#repairMappingIfNeeded(metadata);
     }
+    await this.#persistIndex(metadataByAssetId.values());
+    this.#replaceIndexes(metadataByAssetId.values());
   }
 
   async #repairMappingIfNeeded(metadata: StoredReferenceImageMetadata): Promise<void> {
@@ -224,7 +286,7 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     await this.#initialize();
     const assetId = this.#requestIndex.get(this.#requestKey(localOwnerId, requestId));
     if (assetId === undefined) return null;
-    const metadata = await this.#readMetadata(assetId);
+    const metadata = this.#metadataIndex.get(assetId) ?? null;
     return metadata?.localOwnerId === localOwnerId && metadata.requestId === requestId
       ? metadata
       : null;
@@ -235,7 +297,7 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     assetId: string,
   ): Promise<StoredReferenceImageMetadata | null> {
     await this.#initialize();
-    const metadata = await this.#readMetadata(assetId);
+    const metadata = this.#metadataIndex.get(assetId) ?? null;
     return metadata?.localOwnerId === localOwnerId ? metadata : null;
   }
 
@@ -301,6 +363,7 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     const metadata = createStoredReferenceImageMetadata(input, assetId, timestamp);
 
     try {
+      await this.#markIndexDirty();
       await mkdir(temporaryDirectory, { mode: REFERENCE_IMAGE_DIRECTORY_MODE });
       const contentHandle = await open(
         path.join(temporaryDirectory, filename),
@@ -327,6 +390,8 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
       await rename(temporaryDirectory, finalDirectory);
       await this.#persistMapping(metadata);
       this.#requestIndex.set(this.#requestKey(input.localOwnerId, input.requestId), assetId);
+      this.#metadataIndex.set(assetId, metadata);
+      await this.#persistIndex();
       return metadata;
     } catch (error) {
       await rm(temporaryDirectory, { recursive: true, force: true }).catch(() => undefined);

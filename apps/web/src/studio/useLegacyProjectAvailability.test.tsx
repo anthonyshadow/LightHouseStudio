@@ -36,8 +36,10 @@ const project = (id: string): ProjectSummary => ({
 const repository = (overrides: Partial<LocalProjectRepository> = {}): LocalProjectRepository => ({
   initialize: vi.fn(() => Promise.resolve(readyStorage)),
   getStorageState: vi.fn(() => initialStorage),
+  count: vi.fn(() => Promise.resolve(2)),
   list: vi.fn(() => Promise.resolve([project('one'), project('two')])),
   load: vi.fn(() => Promise.resolve(null)),
+  loadNewestCharacterDesign: vi.fn(() => Promise.resolve(null)),
   readArtifact: vi.fn(() => Promise.resolve(null)),
   deleteProject: vi.fn(() => Promise.resolve()),
   close: vi.fn(),
@@ -80,7 +82,7 @@ describe('useLegacyProjectAvailability', () => {
     });
   });
 
-  it('settles initialization and listing failures without claiming projects are available', async () => {
+  it('settles initialization and count failures without claiming projects are available', async () => {
     const initializationFailure = repository({
       initialize: vi.fn(() => Promise.reject(new Error('IndexedDB unavailable.'))),
     });
@@ -91,19 +93,19 @@ describe('useLegacyProjectAvailability', () => {
     await waitFor(() => expect(initializationFailure.initialize).toHaveBeenCalledOnce());
     await act(() => Promise.resolve());
     expect(initialized.result.current.projectCount).toBe(0);
-    expect(initializationFailure.list).not.toHaveBeenCalled();
+    expect(initializationFailure.count).not.toHaveBeenCalled();
     initialized.unmount();
 
-    const listingFailure = repository({
-      list: vi.fn(() => Promise.reject(new Error('Legacy projects could not be listed.'))),
+    const countFailure = repository({
+      count: vi.fn(() => Promise.reject(new Error('Legacy projects could not be counted.'))),
     });
-    const listed = renderHook(() => useLegacyProjectAvailability({ repository: listingFailure }));
+    const counted = renderHook(() => useLegacyProjectAvailability({ repository: countFailure }));
 
-    await waitFor(() => expect(listingFailure.list).toHaveBeenCalledOnce());
+    await waitFor(() => expect(countFailure.count).toHaveBeenCalledOnce());
     await act(() => Promise.resolve());
-    expect(listed.result.current.storage).toEqual(readyStorage);
-    expect(listed.result.current.projectCount).toBe(0);
-    listed.unmount();
+    expect(counted.result.current.storage).toEqual(readyStorage);
+    expect(counted.result.current.projectCount).toBe(0);
+    counted.unmount();
   });
 
   it('ignores late initialization after unmount and closes the owned repository once', async () => {
@@ -119,7 +121,7 @@ describe('useLegacyProjectAvailability', () => {
       await initialization.promise;
     });
 
-    expect(target.list).not.toHaveBeenCalled();
+    expect(target.count).not.toHaveBeenCalled();
     await waitFor(() => expect(target.close).toHaveBeenCalledOnce());
   });
 });

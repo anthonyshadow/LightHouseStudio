@@ -56,8 +56,10 @@ interface ProjectArtifactRecord {
 }
 
 interface ProjectBackend {
+  count(): Promise<number>;
   list(): Promise<readonly ProjectRecordV1[]>;
   load(projectId: string): Promise<ProjectRecordV1 | null>;
+  loadNewestCharacterDesign(): Promise<ProjectRecordV1 | null>;
   readArtifact(projectId: string, artifactId: string): Promise<Blob | null>;
   deleteProject(projectId: string): Promise<void>;
   close(): void;
@@ -331,6 +333,11 @@ class MemoryProjectBackend implements ProjectBackend {
     this.#artifacts.set(record.id, cloneArtifact(record));
   }
 
+  count() {
+    this.#assertOpen();
+    return Promise.resolve(this.#projects.size);
+  }
+
   list() {
     this.#assertOpen();
     return Promise.resolve([...this.#projects.values()].map(cloneProject));
@@ -339,6 +346,17 @@ class MemoryProjectBackend implements ProjectBackend {
   load(projectId: string) {
     this.#assertOpen();
     const project = this.#projects.get(projectId);
+    return Promise.resolve(project ? cloneProject(project) : null);
+  }
+
+  loadNewestCharacterDesign() {
+    this.#assertOpen();
+    const project = [...this.#projects.values()]
+      .filter(
+        (candidate) =>
+          candidate.checkpoint === 'character-design' && candidate.data.characterDraft !== null,
+      )
+      .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0];
     return Promise.resolve(project ? cloneProject(project) : null);
   }
 
@@ -386,6 +404,16 @@ class IndexedDbProjectBackend implements ProjectBackend {
     database.addEventListener('versionchange', () => database.close());
   }
 
+  async count() {
+    const transaction = this.database.transaction(GUIDED_PROJECTS_STORE, 'readonly');
+    const completion = transactionComplete(transaction);
+    const count = await requestResult<number>(
+      transaction.objectStore(GUIDED_PROJECTS_STORE).count(),
+    );
+    await completion;
+    return count;
+  }
+
   async list() {
     const transaction = this.database.transaction(GUIDED_PROJECTS_STORE, 'readonly');
     const completion = transactionComplete(transaction);
@@ -406,6 +434,24 @@ class IndexedDbProjectBackend implements ProjectBackend {
     );
     await completion;
     return sanitizeProjectRecord(record);
+  }
+
+  async loadNewestCharacterDesign() {
+    const transaction = this.database.transaction(GUIDED_PROJECTS_STORE, 'readonly');
+    const completion = transactionComplete(transaction);
+    const records = await requestResult<unknown[]>(
+      transaction.objectStore(GUIDED_PROJECTS_STORE).getAll(),
+    );
+    await completion;
+    return (
+      records
+        .map((record) => sanitizeProjectRecord(record))
+        .filter(
+          (record): record is ProjectRecordV1 =>
+            record?.checkpoint === 'character-design' && record.data.characterDraft !== null,
+        )
+        .sort((left, right) => right.updatedAt.localeCompare(left.updatedAt))[0] ?? null
+    );
   }
 
   async readArtifact(projectId: string, artifactId: string) {
@@ -522,6 +568,7 @@ export const createLocalProjectRepository = (
   return {
     initialize,
     getStorageState: () => state,
+    count: () => operation((target) => target.count()),
     list: async () => {
       const projects = await operation((target) => target.list());
       for (const project of projects) memoryFallback.seedProject(project);
@@ -531,6 +578,11 @@ export const createLocalProjectRepository = (
     },
     load: async (projectId) => {
       const project = await operation((target) => target.load(projectId));
+      if (project) memoryFallback.seedProject(project);
+      return project;
+    },
+    loadNewestCharacterDesign: async () => {
+      const project = await operation((target) => target.loadNewestCharacterDesign());
       if (project) memoryFallback.seedProject(project);
       return project;
     },

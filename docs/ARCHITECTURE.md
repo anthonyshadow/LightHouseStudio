@@ -353,8 +353,8 @@ errors. The URL is neither persisted nor forwarded to a visual provider.
 | --------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Recipe Shelf `localStorage` | Versioned v6 allowlisted prompt/character/outfit/wardrobe metadata and opaque asset IDs             | Explicit v1→v2→v3→v4→v5→v6 migration, then current-version sanitization; 500-variant metadata cap; degrades to session memory on failure; never stores image bytes                                                                        |
 | Character Builder IndexedDB | One resumable draft and save journal                                                                | Compare-and-swap autosave; prevents duplicate save/preload after retry or reload                                                                                                                                                          |
-| Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings                                       | Owner-scoped under `LIGHTFRAME_DATA_DIR`; no ordinary deletion route                                                                                                                                                                      |
-| Legacy project IndexedDB    | Compatibility project metadata and media Blobs                                                      | List/download/delete plus one-time valid character-design seeding; Guided is not restored                                                                                                                                                 |
+| Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings, and a versioned derived asset index  | Owner-scoped under `LIGHTFRAME_DATA_DIR`; index publication is atomic and dirty-marker recovery preserves legacy assets; no ordinary deletion route                                                                                       |
+| Legacy project IndexedDB    | Compatibility project metadata and media Blobs                                                      | List/download/delete plus native count and one-operation newest-character-design queries for one-time seeding; Guided is not restored                                                                                                     |
 | Session memory              | Streams, tokens, files, direct-import outfit recents, device IDs, recordings, sidecars, voice state | Cleaned on replacement, release/discard, unmount, or tab close as applicable                                                                                                                                                              |
 | Video-job temp root         | Streamed input/reference and inspected provider output                                              | Process-temporary; one immutable accepted-at-plus-60-minute deadline covers active and ready jobs. Delivery, release, or shutdown may clean earlier; a pre-deadline content stream may finish after the boundary; startup purges the root |
 
@@ -362,8 +362,19 @@ Browser storage is untrusted and schema-migrated. Opaque IDs, provenance, and ti
 preserved. The filesystem store uses atomic publication and never exposes internal paths,
 provider URLs, credentials, or raw payloads. Detached reference assets are retained because the
 runtime lacks a complete relationship graph and deletion route. Reference lookup uses versioned
-owner/request transaction mappings. Startup performs one conservative legacy scan and atomic
-mapping repair; ordinary new reads and misses do not rescan the asset directory.
+owner/request transaction mappings plus a versioned, atomically replaced derived index. A clean
+startup reads that index once rather than reading every asset metadata and mapping file. A missing,
+schema-invalid, or dirty index triggers the conservative legacy scan, mapping repair, and index
+rebuild; a dirty marker is published before an asset commit and removed only after the replacement
+index is durable. Ordinary new reads and misses do not rescan the asset directory. The repository
+contract distinguishes a missing asset from a backend that cannot return a streamable local file:
+only the latter may fall back to buffered content, so a miss performs one storage lookup.
+
+Legacy project consumers request `count()` and `loadNewestCharacterDesign()` through the
+storage-agnostic repository. IndexedDB implements count with `IDBObjectStore.count()` and resolves
+the newest valid character-design candidate in one backend request; migration and availability do
+not compose list-plus-load queries. Future SQL/database adapters can implement the same aggregate
+and ordered-filter query contracts without exposing storage primitives to orchestration.
 
 See [privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) for the user-facing data contract.
 

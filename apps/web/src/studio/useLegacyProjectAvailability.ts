@@ -27,8 +27,8 @@ export const useLegacyProjectAvailability = ({
         setStorage(initializedStorage);
 
         try {
-          const projects = await repository.list();
-          if (active) setProjectCount(projects.length);
+          const count = await repository.count();
+          if (active) setProjectCount(count);
         } catch {
           // The manager owns user-facing list errors when it is opened.
         }

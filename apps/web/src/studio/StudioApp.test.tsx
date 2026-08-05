@@ -263,6 +263,7 @@ vi.mock('../features/creative-assets/useCreativeAssetRepository', () => ({
 vi.mock('../features/guided-flow/projectRepository', () => ({
   createLocalProjectRepository: () => ({
     initialize: () => Promise.resolve({ kind: 'memory', available: true }),
+    count: () => Promise.resolve(0),
     list: () => Promise.resolve([]),
     getStorageState: () => ({ kind: 'memory', available: true }),
     close: harness.legacyClose,

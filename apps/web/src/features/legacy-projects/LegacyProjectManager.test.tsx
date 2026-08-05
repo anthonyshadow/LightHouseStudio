@@ -90,8 +90,10 @@ const createRepository = (initialProjects: readonly ProjectRecordV1[]) => {
   const repository: LocalProjectRepository = {
     initialize: vi.fn(() => Promise.resolve(READY_STORAGE)),
     getStorageState: vi.fn(() => READY_STORAGE),
+    count: vi.fn(() => Promise.resolve(projects.size)),
     list: vi.fn(() => Promise.resolve([...projects.values()].map(toSummary))),
     load: vi.fn((projectId: string) => Promise.resolve(projects.get(projectId) ?? null)),
+    loadNewestCharacterDesign: vi.fn(() => Promise.resolve(null)),
     readArtifact: vi.fn(() => Promise.resolve(video)),
     deleteProject: vi.fn((projectId: string) => {
       projects.delete(projectId);

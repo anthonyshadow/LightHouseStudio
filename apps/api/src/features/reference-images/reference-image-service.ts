@@ -77,6 +77,11 @@ interface ReferenceImageFinalizationInput {
   readonly operation: ReferenceImageFinalizationOperationMetadata;
 }
 
+export type ReferenceImageContentFileLookup =
+  | Readonly<{ status: 'available'; file: StoredReferenceImageFile }>
+  | Readonly<{ status: 'missing' }>
+  | Readonly<{ status: 'streaming-unsupported' }>;
+
 const uploadRequestFingerprint = (input: UploadReferenceImageInput): string =>
   createHash('sha256')
     .update('upload\0', 'utf8')
@@ -551,10 +556,12 @@ export class ReferenceImageService {
     return this.#store.getContent(localOwnerId, assetId);
   }
 
-  getContentFile(
+  async getContentFile(
     localOwnerId: string,
     assetId: string,
-  ): Promise<StoredReferenceImageFile | null> | null {
-    return this.#store.getContentFile?.(localOwnerId, assetId) ?? null;
+  ): Promise<ReferenceImageContentFileLookup> {
+    if (!this.#store.getContentFile) return { status: 'streaming-unsupported' };
+    const file = await this.#store.getContentFile(localOwnerId, assetId);
+    return file === null ? { status: 'missing' } : { status: 'available', file };
   }
 }

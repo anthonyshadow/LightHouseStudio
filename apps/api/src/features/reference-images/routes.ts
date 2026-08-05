@@ -339,8 +339,13 @@ export const registerReferenceImageRoutes = (
   app.get('/api/reference-images/:assetId/content', async (request, reply) => {
     const assetId = requireAssetId(request.params);
     const localOwnerId = localOwnerIdForRequest(request);
-    const storedFile = await service.getContentFile(localOwnerId, assetId);
-    const content = storedFile ?? (await service.getContent(localOwnerId, assetId));
+    const fileLookup = await service.getContentFile(localOwnerId, assetId);
+    const content =
+      fileLookup.status === 'available'
+        ? fileLookup.file
+        : fileLookup.status === 'streaming-unsupported'
+          ? await service.getContent(localOwnerId, assetId)
+          : null;
     if (content === null) {
       throw new AppError(404, 'not_found', 'That local reference image is unavailable.');
     }

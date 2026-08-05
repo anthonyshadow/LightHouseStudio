@@ -62,6 +62,7 @@ class FakeRequest<T> extends FakeEventSource {
 type FakeDatabaseState = {
   readonly projects: Map<string, FakeStoredRecord>;
   readonly artifacts: Map<string, FakeStoredRecord>;
+  queryCounts?: { count: number; get: number; getAll: number };
 };
 
 const cloneStored = <T>(value: T): T => structuredClone(value);
@@ -77,7 +78,13 @@ class FakeObjectStore {
     private readonly state: FakeDatabaseState,
   ) {}
 
+  private recordQuery(kind: 'count' | 'get' | 'getAll') {
+    this.state.queryCounts ??= { count: 0, get: 0, getAll: 0 };
+    this.state.queryCounts[kind] += 1;
+  }
+
   get(key: IDBValidKey) {
+    this.recordQuery('get');
     const request = new FakeRequest<unknown>();
     const value = this.values.get(fakeKey(key));
     request.succeed(value === undefined ? undefined : cloneStored(value));
@@ -85,9 +92,17 @@ class FakeObjectStore {
   }
 
   getAll() {
+    this.recordQuery('getAll');
     const request = new FakeRequest<unknown[]>();
     request.succeed([...this.values.values()].map(cloneStored));
     return request as unknown as IDBRequest<unknown[]>;
+  }
+
+  count() {
+    this.recordQuery('count');
+    const request = new FakeRequest<number>();
+    request.succeed(this.values.size);
+    return request as unknown as IDBRequest<number>;
   }
 
   delete(key: IDBValidKey) {
@@ -291,6 +306,47 @@ describe('Guided project compatibility repository', () => {
     expect(GUIDED_PROJECT_ARTIFACTS_STORE).toBe('artifacts');
   });
 
+  it('counts legacy projects with one native IndexedDB count request', async () => {
+    const state: FakeDatabaseState = {
+      projects: new Map([
+        ['one', legacyProjectFixture('one', '2026-01-10T12:02:00.000Z')],
+        ['two', legacyProjectFixture('two', '2026-01-10T12:03:00.000Z')],
+      ]),
+      artifacts: new Map(),
+    };
+    const indexedDb = compatibilityIndexedDb(state);
+    const repository = createLocalProjectRepository({ indexedDB: indexedDb.factory });
+
+    await expect(repository.count()).resolves.toBe(2);
+    expect(state.queryCounts).toEqual({ count: 1, get: 0, getAll: 0 });
+  });
+
+  it('loads the newest migratable character design in one backend query', async () => {
+    const older = legacyProjectFixture('older', '2026-01-10T12:02:00.000Z', {
+      characterDraft: createPromptBuilderDraft('character-transform'),
+    });
+    const newest = legacyProjectFixture('newest', '2026-01-10T12:04:00.000Z', {
+      characterDraft: createPromptBuilderDraft('character-transform'),
+    });
+    const unrelated = legacyProjectFixture('unrelated', '2026-01-10T12:05:00.000Z', {
+      characterDraft: createPromptBuilderDraft('character-transform'),
+    });
+    unrelated.checkpoint = 'complete';
+    const state: FakeDatabaseState = {
+      projects: new Map([
+        ['older', older],
+        ['newest', newest],
+        ['unrelated', unrelated],
+      ]),
+      artifacts: new Map(),
+    };
+    const indexedDb = compatibilityIndexedDb(state);
+    const repository = createLocalProjectRepository({ indexedDB: indexedDb.factory });
+
+    await expect(repository.loadNewestCharacterDesign()).resolves.toMatchObject({ id: 'newest' });
+    expect(state.queryCounts).toEqual({ count: 0, get: 0, getAll: 1 });
+  });
+
   it('reads byte-identical owned artifacts and rejects damaged or cross-project records', async () => {
     const state = {
       projects: new Map([
@@ -411,7 +467,9 @@ describe('Guided project compatibility repository', () => {
       durable: false,
     });
     await expect(repository.list()).resolves.toEqual([]);
+    await expect(repository.count()).resolves.toBe(0);
     await expect(repository.load('legacy')).resolves.toBeNull();
+    await expect(repository.loadNewestCharacterDesign()).resolves.toBeNull();
     await expect(repository.readArtifact('legacy', 'video')).resolves.toBeNull();
   });
 

@@ -27,7 +27,8 @@ import type {
 } from '../../providers/reference-images/reference-image-provider.js';
 import { ReferenceImageProviderError } from '../../providers/reference-images/reference-image-provider.js';
 import { testConfig } from '../../test/fakes.js';
-import { LocalReferenceImageAssetStore } from './asset-store.js';
+import { LocalReferenceImageAssetStore, type ReferenceImageAssetStore } from './asset-store.js';
+import { createStoredReferenceImageMetadata } from './asset-layout.js';
 import type { RemoteReferenceImageDownloader } from './routes.js';
 
 const localHeaders = { origin: 'http://localhost:5173', host: 'localhost:5173' };
@@ -121,6 +122,7 @@ describe('reference image API', () => {
     provider: TestReferenceImageProvider | null,
     characterPromptOptimizer: CharacterPromptOptimizer | null = null,
     remoteImageDownloader?: RemoteReferenceImageDownloader,
+    assetStore?: ReferenceImageAssetStore,
   ) => {
     const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-reference-api-'));
     directories.push(directory);
@@ -131,12 +133,71 @@ describe('reference image API', () => {
           ? null
           : { descriptor: provider.descriptor ?? OPENAI_TEST_DESCRIPTOR, ...provider },
       characterPromptOptimizer,
-      referenceImageAssetStore: new LocalReferenceImageAssetStore(directory),
+      referenceImageAssetStore: assetStore ?? new LocalReferenceImageAssetStore(directory),
       ...(remoteImageDownloader ? { remoteImageDownloader } : {}),
     });
     apps.push(app);
     return app;
   };
+
+  it('falls back to buffered content only when streaming is unsupported', async () => {
+    const bytes = Buffer.from('buffered-reference-image');
+    const metadata = createStoredReferenceImageMetadata(
+      {
+        localOwnerId: 'a'.repeat(64),
+        bytes,
+        mimeType: 'image/jpeg',
+        source: 'uploaded',
+        width: 32,
+        height: 32,
+        requestId,
+        requestFingerprint: 'b'.repeat(64),
+      },
+      requestId,
+      '2026-08-05T12:00:00.000Z',
+    );
+    const getContent = vi.fn(() => Promise.resolve({ metadata, bytes }));
+    const store: ReferenceImageAssetStore = {
+      findByRequestId: () => Promise.resolve(null),
+      getMetadata: () => Promise.resolve(null),
+      getContent,
+      store: () => Promise.reject(new Error('Unexpected store.')),
+    };
+    const app = await setup(null, null, undefined, store);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/reference-images/${requestId}/content`,
+      headers: localHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.rawPayload).toEqual(bytes);
+    expect(getContent).toHaveBeenCalledOnce();
+  });
+
+  it('does not repeat a missing streaming lookup through buffered fallback', async () => {
+    const getContentFile = vi.fn(() => Promise.resolve(null));
+    const getContent = vi.fn(() => Promise.resolve(null));
+    const store: ReferenceImageAssetStore = {
+      findByRequestId: () => Promise.resolve(null),
+      getMetadata: () => Promise.resolve(null),
+      getContent,
+      getContentFile,
+      store: () => Promise.reject(new Error('Unexpected store.')),
+    };
+    const app = await setup(null, null, undefined, store);
+
+    const response = await app.inject({
+      method: 'GET',
+      url: `/api/reference-images/${requestId}/content`,
+      headers: localHeaders,
+    });
+
+    expect(response.statusCode).toBe(404);
+    expect(getContentFile).toHaveBeenCalledOnce();
+    expect(getContent).not.toHaveBeenCalled();
+  });
 
   it('requires explicit Wardrobe intent before reporting Add Outfit availability', async () => {
     const app = await setup(null);

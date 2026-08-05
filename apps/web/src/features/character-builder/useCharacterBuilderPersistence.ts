@@ -65,38 +65,33 @@ export const createCharacterBuilderLegacyMigration = (
         id: 'guided-character-design-v1',
         async loadNewestCharacterDesign() {
           await repository.initialize();
-          const projects = await repository.list();
-          for (const summary of projects) {
-            if (summary.checkpoint !== 'character-design') continue;
-            const record = await repository.load(summary.id);
-            if (!record?.data.characterDraft) continue;
-            const value = sanitizeCharacterBuilderDraftValue({
-              draft: record.data.characterDraft,
-              design:
-                record.data.guidedDesign ?? createGuidedDesignFromDraft(record.data.characterDraft),
-              options: DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS,
-              preview: record.data.referenceImageAssetId
-                ? {
-                    assetId: record.data.referenceImageAssetId,
-                    sourceKey: createReferencePreviewSourceKey(
-                      record.data.characterPrompt,
-                      DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS,
-                    ),
-                    stale: record.data.referenceImageStale,
-                  }
-                : null,
-              uploadedReference: null,
-              pendingSave: null,
-            });
-            if (!value) continue;
-            return {
-              sourceId: record.id,
-              sourceRevision: record.revision,
-              sourceUpdatedAt: record.updatedAt,
-              value,
-            };
-          }
-          return null;
+          const record = await repository.loadNewestCharacterDesign();
+          if (!record?.data.characterDraft) return null;
+          const value = sanitizeCharacterBuilderDraftValue({
+            draft: record.data.characterDraft,
+            design:
+              record.data.guidedDesign ?? createGuidedDesignFromDraft(record.data.characterDraft),
+            options: DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS,
+            preview: record.data.referenceImageAssetId
+              ? {
+                  assetId: record.data.referenceImageAssetId,
+                  sourceKey: createReferencePreviewSourceKey(
+                    record.data.characterPrompt,
+                    DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS,
+                  ),
+                  stale: record.data.referenceImageStale,
+                }
+              : null,
+            uploadedReference: null,
+            pendingSave: null,
+          });
+          if (!value) return null;
+          return {
+            sourceId: record.id,
+            sourceRevision: record.revision,
+            sourceUpdatedAt: record.updatedAt,
+            value,
+          };
         },
       }
     : null;

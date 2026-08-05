@@ -4,7 +4,6 @@ import {
   type GuidedProjectDataV1,
   type LocalProjectRepository,
   type ProjectRecordV1,
-  type ProjectSummary,
 } from '../guided-flow/types';
 import { createGuidedDesignFromDraft } from './characterModel';
 import { createCharacterBuilderLegacyMigration } from './useCharacterBuilderPersistence';
@@ -34,23 +33,14 @@ const emptyGuidedData = (): GuidedProjectDataV1 => ({
 });
 
 const createLegacyRepository = (record: ProjectRecordV1): LocalProjectRepository => {
-  const summary: ProjectSummary = {
-    id: record.id,
-    title: record.title,
-    revision: record.revision,
-    checkpoint: record.checkpoint,
-    characterName: record.data.characterName,
-    hasOriginalVideo: false,
-    hasProcessedVideo: false,
-    createdAt: record.createdAt,
-    updatedAt: record.updatedAt,
-  };
   const storage = { health: 'ready', durable: true, notice: null } as const;
   return {
     initialize: vi.fn(() => Promise.resolve(storage)),
     getStorageState: () => storage,
-    list: vi.fn(() => Promise.resolve([summary])),
-    load: vi.fn((projectId: string) => Promise.resolve(projectId === record.id ? record : null)),
+    count: vi.fn(() => Promise.resolve(1)),
+    list: vi.fn(() => Promise.reject(new Error('Unexpected list.'))),
+    load: vi.fn(() => Promise.reject(new Error('Unexpected load.'))),
+    loadNewestCharacterDesign: vi.fn(() => Promise.resolve(record)),
     readArtifact: vi.fn(() => Promise.resolve(null)),
     deleteProject: vi.fn(() => Promise.reject(new Error('Unexpected delete.'))),
     close: vi.fn(),
@@ -88,7 +78,8 @@ const createLegacyRecord = (guidedDesign: ProjectRecordV1['data']['guidedDesign'
 describe('character builder legacy migration', () => {
   it('hydrates a missing guided design from the canonical legacy draft', async () => {
     const { draft, record } = createLegacyRecord(null);
-    const migration = createCharacterBuilderLegacyMigration(createLegacyRepository(record));
+    const repository = createLegacyRepository(record);
+    const migration = createCharacterBuilderLegacyMigration(repository);
 
     const candidate = await migration?.loadNewestCharacterDesign();
 
@@ -106,6 +97,9 @@ describe('character builder legacy migration', () => {
         },
       },
     });
+    expect(repository.loadNewestCharacterDesign).toHaveBeenCalledOnce();
+    expect(repository.list).not.toHaveBeenCalled();
+    expect(repository.load).not.toHaveBeenCalled();
   });
 
   it('preserves an existing guided design instead of rehydrating it', async () => {

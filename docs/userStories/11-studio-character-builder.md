@@ -61,6 +61,9 @@ erasing existing choices.
   discard.
 - Save retries resume the same caller-supplied character ID and unfinished stage, preventing
   duplicate characters after persistence or preload failure.
+- When no active Builder draft exists, compatibility migration asks the legacy-project repository
+  for its newest valid character-design record in one query. Invalid and unrelated legacy records
+  remain ignored, and successful migration retains the existing one-time marker behavior.
 
 ## References and provider work
 
