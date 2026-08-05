@@ -106,7 +106,10 @@ then edit either base, download, start over, or discard.
    after visual success, its explicit retry uses the retained visual frames and does not resubmit
    visual processing. Every operation publishes truthful stage copy and never retries a billable submission.
 10. **Original** and conditional **Result** update both players. **Edit original** snapshots the
-    immutable source; **Edit result** snapshots the latest result as the next frame source. Review
+    immutable source; **Edit result** snapshots the latest result and its inspected metadata as the
+    next frame source. If an accepted approximate-resolution result is not exactly 16:9 or 9:16,
+    the next explicit Start prepares and revalidates a temporary contain-fit canonical copy without
+    changing the retained or downloadable result. Review
     keeps **Download result**, the selected edit summary, and the destructive action visible. Only the
     immutable source plus latest healthy Result remain after successful replacement. A voice failure
     after visual success retains the visual Result.
@@ -138,8 +141,8 @@ then edit either base, download, start over, or discard.
   immutable source. MP4 passes through.
 - Decart results must be 1280×720 or 720×1280. When Pruna Character Swap is active, the editor
   offers `720p` and `1080p` for each submission; the selected value is an
-  approximate 1 MP/2 MP budget. A different inspected width/height emits a content-free server
-  warning and continues instead of failing the job. Every result still preserves orientation, stays under
+  approximate 1 MP/2 MP budget. A different inspected width/height emits a content-free
+  informational server record and continues instead of failing the job. Every result still preserves orientation, stays under
   300,000,000 bytes, and remains within 500 ms of source duration; the browser compares downloaded
   metadata with the server-approved result rather than hard-coding 720p. Provider-output inspection
   keeps exact dimensions fatal for Decart and never reuses source-upload aspect-ratio guidance.
@@ -170,6 +173,13 @@ then edit either base, download, start over, or discard.
   provider-neutral guidance. No class triggers an automatic submission retry.
 - Original/variant identity stays local metadata until explicit selection. Character Swap hydrates
   the exact selected asset; Virtual Try-On recipe/input selection remains unchanged.
+- Selecting an exact saved character version initially leaves Character Swap Prompt empty so its
+  image is authoritative. Text entered afterward is sent as the transformation instruction. The
+  Decart binding sends that text plus its enhancement flag; the Pruna binding disables enhancement
+  and sends non-blank text unchanged as `instruction_prompt`. Blank or whitespace-only text uses
+  Lightframe's Pruna-specific default: reference image 1 defines the exact facial identity and
+  appearance, the source supplies expressions/lip sync/pose/movement/timing/blocking, and source
+  framing, lighting, background, scene structure, objects, and audio remain unchanged.
 - If an accepted job's status or content request is interrupted, prompt, reference, enhancement,
   and saved-recipe fields remain editable. The UI states that **Resume accepted job** still checks
   the immutable accepted recipe and creates no submission; draft edits apply only after that job

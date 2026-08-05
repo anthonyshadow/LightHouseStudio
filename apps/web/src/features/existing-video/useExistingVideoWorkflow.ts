@@ -8,6 +8,7 @@ import {
   type VideoTransformRecipe,
 } from '@studio/contracts';
 import {
+  canonicalVideoTransformInputGeometry,
   getVideoEditProviderCompatibility,
   validateUploadedVideoFacts,
   validateVideoTransformPlan,
@@ -78,8 +79,11 @@ type FinalizedVisual = Readonly<{
   mimeType: string;
   label: string;
   source: RecordingArtifact;
+  metadata: ValidatedExistingVideo['metadata'];
   generation: number;
 }>;
+
+type ExistingVideoBaseProvenance = 'source' | 'server-approved-result';
 
 export const savedCharacterStepInput = (
   prompt: string,
@@ -192,6 +196,15 @@ export const useExistingVideoWorkflow = ({
   const [retryJob, setRetryJob] = useState<{ jobId: string; stepIndex: number } | null>(null);
   const [comparison, setComparison] = useState<'original' | 'result'>('result');
   const [editBase, setEditBase] = useState<RecordingArtifact | null>(null);
+  const [editBaseMetadata, setEditBaseMetadata] = useState<
+    ValidatedExistingVideo['metadata'] | null
+  >(null);
+  const [editBaseProvenance, setEditBaseProvenance] =
+    useState<ExistingVideoBaseProvenance>('source');
+  const [resultMetadata, setResultMetadata] = useState<ValidatedExistingVideo['metadata'] | null>(
+    null,
+  );
+  const [resultHasServerApprovedVisual, setResultHasServerApprovedVisual] = useState(false);
   const [voiceSelection, setVoiceSelection] = useState<ExistingVideoVoiceSelection | null>(null);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
   const controllerRef = useRef<AbortController | null>(null);
@@ -199,15 +212,30 @@ export const useExistingVideoWorkflow = ({
   const generationRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
   const steps = useMemo<readonly ExistingVideoStep[]>(() => (step ? [step] : []), [step]);
+  const editBaseProviderCompatibility = useMemo(() => {
+    const metadata = editBaseMetadata ?? selection?.metadata;
+    return metadata
+      ? getVideoEditProviderCompatibility({ width: metadata.width, height: metadata.height })
+      : { compatible: true as const, aspect: '16:9' as const, reason: null };
+  }, [editBaseMetadata, selection]);
+  const providerInputNormalization = useMemo(() => {
+    const metadata = editBaseMetadata ?? selection?.metadata;
+    return metadata &&
+      editBaseProvenance === 'server-approved-result' &&
+      !editBaseProviderCompatibility.compatible
+      ? canonicalVideoTransformInputGeometry(metadata)
+      : null;
+  }, [editBaseMetadata, editBaseProvenance, editBaseProviderCompatibility, selection]);
   const visualProviderCompatibility = useMemo(
     () =>
-      selection
-        ? getVideoEditProviderCompatibility({
-            width: selection.metadata.width,
-            height: selection.metadata.height,
-          })
-        : { compatible: true as const, aspect: '16:9' as const, reason: null },
-    [selection],
+      providerInputNormalization
+        ? {
+            compatible: true as const,
+            aspect: providerInputNormalization.aspect,
+            reason: null,
+          }
+        : editBaseProviderCompatibility,
+    [editBaseProviderCompatibility, providerInputNormalization],
   );
 
   const clearOperation = useCallback(() => {
@@ -241,6 +269,10 @@ export const useExistingVideoWorkflow = ({
       setCompletedStepCount(0);
       setComparison('result');
       setEditBase(null);
+      setEditBaseMetadata(null);
+      setEditBaseProvenance('source');
+      setResultMetadata(null);
+      setResultHasServerApprovedVisual(false);
       setVoiceSelection(null);
     },
     [clearOperation, recording, releaseRetainedJob],
@@ -288,6 +320,10 @@ export const useExistingVideoWorkflow = ({
         });
         setSelection(validated);
         setEditBase(sourceArtifact);
+        setEditBaseMetadata(validated.metadata);
+        setEditBaseProvenance('source');
+        setResultMetadata(null);
+        setResultHasServerApprovedVisual(false);
         setStep(null);
         setVoiceSelection(null);
         setCompletedStepCount(0);
@@ -353,6 +389,10 @@ export const useExistingVideoWorkflow = ({
       });
       setSelection(validated);
       setEditBase(sourceArtifact);
+      setEditBaseMetadata(validated.metadata);
+      setEditBaseProvenance('source');
+      setResultMetadata(null);
+      setResultHasServerApprovedVisual(false);
       setStep(null);
       setVoiceSelection(null);
       setCompletedStepCount(0);
@@ -379,10 +419,11 @@ export const useExistingVideoWorkflow = ({
         setMessage(visualProviderCompatibility.reason);
         return false;
       }
+      const metadata = editBaseMetadata ?? selection?.metadata;
       if (
-        selection &&
+        metadata &&
         modelId === 'lucy-vton-latest' &&
-        validateUploadedVideoFacts(selection.metadata, ['virtual-try-on']).some(
+        validateUploadedVideoFacts(metadata, ['virtual-try-on']).some(
           (issue) => issue.code === 'payload-too-large',
         )
       ) {
@@ -408,7 +449,13 @@ export const useExistingVideoWorkflow = ({
       setMessage(null);
       return true;
     },
-    [acceptedSubmission, selection, videoProcessingCapabilities, visualProviderCompatibility],
+    [
+      acceptedSubmission,
+      editBaseMetadata,
+      selection,
+      videoProcessingCapabilities,
+      visualProviderCompatibility,
+    ],
   );
 
   const replaceSource = useCallback(
@@ -423,6 +470,10 @@ export const useExistingVideoWorkflow = ({
       setAcceptedSubmission(false);
       setComparison('original');
       setEditBase(artifact);
+      setEditBaseMetadata(validated.metadata);
+      setEditBaseProvenance('source');
+      setResultMetadata(null);
+      setResultHasServerApprovedVisual(false);
       setVoiceSelection(null);
     },
     [clearOperation, releaseRetainedJob],
@@ -454,6 +505,7 @@ export const useExistingVideoWorkflow = ({
       expectedResult: InspectedVideo,
     ): Promise<FinalizedVisual | null> => {
       if (!selection) throw new Error('The immutable source video is unavailable.');
+      const baseMetadata = editBaseMetadata ?? selection.metadata;
       setPhase('finalizing');
       recording.beginProcessing({
         kind: 'visual-retrieval',
@@ -478,12 +530,12 @@ export const useExistingVideoWorkflow = ({
         );
       }
       if (
-        Math.abs(validatedResult.metadata.durationMs - selection.metadata.durationMs) > 500 ||
+        Math.abs(validatedResult.metadata.durationMs - baseMetadata.durationMs) > 500 ||
         validatedResult.metadata.width !== expectedResult.width ||
         validatedResult.metadata.height !== expectedResult.height ||
         Math.abs(validatedResult.metadata.durationMs - expectedResult.durationMs) > 1 ||
         validatedResult.metadata.width > validatedResult.metadata.height !==
-          selection.metadata.width > selection.metadata.height
+          baseMetadata.width > baseMetadata.height
       ) {
         throw new Error(
           'The visual result could not be synchronized safely with the immutable source.',
@@ -553,10 +605,18 @@ export const useExistingVideoWorkflow = ({
         mimeType: normalized.mimeType,
         label: `${operationForModel(step.modelId)}-${stepIndex + 1}`,
         source,
+        metadata: {
+          ...validatedResult.metadata,
+          container: 'mp4',
+          videoCodec: 'avc',
+          audioCodec: selection.metadata.hasAudio ? 'aac' : null,
+          sizeBytes: normalized.blob.size,
+          hasAudio: selection.metadata.hasAudio,
+        },
         generation,
       };
     },
-    [editBase, recording, selection, steps],
+    [editBase, editBaseMetadata, recording, selection, steps],
   );
 
   const jobInterruption = useCallback(
@@ -668,6 +728,8 @@ export const useExistingVideoWorkflow = ({
     async (
       videoArtifact: RecordingArtifact,
       selectedVoice: ExistingVideoVoiceSelection,
+      metadata: ValidatedExistingVideo['metadata'],
+      hasServerApprovedVisual: boolean,
     ): Promise<VoiceProcessingOutcome> => {
       setPhase('voice-processing');
       const outcome =
@@ -682,6 +744,8 @@ export const useExistingVideoWorkflow = ({
               { replaceExistingResult: true },
             );
       if (outcome.status === 'ready') {
+        setResultMetadata(metadata);
+        setResultHasServerApprovedVisual(hasServerApprovedVisual);
         setComparison('result');
         setPhase('complete');
         setMessage(`${selectedVoice.voiceName} is ready on the generated result.`);
@@ -707,6 +771,8 @@ export const useExistingVideoWorkflow = ({
       selectedVoice: ExistingVideoVoiceSelection | null,
     ) => {
       if (!finalized) return;
+      setResultMetadata(finalized.metadata);
+      setResultHasServerApprovedVisual(true);
       if (!selectedVoice) {
         recording.completeVisualProcessing(
           finalized.blob,
@@ -724,7 +790,12 @@ export const useExistingVideoWorkflow = ({
         finalized.label,
       );
       try {
-        const outcome = await applySelectedVoice(stagedVisual, selectedVoice);
+        const outcome = await applySelectedVoice(
+          stagedVisual,
+          selectedVoice,
+          finalized.metadata,
+          true,
+        );
         if (outcome.status === 'ready' || finalized.generation !== generationRef.current) return;
         recording.completeVisualProcessing(
           finalized.blob,
@@ -803,19 +874,34 @@ export const useExistingVideoWorkflow = ({
       };
       try {
         let submissionSource = source;
-        if (capability.inputPreparation === 'h264-mp4' && source.type !== 'video/mp4') {
+        const requiresH264Mp4 =
+          capability.inputPreparation === 'h264-mp4' &&
+          (source.type || baseArtifact.mimeType) !== 'video/mp4';
+        if (requiresH264Mp4 || providerInputNormalization) {
           setPhase('transcoding');
           recording.beginProcessing({
             kind: 'transcoding',
-            title: 'Preparing H.264 MP4 source…',
-            detail: 'Converting a temporary submission copy while preserving the immutable source.',
+            title: providerInputNormalization
+              ? 'Preparing generated result…'
+              : 'Preparing H.264 MP4 source…',
+            detail: providerInputNormalization
+              ? 'Fitting a temporary submission copy inside 16:9 or 9:16 while preserving the saved result.'
+              : 'Converting a temporary submission copy while preserving the immutable source.',
           });
           const converted = await transcodeRecordingToMp4(source, {
             requireAudio: selection.metadata.hasAudio,
             signal: controller.signal,
+            ...(providerInputNormalization
+              ? {
+                  targetDimensions: {
+                    width: providerInputNormalization.width,
+                    height: providerInputNormalization.height,
+                  },
+                }
+              : {}),
           });
           const validatedPrepared = await validateExistingVideo(
-            new File([converted.blob], 'character-swap-source.mp4', {
+            new File([converted.blob], 'visual-edit-source.mp4', {
               type: converted.mimeType,
             }),
             false,
@@ -823,9 +909,12 @@ export const useExistingVideoWorkflow = ({
           );
           if (
             validatedPrepared.metadata.container !== 'mp4' ||
-            validatedPrepared.metadata.videoCodec !== 'avc'
+            validatedPrepared.metadata.videoCodec !== 'avc' ||
+            (providerInputNormalization !== null &&
+              (validatedPrepared.metadata.width !== providerInputNormalization.width ||
+                validatedPrepared.metadata.height !== providerInputNormalization.height))
           ) {
-            throw new Error('The temporary Character Swap source could not be prepared safely.');
+            throw new Error('The temporary visual-processing source could not be prepared safely.');
           }
           submissionSource = validatedPrepared.file;
           setPhase('uploading');
@@ -874,6 +963,7 @@ export const useExistingVideoWorkflow = ({
       editBase,
       pollAndFinalize,
       onSubmissionAccepted,
+      providerInputNormalization,
       recording,
       releaseRetainedJob,
       selection,
@@ -893,19 +983,33 @@ export const useExistingVideoWorkflow = ({
       completedStepCount > 0
         ? (recording.visual ?? recording.processed)
         : (editBase ?? recording.original);
-    if (!baseArtifact || !voiceSelection) return;
+    const baseMetadata =
+      completedStepCount > 0 ? resultMetadata : (editBaseMetadata ?? selection?.metadata ?? null);
+    if (!baseArtifact || !baseMetadata || !voiceSelection) return;
     clearOperation();
     startedAtRef.current = performance.now();
     setMessage(null);
-    await applySelectedVoice(baseArtifact, voiceSelection);
+    await applySelectedVoice(
+      baseArtifact,
+      voiceSelection,
+      baseMetadata,
+      completedStepCount > 0
+        ? resultHasServerApprovedVisual
+        : editBaseProvenance === 'server-approved-result',
+    );
   }, [
     applySelectedVoice,
     clearOperation,
     completedStepCount,
     editBase,
+    editBaseMetadata,
+    editBaseProvenance,
     recording.original,
     recording.processed,
     recording.visual,
+    resultHasServerApprovedVisual,
+    resultMetadata,
+    selection,
     steps,
     submitStep,
     voiceSelection,
@@ -1013,6 +1117,10 @@ export const useExistingVideoWorkflow = ({
     setCompletedStepCount(0);
     setComparison('original');
     setEditBase(recording.original);
+    setEditBaseMetadata(selection.metadata);
+    setEditBaseProvenance('source');
+    setResultMetadata(null);
+    setResultHasServerApprovedVisual(false);
     setVoiceSelection(null);
   }, [clearOperation, phase, recording, selection]);
 
@@ -1043,16 +1151,43 @@ export const useExistingVideoWorkflow = ({
   const editSelected = useCallback(() => {
     const base =
       comparison === 'original' ? recording.original : (recording.processed ?? recording.visual);
-    if (!base) return;
+    const metadata = comparison === 'original' ? selection?.metadata : resultMetadata;
+    if (!base || !metadata) return;
+    const provenance: ExistingVideoBaseProvenance =
+      comparison === 'result' && resultHasServerApprovedVisual
+        ? 'server-approved-result'
+        : 'source';
+    const requiresFittedSubmission =
+      provenance === 'server-approved-result' &&
+      !getVideoEditProviderCompatibility(metadata).compatible;
     setEditBase(base);
+    setEditBaseMetadata(metadata);
+    setEditBaseProvenance(provenance);
     setStep(null);
     setVoiceSelection(null);
     setCompletedStepCount(0);
     setPhase('ready');
     setMessage(
-      `Editing ${comparison === 'original' ? 'the immutable original' : 'the latest result'}.`,
+      comparison === 'original'
+        ? 'Editing the immutable original.'
+        : requiresFittedSubmission
+          ? 'Editing the latest result. Start edit will fit a temporary submission copy inside 16:9 or 9:16; the saved result stays unchanged.'
+          : 'Editing the latest result.',
     );
-  }, [comparison, recording.original, recording.processed, recording.visual]);
+  }, [
+    comparison,
+    recording.original,
+    recording.processed,
+    recording.visual,
+    resultHasServerApprovedVisual,
+    resultMetadata,
+    selection,
+  ]);
+
+  const currentMetadata =
+    comparison === 'result' && (recording.processed ?? recording.visual)
+      ? (resultMetadata ?? selection?.metadata ?? null)
+      : (selection?.metadata ?? null);
 
   useEffect(() => () => controllerRef.current?.abort(), []);
 
@@ -1096,6 +1231,8 @@ export const useExistingVideoWorkflow = ({
       result: recording.processed ?? recording.visual,
       downloaded: recording.downloaded,
       editBase,
+      editBaseMetadata,
+      currentMetadata,
       voiceSelection,
       voiceAvailable: recording.sidecar.state === 'ready' && recording.sidecar.blob !== null,
       visualProviderCompatibility,
@@ -1144,7 +1281,9 @@ export const useExistingVideoWorkflow = ({
       cancelBeforeAcceptance,
       completedStepCount,
       comparison,
+      currentMetadata,
       editBase,
+      editBaseMetadata,
       editSelected,
       elapsedSeconds,
       message,

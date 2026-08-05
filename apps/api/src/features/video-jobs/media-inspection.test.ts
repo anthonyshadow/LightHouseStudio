@@ -41,9 +41,9 @@ describe('expectedProviderOutputDimensions', () => {
     ['720p', 'portrait', 1_024, 1_024],
     ['1080p', 'landscape', 1_920, 1_024],
   ] as const)(
-    'warns and continues for non-canonical %s megapixel-budget %s output',
+    'records and continues for non-canonical %s megapixel-budget %s output',
     (resolution, orientation, width, height) => {
-      const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+      const information = vi.spyOn(console, 'info').mockImplementation(() => undefined);
       expect(() =>
         assertProviderOutputDimensions(
           { width, height },
@@ -52,8 +52,8 @@ describe('expectedProviderOutputDimensions', () => {
           orientation,
         ),
       ).not.toThrow();
-      expect(warning).toHaveBeenCalledWith(
-        expect.stringContaining('continuing with the inspected result'),
+      expect(information).toHaveBeenCalledWith(
+        expect.stringContaining('Accepted provider-selected dimensions'),
         expect.objectContaining({
           actualWidth: width,
           actualHeight: height,
@@ -61,7 +61,7 @@ describe('expectedProviderOutputDimensions', () => {
           expectedOrientation: orientation,
         }),
       );
-      warning.mockRestore();
+      information.mockRestore();
     },
   );
 

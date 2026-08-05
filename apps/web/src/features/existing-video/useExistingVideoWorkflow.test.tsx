@@ -261,6 +261,94 @@ describe('useExistingVideoWorkflow', () => {
     expect(adapters.submitVideoJob).not.toHaveBeenCalled();
   });
 
+  it('immediately re-edits a non-canonical server-approved result through a temporary contain-fit copy', async () => {
+    const sourceFile = new File(['source'], 'source.mp4', { type: 'video/mp4' });
+    const providerResultFile = new File(['provider-result'], 'result.mp4', {
+      type: 'video/mp4',
+    });
+    const preparedFile = new File(['prepared-result'], 'visual-edit-source.mp4', {
+      type: 'video/mp4',
+    });
+    const providerResultInspection = {
+      ...inspected(providerResultFile),
+      metadata: {
+        ...inspected(providerResultFile).metadata,
+        width: 1_920,
+        height: 1_024,
+      },
+    };
+    const preparedInspection = {
+      ...inspected(preparedFile),
+      metadata: {
+        ...inspected(preparedFile).metadata,
+        width: 1_920,
+        height: 1_080,
+      },
+    };
+    adapters.validateExistingVideo
+      .mockResolvedValueOnce(inspected(sourceFile))
+      .mockResolvedValueOnce(providerResultInspection)
+      .mockResolvedValueOnce(preparedInspection)
+      .mockResolvedValueOnce(providerResultInspection);
+    adapters.fetchVideoJob.mockImplementation((jobId: string) =>
+      Promise.resolve({
+        ...jobStatus(jobId),
+        result: {
+          ...jobStatus(jobId).result,
+          width: 1_920,
+          height: 1_024,
+        },
+      }),
+    );
+    adapters.transcodeRecordingToMp4.mockResolvedValue({
+      blob: preparedFile,
+      mimeType: 'video/mp4',
+    });
+    const recording = recordingController();
+    const { result } = renderHook(() =>
+      useExistingVideoWorkflow({
+        recording,
+        processing: processingController(),
+        publishUploadedVideo: vi.fn().mockReturnValue(recording.original),
+      }),
+    );
+
+    await act(async () => result.current.selectFile(sourceFile));
+    act(() => {
+      result.current.addStep('lucy-latest');
+    });
+    act(() => result.current.updateStep(result.current.steps[0]!.id, { prompt: 'First edit' }));
+    await act(async () => result.current.submitStep(0));
+    await waitFor(() => expect(result.current.phase).toBe('complete'));
+
+    expect(result.current.currentMetadata).toMatchObject({ width: 1_920, height: 1_024 });
+    const retainedResult = recording.visual;
+    expect(retainedResult).not.toBeNull();
+
+    act(() => result.current.editSelected());
+    expect(result.current.message).toContain('temporary submission copy');
+    expect(result.current.visualProviderCompatibility).toMatchObject({
+      compatible: true,
+      aspect: '16:9',
+    });
+    act(() => {
+      result.current.addStep('lucy-latest');
+    });
+    act(() => result.current.updateStep(result.current.steps[0]!.id, { prompt: 'Second edit' }));
+    await act(async () => result.current.submitStep(0));
+
+    expect(adapters.transcodeRecordingToMp4).toHaveBeenCalledWith(
+      retainedResult!.media,
+      expect.objectContaining({
+        requireAudio: false,
+        targetDimensions: { width: 1_920, height: 1_080 },
+      }),
+    );
+    expect(adapters.submitVideoJob).toHaveBeenCalledTimes(2);
+    expect(adapters.submitVideoJob.mock.calls[1]?.[2]).toBe(preparedFile);
+    expect(retainedResult!.media).not.toBe(preparedFile);
+  });
+
   it('requires a reference and locally prepares MOV as an ephemeral MP4 only when requested', async () => {
     const sourceFile = new File(['mov-source'], 'source.mov', { type: 'video/quicktime' });
     const preparedFile = new File(['prepared-mp4'], 'character-swap-source.mp4', {

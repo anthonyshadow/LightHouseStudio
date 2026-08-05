@@ -943,7 +943,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   }, [closeOverlay, existingVideo]);
   const openVideoAdjust = useCallback(() => {
     const sourceArtifact = comparedExistingVideoArtifact ?? recording.presented;
-    const metadata = existingVideo.selection?.metadata;
+    const metadata = existingVideo.currentMetadata;
     if (!sourceArtifact || !metadata || recordingActive || existingVideo.providerActive) return;
     closeOverlay();
     videoEditor.begin({ artifact: sourceArtifact, metadata });
@@ -951,8 +951,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   }, [
     closeOverlay,
     comparedExistingVideoArtifact,
+    existingVideo.currentMetadata,
     existingVideo.providerActive,
-    existingVideo.selection?.metadata,
     recording.presented,
     recordingActive,
     videoEditor,

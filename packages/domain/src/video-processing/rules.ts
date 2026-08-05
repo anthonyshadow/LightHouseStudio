@@ -10,6 +10,12 @@ export const GENERAL_VIDEO_SIZE_LIMIT_BYTES = 300_000_000;
 export const VTON_VIDEO_SIZE_LIMIT_BYTES = 200_000_000;
 export const VIDEO_ASPECT_TOLERANCE = 0.01;
 
+export type CanonicalVideoTransformInputGeometry = Readonly<{
+  width: number;
+  height: number;
+  aspect: '16:9' | '9:16';
+}>;
+
 const supportedAspect = (width: number, height: number): boolean => {
   if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
     return false;
@@ -19,6 +25,32 @@ const supportedAspect = (width: number, height: number): boolean => {
     Math.abs(ratio - 16 / 9) / (16 / 9) <= VIDEO_ASPECT_TOLERANCE ||
     Math.abs(ratio - 9 / 16) / (9 / 16) <= VIDEO_ASPECT_TOLERANCE
   );
+};
+
+/**
+ * Returns the smallest canonical provider-input canvas that contains the
+ * inspected source without cropping. Callers still own the actual local
+ * contain/letterbox render and its validation.
+ */
+export const canonicalVideoTransformInputGeometry = (
+  source: Readonly<{ width: number; height: number }>,
+): CanonicalVideoTransformInputGeometry => {
+  if (
+    !Number.isFinite(source.width) ||
+    !Number.isFinite(source.height) ||
+    source.width <= 0 ||
+    source.height <= 0
+  ) {
+    throw new Error('Video transform input dimensions must be positive and finite.');
+  }
+
+  if (source.width > source.height) {
+    const scale = Math.max(1, Math.ceil(Math.max(source.width / 32, source.height / 18)));
+    return { width: scale * 32, height: scale * 18, aspect: '16:9' };
+  }
+
+  const scale = Math.max(1, Math.ceil(Math.max(source.width / 18, source.height / 32)));
+  return { width: scale * 18, height: scale * 32, aspect: '9:16' };
 };
 
 export const validateUploadedVideoFacts = (

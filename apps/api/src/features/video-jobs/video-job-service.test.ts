@@ -402,7 +402,7 @@ describe('VideoJobService', () => {
     expect(provider.submissions).toHaveLength(1);
   });
 
-  it('warns and publishes a non-canonical megapixel-budget result', async () => {
+  it('reports and publishes a non-canonical megapixel-budget result', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-megapixel-'));
     const provider = new FakeVideoProvider();
     const service = new VideoJobService(
@@ -422,7 +422,7 @@ describe('VideoJobService', () => {
       root,
     );
     services.push(service);
-    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const report = vi.spyOn(console, 'info').mockImplementation(() => undefined);
     const jobId = crypto.randomUUID();
     const ownerId = 'owner-megapixel-result';
 
@@ -433,15 +433,15 @@ describe('VideoJobService', () => {
     const ready = await waitFor(service, jobId, ownerId, 'ready');
 
     expect(ready.result).toMatchObject({ width: 1_280, height: 720 });
-    expect(warning).toHaveBeenCalledWith(
-      expect.stringContaining('continuing with the inspected result'),
+    expect(report).toHaveBeenCalledWith(
+      expect.stringContaining('Accepted provider-selected dimensions'),
       expect.objectContaining({
         actualWidth: 1_280,
         actualHeight: 720,
         resolution: '1080p',
       }),
     );
-    warning.mockRestore();
+    report.mockRestore();
   });
 
   it('returns only a classified safe error when an accepted provider job fails', async () => {

@@ -29,8 +29,8 @@ const app = createApp({
   ...(staticRoot === undefined ? {} : { staticRoot }),
 });
 if (dataDirectory.usesLegacyApiRelativePath) {
-  app.log.warn(
-    'Using the legacy API-relative Lightframe data directory because the repository-relative directory is absent.',
+  app.log.info(
+    'Using the existing API-relative Lightframe data directory for backward compatibility.',
   );
 }
 

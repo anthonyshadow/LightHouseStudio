@@ -385,7 +385,7 @@ export const ExistingVideoPanel = ({
     );
   }
 
-  const metadata = selected.metadata;
+  const metadata = workflow.currentMetadata ?? selected.metadata;
   const currentPhase = existingVideoEditorPhase(workflow);
   const activeStep = workflow.steps[0];
 

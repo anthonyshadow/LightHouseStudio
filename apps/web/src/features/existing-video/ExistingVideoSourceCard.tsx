@@ -40,7 +40,7 @@ export const ExistingVideoSourceCard = ({
   const selected = workflow.selection;
   if (!selected) return null;
 
-  const metadata = selected.metadata;
+  const metadata = workflow.currentMetadata ?? selected.metadata;
   const artifact =
     workflow.comparison === 'result' ? (workflow.result ?? workflow.original) : workflow.original;
   const displayName =
@@ -130,7 +130,7 @@ export const ExistingVideoSourceCard = ({
         <dl css={metadataStyles(theme)}>
           <div>
             <dt>File</dt>
-            <dd title={metadata.displayName}>{metadata.displayName}</dd>
+            <dd title={displayName}>{displayName}</dd>
           </div>
           <div>
             <dt>Size</dt>

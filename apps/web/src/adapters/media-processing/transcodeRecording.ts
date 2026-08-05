@@ -8,6 +8,7 @@ type RecordingTranscodeResult = Readonly<{
 type RecordingTranscodeOptions = Readonly<{
   requireAudio: boolean;
   signal: AbortSignal;
+  targetDimensions?: Readonly<{ width: number; height: number }>;
 }>;
 
 /**
@@ -18,9 +19,20 @@ type RecordingTranscodeOptions = Readonly<{
  */
 export const transcodeRecordingToMp4 = async (
   recordedBlob: Blob,
-  { requireAudio, signal }: RecordingTranscodeOptions,
+  { requireAudio, signal, targetDimensions }: RecordingTranscodeOptions,
 ): Promise<RecordingTranscodeResult> => {
   signal.throwIfAborted();
+  if (
+    targetDimensions &&
+    (!Number.isInteger(targetDimensions.width) ||
+      !Number.isInteger(targetDimensions.height) ||
+      targetDimensions.width <= 0 ||
+      targetDimensions.height <= 0 ||
+      targetDimensions.width % 2 !== 0 ||
+      targetDimensions.height % 2 !== 0)
+  ) {
+    throw new Error('Target video dimensions must be positive even integers.');
+  }
   const {
     ALL_FORMATS,
     BlobSource,
@@ -54,7 +66,7 @@ export const transcodeRecordingToMp4 = async (
     }
     const sourceVideoCodec = await videoTrack.getCodec();
     const sourceAudioCodec = audioTrack ? await audioTrack.getCodec() : null;
-    const videoRequiresTranscode = sourceVideoCodec !== 'avc';
+    const videoRequiresTranscode = sourceVideoCodec !== 'avc' || targetDimensions !== undefined;
     const audioRequiresTranscode = audioTrack !== null && sourceAudioCodec !== 'aac';
     if (videoRequiresTranscode && !(await canEncodeVideo('avc'))) {
       throw new Error('This browser cannot encode H.264 video.');
@@ -92,6 +104,13 @@ export const transcodeRecordingToMp4 = async (
         // exposes software only, while WebKit and physical browsers may expose a
         // different acceleration class.
         hardwareAcceleration: 'no-preference',
+        ...(targetDimensions
+          ? {
+              width: targetDimensions.width,
+              height: targetDimensions.height,
+              fit: 'contain' as const,
+            }
+          : {}),
       },
       audio: {
         codec: 'aac',
@@ -160,6 +179,8 @@ export const transcodeRecordingToMp4 = async (
         !Number.isFinite(outputDuration) ||
         outputDuration <= 0 ||
         Math.abs(outputDuration - sourceDuration) > 0.5 ||
+        (targetDimensions !== undefined &&
+          (outputWidth !== targetDimensions.width || outputHeight !== targetDimensions.height)) ||
         outputWidth > outputHeight !== sourceWidth > sourceHeight
       ) {
         throw new Error('The converted recording failed duration or orientation validation.');

@@ -272,7 +272,9 @@ visual is then published for comparison and retry. The combined plan is not repo
 before the voiced result commits. A Voice retry after visual success continues from the retained
 visual, not the original frame source. Every Voice treatment reads immutable source audio and
 remuxes it onto the explicitly selected Original or Result video. Existing-video comparison
-selects the immutable source or latest result without changing artifact ownership. Its
+selects the immutable source or latest result without changing artifact ownership. The controller
+retains inspected metadata for both layers, so comparison, local editing, provider compatibility,
+and iterative result editing use the dimensions of the artifact actually selected. Its
 source-preserving Start over revokes the latest result, retains the source, and returns
 presentation to that source. Every artifact has a UUID, app-owned name, creation time, kind, and
 parent lineage; generated filenames include the operation, UTC timestamp, and UUID suffix.
@@ -293,9 +295,16 @@ advertises the documented approximate 1 MP (`720p`) and 2 MP (`1080p`) output cl
 provider-neutral capabilities contract. The editor stores one resolution on the visual step and
 the broker validates it against that operation binding before passing it to Pruna. Its prediction
 input also pins `seed=0`, `turbo=false`, `target_fps=original`, `save_audio=true`,
-`ignore_audio=false`, and `disable_safety_checker=false`. Its server-only sizing policy logs a
-content-free warning for non-canonical dimensions and continues with the inspected result; Decart
-keeps exact canonical 720p validation. Virtual Try-On always resolves
+`ignore_audio=false`, and `disable_safety_checker=false`. A blank or whitespace-only recipe prompt
+resolves server-side to the app-owned Pruna replacement instruction: reference image 1 is
+authoritative for facial identity and defining appearance, the source supplies expression, lip
+sync, pose, movement, timing, and blocking, and every non-character scene/audio property is kept.
+Non-blank creator text is forwarded unchanged. Its server-only sizing policy records
+content-free informational metadata for non-canonical dimensions and continues with the inspected
+result; Decart keeps exact canonical 720p validation. When a server-approved result is selected as
+the next frame source, a non-canonical result is fitted locally inside the smallest canonical
+16:9/9:16 canvas at explicit Start. That ephemeral H.264 MP4 copy is revalidated before upload;
+the retained result is never cropped, stretched, or replaced. Virtual Try-On always resolves
 independently to Decart. The shared
 server provider contract normalizes submit, queued/processing/completed/failed status, opaque
 output location, bounded download, retryable failure classification, output resolution, and
@@ -305,8 +314,9 @@ optional cancellation. Environment reads do not enter UI or orchestration.
 `optional | required` reference policy, prompt-enhancement support, and terminal-failure release
 ownership per operation. It exposes no batch model/provider name. When H.264 MP4 preparation is required, the browser converts MOV/WebM at
 explicit Start, revalidates the ephemeral Blob, submits it, and leaves the immutable source and
-audio sidecar unchanged. MP4 remains pass-through. Downloaded metadata is compared with the
-server-approved result rather than a browser-hard-coded 720p size.
+audio sidecar unchanged. MP4 remains pass-through unless iterative result editing needs the
+canonical contain-fit preparation above. Downloaded metadata is compared with the server-approved
+result rather than a browser-hard-coded 720p size.
 VTO recipes carry an explicit batch input discriminator for saved/recent outfit, direct reference
 image, or prompt. Saved and recent recipe records separately persist `vtonInputKind` as `prompt` or
 `saved-outfit` plus `enhancePrompt`; image-only records are valid only with an opaque persisted

@@ -117,6 +117,8 @@ beforeEach(() => {
   media.registerAacEncoder.mockReset();
   media.retainAudio = true;
   media.videoTrack.getCodec.mockReset().mockResolvedValue('avc');
+  media.videoTrack.getDisplayWidth.mockReset().mockResolvedValue(1_280);
+  media.videoTrack.getDisplayHeight.mockReset().mockResolvedValue(720);
   media.audioTrack.getCodec.mockReset().mockResolvedValue('aac');
 });
 
@@ -160,6 +162,27 @@ describe('transcodeRecordingToMp4', () => {
     expect(media.conversionOptions).toMatchObject({
       video: { codec: 'avc', forceTranscode: true },
       audio: { codec: 'aac', forceTranscode: true },
+    });
+  });
+
+  it('fits an approximate provider result inside an exact canonical submission canvas', async () => {
+    media.videoTrack.getDisplayWidth.mockResolvedValue(1_920);
+    media.videoTrack.getDisplayHeight.mockResolvedValueOnce(1_024).mockResolvedValue(1_080);
+
+    await transcodeRecordingToMp4(new Blob(['result'], { type: 'video/mp4' }), {
+      requireAudio: true,
+      signal: new AbortController().signal,
+      targetDimensions: { width: 1_920, height: 1_080 },
+    });
+
+    expect(media.conversionOptions).toMatchObject({
+      video: {
+        codec: 'avc',
+        forceTranscode: true,
+        width: 1_920,
+        height: 1_080,
+        fit: 'contain',
+      },
     });
   });
 

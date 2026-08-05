@@ -45,6 +45,8 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   result: null,
   downloaded: false,
   editBase: null,
+  editBaseMetadata: null,
+  currentMetadata: null,
   voiceSelection: null,
   voiceAvailable: false,
   comparison: 'result',

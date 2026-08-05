@@ -8,7 +8,8 @@ a provider, and replace the immutable source only after a validated export and e
 1. Uploads may use any playable aspect ratio. In **Use existing video**, select **Adjust video** for
    the currently displayed source or latest healthy result. The side panel closes and Studio
    enters one `video-edit` workspace around the existing `MediaStage`; its `<video>` node and
-   playback time remain authoritative.
+   playback time remain authoritative. Source geometry, duration, size, and audio facts come from
+   that displayed artifact rather than being reused from the original upload.
 2. Desktop presents editing categories on the left, the stage in the center, and one named-scroll
    settings panel with sticky actions on the right. Tablet and phone place the stage first, then one
    horizontal category strip and a bounded safe-area-aware settings region. Capture controls are

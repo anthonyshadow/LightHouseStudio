@@ -90,8 +90,8 @@ export const assertProviderOutputDimensions = (
     .map((dimensions) => `${dimensions.width} × ${dimensions.height}`)
     .join(' or ');
   if (outputSizing === 'megapixel-budget') {
-    console.warn(
-      '[video-jobs] Visual result dimensions differ from the approximate resolution target; continuing with the inspected result.',
+    console.info(
+      '[video-jobs] Accepted provider-selected dimensions for the approximate resolution class.',
       {
         actualWidth: actual.width,
         actualHeight: actual.height,

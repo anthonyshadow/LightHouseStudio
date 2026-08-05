@@ -186,6 +186,9 @@ const harness = vi.hoisted(() => {
     },
     steps: [],
     comparison: 'result' as const,
+    get currentMetadata() {
+      return this.selection?.metadata ?? null;
+    },
     active: false,
     providerActive: false,
     adoptRecordedArtifact: vi.fn(() => Promise.resolve()),

@@ -17,7 +17,10 @@ const PRUNA_API_ORIGIN = 'https://api.pruna.ai' as const;
 const PRUNA_FILES_PATH = '/v1/files' as const;
 const PRUNA_PREDICTIONS_PATH = '/v1/predictions' as const;
 const DEFAULT_REPLACEMENT_INSTRUCTION =
-  'Replace the person in the source video with the identity from reference image 1. Keep lip sync, motion, audio, and camera from the source video.';
+  "Replace the primary person in the source video with the character from reference image 1. The output character must match reference image 1 exactly in facial identity and defining appearance while performing the source person's facial expressions, lip sync, pose, movement, timing, and blocking. Keep the source video's camera framing and movement, lighting, background, scene structure, objects, and audio unchanged; change only the character.";
+
+const replacementInstruction = (prompt: string): string =>
+  prompt.trim().length > 0 ? prompt : DEFAULT_REPLACEMENT_INSTRUCTION;
 
 const uploadResponseSchema = z
   .object({
@@ -235,7 +238,7 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
             save_audio: true,
             target_fps: 'original',
             ignore_audio: false,
-            instruction_prompt: input.recipe.prompt || DEFAULT_REPLACEMENT_INSTRUCTION,
+            instruction_prompt: replacementInstruction(input.recipe.prompt),
             disable_safety_checker: false,
           },
         }),

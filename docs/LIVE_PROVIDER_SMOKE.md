@@ -176,9 +176,12 @@ For each resolution row:
 4. Confirm exactly two `/v1/files` uploads and exactly one `/v1/predictions` request with synthetic
    names, `Model: p-video-replace`, one `images` entry, the editor-selected `resolution`, `seed=0`,
    `turbo=false`, `target_fps=original`, `save_audio=true`, `ignore_audio=false`,
-   `disable_safety_checker=false`, and raw prompt or the app-owned default when blank. There must be
-   no webhook, initial retry, fallback, raw identifier/URL/body leakage, or second prediction during
-   Voice retry.
+   `disable_safety_checker=false`, and the unchanged creator prompt when non-blank. With an empty or
+   whitespace-only prompt, verify `instruction_prompt` is the app-owned Pruna default that requires
+   the output character to match reference image 1's facial identity/appearance, transfers source
+   expression/lip sync/pose/movement/timing/blocking, and keeps source framing, lighting,
+   background, scene structure, objects, and audio. There must be no webhook, initial retry,
+   fallback, raw identifier/URL/body leakage, or second prediction during Voice retry.
 5. Observe starting/processing/succeeded and a controlled failed/canceled mapping. Interrupt status
    and result retrieval, then resume the accepted job without another prediction. Confirm Voice
    runs only after the visual result and its retry does not resubmit visual processing. For a
@@ -187,9 +190,11 @@ For each resolution row:
 6. Download only through the authenticated allowlisted Pruna delivery origin/path. Treat `720p`
    and `1080p` as the documented approximate 1 MP and 2 MP resolution classes, not promises of
    exact canonical dimensions. Record the inspected dimensions; if they differ from the canonical
-   target, confirm a content-free server warning appears and the job continues without a browser
-   DELETE. Also verify duration tolerance, source orientation, source-audio restoration, and browser
-   metadata agreement with the server-approved result.
+   target, confirm a content-free informational server record appears and the job continues without
+   a browser DELETE. Select **Edit result**, submit another authorized edit, and confirm the browser
+   prepares a canonical contain-fit temporary copy without changing the retained result. Also verify
+   duration tolerance, source orientation, source-audio restoration, and browser metadata agreement
+   with the server-approved result.
 7. Confirm uploaded inputs expire after approximately 30 minutes and generated delivery content is
    typically available for 24 hours under the tested account. No documented cancellation/deletion
    endpoint is relied upon. A Pruna terminal failure must remain visible until explicit user

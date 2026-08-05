@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  canonicalVideoTransformInputGeometry,
   validateUploadedVideoFacts,
   validateVideoTransformPlan,
   type UploadedVideoFacts,
@@ -57,6 +58,24 @@ describe('uploaded video policy', () => {
         message: 'Use a 16:9 landscape or 9:16 portrait video.',
       },
     ]);
+  });
+
+  it('derives the smallest canonical contain canvas for approximate provider results', () => {
+    expect(canonicalVideoTransformInputGeometry({ width: 1_920, height: 1_024 })).toEqual({
+      width: 1_920,
+      height: 1_080,
+      aspect: '16:9',
+    });
+    expect(canonicalVideoTransformInputGeometry({ width: 1_024, height: 1_920 })).toEqual({
+      width: 1_080,
+      height: 1_920,
+      aspect: '9:16',
+    });
+    expect(canonicalVideoTransformInputGeometry({ width: 1_280, height: 736 })).toEqual({
+      width: 1_312,
+      height: 738,
+      aspect: '16:9',
+    });
   });
 });
 

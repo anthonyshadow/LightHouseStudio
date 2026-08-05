@@ -215,6 +215,12 @@ export const ExistingVideoVisualEditor = ({
               }
             />
             <span>{step.prompt.length}/1,200</span>
+            {step.modelId === 'lucy-latest' && step.referenceImage ? (
+              <small>
+                Leave blank to use the selected identity as the primary direction. Text you add is
+                sent as the visual transformation instruction.
+              </small>
+            ) : null}
           </label>
           {!promptEnhancementSupported ? (
             <p>Prompt enhancement is unavailable for Character Swap in this configuration.</p>

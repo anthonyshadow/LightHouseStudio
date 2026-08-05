@@ -25,12 +25,13 @@ const submission = (
   referencePath: string,
   signal = new AbortController().signal,
   outputResolution: '720p' | '1080p' = '720p',
+  prompt = '',
 ) => ({
   operation: 'character-swap' as const,
   recipe: {
     operation: 'character-swap' as const,
     inputKind: 'character' as const,
-    prompt: '',
+    prompt,
     enhancePrompt: false,
     hasReferenceImage: true,
   },
@@ -111,12 +112,52 @@ describe('PrunaVideoReplaceProvider', () => {
           target_fps: 'original',
           ignore_audio: false,
           instruction_prompt:
-            'Replace the person in the source video with the identity from reference image 1. Keep lip sync, motion, audio, and camera from the source video.',
+            "Replace the primary person in the source video with the character from reference image 1. The output character must match reference image 1 exactly in facial identity and defining appearance while performing the source person's facial expressions, lip sync, pose, movement, timing, and blocking. Keep the source video's camera framing and movement, lighting, background, scene structure, objects, and audio unchanged; change only the character.",
           disable_safety_checker: false,
         },
       });
     },
   );
+
+  it.each([
+    [
+      'whitespace-only prompt',
+      '   ',
+      "Replace the primary person in the source video with the character from reference image 1. The output character must match reference image 1 exactly in facial identity and defining appearance while performing the source person's facial expressions, lip sync, pose, movement, timing, and blocking. Keep the source video's camera framing and movement, lighting, background, scene structure, objects, and audio unchanged; change only the character.",
+    ],
+    ['written prompt', 'Keep my exact custom direction.  ', 'Keep my exact custom direction.  '],
+  ] as const)('maps a %s to the intended instruction exactly', async (_label, prompt, expected) => {
+    const { videoPath, referencePath } = await fixture();
+    const fetchImplementation = vi
+      .fn<typeof fetch>()
+      .mockResolvedValueOnce(
+        jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-video' } }, 201),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-reference' } }, 201),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse(
+          {
+            id: 'prediction-prompt',
+            get_url: 'https://api.pruna.ai/v1/predictions/status/prediction-prompt',
+          },
+          201,
+        ),
+      );
+    const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
+
+    await provider.submit(
+      submission(videoPath, referencePath, new AbortController().signal, '720p', prompt),
+    );
+
+    const predictionBody = fetchImplementation.mock.calls[2]?.[1]?.body;
+    if (typeof predictionBody !== 'string') throw new Error('Expected prediction request JSON.');
+    const prediction = JSON.parse(predictionBody) as {
+      readonly input: { readonly instruction_prompt: unknown };
+    };
+    expect(prediction.input.instruction_prompt).toBe(expected);
+  });
 
   it.each([
     ['starting', 'pending', undefined],

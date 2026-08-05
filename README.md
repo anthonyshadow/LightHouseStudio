@@ -82,9 +82,10 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
   `lucy-vton-latest`, independently of that Character Swap choice. Decart output remains fixed
   720p; when Pruna is active, the editor lets the creator choose its documented approximate 1 MP
   (`720p`) or 2 MP (`1080p`) resolution class for each submission while retaining source
-  orientation. A non-canonical Pruna result size
-  produces a content-free server warning and continues with the inspected dimensions; Decart
-  remains exact-canonical.
+  orientation. A non-canonical Pruna result size produces a content-free informational server
+  record and continues with the inspected dimensions; Decart remains exact-canonical. Selecting
+  such a result for another visual edit prepares a temporary canonical contain-fit copy locally at
+  the next explicit Start; the displayed/downloadable result is unchanged.
   Both paths use explicit submit/status/content stages, inspected size/duration/orientation, and
   no automatic retry of a billable submission. The browser sees only operation capabilities and
   provider-neutral copy. Pruna non-2xx responses log only the numeric upstream status server-side.
@@ -95,7 +96,10 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
   WebM are converted locally at explicit Start into an ephemeral submission Blob; the immutable
   source is unchanged. MP4 input passes through. Every prediction explicitly pins seed `0`, turbo
   off, original frame rate, source-audio conditioning/output, and the enabled safety checker.
-  Prompt enhancement is unavailable in this configuration.
+  Prompt enhancement is unavailable in this configuration. A blank or whitespace-only prompt uses
+  a server-owned Pruna instruction that makes reference image 1 authoritative for facial identity
+  and defining appearance while preserving the source performance, framing, lighting, background,
+  scene, objects, and audio. A written prompt remains byte-for-byte creator-authored.
 - Reference generation uses one startup-selected provider: OpenAI `gpt-image-2`, BFL
   `flux-2-pro`, or Wiro `seedream-v5-lite-uncensored`. There is no automatic billable retry or
   provider fallback.
@@ -149,23 +153,23 @@ Open <http://127.0.0.1:4100>. Production startup fails when `apps/web/dist` is a
 All credentials are read by `apps/api`; never place secrets in `VITE_*` variables. `.env.example`
 is the maintained list of defaults and tunables.
 
-| Variable                                       | Purpose                                                                                |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------- |
-| `DECART_API_KEY`                               | Realtime scoped credentials, Decart Character Swap, and Decart-only Virtual Try-On     |
-| `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`       | Startup Character Swap choice: `decart` (default) or `pruna`; never exposed in the UI  |
-| `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY` | Required enablement and shared server credential when Pruna Character Swap is selected |
-| `PRUNA_VIDEO_REPLACE_MODEL`                    | Exact pinned `p-video-replace` literal; required when Pruna is selected                |
-| `PRUNA_IMAGE_TRY_ON_ENABLED`                   | Enables Wardrobe Add Outfit; defaults to `false` and does not hide saved versions      |
-| `PRUNA_IMAGE_TRY_ON_MODEL`                     | Exact pinned `p-image-try-on` literal; required with try-on enablement                 |
-| `OPENAI_API_KEY`                               | Character prompt optimization and OpenAI image work                                    |
-| `REFERENCE_IMAGE_PROVIDER`                     | Startup choice: `openai` (default), `bfl`, or `wiro`                                   |
-| `BFL_API_KEY`                                  | BFL image work when BFL is selected                                                    |
-| `WIRO_API_KEY`, `WIRO_API_SECRET`              | Wiro image work when Wiro is selected                                                  |
-| `ELEVENLABS_API_KEY`                           | Saved-voice listing, preview, and Voice Changer                                        |
-| `ELEVENLABS_ENABLE_LOGGING`                    | Provider retention choice; defaults to `false`                                         |
-| `LIGHTFRAME_DATA_DIR`                          | Immutable local reference assets; defaults to `./.lightframe-data`                     |
-| `PORT`                                         | Loopback API port; defaults to `4100`                                                  |
-| `NODE_ENV`                                     | `development`, `test`, or `production`                                                 |
+| Variable                                       | Purpose                                                                                                                                                        |
+| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DECART_API_KEY`                               | Realtime scoped credentials, Decart Character Swap, and Decart-only Virtual Try-On                                                                             |
+| `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`       | Startup Character Swap choice: `decart` (default) or `pruna`; never exposed in the UI                                                                          |
+| `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY` | Required enablement and shared server credential when Pruna Character Swap is selected                                                                         |
+| `PRUNA_VIDEO_REPLACE_MODEL`                    | Exact pinned `p-video-replace` literal; required when Pruna is selected                                                                                        |
+| `PRUNA_IMAGE_TRY_ON_ENABLED`                   | Enables Wardrobe Add Outfit; defaults to `false` and does not hide saved versions                                                                              |
+| `PRUNA_IMAGE_TRY_ON_MODEL`                     | Exact pinned `p-image-try-on` literal; required with try-on enablement                                                                                         |
+| `OPENAI_API_KEY`                               | Character prompt optimization and OpenAI image work                                                                                                            |
+| `REFERENCE_IMAGE_PROVIDER`                     | Startup choice: `openai` (default), `bfl`, or `wiro`                                                                                                           |
+| `BFL_API_KEY`                                  | BFL image work when BFL is selected                                                                                                                            |
+| `WIRO_API_KEY`, `WIRO_API_SECRET`              | Wiro image work when Wiro is selected                                                                                                                          |
+| `ELEVENLABS_API_KEY`                           | Saved-voice listing, preview, and Voice Changer                                                                                                                |
+| `ELEVENLABS_ENABLE_LOGGING`                    | Provider retention choice; defaults to `false`                                                                                                                 |
+| `LIGHTFRAME_DATA_DIR`                          | Immutable local reference assets; defaults to repository-root `./.lightframe-data`; an existing API-relative default remains in use for backward compatibility |
+| `PORT`                                         | Loopback API port; defaults to `4100`                                                                                                                          |
+| `NODE_ENV`                                     | `development`, `test`, or `production`                                                                                                                         |
 
 `GET /api/capabilities` reports configuration presence, not provider reachability, entitlement, or
 quota. Missing optional configuration disables only the corresponding feature.
