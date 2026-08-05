@@ -5,13 +5,9 @@ import {
   openCharacterOptions,
   readBrowserState,
 } from './support/studioHarness';
+import { REFERENCE_PNG } from './support/mediaFixtures';
 
 const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
-const REFERENCE_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-  'base64',
-);
-
 const openBuilder = async (page: Page): Promise<void> => {
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Create new character' }).click();

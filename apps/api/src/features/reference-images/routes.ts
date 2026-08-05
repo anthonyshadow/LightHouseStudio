@@ -20,6 +20,7 @@ import {
   uploadReferenceImageResponseSchema,
 } from '@studio/contracts';
 import { randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/errors.js';
 import {
@@ -174,7 +175,11 @@ export const registerReferenceImageRoutes = (
         const downloaded = await remoteImageDownloader.download(parsed.data.url, signal);
         let validated;
         try {
-          validated = await validateUploadedReferenceImage(downloaded.bytes, downloaded.mimeType);
+          validated = await validateUploadedReferenceImage(
+            downloaded.bytes,
+            downloaded.mimeType,
+            signal,
+          );
         } catch (error) {
           if (error instanceof InvalidReferenceImageUploadError) {
             throw new AppError(
@@ -333,13 +338,15 @@ export const registerReferenceImageRoutes = (
 
   app.get('/api/reference-images/:assetId/content', async (request, reply) => {
     const assetId = requireAssetId(request.params);
-    const content = await service.getContent(localOwnerIdForRequest(request), assetId);
+    const localOwnerId = localOwnerIdForRequest(request);
+    const storedFile = await service.getContentFile(localOwnerId, assetId);
+    const content = storedFile ?? (await service.getContent(localOwnerId, assetId));
     if (content === null) {
       throw new AppError(404, 'not_found', 'That local reference image is unavailable.');
     }
     void reply.header('Content-Type', content.metadata.mimeType);
     void reply.header('Content-Length', content.metadata.byteSize);
     void reply.header('X-Content-Type-Options', 'nosniff');
-    return reply.send(content.bytes);
+    return reply.send('path' in content ? createReadStream(content.path) : content.bytes);
   });
 };

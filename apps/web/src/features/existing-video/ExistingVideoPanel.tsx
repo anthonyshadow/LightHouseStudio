@@ -8,18 +8,18 @@ import { Button, ConfirmationDialog, StatusNotice, Surface } from '../../ui';
 import { ExistingVideoActionBar } from './ExistingVideoActionBar';
 import {
   activeConfigurationStyles,
-  dropActionStyles,
-  dropZoneStyles,
   editorColumnStyles,
   panelStackStyles,
-  processingStyles,
-  resultStyles,
   recoveryActionStyles,
   sectionHeadingStyles,
   sourceColumnStyles,
   workspaceStyles,
-  appliedSummaryStyles,
 } from './ExistingVideoPanel.styles';
+import {
+  ExistingVideoProcessingStatus,
+  ExistingVideoResultSummary,
+  ExistingVideoUploadChooser,
+} from './ExistingVideoPanelSections';
 import { ExistingVideoPhaseIndicator } from './ExistingVideoPhaseIndicator';
 import type { ExistingVideoSavedRecipe } from './ExistingVideoRecipeChooser';
 import { ExistingVideoSourceCard } from './ExistingVideoSourceCard';
@@ -29,7 +29,6 @@ import {
   toolForStep,
   visualStepHasSettings,
   visualToolName,
-  visualToolLabel,
   type ExistingVideoToolId,
   type ExistingVideoVisualToolId,
 } from './existingVideoPresentation';
@@ -332,55 +331,15 @@ export const ExistingVideoPanel = ({
             {workflow.message}
           </StatusNotice>
         ) : null}
-        <div
-          css={dropZoneStyles(theme)}
-          onDragOver={(event) => event.preventDefault()}
+        <ExistingVideoUploadChooser
+          phase={workflow.phase}
+          pickerRef={pickerRef}
+          recordingSupported={recordingSupported}
+          onChooseFiles={chooseFiles}
           onDrop={receiveDrop}
-        >
-          <div>
-            <h2>{workflow.phase === 'validating' ? 'Checking your video…' : 'Add a video'}</h2>
-            <p>
-              Upload from this device or record with the local camera. Nothing is sent to a provider
-              until you deliberately apply an AI edit.
-            </p>
-          </div>
-          <input
-            ref={pickerRef}
-            hidden
-            type="file"
-            accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
-            disabled={workflow.phase === 'validating'}
-            onChange={(event) => {
-              chooseFiles(event.currentTarget.files);
-              event.currentTarget.value = '';
-            }}
-          />
-          <div css={dropActionStyles(theme)}>
-            <Button
-              variant="primary"
-              busy={workflow.phase === 'validating'}
-              onClick={() => pickerRef.current?.click()}
-            >
-              Upload from device
-            </Button>
-            {onRecordVideo ? (
-              <Button variant="secondary" disabled={!recordingSupported} onClick={onRecordVideo}>
-                Record a local video
-              </Button>
-            ) : null}
-            {workflow.phase === 'validating' ? (
-              <Button variant="quiet" onClick={workflow.cancelBeforeAcceptance}>
-                Cancel check
-              </Button>
-            ) : null}
-          </div>
-          <span>MP4/H.264, MOV/H.264, or WebM/VP8 · any aspect ratio · up to 5 minutes</span>
-          <span>
-            For the best experience, upload 16:9 or 9:16, or use Adjust video after upload to crop
-            to 16:9 or 9:16.
-          </span>
-          <span>Drag and drop a video anywhere in this area</span>
-        </div>
+          {...(onRecordVideo ? { onRecordVideo } : {})}
+          onCancel={workflow.cancelBeforeAcceptance}
+        />
       </div>
     );
   }
@@ -495,22 +454,10 @@ export const ExistingVideoPanel = ({
           ) : null}
 
           {workflow.phase === 'complete' ? (
-            <section css={resultStyles(theme)} aria-labelledby="existing-video-result-heading">
-              <div>
-                <h2 id="existing-video-result-heading">Your result is ready</h2>
-                <p>
-                  Compare Original and Result beside this summary. Download the healthy result,
-                  continue editing either version, or start over from the original source.
-                </p>
-              </div>
-              <div css={appliedSummaryStyles(theme)} aria-label="Applied edits">
-                {activeStep ? <span>{visualToolLabel(activeStep)}</span> : null}
-                {workflow.voiceSelection ? (
-                  <span>Voice · {workflow.voiceSelection.voiceName}</span>
-                ) : null}
-                {!activeStep && !workflow.voiceSelection ? <span>No AI edits</span> : null}
-              </div>
-            </section>
+            <ExistingVideoResultSummary
+              activeStep={activeStep}
+              voiceSelection={workflow.voiceSelection}
+            />
           ) : (
             <>
               <header css={sectionHeadingStyles(theme)}>
@@ -531,26 +478,10 @@ export const ExistingVideoPanel = ({
               />
 
               {workflow.active ? (
-                <section
-                  css={processingStyles(theme)}
-                  aria-labelledby="existing-video-processing-heading"
-                >
-                  <span data-processing-mark aria-hidden="true">
-                    ···
-                  </span>
-                  <div>
-                    <h2 id="existing-video-processing-heading">
-                      {workflow.operation?.title ?? 'Preparing your video…'}
-                    </h2>
-                    <p>
-                      {workflow.operation?.detail ?? 'The last healthy video remains available.'}
-                    </p>
-                    <p>
-                      Elapsed {Math.round(workflow.elapsedSeconds)}s. Progress percentages are not
-                      estimated.
-                    </p>
-                  </div>
-                </section>
+                <ExistingVideoProcessingStatus
+                  operation={workflow.operation}
+                  elapsedSeconds={workflow.elapsedSeconds}
+                />
               ) : (
                 <div
                   id="existing-video-active-configuration"

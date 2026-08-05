@@ -43,11 +43,7 @@ export interface EditReferenceImageProviderInput extends GenerateReferenceImageP
 }
 
 export interface ReferenceImageProvider {
-  /**
-   * Optional only for legacy injected test doubles. Production adapters always
-   * expose an authoritative descriptor.
-   */
-  readonly descriptor?: ReferenceImageProviderDescriptor;
+  readonly descriptor: ReferenceImageProviderDescriptor;
   generate: (input: GenerateReferenceImageProviderInput) => Promise<GeneratedReferenceImagePayload>;
   edit?: (input: EditReferenceImageProviderInput) => Promise<GeneratedReferenceImagePayload>;
 }
@@ -74,26 +70,26 @@ export class ReferenceImageProviderError extends Error {
 
   constructor(
     reason: ReferenceImageProviderFailureReason,
-    options?: {
-      readonly providerId?: ReferenceImageProviderErrorId;
+    options: {
+      readonly providerId: ReferenceImageProviderErrorId;
       readonly upstreamStatus?: number;
       readonly providerRequestId?: string;
       readonly providerStage?: ReferenceImageProviderStage;
       readonly cause?: unknown;
     },
   ) {
-    const providerId = options?.providerId ?? 'openai';
+    const providerId = options.providerId;
     super(`${providerId} reference image request failed: ${reason}`, {
-      cause: options?.cause,
+      cause: options.cause,
     });
     this.name = 'ReferenceImageProviderError';
     this.reason = reason;
     this.providerId = providerId;
-    if (options?.upstreamStatus !== undefined) this.upstreamStatus = options.upstreamStatus;
-    if (options?.providerRequestId !== undefined) {
+    if (options.upstreamStatus !== undefined) this.upstreamStatus = options.upstreamStatus;
+    if (options.providerRequestId !== undefined) {
       this.providerRequestId = options.providerRequestId;
     }
-    if (options?.providerStage !== undefined) this.providerStage = options.providerStage;
+    if (options.providerStage !== undefined) this.providerStage = options.providerStage;
   }
 }
 

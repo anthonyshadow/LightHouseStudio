@@ -253,7 +253,10 @@ loads MediaBunny and its AAC extension, uses `Conversion` for trim/baked rotatio
 H.264/AAC encoding, and runs the shared WebGL shader after geometric transforms for flips, filters,
 and lighting. Its `StreamTarget` writes into offset-aware 4 MiB blocks with a 300,000,000-byte
 maximum; cancellation and failure release all blocks. There is no synchronous main-thread export
-fallback.
+fallback. The preview creates one renderer for a stable canvas/media/geometry binding and sends
+crop, filter, and lighting changes through shader uniforms; those edits do not churn WebGL
+contexts. Partial shader/program setup is unwound, the worker disposes partially initialized
+resources on every exit, and feature probes explicitly release their temporary context.
 
 Validation requires non-empty playable H.264/AAC MP4 output, expected primary tracks, exact even
 dimensions and orientation, duration within 500 ms, and a newly extracted immutable audio sidecar
@@ -287,6 +290,13 @@ and VTO before submission, and only that active operation is submitted. Browser 
 use `character-swap` and `virtual-try-on`; Lucy model identifiers remain inside Decart/live and
 saved-recipe mappings.
 
+Before the potentially billable `PUT`, the browser creates one operation UUID in `submitting`
+state. A valid success response advances it to `accepted`; an aborted, malformed, or lost success
+response advances it to `acceptance-unknown` without changing the UUID. Both accepted states lock
+resubmission controls. Recovery performs `GET` for that exact UUID and never repeats `PUT`; only a
+confirmed not-found response unlocks a new explicit submission with a new UUID. A valid submission
+response is passed directly into polling, avoiding a redundant immediate status read.
+
 Startup configuration selects the existing-video Character Swap provider through one centralized
 factory. The default Decart binding keeps its exact Lucy endpoint, multipart fields, fixed 720p
 output, and retry behavior. The Pruna binding is Character Swap only: it requires one reference,
@@ -308,7 +318,16 @@ the retained result is never cropped, stretched, or replaced. Virtual Try-On alw
 independently to Decart. The shared
 server provider contract normalizes submit, queued/processing/completed/failed status, opaque
 output location, bounded download, retryable failure classification, output resolution, and
-optional cancellation. Environment reads do not enter UI or orchestration.
+safe failure data. Environment reads do not enter UI or orchestration.
+
+The broker owns upstream polling cadence. Stable queued/processing states back off through
+2/3/5/8/10-second intervals, reset to two seconds when state changes, and expose a nullable
+`nextPollAfterMs` hint. Rapid browser reads return cached app state without another provider
+request. The job registry uses a job map, owner-to-active-job index, and generation-token deadline
+min-heap; matching replays of the same owner/job UUID coalesce while a different fingerprint for
+that UUID fails safely. Temporary cleanup is idempotent, protects active delivery leases, retries
+transient removal failures, retains pending cleanup state, and emits at most one safe job-ID-only
+diagnostic when retries are exhausted.
 
 `GET /api/capabilities` exposes availability, `none | h264-mp4` input preparation,
 `optional | required` reference policy, prompt-enhancement support, and terminal-failure release
@@ -332,7 +351,7 @@ errors. The URL is neither persisted nor forwarded to a visual provider.
 
 | Store                       | Data                                                                                                | Lifetime and trust boundary                                                                                                                                                                                                               |
 | --------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Recipe Shelf `localStorage` | Versioned v6 allowlisted prompt/character/outfit/wardrobe metadata and opaque asset IDs             | Sanitized on read; v1-v5 migration; 500-variant metadata cap; degrades to session memory on failure; never stores image bytes                                                                                                             |
+| Recipe Shelf `localStorage` | Versioned v6 allowlisted prompt/character/outfit/wardrobe metadata and opaque asset IDs             | Explicit v1→v2→v3→v4→v5→v6 migration, then current-version sanitization; 500-variant metadata cap; degrades to session memory on failure; never stores image bytes                                                                        |
 | Character Builder IndexedDB | One resumable draft and save journal                                                                | Compare-and-swap autosave; prevents duplicate save/preload after retry or reload                                                                                                                                                          |
 | Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings                                       | Owner-scoped under `LIGHTFRAME_DATA_DIR`; no ordinary deletion route                                                                                                                                                                      |
 | Legacy project IndexedDB    | Compatibility project metadata and media Blobs                                                      | List/download/delete plus one-time valid character-design seeding; Guided is not restored                                                                                                                                                 |
@@ -342,7 +361,9 @@ errors. The URL is neither persisted nor forwarded to a visual provider.
 Browser storage is untrusted and schema-migrated. Opaque IDs, provenance, and timestamps are
 preserved. The filesystem store uses atomic publication and never exposes internal paths,
 provider URLs, credentials, or raw payloads. Detached reference assets are retained because the
-runtime lacks a complete relationship graph and deletion route.
+runtime lacks a complete relationship graph and deletion route. Reference lookup uses versioned
+owner/request transaction mappings. Startup performs one conservative legacy scan and atomic
+mapping repair; ordinary new reads and misses do not rescan the asset directory.
 
 See [privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) for the user-facing data contract.
 
@@ -375,7 +396,7 @@ boundary. Provider adapters normalize upstream data into allowlisted safe codes;
 bodies, URLs, prompts, credentials, causes, and arbitrary codes never reach clients or logs.
 
 Wiro availability follows the startup-selected reference provider and its required server-only
-credentials. There is no separate pilot access mode. Missing configuration disables only that
+credentials. There is no separate runtime access-mode layer. Missing configuration disables only that
 provider path and never causes provider fallback.
 
 | Boundary                    | Routes                                                                                                                                                                                                                                                                            |

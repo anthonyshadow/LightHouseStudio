@@ -3,8 +3,8 @@ import { APIConnectionError, APIConnectionTimeoutError, APIUserAbortError } from
 import {
   OPENAI_REFERENCE_IMAGE_PARAMETERS,
   OpenAIReferenceImageProvider,
-  ReferenceImageProviderError,
 } from './reference-image-provider.js';
+import { ReferenceImageProviderError } from '../reference-images/reference-image-provider.js';
 
 describe('OpenAIReferenceImageProvider', () => {
   it('disables SDK retries and sends the exact GPT Image 2 contract', async () => {

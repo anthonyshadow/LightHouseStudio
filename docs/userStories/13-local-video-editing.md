@@ -68,5 +68,5 @@ a provider, and replace the immutable source only after a validated export and e
 Pure and component tests cover geometry, history grouping, worker progress/cancellation/staleness,
 chunk limits, keyboard crop behavior, provider gating, replacement controls, and source ownership.
 Real H.264/AAC export, five-minute and maximum-size memory, browser downloads, external playback,
-touch hardware, and Safari/Firefox/Chrome codec behavior require physical qualification and must
+touch hardware, and Safari/Firefox/Chrome codec behavior require physical validation and must
 not be inferred from automation.

@@ -12,7 +12,9 @@ import {
   createProviderOperationDeadline,
   readBoundedJson,
 } from '../transport/bounded-provider-transport.js';
-import { SafeBflImageDownloader, type DownloadedProviderImage } from './safe-image-downloader.js';
+import { SafeBflImageDownloader } from './safe-image-downloader.js';
+import type { DownloadedRemoteImage } from '../transport/safe-remote-image-downloader.js';
+import { nextProviderPollDelayMs } from '../transport/provider-polling.js';
 
 export const BFL_FLUX_2_PRO_MODEL = 'flux-2-pro' as const;
 export const BFL_FLUX_2_PRO_ENDPOINT = 'https://api.us2.bfl.ai/v1/flux-2-pro';
@@ -263,13 +265,11 @@ export class BflFlux2ReferenceImageProvider implements ReferenceImageProvider {
           if (consecutivePollFailures > MAX_CONSECUTIVE_POLL_FAILURES) {
             throw failureForHttpStatus(poll.status, taskId);
           }
-          const retryAfterSeconds = Number(poll.headers.get('retry-after'));
-          const retryAfterMs =
-            Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
-              ? Math.min(retryAfterSeconds * 1_000, MAX_POLL_DELAY_MS)
-              : 0;
-          delayMs = Math.min(Math.ceil(delayMs * 1.5), MAX_POLL_DELAY_MS);
-          delayMs = Math.max(delayMs, retryAfterMs);
+          delayMs = nextProviderPollDelayMs(
+            delayMs,
+            MAX_POLL_DELAY_MS,
+            poll.headers.get('retry-after'),
+          );
           continue;
         }
         throw failureForHttpStatus(poll.status, taskId);
@@ -281,7 +281,7 @@ export class BflFlux2ReferenceImageProvider implements ReferenceImageProvider {
       }
       const status = parsed.data.status;
       if (status === 'Pending' || status === 'Reasoning' || status === 'Generating') {
-        delayMs = Math.min(Math.ceil(delayMs * 1.5), MAX_POLL_DELAY_MS);
+        delayMs = nextProviderPollDelayMs(delayMs, MAX_POLL_DELAY_MS);
         continue;
       }
       if (status === 'Request Moderated' || status === 'Content Moderated') {
@@ -317,7 +317,7 @@ export class BflFlux2ReferenceImageProvider implements ReferenceImageProvider {
         deliveryOrigin: deliveryUrl.origin,
         status,
       });
-      let downloaded: DownloadedProviderImage;
+      let downloaded: DownloadedRemoteImage;
       try {
         downloaded = await this.#downloader.download(parsed.data.result.sample, signal);
       } catch (error) {

@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
   abortableDelay,
+  authenticatedProviderFetch,
   createProviderOperationDeadline,
   MAX_PROVIDER_JSON_BYTES,
   readBoundedJson,
@@ -24,6 +25,23 @@ const createTooLargeError = (options?: BoundedJsonErrorOptions): Error => {
 };
 
 describe('bounded provider transport primitives', () => {
+  it('forces redirect rejection for authenticated requests', async () => {
+    const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}'));
+
+    await authenticatedProviderFetch(fetchImplementation, 'https://provider.invalid/resource', {
+      redirect: 'follow',
+      headers: { Authorization: 'Bearer secret' },
+    });
+
+    expect(fetchImplementation).toHaveBeenCalledWith(
+      'https://provider.invalid/resource',
+      expect.objectContaining({
+        redirect: 'error',
+        headers: { Authorization: 'Bearer secret' },
+      }),
+    );
+  });
+
   it('parses a bounded JSON response', async () => {
     const response = new Response(JSON.stringify({ result: true }), {
       status: 200,

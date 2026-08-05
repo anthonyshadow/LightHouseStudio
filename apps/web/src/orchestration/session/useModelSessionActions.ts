@@ -1,5 +1,4 @@
 import { canApplyRealtimeChanges } from '@studio/domain';
-import type { RealtimeSessionProfile } from '@studio/contracts';
 import { useCallback, type Dispatch, type RefObject, type SetStateAction } from 'react';
 import { ApiClientError, requestRealtimeToken } from '../../adapters/api-client/apiClient';
 import {
@@ -41,7 +40,6 @@ export type ModelSessionActionsOptions = {
     operation: number,
   ) => Promise<MediaStream>;
   localRef: RefObject<MediaStream | null>;
-  realtimeSessionProfile?: RealtimeSessionProfile;
   onPromptCommitted?: PromptCommittedHandler;
 };
 
@@ -105,7 +103,6 @@ export const useModelSessionActions = ({
   setError,
   ensureMedia,
   localRef,
-  realtimeSessionProfile,
   onPromptCommitted,
 }: ModelSessionActionsOptions): ModelSessionActions => {
   const handleDisconnected = useCallback(
@@ -197,9 +194,7 @@ export const useModelSessionActions = ({
       setLifecycle('requesting-token');
       const controller = new AbortController();
       startAbortRef.current = controller;
-      const token = realtimeSessionProfile
-        ? await requestRealtimeToken(currentDraft.mode, controller.signal, realtimeSessionProfile)
-        : await requestRealtimeToken(currentDraft.mode, controller.signal);
+      const token = await requestRealtimeToken(currentDraft.mode, controller.signal);
       if (operationRef.current !== operation) return;
 
       setLifecycle('connecting');
@@ -233,7 +228,6 @@ export const useModelSessionActions = ({
     notifyPromptCommitted,
     operationRef,
     realtime,
-    realtimeSessionProfile,
     setApplied,
     setError,
     setLifecycle,

@@ -15,7 +15,9 @@ import {
   readBoundedJson,
 } from '../transport/bounded-provider-transport.js';
 import { normalizeWiroImage } from './normalize-image.js';
-import { SafeWiroImageDownloader, type DownloadedWiroImage } from './safe-image-downloader.js';
+import { SafeWiroImageDownloader } from './safe-image-downloader.js';
+import type { DownloadedRemoteImage } from '../transport/safe-remote-image-downloader.js';
+import { nextProviderPollDelayMs } from '../transport/provider-polling.js';
 
 export const WIRO_SEEDREAM_MODEL = 'seedream-v5-lite-uncensored' as const;
 export const WIRO_SEEDREAM_OWNER = 'ByteDance' as const;
@@ -362,14 +364,11 @@ export class WiroSeedreamReferenceImageProvider implements ReferenceImageProvide
           if (consecutivePollFailures > MAX_CONSECUTIVE_POLL_FAILURES) {
             throw failureForHttpStatus(poll.status, taskId);
           }
-          const retryAfterSeconds = Number(poll.headers.get('retry-after'));
-          const retryAfterMs =
-            Number.isFinite(retryAfterSeconds) && retryAfterSeconds >= 0
-              ? Math.min(retryAfterSeconds * 1_000, MAX_POLL_DELAY_MS)
-              : 0;
-          delayMs = Math.max(
-            Math.min(Math.ceil(Math.max(delayMs, 1) * 1.5), MAX_POLL_DELAY_MS),
-            retryAfterMs,
+          delayMs = nextProviderPollDelayMs(
+            delayMs,
+            MAX_POLL_DELAY_MS,
+            poll.headers.get('retry-after'),
+            1,
           );
           continue;
         }
@@ -399,7 +398,7 @@ export class WiroSeedreamReferenceImageProvider implements ReferenceImageProvide
         throw providerError('failure', { providerRequestId: taskId });
       }
       if (task.status !== 'task_postprocess_end') {
-        delayMs = Math.min(Math.ceil(Math.max(delayMs, 1) * 1.5), MAX_POLL_DELAY_MS);
+        delayMs = nextProviderPollDelayMs(delayMs, MAX_POLL_DELAY_MS, null, 1);
         continue;
       }
       if (task.pexit !== '0') {
@@ -419,7 +418,7 @@ export class WiroSeedreamReferenceImageProvider implements ReferenceImageProvide
         deliveryOrigin: deliveryUrl.origin,
         status: task.status,
       });
-      let downloaded: DownloadedWiroImage;
+      let downloaded: DownloadedRemoteImage;
       try {
         downloaded = await this.#downloader.download(output.url, signal);
       } catch (error) {

@@ -44,6 +44,7 @@ describe('DecartHttpVideoJobProvider', () => {
     const [url, init] = fetchImplementation.mock.calls[0]!;
     expect(url).toBe('https://provider.invalid/v1/jobs/lucy-vton-latest');
     expect(init?.headers).toEqual({ 'X-API-KEY': 'server-secret' });
+    expect(init?.redirect).toBe('error');
     const form = init?.body;
     expect(form).toBeInstanceOf(FormData);
     if (!(form instanceof FormData)) throw new Error('Expected a provider multipart body.');
@@ -92,4 +93,46 @@ describe('DecartHttpVideoJobProvider', () => {
     expect(form.get('resolution')).toBe('720p');
     expect(form.get('enhance_prompt')).toBe('false');
   });
+
+  it.each([301, 302, 307, 308])(
+    'rejects a %s redirect without forwarding the Decart credential',
+    async (status) => {
+      const root = await mkdtemp(path.join(tmpdir(), 'lightframe-decart-redirect-'));
+      const videoPath = path.join(root, 'input.video');
+      await writeFile(videoPath, 'video');
+      const fetchImplementation = vi
+        .fn<typeof fetch>()
+        .mockResolvedValue(
+          new Response(null, { status, headers: { Location: 'https://evil.test' } }),
+        );
+      const provider = new DecartHttpVideoJobProvider(
+        'server-secret',
+        fetchImplementation,
+        'https://provider.invalid',
+      );
+
+      await expect(
+        provider.submit({
+          operation: 'character-swap',
+          recipe: {
+            operation: 'character-swap',
+            prompt: 'Keep this request local to the configured provider.',
+            enhancePrompt: false,
+            hasReferenceImage: false,
+          },
+          videoPath,
+          videoMimeType: 'video/mp4',
+          referenceImagePath: null,
+          referenceImageMimeType: null,
+          signal: new AbortController().signal,
+        }),
+      ).rejects.toMatchObject({ upstreamStatus: status });
+
+      expect(fetchImplementation).toHaveBeenCalledOnce();
+      expect(fetchImplementation.mock.calls[0]?.[1]).toMatchObject({
+        redirect: 'error',
+        headers: { 'X-API-KEY': 'server-secret' },
+      });
+    },
+  );
 });

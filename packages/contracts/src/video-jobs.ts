@@ -164,6 +164,7 @@ export const videoJobStatusResponseSchema = z
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
     expiresAt: z.iso.datetime(),
+    nextPollAfterMs: z.number().int().min(0).max(10_000).nullable().optional(),
     result: inspectedVideoSchema.nullable(),
     error: videoJobSafeErrorSchema.nullable(),
   })

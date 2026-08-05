@@ -4,8 +4,8 @@ Manual QA complements deterministic tests. It is required for physical camera/mi
 final browser codecs/downloads, real touch/reflow, interruption/cleanup indicators, memory, and
 live provider accounts.
 
-**Current state:** all `45` physical device/browser rows remain open. Emulation and synthetic media
-do not qualify them.
+**Current state:** physical device/browser validation remains open. Emulation and synthetic media
+do not replace it.
 
 ## Before physical or paid work
 
@@ -21,10 +21,9 @@ pnpm audit:all
 pnpm audit:prod
 ```
 
-Use the devices and browser versions in
-[`qualification/required-matrix.json`](qualification/required-matrix.json). Record only the fields
-allowed by the historical [qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md). Never attach credentials,
-tokens, participant codes, personal media, raw provider responses, URLs, headers, device IDs, or
+Use the five canonical viewports below and the currently supported browser/device targets. Record
+only the result, environment, candidate revision, non-sensitive notes, and remediation link. Never
+attach credentials, tokens, personal media, raw provider responses, URLs, headers, device IDs, or
 network archives.
 
 Provider checks use the separate [gated live procedure](LIVE_PROVIDER_SMOKE.md). Pruna 720p,
@@ -32,10 +31,10 @@ Pruna 1080p, Pruna Wardrobe try-on, OpenAI, BFL, and Wiro require separately rec
 Pruna resolution is chosen in the editor while Pruna remains the startup-selected Character Swap
 provider. Wardrobe try-on is separately enabled and is never inferred from Character Swap.
 
-## Per-row physical protocol
+## Per-target physical protocol
 
 Use non-sensitive disposable media. Start from a fresh browser profile and stopped media. Run the
-primary flows in [user stories](userStories/README.md) and record every applicable matrix check.
+primary flows in [user stories](userStories/README.md) and complete every applicable check.
 
 ### Common checks
 

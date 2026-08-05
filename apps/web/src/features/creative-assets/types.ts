@@ -142,6 +142,11 @@ export interface CreateSavedCharacterVariantInput {
 export interface CreativeAssetRepository {
   getSnapshot: () => CreativeAssetRepositoryState;
   subscribe: (listener: () => void) => () => void;
+  subscribeSelector: <Selection>(
+    selector: (state: CreativeAssetRepositoryState) => Selection,
+    listener: () => void,
+    isEqual?: (left: Selection, right: Selection) => boolean,
+  ) => () => void;
   createSavedPrompt: (input: CreateSavedPromptInput) => SavedPrompt;
   updateSavedPrompt: (id: string, input: UpdateSavedPromptInput) => SavedPrompt;
   renameSavedPrompt: (id: string, title: string) => SavedPrompt;

@@ -1,31 +1,19 @@
 import { ReferenceImageProviderError } from '../reference-images/reference-image-provider.js';
 import {
   type DownloadedRemoteImage,
-  isPublicRemoteImageAddress,
+  type RemoteImageHostnameResolver,
   type RemoteImageRequestImplementation,
-  type ResolvedRemoteImageAddress,
   SAFE_PROVIDER_IMAGE_DOWNLOAD_POLICY,
   SafeRemoteImageDownloader,
 } from '../transport/safe-remote-image-downloader.js';
-
-export const isPublicWiroImageAddress = isPublicRemoteImageAddress;
-export type ResolvedWiroImageAddress = {
-  readonly address: ResolvedRemoteImageAddress['address'];
-  readonly family: ResolvedRemoteImageAddress['family'];
-};
-export type WiroImageHostnameResolver = (
-  hostname: string,
-) => Promise<readonly ResolvedWiroImageAddress[]>;
-export type WiroHttpsRequestImplementation = RemoteImageRequestImplementation;
-export type DownloadedWiroImage = DownloadedRemoteImage;
 
 export class SafeWiroImageDownloader {
   readonly #transport: SafeRemoteImageDownloader;
 
   constructor(
     options: {
-      readonly resolveHostname?: WiroImageHostnameResolver;
-      readonly request?: WiroHttpsRequestImplementation;
+      readonly resolveHostname?: RemoteImageHostnameResolver;
+      readonly request?: RemoteImageRequestImplementation;
     } = {},
   ) {
     this.#transport = new SafeRemoteImageDownloader({
@@ -39,7 +27,7 @@ export class SafeWiroImageDownloader {
     });
   }
 
-  download(url: string, signal: AbortSignal): Promise<DownloadedWiroImage> {
+  download(url: string, signal: AbortSignal): Promise<DownloadedRemoteImage> {
     return this.#transport.download(url, signal);
   }
 }

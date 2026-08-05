@@ -2,7 +2,45 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   assertProviderOutputDimensions,
   expectedProviderOutputDimensions,
+  validateRawInspectedVideo,
+  type RawInspectedVideo,
 } from './media-inspection.js';
+
+const rawVideo = (overrides: Partial<RawInspectedVideo> = {}): RawInspectedVideo => ({
+  mimeType: 'video/mp4',
+  container: 'mp4',
+  videoCodec: 'avc',
+  audioCodec: 'aac',
+  durationMs: 20_000,
+  width: 1_280,
+  height: 720,
+  sizeBytes: 5_000_000,
+  hasAudio: true,
+  ...overrides,
+});
+
+describe('validateRawInspectedVideo', () => {
+  it.each([
+    [{ videoCodec: 'hevc' }, 'unsupported_codec', 400],
+    [{ durationMs: 300_001 }, 'duration_exceeded', 400],
+    [{ sizeBytes: 300_000_001 }, 'payload_too_large', 413],
+  ] as const)(
+    'classifies invalid upload facts before contract narrowing',
+    (overrides, code, status) => {
+      expect(() => validateRawInspectedVideo(rawVideo(overrides), 'character-swap')).toThrowError(
+        expect.objectContaining({ code, statusCode: status }),
+      );
+    },
+  );
+
+  it('maps the same invalid raw provider facts to a safe 502', () => {
+    expect(() =>
+      validateRawInspectedVideo(rawVideo({ videoCodec: 'hevc' }), 'character-swap', {
+        requireProviderOutputSize: true,
+      }),
+    ).toThrowError(expect.objectContaining({ code: 'result_invalid', statusCode: 502 }));
+  });
+});
 
 describe('expectedProviderOutputDimensions', () => {
   it.each([

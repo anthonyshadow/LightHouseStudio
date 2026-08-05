@@ -14,7 +14,7 @@ security, data, lifecycle, provider, accessibility, or release regression.
 | Functional Playwright      | Critical journeys, persistent-stage ownership, recovery, responsive actions, and network denial   |
 | Production smoke           | Built entry, direct Studio, and health routes from one loopback origin                            |
 | Curated visual regression  | High-risk composition at the five canonical viewports; always explicit                            |
-| Manual/live qualification  | Physical media, codecs, memory, assistive technology, downloads, and paid provider behavior       |
+| Manual/live validation     | Physical media, codecs, memory, assistive technology, downloads, and paid provider behavior       |
 
 Storybook remains a typed, statically built review catalog. Its previous browser sweep rendered
 every story in addition to component and journey tests, so it is no longer a separate automated
@@ -71,8 +71,7 @@ The retained suite protects:
 
 Physical devices, real codecs and browser memory, assistive-technology output, completed browser
 downloads, live provider entitlement/output/retention, and paid-provider behavior remain outside
-automation. They use `MANUAL_QA.md`, `LIVE_PROVIDER_SMOKE.md`, and the controlled-pilot evidence
-contract.
+automation. They use `MANUAL_QA.md` and `LIVE_PROVIDER_SMOKE.md`.
 
 ## Browser and visual scope
 
@@ -92,7 +91,7 @@ Run `pnpm test:visual` when:
 - work materially changes layout, responsive behavior, overlays, stage composition, typography,
   design tokens, or a protected visual state;
 - reviewing an intentional baseline or visual-matrix change; or
-- qualifying an exact release candidate.
+- validating an exact release candidate.
 
 Run `pnpm screenshots:capture` only for broad manual design review. Its 125 captures are artifacts,
 not assertions or baselines.
@@ -113,7 +112,7 @@ every required platform baseline exists.
 
 Ordinary pushes and pull requests run:
 
-1. dependency audit and the participant-data retirement drill;
+1. dependency audit;
 2. `pnpm quality`, including the static Storybook build;
 3. the built production smoke; and
 4. focused functional Playwright journeys.

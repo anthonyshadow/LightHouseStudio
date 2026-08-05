@@ -29,7 +29,6 @@ jobs:
           cache: pnpm
       - run: pnpm install --frozen-lockfile
       - run: pnpm audit:all
-      - run: pnpm pilot:data-retirement:drill
       - run: pnpm quality
       - run: pnpm test:production
       - name: Upload unit failure report

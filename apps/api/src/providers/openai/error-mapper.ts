@@ -4,10 +4,8 @@ import {
   CharacterPromptOptimizerError,
   type CharacterPromptOptimizerFailureReason,
 } from './character-prompt-optimizer.js';
-import {
-  ReferenceImageProviderError,
-  type ReferenceImageProviderFailureReason,
-} from './reference-image-provider.js';
+import { ReferenceImageProviderError } from '../reference-images/reference-image-provider.js';
+import { translateReferenceImageProviderError } from '../reference-images/error-mapper-profile.js';
 
 const upstreamOptions = (
   upstreamStatus: number | undefined,
@@ -19,89 +17,28 @@ const translation = (errorClass: string, reason: string, appError: AppError): Er
   diagnostic: { errorClass, reason },
 });
 
-const mapReferenceImageError = (
-  error: ReferenceImageProviderError,
-  reason: ReferenceImageProviderFailureReason,
-): ErrorTranslation => {
-  const options = upstreamOptions(error.upstreamStatus);
-  const appError = (() => {
-    switch (reason) {
-      case 'aborted':
-        return new AppError(499, 'request_aborted', 'The reference image request was cancelled.');
-      case 'moderation':
-        return new AppError(
-          400,
-          'moderation_blocked',
-          'OpenAI blocked the prompt, source image, or generated result under its safety checks. Try another source image or revise the character description.',
-          options,
-        );
-      case 'rate-limit':
-        return new AppError(
-          429,
-          'rate_limited',
-          'OpenAI is temporarily rate limiting image generation. Wait a moment, then generate again with a new request.',
-          options,
-        );
-      case 'authentication':
-        return new AppError(
-          502,
-          'provider_authentication',
-          'OpenAI rejected the configured server credential. Check OPENAI_API_KEY.',
-          options,
-        );
-      case 'credits':
-        return new AppError(
-          502,
-          'provider_failure',
-          'OpenAI could not complete reference image generation because the account is unavailable for billing.',
-          options,
-        );
-      case 'configuration':
-        return new AppError(
-          503,
-          'provider_configuration',
-          'Reference generation is unavailable until OpenAI is configured on the server.',
-          options,
-        );
-      case 'connection':
-        return new AppError(
-          502,
-          'provider_failure',
-          'The API server lost its connection to OpenAI during reference image generation. Check the Recent Shelf, then verify server network, DNS, TLS, and proxy access before deliberately trying again.',
-          options,
-        );
-      case 'invalid-request':
-        return new AppError(
-          400,
-          'validation_error',
-          'OpenAI rejected the reference image request or source image.',
-          options,
-        );
-      case 'timeout':
-        return new AppError(
-          504,
-          'request_timeout',
-          'OpenAI image generation took too long. Check the Recent Shelf before deliberately trying again.',
-          options,
-        );
-      case 'invalid-response':
-        return new AppError(
-          502,
-          'invalid_provider_image',
-          'OpenAI returned no usable image. Generate again when the provider is available.',
-          options,
-        );
-      case 'failure':
-        return new AppError(
-          502,
-          'provider_failure',
-          'OpenAI could not complete reference image generation. Try again with a new request when ready.',
-          options,
-        );
-    }
-  })();
-  return translation('ReferenceImageProviderError', reason, appError);
-};
+const openAIReferenceImageProfile = {
+  providerId: 'openai',
+  messages: {
+    moderation:
+      'OpenAI blocked the prompt, source image, or generated result under its safety checks. Try another source image or revise the character description.',
+    'rate-limit':
+      'OpenAI is temporarily rate limiting image generation. Wait a moment, then generate again with a new request.',
+    authentication: 'OpenAI rejected the configured server credential. Check OPENAI_API_KEY.',
+    credits:
+      'OpenAI could not complete reference image generation because the account is unavailable for billing.',
+    configuration: 'Reference generation is unavailable until OpenAI is configured on the server.',
+    connection:
+      'The API server lost its connection to OpenAI during reference image generation. Check the Recent Shelf, then verify server network, DNS, TLS, and proxy access before deliberately trying again.',
+    'invalid-request': 'OpenAI rejected the reference image request or source image.',
+    timeout:
+      'OpenAI image generation took too long. Check the Recent Shelf before deliberately trying again.',
+    'invalid-response':
+      'OpenAI returned no usable image. Generate again when the provider is available.',
+    failure:
+      'OpenAI could not complete reference image generation. Try again with a new request when ready.',
+  },
+} as const;
 
 const mapPromptOptimizerError = (
   error: CharacterPromptOptimizerError,
@@ -172,7 +109,7 @@ const mapPromptOptimizerError = (
 
 export const translateOpenAIError: ErrorTranslator = (error) => {
   if (error instanceof ReferenceImageProviderError && error.providerId === 'openai') {
-    return mapReferenceImageError(error, error.reason);
+    return translateReferenceImageProviderError(error, openAIReferenceImageProfile);
   }
   if (error instanceof CharacterPromptOptimizerError) {
     return mapPromptOptimizerError(error, error.reason);

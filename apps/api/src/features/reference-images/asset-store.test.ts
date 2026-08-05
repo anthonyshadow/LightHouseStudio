@@ -43,9 +43,11 @@ describe('LocalReferenceImageAssetStore', () => {
     localOwnerId: ownerId,
     bytes: Buffer.from('immutable-image-bytes'),
     mimeType: 'image/jpeg' as const,
+    source: 'generated' as const,
     size: '1024x1024' as const,
     width: 1024 as const,
     height: 1024 as const,
+    provider: 'openai' as const,
     model: 'gpt-image-2',
     quality: 'high' as const,
     originalPrompt: 'Original Lucy prompt',
@@ -82,6 +84,8 @@ describe('LocalReferenceImageAssetStore', () => {
     },
     promptHash: 'c'.repeat(64),
     requestId,
+    requestFingerprint: 'f'.repeat(64),
+    requestFingerprintVersion: 2 as const,
     providerRequestId: 'provider-request-one',
   };
 

@@ -55,12 +55,11 @@ after relevant edits and cannot silently survive into Save.
 ## Reference media became immutable and explicit
 
 Uploaded and generated references are immutable, owner-scoped local assets. Detaching a reference,
-resetting a draft, or deleting a browser record does not promise byte deletion. The controlled
-pilot therefore uses isolated participant environments and verified whole-environment retirement
-instead of unsafe orphan garbage collection.
+resetting a draft, or deleting a browser record does not promise byte deletion. Whole-directory
+cleanup is safer than introducing unverified orphan garbage collection.
 
 OpenAI, BFL, and Wiro are startup-selected provider passes. They never fall back to one another or
-automatically repeat an initial billable submission. Wiro is operator qualification only.
+automatically repeat an initial billable submission.
 
 ## Live recipe changes became atomic
 
@@ -109,13 +108,13 @@ before submission, and submits only that selected exact model. Start over retain
 source and clears the visual choice before another explicit plan.
 
 The accepted H.264/VP8 subset, 720p result checks, source-audio restoration, 500 ms duration
-tolerance, and temporary storage are app-owned conservative policy until exact-model live and
-physical qualification is complete.
+tolerance, and temporary storage are app-owned conservative policy pending exact-model live and
+physical validation.
 
-On 2026-08-03, fixed participant-total and per-operation visual batch submission counters were
-removed from both browser orchestration and the loopback broker. Submissions remain explicit,
-potentially billable, operator-approved actions; the one-active-job rule and prohibition on
-automatic billable retry or provider fallback remain unchanged.
+On 2026-08-03, fixed visual batch submission counters were removed from both browser orchestration
+and the loopback broker. Submissions remain explicit, potentially billable actions; the
+one-active-job rule and prohibition on automatic billable retry or provider fallback remain
+unchanged.
 
 On 2026-08-03, Pruna Character Swap resolution moved from startup environment configuration to a
 provider-neutral editor setting. When the active Character Swap capability supports both classes,
@@ -127,7 +126,7 @@ On 2026-08-02, existing-video Character Swap gained a startup-selected Pruna
 browser/API boundary moved from batch model identifiers to provider-neutral Character Swap/VTO
 operation capabilities. Pruna requires one identity reference, disables prompt enhancement, and
 uses locally prepared ephemeral H.264 MP4 for compatible MOV/WebM sources. Decart retains exact
-Lucy endpoints and 720p output; Pruna qualification is split into 720p and 1080p rows. There
+Lucy endpoints and 720p output; Pruna exposes separate 720p and 1080p classes. There
 is no UI provider selector, fallback, automatic initial retry, or claim that local cleanup deletes
 Pruna inputs/results.
 

@@ -39,10 +39,9 @@ ever uploading video or replacing the immutable original on failure.
 - Edited 1:1, 4:5, or incompatible Freeform sources remain eligible when their sidecar is valid
   even though Character Swap and Virtual Try On are disabled.
 
-## Controlled-pilot boundary
+## Live-provider boundary
 
-Configuration availability is not an entitlement or retention check. Participant conversion
-remains prohibited unless zero-retention eligibility is confirmed; otherwise only operator
-qualification may exercise the provider path. The synthetic saved-library journey is automated,
-but live entitlement, retention, output quality, billing, codecs, and physical playback still
-require gated evidence.
+Configuration availability is not an entitlement or retention check. Use the live provider only
+when the owner has authorized the credentialed, cost-bearing check and confirmed the applicable
+retention setting. The synthetic saved-library journey is automated, but live entitlement,
+retention, output quality, billing, codecs, and physical playback still require gated validation.

@@ -47,7 +47,7 @@ the pinned `lucy-vton-latest` model.
   combined outfit still has a usable prompt; image-only outfits offer Retry or removal.
 - Studio makes no fit, sizing, fabric-behavior, or purchase-accuracy claim.
 - **Use existing video** presents consent, garment, and accuracy guidance contextually as calm
-  disclosure, without overemphasizing pilot status or presenting it as a warning alert.
+  disclosure rather than a warning alert.
 - Expected 300-second completion preserves the recipe and local preview; early end/disconnect is a
   distinct safe recovery state.
 - An active take finalizes once before source resources release.
@@ -55,4 +55,4 @@ the pinned `lucy-vton-latest` model.
 ## Evidence status
 
 Image-only start, explicit Apply, fallback, and duration races have deterministic coverage. Live
-VTO output, provider maximum-duration, and physical-device evidence remain pilot gates.
+VTO output, provider maximum-duration, and physical-device behavior remain manual validation areas.

@@ -150,6 +150,7 @@ const jobStatus = (jobId: string) => ({
   createdAt: '2026-07-30T12:00:00.000Z',
   updatedAt: '2026-07-30T12:00:01.000Z',
   expiresAt: '2026-07-30T13:00:00.000Z',
+  nextPollAfterMs: 0,
   result: {
     mimeType: 'video/mp4' as const,
     container: 'mp4' as const,
@@ -163,6 +164,12 @@ const jobStatus = (jobId: string) => ({
   },
   error: null,
 });
+
+const submittedJobIdAt = (callIndex: number): string => {
+  const value: unknown = adapters.submitVideoJob.mock.calls[callIndex]?.[0];
+  if (typeof value !== 'string') throw new TypeError('Expected a submitted video job ID.');
+  return value;
+};
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -842,6 +849,55 @@ describe('useExistingVideoWorkflow', () => {
     },
   );
 
+  it('retains the same operation UUID when a successful submission response is lost', async () => {
+    adapters.submitVideoJob.mockRejectedValueOnce(
+      new ApiClientError('The video job response was invalid.', 502, 'invalid-response'),
+    );
+    const { result, unmount } = await configuredVisualWorkflow();
+
+    await act(async () => result.current.submitStep(0));
+
+    const submittedJobId = submittedJobIdAt(0);
+    expect(result.current.submissionOperation).toEqual({
+      jobId: submittedJobId,
+      stepIndex: 0,
+      state: 'acceptance-unknown',
+    });
+    expect(result.current.acceptedSubmission).toBe(true);
+    expect(result.current.retryJob?.jobId).toBe(submittedJobId);
+
+    await act(async () => result.current.retryExistingJob());
+    await waitFor(() => expect(result.current.phase).toBe('complete'));
+
+    expect(adapters.fetchVideoJob).toHaveBeenCalledWith(submittedJobId, expect.any(AbortSignal));
+    expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
+    unmount();
+  });
+
+  it('requires confirmed not-found and an explicit action before allocating a new UUID', async () => {
+    adapters.submitVideoJob.mockRejectedValueOnce(
+      new ApiClientError('The video job response was invalid.', 502, 'invalid-response'),
+    );
+    const { result, unmount } = await configuredVisualWorkflow();
+
+    await act(async () => result.current.submitStep(0));
+    const firstJobId = submittedJobIdAt(0);
+    adapters.fetchVideoJob.mockRejectedValueOnce(
+      new ApiClientError('That temporary video job is unavailable.', 404, 'not_found'),
+    );
+
+    await act(async () => result.current.retryExistingJob());
+
+    expect(result.current.submissionOperation).toBeNull();
+    expect(result.current.retryJob).toBeNull();
+    expect(adapters.submitVideoJob).toHaveBeenCalledTimes(1);
+
+    await act(async () => result.current.submitStep(0));
+    expect(adapters.submitVideoJob).toHaveBeenCalledTimes(2);
+    expect(adapters.submitVideoJob.mock.calls[1]?.[0]).not.toBe(firstJobId);
+    unmount();
+  });
+
   it('uses the same terminal copy for an expired status response', async () => {
     adapters.fetchVideoJob.mockImplementationOnce((jobId: string) =>
       Promise.resolve({
@@ -935,7 +991,7 @@ describe('useExistingVideoWorkflow', () => {
     expect(result.current.message).toContain('resuming it does not create another submission');
 
     act(() => result.current.updateStep(stepId, { prompt: 'Edited possible retry prompt' }));
-    expect(result.current.steps[0]!.prompt).toBe('Edited possible retry prompt');
+    expect(result.current.steps[0]!.prompt).toBe('Original accepted prompt');
 
     await act(async () => result.current.retryExistingJob());
     await waitFor(() => expect(result.current.phase).toBe('complete'));

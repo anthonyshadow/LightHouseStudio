@@ -8,10 +8,8 @@ import {
   characterReferenceOptionsSchema,
   REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH,
   REFERENCE_IMAGE_MAX_BYTES,
-  REFERENCE_IMAGE_MODEL_ID,
   REFERENCE_IMAGE_PROMPT_MAX_LENGTH,
   PRUNA_IMAGE_TRY_ON_MODEL,
-  REFERENCE_IMAGE_QUALITY,
   REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
   REFERENCE_IMAGE_UPLOAD_MAX_PIXELS,
   referenceImageMimeTypeSchema,
@@ -207,11 +205,11 @@ export interface StoreGeneratedReferenceImageInput {
   readonly localOwnerId: string;
   readonly bytes: Buffer;
   readonly mimeType: ValidReferenceImageMimeType;
-  readonly source?: 'generated';
+  readonly source: 'generated';
   readonly size: ReferenceImageSize;
   readonly width: 1024 | 1536;
   readonly height: 1024 | 1536;
-  readonly provider?: 'openai' | 'bfl' | 'wiro';
+  readonly provider: 'openai' | 'bfl' | 'wiro';
   readonly model: string;
   readonly quality: 'high' | 'medium';
   readonly originalPrompt: string;
@@ -227,8 +225,8 @@ export interface StoreGeneratedReferenceImageInput {
   };
   readonly promptHash: string;
   readonly requestId: string;
-  readonly requestFingerprint?: string;
-  readonly requestFingerprintVersion?: 2;
+  readonly requestFingerprint: string;
+  readonly requestFingerprintVersion: 2;
   readonly derivation?:
     | { readonly kind: 'generate' }
     | {
@@ -377,10 +375,8 @@ export const createStoredReferenceImageMetadata = (
     height: input.height,
     byteSize: input.bytes.byteLength,
     requestId: input.requestId,
-    ...(input.requestFingerprint === undefined
-      ? {}
-      : { requestFingerprint: input.requestFingerprint }),
-    ...(input.source === 'uploaded' || input.requestFingerprintVersion === undefined
+    requestFingerprint: input.requestFingerprint,
+    ...(input.source === 'uploaded'
       ? {}
       : { requestFingerprintVersion: input.requestFingerprintVersion }),
     createdAt: timestamp,
@@ -405,9 +401,9 @@ export const createStoredReferenceImageMetadata = (
     ...common,
     size: input.size,
     source: 'generated',
-    provider: input.provider ?? 'openai',
-    model: input.model || REFERENCE_IMAGE_MODEL_ID,
-    quality: input.quality || REFERENCE_IMAGE_QUALITY,
+    provider: input.provider,
+    model: input.model,
+    quality: input.quality,
     originalPrompt: input.originalPrompt,
     derivedPrompt: input.derivedPrompt,
     promptAudit: input.promptAudit,

@@ -1,5 +1,5 @@
 import { preferredCharacterVersionSelection, resolveCharacterVersion } from '@studio/domain';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useReducer, useState } from 'react';
 import {
   createRecipeEditorDraft,
   type RecipeEditorDraft,
@@ -17,6 +17,104 @@ export interface EditingState {
   id: string;
   action: EditAction;
 }
+
+type EditableRecipeKind = EditingState['kind'];
+
+type ShelfActionState =
+  | { kind: 'idle' }
+  | {
+      kind: 'create';
+      key: number;
+      seed: Partial<RecipeFormValue>;
+      referenceImageAssetId: string | null;
+      draft: RecipeEditorDraft;
+      dirty: boolean;
+    }
+  | {
+      kind: 'edit';
+      targetKind: EditableRecipeKind;
+      id: string;
+      draft: RecipeEditorDraft;
+      dirty: boolean;
+    }
+  | {
+      kind: 'rename';
+      targetKind: EditableRecipeKind;
+      id: string;
+      draft: string;
+      dirty: boolean;
+    }
+  | { kind: 'delete'; targetKind: EditableRecipeKind; id: string };
+
+type ShelfAction =
+  | { type: 'leave' }
+  | {
+      type: 'create';
+      seed: Partial<RecipeFormValue>;
+      referenceImageAssetId: string | null;
+    }
+  | {
+      type: 'edit';
+      targetKind: EditableRecipeKind;
+      id: string;
+      initialValue: Partial<RecipeFormValue>;
+    }
+  | {
+      type: 'rename';
+      targetKind: EditableRecipeKind;
+      id: string;
+      initialValue: string;
+    }
+  | { type: 'delete'; targetKind: EditableRecipeKind; id: string }
+  | { type: 'update-editor-draft'; draft: RecipeEditorDraft }
+  | { type: 'update-rename-draft'; draft: string }
+  | { type: 'set-dirty'; dirty: boolean };
+
+const shelfActionReducer = (state: ShelfActionState, action: ShelfAction): ShelfActionState => {
+  switch (action.type) {
+    case 'leave':
+      return { kind: 'idle' };
+    case 'create':
+      return {
+        kind: 'create',
+        key: state.kind === 'create' ? state.key + 1 : 1,
+        seed: action.seed,
+        referenceImageAssetId: action.referenceImageAssetId,
+        draft: createRecipeEditorDraft(action.seed),
+        dirty: false,
+      };
+    case 'edit':
+      return {
+        kind: 'edit',
+        targetKind: action.targetKind,
+        id: action.id,
+        draft: createRecipeEditorDraft(action.initialValue),
+        dirty: false,
+      };
+    case 'rename':
+      return {
+        kind: 'rename',
+        targetKind: action.targetKind,
+        id: action.id,
+        draft: action.initialValue,
+        dirty: false,
+      };
+    case 'delete':
+      return { kind: 'delete', targetKind: action.targetKind, id: action.id };
+    case 'update-editor-draft':
+      return state.kind === 'create' || state.kind === 'edit'
+        ? { ...state, draft: action.draft }
+        : state;
+    case 'update-rename-draft':
+      return state.kind === 'rename' ? { ...state, draft: action.draft } : state;
+    case 'set-dirty':
+      return state.kind === 'create' || state.kind === 'edit' || state.kind === 'rename'
+        ? state.dirty === action.dirty
+          ? state
+          : { ...state, dirty: action.dirty }
+        : state;
+  }
+};
 
 export interface SelectedRecipeState {
   kind: 'saved' | 'recent' | 'character';
@@ -71,17 +169,35 @@ export const useRecipeShelfController = ({
   const [category, setCategory] = useState<ShelfCategory>('saved');
   const [tagFilter, setTagFilter] = useState('');
   const [selectedRecipe, setSelectedRecipe] = useState<SelectedRecipeState | null>(null);
-  const [editing, setEditing] = useState<EditingState | null>(null);
-  const [createSeed, setCreateSeed] = useState<Partial<RecipeFormValue> | null>(null);
-  const [createReferenceImageAssetId, setCreateReferenceImageAssetId] = useState<string | null>(
-    null,
-  );
-  const [editorDraft, setEditorDraft] = useState<RecipeEditorDraft | null>(null);
-  const [renameDraft, setRenameDraft] = useState<string | null>(null);
-  const [createKey, setCreateKey] = useState(0);
+  const [shelfAction, dispatchShelfAction] = useReducer(shelfActionReducer, { kind: 'idle' });
   const [actionError, setActionError] = useState<string | null>(null);
-  const [formDirty, setFormDirty] = useState(false);
   const [synchronizedEntryIntentId, setSynchronizedEntryIntentId] = useState<number | null>(null);
+  const formDirty = 'dirty' in shelfAction ? shelfAction.dirty : false;
+  const editing: EditingState | null =
+    shelfAction.kind === 'edit' || shelfAction.kind === 'rename' || shelfAction.kind === 'delete'
+      ? {
+          kind: shelfAction.targetKind,
+          id: shelfAction.id,
+          action: shelfAction.kind,
+        }
+      : null;
+  const createSeed = shelfAction.kind === 'create' ? shelfAction.seed : null;
+  const createKey = shelfAction.kind === 'create' ? shelfAction.key : 0;
+  const editorDraft =
+    shelfAction.kind === 'create' || shelfAction.kind === 'edit' ? shelfAction.draft : null;
+  const renameDraft = shelfAction.kind === 'rename' ? shelfAction.draft : null;
+  const setEditorDraft = useCallback(
+    (draft: RecipeEditorDraft) => dispatchShelfAction({ type: 'update-editor-draft', draft }),
+    [],
+  );
+  const setRenameDraft = useCallback(
+    (draft: string) => dispatchShelfAction({ type: 'update-rename-draft', draft }),
+    [],
+  );
+  const setFormDirty = useCallback(
+    (dirty: boolean) => dispatchShelfAction({ type: 'set-dirty', dirty }),
+    [],
+  );
   const activeRecipeKey = activeRecipe ? `${activeRecipe.origin}:${activeRecipe.assetId}` : null;
   const [synchronizedActiveRecipeKey, setSynchronizedActiveRecipeKey] = useState(activeRecipeKey);
   const controlledSelection: SelectedRecipeState | null | undefined = activeRecipe
@@ -158,12 +274,7 @@ export const useRecipeShelfController = ({
     window.confirm('Discard the unsaved recipe changes and continue with another shelf action?');
 
   const leaveForm = () => {
-    setFormDirty(false);
-    setEditing(null);
-    setCreateSeed(null);
-    setCreateReferenceImageAssetId(null);
-    setEditorDraft(null);
-    setRenameDraft(null);
+    dispatchShelfAction({ type: 'leave' });
   };
 
   if (entryIntent && synchronizedEntryIntentId !== entryIntent.id) {
@@ -195,10 +306,7 @@ export const useRecipeShelfController = ({
   const perform = (action: () => void) => {
     try {
       action();
-      setEditing(null);
-      setFormDirty(false);
-      setEditorDraft(null);
-      setRenameDraft(null);
+      dispatchShelfAction({ type: 'leave' });
       setActionError(null);
       focusShelfHeading();
     } catch (error) {
@@ -212,40 +320,39 @@ export const useRecipeShelfController = ({
   ) => {
     if (!canReplaceForm()) return;
     const nextSeed = seed ?? {};
-    setCreateSeed(nextSeed);
-    setCreateReferenceImageAssetId(referenceImageAssetId);
-    setEditorDraft(createRecipeEditorDraft(nextSeed));
-    setRenameDraft(null);
-    setCreateKey((value) => value + 1);
-    setEditing(null);
-    setFormDirty(false);
+    dispatchShelfAction({ type: 'create', seed: nextSeed, referenceImageAssetId });
     setActionError(null);
   };
 
   const closeCreate = () => {
-    setCreateSeed(null);
-    setCreateReferenceImageAssetId(null);
-    setEditorDraft(null);
-    setFormDirty(false);
+    dispatchShelfAction({ type: 'leave' });
     focusShelfHeading();
   };
 
   const startEditing = (next: EditingState, initialValue: Partial<RecipeFormValue>) => {
     if (!canReplaceForm()) return;
-    setCreateSeed(null);
-    setCreateReferenceImageAssetId(null);
-    setEditing(next);
-    setEditorDraft(next.action === 'edit' ? createRecipeEditorDraft(initialValue) : null);
-    setRenameDraft(next.action === 'rename' ? (initialValue.title ?? '') : null);
-    setFormDirty(false);
+    if (next.action === 'edit') {
+      dispatchShelfAction({
+        type: 'edit',
+        targetKind: next.kind,
+        id: next.id,
+        initialValue,
+      });
+    } else if (next.action === 'rename') {
+      dispatchShelfAction({
+        type: 'rename',
+        targetKind: next.kind,
+        id: next.id,
+        initialValue: initialValue.title ?? '',
+      });
+    } else {
+      dispatchShelfAction({ type: 'delete', targetKind: next.kind, id: next.id });
+    }
     setActionError(null);
   };
 
   const closeEditor = () => {
-    setEditing(null);
-    setEditorDraft(null);
-    setRenameDraft(null);
-    setFormDirty(false);
+    dispatchShelfAction({ type: 'leave' });
     focusShelfHeading();
   };
 
@@ -256,11 +363,10 @@ export const useRecipeShelfController = ({
         prompt: value.prompt,
         modelModeId: activeMode,
         source: 'manual',
-        referenceImageAssetId: createReferenceImageAssetId,
+        referenceImageAssetId:
+          shelfAction.kind === 'create' ? shelfAction.referenceImageAssetId : null,
         tags: value.tags,
       });
-      setCreateSeed(null);
-      setCreateReferenceImageAssetId(null);
     });
 
   const selectSaved = (item: SavedPrompt) =>

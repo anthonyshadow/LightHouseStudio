@@ -50,6 +50,6 @@ export default defineConfig(() => {
     server: {
       proxy: { '/api': DEVELOPMENT_API_PROXY },
     },
-    build: { sourcemap: false },
+    build: { sourcemap: false, manifest: true },
   };
 });

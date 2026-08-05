@@ -14,6 +14,7 @@ import { createVideoEditFrameRenderer } from './videoEditShader';
 
 let activeOperationId: number | null = null;
 let activeConversion: { cancel: () => Promise<void> } | null = null;
+let canceledOperationId: number | null = null;
 
 type VideoEditWorkerScope = Readonly<{
   postMessage: (message: VideoEditWorkerResponse) => void;
@@ -39,24 +40,33 @@ const render = async (
 ): Promise<void> => {
   activeOperationId = request.operationId;
   const writer = new VideoEditChunkAccumulator();
-  const {
-    ALL_FORMATS,
-    BlobSource,
-    Conversion,
-    Input,
-    Mp4OutputFormat,
-    Output,
-    StreamTarget,
-    canEncodeAudio,
-    canEncodeVideo,
-  } = await import('mediabunny');
-  const input = new Input({ formats: ALL_FORMATS, source: new BlobSource(request.source) });
+  let input: { dispose: () => void } | null = null;
   let renderer: ReturnType<typeof createVideoEditFrameRenderer> | null = null;
+  const throwIfCanceled = (): void => {
+    if (canceledOperationId === request.operationId) {
+      throw new DOMException('The local video render was canceled.', 'AbortError');
+    }
+  };
   try {
+    const {
+      ALL_FORMATS,
+      BlobSource,
+      Conversion,
+      Input,
+      Mp4OutputFormat,
+      Output,
+      StreamTarget,
+      canEncodeAudio,
+      canEncodeVideo,
+    } = await import('mediabunny');
+    throwIfCanceled();
+    const mediaInput = new Input({ formats: ALL_FORMATS, source: new BlobSource(request.source) });
+    input = mediaInput;
     const [videoTrack, audioTrack] = await Promise.all([
-      input.getPrimaryVideoTrack(),
-      input.getPrimaryAudioTrack(),
+      mediaInput.getPrimaryVideoTrack(),
+      mediaInput.getPrimaryAudioTrack(),
     ]);
+    throwIfCanceled();
     if (!videoTrack) throw new Error('Missing video track.');
     if (request.requireAudio && !audioTrack) throw new Error('Missing audio track.');
     if (!(await canEncodeVideo('avc'))) throw new Error('H.264 encoding is unavailable.');
@@ -103,7 +113,7 @@ const render = async (
       target,
     });
     const conversion = await Conversion.init({
-      input,
+      input: mediaInput,
       output,
       tracks: 'primary',
       trim: {
@@ -136,6 +146,11 @@ const render = async (
       tags: {},
       showWarnings: false,
     });
+    activeConversion = conversion;
+    if (canceledOperationId === request.operationId) {
+      await conversion.cancel().catch(() => undefined);
+      throwIfCanceled();
+    }
     if (
       !conversion.isValid ||
       !conversion.utilizedTracks.includes(videoTrack) ||
@@ -143,29 +158,33 @@ const render = async (
     ) {
       throw new Error('The edit would drop required media tracks.');
     }
-    activeConversion = conversion;
     conversion.onProgress = (progress) => {
-      if (activeOperationId === request.operationId) {
+      if (
+        activeOperationId === request.operationId &&
+        canceledOperationId !== request.operationId
+      ) {
         respond({ type: 'progress', operationId: request.operationId, progress });
       }
     };
     await conversion.execute();
+    throwIfCanceled();
     if (activeOperationId !== request.operationId) return;
     const mimeType = await output.getMimeType();
     const blob = writer.toBlob(mimeType);
     if (blob.size <= 0) throw new Error('The edited output was empty.');
     respond({ type: 'complete', operationId: request.operationId, blob, mimeType: 'video/mp4' });
   } catch (error) {
-    if (activeOperationId === request.operationId) {
+    if (activeOperationId === request.operationId && canceledOperationId !== request.operationId) {
       respond({ type: 'error', operationId: request.operationId, message: safeMessage(error) });
     }
   } finally {
     renderer?.dispose();
-    input.dispose();
+    input?.dispose();
     writer.clear();
     if (activeOperationId === request.operationId) {
       activeOperationId = null;
       activeConversion = null;
+      if (canceledOperationId === request.operationId) canceledOperationId = null;
     }
   }
 };
@@ -174,10 +193,10 @@ workerScope.addEventListener('message', (event) => {
   const request = event.data;
   if (request.type === 'cancel') {
     if (activeOperationId !== request.operationId) return;
-    activeOperationId = null;
-    void activeConversion?.cancel().finally(() => {
-      respond({ type: 'canceled', operationId: request.operationId });
-    });
+    if (canceledOperationId === request.operationId) return;
+    canceledOperationId = request.operationId;
+    respond({ type: 'canceled', operationId: request.operationId });
+    void activeConversion?.cancel().catch(() => undefined);
     return;
   }
   if (activeOperationId !== null) {

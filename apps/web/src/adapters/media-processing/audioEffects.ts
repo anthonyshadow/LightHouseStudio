@@ -25,47 +25,89 @@ export const decodeAudioBlob = async (blob: Blob): Promise<AudioBuffer> => {
   }
 };
 
+interface FilterSettings {
+  type: BiquadFilterType;
+  frequency: number;
+  q?: number;
+  gain?: number;
+}
+
+interface CompressorSettings {
+  threshold: number;
+  knee: number;
+  ratio: number;
+  attack: number;
+  release: number;
+}
+
+const createFilter = (
+  context: OfflineAudioContext,
+  { type, frequency, q, gain }: FilterSettings,
+) => {
+  const filter = context.createBiquadFilter();
+  filter.type = type;
+  filter.frequency.value = frequency;
+  if (q !== undefined) filter.Q.value = q;
+  if (gain !== undefined) filter.gain.value = gain;
+  return filter;
+};
+
+const createCompressor = (context: OfflineAudioContext, values: CompressorSettings) => {
+  const compressor = context.createDynamicsCompressor();
+  compressor.threshold.value = values.threshold;
+  compressor.knee.value = values.knee;
+  compressor.ratio.value = values.ratio;
+  compressor.attack.value = values.attack;
+  compressor.release.value = values.release;
+  return compressor;
+};
+
+const createGain = (context: OfflineAudioContext, value: number) => {
+  const gain = context.createGain();
+  gain.gain.value = value;
+  return gain;
+};
+
+const connectAudioGraph = (source: AudioNode, ...nodes: AudioNode[]) => {
+  let output = source;
+  for (const node of nodes) output = output.connect(node);
+  return output;
+};
+
 const connectWarmEffect = (
   context: OfflineAudioContext,
   source: AudioBufferSourceNode,
 ): AudioNode => {
-  const warmth = context.createBiquadFilter();
-  warmth.type = 'lowshelf';
-  warmth.frequency.value = 180;
-  warmth.gain.value = 2.2;
-  const soften = context.createBiquadFilter();
-  soften.type = 'lowpass';
-  soften.frequency.value = 13_500;
-  const compressor = context.createDynamicsCompressor();
-  compressor.threshold.value = -20;
-  compressor.knee.value = 18;
-  compressor.ratio.value = 3;
-  compressor.attack.value = 0.015;
-  compressor.release.value = 0.22;
-  source.connect(warmth).connect(soften).connect(compressor);
-  return compressor;
+  return connectAudioGraph(
+    source,
+    createFilter(context, { type: 'lowshelf', frequency: 180, gain: 2.2 }),
+    createFilter(context, { type: 'lowpass', frequency: 13_500 }),
+    createCompressor(context, {
+      threshold: -20,
+      knee: 18,
+      ratio: 3,
+      attack: 0.015,
+      release: 0.22,
+    }),
+  );
 };
 
 const connectClearEffect = (
   context: OfflineAudioContext,
   source: AudioBufferSourceNode,
 ): AudioNode => {
-  const highPass = context.createBiquadFilter();
-  highPass.type = 'highpass';
-  highPass.frequency.value = 85;
-  const presence = context.createBiquadFilter();
-  presence.type = 'peaking';
-  presence.frequency.value = 3_200;
-  presence.Q.value = 0.8;
-  presence.gain.value = 3.2;
-  const compressor = context.createDynamicsCompressor();
-  compressor.threshold.value = -24;
-  compressor.knee.value = 12;
-  compressor.ratio.value = 4;
-  compressor.attack.value = 0.008;
-  compressor.release.value = 0.16;
-  source.connect(highPass).connect(presence).connect(compressor);
-  return compressor;
+  return connectAudioGraph(
+    source,
+    createFilter(context, { type: 'highpass', frequency: 85 }),
+    createFilter(context, { type: 'peaking', frequency: 3_200, q: 0.8, gain: 3.2 }),
+    createCompressor(context, {
+      threshold: -24,
+      knee: 12,
+      ratio: 4,
+      attack: 0.008,
+      release: 0.16,
+    }),
+  );
 };
 
 const connectRobotEffect = (
@@ -73,23 +115,17 @@ const connectRobotEffect = (
   source: AudioBufferSourceNode,
   duration: number,
 ): AudioNode => {
-  const ring = context.createGain();
-  ring.gain.value = 0;
+  const ring = createGain(context, 0);
   const oscillator = context.createOscillator();
   oscillator.type = 'square';
   oscillator.frequency.value = 38;
   oscillator.connect(ring.gain);
-  const band = context.createBiquadFilter();
-  band.type = 'bandpass';
-  band.frequency.value = 1_850;
-  band.Q.value = 0.65;
-  const dry = context.createGain();
-  dry.gain.value = 0.22;
-  const wet = context.createGain();
-  wet.gain.value = 0.85;
-  const mix = context.createGain();
-  source.connect(ring).connect(band).connect(wet).connect(mix);
-  source.connect(dry).connect(mix);
+  const band = createFilter(context, { type: 'bandpass', frequency: 1_850, q: 0.65 });
+  const dry = createGain(context, 0.22);
+  const wet = createGain(context, 0.85);
+  const mix = createGain(context, 1);
+  connectAudioGraph(source, ring, band, wet, mix);
+  connectAudioGraph(source, dry, mix);
   oscillator.start(0);
   oscillator.stop(duration);
   return mix;

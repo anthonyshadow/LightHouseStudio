@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import type { RecordingArtifact } from '../recording/types';
 import { ExistingVideoPanel } from './ExistingVideoPanel';
-import { ExistingVideoReferenceField } from './ExistingVideoReferenceField';
+import { ReferenceImageInputField } from '../reference-images/ReferenceImageInputField';
 import type {
   ExistingVideoVoiceSelection,
   ExistingVideoWorkflow,
@@ -39,6 +39,7 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   status: null,
   completedStepCount: 0,
   acceptedSubmission: false,
+  submissionOperation: null,
   pendingVisual: null,
   retryJob: null,
   original: null,
@@ -181,6 +182,8 @@ beforeEach(() => {
   api.importRemoteReferenceImage.mockReset();
   api.listWorkspaceVoices.mockReset();
   api.fetchVoicePreview.mockReset();
+  vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+  vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
   Object.defineProperty(URL, 'createObjectURL', {
     configurable: true,
     value: vi.fn(() => {
@@ -452,8 +455,8 @@ describe('ExistingVideoPanel', () => {
     api.importRemoteReferenceImage.mockResolvedValue(imported);
     render(
       <StudioDesignProvider>
-        <ExistingVideoReferenceField
-          modelId="lucy-latest"
+        <ReferenceImageInputField
+          kind="character"
           file={null}
           disabled={false}
           allowUrlImport
@@ -1689,6 +1692,7 @@ describe('ExistingVideoPanel', () => {
     expect(editSelected).toHaveBeenCalledOnce();
     expect(download).toHaveAttribute('href', 'blob:generated-result');
     expect(download).toHaveAttribute('download', 'source-lucy-1.mp4');
+    download.addEventListener('click', (event) => event.preventDefault(), { once: true });
     fireEvent.click(download);
     expect(downloadResult).toHaveBeenCalledOnce();
     expect(screen.queryByRole('button', { name: /Review Voice/u })).not.toBeInTheDocument();

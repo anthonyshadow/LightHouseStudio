@@ -26,9 +26,10 @@ import type {
   CharacterVersionSelection,
   RecentPrompt,
   SavedCharacterPrompt,
+  SavedCharacterVariant,
   SavedPrompt,
 } from '../features/creative-assets/types';
-import { useCreativeAssetRepository } from '../features/creative-assets/useCreativeAssetRepository';
+import { useCreativeAssetSelector } from '../features/creative-assets/useCreativeAssetRepository';
 import { OutfitBuilder } from '../features/creative-assets/OutfitBuilder';
 import { OutfitSelector } from '../features/creative-assets/OutfitSelector';
 import { ExistingVideoPanel } from '../features/existing-video/ExistingVideoPanel';
@@ -70,7 +71,9 @@ import { AIExperienceChooser } from './AIExperienceChooser';
 import { AIPreparationChooser } from './AIPreparationChooser';
 import { StudioExitGuard } from './StudioExitGuard';
 import { StudioHeader } from './StudioHeader';
+import { StudioCharacterSelectorOverlay } from './StudioCharacterSelectorOverlay';
 import { StudioSessionControlBar } from './StudioSessionControlBar';
+import { StudioTakeOverlays } from './StudioTakeOverlays';
 import {
   deriveRecordingDurationNotices,
   deriveRealtimeSessionNotices,
@@ -99,9 +102,6 @@ const LegacyProjectManager = lazy(() =>
   import('../features/legacy-projects/LegacyProjectManager').then((module) => ({
     default: module.LegacyProjectManager,
   })),
-);
-const TakeDock = lazy(() =>
-  import('../features/take-review/TakeDock').then((module) => ({ default: module.TakeDock })),
 );
 const CharacterWardrobePanel = lazy(() =>
   import('../features/character-wardrobe/CharacterWardrobePanel').then((module) => ({
@@ -175,10 +175,16 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const mainRef = useRef<HTMLElement>(null);
   const desktopStudioLayout = useDesktopStudioLayout();
   const repository = useMemo(() => createCreativeAssetRepository(), []);
-  const repositoryState = useCreativeAssetRepository(repository);
-  const existingVideoSavedRecipes = useMemo<readonly ExistingVideoSavedRecipe[]>(
-    () => [
-      ...repositoryState.store.savedPrompts.map((recipe) => ({
+  const repositoryStore = useCreativeAssetSelector(repository, (state) => state.store);
+  const existingVideoSavedRecipes = useMemo<readonly ExistingVideoSavedRecipe[]>(() => {
+    const variantsByCharacter = new Map<string, SavedCharacterVariant[]>();
+    for (const variant of repositoryStore.savedCharacterVariants) {
+      const variants = variantsByCharacter.get(variant.parentCharacterId) ?? [];
+      variants.push(variant);
+      variantsByCharacter.set(variant.parentCharacterId, variants);
+    }
+    return [
+      ...repositoryStore.savedPrompts.map((recipe) => ({
         id: recipe.id,
         label: recipe.title,
         modelId: recipe.modelModeId,
@@ -187,7 +193,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         vtonInputKind: recipe.vtonInputKind,
         enhancePrompt: recipe.enhancePrompt,
       })),
-      ...repositoryState.store.savedCharacterPrompts.flatMap((character) => [
+      ...repositoryStore.savedCharacterPrompts.flatMap((character) => [
         {
           id: character.id,
           label: `${character.name} · Original`,
@@ -199,24 +205,21 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           savedCharacterPromptId: character.id,
           originalCharacterVersion: true,
         },
-        ...repositoryState.store.savedCharacterVariants
-          .filter((variant) => variant.parentCharacterId === character.id)
-          .map((variant) => ({
-            id: variant.id,
-            label: `${character.name} · ${variant.title}`,
-            modelId: 'lucy-latest' as const,
-            prompt: character.prompt,
-            referenceImageAssetId: variant.referenceImageAssetId,
-            vtonInputKind: null,
-            enhancePrompt: false,
-            savedCharacterPromptId: character.id,
-            savedCharacterVariantId: variant.id,
-            originalCharacterVersion: false,
-          })),
+        ...(variantsByCharacter.get(character.id) ?? []).map((variant) => ({
+          id: variant.id,
+          label: `${character.name} · ${variant.title}`,
+          modelId: 'lucy-latest' as const,
+          prompt: character.prompt,
+          referenceImageAssetId: variant.referenceImageAssetId,
+          vtonInputKind: null,
+          enhancePrompt: false,
+          savedCharacterPromptId: character.id,
+          savedCharacterVariantId: variant.id,
+          originalCharacterVersion: false,
+        })),
       ]),
-    ],
-    [repositoryState.store],
-  );
+    ];
+  }, [repositoryStore]);
   const recordAcceptedBatchStep = useCallback(
     (step: {
       readonly modelId: ModelMode;
@@ -301,9 +304,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const [wardrobeDirty, setWardrobeDirty] = useState(false);
   const [videoEditDiscardPromptOpen, setVideoEditDiscardPromptOpen] = useState(false);
   const wardrobeCharacter = wardrobeCharacterId
-    ? (repositoryState.store.savedCharacterPrompts.find(
-        (item) => item.id === wardrobeCharacterId,
-      ) ?? null)
+    ? (repositoryStore.savedCharacterPrompts.find((item) => item.id === wardrobeCharacterId) ??
+      null)
     : null;
   const outfitBuilderDirtyRef = useRef(false);
   const updateOutfitBuilderDirty = useCallback((dirty: boolean) => {
@@ -521,7 +523,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const openWorkshopOverlay = useCallback(() => openOverlay('workshop'), [openOverlay]);
   const handoff = useReferenceRecipeHandoff({
     repository,
-    store: repositoryState.store,
+    store: repositoryStore,
     session,
     mediaLocked,
     recordingActive,
@@ -793,9 +795,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     persistedReferenceAssetId(session.draft.referenceImage);
   const effectiveRecordingMode = currentExperienceLabel ? session.draft.mode : recordingMode;
   const activeCharacterRecord = activeCharacter
-    ? repositoryState.store.savedCharacterPrompts.find(
-        (candidate) => candidate.id === activeCharacter.id,
-      )
+    ? repositoryStore.savedCharacterPrompts.find((candidate) => candidate.id === activeCharacter.id)
     : undefined;
   const characterRemovalBlockedReason = recordingActive
     ? 'Finish recording before changing the selected AI recipe.'
@@ -1438,77 +1438,21 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           ) : null}
         </OverlayPanel>
 
-        <OverlayPanel
+        <StudioCharacterSelectorOverlay
           open={activeOverlay === 'character-selector'}
-          onClose={closeOverlay}
-          title="Character"
-          description="Choose the character shown in the studio controls, or create a new one."
-          placement="right"
-          bodyMode="contained"
           returnFocusRef={characterSelectorRef}
-        >
-          <div
-            css={{
-              display: 'grid',
-              gap: theme.space.sm,
-              alignContent: 'start',
-              '& p': { margin: 0, color: theme.colors.textMuted },
-            }}
-          >
-            <p>
-              {activeCharacterName
-                ? `${activeCharacterName} is currently selected.`
-                : 'No saved character is selected.'}
-            </p>
-            {activeCharacterName ? (
-              <>
-                <Button
-                  variant="secondary"
-                  disabled={Boolean(characterBuilderOpenBlockedReason)}
-                  title={characterBuilderOpenBlockedReason}
-                  onClick={() => {
-                    if (activeCharacterRecord) editCharacter(activeCharacterRecord);
-                  }}
-                >
-                  Edit {activeCharacterName}
-                </Button>
-                <Button
-                  variant="secondary"
-                  disabled={!activeCharacterRecord || Boolean(characterBuilderOpenBlockedReason)}
-                  title={characterBuilderOpenBlockedReason}
-                  onClick={() => {
-                    if (activeCharacterRecord) openWardrobe(activeCharacterRecord);
-                  }}
-                >
-                  Wardrobe
-                </Button>
-                <Button
-                  variant="danger"
-                  disabled={Boolean(characterRemovalBlockedReason)}
-                  title={characterRemovalBlockedReason}
-                  onClick={unselectCharacter}
-                >
-                  Unselect character
-                </Button>
-              </>
-            ) : null}
-            <Button
-              variant="primary"
-              disabled={Boolean(characterBuilderOpenBlockedReason)}
-              title={characterBuilderOpenBlockedReason}
-              onClick={openCharacterBuilder}
-            >
-              Create new character
-            </Button>
-            <Button
-              variant="secondary"
-              disabled={recordingActive}
-              onClick={() => openSavedRecipesFor('lucy-latest')}
-            >
-              Choose saved character
-            </Button>
-          </div>
-        </OverlayPanel>
+          activeCharacterName={activeCharacterName}
+          activeCharacter={activeCharacterRecord}
+          editBlockedReason={characterBuilderOpenBlockedReason}
+          removalBlockedReason={characterRemovalBlockedReason}
+          recordingActive={recordingActive}
+          onClose={closeOverlay}
+          onEdit={editCharacter}
+          onOpenWardrobe={openWardrobe}
+          onUnselect={unselectCharacter}
+          onCreate={openCharacterBuilder}
+          onChooseSaved={() => openSavedRecipesFor('lucy-latest')}
+        />
 
         <OverlayPanel
           open={activeOverlay === 'character-wardrobe' && Boolean(wardrobeCharacter)}
@@ -1525,7 +1469,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             <Suspense fallback={deferredPanelFallback}>
               <CharacterWardrobePanel
                 repository={repository}
-                store={repositoryState.store}
+                store={repositoryStore}
                 character={wardrobeCharacter}
                 addOutfitAvailable={Boolean(availability.wardrobeAddOutfitAvailable)}
                 changeFeaturesAvailable={Boolean(availability.referenceImageEditAvailable)}
@@ -1620,75 +1564,21 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           ) : null}
         </OverlayPanel>
 
-        <OverlayPanel
-          open={activeOverlay === 'take-review' && Boolean(recording.presented)}
+        <StudioTakeOverlays
+          activeOverlay={activeOverlay}
+          recording={recording}
+          processing={processing}
+          elevenLabsAvailable={availability.elevenLabs}
+          elevenLabsModel={availability.elevenLabsModel}
+          browserCapabilities={browser}
+          editVideoToggleRef={editVideoToggleRef}
+          dockToggleRef={dockToggleRef}
           onClose={closeOverlay}
-          title="Latest Take"
-          description="Playback stays on the stage while you review this temporary in-memory take."
-          placement="bottom"
-          size="wide"
-          bodyMode="contained"
-          returnFocusRef={recording.presented ? editVideoToggleRef : dockToggleRef}
-        >
-          <Suspense fallback={deferredPanelFallback}>
-            <TakeDock
-              view="take"
-              recording={recording}
-              processing={processing}
-              elevenLabsAvailable={availability.elevenLabs}
-              elevenLabsModel={availability.elevenLabsModel}
-              browserCapabilities={browser}
-              onCloseTake={closeOverlay}
-              onDiscardTake={discardExistingVideoSelection}
-              {...(existingVideo.selection ? { onEditVideo: openExistingVideo } : {})}
-              onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
-            />
-          </Suspense>
-        </OverlayPanel>
-
-        <OverlayPanel
-          open={activeOverlay === 'voice-treatments' && Boolean(recording.presented)}
-          onClose={closeOverlay}
-          title="Voice Treatments"
-          description="Every treatment starts from the immutable original audio sidecar."
-          headerEyebrow={
-            <button
-              type="button"
-              css={{
-                minHeight: '2.75rem',
-                display: 'inline-flex',
-                alignItems: 'center',
-                padding: 0,
-                border: 0,
-                color: theme.colors.accent,
-                background: 'transparent',
-                fontSize: theme.fontSizes.caption,
-                fontWeight: 760,
-                cursor: 'pointer',
-              }}
-              onClick={() => openOverlay('take-review')}
-            >
-              ‹ Back to take review
-            </button>
-          }
-          placement="bottom"
-          size="wide"
-          height="tall"
-          centered
-          bodyMode="contained"
-          returnFocusRef={recording.presented ? editVideoToggleRef : dockToggleRef}
-        >
-          <Suspense fallback={deferredPanelFallback}>
-            <TakeDock
-              view="voice"
-              recording={recording}
-              processing={processing}
-              elevenLabsAvailable={availability.elevenLabs}
-              elevenLabsModel={availability.elevenLabsModel}
-              browserCapabilities={browser}
-            />
-          </Suspense>
-        </OverlayPanel>
+          onDiscardTake={discardExistingVideoSelection}
+          {...(existingVideo.selection ? { onEditVideo: openExistingVideo } : {})}
+          onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
+          onBackToTakeReview={() => openOverlay('take-review')}
+        />
 
         {activeOverlay === 'character-builder' ? (
           <Suspense fallback={deferredPanelFallback}>

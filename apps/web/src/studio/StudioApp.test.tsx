@@ -58,10 +58,11 @@ const referenceAsset: ReferenceImageAsset = {
 
 const harness = vi.hoisted(() => {
   const store = {
-    schemaVersion: 5 as const,
+    schemaVersion: 6 as const,
     savedPrompts: [],
     recentPrompts: [],
     savedCharacterPrompts: [],
+    savedCharacterVariants: [],
   };
   const repository = {
     getSnapshot: vi.fn(() => ({ store, health: 'ready' as const, notice: null })),
@@ -253,6 +254,10 @@ vi.mock('../features/creative-assets/repository', () => ({
 }));
 vi.mock('../features/creative-assets/useCreativeAssetRepository', () => ({
   useCreativeAssetRepository: () => harness.repository.getSnapshot(),
+  useCreativeAssetSelector: (
+    _repository: unknown,
+    selector: (state: ReturnType<typeof harness.repository.getSnapshot>) => unknown,
+  ) => selector(harness.repository.getSnapshot()),
 }));
 
 vi.mock('../features/guided-flow/projectRepository', () => ({

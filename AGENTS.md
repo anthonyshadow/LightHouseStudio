@@ -7,15 +7,11 @@ microphone off until an explicit control-bar or upload-panel action. Live Charac
 transformation and Workshop are advanced flows. The server is loopback-only; do not turn future
 accounts, cloud storage, billing, or public deployment into current MVP requirements.
 
-Product-owner scope recorded 2026-07-28: touch/mobile creation is required; the supported take
-maximum is 300 seconds; and Character, VTO, local Voice, ElevenLabs, OpenAI, BFL, and Wiro are all
-included in pilot qualification. This is target scope, not a claim that the current runtime is
-ready. OpenAI/BFL/Wiro still require separate startup-selected passes with no fallback. The
-[controlled-pilot release contract](docs/CONTROLLED_PILOT_RELEASE_CONTRACT.md) freezes the
-moderated cohort, physical qualification targets, independent 270/300-second warning behavior,
-participant cleanup promise, provider/content rules, generic local owner roles, limits, metrics,
-and escalation path. Those outcomes remain implementation/evidence gates, not open product
-decisions. Monetization and future cloud ownership/portability remain deferred.
+Touch/mobile creation is required and the supported take maximum is 300 seconds. Character, VTO,
+local Voice, ElevenLabs, OpenAI, BFL, Wiro, and Pruna are current product capabilities, but
+configuration does not prove live provider health or physical-device support. OpenAI/BFL/Wiro
+remain separate startup-selected passes with no fallback. Monetization and future cloud
+ownership/portability remain deferred.
 
 ## Read before changing behavior
 
@@ -189,7 +185,7 @@ Stop and ask when:
 - a change would expose the app beyond loopback or add accounts, billing, cloud persistence, public
   sharing, moderation enforcement, or a new paid provider;
 - model/provider choice, retention/deletion, supported devices/duration, pricing/credits, or
-  participant data ownership is materially ambiguous;
+  creator data ownership is materially ambiguous;
 - an existing user change overlaps the required files and cannot be preserved;
 - completing the task requires destructive data migration, secret access, paid live calls, or a
   broad behavior change outside the authorized phase.

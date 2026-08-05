@@ -728,6 +728,28 @@ describe('createCreativeAssetRepository', () => {
     expect(repository.getSnapshot().store.savedPrompts).toHaveLength(1);
   });
 
+  it('notifies selector subscribers only when their selected slice changes', () => {
+    const storage = new MemoryStorage();
+    const repository = repositoryFixture(storage);
+    const listener = vi.fn();
+    repository.subscribeSelector((snapshot) => snapshot.health, listener);
+
+    repository.createSavedPrompt({
+      title: 'Stable storage',
+      prompt: 'A calm studio portrait with warm side lighting.',
+      modelModeId: 'lucy-latest',
+    });
+    expect(listener).not.toHaveBeenCalled();
+
+    storage.failWrites = true;
+    repository.createSavedPrompt({
+      title: 'Session only',
+      prompt: 'A cool studio portrait with soft fill lighting.',
+      modelModeId: 'lucy-latest',
+    });
+    expect(listener).toHaveBeenCalledOnce();
+  });
+
   it('durably saves a caller-identified character before publishing it', () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);

@@ -22,12 +22,12 @@ import {
   type OptimizeCharacterReferencePromptResponse,
   type ReferenceImageAsset,
   type DerivedReferenceImageAsset,
-  type RealtimeSessionProfile,
 } from '@studio/contracts';
 import { imageFileExtension, isImageMimeType } from '@studio/domain';
 import type { ModelMode, ProviderAvailability } from '../../application/types';
 import { validateReferenceImage } from '../browser-media/imageValidation';
 import { referenceImageContentUrl } from './referenceImageRoutes';
+import { readBoundedBlob } from './readBoundedBlob';
 
 export { referenceImageContentUrl } from './referenceImageRoutes';
 
@@ -242,20 +242,22 @@ export const importRemoteReferenceImage = async (
   });
   const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim();
   if (!contentType || !isImageMimeType(contentType)) {
+    void response.body?.cancel().catch(() => undefined);
     throw new ApiClientError(
       'The imported image response was invalid.',
       502,
       'invalid_remote_image',
     );
   }
-  const blob = await response.blob();
-  if (blob.size <= 0 || blob.size > REFERENCE_IMAGE_UPLOAD_MAX_BYTES) {
-    throw new ApiClientError(
-      'The imported image response was invalid.',
-      502,
-      'invalid_remote_image',
-    );
-  }
+  const importError = () =>
+    new ApiClientError('The imported image response was invalid.', 502, 'invalid_remote_image');
+  const blob = await readBoundedBlob(response, {
+    maximumBytes: REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
+    signal: signal ?? new AbortController().signal,
+    acceptsContentType: (candidate) => candidate === contentType,
+    createError: importError,
+    abortMessage: 'Remote image import was cancelled.',
+  });
   const disposition = response.headers.get('content-disposition');
   const responseName = /filename="([a-zA-Z0-9._-]+)"/u.exec(disposition ?? '')?.[1];
   return new File(
@@ -344,11 +346,22 @@ export const hydrateReferenceImage = async (
       'invalid_provider_image',
     );
   }
-  const blob = await response.blob();
   const maximumBytes =
     metadata.source === 'generated'
       ? REFERENCE_IMAGE_MAX_BYTES - 1
       : REFERENCE_IMAGE_UPLOAD_MAX_BYTES;
+  const blob = await readBoundedBlob(response, {
+    maximumBytes,
+    signal: signal ?? new AbortController().signal,
+    acceptsContentType: (candidate) => candidate === metadata.mimeType,
+    createError: () =>
+      new ApiClientError(
+        'The stored reference failed integrity checks.',
+        502,
+        'invalid_provider_image',
+      ),
+    abortMessage: 'Reference image hydration was cancelled.',
+  });
   if (
     blob.type !== metadata.mimeType ||
     blob.size !== metadata.byteSize ||
@@ -383,7 +396,6 @@ export const hydrateReferenceImage = async (
 export const requestRealtimeToken = async (
   model: ModelMode,
   signal: AbortSignal,
-  sessionProfile?: RealtimeSessionProfile,
 ): Promise<{
   apiKey: string;
   expiresAt: string;
@@ -396,7 +408,7 @@ export const requestRealtimeToken = async (
       signal,
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-      body: JSON.stringify({ model, ...(sessionProfile ? { sessionProfile } : {}) }),
+      body: JSON.stringify({ model }),
     },
     realtimeTokenResponseSchema,
     invalidApiResponse('The realtime credential response was incomplete.', 'bad-token'),

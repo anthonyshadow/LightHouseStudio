@@ -37,9 +37,14 @@ export const dropZoneStyles = (theme: Theme): CSSObject => ({
   '& h2': { fontFamily: theme.type.display, fontSize: 'clamp(1.35rem, 4vw, 1.9rem)' },
   '& p': { marginBlockStart: theme.space.xs, color: theme.colors.textMuted, lineHeight: 1.5 },
   '@media (max-height: 36rem)': {
-    minHeight: '18rem',
-    padding: theme.space.lg,
-    gap: theme.space.md,
+    minHeight: 'min(15rem, 52dvh)',
+    padding: theme.space.sm,
+    gap: theme.space.xs,
+    '& p': { lineHeight: 1.35 },
+    '& [data-secondary-upload-guidance]': { display: 'none' },
+  },
+  '@media (hover: none) and (pointer: coarse)': {
+    '& [data-drag-only-guidance]': { display: 'none' },
   },
 });
 

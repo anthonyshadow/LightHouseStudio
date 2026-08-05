@@ -37,9 +37,12 @@ export interface ElevenLabsProvider {
   convertRecording(
     voiceId: string,
     modelId: string,
-    audio: Uint8Array,
+    audio: VoiceConversionAudio,
     mimeType: VoiceConversionContentType,
     enableLogging: boolean,
     signal: AbortSignal,
   ): Promise<AudioStream>;
 }
+
+export type VoiceConversionAudio =
+  Uint8Array | { readonly path: string; readonly byteLength: number };

@@ -1,30 +1,32 @@
-import { mkdir, mkdtemp, readFile, readdir, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
-import type {
-  DecartVideoJobProvider,
-  DecartQueueStatus,
-  DecartVideoProviderFailureReason,
-} from '../../providers/decart/video-job-provider.js';
 import { VideoJobService } from './video-job-service.js';
+import type {
+  ExistingVideoJobProvider,
+  ExistingVideoProviderRegistry,
+  VideoJobProviderFailureReason,
+  VideoJobProviderStatus,
+} from '../../providers/video-jobs/video-job-provider.js';
 
 const VIDEO_FIXTURE_BASE64 =
   'AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAARnbW9vdgAAAGxtdmhkAAAAAAAAAAAAAAAAAAAD6AAAA+gAAQAAAQAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAgAAA5J0cmFrAAAAXHRraGQAAAADAAAAAAAAAAAAAAABAAAAAAAAA+gAAAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAABAAAAAAAAAAAAAAAAAABAAAAABQAAAALQAAAAAAAkZWR0cwAAABxlbHN0AAAAAAAAAAEAAAPoAAAEAAABAAAAAAMKbWRpYQAAACBtZGhkAAAAAAAAAAAAAAAAAAAyAAAAMgBVxAAAAAAALWhkbHIAAAAAAAAAAHZpZGUAAAAAAAAAAAAAAABWaWRlb0hhbmRsZXIAAAACtW1pbmYAAAAUdm1oZAAAAAEAAAAAAAAAAAAAACRkaW5mAAAAHGRyZWYAAAAAAAAAAQAAAAx1cmwgAAAAAQAAAnVzdGJsAAAAwXN0c2QAAAAAAAAAAQAAALFhdmMxAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAABQAC0ABIAAAASAAAAAAAAAABFUxhdmM2Mi4xMS4xMDAgbGlieDI2NAAAAAAAAAAAAAAAGP//AAAAN2F2Y0MBZAAf/+EAGmdkAB+s2UBQBbsBEAAAAwAQAAADAyDxgxlgAQAGaOvjyyLA/fj4AAAAABBwYXNwAAAAAQAAAAEAAAAUYnRydAAAAAAAADnYAAAAAAAAABhzdHRzAAAAAAAAAAEAAAAZAAACAAAAABRzdHNzAAAAAAAAAAEAAAABAAAA2GN0dHMAAAAAAAAAGQAAAAEAAAQAAAAAAQAACgAAAAABAAAEAAAAAAEAAAAAAAAAAQAAAgAAAAABAAAKAAAAAAEAAAQAAAAAAQAAAAAAAAABAAACAAAAAAEAAAoAAAAAAQAABAAAAAABAAAAAAAAAAEAAAIAAAAAAQAACgAAAAABAAAEAAAAAAEAAAAAAAAAAQAAAgAAAAABAAAKAAAAAAEAAAQAAAAAAQAAAAAAAAABAAACAAAAAAEAAAoAAAAAAQAABAAAAAABAAAAAAAAAAEAAAIAAAAAHHN0c2MAAAAAAAAAAQAAAAEAAAAZAAAAAQAAAHhzdHN6AAAAAAAAAAAAAAAZAAADigAAACgAAAAlAAAAJQAAACUAAAAuAAAAJwAAACUAAAAlAAAALgAAACcAAAAlAAAAJQAAAC4AAAAnAAAAJQAAACUAAAAuAAAAJwAAACUAAAAlAAAALQAAACcAAAAlAAAAJQAAABRzdGNvAAAAAAAAAAEAAASXAAAAYXVkdGEAAABZbWV0YQAAAAAAAAAhaGRscgAAAAAAAAAAbWRpcmFwcGwAAAAAAAAAAAAAAAAsaWxzdAAAACSpdG9vAAAAHGRhdGEAAAABAAAAAExhdmY2Mi4zLjEwMAAAAAhmcmVlAAAHQ21kYXQAAAKvBgX//6vcRem95tlIt5Ys2CDZI+7veDI2NCAtIGNvcmUgMTY1IHIzMjIyIGIzNTYwNWEgLSBILjI2NC9NUEVHLTQgQVZDIGNvZGVjIC0gQ29weWxlZnQgMjAwMy0yMDI1IC0gaHR0cDovL3d3dy52aWRlb2xhbi5vcmcveDI2NC5odG1sIC0gb3B0aW9uczogY2FiYWM9MSByZWY9MyBkZWJsb2NrPTE6MDowIGFuYWx5c2U9MHgzOjB4MTEzIG1lPWhleCBzdWJtZT03IHBzeT0xIHBzeV9yZD0xLjAwOjAuMDAgbWl4ZWRfcmVmPTEgbWVfcmFuZ2U9MTYgY2hyb21hX21lPTEgdHJlbGxpcz0xIDh4OGRjdD0xIGNxbT0wIGRlYWR6b25lPTIxLDExIGZhc3RfcHNraXA9MSBjaHJvbWFfcXBfb2Zmc2V0PS0yIHRocmVhZHM9MTUgbG9va2FoZWFkX3RocmVhZHM9MiBzbGljZWRfdGhyZWFkcz0wIG5yPTAgZGVjaW1hdGU9MSBpbnRlcmxhY2VkPTAgYmx1cmF5X2NvbXBhdD0wIGNvbnN0cmFpbmVkX2ludHJhPTAgYmZyYW1lcz0zIGJfcHlyYW1pZD0yIGJfYWRhcHQ9MSBiX2JpYXM9MCBkaXJlY3Q9MSB3ZWlnaHRiPTEgb3Blbl9nb3A9MCB3ZWlnaHRwPTIga2V5aW50PTI1MCBrZXlpbnRfbWluPTI1IHNjZW5lY3V0PTQwIGludHJhX3JlZnJlc2g9MCByY19sb29rYWhlYWQ9NDAgcmM9Y3JmIG1idHJlZT0xIGNyZj0yMy4wIHFjb21wPTAuNjAgcXBtaW49MCBxcG1heD02OSBxcHN0ZXA9NCBpcF9yYXRpbz0xLjQwIGFxPTE6MS4wMACAAAAA02WIhAA7//73Tr8Cm1TCKgOSVwr2yqQmWblSawHypgAAAwAAAwAAAwAAAwAKW2oohWn0yb00AAADAAADAXUAAVUAAiYABNQADUAAMkAA4gAD+AATIACGgAPsABigAOsAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAA2cAAAAkQZokbEO//qmWAAADAAADAAADAAADAAADAAADAAADAAADABgwAAAAIUGeQniF/wAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAccQAAACEBnmF0Qr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuAAAAAhAZ5jakK/AAADAAADAAADAAADAAADAAADAAADAAADACbhAAAAKkGaaEmoQWiZTAh3//6plgAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAYMQAAACNBnoZFESwv/wAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAccQAAACEBnqV0Qr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuEAAAAhAZ6nakK/AAADAAADAAADAAADAAADAAADAAADAAADACbgAAAAKkGarEmoQWyZTAh3//6plgAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAYMAAAACNBnspFFSwv/wAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAccQAAACEBnul0Qr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuAAAAAhAZ7rakK/AAADAAADAAADAAADAAADAAADAAADAAADACbgAAAAKkGa8EmoQWyZTAhv//6nhAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAwIQAAACNBnw5FFSwv/wAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAccQAAACEBny10Qr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuEAAAAhAZ8vakK/AAADAAADAAADAAADAAADAAADAAADAAADACbgAAAAKkGbNEmoQWyZTAhn//6eEAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwC7gAAAACNBn1JFFSwv/wAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAccQAAACEBn3F0Qr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuAAAAAhAZ9zakK/AAADAAADAAADAAADAAADAAADAAADAAADACbgAAAAKUGbeEmoQWyZTAhX//44QAAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwLbAAAAI0GflkUVLC//AAADAAADAAADAAADAAADAAADAAADAAADABxwAAAAIQGftXRCvwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAAAwAm4QAAACEBn7dqQr8AAAMAAAMAAAMAAAMAAAMAAAMAAAMAAAMAJuE=';
 
-class FakeVideoProvider implements DecartVideoJobProvider {
+class FakeVideoProvider implements ExistingVideoJobProvider {
   readonly submissions: Array<{
     operation: string;
     videoMimeType: string;
     outputResolution: string;
   }> = [];
-  nextStatus: DecartQueueStatus = 'pending';
-  nextFailureReason: DecartVideoProviderFailureReason | undefined;
+  nextStatus: VideoJobProviderStatus = 'pending';
+  nextFailureReason: VideoJobProviderFailureReason | undefined;
+  statusCalls = 0;
 
   submit(
-    input: Parameters<DecartVideoJobProvider['submit']>[0],
-  ): Promise<{ providerJobId: string; status: DecartQueueStatus }> {
+    input: Parameters<ExistingVideoJobProvider['submit']>[0],
+  ): Promise<{ providerJobId: string; status: VideoJobProviderStatus }> {
     this.submissions.push({
       operation: input.operation,
       videoMimeType: input.videoMimeType,
@@ -37,9 +39,10 @@ class FakeVideoProvider implements DecartVideoJobProvider {
   }
 
   status(): Promise<{
-    status: DecartQueueStatus;
-    failureReason?: DecartVideoProviderFailureReason;
+    status: VideoJobProviderStatus;
+    failureReason?: VideoJobProviderFailureReason;
   }> {
+    this.statusCalls += 1;
     return Promise.resolve({
       status: this.nextStatus,
       ...(this.nextFailureReason === undefined ? {} : { failureReason: this.nextFailureReason }),
@@ -171,16 +174,182 @@ const waitFor = async (
   throw new Error(`Job did not reach ${expected}.`);
 };
 
+const providerRegistry = (
+  providers: ExistingVideoProviderRegistry | ExistingVideoJobProvider | null,
+): ExistingVideoProviderRegistry => {
+  if (providers === null) return { 'character-swap': null, 'virtual-try-on': null };
+  if (!('submit' in providers)) return providers;
+  const binding = {
+    provider: providers,
+    outputResolutions: ['720p'] as const,
+    defaultOutputResolution: '720p' as const,
+    outputSizing: 'exact-canonical' as const,
+    inputPreparation: 'none' as const,
+    referencePolicy: 'optional' as const,
+    promptEnhancement: true,
+  };
+  return { 'character-swap': binding, 'virtual-try-on': binding };
+};
+
+const createService = (
+  providers: ExistingVideoProviderRegistry | ExistingVideoJobProvider | null,
+  root: string,
+  options: ConstructorParameters<typeof VideoJobService>[2] = {},
+): VideoJobService =>
+  new VideoJobService(providerRegistry(providers), root, {
+    ...options,
+    providerPollBackoffMs: [0, 0, 0, 0, 0],
+  });
+
 describe('VideoJobService', () => {
   const services: VideoJobService[] = [];
   afterEach(async () => {
     await Promise.all(services.splice(0).map((service) => service.close()));
   });
 
+  it('owns capped provider polling cadence and serves cached status under rapid reads', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-poll-cadence-'));
+    const provider = new FakeVideoProvider();
+    const scheduler = new ManualDeadlineScheduler();
+    const service = new VideoJobService(providerRegistry(provider), root, {
+      now: scheduler.now,
+      scheduleDeadline: scheduler.scheduleDeadline,
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-poll-cadence';
+
+    await startJob(service, jobId, ownerId);
+    await vi.waitFor(() => expect(provider.submissions).toHaveLength(1));
+    expect((await service.existing(jobId, ownerId))?.nextPollAfterMs).toBe(2_000);
+
+    expect((await service.status(jobId, ownerId)).nextPollAfterMs).toBe(3_000);
+    expect(provider.statusCalls).toBe(1);
+    expect((await service.status(jobId, ownerId)).nextPollAfterMs).toBe(3_000);
+    expect(provider.statusCalls).toBe(1);
+
+    provider.nextStatus = 'processing';
+    await scheduler.advanceTo(scheduler.nowMs + 3_000);
+    expect((await service.status(jobId, ownerId)).nextPollAfterMs).toBe(2_000);
+
+    const expectedUnchangedBackoff = [3_000, 5_000, 8_000, 10_000, 10_000];
+    for (const expected of expectedUnchangedBackoff) {
+      const current = await service.existing(jobId, ownerId);
+      await scheduler.advanceTo(scheduler.nowMs + (current?.nextPollAfterMs ?? 0));
+      expect((await service.status(jobId, ownerId)).nextPollAfterMs).toBe(expected);
+    }
+    expect(provider.statusCalls).toBe(7);
+  });
+
+  it('retries transient temporary-job cleanup before deleting bookkeeping', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-cleanup-retry-'));
+    const provider = new FakeVideoProvider();
+    let recursiveAttempts = 0;
+    const service = createService(provider, root, {
+      removePath: async (target, options) => {
+        if (options.recursive) {
+          recursiveAttempts += 1;
+          if (recursiveAttempts < 3) throw new Error('transient removal failure');
+        }
+        await rm(target, options);
+      },
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-cleanup-retry';
+
+    await startJob(service, jobId, ownerId);
+    await makeReady(service, provider, jobId, ownerId);
+    const content = await service.content(jobId, ownerId);
+    await content.settle(true);
+
+    expect(recursiveAttempts).toBe(3);
+    expect(await service.existing(jobId, ownerId)).toBeNull();
+  });
+
+  it('coalesces same-owner recipe replays and rejects a conflicting recipe for the same job ID', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-idempotency-'));
+    const provider = new FakeVideoProvider();
+    const service = createService(provider, root);
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-idempotency';
+    const accepted = await startJob(service, jobId, ownerId);
+
+    const replayPaths = await service.prepareJobDirectory(jobId);
+    await writeFile(replayPaths.inputPath, Buffer.from(VIDEO_FIXTURE_BASE64, 'base64'));
+    const replay = await service.start({
+      jobId,
+      ownerId,
+      recipe: {
+        operation: 'character-swap',
+        prompt: 'Change the lighting',
+        enhancePrompt: false,
+        hasReferenceImage: false,
+      },
+      directory: replayPaths.directory,
+      inputPath: replayPaths.inputPath,
+      referencePath: null,
+      referenceMimeType: null,
+    });
+    expect(replay.createdAt).toBe(accepted.status.createdAt);
+    expect(await pathExists(replayPaths.directory)).toBe(false);
+
+    const conflictPaths = await service.prepareJobDirectory(jobId);
+    await writeFile(conflictPaths.inputPath, Buffer.from(VIDEO_FIXTURE_BASE64, 'base64'));
+    await expect(
+      service.start({
+        jobId,
+        ownerId,
+        recipe: {
+          operation: 'character-swap',
+          prompt: 'Use conflicting settings',
+          enhancePrompt: false,
+          hasReferenceImage: false,
+        },
+        directory: conflictPaths.directory,
+        inputPath: conflictPaths.inputPath,
+        referencePath: null,
+        referenceMimeType: null,
+      }),
+    ).rejects.toMatchObject({ code: 'request_id_conflict' });
+    expect(await pathExists(conflictPaths.directory)).toBe(false);
+    await vi.waitFor(() => expect(provider.submissions).toHaveLength(1));
+  });
+
+  it('retains pending cleanup and reports one safe diagnostic after permanent failure', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-cleanup-pending-'));
+    const provider = new FakeVideoProvider();
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
+    const service = createService(provider, root, {
+      removePath: async (target, options) => {
+        if (options.recursive) throw new Error('private filesystem detail');
+        await rm(target, options);
+      },
+    });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = 'owner-cleanup-pending';
+
+    await startJob(service, jobId, ownerId);
+    await makeReady(service, provider, jobId, ownerId);
+    await service.release(jobId, ownerId);
+    await service.release(jobId, ownerId);
+
+    expect(await service.existing(jobId, ownerId)).not.toBeNull();
+    expect(warning).toHaveBeenCalledTimes(1);
+    expect(warning).toHaveBeenCalledWith(
+      expect.stringContaining('cleanup could not be completed'),
+      { jobId },
+    );
+    expect(JSON.stringify(warning.mock.calls)).not.toContain('private filesystem detail');
+    warning.mockRestore();
+  });
+
   it('passes the request-selected output resolution to the provider', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-resolution-'));
     const provider = new FakeVideoProvider();
-    const service = new VideoJobService(
+    const service = createService(
       {
         'character-swap': {
           provider,
@@ -207,7 +376,7 @@ describe('VideoJobService', () => {
   it('rejects an output resolution not supported by the active operation', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-resolution-reject-'));
     const provider = new FakeVideoProvider();
-    const service = new VideoJobService(provider, root);
+    const service = createService(provider, root);
     services.push(service);
     const jobId = crypto.randomUUID();
     const paths = await service.prepareJobDirectory(jobId);
@@ -243,7 +412,7 @@ describe('VideoJobService', () => {
   it('enforces operation-specific reference requirements before provider submission', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-reference-'));
     const provider = new FakeVideoProvider();
-    const service = new VideoJobService(
+    const service = createService(
       {
         'character-swap': {
           provider,
@@ -291,7 +460,7 @@ describe('VideoJobService', () => {
   it('inspects, pins, and submits a client job exactly once before safe retrieval', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-'));
     const provider = new FakeVideoProvider();
-    const service = new VideoJobService(provider, root);
+    const service = createService(provider, root);
     services.push(service);
     const jobId = crypto.randomUUID();
     const ownerId = 'owner-one';
@@ -344,7 +513,7 @@ describe('VideoJobService', () => {
   it('allows more than four sequential explicit submissions for one owner', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-repeat-'));
     const provider = new FakeVideoProvider();
-    const service = new VideoJobService(provider, root);
+    const service = createService(provider, root);
     services.push(service);
     const ownerId = 'owner-repeat';
 
@@ -367,7 +536,7 @@ describe('VideoJobService', () => {
   it('reports provider-output dimensions without blaming a valid source aspect ratio', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-dimensions-'));
     const provider = new FakeVideoProvider();
-    const service = new VideoJobService(
+    const service = createService(
       {
         'character-swap': {
           provider,
@@ -405,7 +574,7 @@ describe('VideoJobService', () => {
   it('reports and publishes a non-canonical megapixel-budget result', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-megapixel-'));
     const provider = new FakeVideoProvider();
-    const service = new VideoJobService(
+    const service = createService(
       {
         'character-swap': {
           provider,
@@ -447,7 +616,7 @@ describe('VideoJobService', () => {
   it('returns only a classified safe error when an accepted provider job fails', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-provider-failure-'));
     const provider = new FakeVideoProvider();
-    const service = new VideoJobService(provider, root);
+    const service = createService(provider, root);
     services.push(service);
     const jobId = crypto.randomUUID();
     const ownerId = 'owner-provider-failure';
@@ -471,7 +640,7 @@ describe('VideoJobService', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-failure-'));
     const provider = new FakeVideoProvider();
     provider.submit = vi.fn().mockRejectedValue(new TypeError('private upstream failure'));
-    const service = new VideoJobService(provider, root);
+    const service = createService(provider, root);
     services.push(service);
     const jobId = crypto.randomUUID();
     const paths = await service.prepareJobDirectory(jobId);
@@ -507,7 +676,7 @@ describe('VideoJobService', () => {
   it('distinguishes a terminal provider generation failure from an HTTP request failure', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-terminal-failure-'));
     const provider = new FakeVideoProvider();
-    const service = new VideoJobService(provider, root);
+    const service = createService(provider, root);
     services.push(service);
     const jobId = crypto.randomUUID();
     const ownerId = 'owner-terminal-generation-failure';
@@ -532,7 +701,7 @@ describe('VideoJobService', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-expiry-'));
     const provider = new FakeVideoProvider();
     const clock = new ManualDeadlineScheduler();
-    const service = new VideoJobService(provider, root, {
+    const service = createService(provider, root, {
       now: clock.now,
       scheduleDeadline: clock.scheduleDeadline,
     });
@@ -586,7 +755,7 @@ describe('VideoJobService', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-lease-'));
     const provider = new FakeVideoProvider();
     const clock = new ManualDeadlineScheduler();
-    const service = new VideoJobService(provider, root, {
+    const service = createService(provider, root, {
       now: clock.now,
       scheduleDeadline: clock.scheduleDeadline,
     });
@@ -615,7 +784,7 @@ describe('VideoJobService', () => {
   it('keeps an interrupted pre-deadline delivery retryable and removes a delivered result once', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-retry-'));
     const provider = new FakeVideoProvider();
-    const service = new VideoJobService(provider, root);
+    const service = createService(provider, root);
     services.push(service);
     const jobId = crypto.randomUUID();
     const ownerId = 'owner-retry';
@@ -637,7 +806,7 @@ describe('VideoJobService', () => {
   it('owner-scopes and explicitly releases ready output before its deadline', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-release-'));
     const provider = new FakeVideoProvider();
-    const service = new VideoJobService(provider, root);
+    const service = createService(provider, root);
     services.push(service);
     const jobId = crypto.randomUUID();
     const ownerId = 'owner-release';
@@ -677,7 +846,7 @@ describe('VideoJobService', () => {
         mode: 0o600,
       });
     });
-    const service = new VideoJobService(provider, root, {
+    const service = createService(provider, root, {
       now: clock.now,
       scheduleDeadline: clock.scheduleDeadline,
     });
@@ -703,7 +872,7 @@ describe('VideoJobService', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-deadline-race-'));
     const provider = new FakeVideoProvider();
     const clock = new ManualDeadlineScheduler();
-    const service = new VideoJobService(provider, root, {
+    const service = createService(provider, root, {
       now: clock.now,
       scheduleDeadline: clock.scheduleDeadline,
     });
@@ -713,7 +882,7 @@ describe('VideoJobService', () => {
     const { paths, status: accepted } = await startJob(service, jobId, ownerId);
     await waitFor(service, jobId, ownerId, 'queued');
 
-    const statusGate = deferred<{ status: DecartQueueStatus }>();
+    const statusGate = deferred<{ status: VideoJobProviderStatus }>();
     provider.status = vi.fn(() => statusGate.promise);
     provider.download = vi.fn(
       (_providerJobId: string, _destinationPath: string, _signal: AbortSignal): Promise<void> =>
@@ -741,7 +910,7 @@ describe('VideoJobService', () => {
     await mkdir(path.dirname(stalePath), { recursive: true });
     await writeFile(stalePath, 'stale');
 
-    const unavailable = new VideoJobService(null, root);
+    const unavailable = createService(null, root);
     services.push(unavailable);
     await vi.waitFor(async () => expect(await pathExists(stalePath)).toBe(false));
     await mkdir(tempRoot, { recursive: true });
@@ -755,7 +924,7 @@ describe('VideoJobService', () => {
       await submitGate.promise;
       return { providerJobId: 'late-provider-job', status: 'pending' as const };
     });
-    const closing = new VideoJobService(provider, root);
+    const closing = createService(provider, root);
     services.push(closing);
     const jobId = crypto.randomUUID();
     await startJob(closing, jobId, 'owner-close');

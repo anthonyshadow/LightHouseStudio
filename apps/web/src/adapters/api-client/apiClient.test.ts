@@ -219,7 +219,7 @@ describe('reference image API client', () => {
       vi.fn().mockResolvedValue(
         new Response(
           JSON.stringify({
-            realtimeVideo: { available: true, models: ['lucy-latest'] },
+            realtimeVideo: { available: true },
             videoProcessing: {
               characterSwap: {
                 available: true,
@@ -245,7 +245,6 @@ describe('reference image API client', () => {
               providerId: 'openai',
               modelId: 'gpt-image-2',
               sizes: ['1024x1024', '1024x1536', '1536x1024'],
-              quality: 'high',
               optimizer: {
                 available: true,
                 model: 'gpt-5.6',
@@ -473,11 +472,10 @@ describe('reference image API client', () => {
   });
 
   it('hydrates a persisted reference from its stable URL and validates exact integrity', async () => {
-    const response = new Response(null, {
+    const response = new Response(jpegBytes, {
       status: 200,
       headers: { 'Content-Type': 'image/jpeg' },
     });
-    vi.spyOn(response, 'blob').mockResolvedValue(new Blob([jpegBytes], { type: 'image/jpeg' }));
     const fetchMock = vi.fn().mockResolvedValue(response);
     vi.stubGlobal('fetch', fetchMock);
     vi.stubGlobal(

@@ -1,5 +1,4 @@
 import { canSwitchMode } from '@studio/domain';
-import type { RealtimeSessionProfile } from '@studio/contracts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   hasLiveVideo,
@@ -30,7 +29,6 @@ import { useSessionDraftState } from './useSessionDraftState';
 
 export type StudioSessionOptions = {
   availability: ProviderAvailability;
-  realtimeSessionProfile?: RealtimeSessionProfile;
   onPromptCommitted?: PromptCommittedHandler;
 };
 
@@ -61,7 +59,6 @@ const withPreferredFacingMode = (
 
 export const useStudioSession = ({
   availability,
-  realtimeSessionProfile,
   onPromptCommitted,
 }: StudioSessionOptions): StudioSessionWithCapturePreferences => {
   const [lifecycle, setLifecycle] = useState<SessionLifecycle>('idle');
@@ -284,7 +281,6 @@ export const useStudioSession = ({
     setError,
     ensureMedia: ensurePreferredMedia,
     localRef,
-    ...(realtimeSessionProfile ? { realtimeSessionProfile } : {}),
     ...(onPromptCommitted ? { onPromptCommitted } : {}),
   });
 

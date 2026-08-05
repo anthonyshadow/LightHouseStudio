@@ -11,19 +11,13 @@ import type {
   OutfitTryOnRequest,
   UploadedReferenceImageAsset,
 } from '@studio/contracts';
+import { REFERENCE_PNG } from './mediaFixtures.js';
 import type {
   MockReferenceImageAsset,
   ModelId,
   NetworkJourneyState,
   StudioHarnessOptions,
 } from './studioHarness.types.js';
-
-// A valid one-pixel PNG. Browser-side image validation is deterministically
-// stubbed to 1024x1024 by the harness, so these bytes exercise the complete
-// fetch/File handoff while keeping the fixture tiny and fast.
-const REFERENCE_PNG_BASE64 =
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=';
-const REFERENCE_PNG = Buffer.from(REFERENCE_PNG_BASE64, 'base64');
 
 const createReplacementVoiceWav = (): Buffer => {
   const sampleRate = 48_000;
@@ -235,8 +229,6 @@ export const installProviderNetworkDriver = async (
         body: JSON.stringify({
           realtimeVideo: {
             available: options.realtimeVideoAvailable ?? true,
-            models:
-              options.realtimeVideoAvailable === false ? [] : ['lucy-latest', 'lucy-vton-latest'],
           },
           videoProcessing: {
             characterSwap: {
@@ -266,7 +258,6 @@ export const installProviderNetworkDriver = async (
             providerId: 'openai',
             modelId: 'gpt-image-2',
             sizes: ['1024x1024', '1024x1536', '1536x1024'],
-            quality: 'high',
             optimizer: {
               available: options.referenceImagesAvailable ?? true,
               model: 'gpt-5.6',

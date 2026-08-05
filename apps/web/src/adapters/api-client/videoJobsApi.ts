@@ -7,6 +7,7 @@ import {
   type VideoTransformRecipe,
 } from '@studio/contracts';
 import { ApiClientError, apiFetch } from './apiClient';
+import { readBoundedBlob } from './readBoundedBlob';
 
 const jobUrl = (jobId: string): string => `/api/video-jobs/${encodeURIComponent(jobId)}`;
 const intentHeaders = {
@@ -69,23 +70,20 @@ export const downloadVideoJobResult = async (jobId: string, signal: AbortSignal)
     cache: 'no-store',
     signal,
   });
-  const declaredSize = Number(response.headers.get('content-length'));
-  if (Number.isFinite(declaredSize) && declaredSize > VIDEO_RESULT_MAX_BYTES) {
-    throw new ApiClientError(
-      'The visual result exceeded the app-owned 300 MB safety limit.',
-      502,
-      'result_too_large',
-    );
-  }
-  const blob = await response.blob();
-  if (!blob.size || blob.size > VIDEO_RESULT_MAX_BYTES) {
-    throw new ApiClientError(
-      blob.size ? 'The visual result was too large.' : 'The visual result was empty.',
-      502,
-      blob.size ? 'result_too_large' : 'result_invalid',
-    );
-  }
-  return blob;
+  return readBoundedBlob(response, {
+    maximumBytes: VIDEO_RESULT_MAX_BYTES,
+    signal,
+    acceptsContentType: (contentType) => contentType.startsWith('video/'),
+    createError: (failure) =>
+      new ApiClientError(
+        failure === 'too-large'
+          ? 'The visual result exceeded the app-owned 300 MB safety limit.'
+          : 'The visual result was empty or invalid.',
+        502,
+        failure === 'too-large' ? 'result_too_large' : 'result_invalid',
+      ),
+    abortMessage: 'Visual result download was cancelled.',
+  });
 };
 
 export const releaseVideoJob = async (jobId: string, signal?: AbortSignal): Promise<void> => {

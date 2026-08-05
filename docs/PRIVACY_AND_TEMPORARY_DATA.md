@@ -4,7 +4,7 @@ Lightframe Studio is local-first, not offline-only. Local capture and local Voic
 browser. Provider transfer occurs only after an explicit provider action through the loopback
 broker.
 
-This document separates current runtime behavior from the approved pilot operating procedure.
+This document describes current runtime behavior and operator-controlled cleanup boundaries.
 
 ## Current data inventory
 
@@ -13,7 +13,7 @@ This document separates current runtime behavior from the approved pilot operati
 | Saved/recent recipes, character/outfit/wardrobe metadata, opaque reference IDs | Sanitized/versioned Recipe Shelf v6 in this browser profile’s `localStorage`; Wardrobe metadata is capped at 500 variants                                                                                                                                   | None                                                                                                                                                          |
 | Active Character Builder draft/save journal                                    | One sanitized/versioned IndexedDB record until Reset, successful Save, site-data removal, or eviction                                                                                                                                                       | Only after explicit optimization/image action                                                                                                                 |
 | Legacy Guided projects/media                                                   | Versioned IndexedDB records until manager deletion, site-data removal, or eviction                                                                                                                                                                          | None                                                                                                                                                          |
-| Uploaded/generated/edited/composed references and metadata                     | Immutable owner-scoped files under `LIGHTFRAME_DATA_DIR` until operator retirement                                                                                                                                                                          | Upload/direct save: none; provider image actions: prompt/options and source bytes when applicable                                                             |
+| Uploaded/generated/edited/composed references and metadata                     | Immutable owner-scoped files under `LIGHTFRAME_DATA_DIR` until deliberate whole-directory cleanup                                                                                                                                                           | Upload/direct save: none; provider image actions: prompt/options and source bytes when applicable                                                             |
 | Active mode text/enhancement, capture preferences, temporary portrait/garment  | Tab memory until reset/reload/unmount                                                                                                                                                                                                                       | Decart only after matching Start/Apply                                                                                                                        |
 | Unsaved Outfit Builder image and directly uploaded/imported outfit recents     | Bounded tab memory until replacement, discard, reload, or tab close; final Save stores bytes locally                                                                                                                                                        | Import fetches the explicit public HTTPS origin; no Decart or image-provider transfer on Save                                                                 |
 | Camera/microphone streams                                                      | Browser memory while live                                                                                                                                                                                                                                   | None in Local; Decart during explicit AI session                                                                                                              |
@@ -89,7 +89,7 @@ provider intent. Local Voice uses Web Audio/remux only.
 - Recipe Dock portrait/garment files are tab-ephemeral.
 - Outfit Builder files remain tab-ephemeral until final Save. Successful final Save uses the
   idempotent local reference-upload endpoint, then stores only the opaque asset ID in Recipe Shelf
-  v5. Directly uploaded/imported recent outfits stay bounded and tab-only; successful prompt uses
+  v6. Directly uploaded/imported recent outfits stay bounded and tab-only; successful prompt uses
   and explicitly saved image outfits may create persistent Recipe Shelf recents.
 - Character Builder references are immutable local assets. Remove/Detach, draft reset,
   regeneration, stale-preview rejection, and character deletion remove relationships only; they do
@@ -108,7 +108,7 @@ Operator controls:
 - use Release/Discard for the current take and Legacy Projects for legacy media;
 - clear exact-origin site data for browser persistence;
 - remove provider keys and restart to disable integrations; and
-- retire a dedicated `LIGHTFRAME_DATA_DIR` only through the reviewed whole-environment procedure.
+- remove a dedicated `LIGHTFRAME_DATA_DIR` only after resolving and reviewing the exact target.
 
 ## Video-job retention
 
@@ -120,29 +120,15 @@ the deadline may finish after it; the broker does not admit a new content stream
 deadline. Expired jobs retain only a safe process-memory tombstone so the same job ID cannot become
 a second provider submission; output bytes and result metadata are removed.
 
+Queued and processing provider reads use server-owned 2/3/5/8/10-second capped backoff, reset when
+provider state changes. Rapid browser status requests receive cached state and a nullable next-poll
+hint rather than multiplying upstream traffic. Cleanup is idempotent, waits for an admitted content
+delivery lease, retries transient filesystem removal failures, retains pending cleanup work, and
+logs at most one safe diagnostic containing only the application job ID after retries are
+exhausted.
+
 Expiry and earlier cleanup apply only to Lightframe's in-memory state and private temporary files.
 They do not cancel a provider job and do not establish provider-side deletion.
-
-## Approved pilot lifecycle (operating target)
-
-The runtime does not automate participant isolation or whole-environment deletion. The moderated
-pilot operator must:
-
-- use a fresh browser profile and dedicated, resolved data-directory leaf for each anonymous
-  participant code;
-- retain it only through the engagement and at most one planned seven-day return;
-- retire it within 24 hours after the final session/withdrawal/cancellation and no later than day
-  eight after first use;
-- clear exact-origin site data/profile, retire only the reviewed data leaf, verify old asset IDs
-  fail against an empty environment, reconcile provider cleanup, and preserve siblings/shared
-  roots; and
-- retain only aggregated content-free metrics with no participant lookup key.
-
-The former pilot retirement checklist remains historical operating guidance, not an application
-gate or current project command.
-
-Downloaded participant copies are their durable handoff and are outside the operator’s Lightframe
-dataset.
 
 ## Provider retention
 
@@ -161,6 +147,11 @@ exact account configuration:
 
 Local cleanup must never be described as provider-side deletion.
 
+ElevenLabs conversion request and provider-output media are spooled through a private temporary
+directory with private files, not retained as complete request/output buffers in server memory.
+The output is bounded and fully validated before the response stream opens. Abort, disconnect,
+failure, and normal completion all remove the temporary directory.
+
 ## Server security scope
 
 The API is a trusted local broker: it binds to loopback, rejects non-loopback Host values, requires
@@ -172,6 +163,3 @@ Do not expose it through LAN binding, a tunnel, proxy, container ingress, or pub
 Accounts, remote persistence, public ingress, and tenancy remain deferred behind the
 [remote-backend handoff](REMOTE_BACKEND_HANDOFF.md). Local Host hashes, paths, keys, device IDs,
 provider IDs, and tokens are never future identity or ownership.
-
-The [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) is authoritative for
-cohort, content, limits, roles, metrics, and escalation.

@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_CHARACTER_MODEL_ID,
   PAGE_SIZE_LIMIT,
-  SUPPORTED_MODEL_IDS,
   VOICE_CONVERSION_MAX_BYTES,
   VOICE_CONVERSION_OUTPUT_MAX_BYTES,
   VOICE_PREVIEW_MAX_BYTES,
@@ -48,7 +47,7 @@ describe('health and capabilities contracts', () => {
   it('normalizes provider availability without exposing credentials', () => {
     expect(
       capabilitiesResponseSchema.parse({
-        realtimeVideo: { available: true, models: [...SUPPORTED_MODEL_IDS] },
+        realtimeVideo: { available: true },
         videoProcessing: {
           characterSwap: {
             available: true,
@@ -74,7 +73,6 @@ describe('health and capabilities contracts', () => {
           providerId: 'openai',
           modelId: 'gpt-image-2',
           sizes: ['1024x1024', '1024x1536', '1536x1024'],
-          quality: 'high',
           optimizer: {
             available: true,
             model: 'gpt-5.6',
@@ -84,7 +82,7 @@ describe('health and capabilities contracts', () => {
         wardrobe: { addOutfitAvailable: true },
       }),
     ).toEqual({
-      realtimeVideo: { available: true, models: ['lucy-latest', 'lucy-vton-latest'] },
+      realtimeVideo: { available: true },
       videoProcessing: {
         characterSwap: {
           available: true,
@@ -110,7 +108,6 @@ describe('health and capabilities contracts', () => {
         providerId: 'openai',
         modelId: 'gpt-image-2',
         sizes: ['1024x1024', '1024x1536', '1536x1024'],
-        quality: 'high',
         optimizer: {
           available: true,
           model: 'gpt-5.6',
@@ -121,7 +118,7 @@ describe('health and capabilities contracts', () => {
     });
     expect(
       capabilitiesResponseSchema.safeParse({
-        realtimeVideo: { available: true, models: ['local'] },
+        realtimeVideo: { available: true },
         videoProcessing: { available: false, models: [] },
         elevenLabs: { available: false, modelId: null },
         referenceImages: {
@@ -130,7 +127,6 @@ describe('health and capabilities contracts', () => {
           providerId: 'openai',
           modelId: 'gpt-image-2',
           sizes: ['1024x1024', '1024x1536', '1536x1024'],
-          quality: 'high',
           optimizer: {
             available: false,
             model: 'gpt-5.6',
@@ -533,10 +529,7 @@ describe('realtime credential contracts', () => {
       realtimeTokenRequestSchema.safeParse({ model: 'lucy-latest', apiKey: 'bad' }).success,
     ).toBe(false);
     expect(
-      realtimeTokenRequestSchema.parse({ model: 'lucy-latest', sessionProfile: 'guided' }),
-    ).toEqual({ model: 'lucy-latest', sessionProfile: 'guided' });
-    expect(
-      realtimeTokenRequestSchema.safeParse({ model: 'lucy-latest', sessionProfile: 'unknown' })
+      realtimeTokenRequestSchema.safeParse({ model: 'lucy-latest', sessionProfile: 'guided' })
         .success,
     ).toBe(false);
   });

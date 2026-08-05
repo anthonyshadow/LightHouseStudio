@@ -83,7 +83,7 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
       }
       const ownerId = localOwnerIdForRequest(request);
       const duplicate = await service.existing(parsedParams.data.jobId, ownerId);
-      if (duplicate) {
+      if (duplicate?.status === 'expired') {
         await reply.status(202).send(duplicate);
         return;
       }

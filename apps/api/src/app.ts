@@ -20,15 +20,19 @@ import {
 import { ReferenceImageService } from './features/reference-images/reference-image-service.js';
 import { OutfitTryOnService } from './features/reference-images/outfit-try-on-service.js';
 import { translateVoiceServiceError } from './features/voices/error-mapper.js';
-import { registerVoiceRoutes, SUPPORTED_AUDIO_CONTENT_TYPES } from './features/voices/routes.js';
+import {
+  MAX_RECORDING_AUDIO_BYTES,
+  registerVoiceRoutes,
+  SUPPORTED_AUDIO_CONTENT_TYPES,
+} from './features/voices/routes.js';
 import { VoiceService } from './features/voices/voice-service.js';
-import { installErrorHandling } from './http/errors.js';
+import { AppError, installErrorHandling } from './http/errors.js';
+import { spoolAudioUpload, SpooledUploadTooLargeError } from './application/spooled-upload.js';
 import { installLocalSecurityBoundary } from './http/security.js';
 import {
   DecartSdkTokenProvider,
   type DecartTokenProvider,
 } from './providers/decart/token-provider.js';
-import type { DecartVideoJobProvider } from './providers/decart/video-job-provider.js';
 import { ElevenLabsHttpProvider } from './providers/elevenlabs/http-provider.js';
 import type { ElevenLabsProvider } from './providers/elevenlabs/types.js';
 import { translateProviderError } from './providers/error-mapper.js';
@@ -58,7 +62,7 @@ export const SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES = referenceImageMimeTypeSch
 export interface AppDependencies {
   readonly config: RuntimeConfig;
   readonly decartProvider?: DecartTokenProvider | null;
-  readonly decartVideoProvider?: DecartVideoJobProvider | null;
+  readonly decartVideoProvider?: ExistingVideoJobProvider | null;
   readonly prunaVideoProvider?: ExistingVideoJobProvider | null;
   readonly prunaImageTryOnProvider?: OutfitTryOnProvider | null;
   readonly elevenLabsProvider?: ElevenLabsProvider | null;
@@ -114,11 +118,17 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     });
   }
 
-  app.addContentTypeParser(
-    [...SUPPORTED_AUDIO_CONTENT_TYPES],
-    { parseAs: 'buffer' },
-    (_request, body, done) => done(null, body),
-  );
+  app.addContentTypeParser([...SUPPORTED_AUDIO_CONTENT_TYPES], (_request, payload, done) => {
+    void spoolAudioUpload(payload, MAX_RECORDING_AUDIO_BYTES).then(
+      (body) => done(null, body),
+      (error: unknown) =>
+        done(
+          error instanceof SpooledUploadTooLargeError
+            ? new AppError(413, 'payload_too_large', 'The audio sidecar must be 25 MiB or smaller.')
+            : (error as Error),
+        ),
+    );
+  });
   app.addContentTypeParser(
     [...SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES],
     { parseAs: 'buffer' },

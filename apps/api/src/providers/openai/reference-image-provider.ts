@@ -13,15 +13,6 @@ import {
 } from '../reference-images/reference-image-provider.js';
 import { classifyOpenAITransportFailure, openAIUpstreamStatus } from './transport-error.js';
 
-export {
-  type EditReferenceImageProviderInput,
-  type GenerateReferenceImageProviderInput,
-  type GeneratedReferenceImagePayload,
-  type ReferenceImageProvider,
-  type ReferenceImageProviderFailureReason,
-  ReferenceImageProviderError,
-} from '../reference-images/reference-image-provider.js';
-
 export const OPENAI_REFERENCE_IMAGE_MODEL = REFERENCE_IMAGE_MODEL_ID;
 export const OPENAI_REFERENCE_IMAGE_TIMEOUT_MS = 150_000;
 
@@ -83,7 +74,9 @@ const normalizeOpenAIError = (error: unknown): ReferenceImageProviderError => {
   if (error instanceof ReferenceImageProviderError) return error;
   const status = openAIUpstreamStatus(error);
   const options =
-    status === undefined ? { cause: error } : { cause: error, upstreamStatus: status };
+    status === undefined
+      ? { providerId: 'openai' as const, cause: error }
+      : { providerId: 'openai' as const, cause: error, upstreamStatus: status };
   const transportFailure = classifyOpenAITransportFailure(error);
   if (transportFailure !== undefined) {
     return new ReferenceImageProviderError(transportFailure.reason, options);
@@ -103,7 +96,7 @@ const imagePayload = (
 ): GeneratedReferenceImagePayload => {
   const base64 = response.data?.[0]?.b64_json;
   if (typeof base64 !== 'string' || base64.length === 0) {
-    throw new ReferenceImageProviderError('invalid-response');
+    throw new ReferenceImageProviderError('invalid-response', { providerId: 'openai' });
   }
   const providerRequestId = (response as ImagesResponse & { readonly _request_id?: unknown })
     ._request_id;
@@ -184,7 +177,9 @@ export class OpenAIReferenceImageProvider implements ReferenceImageProvider {
   async edit(input: EditReferenceImageProviderInput): Promise<GeneratedReferenceImagePayload> {
     try {
       const edit = this.#client.images.edit?.bind(this.#client.images);
-      if (edit === undefined) throw new ReferenceImageProviderError('configuration');
+      if (edit === undefined) {
+        throw new ReferenceImageProviderError('configuration', { providerId: 'openai' });
+      }
       const source = await toFile(
         input.source.bytes,
         `reference.${imageFileExtension(input.source.mimeType)}`,

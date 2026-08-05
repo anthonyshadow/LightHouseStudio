@@ -80,6 +80,7 @@ describe('PrunaVideoReplaceProvider', () => {
       for (const call of fetchImplementation.mock.calls.slice(0, 2)) {
         expect(call[0]).toBe('https://api.pruna.ai/v1/files');
         expect(call[1]?.headers).toEqual({ apikey: 'server-secret' });
+        expect(call[1]?.redirect).toBe('error');
       }
       const videoForm = fetchImplementation.mock.calls[0]![1]?.body;
       const referenceForm = fetchImplementation.mock.calls[1]![1]?.body;

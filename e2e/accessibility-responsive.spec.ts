@@ -64,7 +64,7 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
           status: 200,
           contentType: 'application/json',
           body: JSON.stringify({
-            realtimeVideo: { available: true, models: ['lucy-latest', 'lucy-vton-latest'] },
+            realtimeVideo: { available: true },
             videoProcessing: {
               characterSwap: {
                 available: false,
@@ -90,7 +90,6 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
               providerId: 'openai',
               modelId: 'gpt-image-2',
               sizes: ['1024x1024', '1024x1536', '1536x1024'],
-              quality: 'high',
               optimizer: {
                 available: false,
                 model: 'gpt-5.6',

@@ -79,7 +79,7 @@ variant-source edits use only the selected image and requested change.
 | Optimizer    | OpenAI Responses, default `gpt-5.6`, `medium`, `store: false`, 120-second timeout                                                          |
 | OpenAI image | `gpt-image-2`, default `high`, one result, 150-second timeout, zero SDK retries                                                            |
 | BFL image    | Pinned `flux-2-pro` US2 submission; default safety tolerance `2`, prompt upsampling disabled, one 150-second submit/poll/download deadline |
-| Wiro image   | Pinned `seedream-v5-lite-uncensored`, one 2k result, watermark off, one 180-second deadline; operator qualification only                   |
+| Wiro image   | Pinned `seedream-v5-lite-uncensored`, one 2k result, watermark off, and one 180-second deadline                                            |
 
 BFL sends an owner-scoped source as base64 in `input_image`. Wiro uses one multipart
 `inputImage`, normalizes the result to the exact app dimensions, and attempts
@@ -105,7 +105,7 @@ download retries continue only for that task. A failed provider never triggers a
   no provider cancellation or deletion operation is claimed.
 
 See [privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) for lifetime and deletion rules and
-[live provider smoke](LIVE_PROVIDER_SMOKE.md) for cost-bearing qualification.
+[live provider smoke](LIVE_PROVIDER_SMOKE.md) for authorized cost-bearing validation.
 
 ## Implementation map
 

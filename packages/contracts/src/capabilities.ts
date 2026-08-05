@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { supportedModelIdSchema } from './realtime';
 import { REFERENCE_IMAGE_SIZES } from './reference-images';
 import { videoOutputResolutionSchema } from './video-jobs';
 
@@ -22,7 +21,6 @@ export const capabilitiesResponseSchema = z
     realtimeVideo: z
       .object({
         available: z.boolean(),
-        models: z.array(supportedModelIdSchema).max(2),
       })
       .strict(),
     videoProcessing: z
@@ -44,7 +42,6 @@ export const capabilitiesResponseSchema = z
         providerId: z.enum(['openai', 'bfl', 'wiro']),
         modelId: z.string().trim().min(1).max(128),
         sizes: z.array(z.enum(REFERENCE_IMAGE_SIZES)).length(REFERENCE_IMAGE_SIZES.length),
-        quality: z.enum(['high', 'medium']),
         optimizer: z
           .object({
             available: z.boolean(),

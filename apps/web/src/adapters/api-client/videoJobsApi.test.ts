@@ -64,4 +64,25 @@ describe('videoJobsApi', () => {
       downloadVideoJobResult(crypto.randomUUID(), new AbortController().signal),
     ).rejects.toMatchObject({ code: 'result_too_large' });
   });
+
+  it('cancels a chunked result as soon as its streamed bytes exceed the limit', async () => {
+    const cancel = vi.fn();
+    let pulls = 0;
+    const body = new ReadableStream<Uint8Array>({
+      pull(controller) {
+        pulls += 1;
+        controller.enqueue({ byteLength: 300_000_001 } as Uint8Array);
+      },
+      cancel,
+    });
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(body, { headers: { 'content-type': 'video/mp4' } }),
+    );
+
+    await expect(
+      downloadVideoJobResult(crypto.randomUUID(), new AbortController().signal),
+    ).rejects.toMatchObject({ code: 'result_too_large' });
+    expect(pulls).toBeLessThanOrEqual(3);
+    await vi.waitFor(() => expect(cancel).toHaveBeenCalledOnce());
+  });
 });

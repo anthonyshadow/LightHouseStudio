@@ -98,33 +98,49 @@ export const createVideoEditFrameRenderer = (canvas: RenderCanvas): VideoEditFra
     preserveDrawingBuffer: false,
   });
   if (!gl) throw new Error('WebGL is required for local video editing.');
-  const vertex = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
-  const fragment = compileShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
-  const program = gl.createProgram();
-  if (!program) throw new Error('The video editor could not allocate a GPU program.');
-  gl.attachShader(program, vertex);
-  gl.attachShader(program, fragment);
-  gl.linkProgram(program);
-  if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
-    throw new Error('The video editor GPU program could not be linked.');
+  let vertex: WebGLShader | null = null;
+  let fragment: WebGLShader | null = null;
+  let program: WebGLProgram | null = null;
+  let position: WebGLBuffer | null = null;
+  let texture: WebGLTexture | null = null;
+  try {
+    vertex = compileShader(gl, gl.VERTEX_SHADER, VERTEX_SHADER);
+    fragment = compileShader(gl, gl.FRAGMENT_SHADER, FRAGMENT_SHADER);
+    program = gl.createProgram();
+    if (!program) throw new Error('The video editor could not allocate a GPU program.');
+    gl.attachShader(program, vertex);
+    gl.attachShader(program, fragment);
+    gl.linkProgram(program);
+    if (!gl.getProgramParameter(program, gl.LINK_STATUS)) {
+      throw new Error('The video editor GPU program could not be linked.');
+    }
+    gl.useProgram(program);
+    position = gl.createBuffer();
+    if (!position) throw new Error('The video editor could not allocate a GPU buffer.');
+    gl.bindBuffer(gl.ARRAY_BUFFER, position);
+    gl.bufferData(
+      gl.ARRAY_BUFFER,
+      new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
+      gl.STATIC_DRAW,
+    );
+    const positionLocation = gl.getAttribLocation(program, 'a_position');
+    gl.enableVertexAttribArray(positionLocation);
+    gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
+    texture = gl.createTexture();
+    if (!texture) throw new Error('The video editor could not allocate a GPU texture.');
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  } catch (error) {
+    if (texture) gl.deleteTexture(texture);
+    if (position) gl.deleteBuffer(position);
+    if (program) gl.deleteProgram(program);
+    if (fragment) gl.deleteShader(fragment);
+    if (vertex) gl.deleteShader(vertex);
+    throw error;
   }
-  gl.useProgram(program);
-  const position = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, position);
-  gl.bufferData(
-    gl.ARRAY_BUFFER,
-    new Float32Array([-1, -1, 1, -1, -1, 1, -1, 1, 1, -1, 1, 1]),
-    gl.STATIC_DRAW,
-  );
-  const positionLocation = gl.getAttribLocation(program, 'a_position');
-  gl.enableVertexAttribArray(positionLocation);
-  gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, 0, 0);
-  const texture = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, texture);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
 
   const cropLocation = gl.getUniformLocation(program, 'u_crop');
   const rotationLocation = gl.getUniformLocation(program, 'u_rotation');
@@ -168,5 +184,8 @@ export const createVideoEditFrameRenderer = (canvas: RenderCanvas): VideoEditFra
 export const videoEditPreviewSupported = (): boolean => {
   if (typeof document === 'undefined') return false;
   const canvas = document.createElement('canvas');
-  return Boolean(canvas.getContext('webgl'));
+  const gl = canvas.getContext('webgl');
+  if (!gl) return false;
+  gl.getExtension('WEBGL_lose_context')?.loseContext();
+  return true;
 };

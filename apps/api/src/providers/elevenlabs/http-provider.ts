@@ -1,4 +1,7 @@
-import { Readable } from 'node:stream';
+import { createReadStream, openAsBlob } from 'node:fs';
+import { chmod, mkdtemp, open, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import {
   PAGE_SIZE_LIMIT,
   VOICE_CONVERSION_OUTPUT_MAX_BYTES,
@@ -7,7 +10,10 @@ import {
 } from '@studio/contracts';
 import { z } from 'zod';
 import { ProviderError, type ProviderOperation } from '../provider-error.js';
-import { readBoundedJson } from '../transport/bounded-provider-transport.js';
+import {
+  authenticatedProviderFetch,
+  readBoundedJson,
+} from '../transport/bounded-provider-transport.js';
 import type { AudioStream } from '../../application/audio-stream.js';
 import type {
   ElevenLabsModel,
@@ -15,6 +21,7 @@ import type {
   ProviderVoice,
   ProviderWorkspaceVoicePage,
   VoiceSearchInput,
+  VoiceConversionAudio,
 } from './types.js';
 
 const ELEVENLABS_API_ORIGIN = 'https://api.elevenlabs.io';
@@ -50,31 +57,33 @@ const hasMp3Path = (rawUrl: string): boolean => {
   }
 };
 
-const firstBytes = (chunks: readonly Uint8Array[], count: number): Uint8Array => {
-  const available = chunks.reduce((total, chunk) => total + chunk.byteLength, 0);
-  const signature = new Uint8Array(Math.min(available, count));
-  let signatureOffset = 0;
-  for (const chunk of chunks) {
-    const remaining = signature.byteLength - signatureOffset;
-    if (remaining <= 0) break;
-    const bytesToCopy = Math.min(chunk.byteLength, remaining);
-    signature.set(chunk.subarray(0, bytesToCopy), signatureOffset);
-    signatureOffset += bytesToCopy;
-  }
-  return signature;
-};
-
 const readBoundedAudio = async (
   providerResponse: ProviderResponse,
   operation: ProviderOperation,
   maximumBytes: number,
-): Promise<{ readonly chunks: readonly Uint8Array[]; readonly byteLength: number }> => {
+): Promise<{
+  readonly path: string;
+  readonly signature: Uint8Array;
+  readonly byteLength: number;
+  readonly cleanup: () => Promise<void>;
+}> => {
   const { response, callerSignal, timeoutSignal, combinedSignal } = providerResponse;
   if (response.body === null) {
     throw new ProviderError(operation, 'invalid-response', response.status);
   }
   const reader = response.body.getReader();
-  const chunks: Uint8Array[] = [];
+  const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-elevenlabs-'));
+  const audioPath = path.join(directory, 'audio.bin');
+  let handle: Awaited<ReturnType<typeof open>>;
+  try {
+    await chmod(directory, 0o700);
+    handle = await open(audioPath, 'wx', 0o600);
+  } catch {
+    await rm(directory, { recursive: true, force: true }).catch(() => undefined);
+    throw new ProviderError(operation, 'invalid-response', response.status);
+  }
+  const signature = new Uint8Array(3);
+  let signatureLength = 0;
   let byteLength = 0;
   let completed = false;
   const abortReader = () => {
@@ -98,7 +107,12 @@ const readBoundedAudio = async (
       if (byteLength > maximumBytes) {
         throw new ProviderError(operation, 'response-too-large', response.status);
       }
-      chunks.push(chunk.value.slice());
+      if (signatureLength < signature.byteLength) {
+        const copied = Math.min(signature.byteLength - signatureLength, chunk.value.byteLength);
+        signature.set(chunk.value.subarray(0, copied), signatureLength);
+        signatureLength += copied;
+      }
+      await handle.write(chunk.value);
     }
   } catch (error) {
     if (error instanceof ProviderError) throw error;
@@ -109,12 +123,19 @@ const readBoundedAudio = async (
     combinedSignal.removeEventListener('abort', abortReader);
     if (!completed) await reader.cancel().catch(() => undefined);
     reader.releaseLock();
+    await handle.close().catch(() => undefined);
+    if (!completed) await rm(directory, { recursive: true, force: true }).catch(() => undefined);
   }
 
   if (byteLength === 0) {
     throw new ProviderError(operation, 'invalid-response', response.status);
   }
-  return { chunks, byteLength };
+  return {
+    path: audioPath,
+    signature: signature.subarray(0, signatureLength),
+    byteLength,
+    cleanup: () => rm(directory, { recursive: true, force: true }),
+  };
 };
 
 const labelsSchema = z.record(z.string(), z.unknown()).nullish();
@@ -295,11 +316,15 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
 
     let response: Response;
     try {
-      response = await this.#fetch(new URL(path, ELEVENLABS_API_ORIGIN), {
-        ...init,
-        headers,
-        signal: combinedSignal,
-      });
+      response = await authenticatedProviderFetch(
+        this.#fetch,
+        new URL(path, ELEVENLABS_API_ORIGIN),
+        {
+          ...init,
+          headers,
+          signal: combinedSignal,
+        },
+      );
     } catch {
       if (signal.aborted) throw new ProviderError(operation, 'aborted');
       if (timeoutSignal.aborted) throw new ProviderError(operation, 'timeout');
@@ -400,14 +425,24 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
       declaredLength.value !== null &&
       declaredLength.value !== audio.byteLength
     ) {
+      await audio.cleanup().catch(() => undefined);
       throw new ProviderError(operation, 'invalid-response', response.status);
     }
-    if (contentType === 'audio/mpeg' && !isMp3Signature(firstBytes(audio.chunks, 3))) {
+    if (contentType === 'audio/mpeg' && !isMp3Signature(audio.signature)) {
+      await audio.cleanup().catch(() => undefined);
       throw new ProviderError(operation, 'invalid-response', response.status);
     }
 
+    const body = createReadStream(audio.path);
+    let cleaned = false;
+    const cleanup = (): void => {
+      if (cleaned) return;
+      cleaned = true;
+      void audio.cleanup().catch(() => undefined);
+    };
+    body.once('close', cleanup);
     return {
-      body: Readable.from(audio.chunks),
+      body,
       contentType,
       contentLength: audio.byteLength,
     };
@@ -503,18 +538,17 @@ export class ElevenLabsHttpProvider implements ElevenLabsProvider {
   async convertRecording(
     voiceId: string,
     modelId: string,
-    audio: Uint8Array,
+    audio: VoiceConversionAudio,
     mimeType: VoiceConversionContentType,
     enableLogging: boolean,
     signal: AbortSignal,
   ): Promise<AudioStream> {
     const form = new FormData();
-    const copiedAudio = audio.slice();
-    form.append(
-      'audio',
-      new Blob([copiedAudio], { type: mimeType }),
-      `recording.${audioExtension(mimeType)}`,
-    );
+    const audioBlob =
+      audio instanceof Uint8Array
+        ? new Blob([audio.slice()], { type: mimeType })
+        : await openAsBlob(audio.path, { type: mimeType });
+    form.append('audio', audioBlob, `recording.${audioExtension(mimeType)}`);
     form.append('model_id', modelId);
 
     const path = `/v1/speech-to-speech/${encodeURIComponent(voiceId)}?output_format=mp3_44100_128&enable_logging=${String(enableLogging)}`;

@@ -7,11 +7,18 @@ import { createDefaultVideoEditSpec, type VideoEditSpec } from '@studio/domain';
 import { StudioDesignProvider } from '../../ui';
 import { VideoEditStagePreview } from './VideoEditStagePreview';
 
-vi.mock('./videoEditShader', () => ({
-  createVideoEditFrameRenderer: () => ({ render: vi.fn(), dispose: vi.fn() }),
+const shader = vi.hoisted(() => ({
+  createVideoEditFrameRenderer: vi.fn(() => ({ render: vi.fn(), dispose: vi.fn() })),
 }));
 
-afterEach(cleanup);
+vi.mock('./videoEditShader', () => ({
+  createVideoEditFrameRenderer: shader.createVideoEditFrameRenderer,
+}));
+
+afterEach(() => {
+  cleanup();
+  shader.createVideoEditFrameRenderer.mockClear();
+});
 
 const PreviewHarness = ({
   showingBefore = false,
@@ -64,6 +71,17 @@ const PreviewHarness = ({
 };
 
 describe('VideoEditStagePreview', () => {
+  it('keeps one renderer while crop state changes without changing geometry', () => {
+    render(<PreviewHarness onCropStart={vi.fn()} onCropChange={vi.fn()} onCropCommit={vi.fn()} />);
+    expect(shader.createVideoEditFrameRenderer).toHaveBeenCalledOnce();
+
+    const handle = screen.getByRole('button', { name: 'Resize crop from top left' });
+    fireEvent.keyDown(handle, { key: 'ArrowRight' });
+    fireEvent.keyUp(handle, { key: 'ArrowRight' });
+
+    expect(shader.createVideoEditFrameRenderer).toHaveBeenCalledOnce();
+  });
+
   it('drags the whole crop selection and keeps a fixed-ratio preset positioned', () => {
     const onCropStart = vi.fn<() => void>();
     const onCropChange = vi.fn<(spec: VideoEditSpec) => void>();

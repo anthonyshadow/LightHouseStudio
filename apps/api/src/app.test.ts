@@ -25,7 +25,7 @@ describe('API shell', () => {
 
     expect(health.json()).toEqual({ ok: true });
     expect(capabilities.json()).toEqual({
-      realtimeVideo: { available: false, models: ['lucy-latest', 'lucy-vton-latest'] },
+      realtimeVideo: { available: false },
       videoProcessing: {
         characterSwap: {
           available: false,
@@ -51,7 +51,6 @@ describe('API shell', () => {
         providerId: 'openai',
         modelId: 'gpt-image-2',
         sizes: ['1024x1024', '1024x1536', '1536x1024'],
-        quality: 'high',
         optimizer: {
           available: false,
           model: 'gpt-5.6',

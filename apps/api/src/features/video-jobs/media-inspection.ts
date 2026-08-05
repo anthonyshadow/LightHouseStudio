@@ -5,7 +5,7 @@ import {
   type InspectedVideo,
   type VideoTransformOperationId,
 } from '@studio/contracts';
-import { validateUploadedVideoFacts } from '@studio/domain';
+import { validateUploadedVideoFacts, type UploadedVideoFacts } from '@studio/domain';
 import { ALL_FORMATS, FilePathSource, Input, MP4, QTFF, WEBM } from 'mediabunny';
 import { AppError } from '../../http/app-error.js';
 import type { VideoJobOutputSizing } from '../../providers/video-jobs/video-job-provider.js';
@@ -55,6 +55,59 @@ const appErrorForProviderOutputValidation = (
     'result_invalid',
     'The visual result did not meet the app-owned media requirements.',
   );
+};
+
+export type RawInspectedVideo = UploadedVideoFacts &
+  Readonly<{
+    mimeType: string;
+    audioCodec: string | null;
+  }>;
+
+const validationIssue = (
+  facts: UploadedVideoFacts,
+  operation: VideoTransformOperationId,
+  requireProviderOutputSize: boolean,
+  outputSizing: VideoJobOutputSizing,
+) =>
+  validateUploadedVideoFacts(facts, requireProviderOutputSize ? [] : [operation]).find(
+    (issue) =>
+      !requireProviderOutputSize ||
+      outputSizing !== 'megapixel-budget' ||
+      issue.code !== 'unsupported-aspect-ratio',
+  );
+
+/** Applies product policy to permissive media facts before narrowing the HTTP contract. */
+export const validateRawInspectedVideo = (
+  raw: RawInspectedVideo,
+  operation: VideoTransformOperationId,
+  options: {
+    readonly requireProviderOutputSize?: boolean;
+    readonly outputSizing?: VideoJobOutputSizing;
+  } = {},
+): InspectedVideo => {
+  const requireProviderOutputSize = options.requireProviderOutputSize === true;
+  const issue = validationIssue(
+    raw,
+    operation,
+    requireProviderOutputSize,
+    options.outputSizing ?? 'exact-canonical',
+  );
+  if (issue) {
+    throw requireProviderOutputSize
+      ? appErrorForProviderOutputValidation(issue)
+      : appErrorForValidation(issue);
+  }
+  const parsed = inspectedVideoSchema.safeParse(raw);
+  if (!parsed.success) {
+    throw requireProviderOutputSize
+      ? new AppError(
+          502,
+          'result_invalid',
+          'The visual result did not meet the app-owned media requirements.',
+        )
+      : new AppError(400, 'invalid_video', 'The uploaded video could not be inspected.');
+  }
+  return parsed.data;
 };
 
 export const expectedProviderOutputDimensions = (
@@ -122,38 +175,56 @@ export const inspectVideoFile = async (
     readonly outputSizing?: VideoJobOutputSizing;
   } = {},
 ): Promise<InspectedVideo> => {
+  const providerOutput = options.requireProviderOutputSize === true;
+  const invalidMedia = (message: string): AppError =>
+    providerOutput
+      ? new AppError(
+          502,
+          'result_invalid',
+          'The visual result did not meet the app-owned media requirements.',
+        )
+      : new AppError(400, 'invalid_video', message);
   const file = await stat(filePath).catch(() => null);
   if (!file?.isFile() || file.size <= 0) {
-    throw new AppError(400, 'invalid_video', 'The uploaded video is empty or invalid.');
+    throw invalidMedia('The uploaded video is empty or invalid.');
   }
 
   const input = new Input({ formats: ALL_FORMATS, source: new FilePathSource(filePath) });
   try {
     if (!(await input.canRead())) {
-      throw new AppError(400, 'invalid_video', 'The uploaded video could not be read.');
+      throw invalidMedia('The uploaded video could not be read.');
     }
     const format = containerDetails(await input.getFormat());
     if (!format) {
-      throw new AppError(400, 'unsupported_container', 'Use an MP4, H.264 MOV, or VP8 WebM video.');
+      throw providerOutput
+        ? invalidMedia('The visual result used an unsupported container.')
+        : new AppError(400, 'unsupported_container', 'Use an MP4, H.264 MOV, or VP8 WebM video.');
     }
     const videoTrack = await input.getPrimaryVideoTrack();
     if (!videoTrack) {
-      throw new AppError(400, 'invalid_video', 'The selected file does not contain a video track.');
+      throw invalidMedia('The selected file does not contain a video track.');
     }
     const videoCodec = await videoTrack.getCodec();
     const audioTrack = await input.getPrimaryAudioTrack();
     const durationSeconds =
       (await input.getDurationFromMetadata()) ?? (await input.computeDuration());
-    const inspected = inspectedVideoSchema.parse({
-      ...format,
-      videoCodec,
-      audioCodec: audioTrack ? await audioTrack.getCodec() : null,
-      durationMs: durationSeconds * 1_000,
-      width: Math.round(await videoTrack.getDisplayWidth()),
-      height: Math.round(await videoTrack.getDisplayHeight()),
-      sizeBytes: file.size,
-      hasAudio: audioTrack !== null,
-    });
+    const inspected = validateRawInspectedVideo(
+      {
+        ...format,
+        videoCodec: videoCodec ?? '',
+        audioCodec: audioTrack ? await audioTrack.getCodec() : null,
+        durationMs: durationSeconds * 1_000,
+        width: Math.round(await videoTrack.getDisplayWidth()),
+        height: Math.round(await videoTrack.getDisplayHeight()),
+        sizeBytes: file.size,
+        hasAudio: audioTrack !== null,
+      },
+      operation,
+      {
+        requireProviderOutputSize: providerOutput,
+        outputSizing: options.outputSizing ?? 'exact-canonical',
+      },
+    );
     if (options.requireProviderOutputSize) {
       assertProviderOutputDimensions(
         inspected,
@@ -161,21 +232,6 @@ export const inspectVideoFile = async (
         options.outputSizing ?? 'exact-canonical',
         options.expectedOrientation,
       );
-    }
-    const issues = validateUploadedVideoFacts(
-      inspected,
-      options.requireProviderOutputSize ? [] : [operation],
-    );
-    const firstIssue = issues.find(
-      (issue) =>
-        !options.requireProviderOutputSize ||
-        options.outputSizing !== 'megapixel-budget' ||
-        issue.code !== 'unsupported-aspect-ratio',
-    );
-    if (firstIssue) {
-      throw options.requireProviderOutputSize
-        ? appErrorForProviderOutputValidation(firstIssue)
-        : appErrorForValidation(firstIssue);
     }
     if (
       options.expectedDurationMs !== undefined &&
@@ -191,6 +247,14 @@ export const inspectVideoFile = async (
     return inspected;
   } catch (error) {
     if (error instanceof AppError) throw error;
+    if (providerOutput) {
+      throw new AppError(
+        502,
+        'result_invalid',
+        'The visual result could not be inspected safely.',
+        { cause: error },
+      );
+    }
     throw new AppError(400, 'invalid_video', 'The uploaded video could not be inspected.', {
       cause: error,
     });

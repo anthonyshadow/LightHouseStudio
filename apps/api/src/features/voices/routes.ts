@@ -9,6 +9,7 @@ import {
 } from '@studio/contracts';
 import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AudioStream } from '../../application/audio-stream.js';
+import { isSpooledAudioUpload } from '../../application/spooled-upload.js';
 import { AppError } from '../../http/errors.js';
 import { requireTrustedOrigin, requireVoiceProviderIntent } from '../../http/security.js';
 import {
@@ -112,7 +113,7 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
           'Use WebM, MP4, Ogg, WAV, MPEG, or AAC audio.',
         );
       }
-      if (!Buffer.isBuffer(request.body) || request.body.byteLength === 0) {
+      if (!isSpooledAudioUpload(request.body) || request.body.byteLength === 0) {
         throw new AppError(
           400,
           'invalid_audio',
@@ -127,14 +128,19 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
         );
       }
 
-      return streamProviderAudio(request, reply, (signal) =>
-        requireVoiceService(service).convertRecording({
-          voiceId: query.data.voiceId,
-          audio: request.body as Buffer,
-          mimeType: parsedContentType.data,
-          signal,
-        }),
-      );
+      const upload = request.body;
+      return streamProviderAudio(request, reply, async (signal) => {
+        try {
+          return await requireVoiceService(service).convertRecording({
+            voiceId: query.data.voiceId,
+            audio: { path: upload.path, byteLength: upload.byteLength },
+            mimeType: parsedContentType.data,
+            signal,
+          });
+        } finally {
+          await upload.cleanup().catch(() => undefined);
+        }
+      });
     },
   );
 };

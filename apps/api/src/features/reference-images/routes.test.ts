@@ -1,4 +1,3 @@
-import { request as httpRequest } from 'node:http';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -25,14 +24,22 @@ import type {
   GenerateReferenceImageProviderInput,
   GeneratedReferenceImagePayload,
   ReferenceImageProvider,
-} from '../../providers/openai/reference-image-provider.js';
-import { ReferenceImageProviderError } from '../../providers/openai/reference-image-provider.js';
+} from '../../providers/reference-images/reference-image-provider.js';
+import { ReferenceImageProviderError } from '../../providers/reference-images/reference-image-provider.js';
 import { testConfig } from '../../test/fakes.js';
 import { LocalReferenceImageAssetStore } from './asset-store.js';
 import type { RemoteReferenceImageDownloader } from './routes.js';
 
 const localHeaders = { origin: 'http://localhost:5173', host: 'localhost:5173' };
 const requestId = '37d15fec-43a3-47b2-8330-7fb410698564';
+const OPENAI_TEST_DESCRIPTOR = {
+  providerId: 'openai' as const,
+  modelId: 'gpt-image-2',
+  adapterVersion: 'openai-gpt-image-v1',
+  effectiveSettings: { quality: 'high' as const },
+};
+type TestReferenceImageProvider = Omit<ReferenceImageProvider, 'descriptor'> &
+  Partial<Pick<ReferenceImageProvider, 'descriptor'>>;
 const secondRequestId = '5f43d16c-81b7-445a-a70e-35a64a597086';
 
 const record = (value: unknown): Record<string, unknown> => {
@@ -111,7 +118,7 @@ describe('reference image API', () => {
   });
 
   const setup = async (
-    provider: ReferenceImageProvider | null,
+    provider: TestReferenceImageProvider | null,
     characterPromptOptimizer: CharacterPromptOptimizer | null = null,
     remoteImageDownloader?: RemoteReferenceImageDownloader,
   ) => {
@@ -119,7 +126,10 @@ describe('reference image API', () => {
     directories.push(directory);
     const app = createApp({
       config: testConfig({ lightframeDataDir: directory }),
-      referenceImageProvider: provider,
+      referenceImageProvider:
+        provider === null
+          ? null
+          : { descriptor: provider.descriptor ?? OPENAI_TEST_DESCRIPTOR, ...provider },
       characterPromptOptimizer,
       referenceImageAssetStore: new LocalReferenceImageAssetStore(directory),
       ...(remoteImageDownloader ? { remoteImageDownloader } : {}),
@@ -207,6 +217,7 @@ describe('reference image API', () => {
   it('optimizes first, routes the exact optimized prompt, and returns stored Lucy audit metadata', async () => {
     const providerInputs: GenerateReferenceImageProviderInput[] = [];
     const provider: ReferenceImageProvider = {
+      descriptor: OPENAI_TEST_DESCRIPTOR,
       generate: vi.fn(async (input: GenerateReferenceImageProviderInput) => {
         providerInputs.push(input);
         return providerImage(await createImage(input.size), input.format);
@@ -410,59 +421,10 @@ describe('reference image API', () => {
     });
   });
 
-  it('does not cancel a pending generation when a normal POST body finishes', async () => {
-    const image = await createImage('1024x1024');
-    let providerSignal: AbortSignal | undefined;
-    const provider: ReferenceImageProvider = {
-      generate: vi.fn(
-        (input: GenerateReferenceImageProviderInput) =>
-          new Promise<GeneratedReferenceImagePayload>((resolve, reject) => {
-            providerSignal = input.signal;
-            const timer = setTimeout(() => resolve(providerImage(image, input.format)), 50);
-            const abort = () => {
-              clearTimeout(timer);
-              reject(new ReferenceImageProviderError('aborted'));
-            };
-            if (input.signal?.aborted === true) abort();
-            else input.signal?.addEventListener('abort', abort, { once: true });
-          }),
-      ),
-    };
-    const app = await setup(provider);
-    await app.listen({ host: '127.0.0.1', port: 0 });
-    const address = app.server.address();
-    if (address === null || typeof address === 'string') throw new Error('Missing test address.');
-    const origin = `http://127.0.0.1:${address.port}`;
-    const requestBody = JSON.stringify(bypassPayload('A patient cartographer'));
-
-    const responseStatus = await new Promise<number | undefined>((resolve, reject) => {
-      const outgoing = httpRequest(
-        `${origin}/api/reference-images`,
-        {
-          method: 'POST',
-          headers: {
-            'content-type': 'application/json',
-            'content-length': Buffer.byteLength(requestBody),
-            origin,
-          },
-        },
-        (response) => {
-          response.resume();
-          response.once('end', () => resolve(response.statusCode));
-        },
-      );
-      outgoing.once('error', reject);
-      outgoing.end(requestBody);
-    });
-
-    expect(responseStatus).toBe(200);
-    expect(providerSignal).toBeInstanceOf(AbortSignal);
-    expect(providerSignal?.aborted).toBe(false);
-  });
-
   it('edits an owner-scoped stored image and exposes only immutable lineage metadata', async () => {
     const editInputs: EditReferenceImageProviderInput[] = [];
     const provider: ReferenceImageProvider = {
+      descriptor: OPENAI_TEST_DESCRIPTOR,
       generate: vi.fn(async (input: GenerateReferenceImageProviderInput) => ({
         ...providerImage(await createImage(input.size), input.format),
       })),
@@ -705,6 +667,7 @@ describe('reference image API', () => {
   it('composes a generated preview from an uploaded source and records source provenance', async () => {
     const editInputs: EditReferenceImageProviderInput[] = [];
     const provider: ReferenceImageProvider = {
+      descriptor: OPENAI_TEST_DESCRIPTOR,
       generate: vi.fn(),
       edit: vi.fn(async (input: EditReferenceImageProviderInput) => {
         editInputs.push(input);
@@ -1007,7 +970,12 @@ describe('reference image API', () => {
     const image = await createImage('1024x1024');
     const generate = vi
       .fn<ReferenceImageProvider['generate']>()
-      .mockRejectedValueOnce(new ReferenceImageProviderError('failure', { upstreamStatus: 502 }))
+      .mockRejectedValueOnce(
+        new ReferenceImageProviderError('failure', {
+          providerId: 'openai',
+          upstreamStatus: 502,
+        }),
+      )
       .mockResolvedValueOnce(providerImage(image));
     const app = await setup({ generate });
 

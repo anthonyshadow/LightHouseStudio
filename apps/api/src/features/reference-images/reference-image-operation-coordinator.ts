@@ -60,12 +60,10 @@ export class ReferenceImageOperationCoordinator {
       if (!active.operation.acceptingSubscribers) {
         throw new ReferenceImageGenerationStateError('generation-in-progress');
       }
-      return active.operation.subscribe(
-        input.signal,
-        () =>
-          new ReferenceImageProviderError('aborted', {
-            ...(input.providerId === undefined ? {} : { providerId: input.providerId }),
-          }),
+      return active.operation.subscribe(input.signal, () =>
+        input.providerId === undefined
+          ? new ReferenceImageGenerationStateError('operation-aborted')
+          : new ReferenceImageProviderError('aborted', { providerId: input.providerId }),
       );
     }
 
@@ -81,12 +79,10 @@ export class ReferenceImageOperationCoordinator {
       }
     };
     void operation.result.then(release, release);
-    return operation.subscribe(
-      input.signal,
-      () =>
-        new ReferenceImageProviderError('aborted', {
-          ...(input.providerId === undefined ? {} : { providerId: input.providerId }),
-        }),
+    return operation.subscribe(input.signal, () =>
+      input.providerId === undefined
+        ? new ReferenceImageGenerationStateError('operation-aborted')
+        : new ReferenceImageProviderError('aborted', { providerId: input.providerId }),
     );
   }
 }

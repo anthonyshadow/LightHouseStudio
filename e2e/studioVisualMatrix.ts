@@ -48,46 +48,48 @@ export const STUDIO_PORTRAIT_INITIAL_VISUAL_SCENARIO = {
   baseline: '01-studio/initial-portrait.png',
 } as const;
 
-export const FOCUSED_VISUAL_SCENARIOS = [
-  { id: 'ai-experience-choice', baseline: '01-studio/ai-experience-choice.png' },
-  { id: 'selected-character-ai-live', baseline: '01-studio/selected-character-ai-live.png' },
-  {
+export const FOCUSED_VISUAL_SCENARIOS = {
+  selectedCharacterAiLive: {
+    id: 'selected-character-ai-live',
+    baseline: '01-studio/selected-character-ai-live.png',
+  },
+  characterBuilderCombinedReady: {
     id: 'character-builder-combined-ready',
     baseline: '02-character-builder/combined-reference-ready.png',
   },
-  {
+  savedCharacterSelection: {
     id: 'saved-character-selection',
     baseline: '03-character-library/saved-character-selection.png',
   },
-  {
+  takePlaybackReviewSettled: {
     id: 'take-playback-review-settled',
     baseline: '04-take-review/playback-review-settled.png',
   },
-  {
+  uploadChooser: {
     id: 'upload-chooser',
     baseline: '07-existing-video/chooser.png',
   },
-  {
+  uploadValidatedSetup: {
     id: 'upload-validated-setup',
     baseline: '07-existing-video/validated-setup.png',
   },
-  {
+  uploadProcessing: {
     id: 'upload-processing',
     baseline: '07-existing-video/processing.png',
   },
-  {
+  uploadResult: {
     id: 'upload-result',
     baseline: '07-existing-video/result.png',
   },
-  {
+  videoEditLightingDirty: {
     id: 'video-edit-lighting-dirty',
     baseline: '08-video-editor/lighting-dirty.png',
   },
-  {
+  videoEditCropDirty: {
     id: 'video-edit-crop-dirty',
     baseline: '08-video-editor/crop-dirty.png',
   },
-] as const;
+} as const;
 
 export const DESKTOP_VISUAL_SCENARIOS = [
   {
@@ -107,7 +109,7 @@ export type VisualScenarioId =
   | (typeof STUDIO_INITIAL_VISUAL_SCENARIO)['id']
   | (typeof STUDIO_PORTRAIT_INITIAL_VISUAL_SCENARIO)['id']
   | (typeof CORE_VISUAL_SCENARIOS)[number]['id']
-  | (typeof FOCUSED_VISUAL_SCENARIOS)[number]['id']
+  | (typeof FOCUSED_VISUAL_SCENARIOS)[keyof typeof FOCUSED_VISUAL_SCENARIOS]['id']
   | (typeof DESKTOP_VISUAL_SCENARIOS)[number]['id']
   | (typeof SMALL_MOBILE_VISUAL_SCENARIOS)[number]['id'];
 
@@ -127,18 +129,24 @@ export const VISUAL_CASE_MATRIX = [
   ),
   { viewport: desktopViewport, scenario: STUDIO_INITIAL_VISUAL_SCENARIO },
   { viewport: desktopViewport, scenario: STUDIO_PORTRAIT_INITIAL_VISUAL_SCENARIO },
-  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[1] },
-  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[2] },
-  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[3] },
-  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[4] },
-  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[5] },
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.selectedCharacterAiLive },
+  {
+    viewport: smallMobileViewport,
+    scenario: FOCUSED_VISUAL_SCENARIOS.characterBuilderCombinedReady,
+  },
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.savedCharacterSelection },
+  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.takePlaybackReviewSettled },
+  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.uploadChooser },
   ...VISUAL_VIEWPORTS.filter(
     (viewport) => viewport.id !== 'desktop' && viewport.id !== 'small-mobile',
-  ).map((viewport) => ({ viewport, scenario: FOCUSED_VISUAL_SCENARIOS[6] })),
-  { viewport: compactViewport, scenario: FOCUSED_VISUAL_SCENARIOS[7] },
-  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[8] },
-  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS[9] },
-  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS[10] },
+  ).map((viewport) => ({
+    viewport,
+    scenario: FOCUSED_VISUAL_SCENARIOS.uploadValidatedSetup,
+  })),
+  { viewport: compactViewport, scenario: FOCUSED_VISUAL_SCENARIOS.uploadProcessing },
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.uploadResult },
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.videoEditLightingDirty },
+  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.videoEditCropDirty },
   ...DESKTOP_VISUAL_SCENARIOS.map((scenario) => ({ viewport: desktopViewport, scenario })),
   ...SMALL_MOBILE_VISUAL_SCENARIOS.map((scenario) => ({
     viewport: smallMobileViewport,

@@ -9,23 +9,14 @@ import {
   type StudioMode,
 } from '../media-session';
 import {
-  activityIndicatorStyles,
-  badgeStyles,
-  blockingCardStyles,
-  blockingOverlayStyles,
-  emptyIconStyles,
-  emptyStyles,
   framingGuideStyles,
   guideCornerStyles,
-  iconButtonStyles,
   stageControlsRegionStyles,
   stageFrameStyles,
   stageStyles,
-  statusDotStyles,
-  toolbarGroupStyles,
-  topToolbarStyles,
   videoStyles,
 } from './MediaStage.styles';
+import { MediaStageBlockingLayers, MediaStageEmpty, MediaStageToolbar } from './MediaStageSections';
 import { StageNoticeLayer } from './StageNoticeLayer';
 import type { StageNotice } from './stageNotices';
 import { describeStageMedia, type StagePresentation } from './stagePresentation';
@@ -94,37 +85,6 @@ const resolveLiveMedia = (
   }
   return { livePresentation: null, stream: null, mirrored: false };
 };
-
-const StageIcon = () => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    <path
-      d="M8 3H5a2 2 0 0 0-2 2v3m13-5h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3m13 5h3a2 2 0 0 0 2-2v-3"
-      stroke="currentColor"
-      strokeLinecap="round"
-    />
-    <rect x="8" y="8" width="8" height="8" rx="2.5" stroke="currentColor" />
-  </svg>
-);
-
-const FullscreenIcon = ({ active }: { active: boolean }) => (
-  <svg aria-hidden="true" viewBox="0 0 24 24" fill="none">
-    {active ? (
-      <path
-        d="M9 4v3a2 2 0 0 1-2 2H4m11-5v3a2 2 0 0 0 2 2h3M9 20v-3a2 2 0 0 0-2-2H4m11 5v-3a2 2 0 0 1 2-2h3"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    ) : (
-      <path
-        d="M9 4H4v5m11-5h5v5M9 20H4v-5m11 5h5v-5"
-        stroke="currentColor"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-    )}
-  </svg>
-);
 
 const lifecycleLabel = (
   lifecycle: SessionLifecycle,
@@ -641,14 +601,7 @@ export const MediaStage = ({
         ) : null}
 
         {!hasVisibleMedia ? (
-          <div css={emptyStyles(theme)}>
-            <span css={emptyIconStyles(theme)}>
-              <StageIcon />
-            </span>
-            <strong>{copy.title}</strong>
-            <p>{copy.description}</p>
-            {idleAction ? <div>{idleAction}</div> : null}
-          </div>
+          <MediaStageEmpty title={copy.title} description={copy.description} action={idleAction} />
         ) : null}
 
         <div
@@ -661,112 +614,27 @@ export const MediaStage = ({
           <span css={guideCornerStyles('br')} />
         </div>
 
-        <div css={topToolbarStyles(theme, showRealtimeTiming)}>
-          <div css={toolbarGroupStyles(theme, showRealtimeTiming)}>
-            <span
-              role={recording ? 'timer' : 'status'}
-              aria-live={recording ? 'off' : 'polite'}
-              aria-label={
-                recording
-                  ? `Recording elapsed time ${formatDuration(
-                      recordingDurationTiming.elapsedSeconds,
-                    )}, maximum ${formatDuration(
-                      recordingDurationTiming.maximumSeconds,
-                    )}, ${formatDuration(recordingDurationTiming.remainingSeconds)} remaining`
-                  : statusLabel
-              }
-              css={badgeStyles(theme, statusToneResolved)}
-              data-recording-duration-status={
-                recording ? recordingDurationTiming.status : undefined
-              }
-            >
-              <span css={statusDotStyles(theme, statusToneResolved)} aria-hidden="true" />
-              <span data-stage-status-long>{statusLabel}</span>
-              <span data-stage-status-short aria-hidden="true">
-                {compactStatusLabel}
-              </span>
-            </span>
-            {showRealtimeTiming && realtimeSessionTiming && realtimeTimingLabel ? (
-              <span
-                role="timer"
-                aria-live="off"
-                aria-label={`AI session maximum ${formatDuration(
-                  realtimeSessionTiming.maximumSeconds,
-                )}, elapsed ${formatDuration(
-                  realtimeSessionTiming.elapsedSeconds,
-                )}, ${formatDuration(realtimeSessionTiming.remainingSeconds)} remaining`}
-                css={badgeStyles(theme, realtimeTimingTone)}
-                data-realtime-session-status={realtimeSessionTiming.status}
-              >
-                <span css={statusDotStyles(theme, realtimeTimingTone)} aria-hidden="true" />
-                <span>{realtimeTimingLabel}</span>
-              </span>
-            ) : null}
-          </div>
+        <MediaStageToolbar
+          recording={recording}
+          statusLabel={statusLabel}
+          compactStatusLabel={compactStatusLabel}
+          statusTone={statusToneResolved}
+          recordingTiming={recordingDurationTiming}
+          realtimeTiming={showRealtimeTiming ? realtimeSessionTiming : null}
+          realtimeTimingLabel={realtimeTimingLabel}
+          realtimeTimingTone={realtimeTimingTone}
+          fullscreenSupported={fullscreenSupported}
+          fullscreen={fullscreen}
+          onToggleFullscreen={toggleFullscreen}
+        />
 
-          <div css={toolbarGroupStyles(theme)}>
-            {fullscreenSupported ? (
-              <button
-                type="button"
-                css={iconButtonStyles(theme)}
-                aria-label={fullscreen ? 'Exit stage fullscreen' : 'View stage fullscreen'}
-                aria-pressed={fullscreen}
-                onClick={toggleFullscreen}
-              >
-                <FullscreenIcon active={fullscreen} />
-              </button>
-            ) : null}
-          </div>
-        </div>
-
-        {isFinalizing ? (
-          <div
-            css={blockingOverlayStyles(theme, 'finalizing')}
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-            data-finalizing-started-at={presentation.startedAt}
-          >
-            <span css={blockingCardStyles(theme)}>
-              <span css={activityIndicatorStyles(theme)} aria-hidden="true" />
-              <strong>Finalizing take…</strong>
-              <span>Securing the final recording data before camera and AI resources close.</span>
-            </span>
-          </div>
-        ) : null}
-
-        {playbackLocked ? (
-          <div
-            css={blockingOverlayStyles(theme, 'processing')}
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <span css={blockingCardStyles(theme)}>
-              <span css={activityIndicatorStyles(theme)} aria-hidden="true" />
-              <strong>{playbackOperation?.title ?? 'Processing video…'}</strong>
-              <span>
-                {playbackOperation?.detail ??
-                  'Playback is paused until the current operation is ready.'}
-              </span>
-            </span>
-          </div>
-        ) : null}
-
-        {aiStarting ? (
-          <div
-            css={[blockingOverlayStyles(theme, 'processing'), { pointerEvents: 'none' }]}
-            role="status"
-            aria-live="polite"
-            aria-atomic="true"
-          >
-            <span css={blockingCardStyles(theme)}>
-              <span css={activityIndicatorStyles(theme)} aria-hidden="true" />
-              <strong>Connecting to AI…</strong>
-              <span>Preparing {experienceLabel ?? 'your selected experience'}</span>
-            </span>
-          </div>
-        ) : null}
+        <MediaStageBlockingLayers
+          finalizingStartedAt={presentation.kind === 'finalizing' ? presentation.startedAt : null}
+          playbackLocked={playbackLocked}
+          playbackOperation={playbackOperation}
+          aiStarting={aiStarting}
+          experienceLabel={experienceLabel}
+        />
 
         <StageNoticeLayer notices={effectiveNotices} />
       </div>

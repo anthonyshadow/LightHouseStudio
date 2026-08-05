@@ -41,8 +41,7 @@ rendered DOM, CSS selector, media ownership, or cleanup lifecycle changed.
   four pixel diffs with the same counts, confirming pre-existing stale baselines for Character
   Builder, take review, upload chooser, and upload processing. No baseline was regenerated.
 
-No live or paid provider call, physical-device check, assistive-technology pass, or moderated-pilot
-evidence collection was performed.
+No live or paid provider call, physical-device check, or assistive-technology pass was performed.
 
 ## 2026-08-02 follow-up audit
 
@@ -83,7 +82,7 @@ rendered UI, CSS selector, media node, or cleanup owner changed.
   `tsup`'s declared `esbuild@0.27.x` range. Forcing `0.28.1` underneath that incompatible range is
   not an acceptable cleanup.
 - Nine Linux visual baselines are missing and none are removable. Live/paid provider, physical
-  device, real-codec, memory, assistive-technology, and moderated-pilot evidence remain open.
+  device, real-codec, memory, and assistive-technology validation remain open.
 
 ### 2026-08-02 validation
 
@@ -93,7 +92,7 @@ rendered UI, CSS selector, media node, or cleanup owner changed.
   and unresolved imports. The full production export view still contains deliberate test/Storybook
   seams and is not used as an automatic removal list.
 - `pnpm test:coverage` passed with 82.23% statements, 73.32% branches, 83.61% functions, and 84.88%
-  lines. `pnpm test:production` passed 1/1, and the participant-data retirement drill passed.
+  lines. `pnpm test:production` passed 1/1.
 - `pnpm test:e2e` improved from the 43-pass / 16-failure baseline to 44 passes / 15 failures. Every
   remaining failure reaches the known synthetic recorder-to-H.264/AAC transcode limitation; the
   stale locator no longer masks that boundary.
@@ -105,8 +104,7 @@ rendered UI, CSS selector, media node, or cleanup owner changed.
 - `graphify update .` completed with 4,280 nodes, 9,896 edges, and 238 communities after the source
   changes.
 
-No live provider calls, physical/manual qualification, or participant evidence collection was
-performed.
+No live provider calls or physical/manual validation was performed.
 
 ### SEC-008 retention follow-up
 
@@ -136,7 +134,7 @@ The implemented cleanup is deliberately narrow:
 - remove API validation wrappers used only by their own tests;
 - represent the mutually exclusive existing-video choice as one internal value while preserving
   the hook's public array/index contract; and
-- correct documentation that described old processing, qualification, baseline, or backend
+- correct documentation that described old processing, validation, baseline, or backend
   boundaries.
 
 No files were moved, no folders were introduced, no dependencies were added or removed, and no
@@ -161,7 +159,7 @@ changed.
 | `apps/api/src/config`             | Typed server environment and startup-selected configuration                                |
 | `stories`                         | Typed component and flow review states                                                     |
 | `e2e`                             | Critical cross-boundary browser journeys                                                   |
-| `scripts`                         | Repository validation, evidence, and maintenance commands                                  |
+| `scripts`                         | Repository validation and maintenance commands                                             |
 
 Keep a hook, helper, type, style, fixture, and component in its owning feature while it has only
 that feature as a consumer. Create a named subfolder only when a cohesive group makes navigation
@@ -171,7 +169,7 @@ request, polling, download, billing, and error contracts evolve independently.
 
 Tests remain beside the source they protect for domain, adapter, component, controller, and API
 contracts. Cross-boundary browser cases belong in `e2e`; visual states belong in the curated
-matrix; physical-device and paid-provider evidence remain manual/live qualification.
+matrix; physical-device and paid-provider results remain manual/live validation.
 
 ## Cleanup record
 
@@ -197,9 +195,8 @@ complete proof required for removal, so package manifests and the lockfile were 
 - Reference-image provider audit metadata now derives its return type from the store input instead
   of repeating the provider settings and usage shape.
 - The 2026-07-30 documents distinguished process-local video jobs from a durable job system, the
-  zero-or-one upload transformation from the retired ordered chain, the nine-row qualification
-  matrix from its historical ten-row form, and the then-current 24-case visual matrix from its
-  29-case budget.
+  zero-or-one upload transformation from the retired ordered chain and the then-current 24-case
+  visual matrix from its 29-case budget.
 
 ## Deferred findings
 
@@ -250,6 +247,6 @@ Post-change validation:
 
 `pnpm audit:all` could not reach the registry in the restricted environment, and permission to send
 dependency metadata externally was not granted. Physical-device, assistive-technology, and paid
-live-provider qualification were not run. Use those release-only gates exactly as described in
+live-provider validation were not run. Use those release-only gates exactly as described in
 [Testing](TESTING.md) and the [active audit plan](project-audit-implementation-plan.md); do not
 convert any of these limitations into passing claims.

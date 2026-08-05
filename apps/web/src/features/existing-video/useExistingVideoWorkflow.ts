@@ -13,7 +13,15 @@ import {
   validateUploadedVideoFacts,
   validateVideoTransformPlan,
 } from '@studio/domain';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useMemo,
+  useReducer,
+  useRef,
+  type Dispatch,
+  type SetStateAction,
+} from 'react';
 import {
   downloadVideoJobResult,
   fetchVideoJob,
@@ -85,6 +93,108 @@ type FinalizedVisual = Readonly<{
 
 type ExistingVideoBaseProvenance = 'source' | 'server-approved-result';
 
+export type ExistingVideoSubmissionOperation = Readonly<{
+  jobId: string;
+  stepIndex: number;
+  state: 'submitting' | 'acceptance-unknown' | 'accepted';
+}>;
+
+type PendingVisual = Readonly<{
+  blob: Blob;
+  mimeType: string;
+  stepIndex: number;
+  expectedResult: InspectedVideo;
+}>;
+
+type RetryJob = Readonly<{ jobId: string; stepIndex: number }>;
+
+interface ExistingVideoWorkflowState {
+  selection: ValidatedExistingVideo | null;
+  step: ExistingVideoStep | null;
+  phase: ExistingVideoWorkflowPhase;
+  message: string | null;
+  status: VideoJobStatusResponse | null;
+  completedStepCount: number;
+  submissionOperation: ExistingVideoSubmissionOperation | null;
+  pendingVisual: PendingVisual | null;
+  retryJob: RetryJob | null;
+  comparison: 'original' | 'result';
+  editBase: RecordingArtifact | null;
+  editBaseMetadata: ValidatedExistingVideo['metadata'] | null;
+  editBaseProvenance: ExistingVideoBaseProvenance;
+  resultMetadata: ValidatedExistingVideo['metadata'] | null;
+  resultHasServerApprovedVisual: boolean;
+  voiceSelection: ExistingVideoVoiceSelection | null;
+  elapsedSeconds: number;
+}
+
+type ExistingVideoWorkflowStateAction = {
+  [Key in keyof ExistingVideoWorkflowState]: Readonly<{
+    key: Key;
+    value: SetStateAction<ExistingVideoWorkflowState[Key]>;
+  }>;
+}[keyof ExistingVideoWorkflowState];
+
+const initialExistingVideoWorkflowState: ExistingVideoWorkflowState = {
+  selection: null,
+  step: null,
+  phase: 'empty',
+  message: null,
+  status: null,
+  completedStepCount: 0,
+  submissionOperation: null,
+  pendingVisual: null,
+  retryJob: null,
+  comparison: 'result',
+  editBase: null,
+  editBaseMetadata: null,
+  editBaseProvenance: 'source',
+  resultMetadata: null,
+  resultHasServerApprovedVisual: false,
+  voiceSelection: null,
+  elapsedSeconds: 0,
+};
+
+const existingVideoWorkflowReducer = (
+  state: ExistingVideoWorkflowState,
+  action: ExistingVideoWorkflowStateAction,
+): ExistingVideoWorkflowState => {
+  const current = state[action.key];
+  const next =
+    typeof action.value === 'function'
+      ? (action.value as (value: typeof current) => typeof current)(current)
+      : action.value;
+  return Object.is(current, next) ? state : { ...state, [action.key]: next };
+};
+
+const stateSetter =
+  <Key extends keyof ExistingVideoWorkflowState>(
+    dispatch: Dispatch<ExistingVideoWorkflowStateAction>,
+    key: Key,
+  ): Dispatch<SetStateAction<ExistingVideoWorkflowState[Key]>> =>
+  (value) =>
+    dispatch({ key, value } as ExistingVideoWorkflowStateAction);
+
+const createWorkflowStateSetters = (dispatch: Dispatch<ExistingVideoWorkflowStateAction>) => ({
+  setSelection: stateSetter(dispatch, 'selection'),
+  setStep: stateSetter(dispatch, 'step'),
+  setPhase: stateSetter(dispatch, 'phase'),
+  setMessage: stateSetter(dispatch, 'message'),
+  setStatus: stateSetter(dispatch, 'status'),
+  setCompletedStepCount: stateSetter(dispatch, 'completedStepCount'),
+  setSubmissionOperation: stateSetter(dispatch, 'submissionOperation'),
+  setPendingVisual: stateSetter(dispatch, 'pendingVisual'),
+  setRetryJob: stateSetter(dispatch, 'retryJob'),
+  setComparison: stateSetter(dispatch, 'comparison'),
+  setEditBase: stateSetter(dispatch, 'editBase'),
+  setEditBaseMetadata: stateSetter(dispatch, 'editBaseMetadata'),
+  setEditBaseProvenance: stateSetter(dispatch, 'editBaseProvenance'),
+  setResultMetadata: stateSetter(dispatch, 'resultMetadata'),
+  setResultHasServerApprovedVisual: stateSetter(dispatch, 'resultHasServerApprovedVisual'),
+  setVoiceSelection: stateSetter(dispatch, 'voiceSelection'),
+  setElapsedSeconds: stateSetter(dispatch, 'elapsedSeconds'),
+});
+
 export const savedCharacterStepInput = (
   prompt: string,
   referenceImage: File | null,
@@ -103,17 +213,21 @@ type UseExistingVideoWorkflowOptions = {
   readonly videoProcessingCapabilities?: CapabilitiesResponse['videoProcessing'];
 };
 
-const waitForPoll = (signal: AbortSignal): Promise<void> =>
+const waitForPoll = (signal: AbortSignal, milliseconds = 1_500): Promise<void> =>
   new Promise((resolve, reject) => {
-    const timer = window.setTimeout(resolve, 1_500);
-    signal.addEventListener(
-      'abort',
-      () => {
-        window.clearTimeout(timer);
-        reject(new DOMException('Video processing status check was canceled.', 'AbortError'));
-      },
-      { once: true },
-    );
+    if (signal.aborted) {
+      reject(new DOMException('Video processing status check was canceled.', 'AbortError'));
+      return;
+    }
+    const onAbort = () => {
+      window.clearTimeout(timer);
+      reject(new DOMException('Video processing status check was canceled.', 'AbortError'));
+    };
+    const timer = window.setTimeout(() => {
+      signal.removeEventListener('abort', onAbort);
+      resolve();
+    }, milliseconds);
+    signal.addEventListener('abort', onAbort, { once: true });
   });
 
 const operationForModel = (modelId: VideoTransformModelId): VideoTransformOperationId =>
@@ -180,38 +294,67 @@ export const useExistingVideoWorkflow = ({
   onSubmissionAccepted,
   videoProcessingCapabilities = defaultVideoProcessingCapabilities,
 }: UseExistingVideoWorkflowOptions) => {
-  const [selection, setSelection] = useState<ValidatedExistingVideo | null>(null);
-  const [step, setStep] = useState<ExistingVideoStep | null>(null);
-  const [phase, setPhase] = useState<ExistingVideoWorkflowPhase>('empty');
-  const [message, setMessage] = useState<string | null>(null);
-  const [status, setStatus] = useState<VideoJobStatusResponse | null>(null);
-  const [completedStepCount, setCompletedStepCount] = useState(0);
-  const [acceptedSubmission, setAcceptedSubmission] = useState(false);
-  const [pendingVisual, setPendingVisual] = useState<{
-    blob: Blob;
-    mimeType: string;
-    stepIndex: number;
-    expectedResult: InspectedVideo;
-  } | null>(null);
-  const [retryJob, setRetryJob] = useState<{ jobId: string; stepIndex: number } | null>(null);
-  const [comparison, setComparison] = useState<'original' | 'result'>('result');
-  const [editBase, setEditBase] = useState<RecordingArtifact | null>(null);
-  const [editBaseMetadata, setEditBaseMetadata] = useState<
-    ValidatedExistingVideo['metadata'] | null
-  >(null);
-  const [editBaseProvenance, setEditBaseProvenance] =
-    useState<ExistingVideoBaseProvenance>('source');
-  const [resultMetadata, setResultMetadata] = useState<ValidatedExistingVideo['metadata'] | null>(
-    null,
+  const [workflowState, dispatchWorkflowState] = useReducer(
+    existingVideoWorkflowReducer,
+    initialExistingVideoWorkflowState,
   );
-  const [resultHasServerApprovedVisual, setResultHasServerApprovedVisual] = useState(false);
-  const [voiceSelection, setVoiceSelection] = useState<ExistingVideoVoiceSelection | null>(null);
-  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  const workflowStateSetters = useMemo(() => createWorkflowStateSetters(dispatchWorkflowState), []);
+  const {
+    selection,
+    step,
+    phase,
+    message,
+    status,
+    completedStepCount,
+    submissionOperation,
+    pendingVisual,
+    retryJob,
+    comparison,
+    editBase,
+    editBaseMetadata,
+    editBaseProvenance,
+    resultMetadata,
+    resultHasServerApprovedVisual,
+    voiceSelection,
+    elapsedSeconds,
+  } = workflowState;
+  const {
+    setSelection,
+    setStep,
+    setPhase,
+    setMessage,
+    setStatus,
+    setCompletedStepCount,
+    setSubmissionOperation,
+    setPendingVisual,
+    setRetryJob,
+    setComparison,
+    setEditBase,
+    setEditBaseMetadata,
+    setEditBaseProvenance,
+    setResultMetadata,
+    setResultHasServerApprovedVisual,
+    setVoiceSelection,
+    setElapsedSeconds,
+  } = workflowStateSetters;
   const controllerRef = useRef<AbortController | null>(null);
+  const submissionOperationRef = useRef<ExistingVideoSubmissionOperation | null>(null);
   const retainedJobIdRef = useRef<string | null>(null);
   const generationRef = useRef(0);
   const startedAtRef = useRef<number | null>(null);
   const steps = useMemo<readonly ExistingVideoStep[]>(() => (step ? [step] : []), [step]);
+  const acceptedSubmission =
+    submissionOperation?.state === 'accepted' ||
+    submissionOperation?.state === 'acceptance-unknown';
+  const submissionLocked = submissionOperation !== null;
+
+  const updateSubmissionOperation = useCallback(
+    (operation: ExistingVideoSubmissionOperation | null) => {
+      submissionOperationRef.current = operation;
+      setSubmissionOperation(operation);
+    },
+    [setSubmissionOperation],
+  );
   const editBaseProviderCompatibility = useMemo(() => {
     const metadata = editBaseMetadata ?? selection?.metadata;
     return metadata
@@ -245,10 +388,10 @@ export const useExistingVideoWorkflow = ({
     startedAtRef.current = null;
     setElapsedSeconds(0);
     setStatus(null);
-    setAcceptedSubmission(false);
+    updateSubmissionOperation(null);
     setPendingVisual(null);
     setRetryJob(null);
-  }, []);
+  }, [setElapsedSeconds, setPendingVisual, setRetryJob, setStatus, updateSubmissionOperation]);
 
   const releaseRetainedJob = useCallback(() => {
     const jobId = retainedJobIdRef.current;
@@ -275,12 +418,28 @@ export const useExistingVideoWorkflow = ({
       setResultHasServerApprovedVisual(false);
       setVoiceSelection(null);
     },
-    [clearOperation, recording, releaseRetainedJob],
+    [
+      clearOperation,
+      recording,
+      releaseRetainedJob,
+      setComparison,
+      setCompletedStepCount,
+      setEditBase,
+      setEditBaseMetadata,
+      setEditBaseProvenance,
+      setMessage,
+      setPhase,
+      setResultHasServerApprovedVisual,
+      setResultMetadata,
+      setSelection,
+      setStep,
+      setVoiceSelection,
+    ],
   );
 
   const selectFile = useCallback(
     async (file: File) => {
-      if (acceptedSubmission) return;
+      if (submissionLocked) return;
       releaseRetainedJob();
       clearOperation();
       const generation = generationRef.current;
@@ -342,12 +501,30 @@ export const useExistingVideoWorkflow = ({
         if (controllerRef.current === controller) controllerRef.current = null;
       }
     },
-    [acceptedSubmission, clearOperation, publishUploadedVideo, recording, releaseRetainedJob],
+    [
+      clearOperation,
+      publishUploadedVideo,
+      recording,
+      releaseRetainedJob,
+      setComparison,
+      setCompletedStepCount,
+      setEditBase,
+      setEditBaseMetadata,
+      setEditBaseProvenance,
+      setMessage,
+      setPhase,
+      setResultHasServerApprovedVisual,
+      setResultMetadata,
+      setSelection,
+      setStep,
+      setVoiceSelection,
+      submissionLocked,
+    ],
   );
 
   const adoptRecordedArtifact = useCallback(async () => {
     const draft = recording.original;
-    if (!draft || recording.lifecycle !== 'recorded' || acceptedSubmission) return;
+    if (!draft || recording.lifecycle !== 'recorded' || submissionLocked) return;
     releaseRetainedJob();
     clearOperation();
     const generation = generationRef.current;
@@ -410,11 +587,29 @@ export const useExistingVideoWorkflow = ({
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
     }
-  }, [acceptedSubmission, clearOperation, publishUploadedVideo, recording, releaseRetainedJob]);
+  }, [
+    clearOperation,
+    publishUploadedVideo,
+    recording,
+    releaseRetainedJob,
+    setComparison,
+    setCompletedStepCount,
+    setEditBase,
+    setEditBaseMetadata,
+    setEditBaseProvenance,
+    setMessage,
+    setPhase,
+    setResultHasServerApprovedVisual,
+    setResultMetadata,
+    setSelection,
+    setStep,
+    setVoiceSelection,
+    submissionLocked,
+  ]);
 
   const addStep = useCallback(
     (modelId: VideoTransformModelId): boolean => {
-      if (acceptedSubmission) return false;
+      if (submissionLocked) return false;
       if (!visualProviderCompatibility.compatible) {
         setMessage(visualProviderCompatibility.reason);
         return false;
@@ -450,9 +645,11 @@ export const useExistingVideoWorkflow = ({
       return true;
     },
     [
-      acceptedSubmission,
       editBaseMetadata,
       selection,
+      setMessage,
+      setStep,
+      submissionLocked,
       videoProcessingCapabilities,
       visualProviderCompatibility,
     ],
@@ -467,7 +664,6 @@ export const useExistingVideoWorkflow = ({
       setPhase('ready');
       setMessage(validated.audioUnavailableReason);
       setCompletedStepCount(0);
-      setAcceptedSubmission(false);
       setComparison('original');
       setEditBase(artifact);
       setEditBaseMetadata(validated.metadata);
@@ -476,23 +672,38 @@ export const useExistingVideoWorkflow = ({
       setResultHasServerApprovedVisual(false);
       setVoiceSelection(null);
     },
-    [clearOperation, releaseRetainedJob],
+    [
+      clearOperation,
+      releaseRetainedJob,
+      setComparison,
+      setCompletedStepCount,
+      setEditBase,
+      setEditBaseMetadata,
+      setEditBaseProvenance,
+      setMessage,
+      setPhase,
+      setResultHasServerApprovedVisual,
+      setResultMetadata,
+      setSelection,
+      setStep,
+      setVoiceSelection,
+    ],
   );
 
   const updateStep = useCallback(
     (id: string, patch: Partial<Omit<ExistingVideoStep, 'id' | 'modelId'>>) => {
-      if (acceptedSubmission && (phase !== 'error' || retryJob === null)) return;
+      if (submissionLocked) return;
       setStep((current) => (current?.id === id ? { ...current, ...patch } : current));
     },
-    [acceptedSubmission, phase, retryJob],
+    [setStep, submissionLocked],
   );
 
   const removeStep = useCallback(
     (id: string) => {
-      if (acceptedSubmission) return;
+      if (submissionLocked) return;
       setStep((current) => (current?.id === id ? null : current));
     },
-    [acceptedSubmission],
+    [setStep, submissionLocked],
   );
 
   const finalizeVisual = useCallback(
@@ -597,7 +808,7 @@ export const useExistingVideoWorkflow = ({
       setPendingVisual(null);
       setRetryJob(null);
       setCompletedStepCount(stepIndex + 1);
-      setAcceptedSubmission(false);
+      updateSubmissionOperation(null);
       const source = editBase ?? recording.original;
       if (!source) throw new Error('The immutable source video is unavailable.');
       return {
@@ -616,7 +827,19 @@ export const useExistingVideoWorkflow = ({
         generation,
       };
     },
-    [editBase, editBaseMetadata, recording, selection, steps],
+    [
+      editBase,
+      editBaseMetadata,
+      recording,
+      selection,
+      setComparison,
+      setCompletedStepCount,
+      setPendingVisual,
+      setPhase,
+      setRetryJob,
+      steps,
+      updateSubmissionOperation,
+    ],
   );
 
   const jobInterruption = useCallback(
@@ -625,13 +848,13 @@ export const useExistingVideoWorkflow = ({
         error instanceof ApiClientError ? terminalJobMessage(error.code) : null;
       if (terminalMessage) {
         setRetryJob(null);
-        setAcceptedSubmission(false);
+        updateSubmissionOperation(null);
         return new Error(terminalMessage);
       }
       setRetryJob({ jobId, stepIndex });
       return new RetryExistingVideoJobError(acceptedJobInterruptionMessage(error, fallback));
     },
-    [],
+    [setRetryJob, updateSubmissionOperation],
   );
 
   const pollAndFinalize = useCallback(
@@ -640,10 +863,25 @@ export const useExistingVideoWorkflow = ({
       stepIndex: number,
       controller: AbortController,
       generation: number,
+      initialStatus: VideoJobStatusResponse | null = null,
     ): Promise<FinalizedVisual | null> => {
-      let current = status?.jobId === jobId ? status : null;
+      let current = initialStatus?.jobId === jobId ? initialStatus : null;
       while (!current || !['ready', 'failed', 'expired'].includes(current.status)) {
         controller.signal.throwIfAborted();
+        if (current) {
+          setStatus(current);
+          setPhase(current.status === 'retrieving' ? 'retrieving' : 'processing');
+          const currentStep = steps[stepIndex];
+          recording.beginProcessing({
+            kind: current.status === 'retrieving' ? 'visual-retrieval' : 'visual-generation',
+            title:
+              current.status === 'retrieving'
+                ? 'Retrieving visual result…'
+                : `Generating ${currentStep ? stepLabel(currentStep.modelId).toLowerCase() : 'visual edit'}…`,
+            detail: 'Visual processing is running for the single accepted job.',
+          });
+          await waitForPoll(controller.signal, current.nextPollAfterMs ?? 1_500);
+        }
         try {
           current = await fetchVideoJob(jobId, controller.signal);
         } catch (error) {
@@ -656,19 +894,9 @@ export const useExistingVideoWorkflow = ({
           );
         }
         if (generation !== generationRef.current) return null;
-        setStatus(current);
-        setPhase(current.status === 'retrieving' ? 'retrieving' : 'processing');
-        const currentStep = steps[stepIndex];
-        recording.beginProcessing({
-          kind: current.status === 'retrieving' ? 'visual-retrieval' : 'visual-generation',
-          title:
-            current.status === 'retrieving'
-              ? 'Retrieving visual result…'
-              : `Generating ${currentStep ? stepLabel(currentStep.modelId).toLowerCase() : 'visual edit'}…`,
-          detail: 'Visual processing is running for the single accepted job.',
-        });
-        if (!['ready', 'failed', 'expired'].includes(current.status)) {
-          await waitForPoll(controller.signal);
+        const operation = submissionOperationRef.current;
+        if (operation?.jobId === jobId && operation.state === 'acceptance-unknown') {
+          updateSubmissionOperation({ ...operation, state: 'accepted' });
         }
       }
       if (current.status !== 'ready') {
@@ -721,7 +949,17 @@ export const useExistingVideoWorkflow = ({
         current.result,
       );
     },
-    [finalizeVisual, jobInterruption, recording, status, steps, videoProcessingCapabilities],
+    [
+      finalizeVisual,
+      jobInterruption,
+      recording,
+      setPhase,
+      setRetryJob,
+      setStatus,
+      steps,
+      updateSubmissionOperation,
+      videoProcessingCapabilities,
+    ],
   );
 
   const applySelectedVoice = useCallback(
@@ -757,13 +995,20 @@ export const useExistingVideoWorkflow = ({
       }
       return outcome;
     },
-    [processing],
+    [
+      processing,
+      setComparison,
+      setMessage,
+      setPhase,
+      setResultHasServerApprovedVisual,
+      setResultMetadata,
+    ],
   );
 
   const completeVisualPlan = useCallback(() => {
     setPhase('complete');
     setMessage('Visual processing is complete. The result is ready to compare and download.');
-  }, []);
+  }, [setMessage, setPhase]);
 
   const completeVisualArtifact = useCallback(
     async (
@@ -812,7 +1057,16 @@ export const useExistingVideoWorkflow = ({
         revokeArtifactUrl(stagedVisual, 'replacement');
       }
     },
-    [applySelectedVoice, completeVisualPlan, recording],
+    [
+      applySelectedVoice,
+      completeVisualPlan,
+      recording,
+      setComparison,
+      setMessage,
+      setPhase,
+      setResultHasServerApprovedVisual,
+      setResultMetadata,
+    ],
   );
 
   const submitStep = useCallback(
@@ -820,7 +1074,7 @@ export const useExistingVideoWorkflow = ({
       const baseArtifact = editBase ?? recording.original;
       const source = baseArtifact?.media;
       const step = steps[stepIndex];
-      if (!selection || !source || !step || acceptedSubmission) return;
+      if (!selection || !source || !step || submissionOperationRef.current !== null) return;
       const operation = operationForModel(step.modelId);
       const capability = capabilityForModel(step.modelId, videoProcessingCapabilities);
       if (!capability.available) {
@@ -855,6 +1109,7 @@ export const useExistingVideoWorkflow = ({
       const controller = new AbortController();
       controllerRef.current = controller;
       const jobId = crypto.randomUUID();
+      updateSubmissionOperation({ jobId, stepIndex, state: 'submitting' });
       startedAtRef.current = performance.now();
       const selectedVoice = voiceSelection;
       setPhase('uploading');
@@ -872,6 +1127,8 @@ export const useExistingVideoWorkflow = ({
         hasReferenceImage: step.referenceImage !== null,
         outputResolution: step.outputResolution ?? capability.outputResolutions[0] ?? '720p',
       };
+      let submissionRequestStarted = false;
+      let submissionAccepted = false;
       try {
         let submissionSource = source;
         const requiresH264Mp4 =
@@ -919,6 +1176,7 @@ export const useExistingVideoWorkflow = ({
           submissionSource = validatedPrepared.file;
           setPhase('uploading');
         }
+        submissionRequestStarted = true;
         const submitted = await submitVideoJob(
           jobId,
           recipe,
@@ -927,23 +1185,41 @@ export const useExistingVideoWorkflow = ({
           controller.signal,
         );
         if (generation !== generationRef.current) return;
-        setAcceptedSubmission(true);
+        submissionAccepted = true;
+        updateSubmissionOperation({ jobId, stepIndex, state: 'accepted' });
         try {
           onSubmissionAccepted?.(step);
         } catch {
           // Local recipe recency is auxiliary; it must never affect an accepted paid job.
         }
         setStatus(submitted);
-        const visualArtifact = await pollAndFinalize(jobId, stepIndex, controller, generation);
+        const visualArtifact = await pollAndFinalize(
+          jobId,
+          stepIndex,
+          controller,
+          generation,
+          submitted,
+        );
         await completeVisualArtifact(visualArtifact, selectedVoice);
       } catch (error) {
-        if (controller.signal.aborted && !acceptedSubmission) {
+        if (submissionRequestStarted && !submissionAccepted) {
+          updateSubmissionOperation({ jobId, stepIndex, state: 'acceptance-unknown' });
+          setRetryJob({ jobId, stepIndex });
+          const safeMessage =
+            'The submission response was interrupted, so acceptance is unknown. Check this same job before submitting anything new.';
+          recording.failProcessing(safeMessage);
+          setPhase('error');
+          setMessage(safeMessage);
+          return;
+        }
+        if (controller.signal.aborted && !submissionAccepted) {
+          updateSubmissionOperation(null);
           recording.cancelProcessing();
           setPhase('ready');
           return;
         }
         if (!(error instanceof RetryExistingVideoJobError)) {
-          setAcceptedSubmission(false);
+          updateSubmissionOperation(null);
         }
         const safeMessage =
           error instanceof Error
@@ -957,7 +1233,6 @@ export const useExistingVideoWorkflow = ({
       }
     },
     [
-      acceptedSubmission,
       clearOperation,
       completeVisualArtifact,
       editBase,
@@ -967,7 +1242,12 @@ export const useExistingVideoWorkflow = ({
       recording,
       releaseRetainedJob,
       selection,
+      setMessage,
+      setPhase,
+      setRetryJob,
+      setStatus,
       steps,
+      updateSubmissionOperation,
       videoProcessingCapabilities,
       voiceSelection,
     ],
@@ -1010,6 +1290,7 @@ export const useExistingVideoWorkflow = ({
     resultHasServerApprovedVisual,
     resultMetadata,
     selection,
+    setMessage,
     steps,
     submitStep,
     voiceSelection,
@@ -1045,16 +1326,36 @@ export const useExistingVideoWorkflow = ({
     } finally {
       if (controllerRef.current === controller) controllerRef.current = null;
     }
-  }, [completeVisualArtifact, finalizeVisual, pendingVisual, recording, voiceSelection]);
+  }, [
+    completeVisualArtifact,
+    finalizeVisual,
+    pendingVisual,
+    recording,
+    setMessage,
+    setPhase,
+    voiceSelection,
+  ]);
 
   const retryExistingJob = useCallback(async () => {
     if (!retryJob) return;
-    clearOperation();
+    controllerRef.current?.abort();
+    controllerRef.current = null;
+    generationRef.current += 1;
+    startedAtRef.current = null;
+    setElapsedSeconds(0);
+    setStatus(null);
+    setPendingVisual(null);
+    const job = retryJob;
     const generation = generationRef.current;
     const controller = new AbortController();
     controllerRef.current = controller;
     startedAtRef.current = performance.now();
-    setAcceptedSubmission(true);
+    const existingOperation = submissionOperationRef.current;
+    updateSubmissionOperation(
+      existingOperation?.jobId === job.jobId
+        ? existingOperation
+        : { jobId: job.jobId, stepIndex: job.stepIndex, state: 'accepted' },
+    );
     setPhase('processing');
     setMessage(null);
     recording.beginProcessing({
@@ -1063,16 +1364,11 @@ export const useExistingVideoWorkflow = ({
       detail: 'Checking the accepted visual-processing job without creating a new submission.',
     });
     try {
-      const artifact = await pollAndFinalize(
-        retryJob.jobId,
-        retryJob.stepIndex,
-        controller,
-        generation,
-      );
+      const artifact = await pollAndFinalize(job.jobId, job.stepIndex, controller, generation);
       await completeVisualArtifact(artifact, voiceSelection);
     } catch (error) {
       if (!(error instanceof RetryExistingVideoJobError)) {
-        setAcceptedSubmission(false);
+        updateSubmissionOperation(null);
       }
       const safeMessage =
         error instanceof Error ? error.message : 'The existing video job could not be resumed.';
@@ -1083,11 +1379,16 @@ export const useExistingVideoWorkflow = ({
       if (controllerRef.current === controller) controllerRef.current = null;
     }
   }, [
-    clearOperation,
     completeVisualArtifact,
     pollAndFinalize,
     recording,
     retryJob,
+    setElapsedSeconds,
+    setMessage,
+    setPendingVisual,
+    setPhase,
+    setStatus,
+    updateSubmissionOperation,
     voiceSelection,
   ]);
 
@@ -1105,7 +1406,7 @@ export const useExistingVideoWorkflow = ({
     setMessage(
       selection ? 'The pending operation was canceled. Your current video is safe.' : null,
     );
-  }, [acceptedSubmission, phase, processing, recording, selection]);
+  }, [acceptedSubmission, phase, processing, recording, selection, setMessage, setPhase]);
 
   const startOver = useCallback(() => {
     if (!selection || phase !== 'complete') return;
@@ -1122,7 +1423,23 @@ export const useExistingVideoWorkflow = ({
     setResultMetadata(null);
     setResultHasServerApprovedVisual(false);
     setVoiceSelection(null);
-  }, [clearOperation, phase, recording, selection]);
+  }, [
+    clearOperation,
+    phase,
+    recording,
+    selection,
+    setComparison,
+    setCompletedStepCount,
+    setEditBase,
+    setEditBaseMetadata,
+    setEditBaseProvenance,
+    setMessage,
+    setPhase,
+    setResultHasServerApprovedVisual,
+    setResultMetadata,
+    setStep,
+    setVoiceSelection,
+  ]);
 
   const setVtonInputKind = useCallback(
     (
@@ -1145,7 +1462,7 @@ export const useExistingVideoWorkflow = ({
       });
       setMessage(null);
     },
-    [],
+    [setMessage, setStep],
   );
 
   const editSelected = useCallback(() => {
@@ -1182,6 +1499,14 @@ export const useExistingVideoWorkflow = ({
     resultHasServerApprovedVisual,
     resultMetadata,
     selection,
+    setCompletedStepCount,
+    setEditBase,
+    setEditBaseMetadata,
+    setEditBaseProvenance,
+    setMessage,
+    setPhase,
+    setStep,
+    setVoiceSelection,
   ]);
 
   const currentMetadata =
@@ -1212,7 +1537,7 @@ export const useExistingVideoWorkflow = ({
     updateElapsed();
     const timer = window.setInterval(updateElapsed, 1_000);
     return () => window.clearInterval(timer);
-  }, [phase, trackingElapsedTime]);
+  }, [phase, setElapsedSeconds, trackingElapsedTime]);
 
   return useMemo(
     () => ({
@@ -1223,6 +1548,7 @@ export const useExistingVideoWorkflow = ({
       status,
       completedStepCount,
       acceptedSubmission,
+      submissionOperation,
       pendingVisual,
       retryJob,
       original: recording.original,
@@ -1267,6 +1593,7 @@ export const useExistingVideoWorkflow = ({
     }),
     [
       acceptedSubmission,
+      submissionOperation,
       addStep,
       cancelBeforeAcceptance,
       completedStepCount,
@@ -1298,6 +1625,8 @@ export const useExistingVideoWorkflow = ({
       adoptRecordedArtifact,
       replaceSource,
       selection,
+      setComparison,
+      setVoiceSelection,
       status,
       steps,
       submitStep,

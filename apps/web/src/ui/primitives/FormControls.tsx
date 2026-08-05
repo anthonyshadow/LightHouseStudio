@@ -1,5 +1,11 @@
 import { useTheme, type CSSObject } from '@emotion/react';
-import { forwardRef, useId, type InputHTMLAttributes, type TextareaHTMLAttributes } from 'react';
+import {
+  forwardRef,
+  useId,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type TextareaHTMLAttributes,
+} from 'react';
 import { controlStyles, fieldRootStyles, labelStyles, messageStyles } from './FormControl.styles';
 
 interface SharedFieldProps {
@@ -29,13 +35,29 @@ const resolveFieldIds = (
   return { id, messageId: hasMessage ? `${id}-message` : undefined };
 };
 
-export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
-  { id: providedId, label, hint, error, required, ...props },
-  ref,
-) {
+interface FieldFrameProps extends SharedFieldProps {
+  providedId?: string | undefined;
+  required?: boolean | undefined;
+  renderControl: (options: {
+    id: string;
+    messageId: string | undefined;
+    invalid: boolean;
+    controlCss: CSSObject;
+  }) => ReactNode;
+}
+
+const FieldFrame = ({
+  providedId,
+  label,
+  hint,
+  error,
+  required,
+  renderControl,
+}: FieldFrameProps) => {
   const theme = useTheme();
   const generatedId = useId();
   const { id, messageId } = resolveFieldIds(providedId, generatedId, Boolean(error || hint));
+  const invalid = Boolean(error);
 
   return (
     <div css={fieldRootStyles(theme)}>
@@ -43,59 +65,63 @@ export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function T
         <span>{label}</span>
         {required ? <span aria-hidden="true">Required</span> : null}
       </label>
-      <input
-        ref={ref}
-        id={id}
-        required={required}
-        aria-invalid={Boolean(error)}
-        aria-describedby={messageId}
-        css={controlStyles(theme, Boolean(error))}
-        {...props}
-      />
+      {renderControl({ id, messageId, invalid, controlCss: controlStyles(theme, invalid) })}
       {error || hint ? (
-        <p
-          id={messageId}
-          role={error ? 'alert' : undefined}
-          css={messageStyles(theme, Boolean(error))}
-        >
+        <p id={messageId} role={error ? 'alert' : undefined} css={messageStyles(theme, invalid)}>
           {error ?? hint}
         </p>
       ) : null}
     </div>
   );
+};
+
+export const TextField = forwardRef<HTMLInputElement, TextFieldProps>(function TextField(
+  { id: providedId, label, hint, error, required, ...props },
+  ref,
+) {
+  return (
+    <FieldFrame
+      providedId={providedId}
+      label={label}
+      hint={hint}
+      error={error}
+      required={required}
+      renderControl={({ id, messageId, invalid, controlCss }) => (
+        <input
+          ref={ref}
+          id={id}
+          required={required}
+          aria-invalid={invalid}
+          aria-describedby={messageId}
+          css={controlCss}
+          {...props}
+        />
+      )}
+    />
+  );
 });
 
 export const TextAreaField = forwardRef<HTMLTextAreaElement, TextAreaFieldProps>(
   function TextAreaField({ id: providedId, label, hint, error, required, ...props }, ref) {
-    const theme = useTheme();
-    const generatedId = useId();
-    const { id, messageId } = resolveFieldIds(providedId, generatedId, Boolean(error || hint));
-
     return (
-      <div css={fieldRootStyles(theme)}>
-        <label htmlFor={id} css={labelStyles(theme)}>
-          <span>{label}</span>
-          {required ? <span aria-hidden="true">Required</span> : null}
-        </label>
-        <textarea
-          ref={ref}
-          id={id}
-          required={required}
-          aria-invalid={Boolean(error)}
-          aria-describedby={messageId}
-          css={[controlStyles(theme, Boolean(error)), textareaStyles()]}
-          {...props}
-        />
-        {error || hint ? (
-          <p
-            id={messageId}
-            role={error ? 'alert' : undefined}
-            css={messageStyles(theme, Boolean(error))}
-          >
-            {error ?? hint}
-          </p>
-        ) : null}
-      </div>
+      <FieldFrame
+        providedId={providedId}
+        label={label}
+        hint={hint}
+        error={error}
+        required={required}
+        renderControl={({ id, messageId, invalid, controlCss }) => (
+          <textarea
+            ref={ref}
+            id={id}
+            required={required}
+            aria-invalid={invalid}
+            aria-describedby={messageId}
+            css={[controlCss, textareaStyles()]}
+            {...props}
+          />
+        )}
+      />
     );
   },
 );

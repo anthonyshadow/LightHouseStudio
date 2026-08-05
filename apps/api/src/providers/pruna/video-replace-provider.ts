@@ -6,7 +6,10 @@ import { z } from 'zod';
 import { VIDEO_RESULT_MAX_BYTES } from '@studio/contracts';
 import { imageFileExtension, type ImageMimeType } from '@studio/domain';
 import { PRUNA_VIDEO_REPLACE_MODEL } from '../../config/environment.js';
-import { readBoundedJson } from '../transport/bounded-provider-transport.js';
+import {
+  authenticatedProviderFetch,
+  readBoundedJson,
+} from '../transport/bounded-provider-transport.js';
 import {
   type ExistingVideoJobProvider,
   VideoJobProviderError,
@@ -144,8 +147,12 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
   ): Promise<unknown> {
     const request = requestSignal(callerSignal, timeoutMs);
     try {
-      const response = await this.#fetch(url, { ...init, signal: request.signal });
+      const response = await authenticatedProviderFetch(this.#fetch, url, {
+        ...init,
+        signal: request.signal,
+      });
       if (!response.ok) {
+        void response.body?.cancel().catch(() => undefined);
         warnForUpstreamHttpFailure(response.status);
         throw new VideoJobProviderError(
           videoJobFailureReasonForHttpStatus(response.status),
@@ -297,11 +304,12 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
     const url = providerUrl(outputLocation, `${PRUNA_PREDICTIONS_PATH}/delivery/`);
     const request = requestSignal(signal, this.#timeouts.downloadMs);
     try {
-      const response = await this.#fetch(url, {
+      const response = await authenticatedProviderFetch(this.#fetch, url, {
         headers: { apikey: this.#apiKey },
         signal: request.signal,
       });
       if (!response.ok) {
+        void response.body?.cancel().catch(() => undefined);
         warnForUpstreamHttpFailure(response.status);
         throw new VideoJobProviderError(
           videoJobFailureReasonForHttpStatus(response.status),
@@ -310,10 +318,12 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
       }
       if (!response.body) throw new VideoJobProviderError('invalid-response', response.status);
       if (response.headers.get('content-type')?.split(';', 1)[0]?.trim() !== 'video/mp4') {
+        void response.body.cancel().catch(() => undefined);
         throw new VideoJobProviderError('invalid-response', response.status);
       }
       const declaredSize = Number(response.headers.get('content-length'));
       if (Number.isFinite(declaredSize) && declaredSize > VIDEO_RESULT_MAX_BYTES) {
+        void response.body.cancel().catch(() => undefined);
         throw new VideoJobProviderError('result-too-large');
       }
       const output = createWriteStream(destinationPath, { flags: 'wx', mode: 0o600 });

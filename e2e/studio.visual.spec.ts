@@ -17,14 +17,11 @@ import {
   startLocalPreview,
   type NetworkJourneyState,
 } from './support/studioHarness';
+import { REFERENCE_PNG } from './support/mediaFixtures';
 import { VISUAL_CASE_MATRIX, type VisualScenarioId } from './studioVisualMatrix';
 
 const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
 const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
-const REFERENCE_PNG = Buffer.from(
-  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=',
-  'base64',
-);
 const SEEDED_CHARACTER_STORE = {
   schemaVersion: 6,
   savedPrompts: [],
@@ -391,16 +388,6 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         'data-stage-aspect-ratio',
         switchedAspectRatio,
       );
-    },
-  },
-  'ai-experience-choice': {
-    id: 'ai-experience-choice',
-    setup: async (page) => {
-      const controls = page.getByLabel('Studio session controls');
-      await controls.getByRole('button', { name: 'Record New Video' }).click();
-      await expect(page.getByLabel('Live local camera preview')).toBeVisible();
-      await controls.getByRole('button', { name: 'Start AI' }).click();
-      await expect(page.getByRole('dialog', { name: 'Choose live AI experience' })).toBeVisible();
     },
   },
   'selected-character-ai-live': {

@@ -12,7 +12,7 @@ import {
   ExistingVideoRecipeChooser,
   type ExistingVideoSavedRecipe,
 } from './ExistingVideoRecipeChooser';
-import { ExistingVideoReferenceField } from './ExistingVideoReferenceField';
+import { ReferenceImageInputField } from '../reference-images/ReferenceImageInputField';
 import type { ExistingVideoStep } from './useExistingVideoWorkflow';
 
 export type RecentOutfit = Readonly<{ id: string; file: File }>;
@@ -250,8 +250,8 @@ export const ExistingVideoVisualEditor = ({
       ) : null}
 
       {step.modelId === 'lucy-latest' || step.inputKind === 'reference-image' ? (
-        <ExistingVideoReferenceField
-          modelId={step.modelId}
+        <ReferenceImageInputField
+          kind={step.modelId === 'lucy-latest' ? 'character' : 'garment'}
           file={step.referenceImage}
           disabled={recipeLocked}
           allowUrlImport

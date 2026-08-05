@@ -131,6 +131,10 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
         : contract.spec,
     [contract.spec, cropMode],
   );
+  const previewSpecRef = useRef(previewSpec);
+  useEffect(() => {
+    previewSpecRef.current = previewSpec;
+  }, [previewSpec]);
   const previewScale = Math.min(1, 1280 / Math.max(displayGeometry.width, displayGeometry.height));
   const trimStartMs = contract.spec.trim.startMs;
   const trimEndMs = contract.spec.trim.endMs;
@@ -153,7 +157,7 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
     const render = () => {
       if (video.readyState >= HTMLMediaElement.HAVE_CURRENT_DATA) {
         try {
-          renderer.render(video, previewSpec);
+          renderer.render(video, previewSpecRef.current);
         } catch {
           // A transient seek/frame gap is retried on the next animation frame.
         }
@@ -177,7 +181,6 @@ export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
     displayGeometry.height,
     displayGeometry.width,
     previewScale,
-    previewSpec,
     videoRef,
   ]);
 

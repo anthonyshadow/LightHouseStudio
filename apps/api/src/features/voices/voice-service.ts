@@ -9,6 +9,7 @@ import { ProviderError } from '../../providers/provider-error.js';
 import type {
   ElevenLabsModel,
   ElevenLabsProvider,
+  VoiceConversionAudio,
   ProviderVoice,
 } from '../../providers/elevenlabs/types.js';
 import { VoiceServiceError } from './voice-service-error.js';
@@ -119,7 +120,7 @@ export class VoiceService {
 
   async convertRecording(input: {
     readonly voiceId: string;
-    readonly audio: Uint8Array;
+    readonly audio: VoiceConversionAudio;
     readonly mimeType: VoiceConversionContentType;
     readonly signal: AbortSignal;
   }): Promise<AudioStream> {

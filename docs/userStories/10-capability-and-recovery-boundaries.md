@@ -41,6 +41,5 @@ recovery path without risking a valid artifact.
 
 ## Evidence status
 
-Configuration truth and independent degradation are automated. Live provider capability and the
-controlled-pilot physical/browser matrix remain unqualified until the release evidence gate
-passes.
+Configuration truth and independent degradation are automated. Live provider capability and
+physical/browser behavior require the separate live and manual procedures.

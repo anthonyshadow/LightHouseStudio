@@ -3,15 +3,13 @@ import type { IncomingMessage } from 'node:http';
 import type { request as httpsRequest, RequestOptions } from 'node:https';
 import { Readable } from 'node:stream';
 import { describe, expect, it, vi } from 'vitest';
-import { SafeBflImageDownloader, isPublicImageAddress } from '../bfl/safe-image-downloader.js';
-import {
-  SafeWiroImageDownloader,
-  isPublicWiroImageAddress,
-} from '../wiro/safe-image-downloader.js';
+import { SafeBflImageDownloader } from '../bfl/safe-image-downloader.js';
+import { SafeWiroImageDownloader } from '../wiro/safe-image-downloader.js';
 import {
   MAX_PROVIDER_IMAGE_BYTES,
   type ReferenceImageMimeType,
 } from './reference-image-provider.js';
+import { isPublicRemoteImageAddress } from '../transport/safe-remote-image-downloader.js';
 
 interface ResolvedImageAddress {
   readonly address: string;
@@ -45,12 +43,12 @@ const contracts: readonly DownloaderContract[] = [
   {
     providerId: 'bfl',
     create: (options) => new SafeBflImageDownloader(options),
-    isPublicAddress: isPublicImageAddress,
+    isPublicAddress: isPublicRemoteImageAddress,
   },
   {
     providerId: 'wiro',
     create: (options) => new SafeWiroImageDownloader(options),
-    isPublicAddress: isPublicWiroImageAddress,
+    isPublicAddress: isPublicRemoteImageAddress,
   },
 ];
 

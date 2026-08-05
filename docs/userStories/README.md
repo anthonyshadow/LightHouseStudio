@@ -5,21 +5,21 @@ references, not release-readiness claims or future requirements.
 
 ## Journeys
 
-| Flow                                                 | Story                                                                                      |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| Record or upload, then edit and download             | [Existing video and single visual processing](12-existing-video-and-ordered-processing.md) |
-| Trim, crop, relight, filter, and replace a source    | [Local non-destructive video editing](13-local-video-editing.md)                           |
-| Choose camera, microphone, local format, and quality | [Configure capture settings](01-configure-capture-settings.md)                             |
-| Preview and record without provider work             | [Local camera capture](02-local-camera-capture.md)                                         |
-| Run and record live Lucy 2.5                         | [Character AI session](03-character-ai-session.md)                                         |
-| Run and record live VTON 3                           | [Virtual try-on session](04-virtual-try-on-session.md)                                     |
-| Build Add, Replace, or Restyle directions            | [Structured prompt workshop](05-structured-prompt-workshop.md)                             |
-| Save and reuse recipes                               | [Recipe Shelf](06-recipe-shelf.md)                                                         |
-| Review, download, and release a take                 | [Take review and cleanup](07-take-review-and-cleanup.md)                                   |
-| Apply browser-local voice effects                    | [Local voice treatments](08-local-voice-treatments.md)                                     |
-| Apply a saved ElevenLabs voice                       | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                               |
-| Recover from missing capabilities                    | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md)             |
-| Build and preload a reusable character               | [Studio character builder](11-studio-character-builder.md)                                 |
+| Flow                                                 | Story                                                                          |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------ |
+| Record or upload, then edit and download             | [Existing video processing](12-existing-video-processing.md)                   |
+| Trim, crop, relight, filter, and replace a source    | [Local non-destructive video editing](13-local-video-editing.md)               |
+| Choose camera, microphone, local format, and quality | [Configure capture settings](01-configure-capture-settings.md)                 |
+| Preview and record without provider work             | [Local camera capture](02-local-camera-capture.md)                             |
+| Run and record live Lucy 2.5                         | [Character AI session](03-character-ai-session.md)                             |
+| Run and record live VTON 3                           | [Virtual try-on session](04-virtual-try-on-session.md)                         |
+| Build Add, Replace, or Restyle directions            | [Structured prompt workshop](05-structured-prompt-workshop.md)                 |
+| Save and reuse recipes                               | [Recipe Shelf](06-recipe-shelf.md)                                             |
+| Review, download, and release a take                 | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
+| Apply browser-local voice effects                    | [Local voice treatments](08-local-voice-treatments.md)                         |
+| Apply a saved ElevenLabs voice                       | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
+| Recover from missing capabilities                    | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md) |
+| Build and preload a reusable character               | [Studio character builder](11-studio-character-builder.md)                     |
 
 ## Shared runtime rules
 
@@ -57,6 +57,5 @@ Deterministic tests cover the implemented journeys, including synthetic provider
 cases. The [testing strategy](../TESTING.md) maps those critical journeys to the smallest useful
 domain, controller, API, browser, or visual layer. It does not qualify physical devices,
 accessibility tools, codecs, memory behavior, live provider entitlement/output, or cleanup.
-Controlled-pilot support remains blocked until the exact release candidate satisfies the
-[qualification evidence gate](../PILOT_QUALIFICATION_EVIDENCE.md) and
-[release contract](../CONTROLLED_PILOT_RELEASE_CONTRACT.md).
+Use [Manual QA](../MANUAL_QA.md) and the authorized
+[live-provider procedure](../LIVE_PROVIDER_SMOKE.md) for those environment-dependent checks.

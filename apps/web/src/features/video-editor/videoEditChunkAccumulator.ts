@@ -2,7 +2,7 @@ export const MAXIMUM_VIDEO_EDIT_OUTPUT_BYTES = 300_000_000;
 export const VIDEO_EDIT_OUTPUT_BLOCK_BYTES = 4 * 1024 * 1024;
 
 export class VideoEditChunkAccumulator {
-  private readonly blocks = new Map<number, Uint8Array>();
+  private readonly blocks = new Map<number, Uint8Array<ArrayBuffer>>();
   private size = 0;
 
   write(data: Uint8Array, position: number): void {
@@ -37,8 +37,7 @@ export class VideoEditChunkAccumulator {
       const remaining = this.size - index * VIDEO_EDIT_OUTPUT_BLOCK_BYTES;
       const length = Math.min(VIDEO_EDIT_OUTPUT_BLOCK_BYTES, remaining);
       const block = this.blocks.get(index) ?? new Uint8Array(length);
-      const part = block.byteLength === length ? block : block.subarray(0, length);
-      parts.push(Uint8Array.from(part).buffer);
+      parts.push(block.byteLength === length ? block : block.subarray(0, length));
     }
     return new Blob(parts, { type });
   }

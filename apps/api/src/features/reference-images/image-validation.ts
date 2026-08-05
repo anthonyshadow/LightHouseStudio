@@ -6,6 +6,7 @@ import {
 } from '@studio/contracts';
 import type { ImageMimeType } from '@studio/domain';
 import sharp from 'sharp';
+import { imageDecodeAdmission } from '../../application/cpu-admission-queue.js';
 import {
   dimensionsForReferenceImageSize,
   MAX_PROVIDER_IMAGE_BYTES,
@@ -86,7 +87,7 @@ const inspectImage = async (
   }
 };
 
-export const validateReferenceImageBytes = async (
+const validateReferenceImageBytesWithoutAdmission = async (
   providerBytes: Uint8Array,
   expectedSize: ReferenceImageSize = '1024x1024',
   declaredMimeType?: ValidReferenceImageMimeType,
@@ -133,7 +134,19 @@ export const validateReferenceImageBytes = async (
   };
 };
 
-export const validateUploadedReferenceImage = async (
+export const validateReferenceImageBytes = (
+  providerBytes: Uint8Array,
+  expectedSize: ReferenceImageSize = '1024x1024',
+  declaredMimeType?: ValidReferenceImageMimeType,
+  signal?: AbortSignal,
+): Promise<ValidatedReferenceImage> =>
+  imageDecodeAdmission.run(
+    () =>
+      validateReferenceImageBytesWithoutAdmission(providerBytes, expectedSize, declaredMimeType),
+    signal,
+  );
+
+const validateUploadedReferenceImageWithoutAdmission = async (
   bytes: Buffer,
   declaredMimeType: ValidReferenceImageMimeType,
 ): Promise<ValidatedUploadedReferenceImage> => {
@@ -185,3 +198,13 @@ export const validateUploadedReferenceImage = async (
     );
   }
 };
+
+export const validateUploadedReferenceImage = (
+  bytes: Buffer,
+  declaredMimeType: ValidReferenceImageMimeType,
+  signal?: AbortSignal,
+): Promise<ValidatedUploadedReferenceImage> =>
+  imageDecodeAdmission.run(
+    () => validateUploadedReferenceImageWithoutAdmission(bytes, declaredMimeType),
+    signal,
+  );

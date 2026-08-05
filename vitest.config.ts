@@ -11,7 +11,12 @@ export default defineConfig({
     },
   },
   test: {
-    include: ['apps/**/*.test.{ts,tsx}', 'packages/**/*.test.ts', 'scripts/**/*.test.mjs'],
+    include: [
+      'apps/**/*.test.{ts,tsx}',
+      'packages/**/*.test.ts',
+      'scripts/**/*.test.mjs',
+      'e2e/**/*.test.ts',
+    ],
     setupFiles: ['./vitest.setup.ts'],
     ...(process.env.CI
       ? {

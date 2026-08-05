@@ -1,18 +1,15 @@
-# Gated live provider smoke
+# Live provider smoke
 
 Live checks are manual, opt-in, cost-bearing, and excluded from normal test/quality commands.
-Current repository evidence is `0/12`; no provider/local row is qualified.
 
 Use only authorized, least-privilege test credentials, non-sensitive disposable media, understood
 account retention/quota, and an approved spend. Never run this procedure in CI, Storybook,
-screenshots, ordinary tests, shared environments, or with a participant where the
-[release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) prohibits it.
+screenshots, ordinary tests, or shared environments.
 
 ## Preflight
 
 1. Run deterministic release gates, including `pnpm quality` and `pnpm test:e2e`.
-2. Record the generic Credential Custodian, Billing Authorizer, Evidence Recorder, and Support &
-   Escalation Owner roles for this pass.
+2. Confirm the person running the check is authorized to use the credentials and approve spend.
 3. Review current account model availability, pricing, quota, content policy, and retention. Stop
    if they differ from the approved configuration.
 4. Configure only the provider under test using repository-root `.env` and `.env.example`; restart
@@ -41,7 +38,7 @@ provider bodies, signed/polling URLs, personal media, or full network archives.
 | ElevenLabs        | Saved voices, `eleven_multilingual_sts_v2`, `ELEVENLABS_ENABLE_LOGGING=false`    |
 | OpenAI image      | Optimizer `gpt-5.6`/`medium`; image `gpt-image-2`/`high`                         |
 | BFL image         | `flux-2-pro`, safety `2`, prompt upsampling off                                  |
-| Wiro image        | `seedream-v5-lite-uncensored`, 2k, watermark off, operator qualification         |
+| Wiro image        | `seedream-v5-lite-uncensored`, 2k, watermark off                                 |
 
 Reference image providers require three separate server startups; there is no fallback.
 
@@ -136,8 +133,8 @@ with configured fields and confirm the topmost warning preserves everything on c
 the previous visual fields on confirmation, and leaves configured Voice untouched. Verify there is
 still only one active visual recipe and one submitted operation.
 
-Each batch submission must remain explicit and operator-approved; there is no participant-total or
-per-operation submission-count cap. Broker restart, the immutable accepted-at-plus-60-minute
+Each batch submission must remain explicit and operator-approved; the runtime imposes no separate
+program-level submission-count cap. Broker restart, the immutable accepted-at-plus-60-minute
 deadline, ambiguous responses, unavailable
 credentials, and background/foreground recovery must fail safely without automatic resubmission.
 Deterministic lifecycle coverage does not qualify the live row: record the exact candidate's
@@ -238,7 +235,7 @@ and [asynchronous workflow](https://docs.api.pruna.ai/guides/quickstart) before 
    second prediction. Reuse that ID with a different person or garment and confirm conflict before
    provider contact. Verify another loopback owner cannot reference either input.
 
-Automated fake-transport coverage is not live qualification. No live Pruna try-on call is part of
+Automated fake-transport coverage is not live validation. No live Pruna try-on call is part of
 ordinary tests, screenshots, E2E, or this implementation change.
 
 ## Reference image providers
@@ -294,10 +291,9 @@ Wiro cleanup failure fails the check.
 Confirm the configured `ELEVENLABS_ENABLE_LOGGING` choice matches the reviewed account retention
 setting. A zero-retention request may require an eligible provider account.
 
-## Evidence and cleanup
+## Results and cleanup
 
-Record only content-free outcomes. The former pilot evidence validator has been removed and is not
-a current release gate.
+Record only content-free outcomes in the release review notes.
 
 After each pass, Stop AI/camera, release or discard test takes, close Studio, verify media/WebRTC
 indicators are gone, remove credentials when no longer needed, and restart to confirm optional

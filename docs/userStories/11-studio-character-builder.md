@@ -78,8 +78,8 @@ erasing existing choices.
   as the generated reference until regenerated; valid prompt/upload save paths remain.
 - **Regenerate** supports a fresh generation/composition or an instructed edit from the matching
   immutable source.
-- Participant-mode Wiro generation is disabled. Wiro is reserved for an explicit operator
-  qualification pass.
+- Wiro availability follows startup configuration. There is no second runtime access-mode layer;
+  live use still requires an explicitly authorized, cost-bearing check.
 - Saved Character Wardrobe can delete an individual variant after confirmation. The variant,
   selected-version relationship, and Recent attribution links are removed; immutable source and
   result image bytes remain. **Change Features** preserves the selected character by default. The
@@ -106,5 +106,5 @@ garbage-collection flow.
 Create/edit, all save variants, draft restore/reset, stale preview, optimizer fallback, combined
 generation, regeneration/edit, idempotent save, and responsive single-preview behavior have
 automated coverage. Live OpenAI/BFL/Wiro work, physical touch/mobile, assistive technology,
-retention cleanup, and provider-output qualification remain manual validation areas, not runtime
+retention cleanup, and provider-output quality remain manual validation areas, not runtime
 feature gates.

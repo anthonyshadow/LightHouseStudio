@@ -1,57 +1,83 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useReducer, useRef } from 'react';
 import { revokeArtifactUrl } from '../../features/recording/recordingHelpers';
 import type {
   RecordingArtifact,
   RecordingAudioSidecar,
   RecordingProcessingOperation,
   RestorePersistedOriginalInput,
-  VoiceProcessingState,
 } from '../../features/recording/types';
 import {
   createPersistedOriginalRecording,
   createProcessedRecordingArtifact,
   IDLE_AUDIO_SIDECAR,
 } from './recordingArtifacts';
+import {
+  initialRecordingArtifactState,
+  recordingArtifactReducer,
+  type RecordingArtifactAction,
+  type RecordingArtifactState,
+} from './recordingArtifactState';
+
+const artifactSlots = ['original', 'visual', 'processed'] as const;
+
+const removedArtifacts = (
+  current: RecordingArtifactState,
+  next: RecordingArtifactState,
+): RecordingArtifact[] => {
+  const retainedUrls = new Set(
+    artifactSlots
+      .map((slot) => next[slot]?.objectUrl)
+      .filter((url): url is string => url !== undefined),
+  );
+  return artifactSlots
+    .map((slot) => current[slot])
+    .filter(
+      (artifact): artifact is RecordingArtifact =>
+        artifact !== null && !retainedUrls.has(artifact.objectUrl),
+    );
+};
 
 export const useRecordingArtifacts = () => {
-  const [original, setOriginal] = useState<RecordingArtifact | null>(null);
-  const [visual, setVisual] = useState<RecordingArtifact | null>(null);
-  const [processed, setProcessed] = useState<RecordingArtifact | null>(null);
-  const [sidecar, setSidecar] = useState<RecordingAudioSidecar>(IDLE_AUDIO_SIDECAR);
-  const [recordingError, setRecordingError] = useState<string | null>(null);
-  const [processingState, setProcessingState] = useState<VoiceProcessingState>('idle');
-  const [processingOperation, setProcessingOperation] =
-    useState<RecordingProcessingOperation | null>(null);
-  const [processingError, setProcessingError] = useState<string | null>(null);
-  const [downloaded, setDownloaded] = useState(false);
+  const [state, dispatch] = useReducer(recordingArtifactReducer, initialRecordingArtifactState);
+  const stateRef = useRef(state);
   const originalRef = useRef<RecordingArtifact | null>(null);
   const visualRef = useRef<RecordingArtifact | null>(null);
   const processedRef = useRef<RecordingArtifact | null>(null);
+  const pendingRevocationsRef = useRef<RecordingArtifact[]>([]);
   const repairedPlaybackArtifactIdRef = useRef<string | null>(null);
 
+  const transition = useCallback((action: RecordingArtifactAction) => {
+    const next = recordingArtifactReducer(stateRef.current, action);
+    pendingRevocationsRef.current.push(...removedArtifacts(stateRef.current, next));
+    stateRef.current = next;
+    originalRef.current = next.original;
+    visualRef.current = next.visual;
+    processedRef.current = next.processed;
+    dispatch(action);
+  }, []);
+
+  useEffect(() => {
+    const retainedUrls = new Set(
+      artifactSlots
+        .map((slot) => state[slot]?.objectUrl)
+        .filter((url): url is string => url !== undefined),
+    );
+    const pending = pendingRevocationsRef.current;
+    pendingRevocationsRef.current = [];
+    const revoked = new Set<string>();
+    for (const artifact of pending) {
+      if (retainedUrls.has(artifact.objectUrl) || revoked.has(artifact.objectUrl)) continue;
+      revoked.add(artifact.objectUrl);
+      revokeArtifactUrl(artifact, 'replacement');
+    }
+  }, [state]);
+
   const publishOriginal = useCallback(
-    (artifact: RecordingArtifact, nextSidecar: RecordingAudioSidecar) => {
-      const previousOriginal = originalRef.current;
-      const previousVisual = visualRef.current;
-      const previousProcessed = processedRef.current;
-      originalRef.current = artifact;
-      visualRef.current = null;
-      processedRef.current = null;
+    (artifact: RecordingArtifact, sidecar: RecordingAudioSidecar) => {
       repairedPlaybackArtifactIdRef.current = null;
-      setOriginal(artifact);
-      setVisual(null);
-      setProcessed(null);
-      setSidecar(nextSidecar);
-      setRecordingError(null);
-      setProcessingState('idle');
-      setProcessingOperation(null);
-      setProcessingError(null);
-      setDownloaded(false);
-      revokeArtifactUrl(previousProcessed, 'replacement');
-      revokeArtifactUrl(previousVisual, 'replacement');
-      revokeArtifactUrl(previousOriginal, 'replacement');
+      transition({ type: 'publish-original', artifact, sidecar });
     },
-    [],
+    [transition],
   );
 
   const restorePersistedOriginal = useCallback(
@@ -69,23 +95,9 @@ export const useRecordingArtifacts = () => {
   );
 
   const discardArtifacts = useCallback(() => {
-    revokeArtifactUrl(originalRef.current, 'discard');
-    revokeArtifactUrl(visualRef.current, 'discard');
-    revokeArtifactUrl(processedRef.current, 'discard');
-    originalRef.current = null;
-    visualRef.current = null;
-    processedRef.current = null;
     repairedPlaybackArtifactIdRef.current = null;
-    setOriginal(null);
-    setVisual(null);
-    setProcessed(null);
-    setSidecar(IDLE_AUDIO_SIDECAR);
-    setRecordingError(null);
-    setProcessingState('idle');
-    setProcessingOperation(null);
-    setProcessingError(null);
-    setDownloaded(false);
-  }, []);
+    transition({ type: 'discard' });
+  }, [transition]);
 
   const completeVisualProcessing = useCallback(
     (
@@ -94,23 +106,14 @@ export const useRecordingArtifacts = () => {
       label: string,
       explicitSource?: RecordingArtifact,
     ): RecordingArtifact => {
-      const source = explicitSource ?? originalRef.current;
+      const source = explicitSource ?? stateRef.current.original;
       if (!source) throw new Error('Original recording is unavailable.');
       const artifact = createProcessedRecordingArtifact(source, blob, mimeType, label);
-      revokeArtifactUrl(visualRef.current, 'replacement');
-      revokeArtifactUrl(processedRef.current, 'replacement');
-      visualRef.current = artifact;
-      processedRef.current = null;
       repairedPlaybackArtifactIdRef.current = null;
-      setVisual(artifact);
-      setProcessed(null);
-      setProcessingState('ready');
-      setProcessingOperation(null);
-      setProcessingError(null);
-      setDownloaded(false);
+      transition({ type: 'complete-visual', artifact });
       return artifact;
     },
-    [],
+    [transition],
   );
 
   const completeProcessing = useCallback(
@@ -121,119 +124,102 @@ export const useRecordingArtifacts = () => {
       explicitSource?: RecordingArtifact,
       replaceExistingResult = false,
     ): RecordingArtifact => {
-      const source = explicitSource ?? visualRef.current ?? originalRef.current;
+      const source = explicitSource ?? stateRef.current.visual ?? stateRef.current.original;
       if (!source) throw new Error('Original recording is unavailable.');
       const artifact = createProcessedRecordingArtifact(source, blob, mimeType, label);
-      if (replaceExistingResult) {
-        revokeArtifactUrl(visualRef.current, 'replacement');
-        visualRef.current = null;
-        setVisual(null);
-      }
-      revokeArtifactUrl(processedRef.current, 'replacement');
-      processedRef.current = artifact;
       repairedPlaybackArtifactIdRef.current = null;
-      setProcessed(artifact);
-      setProcessingState('ready');
-      setProcessingOperation(null);
-      setProcessingError(null);
-      setDownloaded(false);
+      transition({
+        type: 'complete-processing',
+        artifact,
+        replaceVisual: replaceExistingResult,
+      });
       return artifact;
     },
-    [],
+    [transition],
   );
 
-  const restoreOriginal = useCallback(() => {
-    revokeArtifactUrl(processedRef.current, 'replacement');
-    processedRef.current = null;
-    setProcessed(null);
-    setProcessingState('idle');
-    setProcessingOperation(null);
-    setProcessingError(null);
-    setDownloaded(false);
-  }, []);
+  const restoreOriginal = useCallback(() => transition({ type: 'restore-original' }), [transition]);
 
-  const clearVisualProcessing = useCallback(() => {
-    revokeArtifactUrl(visualRef.current, 'replacement');
-    revokeArtifactUrl(processedRef.current, 'replacement');
-    visualRef.current = null;
-    processedRef.current = null;
-    setVisual(null);
-    setProcessed(null);
-    setProcessingState('idle');
-    setProcessingOperation(null);
-    setProcessingError(null);
-    setDownloaded(false);
-  }, []);
+  const clearVisualProcessing = useCallback(
+    () => transition({ type: 'clear-visual' }),
+    [transition],
+  );
 
-  const markSidecarRecording = useCallback((started: boolean, error: string | null) => {
-    setSidecar(
-      started
-        ? { ...IDLE_AUDIO_SIDECAR, state: 'recording' }
-        : error
-          ? { ...IDLE_AUDIO_SIDECAR, state: 'error', error }
-          : IDLE_AUDIO_SIDECAR,
-    );
-  }, []);
+  const markSidecarRecording = useCallback(
+    (started: boolean, error: string | null) => {
+      transition({
+        type: 'set-sidecar',
+        sidecar: started
+          ? { ...IDLE_AUDIO_SIDECAR, state: 'recording' }
+          : error
+            ? { ...IDLE_AUDIO_SIDECAR, state: 'error', error }
+            : IDLE_AUDIO_SIDECAR,
+      });
+    },
+    [transition],
+  );
 
-  const failSidecar = useCallback((message: string) => {
-    setSidecar({ ...IDLE_AUDIO_SIDECAR, state: 'error', error: message });
-  }, []);
+  const failSidecar = useCallback(
+    (message: string) =>
+      transition({
+        type: 'set-sidecar',
+        sidecar: { ...IDLE_AUDIO_SIDECAR, state: 'error', error: message },
+      }),
+    [transition],
+  );
 
-  const clearRecordingError = useCallback(() => setRecordingError(null), []);
-  const reportRecordingError = useCallback((message: string) => setRecordingError(message), []);
-  const markDownloaded = useCallback(() => setDownloaded(true), []);
-  const beginProcessing = useCallback((operation?: RecordingProcessingOperation) => {
-    setProcessingState('processing');
-    setProcessingOperation(
-      operation ?? {
-        kind: 'voice-composition',
-        title: 'Processing video…',
-        detail: 'Playback is paused until a complete replacement is ready.',
-      },
-    );
-    setProcessingError(null);
-  }, []);
-  const cancelProcessing = useCallback(() => {
-    setProcessingState(processedRef.current ? 'ready' : 'idle');
-    setProcessingOperation(null);
-    setProcessingError(null);
-  }, []);
-  const failProcessing = useCallback((message: string) => {
-    setProcessingState('error');
-    setProcessingOperation(null);
-    setProcessingError(message);
-  }, []);
+  const clearRecordingError = useCallback(
+    () => transition({ type: 'set-recording-error', message: null }),
+    [transition],
+  );
+  const reportRecordingError = useCallback(
+    (message: string) => transition({ type: 'set-recording-error', message }),
+    [transition],
+  );
+  const markDownloaded = useCallback(() => transition({ type: 'mark-downloaded' }), [transition]);
+  const beginProcessing = useCallback(
+    (operation?: RecordingProcessingOperation) =>
+      transition({
+        type: 'begin-processing',
+        operation: operation ?? {
+          kind: 'voice-composition',
+          title: 'Processing video…',
+          detail: 'Playback is paused until a complete replacement is ready.',
+        },
+      }),
+    [transition],
+  );
+  const cancelProcessing = useCallback(
+    () => transition({ type: 'cancel-processing' }),
+    [transition],
+  );
+  const failProcessing = useCallback(
+    (message: string) => transition({ type: 'fail-processing', message }),
+    [transition],
+  );
 
   const repairPresentedObjectUrl = useCallback((): boolean => {
-    const current = processedRef.current ?? visualRef.current ?? originalRef.current;
-    if (!current || repairedPlaybackArtifactIdRef.current === current.id) return false;
+    const current = stateRef.current;
+    const slot = current.processed ? 'processed' : current.visual ? 'visual' : 'original';
+    const artifact = current[slot];
+    if (!artifact || repairedPlaybackArtifactIdRef.current === artifact.id) return false;
 
     let objectUrl: string;
     try {
-      objectUrl = URL.createObjectURL(current.media);
+      objectUrl = URL.createObjectURL(artifact.media);
     } catch {
       return false;
     }
     if (!objectUrl) return false;
 
-    const repaired = { ...current, objectUrl };
-    repairedPlaybackArtifactIdRef.current = current.id;
-    if (processedRef.current?.id === current.id) {
-      processedRef.current = repaired;
-      setProcessed(repaired);
-    } else if (visualRef.current?.id === current.id) {
-      visualRef.current = repaired;
-      setVisual(repaired);
-    } else {
-      originalRef.current = repaired;
-      setOriginal(repaired);
-    }
+    repairedPlaybackArtifactIdRef.current = artifact.id;
+    transition({ type: 'repair-object-url', slot, artifact: { ...artifact, objectUrl } });
     return true;
-  }, []);
+  }, [transition]);
 
   useEffect(() => {
     const protectTake = (event: BeforeUnloadEvent) => {
-      if (!originalRef.current) return;
+      if (!stateRef.current.original) return;
       event.preventDefault();
       event.returnValue = '';
     };
@@ -243,24 +229,24 @@ export const useRecordingArtifacts = () => {
 
   useEffect(
     () => () => {
-      revokeArtifactUrl(originalRef.current, 'unmount');
-      revokeArtifactUrl(visualRef.current, 'unmount');
-      revokeArtifactUrl(processedRef.current, 'unmount');
+      const artifacts = [
+        ...pendingRevocationsRef.current,
+        ...artifactSlots.map((slot) => stateRef.current[slot]),
+      ];
+      const revoked = new Set<string>();
+      for (const artifact of artifacts) {
+        if (!artifact || revoked.has(artifact.objectUrl)) continue;
+        revoked.add(artifact.objectUrl);
+        revokeArtifactUrl(artifact, 'unmount');
+      }
+      pendingRevocationsRef.current = [];
     },
     [],
   );
 
   return useMemo(
     () => ({
-      original,
-      visual,
-      processed,
-      sidecar,
-      recordingError,
-      processingState,
-      processingOperation,
-      processingError,
-      downloaded,
+      ...state,
       originalRef,
       publishOriginal,
       restorePersistedOriginal,
@@ -280,15 +266,7 @@ export const useRecordingArtifacts = () => {
       restoreOriginal,
     }),
     [
-      original,
-      visual,
-      processed,
-      sidecar,
-      recordingError,
-      processingState,
-      processingOperation,
-      processingError,
-      downloaded,
+      state,
       publishOriginal,
       restorePersistedOriginal,
       discardArtifacts,

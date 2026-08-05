@@ -80,6 +80,7 @@ describe('ElevenLabsHttpProvider', () => {
     expect(requestedUrl(url)).toContain('search=warm+voice');
     expect(requestedUrl(url)).toContain('voice_type=saved');
     expect(new Headers(init?.headers).get('xi-api-key')).toBe('server-only-placeholder');
+    expect(init?.redirect).toBe('error');
   });
 
   it.each([

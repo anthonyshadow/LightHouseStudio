@@ -1,22 +1,15 @@
 # Project audit completed work
 
-This is a durable summary of implemented audit outcomes. It does not qualify the current release
-candidate; live, physical, accessibility, and exact-candidate gates remain in the
+This is a durable summary of implemented audit outcomes. Live, physical, accessibility, and
+exact-candidate validation remains in the
 [active plan](project-audit-implementation-plan.md).
 
-## 2026-07-28 — Release contract and audit baseline
+## 2026-07-28 — Audit baseline
 
-- Approved the moderated, loopback-only cohort, device/browser targets, independent 270/300-second
-  recording and Decart behavior, participant isolation/retirement, provider settings, content
-  policy, generic owners, operator limits, metrics, and escalation path.
-- Established the then-current Character-first hierarchy, Workshop as advanced, and touch/mobile
-  as required.
 - Audited architecture, product, UI/UX, provider boundaries, documentation, and tests.
 - Rebuilt the curated visual suite around meaningful current states, semantic readiness, five
   canonical viewports, deterministic fixtures, and Darwin/Linux baselines.
 - Removed obsolete Guided visuals and stale provider/current-state documentation.
-
-Authority: [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md).
 
 ## 2026-07-28 to 2026-07-29 — Journey and UI corrections
 
@@ -47,16 +40,12 @@ Authority: [controlled-pilot release contract](CONTROLLED_PILOT_RELEASE_CONTRACT
 - Saved-voice functional coverage includes explicit listing/preview intent, immutable-sidecar
   Apply, remux, Download, Restore Original, and object-URL cleanup with external-network denial.
 
-## 2026-07-28 to 2026-07-29 — Pilot trust and evidence infrastructure
+## 2026-07-28 to 2026-07-29 — Provider trust and validation infrastructure
 
 - Builder, VTO, image-provider, and ElevenLabs decision points disclose retention, possible usage,
   provider/model context, and applicable limitations.
-- Participant mode disables Wiro even when configured; operator-qualification mode is explicit.
+- Provider availability follows startup configuration; there is no runtime access-mode layer.
 - Reference actions use truthful Detach/retention language.
-- The retirement checklist and disposable exact-leaf drill protect shared roots and siblings.
-- The initial strict qualification matrix and validator required ten provider/local rows,
-  including the then-approved ordered-chain checkpoint, and 45 physical browser/device rows for
-  one exact commit. Evidence rejects extra or content-bearing fields.
 - Release coverage now includes deterministic provider-free and provider-lifecycle journeys,
   accessibility/reflow checks, Storybook, curated visuals, production smoke, and full/production
   dependency-audit jobs.
@@ -69,14 +58,6 @@ spend safety, observability, rollback, and tests to proposed remote boundaries.
 
 This completed a design artifact only. It is unapproved, unimplemented, and does not authorize
 accounts, remote exposure, cloud persistence, billing, or public data handling.
-
-## Current qualification boundary
-
-The 2026-07-30 single-processing decision retired the ordered-chain checkpoint, so the current
-matrix has eleven provider/local rows. No completed qualification records are checked in. At this
-documentation audit the validator reports **0/11 provider/local** and **0/45 physical** passes.
-Historical test runs and implemented automation do not replace the exact-candidate work in the
-active plan.
 
 ## 2026-07-31 — Primary post-recording workflow
 
@@ -102,4 +83,32 @@ active plan.
   races, delivery, release, owner isolation, late provider results, shutdown, and retry semantics.
 
 This closes `SEC-008` as an implementation finding. Exact-model live output/retention and physical
-qualification remain in the active plan. Local cleanup is not provider cancellation or deletion.
+validation remain in the active plan. Local cleanup is not provider cancellation or deletion.
+
+## 2026-08-05 — Whole-project hardening and simplification
+
+- Removed the retired program documents, qualification/evidence hierarchy, workflow step, and all
+  product-program terminology without rewriting Git history or removing the two unrelated creative
+  fiction fixtures.
+- Unified authenticated provider transport around redirect rejection, deadlines, bounded reads,
+  body cancellation, and safe adapter-owned errors. Realtime sessions now use one 300-second cap.
+- Made paid Existing Video submission recovery durable and same-ID: ambiguous acceptance performs
+  status reads only, and a new billable UUID requires confirmed not-found plus explicit resubmission.
+- Reworked video-job scheduling around owner/job indexes, atomic reservation, generation-token
+  deadlines, cached server polling cadence, duplicate coalescing, leases, and retryable cleanup.
+- Added bounded browser streaming, private ElevenLabs spooling, O(1) reference-image mappings,
+  streamed image delivery, CPU admission, stable WebGL reuse, and copy-reduced video accumulation.
+- Simplified Studio and Existing Video presentation at ownership boundaries; introduced pure
+  recording and Recipe Shelf reducers, explicit creative-store migrations, shared provider/media/UI
+  helpers, and selector/batched creative-store subscriptions.
+- Removed confirmed obsolete aliases, capability fields, constructor compatibility, unused provider
+  surfaces, direct reference-field wrapper, redundant E2E guards, and the unscheduled visual case.
+- Corrected narrow-screen actions and upload selection, inspected intentional Darwin differences,
+  completed both 29-case platform baseline inventories, and removed two obsolete Darwin files only
+  after inventory verification.
+- Added command-reference, documentation-link, retired-term, visual-matrix, build-closure, bounded
+  streaming, recovery, cleanup, migration, renderer, worker, and CLI-parser checks. JSDOM is 30.0.1,
+  Esbuild is pinned to patched 0.28.1, and dependency audits report no known vulnerabilities.
+
+The automated release gates pass. Physical device/assistive-technology checks and authorized live
+provider smoke remain environment-dependent and are not claimed here.

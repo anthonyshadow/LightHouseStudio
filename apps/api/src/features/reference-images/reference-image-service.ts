@@ -13,6 +13,7 @@ import {
   type ReferenceImageAssetStore,
   type StoreGeneratedReferenceImageInput,
   type StoredReferenceImageContent,
+  type StoredReferenceImageFile,
   type StoredReferenceImageMetadata,
 } from './asset-store.js';
 import {
@@ -67,6 +68,7 @@ interface ReferenceImageFinalizationOperationMetadata {
   readonly requestFingerprint: string;
   readonly originalPrompt: string;
   readonly prepared: PreparedReferenceImageGeneration;
+  readonly signal?: AbortSignal;
 }
 
 interface ReferenceImageFinalizationInput {
@@ -195,6 +197,9 @@ export class ReferenceImageService {
   }
 
   async upload(input: UploadReferenceImageInput): Promise<ReferenceImageAsset> {
+    if (input.signal?.aborted === true) {
+      throw new ReferenceImageGenerationStateError('operation-aborted');
+    }
     const requestFingerprint = uploadRequestFingerprint(input);
     const persisted = await this.#store.findByRequestId(input.localOwnerId, input.requestId);
     if (persisted !== null) {
@@ -206,8 +211,18 @@ export class ReferenceImageService {
       requestId: input.requestId,
       requestFingerprint,
       ...(input.signal === undefined ? {} : { signal: input.signal }),
-      start: async () => {
-        const image = await validateUploadedReferenceImage(input.bytes, input.mimeType);
+      start: async (operationSignal) => {
+        if (operationSignal.aborted) {
+          throw new ReferenceImageGenerationStateError('operation-aborted');
+        }
+        const image = await validateUploadedReferenceImage(
+          input.bytes,
+          input.mimeType,
+          operationSignal,
+        );
+        if (operationSignal.aborted) {
+          throw new ReferenceImageGenerationStateError('operation-aborted');
+        }
         return this.#store.store({
           localOwnerId: input.localOwnerId,
           bytes: image.bytes,
@@ -318,6 +333,7 @@ export class ReferenceImageService {
         requestId: input.requestId,
         requestFingerprint,
         prepared,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
       },
     });
   }
@@ -369,6 +385,7 @@ export class ReferenceImageService {
         requestId: input.requestId,
         requestFingerprint,
         prepared,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
       },
     });
   }
@@ -407,6 +424,7 @@ export class ReferenceImageService {
         requestId: input.requestId,
         requestFingerprint,
         prepared,
+        ...(input.signal === undefined ? {} : { signal: input.signal }),
       },
     });
   }
@@ -421,11 +439,13 @@ export class ReferenceImageService {
         providerResult.bytes,
         operation.prepared.size,
         providerResult.mimeType,
+        operation.signal,
       );
       return this.#store.store({
         localOwnerId: operation.localOwnerId,
         bytes: image.bytes,
         mimeType: image.mimeType,
+        source: 'generated',
         size: operation.prepared.size,
         width: image.width,
         height: image.height,
@@ -529,5 +549,12 @@ export class ReferenceImageService {
 
   getContent(localOwnerId: string, assetId: string): Promise<StoredReferenceImageContent | null> {
     return this.#store.getContent(localOwnerId, assetId);
+  }
+
+  getContentFile(
+    localOwnerId: string,
+    assetId: string,
+  ): Promise<StoredReferenceImageFile | null> | null {
+    return this.#store.getContentFile?.(localOwnerId, assetId) ?? null;
   }
 }

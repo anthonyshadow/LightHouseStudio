@@ -1,14 +1,12 @@
 # Lightframe Studio product state
 
-**Current as of:** 2026-08-04
+**Current as of:** 2026-08-05
 
 **Release frame:** local-first, single-operator development runtime
 
 This is the concise product authority. Implementation details live in
 [Architecture](ARCHITECTURE.md), [Privacy](PRIVACY_AND_TEMPORARY_DATA.md), and the
-[observable user stories](userStories/README.md). The former
-[controlled-pilot contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md) is historical and does not gate
-current application features or project validation.
+[observable user stories](userStories/README.md).
 
 ## Product
 
@@ -29,15 +27,9 @@ exposed through LAN binding, a tunnel, proxy, shared ingress, or public hostname
 
 ## Audience and release posture
 
-The approved pilot has at most five invited, technically comfortable solo creators or design
-partners. Every session is moderated from setup through verified cleanup. Touch/mobile creation is
-required, but no physical target is qualified yet.
-
-| Release model                 | State                                                                                                          |
-| ----------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| Operator-assisted local pilot | Runtime is substantially implemented; qualification evidence is open.                                          |
-| Unassisted local beta         | Not approved by the current release contract.                                                                  |
-| Remote/public product         | Unsupported; blocked by identity, authorization, tenancy, spend, retention, moderation, and operations design. |
+The supported runtime is a local, single-operator creation tool. Touch/mobile creation is required.
+A remote or public product remains unsupported until identity, authorization, tenancy, spend,
+retention, moderation, and operations receive a separately approved design.
 
 ## Current capabilities
 
@@ -67,7 +59,6 @@ required, but no physical target is qualified yet.
   a new immutable `edited` source only after explicit replacement confirmation. Non-16:9/9:16
   edits keep Download and Voice but disable visual-provider intent.
 - OpenAI, BFL, and Wiro are separate startup-selected image-provider passes with no fallback.
-  Participant mode disables Wiro.
 - Recording owns an accessible warning at 270 seconds and coalesced Stop/finalize at 300 seconds.
 - Studio keeps one temporary source/visual/voice pipeline. Download is the durable handoff;
   Release or Discard revokes its URLs.
@@ -86,10 +77,10 @@ required, but no physical target is qualified yet.
 - Capability status proves configuration, not live health, entitlement, quota, output quality, or
   retention settings.
 - Takes and processing outputs are retained in browser memory; physical codec and memory support
-  is unqualified.
+  still requires manual validation on the target device.
 - Local video edits are session-only. Safari/Firefox/Chrome worker codec behavior, real render
-  cancellation, maximum-size/five-minute memory, touch, download, and external playback remain
-  physically unqualified.
+  cancellation, maximum-size/five-minute memory, touch, download, and external playback require
+  physical validation.
 - Video-job state is process-local and temporary; refresh, crash, restart, or expiry does not
   recover an upload workflow, and local cleanup is not provider-side deletion.
 - Reference assets have no relationship-aware per-asset deletion route. Use a dedicated local data
@@ -104,10 +95,9 @@ Stop, saved-character entry, permission recovery, provider disclosures, truthful
 the independent Decart and recording time boundaries, immutable take processing, bounded
 ElevenLabs output, responsive/reflow behavior, and provider-free network denial.
 
-The former pilot validator and evidence thresholds are retired. Normal project quality remains the
-automated implementation gate. Physical-device, accessibility, long-take memory, and live-provider
-checks remain valuable manual evidence, but they do not disable configured features or block normal
-project validation.
+Automated project quality is the implementation gate. Physical-device, accessibility, long-take
+memory, and live-provider checks remain valuable manual validation, but they do not disable
+configured features or block normal project development.
 
 ## Product decisions
 
@@ -122,53 +112,10 @@ project validation.
 - Do not turn loopback identifiers, device IDs, storage paths, or provider IDs into future user
   identity.
 
-## Archived controlled-pilot success metrics
-
-These are small-cohort hypotheses, not release criteria. Record numerator, denominator, and
-content-free timing so a percentage never hides a tiny sample.
-
-### Activation
-
-- At least 70% of first sessions reach local preview without intervention within 90 seconds.
-- At least 50% reach review and initiate Download within five minutes of starting the supported
-  capture loop.
-- At least 60% of sessions with Character intent save/select a character and start Lucy 2.5 within
-  ten minutes.
-
-### Reliability and safety
-
-- Local preview succeeds in at least 95% of attempts after permission on qualified targets.
-- Decart connects in at least 90% of authorized attempts with verified prerequisites.
-- At least 98% of Stop attempts produce a playable, downloadable main take.
-- 100% of provider recordings finalize before owned live resources release.
-- 100% of failed voice treatments preserve the immutable original.
-- Zero sessions make an unexpected provider request or exceed a stated limit without its warning
-  and defined recovery.
-
-### Value, trust, and operations
-
-- At least 60% of successful Character sessions produce a recording.
-- At least 50% of completed AI takes are rated usable/exportable by the creator.
-- Track seven-day character reuse as returning reusers divided by eligible returning
-  participants; the initial hypothesis is at least 40%.
-- Zero participants are surprised by provider contact or believe Detach deleted retained bytes.
-- Track connected seconds, generation/conversion attempts, safe outcome class, support minutes,
-  and provider cost per usable Download. Never record prompts, media, raw errors, URLs,
-  credentials, provider payloads, or device identifiers.
-
-## Archived pilot questions
-
-- Does reusable identity, live transformation, faster capture, or local control drive return use?
-- Where does the Record/Upload → Review → Edit → Download path still need operator explanation?
-- Does saved-character reuse improve speed or output consistency at the return session?
-- Does Voice materially improve usable output enough to justify cost and complexity?
-- Does VTO solve a distinct job within its stated input and accuracy limitations?
-- Is Download plus local files sufficient, or is portability/history a repeated unmet need?
-
 ## Deferred scope
 
 Accounts, cloud persistence, entitlements, billing, take history, collaboration, sharing,
-templates/marketplaces, public voice import/cloning, and commerce-aware VTO require pilot evidence
-and separate product, security, privacy, cost, and operations approval. The
+templates/marketplaces, public voice import/cloning, and commerce-aware VTO require separate
+product, security, privacy, cost, and operations approval. The
 [remote backend handoff](REMOTE_BACKEND_HANDOFF.md) is design-only and authorizes no remote
 implementation.

@@ -121,9 +121,7 @@ const STAGE_CONTROLS_IDLE_TIMEOUT_MS = 3_000;
 for (const viewport of exactViewports) {
   test(`${viewport.name} keeps every live/capture/review state viewport-bound`, async ({
     page,
-    browserName,
   }) => {
-    test.skip(browserName !== 'chromium', 'The exact visual-state matrix runs in Chromium.');
     const network = await installSuccessfulStudioHarness(page);
     await page.setViewportSize({ width: viewport.width, height: viewport.height });
     await page.goto('/studio');
@@ -262,11 +260,7 @@ for (const viewport of exactViewports) {
 
 test('@cross-browser focused media smoke reaches record, Voice, and review recovery', async ({
   page,
-}, testInfo) => {
-  test.skip(
-    !['webkit', 'mobile'].includes(testInfo.project.name),
-    'This smoke targets WebKit and the configured touch project.',
-  );
+}) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/studio');
 
@@ -304,11 +298,8 @@ test('@cross-browser focused media smoke reaches record, Voice, and review recov
   expectNoExternalProviderTraffic(network);
 });
 
-test('@touch controls recover while recording Stop remains reachable', async ({
-  page,
-}, testInfo) => {
+test('@touch controls recover while recording Stop remains reachable', async ({ page }) => {
   test.setTimeout(45_000);
-  test.skip(testInfo.project.name !== 'mobile', 'This interaction requires a touch context.');
   const network = await installSuccessfulStudioHarness(page);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/studio');
@@ -531,12 +522,7 @@ test('no-key Local Camera records and finalizes without provider HTTP, WebSocket
 
 test('saved voice preview, Apply, remux, Download, and Restore Original stay explicit and immutable', async ({
   page,
-  browserName,
 }) => {
-  test.skip(
-    browserName !== 'chromium',
-    'Deterministic browser remux qualification runs in Chromium.',
-  );
   test.setTimeout(60_000);
   const network = await installSuccessfulStudioHarness(page, {
     elevenLabsAvailable: true,

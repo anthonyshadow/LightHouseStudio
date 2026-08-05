@@ -508,47 +508,122 @@ const sanitizeArray = <T>(
   };
 };
 
+type VersionedUntrustedStore = Record<string, unknown> & { readonly schemaVersion: number };
+
+const migrateRecords = (
+  value: unknown,
+  migrate: (record: Record<string, unknown>) => Record<string, unknown>,
+): unknown => {
+  if (!Array.isArray(value)) return value;
+  const records: unknown[] = value;
+  return records.map((record) => (isRecord(record) ? migrate(record) : record));
+};
+
+const migrateV1ToV2 = (store: VersionedUntrustedStore): VersionedUntrustedStore => ({
+  ...store,
+  schemaVersion: LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
+  savedPrompts: migrateRecords(
+    store.savedPrompts,
+    ({ referenceImageAssetId: _, ...record }) => record,
+  ),
+  recentPrompts: migrateRecords(
+    store.recentPrompts,
+    ({ referenceImageAssetId: _, ...record }) => record,
+  ),
+  savedCharacterPrompts: migrateRecords(
+    store.savedCharacterPrompts,
+    ({ referenceImageAssetId: _, ...record }) => record,
+  ),
+});
+
+const migrateV2ToV3 = (store: VersionedUntrustedStore): VersionedUntrustedStore => ({
+  ...store,
+  schemaVersion: EARLIER_CREATIVE_ASSET_SCHEMA_VERSION,
+  savedCharacterPrompts: migrateRecords(
+    store.savedCharacterPrompts,
+    ({ guidedDesign: _, ...record }) => record,
+  ),
+});
+
+const migrateV3ToV4 = (store: VersionedUntrustedStore): VersionedUntrustedStore => ({
+  ...store,
+  schemaVersion: OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
+  recentPrompts: migrateRecords(
+    store.recentPrompts,
+    ({ savedCharacterPromptId: _, characterName: __, ...record }) => record,
+  ),
+  savedCharacterPrompts: migrateRecords(
+    store.savedCharacterPrompts,
+    ({ uploadedReferenceImageAssetId: _, finalReferenceKind: __, ...record }) => record,
+  ),
+});
+
+const migrateV4ToV5 = (store: VersionedUntrustedStore): VersionedUntrustedStore => ({
+  ...store,
+  schemaVersion: PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+  savedPrompts: migrateRecords(
+    store.savedPrompts,
+    ({ vtonInputKind: _, enhancePrompt: __, ...record }) => record,
+  ),
+  recentPrompts: migrateRecords(
+    store.recentPrompts,
+    ({ vtonInputKind: _, enhancePrompt: __, ...record }) => record,
+  ),
+});
+
+const migrateV5ToV6 = (store: VersionedUntrustedStore): VersionedUntrustedStore => ({
+  ...store,
+  schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+  recentPrompts: migrateRecords(
+    store.recentPrompts,
+    ({ savedCharacterVariantId: _, ...record }) => record,
+  ),
+  savedCharacterPrompts: migrateRecords(
+    store.savedCharacterPrompts,
+    ({ selectedWardrobeVariantId: _, ...record }) => record,
+  ),
+  savedCharacterVariants: [],
+});
+
+const migrateCreativeAssetStore = (value: unknown): VersionedUntrustedStore | null => {
+  if (!isRecord(value) || typeof value.schemaVersion !== 'number') return null;
+  const store = value as VersionedUntrustedStore;
+  switch (store.schemaVersion) {
+    case ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION:
+      return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(store)))));
+    case LEGACY_CREATIVE_ASSET_SCHEMA_VERSION:
+      return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(store))));
+    case EARLIER_CREATIVE_ASSET_SCHEMA_VERSION:
+      return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(store)));
+    case OLDER_CREATIVE_ASSET_SCHEMA_VERSION:
+      return migrateV5ToV6(migrateV4ToV5(store));
+    case PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION:
+      return migrateV5ToV6(store);
+    case CREATIVE_ASSET_SCHEMA_VERSION:
+      return store;
+    default:
+      return null;
+  }
+};
+
 export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAssetResult => {
-  if (
-    !isRecord(value) ||
-    (value.schemaVersion !== CREATIVE_ASSET_SCHEMA_VERSION &&
-      value.schemaVersion !== PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION &&
-      value.schemaVersion !== OLDER_CREATIVE_ASSET_SCHEMA_VERSION &&
-      value.schemaVersion !== EARLIER_CREATIVE_ASSET_SCHEMA_VERSION &&
-      value.schemaVersion !== LEGACY_CREATIVE_ASSET_SCHEMA_VERSION &&
-      value.schemaVersion !== ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION)
-  ) {
+  const originalSchemaVersion = isRecord(value) ? value.schemaVersion : undefined;
+  const migrated = migrateCreativeAssetStore(value);
+  if (migrated === null) {
     return { store: createEmptyCreativeAssetStore(), recovered: true, droppedRecords: 0 };
   }
 
-  const includeReferenceImages = value.schemaVersion >= LEGACY_CREATIVE_ASSET_SCHEMA_VERSION;
-  const includeGuidedDesign = value.schemaVersion >= EARLIER_CREATIVE_ASSET_SCHEMA_VERSION;
-  const includeReferenceProvenance = value.schemaVersion >= OLDER_CREATIVE_ASSET_SCHEMA_VERSION;
-  const includeVtonConfiguration = value.schemaVersion >= PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION;
-  const includeWardrobe = value.schemaVersion === CREATIVE_ASSET_SCHEMA_VERSION;
-  const savedInput = sanitizeArray(value.savedPrompts, (record) =>
-    sanitizeSavedPrompt(record, includeReferenceImages, includeVtonConfiguration),
+  const savedInput = sanitizeArray(migrated.savedPrompts, (record) =>
+    sanitizeSavedPrompt(record, true, true),
   );
-  const recentInput = sanitizeArray(value.recentPrompts, (record) =>
-    sanitizeRecentPrompt(
-      record,
-      includeReferenceImages,
-      includeReferenceProvenance,
-      includeVtonConfiguration,
-      includeWardrobe,
-    ),
+  const recentInput = sanitizeArray(migrated.recentPrompts, (record) =>
+    sanitizeRecentPrompt(record, true, true, true, true),
   );
-  const characterInput = sanitizeArray(value.savedCharacterPrompts, (record) =>
-    sanitizeSavedCharacterPrompt(
-      record,
-      includeReferenceImages,
-      includeGuidedDesign,
-      includeReferenceProvenance,
-      includeWardrobe,
-    ),
+  const characterInput = sanitizeArray(migrated.savedCharacterPrompts, (record) =>
+    sanitizeSavedCharacterPrompt(record, true, true, true, true),
   );
-  const variantInput = sanitizeArray(value.savedCharacterVariants, (record) =>
-    includeWardrobe ? sanitizeSavedCharacterVariant(record) : null,
+  const variantInput = sanitizeArray(migrated.savedCharacterVariants, (record) =>
+    sanitizeSavedCharacterVariant(record),
   );
 
   const savedPrompts = uniqueById(
@@ -659,14 +734,14 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
   };
   let inputMatchesSanitizedStore = false;
   try {
-    inputMatchesSanitizedStore = JSON.stringify(value) === JSON.stringify(store);
+    inputMatchesSanitizedStore = JSON.stringify(migrated) === JSON.stringify(store);
   } catch {
     // Untrusted in-memory input can be cyclic or otherwise non-serializable. It must be rewritten.
   }
   return {
     store,
     recovered:
-      value.schemaVersion !== CREATIVE_ASSET_SCHEMA_VERSION ||
+      originalSchemaVersion !== CREATIVE_ASSET_SCHEMA_VERSION ||
       droppedRecords > 0 ||
       !inputMatchesSanitizedStore,
     droppedRecords,

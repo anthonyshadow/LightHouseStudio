@@ -3,12 +3,10 @@ import { z } from 'zod';
 export const DEFAULT_CHARACTER_MODEL_ID = 'lucy-latest' as const;
 export const SUPPORTED_MODEL_IDS = [DEFAULT_CHARACTER_MODEL_ID, 'lucy-vton-latest'] as const;
 export const supportedModelIdSchema = z.enum(SUPPORTED_MODEL_IDS);
-export const realtimeSessionProfileSchema = z.enum(['advanced', 'guided']);
 
 export const realtimeTokenRequestSchema = z
   .object({
     model: supportedModelIdSchema.default(DEFAULT_CHARACTER_MODEL_ID),
-    sessionProfile: realtimeSessionProfileSchema.optional(),
   })
   .strict()
   .default({ model: DEFAULT_CHARACTER_MODEL_ID });
@@ -31,7 +29,6 @@ export const realtimeTokenResponseSchema = z
   .strict();
 
 export type SupportedModelId = z.infer<typeof supportedModelIdSchema>;
-export type RealtimeSessionProfile = z.infer<typeof realtimeSessionProfileSchema>;
 export type RealtimeTokenRequest = z.infer<typeof realtimeTokenRequestSchema>;
 export type RealtimeTokenResponse = z.infer<typeof realtimeTokenResponseSchema>;
 export type RealtimeTokenConstraints = z.infer<typeof realtimeTokenConstraintsSchema>;

@@ -45,5 +45,5 @@
 ## Evidence status
 
 The no-key journey, network denial, control recovery, finalization ordering, and 270/300-second
-policy are automated. Physical browser/device, codec, memory, interruption, and long-take evidence
-remain pending for the controlled pilot.
+policy are automated. Physical browser/device, codec, memory, interruption, and long-take behavior
+remain pending manual validation.

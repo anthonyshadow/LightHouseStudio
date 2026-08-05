@@ -1,4 +1,5 @@
 import sharp, { type Sharp } from 'sharp';
+import { imageDecodeAdmission } from '../../application/cpu-admission-queue.js';
 import {
   dimensionsForReferenceImageSize,
   MAX_PROVIDER_IMAGE_BYTES,
@@ -32,7 +33,7 @@ export interface NormalizedWiroImage {
   readonly mimeType: ReferenceImageMimeType;
 }
 
-export const normalizeWiroImage = async (
+const normalizeWiroImageWithoutAdmission = async (
   sourceBytes: Uint8Array,
   size: GenerateReferenceImageProviderInput['size'],
   format: GenerateReferenceImageProviderInput['format'],
@@ -75,3 +76,10 @@ export const normalizeWiroImage = async (
     throw providerError(error);
   }
 };
+
+export const normalizeWiroImage = (
+  sourceBytes: Uint8Array,
+  size: GenerateReferenceImageProviderInput['size'],
+  format: GenerateReferenceImageProviderInput['format'],
+): Promise<NormalizedWiroImage> =>
+  imageDecodeAdmission.run(() => normalizeWiroImageWithoutAdmission(sourceBytes, size, format));

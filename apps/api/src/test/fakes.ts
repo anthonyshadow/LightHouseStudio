@@ -1,10 +1,12 @@
 import { Readable } from 'node:stream';
+import { readFile } from 'node:fs/promises';
 import type { VoiceConversionContentType } from '@studio/contracts';
 import type { RuntimeConfig } from '../config/environment.js';
 import type { AudioStream } from '../application/audio-stream.js';
 import type {
   ElevenLabsModel,
   ElevenLabsProvider,
+  VoiceConversionAudio,
   ProviderVoice,
   ProviderWorkspaceVoicePage,
   VoiceSearchInput,
@@ -106,22 +108,25 @@ export class FakeElevenLabsProvider implements ElevenLabsProvider {
   convertRecording(
     voiceId: string,
     modelId: string,
-    audio: Uint8Array,
+    audio: VoiceConversionAudio,
     mimeType: VoiceConversionContentType,
     enableLogging: boolean,
     _signal: AbortSignal,
   ): Promise<AudioStream> {
-    this.conversions.push({
-      voiceId,
-      modelId,
-      audio: audio.slice(),
-      mimeType,
-      enableLogging,
-    });
-    return Promise.resolve({
-      body: Readable.from(this.convertedBytes),
-      contentType: this.conversionContentType,
-      contentLength: this.convertedBytes.byteLength,
+    const audioBytes = audio instanceof Uint8Array ? audio.slice() : readFile(audio.path);
+    return Promise.resolve(audioBytes).then((resolvedAudio) => {
+      this.conversions.push({
+        voiceId,
+        modelId,
+        audio: resolvedAudio,
+        mimeType,
+        enableLogging,
+      });
+      return {
+        body: Readable.from(this.convertedBytes),
+        contentType: this.conversionContentType,
+        contentLength: this.convertedBytes.byteLength,
+      };
     });
   }
 }

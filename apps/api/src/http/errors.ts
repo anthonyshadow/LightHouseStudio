@@ -6,8 +6,6 @@ import {
 import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import { AppError } from './app-error.js';
 
-export type ApiErrorBody = ApiErrorResponse;
-
 export { AppError } from './app-error.js';
 
 export interface ErrorDiagnostic {
@@ -25,7 +23,11 @@ export interface ErrorTranslation {
 
 export type ErrorTranslator = (error: Error) => ErrorTranslation | undefined;
 
-const errorBody = (code: ApiErrorCode, message: string, upstreamStatus?: number): ApiErrorBody =>
+const errorBody = (
+  code: ApiErrorCode,
+  message: string,
+  upstreamStatus?: number,
+): ApiErrorResponse =>
   apiErrorResponseSchema.parse({
     error: { code, message, ...(upstreamStatus === undefined ? {} : { upstreamStatus }) },
   });

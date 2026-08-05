@@ -7,7 +7,6 @@ import type {
 import type { ImageMimeType } from '@studio/domain';
 
 export type VideoJobProviderStatus = 'pending' | 'processing' | 'completed' | 'failed';
-export type VideoJobOutputResolution = VideoOutputResolution;
 export type VideoJobOutputSizing = 'exact-canonical' | 'megapixel-budget';
 
 export type VideoJobProviderFailureReason =
@@ -58,7 +57,7 @@ export interface ExistingVideoJobProvider {
     readonly videoMimeType: VideoInputMimeType;
     readonly referenceImagePath: string | null;
     readonly referenceImageMimeType: ImageMimeType | null;
-    readonly outputResolution: VideoJobOutputResolution;
+    readonly outputResolution: VideoOutputResolution;
     readonly signal: AbortSignal;
   }): Promise<{
     readonly providerJobId: string;
@@ -79,13 +78,12 @@ export interface ExistingVideoJobProvider {
     signal: AbortSignal,
     outputLocation?: string | null,
   ): Promise<void>;
-  cancel?(providerJobId: string, signal: AbortSignal): Promise<void>;
 }
 
 export interface ExistingVideoOperationBinding {
   readonly provider: ExistingVideoJobProvider;
-  readonly outputResolutions: readonly VideoJobOutputResolution[];
-  readonly defaultOutputResolution: VideoJobOutputResolution;
+  readonly outputResolutions: readonly VideoOutputResolution[];
+  readonly defaultOutputResolution: VideoOutputResolution;
   readonly outputSizing: VideoJobOutputSizing;
   readonly inputPreparation: 'none' | 'h264-mp4';
   readonly referencePolicy: 'optional' | 'required';

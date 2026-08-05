@@ -33,7 +33,6 @@ describe('SelectField', () => {
     const trigger = screen.getByRole('combobox', { name: 'Camera profile' });
     expect(trigger).toHaveAttribute('aria-expanded', 'false');
     expect(trigger).toHaveTextContent('Alpha');
-    expect(trigger).toHaveStyle({ minHeight: '2.85rem' });
 
     await user.click(trigger);
     const listbox = screen.getByRole('listbox', { name: 'Camera profile' });

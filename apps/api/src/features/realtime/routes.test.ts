@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { ApiErrorResponse, RealtimeTokenResponse } from '@studio/contracts';
+import type { ApiErrorResponse } from '@studio/contracts';
 import { createApp } from '../../app.js';
 import type {
   DecartTokenProvider,
@@ -89,7 +89,7 @@ describe('realtime token API', () => {
     expect(createToken).toHaveBeenCalledTimes(1);
   });
 
-  it('issues a seven-minute active session only for the guided recording profile', async () => {
+  it('rejects the removed guided recording profile', async () => {
     const { app, scopes } = setup();
     const response = await app.inject({
       method: 'POST',
@@ -98,12 +98,8 @@ describe('realtime token API', () => {
       payload: { model: 'lucy-latest', sessionProfile: 'guided' },
     });
 
-    expect(response.statusCode).toBe(200);
-    expect(response.json<RealtimeTokenResponse>().constraints?.maxSessionDurationSeconds).toBe(420);
-    expect(scopes[0]).toMatchObject({
-      expiresInSeconds: 300,
-      maxSessionDurationSeconds: 420,
-    });
+    expect(response.statusCode).toBe(400);
+    expect(scopes).toHaveLength(0);
   });
 
   it('requires a canonical loopback browser origin', async () => {

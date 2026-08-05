@@ -47,5 +47,5 @@ for browser-reported front/rear modes and hardware zoom only when the track repo
 
 Aspect-ratio constraint selection, stage framing, atomic replacement, post-permission refresh,
 unavailable-device fallback, front/rear switching, and zoom gating have automated coverage.
-Physical camera discovery, portrait negotiation, and controls remain part of the
-[pilot qualification gate](../PILOT_QUALIFICATION_EVIDENCE.md).
+Physical camera discovery, portrait negotiation, and controls remain part of
+[manual release validation](../MANUAL_QA.md).

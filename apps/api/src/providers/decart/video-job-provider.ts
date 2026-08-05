@@ -12,6 +12,10 @@ import {
 } from '@studio/contracts';
 import { imageFileExtension, type ImageMimeType } from '@studio/domain';
 import {
+  authenticatedProviderFetch,
+  readBoundedJson,
+} from '../transport/bounded-provider-transport.js';
+import {
   type ExistingVideoJobProvider,
   VideoJobProviderError,
   type VideoJobProviderFailureReason,
@@ -19,12 +23,8 @@ import {
   videoJobFailureReasonForHttpStatus,
 } from '../video-jobs/video-job-provider.js';
 
-export type DecartQueueStatus = VideoJobProviderStatus;
-export type DecartVideoJobProvider = ExistingVideoJobProvider;
-export type DecartVideoProviderFailureReason = VideoJobProviderFailureReason;
-
 export class DecartVideoProviderError extends VideoJobProviderError {
-  constructor(reason: DecartVideoProviderFailureReason, upstreamStatus?: number) {
+  constructor(reason: VideoJobProviderFailureReason, upstreamStatus?: number) {
     super(reason, upstreamStatus);
     this.name = 'DecartVideoProviderError';
   }
@@ -45,7 +45,7 @@ const safeRequestSignal = (
   return { signal: AbortSignal.any([caller, timeout]), timeout };
 };
 
-export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
+export class DecartHttpVideoJobProvider implements ExistingVideoJobProvider {
   readonly #apiKey: string;
   readonly #fetch: typeof fetch;
   readonly #baseUrl: string;
@@ -68,13 +68,25 @@ export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
   ): Promise<z.infer<typeof jobResponseSchema>> {
     const request = safeRequestSignal(callerSignal, timeoutMs);
     try {
-      const response = await this.#fetch(url, { ...init, signal: request.signal });
-      if (!response.ok)
+      const response = await authenticatedProviderFetch(this.#fetch, url, {
+        ...init,
+        signal: request.signal,
+      });
+      if (!response.ok) {
+        void response.body?.cancel().catch(() => undefined);
         throw new DecartVideoProviderError(
           videoJobFailureReasonForHttpStatus(response.status),
           response.status,
         );
-      const parsed = jobResponseSchema.safeParse(await response.json());
+      }
+      const parsed = jobResponseSchema.safeParse(
+        await readBoundedJson(
+          response,
+          () => new DecartVideoProviderError('invalid-response', response.status),
+          () => new DecartVideoProviderError('invalid-response', response.status),
+          request.signal,
+        ),
+      );
       if (!parsed.success) throw new DecartVideoProviderError('invalid-response');
       return parsed.data;
     } catch (error) {
@@ -93,7 +105,7 @@ export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
     readonly referenceImagePath: string | null;
     readonly referenceImageMimeType: ImageMimeType | null;
     readonly signal: AbortSignal;
-  }): Promise<{ readonly providerJobId: string; readonly status: DecartQueueStatus }> {
+  }): Promise<{ readonly providerJobId: string; readonly status: VideoJobProviderStatus }> {
     const form = new FormData();
     const videoExtension =
       input.videoMimeType === 'video/webm'
@@ -133,7 +145,7 @@ export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
   async status(
     providerJobId: string,
     signal: AbortSignal,
-  ): Promise<{ readonly status: DecartQueueStatus }> {
+  ): Promise<{ readonly status: VideoJobProviderStatus }> {
     const response = await this.#requestJson(
       `${this.#baseUrl}/v1/jobs/${encodeURIComponent(providerJobId)}`,
       { headers: { 'X-API-KEY': this.#apiKey } },
@@ -150,11 +162,13 @@ export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
   ): Promise<void> {
     const request = safeRequestSignal(callerSignal, 180_000);
     try {
-      const response = await this.#fetch(
+      const response = await authenticatedProviderFetch(
+        this.#fetch,
         `${this.#baseUrl}/v1/jobs/${encodeURIComponent(providerJobId)}/content`,
         { headers: { 'X-API-KEY': this.#apiKey }, signal: request.signal },
       );
       if (!response.ok || !response.body) {
+        void response.body?.cancel().catch(() => undefined);
         throw new DecartVideoProviderError(
           videoJobFailureReasonForHttpStatus(response.status),
           response.status,
@@ -162,6 +176,7 @@ export class DecartHttpVideoJobProvider implements DecartVideoJobProvider {
       }
       const declaredSize = Number(response.headers.get('content-length'));
       if (Number.isFinite(declaredSize) && declaredSize > VIDEO_RESULT_MAX_BYTES) {
+        void response.body.cancel().catch(() => undefined);
         throw new DecartVideoProviderError('result-too-large');
       }
 

@@ -44,16 +44,18 @@ failure and cancellation keep the prior artifact and draft intact while releasin
 Uploaded source limits are decimal bytes: 300,000,000 for local/Lucy-only workflows and
 200,000,000 when VTO is planned. Downloaded provider output is capped at 300,000,000 bytes.
 Server-side upload and result files are streamed to the dedicated temporary video-job root rather
-than buffered in process memory. They are not a recovery store.
+than buffered in process memory. Browser video, audio, and remote-image responses are likewise read
+incrementally with declared and observed byte limits before a Blob is published. ElevenLabs input
+and output media use private server temporary files, and the validated output is streamed only
+after its complete media check. These temporary files are not a recovery store.
 
 Automated domain and controller tests cover those rules, including source end, delayed sidecar,
 finalization timeout, and unmount races. They do not qualify real browser memory, codecs, or
 physical devices.
 
-## Physical qualification
+## Physical validation
 
-For every required device/browser row in
-[`qualification/required-matrix.json`](qualification/required-matrix.json):
+For every supported device/browser target at the canonical viewports:
 
 1. Record the exact release-candidate commit, browser/OS version, device class, selected
    intermediate recording MIME type, raw main/sidecar byte sizes, final MP4 byte size, and confirmed

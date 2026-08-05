@@ -37,9 +37,13 @@
     "check:dead-code": "knip --no-progress --reporter compact",
     "check:dead-code:production": "knip --production --no-progress --include files,dependencies,unlisted,unresolved --reporter compact",
     "check:modules": "node scripts/check-module-graph.mjs",
+    "check:build-manifest": "node scripts/check-build-manifest.mjs",
+    "check:script-references": "node scripts/check-script-references.mjs",
+    "check:docs": "node scripts/check-doc-links.mjs",
+    "check:retired-program": "node scripts/check-retired-program-references.mjs",
     "recording:memory:estimate": "node scripts/estimate-recording-memory.mjs",
     "screenshots:capture": "playwright test --config playwright.screenshots.config.ts",
-    "quality": "pnpm typecheck && pnpm storybook:typecheck && pnpm lint && pnpm format:check && pnpm check:dead-code && pnpm check:modules && pnpm test && pnpm build && pnpm storybook:build"
+    "quality": "pnpm typecheck && pnpm storybook:typecheck && pnpm lint && pnpm format:check && pnpm check:dead-code && pnpm check:modules && pnpm check:script-references && pnpm check:docs && pnpm check:retired-program && pnpm test && pnpm build && pnpm check:build-manifest && pnpm storybook:build"
   },
   "devDependencies": {
     "@axe-core/playwright": "4.12.1",
@@ -65,7 +69,7 @@
     "eslint-plugin-jsx-a11y": "6.10.2",
     "eslint-plugin-react-hooks": "7.1.1",
     "globals": "17.8.0",
-    "jsdom": "29.1.1",
+    "jsdom": "30.0.1",
     "knip": "6.29.0",
     "prettier": "3.9.6",
     "react": "19.2.8",

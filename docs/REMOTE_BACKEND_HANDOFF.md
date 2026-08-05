@@ -116,8 +116,8 @@ All of the following remain pending:
 The remote phase may begin only when:
 
 1. approvals and open decisions are recorded;
-2. local pilot value and pre-remote acceptance gates are complete or explicitly accepted by their
-   owners;
+2. local product value and pre-remote acceptance gates are complete or explicitly accepted by
+   their owners;
 3. no Critical/High local boundary finding would be carried into public exposure;
 4. the loopback broker has not been exposed as a shortcut;
 5. a reviewable implementation/test/migration plan is approved; and

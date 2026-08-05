@@ -109,6 +109,7 @@ export class OutfitTryOnService {
           validated = await validateUploadedReferenceImage(
             Buffer.from(result.bytes),
             result.mimeType,
+            operationSignal,
           );
         } catch (error) {
           throw new ReferenceImageProviderError('invalid-response', {

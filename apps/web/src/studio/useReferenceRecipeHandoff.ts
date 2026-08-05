@@ -12,7 +12,7 @@ import {
   activeRecipeReducer,
   INITIAL_ACTIVE_RECIPE_STATE,
   resolveActiveRecipe,
-  type ActiveStudioRecipe as ActiveStudioRecipeState,
+  type ActiveStudioRecipe,
 } from './referenceRecipeIdentity';
 import {
   createPendingReferenceRecipeUse,
@@ -22,8 +22,6 @@ import { useReferenceRecipeHydration } from './useReferenceRecipeHydration';
 import { useReferenceRecipeWorkshop } from './useReferenceRecipeWorkshop';
 
 export { isExactActiveRecipe } from './referenceRecipeIdentity';
-export type ActiveStudioRecipe = ActiveStudioRecipeState;
-
 type UseReferenceRecipeHandoffOptions = {
   readonly repository: CreativeAssetRepository;
   readonly store: CreativeAssetStore;

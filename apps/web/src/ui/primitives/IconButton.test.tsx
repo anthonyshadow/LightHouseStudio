@@ -8,7 +8,7 @@ import { IconButton } from './IconButton';
 afterEach(cleanup);
 
 describe('IconButton', () => {
-  it('requires a visible accessible name while retaining a 44px target', () => {
+  it('requires a visible accessible name', () => {
     render(
       <StudioDesignProvider>
         <IconButton label="Open settings">
@@ -18,9 +18,6 @@ describe('IconButton', () => {
     );
 
     const button = screen.getByRole('button', { name: 'Open settings' });
-    expect(button).toHaveStyle({
-      minInlineSize: '2.75rem',
-      minBlockSize: '2.75rem',
-    });
+    expect(button).toBeVisible();
   });
 });

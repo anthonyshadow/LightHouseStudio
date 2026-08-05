@@ -47,6 +47,8 @@ export const translateReferenceImageError: ErrorTranslator = (error) => {
 
   const appError = (() => {
     switch (error.reason) {
+      case 'operation-aborted':
+        return new AppError(499, 'request_aborted', 'The reference image request was cancelled.');
       case 'edit-not-configured':
         return new AppError(
           503,

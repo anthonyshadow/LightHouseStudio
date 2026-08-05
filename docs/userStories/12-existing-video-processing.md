@@ -3,8 +3,8 @@
 ## Goal
 
 Use an uploaded or newly recorded browser-local video as the immutable source, optionally apply
-either Character Swap or Virtual Try-On and/or a saved voice, compare the latest healthy result with the source,
-then edit either base, download, start over, or discard.
+zero or one visual edit followed by optional Voice, compare the latest healthy result with the
+source, then edit either base, download, start over, or discard.
 
 ## Journey
 
@@ -79,7 +79,7 @@ then edit either base, download, start over, or discard.
    enhancement setting; saved-image and migrated combined outfits restore Saved outfit mode with
    enhancement off. New, edit, and Save a copy outfit library actions route through Outfit Builder.
    A missing saved image exposes Retry and, only when a usable prompt remains, **Continue without
-   reference**; image-only outfits expose Retry or removal. VTO retains calm controlled-pilot,
+   reference**; image-only outfits expose Retry or removal. VTO retains calm contextual
    consent, one-garment, plain-background, and no-fit/sizing/purchase-accuracy disclosure.
 8. **Voice** opens the same cohesive treatment workspace used by Latest Take; the existing-video
    editor does not introduce a second Voice entry or nested browser. It exposes browser-local
@@ -104,7 +104,12 @@ then edit either base, download, start over, or discard.
    this avoids a redundant decoder pass without weakening the publication gate. Voice-only uses
    the selected video's frames. A combined plan is ready only after Voice commits. If Voice fails
    after visual success, its explicit retry uses the retained visual frames and does not resubmit
-   visual processing. Every operation publishes truthful stage copy and never retries a billable submission.
+   visual processing. Every operation publishes truthful stage copy and never retries a billable
+   submission. The browser records one operation UUID before `PUT`. A valid response marks it
+   accepted; a lost, malformed, or aborted success response marks acceptance unknown and keeps the
+   same UUID. Both states lock submission controls. **Resume accepted job** checks that UUID with
+   `GET` and never repeats the potentially billable `PUT`. A new UUID is possible only after that
+   lookup confirms not-found and the creator explicitly submits again.
 10. **Original** and conditional **Result** update both players. **Edit original** snapshots the
     immutable source; **Edit result** snapshots the latest result and its inspected metadata as the
     next frame source. If an accepted approximate-resolution result is not exactly 16:9 or 9:16,
@@ -167,6 +172,9 @@ then edit either base, download, start over, or discard.
   JPEG/PNG/WebP contents, supports abort, and never persists, logs, echoes, or forwards the URL.
 - Retrying status, content retrieval, inspection, or audio composition reuses the accepted job.
   Retrying a provider submission is a new explicit potentially billable action.
+- The broker caches provider status between server-owned 2/3/5/8/10-second polling intervals and
+  returns a nullable next-poll hint. Repeated browser status reads inside that window do not contact
+  the provider.
 - A failed provider status may contain private diagnostics. The server reduces those diagnostics to
   an allowlisted failure class (content safeguards, account attention/limit, submitted media,
   cancellation, timeout, or upstream failure), discards the provider text, and exposes only
@@ -207,13 +215,15 @@ Lightframe relies on no documented Pruna cancellation/deletion endpoint.
 Pruna terminal failures retain their safe status until the creator explicitly discards/replaces the
 video or the fixed local deadline expires. Successful content delivery cleans its local job without
 a follow-up browser DELETE. Decart terminal-failure release behavior remains automatic.
+Cleanup waits for any admitted delivery stream, retries transient filesystem failures, and retains
+pending cleanup state. If retries are exhausted, the server emits one safe diagnostic containing
+only the application job ID; it never logs temporary paths or provider data.
 
 After Decart accepts a batch VTO submission, a persistent prompt or explicitly saved-image outfit
 records an exact Recipe Shelf recent. Directly uploaded or imported reference files enter only the
 bounded tab-local recent registry and are never automatically persisted.
 
-The UI reports one planned submission, not credits or currency. The controlled pilot has no fixed
-participant-total or per-operation batch submission-count cap. Every provider submission remains
+The UI reports one planned submission, not credits or currency. Every provider submission remains
 an explicit, potentially billable action with no automatic retry or fallback.
 
 ## Evidence boundary

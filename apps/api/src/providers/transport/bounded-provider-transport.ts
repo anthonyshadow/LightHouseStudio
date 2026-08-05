@@ -7,6 +7,13 @@ export interface BoundedJsonErrorOptions {
 
 export type BoundedJsonErrorFactory = (options?: BoundedJsonErrorOptions) => Error;
 
+/** Authenticated provider requests must never follow a redirect with application credentials. */
+export const authenticatedProviderFetch = (
+  fetchImplementation: typeof fetch,
+  input: RequestInfo | URL,
+  init: RequestInit,
+): Promise<Response> => fetchImplementation(input, { ...init, redirect: 'error' });
+
 export const readBoundedJson = async (
   response: Response,
   createError: BoundedJsonErrorFactory,

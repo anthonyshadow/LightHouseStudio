@@ -2,7 +2,6 @@ import {
   capabilitiesResponseSchema,
   healthResponseSchema,
   REFERENCE_IMAGE_SIZES,
-  SUPPORTED_MODEL_IDS,
 } from '@studio/contracts';
 import type { FastifyInstance } from 'fastify';
 import type { ExistingVideoOperationBinding } from '../../providers/video-jobs/video-job-provider.js';
@@ -36,7 +35,6 @@ export const registerSystemRoutes = (
     capabilitiesResponseSchema.parse({
       realtimeVideo: {
         available: availability.decartAvailable,
-        models: [...SUPPORTED_MODEL_IDS],
       },
       videoProcessing: {
         characterSwap: {
@@ -73,7 +71,6 @@ export const registerSystemRoutes = (
         providerId: availability.referenceImageProviderId,
         modelId: availability.referenceImageModelId,
         sizes: [...REFERENCE_IMAGE_SIZES],
-        quality: availability.referenceImageQuality,
         optimizer: {
           available: availability.promptOptimizerAvailable,
           model: availability.promptOptimizerModel,

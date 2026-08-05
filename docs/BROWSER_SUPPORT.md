@@ -3,18 +3,15 @@
 ## Current support state
 
 Browser media behavior depends on the exact browser/OS patch, hardware, permissions, codec, and
-provider WebRTC path. The app feature-detects critical APIs, but the approved physical matrix is
-not yet qualified. The repository currently has no passing physical evidence records (`0/45`).
+provider WebRTC path. The app feature-detects critical APIs, while physical support claims still
+require validation on the exact target.
 
 Use a secure context. Loopback HTTP (`127.0.0.1` or `localhost`) is valid for the local product;
 non-loopback use requires HTTPS and a separately approved public security design.
 
-The approved target set is current stable Chrome, Firefox, and Safari where available, across the
-devices frozen in the [controlled-pilot contract](CONTROLLED_PILOT_RELEASE_CONTRACT.md). The exact
-rows and version strings live in
-[`qualification/required-matrix.json`](qualification/required-matrix.json). Record the latest
-generally available stable patch and exact installed version; support never carries automatically
-to a later browser/OS release.
+The target set is current stable Chrome, Firefox, and Safari where available. Record the latest
+generally available stable patch and exact installed version during manual validation; support
+never carries automatically to a later browser/OS release.
 
 ## Layout contract
 
@@ -31,7 +28,7 @@ Automated layout/visual checks cover:
 - document/body containment within one CSS pixel; and
 - deterministic Chromium states with animation disabled.
 
-Those checks protect implementation but do not qualify Safari, Firefox, touch hardware, safe
+Those checks protect implementation but do not validate Safari, Firefox, touch hardware, safe
 areas, the software keyboard, browser chrome changes, or physical 200% text/reflow. See
 [Manual QA](MANUAL_QA.md) and the
 [visual coverage manifest](screenshot-test-coverage.md).
@@ -74,7 +71,7 @@ Local Capture Settings offers 16:9 landscape and 9:16 portrait. The selected for
 persistent preview frame and is sent as an exact camera aspect constraint with the selected
 quality target; recording borrows the resulting track. A camera/browser that cannot satisfy the
 format may reject Start or Apply, and **Active capture** remains the source of truth for negotiated
-dimensions. Physical portrait support is not qualified until the device matrix passes.
+dimensions. Physical portrait support must be checked on each claimed target.
 
 **Switch camera** appears only when the active track and post-permission capabilities expose both
 `user` and `environment`. It requests the exact opposite facing mode and never cycles desktop
@@ -147,8 +144,8 @@ offset-aware stream accumulator rejects output beyond 300,000,000 bytes and rele
 cancel/error. Square, 4:5, other uploaded ratios, and incompatible Freeform outputs are valid local
 sources, but only 16:9 and 9:16 within 1% are eligible for Character Swap/VTO.
 
-Automated Chromium export or a working preview does not qualify the codec path on another browser.
-Physical rows must exercise real export and cancellation in current Safari, Firefox, and Chrome,
+Automated Chromium export or a working preview does not validate the codec path on another browser.
+Manual checks must exercise real export and cancellation in current Safari, Firefox, and Chrome,
 including touch, five-minute input, maximum-size memory, browser download, and external playback.
 
 ## Known physical risks
@@ -167,11 +164,11 @@ including touch, five-minute input, maximum-size memory, browser download, and e
   [recording memory policy](RECORDING_MEMORY_POLICY.md).
 - File-picker MIME reporting, H.264 MOV playback, WebM VP8 support, audio extraction, and download
   behavior differ across iOS, Android, Safari, Firefox, and Chrome. A browser-local preview is not
-  evidence that server/provider qualification passed.
+  evidence that server/provider validation passed.
 
-## Qualification rule
+## Physical validation rule
 
-Every required row must physically pass permission allow/deny/revoke; Local/Character/VTO capture;
+Every claimed target must physically pass permission allow/deny/revoke; Local/Character/VTO capture;
 uploaded-video pick, replace, local download, mutually exclusive Character Swap and batch VTO,
 including capability-required local MOV/WebM preparation; the
 local video editor's preview/render/cancel/replace choices; the 270/300-second warning and
@@ -181,6 +178,5 @@ also require native file pickers, portrait/landscape, safe areas, browser chrome
 keyboard, 200% text, touch-control recovery, and camera switching when exposed. Desktop rows
 require the five canonical viewports, pointer/keyboard recovery, 200% text, and device replacement.
 
-Record results through
-[controlled-pilot qualification evidence](PILOT_QUALIFICATION_EVIDENCE.md). Emulation, a different
-device/browser, or deterministic fakes cannot satisfy a physical row.
+Record content-free results in the release review notes. Emulation, a different device/browser, or
+deterministic fakes cannot validate a physical target.

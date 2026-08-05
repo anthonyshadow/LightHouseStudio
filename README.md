@@ -12,9 +12,8 @@ public, or multi-user deployment.
 ## Status
 
 The core workflow is implemented and automated tests cover local, Character, VTO, recording,
-review, and voice paths. The former controlled-pilot scope is not a current runtime or release
-gate. Physical-device and live-provider evidence remain useful validation inputs, but their
-absence does not disable configured application features.
+review, and voice paths. Physical-device and live-provider results remain useful validation
+inputs, but their absence does not disable configured application features.
 
 ## Product flow
 
@@ -244,7 +243,7 @@ pure policy         runtime HTTP schemas
                          │
                   apps/api Fastify broker
                          │
-       Decart / OpenAI / BFL / Wiro / ElevenLabs
+       Decart / Pruna / OpenAI / BFL / Wiro / ElevenLabs
 ```
 
 The creator of a stream, recorder, timer, listener, object URL, audio context, transcoder, or
@@ -267,7 +266,6 @@ Start with the [documentation map](docs/README.md). Key references:
 - [Implemented journeys](docs/userStories/README.md)
 - [Architecture and ownership](docs/ARCHITECTURE.md)
 - [Privacy and temporary data](docs/PRIVACY_AND_TEMPORARY_DATA.md)
-- [Historical controlled-pilot release contract](docs/CONTROLLED_PILOT_RELEASE_CONTRACT.md)
 - [Active implementation plan](docs/project-audit-implementation-plan.md)
 - [Browser support](docs/BROWSER_SUPPORT.md)
 - [Manual QA](docs/MANUAL_QA.md)

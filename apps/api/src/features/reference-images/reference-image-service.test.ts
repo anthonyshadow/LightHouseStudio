@@ -6,7 +6,7 @@ import type {
 } from '@studio/contracts';
 import type { CharacterPromptOptimizer } from '../../providers/openai/character-prompt-optimizer.js';
 import { CharacterPromptOptimizerError } from '../../providers/openai/character-prompt-optimizer.js';
-import type { ReferenceImageProvider } from '../../providers/openai/reference-image-provider.js';
+import type { ReferenceImageProvider } from '../../providers/reference-images/reference-image-provider.js';
 import { type ReferenceImageAssetStore, type StoreReferenceImageInput } from './asset-store.js';
 import { createStoredReferenceImageMetadata } from './asset-layout.js';
 import { createPromptOptimizationInputHash } from './prompt.js';
@@ -170,6 +170,27 @@ const runProviderOperation = (
 };
 
 describe('ReferenceImageService prompt optimization', () => {
+  it('uses an application cancellation error before validating a local upload', async () => {
+    const store = vi.fn<ReferenceImageAssetStore['store']>();
+    const service = new ReferenceImageService(null, createStore(store));
+    const controller = new AbortController();
+    controller.abort();
+
+    await expect(
+      service.upload({
+        localOwnerId,
+        requestId: 'a70d9fd8-c8fb-4b5c-b32b-569571bcc2f1',
+        bytes: Buffer.from('not-an-image'),
+        mimeType: 'image/png',
+        signal: controller.signal,
+      }),
+    ).rejects.toMatchObject({
+      name: 'ReferenceImageGenerationStateError',
+      reason: 'operation-aborted',
+    });
+    expect(store).not.toHaveBeenCalled();
+  });
+
   it('coalesces duplicate in-flight optimizer calls and returns a versioned fingerprint', async () => {
     let finish: ((value: CharacterPromptOptimizationResult) => void) | undefined;
     let providerSignal: AbortSignal | undefined;
@@ -275,7 +296,18 @@ describe('ReferenceImageService prompt optimization', () => {
           providerSignal = providerInput.signal;
         }),
     );
-    const service = new ReferenceImageService({ generate }, unusedStore);
+    const service = new ReferenceImageService(
+      {
+        descriptor: {
+          providerId: 'openai',
+          modelId: 'gpt-image-2',
+          adapterVersion: 'openai-gpt-image-v1',
+          effectiveSettings: { quality: 'high' },
+        },
+        generate,
+      },
+      unusedStore,
+    );
     const caller = new AbortController();
     const generationInput = {
       localOwnerId: 'a'.repeat(64),

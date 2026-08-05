@@ -232,10 +232,38 @@ export const createCreativeAssetRepository = (
   storage = initial.storage;
   let state = initial.state;
   const listeners = new Set<() => void>();
+  const selectorListeners = new Set<{
+    readonly selector: (state: CreativeAssetRepositoryState) => unknown;
+    readonly listener: () => void;
+    readonly isEqual: (left: unknown, right: unknown) => boolean;
+    selected: unknown;
+  }>();
   const now = options.now ?? (() => new Date());
   const idFactory = options.idFactory ?? defaultIdFactory;
 
-  const notify = () => listeners.forEach((listener) => listener());
+  let notifying = false;
+  let notificationPending = false;
+  const notify = () => {
+    if (notifying) {
+      notificationPending = true;
+      return;
+    }
+    do {
+      notificationPending = false;
+      notifying = true;
+      try {
+        [...listeners].forEach((listener) => listener());
+        for (const subscription of [...selectorListeners]) {
+          const selected = subscription.selector(state);
+          if (subscription.isEqual(subscription.selected, selected)) continue;
+          subscription.selected = selected;
+          subscription.listener();
+        }
+      } finally {
+        notifying = false;
+      }
+    } while (notificationPending);
+  };
 
   const commit = (nextStore: CreativeAssetStore) => {
     const store = sanitizeCreativeAssetStore(nextStore).store;
@@ -625,6 +653,16 @@ export const createCreativeAssetRepository = (
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
+    },
+    subscribeSelector: (selector, listener, isEqual = Object.is) => {
+      const subscription = {
+        selector: selector as (state: CreativeAssetRepositoryState) => unknown,
+        listener,
+        isEqual: isEqual as (left: unknown, right: unknown) => boolean,
+        selected: selector(state),
+      };
+      selectorListeners.add(subscription);
+      return () => selectorListeners.delete(subscription);
     },
     createSavedPrompt,
     updateSavedPrompt,

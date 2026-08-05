@@ -38,4 +38,4 @@
 ## Evidence status
 
 Immutable-original, cancellation, stale-result, remux, and object-URL behavior have deterministic
-coverage. Physical browser codec/playback and long-take memory evidence remain pilot gates.
+coverage. Physical browser codec/playback and long-take memory behavior remain manual checks.

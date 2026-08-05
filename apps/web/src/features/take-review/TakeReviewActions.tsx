@@ -34,6 +34,13 @@ const actionStyles = (
       paddingInline: presentation === 'control-bar' ? theme.space.xs : undefined,
       fontSize: presentation === 'control-bar' ? theme.fontSizes.caption : undefined,
     },
+    ...(presentation === 'panel'
+      ? {
+          display: 'grid',
+          gridTemplateColumns: 'minmax(0, 1fr)',
+          '& > *': { width: '100%', minWidth: 0 },
+        }
+      : {}),
   },
   '@media (max-width: 22.49rem)': {
     ...(presentation === 'control-bar'

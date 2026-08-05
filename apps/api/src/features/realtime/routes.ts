@@ -10,8 +10,7 @@ import { withRequestLifetime } from '../../http/streaming.js';
 import type { DecartTokenProvider } from '../../providers/decart/token-provider.js';
 
 const TOKEN_EXPIRY_SECONDS = 300;
-const ADVANCED_MAX_SESSION_DURATION_SECONDS = 300;
-const GUIDED_MAX_SESSION_DURATION_SECONDS = 420;
+const MAX_SESSION_DURATION_SECONDS = 300;
 
 const verifyProviderOrigin = (request: FastifyRequest): Promise<void> => {
   requireTrustedOrigin(request);
@@ -43,16 +42,12 @@ export const registerRealtimeRoutes = (
       }
 
       const origin = requireTrustedOrigin(request);
-      const maxSessionDurationSeconds =
-        parsed.data.sessionProfile === 'guided'
-          ? GUIDED_MAX_SESSION_DURATION_SECONDS
-          : ADVANCED_MAX_SESSION_DURATION_SECONDS;
       return withRequestLifetime(request, reply, async (signal) => {
         const token = await provider.createToken({
           model: parsed.data.model,
           origin,
           expiresInSeconds: TOKEN_EXPIRY_SECONDS,
-          maxSessionDurationSeconds,
+          maxSessionDurationSeconds: MAX_SESSION_DURATION_SECONDS,
           signal,
         });
         return realtimeTokenResponseSchema.parse({
@@ -60,7 +55,7 @@ export const registerRealtimeRoutes = (
           expiresAt: token.expiresAt,
           constraints: {
             model: parsed.data.model,
-            maxSessionDurationSeconds,
+            maxSessionDurationSeconds: MAX_SESSION_DURATION_SECONDS,
             applicationOrigin: origin,
           },
         });
