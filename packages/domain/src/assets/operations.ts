@@ -197,6 +197,24 @@ const unlinkRecentCharacter = (
   };
 };
 
+const unlinkRecentCharacterVariant = (
+  recent: RecentPrompt,
+  savedCharacterVariantId: string,
+): RecentPrompt => {
+  if (recent.savedCharacterVariantId !== savedCharacterVariantId) return recent;
+  return {
+    id: recent.id,
+    prompt: recent.prompt,
+    modelModeId: recent.modelModeId,
+    ...(recent.savedPromptId ? { savedPromptId: recent.savedPromptId } : {}),
+    ...(recent.characterName ? { characterName: recent.characterName } : {}),
+    referenceImageAssetId: recent.referenceImageAssetId,
+    vtonInputKind: recent.vtonInputKind,
+    enhancePrompt: recent.enhancePrompt,
+    usedAt: recent.usedAt,
+  };
+};
+
 export const createSavedPrompt = (
   store: CreativeAssetStore,
   input: SavedPromptInput,
@@ -750,6 +768,20 @@ export const createSavedCharacterVariant = (
     savedCharacterVariants,
   };
 };
+
+export const deleteSavedCharacterVariant = (
+  store: CreativeAssetStore,
+  id: string,
+): CreativeAssetStore => ({
+  ...store,
+  savedCharacterPrompts: store.savedCharacterPrompts.map((character) =>
+    character.selectedWardrobeVariantId === id
+      ? { ...character, selectedWardrobeVariantId: null }
+      : character,
+  ),
+  recentPrompts: store.recentPrompts.map((recent) => unlinkRecentCharacterVariant(recent, id)),
+  savedCharacterVariants: store.savedCharacterVariants.filter((variant) => variant.id !== id),
+});
 
 export const selectCharacterVersion = (
   store: CreativeAssetStore,

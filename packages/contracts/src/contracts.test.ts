@@ -369,6 +369,22 @@ describe('reference image contracts', () => {
     ).toBe(false);
   });
 
+  it('accepts explicit drastic-change intent while default-compatible requests omit it', () => {
+    const request = {
+      requestId: 'cb6ab812-0ebd-455b-8fe1-3a3665daf158',
+      sourcePromptMode: 'image-only' as const,
+      allowDrasticChanges: true,
+      changeInstructions: 'Replace the person with a crystalline alien.',
+      options,
+      optimization: { enabled: false as const },
+    };
+
+    expect(editReferenceImageRequestSchema.parse(request)).toEqual(request);
+    expect(
+      editReferenceImageRequestSchema.safeParse({ ...request, allowDrasticChanges: 'yes' }).success,
+    ).toBe(false);
+  });
+
   it('accepts optimized and explicit raw-fallback source-image composition', () => {
     const request = {
       requestId: 'cb6ab812-0ebd-455b-8fe1-3a3665daf158',

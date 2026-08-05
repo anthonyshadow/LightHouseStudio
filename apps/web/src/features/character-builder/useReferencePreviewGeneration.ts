@@ -24,6 +24,7 @@ export interface ReferencePreviewGenerationInput {
   sourceAssetId?: string | undefined;
   changeInstructions?: string | undefined;
   sourcePromptMode?: 'character-prompt' | 'image-only' | undefined;
+  allowDrasticChanges?: boolean | undefined;
   attemptOptimization?: boolean | undefined;
   fallbackOnOptimizationFailure?: boolean | undefined;
   forceOptimization?: boolean | undefined;
@@ -151,6 +152,7 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
           kind: edit ? 'edit' : compose ? 'compose' : 'generate',
           sourceAssetId: edit || compose ? input.sourceAssetId : null,
           sourcePromptMode: edit ? (input.sourcePromptMode ?? 'character-prompt') : null,
+          allowDrasticChanges: edit ? Boolean(input.allowDrasticChanges) : false,
           sourceKey,
           changeInstructions,
           optimizationInputHash: optimization?.inputHash ?? null,
@@ -169,6 +171,7 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
                   ? {
                       requestId: providerRequestId,
                       sourcePromptMode: 'image-only',
+                      allowDrasticChanges: Boolean(input.allowDrasticChanges),
                       changeInstructions,
                       options: input.options,
                       optimization: { enabled: false },
@@ -176,6 +179,7 @@ export const useReferencePreviewGeneration = (callbacks: ReferencePreviewGenerat
                   : {
                       requestId: providerRequestId,
                       rawPrompt: input.rawPrompt,
+                      allowDrasticChanges: Boolean(input.allowDrasticChanges),
                       changeInstructions,
                       options: input.options,
                       optimization: requestOptimization,

@@ -24,8 +24,8 @@ import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/errors.js';
 import {
   localOwnerIdForRequest,
+  requireReferenceImageImportIntent,
   requireTrustedOrigin,
-  requireVideoProviderIntent,
   requireWardrobeProviderIntent,
 } from '../../http/security.js';
 import { withRequestLifetime } from '../../http/streaming.js';
@@ -52,10 +52,7 @@ const verifyGenerationOrigin = (request: FastifyRequest): Promise<void> => {
 
 const verifyRemoteImportIntent = (request: FastifyRequest): Promise<void> => {
   requireTrustedOrigin(request);
-  requireVideoProviderIntent(
-    request,
-    'Remote reference import requires explicit local Studio intent.',
-  );
+  requireReferenceImageImportIntent(request);
   return Promise.resolve();
 };
 

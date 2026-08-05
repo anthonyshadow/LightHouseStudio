@@ -8,6 +8,9 @@ import { StudioDesignProvider } from '../../ui';
 import type { CharacterBuilderUploadedReference } from './machine';
 import { BuilderReferenceImageField } from './BuilderReferenceImageField';
 
+const api = vi.hoisted(() => ({ importRemoteReferenceImage: vi.fn() }));
+vi.mock('../../adapters/api-client/apiClient', () => api);
+
 const uploadedReference: CharacterBuilderUploadedReference = {
   asset: {
     assetId: '8f45ea24-c274-41a5-a988-aa0602115191',
@@ -30,6 +33,43 @@ afterEach(() => {
 });
 
 describe('BuilderReferenceImageField presentation', () => {
+  it('imports a public HTTPS image through the shared URL flow', async () => {
+    const user = userEvent.setup();
+    const onSelect = vi.fn();
+    const imported = new File(['remote portrait'], 'remote-portrait.webp', {
+      type: 'image/webp',
+    });
+    api.importRemoteReferenceImage.mockResolvedValue(imported);
+    render(
+      <StudioDesignProvider>
+        <BuilderReferenceImageField
+          reference={null}
+          pending={false}
+          error={null}
+          disabled={false}
+          onSelect={onSelect}
+          onRemove={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    expect(
+      screen.queryByRole('textbox', { name: 'Public HTTPS image URL' }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Use an image URL instead' }));
+    await user.type(
+      screen.getByRole('textbox', { name: 'Public HTTPS image URL' }),
+      'https://images.example.test/portrait.webp',
+    );
+    await user.click(screen.getByRole('button', { name: 'Import image' }));
+
+    await waitFor(() => expect(onSelect).toHaveBeenCalledWith(imported));
+    expect(api.importRemoteReferenceImage).toHaveBeenCalledWith(
+      'https://images.example.test/portrait.webp',
+      expect.any(AbortSignal),
+    );
+  });
+
   it('preserves the picker name, accepted types, guidance, and same-file replacement behavior', async () => {
     const user = userEvent.setup();
     const onSelect = vi.fn();

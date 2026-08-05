@@ -6,6 +6,7 @@ import {
   createEmptyCreativeAssetStore,
   createSavedPrompt as createDomainSavedPrompt,
   deleteSavedCharacterPrompt as deleteDomainCharacterPrompt,
+  deleteSavedCharacterVariant as deleteDomainCharacterVariant,
   deleteSavedPrompt as deleteDomainSavedPrompt,
   enrichNewestMatchingRecentWithReferenceImage,
   parseCreativeAssetStore,
@@ -553,6 +554,16 @@ export const createCreativeAssetRepository = (
     }
   };
 
+  const deleteSavedCharacterVariant = (id: string) => {
+    if (!state.store.savedCharacterVariants.some((variant) => variant.id === id)) {
+      throw new CreativeAssetError(
+        'not-found',
+        'That character variant is no longer in this library.',
+      );
+    }
+    commit(deleteDomainCharacterVariant(state.store, id));
+  };
+
   const selectCharacterVersion: CreativeAssetRepository['selectCharacterVersion'] = (selection) => {
     try {
       commit(
@@ -625,6 +636,7 @@ export const createCreativeAssetRepository = (
     renameSavedCharacterPrompt: (id, name) => updateSavedCharacterPrompt(id, { name }),
     deleteSavedCharacterPrompt,
     createSavedCharacterVariant,
+    deleteSavedCharacterVariant,
     selectCharacterVersion,
     recordSuccessfulPrompt,
     enrichNewestMatchingRecent,

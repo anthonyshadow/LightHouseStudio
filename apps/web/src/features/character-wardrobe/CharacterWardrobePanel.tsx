@@ -1,6 +1,6 @@
 import type { CharacterReferenceOptions, ReferenceImageAsset } from '@studio/contracts';
 import { useTheme } from '@emotion/react';
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   createOutfitTryOn,
   fetchReferenceImageMetadata,
@@ -9,6 +9,7 @@ import {
 import { validateReferenceImage } from '../../adapters/browser-media/imageValidation';
 import {
   Button,
+  ConfirmationDialog,
   ReferenceImagePreview,
   SegmentedControl,
   StatusNotice,
@@ -62,6 +63,7 @@ export const CharacterWardrobePanel = ({
   readonly onClose: () => void;
 }) => {
   const theme = useTheme();
+  const drasticChangesId = useId();
   const variants = store.savedCharacterVariants.filter(
     (variant) => variant.parentCharacterId === character.id,
   );
@@ -72,11 +74,13 @@ export const CharacterWardrobePanel = ({
   );
   const [garment, setGarment] = useState<File | null>(null);
   const [instructions, setInstructions] = useState('');
+  const [allowDrasticChanges, setAllowDrasticChanges] = useState(false);
   const [title, setTitle] = useState('');
   const [preview, setPreview] = useState<ReferenceImageAsset | null>(null);
   const [garmentAssetId, setGarmentAssetId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
   const operationRef = useRef<{ controller: AbortController; key: string } | null>(null);
   const retryRef = useRef<{ fingerprint: string; requestId: string } | null>(null);
 
@@ -89,6 +93,7 @@ export const CharacterWardrobePanel = ({
       sourceVariantId !== character.selectedWardrobeVariantId ||
       garment ||
       instructions.trim() ||
+      allowDrasticChanges ||
       title.trim() ||
       preview ||
       busy,
@@ -201,9 +206,10 @@ export const CharacterWardrobePanel = ({
   const generateFeatures = async () => {
     if (!sourceAssetId || !instructions.trim() || busy || !changeFeaturesAvailable) return;
     const selectedSourceAssetId = sourceAssetId;
-    const selectedSourcePromptMode = sourceVariantId ? 'image-only' : 'character-prompt';
+    const selectedSourcePromptMode =
+      sourceVariantId || allowDrasticChanges ? 'image-only' : 'character-prompt';
     const selectedInstructions = instructions.trim();
-    const key = `features:${selectedSourceAssetId}:${selectedInstructions}`;
+    const key = `features:${selectedSourceAssetId}:${allowDrasticChanges ? 'drastic' : 'faithful'}:${selectedInstructions}`;
     const controller = new AbortController();
     operationRef.current = { controller, key };
     setBusy(true);
@@ -224,6 +230,7 @@ export const CharacterWardrobePanel = ({
             character.prompt.trim() || `Faithful character reference for ${character.name}`,
           sourceAssetId: selectedSourceAssetId,
           sourcePromptMode: selectedSourcePromptMode,
+          allowDrasticChanges,
           changeInstructions: selectedInstructions,
           options: sourceOptions,
           attemptOptimization: false,
@@ -260,93 +267,132 @@ export const CharacterWardrobePanel = ({
     setGarment(null);
     setGarmentAssetId(null);
     setInstructions('');
+    setAllowDrasticChanges(false);
     setPreview(null);
     onSaved?.();
   };
 
   if (!creating) {
+    const deleteCandidate = deleteCandidateId
+      ? (variants.find((variant) => variant.id === deleteCandidateId) ?? null)
+      : null;
     return (
-      <div
-        css={{
-          height: '100%',
-          minHeight: 0,
-          display: 'grid',
-          gridTemplateRows: 'auto auto minmax(0, 1fr)',
-          gap: theme.space.sm,
-        }}
-      >
-        <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.xs }}>
-          <Button
-            variant="primary"
-            disabled={!character.referenceImageAssetId || !addOutfitAvailable}
-            title={
-              !addOutfitAvailable
-                ? 'Add Outfit is unavailable until server configuration is complete.'
-                : undefined
-            }
-            onClick={() => setCreating('add-outfit')}
-          >
-            Add outfit
-          </Button>
-          <Button
-            variant="secondary"
-            disabled={!character.referenceImageAssetId || !changeFeaturesAvailable}
-            title={
-              !changeFeaturesAvailable
-                ? 'Change Features is unavailable from the selected image provider.'
-                : undefined
-            }
-            onClick={() => setCreating('change-features')}
-          >
-            Change features
-          </Button>
-        </div>
-        {!character.referenceImageAssetId ? (
-          <StatusNotice tone="warning">
-            Add or generate a reference image in Character Builder before creating wardrobe
-            variants. The original prompt remains usable.
-          </StatusNotice>
-        ) : !addOutfitAvailable || !changeFeaturesAvailable ? (
-          <StatusNotice tone="neutral">
-            {!addOutfitAvailable ? 'Add Outfit is not configured. ' : ''}
-            {!changeFeaturesAvailable ? 'Change Features is not configured. ' : ''}Saved versions
-            remain available.
-          </StatusNotice>
-        ) : null}
+      <>
         <div
-          data-scroll-region="character-wardrobe"
           css={{
+            height: '100%',
             minHeight: 0,
-            overflow: 'auto',
             display: 'grid',
-            alignContent: 'start',
+            gridTemplateRows: 'auto auto minmax(0, 1fr)',
             gap: theme.space.sm,
           }}
         >
-          <TextField
-            label="Search wardrobe"
-            value={query}
-            onChange={(event) => setQuery(event.currentTarget.value)}
-          />
-          {visibleOptions.length ? (
-            <CharacterVersionSelector
-              versions={visibleOptions}
-              selectedValue={character.selectedWardrobeVariantId ?? ORIGINAL_VALUE}
-              disabled={useDisabled}
-              allowPromptOnlyOriginal
-              onSelect={(value) =>
-                onUse({
-                  characterId: character.id,
-                  variantId: value === ORIGINAL_VALUE ? null : value,
-                })
+          <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.xs }}>
+            <Button
+              variant="primary"
+              disabled={!character.referenceImageAssetId || !addOutfitAvailable}
+              title={
+                !addOutfitAvailable
+                  ? 'Add Outfit is unavailable until server configuration is complete.'
+                  : undefined
               }
+              onClick={() => setCreating('add-outfit')}
+            >
+              Add outfit
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={!character.referenceImageAssetId || !changeFeaturesAvailable}
+              title={
+                !changeFeaturesAvailable
+                  ? 'Change Features is unavailable from the selected image provider.'
+                  : undefined
+              }
+              onClick={() => setCreating('change-features')}
+            >
+              Change features
+            </Button>
+          </div>
+          {!character.referenceImageAssetId ? (
+            <StatusNotice tone="warning">
+              Add or generate a reference image in Character Builder before creating wardrobe
+              variants. The original prompt remains usable.
+            </StatusNotice>
+          ) : !addOutfitAvailable || !changeFeaturesAvailable ? (
+            <StatusNotice tone="neutral">
+              {!addOutfitAvailable ? 'Add Outfit is not configured. ' : ''}
+              {!changeFeaturesAvailable ? 'Change Features is not configured. ' : ''}Saved versions
+              remain available.
+            </StatusNotice>
+          ) : null}
+          <div
+            data-scroll-region="character-wardrobe"
+            css={{
+              minHeight: 0,
+              overflow: 'auto',
+              display: 'grid',
+              alignContent: 'start',
+              gap: theme.space.sm,
+            }}
+          >
+            <TextField
+              label="Search wardrobe"
+              value={query}
+              onChange={(event) => setQuery(event.currentTarget.value)}
             />
-          ) : (
-            <StatusNotice tone="neutral">No wardrobe versions match this search.</StatusNotice>
-          )}
-          {variants.length === 0 ? <p>No variants yet. Create one when you are ready.</p> : null}
+            {visibleOptions.length ? (
+              <CharacterVersionSelector
+                versions={visibleOptions}
+                selectedValue={character.selectedWardrobeVariantId ?? ORIGINAL_VALUE}
+                disabled={useDisabled}
+                allowPromptOnlyOriginal
+                onDelete={setDeleteCandidateId}
+                onSelect={(value) =>
+                  onUse({
+                    characterId: character.id,
+                    variantId: value === ORIGINAL_VALUE ? null : value,
+                  })
+                }
+              />
+            ) : (
+              <StatusNotice tone="neutral">No wardrobe versions match this search.</StatusNotice>
+            )}
+            {error ? (
+              <StatusNotice tone="danger" role="alert">
+                {error}
+              </StatusNotice>
+            ) : null}
+            {variants.length === 0 ? <p>No variants yet. Create one when you are ready.</p> : null}
+          </div>
         </div>
-      </div>
+        <ConfirmationDialog
+          open={deleteCandidate !== null}
+          title={
+            deleteCandidate ? `Delete “${deleteCandidate.title}”?` : 'Delete character variant?'
+          }
+          description="This removes the saved variant and its library links. Immutable local image bytes remain until whole-environment retirement."
+          confirmLabel="Delete variant"
+          cancelLabel="Keep variant"
+          danger
+          onCancel={() => setDeleteCandidateId(null)}
+          onConfirm={() => {
+            if (!deleteCandidate) return;
+            try {
+              repository.deleteSavedCharacterVariant(deleteCandidate.id);
+              setDeleteCandidateId(null);
+              setError(null);
+              onSaved?.();
+            } catch (caught) {
+              setDeleteCandidateId(null);
+              setError(
+                caught instanceof Error
+                  ? caught.message
+                  : 'The character variant could not be deleted.',
+              );
+            }
+          }}
+        />
+      </>
     );
   }
 
@@ -386,6 +432,7 @@ export const CharacterWardrobePanel = ({
           css={{ justifySelf: 'start' }}
           onClick={() => {
             invalidatePreview();
+            setAllowDrasticChanges(false);
             setCreating(null);
           }}
         >
@@ -401,6 +448,7 @@ export const CharacterWardrobePanel = ({
           disabled={busy}
           onChange={(value) => {
             invalidatePreview();
+            setAllowDrasticChanges(false);
             setCreating(value);
           }}
         />
@@ -475,17 +523,50 @@ export const CharacterWardrobePanel = ({
                   }}
                 />
               ) : (
-                <TextAreaField
-                  label="Required changes"
-                  hint={`${instructions.length}/2,000`}
-                  maxLength={2_000}
-                  value={instructions}
-                  disabled={busy}
-                  onChange={(event) => {
-                    invalidatePreview();
-                    setInstructions(event.currentTarget.value);
-                  }}
-                />
+                <div css={{ display: 'grid', gap: theme.space.xs }}>
+                  <TextAreaField
+                    label="Required changes"
+                    hint={`${instructions.length}/2,000`}
+                    maxLength={2_000}
+                    value={instructions}
+                    disabled={busy}
+                    onChange={(event) => {
+                      invalidatePreview();
+                      setInstructions(event.currentTarget.value);
+                    }}
+                  />
+                  <div
+                    css={{
+                      minHeight: '2.75rem',
+                      display: 'grid',
+                      gridTemplateColumns: 'auto minmax(0, 1fr)',
+                      alignItems: 'start',
+                      gap: theme.space.xs,
+                    }}
+                  >
+                    <input
+                      id={drasticChangesId}
+                      type="checkbox"
+                      checked={allowDrasticChanges}
+                      disabled={busy}
+                      css={{ width: '1.25rem', height: '1.25rem', marginBlockStart: '0.125rem' }}
+                      onChange={(event) => {
+                        invalidatePreview();
+                        setAllowDrasticChanges(event.currentTarget.checked);
+                      }}
+                    />
+                    <label
+                      htmlFor={drasticChangesId}
+                      css={{ cursor: busy ? 'not-allowed' : 'pointer' }}
+                    >
+                      <strong css={{ display: 'block' }}>Allow major departure from source</strong>
+                      <small css={{ color: theme.colors.textMuted }}>
+                        Let the prompt replace identity and other defining traits. Leave unchecked
+                        to preserve the selected character.
+                      </small>
+                    </label>
+                  </div>
+                </div>
               )}
               <div css={{ display: 'flex', flexWrap: 'wrap', gap: theme.space.xs }}>
                 <Button

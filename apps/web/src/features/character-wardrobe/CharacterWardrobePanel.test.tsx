@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import { ThemeProvider } from '@emotion/react';
+import type { EditReferenceImageRequest } from '@studio/contracts';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -81,6 +82,7 @@ const store: CreativeAssetStore = {
 const renderPanel = (overrides: Partial<Parameters<typeof CharacterWardrobePanel>[0]> = {}) => {
   const repository = {
     createSavedCharacterVariant: vi.fn(),
+    deleteSavedCharacterVariant: vi.fn(),
   } as unknown as CreativeAssetRepository;
   const onUse = vi.fn();
   render(
@@ -118,6 +120,20 @@ describe('CharacterWardrobePanel', () => {
 
     await user.click(screen.getByRole('button', { name: 'Use' }));
     expect(onUse).toHaveBeenCalledWith({ characterId: character.id, variantId: null });
+  });
+
+  it('confirms before deleting a saved variant and preserves immutable image bytes', async () => {
+    const user = userEvent.setup();
+    const onSaved = vi.fn();
+    const { repository } = renderPanel({ onSaved });
+
+    await user.click(screen.getByRole('button', { name: 'Delete Blue jacket' }));
+    const dialog = screen.getByRole('dialog', { name: 'Delete “Blue jacket”?' });
+    expect(dialog).toHaveTextContent('Immutable local image bytes remain');
+    await user.click(within(dialog).getByRole('button', { name: 'Delete variant' }));
+
+    expect(repository.deleteSavedCharacterVariant).toHaveBeenCalledWith('variant-one');
+    expect(onSaved).toHaveBeenCalledOnce();
   });
 
   it('keeps prompt-only characters visible and disables both creation paths with guidance', () => {
@@ -224,6 +240,7 @@ describe('CharacterWardrobePanel', () => {
       'original-image',
       expect.objectContaining({
         rawPrompt: character.prompt,
+        allowDrasticChanges: false,
         changeInstructions: 'Add silver glasses.',
         optimization: { enabled: false },
       }),
@@ -264,6 +281,7 @@ describe('CharacterWardrobePanel', () => {
       'yoga-image',
       expect.objectContaining({
         sourcePromptMode: 'image-only',
+        allowDrasticChanges: false,
         changeInstructions: 'Add a warm expression.',
       }),
       expect.any(AbortSignal),
@@ -281,5 +299,37 @@ describe('CharacterWardrobePanel', () => {
         changeInstructions: 'Add a warm expression.',
       },
     });
+  });
+
+  it('keeps drastic changes off by default and opts into image-authoritative generation', async () => {
+    const user = userEvent.setup();
+    renderPanel();
+    api.editReferenceImage.mockResolvedValue({
+      assetId: 'drastic-result',
+      source: 'generated',
+      options: {},
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Change features' }));
+    const originalCard = screen.getByText('Original character').closest('article');
+    if (!originalCard) throw new Error('Expected the original source card.');
+    await user.click(within(originalCard).getByRole('button', { name: 'Choose source' }));
+    const checkbox = screen.getByRole('checkbox', {
+      name: /Allow major departure from source/u,
+    });
+    expect(checkbox).not.toBeChecked();
+    await user.click(checkbox);
+    await user.type(screen.getByLabelText('Required changes'), 'Create a crystalline alien being.');
+    await user.click(screen.getByRole('button', { name: 'Generate changes' }));
+
+    await waitFor(() => expect(api.editReferenceImage).toHaveBeenCalledOnce());
+    const request = api.editReferenceImage.mock.calls[0]?.[1] as
+      EditReferenceImageRequest | undefined;
+    expect(request).toMatchObject({
+      sourcePromptMode: 'image-only',
+      allowDrasticChanges: true,
+      changeInstructions: 'Create a crystalline alien being.',
+    });
+    expect(request).not.toHaveProperty('rawPrompt');
   });
 });

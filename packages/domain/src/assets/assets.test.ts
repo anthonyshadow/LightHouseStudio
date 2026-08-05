@@ -14,6 +14,7 @@ import {
   createSavedCharacterVariant,
   createSavedPrompt,
   deleteSavedCharacterPrompt,
+  deleteSavedCharacterVariant,
   deleteSavedPrompt,
   enrichNewestMatchingRecentWithReferenceImage,
   parseCreativeAssetStore,
@@ -619,6 +620,16 @@ describe('creative asset CRUD and use', () => {
     expect(store.recentPrompts[0]).toMatchObject({
       savedCharacterPromptId: 'host',
       savedCharacterVariantId: 'variant-two',
+      referenceImageAssetId: 'host-features',
+    });
+
+    store = deleteSavedCharacterVariant(store, 'variant-two');
+    expect(store.savedCharacterVariants.map((variant) => variant.id)).toEqual(['variant-one']);
+    expect(store.savedCharacterPrompts[0]?.selectedWardrobeVariantId).toBeNull();
+    expect(store.recentPrompts[0]).not.toHaveProperty('savedCharacterPromptId');
+    expect(store.recentPrompts[0]).not.toHaveProperty('savedCharacterVariantId');
+    expect(store.recentPrompts[0]).toMatchObject({
+      characterName: 'Field host',
       referenceImageAssetId: 'host-features',
     });
 

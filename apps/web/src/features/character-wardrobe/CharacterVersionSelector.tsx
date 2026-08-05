@@ -18,6 +18,7 @@ export const CharacterVersionSelector = ({
   allowPromptOnlyOriginal = false,
   actionLabel = 'Use',
   onSelect,
+  onDelete,
 }: {
   readonly versions: readonly CharacterVersionOption[];
   readonly selectedValue: string | null;
@@ -25,6 +26,7 @@ export const CharacterVersionSelector = ({
   readonly allowPromptOnlyOriginal?: boolean;
   readonly actionLabel?: string;
   readonly onSelect: (value: string) => void;
+  readonly onDelete?: (value: string) => void;
 }) => {
   const theme = useTheme();
   return (
@@ -98,18 +100,31 @@ export const CharacterVersionSelector = ({
                 {version.useCount ? ` · Used ${version.useCount}×` : ''}
               </small>
             </div>
-            <Button
-              variant={selected ? 'primary' : 'secondary'}
-              size="small"
-              disabled={
-                disabled ||
-                (!version.referenceImageAssetId && !(allowPromptOnlyOriginal && version.original))
-              }
-              aria-pressed={selected}
-              onClick={() => onSelect(version.value)}
-            >
-              {selected ? 'Selected' : actionLabel}
-            </Button>
+            <div css={{ display: 'grid', gap: theme.space.xs }}>
+              <Button
+                variant={selected ? 'primary' : 'secondary'}
+                size="small"
+                disabled={
+                  disabled ||
+                  (!version.referenceImageAssetId && !(allowPromptOnlyOriginal && version.original))
+                }
+                aria-pressed={selected}
+                onClick={() => onSelect(version.value)}
+              >
+                {selected ? 'Selected' : actionLabel}
+              </Button>
+              {!version.original && onDelete ? (
+                <Button
+                  variant="danger"
+                  size="small"
+                  disabled={disabled}
+                  aria-label={`Delete ${version.title}`}
+                  onClick={() => onDelete(version.value)}
+                >
+                  Delete
+                </Button>
+              ) : null}
+            </div>
           </article>
         );
       })}

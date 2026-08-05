@@ -279,6 +279,38 @@ describe('createCreativeAssetRepository', () => {
     ).toBe(1);
   });
 
+  it('deletes one wardrobe variant and rejects a repeated deletion', () => {
+    const repository = repositoryFixture();
+    const character = repository.createSavedCharacterPrompt({
+      name: 'Variant owner',
+      prompt: 'Replace the subject with a variant owner.',
+      promptIntent: 'character-transform',
+      referenceImageStatus: 'persisted-reference',
+      referenceImageAssetId: 'owner-original',
+    });
+    const variant = repository.createSavedCharacterVariant({
+      parentCharacterId: character.id,
+      title: 'Copper form',
+      referenceImageAssetId: 'owner-copper',
+      creation: {
+        method: 'change-features',
+        sourceReferenceImageAssetId: 'owner-original',
+        changeInstructions: 'Make the character copper.',
+      },
+    });
+    repository.selectCharacterVersion({ characterId: character.id, variantId: variant.id });
+
+    repository.deleteSavedCharacterVariant(variant.id);
+
+    expect(repository.getSnapshot().store.savedCharacterVariants).toEqual([]);
+    expect(
+      repository.getSnapshot().store.savedCharacterPrompts[0]?.selectedWardrobeVariantId,
+    ).toBeNull();
+    expect(() => repository.deleteSavedCharacterVariant(variant.id)).toThrow(
+      expect.objectContaining({ code: 'not-found' }),
+    );
+  });
+
   it('persists image-only characters and retains their standalone Recent recipe after deletion', () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);

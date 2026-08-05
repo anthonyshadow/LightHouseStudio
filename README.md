@@ -66,8 +66,11 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
   variants. Browsing and exact version selection stay local. **Add Outfit** contacts Pruna only
   from explicit Generate/Regenerate; **Change Features** uses the startup-selected OpenAI/BFL/Wiro
   image provider with optimization disabled. Original-source edits include the parent prompt;
-  variant-source edits treat the selected image as authoritative and send no parent prompt.
-  Saving never selects a variant implicitly.
+  variant-source edits treat the selected image as authoritative and send no parent prompt. An
+  optional, default-off major-departure control also treats the selected image as image-only input
+  and allows requested identity and defining-trait changes. Saving never selects a variant
+  implicitly. Deleting a variant removes its browser-local metadata and links while retaining
+  immutable image bytes.
 - Outfit Builder creates reusable prompt or reference-image VTO recipes. Prompt enhancement is
   remembered with prompt outfits. A selected image remains tab-temporary until final Save, when
   the existing idempotent local upload endpoint makes it durable; Save never starts media or
@@ -98,9 +101,9 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
   provider fallback.
 - ElevenLabs lists voices already saved in the configured account. Preview does not upload the
   take; Apply sends only the immutable original audio sidecar.
-- Explicit Character Swap/VTO image-URL import uses the loopback broker, accepts public HTTPS
-  JPEG/PNG/WebP only, pins public DNS across bounded redirects, validates decoded contents, and
-  never retains the URL.
+- Explicit Character Builder, Character Swap, VTO, and Outfit Builder image-URL import uses the
+  loopback broker, accepts public HTTPS JPEG/PNG/WebP only, pins public DNS across bounded
+  redirects, validates decoded contents, and never retains the URL.
 - Provider credentials remain server-side. API contracts and errors are app-owned and sanitized.
 
 See [privacy and temporary data](docs/PRIVACY_AND_TEMPORARY_DATA.md) for the complete storage,

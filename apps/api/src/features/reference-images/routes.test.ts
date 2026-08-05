@@ -170,7 +170,7 @@ describe('reference image API', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/reference-images/import',
-      headers: { ...localHeaders, 'x-lightframe-provider-intent': 'video' },
+      headers: { ...localHeaders, 'x-lightframe-provider-intent': 'reference-image-import' },
       payload: { url: sourceUrl },
     });
     expect(response.statusCode).toBe(200);
@@ -195,7 +195,7 @@ describe('reference image API', () => {
     const response = await app.inject({
       method: 'POST',
       url: '/api/reference-images/import',
-      headers: { ...localHeaders, 'x-lightframe-provider-intent': 'video' },
+      headers: { ...localHeaders, 'x-lightframe-provider-intent': 'reference-image-import' },
       payload: { url: sourceUrl },
     });
 

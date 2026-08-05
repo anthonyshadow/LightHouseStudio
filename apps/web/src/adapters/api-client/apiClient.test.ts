@@ -402,7 +402,7 @@ describe('reference image API client', () => {
     expect(new Headers(init.headers).get('Idempotency-Key')).toBe(requestId);
   });
 
-  it('imports a remote image through the explicit same-origin video-intent endpoint', async () => {
+  it('imports a remote image through the explicit same-origin reference-import endpoint', async () => {
     const response = new Response(new Blob([jpegBytes], { type: 'image/jpeg' }), {
       status: 200,
       headers: {
@@ -431,7 +431,7 @@ describe('reference image API client', () => {
     const headers = new Headers(
       (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].headers,
     );
-    expect(headers.get('x-lightframe-provider-intent')).toBe('video');
+    expect(headers.get('x-lightframe-provider-intent')).toBe('reference-image-import');
   });
 
   it('composes a generated asset from an opaque uploaded source identity', async () => {

@@ -31,7 +31,7 @@ export const createPromptOptimizationInputHash = (
 };
 
 export const REFERENCE_IMAGE_EDIT_PROMPT_TEMPLATE_VERSION =
-  'lucy-character-reference-edit-v3' as const;
+  'lucy-character-reference-edit-v4' as const;
 export const REFERENCE_IMAGE_COMPOSITION_PROMPT_TEMPLATE_VERSION =
   'lucy-character-reference-compose-v1' as const;
 
@@ -42,13 +42,16 @@ export const REFERENCE_IMAGE_COMPOSITION_PROMPT_TEMPLATE_VERSION =
 export const createReferenceImageEditPrompt = (
   optimizedCharacterPrompt: string | null,
   changeInstructions: string,
+  allowDrasticChanges = false,
 ): string => {
   const requestedChange = `Edit the person in the supplied image. Apply every requested change:\n${changeInstructions}`;
-  const direction = optimizedCharacterPrompt
-    ? '\n\nCharacter context for unchanged identity and style details only; ignore anything here that conflicts with a requested change:\n'
-    : '';
-  const requirements =
-    '\n\nThe final image must visibly satisfy every requested change. Use the strength and extent stated; when none is stated, make each change strong, obvious, and realistic. Requested changes override the source image and character context. Keep the same recognizable character and preserve pose, outfit, framing, lighting, background, and visual style only where they do not conflict. Do not return an unchanged or near-unchanged image, skip a requested change, or introduce unrelated changes.';
+  const direction =
+    optimizedCharacterPrompt && !allowDrasticChanges
+      ? '\n\nCharacter context for unchanged identity and style details only; ignore anything here that conflicts with a requested change:\n'
+      : '';
+  const requirements = allowDrasticChanges
+    ? '\n\nThe final image must visibly satisfy every requested change. The requested changes are authoritative and may replace the person or character identity, face, body traits, age, appearance, pose, outfit, framing, lighting, background, and visual style. Treat the supplied image only as optional composition guidance where it does not conflict. Do not preserve recognizable identity unless the request asks for it, and do not return an unchanged or near-unchanged image.'
+    : '\n\nThe final image must visibly satisfy every requested change. Use the strength and extent stated; when none is stated, make each change strong, obvious, and realistic. Requested changes override the source image and character context. Keep the same recognizable character and preserve pose, outfit, framing, lighting, background, and visual style only where they do not conflict. Do not return an unchanged or near-unchanged image, skip a requested change, or introduce unrelated changes.';
   const availablePromptLength = Math.max(
     0,
     REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH -
@@ -56,7 +59,9 @@ export const createReferenceImageEditPrompt = (
       direction.length -
       requirements.length,
   );
-  return `${requestedChange}${direction}${optimizedCharacterPrompt?.slice(0, availablePromptLength) ?? ''}${requirements}`;
+  return `${requestedChange}${direction}${
+    direction ? (optimizedCharacterPrompt?.slice(0, availablePromptLength) ?? '') : ''
+  }${requirements}`;
 };
 
 /** Builds the provider-only first composition instruction for a user-uploaded source image. */

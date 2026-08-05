@@ -1,5 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
+  REFERENCE_IMAGE_IMPORT_INTENT_HEADER,
+  REFERENCE_IMAGE_IMPORT_INTENT_VALUE,
   VIDEO_PROVIDER_INTENT_HEADER,
   VIDEO_PROVIDER_INTENT_VALUE,
   VOICE_PROVIDER_INTENT_HEADER,
@@ -104,6 +106,18 @@ export const requireVideoProviderIntent = (
 ): void => {
   if (request.headers[VIDEO_PROVIDER_INTENT_HEADER] !== VIDEO_PROVIDER_INTENT_VALUE) {
     throw new AppError(403, 'forbidden_origin', message);
+  }
+};
+
+export const requireReferenceImageImportIntent = (request: FastifyRequest): void => {
+  if (
+    request.headers[REFERENCE_IMAGE_IMPORT_INTENT_HEADER] !== REFERENCE_IMAGE_IMPORT_INTENT_VALUE
+  ) {
+    throw new AppError(
+      403,
+      'forbidden_origin',
+      'Remote reference import requires explicit local Studio intent.',
+    );
   }
 };
 

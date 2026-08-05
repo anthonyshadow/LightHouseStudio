@@ -170,8 +170,9 @@ character store. Each variant points to one parent and one immutable result asse
 turns `{ characterId, variantId }` into the ordinary character prompt, label, and exact image ID
 used by Studio and Existing Video. The original remains the default; only successful hydration/use
 persists a different selected version and updates exact parent/variant usage attribution. Parent
-deletion cascades variant metadata and Recent links while retained image bytes follow the existing
-immutable-asset policy. Wardrobe owns no media node or provider client.
+deletion cascades variant metadata and Recent links. Individual variant deletion resets a matching
+selected-version link and detaches Recent attribution for that version. Retained image bytes follow
+the existing immutable-asset policy. Wardrobe owns no media node or provider client.
 
 Wardrobe **Add Outfit** is an independent optional Pruna operation. The server uploads the
 owner-scoped person and one garment, submits one pinned `p-image-try-on` prediction, polls bounded
@@ -182,7 +183,9 @@ Features** remains an edit through the startup-selected OpenAI/BFL/Wiro adapter 
 optimization disabled. Original-source edits include the parent character prompt. Variant-source
 edits use the selected immutable image as authoritative through the image-only edit contract, so
 the parent prompt is absent from both the browser request and provider prompt. Every saved result
-still points directly to the original parent character as a sibling Wardrobe variant.
+still points directly to the original parent character as a sibling Wardrobe variant. The
+default-off major-departure option also selects the image-only contract for an original source and
+adds explicit server-owned prompt policy allowing identity and other defining traits to change.
 
 Outfit Builder exclusively owns reusable VTO recipe creation, edit, copy, naming, prompt/image mode
 exclusion, prompt enhancement, temporary reference files, and idempotent final-save upload. It
@@ -308,8 +311,9 @@ VTO recipes carry an explicit batch input discriminator for saved/recent outfit,
 image, or prompt. Saved and recent recipe records separately persist `vtonInputKind` as `prompt` or
 `saved-outfit` plus `enhancePrompt`; image-only records are valid only with an opaque persisted
 reference ID. Prompt recipes restore Prompt mode and enhancement. Saved-image and migrated combined
-recipes restore Saved outfit mode with enhancement off. An explicit Character Swap or VTO remote
-reference import goes through the loopback API: HTTPS-only URL parsing,
+recipes restore Saved outfit mode with enhancement off. An explicit Character Builder, Outfit
+Builder, Character Swap, or VTO remote reference import goes through the loopback API with its own
+`reference-image-import` intent: HTTPS-only URL parsing,
 credential/private/mixed-address rejection, per-hop DNS pinning, bounded redirects/bytes,
 JPEG/PNG/WebP header and decoded-content validation, cancellation, no-store bytes, and sanitized
 errors. The URL is neither persisted nor forwarded to a visual provider.
@@ -352,8 +356,9 @@ checks for provider or reference mutations. Browsers may omit `Origin` on same-o
 requests, so provider reads accept an exact loopback `Origin` or referrer, or browser
 `Sec-Fetch-Site: same-origin`; their explicit provider-intent header remains mandatory. ElevenLabs
 provider-contact routes require `X-Lightframe-Provider-Intent: voice`; visual batch routes require
-`X-Lightframe-Provider-Intent: video`; Pruna Wardrobe generation requires the independent
-`X-Lightframe-Provider-Intent: wardrobe`. Responses are `no-store`.
+`X-Lightframe-Provider-Intent: video`; remote reference import requires
+`X-Lightframe-Provider-Intent: reference-image-import`; Pruna Wardrobe generation requires the
+independent `X-Lightframe-Provider-Intent: wardrobe`. Responses are `no-store`.
 
 Permanent keys remain in server environment memory. App-owned schemas validate every HTTP
 boundary. Provider adapters normalize upstream data into allowlisted safe codes; raw messages,

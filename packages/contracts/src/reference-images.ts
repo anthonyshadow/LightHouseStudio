@@ -12,6 +12,8 @@ export const REFERENCE_IMAGE_CHANGE_INSTRUCTIONS_MAX_LENGTH = 2_000;
 export const PRUNA_IMAGE_TRY_ON_MODEL = 'p-image-try-on' as const;
 export const WARDROBE_PROVIDER_INTENT_HEADER = 'x-lightframe-provider-intent' as const;
 export const WARDROBE_PROVIDER_INTENT_VALUE = 'wardrobe' as const;
+export const REFERENCE_IMAGE_IMPORT_INTENT_HEADER = 'x-lightframe-provider-intent' as const;
+export const REFERENCE_IMAGE_IMPORT_INTENT_VALUE = 'reference-image-import' as const;
 
 export const remoteReferenceImageImportRequestSchema = z
   .object({
@@ -212,6 +214,7 @@ export const createReferenceImageRequestSchema = z
 
 const editReferenceImageRequestCommonShape = {
   requestId: referenceImageRequestIdSchema,
+  allowDrasticChanges: z.boolean().optional(),
   changeInstructions: z
     .string()
     .trim()

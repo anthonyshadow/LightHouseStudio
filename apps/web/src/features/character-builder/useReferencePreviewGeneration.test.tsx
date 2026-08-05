@@ -390,6 +390,7 @@ describe('useReferencePreviewGeneration', () => {
       rawPrompt,
       options,
       changeInstructions: 'Change the field coat to cobalt blue.',
+      allowDrasticChanges: false,
     });
     expect(editInput?.optimization.enabled).toBe(true);
     if (editInput?.optimization.enabled) {
@@ -399,6 +400,32 @@ describe('useReferencePreviewGeneration', () => {
       'optimizing',
       'regenerating',
     ]);
+  });
+
+  it('includes drastic-change intent in image-only edits and their retry identity', async () => {
+    const handlers = callbacks();
+    const { result } = renderHook(() => useReferencePreviewGeneration(handlers));
+    const sourceAssetId = '550e8400-e29b-41d4-a716-446655440001';
+
+    await act(async () => {
+      await result.current.generate({
+        rawPrompt,
+        options,
+        sourceAssetId,
+        sourcePromptMode: 'image-only',
+        allowDrasticChanges: true,
+        changeInstructions: 'Replace the person with a stone golem.',
+        attemptOptimization: false,
+      });
+    });
+
+    expect(editReferenceImage.mock.calls[0]?.[1]).toEqual(
+      expect.objectContaining({
+        sourcePromptMode: 'image-only',
+        allowDrasticChanges: true,
+        changeInstructions: 'Replace the person with a stone golem.',
+      }),
+    );
   });
 
   it('routes a source image without edit instructions through composition', async () => {

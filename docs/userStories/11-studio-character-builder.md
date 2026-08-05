@@ -13,7 +13,8 @@ handoff from an unsubmitted edited-video Character Swap step.
 
 1. Open **Build Your Character** for a new character or the named edit panel for an existing one.
 2. Use the three-step guided workflow in any order:
-   - **Start:** optionally upload a reference first, then choose presentation and adult age;
+   - **Start:** optionally upload a reference or import one from a public HTTPS image URL first,
+     then choose presentation and adult age;
    - **Details:** refine appearance, identity, styling, role, mood, and setting; and
    - **Preview:** review the combined direction and optionally generate a reference image.
      Every step label remains enabled and directly clickable. **Back** and **Continue** are
@@ -63,8 +64,10 @@ erasing existing choices.
 
 ## References and provider work
 
-- Upload accepts JPEG/PNG/WebP up to 10 MiB and 40 megapixels. Selection immediately stores an
-  immutable owner-scoped local asset; **Detach** removes only the draft relationship.
+- Upload and public-HTTPS import accept JPEG/PNG/WebP up to 10 MiB and 40 megapixels. Remote import
+  uses the same bounded loopback broker flow as Existing Video and never retains the URL. A valid
+  selection immediately stores an immutable owner-scoped local asset; **Detach** removes only the
+  draft relationship.
 - Prompt-only, direct-upload, and image-only save do not contact the optimizer or image provider.
 - **Generate Preview** normally optimizes the structured direction, then makes one request to the
   startup-selected image provider. **Generate Combined Preview** also supplies the uploaded source.
@@ -77,6 +80,12 @@ erasing existing choices.
   immutable source.
 - Participant-mode Wiro generation is disabled. Wiro is reserved for an explicit operator
   qualification pass.
+- Saved Character Wardrobe can delete an individual variant after confirmation. The variant,
+  selected-version relationship, and Recent attribution links are removed; immutable source and
+  result image bytes remain. **Change Features** preserves the selected character by default. The
+  default-off **Allow major departure from source** checkbox makes the requested changes
+  authoritative, omits the parent prompt, and permits a substantially different identity and
+  defining traits.
 
 Uploaded, generated, composed, edited, detached, superseded, and character-deleted assets remain
 immutable local bytes until whole-environment retirement. There is no per-asset deletion or

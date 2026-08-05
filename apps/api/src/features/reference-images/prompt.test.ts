@@ -69,4 +69,19 @@ describe('reference image prompt inputs', () => {
     expect(prompt).not.toContain('Character context for unchanged identity');
     expect(prompt).toContain('Keep the same recognizable character');
   });
+
+  it('allows an explicit drastic edit to depart from the source identity', () => {
+    const prompt = createReferenceImageEditPrompt(
+      'A blue fox wearing a red scarf.',
+      'Replace the subject with a crystalline alien.',
+      true,
+    );
+
+    expect(prompt).toContain('may replace the person or character identity');
+    expect(prompt).toContain(
+      'Do not preserve recognizable identity unless the request asks for it',
+    );
+    expect(prompt).not.toContain('A blue fox wearing a red scarf.');
+    expect(prompt).not.toContain('Keep the same recognizable character');
+  });
 });

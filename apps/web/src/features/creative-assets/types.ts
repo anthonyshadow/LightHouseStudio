@@ -159,6 +159,7 @@ export interface CreativeAssetRepository {
   renameSavedCharacterPrompt: (id: string, name: string) => SavedCharacterPrompt;
   deleteSavedCharacterPrompt: (id: string) => void;
   createSavedCharacterVariant: (input: CreateSavedCharacterVariantInput) => SavedCharacterVariant;
+  deleteSavedCharacterVariant: (id: string) => void;
   selectCharacterVersion: (selection: CharacterVersionSelection) => void;
   recordSuccessfulPrompt: (input: RecordSuccessfulPromptInput) => void;
   enrichNewestMatchingRecent: (

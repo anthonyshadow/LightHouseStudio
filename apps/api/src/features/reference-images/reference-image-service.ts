@@ -341,6 +341,7 @@ export class ReferenceImageService {
     const providerPrompt = createReferenceImageEditPrompt(
       input.sourcePromptMode === 'image-only' ? null : prepared.prompt,
       input.changeInstructions,
+      input.allowDrasticChanges ?? false,
     );
     const edited = await this.#callProvider(() =>
       editProvider.call(provider, {
