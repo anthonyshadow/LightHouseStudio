@@ -12,7 +12,6 @@ export type ActiveOverlay =
   | 'character-wardrobe'
   | 'outfit-selector'
   | 'outfit-builder'
-  | 'ai-preparation'
   | 'ai-experience'
   | 'legacy-projects'
   | 'video-upload'

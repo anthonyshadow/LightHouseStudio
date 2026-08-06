@@ -370,11 +370,7 @@ vi.mock('./useTakeReviewFlow', () => ({
 }));
 
 vi.mock('./StudioHeader', () => ({
-  StudioHeader: ({ onOpenCharacterSelector }: { onOpenCharacterSelector: () => void }) => (
-    <button type="button" onClick={onOpenCharacterSelector}>
-      Character selector
-    </button>
-  ),
+  StudioHeader: () => <div>Studio header</div>,
 }));
 
 vi.mock('../ui', async () => {
@@ -415,6 +411,9 @@ vi.mock('./CreativeWorkspace', () => ({
         </button>
         <button type="button" onClick={props.actions.onToggleShelf}>
           Toggle shelf
+        </button>
+        <button type="button" onClick={props.actions.onOpenCharacter}>
+          Open character options
         </button>
         <button type="button" onClick={() => props.actions.onShelfDirtyChange(true)}>
           Mark shelf dirty
@@ -713,8 +712,7 @@ describe('StudioApp composition lifecycle', () => {
     renderStudio();
 
     fireEvent.click(screen.getByRole('button', { name: 'Mark shelf dirty' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Character selector' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Select Character' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Open character options' }));
     fireEvent.click(screen.getByRole('button', { name: 'Choose saved character' }));
 
     expect(window.confirm).toHaveBeenCalledWith(

@@ -1,10 +1,12 @@
 import { useTheme } from '@emotion/react';
 import type { AuthenticatedUser } from '@studio/contracts';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef } from 'react';
 import { Button } from '../../ui/primitives/Button';
 
 interface AccountMenuProps {
   readonly user: AuthenticatedUser;
+  readonly open: boolean;
+  readonly onOpenChange: (open: boolean) => void;
   readonly busy?: boolean | undefined;
   readonly onOpenVideos: () => void;
   readonly onOpenCharacters: () => void;
@@ -14,6 +16,8 @@ interface AccountMenuProps {
 
 export const AccountMenu = ({
   user,
+  open,
+  onOpenChange,
   busy = false,
   onOpenVideos,
   onOpenCharacters,
@@ -21,7 +25,6 @@ export const AccountMenu = ({
   onLogout,
 }: AccountMenuProps) => {
   const theme = useTheme();
-  const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
   const triggerRef = useRef<HTMLButtonElement>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -29,20 +32,22 @@ export const AccountMenu = ({
   useEffect(() => {
     if (!open) return;
     const closeOutside = (event: PointerEvent) => {
-      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) setOpen(false);
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
+        onOpenChange(false);
+      }
     };
     const closeWithEscape = (event: KeyboardEvent) => {
       if (event.key !== 'Escape') return;
-      setOpen(false);
+      onOpenChange(false);
       triggerRef.current?.focus();
     };
-    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('pointerdown', closeOutside, true);
     document.addEventListener('keydown', closeWithEscape);
     return () => {
-      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('pointerdown', closeOutside, true);
       document.removeEventListener('keydown', closeWithEscape);
     };
-  }, [open]);
+  }, [onOpenChange, open]);
 
   useEffect(() => {
     if (!open) return;
@@ -57,12 +62,32 @@ export const AccountMenu = ({
     .map((part) => part[0]?.toUpperCase())
     .join('');
   const run = (action: () => void) => {
-    setOpen(false);
+    onOpenChange(false);
     action();
   };
 
   return (
-    <div ref={rootRef} css={{ position: 'relative', flex: '0 0 auto' }}>
+    <div
+      ref={rootRef}
+      css={{
+        position: 'relative',
+        flex: '0 0 auto',
+        '& > button': {
+          width: '2.75rem',
+          height: '2.75rem',
+          padding: 0,
+          borderColor: theme.colors.border,
+          borderRadius: theme.radii.round,
+          color: theme.colors.text,
+          background: theme.colors.surface,
+          fontWeight: 820,
+          '&:hover:not(:disabled):not([aria-disabled="true"])': {
+            borderColor: theme.colors.accent,
+            background: theme.colors.surfaceStrong,
+          },
+        },
+      }}
+    >
       <Button
         ref={triggerRef}
         size="small"
@@ -71,12 +96,11 @@ export const AccountMenu = ({
         aria-haspopup="menu"
         aria-expanded={open}
         disabled={busy}
-        css={{ width: '2.75rem', padding: 0, borderRadius: '999px' }}
-        onClick={() => setOpen((current) => !current)}
+        onClick={() => onOpenChange(!open)}
         onKeyDown={(event) => {
           if (event.key !== 'ArrowDown') return;
           event.preventDefault();
-          setOpen(true);
+          onOpenChange(true);
         }}
       >
         <span aria-hidden="true">{initials || 'U'}</span>
@@ -109,23 +133,55 @@ export const AccountMenu = ({
             position: 'absolute',
             zIndex: theme.layers.overlay,
             insetBlockStart: 'calc(100% + .45rem)',
-            insetInlineStart: 0,
+            insetInlineEnd: 0,
             width: 'min(17rem, calc(100vw - 1rem))',
             display: 'grid',
             gap: theme.space.xxs,
             padding: theme.space.sm,
             border: `1px solid ${theme.colors.borderStrong}`,
-            borderRadius: theme.radii.medium,
+            borderRadius: theme.radii.large,
             background: theme.colors.overlaySurface,
             boxShadow: theme.shadows.lifted,
-            '& > p': { margin: `0 0 ${theme.space.xs}`, color: theme.colors.textMuted },
+            '& [data-account-identity]': {
+              margin: 0,
+              padding: `${theme.space.xs} ${theme.space.sm} ${theme.space.sm}`,
+              borderBottom: `1px solid ${theme.colors.border}`,
+              color: theme.colors.textMuted,
+              fontSize: theme.fontSizes.metadata,
+              lineHeight: 1.45,
+            },
+            '& [data-menu-section-label]': {
+              padding: `${theme.space.xs} ${theme.space.sm} ${theme.space.xxs}`,
+              color: theme.colors.textFaint,
+              fontSize: theme.fontSizes.caption,
+              fontWeight: 800,
+              letterSpacing: '0.08em',
+              textTransform: 'uppercase',
+            },
             '& > button': { justifyContent: 'flex-start', width: '100%' },
+            '& > button[role="menuitem"]': { minHeight: '2.75rem' },
+            '& > button[data-logout]': {
+              marginBlockStart: theme.space.xs,
+              borderTop: `1px solid ${theme.colors.border}`,
+              borderRadius: theme.radii.small,
+            },
+            '@media (max-width: 39.99rem)': {
+              position: 'fixed',
+              insetBlockStart: '4rem',
+              insetInline: theme.space.xs,
+              width: 'auto',
+              maxHeight: 'calc(100dvh - 4.5rem)',
+              overflowY: 'auto',
+            },
           }}
         >
-          <p>
+          <p data-account-identity>
             <strong css={{ display: 'block', color: theme.colors.text }}>{user.displayName}</strong>
             {user.login}
           </p>
+          <span role="presentation" data-menu-section-label>
+            Saved libraries
+          </span>
           <Button role="menuitem" variant="quiet" onClick={() => run(onOpenVideos)}>
             Saved Videos
           </Button>
@@ -135,7 +191,7 @@ export const AccountMenu = ({
           <Button role="menuitem" variant="quiet" onClick={() => run(onOpenOutfits)}>
             Saved Outfits
           </Button>
-          <Button role="menuitem" variant="danger" onClick={() => run(onLogout)}>
+          <Button data-logout role="menuitem" variant="danger" onClick={() => run(onLogout)}>
             Log out
           </Button>
         </div>

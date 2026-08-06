@@ -7,7 +7,8 @@ recovery path without risking a valid artifact.
 
 1. The header reports **Studio available to try**, **Studio limited**, or **Integration status
    unavailable**. Its expanded integration details remain above the Studio workspace and reachable
-   at every canonical viewport.
+   at every canonical viewport. The integration and account popovers are mutually exclusive;
+   outside pointer and Escape dismiss the active popover, and Escape restores its trigger focus.
 2. Local capture availability comes from browser feature detection. `/api/capabilities` reports
    configured Decart and ElevenLabs paths plus the startup-selected image provider, independent
    optimizer state, and provider-neutral `wardrobe.addOutfitAvailable` state.

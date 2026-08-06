@@ -7,8 +7,8 @@ garment transformation. Post-recording Virtual Try On is also available in the p
 
 1. Prepare an outfit before starting media. On desktop, **Select Outfit** appears after **Select
    Character** and immediately before **Workshop** in the creative-tool rail. On phones and
-   tablets, header **Select AI** opens a provider-free chooser and **Virtual Try-On** routes to the
-   same Outfit panel.
+   tablets, **Dock** accepts a direct Virtual Try-On recipe and **Shelf** exposes saved/recent
+   outfits plus **New garment recipe**.
 2. The Outfit panel has **Saved** and **Recent** views plus **Create new outfit**. Successful live
    Start/Apply uses appear in Recent; saved prompt and explicitly saved-image uses are persistent,
    while direct upload/import files remain bounded tab-only recents.

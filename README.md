@@ -41,10 +41,10 @@ inputs, but their absence does not disable configured application features.
    saves as a new, source-linked video by default; explicit replacement confirms before appending
    an immutable version.
 7. Prepare advanced live work without starting media: desktop places **Select Character** and
-   **Select Outfit** immediately before **Workshop** in the creative-tool rail; phones and tablets
-   expose one header **Select AI** action that routes to either preparation flow. A saved selection
-   can then be started explicitly from **Start AI** or the Dock and recorded through the existing
-   live flow.
+   **Select Outfit** immediately before **Workshop** in the creative-tool rail. Phones and tablets
+   use **Dock** for direct Character/VTO recipes and **Shelf** for saved characters, outfits, and
+   their builders. A prepared selection can then be started explicitly from **Start AI** or the
+   Dock and recorded through the existing live flow.
 
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio`,
 `/studio/videos`, `/studio/characters`, and `/studio/outfits` share one persistent `StudioApp` and

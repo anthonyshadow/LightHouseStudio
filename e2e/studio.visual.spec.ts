@@ -200,7 +200,11 @@ const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<Netwo
   if (entryRoute) {
     await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
   } else {
-    await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
+    await page.getByLabel('Integration availability').getByRole('button').click();
+    await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
+      'AI video configured',
+    );
+    await page.keyboard.press('Escape');
   }
   await page.addStyleTag({
     content: `
@@ -218,7 +222,9 @@ const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<Netwo
 
 const openCharacterBuilder = async (page: Page): Promise<void> => {
   await openCharacterOptions(page);
-  await page.getByRole('button', { name: 'Create new character' }).click();
+  await page
+    .getByRole('button', { name: /^(Create new character|New character recipe)$/u })
+    .click();
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
 };
 

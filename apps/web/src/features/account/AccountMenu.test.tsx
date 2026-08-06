@@ -3,6 +3,7 @@
 import type { AuthenticatedUser } from '@studio/contracts';
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
+import { useState, type ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../../ui';
 import { AccountMenu } from './AccountMenu';
@@ -22,6 +23,13 @@ const user: AuthenticatedUser = {
   lastLoginAt: '2026-08-05T12:00:00.000Z',
 };
 
+type HarnessProps = Omit<ComponentProps<typeof AccountMenu>, 'open' | 'onOpenChange'>;
+
+const AccountMenuHarness = (props: HarnessProps) => {
+  const [open, setOpen] = useState(false);
+  return <AccountMenu {...props} open={open} onOpenChange={setOpen} />;
+};
+
 describe('AccountMenu', () => {
   afterEach(cleanup);
 
@@ -35,7 +43,7 @@ describe('AccountMenu', () => {
     };
     render(
       <StudioDesignProvider>
-        <AccountMenu user={user} {...actions} />
+        <AccountMenuHarness user={user} {...actions} />
       </StudioDesignProvider>,
     );
     const trigger = screen.getByRole('button', { name: 'Lightframe Demo account menu' });
@@ -68,7 +76,7 @@ describe('AccountMenu', () => {
     const userInput = userEvent.setup();
     render(
       <StudioDesignProvider>
-        <AccountMenu
+        <AccountMenuHarness
           user={user}
           onOpenVideos={vi.fn()}
           onOpenCharacters={vi.fn()}

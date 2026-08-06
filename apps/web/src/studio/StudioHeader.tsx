@@ -1,33 +1,25 @@
 import { useTheme } from '@emotion/react';
 import type { AuthenticatedUser } from '@studio/contracts';
-import { referenceImageContentUrl } from '../adapters/api-client/referenceImageRoutes';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccountMenu } from '../features/account/AccountMenu';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
-import type { RefObject } from 'react';
-import { Button } from '../ui';
 import {
   brandStyles,
   capabilityDetailStyles,
   capabilityStyles,
-  characterSelectorStyles,
+  headerActionsStyles,
   headerStyles,
   systemStatusDotStyles,
 } from './StudioApp.styles';
 
 export type CapabilityState = 'loading' | 'ready' | 'error';
 
+type HeaderMenu = 'account' | 'status';
+
 type StudioHeaderProps = {
   availability: ProviderAvailability;
   browser: BrowserCapabilities;
   capabilityState: CapabilityState;
-  characterSelectorRef: RefObject<HTMLButtonElement | null>;
-  showAiSelector?: boolean;
-  selectorLabel?: string;
-  activeCharacterName?: string | undefined;
-  activeCharacterImageAssetId?: string | null | undefined;
-  onOpenCharacterSelector: () => void;
-  onClearCharacter: () => void;
-  clearCharacterDisabledReason?: string | undefined;
   user: AuthenticatedUser;
   accountBusy?: boolean;
   onOpenVideos: () => void;
@@ -55,24 +47,92 @@ const systemStatusLabel = (
   return systemState === 'ready' ? 'Studio available to try' : 'Studio limited';
 };
 
-const ChevronDownIcon = () => (
-  <svg data-character-chevron aria-hidden="true" viewBox="0 0 16 16" fill="none">
-    <path d="m4 6 4 4 4-4" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+type StatusMenuProps = {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  systemState: 'loading' | 'ready' | 'limited';
+  systemLabel: string;
+  localCaptureState: string;
+  aiVideoState: string;
+  voiceCloudState: string;
+};
+
+const StatusMenu = ({
+  open,
+  onOpenChange,
+  systemState,
+  systemLabel,
+  localCaptureState,
+  aiVideoState,
+  voiceCloudState,
+}: StatusMenuProps) => {
+  const theme = useTheme();
+  const rootRef = useRef<HTMLDivElement>(null);
+  const triggerRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const closeOutside = (event: PointerEvent) => {
+      if (event.target instanceof Node && !rootRef.current?.contains(event.target)) {
+        onOpenChange(false);
+      }
+    };
+    const closeWithEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      onOpenChange(false);
+      triggerRef.current?.focus();
+    };
+    document.addEventListener('pointerdown', closeOutside, true);
+    document.addEventListener('keydown', closeWithEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside, true);
+      document.removeEventListener('keydown', closeWithEscape);
+    };
+  }, [onOpenChange, open]);
+
+  return (
+    <div ref={rootRef} css={capabilityStyles(theme)} aria-label="Integration availability">
+      <button
+        ref={triggerRef}
+        type="button"
+        aria-expanded={open}
+        aria-controls="studio-availability-details"
+        onClick={() => onOpenChange(!open)}
+      >
+        <span css={systemStatusDotStyles(theme, systemState)} aria-hidden="true" />
+        <span data-system-label>{systemLabel}</span>
+      </button>
+      {open ? (
+        <div
+          id="studio-availability-details"
+          role="region"
+          aria-label="Studio availability details"
+          css={capabilityDetailStyles(theme)}
+        >
+          <div data-capability-heading>
+            <strong>Studio availability</strong>
+            <span>Browser support and configured integrations</span>
+          </div>
+          <span>
+            Local capture <strong>{localCaptureState}</strong>
+          </span>
+          <span>
+            AI video <strong>{aiVideoState}</strong>
+          </span>
+          <span>
+            Voice cloud <strong>{voiceCloudState}</strong>
+          </span>
+          <small>Provider configuration does not verify live service health.</small>
+        </div>
+      ) : null}
+    </div>
+  );
+};
 
 export const StudioHeader = ({
   availability,
   browser,
   capabilityState,
-  characterSelectorRef,
-  activeCharacterName,
-  activeCharacterImageAssetId,
-  onOpenCharacterSelector,
-  onClearCharacter,
-  clearCharacterDisabledReason,
-  showAiSelector = true,
-  selectorLabel = 'Select Character',
   user,
   accountBusy,
   onOpenVideos,
@@ -81,6 +141,7 @@ export const StudioHeader = ({
   onLogout,
 }: StudioHeaderProps) => {
   const theme = useTheme();
+  const [openMenu, setOpenMenu] = useState<HeaderMenu | null>(null);
   const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
   const localCaptureState = localCaptureAvailable ? 'available' : 'unavailable';
   const aiVideoState = capabilityLabel(capabilityState, availability.decart, 'not configured');
@@ -96,22 +157,33 @@ export const StudioHeader = ({
         ? 'ready'
         : 'limited';
   const systemLabel = systemStatusLabel(capabilityState, systemState);
-  const characterImageUrl = activeCharacterImageAssetId
-    ? referenceImageContentUrl(activeCharacterImageAssetId)
-    : null;
+  const setMenuOpen = useCallback((menu: HeaderMenu, open: boolean) => {
+    setOpenMenu(open ? menu : null);
+  }, []);
 
   return (
     <header css={headerStyles(theme)}>
-      <div css={{ display: 'flex', alignItems: 'center', gap: theme.space.xs, minWidth: 0 }}>
-        <div css={brandStyles(theme)}>
-          <img src="/favicon.svg" alt="" width="38" height="38" />
-          <div>
-            <h1>Lightframe Studio</h1>
-            <span>Local-first studio</span>
-          </div>
+      <div css={brandStyles(theme)}>
+        <img src="/favicon.svg" alt="" width="38" height="38" />
+        <div>
+          <h1>Lightframe Studio</h1>
+          <span>Local-first studio</span>
         </div>
+      </div>
+      <div css={headerActionsStyles(theme)}>
+        <StatusMenu
+          open={openMenu === 'status'}
+          onOpenChange={(open) => setMenuOpen('status', open)}
+          systemState={systemState}
+          systemLabel={systemLabel}
+          localCaptureState={localCaptureState}
+          aiVideoState={aiVideoState}
+          voiceCloudState={voiceCloudState}
+        />
         <AccountMenu
           user={user}
+          open={openMenu === 'account'}
+          onOpenChange={(open) => setMenuOpen('account', open)}
           busy={accountBusy}
           onOpenVideos={onOpenVideos}
           onOpenCharacters={onOpenCharacters}
@@ -119,62 +191,6 @@ export const StudioHeader = ({
           onLogout={onLogout}
         />
       </div>
-      {showAiSelector ? (
-        <div css={characterSelectorStyles(theme)}>
-          <Button
-            ref={characterSelectorRef}
-            variant="secondary"
-            aria-haspopup="dialog"
-            aria-label={
-              activeCharacterName
-                ? `Selected AI: ${activeCharacterName}. Open ${selectorLabel} options`
-                : `No AI selected. Open ${selectorLabel} options`
-            }
-            onClick={onOpenCharacterSelector}
-          >
-            {characterImageUrl ? (
-              <img src={characterImageUrl} alt="" width="26" height="26" />
-            ) : (
-              <span data-character-placeholder aria-hidden="true">
-                ✦
-              </span>
-            )}
-            <span data-character-label>{activeCharacterName ?? selectorLabel}</span>
-            <ChevronDownIcon />
-          </Button>
-          {activeCharacterName ? (
-            <Button
-              data-clear-character="true"
-              variant="quiet"
-              aria-label={`Unselect AI: ${activeCharacterName}`}
-              title={clearCharacterDisabledReason ?? `Unselect ${activeCharacterName}`}
-              disabled={Boolean(clearCharacterDisabledReason)}
-              onClick={onClearCharacter}
-            >
-              <span aria-hidden="true">×</span>
-            </Button>
-          ) : null}
-        </div>
-      ) : (
-        <span aria-hidden="true" />
-      )}
-      <details css={capabilityStyles(theme)} aria-label="Integration availability">
-        <summary>
-          <span css={systemStatusDotStyles(theme, systemState)} aria-hidden="true" />
-          <span data-system-label>{systemLabel}</span>
-        </summary>
-        <div css={capabilityDetailStyles(theme)}>
-          <span>
-            Local capture <strong>{localCaptureState}</strong>
-          </span>
-          <span>
-            AI video <strong>{aiVideoState}</strong>
-          </span>
-          <span>
-            Voice cloud <strong>{voiceCloudState}</strong>
-          </span>
-        </div>
-      </details>
     </header>
   );
 };

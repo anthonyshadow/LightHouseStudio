@@ -215,11 +215,28 @@ for (const viewport of representativeViewports) {
       stageFrameBox!.y + stageFrameBox!.height,
     );
     const availability = page.getByLabel('Integration availability');
-    await expect(availability).toContainText('AI video configured');
+    await availability.getByRole('button').click();
+    await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
+      'AI video configured',
+    );
 
-    await page.getByRole('button', { name: 'Lightframe Demo account menu' }).click();
+    const statusTrigger = availability.getByRole('button');
+    const accountTrigger = page.getByRole('button', { name: 'Lightframe Demo account menu' });
+    await expect(accountTrigger).toBeVisible();
+    const statusTriggerBox = await statusTrigger.boundingBox();
+    const accountTriggerBox = await accountTrigger.boundingBox();
+    expect(statusTriggerBox).not.toBeNull();
+    expect(accountTriggerBox).not.toBeNull();
+    expect(accountTriggerBox!.x).toBeGreaterThan(statusTriggerBox!.x);
+    expect(accountTriggerBox!.x + accountTriggerBox!.width).toBeLessThanOrEqual(viewport.width);
+    expect(
+      await accountTrigger.evaluate((trigger) => getComputedStyle(trigger).backgroundColor),
+    ).not.toBe('rgba(0, 0, 0, 0)');
+
+    await accountTrigger.click();
     const accountMenu = page.getByRole('menu', { name: 'Account and saved libraries' });
     await expect(accountMenu).toBeVisible();
+    await expect(page.getByRole('region', { name: 'Studio availability details' })).toHaveCount(0);
     await expect
       .poll(() =>
         accountMenu.evaluate((menu) => {
@@ -234,8 +251,8 @@ for (const viewport of representativeViewports) {
       .toBe(true);
     await page.keyboard.press('Escape');
 
-    await availability.locator('summary').click();
-    const availabilityMenu = availability.locator(':scope > div');
+    await availability.getByRole('button').click();
+    const availabilityMenu = page.getByRole('region', { name: 'Studio availability details' });
     await expect(availabilityMenu).toBeVisible();
     await expect
       .poll(() =>
@@ -249,7 +266,7 @@ for (const viewport of representativeViewports) {
         }),
       )
       .toBe(true);
-    await availability.locator('summary').click();
+    await availability.getByRole('button').click();
 
     const skipLink = page.getByRole('link', { name: 'Skip to studio' });
     await skipLink.focus();
@@ -301,7 +318,7 @@ test('small-mobile Builder steps survive 200% text and keep one preview', async 
   });
 
   await openCharacterOptions(page);
-  await page.getByRole('button', { name: 'Create new character' }).click();
+  await page.getByRole('button', { name: 'New character recipe' }).click();
   const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
   const previewStep = dialog.getByRole('button', {
     name: /^Preview(?: |$)/u,
@@ -323,7 +340,7 @@ test('small-mobile Builder steps survive 200% text and keep one preview', async 
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
 
-test('phone and tablet use one Select AI preparation chooser and keep the four-tool row', async ({
+test('phone and tablet keep AI preparation in Dock and Shelf with no header selector', async ({
   page,
 }) => {
   const network = await installProviderFreeStudio(page);
@@ -345,29 +362,27 @@ test('phone and tablet use one Select AI preparation chooser and keep the four-t
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('/studio');
-    const selectAi = page.getByRole('button', { name: /No AI selected\. Open Select AI options/u });
-    await expect(selectAi.locator('[data-character-label]')).toHaveText('Select AI');
     const rail = page.getByRole('navigation', { name: 'Creative workspace tools' });
     await expect(rail.getByRole('button')).toHaveCount(4);
     await expect(rail.getByRole('button', { name: 'Select Character' })).toHaveCount(0);
     await expect(rail.getByRole('button', { name: 'Select Outfit' })).toHaveCount(0);
-    await selectAi.click();
-    const chooser = page.getByRole('dialog', { name: 'Select AI' });
-    await expect(chooser.getByRole('button', { name: 'Select Character' })).toBeVisible();
-    await expect(chooser.getByRole('button', { name: 'Select Outfit' })).toBeVisible();
-    await chooser.getByRole('button', { name: 'Select Outfit' }).click();
-    await expect(page.getByRole('dialog', { name: 'Outfit' })).toBeVisible();
-    await page.keyboard.press('Escape');
-    await expect(selectAi).toBeFocused();
+    await expect(page.getByRole('button', { name: /Select AI/u })).toHaveCount(0);
 
-    await selectAi.click();
-    await page
-      .getByRole('dialog', { name: 'Select AI' })
-      .getByRole('button', { name: 'Select Character' })
-      .click();
-    await expect(page.getByRole('dialog', { name: 'Character' })).toBeVisible();
+    const dock = rail.getByRole('button', { name: 'Dock' });
+    await dock.click();
+    const recipeDock = page.getByRole('dialog', { name: 'Recipe Dock' });
+    await expect(recipeDock.getByRole('button', { name: 'Character · Lucy 2.5' })).toBeVisible();
+    await expect(recipeDock.getByRole('button', { name: 'Virtual Try-On · VTON 3' })).toBeVisible();
     await page.keyboard.press('Escape');
-    await expect(selectAi).toBeFocused();
+    await expect(dock).toBeFocused();
+
+    const shelf = rail.getByRole('button', { name: 'Shelf' });
+    await shelf.click();
+    const recipeShelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
+    await expect(recipeShelf.getByRole('button', { name: /^Characters/u })).toBeVisible();
+    await expect(recipeShelf.getByRole('button', { name: /^Try-on recipes/u })).toBeVisible();
+    await page.keyboard.press('Escape');
+    await expect(shelf).toBeFocused();
   }
   expect(await cameraCalls(page)).toBe(0);
   expect(network.blockedExternalRequests).toEqual([]);

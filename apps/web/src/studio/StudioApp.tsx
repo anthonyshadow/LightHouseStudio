@@ -74,7 +74,6 @@ import {
   type ModelMode,
 } from './CreativeWorkspace';
 import { AIExperienceChooser } from './AIExperienceChooser';
-import { AIPreparationChooser } from './AIPreparationChooser';
 import { StudioExitGuard } from './StudioExitGuard';
 import { StudioHeader } from './StudioHeader';
 import { StudioCharacterSelectorOverlay } from './StudioCharacterSelectorOverlay';
@@ -854,13 +853,17 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const unselectCharacter = useCallback(() => {
     if (!clearActiveCharacter()) return;
     closeOverlayIf(['character-selector']);
-    window.requestAnimationFrame(() => characterSelectorRef.current?.focus());
-  }, [clearActiveCharacter, closeOverlayIf]);
+    window.requestAnimationFrame(() =>
+      (desktopStudioLayout ? characterSelectorRef : shelfToggleRef).current?.focus(),
+    );
+  }, [clearActiveCharacter, closeOverlayIf, desktopStudioLayout]);
   const unselectAi = useCallback(() => {
     if (!clearActiveRecipe()) return;
-    closeOverlayIf(['character-selector', 'outfit-selector', 'ai-preparation']);
-    window.requestAnimationFrame(() => characterSelectorRef.current?.focus());
-  }, [clearActiveRecipe, closeOverlayIf]);
+    closeOverlayIf(['character-selector', 'outfit-selector']);
+    window.requestAnimationFrame(() =>
+      (desktopStudioLayout ? characterSelectorRef : shelfToggleRef).current?.focus(),
+    );
+  }, [clearActiveRecipe, closeOverlayIf, desktopStudioLayout]);
   const openNewOutfitBuilder = useCallback(
     (saveAndSelect: boolean, destination: OutfitBuilderLaunch['destination']) => {
       if (characterBuilderOpenBlockedReason) return;
@@ -1299,16 +1302,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             availability={availability}
             browser={browser}
             capabilityState={capabilityState}
-            characterSelectorRef={characterSelectorRef}
-            showAiSelector={!desktopStudioLayout}
-            selectorLabel="Select AI"
-            {...(currentExperienceLabel ? { activeCharacterName: currentExperienceLabel } : {})}
-            activeCharacterImageAssetId={currentExperienceImageAssetId}
-            onOpenCharacterSelector={() => openOverlay('ai-preparation')}
-            onClearCharacter={unselectAi}
-            {...(characterRemovalBlockedReason
-              ? { clearCharacterDisabledReason: characterRemovalBlockedReason }
-              : {})}
             user={auth.session!.user}
             accountBusy={logoutBusy}
             onOpenVideos={() => void navigate(APP_PATHS.videos)}
@@ -1637,15 +1630,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           />
         </OverlayPanel>
 
-        <AIPreparationChooser
-          open={activeOverlay === 'ai-preparation'}
-          returnFocusRef={characterSelectorRef}
-          disabledReason={characterBuilderOpenBlockedReason}
-          onClose={closeOverlay}
-          onChooseCharacter={openCharacterSelector}
-          onChooseOutfit={openOutfitSelector}
-        />
-
         <OverlayPanel
           open={activeOverlay === 'outfit-selector'}
           onClose={closeOverlay}
@@ -1653,7 +1637,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           description="Create an outfit, or select a saved or recently used Virtual Try-On recipe."
           placement="right"
           bodyMode="scroll"
-          returnFocusRef={desktopStudioLayout ? outfitToggleRef : characterSelectorRef}
+          returnFocusRef={desktopStudioLayout ? outfitToggleRef : shelfToggleRef}
         >
           {activeOverlay === 'outfit-selector' ? (
             <OutfitSelector
@@ -1690,7 +1674,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               ? shelfToggleRef
               : desktopStudioLayout
                 ? outfitToggleRef
-                : characterSelectorRef
+                : shelfToggleRef
           }
         >
           {activeOverlay === 'outfit-builder' ? (
@@ -1719,7 +1703,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
         <StudioCharacterSelectorOverlay
           open={activeOverlay === 'character-selector'}
-          returnFocusRef={characterSelectorRef}
+          returnFocusRef={desktopStudioLayout ? characterSelectorRef : shelfToggleRef}
           activeCharacterName={activeCharacterName}
           activeCharacter={activeCharacterRecord}
           editBlockedReason={characterBuilderOpenBlockedReason}
@@ -1742,7 +1726,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           size="wide"
           bodyMode="contained"
           closeOnBackdrop={!wardrobeDirty}
-          returnFocusRef={characterSelectorRef}
+          returnFocusRef={desktopStudioLayout ? characterSelectorRef : shelfToggleRef}
         >
           {wardrobeCharacter ? (
             <Suspense fallback={deferredPanelFallback}>
@@ -1877,7 +1861,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               returnFocusRef={
                 characterBuilderDestination.kind === 'existing-video'
                   ? editVideoToggleRef
-                  : characterSelectorRef
+                  : desktopStudioLayout
+                    ? characterSelectorRef
+                    : shelfToggleRef
               }
               generationAvailable={Boolean(availability.referenceImages)}
               optimizationAvailable={Boolean(availability.referenceImageOptimizerAvailable)}

@@ -403,21 +403,10 @@ test('persistent controls preserve local media across VTON choice, AI stop, trac
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/studio');
 
-  await page.getByRole('button', { name: /Open Select AI options/u }).click();
-  await page
-    .getByRole('dialog', { name: 'Select AI' })
-    .getByRole('button', { name: 'Select Outfit' })
-    .click();
-  await page
-    .getByRole('dialog', { name: 'Outfit' })
-    .getByRole('button', { name: 'Create new outfit' })
-    .click();
-  const outfitBuilder = page.getByRole('dialog', { name: 'Create a new outfit' });
-  await outfitBuilder.getByLabel('Garment direction').fill('A structured amber field jacket');
-  await outfitBuilder.getByRole('button', { name: 'Continue to save' }).click();
-  await outfitBuilder.getByLabel('Outfit name').fill('Amber field jacket');
-  await outfitBuilder.getByRole('button', { name: 'Save & Select' }).click();
-  await expect(outfitBuilder).toBeHidden();
+  await openRecipeDockWhenOverlaid(page);
+  await page.getByRole('button', { name: 'Virtual Try-On · VTON 3' }).click();
+  await page.getByLabel('Garment direction').fill('A structured amber field jacket');
+  await closeRecipeDockWhenOverlaid(page);
 
   const controls = page.getByLabel('Studio session controls');
   await controls.getByRole('button', { name: 'Record New Video' }).click();
@@ -470,8 +459,11 @@ test('no-key Local Camera records and finalizes without provider HTTP, WebSocket
   });
   await page.goto('/studio');
   const availability = page.getByLabel('Integration availability');
-  await expect(availability).toContainText('AI video not configured');
-  await expect(availability).toContainText('Voice cloud not configured (optional)');
+  await availability.getByRole('button').click();
+  const availabilityDetails = page.getByRole('region', { name: 'Studio availability details' });
+  await expect(availabilityDetails).toContainText('AI video not configured');
+  await expect(availabilityDetails).toContainText('Voice cloud not configured (optional)');
+  await page.keyboard.press('Escape');
 
   await page.getByRole('button', { name: 'Shelf' }).click();
   await page.getByRole('button', { name: 'Try-on recipes' }).click();
@@ -739,7 +731,11 @@ test('Lucy 2.5 starts, applies explicitly, falls back on disconnect, recovers, a
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/studio');
-  await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
+  await page.getByLabel('Integration availability').getByRole('button').click();
+  await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
+    'AI video configured',
+  );
+  await page.keyboard.press('Escape');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Character · Lucy 2.5' }).click();
@@ -898,7 +894,11 @@ test('VTON 3 accepts a valid ephemeral garment image and starts with image-only 
 }) => {
   const network = await installSuccessfulStudioHarness(page);
   await page.goto('/studio');
-  await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
+  await page.getByLabel('Integration availability').getByRole('button').click();
+  await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
+    'AI video configured',
+  );
+  await page.keyboard.press('Escape');
 
   await openRecipeDockWhenOverlaid(page);
   await page.getByRole('button', { name: 'Virtual Try-On · VTON 3' }).click();

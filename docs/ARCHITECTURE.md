@@ -113,11 +113,13 @@ source, baseline, draft, 50-entry grouped history, generation, candidate, and wo
 
 At the existing `64rem` desktop breakpoint, the header has no AI selection control. The
 creative-tool rail owns **Select Character**, **Select Outfit**, then **Workshop** as three ordered
-preparation actions. Below that breakpoint the four-button bottom tool row remains Dock, Take,
-Workshop, and Shelf; a single header **Select AI** action opens a provider-free preparation chooser
-for Character or Virtual Try-On. These responsive presentations share the same overlay controller,
-recipe handoff, selected-state labels, activity locks, and return-focus behavior. They never mount
-duplicate stateful selectors or start media/provider work.
+preparation actions. The header contains only the brand plus mutually exclusive integration and
+account popovers, with the account trigger anchored at the far right. Below the desktop breakpoint
+the four-button bottom tool row remains Dock, Take, Workshop, and Shelf: Dock owns direct
+Character/VTO recipe preparation, while Shelf owns saved character/outfit selection and builder
+entry. These responsive presentations share the same overlay controller, recipe handoff, activity
+locks, and return-focus behavior. They never mount duplicate stateful selectors or start
+media/provider work.
 
 All tools use the shared `OverlayPanel` portal. It owns focus trap, inert background, Escape,
 topmost dismissal, scroll lock, transition-safe backdrop behavior, and return focus. The portal

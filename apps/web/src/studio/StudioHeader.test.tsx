@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { StudioDesignProvider } from '../ui';
@@ -20,7 +20,7 @@ const browser = {
   offlineAudio: true,
 };
 
-const accountProps = {
+const headerProps = {
   user: {
     id: '2d7914b2-f912-4b96-b17d-54100a2ffea3',
     login: 'demo@lightframe.local',
@@ -41,68 +41,70 @@ const accountProps = {
   onLogout: vi.fn(),
 };
 
+const renderHeader = () =>
+  render(
+    <StudioDesignProvider>
+      <StudioHeader
+        {...headerProps}
+        availability={availability}
+        browser={browser}
+        capabilityState="ready"
+      />
+      <button type="button">Outside header</button>
+    </StudioDesignProvider>,
+  );
+
 afterEach(cleanup);
 
 describe('StudioHeader', () => {
-  it('places an accessible unselect action next to the selected AI recipe', async () => {
+  it('keeps status before the far-right account control and omits Select AI', () => {
+    renderHeader();
+    const header = screen.getByRole('banner');
+    const status = within(header).getByRole('button', { name: 'Studio available to try' });
+    const account = within(header).getByRole('button', { name: 'Demo Creator account menu' });
+
+    expect(status.compareDocumentPosition(account) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(within(header).queryByRole('button', { name: /Select AI/u })).not.toBeInTheDocument();
+  });
+
+  it('renders only one header menu at a time', async () => {
     const user = userEvent.setup();
-    const onClearCharacter = vi.fn();
-    render(
-      <StudioDesignProvider>
-        <StudioHeader
-          {...accountProps}
-          availability={availability}
-          browser={browser}
-          capabilityState="ready"
-          characterSelectorRef={{ current: null }}
-          selectorLabel="Select AI"
-          activeCharacterName="Business man"
-          onOpenCharacterSelector={vi.fn()}
-          onClearCharacter={onClearCharacter}
-        />
-      </StudioDesignProvider>,
-    );
+    renderHeader();
+    const account = screen.getByRole('button', { name: 'Demo Creator account menu' });
+    const status = screen.getByRole('button', { name: 'Studio available to try' });
 
-    await user.click(screen.getByRole('button', { name: 'Unselect AI: Business man' }));
-    expect(onClearCharacter).toHaveBeenCalledOnce();
+    await user.click(account);
+    expect(screen.getByRole('menu', { name: 'Account and saved libraries' })).toBeVisible();
+
+    await user.click(status);
+    expect(
+      screen.queryByRole('menu', { name: 'Account and saved libraries' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Studio availability details' })).toBeVisible();
+
+    await user.click(account);
+    expect(
+      screen.queryByRole('region', { name: 'Studio availability details' }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole('menu', { name: 'Account and saved libraries' })).toBeVisible();
   });
 
-  it('hides the unselect action when no character is selected', () => {
-    render(
-      <StudioDesignProvider>
-        <StudioHeader
-          {...accountProps}
-          availability={availability}
-          browser={browser}
-          capabilityState="ready"
-          characterSelectorRef={{ current: null }}
-          selectorLabel="Select AI"
-          onOpenCharacterSelector={vi.fn()}
-          onClearCharacter={vi.fn()}
-        />
-      </StudioDesignProvider>,
-    );
+  it('closes status for Escape and outside pointer and restores trigger focus', async () => {
+    const user = userEvent.setup();
+    renderHeader();
+    const status = screen.getByRole('button', { name: 'Studio available to try' });
 
-    expect(screen.getByRole('button', { name: /No AI selected/u })).toHaveTextContent('Select AI');
-    expect(screen.queryByRole('button', { name: /Unselect AI/u })).not.toBeInTheDocument();
-  });
+    await user.click(status);
+    await user.keyboard('{Escape}');
+    expect(
+      screen.queryByRole('region', { name: 'Studio availability details' }),
+    ).not.toBeInTheDocument();
+    expect(status).toHaveFocus();
 
-  it('omits the header selector for the desktop rail layout', () => {
-    render(
-      <StudioDesignProvider>
-        <StudioHeader
-          {...accountProps}
-          availability={availability}
-          browser={browser}
-          capabilityState="ready"
-          characterSelectorRef={{ current: null }}
-          showAiSelector={false}
-          selectorLabel="Select AI"
-          onOpenCharacterSelector={vi.fn()}
-          onClearCharacter={vi.fn()}
-        />
-      </StudioDesignProvider>,
-    );
-    expect(screen.queryByRole('button', { name: /Select AI options/u })).not.toBeInTheDocument();
+    await user.click(status);
+    await user.click(screen.getByRole('button', { name: 'Outside header' }));
+    expect(
+      screen.queryByRole('region', { name: 'Studio availability details' }),
+    ).not.toBeInTheDocument();
   });
 });

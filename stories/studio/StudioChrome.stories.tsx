@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useState } from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { fn } from 'storybook/test';
 import { AIExperienceChooser } from '@web/studio/AIExperienceChooser';
@@ -51,10 +51,7 @@ const meta = {
     availability: headerAvailability,
     browser: browserCapabilities,
     capabilityState: 'ready',
-    characterSelectorRef: { current: null },
     user: headerUser,
-    onOpenCharacterSelector: fn(),
-    onClearCharacter: fn(),
     onOpenVideos: fn(),
     onOpenCharacters: fn(),
     onOpenOutfits: fn(),
@@ -64,7 +61,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Studio chrome covers brand/system status, active-character selection, the fullscreen AI experience chooser, and the context-sensitive stage control bar for idle, local preview, AI, recording, and take-review states.',
+          'Studio chrome covers the brand, mutually exclusive system/account popovers, the fullscreen AI experience chooser, and the context-sensitive stage control bar for idle, local preview, AI, recording, and take-review states.',
       },
     },
   },
@@ -74,18 +71,13 @@ export default meta;
 type Story = StoryObj<typeof meta>;
 
 const HeaderHarness = () => {
-  const selectorRef = useRef<HTMLButtonElement>(null);
   return (
     <StoryColumn width="86rem">
       <StudioHeader
         availability={headerAvailability}
         browser={browserCapabilities}
         capabilityState="ready"
-        characterSelectorRef={selectorRef}
         user={headerUser}
-        activeCharacterName="Midnight culture host"
-        onOpenCharacterSelector={fn()}
-        onClearCharacter={fn()}
         onOpenVideos={fn()}
         onOpenCharacters={fn()}
         onOpenOutfits={fn()}

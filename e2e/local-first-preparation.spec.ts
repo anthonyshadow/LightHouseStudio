@@ -115,7 +115,11 @@ test('prepares an object recipe accessibly without camera or provider work', asy
   await expect(page.getByLabel('Studio media stage')).toContainText(
     'Camera and microphone remain off until you start local preview.',
   );
-  await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
+  await page.getByLabel('Integration availability').getByRole('button').click();
+  await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
+    'AI video configured',
+  );
+  await page.keyboard.press('Escape');
 
   const skipLink = page.getByRole('link', { name: 'Skip to studio' });
   await skipLink.focus();

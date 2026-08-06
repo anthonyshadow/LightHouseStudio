@@ -56,77 +56,22 @@ export const skipLinkStyles = (theme: Theme): CSSObject => ({
 });
 
 export const headerStyles = (theme: Theme): CSSObject => ({
-  display: 'grid',
+  display: 'flex',
   height: '100%',
-  gridTemplateColumns: 'minmax(10rem, 1fr) minmax(15rem, auto) minmax(8rem, 1fr)',
   alignItems: 'center',
+  justifyContent: 'space-between',
   gap: theme.space.md,
   minWidth: 0,
-  '@media (max-width: 45rem), (max-height: 48rem)': {
-    gridTemplateColumns: 'minmax(9rem, 1fr) minmax(12rem, auto) minmax(3rem, 1fr)',
-    gap: theme.space.xs,
-  },
-  '@media (max-width: 39.99rem)': {
-    gridTemplateColumns: '5.5rem minmax(0, 1fr) 2.75rem',
-    gap: theme.space.xs,
-  },
+  '@media (max-width: 45rem), (max-height: 48rem)': { gap: theme.space.xs },
 });
 
-export const characterSelectorStyles = (theme: Theme): CSSObject => ({
+export const headerActionsStyles = (theme: Theme): CSSObject => ({
   display: 'flex',
   alignItems: 'center',
-  justifyContent: 'center',
-  gap: theme.space.xxs,
-  minWidth: 0,
-  '& > button:first-of-type': {
-    minWidth: 0,
-    maxWidth: '20rem',
-    minHeight: '2.55rem',
-    paddingBlock: theme.space.xxs,
-    whiteSpace: 'nowrap',
-  },
-  '& > button[data-clear-character="true"]': {
-    width: '2.75rem',
-    minWidth: '2.75rem',
-    maxWidth: '2.75rem',
-    minHeight: '2.75rem',
-    padding: 0,
-    color: theme.colors.danger,
-    fontSize: '1.25rem',
-  },
-  '& img, & [data-character-placeholder]': {
-    width: '1.65rem',
-    height: '1.65rem',
-    display: 'grid',
-    flex: '0 0 auto',
-    placeItems: 'center',
-    borderRadius: theme.radii.small,
-    background: theme.colors.surfaceSoft,
-    objectFit: 'cover',
-  },
-  '& [data-character-label]': {
-    minWidth: 0,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-  },
-  '& [data-character-chevron]': {
-    width: '0.9rem',
-    height: '0.9rem',
-    flex: '0 0 auto',
-    color: theme.colors.textFaint,
-  },
-  '@media (max-width: 39.99rem)': {
-    '& > button:first-of-type': {
-      width: '100%',
-      maxWidth: 'none',
-      minHeight: '2.75rem',
-      paddingInline: theme.space.xs,
-    },
-    '& > button[data-clear-character="true"]': {
-      width: '2.75rem',
-      flex: '0 0 2.75rem',
-    },
-  },
+  justifyContent: 'flex-end',
+  gap: theme.space.sm,
+  flex: '0 0 auto',
+  '@media (max-width: 39.99rem)': { gap: theme.space.xs },
 });
 
 export const brandStyles = (theme: Theme): CSSObject => ({
@@ -161,14 +106,13 @@ export const brandStyles = (theme: Theme): CSSObject => ({
 
 export const capabilityStyles = (theme: Theme): CSSObject => ({
   position: 'relative',
-  justifySelf: 'end',
-  minWidth: 0,
-  '& summary': {
-    minHeight: '2.45rem',
+  flex: '0 0 auto',
+  '& > button': {
+    minHeight: '2.75rem',
     display: 'inline-flex',
     alignItems: 'center',
     gap: theme.space.xs,
-    padding: `0.38rem ${theme.space.sm}`,
+    padding: `0.45rem ${theme.space.sm}`,
     border: `1px solid ${theme.colors.border}`,
     borderRadius: theme.radii.round,
     color: theme.colors.textMuted,
@@ -177,19 +121,24 @@ export const capabilityStyles = (theme: Theme): CSSObject => ({
     fontWeight: 760,
     whiteSpace: 'nowrap',
     cursor: 'pointer',
-    listStyle: 'none',
+    transition: `color ${theme.motion.quick}, border-color ${theme.motion.quick}, background ${theme.motion.quick}`,
+    '&:hover': {
+      color: theme.colors.text,
+      borderColor: theme.colors.borderStrong,
+      background: theme.colors.surface,
+    },
   },
-  '& summary::-webkit-details-marker': { display: 'none' },
-  '& summary:focus-visible': {
+  '& > button:focus-visible': {
     outline: `2px solid ${theme.colors.focus}`,
     outlineOffset: '2px',
   },
-  '&[open] summary': {
+  '& > button[aria-expanded="true"]': {
     borderColor: theme.colors.accent,
     color: theme.colors.text,
+    background: theme.colors.surface,
   },
   '@media (max-width: 39.99rem)': {
-    '& summary': {
+    '& > button': {
       width: '2.75rem',
       height: '2.75rem',
       justifyContent: 'center',
@@ -227,15 +176,23 @@ export const capabilityDetailStyles = (theme: Theme): CSSObject => ({
   zIndex: theme.layers.stageNotices,
   insetBlockStart: 'calc(100% + 0.45rem)',
   insetInlineEnd: 0,
-  width: 'min(18rem, calc(100vw - 1rem))',
+  width: 'min(20rem, calc(100vw - 1rem))',
   display: 'grid',
-  gap: theme.space.xs,
-  padding: theme.space.sm,
+  gap: theme.space.sm,
+  padding: theme.space.md,
   border: `1px solid ${theme.colors.borderStrong}`,
-  borderRadius: theme.radii.medium,
+  borderRadius: theme.radii.large,
   background: theme.colors.overlaySurface,
   boxShadow: theme.shadows.lifted,
   backdropFilter: 'blur(14px)',
+  '& [data-capability-heading]': {
+    display: 'grid',
+    gap: theme.space.xxs,
+    paddingBlockEnd: theme.space.sm,
+    borderBottom: `1px solid ${theme.colors.border}`,
+    '& > strong': { color: theme.colors.text, fontSize: theme.fontSizes.body },
+    '& > span': { color: theme.colors.textMuted, fontSize: theme.fontSizes.caption },
+  },
   '& span': {
     display: 'flex',
     justifyContent: 'space-between',
@@ -244,6 +201,13 @@ export const capabilityDetailStyles = (theme: Theme): CSSObject => ({
     fontSize: theme.fontSizes.caption,
   },
   '& strong': { color: theme.colors.text, fontWeight: 760 },
+  '& small': {
+    paddingBlockStart: theme.space.sm,
+    borderTop: `1px solid ${theme.colors.border}`,
+    color: theme.colors.textFaint,
+    fontSize: theme.fontSizes.caption,
+    lineHeight: 1.45,
+  },
   '@media (max-width: 39.99rem)': {
     position: 'fixed',
     insetInline: theme.space.xs,

@@ -695,9 +695,11 @@ for (const viewport of VIEWPORTS) {
 
       await page.goto('/studio');
       await expect(page.getByRole('main')).toBeVisible();
-      await expect(page.getByLabel('Integration availability')).toContainText(
+      await page.getByLabel('Integration availability').getByRole('button').click();
+      await expect(page.getByRole('region', { name: 'Studio availability details' })).toContainText(
         'AI video configured',
       );
+      await page.keyboard.press('Escape');
       await page.addStyleTag({
         content: `
           *, *::before, *::after {

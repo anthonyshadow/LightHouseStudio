@@ -7,7 +7,8 @@ reuse or remove a record, and return to creation without losing the shared Studi
 
 ## Observable behavior
 
-1. The account menu stays above the Studio workspace and links to `/studio/characters` and
+1. The account trigger is the far-right header control. Its viewport-safe menu stays above the
+   Studio workspace, never overlaps the integration popover, and links to `/studio/characters` and
    `/studio/outfits` alongside Saved Videos.
 2. Both routes render full-screen library workspaces inside the existing `StudioApp`; route changes
    do not remount the media stage, create another session, or contact a provider.

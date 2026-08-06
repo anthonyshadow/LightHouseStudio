@@ -14,7 +14,9 @@ import { REFERENCE_PNG } from './support/mediaFixtures';
 
 const openCharacterBuilder = async (page: Page): Promise<void> => {
   await openCharacterOptions(page);
-  await page.getByRole('button', { name: 'Create new character' }).click();
+  await page
+    .getByRole('button', { name: /^(Create new character|New character recipe)$/u })
+    .click();
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeVisible();
   await page.getByRole('button', { name: 'Adult', exact: true }).click();
   await page.getByRole('button', { name: /^Preview(?: |$)/u }).click();

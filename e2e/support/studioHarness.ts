@@ -15,17 +15,14 @@ export const openCharacterOptions = async (page: Page): Promise<void> => {
   const desktopTrigger = page
     .getByRole('navigation', { name: 'Creative workspace tools' })
     .getByRole('button', { name: /^(Select Character|Selected character:)/u });
-  const mobileTrigger = page.getByRole('button', { name: /Open Select AI options/u });
-  await expect(desktopTrigger.or(mobileTrigger).first()).toBeVisible();
   if (await desktopTrigger.isVisible()) {
     await desktopTrigger.click();
     return;
   }
-  await mobileTrigger.click();
-  await page
-    .getByRole('dialog', { name: 'Select AI' })
-    .getByRole('button', { name: 'Select Character' })
-    .click();
+  const shelfTrigger = page.getByRole('button', { name: 'Shelf', exact: true });
+  await expect(shelfTrigger).toBeVisible();
+  await shelfTrigger.click();
+  await expect(page.getByRole('dialog', { name: 'Recipe Shelf' })).toBeVisible();
 };
 
 export {
