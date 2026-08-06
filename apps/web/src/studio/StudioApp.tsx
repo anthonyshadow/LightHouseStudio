@@ -1294,7 +1294,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         Skip to studio
       </a>
       <div css={shellStyles(theme)}>
-        <div css={headerRegionStyles()}>
+        <div css={headerRegionStyles(theme)}>
           <StudioHeader
             availability={availability}
             browser={browser}

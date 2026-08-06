@@ -33,10 +33,12 @@ export const shellStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-export const headerRegionStyles = (): CSSObject => ({
+export const headerRegionStyles = (theme: Theme): CSSObject => ({
+  position: 'relative',
+  zIndex: theme.layers.stageNotices + 1,
   minWidth: 0,
   minHeight: 0,
-  overflow: 'hidden',
+  overflow: 'visible',
 });
 
 export const skipLinkStyles = (theme: Theme): CSSObject => ({

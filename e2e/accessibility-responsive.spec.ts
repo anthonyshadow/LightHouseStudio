@@ -214,7 +214,42 @@ for (const viewport of representativeViewports) {
     expect(guideBox!.y + guideBox!.height).toBeLessThanOrEqual(
       stageFrameBox!.y + stageFrameBox!.height,
     );
-    await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
+    const availability = page.getByLabel('Integration availability');
+    await expect(availability).toContainText('AI video configured');
+
+    await page.getByRole('button', { name: 'Lightframe Demo account menu' }).click();
+    const accountMenu = page.getByRole('menu', { name: 'Account and saved libraries' });
+    await expect(accountMenu).toBeVisible();
+    await expect
+      .poll(() =>
+        accountMenu.evaluate((menu) => {
+          const bounds = menu.getBoundingClientRect();
+          const topmost = document.elementFromPoint(
+            bounds.left + bounds.width / 2,
+            bounds.top + bounds.height / 2,
+          );
+          return topmost !== null && (topmost === menu || menu.contains(topmost));
+        }),
+      )
+      .toBe(true);
+    await page.keyboard.press('Escape');
+
+    await availability.locator('summary').click();
+    const availabilityMenu = availability.locator(':scope > div');
+    await expect(availabilityMenu).toBeVisible();
+    await expect
+      .poll(() =>
+        availabilityMenu.evaluate((menu) => {
+          const bounds = menu.getBoundingClientRect();
+          const topmost = document.elementFromPoint(
+            bounds.left + bounds.width / 2,
+            bounds.top + bounds.height / 2,
+          );
+          return topmost !== null && (topmost === menu || menu.contains(topmost));
+        }),
+      )
+      .toBe(true);
+    await availability.locator('summary').click();
 
     const skipLink = page.getByRole('link', { name: 'Skip to studio' });
     await skipLink.focus();

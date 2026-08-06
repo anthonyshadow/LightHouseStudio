@@ -7,7 +7,8 @@ reuse or remove a record, and return to creation without losing the shared Studi
 
 ## Observable behavior
 
-1. The account menu links to `/studio/characters` and `/studio/outfits` alongside Saved Videos.
+1. The account menu stays above the Studio workspace and links to `/studio/characters` and
+   `/studio/outfits` alongside Saved Videos.
 2. Both routes render full-screen library workspaces inside the existing `StudioApp`; route changes
    do not remount the media stage, create another session, or contact a provider.
 3. Saved Characters list the user-scoped Character/Shelf records and support existing exact
