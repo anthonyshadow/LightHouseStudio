@@ -1,0 +1,141 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { SavedVideoDetail, SavedVideoOrigin } from '@studio/contracts';
+import {
+  appendSavedVideoVersion,
+  saveSavedVideoThumbnail,
+  saveVideo,
+} from '../../adapters/api-client/savedVideosApi';
+import type { RecordingArtifact } from '../recording/types';
+import { createSavedVideoThumbnail } from './thumbnailClient';
+
+export type SaveVideoState =
+  | { readonly status: 'idle' }
+  | { readonly status: 'saving'; readonly artifactId: string }
+  | { readonly status: 'saved'; readonly artifactId: string; readonly video: SavedVideoDetail }
+  | { readonly status: 'error'; readonly artifactId: string; readonly message: string };
+
+const originForArtifact = (artifact: RecordingArtifact): SavedVideoOrigin => {
+  switch (artifact.kind) {
+    case 'uploaded':
+      return 'uploaded';
+    case 'edited':
+      return 'editor';
+    case 'visual':
+      return 'character-swap';
+    case 'voice':
+      return 'voice-treatment';
+    case 'recorded':
+    default:
+      return 'recorded';
+  }
+};
+
+export const useSaveVideo = () => {
+  const [state, setState] = useState<SaveVideoState>({ status: 'idle' });
+  const keys = useRef(new Map<string, string>());
+  const controller = useRef<AbortController | null>(null);
+
+  useEffect(() => () => controller.current?.abort('unmount'), []);
+
+  const save = useCallback(
+    async (
+      artifact: RecordingArtifact,
+      title?: string,
+      source?: { readonly videoId: string; readonly versionId: string },
+    ) => {
+      if (state.status === 'saving') return null;
+      const idempotencyKey = keys.current.get(artifact.id) ?? crypto.randomUUID();
+      keys.current.set(artifact.id, idempotencyKey);
+      controller.current?.abort('replaced');
+      const active = new AbortController();
+      controller.current = active;
+      setState({ status: 'saving', artifactId: artifact.id });
+      try {
+        const video = await saveVideo({
+          blob: artifact.media,
+          title: title?.trim() || artifact.name || artifact.filename.replace(/\.[^.]+$/u, ''),
+          filename: artifact.filename,
+          origin: originForArtifact(artifact),
+          idempotencyKey,
+          sourceVideoId: source?.videoId ?? null,
+          sourceVersionId: source?.versionId ?? null,
+          signal: active.signal,
+        });
+        const saved = await createSavedVideoThumbnail(artifact.media, active.signal)
+          .then((thumbnail) =>
+            saveSavedVideoThumbnail(video.id, video.currentVersion.id, thumbnail, active.signal),
+          )
+          .catch((error: unknown) => {
+            if (active.signal.aborted) throw error;
+            return video;
+          });
+        setState({ status: 'saved', artifactId: artifact.id, video: saved });
+        return saved;
+      } catch (error) {
+        if (active.signal.aborted) return null;
+        setState({
+          status: 'error',
+          artifactId: artifact.id,
+          message: error instanceof Error ? error.message : 'The video could not be saved.',
+        });
+        return null;
+      }
+    },
+    [state.status],
+  );
+
+  const replace = useCallback(
+    async (
+      artifact: RecordingArtifact,
+      target: { readonly videoId: string; readonly currentVersionId: string },
+      title?: string,
+    ) => {
+      if (state.status === 'saving') return null;
+      const keyId = `${artifact.id}:replace:${target.videoId}:${target.currentVersionId}`;
+      const idempotencyKey = keys.current.get(keyId) ?? crypto.randomUUID();
+      keys.current.set(keyId, idempotencyKey);
+      controller.current?.abort('replaced');
+      const active = new AbortController();
+      controller.current = active;
+      setState({ status: 'saving', artifactId: artifact.id });
+      try {
+        const video = await appendSavedVideoVersion(target.videoId, target.currentVersionId, {
+          blob: artifact.media,
+          title: title?.trim() || artifact.name || artifact.filename.replace(/\.[^.]+$/u, ''),
+          filename: artifact.filename,
+          origin: originForArtifact(artifact),
+          idempotencyKey,
+          sourceVideoId: target.videoId,
+          sourceVersionId: target.currentVersionId,
+          signal: active.signal,
+        });
+        const saved = await createSavedVideoThumbnail(artifact.media, active.signal)
+          .then((thumbnail) =>
+            saveSavedVideoThumbnail(video.id, video.currentVersion.id, thumbnail, active.signal),
+          )
+          .catch((error: unknown) => {
+            if (active.signal.aborted) throw error;
+            return video;
+          });
+        setState({ status: 'saved', artifactId: artifact.id, video: saved });
+        return saved;
+      } catch (error) {
+        if (active.signal.aborted) return null;
+        setState({
+          status: 'error',
+          artifactId: artifact.id,
+          message: error instanceof Error ? error.message : 'The video could not be replaced.',
+        });
+        return null;
+      }
+    },
+    [state.status],
+  );
+
+  const reset = useCallback(() => {
+    controller.current?.abort('reset');
+    setState({ status: 'idle' });
+  }, []);
+
+  return { state, save, replace, reset } as const;
+};

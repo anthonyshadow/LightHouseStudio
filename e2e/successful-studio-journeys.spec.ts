@@ -603,7 +603,7 @@ test('saved voice preview, Apply, remux, Download, and Restore Original stay exp
 
   await processedTakeDialog.getByRole('button', { name: 'Voice treatments' }).click();
   const restoredVoiceTreatments = page.getByRole('dialog', { name: 'Voice Treatments' });
-  await restoredVoiceTreatments.getByRole('button', { name: 'Original' }).click();
+  await restoredVoiceTreatments.getByRole('button', { name: 'Original', exact: true }).click();
   await restoredVoiceTreatments.getByRole('button', { name: 'Restore original audio' }).click();
   await restoredVoiceTreatments.getByRole('button', { name: 'Back to take review' }).click();
   await expect(

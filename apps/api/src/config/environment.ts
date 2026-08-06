@@ -21,6 +21,15 @@ export const WIRO_REFERENCE_IMAGE_MODEL = 'seedream-v5-lite-uncensored' as const
 export const PRUNA_VIDEO_REPLACE_MODEL = 'p-video-replace' as const;
 export const DEFAULT_BFL_SAFETY_TOLERANCE = 2;
 export const DEFAULT_BFL_DISABLE_PROMPT_UPSAMPLING = true;
+export const DEFAULT_DEMO_USER_ID = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
+export const DEFAULT_DEMO_USER_LOGIN = 'demo@lightframe.local';
+export const DEFAULT_DEMO_USER_DISPLAY_NAME = 'Demo Creator';
+export const DEFAULT_DEMO_USER_PASSWORD = 'lightframe-demo';
+export const DEFAULT_DEMO_USER_PASSWORD_HASH =
+  '$argon2id$v=19$m=19456,t=2,p=1$AQ6KYL1hKyx+ajWTKCCdCA$wrv4SBSsWdptAwMQE3QHId1riBhXxJ/10dvv0Kh/HK8';
+export const DEFAULT_DEMO_JWT_SECRET = 'lightframe-local-demo-signing-key-not-for-production-2026';
+export const DEFAULT_AUTH_SESSION_TTL_SECONDS = 24 * 60 * 60;
+export const DEFAULT_AUTH_COOKIE_NAME = 'lightframe_session';
 
 const normalizeOptionalString = (value: unknown): unknown => {
   if (typeof value !== 'string') return value;
@@ -61,6 +70,45 @@ const environmentSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: portSchema,
+    DEMO_AUTH_ENABLED: strictBooleanSchema(true),
+    DEMO_AUTH_PREFILL: strictBooleanSchema(true),
+    DEMO_USER_ID: z.preprocess(normalizeOptionalString, z.uuid().default(DEFAULT_DEMO_USER_ID)),
+    DEMO_USER_LOGIN: z.preprocess(
+      normalizeOptionalString,
+      z.string().trim().min(1).max(254).default(DEFAULT_DEMO_USER_LOGIN),
+    ),
+    DEMO_USER_DISPLAY_NAME: z.preprocess(
+      normalizeOptionalString,
+      z.string().trim().min(1).max(100).default(DEFAULT_DEMO_USER_DISPLAY_NAME),
+    ),
+    DEMO_USER_PASSWORD: z.preprocess(
+      normalizeOptionalString,
+      z.string().min(1).max(512).default(DEFAULT_DEMO_USER_PASSWORD),
+    ),
+    DEMO_USER_PASSWORD_HASH: z.preprocess(
+      normalizeOptionalString,
+      z.string().startsWith('$argon2id$').default(DEFAULT_DEMO_USER_PASSWORD_HASH),
+    ),
+    AUTH_JWT_SECRET: z.preprocess(
+      normalizeOptionalString,
+      z.string().min(32).default(DEFAULT_DEMO_JWT_SECRET),
+    ),
+    AUTH_SESSION_TTL_SECONDS: z.preprocess(
+      (value) => (value === undefined || value === '' ? DEFAULT_AUTH_SESSION_TTL_SECONDS : value),
+      z.coerce
+        .number()
+        .int()
+        .min(300)
+        .max(7 * 24 * 60 * 60),
+    ),
+    AUTH_COOKIE_NAME: z.preprocess(
+      normalizeOptionalString,
+      z
+        .string()
+        .regex(/^[A-Za-z0-9_-]+$/u)
+        .default(DEFAULT_AUTH_COOKIE_NAME),
+    ),
+    AUTH_COOKIE_SECURE: strictBooleanSchema(false),
     DECART_API_KEY: optionalSecretSchema,
     EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: z.preprocess(
       normalizeOptionalString,
@@ -151,12 +199,41 @@ const environmentSchema = z
     for (const [variable, valid, message] of required) {
       if (!valid) context.addIssue({ code: 'custom', path: [variable], message });
     }
+    if (value.NODE_ENV === 'production' && value.AUTH_JWT_SECRET === DEFAULT_DEMO_JWT_SECRET) {
+      context.addIssue({
+        code: 'custom',
+        path: ['AUTH_JWT_SECRET'],
+        message: 'Set an environment-specific signing secret in production.',
+      });
+    }
+    if (
+      value.NODE_ENV === 'production' &&
+      value.DEMO_AUTH_ENABLED &&
+      value.DEMO_USER_PASSWORD_HASH === DEFAULT_DEMO_USER_PASSWORD_HASH
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DEMO_USER_PASSWORD_HASH'],
+        message: 'Set an environment-specific demo password hash in production.',
+      });
+    }
   });
 
 export interface RuntimeConfig {
   readonly nodeEnv: 'development' | 'test' | 'production';
   readonly host: '127.0.0.1';
   readonly port: number;
+  readonly demoAuthEnabled: boolean;
+  readonly demoAuthPrefill: boolean;
+  readonly demoUserId: string;
+  readonly demoUserLogin: string;
+  readonly demoUserDisplayName: string;
+  readonly demoUserPassword: string;
+  readonly demoUserPasswordHash: string;
+  readonly authJwtSecret: string;
+  readonly authSessionTtlSeconds: number;
+  readonly authCookieName: string;
+  readonly authCookieSecure: boolean;
   readonly decartApiKey?: string;
   readonly existingVideoCharacterSwapProvider: 'decart' | 'pruna';
   readonly prunaVideoReplaceEnabled: boolean;
@@ -272,6 +349,17 @@ export const parseEnvironment = (
     nodeEnv: result.data.NODE_ENV,
     host: '127.0.0.1',
     port: result.data.PORT,
+    demoAuthEnabled: result.data.DEMO_AUTH_ENABLED,
+    demoAuthPrefill: result.data.DEMO_AUTH_PREFILL,
+    demoUserId: result.data.DEMO_USER_ID,
+    demoUserLogin: result.data.DEMO_USER_LOGIN,
+    demoUserDisplayName: result.data.DEMO_USER_DISPLAY_NAME,
+    demoUserPassword: result.data.DEMO_USER_PASSWORD,
+    demoUserPasswordHash: result.data.DEMO_USER_PASSWORD_HASH,
+    authJwtSecret: result.data.AUTH_JWT_SECRET,
+    authSessionTtlSeconds: result.data.AUTH_SESSION_TTL_SECONDS,
+    authCookieName: result.data.AUTH_COOKIE_NAME,
+    authCookieSecure: result.data.AUTH_COOKIE_SECURE,
     ...(result.data.DECART_API_KEY === undefined
       ? {}
       : { decartApiKey: result.data.DECART_API_KEY }),

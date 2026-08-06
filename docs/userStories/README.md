@@ -20,16 +20,20 @@ references, not release-readiness claims or future requirements.
 | Browse, save, manage, and apply ElevenLabs voices    | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
 | Recover from missing capabilities                    | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md) |
 | Build and preload a reusable character               | [Studio character builder](11-studio-character-builder.md)                     |
+| Log in, restore, and log out safely                  | [Login and local session](14-login-and-session.md)                             |
+| Save, browse, version, and reload local videos       | [Saved Video Gallery](15-saved-video-gallery.md)                               |
+| Reuse saved characters and outfits                   | [Saved creative libraries](16-saved-creative-libraries.md)                     |
 
 ## Shared runtime rules
 
-- `/` is the provider-free entry and `/studio` is the active Studio runtime. **Record New Video**
-  and **Upload Video** are entry intents for that same runtime; every other path returns to `/`.
+- `/` is the provider-free entry and Login surface. `/studio`, `/studio/videos`,
+  `/studio/characters`, and `/studio/outfits` are authenticated views of one active Studio
+  runtime; every other path returns to `/`.
 - Studio begins in neutral Local Camera mode with camera and microphone off. Only an explicit
   control-bar, upload-panel, or Dock action acquires media; only an explicit AI Start contacts a
   provider.
-- When old browser-local project data is detected, Recipe Shelf can open the download/delete-only
-  Legacy Projects manager. It has no route and cannot revive the retired Guided experience.
+- Retired Guided project records and media are cleared on authenticated Studio initialization;
+  they are not imported into Saved Videos and cannot revive the retired Guided experience.
 - Browser navigation cannot abandon recording/finalization or an active video render. Leaving with
   a temporary take, active Voice process, dirty local video edit, or dirty Shelf form requires
   confirmed discard.
@@ -48,8 +52,8 @@ references, not release-readiness claims or future requirements.
   the single active model before submission; only the active choice is used.
 - The recording and Decart session limits are independent: each warns at 270 seconds and ends
   through its own safe path at 300 seconds.
-- Recipe metadata is browser-local. Builder reference bytes are immutable local server assets;
-  Dock portrait and garment uploads are tab-ephemeral.
+- Recipe metadata is user-namespaced browser data. Builder reference bytes and saved video bytes
+  are authenticated local server assets; Dock portrait and garment uploads are tab-ephemeral.
 
 ## Evidence boundary
 

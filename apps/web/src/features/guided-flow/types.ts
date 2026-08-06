@@ -93,5 +93,6 @@ export interface LocalProjectRepository {
   loadNewestCharacterDesign(): Promise<ProjectRecordV1 | null>;
   readArtifact(projectId: string, artifactId: string): Promise<Blob | null>;
   deleteProject(projectId: string): Promise<void>;
+  clearAll(): Promise<void>;
   close(): void;
 }

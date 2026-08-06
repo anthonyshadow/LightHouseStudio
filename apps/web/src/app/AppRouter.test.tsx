@@ -4,6 +4,9 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { useLayoutEffect, useRef } from 'react';
 import { createMemoryRouter, RouterProvider, type InitialEntry } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { AuthenticatedSessionResponse } from '@studio/contracts';
+import { createPhaseOneEntitlements } from '@studio/domain';
+import { AuthProvider } from '../application/auth/AuthProvider';
 import { StudioDesignProvider } from '../ui';
 import type { StudioAppProps } from '../studio/StudioApp';
 
@@ -30,13 +33,37 @@ vi.mock('../studio/StudioApp', () => ({
 
 import { RoutedApplication } from './AppRouter';
 
-const renderApplication = (initialEntry: InitialEntry = '/') => {
+const testSession: AuthenticatedSessionResponse = {
+  user: {
+    id: '2d7914b2-f912-4b96-b17d-54100a2ffea3',
+    login: 'demo@lightframe.local',
+    username: 'demo',
+    email: 'demo@lightframe.local',
+    displayName: 'Demo Creator',
+    avatarUrl: null,
+    planId: 'free',
+    role: 'user',
+    status: 'active',
+    createdAt: '2026-08-05T12:00:00.000Z',
+    updatedAt: '2026-08-05T12:00:00.000Z',
+    lastLoginAt: '2026-08-05T12:00:00.000Z',
+  },
+  entitlements: createPhaseOneEntitlements('free', '2026-08-05T12:00:00.000Z'),
+  expiresAt: '2099-08-06T12:00:00.000Z',
+};
+
+const renderApplication = (
+  initialEntry: InitialEntry = '/',
+  initialSession: AuthenticatedSessionResponse | null = testSession,
+) => {
   const router = createMemoryRouter([{ path: '*', element: <RoutedApplication /> }], {
     initialEntries: [initialEntry],
   });
   const view = render(
     <StudioDesignProvider>
-      <RouterProvider router={router} />
+      <AuthProvider initialSession={initialSession}>
+        <RouterProvider router={router} />
+      </AuthProvider>
     </StudioDesignProvider>,
   );
   return { ...view, router };
@@ -63,8 +90,7 @@ describe('AppRouter', () => {
     renderApplication();
 
     expect(screen.getByRole('heading', { name: 'Enter Lightframe Studio' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Record New Video' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Upload Video' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Enter Studio' })).toBeInTheDocument();
     expect(screen.queryByText('Studio route')).not.toBeInTheDocument();
     expect(appHarness.renderCount).toBe(0);
     expect(document.title).toBe('Enter Lightframe Studio');
@@ -72,9 +98,9 @@ describe('AppRouter', () => {
     expect(description?.content).toContain('Record or upload a video');
   });
 
-  it('pushes Studio from Record New Video without starting media and hands focus to its main landmark', async () => {
+  it('pushes Studio from the authenticated entry and hands focus to its main landmark', async () => {
     const { router } = renderApplication();
-    fireEvent.click(screen.getByRole('button', { name: 'Record New Video' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Studio' }));
 
     expect(await screen.findByText('Studio route')).toBeInTheDocument();
     expect(router.state.location.pathname).toBe('/studio');
@@ -83,27 +109,22 @@ describe('AppRouter', () => {
     expect(document.title).toBe('Lightframe Studio');
   });
 
-  it('passes upload intent without selecting a file or mounting Studio on the entry route', async () => {
-    const { router } = renderApplication();
+  it('keeps unauthenticated entry provider-free and exposes only login', () => {
+    renderApplication('/', null);
 
-    fireEvent.click(screen.getByRole('button', { name: 'Upload Video' }));
-
-    expect(await screen.findByText('Studio route')).toBeInTheDocument();
-    expect(router.state.location.pathname).toBe('/studio');
-    expect(appHarness.latestProps).toEqual({
-      focusMainOnMount: true,
-      initialIntent: 'upload',
-    });
+    expect(screen.getByRole('button', { name: 'Log in' })).toBeInTheDocument();
+    expect(screen.queryByText('Studio route')).not.toBeInTheDocument();
+    expect(appHarness.renderCount).toBe(0);
   });
 
   it('restores focus to the camera entry after browser Back', async () => {
     const { router } = renderApplication();
-    fireEvent.click(screen.getByRole('button', { name: 'Record New Video' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Enter Studio' }));
     await screen.findByText('Studio route');
 
     await router.navigate(-1);
 
-    const enter = await screen.findByRole('button', { name: 'Record New Video' });
+    const enter = await screen.findByRole('button', { name: 'Enter Studio' });
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     await waitFor(() => expect(enter).toHaveFocus());
   });
@@ -116,6 +137,17 @@ describe('AppRouter', () => {
     expect(document.activeElement).toBe(document.body);
   });
 
+  it.each(['/studio/videos', '/studio/characters', '/studio/outfits'])(
+    'keeps the persistent Studio runtime for %s',
+    async (path) => {
+      renderApplication(path);
+
+      expect(await screen.findByText('Studio route')).toBeInTheDocument();
+      expect(appHarness.renderCount).toBe(1);
+      expect(appHarness.latestProps?.focusMainOnMount).toBe(false);
+    },
+  );
+
   it.each([
     '/advanced',
     '/guided',
@@ -124,7 +156,7 @@ describe('AppRouter', () => {
   ])('replaces the noncanonical path %s with the entry page', async (path) => {
     const { router } = renderApplication(path);
 
-    expect(await screen.findByRole('button', { name: 'Record New Video' })).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'Enter Studio' })).toBeInTheDocument();
     await waitFor(() => expect(router.state.location.pathname).toBe('/'));
     expect(router.state.location.search).toBe('');
     expect(appHarness.renderCount).toBe(0);
@@ -135,7 +167,7 @@ describe('AppRouter', () => {
     async (path) => {
       renderApplication(path);
 
-      expect(await screen.findByRole('button', { name: 'Record New Video' })).toBeInTheDocument();
+      expect(await screen.findByRole('button', { name: 'Enter Studio' })).toBeInTheDocument();
       expect(appHarness.renderCount).toBe(0);
     },
   );

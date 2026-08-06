@@ -27,6 +27,10 @@ export const useLegacyProjectAvailability = ({
         setStorage(initializedStorage);
 
         try {
+          // Phase 1 accounts intentionally start with no retired Guided-project media. This
+          // idempotently removes the legacy project and Blob stores instead of assigning them to
+          // the seeded account.
+          await repository.clearAll();
           const count = await repository.count();
           if (active) setProjectCount(count);
         } catch {

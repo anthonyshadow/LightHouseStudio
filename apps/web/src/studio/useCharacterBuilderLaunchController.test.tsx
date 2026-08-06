@@ -118,6 +118,28 @@ describe('useCharacterBuilderLaunchController', () => {
     expect(result.current.launchError).toBeNull();
   });
 
+  it('prepares launches against the authenticated user draft namespace', async () => {
+    const prepareLaunch = vi.fn(() => Promise.resolve(true));
+    const onOpen = vi.fn();
+    const { result } = renderHook(() =>
+      useCharacterBuilderLaunchController({
+        ownerUserId: 'user-123',
+        onOpen,
+        prepareLaunch,
+      }),
+    );
+
+    await act(() => result.current.launchCharacterBuilder(createLaunch));
+
+    expect(prepareLaunch).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ownerUserId: 'user-123',
+        target: createLaunch.target,
+      }),
+    );
+    expect(onOpen).toHaveBeenCalledOnce();
+  });
+
   it('keeps confirmation focus topmost and restores the exact launch control on cancel', async () => {
     const user = userEvent.setup();
     const onOpen = vi.fn();

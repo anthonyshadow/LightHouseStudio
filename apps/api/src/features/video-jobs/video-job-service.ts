@@ -20,6 +20,7 @@ import {
   VideoJobProviderError,
 } from '../../providers/video-jobs/video-job-provider.js';
 import { inspectVideoFile } from './media-inspection.js';
+import type { ProcessingJobTraceWriter } from '../processing-jobs/file-processing-job-repository.js';
 
 interface ScheduledVideoJobDeadline {
   cancel(): void;
@@ -37,6 +38,8 @@ interface VideoJobServiceOptions {
     callback: () => Promise<void>,
     delayMs: number,
   ) => ScheduledVideoJobDeadline;
+  readonly traceWriter?: ProcessingJobTraceWriter;
+  readonly providerIds?: Readonly<Record<VideoTransformOperationId, string>>;
 }
 
 type VideoJobRecord = {
@@ -192,6 +195,8 @@ export class VideoJobService {
   readonly #scheduleDeadline: NonNullable<VideoJobServiceOptions['scheduleDeadline']>;
   readonly #providerPollBackoffMs: readonly [number, number, number, number, number];
   readonly #removePath: NonNullable<VideoJobServiceOptions['removePath']>;
+  readonly #traceWriter: ProcessingJobTraceWriter | undefined;
+  readonly #providerIds: Readonly<Record<VideoTransformOperationId, string>>;
   readonly #operations = new Set<Promise<void>>();
   #deadlineGeneration = 0;
   #deadline: ScheduledVideoJobDeadline | null = null;
@@ -209,6 +214,11 @@ export class VideoJobService {
     this.#providerPollBackoffMs = options.providerPollBackoffMs ?? PROVIDER_POLL_BACKOFF_MS;
     this.#removePath = options.removePath ?? rm;
     this.#scheduleDeadline = options.scheduleDeadline ?? scheduleSystemDeadline;
+    this.#traceWriter = options.traceWriter;
+    this.#providerIds = options.providerIds ?? {
+      'character-swap': 'configured-provider',
+      'virtual-try-on': 'configured-provider',
+    };
     this.#root = path.resolve(lightframeDataDir, '.tmp', 'video-jobs');
     this.#ready = rm(this.#root, { recursive: true, force: true }).then(async () => {
       if (Object.values(providers).some((binding) => binding !== null) && !this.#closed) {
@@ -274,6 +284,31 @@ export class VideoJobService {
     } else {
       this.#activeJobByOwner.set(job.ownerId, job.jobId);
     }
+    this.#trace(job);
+  }
+
+  #trace(job: VideoJobRecord): void {
+    if (this.#traceWriter === undefined) return;
+    const trace = this.#traceWriter
+      .upsert({
+        schemaVersion: 1,
+        jobId: job.jobId,
+        ownerUserId: job.ownerId,
+        operation: job.operation,
+        provider: this.#providerIds[job.operation],
+        providerJobId: job.providerJobId,
+        status: job.status,
+        safeErrorCode: job.error?.code ?? null,
+        createdAt: job.createdAt,
+        updatedAt: job.updatedAt,
+        completedAt: terminal(job.status) ? job.updatedAt : null,
+      })
+      .catch(() => {
+        console.warn('[video-jobs] Durable processing trace could not be updated.', {
+          jobId: job.jobId,
+        });
+      });
+    this.#track(trace);
   }
 
   #pushDeadline(entry: VideoJobDeadlineEntry): void {
@@ -399,6 +434,7 @@ export class VideoJobService {
       code: 'job_expired',
       message: 'This temporary video job expired. Submit a new job explicitly to retry.',
     };
+    this.#trace(job);
     await this.#requestCleanup(job, false);
   }
 
@@ -559,6 +595,7 @@ export class VideoJobService {
       generation: job.deadlineGeneration,
     });
     this.#scheduleNextDeadline();
+    this.#trace(job);
     this.#track(this.#submit(job, input.recipe));
     return this.#snapshot(job);
   }
@@ -608,6 +645,7 @@ export class VideoJobService {
         error instanceof AppError
           ? { code: error.code as VideoJobErrorCode, message: error.message }
           : safeProviderFailure(error);
+      this.#trace(job);
       await this.#cleanupFiles(job);
     }
   }
@@ -653,6 +691,7 @@ export class VideoJobService {
         error instanceof AppError
           ? { code: error.code as VideoJobErrorCode, message: error.message }
           : safeProviderFailure(error);
+      this.#trace(job);
       await this.#cleanupFiles(job);
     }
   }
@@ -687,6 +726,7 @@ export class VideoJobService {
           job.error = safeProviderFailure(
             new VideoJobProviderError(providerStatus.failureReason ?? 'upstream'),
           );
+          this.#trace(job);
           await this.#cleanupFiles(job);
           return;
         }
@@ -722,6 +762,7 @@ export class VideoJobService {
         }
         this.#touch(job, 'failed');
         job.error = safeProviderFailure(error);
+        this.#trace(job);
         await this.#cleanupFiles(job);
       }
     })().finally(() => {

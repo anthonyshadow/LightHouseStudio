@@ -3,11 +3,11 @@ import {
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
   openCharacterOptions,
+  readCreativeAssetStore,
   readBrowserState,
 } from './support/studioHarness';
 import { REFERENCE_PNG } from './support/mediaFixtures';
 
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
 const openBuilder = async (page: Page): Promise<void> => {
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Create new character' }).click();
@@ -127,18 +127,7 @@ test('character direction supports preview generation and save', async ({ page }
   await confirmCharacterName(page, 'Adult Guide');
   await expect(dialog).toBeHidden();
 
-  const saved = await page.evaluate((storageKey) => {
-    const payload = localStorage.getItem(storageKey);
-    if (!payload) return null;
-    const store = JSON.parse(payload) as {
-      savedCharacterPrompts?: Array<{
-        name?: string;
-        builderDraft?: { presetId?: string | null; adultAge?: string | null } | null;
-        guidedDesign?: { starterId?: string | null } | null;
-      }>;
-    };
-    return store.savedCharacterPrompts?.[0] ?? null;
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const saved = (await readCreativeAssetStore(page))?.savedCharacterPrompts[0];
   expect(saved).toMatchObject({
     name: 'Adult Guide',
     builderDraft: { presetId: null, adultAge: 'adult' },
@@ -166,21 +155,11 @@ test('prompt-only save performs no image request and immediately preloads the Do
 
   await page.getByRole('button', { name: 'Dock', exact: true }).click();
   await expect(page.getByText('Field Presenter is preloaded.')).toBeVisible();
-  const saved = await page.evaluate((storageKey) => {
-    const payload = localStorage.getItem(storageKey);
-    if (!payload) return null;
-    const store = JSON.parse(payload) as {
-      savedCharacterPrompts?: Array<{
-        name?: string;
-        referenceImageStatus?: string;
-        useCount?: number;
-      }>;
-    };
-    return {
-      count: store.savedCharacterPrompts?.length ?? 0,
-      character: store.savedCharacterPrompts?.[0] ?? null,
-    };
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const savedStore = await readCreativeAssetStore(page);
+  const saved = {
+    count: savedStore?.savedCharacterPrompts.length ?? 0,
+    character: savedStore?.savedCharacterPrompts[0] ?? null,
+  };
   expect(saved).toMatchObject({
     count: 1,
     character: {
@@ -220,14 +199,8 @@ test('saved-character selection survives reload and completes Use through Start'
   await confirmCharacterName(page, 'Shelf Field Host');
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
 
-  const savedPrompt = await page.evaluate((storageKey) => {
-    const payload = localStorage.getItem(storageKey);
-    if (!payload) return null;
-    const store = JSON.parse(payload) as {
-      savedCharacterPrompts?: Array<{ prompt?: string }>;
-    };
-    return store.savedCharacterPrompts?.[0]?.prompt ?? null;
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const savedPrompt =
+    (await readCreativeAssetStore(page))?.savedCharacterPrompts[0]?.prompt ?? null;
   expect(savedPrompt).toBeTruthy();
 
   await page.reload();
@@ -326,27 +299,11 @@ test('image-only upload saves and preloads without starting AI, then appears in 
   await expect(dialog).toBeHidden();
   expect((await readBrowserState(page)).connections).toEqual([]);
 
-  const beforeStart = await page.evaluate((storageKey) => {
-    const payload = localStorage.getItem(storageKey);
-    if (!payload) return null;
-    const store = JSON.parse(payload) as {
-      recentPrompts?: unknown[];
-      savedCharacterPrompts?: Array<{
-        id?: string;
-        name?: string;
-        prompt?: string;
-        referenceImageAssetId?: string | null;
-        uploadedReferenceImageAssetId?: string | null;
-        finalReferenceKind?: string | null;
-        builderDraft?: unknown;
-        guidedDesign?: unknown;
-      }>;
-    };
-    return {
-      recentCount: store.recentPrompts?.length ?? 0,
-      character: store.savedCharacterPrompts?.[0] ?? null,
-    };
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const beforeStartStore = await readCreativeAssetStore(page);
+  const beforeStart = {
+    recentCount: beforeStartStore?.recentPrompts.length ?? 0,
+    character: beforeStartStore?.savedCharacterPrompts[0] ?? null,
+  };
   expect(beforeStart).toMatchObject({
     recentCount: 0,
     character: {
@@ -378,14 +335,7 @@ test('image-only upload saves and preloads without starting AI, then appears in 
       },
     },
   ]);
-  const recent = await page.evaluate((storageKey) => {
-    const payload = localStorage.getItem(storageKey);
-    if (!payload) return null;
-    const store = JSON.parse(payload) as {
-      recentPrompts?: Array<Record<string, unknown>>;
-    };
-    return store.recentPrompts?.[0] ?? null;
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const recent = (await readCreativeAssetStore(page))?.recentPrompts[0];
   expect(recent).toMatchObject({
     prompt: '',
     characterName: 'Portrait Coach',
@@ -424,14 +374,7 @@ test('prompt plus upload saves the uploaded source directly with enhancement off
 
   expect(network.referenceWorkflowCalls).toEqual(['upload']);
   const uploaded = network.referenceImageUploads[0];
-  const saved = await page.evaluate((storageKey) => {
-    const payload = localStorage.getItem(storageKey);
-    if (!payload) return null;
-    const store = JSON.parse(payload) as {
-      savedCharacterPrompts?: Array<Record<string, unknown>>;
-    };
-    return store.savedCharacterPrompts?.[0] ?? null;
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const saved = (await readCreativeAssetStore(page))?.savedCharacterPrompts[0];
   expect(saved).toMatchObject({
     referenceImageAssetId: uploaded?.assetId,
     uploadedReferenceImageAssetId: uploaded?.assetId,
@@ -529,14 +472,7 @@ test('combined preview composes from the immutable upload and preloads the gener
   await confirmCharacterName(page, 'Combined Presenter');
   await expect(dialog).toBeHidden();
   const composition = network.referenceImageCompositions[0];
-  const saved = await page.evaluate((storageKey) => {
-    const payload = localStorage.getItem(storageKey);
-    if (!payload) return null;
-    const store = JSON.parse(payload) as {
-      savedCharacterPrompts?: Array<Record<string, unknown>>;
-    };
-    return store.savedCharacterPrompts?.[0] ?? null;
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const saved = (await readCreativeAssetStore(page))?.savedCharacterPrompts[0];
   expect(saved).toMatchObject({
     referenceImageAssetId: composition?.assetId,
     uploadedReferenceImageAssetId: network.referenceImageUploads[0]?.assetId,
@@ -574,14 +510,8 @@ test('Generate Preview always optimizes, and stale form edits detach the image f
   await confirmCharacterName(page, 'Copper Presenter');
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
 
-  const savedReferenceId = await page.evaluate((storageKey) => {
-    const payload = localStorage.getItem(storageKey);
-    if (!payload) return 'missing';
-    const store = JSON.parse(payload) as {
-      savedCharacterPrompts?: Array<{ referenceImageAssetId?: string | null }>;
-    };
-    return store.savedCharacterPrompts?.[0]?.referenceImageAssetId ?? null;
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const savedReferenceId =
+    (await readCreativeAssetStore(page))?.savedCharacterPrompts[0]?.referenceImageAssetId ?? null;
   expect(savedReferenceId).toBeNull();
 });
 
@@ -603,18 +533,7 @@ test('image-backed save preserves the exact generated asset and optimized Lucy p
   await confirmCharacterName(page, 'Generated Presenter');
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
 
-  const saved = await page.evaluate((storageKey) => {
-    const payload = localStorage.getItem(storageKey);
-    if (!payload) return null;
-    const store = JSON.parse(payload) as {
-      savedCharacterPrompts?: Array<{
-        referenceImageAssetId?: string | null;
-        referenceImageStatus?: string;
-        useCount?: number;
-      }>;
-    };
-    return store.savedCharacterPrompts?.[0] ?? null;
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const saved = (await readCreativeAssetStore(page))?.savedCharacterPrompts[0];
   expect(saved).toMatchObject({
     referenceImageAssetId: generated?.assetId,
     referenceImageStatus: 'persisted-reference',
@@ -642,16 +561,7 @@ test('image-backed save preserves the exact generated asset and optimized Lucy p
   await page.getByRole('button', { name: 'Start Character AI' }).click();
   await expect(page.getByLabel('Live transformed camera preview')).toBeVisible();
   await expect
-    .poll(() =>
-      page.evaluate((storageKey) => {
-        const payload = localStorage.getItem(storageKey);
-        if (!payload) return 0;
-        const store = JSON.parse(payload) as {
-          savedCharacterPrompts?: Array<{ useCount?: number }>;
-        };
-        return store.savedCharacterPrompts?.[0]?.useCount ?? 0;
-      }, CREATIVE_ASSET_STORAGE_KEY),
-    )
+    .poll(async () => (await readCreativeAssetStore(page))?.savedCharacterPrompts[0]?.useCount ?? 0)
     .toBe(1);
 });
 

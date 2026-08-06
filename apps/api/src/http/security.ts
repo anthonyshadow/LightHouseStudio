@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import {
   REFERENCE_IMAGE_IMPORT_INTENT_HEADER,
   REFERENCE_IMAGE_IMPORT_INTENT_VALUE,
@@ -138,18 +137,6 @@ export const requireWardrobeProviderIntent = (request: FastifyRequest): void => 
     WARDROBE_PROVIDER_INTENT_VALUE,
     'This wardrobe provider action requires explicit local Studio intent.',
   );
-};
-
-/** Opaque, deterministic owner boundary for the exact local Host (including port). */
-export const localOwnerIdForRequest = (request: FastifyRequest): string => {
-  const hostHeader = request.headers.host;
-  const parsedHost = typeof hostHeader === 'string' ? parseHostHeader(hostHeader) : undefined;
-  if (parsedHost === undefined || !isLoopbackHostname(parsedHost.hostname)) {
-    throw new AppError(421, 'forbidden_origin', 'This local Studio owner could not be verified.');
-  }
-  return createHash('sha256')
-    .update(parsedHost.host.toLocaleLowerCase('en-US'), 'utf8')
-    .digest('hex');
 };
 
 export const installLocalSecurityBoundary = (app: FastifyInstance): void => {

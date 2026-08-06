@@ -19,13 +19,36 @@ pure domain rules, and runtime API contracts. Its design is local-first and sing
 Imports point inward toward domain rules and contracts. The web app does not import API
 implementation code, and the API does not know about React.
 
+## Authentication and ownership
+
+Phase 1 has one configured, server-seeded local user. The API verifies the Argon2id password hash
+and issues a session-specific HS256 JWT in a host-only, HTTP-only, `SameSite=Strict` cookie. The
+cookie has a 24-hour `Max-Age`, so a healthy session can be restored after browser closure. JWT
+issuer, audience, subject, expiry, ID, user status, and the process-memory revocation record are
+checked on each private request. Restarting the broker invalidates active sessions.
+
+The API uses a deny-by-default `/api/*` authentication hook with a small exact public allowlist.
+State-changing cookie-authenticated routes also require the exact trusted Origin. `ownerUserId`
+comes only from the verified JWT subject; browser bodies, queries, multipart fields, Host hashes,
+provider IDs, storage paths, and device IDs cannot choose ownership. The legacy Host-hash namespace
+is accepted only by the idempotent reference-asset claim migration into the stable seeded user.
+
+The browser keeps the authenticated session snapshot in React memory and restores it through
+`GET /api/auth/me`; it never reads or stores the cookie/JWT. A centralized cleanup coordinator
+blocks logout during non-discardable work, confirms discardable work, cancels temporary work,
+releases media, calls the idempotent logout endpoint, clears user caches, and returns to `/`.
+Development may fetch the configured demo login and password prefill from the loopback-only
+demo-config endpoint. Production never returns that prefill and rejects the checked development
+JWT secret and password hash.
+
 ## Studio composition
 
 `AppRouter.tsx` is the browser URL boundary. React Router's data browser router renders the
-provider-free entry at `/` and lazy-loads Studio at `/studio`; the data-router form is required for
-route blocking. It also owns route titles/descriptions, focus handoff, and loading/error surfaces.
-Only `/` and `/studio` are registered; every other path returns to `/`. The loopback Vite/Fastify
-SPA fallback already serves both paths, and origin-scoped browser storage requires no migration.
+provider-free entry at `/` and protects the lazy Studio route family: `/studio`,
+`/studio/videos`, `/studio/characters`, and `/studio/outfits`. The data-router form is required for
+route blocking. Route metadata, focus handoff, and loading/error surfaces remain router-owned;
+unknown paths return to `/`. All Studio children render the same `StudioApp` instance so moving
+between a workspace and its libraries preserves the one media stage and active controller state.
 
 The entry does not mount `StudioApp`, request capabilities, acquire media, load Decart, open a
 WebSocket, or contact a provider. `StudioApp.tsx` remains the sole runtime composition boundary.
@@ -45,6 +68,8 @@ The mounted Studio owns focused controllers for:
 - recording, review, and voice processing;
 - existing-video selection, local inspection, and one mutually exclusive batch transformation;
 - Character Builder, Outfit Builder, Prompt Workshop, and Recipe Shelf handoff;
+- Saved Videos, Saved Characters, and Saved Outfits library presentation and handoff;
+- account navigation and ordered logout cleanup;
 - overlays and the data-triggered compatibility project manager.
 
 `MediaStage` stays mounted once and owns one `<video>` element. A discriminated presentation state
@@ -288,10 +313,11 @@ server-side search/filter/sort with fixed 20-item pages. The adapter always send
 `include_custom_rates=false`, then fails closed unless the exact shared response fields satisfy
 `rate === 1` and `free_users_allowed === true`; authenticated visibility is the account-plan
 entitlement check. `available_for_tiers` and interface labels are not eligibility inputs. Add
-re-fetches the exact `public_owner_id`/`voice_id` candidate before the idempotent bookmarked add.
-Delete re-fetches saved metadata and permits only `is_bookmarked === true`,
-`is_owner !== true`, community copies with a public owner ID. The selected voice is never removed
-from the UI.
+re-fetches the exact `public_owner_id`/`voice_id` candidate before an idempotent provider bookmark
+when needed, then writes an app-owned user/voice relationship. The first explicit Saved read may
+claim eligible provider-workspace memberships for the seeded user. Remove deletes only the
+Lightframe relationship; it never calls the ElevenLabs voice-delete API. Preview and conversion
+fail closed unless the authenticated user owns the relationship.
 
 Saved search continues through `/v2/voices?voice_type=saved`. Search runs upstream, while exact
 language, gender, age, accent, use-case, and descriptive matching incrementally aggregates cached
@@ -370,15 +396,18 @@ errors. The URL is neither persisted nor forwarded to a visual provider.
 
 | Store                       | Data                                                                                                | Lifetime and trust boundary                                                                                                                                                                                                               |
 | --------------------------- | --------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Recipe Shelf `localStorage` | Versioned v6 allowlisted prompt/character/outfit/wardrobe metadata and opaque asset IDs             | Explicit v1→v2→v3→v4→v5→v6 migration, then current-version sanitization; 500-variant metadata cap; degrades to session memory on failure; never stores image bytes                                                                        |
-| Character Builder IndexedDB | One resumable draft and save journal                                                                | Compare-and-swap autosave; prevents duplicate save/preload after retry or reload                                                                                                                                                          |
-| Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings, and a versioned derived asset index  | Owner-scoped under `LIGHTFRAME_DATA_DIR`; index publication is atomic and dirty-marker recovery preserves legacy assets; no ordinary deletion route                                                                                       |
-| Legacy project IndexedDB    | Compatibility project metadata and media Blobs                                                      | List/download/delete plus native count and one-operation newest-character-design queries for one-time seeding; Guided is not restored                                                                                                     |
-| Session memory              | Streams, tokens, files, direct-import outfit recents, device IDs, recordings, sidecars, voice state | Cleaned on replacement, release/discard, unmount, or tab close as applicable                                                                                                                                                              |
+| Recipe Shelf `localStorage` | User-namespaced v6 allowlisted prompt/character/outfit/wardrobe metadata and opaque asset IDs       | Stable-user migration retains the legacy rollback key; current-version sanitization and caps apply; degrades to session memory on failure; never stores media bytes                                                                       |
+| Character Builder IndexedDB | User-scoped resumable draft and save journal                                                        | Database name includes the stable user ID; compare-and-swap autosave prevents duplicate save/preload after retry or reload                                                                                                                |
+| Saved-video filesystem      | Saved-video aggregates, immutable versions, optional WebP thumbnails, media manifests, and receipts | Owner-scoped under `LIGHTFRAME_DATA_DIR`; checksum verification, atomic publication, optimistic versions, idempotent requests, and tombstones; logical deletion retains unreferenced bytes until Phase 2                                  |
+| Reference asset filesystem  | Immutable image bytes, private metadata, idempotency mappings, and a versioned derived asset index  | Owner-scoped under `LIGHTFRAME_DATA_DIR`; index publication is atomic; legacy Host-hash records are claimed idempotently by the seeded user; no ordinary physical deletion route                                                          |
+| Saved-voice relationships   | App-owned user-to-provider-voice bookmarks                                                          | Owner-scoped file repository; remove deletes the relationship only and never calls provider voice deletion                                                                                                                                |
+| Processing trace filesystem | Safe video-job owner/provider/status snapshots                                                      | Owner-scoped durable diagnostics without prompts, raw provider data, URLs, or credentials                                                                                                                                                 |
+| Legacy project IndexedDB    | Retired Guided project metadata and media Blobs                                                     | Cleared on authenticated Studio startup for this local Phase 1 reset; legacy videos are not imported or shown in Gallery                                                                                                                  |
+| Session memory              | Auth snapshot, streams, tokens, files, direct-import outfit recents, device IDs, takes, sidecars    | JWT remains only in the HTTP-only cookie; other state is cleaned on auth change, replacement, release/discard, unmount, or tab close as applicable                                                                                        |
 | Video-job temp root         | Streamed input/reference and inspected provider output                                              | Process-temporary; one immutable accepted-at-plus-60-minute deadline covers active and ready jobs. Delivery, release, or shutdown may clean earlier; a pre-deadline content stream may finish after the boundary; startup purges the root |
 
-Browser storage is untrusted and schema-migrated. Opaque IDs, provenance, and timestamps are
-preserved. The filesystem store uses atomic publication and never exposes internal paths,
+Browser storage is untrusted, schema-migrated, and user-namespaced. Opaque IDs, provenance, and
+timestamps are preserved. The filesystem store uses atomic publication and never exposes internal paths,
 provider URLs, credentials, or raw payloads. Detached reference assets are retained because the
 runtime lacks a complete relationship graph and deletion route. Reference lookup uses versioned
 owner/request transaction mappings plus a versioned, atomically replaced derived index. A clean
@@ -389,11 +418,10 @@ index is durable. Ordinary new reads and misses do not rescan the asset director
 contract distinguishes a missing asset from a backend that cannot return a streamable local file:
 only the latter may fall back to buffered content, so a miss performs one storage lookup.
 
-Legacy project consumers request `count()` and `loadNewestCharacterDesign()` through the
-storage-agnostic repository. IndexedDB implements count with `IDBObjectStore.count()` and resolves
-the newest valid character-design candidate in one backend request; migration and availability do
-not compose list-plus-load queries. Future SQL/database adapters can implement the same aggregate
-and ordered-filter query contracts without exposing storage primitives to orchestration.
+The retired Guided repository remains behind a narrow compatibility interface only so authenticated
+Studio startup can invoke one idempotent `clearAll()` reset. No current presentation lists,
+downloads, promotes, or hydrates those records. New saved media is written only through the
+authenticated server Saved Video service.
 
 See [privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) for the user-facing data contract.
 
@@ -431,16 +459,19 @@ provider path and never causes provider fallback.
 
 | Boundary                    | Routes                                                                                                                                                                                                                                                                                                                                             |
 | --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Local status                | `GET /api/health`, `GET /api/capabilities`                                                                                                                                                                                                                                                                                                         |
+| Authentication              | `GET /api/auth/demo-config`, `POST /api/auth/login`, `GET /api/auth/me`, `POST /api/auth/logout`                                                                                                                                                                                                                                                   |
+| Local status                | `GET /api/health`, authenticated `GET /api/capabilities`                                                                                                                                                                                                                                                                                           |
 | Decart                      | `POST /api/realtime-token`                                                                                                                                                                                                                                                                                                                         |
 | Existing-video processing   | `PUT /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId`, `GET /api/video-jobs/:jobId/content`, `DELETE /api/video-jobs/:jobId`                                                                                                                                                                                                                  |
+| Saved videos                | `POST/GET /api/videos`, `GET/PATCH/DELETE /api/videos/:videoId`, `POST /api/videos/:videoId/versions`, owner-checked current/version content, and optional thumbnail upload/content                                                                                                                                                                |
 | Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/import`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions`, `POST /api/reference-images/:sourceAssetId/outfit-try-ons`                                                                  |
 | Local reference storage     | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`                                                                                                                                                                                                                           |
 | ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `DELETE /api/elevenlabs/voices/:voiceId`, `GET /api/elevenlabs/shared-voices`, `GET /api/elevenlabs/shared-voices/:publicOwnerId/:voiceId/preview`, `POST /api/elevenlabs/shared-voices/:publicOwnerId/:voiceId/save`, `POST /api/elevenlabs/voice-changer/recording` |
 
-Capabilities report configuration presence only. The backend has process-local temporary video
-jobs but no accounts, analytics, durable job database or queue, SQL database, or session history.
-Host-derived owner IDs are a local namespace, not identity.
+Capabilities report configuration presence only. The backend has one configured demo user,
+process-memory sessions/revocation, durable local media/relationship metadata, and safe processing
+traces, but no signup, analytics, durable job queue, SQL database, cloud tenancy, or session
+history. Host-derived legacy namespaces are migration inputs only, never authenticated identity.
 
 ## Resource ownership
 

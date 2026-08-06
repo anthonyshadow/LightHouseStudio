@@ -45,8 +45,14 @@ once through a single Vitest invocation.
 
 The retained suite protects:
 
-- provider-free entry, neutral Local Camera startup with no automatic media/AI, and discoverable
-  **Record New Video** / **Upload Video** actions;
+- provider-free entry, accessible Login, correct/incorrect credentials, 24-hour cookie attributes,
+  restore/revoke/expiry behavior, deny-by-default private APIs, trusted mutation Origin, and no
+  automatic media/AI before authenticated Studio entry;
+- the shared `/studio`, `/studio/videos`, `/studio/characters`, and `/studio/outfits` runtime,
+  centralized logout cleanup, and one persistent media stage across library transitions;
+- idempotent Save Video, immutable append-only replacement, cross-owner denial, metadata-first
+  gallery pagination, lazy thumbnail fallback, range content delivery, tombstones, and retained
+  unreferenced bytes;
 - reusable Character create/edit/save/preload and atomic reference hydration;
 - Lucy 2.5 and VTO explicit Start/Apply, safe fallback, and independent 300-second boundaries;
 - recording source pinning, duplicate Stop coalescing, recorder/sidecar/transcode ordering, forced
@@ -61,8 +67,10 @@ The retained suite protects:
   latest-result cleanup; and post-generation MP4 validation;
 - advanced live AI entry, Start/Apply behavior, Latest Take review, and cleanup remain independent
   from the primary post-recording workflow;
-- versioned/sanitized Recipe Shelf and Character Builder persistence, recovery, and destructive
-  actions;
+- versioned/sanitized user-scoped Recipe Shelf and Character Builder persistence, recovery,
+  legacy-key migration, retired Guided reset, and destructive actions;
+- app-owned saved-voice membership, first-read claim, owner-checked preview/conversion, and proof
+  that relationship removal never calls provider voice deletion;
 - loopback Host/Origin, explicit provider intent, bounded response/stream handling, SSRF-resistant
   image downloads/imports, DNS pinning, redirect/byte/content limits, safe errors, and no provider fallback;
 - one persistent media stage, shared overlay focus/inert/Escape behavior, dominant recording Stop,

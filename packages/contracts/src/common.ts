@@ -1,12 +1,15 @@
 import { z } from 'zod';
 
 export const API_ERROR_CODES = [
+  'authentication_required',
   'bad_request',
+  'conflict',
   'feature_unavailable',
   'forbidden_origin',
   'generation_in_progress',
   'incompatible_voice',
   'internal_error',
+  'invalid_credentials',
   'invalid_audio',
   'invalid_provider_image',
   'invalid_remote_image',
@@ -23,6 +26,8 @@ export const API_ERROR_CODES = [
   'result_too_large',
   'job_expired',
   'moderation_blocked',
+  'asset_missing',
+  'migration_required',
   'not_found',
   'payload_too_large',
   'provider_authentication',

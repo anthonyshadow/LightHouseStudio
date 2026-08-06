@@ -15,6 +15,7 @@ import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
 import type { AudioStream } from '../../application/audio-stream.js';
 import { isSpooledAudioUpload } from '../../application/spooled-upload.js';
 import { AppError } from '../../http/errors.js';
+import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { requireTrustedOrigin, requireVoiceProviderIntent } from '../../http/security.js';
 import {
   createRequestLifetime,
@@ -91,6 +92,7 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
           nextPageToken: parsed.data.pageToken ?? null,
           refresh: parsed.data.refresh,
           signal,
+          ownerUserId: ownerUserIdForRequest(request),
         }),
       ),
     );
@@ -103,7 +105,11 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
       const parsed = workspaceVoiceParamsSchema.safeParse(request.params);
       if (!parsed.success) throw validationError('Choose a valid saved-library voice.');
       return streamProviderAudio(request, reply, (signal) =>
-        requireVoiceService(service).workspacePreview(parsed.data.voiceId, signal),
+        requireVoiceService(service).workspacePreview(
+          parsed.data.voiceId,
+          signal,
+          ownerUserIdForRequest(request),
+        ),
       );
     },
   );
@@ -119,7 +125,11 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
 
       return withRequestLifetime(request, reply, async (signal) =>
         sharedVoicesResponseSchema.parse(
-          await requireVoiceService(service).listSharedVoices({ ...parsed.data, signal }),
+          await requireVoiceService(service).listSharedVoices({
+            ...parsed.data,
+            signal,
+            ownerUserId: ownerUserIdForRequest(request),
+          }),
         ),
       );
     },
@@ -153,6 +163,7 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
             parsed.data.publicOwnerId,
             parsed.data.voiceId,
             signal,
+            ownerUserIdForRequest(request),
           ),
         ),
       );
@@ -167,7 +178,11 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
       if (!parsed.success) throw validationError('Choose a valid saved-library voice.');
       return withRequestLifetime(request, reply, async (signal) =>
         voiceLibraryMutationResponseSchema.parse(
-          await requireVoiceService(service).removeWorkspaceVoice(parsed.data.voiceId, signal),
+          await requireVoiceService(service).removeWorkspaceVoice(
+            parsed.data.voiceId,
+            signal,
+            ownerUserIdForRequest(request),
+          ),
         ),
       );
     },
@@ -212,6 +227,7 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
             audio: { path: upload.path, byteLength: upload.byteLength },
             mimeType: parsedContentType.data,
             signal,
+            ownerUserId: ownerUserIdForRequest(request),
           });
         } finally {
           await upload.cleanup().catch(() => undefined);

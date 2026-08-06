@@ -95,6 +95,10 @@ const createRepository = (initialProjects: readonly ProjectRecordV1[]) => {
     load: vi.fn((projectId: string) => Promise.resolve(projects.get(projectId) ?? null)),
     loadNewestCharacterDesign: vi.fn(() => Promise.resolve(null)),
     readArtifact: vi.fn(() => Promise.resolve(video)),
+    clearAll: vi.fn(() => {
+      projects.clear();
+      return Promise.resolve();
+    }),
     deleteProject: vi.fn((projectId: string) => {
       projects.delete(projectId);
       return Promise.resolve();

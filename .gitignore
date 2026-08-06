@@ -15,3 +15,5 @@ apps/web/public/test-media/
 
 graphify-out/
 /config.toml
+
+apps/api/.lightframe-data/

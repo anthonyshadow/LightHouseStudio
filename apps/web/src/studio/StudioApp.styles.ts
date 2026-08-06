@@ -65,7 +65,7 @@ export const headerStyles = (theme: Theme): CSSObject => ({
     gap: theme.space.xs,
   },
   '@media (max-width: 39.99rem)': {
-    gridTemplateColumns: '2.25rem minmax(0, 1fr) 2.75rem',
+    gridTemplateColumns: '5.5rem minmax(0, 1fr) 2.75rem',
     gap: theme.space.xs,
   },
 });

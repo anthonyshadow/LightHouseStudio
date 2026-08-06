@@ -62,6 +62,7 @@ interface ProjectBackend {
   loadNewestCharacterDesign(): Promise<ProjectRecordV1 | null>;
   readArtifact(projectId: string, artifactId: string): Promise<Blob | null>;
   deleteProject(projectId: string): Promise<void>;
+  clearAll(): Promise<void>;
   close(): void;
 }
 
@@ -375,6 +376,13 @@ class MemoryProjectBackend implements ProjectBackend {
     return Promise.resolve();
   }
 
+  clearAll() {
+    this.#assertOpen();
+    this.#projects.clear();
+    this.#artifacts.clear();
+    return Promise.resolve();
+  }
+
   close() {
     this.#closed = true;
   }
@@ -476,6 +484,17 @@ class IndexedDbProjectBackend implements ProjectBackend {
       transaction.objectStore(GUIDED_PROJECT_ARTIFACTS_STORE),
       projectId,
     );
+    await completion;
+  }
+
+  async clearAll() {
+    const transaction = this.database.transaction(
+      [GUIDED_PROJECTS_STORE, GUIDED_PROJECT_ARTIFACTS_STORE],
+      'readwrite',
+    );
+    const completion = transactionComplete(transaction);
+    transaction.objectStore(GUIDED_PROJECTS_STORE).clear();
+    transaction.objectStore(GUIDED_PROJECT_ARTIFACTS_STORE).clear();
     await completion;
   }
 
@@ -620,6 +639,10 @@ export const createLocalProjectRepository = (
     deleteProject: async (projectId) => {
       await operation((target) => target.deleteProject(projectId));
       if (backend !== memoryFallback) await memoryFallback.deleteProject(projectId);
+    },
+    clearAll: async () => {
+      await operation((target) => target.clearAll());
+      if (backend !== memoryFallback) await memoryFallback.clearAll();
     },
     close: () => {
       if (closed) return;

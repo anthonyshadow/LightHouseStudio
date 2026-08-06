@@ -46,4 +46,5 @@ export {
   triggerGenerationTick,
   triggerProviderDisconnect,
 } from './studioHarness.browser.js';
+export { CREATIVE_ASSET_STORAGE_KEY, readCreativeAssetStore } from './creativeAssetStorage.js';
 export type { NetworkJourneyState } from './studioHarness.types.js';

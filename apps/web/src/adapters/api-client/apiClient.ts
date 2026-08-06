@@ -61,7 +61,11 @@ type JsonSchema<T> = {
 };
 
 export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
-  const response = await fetch(input, init);
+  const response = await fetch(input, { credentials: 'same-origin', ...init });
+  const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
+  if (response.status === 401 && !url.includes('/api/auth/login')) {
+    window.dispatchEvent(new Event('lightframe:authentication-required'));
+  }
   if (!response.ok) throw await readError(response);
   return response;
 };

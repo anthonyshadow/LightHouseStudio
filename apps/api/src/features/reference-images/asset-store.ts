@@ -71,17 +71,23 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
   readonly #layout: ReferenceImageLayout;
   readonly #createAssetId: () => string;
   readonly #now: () => Date;
+  readonly #legacyOwnerUserId: string | undefined;
   readonly #requestIndex = new Map<string, string>();
   readonly #metadataIndex = new Map<string, StoredReferenceImageMetadata>();
   #initialized: Promise<void> | undefined;
 
   constructor(
     dataDirectory: string,
-    options: { readonly createAssetId?: () => string; readonly now?: () => Date } = {},
+    options: {
+      readonly createAssetId?: () => string;
+      readonly now?: () => Date;
+      readonly legacyOwnerUserId?: string;
+    } = {},
   ) {
     this.#layout = createReferenceImageLayout(dataDirectory);
     this.#createAssetId = options.createAssetId ?? randomUUID;
     this.#now = options.now ?? (() => new Date());
+    this.#legacyOwnerUserId = options.legacyOwnerUserId;
   }
 
   async #initialize(): Promise<void> {
@@ -196,6 +202,31 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     }
   }
 
+  async #claimLegacyAssets(
+    assets: readonly StoredReferenceImageMetadata[],
+  ): Promise<readonly StoredReferenceImageMetadata[]> {
+    if (this.#legacyOwnerUserId === undefined) return assets;
+    let changed = false;
+    const claimed: StoredReferenceImageMetadata[] = [];
+    for (const metadata of assets) {
+      if (!/^[a-f0-9]{64}$/u.test(metadata.localOwnerId)) {
+        claimed.push(metadata);
+        continue;
+      }
+      changed = true;
+      const next = { ...metadata, localOwnerId: this.#legacyOwnerUserId };
+      const parsed = parseStoredReferenceImageMetadata(next);
+      claimed.push(parsed);
+      await this.#writeFileAtomic(
+        path.join(this.#assetDirectory(parsed.assetId), 'metadata.json'),
+        serializeStoredReferenceImageMetadata(parsed),
+      );
+      await this.#repairMappingIfNeeded(parsed);
+    }
+    if (changed) await this.#persistIndex(claimed);
+    return claimed;
+  }
+
   async #loadPersistedIndex(): Promise<boolean> {
     try {
       await stat(this.#layout.indexDirtyPath);
@@ -205,7 +236,7 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     }
     try {
       const index = parseReferenceImageAssetIndex(await readJson(this.#layout.indexPath));
-      this.#replaceIndexes(index.assets);
+      this.#replaceIndexes(await this.#claimLegacyAssets(index.assets));
       return true;
     } catch (error) {
       if (isMissingPathError(error) || isReferenceImageCodecError(error)) return false;
@@ -213,7 +244,9 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     }
   }
 
-  async #persistIndex(assets = this.#metadataIndex.values()): Promise<void> {
+  async #persistIndex(
+    assets: Iterable<StoredReferenceImageMetadata> = this.#metadataIndex.values(),
+  ): Promise<void> {
     await this.#writeFileAtomic(this.#layout.indexPath, serializeReferenceImageAssetIndex(assets));
     await rm(this.#layout.indexDirtyPath, { force: true });
     const rootHandle = await open(this.#layout.root, 'r');
@@ -247,8 +280,10 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
       }
       if (metadata === null) continue;
       if (metadata.assetId !== entry.name) continue;
-      metadataByAssetId.set(metadata.assetId, metadata);
-      await this.#repairMappingIfNeeded(metadata);
+      const [claimed] = await this.#claimLegacyAssets([metadata]);
+      if (claimed === undefined) continue;
+      metadataByAssetId.set(claimed.assetId, claimed);
+      await this.#repairMappingIfNeeded(claimed);
     }
     await this.#persistIndex(metadataByAssetId.values());
     this.#replaceIndexes(metadataByAssetId.values());

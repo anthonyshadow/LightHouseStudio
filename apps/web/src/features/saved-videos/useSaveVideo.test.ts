@@ -1,0 +1,154 @@
+// @vitest-environment jsdom
+
+import type { SavedVideoDetail } from '@studio/contracts';
+import { act, renderHook } from '@testing-library/react';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { SaveVideoInput } from '../../adapters/api-client/savedVideosApi';
+import type { RecordingArtifact } from '../recording/types';
+
+const api = vi.hoisted(() => ({
+  appendSavedVideoVersion:
+    vi.fn<
+      (
+        videoId: string,
+        expectedVersionId: string,
+        input: SaveVideoInput,
+      ) => Promise<SavedVideoDetail>
+    >(),
+  saveSavedVideoThumbnail:
+    vi.fn<
+      (
+        videoId: string,
+        versionId: string,
+        thumbnail: Blob,
+        signal?: AbortSignal,
+      ) => Promise<SavedVideoDetail>
+    >(),
+  saveVideo: vi.fn<(input: SaveVideoInput) => Promise<SavedVideoDetail>>(),
+  createSavedVideoThumbnail: vi.fn<(video: Blob, signal: AbortSignal) => Promise<Blob>>(),
+}));
+
+vi.mock('../../adapters/api-client/savedVideosApi', () => ({
+  appendSavedVideoVersion: api.appendSavedVideoVersion,
+  saveSavedVideoThumbnail: api.saveSavedVideoThumbnail,
+  saveVideo: api.saveVideo,
+}));
+vi.mock('./thumbnailClient', () => ({
+  createSavedVideoThumbnail: api.createSavedVideoThumbnail,
+}));
+
+import { useSaveVideo } from './useSaveVideo';
+
+const videoId = 'c26b5280-1538-44cd-82db-a6b1356acf62';
+const versionId = '2efcc6c3-e82c-419a-8807-c0026170fb75';
+const savedVideo: SavedVideoDetail = {
+  id: videoId,
+  title: 'Morning take',
+  status: 'ready',
+  currentVersion: {
+    id: versionId,
+    videoId,
+    ordinal: 1,
+    origin: 'recorded',
+    sourceVersionId: null,
+    mimeType: 'video/mp4',
+    filename: 'morning-take.mp4',
+    sizeBytes: 5,
+    durationMs: 1_000,
+    width: 1_280,
+    height: 720,
+    createdAt: '2026-08-05T12:00:00.000Z',
+  },
+  sourceVideoId: null,
+  versionCount: 1,
+  thumbnailAvailable: false,
+  createdAt: '2026-08-05T12:00:00.000Z',
+  updatedAt: '2026-08-05T12:00:00.000Z',
+  versions: [],
+};
+savedVideo.versions.push(savedVideo.currentVersion);
+
+const artifact = (
+  kind: RecordingArtifact['kind'] = 'recorded',
+  id = crypto.randomUUID(),
+): RecordingArtifact => ({
+  id,
+  name: 'Morning take',
+  createdAt: '2026-08-05T12:00:00.000Z',
+  kind,
+  parentArtifactId: null,
+  media: new Blob(['video'], { type: 'video/mp4' }),
+  objectUrl: `blob:${id}`,
+  mimeType: 'video/mp4',
+  filename: 'morning-take.mp4',
+  sourceModeId: 'local',
+  startedAt: '2026-08-05T12:00:00.000Z',
+  durationMs: 1_000,
+  sizeBytes: 5,
+});
+
+describe('useSaveVideo', () => {
+  beforeEach(() => {
+    api.appendSavedVideoVersion.mockReset().mockResolvedValue(savedVideo);
+    api.saveSavedVideoThumbnail.mockReset().mockResolvedValue(savedVideo);
+    api.saveVideo.mockReset().mockResolvedValue(savedVideo);
+    api.createSavedVideoThumbnail
+      .mockReset()
+      .mockResolvedValue(new Blob(['thumbnail'], { type: 'image/webp' }));
+  });
+
+  it('saves every runtime origin, reuses idempotency, and uploads an optional thumbnail', async () => {
+    const { result } = renderHook(() => useSaveVideo());
+    const original = artifact('recorded');
+
+    await act(async () => {
+      await result.current.save(original, '  Explicit title  ');
+      await result.current.save(original);
+      for (const kind of ['uploaded', 'edited', 'visual', 'voice'] as const) {
+        await result.current.save(artifact(kind));
+      }
+    });
+
+    expect(result.current.state).toMatchObject({ status: 'saved', video: savedVideo });
+    expect(api.saveVideo).toHaveBeenCalledTimes(6);
+    expect(api.saveVideo.mock.calls[0]?.[0]).toMatchObject({
+      title: 'Explicit title',
+      origin: 'recorded',
+    });
+    expect(api.saveVideo.mock.calls[1]?.[0].idempotencyKey).toBe(
+      api.saveVideo.mock.calls[0]?.[0].idempotencyKey,
+    );
+    expect(api.saveVideo.mock.calls.slice(2).map((call) => call[0].origin)).toEqual([
+      'uploaded',
+      'editor',
+      'character-swap',
+      'voice-treatment',
+    ]);
+    expect(api.saveSavedVideoThumbnail).toHaveBeenCalledTimes(6);
+  });
+
+  it('appends a version, tolerates thumbnail failure, reports save failure, and resets', async () => {
+    const { result } = renderHook(() => useSaveVideo());
+    api.createSavedVideoThumbnail.mockRejectedValueOnce(new Error('no frame'));
+    await act(async () => {
+      await result.current.replace(artifact('edited'), {
+        videoId,
+        currentVersionId: versionId,
+      });
+    });
+    expect(api.appendSavedVideoVersion).toHaveBeenCalledOnce();
+    expect(result.current.state.status).toBe('saved');
+
+    api.saveVideo.mockRejectedValueOnce(new Error('disk unavailable'));
+    await act(async () => {
+      await result.current.save(artifact());
+    });
+    expect(result.current.state).toMatchObject({
+      status: 'error',
+      message: 'disk unavailable',
+    });
+
+    act(() => result.current.reset());
+    expect(result.current.state).toEqual({ status: 'idle' });
+  });
+});

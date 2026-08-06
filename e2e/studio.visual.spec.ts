@@ -198,7 +198,7 @@ const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<Netwo
   await page.goto(entryRoute ? '/' : '/studio');
   await expect(page.getByRole('main')).toBeVisible();
   if (entryRoute) {
-    await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
   } else {
     await expect(page.getByLabel('Integration availability')).toContainText('AI video configured');
   }
@@ -281,7 +281,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
     id: 'entry-initial',
     setup: async (page) => {
       await expect(page.getByRole('heading', { name: 'Enter Lightframe Studio' })).toBeAttached();
-      await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
       await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
     },
   },

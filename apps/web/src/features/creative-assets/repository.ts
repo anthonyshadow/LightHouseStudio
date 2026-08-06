@@ -78,6 +78,7 @@ export interface CreativeAssetRepositoryOptions {
   readonly legacyStorageKey?: string | null;
   readonly now?: () => Date;
   readonly idFactory?: () => string;
+  readonly ownerUserId?: string;
 }
 
 const normalizeCharacterPromptInput = (input: CreateSavedCharacterPromptInput) => ({
@@ -144,6 +145,7 @@ const loadInitialState = (
   storage: StorageLike | null,
   storageKey: string,
   legacyStorageKeys: readonly string[],
+  ownerUserId?: string,
 ): { state: CreativeAssetRepositoryState; storage: StorageLike | null } => {
   if (!storage) {
     const health = 'session-only' as const;
@@ -178,13 +180,38 @@ const loadInitialState = (
     };
   }
 
-  const result = parseCreativeAssetStore(serialized);
+  let candidate = serialized;
+  if (ownerUserId) {
+    try {
+      const envelope = JSON.parse(serialized) as unknown;
+      if (
+        typeof envelope === 'object' &&
+        envelope !== null &&
+        'ownerUserId' in envelope &&
+        'store' in envelope
+      ) {
+        if (envelope.ownerUserId !== ownerUserId) {
+          return {
+            state: { store: createEmptyCreativeAssetStore(), health: 'ready', notice: null },
+            storage,
+          };
+        }
+        candidate = JSON.stringify(envelope.store);
+      }
+    } catch {
+      // The canonical sanitizer below handles malformed legacy content.
+    }
+  }
+  const result = parseCreativeAssetStore(candidate);
   const isCleanLegacyMigration =
     migratedLegacy && isSupportedLegacyPayload(serialized) && result.droppedRecords === 0;
   const health = result.recovered && !isCleanLegacyMigration ? 'recovered' : 'ready';
   if (result.recovered || migratedLegacy) {
     try {
-      storage.setItem(storageKey, JSON.stringify(result.store));
+      storage.setItem(
+        storageKey,
+        JSON.stringify(ownerUserId ? { ownerUserId, store: result.store } : result.store),
+      );
     } catch {
       const fallbackHealth = 'session-only' as const;
       return {
@@ -228,7 +255,7 @@ export const createCreativeAssetRepository = (
         : [options.legacyStorageKey];
   const durableStorage = options.storage === undefined ? browserStorage() : options.storage;
   let storage = durableStorage;
-  const initial = loadInitialState(storage, storageKey, legacyStorageKeys);
+  const initial = loadInitialState(storage, storageKey, legacyStorageKeys, options.ownerUserId);
   storage = initial.storage;
   let state = initial.state;
   const listeners = new Set<() => void>();
@@ -271,7 +298,10 @@ export const createCreativeAssetRepository = (
     let notice = state.notice;
     if (storage) {
       try {
-        storage.setItem(storageKey, JSON.stringify(store));
+        storage.setItem(
+          storageKey,
+          JSON.stringify(options.ownerUserId ? { ownerUserId: options.ownerUserId, store } : store),
+        );
       } catch {
         storage = null;
         health = 'session-only';
@@ -292,7 +322,10 @@ export const createCreativeAssetRepository = (
       );
     }
     try {
-      durableStorage.setItem(storageKey, JSON.stringify(store));
+      durableStorage.setItem(
+        storageKey,
+        JSON.stringify(options.ownerUserId ? { ownerUserId: options.ownerUserId, store } : store),
+      );
     } catch (error) {
       throw new CreativeAssetError(
         'storage-write-failed',

@@ -489,6 +489,7 @@ export const useExistingVideoWorkflow = ({
         setComparison('original');
         setPhase('ready');
         setMessage(validated.audioUnavailableReason);
+        return sourceArtifact;
       } catch (error) {
         if (controller.signal.aborted) {
           if (generation === generationRef.current) recording.cancelProcessing();

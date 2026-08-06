@@ -22,6 +22,16 @@ Use the narrowest authoritative document. Do not copy detailed rules into severa
 | [Audit findings](project-audit-findings.md)                       | Current    | Engineering         | Verified technical concerns and their implemented outcomes                    | 2026-08-05    |
 | [Completed work](project-audit-completed-work.md)                 | Historical | Engineering         | Durable summary of completed technical audit outcomes                         | 2026-08-05    |
 
+## Account foundation and deferred infrastructure
+
+Phase 1 is implemented in the current local runtime. The deferred roadmap remains design-only and
+does not authorize public deployment or relax the loopback boundary.
+
+| Document                                                                                      | Status   | Owner               | Use                                                                                           |
+| --------------------------------------------------------------------------------------------- | -------- | ------------------- | --------------------------------------------------------------------------------------------- |
+| [User Accounts Phase 1 audit and plan](user-accounts-phase-1-audit-and-plan.md)               | Current  | Product/engineering | Implemented seeded-user/auth/ownership/saved-library decisions and validation checklist       |
+| [Deferred account and infrastructure roadmap](deferred-account-and-infrastructure-roadmap.md) | Deferred | Product/engineering | Post-Phase-1 database, R2, real-account, jobs, billing, operations, and public-readiness path |
+
 ## Focused technical references
 
 | Document                                            | Use                                                                                                      |

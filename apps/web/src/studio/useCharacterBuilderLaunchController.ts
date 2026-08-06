@@ -21,6 +21,7 @@ export type CharacterBuilderLaunchPreparer = (
 
 export type CharacterBuilderLaunchControllerOptions = Readonly<{
   blockedReason?: string;
+  ownerUserId?: string;
   onOpen: () => void;
   prepareLaunch?: CharacterBuilderLaunchPreparer;
 }>;
@@ -29,6 +30,7 @@ const fallbackLaunchError = 'The Character Builder draft could not be prepared. 
 
 export const useCharacterBuilderLaunchController = ({
   blockedReason,
+  ownerUserId,
   onOpen,
   prepareLaunch = prepareCharacterBuilderLaunch,
 }: CharacterBuilderLaunchControllerOptions) => {
@@ -79,6 +81,7 @@ export const useCharacterBuilderLaunchController = ({
         const ready = await prepareLaunch({
           target: nextLaunch.target,
           confirmDiscard: requestDiscard,
+          ...(ownerUserId ? { ownerUserId } : {}),
         });
         if (
           !ready ||
@@ -99,7 +102,7 @@ export const useCharacterBuilderLaunchController = ({
         }
       }
     },
-    [blockedReason, onOpen, prepareLaunch, requestDiscard],
+    [blockedReason, onOpen, ownerUserId, prepareLaunch, requestDiscard],
   );
 
   const openNewCharacter = useCallback(() => {

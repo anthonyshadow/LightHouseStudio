@@ -6,6 +6,7 @@ import type { VoiceProcessingController } from '../voice-effects/types';
 import type { VoiceBrowserCapabilities } from '../voice-effects/voiceCapabilities';
 import { VoiceEffectsPanel } from '../voice-effects/VoiceEffectsPanel';
 import { TakeReviewActions } from './TakeReviewActions';
+import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 
 export type TakeDockProps = {
   recording: RecordingController;
@@ -18,6 +19,9 @@ export type TakeDockProps = {
   onDiscardTake?: () => void;
   onEditVideo?: () => void;
   onOpenVoiceTreatments?: () => void;
+  onSaveVideo?: () => void;
+  saveVideoState?: SaveVideoState;
+  onReplaceSavedVideo?: () => void;
 };
 
 const gridStyles = (theme: Theme, view: NonNullable<TakeDockProps['view']>): CSSObject => ({
@@ -198,6 +202,9 @@ export const TakeDock = ({
   onDiscardTake,
   onEditVideo,
   onOpenVoiceTreatments,
+  onSaveVideo,
+  saveVideoState,
+  onReplaceSavedVideo,
 }: TakeDockProps) => {
   const theme = useTheme();
   const artifact = recording.presented;
@@ -273,6 +280,9 @@ export const TakeDock = ({
                 {...(onDiscardTake ? { onDiscardTake } : {})}
                 {...(onEditVideo ? { onEditVideo } : {})}
                 {...(onOpenVoiceTreatments ? { onOpenVoiceTreatments } : {})}
+                {...(onSaveVideo ? { onSaveVideo } : {})}
+                {...(saveVideoState ? { saveVideoState } : {})}
+                {...(onReplaceSavedVideo ? { onReplaceSavedVideo } : {})}
               />
             </div>
           </div>

@@ -27,7 +27,15 @@ describe('VoiceService catalog and saved-library policy', () => {
     provider.sharedTotal = 3;
     provider.workspaceVoices = [voice({ voiceId: 'eligible' })];
 
-    const page = await serviceFor(provider).listSharedVoices({
+    const service = serviceFor(provider);
+    await service.listWorkspaceVoices({
+      ...filters,
+      pageSize: 20,
+      nextPageToken: null,
+      refresh: false,
+      signal: signal(),
+    });
+    const page = await service.listSharedVoices({
       ...filters,
       pageSize: 20,
       page: 0,
@@ -80,28 +88,33 @@ describe('VoiceService catalog and saved-library policy', () => {
     expect(getSharedVoice).toHaveBeenCalledOnce();
     expect(addSharedVoice).toHaveBeenCalledOnce();
 
-    provider.sharedVoices = [sharedVoice({ rate: 2 })];
+    provider.sharedVoices = [sharedVoice({ voiceId: 'ineligible', rate: 2 })];
     await expect(
-      service.saveSharedVoice('owner-one', 'shared-one', signal()),
+      service.saveSharedVoice('owner-one', 'ineligible', signal()),
     ).rejects.toMatchObject({ reason: 'shared-voice-ineligible' });
   });
 
-  it('removes only bookmarked, non-owned community copies with a public owner ID', async () => {
+  it('removes only the app-owned relationship and leaves the provider workspace unchanged', async () => {
     const provider = new FakeElevenLabsProvider();
     const service = serviceFor(provider);
 
     provider.workspaceVoices = [voice({ isOwner: true })];
-    await expect(service.removeWorkspaceVoice('voice-one', signal())).rejects.toMatchObject({
-      reason: 'voice-removal-not-allowed',
+    await service.listWorkspaceVoices({
+      ...filters,
+      pageSize: 20,
+      nextPageToken: null,
+      refresh: false,
+      signal: signal(),
     });
-    expect(provider.deletedVoiceIds).toHaveLength(0);
-
-    provider.workspaceVoices = [voice()];
     await expect(service.removeWorkspaceVoice('voice-one', signal())).resolves.toEqual({
       status: 'removed',
       voiceId: 'voice-one',
     });
-    expect(provider.deletedVoiceIds).toEqual(['voice-one']);
+    await expect(service.removeWorkspaceVoice('voice-one', signal())).resolves.toEqual({
+      status: 'already-removed',
+      voiceId: 'voice-one',
+    });
+    expect(provider.deletedVoiceIds).toHaveLength(0);
   });
 
   it('applies exact normalized saved traits while retaining opaque continuation state', async () => {

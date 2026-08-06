@@ -36,7 +36,7 @@ export const translateVoiceServiceError: ErrorTranslator = (error) => {
         new AppError(
           404,
           'not_found',
-          'That voice is no longer in your ElevenLabs library. Refresh the library and choose another.',
+          'That voice is no longer in your Lightframe library. Refresh the library and choose another.',
         ),
       );
     case 'shared-voice-not-found':

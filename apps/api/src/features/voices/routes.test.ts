@@ -88,6 +88,11 @@ describe('ElevenLabs voice API', () => {
       total: null,
     });
     expect(provider.workspaceSearches[0]).toMatchObject({
+      search: '',
+      pageSize: 20,
+      nextPageToken: null,
+    });
+    expect(provider.workspaceSearches[1]).toMatchObject({
       search: 'nova',
       pageSize: 20,
       nextPageToken: null,
@@ -99,7 +104,7 @@ describe('ElevenLabs voice API', () => {
       headers: intentHeaders,
     });
     expect(tooLarge.statusCode).toBe(400);
-    expect(provider.workspaceSearches).toHaveLength(1);
+    expect(provider.workspaceSearches).toHaveLength(2);
   });
 
   it('keeps browsing independent of conversion-model discovery', async () => {
@@ -230,6 +235,11 @@ describe('ElevenLabs voice API', () => {
 
     const deleteSetup = setup();
     const deletePath = '/api/elevenlabs/voices/voice-one';
+    await deleteSetup.app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/voices',
+      headers: originHeaders,
+    });
     const rejectedDelete = await deleteSetup.app.inject({
       method: 'DELETE',
       url: deletePath,
@@ -244,7 +254,7 @@ describe('ElevenLabs voice API', () => {
     expect(rejectedDelete.statusCode).toBe(403);
     expect(acceptedDelete.statusCode).toBe(200);
     expect(acceptedDelete.json()).toEqual({ status: 'removed', voiceId: 'voice-one' });
-    expect(deleteSetup.provider.deletedVoiceIds).toEqual(['voice-one']);
+    expect(deleteSetup.provider.deletedVoiceIds).toHaveLength(0);
   });
 
   it('rejects stale or malformed saved pagination cursors without provider contact', async () => {
@@ -274,7 +284,7 @@ describe('ElevenLabs voice API', () => {
     expect(response.json<ApiErrorResponse>().error).toEqual({
       code: 'not_found',
       message:
-        'That voice is no longer in your ElevenLabs library. Refresh the library and choose another.',
+        'That voice is no longer in your Lightframe library. Refresh the library and choose another.',
     });
     expect(provider.conversions).toHaveLength(0);
   });

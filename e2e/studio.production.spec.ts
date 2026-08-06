@@ -9,6 +9,11 @@ test('serves the built entry, direct Studio, and local health endpoint from one 
   await expect(health.json()).resolves.toEqual({ ok: true });
 
   await page.goto('/');
+  await page.getByRole('button', { name: 'Log in' }).click();
+  const login = page.getByRole('dialog', { name: 'Log in to Lightframe' });
+  await login.getByLabel('Login').fill('demo@lightframe.local');
+  await login.getByLabel('Password').fill('lightframe-demo');
+  await login.getByRole('button', { name: 'Log in' }).click();
   await expect(page.getByRole('button', { name: 'Record New Video' })).toBeVisible();
 
   await page.goto('/studio');

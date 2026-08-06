@@ -42,6 +42,7 @@ const createLegacyRepository = (record: ProjectRecordV1): LocalProjectRepository
     load: vi.fn(() => Promise.reject(new Error('Unexpected load.'))),
     loadNewestCharacterDesign: vi.fn(() => Promise.resolve(record)),
     readArtifact: vi.fn(() => Promise.resolve(null)),
+    clearAll: vi.fn(() => Promise.resolve()),
     deleteProject: vi.fn(() => Promise.reject(new Error('Unexpected delete.'))),
     close: vi.fn(),
   };

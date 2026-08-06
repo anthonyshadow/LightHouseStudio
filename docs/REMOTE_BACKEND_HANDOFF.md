@@ -18,9 +18,11 @@ The current application remains defined by [Architecture](ARCHITECTURE.md) and
 
 - the API binds to `127.0.0.1`, does not trust proxies, and accepts loopback hosts only;
 - exact Host/Origin checks protect a local credential broker, not a public service;
-- there are no accounts, tenants, product database, remote jobs, billing ledger, or cloud media;
+- there is one configured seeded local account, but no signup/recovery, tenants, remote product
+  database, remote jobs, billing ledger, or cloud media;
 - browser stores and `LIGHTFRAME_DATA_DIR` are the current persistence mechanisms; and
-- the Host-derived local owner hash is a namespace only, never a person or future account.
+- the stable seeded user UUID is local Phase 1 identity; legacy Host hashes are migration
+  namespaces only and neither becomes remote tenancy proof.
 
 Implementation must stop until the approval gate below is complete and a separate remote-MVP plan
 is authorized.

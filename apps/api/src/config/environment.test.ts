@@ -45,6 +45,9 @@ describe('parseEnvironment', () => {
     expect(
       parseEnvironment({
         NODE_ENV: 'production',
+        AUTH_JWT_SECRET: 'production-test-signing-secret-that-is-not-a-default',
+        DEMO_USER_PASSWORD_HASH:
+          '$argon2id$v=19$m=19456,t=2,p=1$3Jc1DI4gFLxlnIHlbUmVvg$HvHo3eFp60xDrSTIRQaDaLilJgFBNQ6fJ4xwlL+I+iA',
         PORT: '4321',
         DECART_API_KEY: '  decart-placeholder  ',
         OPENAI_API_KEY: '  openai-placeholder  ',

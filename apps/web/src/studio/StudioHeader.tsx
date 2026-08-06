@@ -1,5 +1,7 @@
 import { useTheme } from '@emotion/react';
+import type { AuthenticatedUser } from '@studio/contracts';
 import { referenceImageContentUrl } from '../adapters/api-client/referenceImageRoutes';
+import { AccountMenu } from '../features/account/AccountMenu';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
 import type { RefObject } from 'react';
 import { Button } from '../ui';
@@ -26,6 +28,12 @@ type StudioHeaderProps = {
   onOpenCharacterSelector: () => void;
   onClearCharacter: () => void;
   clearCharacterDisabledReason?: string | undefined;
+  user: AuthenticatedUser;
+  accountBusy?: boolean;
+  onOpenVideos: () => void;
+  onOpenCharacters: () => void;
+  onOpenOutfits: () => void;
+  onLogout: () => void;
 };
 
 const capabilityLabel = (
@@ -65,6 +73,12 @@ export const StudioHeader = ({
   clearCharacterDisabledReason,
   showAiSelector = true,
   selectorLabel = 'Select Character',
+  user,
+  accountBusy,
+  onOpenVideos,
+  onOpenCharacters,
+  onOpenOutfits,
+  onLogout,
 }: StudioHeaderProps) => {
   const theme = useTheme();
   const localCaptureAvailable = browser.mediaDevices && browser.secureContext;
@@ -88,12 +102,22 @@ export const StudioHeader = ({
 
   return (
     <header css={headerStyles(theme)}>
-      <div css={brandStyles(theme)}>
-        <img src="/favicon.svg" alt="" width="38" height="38" />
-        <div>
-          <h1>Lightframe Studio</h1>
-          <span>Local-first studio</span>
+      <div css={{ display: 'flex', alignItems: 'center', gap: theme.space.xs, minWidth: 0 }}>
+        <div css={brandStyles(theme)}>
+          <img src="/favicon.svg" alt="" width="38" height="38" />
+          <div>
+            <h1>Lightframe Studio</h1>
+            <span>Local-first studio</span>
+          </div>
         </div>
+        <AccountMenu
+          user={user}
+          busy={accountBusy}
+          onOpenVideos={onOpenVideos}
+          onOpenCharacters={onOpenCharacters}
+          onOpenOutfits={onOpenOutfits}
+          onLogout={onLogout}
+        />
       </div>
       {showAiSelector ? (
         <div css={characterSelectorStyles(theme)}>

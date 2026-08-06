@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
-import type { ReferenceImageAsset } from '@studio/contracts';
+import type { AuthenticatedSessionResponse, ReferenceImageAsset } from '@studio/contracts';
+import { createPhaseOneEntitlements } from '@studio/domain';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
@@ -448,22 +449,44 @@ vi.mock('./CreativeWorkspace', () => ({
 }));
 
 import { StudioApp } from './StudioApp';
+import { AuthProvider } from '../application/auth/AuthProvider';
 import { StudioDesignProvider } from '../ui';
+
+const testSession: AuthenticatedSessionResponse = {
+  user: {
+    id: '2d7914b2-f912-4b96-b17d-54100a2ffea3',
+    login: 'demo@lightframe.local',
+    username: 'demo',
+    email: 'demo@lightframe.local',
+    displayName: 'Demo Creator',
+    avatarUrl: null,
+    planId: 'free',
+    role: 'user',
+    status: 'active',
+    createdAt: '2026-08-05T12:00:00.000Z',
+    updatedAt: '2026-08-05T12:00:00.000Z',
+    lastLoginAt: '2026-08-05T12:00:00.000Z',
+  },
+  entitlements: createPhaseOneEntitlements('free', '2026-08-05T12:00:00.000Z'),
+  expiresAt: '2099-08-06T12:00:00.000Z',
+};
 
 const renderStudio = (initialIntent?: 'upload') =>
   render(
     <StudioDesignProvider>
-      <RouterProvider
-        router={createMemoryRouter(
-          [
-            {
-              path: '/studio',
-              element: <StudioApp {...(initialIntent ? { initialIntent } : {})} />,
-            },
-          ],
-          { initialEntries: ['/studio'] },
-        )}
-      />
+      <AuthProvider initialSession={testSession}>
+        <RouterProvider
+          router={createMemoryRouter(
+            [
+              {
+                path: '/studio',
+                element: <StudioApp {...(initialIntent ? { initialIntent } : {})} />,
+              },
+            ],
+            { initialEntries: ['/studio'] },
+          )}
+        />
+      </AuthProvider>
     </StudioDesignProvider>,
   );
 

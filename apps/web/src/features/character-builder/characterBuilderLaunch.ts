@@ -4,6 +4,7 @@ import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import { createFreshCharacterBuilderDraftValue } from './characterBuilderControllerSupport';
 import { createGuidedDesignFromDraft } from './characterModel';
 import {
+  CHARACTER_BUILDER_DRAFT_DATABASE_NAME,
   createCharacterBuilderDraftRepository,
   type CharacterBuilderDraftRepository,
 } from './draftRepository';
@@ -82,14 +83,19 @@ export type CharacterBuilderLaunchRepository = Pick<
 export interface PrepareCharacterBuilderLaunchOptions {
   readonly target: CharacterBuilderTarget;
   readonly confirmDiscard: (message: string) => boolean | Promise<boolean>;
+  readonly ownerUserId?: string;
   readonly repository?: CharacterBuilderLaunchRepository;
 }
 
 export const prepareCharacterBuilderLaunch = async ({
   target,
   confirmDiscard,
+  ownerUserId,
   repository = createCharacterBuilderDraftRepository({
     sanitizeDraft: sanitizeCharacterBuilderDraftValue,
+    ...(ownerUserId
+      ? { databaseName: `${CHARACTER_BUILDER_DRAFT_DATABASE_NAME}.${ownerUserId}` }
+      : {}),
   }),
 }: PrepareCharacterBuilderLaunchOptions): Promise<boolean> => {
   try {

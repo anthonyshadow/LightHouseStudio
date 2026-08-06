@@ -11,6 +11,7 @@ import type {
   OutfitTryOnRequest,
   UploadedReferenceImageAsset,
 } from '@studio/contracts';
+import { TEST_AUTH_SESSION, TEST_DEMO_CONFIG } from './authFixture.js';
 import { REFERENCE_PNG } from './mediaFixtures.js';
 import type {
   MockReferenceImageAsset,
@@ -208,6 +209,47 @@ export const installProviderNetworkDriver = async (
     if (!isLocal) {
       network.blockedExternalRequests.push(requestUrl.href);
       await route.abort('blockedbyclient');
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/auth/me' && route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(TEST_AUTH_SESSION),
+      });
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/auth/demo-config' && route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(TEST_DEMO_CONFIG),
+      });
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/auth/login' && route.request().method() === 'POST') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(TEST_AUTH_SESSION),
+      });
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/auth/logout' && route.request().method() === 'POST') {
+      await route.fulfill({ status: 204, body: '' });
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/videos' && route.request().method() === 'GET') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ videos: [], nextCursor: null }),
+      });
       return;
     }
 

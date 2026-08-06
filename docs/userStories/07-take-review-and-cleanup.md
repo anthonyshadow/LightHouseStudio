@@ -31,16 +31,20 @@ deliberately release or discard it.
    MIME type. The panel does not create another player and has no dedicated tool-rail launcher.
 7. Optionally apply a voice treatment. Playback and download remain locked until processing
    settles or is cancelled.
-8. Select **Download**. Studio records only that download initiation was requested; it cannot
+8. Optionally select **Save Video**. It is distinct from Download, reports progress, and publishes
+   the final validated artifact to the authenticated local gallery without changing review or
+   release ownership. Repeated submission of the same artifact is idempotent.
+9. Select **Download**. Studio records only that download initiation was requested; it cannot
    verify browser save completion.
-9. Verify the browser saved the file, then select **Release**. Or select **Discard** and confirm
-   irreversible removal without a download.
+10. Verify the browser saved the file, then select **Release**. Or select **Discard** and confirm
+    irreversible removal without a download.
 
 ## Guards and recovery
 
 - Release stays disabled until download initiation. A click can still be blocked or mishandled by
   the browser, so verify the downloaded file before release.
-- Playback, Voice, and Download remain unavailable while device-local transcoding is active.
+- Playback, Voice, Download, and Save Video remain unavailable while device-local transcoding is
+  active.
 - Main video remains available if the optional sidecar fails, provided the required H.264 MP4
   conversion succeeds.
 - Conversion cancellation, encoder failure, or a dropped video/audio track publishes no raw

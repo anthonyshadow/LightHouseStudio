@@ -1,6 +1,7 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { Button } from '../../ui';
 import type { RecordingController } from '../recording/types';
+import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 
 export type TakeReviewActionsProps = {
   recording: RecordingController;
@@ -9,6 +10,9 @@ export type TakeReviewActionsProps = {
   onDiscardTake?: () => void;
   onEditVideo?: () => void;
   onOpenVoiceTreatments?: () => void;
+  onSaveVideo?: () => void;
+  saveVideoState?: SaveVideoState;
+  onReplaceSavedVideo?: () => void;
 };
 
 const actionStyles = (
@@ -94,11 +98,16 @@ export const TakeReviewActions = ({
   onDiscardTake,
   onEditVideo,
   onOpenVoiceTreatments,
+  onSaveVideo,
+  saveVideoState = { status: 'idle' },
+  onReplaceSavedVideo,
 }: TakeReviewActionsProps) => {
   const theme = useTheme();
   const artifact = recording.presented;
   const locked = recording.processingState === 'processing';
   const compact = presentation === 'control-bar';
+  const saving = saveVideoState.status === 'saving' && saveVideoState.artifactId === artifact?.id;
+  const saved = saveVideoState.status === 'saved' && saveVideoState.artifactId === artifact?.id;
 
   if (!artifact) return null;
 
@@ -126,6 +135,21 @@ export const TakeReviewActions = ({
       role={compact ? 'group' : undefined}
       aria-label={compact ? 'Recorded take controls' : undefined}
     >
+      {onSaveVideo ? (
+        <Button
+          variant="primary"
+          busy={saving}
+          disabled={locked || saving || saved}
+          onClick={onSaveVideo}
+        >
+          {saving ? 'Saving…' : saved ? 'Saved' : compact ? 'Save' : 'Save Video'}
+        </Button>
+      ) : null}
+      {onReplaceSavedVideo ? (
+        <Button variant="secondary" disabled={locked || saving} onClick={onReplaceSavedVideo}>
+          Replace Saved Version
+        </Button>
+      ) : null}
       <a
         href={artifact.objectUrl}
         download={artifact.filename}
@@ -167,6 +191,9 @@ export const TakeReviewActions = ({
       >
         {compact ? 'Release' : 'Close and release'}
       </Button>
+      {saveVideoState.status === 'error' && saveVideoState.artifactId === artifact.id ? (
+        <span role="alert">{saveVideoState.message}</span>
+      ) : null}
     </div>
   );
 };

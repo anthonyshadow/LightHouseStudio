@@ -6,15 +6,16 @@ import {
   loadH264VideoFixture,
 } from './support/existingVideoHarness';
 import {
+  CREATIVE_ASSET_STORAGE_KEY,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
+  readCreativeAssetStore,
   readBrowserState,
 } from './support/studioHarness';
 import { installProviderNetworkDriver } from './support/studioHarness.network';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
 const SEEDED_UPLOAD_RECIPES = {
   schemaVersion: 6,
   savedPrompts: [
@@ -94,7 +95,7 @@ test('Record a local video closes the panel and keeps capture on the persistent 
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/');
+  await page.goto('/studio');
   await page.getByRole('button', { name: 'Upload Video' }).click();
 
   const dialog = page.getByRole('dialog', { name: 'Use existing video' });
@@ -174,7 +175,7 @@ test('provider-free upload previews and enters the existing take/download surfac
 }) => {
   await installCameraSentinel(page);
   const network = await installProviderNetworkDriver(page, { videoProcessingAvailable: false });
-  await page.goto('/');
+  await page.goto('/studio');
   const fixture = await loadH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'local-only.mp4');
@@ -202,7 +203,7 @@ test('provider-free Adjust video renders locally and atomically replaces the per
 }) => {
   await installCameraSentinel(page);
   const network = await installProviderNetworkDriver(page);
-  await page.goto('/');
+  await page.goto('/studio');
   const fixture = await loadDecodableH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'local-edit-source.mp4');
@@ -294,7 +295,7 @@ test('a selected upload ignores backdrop dismissal and can be reopened after an 
 }) => {
   await installCameraSentinel(page);
   await installProviderNetworkDriver(page, { videoProcessingAvailable: false });
-  await page.goto('/');
+  await page.goto('/studio');
   const fixture = await loadH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'resume-source.mp4');
@@ -331,7 +332,7 @@ test('the upload editor and open saved-character chooser reflow at every support
 
   for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {
     await page.setViewportSize(viewport);
-    await page.goto('/');
+    await page.goto('/studio');
     await selectExistingVideo(page, fixture, 'responsive-source.mp4');
     const dialog = page.getByRole('dialog', { name: 'Use existing video' });
     await dialog.getByRole('button', { name: 'Character Swap', exact: true }).click();
@@ -403,7 +404,7 @@ test('switching a configured visual edit confirms before clearing only its setti
 }) => {
   await installCameraSentinel(page);
   await installProviderNetworkDriver(page);
-  await page.goto('/');
+  await page.goto('/studio');
   const fixture = await loadH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'visual-switch-source.mp4');
@@ -454,7 +455,7 @@ test('Create A Character returns to the upload plan with the new character selec
 }) => {
   await installCameraSentinel(page);
   await installProviderNetworkDriver(page);
-  await page.goto('/');
+  await page.goto('/studio');
   const fixture = await loadH264VideoFixture();
 
   await selectExistingVideo(page, fixture, 'character-source.mp4');
@@ -487,14 +488,9 @@ test('Create A Character returns to the upload plan with the new character selec
     'true',
   );
 
-  const savedCharacter = await page.evaluate((storageKey) => {
-    const payload = localStorage.getItem(storageKey);
-    if (!payload) return null;
-    const store = JSON.parse(payload) as {
-      savedCharacterPrompts?: Array<{ name?: string }>;
-    };
-    return store.savedCharacterPrompts?.find(({ name }) => name === 'Upload Performer') ?? null;
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const savedCharacter = (await readCreativeAssetStore(page))?.savedCharacterPrompts.find(
+    ({ name }) => name === 'Upload Performer',
+  );
   expect(savedCharacter).toMatchObject({ name: 'Upload Performer' });
   expect(await cameraCalls(page)).toBe(0);
 });
@@ -503,7 +499,7 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
   test(`upload uses only ${operation} when that visual option is selected`, async ({ page }) => {
     await installCameraSentinel(page);
     await installProviderNetworkDriver(page);
-    await page.goto('/');
+    await page.goto('/studio');
     // This journey switches the persistent stage between both artifacts. Use the
     // deterministic decodable fixture so a codec error cannot trigger the stage's
     // intentional object-URL repair path and obscure source-identity assertions.

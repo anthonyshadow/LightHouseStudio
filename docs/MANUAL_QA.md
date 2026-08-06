@@ -31,6 +31,26 @@ Pruna 1080p, Pruna Wardrobe try-on, OpenAI, BFL, and Wiro require separately rec
 Pruna resolution is chosen in the editor while Pruna remains the startup-selected Character Swap
 provider. Wardrobe try-on is separately enabled and is never inferred from Character Swap.
 
+## Account and saved-library checks
+
+Run these before physical/provider work so later evidence uses the intended owner and clean local
+state:
+
+| Check                    | Pass condition                                                                                                                                                                               |
+| ------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `entry-login`            | `/` requests no media/capability/provider work; Login traps focus; development prefills both configured credentials; incorrect credentials use one generic error and clear no unrelated data |
+| `session-restore`        | Correct login opens Studio; closing/reopening the browser restores direct `/studio` and library routes within 24 hours without exposing a token to URL or browser storage                    |
+| `session-expiry-logout`  | Expired/revoked session returns to entry; logout blocks non-discardable work, confirms discardable work, releases indicators/resources, clears the cookie, and returns to Login              |
+| `studio-library-routing` | `/studio/videos`, `/studio/characters`, and `/studio/outfits` keep the same stage/runtime; browser Back/Forward, Escape, account-menu arrow/Home/End keys, and return focus behave correctly |
+| `save-video`             | Download remains distinct; Save is idempotent; optional thumbnail failure is non-fatal; replace confirms and appends a version; rename/download/delete operate on the selected owner record  |
+| `video-gallery-states`   | Empty/loading/error/missing/placeholder/populated/load-more states are usable without eager video requests at all five viewports and 200% text                                               |
+| `saved-character-outfit` | Both libraries show the user-scoped records; Use follows existing handoff; delete removes relationships without provider work or unintended immutable-byte deletion                          |
+| `legacy-reset`           | Pre-existing retired Guided records are cleared on authenticated Studio initialization and do not appear in Saved Videos                                                                     |
+
+Use disposable data for `legacy-reset`: the deletion is intentional and cannot be reversed through
+Lightframe. Logical Saved Video deletion is different: gallery metadata is tombstoned, while
+unreferenced media remains retained until Phase 2.
+
 ## Per-target physical protocol
 
 Use non-sensitive disposable media. Start from a fresh browser profile and stopped media. Run the

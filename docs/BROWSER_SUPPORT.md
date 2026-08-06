@@ -130,6 +130,12 @@ the inspected result dimensions after emitting a content-free server warning whe
 the canonical target; the browser must match the server-approved result metadata exactly. The Pruna
 resolution class is selected in the Character Swap editor for each submission.
 
+Saved Video thumbnail capture is an optional browser-local enhancement. It uses MediaBunny's
+canvas-frame path and WebCodecs rather than another `<video>` element, then the loopback broker
+validates and bounds the image as WebP. A browser decode/canvas failure leaves the video saved and
+the gallery displays its accessible placeholder. Gallery metadata, rename, versioning,
+authenticated content loading, Download, and Delete do not depend on thumbnail support.
+
 ## Local video editor
 
 The editor checks WebGL preview and dedicated-worker WebCodecs/OffscreenCanvas export support only

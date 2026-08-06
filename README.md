@@ -3,11 +3,12 @@
 Lightframe Studio is a local-first browser studio for short-form video creation and reusable
 characters. Its primary loop is:
 
-**Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Download**
+**Log in → Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Save and/or Download**
 
-Live AI camera transformation and Workshop remain advanced tools. The app is single-operator,
-binds to loopback, and stores no accounts or cloud projects. It is not approved for LAN, tunnel,
-public, or multi-user deployment.
+Live AI camera transformation and Workshop remain advanced tools. The app is single-operator and
+binds to loopback. Phase 1 provides one seeded local demo account, authenticated ownership, and
+durable local saved-media records; it does not provide signup, billing, cloud projects, or public
+multi-user deployment. It is not approved for LAN, tunnel, proxy, or public exposure.
 
 ## Status
 
@@ -17,7 +18,9 @@ inputs, but their absence does not disable configured application features.
 
 ## Product flow
 
-1. Open `/` and select **Record New Video** or **Upload Video** to move to `/studio`.
+1. Open `/`, choose **Log in**, and submit the locally configured demo credentials. The backend
+   verifies the Argon2id password hash and issues a session JWT in a host-only, HTTP-only cookie.
+   The development login form currently prefills both values by product decision.
 2. Studio opens in neutral **Local Camera** mode. Camera and microphone remain off until the
    creator explicitly starts them from the control bar or **Record a local video** in the upload
    panel. No AI model, provider session, or remote processing starts on entry or refresh.
@@ -33,22 +36,23 @@ inputs, but their absence does not disable configured application features.
    and/or **Voice**. Combined work completes and validates the visual result before voice
    conversion. Any non-16:9/9:16 upload or local square, 4:5, or incompatible Freeform edit keeps
    Download and Voice but disables Character Swap/VTO before provider contact.
-6. Preview **Original** and **Result**, revise the plan or edit base, then download the latest
-   healthy result or start over while retaining the immutable source.
+6. Preview **Original** and **Result**, revise the plan or edit base, then **Save Video** and/or
+   download the latest healthy result. Save is idempotent and independent of Download. An edit
+   saves as a new, source-linked video by default; explicit replacement confirms before appending
+   an immutable version.
 7. Prepare advanced live work without starting media: desktop places **Select Character** and
    **Select Outfit** immediately before **Workshop** in the creative-tool rail; phones and tablets
    expose one header **Select AI** action that routes to either preparation flow. A saved selection
    can then be started explicitly from **Start AI** or the Dock and recorded through the existing
    live flow.
 
-`/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio` owns the
-one persistent stage; creative tools open as overlays without remounting it or creating another
-media session. **Use existing video** alone also renders a secondary inline source/result player
-that borrows existing artifact URLs without owning tracks or sessions. Live preview, recording,
-and finalization always stay on the main stage. Those are the only registered application routes;
-every other path returns to `/`.
-Existing compatibility projects can still be downloaded or deleted from Recipe Shelf when Studio
-detects them, but they have no URL entry.
+`/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio`,
+`/studio/videos`, `/studio/characters`, and `/studio/outfits` share one persistent `StudioApp` and
+one stage; their full-screen library surfaces never create another media session. The gallery
+loads metadata and lazy thumbnails first, then fetches video bytes only for an explicit Studio,
+Edit, or Download action. **Use existing video** alone retains its approved secondary inline
+source/result player. Every other path returns to `/`. Older Guided compatibility videos are
+deleted locally on the Phase 1 cutover and are not imported into the new gallery.
 
 Leaving Studio is blocked during recording/finalization and active local video rendering. A
 temporary take, active Voice work, dirty video edit, or dirty Recipe Shelf/Outfit Builder/Wardrobe
@@ -102,12 +106,13 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
 - Reference generation uses one startup-selected provider: OpenAI `gpt-image-2`, BFL
   `flux-2-pro`, or Wiro `seedream-v5-lite-uncensored`. There is no automatic billable retry or
   provider fallback.
-- ElevenLabs provides lazy **Saved Voices** and **Browse Voices** views. Browse exposes only
+- ElevenLabs provides lazy **Saved Voices** and **Browse Voices** views. Saved state is an
+  owner-scoped Lightframe relationship; removing it never calls the ElevenLabs delete API.
+  Browse exposes only
   authenticated catalog voices whose provider metadata reports the standard included rate
   (`rate === 1`) and free-user allowance, and lets the creator add them to Saved Voices. Eligible
-  bookmarked community copies can be removed; owned, cloned, workspace, default, and legacy
-  voices cannot. Preview does not upload the take; Apply sends only the immutable original audio
-  sidecar.
+  catalog voices can be added or removed from the current user's Lightframe library. Preview does
+  not upload the take; Apply sends only the immutable original audio sidecar.
 - Explicit Character Builder, Character Swap, VTO, and Outfit Builder image-URL import uses the
   loopback broker, accepts public HTTPS JPEG/PNG/WebP only, pins public DNS across bounded
   redirects, validates decoded contents, and never retains the URL.
@@ -140,7 +145,10 @@ pnpm dev
 
 Open <http://127.0.0.1:4173> for the entry or <http://127.0.0.1:4173/studio> for a direct Studio
 load. Vite proxies `/api` to `127.0.0.1:4100`; keep `PORT=4100` for the normal development and
-functional Playwright paths. Leave provider keys empty to exercise the fully local path.
+functional Playwright paths. The checked development defaults prefill
+`demo@lightframe.local` / `lightframe-demo`; change the plaintext prefill and its independently
+generated hash together when rotating the demo credential. Leave provider keys empty to exercise
+the fully local path.
 
 For the production-mode loopback smoke:
 
@@ -150,29 +158,36 @@ NODE_ENV=production pnpm start
 ```
 
 Open <http://127.0.0.1:4100>. Production startup fails when `apps/web/dist` is absent.
+It also rejects the checked demo JWT secret and demo password hash; set environment-specific
+values before a production-mode loopback smoke.
 
 ## Configuration
 
 All credentials are read by `apps/api`; never place secrets in `VITE_*` variables. `.env.example`
 is the maintained list of defaults and tunables.
 
-| Variable                                       | Purpose                                                                                                                                                        |
-| ---------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DECART_API_KEY`                               | Realtime scoped credentials, Decart Character Swap, and Decart-only Virtual Try-On                                                                             |
-| `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`       | Startup Character Swap choice: `decart` (default) or `pruna`; never exposed in the UI                                                                          |
-| `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY` | Required enablement and shared server credential when Pruna Character Swap is selected                                                                         |
-| `PRUNA_VIDEO_REPLACE_MODEL`                    | Exact pinned `p-video-replace` literal; required when Pruna is selected                                                                                        |
-| `PRUNA_IMAGE_TRY_ON_ENABLED`                   | Enables Wardrobe Add Outfit; defaults to `false` and does not hide saved versions                                                                              |
-| `PRUNA_IMAGE_TRY_ON_MODEL`                     | Exact pinned `p-image-try-on` literal; required with try-on enablement                                                                                         |
-| `OPENAI_API_KEY`                               | Character prompt optimization and OpenAI image work                                                                                                            |
-| `REFERENCE_IMAGE_PROVIDER`                     | Startup choice: `openai` (default), `bfl`, or `wiro`                                                                                                           |
-| `BFL_API_KEY`                                  | BFL image work when BFL is selected                                                                                                                            |
-| `WIRO_API_KEY`, `WIRO_API_SECRET`              | Wiro image work when Wiro is selected                                                                                                                          |
-| `ELEVENLABS_API_KEY`                           | Saved-voice listing, preview, and Voice Changer                                                                                                                |
-| `ELEVENLABS_ENABLE_LOGGING`                    | Provider retention choice; defaults to `false`                                                                                                                 |
-| `LIGHTFRAME_DATA_DIR`                          | Immutable local reference assets; defaults to repository-root `./.lightframe-data`; an existing API-relative default remains in use for backward compatibility |
-| `PORT`                                         | Loopback API port; defaults to `4100`                                                                                                                          |
-| `NODE_ENV`                                     | `development`, `test`, or `production`                                                                                                                         |
+| Variable                                        | Purpose                                                                                                                                                   |
+| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEMO_AUTH_ENABLED`, `DEMO_AUTH_PREFILL`        | Enables the seeded local login and the non-production development prefill                                                                                 |
+| `DEMO_USER_ID`, `DEMO_USER_LOGIN`               | Stable immutable owner UUID and normalized seeded login                                                                                                   |
+| `DEMO_USER_PASSWORD`, `DEMO_USER_PASSWORD_HASH` | Development prefill and independently generated Argon2id verification hash; plaintext is never used for backend comparison                                |
+| `AUTH_JWT_SECRET`, `AUTH_SESSION_TTL_SECONDS`   | Session-specific JWT signing secret and expiry; default TTL is 24 hours                                                                                   |
+| `AUTH_COOKIE_NAME`, `AUTH_COOKIE_SECURE`        | Host-only HTTP-only SameSite cookie settings; Secure remains false only for loopback HTTP development                                                     |
+| `DECART_API_KEY`                                | Realtime scoped credentials, Decart Character Swap, and Decart-only Virtual Try-On                                                                        |
+| `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`        | Startup Character Swap choice: `decart` (default) or `pruna`; never exposed in the UI                                                                     |
+| `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY`  | Required enablement and shared server credential when Pruna Character Swap is selected                                                                    |
+| `PRUNA_VIDEO_REPLACE_MODEL`                     | Exact pinned `p-video-replace` literal; required when Pruna is selected                                                                                   |
+| `PRUNA_IMAGE_TRY_ON_ENABLED`                    | Enables Wardrobe Add Outfit; defaults to `false` and does not hide saved versions                                                                         |
+| `PRUNA_IMAGE_TRY_ON_MODEL`                      | Exact pinned `p-image-try-on` literal; required with try-on enablement                                                                                    |
+| `OPENAI_API_KEY`                                | Character prompt optimization and OpenAI image work                                                                                                       |
+| `REFERENCE_IMAGE_PROVIDER`                      | Startup choice: `openai` (default), `bfl`, or `wiro`                                                                                                      |
+| `BFL_API_KEY`                                   | BFL image work when BFL is selected                                                                                                                       |
+| `WIRO_API_KEY`, `WIRO_API_SECRET`               | Wiro image work when Wiro is selected                                                                                                                     |
+| `ELEVENLABS_API_KEY`                            | Saved-voice listing, preview, and Voice Changer                                                                                                           |
+| `ELEVENLABS_ENABLE_LOGGING`                     | Provider retention choice; defaults to `false`                                                                                                            |
+| `LIGHTFRAME_DATA_DIR`                           | Owner-scoped local media bytes and atomic metadata; defaults to repository-root `./.lightframe-data`; an existing API-relative default remains compatible |
+| `PORT`                                          | Loopback API port; defaults to `4100`                                                                                                                     |
+| `NODE_ENV`                                      | `development`, `test`, or `production`                                                                                                                    |
 
 `GET /api/capabilities` reports configuration presence, not provider reachability, entitlement, or
 quota. Missing optional configuration disables only the corresponding feature.
@@ -182,6 +197,7 @@ quota. Missing optional configuration disables only the corresponding feature.
 | Command                                                                                  | Purpose                                                                |
 | ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
 | `pnpm dev`                                                                               | Build shared packages and run API/web watchers                         |
+| `pnpm auth:hash-password`                                                                | Interactively generate an Argon2id demo password hash                  |
 | `pnpm build`                                                                             | Build all workspaces                                                   |
 | `pnpm quality`                                                                           | Type, Storybook, lint, format, dead-code, module, unit, and build gate |
 | `pnpm test`                                                                              | Essential non-visual unit and API integration suite                    |
@@ -246,7 +262,9 @@ packages/domain     packages/contracts
 pure policy         runtime HTTP schemas
                          │
                   apps/api Fastify broker
-                         │
+                    │              │
+          auth + ownership    local asset store
+                    │              │
        Decart / Pruna / OpenAI / BFL / Wiro / ElevenLabs
 ```
 
@@ -258,10 +276,12 @@ Finalization settles the video and optional sidecar, transcodes the main recordi
 H.264/AAC MP4, and publishes that downloadable artifact before live resources release. Raw
 recorder output never receives a download URL.
 
-The backend has process-local temporary video jobs but no account database, durable job database or
-queue, or session history. Its only durable runtime data is the owner-scoped immutable
-reference-asset store. Read [architecture and ownership](docs/ARCHITECTURE.md) for the full
-dependency, lifecycle, persistence, and HTTP boundaries.
+The backend has one configured local user, process-memory sessions/revocation and video jobs, but
+no signup database, durable job queue, cloud tenancy, or session history. Durable local data
+includes owner-scoped saved-video aggregates/bytes/thumbnails, immutable reference assets,
+saved-voice relationships, and safe processing traces. Read
+[architecture and ownership](docs/ARCHITECTURE.md) for the full dependency, lifecycle,
+persistence, and HTTP boundaries.
 
 ## Documentation
 

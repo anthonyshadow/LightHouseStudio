@@ -316,7 +316,7 @@ export const VoiceLibrary = ({ disabled, onSelect, selectedVoiceId }: VoiceLibra
             {filtersActive
               ? `No ${library.tab === 'saved' ? 'saved' : 'catalog'} voices match these filters.`
               : library.tab === 'saved'
-                ? 'No saved voices are available in this ElevenLabs library.'
+                ? 'No saved voices are available in your Lightframe library.'
                 : 'No included-rate voices are available in this catalog page.'}
             {filtersActive ? (
               <Button size="small" variant="quiet" onClick={library.clearFilters}>

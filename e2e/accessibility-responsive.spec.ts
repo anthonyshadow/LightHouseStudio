@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import { TEST_AUTH_SESSION } from './support/authFixture';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 import { openCharacterOptions, openRecipeDockWhenOverlaid } from './support/studioHarness';
 
@@ -54,6 +55,15 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
     if (!isLocal) {
       state.blockedExternalRequests.push(requestUrl.href);
       await route.abort('blockedbyclient');
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/auth/me') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(TEST_AUTH_SESSION),
+      });
       return;
     }
 

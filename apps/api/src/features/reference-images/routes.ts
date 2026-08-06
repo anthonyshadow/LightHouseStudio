@@ -23,8 +23,8 @@ import { randomUUID } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/errors.js';
+import { ownerUserIdForRequest } from '../../http/authentication.js';
 import {
-  localOwnerIdForRequest,
   requireReferenceImageImportIntent,
   requireTrustedOrigin,
   requireWardrobeProviderIntent,
@@ -148,7 +148,7 @@ export const registerReferenceImageRoutes = (
       return withRequestLifetime(request, reply, async (signal) =>
         outfitTryOnResponseSchema.parse({
           asset: await tryOnService.tryOn({
-            localOwnerId: localOwnerIdForRequest(request),
+            localOwnerId: ownerUserIdForRequest(request),
             sourceAssetId: params.data.sourceAssetId,
             garmentAssetId: body.data.garmentAssetId,
             requestId: body.data.requestId,
@@ -242,7 +242,7 @@ export const registerReferenceImageRoutes = (
       }
       return withRequestLifetime(request, reply, async (signal) => {
         const asset = await service.generate({
-          localOwnerId: localOwnerIdForRequest(request),
+          localOwnerId: ownerUserIdForRequest(request),
           signal,
           ...parsed.data,
         });
@@ -266,7 +266,7 @@ export const registerReferenceImageRoutes = (
       }
       return withRequestLifetime(request, reply, async (signal) => {
         const asset = await service.upload({
-          localOwnerId: localOwnerIdForRequest(request),
+          localOwnerId: ownerUserIdForRequest(request),
           requestId,
           bytes,
           mimeType,
@@ -292,7 +292,7 @@ export const registerReferenceImageRoutes = (
       }
       return withRequestLifetime(request, reply, async (signal) => {
         const asset = await service.edit({
-          localOwnerId: localOwnerIdForRequest(request),
+          localOwnerId: ownerUserIdForRequest(request),
           sourceAssetId,
           signal,
           ...parsed.data,
@@ -317,7 +317,7 @@ export const registerReferenceImageRoutes = (
       }
       return withRequestLifetime(request, reply, async (signal) => {
         const asset = await service.compose({
-          localOwnerId: localOwnerIdForRequest(request),
+          localOwnerId: ownerUserIdForRequest(request),
           sourceAssetId,
           signal,
           ...parsed.data,
@@ -329,7 +329,7 @@ export const registerReferenceImageRoutes = (
 
   app.get('/api/reference-images/:assetId', async (request) => {
     const assetId = requireAssetId(request.params);
-    const asset = await service.getMetadata(localOwnerIdForRequest(request), assetId);
+    const asset = await service.getMetadata(ownerUserIdForRequest(request), assetId);
     if (asset === null) {
       throw new AppError(404, 'not_found', 'That local reference image is unavailable.');
     }
@@ -338,7 +338,7 @@ export const registerReferenceImageRoutes = (
 
   app.get('/api/reference-images/:assetId/content', async (request, reply) => {
     const assetId = requireAssetId(request.params);
-    const localOwnerId = localOwnerIdForRequest(request);
+    const localOwnerId = ownerUserIdForRequest(request);
     const fileLookup = await service.getContentFile(localOwnerId, assetId);
     const content =
       fileLookup.status === 'available'

@@ -117,9 +117,11 @@ source, then edit either base, download, start over, or discard.
     next frame source. If an accepted approximate-resolution result is not exactly 16:9 or 9:16,
     the next explicit Start prepares and revalidates a temporary contain-fit canonical copy without
     changing the retained or downloadable result. Review
-    keeps **Download result**, the selected edit summary, and the destructive action visible. Only the
-    immutable source plus latest healthy Result remain after successful replacement. A voice failure
-    after visual success retains the visual Result.
+    keeps **Download result**, **Save Video**, the selected edit summary, and the destructive action
+    visible. Save as New is default; confirmed Replace Existing appends an immutable gallery
+    version and never overwrites prior bytes. Only the immutable runtime source plus latest healthy
+    Result remain after successful replacement. A voice failure after visual success retains the
+    visual Result.
 11. Every source/result has a UUID, app-owned name, timestamp, kind, and parent lineage. Generated
     downloads use operation, UTC timestamp, and UUID suffix. Uploaded originals remain unchanged;
     recorded and all generated results pass the local H.264/AAC MP4 gate before publication.

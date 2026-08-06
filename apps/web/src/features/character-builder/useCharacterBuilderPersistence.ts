@@ -18,6 +18,7 @@ import type {
   CharacterBuilderDraftStorageState,
 } from './draftRepository';
 import {
+  CHARACTER_BUILDER_DRAFT_DATABASE_NAME,
   CharacterBuilderDraftError,
   createCharacterBuilderDraftRepository,
 } from './draftRepository';
@@ -35,6 +36,7 @@ export interface UseCharacterBuilderPersistenceOptions {
   readonly dispatch: Dispatch<CharacterBuilderAction>;
   readonly legacyRepository?: LocalProjectRepository | undefined;
   readonly initialValue?: CharacterBuilderDraftValueV1 | undefined;
+  readonly ownerUserId?: string | undefined;
 }
 
 export interface CharacterBuilderPersistenceController {
@@ -102,6 +104,7 @@ export const useCharacterBuilderPersistence = ({
   dispatch,
   legacyRepository,
   initialValue,
+  ownerUserId,
 }: UseCharacterBuilderPersistenceOptions): CharacterBuilderPersistenceController => {
   const [autosaveMessage, setAutosaveMessage] = useState<string | null>(null);
   const [pendingSave, setPendingSave] = useState<PendingCharacterSave | null>(null);
@@ -120,8 +123,11 @@ export const useCharacterBuilderPersistence = ({
       createCharacterBuilderDraftRepository({
         sanitizeDraft: sanitizeCharacterBuilderDraftValue,
         legacyMigration: createCharacterBuilderLegacyMigration(legacyRepository),
+        ...(ownerUserId
+          ? { databaseName: `${CHARACTER_BUILDER_DRAFT_DATABASE_NAME}.${ownerUserId}` }
+          : {}),
       }),
-    [legacyRepository],
+    [legacyRepository, ownerUserId],
   );
   useStrictModeSafeDisposable(repository);
 

@@ -41,6 +41,7 @@ const repository = (overrides: Partial<LocalProjectRepository> = {}): LocalProje
   load: vi.fn(() => Promise.resolve(null)),
   loadNewestCharacterDesign: vi.fn(() => Promise.resolve(null)),
   readArtifact: vi.fn(() => Promise.resolve(null)),
+  clearAll: vi.fn(() => Promise.resolve()),
   deleteProject: vi.fn(() => Promise.resolve()),
   close: vi.fn(),
   ...overrides,

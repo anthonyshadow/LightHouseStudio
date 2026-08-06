@@ -47,6 +47,7 @@ export interface UseCharacterBuilderControllerOptions {
   readonly onDismiss: () => void;
   readonly target?: CharacterBuilderTarget | undefined;
   readonly initialValue?: CharacterBuilderDraftValueV1 | undefined;
+  readonly ownerUserId?: string | undefined;
 }
 
 const editIsBlocked = (
@@ -72,6 +73,7 @@ export const useCharacterBuilderController = ({
   onDismiss,
   target = { kind: 'create' },
   initialValue,
+  ownerUserId,
 }: UseCharacterBuilderControllerOptions) => {
   const initialDraftValue = useMemo(
     () => initialValue ?? createFreshCharacterBuilderDraftValue(),
@@ -101,6 +103,7 @@ export const useCharacterBuilderController = ({
     dispatch,
     legacyRepository,
     initialValue,
+    ownerUserId,
   });
   const {
     autosaveMessage,

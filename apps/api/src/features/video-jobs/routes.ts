@@ -13,11 +13,8 @@ import {
 } from '@studio/contracts';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/app-error.js';
-import {
-  localOwnerIdForRequest,
-  requireTrustedOrigin,
-  requireVideoProviderIntent,
-} from '../../http/security.js';
+import { requireTrustedOrigin, requireVideoProviderIntent } from '../../http/security.js';
+import { ownerUserIdForRequest } from '../../http/authentication.js';
 import {
   InvalidReferenceImageUploadError,
   validateUploadedReferenceImage,
@@ -81,7 +78,7 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
           'Visual processing is unavailable until its server configuration is complete.',
         );
       }
-      const ownerId = localOwnerIdForRequest(request);
+      const ownerId = ownerUserIdForRequest(request);
       const duplicate = await service.existing(parsedParams.data.jobId, ownerId);
       if (duplicate?.status === 'expired') {
         await reply.status(202).send(duplicate);
@@ -196,7 +193,7 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
   app.get('/api/video-jobs/:jobId', { onRequest: verifyVideoProviderIntent }, async (request) => {
     const parsed = videoJobParamsSchema.safeParse(request.params);
     if (!parsed.success) throw new AppError(400, 'validation_error', 'Use a valid video job ID.');
-    return service.status(parsed.data.jobId, localOwnerIdForRequest(request));
+    return service.status(parsed.data.jobId, ownerUserIdForRequest(request));
   });
 
   app.get(
@@ -205,7 +202,7 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
     async (request, reply) => {
       const parsed = videoJobParamsSchema.safeParse(request.params);
       if (!parsed.success) throw new AppError(400, 'validation_error', 'Use a valid video job ID.');
-      const ownerId = localOwnerIdForRequest(request);
+      const ownerId = ownerUserIdForRequest(request);
       const result = await service.content(parsed.data.jobId, ownerId);
       void reply.header('Content-Length', String(result.media.sizeBytes));
       void reply.type(result.media.mimeType);
@@ -235,7 +232,7 @@ export const registerVideoJobRoutes = (app: FastifyInstance, service: VideoJobSe
     async (request, reply) => {
       const parsed = videoJobParamsSchema.safeParse(request.params);
       if (!parsed.success) throw new AppError(400, 'validation_error', 'Use a valid video job ID.');
-      await service.release(parsed.data.jobId, localOwnerIdForRequest(request));
+      await service.release(parsed.data.jobId, ownerUserIdForRequest(request));
       await reply.status(204).send();
     },
   );

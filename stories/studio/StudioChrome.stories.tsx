@@ -29,6 +29,21 @@ const browserCapabilities = {
   offlineAudio: true,
 };
 
+const headerUser = {
+  id: '2d7914b2-f912-4b96-b17d-54100a2ffea3',
+  login: 'demo@lightframe.local',
+  username: 'demo',
+  email: 'demo@lightframe.local',
+  displayName: 'Lightframe Demo',
+  avatarUrl: null,
+  planId: 'free' as const,
+  role: 'user' as const,
+  status: 'active' as const,
+  createdAt: '2026-08-05T00:00:00.000Z',
+  updatedAt: '2026-08-05T00:00:00.000Z',
+  lastLoginAt: '2026-08-05T00:00:00.000Z',
+};
+
 const meta = {
   title: 'Studio/Chrome',
   component: StudioHeader,
@@ -37,8 +52,13 @@ const meta = {
     browser: browserCapabilities,
     capabilityState: 'ready',
     characterSelectorRef: { current: null },
+    user: headerUser,
     onOpenCharacterSelector: fn(),
     onClearCharacter: fn(),
+    onOpenVideos: fn(),
+    onOpenCharacters: fn(),
+    onOpenOutfits: fn(),
+    onLogout: fn(),
   },
   parameters: {
     docs: {
@@ -62,9 +82,14 @@ const HeaderHarness = () => {
         browser={browserCapabilities}
         capabilityState="ready"
         characterSelectorRef={selectorRef}
+        user={headerUser}
         activeCharacterName="Midnight culture host"
         onOpenCharacterSelector={fn()}
         onClearCharacter={fn()}
+        onOpenVideos={fn()}
+        onOpenCharacters={fn()}
+        onOpenOutfits={fn()}
+        onLogout={fn()}
       />
     </StoryColumn>
   );

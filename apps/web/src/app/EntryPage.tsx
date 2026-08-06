@@ -1,9 +1,14 @@
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
-import { useLayoutEffect, useRef } from 'react';
-import { useNavigate } from 'react-router';
+import { lazy, Suspense, useLayoutEffect, useRef, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router';
+import { useAuth } from '../application/auth/AuthProvider';
 import { Button } from '../ui/primitives/Button';
 import { visuallyHiddenStyles } from '../ui/primitives/VisuallyHidden';
-import { APP_PATHS } from './paths';
+import { APP_PATHS, isStudioPath } from './paths';
+
+const LoginDialog = lazy(() =>
+  import('../features/auth/LoginDialog').then((module) => ({ default: module.LoginDialog })),
+);
 
 const entryStyles = (theme: Theme): CSSObject => ({
   width: '100%',
@@ -31,7 +36,11 @@ interface EntryPageProps {
 export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
   const theme = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
+  const auth = useAuth();
   const enterRef = useRef<HTMLButtonElement>(null);
+  const routeState = location.state as { loginRequired?: unknown; from?: unknown } | null;
+  const [loginOpen, setLoginOpen] = useState(routeState?.loginRequired === true);
 
   useLayoutEffect(() => {
     if (!focusEnterOnMount) return;
@@ -47,20 +56,36 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
           ref={enterRef}
           variant="primary"
           onClick={() => {
-            void navigate(APP_PATHS.studio);
+            if (auth.status === 'authenticated') void navigate(APP_PATHS.studio);
+            else setLoginOpen(true);
           }}
         >
-          Record New Video
-        </Button>
-        <Button
-          variant="secondary"
-          onClick={() => {
-            void navigate(APP_PATHS.studio, { state: { creationIntent: 'upload' } });
-          }}
-        >
-          Upload Video
+          {auth.status === 'authenticated' ? 'Enter Studio' : 'Log in'}
         </Button>
       </div>
+      {loginOpen ? (
+        <Suspense fallback={<p role="status">Loading Login…</p>}>
+          <LoginDialog
+            open
+            message={
+              routeState?.loginRequired === true ? 'Your session is required to continue.' : null
+            }
+            returnFocusRef={enterRef}
+            onClose={() => {
+              setLoginOpen(false);
+              if (routeState?.loginRequired === true)
+                void navigate(APP_PATHS.entry, { replace: true });
+            }}
+            onSuccess={() => {
+              setLoginOpen(false);
+              const requestedPath = typeof routeState?.from === 'string' ? routeState.from : null;
+              void navigate(
+                requestedPath && isStudioPath(requestedPath) ? requestedPath : APP_PATHS.studio,
+              );
+            }}
+          />
+        </Suspense>
+      ) : null}
     </main>
   );
 };

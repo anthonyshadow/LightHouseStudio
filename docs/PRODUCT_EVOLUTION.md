@@ -3,14 +3,29 @@
 This file preserves durable rationale for intentional product changes. Current behavior belongs in
 [Architecture](ARCHITECTURE.md) and the [observable user stories](userStories/README.md).
 
+## Local ownership added accounts and saved libraries
+
+Phase 1 added one configured seeded local user with real password verification, a 24-hour
+HTTP-only cookie session, and server-derived resource ownership. This remains a loopback-only
+single-operator design, not a claim of public authentication or multi-user tenancy. Development
+temporarily prefills both configured credentials; production does not expose them.
+
+Save Video became distinct from Download. Owner-scoped files back gallery records with immutable
+versions and optional thumbnails; logical deletion retains unreferenced bytes until Phase 2.
+`/studio/videos`, `/studio/characters`, and `/studio/outfits` are private views inside the same
+Studio runtime. The cutover intentionally clears retired Guided videos instead of importing them.
+Saved Voices became Lightframe-owned user relationships, so removal no longer deletes provider
+voices.
+
 ## Entry became separate from the Studio runtime
 
 Studio originally rendered directly at `/`, and every retired or unknown path canonicalized to
 that same runtime. The application now keeps a minimal provider-free entry at `/` and lazy-loads
 the one Studio runtime at `/studio`. Retired Studio links initially redirected into that runtime
 during the transition; those URL aliases and their navigation-state handoff have since been
-removed. Only `/` and `/studio` remain registered, and every other path returns to the entry.
-Browser-local data needs no migration because its ownership is origin-scoped, not path-scoped.
+removed. The later saved-library children under `/studio/*` keep that same mounted runtime, and
+every unknown path returns to the entry. Browser-local data is now sanitized and namespaced by the
+stable local user rather than route path.
 
 Browser Back and Forward hand focus between Enter and the Studio main landmark. Recording and
 finalization cannot be abandoned by routing; temporary take, Voice, and dirty Shelf work requires
@@ -18,8 +33,8 @@ confirmed discard. This routing layer does not authorize public deployment.
 
 ## One Studio replaced parallel journeys
 
-`/studio` is the sole media runtime. Detected legacy project data may open the compatibility
-manager from Recipe Shelf, but no legacy URL opens it and Guided is not revived.
+`/studio` and its saved-library children share the sole media runtime. Guided is not revived;
+retired project data is cleared during authenticated Studio initialization.
 
 One persistent media stage now owns preview, transformed video, recording, finalization, and
 playback. Dock, Capture Settings, Workshop, Shelf, Character Builder, Take Review, Voice, and
@@ -76,9 +91,9 @@ The product keeps one temporary take, not a take library.
 The app owns an independent 270-second warning and 300-second Stop/finalize boundary. The equal
 Decart active-session limit and ElevenLabs input limit do not substitute for that recording rule.
 
-Download is the durable handoff. It enables the Release actions but does not pretend browser
-download completion is observable. Confirmed Discard performs the same URL cleanup without a
-download.
+Download was initially the only durable handoff. It still does not pretend browser completion is
+observable, and confirmed Discard performs the same temporary URL cleanup. Phase 1 later added the
+separate local Save Video handoff described above.
 
 ## Voice processing preserves the original
 

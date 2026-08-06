@@ -10,6 +10,7 @@ import {
   type RecordingSource,
 } from '../features/recording';
 import { TakeReviewActions } from '../features/take-review/TakeReviewActions';
+import type { SaveVideoState } from '../features/saved-videos/useSaveVideo';
 
 type StudioSessionControlBarProps = {
   session: StudioSessionController;
@@ -32,6 +33,9 @@ type StudioSessionControlBarProps = {
   onChangeExperience: () => void;
   onUploadVideo?: () => void;
   uploadButtonRef?: RefObject<HTMLButtonElement | null>;
+  onSaveVideo?: () => void;
+  saveVideoState?: SaveVideoState;
+  onReplaceSavedVideo?: () => void;
 };
 
 const MicrophoneIcon = ({ muted }: { muted: boolean }) => (
@@ -306,6 +310,9 @@ export const StudioSessionControlBar = ({
   onChangeExperience,
   onUploadVideo,
   uploadButtonRef,
+  onSaveVideo,
+  saveVideoState,
+  onReplaceSavedVideo,
 }: StudioSessionControlBarProps) => {
   const theme = useTheme();
   const transition = transitionLabel(session);
@@ -361,6 +368,9 @@ export const StudioSessionControlBar = ({
           onCloseTake={onCloseTakeReview}
           {...(onDiscardTake ? { onDiscardTake } : {})}
           onOpenVoiceTreatments={onOpenVoiceTreatments}
+          {...(onSaveVideo ? { onSaveVideo } : {})}
+          {...(saveVideoState ? { saveVideoState } : {})}
+          {...(onReplaceSavedVideo ? { onReplaceSavedVideo } : {})}
         />
       ) : (
         <>

@@ -1,16 +1,17 @@
 import { expect, test, type Page } from '@playwright/test';
 import {
+  CREATIVE_ASSET_STORAGE_KEY,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
   openCharacterOptions,
   openRecipeDockWhenOverlaid,
+  readCreativeAssetStore,
   readBrowserState,
 } from './support/studioHarness';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 import { REFERENCE_PNG } from './support/mediaFixtures';
 
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
 const openCharacterBuilder = async (page: Page): Promise<void> => {
   await openCharacterOptions(page);
   await page.getByRole('button', { name: 'Create new character' }).click();
@@ -82,12 +83,7 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
   ]);
   expect(browser.applies).toEqual([]);
 
-  const recentRawPrompt = await page.evaluate((storageKey) => {
-    const serialized = localStorage.getItem(storageKey);
-    if (!serialized) return null;
-    const store = JSON.parse(serialized) as { recentPrompts?: Array<{ prompt?: string }> };
-    return store.recentPrompts?.[0]?.prompt ?? null;
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const recentRawPrompt = (await readCreativeAssetStore(page))?.recentPrompts[0]?.prompt ?? null;
   expect(recentRawPrompt).toBe(generated.rawPrompt);
   expect(recentRawPrompt).not.toBe(optimized.response.result.lucy25CharacterPrompt);
 
@@ -198,18 +194,7 @@ test('wardrobe uses an exact variant image without its parent prompt and remains
 
   await wardrobe.getByRole('textbox', { name: /Variant name/u }).fill('Travel jacket smile');
   await wardrobe.getByRole('button', { name: 'Save variant' }).click();
-  const persisted = await page.evaluate((storageKey) => {
-    const serialized = localStorage.getItem(storageKey);
-    if (!serialized) return null;
-    return JSON.parse(serialized) as {
-      savedCharacterPrompts: Array<{ id: string; name: string }>;
-      savedCharacterVariants: Array<{
-        parentCharacterId: string;
-        title: string;
-        creation: { sourceReferenceImageAssetId: string };
-      }>;
-    };
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const persisted = await readCreativeAssetStore(page);
   const parent = persisted?.savedCharacterPrompts.find(
     (character) => character.name === 'Wardrobe source host',
   );
@@ -247,17 +232,9 @@ test('saved character opens in Builder and updates its original record after reg
   await createNameDialog.getByRole('button', { name: 'Save Character', exact: true }).click();
   await expect(page.getByRole('dialog', { name: 'Build Your Character' })).toBeHidden();
 
-  const persistedAssetId = await page.evaluate((storageKey) => {
-    const serialized = localStorage.getItem(storageKey);
-    if (!serialized) return null;
-    const store = JSON.parse(serialized) as {
-      savedCharacterPrompts?: Array<{ name?: string; referenceImageAssetId?: string | null }>;
-    };
-    return (
-      store.savedCharacterPrompts?.find((item) => item.name === 'Immutable astronomy host')
-        ?.referenceImageAssetId ?? null
-    );
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const persistedAssetId = (await readCreativeAssetStore(page))?.savedCharacterPrompts.find(
+    (item) => item.name === 'Immutable astronomy host',
+  )?.referenceImageAssetId;
   expect(persistedAssetId).toBe(firstAssetId);
 
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();
@@ -295,20 +272,11 @@ test('saved character opens in Builder and updates its original record after reg
   await editNameDialog.getByRole('button', { name: 'Save Character', exact: true }).click();
   await expect(builder).toBeHidden();
 
-  const edited = await page.evaluate((storageKey) => {
-    const serialized = localStorage.getItem(storageKey);
-    if (!serialized) return null;
-    const store = JSON.parse(serialized) as {
-      savedCharacterPrompts?: Array<{
-        name?: string;
-        referenceImageAssetId?: string | null;
-      }>;
-    };
-    return {
-      count: store.savedCharacterPrompts?.length ?? 0,
-      character: store.savedCharacterPrompts?.[0] ?? null,
-    };
-  }, CREATIVE_ASSET_STORAGE_KEY);
+  const editedStore = await readCreativeAssetStore(page);
+  const edited = {
+    count: editedStore?.savedCharacterPrompts.length ?? 0,
+    character: editedStore?.savedCharacterPrompts[0] ?? null,
+  };
   expect(edited).toMatchObject({
     count: 1,
     character: {

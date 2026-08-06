@@ -87,6 +87,10 @@ export const createLegacyProjectRepository = (): LocalProjectRepository => {
     projects.delete(projectId);
     return Promise.resolve();
   };
+  const clearAll: LocalProjectRepository['clearAll'] = () => {
+    projects.clear();
+    return Promise.resolve();
+  };
   return {
     initialize: fn(() => Promise.resolve(readyProjectStorage)),
     getStorageState: fn(() => readyProjectStorage),
@@ -96,6 +100,7 @@ export const createLegacyProjectRepository = (): LocalProjectRepository => {
     loadNewestCharacterDesign: fn(() => Promise.resolve(null)),
     readArtifact: fn(() => Promise.resolve(new Blob(['legacy-video'], { type: 'video/webm' }))),
     deleteProject: fn(deleteProject),
+    clearAll: fn(clearAll),
     close: fn(),
   };
 };

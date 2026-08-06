@@ -66,7 +66,7 @@ const internalDerivationSchema = z.discriminatedUnion('kind', [
 const storedMetadataCommonShape = {
   schemaVersion: z.literal(REFERENCE_IMAGE_LAYOUT_VERSION),
   assetId: z.uuid(),
-  localOwnerId: z.string().regex(/^[a-f0-9]{64}$/u),
+  localOwnerId: z.union([z.uuid(), z.string().regex(/^[a-f0-9]{64}$/u)]),
   storageKey: z.string().min(1),
   mimeType: referenceImageMimeTypeSchema,
   requestId: z.uuid(),
@@ -193,7 +193,7 @@ const storedReferenceImageMetadataSchema = z.union([
 const idempotencyMappingSchema = z
   .object({
     schemaVersion: z.literal(REFERENCE_IMAGE_LAYOUT_VERSION),
-    localOwnerId: z.string().regex(/^[a-f0-9]{64}$/u),
+    localOwnerId: z.union([z.uuid(), z.string().regex(/^[a-f0-9]{64}$/u)]),
     requestId: z.uuid(),
     assetId: z.uuid(),
   })

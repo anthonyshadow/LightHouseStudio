@@ -20,6 +20,27 @@ const browser = {
   offlineAudio: true,
 };
 
+const accountProps = {
+  user: {
+    id: '2d7914b2-f912-4b96-b17d-54100a2ffea3',
+    login: 'demo@lightframe.local',
+    username: 'demo',
+    email: 'demo@lightframe.local',
+    displayName: 'Demo Creator',
+    avatarUrl: null,
+    planId: 'free' as const,
+    role: 'user' as const,
+    status: 'active' as const,
+    createdAt: '2026-08-05T12:00:00.000Z',
+    updatedAt: '2026-08-05T12:00:00.000Z',
+    lastLoginAt: '2026-08-05T12:00:00.000Z',
+  },
+  onOpenVideos: vi.fn(),
+  onOpenCharacters: vi.fn(),
+  onOpenOutfits: vi.fn(),
+  onLogout: vi.fn(),
+};
+
 afterEach(cleanup);
 
 describe('StudioHeader', () => {
@@ -29,6 +50,7 @@ describe('StudioHeader', () => {
     render(
       <StudioDesignProvider>
         <StudioHeader
+          {...accountProps}
           availability={availability}
           browser={browser}
           capabilityState="ready"
@@ -49,6 +71,7 @@ describe('StudioHeader', () => {
     render(
       <StudioDesignProvider>
         <StudioHeader
+          {...accountProps}
           availability={availability}
           browser={browser}
           capabilityState="ready"
@@ -68,6 +91,7 @@ describe('StudioHeader', () => {
     render(
       <StudioDesignProvider>
         <StudioHeader
+          {...accountProps}
           availability={availability}
           browser={browser}
           capabilityState="ready"

@@ -1,4 +1,5 @@
 import { useTheme } from '@emotion/react';
+import type { SavedVideoSummary } from '@studio/contracts';
 import { getVideoEditOutputGeometry, resolveCharacterVersion } from '@studio/domain';
 import {
   lazy,
@@ -10,8 +11,12 @@ import {
   useRef,
   useState,
 } from 'react';
-import { hydrateReferenceImage } from '../adapters/api-client/apiClient';
+import { useLocation, useNavigate } from 'react-router';
+import { apiFetch, hydrateReferenceImage } from '../adapters/api-client/apiClient';
+import { savedVideoContentUrl } from '../adapters/api-client/savedVideosApi';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
+import { useAuth } from '../application/auth/AuthProvider';
+import { APP_PATHS } from '../app/paths';
 import type { PromptCommittedHandler } from '../application/types';
 import type {
   CharacterSaveProgress,
@@ -20,6 +25,7 @@ import type {
 import type { CharacterSaveStage } from '../features/character-builder/characterBuilderPersistence';
 import { persistCharacterSaveSnapshot } from '../features/character-builder/persistCharacterSaveSnapshot';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
+import { CREATIVE_ASSET_STORAGE_KEY } from '../features/creative-assets/types';
 import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
 import { savedPromptToRecipeSelection } from '../features/creative-assets/recipeSelection';
 import type {
@@ -87,6 +93,13 @@ import { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 import { useTakeReviewFlow } from './useTakeReviewFlow';
 import { useDesktopStudioLayout } from './useDesktopStudioLayout';
 import { useStudioOverlayController, type ActiveOverlay } from './useStudioOverlayController';
+import { useSaveVideo } from '../features/saved-videos/useSaveVideo';
+import { SessionCleanupCoordinator } from '../orchestration/lifecycle/SessionCleanupCoordinator';
+import { VideoGallery } from '../features/video-gallery/VideoGallery';
+import {
+  SavedCharacterLibrary,
+  SavedOutfitLibrary,
+} from '../features/account-library/SavedCreativeLibrary';
 
 const CharacterBuilderCoordinator = lazy(() =>
   import('../features/character-builder/CharacterBuilderCoordinator').then((module) => ({
@@ -171,10 +184,26 @@ interface StudioExperienceProps {
 
 const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceProps) => {
   const theme = useTheme();
+  const auth = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const desktopStudioLayout = useDesktopStudioLayout();
-  const repository = useMemo(() => createCreativeAssetRepository(), []);
+  const repository = useMemo(
+    () =>
+      createCreativeAssetRepository({
+        storageKey: `${CREATIVE_ASSET_STORAGE_KEY}.${auth.session!.user.id}`,
+        legacyStorageKey: CREATIVE_ASSET_STORAGE_KEY,
+        ownerUserId: auth.session!.user.id,
+      }),
+    [auth.session],
+  );
+  const savedVideoSave = useSaveVideo();
+  const sessionCleanup = useMemo(() => new SessionCleanupCoordinator(), []);
+  const [logoutPromptOpen, setLogoutPromptOpen] = useState(false);
+  const [logoutBlockedOpen, setLogoutBlockedOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
   const repositoryStore = useCreativeAssetSelector(repository, (state) => state.store);
   const existingVideoSavedRecipes = useMemo<readonly ExistingVideoSavedRecipe[]>(() => {
     const variantsByCharacter = new Map<string, SavedCharacterVariant[]>();
@@ -303,6 +332,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   );
   const [wardrobeDirty, setWardrobeDirty] = useState(false);
   const [videoEditDiscardPromptOpen, setVideoEditDiscardPromptOpen] = useState(false);
+  const galleryEditRequestedRef = useRef(false);
+  const [loadedSavedSource, setLoadedSavedSource] = useState<{
+    readonly videoId: string;
+    readonly currentVersionId: string;
+    readonly artifactId: string;
+  } | null>(null);
   const wardrobeCharacter = wardrobeCharacterId
     ? (repositoryStore.savedCharacterPrompts.find((item) => item.id === wardrobeCharacterId) ??
       null)
@@ -354,6 +389,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     session,
     onReviewCleared: handleReviewCleared,
   });
+  const activeLoadedSavedSource =
+    !loadedSavedSource ||
+    !recording.original ||
+    recording.original.id === loadedSavedSource.artifactId ||
+    recording.original.parentArtifactId === loadedSavedSource.artifactId
+      ? loadedSavedSource
+      : null;
   const existingVideo = useExistingVideoWorkflow({
     recording,
     processing,
@@ -487,6 +529,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     resolveDiscard: resolveCharacterBuilderDraftDiscard,
     dismissLaunchError: dismissCharacterBuilderLaunchError,
   } = useCharacterBuilderLaunchController({
+    ownerUserId: auth.session!.user.id,
     ...(characterBuilderActivityBlockedReason
       ? { blockedReason: characterBuilderActivityBlockedReason }
       : {}),
@@ -935,7 +978,66 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     updateOutfitBuilderDirty(false);
     setWardrobeDirty(false);
     videoEditor.close();
-  }, [existingVideo, processing, recording, setShelfDirty, updateOutfitBuilderDirty, videoEditor]);
+    savedVideoSave.reset();
+  }, [
+    existingVideo,
+    processing,
+    recording,
+    savedVideoSave,
+    setShelfDirty,
+    updateOutfitBuilderDirty,
+    videoEditor,
+  ]);
+  useEffect(
+    () =>
+      sessionCleanup.register('studio-temporary-state', 'cancel-operations', () => {
+        discardTemporaryWork();
+      }),
+    [discardTemporaryWork, sessionCleanup],
+  );
+  useEffect(
+    () =>
+      sessionCleanup.register('studio-media-session', 'release-media', async () => {
+        await session.stopCamera();
+      }),
+    [session, sessionCleanup],
+  );
+  const logoutHasDiscardableWork =
+    Boolean(recording.presented) ||
+    recording.processingState === 'processing' ||
+    shelfDirty ||
+    outfitBuilderDirty ||
+    wardrobeDirty ||
+    videoEditor.dirty;
+  const logoutHasActiveWork =
+    recordingActive ||
+    finalizingStartedAt !== null ||
+    finalizingStream !== null ||
+    existingVideo.providerActive ||
+    isVideoEditBusy(videoEditor.phase);
+  const completeLogout = useCallback(async () => {
+    if (logoutBusy) return;
+    setLogoutBusy(true);
+    setLogoutPromptOpen(false);
+    try {
+      await sessionCleanup.run();
+      await auth.logout();
+      void navigate(APP_PATHS.entry, { replace: true });
+    } finally {
+      setLogoutBusy(false);
+    }
+  }, [auth, logoutBusy, navigate, sessionCleanup]);
+  const requestLogout = useCallback(() => {
+    if (logoutHasActiveWork) {
+      setLogoutBlockedOpen(true);
+      return;
+    }
+    if (logoutHasDiscardableWork) {
+      setLogoutPromptOpen(true);
+      return;
+    }
+    void completeLogout();
+  }, [completeLogout, logoutHasActiveWork, logoutHasDiscardableWork]);
   const discardExistingVideoSelection = useCallback(() => {
     if (existingVideo.selection) existingVideo.reset(false);
   }, [existingVideo]);
@@ -979,6 +1081,76 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     recordingActive,
     videoEditor,
   ]);
+  const useSavedVideo = useCallback(
+    async (video: SavedVideoSummary, intent: 'play' | 'edit') => {
+      if (recordingActive || existingVideo.providerActive) return;
+      const response = await apiFetch(savedVideoContentUrl(video.id), {
+        cache: 'no-store',
+        headers: { Accept: video.currentVersion.mimeType },
+      });
+      const blob = await response.blob();
+      const file = new File([blob], video.currentVersion.filename, {
+        type: video.currentVersion.mimeType,
+        lastModified: new Date(video.currentVersion.createdAt).getTime(),
+      });
+      galleryEditRequestedRef.current = intent === 'edit';
+      void navigate(APP_PATHS.studio, { replace: true });
+      openOverlay('video-upload');
+      const artifact = await existingVideo.selectFile(file);
+      if (artifact) {
+        setLoadedSavedSource({
+          videoId: video.id,
+          currentVersionId: video.currentVersion.id,
+          artifactId: artifact.id,
+        });
+      }
+    },
+    [existingVideo, navigate, openOverlay, recordingActive],
+  );
+  useEffect(() => {
+    if (
+      !galleryEditRequestedRef.current ||
+      existingVideo.phase !== 'ready' ||
+      !existingVideo.selection
+    )
+      return;
+    galleryEditRequestedRef.current = false;
+    openVideoAdjust();
+  }, [existingVideo.phase, existingVideo.selection, openVideoAdjust]);
+  const replaceLoadedSavedVideo = useCallback(async () => {
+    const artifact = recording.presented;
+    if (!artifact || !activeLoadedSavedSource || artifact.id === activeLoadedSavedSource.artifactId)
+      return;
+    if (
+      !window.confirm(
+        'Replace the current gallery version with this result? The previous version remains recoverable.',
+      )
+    ) {
+      return;
+    }
+    const video = await savedVideoSave.replace(artifact, activeLoadedSavedSource);
+    if (video) {
+      setLoadedSavedSource((current) =>
+        current?.videoId === video.id
+          ? { ...current, currentVersionId: video.currentVersion.id }
+          : current,
+      );
+    }
+  }, [activeLoadedSavedSource, recording.presented, savedVideoSave]);
+  const savePresentedVideo = useCallback(() => {
+    const artifact = recording.presented;
+    if (!artifact) return;
+    void savedVideoSave.save(
+      artifact,
+      undefined,
+      activeLoadedSavedSource
+        ? {
+            videoId: activeLoadedSavedSource.videoId,
+            versionId: activeLoadedSavedSource.currentVersionId,
+          }
+        : undefined,
+    );
+  }, [activeLoadedSavedSource, recording.presented, savedVideoSave]);
   const returnFromVideoEditor = useCallback(() => {
     videoEditor.close();
     setVideoEditDiscardPromptOpen(false);
@@ -1137,6 +1309,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             {...(characterRemovalBlockedReason
               ? { clearCharacterDisabledReason: characterRemovalBlockedReason }
               : {})}
+            user={auth.session!.user}
+            accountBusy={logoutBusy}
+            onOpenVideos={() => void navigate(APP_PATHS.videos)}
+            onOpenCharacters={() => void navigate(APP_PATHS.characters)}
+            onOpenOutfits={() => void navigate(APP_PATHS.outfits)}
+            onLogout={requestLogout}
           />
         </div>
 
@@ -1219,6 +1397,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                         onChangeExperience={() => openOverlay('ai-experience')}
                         onUploadVideo={openExistingVideo}
                         uploadButtonRef={uploadToggleRef}
+                        {...(recording.presented ? { onSaveVideo: savePresentedVideo } : {})}
+                        saveVideoState={savedVideoSave.state}
+                        {...(activeLoadedSavedSource &&
+                        recording.presented?.id !== activeLoadedSavedSource.artifactId
+                          ? { onReplaceSavedVideo: () => void replaceLoadedSavedVideo() }
+                          : {})}
                       />
                     ),
                   }
@@ -1294,6 +1478,34 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
         <Suspense fallback={null}>
           <ConfirmationDialog
+            open={logoutPromptOpen}
+            title="Log out and discard temporary work?"
+            description="Logging out stops local media and discards the current temporary take, active Voice work, unsaved video edits, and unsaved library changes. Saved account items remain available."
+            confirmLabel={logoutBusy ? 'Logging out…' : 'Log out and discard'}
+            cancelLabel="Stay in Studio"
+            danger
+            busy={logoutBusy}
+            returnFocusRef={mainRef}
+            onCancel={() => setLogoutPromptOpen(false)}
+            onConfirm={() => void completeLogout()}
+          />
+          <OverlayPanel
+            open={logoutBlockedOpen}
+            onClose={() => setLogoutBlockedOpen(false)}
+            title="Finish active work before logging out"
+            description="Stop recording, wait for finalization or provider processing, or cancel the active video render before logging out."
+            placement="bottom"
+            size="standard"
+            returnFocusRef={mainRef}
+            footer={
+              <Button variant="primary" onClick={() => setLogoutBlockedOpen(false)}>
+                Return to Studio
+              </Button>
+            }
+          >
+            <p>Lightframe will not abandon active media work during logout.</p>
+          </OverlayPanel>
+          <ConfirmationDialog
             open={videoEditDiscardPromptOpen}
             title="Discard video edits?"
             description="Your current video stays unchanged. All trim, crop, rotation, lighting, and filter changes in this edit session will be discarded."
@@ -1320,6 +1532,73 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             onConfirm={() => commitVideoEdit(true)}
           />
         </Suspense>
+
+        <OverlayPanel
+          open={location.pathname === APP_PATHS.videos}
+          onClose={() => void navigate(APP_PATHS.studio)}
+          title="Saved Videos"
+          description="Play, edit, download, rename, or remove account videos. Video bytes load only when you choose an action."
+          placement="fullscreen"
+          size="wide"
+          bodyMode="scroll"
+          returnFocusRef={mainRef}
+        >
+          {location.pathname === APP_PATHS.videos ? <VideoGallery onUse={useSavedVideo} /> : null}
+        </OverlayPanel>
+
+        <OverlayPanel
+          open={location.pathname === APP_PATHS.characters}
+          onClose={() => void navigate(APP_PATHS.studio)}
+          title="Saved Characters"
+          description="Choose a saved character for Studio or remove it with its wardrobe metadata."
+          placement="fullscreen"
+          size="wide"
+          bodyMode="scroll"
+          returnFocusRef={mainRef}
+        >
+          {location.pathname === APP_PATHS.characters ? (
+            <SavedCharacterLibrary
+              items={repositoryStore.savedCharacterPrompts}
+              repository={repository}
+              onUse={(character) => {
+                applyRecipeSelection({
+                  origin: 'character-prompt',
+                  prompt: character.prompt,
+                  modelModeId: 'lucy-latest',
+                  assetId: character.id,
+                  characterName: character.name,
+                  referenceImageAssetId: character.referenceImageAssetId,
+                  ...(character.builderDraft ? { builderDraft: character.builderDraft } : {}),
+                });
+                void navigate(APP_PATHS.studio);
+              }}
+            />
+          ) : null}
+        </OverlayPanel>
+
+        <OverlayPanel
+          open={location.pathname === APP_PATHS.outfits}
+          onClose={() => void navigate(APP_PATHS.studio)}
+          title="Saved Outfits"
+          description="Choose a saved Virtual Try-On outfit for Studio or remove it from your library."
+          placement="fullscreen"
+          size="wide"
+          bodyMode="scroll"
+          returnFocusRef={mainRef}
+        >
+          {location.pathname === APP_PATHS.outfits ? (
+            <SavedOutfitLibrary
+              items={repositoryStore.savedPrompts.filter(
+                (item) => item.modelModeId === 'lucy-vton-latest',
+              )}
+              repository={repository}
+              onUse={(outfit) => {
+                selectSavedOutfit(outfit);
+                void navigate(APP_PATHS.studio);
+              }}
+            />
+          ) : null}
+        </OverlayPanel>
 
         <OverlayPanel
           open={activeOverlay === 'video-upload'}
@@ -1578,12 +1857,19 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           {...(existingVideo.selection ? { onEditVideo: openExistingVideo } : {})}
           onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
           onBackToTakeReview={() => openOverlay('take-review')}
+          {...(recording.presented ? { onSaveVideo: savePresentedVideo } : {})}
+          saveVideoState={savedVideoSave.state}
+          {...(activeLoadedSavedSource &&
+          recording.presented?.id !== activeLoadedSavedSource.artifactId
+            ? { onReplaceSavedVideo: () => void replaceLoadedSavedVideo() }
+            : {})}
         />
 
         {activeOverlay === 'character-builder' ? (
           <Suspense fallback={deferredPanelFallback}>
             <CharacterBuilderCoordinator
               open
+              ownerUserId={auth.session!.user.id}
               target={characterBuilderLaunch.target}
               {...(characterBuilderLaunch.initialValue
                 ? { initialValue: characterBuilderLaunch.initialValue }

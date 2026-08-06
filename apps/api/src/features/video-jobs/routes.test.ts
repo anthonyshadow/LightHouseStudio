@@ -2,17 +2,43 @@ import type { ApiErrorResponse } from '@studio/contracts';
 import { mkdtemp, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import Fastify from 'fastify';
+import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../app.js';
 import { testConfig } from '../../test/fakes.js';
 import { registerVideoJobRoutes } from './routes.js';
 import type { VideoJobService } from './video-job-service.js';
+import { createPhaseOneEntitlements } from '@studio/domain';
 
 const trustedHeaders = {
   host: 'localhost:4173',
   origin: 'http://localhost:4173',
   'x-lightframe-provider-intent': 'video',
+};
+
+const installRouteTestAuth = (app: FastifyInstance) => {
+  app.decorateRequest('auth', null);
+  app.addHook('onRequest', async (request: FastifyRequest) => {
+    await Promise.resolve();
+    request.auth = {
+      user: {
+        id: '2d7914b2-f912-4b96-b17d-54100a2ffea3',
+        login: 'demo@lightframe.local',
+        username: 'demo',
+        email: 'demo@lightframe.local',
+        displayName: 'Demo Creator',
+        avatarUrl: null,
+        planId: 'free',
+        role: 'user',
+        status: 'active',
+        createdAt: '2026-08-05T12:00:00.000Z',
+        updatedAt: '2026-08-05T12:00:00.000Z',
+        lastLoginAt: '2026-08-05T12:00:00.000Z',
+      },
+      entitlements: createPhaseOneEntitlements('free', '2026-08-05T12:00:00.000Z'),
+      expiresAt: '2026-08-06T12:00:00.000Z',
+    };
+  });
 };
 
 describe('video job route boundary', () => {
@@ -176,6 +202,7 @@ describe('video job route boundary', () => {
       content,
     } as unknown as VideoJobService;
     const app = Fastify();
+    installRouteTestAuth(app);
     registerVideoJobRoutes(app, service);
     apps.push(app);
     const jobId = crypto.randomUUID();
@@ -217,6 +244,7 @@ describe('video job route boundary', () => {
       start,
     } as unknown as VideoJobService;
     const app = Fastify();
+    installRouteTestAuth(app);
     registerVideoJobRoutes(app, service);
     apps.push(app);
 

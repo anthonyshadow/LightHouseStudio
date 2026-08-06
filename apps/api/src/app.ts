@@ -1,9 +1,18 @@
+import cookie from '@fastify/cookie';
 import helmet from '@fastify/helmet';
 import multipart from '@fastify/multipart';
 import fastifyStatic from '@fastify/static';
-import { referenceImageMimeTypeSchema } from '@studio/contracts';
+import {
+  referenceImageMimeTypeSchema,
+  VIDEO_INPUT_MIME_TYPES,
+  VIDEO_RESULT_MAX_BYTES,
+} from '@studio/contracts';
 import Fastify, { LogController, type FastifyInstance } from 'fastify';
 import type { RuntimeConfig } from './config/environment.js';
+import { AuthService } from './features/auth/auth-service.js';
+import { registerAuthRoutes } from './features/auth/routes.js';
+import { SeededUserRepository } from './features/auth/seeded-user-repository.js';
+import { InMemorySessionRepository } from './features/auth/session-repository.js';
 import { registerRealtimeRoutes } from './features/realtime/routes.js';
 import { registerSystemRoutes } from './features/system/routes.js';
 import { registerVideoJobRoutes } from './features/video-jobs/routes.js';
@@ -26,9 +35,19 @@ import {
   SUPPORTED_AUDIO_CONTENT_TYPES,
 } from './features/voices/routes.js';
 import { VoiceService } from './features/voices/voice-service.js';
+import {
+  FileSavedVoiceRepository,
+  MemorySavedVoiceRepository,
+} from './features/voices/saved-voice-repository.js';
 import { AppError, installErrorHandling } from './http/errors.js';
 import { spoolAudioUpload, SpooledUploadTooLargeError } from './application/spooled-upload.js';
 import { installLocalSecurityBoundary } from './http/security.js';
+import { installAuthentication } from './http/authentication.js';
+import { LocalAssetByteStore } from './storage/asset-byte-store.js';
+import { FileSavedVideoRepository } from './features/saved-videos/saved-video-repository.js';
+import { SavedVideoService } from './features/saved-videos/saved-video-service.js';
+import { registerSavedVideoRoutes } from './features/saved-videos/routes.js';
+import { FileProcessingJobRepository } from './features/processing-jobs/file-processing-job-repository.js';
 import {
   DecartSdkTokenProvider,
   type DecartTokenProvider,
@@ -107,6 +126,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     contentSecurityPolicy: false,
     crossOriginEmbedderPolicy: false,
   });
+  void app.register(cookie);
   void app.register(multipart);
 
   if (dependencies.staticRoot !== undefined) {
@@ -134,6 +154,17 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     { parseAs: 'buffer' },
     (_request, body, done) => done(null, body),
   );
+  app.addContentTypeParser([...VIDEO_INPUT_MIME_TYPES], (_request, payload, done) => {
+    void spoolAudioUpload(payload, VIDEO_RESULT_MAX_BYTES).then(
+      (body) => done(null, body),
+      (error: unknown) =>
+        done(
+          error instanceof SpooledUploadTooLargeError
+            ? new AppError(413, 'payload_too_large', 'The saved video must be 300 MB or smaller.')
+            : (error as Error),
+        ),
+    );
+  });
   // Let the upload route return its image-specific 415 response for unsupported
   // image declarations instead of Fastify's generic content-parser error.
   app.addContentTypeParser(/^image\//u, { parseAs: 'buffer' }, (_request, body, done) =>
@@ -141,6 +172,22 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   );
 
   installLocalSecurityBoundary(app);
+
+  const authService = new AuthService(
+    new SeededUserRepository({
+      id: dependencies.config.demoUserId,
+      login: dependencies.config.demoUserLogin,
+      displayName: dependencies.config.demoUserDisplayName,
+      passwordHash: dependencies.config.demoUserPasswordHash,
+    }),
+    new InMemorySessionRepository(),
+    dependencies.config.authJwtSecret,
+    'lightframe-studio',
+    'lightframe-local-api',
+    dependencies.config.authSessionTtlSeconds,
+    dependencies.config.demoUserPasswordHash,
+  );
+  installAuthentication(app, authService, dependencies.config);
 
   const decartProvider = resolveOptionalProvider(dependencies.decartProvider, () =>
     dependencies.config.decartApiKey === undefined
@@ -176,6 +223,9 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
           elevenLabsProvider,
           dependencies.config.elevenLabsModelId,
           dependencies.config.elevenLabsEnableLogging,
+          dependencies.config.nodeEnv === 'test'
+            ? new MemorySavedVoiceRepository()
+            : new FileSavedVoiceRepository(dependencies.config.lightframeDataDir),
         );
 
   const referenceImageProvider = resolveOptionalProvider(dependencies.referenceImageProvider, () =>
@@ -209,7 +259,9 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   );
   const referenceImageAssetStore =
     dependencies.referenceImageAssetStore ??
-    new LocalReferenceImageAssetStore(dependencies.config.lightframeDataDir);
+    new LocalReferenceImageAssetStore(dependencies.config.lightframeDataDir, {
+      legacyOwnerUserId: dependencies.config.demoUserId,
+    });
   const outfitTryOnProvider = resolveOptionalProvider(dependencies.prunaImageTryOnProvider, () =>
     dependencies.config.prunaImageTryOnEnabled && dependencies.config.prunaApiKey
       ? new PrunaImageTryOnProvider(dependencies.config.prunaApiKey, {
@@ -235,8 +287,24 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   const videoJobService = new VideoJobService(
     videoJobProviders,
     dependencies.config.lightframeDataDir,
+    {
+      ...(dependencies.config.nodeEnv === 'test'
+        ? {}
+        : {
+            traceWriter: new FileProcessingJobRepository(dependencies.config.lightframeDataDir),
+          }),
+      providerIds: {
+        'character-swap': dependencies.config.existingVideoCharacterSwapProvider,
+        'virtual-try-on': 'pruna',
+      },
+    },
+  );
+  const savedVideoService = new SavedVideoService(
+    new FileSavedVideoRepository(dependencies.config.lightframeDataDir),
+    new LocalAssetByteStore(dependencies.config.lightframeDataDir),
   );
 
+  registerAuthRoutes(app, authService, dependencies.config);
   registerSystemRoutes(app, {
     decartAvailable: decartProvider !== null,
     videoProcessing: {
@@ -257,6 +325,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   });
   registerRealtimeRoutes(app, decartProvider);
   registerVideoJobRoutes(app, videoJobService);
+  registerSavedVideoRoutes(app, savedVideoService);
   registerReferenceImageRoutes(app, referenceImageService, {
     ...(dependencies.remoteImageDownloader
       ? { remoteImageDownloader: dependencies.remoteImageDownloader }

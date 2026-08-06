@@ -5,6 +5,7 @@ import type { VoiceBrowserCapabilities } from '../features/voice-effects/voiceCa
 import type { VoiceProcessingController } from '../features/voice-effects/types';
 import { OverlayPanel } from '../ui';
 import type { ActiveOverlay } from './useStudioOverlayController';
+import type { SaveVideoState } from '../features/saved-videos/useSaveVideo';
 
 const TakeDock = lazy(() =>
   import('../features/take-review/TakeDock').then((module) => ({ default: module.TakeDock })),
@@ -24,6 +25,9 @@ export const StudioTakeOverlays = ({
   onEditVideo,
   onOpenVoiceTreatments,
   onBackToTakeReview,
+  onSaveVideo,
+  saveVideoState,
+  onReplaceSavedVideo,
 }: {
   activeOverlay: ActiveOverlay;
   recording: RecordingController;
@@ -38,6 +42,9 @@ export const StudioTakeOverlays = ({
   onEditVideo?: () => void;
   onOpenVoiceTreatments: () => void;
   onBackToTakeReview: () => void;
+  onSaveVideo?: () => void;
+  saveVideoState?: SaveVideoState;
+  onReplaceSavedVideo?: () => void;
 }) => {
   const theme = useTheme();
   const returnFocusRef = recording.presented ? editVideoToggleRef : dockToggleRef;
@@ -65,6 +72,9 @@ export const StudioTakeOverlays = ({
             onDiscardTake={onDiscardTake}
             {...(onEditVideo ? { onEditVideo } : {})}
             onOpenVoiceTreatments={onOpenVoiceTreatments}
+            {...(onSaveVideo ? { onSaveVideo } : {})}
+            {...(saveVideoState ? { saveVideoState } : {})}
+            {...(onReplaceSavedVideo ? { onReplaceSavedVideo } : {})}
           />
         </Suspense>
       </OverlayPanel>

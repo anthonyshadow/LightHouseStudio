@@ -19,6 +19,7 @@ import {
 import { Button } from '../ui/primitives/Button';
 import { EntryPage } from './EntryPage';
 import { APP_PATHS, isStudioPath } from './paths';
+import { ProtectedRoute } from './ProtectedRoute';
 
 const LazyStudioApp = lazy(() =>
   import('../studio/StudioApp').then((module) => ({ default: module.StudioApp })),
@@ -42,12 +43,22 @@ const routeSurfaceStyles = {
 const RouteMetadata = () => {
   const location = useLocation();
   const studioRoute = isStudioPath(location.pathname);
+  const title =
+    location.pathname === APP_PATHS.videos
+      ? 'Saved Videos · Lightframe Studio'
+      : location.pathname === APP_PATHS.characters
+        ? 'Saved Characters · Lightframe Studio'
+        : location.pathname === APP_PATHS.outfits
+          ? 'Saved Outfits · Lightframe Studio'
+          : studioRoute
+            ? 'Lightframe Studio'
+            : 'Enter Lightframe Studio';
 
   useLayoutEffect(() => {
-    document.title = studioRoute ? 'Lightframe Studio' : 'Enter Lightframe Studio';
+    document.title = title;
     const description = document.querySelector<HTMLMetaElement>('meta[name="description"]');
     description?.setAttribute('content', studioRoute ? STUDIO_DESCRIPTION : ENTRY_DESCRIPTION);
-  }, [studioRoute]);
+  }, [studioRoute, title]);
 
   return null;
 };
@@ -144,8 +155,12 @@ export const RoutedApplication = () => {
             element={<EntryRoute focusEnterOnMount={hasVisitedStudio} />}
           />
           <Route
-            path={APP_PATHS.studio}
-            element={<StudioRoute focusMainOnMount={focusMainOnMount} />}
+            path={`${APP_PATHS.studio}/*`}
+            element={
+              <ProtectedRoute>
+                <StudioRoute focusMainOnMount={focusMainOnMount} />
+              </ProtectedRoute>
+            }
           />
           <Route path="*" element={<Navigate replace to={APP_PATHS.entry} />} />
         </Routes>

@@ -8,7 +8,16 @@ import {
 } from '@studio/contracts';
 import { openRecipeDockWhenOverlaid } from './support/studioHarness';
 
-test.beforeEach(async ({ page }) => {
+test.beforeEach(async ({ page, request, baseURL }) => {
+  const origin = new URL(baseURL ?? 'http://127.0.0.1:4173').origin;
+  for (const context of [request, page.request]) {
+    const login = await context.post('/api/auth/login', {
+      headers: { Origin: origin },
+      data: { login: 'demo@lightframe.local', password: 'lightframe-demo' },
+    });
+    expect(login.ok()).toBe(true);
+  }
+
   await page.addInitScript(() => {
     const state = { cameraCalls: 0 };
     Object.defineProperty(window, '__lightframeTestState', {
@@ -157,7 +166,7 @@ test('prepares an object recipe accessibly without camera or provider work', asy
   });
   expect(cameraCalls).toBe(0);
   expect(apiRequests.length).toBeGreaterThan(0);
-  expect(new Set(apiRequests)).toEqual(new Set(['/api/capabilities']));
+  expect(new Set(apiRequests)).toEqual(new Set(['/api/auth/me', '/api/capabilities']));
   expect(apiRequests).not.toContain('/api/realtime-token');
 });
 
