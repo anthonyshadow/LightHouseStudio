@@ -1530,7 +1530,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           open={location.pathname === APP_PATHS.videos}
           onClose={() => void navigate(APP_PATHS.studio)}
           title="Saved Videos"
-          description="Play, edit, download, rename, or remove account videos. Video bytes load only when you choose an action."
+          description="Preview, load, edit, download, rename, or remove account videos. Video bytes load only when you choose an action."
           placement="fullscreen"
           size="wide"
           bodyMode="scroll"

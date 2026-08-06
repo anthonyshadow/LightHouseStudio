@@ -89,9 +89,12 @@ provider intent. Local Voice uses Web Audio/remux only.
   explicit Save Video copies a validated final artifact into the owner-scoped filesystem store;
   it does not change temporary take cleanup.
 - Saved Videos list metadata first. Video content and thumbnails are served only through
-  authenticated owner checks. Rename updates metadata; replace appends an immutable version;
-  logical delete creates a tombstone. Unreferenced bytes remain retained until Phase 2—there is no
-  seven-day quarantine or automatic physical garbage collection in Phase 1.
+  authenticated owner checks. Video bytes begin loading only after explicit Preview, Studio, Edit,
+  or Download intent. The centered Preview player uses the authenticated content response directly
+  and detaches it on close without creating a retained object URL. Rename updates metadata; replace
+  appends an immutable version; logical delete creates a tombstone. Unreferenced bytes remain
+  retained until Phase 2—there is no seven-day quarantine or automatic physical garbage collection
+  in Phase 1.
 - Saved/Browse criteria and page caches are session/process memory only. A saved voice is an
   app-owned relationship. Removing it never calls provider voice deletion; an initial eligible
   community save may still add that voice to the configured provider workspace.

@@ -16,15 +16,20 @@ browse lightweight gallery records, and load a chosen version into the existing 
    loads metadata in newest-first cursor pages; it does not eagerly load video bytes.
 4. Cards show safe title, time, duration, dimensions, origin, version count, and a lazy optional
    thumbnail. Missing or failed thumbnail generation renders a placeholder and does not fail Save.
-5. **Use** fetches owner-checked bytes only after selection, validates them through the existing
+5. Activating a ready thumbnail explicitly fetches owner-checked bytes into a centered video
+   preview over a darkened gallery. The dialog traps focus, closes with Escape, returns focus to the
+   thumbnail, and detaches its player source when closed; it owns no tracks, object URL, recorder,
+   or provider session.
+6. **Use** fetches owner-checked bytes only after selection, validates them through the existing
    source path, and returns to the Studio stage/editor with saved video/version lineage.
-6. Rename changes metadata. Delete confirms, enforces source dependencies, tombstones the record,
+7. Rename changes metadata. Delete confirms, enforces source dependencies, tombstones the record,
    and removes it from the visible gallery. Download uses an authenticated content response.
 
 ## Acceptance checks
 
-- Empty, loading, incremental-load, error, missing-media, thumbnail-fallback, and populated states
-  remain operable at all five canonical viewports with approximately 44px touch targets.
+- Empty, loading, incremental-load, error, missing-media, thumbnail-fallback, populated, and open
+  preview states remain operable at all five canonical viewports with approximately 44px touch
+  targets.
 - List/detail responses expose no local path, asset key, provider URL, credential, or raw error.
 - Wrong-owner and missing records use safe non-enumerating responses. Content supports controlled
   range delivery without reading the full file into application memory.

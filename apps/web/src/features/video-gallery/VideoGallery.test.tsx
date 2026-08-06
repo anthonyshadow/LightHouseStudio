@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { SavedVideoSummary } from '@studio/contracts';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
@@ -13,6 +13,7 @@ const api = vi.hoisted(() => ({
 vi.mock('../../adapters/api-client/savedVideosApi', () => ({
   ...api,
   downloadSavedVideoUrl: (videoId: string) => `/api/videos/${videoId}/content?download=true`,
+  savedVideoContentUrl: (videoId: string) => `/api/videos/${videoId}/content`,
   savedVideoThumbnailUrl: (videoId: string) => `/api/videos/${videoId}/thumbnail`,
 }));
 
@@ -59,6 +60,8 @@ describe('VideoGallery', () => {
     api.deleteSavedVideo.mockReset().mockResolvedValue(undefined);
     api.renameSavedVideo.mockReset();
     api.listSavedVideos.mockReset();
+    vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
+    vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
   });
 
   afterEach(() => {
@@ -73,13 +76,32 @@ describe('VideoGallery', () => {
 
     expect(await screen.findByRole('heading', { name: 'Morning take' })).toBeInTheDocument();
     expect(document.querySelector('video')).toBeNull();
-    expect(screen.getByRole('img', { name: 'Thumbnail for Morning take' })).toHaveAttribute(
-      'src',
-      `/api/videos/${item.id}/thumbnail`,
-    );
-    expect(screen.getByText(/0:12/u)).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Preview Morning take' }).querySelector('img'),
+    ).toHaveAttribute('src', `/api/videos/${item.id}/thumbnail`);
+    expect(screen.getByText('0:12')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Load in Studio' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'play'));
+  });
+
+  it('opens a centered authenticated preview on thumbnail activation and restores focus on close', async () => {
+    const item = video();
+    api.listSavedVideos.mockResolvedValue({ videos: [item], nextCursor: null });
+    renderGallery();
+
+    const previewTrigger = await screen.findByRole('button', { name: 'Preview Morning take' });
+    fireEvent.click(previewTrigger);
+
+    const dialog = await screen.findByRole('dialog', { name: 'Morning take' });
+    expect(within(dialog).getByLabelText('Preview of Morning take')).toHaveAttribute(
+      'src',
+      `/api/videos/${item.id}/content`,
+    );
+    expect(within(dialog).getByText('1280×720')).toBeInTheDocument();
+
+    fireEvent.keyDown(document, { key: 'Escape' });
+    await waitFor(() => expect(screen.queryByLabelText('Preview of Morning take')).toBeNull());
+    await waitFor(() => expect(previewTrigger).toHaveFocus());
   });
 
   it('shows an actionable empty state', async () => {
@@ -100,6 +122,7 @@ describe('VideoGallery', () => {
     renderGallery();
     await screen.findByRole('heading', { name: 'Morning take' });
 
+    fireEvent.click(screen.getByLabelText('More actions for Morning take'));
     fireEvent.click(screen.getByRole('button', { name: 'Rename' }));
     expect(await screen.findByRole('heading', { name: 'Renamed take' })).toBeInTheDocument();
     expect(api.renameSavedVideo).toHaveBeenCalledWith(original.id, 'Renamed take');
