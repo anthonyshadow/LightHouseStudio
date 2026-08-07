@@ -50,6 +50,7 @@ const savedVideo: SavedVideoDetail = {
     videoId,
     ordinal: 1,
     origin: 'recorded',
+    characterName: 'Mara',
     sourceVersionId: null,
     mimeType: 'video/mp4',
     filename: 'morning-take.mp4',
@@ -102,7 +103,7 @@ describe('useSaveVideo', () => {
     const original = artifact('recorded');
 
     await act(async () => {
-      await result.current.save(original, '  Explicit title  ');
+      await result.current.save(original, '  Explicit title  ', undefined, 'Mara');
       await result.current.save(original);
       for (const kind of ['uploaded', 'edited', 'visual', 'voice'] as const) {
         await result.current.save(artifact(kind));
@@ -114,6 +115,7 @@ describe('useSaveVideo', () => {
     expect(api.saveVideo.mock.calls[0]?.[0]).toMatchObject({
       title: 'Explicit title',
       origin: 'recorded',
+      characterName: 'Mara',
     });
     expect(api.saveVideo.mock.calls[1]?.[0].idempotencyKey).toBe(
       api.saveVideo.mock.calls[0]?.[0].idempotencyKey,

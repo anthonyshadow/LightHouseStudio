@@ -1,4 +1,5 @@
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -25,6 +26,7 @@ const inspected = {
 const metadata = (override: Partial<SavedVideoUploadMetadata> = {}): SavedVideoUploadMetadata => ({
   title: '  Demo   take  ',
   origin: 'recorded',
+  characterName: null,
   filename: '../unsafe name?.mp4',
   sourceVideoId: null,
   sourceVersionId: null,
@@ -66,7 +68,11 @@ describe('SavedVideoService', () => {
       title: 'Demo take',
       sourceVideoId: null,
       versionCount: 1,
-      currentVersion: { filename: 'unsafe-name.mp4', origin: 'recorded' },
+      currentVersion: {
+        filename: 'unsafe-name.mp4',
+        origin: 'recorded',
+        characterName: null,
+      },
     });
     const aggregates = await repository.list(ownerUserId);
     expect(aggregates).toHaveLength(1);
@@ -110,7 +116,7 @@ describe('SavedVideoService', () => {
     expect(updated.versions[0]).toEqual(original.currentVersion);
   });
 
-  it('blocks source deletion until derived records are removed and retains bytes for Phase 2', async () => {
+  it('deletes a source independently while retaining its derived record and Phase 2 bytes', async () => {
     const source = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
     const derived = await service.saveNew(
       ownerUserId,
@@ -125,15 +131,25 @@ describe('SavedVideoService', () => {
     );
     const sourceAssetId = (await repository.get(ownerUserId, source.id))!.versions[0]!.assetId;
 
-    await expect(service.delete(ownerUserId, source.id)).rejects.toMatchObject({
-      statusCode: 409,
-      code: 'conflict',
-    });
-    await service.delete(ownerUserId, derived.id);
     await service.delete(ownerUserId, source.id);
 
-    expect(await repository.list(ownerUserId)).toHaveLength(0);
+    expect(await repository.list(ownerUserId)).toMatchObject([
+      {
+        video: {
+          id: derived.id,
+          sourceVideoId: source.id,
+          status: 'ready',
+          deletedAt: null,
+        },
+      },
+    ]);
+    await expect(service.content(ownerUserId, derived.id)).resolves.toMatchObject({
+      video: { id: derived.id, sourceVideoId: source.id },
+    });
     expect(await bytes.exists(ownerUserId, sourceAssetId)).toBe(true);
+
+    await service.delete(ownerUserId, derived.id);
+    expect(await repository.list(ownerUserId)).toHaveLength(0);
   });
 
   it('returns non-enumerating wrong-owner failures and marks missing local bytes', async () => {
@@ -194,13 +210,171 @@ describe('SavedVideoService', () => {
       metadata({ title: 'Second' }),
     );
 
-    const pageOne = await service.list(ownerUserId, undefined, 1);
-    const pageTwo = await service.list(ownerUserId, pageOne.nextCursor!, 1);
+    const pageOne = await service.list(ownerUserId, { pageSize: 1, sort: 'latest' });
+    const pageTwo = await service.list(ownerUserId, {
+      cursor: pageOne.nextCursor!,
+      pageSize: 1,
+      sort: 'latest',
+    });
     expect(new Set([pageOne.videos[0]!.id, pageTwo.videos[0]!.id])).toEqual(
       new Set([first.id, second.id]),
     );
     expect(pageOne.nextCursor).not.toBeNull();
     expect(pageTwo.nextCursor).toBeNull();
     expect(pageOne.videos[0]).not.toHaveProperty('assetId');
+  });
+
+  it('filters the full library by character and format and sorts by time or duration', async () => {
+    const facts = [
+      { ...inspected, durationMs: 30_000, width: 1_280, height: 720 },
+      { ...inspected, durationMs: 5_000, width: 720, height: 1_280 },
+      { ...inspected, durationMs: 12_000, width: 1_080, height: 1_080 },
+    ];
+    const dates = [
+      '2026-08-03T12:00:00.000Z',
+      '2026-08-04T12:00:00.000Z',
+      '2026-08-05T12:00:00.000Z',
+    ];
+    let index = 0;
+    service = new SavedVideoService(
+      repository,
+      bytes,
+      () => new Date(dates[index - 1]!),
+      () => Promise.resolve(facts[index++]!),
+    );
+    await service.saveNew(
+      ownerUserId,
+      crypto.randomUUID(),
+      sourcePath,
+      metadata({ title: 'Mara landscape', characterName: 'Mara' }),
+    );
+    await service.saveNew(
+      ownerUserId,
+      crypto.randomUUID(),
+      sourcePath,
+      metadata({ title: 'Nova portrait', characterName: 'Nova' }),
+    );
+    await service.saveNew(
+      ownerUserId,
+      crypto.randomUUID(),
+      sourcePath,
+      metadata({ title: 'Mara square', characterName: 'Mara' }),
+    );
+
+    const mara = await service.list(ownerUserId, {
+      pageSize: 20,
+      characterName: 'Mara',
+      sort: 'oldest',
+    });
+    expect(mara.videos.map((video) => video.title)).toEqual(['Mara landscape', 'Mara square']);
+    expect(mara.total).toBe(2);
+    expect(mara.facets).toEqual({
+      characterNames: ['Mara', 'Nova'],
+      formats: ['landscape', 'portrait', 'square'],
+    });
+
+    const latest = await service.list(ownerUserId, { pageSize: 20, sort: 'latest' });
+    expect(latest.videos.map((video) => video.title)).toEqual([
+      'Mara square',
+      'Nova portrait',
+      'Mara landscape',
+    ]);
+
+    const portrait = await service.list(ownerUserId, {
+      pageSize: 20,
+      format: 'portrait',
+      sort: 'latest',
+    });
+    expect(portrait.videos.map((video) => video.title)).toEqual(['Nova portrait']);
+
+    const maraSquare = await service.list(ownerUserId, {
+      pageSize: 20,
+      characterName: 'Mara',
+      format: 'square',
+      sort: 'latest',
+    });
+    expect(maraSquare.videos.map((video) => video.title)).toEqual(['Mara square']);
+
+    const shortest = await service.list(ownerUserId, { pageSize: 20, sort: 'shortest' });
+    expect(shortest.videos.map((video) => video.title)).toEqual([
+      'Nova portrait',
+      'Mara square',
+      'Mara landscape',
+    ]);
+    const longest = await service.list(ownerUserId, { pageSize: 20, sort: 'longest' });
+    expect(longest.videos.map((video) => video.title)).toEqual([
+      'Mara landscape',
+      'Mara square',
+      'Nova portrait',
+    ]);
+  });
+
+  it('migrates schema v1 manifests without character attribution on the next write', async () => {
+    const videoId = crypto.randomUUID();
+    const versionId = crypto.randomUUID();
+    const manifestDirectory = path.join(directory, 'metadata', 'v1', 'saved-videos');
+    const manifestPath = path.join(
+      manifestDirectory,
+      `${createHash('sha256').update(ownerUserId).digest('hex')}.json`,
+    );
+    await mkdir(manifestDirectory, { recursive: true });
+    await writeFile(
+      manifestPath,
+      JSON.stringify({
+        schemaVersion: 1,
+        ownerUserId,
+        revision: 1,
+        videos: [
+          {
+            video: {
+              id: videoId,
+              ownerUserId,
+              title: 'Legacy saved video',
+              currentVersionId: versionId,
+              sourceVideoId: null,
+              status: 'ready',
+              createdAt: '2026-08-01T12:00:00.000Z',
+              updatedAt: '2026-08-01T12:00:00.000Z',
+              deletedAt: null,
+            },
+            versions: [
+              {
+                id: versionId,
+                videoId,
+                ownerUserId,
+                ordinal: 1,
+                origin: 'recorded',
+                sourceVersionId: null,
+                assetId: crypto.randomUUID(),
+                thumbnailAssetId: null,
+                mimeType: 'video/mp4',
+                filename: 'legacy.mp4',
+                sizeBytes: 11,
+                durationMs: 12_000,
+                width: 1_280,
+                height: 720,
+                createdAt: '2026-08-01T12:00:00.000Z',
+              },
+            ],
+            revision: 1,
+          },
+        ],
+        receipts: [],
+      }),
+    );
+
+    expect((await repository.list(ownerUserId))[0]?.versions[0]?.characterName).toBeNull();
+    await repository.rename(
+      ownerUserId,
+      videoId,
+      'Migrated saved video',
+      '2026-08-06T12:00:00.000Z',
+    );
+    const migrated = JSON.parse(await readFile(manifestPath, 'utf8')) as {
+      schemaVersion: number;
+      videos: Array<{ versions: Array<{ characterName?: string | null }> }>;
+    };
+    expect(migrated.schemaVersion).toBe(2);
+    expect(migrated.videos[0]?.versions[0]?.characterName).toBeNull();
   });
 });

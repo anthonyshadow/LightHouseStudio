@@ -336,6 +336,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     readonly videoId: string;
     readonly currentVersionId: string;
     readonly artifactId: string;
+    readonly characterName: string | null;
   } | null>(null);
   const wardrobeCharacter = wardrobeCharacterId
     ? (repositoryStore.savedCharacterPrompts.find((item) => item.id === wardrobeCharacterId) ??
@@ -1105,6 +1106,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           videoId: video.id,
           currentVersionId: video.currentVersion.id,
           artifactId: artifact.id,
+          characterName: video.currentVersion.characterName,
         });
       }
     },
@@ -1120,6 +1122,23 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     galleryEditRequestedRef.current = false;
     openVideoAdjust();
   }, [existingVideo.phase, existingVideo.selection, openVideoAdjust]);
+  const completedCharacterAttribution = useMemo(() => {
+    if (existingVideo.completedStepCount < 1) return { applied: false, name: null } as const;
+    const step = existingVideo.steps[existingVideo.completedStepCount - 1];
+    if (step?.modelId !== 'lucy-latest') return { applied: false, name: null } as const;
+    const recipe = step.savedRecipeId
+      ? existingVideoSavedRecipes.find((candidate) => candidate.id === step.savedRecipeId)
+      : undefined;
+    return {
+      applied: true,
+      name: recipe?.savedCharacterPromptId ? (recipe.label.split(' · ')[0] ?? null) : null,
+    } as const;
+  }, [existingVideo.completedStepCount, existingVideo.steps, existingVideoSavedRecipes]);
+  const presentedVideoCharacterName = completedCharacterAttribution.applied
+    ? completedCharacterAttribution.name
+    : recording.presented?.sourceModeId === 'lucy-latest'
+      ? (activeCharacterRecord?.name ?? activeCharacterName ?? null)
+      : (activeLoadedSavedSource?.characterName ?? null);
   const replaceLoadedSavedVideo = useCallback(async () => {
     const artifact = recording.presented;
     if (!artifact || !activeLoadedSavedSource || artifact.id === activeLoadedSavedSource.artifactId)
@@ -1131,15 +1150,24 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     ) {
       return;
     }
-    const video = await savedVideoSave.replace(artifact, activeLoadedSavedSource);
+    const video = await savedVideoSave.replace(
+      artifact,
+      activeLoadedSavedSource,
+      undefined,
+      presentedVideoCharacterName,
+    );
     if (video) {
       setLoadedSavedSource((current) =>
         current?.videoId === video.id
-          ? { ...current, currentVersionId: video.currentVersion.id }
+          ? {
+              ...current,
+              currentVersionId: video.currentVersion.id,
+              characterName: video.currentVersion.characterName,
+            }
           : current,
       );
     }
-  }, [activeLoadedSavedSource, recording.presented, savedVideoSave]);
+  }, [activeLoadedSavedSource, presentedVideoCharacterName, recording.presented, savedVideoSave]);
   const savePresentedVideo = useCallback(() => {
     const artifact = recording.presented;
     if (!artifact) return;
@@ -1152,8 +1180,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             versionId: activeLoadedSavedSource.currentVersionId,
           }
         : undefined,
+      presentedVideoCharacterName,
     );
-  }, [activeLoadedSavedSource, recording.presented, savedVideoSave]);
+  }, [activeLoadedSavedSource, presentedVideoCharacterName, recording.presented, savedVideoSave]);
   const returnFromVideoEditor = useCallback(() => {
     videoEditor.close();
     setVideoEditDiscardPromptOpen(false);

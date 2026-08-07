@@ -29,6 +29,7 @@ const video = (override: Partial<SavedVideoSummary> = {}): SavedVideoSummary => 
     videoId: 'c26b5280-1538-44cd-82db-a6b1356acf62',
     ordinal: 1,
     origin: 'recorded',
+    characterName: 'Mara',
     sourceVersionId: null,
     mimeType: 'video/mp4',
     filename: 'morning-take.mp4',
@@ -44,6 +45,13 @@ const video = (override: Partial<SavedVideoSummary> = {}): SavedVideoSummary => 
   createdAt: '2026-08-05T12:00:00.000Z',
   updatedAt: '2026-08-05T12:00:00.000Z',
   ...override,
+});
+
+const page = (videos: readonly SavedVideoSummary[]) => ({
+  videos,
+  nextCursor: null,
+  total: videos.length,
+  facets: { characterNames: ['Mara', 'Nova'], formats: ['landscape', 'portrait'] as const },
 });
 
 const renderGallery = (onUse = vi.fn().mockResolvedValue(undefined)) => {
@@ -71,7 +79,7 @@ describe('VideoGallery', () => {
 
   it('loads metadata and lazy thumbnails without mounting or requesting a video player', async () => {
     const item = video();
-    api.listSavedVideos.mockResolvedValue({ videos: [item], nextCursor: null });
+    api.listSavedVideos.mockResolvedValue(page([item]));
     const onUse = renderGallery();
 
     expect(await screen.findByRole('heading', { name: 'Morning take' })).toBeInTheDocument();
@@ -80,13 +88,15 @@ describe('VideoGallery', () => {
       screen.getByRole('button', { name: 'Preview Morning take' }).querySelector('img'),
     ).toHaveAttribute('src', `/api/videos/${item.id}/thumbnail`);
     expect(screen.getByText('0:12')).toBeInTheDocument();
+    expect(screen.getAllByText('Landscape').length).toBeGreaterThan(0);
+    expect(screen.getByText('Mara')).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: 'Load in Studio' }));
     await waitFor(() => expect(onUse).toHaveBeenCalledWith(item, 'play'));
   });
 
   it('opens a centered authenticated preview on thumbnail activation and restores focus on close', async () => {
     const item = video();
-    api.listSavedVideos.mockResolvedValue({ videos: [item], nextCursor: null });
+    api.listSavedVideos.mockResolvedValue(page([item]));
     renderGallery();
 
     const previewTrigger = await screen.findByRole('button', { name: 'Preview Morning take' });
@@ -105,7 +115,12 @@ describe('VideoGallery', () => {
   });
 
   it('shows an actionable empty state', async () => {
-    api.listSavedVideos.mockResolvedValue({ videos: [], nextCursor: null });
+    api.listSavedVideos.mockResolvedValue({
+      videos: [],
+      nextCursor: null,
+      total: 0,
+      facets: { characterNames: [], formats: [] },
+    });
     renderGallery();
 
     expect(await screen.findByRole('heading', { name: 'No saved videos yet' })).toBeInTheDocument();
@@ -115,7 +130,12 @@ describe('VideoGallery', () => {
   it('renames and confirms deletion without loading media bytes', async () => {
     const original = video();
     const renamed = video({ title: 'Renamed take' });
-    api.listSavedVideos.mockResolvedValue({ videos: [original], nextCursor: null });
+    api.listSavedVideos.mockResolvedValueOnce(page([original])).mockResolvedValue({
+      videos: [],
+      nextCursor: null,
+      total: 0,
+      facets: { characterNames: [], formats: [] },
+    });
     api.renameSavedVideo.mockResolvedValue(renamed);
     vi.spyOn(window, 'prompt').mockReturnValue('Renamed take');
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -130,5 +150,38 @@ describe('VideoGallery', () => {
 
     await waitFor(() => expect(api.deleteSavedVideo).toHaveBeenCalledWith(original.id));
     expect(screen.queryByRole('heading', { name: 'Renamed take' })).not.toBeInTheDocument();
+  });
+
+  it('requests character and format filters with each supported sort order', async () => {
+    const item = video();
+    api.listSavedVideos.mockResolvedValue(page([item]));
+    renderGallery();
+    await screen.findByRole('heading', { name: 'Morning take' });
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Character used' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Mara' }));
+    await waitFor(() =>
+      expect(api.listSavedVideos).toHaveBeenLastCalledWith(
+        expect.objectContaining({ characterName: 'Mara', sort: 'latest' }),
+      ),
+    );
+
+    fireEvent.click(screen.getByRole('combobox', { name: 'Video format' }));
+    fireEvent.click(screen.getByRole('option', { name: 'Portrait' }));
+    await waitFor(() =>
+      expect(api.listSavedVideos).toHaveBeenLastCalledWith(
+        expect.objectContaining({ characterName: 'Mara', format: 'portrait', sort: 'latest' }),
+      ),
+    );
+
+    for (const label of ['Oldest', 'Shortest', 'Longest']) {
+      fireEvent.click(screen.getByRole('combobox', { name: 'Sort by' }));
+      fireEvent.click(screen.getByRole('option', { name: label }));
+      await waitFor(() =>
+        expect(api.listSavedVideos).toHaveBeenLastCalledWith(
+          expect.objectContaining({ sort: label.toLowerCase() }),
+        ),
+      );
+    }
   });
 });

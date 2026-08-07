@@ -2,10 +2,13 @@ import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import sharp from 'sharp';
 import {
+  SAVED_VIDEO_FORMATS,
   savedVideoDetailSchema,
   savedVideoSummarySchema,
   type SavedVideoDetail,
+  type SavedVideoFormat,
   type SavedVideoSummary,
+  type SavedVideosQuery,
   type SavedVideoUploadMetadata,
   type InspectedVideo,
 } from '@studio/contracts';
@@ -44,6 +47,7 @@ const publicVersion = (version: StoredVideoVersion) => ({
   videoId: version.videoId,
   ordinal: version.ordinal,
   origin: version.origin,
+  characterName: version.characterName,
   sourceVersionId: version.sourceVersionId,
   mimeType: version.mimeType,
   filename: version.filename,
@@ -98,6 +102,20 @@ const decodeCursor = (cursor: string | undefined): number => {
   throw new AppError(400, 'validation_error', 'Use a valid saved-video page cursor.');
 };
 
+const videoFormat = (version: StoredVideoVersion): SavedVideoFormat =>
+  version.width === version.height
+    ? 'square'
+    : version.width > version.height
+      ? 'landscape'
+      : 'portrait';
+
+const compareCreatedAt = (
+  left: StoredSavedVideoAggregate,
+  right: StoredSavedVideoAggregate,
+): number =>
+  left.video.createdAt.localeCompare(right.video.createdAt) ||
+  left.video.id.localeCompare(right.video.id);
+
 export class SavedVideoService {
   readonly #repository: SavedVideoRepository;
   readonly #bytes: AssetByteStore;
@@ -141,6 +159,7 @@ export class SavedVideoService {
       ownerUserId,
       ordinal,
       origin: metadata.origin,
+      characterName: metadata.characterName,
       sourceVersionId: metadata.sourceVersionId,
       assetId,
       thumbnailAssetId: null,
@@ -251,19 +270,50 @@ export class SavedVideoService {
 
   async list(
     ownerUserId: string,
-    cursor: string | undefined,
-    pageSize: number,
-  ): Promise<{ videos: readonly SavedVideoSummary[]; nextCursor: string | null }> {
-    const offset = decodeCursor(cursor);
-    const all = [...(await this.#repository.list(ownerUserId))].sort(
-      (left, right) =>
-        right.video.createdAt.localeCompare(left.video.createdAt) ||
-        right.video.id.localeCompare(left.video.id),
+    query: SavedVideosQuery,
+  ): Promise<{
+    videos: readonly SavedVideoSummary[];
+    nextCursor: string | null;
+    total: number;
+    facets: { characterNames: string[]; formats: SavedVideoFormat[] };
+  }> {
+    const offset = decodeCursor(query.cursor);
+    const all = [...(await this.#repository.list(ownerUserId))];
+    const characterNames = [
+      ...new Set(
+        all
+          .map((aggregate) => currentVersion(aggregate).characterName)
+          .filter((name): name is string => name !== null),
+      ),
+    ].sort((left, right) => left.localeCompare(right));
+    const availableFormats = new Set(
+      all.map((aggregate) => videoFormat(currentVersion(aggregate))),
     );
-    const page = all.slice(offset, offset + pageSize);
+    const formats = SAVED_VIDEO_FORMATS.filter((format) => availableFormats.has(format));
+    const filtered = all.filter((aggregate) => {
+      const version = currentVersion(aggregate);
+      return (
+        (query.characterName === undefined || version.characterName === query.characterName) &&
+        (query.format === undefined || videoFormat(version) === query.format)
+      );
+    });
+    filtered.sort((left, right) => {
+      if (query.sort === 'shortest' || query.sort === 'longest') {
+        const durationDifference =
+          currentVersion(left).durationMs - currentVersion(right).durationMs;
+        if (durationDifference !== 0)
+          return query.sort === 'shortest' ? durationDifference : -durationDifference;
+      }
+      const createdAtComparison = compareCreatedAt(left, right);
+      return query.sort === 'oldest' ? createdAtComparison : -createdAtComparison;
+    });
+    const page = filtered.slice(offset, offset + query.pageSize);
     return {
       videos: page.map(publicSummary),
-      nextCursor: offset + page.length < all.length ? encodeCursor(offset + page.length) : null,
+      nextCursor:
+        offset + page.length < filtered.length ? encodeCursor(offset + page.length) : null,
+      total: filtered.length,
+      facets: { characterNames, formats },
     };
   }
 
@@ -287,14 +337,6 @@ export class SavedVideoService {
   }
 
   async delete(ownerUserId: string, videoId: string): Promise<void> {
-    const all = await this.#repository.list(ownerUserId);
-    if (all.some((item) => item.video.sourceVideoId === videoId)) {
-      throw new AppError(
-        409,
-        'conflict',
-        'Delete derived videos before deleting their source video.',
-      );
-    }
     if (!(await this.#repository.delete(ownerUserId, videoId, this.#now().toISOString()))) {
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
     }

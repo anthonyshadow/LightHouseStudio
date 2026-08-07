@@ -148,7 +148,7 @@ export const registerSavedVideoRoutes = (
     if (!query.success)
       throw new AppError(400, 'validation_error', 'Use a valid gallery page request.');
     return savedVideosResponseSchema.parse(
-      await service.list(ownerUserIdForRequest(request), query.data.cursor, query.data.pageSize),
+      await service.list(ownerUserIdForRequest(request), query.data),
     );
   });
 

@@ -16,6 +16,24 @@ export const gallerySummaryStyles = (theme: Theme): CSSObject => ({
   '& strong': { color: theme.colors.text, fontWeight: 760 },
 });
 
+export const filterControlsStyles = (theme: Theme): CSSObject => ({
+  display: 'grid',
+  gridTemplateColumns: 'minmax(0, 1fr)',
+  alignItems: 'end',
+  gap: theme.space.sm,
+  padding: theme.space.md,
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.radii.large,
+  background: theme.colors.surfaceSoft,
+  '& > button': { minHeight: '2.75rem' },
+  '@media (min-width: 40rem)': {
+    gridTemplateColumns: 'repeat(2, minmax(0, 1fr))',
+  },
+  '@media (min-width: 64rem)': {
+    gridTemplateColumns: 'repeat(3, minmax(0, 1fr)) auto',
+  },
+});
+
 export const gridStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: 'minmax(0, 1fr)',

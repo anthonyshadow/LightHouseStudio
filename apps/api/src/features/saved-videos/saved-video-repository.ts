@@ -2,9 +2,13 @@ import { createHash, randomUUID } from 'node:crypto';
 import { chmod, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { savedVideoOriginSchema, videoInputMimeTypeSchema } from '@studio/contracts';
+import {
+  savedVideoCharacterNameSchema,
+  savedVideoOriginSchema,
+  videoInputMimeTypeSchema,
+} from '@studio/contracts';
 
-const versionSchema = z
+const legacyVersionSchema = z
   .object({
     id: z.uuid(),
     videoId: z.uuid(),
@@ -24,6 +28,10 @@ const versionSchema = z
   })
   .strict();
 
+const versionSchema = legacyVersionSchema.extend({
+  characterName: savedVideoCharacterNameSchema.nullable(),
+});
+
 const videoSchema = z
   .object({
     id: z.uuid(),
@@ -38,13 +46,16 @@ const videoSchema = z
   })
   .strict();
 
-const aggregateSchema = z
+const legacyAggregateSchema = z
   .object({
     video: videoSchema,
-    versions: z.array(versionSchema).min(1).max(100),
+    versions: z.array(legacyVersionSchema).min(1).max(100),
     revision: z.number().int().positive(),
   })
   .strict();
+const aggregateSchema = legacyAggregateSchema.extend({
+  versions: z.array(versionSchema).min(1).max(100),
+});
 const receiptSchema = z
   .object({
     idempotencyKey: z.uuid(),
@@ -53,15 +64,19 @@ const receiptSchema = z
     createdAt: z.iso.datetime(),
   })
   .strict();
-const librarySchema = z
+const legacyLibrarySchema = z
   .object({
     schemaVersion: z.literal(1),
     ownerUserId: z.uuid(),
     revision: z.number().int().nonnegative(),
-    videos: z.array(aggregateSchema),
+    videos: z.array(legacyAggregateSchema),
     receipts: z.array(receiptSchema),
   })
   .strict();
+const librarySchema = legacyLibrarySchema.extend({
+  schemaVersion: z.literal(2),
+  videos: z.array(aggregateSchema),
+});
 
 export type StoredVideoVersion = z.infer<typeof versionSchema>;
 export type StoredSavedVideoAggregate = z.infer<typeof aggregateSchema>;
@@ -102,7 +117,7 @@ export interface SavedVideoRepository {
 }
 
 const emptyLibrary = (ownerUserId: string): SavedVideoLibrary => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   ownerUserId,
   revision: 0,
   videos: [],
@@ -124,9 +139,25 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
 
   async #read(ownerUserId: string): Promise<SavedVideoLibrary> {
     try {
-      const library = librarySchema.parse(
-        JSON.parse(await readFile(this.#file(ownerUserId), 'utf8')) as unknown,
-      );
+      const raw = JSON.parse(await readFile(this.#file(ownerUserId), 'utf8')) as unknown;
+      const current = librarySchema.safeParse(raw);
+      let library: SavedVideoLibrary;
+      if (current.success) {
+        library = current.data;
+      } else {
+        const legacy = legacyLibrarySchema.parse(raw);
+        library = librarySchema.parse({
+          ...legacy,
+          schemaVersion: 2,
+          videos: legacy.videos.map((aggregate) => ({
+            ...aggregate,
+            versions: aggregate.versions.map((version) => ({
+              ...version,
+              characterName: null,
+            })),
+          })),
+        });
+      }
       if (library.ownerUserId !== ownerUserId) throw new Error('Saved video owner mismatch.');
       return library;
     } catch (error) {

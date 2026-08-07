@@ -50,11 +50,15 @@ inputs, but their absence does not disable configured application features.
 `/studio/videos`, `/studio/characters`, and `/studio/outfits` share one persistent `StudioApp` and
 one stage; their full-screen library surfaces never create another media session. The gallery
 loads metadata and lazy thumbnails first, then fetches video bytes only for an explicit Preview,
-Studio, Edit, or Download action. A thumbnail Preview opens a centered, focus-managed player over
+Studio, Edit, or Download action. Saved Videos can be filtered by attributed character and
+Landscape, Portrait, or Square format, then ordered by Latest, Oldest, Shortest, or Longest. A
+thumbnail Preview opens a centered, focus-managed player over
 the darkened gallery; that scoped player owns no tracks, object URL, recorder, or provider session
-and detaches its authenticated content URL on close. **Use existing video** retains its separate
-approved source/result player. Every other path returns to `/`. Older Guided compatibility videos
-are deleted locally on the Phase 1 cutover and are not imported into the new gallery.
+and detaches its authenticated content URL on close. Any saved video can be deleted independently;
+a retained derived video remains usable when its source record is deleted. **Use existing video**
+retains its separate approved source/result player. Every other path returns to `/`. Older Guided
+compatibility videos are deleted locally on the Phase 1 cutover and are not imported into the new
+gallery.
 
 Leaving Studio is blocked during recording/finalization and active local video rendering. A
 temporary take, active Voice work, dirty video edit, or dirty Recipe Shelf/Outfit Builder/Wardrobe

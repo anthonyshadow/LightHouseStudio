@@ -248,7 +248,12 @@ export const installProviderNetworkDriver = async (
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ videos: [], nextCursor: null }),
+        body: JSON.stringify({
+          videos: [],
+          nextCursor: null,
+          total: 0,
+          facets: { characterNames: [], formats: [] },
+        }),
       });
       return;
     }

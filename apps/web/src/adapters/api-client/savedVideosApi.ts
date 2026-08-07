@@ -2,7 +2,9 @@ import {
   savedVideoDetailSchema,
   savedVideosResponseSchema,
   type SavedVideoDetail,
+  type SavedVideoFormat,
   type SavedVideoOrigin,
+  type SavedVideoSort,
   type SavedVideosResponse,
 } from '@studio/contracts';
 import { ApiClientError, apiFetch, requestJson } from './apiClient';
@@ -15,6 +17,7 @@ export type SaveVideoInput = Readonly<{
   title: string;
   filename: string;
   origin: SavedVideoOrigin;
+  characterName?: string | null;
   idempotencyKey: string;
   sourceVideoId?: string | null;
   sourceVersionId?: string | null;
@@ -30,6 +33,7 @@ const uploadHeaders = (input: SaveVideoInput): HeadersInit => ({
       title: input.title,
       filename: input.filename,
       origin: input.origin,
+      characterName: input.characterName ?? null,
       sourceVideoId: input.sourceVideoId ?? null,
       sourceVersionId: input.sourceVersionId ?? null,
     }),
@@ -87,15 +91,27 @@ export const saveSavedVideoThumbnail = (
     invalidResponse,
   );
 
-export const listSavedVideos = (
-  cursor?: string,
-  signal?: AbortSignal,
-): Promise<SavedVideosResponse> => {
+export type ListSavedVideosInput = Readonly<{
+  cursor?: string;
+  characterName?: string;
+  format?: SavedVideoFormat;
+  sort?: SavedVideoSort;
+  signal?: AbortSignal;
+}>;
+
+export const listSavedVideos = (input: ListSavedVideosInput = {}): Promise<SavedVideosResponse> => {
   const query = new URLSearchParams({ pageSize: '20' });
-  if (cursor) query.set('cursor', cursor);
+  if (input.cursor) query.set('cursor', input.cursor);
+  if (input.characterName) query.set('characterName', input.characterName);
+  if (input.format) query.set('format', input.format);
+  if (input.sort) query.set('sort', input.sort);
   return requestJson(
     `/api/videos?${query.toString()}`,
-    { cache: 'no-store', headers: { Accept: 'application/json' }, ...(signal ? { signal } : {}) },
+    {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
     savedVideosResponseSchema,
     invalidResponse,
   );

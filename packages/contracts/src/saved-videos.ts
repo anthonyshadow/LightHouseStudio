@@ -13,8 +13,13 @@ export const SAVED_VIDEO_ORIGINS = [
 export const savedVideoOriginSchema = z.enum(SAVED_VIDEO_ORIGINS);
 export const savedVideoStatusSchema = z.enum(['ready', 'processing', 'failed', 'missing']);
 export const savedVideoTitleSchema = z.string().trim().min(1).max(120);
+export const savedVideoCharacterNameSchema = z.string().trim().min(1).max(120);
 export const savedVideoIdSchema = z.uuid();
 export const savedVideoIdempotencyKeySchema = z.uuid();
+export const SAVED_VIDEO_FORMATS = ['landscape', 'portrait', 'square'] as const;
+export const savedVideoFormatSchema = z.enum(SAVED_VIDEO_FORMATS);
+export const SAVED_VIDEO_SORTS = ['latest', 'oldest', 'shortest', 'longest'] as const;
+export const savedVideoSortSchema = z.enum(SAVED_VIDEO_SORTS);
 
 export const savedVideoVersionSchema = z
   .object({
@@ -22,6 +27,7 @@ export const savedVideoVersionSchema = z
     videoId: z.uuid(),
     ordinal: z.number().int().positive(),
     origin: savedVideoOriginSchema,
+    characterName: savedVideoCharacterNameSchema.nullable(),
     sourceVersionId: z.uuid().nullable(),
     mimeType: videoInputMimeTypeSchema,
     filename: z.string().trim().min(1).max(180),
@@ -55,6 +61,9 @@ export const savedVideosQuerySchema = z
   .object({
     cursor: z.string().trim().min(1).max(500).optional(),
     pageSize: z.coerce.number().int().min(1).max(40).default(20),
+    characterName: savedVideoCharacterNameSchema.optional(),
+    format: savedVideoFormatSchema.optional(),
+    sort: savedVideoSortSchema.default('latest'),
   })
   .strict();
 
@@ -62,6 +71,13 @@ export const savedVideosResponseSchema = z
   .object({
     videos: z.array(savedVideoSummarySchema).max(40),
     nextCursor: z.string().max(500).nullable(),
+    total: z.number().int().nonnegative(),
+    facets: z
+      .object({
+        characterNames: z.array(savedVideoCharacterNameSchema).max(500),
+        formats: z.array(savedVideoFormatSchema).max(SAVED_VIDEO_FORMATS.length),
+      })
+      .strict(),
   })
   .strict();
 
@@ -75,6 +91,7 @@ export const savedVideoUploadMetadataSchema = z
   .object({
     title: savedVideoTitleSchema,
     origin: savedVideoOriginSchema,
+    characterName: savedVideoCharacterNameSchema.nullable().default(null),
     filename: z.string().trim().min(1).max(180),
     sourceVideoId: z.uuid().nullable().default(null),
     sourceVersionId: z.uuid().nullable().default(null),
@@ -82,8 +99,11 @@ export const savedVideoUploadMetadataSchema = z
   .strict();
 
 export type SavedVideoOrigin = z.infer<typeof savedVideoOriginSchema>;
+export type SavedVideoFormat = z.infer<typeof savedVideoFormatSchema>;
+export type SavedVideoSort = z.infer<typeof savedVideoSortSchema>;
 export type SavedVideoVersion = z.infer<typeof savedVideoVersionSchema>;
 export type SavedVideoSummary = z.infer<typeof savedVideoSummarySchema>;
 export type SavedVideoDetail = z.infer<typeof savedVideoDetailSchema>;
 export type SavedVideosResponse = z.infer<typeof savedVideosResponseSchema>;
+export type SavedVideosQuery = z.infer<typeof savedVideosQuerySchema>;
 export type SavedVideoUploadMetadata = z.infer<typeof savedVideoUploadMetadataSchema>;

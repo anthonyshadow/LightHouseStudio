@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import type { SavedVideoSummary } from '@studio/contracts';
+import type { SavedVideoFormat, SavedVideoSort, SavedVideoSummary } from '@studio/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   deleteSavedVideo,
@@ -9,7 +9,7 @@ import {
   savedVideoContentUrl,
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
-import { Button, OverlayPanel, StatusNotice } from '../../ui';
+import { Button, OverlayPanel, SelectField, StatusNotice } from '../../ui';
 import {
   actionMenuPopoverStyles,
   actionMenuStyles,
@@ -20,6 +20,7 @@ import {
   chipRowStyles,
   chipStyles,
   durationBadgeStyles,
+  filterControlsStyles,
   galleryStyles,
   gallerySummaryStyles,
   gridStyles,
@@ -61,6 +62,24 @@ const duration = (milliseconds: number): string => {
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 };
 
+const FORMAT_LABELS: Readonly<Record<SavedVideoFormat, string>> = {
+  landscape: 'Landscape',
+  portrait: 'Portrait',
+  square: 'Square',
+};
+
+const SORT_OPTIONS = [
+  { value: 'latest', label: 'Latest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'shortest', label: 'Shortest' },
+  { value: 'longest', label: 'Longest' },
+] satisfies ReadonlyArray<{ value: SavedVideoSort; label: string }>;
+
+const formatForVideo = (video: SavedVideoSummary): SavedVideoFormat => {
+  const { width, height } = video.currentVersion;
+  return width === height ? 'square' : width > height ? 'landscape' : 'portrait';
+};
+
 export const VideoGallery = ({
   onUse,
 }: {
@@ -69,6 +88,12 @@ export const VideoGallery = ({
   const theme = useTheme();
   const [videos, setVideos] = useState<readonly SavedVideoSummary[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
+  const [total, setTotal] = useState(0);
+  const [characterNames, setCharacterNames] = useState<readonly string[]>([]);
+  const [availableFormats, setAvailableFormats] = useState<readonly SavedVideoFormat[]>([]);
+  const [characterName, setCharacterName] = useState('');
+  const [format, setFormat] = useState<SavedVideoFormat | ''>('');
+  const [sort, setSort] = useState<SavedVideoSort>('latest');
   const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [message, setMessage] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
@@ -79,23 +104,35 @@ export const VideoGallery = ({
   const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
   const previewPlayerRef = useRef<HTMLVideoElement | null>(null);
 
-  const load = useCallback(async (cursor?: string) => {
-    request.current?.abort('replaced');
-    const controller = new AbortController();
-    request.current = controller;
-    if (!cursor) setStatus('loading');
-    try {
-      const page = await listSavedVideos(cursor, controller.signal);
-      setVideos((current) => (cursor ? [...current, ...page.videos] : page.videos));
-      setNextCursor(page.nextCursor);
-      setStatus('ready');
-      setMessage(null);
-    } catch (error) {
-      if (controller.signal.aborted) return;
-      setStatus('error');
-      setMessage(error instanceof Error ? error.message : 'Saved videos could not be loaded.');
-    }
-  }, []);
+  const load = useCallback(
+    async (cursor?: string) => {
+      request.current?.abort('replaced');
+      const controller = new AbortController();
+      request.current = controller;
+      if (!cursor) setStatus('loading');
+      try {
+        const page = await listSavedVideos({
+          ...(cursor ? { cursor } : {}),
+          ...(characterName ? { characterName } : {}),
+          ...(format ? { format } : {}),
+          sort,
+          signal: controller.signal,
+        });
+        setVideos((current) => (cursor ? [...current, ...page.videos] : page.videos));
+        setNextCursor(page.nextCursor);
+        setTotal(page.total);
+        setCharacterNames(page.facets.characterNames);
+        setAvailableFormats(page.facets.formats);
+        setStatus('ready');
+        setMessage(null);
+      } catch (error) {
+        if (controller.signal.aborted) return;
+        setStatus('error');
+        setMessage(error instanceof Error ? error.message : 'Saved videos could not be loaded.');
+      }
+    },
+    [characterName, format, sort],
+  );
 
   useEffect(() => {
     const timer = window.setTimeout(() => void load(), 0);
@@ -134,7 +171,7 @@ export const VideoGallery = ({
     setBusyId(video.id);
     try {
       await deleteSavedVideo(video.id);
-      setVideos((current) => current.filter((item) => item.id !== video.id));
+      await load();
       setMessage('Video removed. Its local media remains retained until Phase 2.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'The video could not be deleted.');
@@ -183,7 +220,10 @@ export const VideoGallery = ({
       </StatusNotice>
     );
   }
-  if (videos.length === 0) {
+  const libraryHasVideos = availableFormats.length > 0;
+  const filtersActive = Boolean(characterName || format);
+
+  if (!libraryHasVideos) {
     return (
       <div>
         <h2>No saved videos yet</h2>
@@ -195,118 +235,166 @@ export const VideoGallery = ({
   return (
     <div css={galleryStyles(theme)}>
       {message ? <StatusNotice role="status">{message}</StatusNotice> : null}
+      <div css={filterControlsStyles(theme)} aria-label="Filter and sort saved videos">
+        <SelectField
+          label="Character used"
+          value={characterName}
+          options={[
+            { value: '', label: 'All characters' },
+            ...characterNames.map((name) => ({ value: name, label: name })),
+          ]}
+          disabled={characterNames.length === 0}
+          onValueChange={setCharacterName}
+        />
+        <SelectField
+          label="Video format"
+          value={format}
+          options={[
+            { value: '', label: 'All formats' },
+            ...availableFormats.map((value) => ({ value, label: FORMAT_LABELS[value] })),
+          ]}
+          onValueChange={(value) => setFormat(value as SavedVideoFormat | '')}
+        />
+        <SelectField
+          label="Sort by"
+          value={sort}
+          options={SORT_OPTIONS}
+          onValueChange={(value) => setSort(value as SavedVideoSort)}
+        />
+        <Button
+          variant="secondary"
+          disabled={!filtersActive}
+          onClick={() => {
+            setCharacterName('');
+            setFormat('');
+          }}
+        >
+          Clear filters
+        </Button>
+      </div>
       <div css={gallerySummaryStyles(theme)}>
         <span>
-          <strong>{videos.length}</strong> saved {videos.length === 1 ? 'video' : 'videos'}
+          <strong>{total}</strong> matching {total === 1 ? 'video' : 'videos'}
         </span>
-        <span>Newest first</span>
+        {videos.length < total ? <span>{videos.length} loaded</span> : null}
       </div>
-      <div css={gridStyles(theme)} aria-label="Saved videos">
-        {videos.map((video) => {
-          const version = video.currentVersion;
-          const busy = busyId === video.id;
-          return (
-            <article key={video.id} css={cardStyles(theme)} aria-busy={busy || undefined}>
-              <button
-                type="button"
-                css={posterButtonStyles(theme)}
-                disabled={busy || video.status !== 'ready'}
-                aria-label={`Preview ${video.title}`}
-                onClick={(event) => openPreview(video, event.currentTarget)}
-              >
-                <span css={posterStyles(theme)}>
-                  {video.thumbnailAvailable && !brokenThumbnails.has(video.id) ? (
-                    <img
-                      css={thumbnailStyles(theme)}
-                      data-gallery-thumbnail=""
-                      src={savedVideoThumbnailUrl(video.id)}
-                      alt=""
-                      loading="lazy"
-                      onError={() =>
-                        setBrokenThumbnails((current) => new Set(current).add(video.id))
-                      }
-                    />
-                  ) : (
-                    <span
-                      css={thumbnailPlaceholderStyles(theme)}
-                      aria-label={
-                        video.thumbnailAvailable
-                          ? 'Thumbnail could not load'
-                          : 'Thumbnail unavailable'
-                      }
-                    >
-                      <VideoPlaceholderIcon />
-                      <span>Preview available</span>
+      {videos.length === 0 ? (
+        <div>
+          <h2>No saved videos match these filters</h2>
+          <p>Choose a different character or video format, or clear the filters.</p>
+        </div>
+      ) : (
+        <div css={gridStyles(theme)} aria-label="Saved videos">
+          {videos.map((video) => {
+            const version = video.currentVersion;
+            const busy = busyId === video.id;
+            return (
+              <article key={video.id} css={cardStyles(theme)} aria-busy={busy || undefined}>
+                <button
+                  type="button"
+                  css={posterButtonStyles(theme)}
+                  disabled={busy || video.status !== 'ready'}
+                  aria-label={`Preview ${video.title}`}
+                  onClick={(event) => openPreview(video, event.currentTarget)}
+                >
+                  <span css={posterStyles(theme)}>
+                    {video.thumbnailAvailable && !brokenThumbnails.has(video.id) ? (
+                      <img
+                        css={thumbnailStyles(theme)}
+                        data-gallery-thumbnail=""
+                        src={savedVideoThumbnailUrl(video.id)}
+                        alt=""
+                        loading="lazy"
+                        onError={() =>
+                          setBrokenThumbnails((current) => new Set(current).add(video.id))
+                        }
+                      />
+                    ) : (
+                      <span
+                        css={thumbnailPlaceholderStyles(theme)}
+                        aria-label={
+                          video.thumbnailAvailable
+                            ? 'Thumbnail could not load'
+                            : 'Thumbnail unavailable'
+                        }
+                      >
+                        <VideoPlaceholderIcon />
+                        <span>Preview available</span>
+                      </span>
+                    )}
+                    <span data-gallery-play="" css={playBadgeStyles(theme)}>
+                      <PlayIcon />
                     </span>
-                  )}
-                  <span data-gallery-play="" css={playBadgeStyles(theme)}>
-                    <PlayIcon />
+                    <span css={durationBadgeStyles(theme)}>{duration(version.durationMs)}</span>
                   </span>
-                  <span css={durationBadgeStyles(theme)}>{duration(version.durationMs)}</span>
-                </span>
-              </button>
-              <div css={cardBodyStyles(theme)}>
-                <div css={cardCopyStyles(theme)}>
-                  <h3>{video.title}</h3>
-                  <p>
-                    {version.width}×{version.height} ·{' '}
-                    <time dateTime={video.createdAt}>
-                      {new Date(video.createdAt).toLocaleDateString()}
-                    </time>
-                  </p>
+                </button>
+                <div css={cardBodyStyles(theme)}>
+                  <div css={cardCopyStyles(theme)}>
+                    <h3>{video.title}</h3>
+                    <p>
+                      {version.width}×{version.height} ·{' '}
+                      <time dateTime={video.createdAt}>
+                        {new Date(video.createdAt).toLocaleDateString()}
+                      </time>
+                    </p>
+                  </div>
+                  <div css={chipRowStyles(theme)} aria-label="Video details">
+                    <span css={chipStyles(theme)}>
+                      {video.versionCount} version{video.versionCount === 1 ? '' : 's'}
+                    </span>
+                    <span css={chipStyles(theme)}>{version.origin}</span>
+                    <span css={chipStyles(theme)}>{FORMAT_LABELS[formatForVideo(video)]}</span>
+                    {version.characterName ? (
+                      <span css={chipStyles(theme)}>{version.characterName}</span>
+                    ) : null}
+                    {video.status !== 'ready' ? (
+                      <span css={chipStyles(theme)}>{video.status}</span>
+                    ) : null}
+                  </div>
+                  <div css={actionsStyles(theme)}>
+                    <Button
+                      variant="primary"
+                      disabled={busy || video.status !== 'ready'}
+                      busy={busy}
+                      onClick={() => void handleUseVideo(video, 'play')}
+                    >
+                      Load in Studio
+                    </Button>
+                    <details css={actionMenuStyles(theme)}>
+                      <summary aria-label={`More actions for ${video.title}`}>
+                        <MoreIcon />
+                      </summary>
+                      <div css={actionMenuPopoverStyles(theme)}>
+                        <button
+                          type="button"
+                          disabled={busy || video.status !== 'ready'}
+                          onClick={() => void handleUseVideo(video, 'edit')}
+                        >
+                          Edit video
+                        </button>
+                        <a href={downloadSavedVideoUrl(video.id)} download={version.filename}>
+                          Download
+                        </a>
+                        <button type="button" disabled={busy} onClick={() => void rename(video)}>
+                          Rename
+                        </button>
+                        <button
+                          type="button"
+                          data-danger=""
+                          disabled={busy}
+                          onClick={() => void remove(video)}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </details>
+                  </div>
                 </div>
-                <div css={chipRowStyles(theme)} aria-label="Video details">
-                  <span css={chipStyles(theme)}>
-                    {video.versionCount} version{video.versionCount === 1 ? '' : 's'}
-                  </span>
-                  <span css={chipStyles(theme)}>{version.origin}</span>
-                  {video.status !== 'ready' ? (
-                    <span css={chipStyles(theme)}>{video.status}</span>
-                  ) : null}
-                </div>
-                <div css={actionsStyles(theme)}>
-                  <Button
-                    variant="primary"
-                    disabled={busy || video.status !== 'ready'}
-                    busy={busy}
-                    onClick={() => void handleUseVideo(video, 'play')}
-                  >
-                    Load in Studio
-                  </Button>
-                  <details css={actionMenuStyles(theme)}>
-                    <summary aria-label={`More actions for ${video.title}`}>
-                      <MoreIcon />
-                    </summary>
-                    <div css={actionMenuPopoverStyles(theme)}>
-                      <button
-                        type="button"
-                        disabled={busy || video.status !== 'ready'}
-                        onClick={() => void handleUseVideo(video, 'edit')}
-                      >
-                        Edit video
-                      </button>
-                      <a href={downloadSavedVideoUrl(video.id)} download={version.filename}>
-                        Download
-                      </a>
-                      <button type="button" disabled={busy} onClick={() => void rename(video)}>
-                        Rename
-                      </button>
-                      <button
-                        type="button"
-                        data-danger=""
-                        disabled={busy}
-                        onClick={() => void remove(video)}
-                      >
-                        Delete
-                      </button>
-                    </div>
-                  </details>
-                </div>
-              </div>
-            </article>
-          );
-        })}
-      </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
       {nextCursor ? (
         <div css={paginationStyles(theme)}>
           <Button variant="secondary" onClick={() => void load(nextCursor)}>
@@ -381,6 +469,10 @@ export const VideoGallery = ({
                 {previewVideo.currentVersion.width}×{previewVideo.currentVersion.height}
               </span>
               <span>{previewVideo.currentVersion.origin}</span>
+              <span>{FORMAT_LABELS[formatForVideo(previewVideo)]}</span>
+              {previewVideo.currentVersion.characterName ? (
+                <span>{previewVideo.currentVersion.characterName}</span>
+              ) : null}
               <span>
                 {previewVideo.versionCount} version
                 {previewVideo.versionCount === 1 ? '' : 's'}

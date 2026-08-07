@@ -42,6 +42,7 @@ export const useSaveVideo = () => {
       artifact: RecordingArtifact,
       title?: string,
       source?: { readonly videoId: string; readonly versionId: string },
+      characterName?: string | null,
     ) => {
       if (state.status === 'saving') return null;
       const idempotencyKey = keys.current.get(artifact.id) ?? crypto.randomUUID();
@@ -56,6 +57,7 @@ export const useSaveVideo = () => {
           title: title?.trim() || artifact.name || artifact.filename.replace(/\.[^.]+$/u, ''),
           filename: artifact.filename,
           origin: originForArtifact(artifact),
+          characterName: characterName ?? null,
           idempotencyKey,
           sourceVideoId: source?.videoId ?? null,
           sourceVersionId: source?.versionId ?? null,
@@ -89,6 +91,7 @@ export const useSaveVideo = () => {
       artifact: RecordingArtifact,
       target: { readonly videoId: string; readonly currentVersionId: string },
       title?: string,
+      characterName?: string | null,
     ) => {
       if (state.status === 'saving') return null;
       const keyId = `${artifact.id}:replace:${target.videoId}:${target.currentVersionId}`;
@@ -104,6 +107,7 @@ export const useSaveVideo = () => {
           title: title?.trim() || artifact.name || artifact.filename.replace(/\.[^.]+$/u, ''),
           filename: artifact.filename,
           origin: originForArtifact(artifact),
+          characterName: characterName ?? null,
           idempotencyKey,
           sourceVideoId: target.videoId,
           sourceVersionId: target.currentVersionId,
