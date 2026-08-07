@@ -19,6 +19,7 @@ import {
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+  WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION,
   RECENT_PROMPT_LIMIT,
   SAVED_CHARACTER_PROMPT_LIMIT,
   SAVED_CHARACTER_VARIANT_LIMIT,
@@ -33,6 +34,7 @@ import {
   type SavedCharacterPrompt,
   type SavedCharacterVariant,
   type SavedCharacterPromptSource,
+  type SavedCharacterVoicePreference,
   type SavedPrompt,
   type SavedPromptSource,
   type VtonInputKind,
@@ -67,6 +69,18 @@ const sourceForPrompt = (value: unknown): SavedPromptSource | null =>
 
 const sourceForCharacter = (value: unknown): SavedCharacterPromptSource | null =>
   value === 'manual' || value === 'generator' ? value : null;
+
+const savedCharacterVoice = (value: unknown): SavedCharacterVoicePreference | null => {
+  if (!isRecord(value) || value.kind !== 'elevenlabs') return null;
+  const voiceId = normalizedId(value.voiceId);
+  const voiceName =
+    typeof value.voiceName === 'string'
+      ? normalizeWhitespace(value.voiceName, ASSET_NAME_MAX_LENGTH)
+      : '';
+  return voiceId && containsMeaningfulText(voiceName)
+    ? { kind: 'elevenlabs', voiceId, voiceName }
+    : null;
+};
 
 const vtonInputKind = (value: unknown): VtonInputKind | null =>
   value === 'prompt' || value === 'saved-outfit' ? value : null;
@@ -320,6 +334,7 @@ const sanitizeSavedCharacterPrompt = (
   includeGuidedDesign: boolean,
   includeReferenceProvenance: boolean,
   includeWardrobeSelection: boolean,
+  includeDefaultVoice: boolean,
 ): SavedCharacterPrompt | null => {
   if (!isRecord(value)) return null;
   const id = normalizedId(value.id);
@@ -407,6 +422,7 @@ const sanitizeSavedCharacterPrompt = (
     uploadedReferenceImageAssetId,
     finalReferenceKind,
     selectedWardrobeVariantId,
+    defaultVoice: includeDefaultVoice ? savedCharacterVoice(value.defaultVoice) : null,
     notes:
       typeof value.notes === 'string'
         ? normalizeWhitespace(value.notes, CHARACTER_NOTES_MAX_LENGTH)
@@ -573,7 +589,7 @@ const migrateV4ToV5 = (store: VersionedUntrustedStore): VersionedUntrustedStore 
 
 const migrateV5ToV6 = (store: VersionedUntrustedStore): VersionedUntrustedStore => ({
   ...store,
-  schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+  schemaVersion: WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION,
   recentPrompts: migrateRecords(
     store.recentPrompts,
     ({ savedCharacterVariantId: _, ...record }) => record,
@@ -585,20 +601,33 @@ const migrateV5ToV6 = (store: VersionedUntrustedStore): VersionedUntrustedStore 
   savedCharacterVariants: [],
 });
 
+const migrateV6ToV7 = (store: VersionedUntrustedStore): VersionedUntrustedStore => ({
+  ...store,
+  schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+  savedCharacterPrompts: migrateRecords(
+    store.savedCharacterPrompts,
+    ({ defaultVoice: _, ...record }) => ({ ...record, defaultVoice: null }),
+  ),
+});
+
 const migrateCreativeAssetStore = (value: unknown): VersionedUntrustedStore | null => {
   if (!isRecord(value) || typeof value.schemaVersion !== 'number') return null;
   const store = value as VersionedUntrustedStore;
   switch (store.schemaVersion) {
     case ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION:
-      return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(store)))));
+      return migrateV6ToV7(
+        migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(migrateV1ToV2(store))))),
+      );
     case LEGACY_CREATIVE_ASSET_SCHEMA_VERSION:
-      return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(store))));
+      return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(migrateV2ToV3(store)))));
     case EARLIER_CREATIVE_ASSET_SCHEMA_VERSION:
-      return migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(store)));
+      return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(migrateV3ToV4(store))));
     case OLDER_CREATIVE_ASSET_SCHEMA_VERSION:
-      return migrateV5ToV6(migrateV4ToV5(store));
+      return migrateV6ToV7(migrateV5ToV6(migrateV4ToV5(store)));
     case PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION:
-      return migrateV5ToV6(store);
+      return migrateV6ToV7(migrateV5ToV6(store));
+    case WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION:
+      return migrateV6ToV7(store);
     case CREATIVE_ASSET_SCHEMA_VERSION:
       return store;
     default:
@@ -620,7 +649,7 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
     sanitizeRecentPrompt(record, true, true, true, true),
   );
   const characterInput = sanitizeArray(migrated.savedCharacterPrompts, (record) =>
-    sanitizeSavedCharacterPrompt(record, true, true, true, true),
+    sanitizeSavedCharacterPrompt(record, true, true, true, true, true),
   );
   const variantInput = sanitizeArray(migrated.savedCharacterVariants, (record) =>
     sanitizeSavedCharacterVariant(record),

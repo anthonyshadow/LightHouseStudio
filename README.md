@@ -72,7 +72,11 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
 - Character Builder saves browser-local character metadata and immutable reference assets under
   `LIGHTFRAME_DATA_DIR`. Prompt-only save and upload do not generate images.
 - Saved Characters expose a normalized Wardrobe containing the labelled original plus saved
-  variants. Browsing and exact version selection stay local. **Add Outfit** contacts Pruna only
+  variants, an optional saved-voice default, and image-backed saved outfits as garment choices.
+  Browsing, duplication into a new Character Builder draft, exact version selection, and default
+  voice persistence stay local. Opening default-voice configuration explicitly loads the saved
+  ElevenLabs library; selecting the character in Existing Video preselects that voice without
+  processing, and the edit can override it. **Add Outfit** contacts Pruna only
   from explicit Generate/Regenerate; **Change Features** uses the startup-selected OpenAI/BFL/Wiro
   image provider with optimization disabled. Original-source edits include the parent prompt;
   variant-source edits treat the selected image as authoritative and send no parent prompt. An
@@ -80,7 +84,8 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
   and allows requested identity and defining-trait changes. Saving never selects a variant
   implicitly. Deleting a variant removes its browser-local metadata and links while retaining
   immutable image bytes.
-- Outfit Builder creates reusable prompt or reference-image VTO recipes. Prompt enhancement is
+- Outfit Builder creates reusable prompt or reference-image VTO recipes from Studio or the Saved
+  Outfits library. Prompt enhancement is
   remembered with prompt outfits. A selected image remains tab-temporary until final Save, when
   the existing idempotent local upload endpoint makes it durable; Save never starts media or
   contacts Decart or an image provider.

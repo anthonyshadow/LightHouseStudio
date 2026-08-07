@@ -6,6 +6,7 @@ import {
   LEGACY_CREATIVE_ASSET_SCHEMA_VERSION,
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+  WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION,
   RECENT_PROMPT_LIMIT,
   SAVED_CHARACTER_VARIANT_LIMIT,
   SAVED_PROMPT_LIMIT,
@@ -469,10 +470,40 @@ describe('creative asset CRUD and use', () => {
     expect(used.guidedDesign).toEqual(guidedDesign());
     expect(used.store.savedCharacterPrompts[0]).toMatchObject({
       useCount: 1,
+      defaultVoice: null,
       referenceImageStatus: 'persisted-reference',
       referenceImageAssetId: 'reference-asset-1',
     });
     expect(JSON.stringify(store)).not.toMatch(/(?:imageData|objectUrl|portrait\.jpg)/u);
+  });
+
+  it('attaches, replaces, and removes a character default voice', () => {
+    let store = createSavedCharacterPrompt(
+      createEmptyCreativeAssetStore(),
+      {
+        name: 'Narrator',
+        prompt: 'Transform the subject into a narrator.',
+        source: 'generator',
+        promptIntent: 'character-transform',
+        referenceImageStatus: 'prompt-only',
+      },
+      context('narrator'),
+    );
+
+    store = updateSavedCharacterPrompt(
+      store,
+      'narrator',
+      { defaultVoice: { kind: 'elevenlabs', voiceId: 'voice-1', voiceName: ' Northstar ' } },
+      timestamp(1),
+    );
+    expect(store.savedCharacterPrompts[0]?.defaultVoice).toEqual({
+      kind: 'elevenlabs',
+      voiceId: 'voice-1',
+      voiceName: 'Northstar',
+    });
+
+    store = updateSavedCharacterPrompt(store, 'narrator', { defaultVoice: null }, timestamp(2));
+    expect(store.savedCharacterPrompts[0]?.defaultVoice).toBeNull();
   });
 
   it('stores image-only characters, records them only after successful use, and unlinks recents on delete', () => {
@@ -1064,6 +1095,43 @@ describe('creative asset sanitation and recovery', () => {
     expect(result.recovered).toBe(true);
     expect(result.store.savedCharacterVariants).toEqual([]);
     expect(result.store.savedCharacterPrompts[0]?.selectedWardrobeVariantId).toBeNull();
+    expect(result.store.savedCharacterPrompts[0]?.defaultVoice).toBeNull();
+  });
+
+  it('migrates v6 wardrobe characters with no default voice', () => {
+    const result = sanitizeCreativeAssetStore({
+      schemaVersion: WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION,
+      savedPrompts: [],
+      recentPrompts: [],
+      savedCharacterPrompts: [
+        {
+          id: 'v6-character',
+          name: 'V6 presenter',
+          prompt: 'Replace the subject with a presenter.',
+          source: 'generator',
+          promptIntent: 'character-transform',
+          builderDraft: null,
+          guidedDesign: null,
+          referenceImageStatus: 'prompt-only',
+          referenceImageAssetId: null,
+          uploadedReferenceImageAssetId: null,
+          finalReferenceKind: null,
+          selectedWardrobeVariantId: null,
+          notes: '',
+          tags: [],
+          createdAt: timestamp(),
+          updatedAt: timestamp(),
+          lastUsedAt: null,
+          useCount: 0,
+        },
+      ],
+      savedCharacterVariants: [],
+    });
+
+    expect(result.store).toMatchObject({
+      schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+      savedCharacterPrompts: [expect.objectContaining({ defaultVoice: null })],
+    });
   });
 
   it('drops cross-parent variants and repairs dangling persisted selections', () => {

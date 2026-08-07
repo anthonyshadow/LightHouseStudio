@@ -34,7 +34,7 @@ const prompt: SavedPrompt = {
   useCount: 0,
 };
 const store: CreativeAssetStore = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   savedPrompts: [prompt],
   recentPrompts: [],
   savedCharacterPrompts: [],
@@ -159,6 +159,7 @@ describe('reference recipe attribution', () => {
       uploadedReferenceImageAssetId: null,
       finalReferenceKind: 'generated' as const,
       selectedWardrobeVariantId: null,
+      defaultVoice: null,
       notes: '',
       tags: [],
       createdAt: '2026-07-21T12:00:00.000Z',
@@ -182,7 +183,7 @@ describe('reference recipe attribution', () => {
       useCount: 0,
     };
     const wardrobeStore: CreativeAssetStore = {
-      schemaVersion: 6,
+      schemaVersion: 7,
       savedPrompts: [],
       recentPrompts: [],
       savedCharacterPrompts: [character],

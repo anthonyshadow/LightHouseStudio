@@ -300,7 +300,7 @@ test('missing persisted asset keeps the shelf open until explicit text-only reco
       localStorage.setItem(
         storageKey,
         JSON.stringify({
-          schemaVersion: 6,
+          schemaVersion: 7,
           savedPrompts: [],
           recentPrompts: [
             {

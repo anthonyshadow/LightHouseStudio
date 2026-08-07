@@ -94,6 +94,9 @@ test('saved video, character, and outfit routes preserve the shared Studio stage
     await expect(page).toHaveURL(new RegExp(`${library.path}$`, 'u'));
     const dialog = page.getByRole('dialog', { name: library.label });
     await expect(dialog.getByRole('heading', { name: library.empty })).toBeVisible();
+    if (library.path === '/studio/characters') {
+      await expect(dialog.getByRole('button', { name: 'Create new character' })).toBeVisible();
+    }
     expect(
       await stageVideo.evaluate(
         (video) =>

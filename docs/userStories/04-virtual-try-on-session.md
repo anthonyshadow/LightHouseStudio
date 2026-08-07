@@ -17,6 +17,8 @@ garment transformation. Post-recording Virtual Try On is also available in the p
    drop, or explicit public-HTTPS import. Final Save requires an 80-character-or-shorter name.
    **Save & Select** stores metadata and any final image through the idempotent local upload path,
    selects the outfit, and does not start media or contact Decart or an image provider.
+   Saved Outfits also exposes **Create new saved outfit**, which opens this same Builder and
+   returns to the library after Save or Cancel.
 4. Until an outfit recipe has content, the stage control bar keeps local **Record** as its primary
    action and does not present **Start AI**. Once prepared, explicitly start local media from
    **Record New Video** or Dock **Start local preview**, then select **Start AI** and **Virtual

@@ -1,7 +1,8 @@
 import type { PromptBuilderDraft, PromptIntent } from '../prompts';
 import type { ModelModeId } from '../session';
 
-export const CREATIVE_ASSET_SCHEMA_VERSION = 6 as const;
+export const CREATIVE_ASSET_SCHEMA_VERSION = 7 as const;
+export const WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION = 6 as const;
 export const PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION = 5 as const;
 export const OLDER_CREATIVE_ASSET_SCHEMA_VERSION = 4 as const;
 export const EARLIER_CREATIVE_ASSET_SCHEMA_VERSION = 3 as const;
@@ -102,12 +103,20 @@ export interface SavedCharacterPrompt {
   readonly finalReferenceKind: 'uploaded' | 'generated' | null;
   /** Null selects the original; otherwise this is a validated child wardrobe variant. */
   readonly selectedWardrobeVariantId: string | null;
+  /** Optional editor default. Provider membership is revalidated when the voice is used. */
+  readonly defaultVoice: SavedCharacterVoicePreference | null;
   readonly notes: string;
   readonly tags: readonly string[];
   readonly createdAt: string;
   readonly updatedAt: string;
   readonly lastUsedAt: string | null;
   readonly useCount: number;
+}
+
+export interface SavedCharacterVoicePreference {
+  readonly kind: 'elevenlabs';
+  readonly voiceId: string;
+  readonly voiceName: string;
 }
 
 export type SavedCharacterVariantCreation =
@@ -179,6 +188,7 @@ export interface SavedCharacterPromptInput {
   readonly referenceImageAssetId?: string | null;
   readonly uploadedReferenceImageAssetId?: string | null;
   readonly finalReferenceKind?: 'uploaded' | 'generated' | null;
+  readonly defaultVoice?: SavedCharacterVoicePreference | null;
   readonly notes?: string;
   readonly tags?: readonly string[];
 }

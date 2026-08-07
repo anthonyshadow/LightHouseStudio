@@ -59,7 +59,7 @@ const referenceAsset: ReferenceImageAsset = {
 
 const harness = vi.hoisted(() => {
   const store = {
-    schemaVersion: 6 as const,
+    schemaVersion: 7 as const,
     savedPrompts: [],
     recentPrompts: [],
     savedCharacterPrompts: [],

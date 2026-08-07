@@ -25,6 +25,7 @@ const character: SavedCharacterPrompt = {
   uploadedReferenceImageAssetId: null,
   finalReferenceKind: null,
   selectedWardrobeVariantId: null,
+  defaultVoice: null,
   notes: '',
   tags: [],
   createdAt: '2026-07-21T12:00:00.000Z',
@@ -33,7 +34,7 @@ const character: SavedCharacterPrompt = {
   useCount: 0,
 };
 const store: CreativeAssetStore = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   savedPrompts: [],
   recentPrompts: [],
   savedCharacterPrompts: [character],

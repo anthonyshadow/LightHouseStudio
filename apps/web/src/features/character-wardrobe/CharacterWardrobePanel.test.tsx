@@ -22,9 +22,21 @@ const api = vi.hoisted(() => ({
   composeReferenceImage: vi.fn(),
   optimizeCharacterReferencePrompt: vi.fn(),
   importRemoteReferenceImage: vi.fn(),
+  listWorkspaceVoices: vi.fn(),
+  listSharedVoices: vi.fn(),
+  saveSharedVoice: vi.fn(),
+  removeWorkspaceVoice: vi.fn(),
+  fetchVoicePreview: vi.fn(),
 }));
 
 vi.mock('../../adapters/api-client/apiClient', () => api);
+vi.mock('../../adapters/api-client/voicesApi', () => ({
+  listWorkspaceVoices: api.listWorkspaceVoices,
+  listSharedVoices: api.listSharedVoices,
+  saveSharedVoice: api.saveSharedVoice,
+  removeWorkspaceVoice: api.removeWorkspaceVoice,
+  fetchVoicePreview: api.fetchVoicePreview,
+}));
 vi.mock('../../adapters/browser-media/imageValidation', () => ({
   REFERENCE_IMAGE_ACCEPT: 'image/jpeg,image/png,image/webp',
   validateReferenceImage: vi.fn().mockResolvedValue({
@@ -48,6 +60,7 @@ const character: SavedCharacterPrompt = {
   uploadedReferenceImageAssetId: null,
   finalReferenceKind: 'generated',
   selectedWardrobeVariantId: 'variant-one',
+  defaultVoice: null,
   notes: '',
   tags: [],
   createdAt: '2026-08-01T12:00:00.000Z',
@@ -56,7 +69,7 @@ const character: SavedCharacterPrompt = {
   useCount: 0,
 };
 const store: CreativeAssetStore = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   savedPrompts: [],
   recentPrompts: [],
   savedCharacterPrompts: [character],
@@ -83,6 +96,7 @@ const renderPanel = (overrides: Partial<Parameters<typeof CharacterWardrobePanel
   const repository = {
     createSavedCharacterVariant: vi.fn(),
     deleteSavedCharacterVariant: vi.fn(),
+    updateSavedCharacterPrompt: vi.fn(),
   } as unknown as CreativeAssetRepository;
   const onUse = vi.fn();
   render(
@@ -108,6 +122,34 @@ describe('CharacterWardrobePanel', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     api.fetchReferenceImageMetadata.mockResolvedValue({ source: 'uploaded' });
+    api.listWorkspaceVoices.mockResolvedValue({
+      voices: [
+        {
+          kind: 'workspace',
+          voice: {
+            voiceId: 'northstar',
+            name: 'Northstar',
+            category: 'professional',
+            description: 'Grounded narration',
+            labels: {},
+            traits: {
+              language: 'en',
+              gender: 'female',
+              age: 'middle-aged',
+              accent: 'Canadian',
+              useCase: 'narration',
+              descriptive: 'grounded',
+            },
+            previewAvailable: false,
+            removable: true,
+          },
+        },
+      ],
+      hasMore: false,
+      nextPageToken: null,
+      total: 1,
+    });
+    api.listSharedVoices.mockResolvedValue({ voices: [], hasMore: false, page: 0, total: 0 });
   });
 
   it('labels the original first and uses only the explicitly chosen version', async () => {
@@ -143,6 +185,7 @@ describe('CharacterWardrobePanel', () => {
         referenceImageStatus: 'prompt-only',
         referenceImageAssetId: null,
         selectedWardrobeVariantId: null,
+        defaultVoice: null,
       },
       store: {
         ...store,
@@ -152,6 +195,7 @@ describe('CharacterWardrobePanel', () => {
             referenceImageStatus: 'prompt-only',
             referenceImageAssetId: null,
             selectedWardrobeVariantId: null,
+            defaultVoice: null,
           },
         ],
         savedCharacterVariants: [],
@@ -218,6 +262,69 @@ describe('CharacterWardrobePanel', () => {
       },
     });
     expect(onUse).not.toHaveBeenCalled();
+  });
+
+  it('uses an image-backed saved outfit as the explicit wardrobe try-on garment', async () => {
+    const user = userEvent.setup();
+    const { repository } = renderPanel({
+      savedOutfits: [
+        {
+          id: 'saved-coat',
+          title: 'Evening coat',
+          prompt: '',
+          modelModeId: 'lucy-vton-latest',
+          source: 'manual',
+          referenceImageAssetId: 'saved-coat-image',
+          vtonInputKind: 'saved-outfit',
+          enhancePrompt: false,
+          tags: [],
+          createdAt: '2026-08-01T12:00:00.000Z',
+          updatedAt: '2026-08-01T12:00:00.000Z',
+          lastUsedAt: null,
+          useCount: 0,
+        },
+      ],
+    });
+    api.createOutfitTryOn.mockResolvedValue({ assetId: 'saved-outfit-result' });
+
+    await user.click(screen.getByRole('button', { name: 'Add outfit' }));
+    await user.click(screen.getByRole('button', { name: 'Saved outfit' }));
+    await user.click(screen.getByRole('combobox', { name: 'Saved outfit' }));
+    await user.click(screen.getByRole('option', { name: /Evening coat/u }));
+    await user.click(screen.getByRole('button', { name: 'Generate outfit' }));
+    await user.type(screen.getByRole('textbox', { name: /Variant name/u }), 'Coat look');
+    await user.click(screen.getByRole('button', { name: 'Save variant' }));
+
+    expect(api.uploadReferenceImage).not.toHaveBeenCalled();
+    expect(api.createOutfitTryOn).toHaveBeenCalledWith(
+      'variant-image',
+      'saved-coat-image',
+      expect.any(String),
+      expect.any(AbortSignal),
+    );
+    expect(repository.createSavedCharacterVariant).toHaveBeenCalledWith({
+      parentCharacterId: character.id,
+      title: 'Coat look',
+      referenceImageAssetId: 'saved-outfit-result',
+      creation: {
+        method: 'add-outfit',
+        sourceReferenceImageAssetId: 'variant-image',
+        garmentReferenceImageAssetId: 'saved-coat-image',
+      },
+    });
+  });
+
+  it('attaches a saved default voice only after the creator opens voice configuration', async () => {
+    const user = userEvent.setup();
+    const { repository } = renderPanel({ elevenLabsAvailable: true });
+
+    expect(api.listWorkspaceVoices).not.toHaveBeenCalled();
+    await user.click(screen.getByRole('button', { name: 'Attach default voice' }));
+    await user.click(await screen.findByRole('button', { name: 'Select Northstar' }));
+
+    expect(repository.updateSavedCharacterPrompt).toHaveBeenCalledWith(character.id, {
+      defaultVoice: { kind: 'elevenlabs', voiceId: 'northstar', voiceName: 'Northstar' },
+    });
   });
 
   it('sends the parent prompt only when Original is the Change Features source', async () => {

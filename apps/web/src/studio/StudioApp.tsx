@@ -25,7 +25,10 @@ import type {
 import type { CharacterSaveStage } from '../features/character-builder/characterBuilderPersistence';
 import { persistCharacterSaveSnapshot } from '../features/character-builder/persistCharacterSaveSnapshot';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
-import { CREATIVE_ASSET_STORAGE_KEY } from '../features/creative-assets/types';
+import {
+  CREATIVE_ASSET_STORAGE_KEY,
+  WARDROBE_CREATIVE_ASSET_STORAGE_KEY,
+} from '../features/creative-assets/types';
 import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeShelf.types';
 import { savedPromptToRecipeSelection } from '../features/creative-assets/recipeSelection';
 import type {
@@ -173,7 +176,7 @@ type OutfitBuilderLaunch = Readonly<{
   outfit?: SavedPrompt;
   saveAsCopy: boolean;
   saveAndSelect: boolean;
-  destination: 'selector' | 'shelf';
+  destination: 'selector' | 'shelf' | 'library';
 }>;
 
 interface StudioExperienceProps {
@@ -193,7 +196,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     () =>
       createCreativeAssetRepository({
         storageKey: `${CREATIVE_ASSET_STORAGE_KEY}.${auth.session!.user.id}`,
-        legacyStorageKey: CREATIVE_ASSET_STORAGE_KEY,
+        legacyStorageKeys: [
+          `${WARDROBE_CREATIVE_ASSET_STORAGE_KEY}.${auth.session!.user.id}`,
+          CREATIVE_ASSET_STORAGE_KEY,
+          WARDROBE_CREATIVE_ASSET_STORAGE_KEY,
+        ],
         ownerUserId: auth.session!.user.id,
       }),
     [auth.session],
@@ -232,6 +239,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           enhancePrompt: false,
           savedCharacterPromptId: character.id,
           originalCharacterVersion: true,
+          defaultVoice: character.defaultVoice,
         },
         ...(variantsByCharacter.get(character.id) ?? []).map((variant) => ({
           id: variant.id,
@@ -244,6 +252,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           savedCharacterPromptId: character.id,
           savedCharacterVariantId: variant.id,
           originalCharacterVersion: false,
+          defaultVoice: character.defaultVoice,
         })),
       ]),
     ];
@@ -526,6 +535,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     launchError: characterBuilderLaunchError,
     openNewCharacter: launchNewCharacterBuilder,
     editCharacter: launchCharacterEditor,
+    copyCharacter: launchCharacterCopy,
     resolveDiscard: resolveCharacterBuilderDraftDiscard,
     dismissLaunchError: dismissCharacterBuilderLaunchError,
   } = useCharacterBuilderLaunchController({
@@ -547,6 +557,14 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       launchCharacterEditor(asset);
     },
     [characterBuilderOpenBlockedReason, launchCharacterEditor],
+  );
+  const copyCharacter = useCallback(
+    (asset: Parameters<typeof launchCharacterCopy>[0]) => {
+      if (characterBuilderOpenBlockedReason) return;
+      setCharacterBuilderDestination({ kind: 'studio' });
+      launchCharacterCopy(asset);
+    },
+    [characterBuilderOpenBlockedReason, launchCharacterCopy],
   );
   const createCharacterForExistingVideo = useCallback(
     (stepId: string) => {
@@ -919,8 +937,19 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       return;
     }
     updateOutfitBuilderDirty(false);
+    if (outfitBuilderLaunch.destination === 'library') {
+      closeOverlay();
+      void navigate(APP_PATHS.outfits);
+      return;
+    }
     openOverlay(outfitBuilderLaunch.destination === 'shelf' ? 'recipe-shelf' : 'outfit-selector');
-  }, [openOverlay, outfitBuilderLaunch.destination, updateOutfitBuilderDirty]);
+  }, [
+    closeOverlay,
+    navigate,
+    openOverlay,
+    outfitBuilderLaunch.destination,
+    updateOutfitBuilderDirty,
+  ]);
   const selectSavedOutfit = useCallback(
     (outfit: SavedPrompt) => {
       updateOutfitBuilderDirty(false);
@@ -1572,16 +1601,48 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           open={location.pathname === APP_PATHS.characters}
           onClose={() => void navigate(APP_PATHS.studio)}
           title="Saved Characters"
-          description="Choose a saved character for Studio or remove it with its wardrobe metadata."
+          description="Manage your Lucy 2.5 cast and their wardrobe."
+          headerActions={
+            <div css={{ display: 'flex', justifyContent: 'flex-end' }}>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  void navigate(APP_PATHS.studio);
+                  openCharacterBuilder();
+                }}
+              >
+                <svg
+                  aria-hidden="true"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  css={{ width: '1.1rem', height: '1.1rem' }}
+                >
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+                Create new character
+              </Button>
+            </div>
+          }
           placement="fullscreen"
           size="wide"
           bodyMode="scroll"
+          initialFocus="heading"
           returnFocusRef={mainRef}
         >
           {location.pathname === APP_PATHS.characters ? (
             <SavedCharacterLibrary
               items={repositoryStore.savedCharacterPrompts}
               repository={repository}
+              onCreateFrom={(character) => {
+                void navigate(APP_PATHS.studio);
+                copyCharacter(character);
+              }}
+              onOpenWardrobe={(character) => {
+                void navigate(APP_PATHS.studio);
+                openWardrobe(character);
+              }}
               onUse={(character) => {
                 applyRecipeSelection({
                   origin: 'character-prompt',
@@ -1614,6 +1675,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                 (item) => item.modelModeId === 'lucy-vton-latest',
               )}
               repository={repository}
+              onCreate={() => {
+                void navigate(APP_PATHS.studio);
+                openNewOutfitBuilder(false, 'library');
+              }}
               onUse={(outfit) => {
                 selectSavedOutfit(outfit);
                 void navigate(APP_PATHS.studio);
@@ -1722,6 +1787,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                   return;
                 }
                 updateOutfitBuilderDirty(false);
+                if (outfitBuilderLaunch.destination === 'library') {
+                  closeOverlay();
+                  void navigate(APP_PATHS.outfits);
+                  return;
+                }
                 openOverlay(
                   outfitBuilderLaunch.destination === 'shelf' ? 'recipe-shelf' : 'outfit-selector',
                 );
@@ -1765,6 +1835,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                 character={wardrobeCharacter}
                 addOutfitAvailable={Boolean(availability.wardrobeAddOutfitAvailable)}
                 changeFeaturesAvailable={Boolean(availability.referenceImageEditAvailable)}
+                elevenLabsAvailable={availability.elevenLabs}
+                savedOutfits={repositoryStore.savedPrompts.filter(
+                  (outfit) => outfit.modelModeId === 'lucy-vton-latest',
+                )}
                 useDisabled={recipeInsertionBlocked || referenceUsePending}
                 onDirtyChange={setWardrobeDirty}
                 onClose={closeWardrobe}

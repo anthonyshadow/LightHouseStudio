@@ -1,6 +1,6 @@
 import type { CharacterReferenceOptions, ReferenceImageAsset } from '@studio/contracts';
 import { useTheme } from '@emotion/react';
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import {
   createOutfitTryOn,
   fetchReferenceImageMetadata,
@@ -12,6 +12,7 @@ import {
   ConfirmationDialog,
   ReferenceImagePreview,
   SegmentedControl,
+  SelectField,
   StatusNotice,
   TextAreaField,
   TextField,
@@ -21,7 +22,9 @@ import type {
   CreativeAssetRepository,
   CreativeAssetStore,
   SavedCharacterPrompt,
+  SavedPrompt,
 } from '../creative-assets/types';
+import { VoiceLibrary } from '../voice-effects/VoiceLibrary';
 import { ReferenceImageInputField } from '../reference-images/ReferenceImageInputField';
 import { useReferencePreviewGeneration } from '../character-builder/useReferencePreviewGeneration';
 import { CharacterVersionSelector, type CharacterVersionOption } from './CharacterVersionSelector';
@@ -56,6 +59,8 @@ export const CharacterWardrobePanel = ({
   character,
   addOutfitAvailable,
   changeFeaturesAvailable,
+  elevenLabsAvailable = false,
+  savedOutfits = [],
   useDisabled = false,
   onUse,
   onSaved,
@@ -67,6 +72,8 @@ export const CharacterWardrobePanel = ({
   readonly character: SavedCharacterPrompt;
   readonly addOutfitAvailable: boolean;
   readonly changeFeaturesAvailable: boolean;
+  readonly elevenLabsAvailable?: boolean;
+  readonly savedOutfits?: readonly SavedPrompt[];
   readonly useDisabled?: boolean;
   readonly onUse: (selection: CharacterVersionSelection) => void;
   readonly onSaved?: () => void;
@@ -80,10 +87,13 @@ export const CharacterWardrobePanel = ({
   );
   const [query, setQuery] = useState('');
   const [creating, setCreating] = useState<CreationKind | null>(null);
+  const [configuringVoice, setConfiguringVoice] = useState(false);
   const [sourceVariantId, setSourceVariantId] = useState<string | null>(
     character.selectedWardrobeVariantId,
   );
   const [garment, setGarment] = useState<File | null>(null);
+  const [garmentInputKind, setGarmentInputKind] = useState<'upload' | 'saved'>('upload');
+  const [selectedSavedOutfitId, setSelectedSavedOutfitId] = useState('');
   const [instructions, setInstructions] = useState('');
   const [allowDrasticChanges, setAllowDrasticChanges] = useState(false);
   const [title, setTitle] = useState('');
@@ -98,10 +108,15 @@ export const CharacterWardrobePanel = ({
   const sourceAssetId = sourceVariantId
     ? (variants.find((variant) => variant.id === sourceVariantId)?.referenceImageAssetId ?? null)
     : character.referenceImageAssetId;
+  const imageBackedOutfits = savedOutfits.filter(
+    (outfit) => outfit.modelModeId === 'lucy-vton-latest' && outfit.referenceImageAssetId,
+  );
   const dirty =
     creating !== null &&
     Boolean(
       sourceVariantId !== character.selectedWardrobeVariantId ||
+      garmentInputKind !== 'upload' ||
+      selectedSavedOutfitId ||
       garment ||
       instructions.trim() ||
       allowDrasticChanges ||
@@ -131,25 +146,22 @@ export const CharacterWardrobePanel = ({
     },
   });
 
-  const options = useMemo<CharacterVersionOption[]>(
-    () => [
-      {
-        value: ORIGINAL_VALUE,
-        title: 'Original',
-        referenceImageAssetId: character.referenceImageAssetId,
-        original: true,
-        useCount: character.useCount,
-      },
-      ...variants.map((variant) => ({
-        value: variant.id,
-        title: variant.title,
-        referenceImageAssetId: variant.referenceImageAssetId,
-        original: false,
-        useCount: variant.useCount,
-      })),
-    ],
-    [character.referenceImageAssetId, character.useCount, variants],
-  );
+  const options: CharacterVersionOption[] = [
+    {
+      value: ORIGINAL_VALUE,
+      title: 'Original',
+      referenceImageAssetId: character.referenceImageAssetId,
+      original: true,
+      useCount: character.useCount,
+    },
+    ...variants.map((variant) => ({
+      value: variant.id,
+      title: variant.title,
+      referenceImageAssetId: variant.referenceImageAssetId,
+      original: false,
+      useCount: variant.useCount,
+    })),
+  ];
   const visibleOptions = options.filter((option) =>
     option.title.toLocaleLowerCase().includes(query.trim().toLocaleLowerCase()),
   );
@@ -169,8 +181,20 @@ export const CharacterWardrobePanel = ({
   };
 
   const generateOutfit = async () => {
-    if (!sourceAssetId || !garment || busy || !addOutfitAvailable) return;
-    const key = `${sourceAssetId}:${garment.name}:${garment.size}:${garment.lastModified}`;
+    const savedGarmentAssetId = imageBackedOutfits.find(
+      (outfit) => outfit.id === selectedSavedOutfitId,
+    )?.referenceImageAssetId;
+    if (
+      !sourceAssetId ||
+      (garmentInputKind === 'upload' ? !garment : !savedGarmentAssetId) ||
+      busy ||
+      !addOutfitAvailable
+    )
+      return;
+    const key =
+      garmentInputKind === 'upload'
+        ? `${sourceAssetId}:${garment!.name}:${garment!.size}:${garment!.lastModified}`
+        : `${sourceAssetId}:saved:${selectedSavedOutfitId}:${savedGarmentAssetId}`;
     const controller = new AbortController();
     operationRef.current = { controller, key };
     setBusy(true);
@@ -178,11 +202,16 @@ export const CharacterWardrobePanel = ({
     let providerFingerprint: string | null = null;
     let providerRequestId: string | null = null;
     try {
-      const validation = await validateReferenceImage(garment, 'lucy-vton-latest');
-      if (validation.blockingError) throw new Error(validation.blockingError);
-      const garmentAsset = garmentAssetId
-        ? { assetId: garmentAssetId }
-        : await uploadReferenceImage(garment, createId(), controller.signal);
+      if (garmentInputKind === 'upload') {
+        const validation = await validateReferenceImage(garment!, 'lucy-vton-latest');
+        if (validation.blockingError) throw new Error(validation.blockingError);
+      }
+      const garmentAsset =
+        garmentInputKind === 'saved'
+          ? { assetId: savedGarmentAssetId! }
+          : garmentAssetId
+            ? { assetId: garmentAssetId }
+            : await uploadReferenceImage(garment!, createId(), controller.signal);
       if (controller.signal.aborted || operationRef.current?.key !== key) return;
       setGarmentAssetId(garmentAsset.assetId);
       providerFingerprint = `${key}:${garmentAsset.assetId}`;
@@ -276,6 +305,8 @@ export const CharacterWardrobePanel = ({
     setCreating(null);
     setTitle('');
     setGarment(null);
+    setGarmentInputKind('upload');
+    setSelectedSavedOutfitId('');
     setGarmentAssetId(null);
     setInstructions('');
     setAllowDrasticChanges(false);
@@ -284,6 +315,56 @@ export const CharacterWardrobePanel = ({
   };
 
   if (!creating) {
+    if (configuringVoice) {
+      return (
+        <div
+          data-scroll-region="character-default-voice"
+          css={{
+            height: '100%',
+            minHeight: 0,
+            overflow: 'auto',
+            display: 'grid',
+            gap: theme.space.md,
+          }}
+        >
+          <div
+            css={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', gap: theme.space.xs }}
+          >
+            <Button variant="quiet" onClick={() => setConfiguringVoice(false)}>
+              ‹ Back to wardrobe
+            </Button>
+            {character.defaultVoice ? (
+              <Button
+                variant="secondary"
+                onClick={() =>
+                  repository.updateSavedCharacterPrompt(character.id, { defaultVoice: null })
+                }
+              >
+                Remove default voice
+              </Button>
+            ) : null}
+          </div>
+          <StatusNotice tone="neutral">
+            {character.defaultVoice
+              ? `${character.defaultVoice.voiceName} is selected automatically when this character is chosen in the existing-video editor. You can still override it per edit.`
+              : 'No default voice is attached. Choose a saved voice below to attach one.'}
+          </StatusNotice>
+          <VoiceLibrary
+            disabled={false}
+            selectedVoiceId={character.defaultVoice?.voiceId ?? null}
+            onSelect={(voice) =>
+              repository.updateSavedCharacterPrompt(character.id, {
+                defaultVoice: {
+                  kind: 'elevenlabs',
+                  voiceId: voice.voiceId,
+                  voiceName: voice.name,
+                },
+              })
+            }
+          />
+        </div>
+      );
+    }
     const deleteCandidate = deleteCandidateId
       ? (variants.find((variant) => variant.id === deleteCandidateId) ?? null)
       : null;
@@ -322,6 +403,20 @@ export const CharacterWardrobePanel = ({
               onClick={() => setCreating('change-features')}
             >
               Change features
+            </Button>
+            <Button
+              variant="secondary"
+              disabled={!elevenLabsAvailable}
+              title={
+                elevenLabsAvailable
+                  ? undefined
+                  : 'Default voices are unavailable until ElevenLabs is configured.'
+              }
+              onClick={() => setConfiguringVoice(true)}
+            >
+              {character.defaultVoice
+                ? `Default voice: ${character.defaultVoice.voiceName}`
+                : 'Attach default voice'}
             </Button>
           </div>
           {!character.referenceImageAssetId ? (
@@ -413,7 +508,9 @@ export const CharacterWardrobePanel = ({
   const saveGuidance = variantSaveGuidance(Boolean(preview), Boolean(title.trim()));
   const creatingOutfit = creating === 'add-outfit';
   const generationDisabled = creatingOutfit
-    ? !garment || !sourceAssetId || !addOutfitAvailable
+    ? (garmentInputKind === 'upload' ? !garment : !selectedSavedOutfitId) ||
+      !sourceAssetId ||
+      !addOutfitAvailable
     : !instructions.trim() || !sourceAssetId || !changeFeaturesAvailable;
   const generateLabel = generationActionLabel(creating, Boolean(preview));
 
@@ -517,23 +614,68 @@ export const CharacterWardrobePanel = ({
                 />
               </div>
               {creating === 'add-outfit' ? (
-                <ReferenceImageInputField
-                  kind="garment"
-                  label="Garment image"
-                  file={garment}
-                  disabled={busy}
-                  allowUrlImport
-                  onSelectFile={(file) => {
-                    invalidatePreview();
-                    setGarmentAssetId(null);
-                    setGarment(file);
-                  }}
-                  onRemove={() => {
-                    invalidatePreview();
-                    setGarmentAssetId(null);
-                    setGarment(null);
-                  }}
-                />
+                <div css={{ display: 'grid', gap: theme.space.sm }}>
+                  <SegmentedControl
+                    label="Garment source"
+                    value={garmentInputKind}
+                    options={[
+                      { value: 'upload', label: 'Upload image' },
+                      { value: 'saved', label: 'Saved outfit' },
+                    ]}
+                    disabled={busy}
+                    onChange={(value) => {
+                      invalidatePreview();
+                      setGarmentInputKind(value);
+                      setGarment(null);
+                      setGarmentAssetId(null);
+                      setSelectedSavedOutfitId('');
+                    }}
+                  />
+                  {garmentInputKind === 'upload' ? (
+                    <ReferenceImageInputField
+                      kind="garment"
+                      label="Garment image"
+                      file={garment}
+                      disabled={busy}
+                      allowUrlImport
+                      onSelectFile={(file) => {
+                        invalidatePreview();
+                        setGarmentAssetId(null);
+                        setGarment(file);
+                      }}
+                      onRemove={() => {
+                        invalidatePreview();
+                        setGarmentAssetId(null);
+                        setGarment(null);
+                      }}
+                    />
+                  ) : (
+                    <SelectField
+                      label="Saved outfit"
+                      value={selectedSavedOutfitId}
+                      disabled={busy || imageBackedOutfits.length === 0}
+                      placeholder={
+                        imageBackedOutfits.length
+                          ? 'Choose a saved outfit'
+                          : 'No image outfits saved'
+                      }
+                      options={imageBackedOutfits.map((outfit) => ({
+                        value: outfit.id,
+                        label: outfit.title,
+                        description: outfit.prompt || 'Reference-image outfit',
+                      }))}
+                      hint="Only saved outfits with a reference image can generate a wardrobe variant."
+                      onValueChange={(value) => {
+                        invalidatePreview();
+                        setSelectedSavedOutfitId(value);
+                        setGarmentAssetId(
+                          imageBackedOutfits.find((outfit) => outfit.id === value)
+                            ?.referenceImageAssetId ?? null,
+                        );
+                      }}
+                    />
+                  )}
+                </div>
               ) : (
                 <div css={{ display: 'grid', gap: theme.space.xs }}>
                   <TextAreaField

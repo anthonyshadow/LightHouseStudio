@@ -224,6 +224,9 @@ export const ExistingVideoPanel = ({
             }
           : {}),
       });
+      if (step.modelId === 'lucy-latest' && recipe.defaultVoice) {
+        workflow.selectVoice(recipe.defaultVoice.voiceId, recipe.defaultVoice.voiceName);
+      }
     } catch {
       if (step.modelId === 'lucy-vton-latest') {
         setReferenceError(

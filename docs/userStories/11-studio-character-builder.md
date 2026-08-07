@@ -7,7 +7,10 @@ reference, then select it in the originating Studio or uploaded-video context wi
 
 Enter `/studio`; the one Studio stage stays mounted behind the fullscreen Builder. Create from the
 desktop Character rail or Shelf, or from **Create A Character** at the end of an uploaded video's
-saved-character chooser. Edit from the active-character selector or a true character card. Recording and
+saved-character chooser. **Create new character** in Saved Characters opens the same Builder with a
+brand-new create target. **Create new from this character** hydrates that character into a distinct
+create target, so saving creates a new ID and leaves the source unchanged. Edit from the
+active-character selector or a true character card. Recording and
 finalization block Builder entry. Take review blocks the general Studio entry but not the explicit
 handoff from an unsubmitted edited-video Character Swap step.
 

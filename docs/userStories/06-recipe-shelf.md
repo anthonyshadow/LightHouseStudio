@@ -26,7 +26,9 @@ projects.
    parent/variant usage and persisting that character's selected version. Saving a new variant does
    not select it.
 8. **Add Outfit** uses the selected original/variant as the person source plus one shared
-   upload/public-HTTPS garment input. Only explicit Generate/Regenerate contacts the independently
+   upload/public-HTTPS garment input or one image-backed saved outfit. Prompt-only saved outfits
+   remain available to the video editor but are not garment-image choices. Only explicit
+   Generate/Regenerate contacts the independently
    configured Pruna try-on path. **Change Features** shows the exact source and sends required
    changes through the configured reference-image edit provider with optimization disabled. The
    parent prompt accompanies Original-source edits only; variant-source edits send the selected
@@ -35,6 +37,9 @@ projects.
    obvious, and realistic while non-conflicting traits preserve character continuity. Both show a
    preview, require a non-empty title, reject stale results, and save only the latest valid result
    under the original parent character.
+9. **Attach default voice** opens the existing Saved/Browse Voice library only after that explicit
+   action. Selecting a saved voice persists its opaque ID and display name on the character;
+   **Remove default voice** returns it to no default without removing the saved-voice relationship.
 
 ## Guards and recovery
 
@@ -44,11 +49,11 @@ projects.
   recording/take review and by incompatible cross-model changes during active AI.
 - Missing reference bytes pause Use with **Retry**. **Continue without reference** appears only
   when a usable prompt remains; image-only outfits offer Retry or removal.
-- Valid v1-v5 data migrates to Recipe Shelf v6. V4 VTO records with references become saved-image
+- Valid v1-v6 data migrates to Recipe Shelf v7. V4 VTO records with references become saved-image
   outfits, other VTO records become prompt outfits, enhancement defaults false, and Character
   records use a null VTO kind/false enhancement. Older characters receive an empty Wardrobe with
   the original selected. Dangling/cross-parent/malformed selections are repaired and Wardrobe
-  metadata is capped at 500 records.
+  metadata is capped at 500 records. V6 characters gain a null default voice.
 - If `localStorage` is unavailable, the Shelf continues in session-only mode and says changes will
   be lost when the tab closes.
 - Browser storage contains allowlisted metadata, provenance, and opaque reference IDs—not image

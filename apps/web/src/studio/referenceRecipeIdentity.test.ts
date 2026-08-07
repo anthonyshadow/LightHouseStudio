@@ -23,7 +23,7 @@ const prompt: SavedPrompt = {
 };
 
 const store: CreativeAssetStore = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   savedPrompts: [prompt],
   recentPrompts: [],
   savedCharacterPrompts: [],

@@ -4,6 +4,7 @@ import { referenceImageContentUrl } from '../../adapters/api-client/referenceIma
 import { Button, SelectField, type SelectOption } from '../../ui';
 import { CharacterVersionSelector } from '../character-wardrobe/CharacterVersionSelector';
 import type { VtonInputKind } from '../creative-assets/types';
+import type { SavedCharacterVoicePreference } from '../creative-assets/types';
 import type { ExistingVideoStep } from './useExistingVideoWorkflow';
 
 export type ExistingVideoSavedRecipe = Readonly<{
@@ -17,6 +18,7 @@ export type ExistingVideoSavedRecipe = Readonly<{
   savedCharacterPromptId?: string;
   savedCharacterVariantId?: string;
   originalCharacterVersion?: boolean;
+  defaultVoice?: SavedCharacterVoicePreference | null;
 }>;
 
 const CREATE_CHARACTER_VALUE = '__create-character__';

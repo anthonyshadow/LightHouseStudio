@@ -9,6 +9,7 @@ import {
   OLDER_CREATIVE_ASSET_STORAGE_KEY,
   ORIGINAL_CREATIVE_ASSET_STORAGE_KEY,
   PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
+  WARDROBE_CREATIVE_ASSET_STORAGE_KEY,
   type GuidedDesignV1,
   type StorageLike,
 } from './types';
@@ -611,6 +612,77 @@ describe('createCreativeAssetRepository', () => {
       savedCharacterPrompts: [expect.objectContaining({ selectedWardrobeVariantId: null })],
       savedCharacterVariants: [],
     });
+  });
+
+  it('migrates the v6 key and initializes nullable character voice preferences', () => {
+    const storage = new MemoryStorage();
+    storage.records.set(
+      WARDROBE_CREATIVE_ASSET_STORAGE_KEY,
+      JSON.stringify({
+        schemaVersion: 6,
+        savedPrompts: [],
+        recentPrompts: [],
+        savedCharacterPrompts: [
+          {
+            id: 'v6-character',
+            name: 'V6 character',
+            prompt: 'Replace the subject with a presenter.',
+            source: 'generator',
+            promptIntent: 'character-transform',
+            builderDraft: null,
+            guidedDesign: null,
+            referenceImageStatus: 'prompt-only',
+            referenceImageAssetId: null,
+            uploadedReferenceImageAssetId: null,
+            finalReferenceKind: null,
+            selectedWardrobeVariantId: null,
+            notes: '',
+            tags: [],
+            createdAt: '2026-07-14T12:00:00.000Z',
+            updatedAt: '2026-07-14T12:00:00.000Z',
+            lastUsedAt: null,
+            useCount: 0,
+          },
+        ],
+        savedCharacterVariants: [],
+      }),
+    );
+
+    expect(createCreativeAssetRepository({ storage }).getSnapshot().store).toMatchObject({
+      schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
+      savedCharacterPrompts: [expect.objectContaining({ defaultVoice: null })],
+    });
+    expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
+  });
+
+  it('treats a clean user-scoped v6 envelope as a healthy migration', () => {
+    const storage = new MemoryStorage();
+    const ownerUserId = 'user-1';
+    const legacyKey = `${WARDROBE_CREATIVE_ASSET_STORAGE_KEY}.${ownerUserId}`;
+    const storageKey = `${CREATIVE_ASSET_STORAGE_KEY}.${ownerUserId}`;
+    storage.records.set(
+      legacyKey,
+      JSON.stringify({
+        ownerUserId,
+        store: {
+          schemaVersion: 6,
+          savedPrompts: [],
+          recentPrompts: [],
+          savedCharacterPrompts: [],
+          savedCharacterVariants: [],
+        },
+      }),
+    );
+
+    const repository = createCreativeAssetRepository({
+      storage,
+      storageKey,
+      legacyStorageKeys: [legacyKey],
+      ownerUserId,
+    });
+
+    expect(repository.getSnapshot()).toMatchObject({ health: 'ready', notice: null });
+    expect(storage.records.has(storageKey)).toBe(true);
   });
 
   it('recovers rather than silently treating a corrupt legacy payload as a migration', () => {

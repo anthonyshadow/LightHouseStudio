@@ -32,6 +32,8 @@ import {
   ORIGINAL_CREATIVE_ASSET_STORAGE_KEY,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
+  WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION,
+  WARDROBE_CREATIVE_ASSET_STORAGE_KEY,
   type CreateSavedCharacterPromptInput,
   type CreateSavedCharacterVariantInput,
   type CreateSavedPromptInput,
@@ -76,6 +78,7 @@ export interface CreativeAssetRepositoryOptions {
   readonly storage?: StorageLike | null;
   readonly storageKey?: string;
   readonly legacyStorageKey?: string | null;
+  readonly legacyStorageKeys?: readonly string[];
   readonly now?: () => Date;
   readonly idFactory?: () => string;
   readonly ownerUserId?: string;
@@ -94,6 +97,7 @@ const normalizeCharacterPromptInput = (input: CreateSavedCharacterPromptInput) =
   ...(input.finalReferenceKind === undefined
     ? {}
     : { finalReferenceKind: input.finalReferenceKind }),
+  defaultVoice: input.defaultVoice ?? null,
   notes: input.notes ?? '',
   tags: input.tags ?? [],
 });
@@ -126,15 +130,18 @@ const storageNotice = (health: CreativeAssetRepositoryState['health']) => {
 const isSupportedLegacyPayload = (serialized: string): boolean => {
   try {
     const value = JSON.parse(serialized) as unknown;
+    const payload =
+      typeof value === 'object' && value !== null && 'store' in value ? value.store : value;
     return (
-      typeof value === 'object' &&
-      value !== null &&
-      'schemaVersion' in value &&
-      (value.schemaVersion === LEGACY_CREATIVE_ASSET_SCHEMA_VERSION ||
-        value.schemaVersion === ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION ||
-        value.schemaVersion === EARLIER_CREATIVE_ASSET_SCHEMA_VERSION ||
-        value.schemaVersion === OLDER_CREATIVE_ASSET_SCHEMA_VERSION ||
-        value.schemaVersion === PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION)
+      typeof payload === 'object' &&
+      payload !== null &&
+      'schemaVersion' in payload &&
+      (payload.schemaVersion === LEGACY_CREATIVE_ASSET_SCHEMA_VERSION ||
+        payload.schemaVersion === ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION ||
+        payload.schemaVersion === EARLIER_CREATIVE_ASSET_SCHEMA_VERSION ||
+        payload.schemaVersion === OLDER_CREATIVE_ASSET_SCHEMA_VERSION ||
+        payload.schemaVersion === PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION ||
+        payload.schemaVersion === WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION)
     );
   } catch {
     return false;
@@ -239,10 +246,12 @@ export const createCreativeAssetRepository = (
   options: CreativeAssetRepositoryOptions = {},
 ): CreativeAssetRepository => {
   const storageKey = options.storageKey ?? CREATIVE_ASSET_STORAGE_KEY;
-  const legacyStorageKeys =
-    options.legacyStorageKey === undefined
+  const legacyStorageKeys = options.legacyStorageKeys
+    ? [...options.legacyStorageKeys]
+    : options.legacyStorageKey === undefined
       ? options.storageKey === undefined
         ? [
+            WARDROBE_CREATIVE_ASSET_STORAGE_KEY,
             PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
             OLDER_CREATIVE_ASSET_STORAGE_KEY,
             EARLIER_CREATIVE_ASSET_STORAGE_KEY,
@@ -403,6 +412,7 @@ export const createCreativeAssetRepository = (
     existing.referenceImageAssetId === candidate.referenceImageAssetId &&
     existing.uploadedReferenceImageAssetId === candidate.uploadedReferenceImageAssetId &&
     existing.finalReferenceKind === candidate.finalReferenceKind &&
+    JSON.stringify(existing.defaultVoice) === JSON.stringify(candidate.defaultVoice) &&
     existing.notes === candidate.notes &&
     JSON.stringify(existing.tags) === JSON.stringify(candidate.tags);
 
@@ -574,6 +584,7 @@ export const createCreativeAssetRepository = (
           ...(input.finalReferenceKind === undefined
             ? {}
             : { finalReferenceKind: input.finalReferenceKind }),
+          ...(input.defaultVoice === undefined ? {} : { defaultVoice: input.defaultVoice }),
           ...(input.notes === undefined ? {} : { notes: input.notes }),
           ...(input.tags === undefined ? {} : { tags: input.tags }),
         },

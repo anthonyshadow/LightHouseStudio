@@ -66,6 +66,9 @@ source, then edit either base, download, start over, or discard.
    creator may write a different prompt. A prompt-only saved character fills Prompt. Character
    and VTO reference fields accept local JPEG/PNG/WebP or the explicitly revealed public-HTTPS URL
    importer. An attached reference renders a local preview with replace and remove actions.
+   If the selected parent character has a default saved voice, its opaque voice ID and display name
+   are also selected in the Voice plan. This performs no conversion and the creator can override it
+   through the ordinary Voice workspace before Start edit.
    Explicitly closing the panel retains the tab-local selection and plan; an **Edit video** action
    in the recorded-take controls reopens the same workflow. Whenever a playback is retained and
    **Edit Video** is available, the main Studio tool row/column disables its live-only **Select

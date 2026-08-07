@@ -5,6 +5,7 @@ import {
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+  WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION,
   type CreativeAssetSearchResults as DomainCreativeAssetSearchResults,
   type CreativeAssetStore as DomainCreativeAssetStore,
   type GuidedDesignV1 as DomainGuidedDesignV1,
@@ -14,6 +15,7 @@ import {
   type SavedCharacterPrompt as DomainSavedCharacterPrompt,
   type SavedCharacterVariant as DomainSavedCharacterVariant,
   type SavedCharacterVariantCreation as DomainSavedCharacterVariantCreation,
+  type SavedCharacterVoicePreference as DomainSavedCharacterVoicePreference,
   type CharacterVersionSelection as DomainCharacterVersionSelection,
   type SavedPrompt as DomainSavedPrompt,
   type SavedPromptSource,
@@ -29,8 +31,10 @@ export {
   OLDER_CREATIVE_ASSET_SCHEMA_VERSION,
   ORIGINAL_CREATIVE_ASSET_SCHEMA_VERSION,
   PREVIOUS_CREATIVE_ASSET_SCHEMA_VERSION,
+  WARDROBE_CREATIVE_ASSET_SCHEMA_VERSION,
 };
-export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
+export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v7';
+export const WARDROBE_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
 export const PREVIOUS_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v5';
 export const OLDER_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v4';
 export const EARLIER_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v3';
@@ -48,6 +52,7 @@ export type RecentPrompt = DomainRecentPrompt;
 export type SavedCharacterPrompt = DomainSavedCharacterPrompt;
 export type SavedCharacterVariant = DomainSavedCharacterVariant;
 export type SavedCharacterVariantCreation = DomainSavedCharacterVariantCreation;
+export type SavedCharacterVoicePreference = DomainSavedCharacterVoicePreference;
 export type CharacterVersionSelection = DomainCharacterVersionSelection;
 export type CreativeAssetStore = DomainCreativeAssetStore;
 export type CreativeAssetSearchResults = DomainCreativeAssetSearchResults;
@@ -95,6 +100,7 @@ export interface CreateSavedCharacterPromptInput {
   readonly referenceImageAssetId?: string | null;
   readonly uploadedReferenceImageAssetId?: string | null;
   readonly finalReferenceKind?: 'uploaded' | 'generated' | null;
+  readonly defaultVoice?: SavedCharacterVoicePreference | null;
   readonly notes?: string;
   readonly tags?: readonly string[];
 }
@@ -116,6 +122,7 @@ export interface UpdateSavedCharacterPromptInput {
   readonly referenceImageAssetId?: string | null;
   readonly uploadedReferenceImageAssetId?: string | null;
   readonly finalReferenceKind?: 'uploaded' | 'generated' | null;
+  readonly defaultVoice?: SavedCharacterVoicePreference | null;
   readonly notes?: string;
   readonly tags?: readonly string[];
 }

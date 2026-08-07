@@ -71,6 +71,14 @@ export const createCharacterEditDraftValue = (
   };
 };
 
+export const createCharacterCopyDraftValue = (
+  asset: SavedCharacterPrompt,
+): CharacterBuilderDraftValueV1 => ({
+  ...createCharacterEditDraftValue(asset),
+  target: { kind: 'create' },
+  pendingSave: null,
+});
+
 const sameTarget = (left: CharacterBuilderTarget, right: CharacterBuilderTarget): boolean =>
   left.kind === right.kind &&
   (left.kind === 'create' || (right.kind === 'edit' && left.characterId === right.characterId));
@@ -82,6 +90,7 @@ export type CharacterBuilderLaunchRepository = Pick<
 
 export interface PrepareCharacterBuilderLaunchOptions {
   readonly target: CharacterBuilderTarget;
+  readonly replaceCreateDraft?: boolean;
   readonly confirmDiscard: (message: string) => boolean | Promise<boolean>;
   readonly ownerUserId?: string;
   readonly repository?: CharacterBuilderLaunchRepository;
@@ -89,6 +98,7 @@ export interface PrepareCharacterBuilderLaunchOptions {
 
 export const prepareCharacterBuilderLaunch = async ({
   target,
+  replaceCreateDraft = false,
   confirmDiscard,
   ownerUserId,
   repository = createCharacterBuilderDraftRepository({
@@ -100,7 +110,11 @@ export const prepareCharacterBuilderLaunch = async ({
 }: PrepareCharacterBuilderLaunchOptions): Promise<boolean> => {
   try {
     const active = await repository.load();
-    if (!active || sameTarget(active.value.target, target)) return true;
+    if (
+      !active ||
+      (sameTarget(active.value.target, target) && !(replaceCreateDraft && target.kind === 'create'))
+    )
+      return true;
     if (
       !(await confirmDiscard(
         'An unfinished character draft exists. Continue and discard it? If you cancel, the draft will stay unchanged.',

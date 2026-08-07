@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SavedCharacterPrompt } from '../features/creative-assets/types';
 import {
   createCharacterEditDraftValue,
+  createCharacterCopyDraftValue,
   prepareCharacterBuilderLaunch,
   type PrepareCharacterBuilderLaunchOptions,
 } from '../features/character-builder/characterBuilderLaunch';
@@ -13,6 +14,7 @@ import type {
 export type CharacterBuilderLaunch = Readonly<{
   target: CharacterBuilderTarget;
   initialValue?: CharacterBuilderDraftValueV1;
+  replaceCreateDraft?: boolean;
 }>;
 
 export type CharacterBuilderLaunchPreparer = (
@@ -80,6 +82,7 @@ export const useCharacterBuilderLaunchController = ({
       try {
         const ready = await prepareLaunch({
           target: nextLaunch.target,
+          replaceCreateDraft: nextLaunch.replaceCreateDraft ?? false,
           confirmDiscard: requestDiscard,
           ...(ownerUserId ? { ownerUserId } : {}),
         });
@@ -124,6 +127,17 @@ export const useCharacterBuilderLaunchController = ({
     [launchCharacterBuilder],
   );
 
+  const copyCharacter = useCallback(
+    (asset: SavedCharacterPrompt) => {
+      void launchCharacterBuilder({
+        target: { kind: 'create' },
+        initialValue: createCharacterCopyDraftValue(asset),
+        replaceCreateDraft: true,
+      });
+    },
+    [launchCharacterBuilder],
+  );
+
   const dismissLaunchError = useCallback(() => setLaunchError(null), []);
 
   return {
@@ -133,6 +147,7 @@ export const useCharacterBuilderLaunchController = ({
     launchCharacterBuilder,
     openNewCharacter,
     editCharacter,
+    copyCharacter,
     resolveDiscard: settleDiscard,
     dismissLaunchError,
   } as const;

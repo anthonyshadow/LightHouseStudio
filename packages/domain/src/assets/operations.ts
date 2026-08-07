@@ -21,6 +21,7 @@ import {
   type RecentPrompt,
   type SavedCharacterPrompt,
   type SavedCharacterPromptInput,
+  type SavedCharacterVoicePreference,
   type SavedCharacterVariant,
   type SavedCharacterVariantInput,
   type SavedPrompt,
@@ -63,6 +64,17 @@ const normalizeReferenceImageAssetId = (value: string | null | undefined): strin
     throw new AssetRuleError('invalid-id', 'A reference image asset ID cannot be empty.');
   }
   return assetId;
+};
+
+const normalizeCharacterVoice = (
+  value: SavedCharacterVoicePreference | null | undefined,
+): SavedCharacterVoicePreference | null => {
+  if (!value) return null;
+  return {
+    kind: 'elevenlabs',
+    voiceId: requireName(value.voiceId, 'Voice', 'invalid-id'),
+    voiceName: requireName(value.voiceName, 'Voice'),
+  };
 };
 
 const normalizeVtonRecipe = (input: {
@@ -558,6 +570,7 @@ export const createSavedCharacterPrompt = (
         : input.referenceImageStatus,
     ...reference,
     selectedWardrobeVariantId: null,
+    defaultVoice: normalizeCharacterVoice(input.defaultVoice),
     notes: normalizeWhitespace(input.notes ?? '', CHARACTER_NOTES_MAX_LENGTH),
     tags: normalizeTags(input.tags ?? []),
     createdAt: now,
@@ -590,6 +603,7 @@ export const updateSavedCharacterPrompt = (
       | 'referenceImageAssetId'
       | 'uploadedReferenceImageAssetId'
       | 'finalReferenceKind'
+      | 'defaultVoice'
       | 'notes'
       | 'tags'
     >
@@ -675,6 +689,9 @@ export const updateSavedCharacterPrompt = (
       guidedDesign: nextGuidedDesign,
       referenceImageStatus: nextReferenceImageStatus,
       ...reference,
+      ...(patch.defaultVoice === undefined
+        ? {}
+        : { defaultVoice: normalizeCharacterVoice(patch.defaultVoice) }),
       ...(patch.notes === undefined
         ? {}
         : { notes: normalizeWhitespace(patch.notes, CHARACTER_NOTES_MAX_LENGTH) }),

@@ -17,7 +17,7 @@ import { installProviderNetworkDriver } from './support/studioHarness.network';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 
 const SEEDED_UPLOAD_RECIPES = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   savedPrompts: [
     {
       id: 'character-anchor',

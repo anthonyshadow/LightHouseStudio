@@ -22,7 +22,7 @@ const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
 const SCREENSHOT_ROOT = path.resolve(
   process.env.LIGHTFRAME_SCREENSHOT_ROOT ?? path.join(process.cwd(), 'test-results', 'captures'),
 );
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
+const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v7';
 const FIXED_WEBP = Buffer.from(
   'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v3AgAA=',
   'base64',
@@ -37,7 +37,7 @@ const VIEWPORTS = [
 ] as const;
 
 const SEEDED_SHELF = {
-  schemaVersion: 6,
+  schemaVersion: 7,
   savedPrompts: [
     {
       id: 'character-amber-host',
@@ -123,6 +123,7 @@ const SEEDED_SHELF = {
       uploadedReferenceImageAssetId: null,
       finalReferenceKind: null,
       selectedWardrobeVariantId: null,
+      defaultVoice: null,
       notes: 'A grounded host treatment for field stories.',
       tags: ['host', 'editorial'],
       createdAt: '2026-07-16T14:30:00.000Z',

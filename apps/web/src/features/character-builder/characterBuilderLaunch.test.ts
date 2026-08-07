@@ -4,6 +4,7 @@ import { createCreativeAssetRepository } from '../creative-assets/repository';
 import { createFreshCharacterBuilderDraftValue } from './characterBuilderControllerSupport';
 import {
   createCharacterEditDraftValue,
+  createCharacterCopyDraftValue,
   prepareCharacterBuilderLaunch,
   type CharacterBuilderLaunchRepository,
 } from './characterBuilderLaunch';
@@ -65,6 +66,23 @@ describe('Character Builder launches', () => {
       characterBase: 'field explorer',
       customDetails: 'Keep the weathered canvas satchel.',
     });
+    expect(value.pendingSave).toBeNull();
+  });
+
+  it('hydrates a saved character into a new independent create target', () => {
+    const repository = createCreativeAssetRepository({ storage: null });
+    const character = repository.createSavedCharacterPrompt({
+      name: 'Field explorer',
+      prompt: 'Transform the subject into an adult field explorer.',
+      promptIntent: 'character-transform',
+      builderDraft: createPromptBuilderDraft('character-transform'),
+      referenceImageStatus: 'prompt-only',
+    });
+
+    const value = createCharacterCopyDraftValue(character);
+
+    expect(value.target).toEqual({ kind: 'create' });
+    expect(value.draft).toEqual(createCharacterEditDraftValue(character).draft);
     expect(value.pendingSave).toBeNull();
   });
 
@@ -138,6 +156,25 @@ describe('Character Builder launches', () => {
 
     expect(confirmDiscard).not.toHaveBeenCalled();
     expect(repository.resetDurably).not.toHaveBeenCalled();
+  });
+
+  it('requires discard before replacing an unfinished create draft with a saved character copy', async () => {
+    const { repository } = launchRepository(
+      activeRecord(createFreshCharacterBuilderDraftValue(), 6),
+    );
+    const confirmDiscard = vi.fn(() => true);
+
+    await expect(
+      prepareCharacterBuilderLaunch({
+        target: { kind: 'create' },
+        replaceCreateDraft: true,
+        confirmDiscard,
+        repository,
+      }),
+    ).resolves.toBe(true);
+
+    expect(confirmDiscard).toHaveBeenCalledOnce();
+    expect(repository.resetDurably).toHaveBeenCalledWith({ expectedRevision: 6 });
   });
 
   it('leaves an unfinished draft untouched when edit is cancelled', async () => {

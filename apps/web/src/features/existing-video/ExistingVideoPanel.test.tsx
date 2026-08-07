@@ -1212,6 +1212,7 @@ describe('ExistingVideoPanel', () => {
 
   it('hydrates and applies the exact wardrobe variant selected for a parent character', async () => {
     const updateStep = vi.fn();
+    const selectVoice = vi.fn();
     const source = new File(['video'], 'source.mp4', { type: 'video/mp4' });
     const variantReference = new File(['variant'], 'evening.jpg', { type: 'image/jpeg' });
     api.hydrateReferenceImage.mockResolvedValue({ file: variantReference });
@@ -1253,6 +1254,7 @@ describe('ExistingVideoPanel', () => {
             ],
             phase: 'ready',
             updateStep,
+            selectVoice,
           })}
           videoProcessingAvailable
           savedRecipes={[
@@ -1266,6 +1268,11 @@ describe('ExistingVideoPanel', () => {
               enhancePrompt: false,
               savedCharacterPromptId: 'host',
               originalCharacterVersion: true,
+              defaultVoice: {
+                kind: 'elevenlabs',
+                voiceId: 'northstar',
+                voiceName: 'Northstar',
+              },
             },
             {
               id: 'host-evening',
@@ -1278,6 +1285,11 @@ describe('ExistingVideoPanel', () => {
               savedCharacterPromptId: 'host',
               savedCharacterVariantId: 'host-evening',
               originalCharacterVersion: false,
+              defaultVoice: {
+                kind: 'elevenlabs',
+                voiceId: 'northstar',
+                voiceName: 'Northstar',
+              },
             },
           ]}
           onFinish={vi.fn()}
@@ -1302,6 +1314,7 @@ describe('ExistingVideoPanel', () => {
         referenceImage: variantReference,
       }),
     );
+    expect(selectVoice).toHaveBeenCalledWith('northstar', 'Northstar');
   });
 
   it('restores a saved prompt outfit in Prompt mode with its enhancement setting', async () => {
