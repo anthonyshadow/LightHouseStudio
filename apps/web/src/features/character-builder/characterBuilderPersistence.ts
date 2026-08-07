@@ -1,6 +1,7 @@
 import {
   characterReferenceOptionsSchema,
   referenceImageAssetIdSchema,
+  swapReadyCharacterReferenceOptions,
   type CharacterReferenceOptions,
 } from '@studio/contracts';
 import {
@@ -218,7 +219,15 @@ export const sanitizeCharacterBuilderDraftValue = (
       displayName: value.uploadedReference.displayName.trim().slice(0, 180),
     };
   }
-  return { target, draft, design, options: options.data, preview, uploadedReference, pendingSave };
+  return {
+    target,
+    draft,
+    design,
+    options: swapReadyCharacterReferenceOptions(options.data),
+    preview,
+    uploadedReference,
+    pendingSave,
+  };
 };
 
 export const characterSaveSnapshotFingerprint = async (

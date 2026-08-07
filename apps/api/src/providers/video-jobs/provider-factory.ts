@@ -24,6 +24,7 @@ const decartBinding = (provider: ExistingVideoJobProvider): ExistingVideoOperati
   outputSizing: 'exact-canonical',
   inputPreparation: 'none',
   referencePolicy: 'optional',
+  promptInput: 'editable',
   promptEnhancement: true,
   terminalFailureRelease: 'automatic',
 });
@@ -61,6 +62,7 @@ export const createExistingVideoProviderRegistry = (
             outputSizing: 'megapixel-budget',
             inputPreparation: 'h264-mp4',
             referencePolicy: 'required',
+            promptInput: 'server-default',
             promptEnhancement: false,
             terminalFailureRelease: 'explicit-user',
           };

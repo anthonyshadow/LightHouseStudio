@@ -67,6 +67,7 @@ describe('createExistingVideoProviderRegistry', () => {
       outputSizing: 'megapixel-budget',
       inputPreparation: 'h264-mp4',
       referencePolicy: 'required',
+      promptInput: 'server-default',
       promptEnhancement: false,
       terminalFailureRelease: 'explicit-user',
     });

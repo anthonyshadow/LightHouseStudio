@@ -4,12 +4,14 @@ import { videoOutputResolutionSchema } from './video-jobs';
 
 export const videoInputPreparationSchema = z.enum(['none', 'h264-mp4']);
 export const videoReferencePolicySchema = z.enum(['optional', 'required']);
+export const videoPromptInputSchema = z.enum(['editable', 'server-default']);
 export const videoTerminalFailureReleaseSchema = z.enum(['automatic', 'explicit-user']);
 export const videoProcessingOperationCapabilitySchema = z
   .object({
     available: z.boolean(),
     inputPreparation: videoInputPreparationSchema,
     referencePolicy: videoReferencePolicySchema,
+    promptInput: videoPromptInputSchema,
     promptEnhancement: z.boolean(),
     terminalFailureRelease: videoTerminalFailureReleaseSchema,
     outputResolutions: z.array(videoOutputResolutionSchema).min(1).max(2),
@@ -62,6 +64,7 @@ export const capabilitiesResponseSchema = z
 export type CapabilitiesResponse = z.infer<typeof capabilitiesResponseSchema>;
 export type VideoInputPreparation = z.infer<typeof videoInputPreparationSchema>;
 export type VideoReferencePolicy = z.infer<typeof videoReferencePolicySchema>;
+export type VideoPromptInput = z.infer<typeof videoPromptInputSchema>;
 export type VideoTerminalFailureRelease = z.infer<typeof videoTerminalFailureReleaseSchema>;
 export type VideoProcessingOperationCapability = z.infer<
   typeof videoProcessingOperationCapabilitySchema

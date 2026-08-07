@@ -50,10 +50,10 @@ source, then edit either base, download, start over, or discard.
    topmost confirmation that names the settings to be cleared and states that Voice is compatible
    with the replacement and will not be affected. Cancel preserves the original visual settings
    and configuration view; confirm clears them and selects the replacement. Only the active
-   transformation owns the submitted prompt, capability-supported prompt-enhancement switch, and
-   validated reference. Character Swap may require one identity reference and disable prompt
-   enhancement; prompt-only saved recipes then remain selectable but cannot Start until a
-   reference is attached. This guidance remains provider-neutral. Saved characters and outfits,
+   transformation owns the submitted recipe and validated reference. Capabilities determine
+   whether prompt input is editable or server-owned. A server-default Character Swap requires one
+   identity reference, hides prompt/enhancement controls, filters prompt-only saved characters,
+   and keeps its submitted prompt empty. This guidance remains provider-neutral. Saved characters and outfits,
    output resolution, and saved/recent outfit selection use the same keyboard-operable custom
    chooser. It is an anchored listbox on larger viewports and a safe-area-aware bottom sheet on
    phones, with 44px-or-larger touch targets, typeahead, Escape/focus restoration, and no document
@@ -62,8 +62,9 @@ source, then edit either base, download, start over, or discard.
    original/variant version grid. **Create new wardrobe variant** opens that parent's Wardrobe and
    a successful save returns to the same Character Swap step; **Create A Character** still opens
    Character Builder and returns with the new parent selected. Selecting any exact saved version
-   with a reference attaches only that version's image and leaves Prompt empty so the
-   creator may write a different prompt. A prompt-only saved character fills Prompt. Character
+   with a reference attaches only that version's image. Editable-prompt bindings leave Prompt empty
+   so the creator may write a different prompt and may use a prompt-only saved character.
+   Server-default bindings expose neither behavior and keep prompt text empty. Character
    and VTO reference fields accept local JPEG/PNG/WebP or the explicitly revealed public-HTTPS URL
    importer. An attached reference renders a local preview with replace and remove actions.
    If the selected parent character has a default saved voice, its opaque voice ID and display name
@@ -189,12 +190,16 @@ source, then edit either base, download, start over, or discard.
 - Original/variant identity stays local metadata until explicit selection. Character Swap hydrates
   the exact selected asset; Virtual Try-On recipe/input selection remains unchanged.
 - Selecting an exact saved character version initially leaves Character Swap Prompt empty so its
-  image is authoritative. Text entered afterward is sent as the transformation instruction. The
-  Decart binding sends that text plus its enhancement flag; the Pruna binding disables enhancement
-  and sends non-blank text unchanged as `instruction_prompt`. Blank or whitespace-only text uses
-  Lightframe's Pruna-specific default: reference image 1 defines the exact facial identity and
-  appearance, the source supplies expressions/lip sync/pose/movement/timing/blocking, and source
-  framing, lighting, background, scene structure, objects, and audio remain unchanged.
+  image is authoritative. For Decart, text entered afterward is sent with its enhancement flag.
+  Pruna advertises a server-default prompt: the editor provides no prompt or enhancement control,
+  browser state is normalized to empty text, the broker rejects tampered non-empty text before
+  provider contact, and the adapter always uses Lightframe's Pruna-specific instruction. Reference
+  image 1 defines the exact facial identity, body, hair, clothing, footwear, and worn accessories;
+  source-person clothing is replaced and must not transfer onto the saved character. The source
+  supplies expressions/lip sync/gaze/pose/hand placement/gestures/movement/timing/blocking, and
+  every non-worn, held, carried, touched, picked-up, put-down, or otherwise interacted-with item
+  retains its appearance, visibility, position, motion, contact, occlusion, and timing. Source
+  framing, lighting, background, scene structure, other objects, and audio remain unchanged.
 - If an accepted job's status or content request is interrupted, prompt, reference, enhancement,
   and saved-recipe fields remain editable. The UI states that **Resume accepted job** still checks
   the immutable accepted recipe and creates no submission; draft edits apply only after that job

@@ -186,6 +186,7 @@ const providerRegistry = (
     outputSizing: 'exact-canonical' as const,
     inputPreparation: 'none' as const,
     referencePolicy: 'optional' as const,
+    promptInput: 'editable' as const,
     promptEnhancement: true,
   };
   return { 'character-swap': binding, 'virtual-try-on': binding };
@@ -358,6 +359,7 @@ describe('VideoJobService', () => {
           outputSizing: 'megapixel-budget',
           inputPreparation: 'none',
           referencePolicy: 'optional',
+          promptInput: 'editable',
           promptEnhancement: false,
         },
         'virtual-try-on': null,
@@ -421,6 +423,7 @@ describe('VideoJobService', () => {
           outputSizing: 'exact-canonical',
           inputPreparation: 'h264-mp4',
           referencePolicy: 'required',
+          promptInput: 'editable',
           promptEnhancement: false,
         },
         'virtual-try-on': null,
@@ -455,6 +458,57 @@ describe('VideoJobService', () => {
       message: 'Character Swap requires a reference image in this configuration.',
     });
     expect(provider.submissions).toEqual([]);
+  });
+
+  it('rejects creator prompt text when the active operation uses a server-owned default', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-server-prompt-'));
+    const provider = new FakeVideoProvider();
+    const service = createService(
+      {
+        'character-swap': {
+          provider,
+          outputResolutions: ['720p'],
+          defaultOutputResolution: '720p',
+          outputSizing: 'megapixel-budget',
+          inputPreparation: 'none',
+          referencePolicy: 'optional',
+          promptInput: 'server-default',
+          promptEnhancement: false,
+        },
+        'virtual-try-on': null,
+      },
+      root,
+    );
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const paths = await service.prepareJobDirectory(jobId);
+    await writeFile(paths.inputPath, Buffer.from(VIDEO_FIXTURE_BASE64, 'base64'), {
+      flag: 'wx',
+      mode: 0o600,
+    });
+
+    await expect(
+      service.start({
+        jobId,
+        ownerId: 'owner-server-prompt',
+        recipe: {
+          operation: 'character-swap',
+          inputKind: 'character',
+          prompt: 'Change the background.',
+          enhancePrompt: false,
+          hasReferenceImage: false,
+        },
+        directory: paths.directory,
+        inputPath: paths.inputPath,
+        referencePath: null,
+        referenceMimeType: null,
+      }),
+    ).rejects.toMatchObject({
+      statusCode: 400,
+      code: 'validation_error',
+      message: 'Prompt text is unavailable for Character Swap in this configuration.',
+    });
+    expect(provider.submissions).toHaveLength(0);
   });
 
   it('inspects, pins, and submits a client job exactly once before safe retrieval', async () => {
@@ -545,6 +599,7 @@ describe('VideoJobService', () => {
           outputSizing: 'exact-canonical',
           inputPreparation: 'h264-mp4',
           referencePolicy: 'optional',
+          promptInput: 'editable',
           promptEnhancement: false,
         },
         'virtual-try-on': null,
@@ -583,6 +638,7 @@ describe('VideoJobService', () => {
           outputSizing: 'megapixel-budget',
           inputPreparation: 'h264-mp4',
           referencePolicy: 'optional',
+          promptInput: 'editable',
           promptEnhancement: false,
           terminalFailureRelease: 'explicit-user',
         },

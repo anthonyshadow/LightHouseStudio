@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import type { VideoOutputResolution } from '@studio/contracts';
+import type { VideoOutputResolution, VideoPromptInput } from '@studio/contracts';
 import { Button, SelectField, Surface } from '../../ui';
 import {
   advancedStyles,
@@ -25,6 +25,7 @@ export interface ExistingVideoVisualEditorProps {
   readonly recipeLocked: boolean;
   readonly recipeLoading: boolean;
   readonly referenceRequired?: boolean;
+  readonly promptInput?: VideoPromptInput;
   readonly promptEnhancementSupported?: boolean;
   readonly outputResolutions?: readonly VideoOutputResolution[];
   readonly onApplySavedRecipe: (step: ExistingVideoStep, recipeId: string) => void;
@@ -60,6 +61,7 @@ export const ExistingVideoVisualEditor = ({
   recipeLocked,
   recipeLoading,
   referenceRequired = false,
+  promptInput = 'editable',
   promptEnhancementSupported = true,
   outputResolutions = ['720p'],
   onApplySavedRecipe,
@@ -191,7 +193,18 @@ export const ExistingVideoVisualEditor = ({
         </>
       )}
 
-      {step.modelId === 'lucy-latest' || step.inputKind === 'prompt' ? (
+      {step.modelId === 'lucy-latest' && promptInput === 'server-default' ? (
+        <Surface tone="soft" padding="compact">
+          <p>
+            Character Swap automatically uses the selected character's identity and wardrobe while
+            preserving the source performance, held items, and scene. Lightframe applies its
+            preservation instruction automatically; no custom prompt is accepted.
+          </p>
+        </Surface>
+      ) : null}
+
+      {promptInput === 'editable' &&
+      (step.modelId === 'lucy-latest' || step.inputKind === 'prompt') ? (
         <>
           <label>
             Prompt

@@ -160,9 +160,10 @@ For each resolution row:
 1. Obtain Billing Authorizer approval for the published $0.03/s 720p or $0.06/s 1080p price and
    confirm account entitlement. Treat the documented 3.58 seconds generation per source second as
    a 720p benchmark only; do not claim a quantified 1080p processing time.
-2. Confirm Character Swap requires one JPEG/PNG/WebP identity reference, prompt-only recipes stay
-   selectable but cannot Start without it, Enhance Prompt is disabled with generic guidance, and
-   no provider/model selector or provider name appears. Confirm the editor offers `720p` and
+2. Confirm Character Swap requires one JPEG/PNG/WebP identity reference, prompt-only characters are
+   absent, and neither Prompt nor Enhance Prompt is rendered. Confirm the provider-neutral notice
+   says the selected identity and source performance/scene are used automatically, with no
+   provider/model selector or provider name. Confirm the editor offers `720p` and
    `1080p`, defaults a new Character Swap setup to `720p`, and locks the choice after submission.
    Confirm VTO never contacts Pruna.
 3. Submit H.264 MP4 as pass-through. Separately Start from H.264 MOV and VP8 WebM, confirm local
@@ -173,12 +174,18 @@ For each resolution row:
 4. Confirm exactly two `/v1/files` uploads and exactly one `/v1/predictions` request with synthetic
    names, `Model: p-video-replace`, one `images` entry, the editor-selected `resolution`, `seed=0`,
    `turbo=false`, `target_fps=original`, `save_audio=true`, `ignore_audio=false`,
-   `disable_safety_checker=false`, and the unchanged creator prompt when non-blank. With an empty or
-   whitespace-only prompt, verify `instruction_prompt` is the app-owned Pruna default that requires
-   the output character to match reference image 1's facial identity/appearance, transfers source
-   expression/lip sync/pose/movement/timing/blocking, and keeps source framing, lighting,
-   background, scene structure, objects, and audio. There must be no webhook, initial retry,
+   `disable_safety_checker=false`. Verify the browser recipe contains an empty prompt and
+   `instruction_prompt` is always the app-owned Pruna default that requires
+   the output character to match reference image 1's facial identity, body, hair, wardrobe,
+   clothing, footwear, and worn accessories. Confirm source-person clothing is replaced rather than
+   copied onto the saved character. Confirm source expression/lip sync/gaze/pose/hand placement/
+   gestures/movement/timing/blocking transfers, every non-worn item the source person holds or
+   interacts with retains its appearance, visibility, position, motion, contact, occlusion, and
+   timing, and source framing, lighting, background, scene structure, other objects, and audio stay
+   unchanged. There must be no webhook, initial retry,
    fallback, raw identifier/URL/body leakage, or second prediction during Voice retry.
+   Separately submit a directly crafted non-empty recipe prompt and confirm the broker rejects it
+   before either upload or prediction creation.
 5. Observe starting/processing/succeeded and a controlled failed/canceled mapping. Interrupt status
    and result retrieval, then resume the accepted job without another prediction. Confirm Voice
    runs only after the visual result and its retry does not resubmit visual processing. For a

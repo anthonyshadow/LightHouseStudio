@@ -22,8 +22,9 @@ handoff from an unsubmitted edited-video Character Swap step.
    - **Preview:** review the combined direction and optionally generate a reference image.
      Every step label remains enabled and directly clickable. **Back** and **Continue** are
      conveniences, not validation gates.
-     Preview settings use the shared custom chooser for framing, orientation, rendering,
-     expression, and background. The chooser supports keyboard/typeahead and pointer input on an
+     Preview settings use the shared custom chooser for framing, orientation, rendering, and
+     expression. Generated references always use a uniform neutral-gray studio background; there
+     is no background chooser. The chooser supports keyboard/typeahead and pointer input on an
      anchored listbox, then adapts to a safe-area-aware touch sheet on phones without adding another
      Builder scroll owner.
 3. Choose one save path:
@@ -34,9 +35,10 @@ handoff from an unsubmitted edited-video Character Swap step.
 4. Name and save. Edit updates the existing character ID and preserves unrelated Shelf metadata.
 5. Builder closes and returns to its originating context:
    - general Studio entry preloads/selects the character in Lucy 2.5, Dock, and Shelf; or
-   - uploaded-video entry reopens the upload panel with the new character selected. When the saved
-     character has a reference, only that image fills the originating Character Swap step and the
-     creator may write a different prompt; a prompt-only character fills the prompt instead.
+   - uploaded-video entry reopens the upload panel with the new character selected. With an
+     editable-prompt Character Swap binding, image-backed and prompt-only handoff retains its prior
+     behavior. With a server-default binding such as Pruna, only an image-backed character can be
+     selected, its image fills the step, and prompt text stays empty and unavailable.
 
    Neither path starts/applies AI, creates a Recent item, or increments use count.
 
@@ -47,7 +49,7 @@ visible as a 400px desktop rail and joins the reading order on the Preview step 
 viewports; no character stateful control is duplicated.
 
 Every predefined option uses its profile-aware repository artwork when the catalog provides one.
-Shared semantic options such as adult age, role, style, expression, mood, and background resolve to
+Shared semantic options such as adult age, role, style, expression, and mood resolve to
 the artwork for the selected presentation. A per-field **Describe My Own** control is collapsed by
 default, reveals a specific 500-character text field on request, and collapses when a predefined
 option is selected. Custom presentation uses presentation-neutral artwork suggestions without
@@ -77,6 +79,11 @@ erasing existing choices.
 - Prompt-only, direct-upload, and image-only save do not contact the optimizer or image provider.
 - **Generate Preview** normally optimizes the structured direction, then makes one request to the
   startup-selected image provider. **Generate Combined Preview** also supplies the uploaded source.
+- Every new generation, regeneration, instructed edit, and composition is normalized in both the
+  browser and broker to a swap-ready profile: exactly one centered character, uniform neutral-gray
+  background, even diffuse lighting, no environment/depth cues, and no unrelated props. Restored
+  legacy background choices are normalized for the next request. Existing uploaded and immutable
+  reference assets remain unchanged.
 - If optimization is unavailable/fails, generation may continue once with the validated raw
   direction and a visible warning. **Retry optimization and regenerate** retries optimization
   first. Image submission is never automatically retried and never falls back to another provider.

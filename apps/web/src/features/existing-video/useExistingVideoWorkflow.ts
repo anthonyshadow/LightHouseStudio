@@ -246,6 +246,7 @@ const defaultVideoProcessingCapabilities: CapabilitiesResponse['videoProcessing'
     available: true,
     inputPreparation: 'none',
     referencePolicy: 'optional',
+    promptInput: 'editable',
     promptEnhancement: true,
     terminalFailureRelease: 'automatic',
     outputResolutions: ['720p'],
@@ -254,6 +255,7 @@ const defaultVideoProcessingCapabilities: CapabilitiesResponse['videoProcessing'
     available: true,
     inputPreparation: 'none',
     referencePolicy: 'optional',
+    promptInput: 'editable',
     promptEnhancement: true,
     terminalFailureRelease: 'automatic',
     outputResolutions: ['720p'],
@@ -694,10 +696,31 @@ export const useExistingVideoWorkflow = ({
   const updateStep = useCallback(
     (id: string, patch: Partial<Omit<ExistingVideoStep, 'id' | 'modelId'>>) => {
       if (submissionLocked) return;
-      setStep((current) => (current?.id === id ? { ...current, ...patch } : current));
+      setStep((current) => {
+        if (current?.id !== id) return current;
+        const next = { ...current, ...patch };
+        return capabilityForModel(current.modelId, videoProcessingCapabilities).promptInput ===
+          'server-default'
+          ? { ...next, prompt: '', enhancePrompt: false }
+          : next;
+      });
     },
-    [setStep, submissionLocked],
+    [setStep, submissionLocked, videoProcessingCapabilities],
   );
+
+  useEffect(() => {
+    setStep((current) => {
+      if (
+        !current ||
+        capabilityForModel(current.modelId, videoProcessingCapabilities).promptInput !==
+          'server-default' ||
+        (!current.prompt && !current.enhancePrompt)
+      ) {
+        return current;
+      }
+      return { ...current, prompt: '', enhancePrompt: false };
+    });
+  }, [setStep, videoProcessingCapabilities]);
 
   const removeStep = useCallback(
     (id: string) => {
@@ -1123,8 +1146,8 @@ export const useExistingVideoWorkflow = ({
       const recipe: VideoTransformRecipe = {
         operation,
         inputKind: step.inputKind,
-        prompt: step.prompt.trim(),
-        enhancePrompt: step.enhancePrompt,
+        prompt: capability.promptInput === 'server-default' ? '' : step.prompt.trim(),
+        enhancePrompt: capability.promptInput === 'server-default' ? false : step.enhancePrompt,
         hasReferenceImage: step.referenceImage !== null,
         outputResolution: step.outputResolution ?? capability.outputResolutions[0] ?? '720p',
       };

@@ -345,6 +345,7 @@ describe('ExistingVideoPanel', () => {
               available: true,
               inputPreparation: 'h264-mp4',
               referencePolicy: 'required',
+              promptInput: 'server-default',
               promptEnhancement: false,
               terminalFailureRelease: 'explicit-user',
               outputResolutions: ['720p', '1080p'],
@@ -353,6 +354,7 @@ describe('ExistingVideoPanel', () => {
               available: false,
               inputPreparation: 'none',
               referencePolicy: 'optional',
+              promptInput: 'editable',
               promptEnhancement: true,
               terminalFailureRelease: 'automatic',
               outputResolutions: ['720p'],
@@ -364,8 +366,11 @@ describe('ExistingVideoPanel', () => {
     );
 
     expect(screen.getByText(/requires one identity reference image/u)).toBeVisible();
-    expect(screen.getByRole('checkbox', { name: /^Enhance prompt/u })).toBeDisabled();
-    expect(screen.getByText(/Prompt enhancement is unavailable for Character Swap/u)).toBeVisible();
+    expect(screen.queryByLabelText('Prompt')).not.toBeInTheDocument();
+    expect(screen.queryByRole('checkbox', { name: /^Enhance prompt/u })).not.toBeInTheDocument();
+    expect(
+      screen.getByText(/automatically uses the selected character's identity and wardrobe/u),
+    ).toBeVisible();
     const resolution = screen.getByRole('combobox', { name: /Output resolution/u });
     expect(resolution).toHaveTextContent('720p');
     fireEvent.click(resolution);

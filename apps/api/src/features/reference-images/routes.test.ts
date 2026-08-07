@@ -284,14 +284,20 @@ describe('reference image API', () => {
         return providerImage(await createImage(input.size), input.format);
       }),
     };
-    const app = await setup(provider, optimizer());
+    const promptOptimizer = optimizer();
+    const app = await setup(provider, promptOptimizer);
     const rawPrompt = '  A moss-covered guardian.  ';
+    const legacyCustomBackgroundOptions = {
+      ...options,
+      background: 'plain_custom',
+      customBackground: 'A detailed moonlit city street.',
+    } as const;
 
     const optimized = await app.inject({
       method: 'POST',
       url: '/api/reference-images/optimize',
       headers: localHeaders,
-      payload: { rawPrompt, options },
+      payload: { rawPrompt, options: legacyCustomBackgroundOptions },
     });
     expect(optimized.statusCode).toBe(200);
     const optimization = optimized.json<OptimizeCharacterReferencePromptResponse>();
@@ -301,6 +307,11 @@ describe('reference image API', () => {
       version: 'lucy-character-reference-v1',
     });
     expect(optimization.inputHash).toMatch(/^[a-f0-9]{64}$/u);
+    const optimizerCalls = vi.mocked(promptOptimizer.optimize).mock.calls;
+    expect(optimizerCalls).toHaveLength(1);
+    expect(optimizerCalls[0]?.[0].options.background).toBe('neutral_gray');
+    expect(optimizerCalls[0]?.[0].options.customBackground).toBeUndefined();
+    expect(optimizerCalls[0]?.[1]).toBeInstanceOf(AbortSignal);
 
     const generated = await app.inject({
       method: 'POST',
@@ -309,7 +320,7 @@ describe('reference image API', () => {
       payload: {
         requestId,
         rawPrompt,
-        options,
+        options: legacyCustomBackgroundOptions,
         optimization: { enabled: true, ...optimization, manuallyEdited: false },
       },
     });
@@ -317,10 +328,11 @@ describe('reference image API', () => {
     expect(generated.statusCode).toBe(200);
     expect(providerInputs).toHaveLength(1);
     expect(providerInputs[0]).toMatchObject({
-      prompt: optimizedResult.optimizedImagePrompt,
       size: '1024x1024',
       format: 'jpeg',
     });
+    expect(providerInputs[0]?.prompt).toContain(optimizedResult.optimizedImagePrompt);
+    expect(providerInputs[0]?.prompt).toContain('uniform neutral gray studio background');
     expect(providerInputs[0]?.signal).toBeInstanceOf(AbortSignal);
     expect(generated.json<CreateReferenceImageResponse>().asset).toMatchObject({
       optimizationEnabled: true,
@@ -804,7 +816,8 @@ describe('reference image API', () => {
     });
 
     expect(generated.statusCode).toBe(200);
-    expect(inputs[0]?.prompt).toBe('A clockwork character');
+    expect(inputs[0]?.prompt).toContain('A clockwork character');
+    expect(inputs[0]?.prompt).toContain('uniform neutral gray studio background');
     expect(generated.json<CreateReferenceImageResponse>().asset).toMatchObject({
       optimizationEnabled: false,
       lucy25CharacterPrompt: 'A clockwork character',
@@ -812,7 +825,7 @@ describe('reference image API', () => {
     });
   });
 
-  it('uses the known landscape size without rewriting the raw fallback prompt', async () => {
+  it('uses the known landscape size with swap-ready staging on the raw fallback prompt', async () => {
     const inputs: GenerateReferenceImageProviderInput[] = [];
     const app = await setup({
       generate: vi.fn(async (input: GenerateReferenceImageProviderInput) => {
@@ -833,7 +846,8 @@ describe('reference image API', () => {
 
     expect(generated.statusCode).toBe(200);
     expect(inputs[0]).toMatchObject({ size: '1536x1024' });
-    expect(inputs[0]?.prompt).toBe('A clockwork character');
+    expect(inputs[0]?.prompt).toContain('A clockwork character');
+    expect(inputs[0]?.prompt).toContain('uniform neutral gray studio background');
   });
 
   it('blocks stale fingerprints, changed models, and contradictory settings before image generation', async () => {

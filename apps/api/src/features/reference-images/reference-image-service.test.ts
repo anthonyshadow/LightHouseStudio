@@ -515,7 +515,6 @@ describe('ReferenceImageService provider-result finalization parity', () => {
         model: 'flux-2-pro',
         quality: 'high',
         originalPrompt: input.rawPrompt,
-        derivedPrompt: result.optimizedImagePrompt,
         promptAudit: {
           optimizationEnabled: true,
           result,
@@ -542,6 +541,7 @@ describe('ReferenceImageService provider-result finalization parity', () => {
       if (storedInput.source === 'uploaded' || storedInput.source === 'derived') {
         throw new TypeError('Expected generated reference-image metadata.');
       }
+      expect(storedInput.derivedPrompt).toContain('uniform neutral gray studio background');
       expect(storedInput.promptHash).toMatch(/^[a-f0-9]{64}$/u);
       expect(storedInput.requestFingerprint).toMatch(/^[a-f0-9]{64}$/u);
     });

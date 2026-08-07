@@ -70,7 +70,10 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
   crop, rotation, flips, lighting and filters, on-device MP4 transcoding, playback, local voice
   effects, and download require no provider credentials or external media traffic.
 - Character Builder saves browser-local character metadata and immutable reference assets under
-  `LIGHTFRAME_DATA_DIR`. Prompt-only save and upload do not generate images.
+  `LIGHTFRAME_DATA_DIR`. Prompt-only save and upload do not generate images. Every newly generated,
+  regenerated, edited, or composed character reference is staged as one character on a uniform
+  neutral-gray background with no environment or unrelated props; existing uploaded and immutable
+  assets are not rewritten.
 - Saved Characters expose a normalized Wardrobe containing the labelled original plus saved
   variants, an optional saved-voice default, and image-backed saved outfits as garment choices.
   Browsing, duplication into a new Character Builder draft, exact version selection, and default
@@ -110,10 +113,13 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
   WebM are converted locally at explicit Start into an ephemeral submission Blob; the immutable
   source is unchanged. MP4 input passes through. Every prediction explicitly pins seed `0`, turbo
   off, original frame rate, source-audio conditioning/output, and the enabled safety checker.
-  Prompt enhancement is unavailable in this configuration. A blank or whitespace-only prompt uses
-  a server-owned Pruna instruction that makes reference image 1 authoritative for facial identity
-  and defining appearance while preserving the source performance, framing, lighting, background,
-  scene, objects, and audio. A written prompt remains byte-for-byte creator-authored.
+  Prompt entry and enhancement are unavailable in this configuration. The browser always submits
+  an empty recipe prompt, the broker rejects tampered non-empty prompt text, and the adapter always
+  uses a server-owned Pruna instruction that makes reference image 1 authoritative for facial
+  identity, defining appearance, clothing, footwear, and worn accessories. Source-person clothing
+  is replaced rather than transferred onto the saved character, while source performance, hand
+  placement, held-item visibility/interactions, framing, lighting, background, scene, other
+  objects, and audio are preserved.
 - Reference generation uses one startup-selected provider: OpenAI `gpt-image-2`, BFL
   `flux-2-pro`, or Wiro `seedream-v5-lite-uncensored`. There is no automatic billable retry or
   provider fallback.

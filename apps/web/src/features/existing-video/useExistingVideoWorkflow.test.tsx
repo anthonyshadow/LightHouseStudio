@@ -42,6 +42,7 @@ const requiredCharacterSwapCapabilities = {
     available: true,
     inputPreparation: 'h264-mp4',
     referencePolicy: 'required',
+    promptInput: 'server-default',
     promptEnhancement: false,
     terminalFailureRelease: 'explicit-user',
     outputResolutions: ['720p', '1080p'],
@@ -50,6 +51,7 @@ const requiredCharacterSwapCapabilities = {
     available: true,
     inputPreparation: 'none',
     referencePolicy: 'optional',
+    promptInput: 'editable',
     promptEnhancement: true,
     terminalFailureRelease: 'automatic',
     outputResolutions: ['720p'],
@@ -431,6 +433,7 @@ describe('useExistingVideoWorkflow', () => {
     expect(adapters.submitVideoJob.mock.calls[0]?.[2]).toBe(preparedFile);
     expect(adapters.submitVideoJob.mock.calls[0]?.[1]).toMatchObject({
       operation: 'character-swap',
+      prompt: '',
       enhancePrompt: false,
       hasReferenceImage: true,
       outputResolution: '1080p',
@@ -461,6 +464,7 @@ describe('useExistingVideoWorkflow', () => {
         prompt: 'Use the saved character direction',
       });
     });
+    expect(result.current.steps[0]?.prompt).toBe('');
     await act(async () => result.current.submitStep(0));
 
     expect(result.current.message).toBe(

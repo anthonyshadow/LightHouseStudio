@@ -113,51 +113,30 @@ describe('PrunaVideoReplaceProvider', () => {
           target_fps: 'original',
           ignore_audio: false,
           instruction_prompt:
-            "Replace the primary person in the source video with the character from reference image 1. The output character must match reference image 1 exactly in facial identity and defining appearance while performing the source person's facial expressions, lip sync, pose, movement, timing, and blocking. Keep the source video's camera framing and movement, lighting, background, scene structure, objects, and audio unchanged; change only the character.",
+            "Replace the primary person in the source video with the character from reference image 1. Reference image 1 is authoritative for the replacement character's exact identity, body, hair, wardrobe, costume, clothing, footwear, and worn accessories; replace the source person's clothing and do not transfer it onto the reference character. Preserve the source person's facial expressions, gaze, lip sync, pose, hand placement, gestures, movement, timing, and blocking exactly. Preserve the source background, scene structure, camera framing and movement, lighting, audio, and every non-worn object or item the source person holds, carries, touches, picks up, puts down, or otherwise interacts with, including its appearance, visibility, position, grip or contact, occlusion, motion, and interaction timing.",
           disable_safety_checker: false,
         },
       });
     },
   );
 
-  it.each([
-    [
-      'whitespace-only prompt',
-      '   ',
-      "Replace the primary person in the source video with the character from reference image 1. The output character must match reference image 1 exactly in facial identity and defining appearance while performing the source person's facial expressions, lip sync, pose, movement, timing, and blocking. Keep the source video's camera framing and movement, lighting, background, scene structure, objects, and audio unchanged; change only the character.",
-    ],
-    ['written prompt', 'Keep my exact custom direction.  ', 'Keep my exact custom direction.  '],
-  ] as const)('maps a %s to the intended instruction exactly', async (_label, prompt, expected) => {
+  it('rejects creator prompt text before provider contact', async () => {
     const { videoPath, referencePath } = await fixture();
-    const fetchImplementation = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-video' } }, 201),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-reference' } }, 201),
-      )
-      .mockResolvedValueOnce(
-        jsonResponse(
-          {
-            id: 'prediction-prompt',
-            get_url: 'https://api.pruna.ai/v1/predictions/status/prediction-prompt',
-          },
-          201,
-        ),
-      );
+    const fetchImplementation = vi.fn<typeof fetch>();
     const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
 
-    await provider.submit(
-      submission(videoPath, referencePath, new AbortController().signal, '720p', prompt),
-    );
-
-    const predictionBody = fetchImplementation.mock.calls[2]?.[1]?.body;
-    if (typeof predictionBody !== 'string') throw new Error('Expected prediction request JSON.');
-    const prediction = JSON.parse(predictionBody) as {
-      readonly input: { readonly instruction_prompt: unknown };
-    };
-    expect(prediction.input.instruction_prompt).toBe(expected);
+    await expect(
+      provider.submit(
+        submission(
+          videoPath,
+          referencePath,
+          new AbortController().signal,
+          '720p',
+          'Keep my exact custom direction.',
+        ),
+      ),
+    ).rejects.toMatchObject({ reason: 'rejected' });
+    expect(fetchImplementation).not.toHaveBeenCalled();
   });
 
   it.each([

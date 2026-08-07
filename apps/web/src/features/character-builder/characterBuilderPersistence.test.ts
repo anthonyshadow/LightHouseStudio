@@ -45,6 +45,23 @@ describe('character builder persisted upload state', () => {
     expect(JSON.stringify(sanitized)).not.toMatch(/(?:imageBytes|objectUrl|blob:)/u);
   });
 
+  it('normalizes a restored legacy background choice for the next generated reference', () => {
+    const sanitized = sanitizeCharacterBuilderDraftValue({
+      ...draftValue(),
+      options: {
+        ...DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS,
+        background: 'plain_custom',
+        customBackground: 'A furnished apartment.',
+      },
+    });
+
+    expect(sanitized?.options).toEqual({
+      ...DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS,
+      background: 'neutral_gray',
+    });
+    expect(sanitized?.options).not.toHaveProperty('customBackground');
+  });
+
   it('accepts a consistent image-only save journal and rejects mismatched provenance', () => {
     const snapshot = {
       saveKind: 'create' as const,

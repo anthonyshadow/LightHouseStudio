@@ -1,4 +1,7 @@
-import { characterReferenceOptionsSchema } from '@studio/contracts';
+import {
+  characterReferenceOptionsSchema,
+  swapReadyCharacterReferenceOptions,
+} from '@studio/contracts';
 import { generateStructuredPrompt } from '@studio/domain';
 import { useCallback, useEffect, type Dispatch } from 'react';
 import {
@@ -161,7 +164,7 @@ export const useCharacterReferenceGeneration = ({
     void generation
       .generate({
         rawPrompt: generated.prompt,
-        options: parsedOptions.data,
+        options: swapReadyCharacterReferenceOptions(parsedOptions.data),
         attemptOptimization: optimizationAvailable,
         ...(current.uploadedReference
           ? { sourceAssetId: current.uploadedReference.asset.assetId }
@@ -204,7 +207,7 @@ export const useCharacterReferenceGeneration = ({
     void generation
       .generate({
         rawPrompt: generated.prompt,
-        options: parsedOptions.data,
+        options: swapReadyCharacterReferenceOptions(parsedOptions.data),
         attemptOptimization: true,
         fallbackOnOptimizationFailure: false,
         forceOptimization: true,

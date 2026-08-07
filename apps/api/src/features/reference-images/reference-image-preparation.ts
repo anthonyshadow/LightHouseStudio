@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import {
   referenceImageAssetSchema,
+  REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH,
   REFERENCE_IMAGE_QUALITY,
   type CharacterPromptOptimizationResult,
   type ComposeReferenceImageRequest,
@@ -60,6 +61,17 @@ const sha256 = (value: string): string => createHash('sha256').update(value, 'ut
 const jsonFingerprint = (value: unknown): string => sha256(JSON.stringify(value));
 export const IMAGE_ONLY_EDIT_AUDIT_PROMPT =
   'The selected source image is the authoritative character reference.';
+const SWAP_READY_REFERENCE_STAGING =
+  'Render exactly one centered character as a clean identity reference on a uniform neutral gray studio background. Show no environment, horizon, scenery, furniture, texture, pattern, gradient, depth cues, unrelated props, text, logos, or additional characters. Use even diffuse lighting, sharp focus, natural proportions, and clear unobscured defining features. The image must describe the character, not a scene.';
+
+const swapReadyGenerationPrompt = (prompt: string): string =>
+  `${prompt.slice(
+    0,
+    Math.max(
+      0,
+      REFERENCE_IMAGE_GENERATION_PROMPT_MAX_LENGTH - SWAP_READY_REFERENCE_STAGING.length - 2,
+    ),
+  )}\n\n${SWAP_READY_REFERENCE_STAGING}`;
 
 export const referenceImageEditRawPrompt = (input: EditReferenceImageInput): string =>
   'rawPrompt' in input ? input.rawPrompt : IMAGE_ONLY_EDIT_AUDIT_PROMPT;
@@ -292,7 +304,7 @@ export const prepareReferenceImageGeneration = (
       throw new ReferenceImageGenerationStateError('invalid-optimization');
     }
     return {
-      prompt: input.optimization.result.optimizedImagePrompt,
+      prompt: swapReadyGenerationPrompt(input.optimization.result.optimizedImagePrompt),
       size: input.optimization.result.recommendedSettings.size,
       format: input.optimization.result.recommendedSettings.format,
       promptHash: createWorkshopPromptHash(rawPrompt),
@@ -310,7 +322,7 @@ export const prepareReferenceImageGeneration = (
 
   const size = ORIENTATION_DEFAULTS[input.options.orientation].size;
   const result: CharacterPromptOptimizationResult = {
-    optimizedImagePrompt: rawPrompt,
+    optimizedImagePrompt: swapReadyGenerationPrompt(rawPrompt),
     lucy25CharacterPrompt: rawPrompt,
     normalizedCharacterDescription: rawPrompt,
     preservedCharacterFacts: [],
@@ -324,7 +336,7 @@ export const prepareReferenceImageGeneration = (
     ),
   };
   return {
-    prompt: rawPrompt,
+    prompt: swapReadyGenerationPrompt(rawPrompt),
     size,
     format: 'jpeg',
     promptHash: createWorkshopPromptHash(rawPrompt),

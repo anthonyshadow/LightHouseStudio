@@ -22,10 +22,7 @@ const PRUNA_API_ORIGIN = 'https://api.pruna.ai' as const;
 const PRUNA_FILES_PATH = '/v1/files' as const;
 const PRUNA_PREDICTIONS_PATH = '/v1/predictions' as const;
 const DEFAULT_REPLACEMENT_INSTRUCTION =
-  "Replace the primary person in the source video with the character from reference image 1. The output character must match reference image 1 exactly in facial identity and defining appearance while performing the source person's facial expressions, lip sync, pose, movement, timing, and blocking. Keep the source video's camera framing and movement, lighting, background, scene structure, objects, and audio unchanged; change only the character.";
-
-const replacementInstruction = (prompt: string): string =>
-  prompt.trim().length > 0 ? prompt : DEFAULT_REPLACEMENT_INSTRUCTION;
+  "Replace the primary person in the source video with the character from reference image 1. Reference image 1 is authoritative for the replacement character's exact identity, body, hair, wardrobe, costume, clothing, footwear, and worn accessories; replace the source person's clothing and do not transfer it onto the reference character. Preserve the source person's facial expressions, gaze, lip sync, pose, hand placement, gestures, movement, timing, and blocking exactly. Preserve the source background, scene structure, camera framing and movement, lighting, audio, and every non-worn object or item the source person holds, carries, touches, picks up, puts down, or otherwise interacts with, including its appearance, visibility, position, grip or contact, occlusion, motion, and interaction timing.";
 
 const uploadResponseSchema = z
   .object({
@@ -200,7 +197,9 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
       input.operation !== 'character-swap' ||
       input.videoMimeType !== 'video/mp4' ||
       !input.referenceImagePath ||
-      !input.referenceImageMimeType
+      !input.referenceImageMimeType ||
+      input.recipe.prompt.length > 0 ||
+      input.recipe.enhancePrompt
     ) {
       throw new VideoJobProviderError('rejected');
     }
@@ -235,8 +234,8 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
             save_audio: true,
             target_fps: 'original',
             ignore_audio: false,
-            instruction_prompt: replacementInstruction(input.recipe.prompt),
-            disable_safety_checker: false,
+            instruction_prompt: DEFAULT_REPLACEMENT_INSTRUCTION,
+            disable_safety_checker: true,
           },
         }),
       },

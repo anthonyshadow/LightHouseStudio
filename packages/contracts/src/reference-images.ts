@@ -36,7 +36,7 @@ export const remoteReferenceImageImportRequestSchema = z
 
 export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_MODEL = 'gpt-5.6' as const;
 export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_REASONING = 'medium' as const;
-export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_VERSION = 'lucy-character-reference-v1' as const;
+export const CHARACTER_PROMPT_OPTIMIZER_DEFAULT_VERSION = 'character-reference-v2' as const;
 
 export const CHARACTER_REFERENCE_FRAMINGS = [
   'head_and_shoulders',
@@ -444,6 +444,13 @@ export type CharacterReferenceRenderingMode = z.infer<typeof characterReferenceR
 export type CharacterReferenceExpression = z.infer<typeof characterReferenceExpressionSchema>;
 export type CharacterReferenceBackground = z.infer<typeof characterReferenceBackgroundSchema>;
 export type CharacterReferenceOptions = z.infer<typeof characterReferenceOptionsSchema>;
+export const swapReadyCharacterReferenceOptions = (
+  options: CharacterReferenceOptions,
+): CharacterReferenceOptions => {
+  const swapReadyOptions = { ...options, background: 'neutral_gray' as const };
+  delete swapReadyOptions.customBackground;
+  return swapReadyOptions;
+};
 export type CharacterReferenceGenerator = z.infer<typeof characterReferenceGeneratorSchema>;
 export type OptimizeCharacterReferencePromptRequest = z.infer<
   typeof optimizeCharacterReferencePromptRequestSchema

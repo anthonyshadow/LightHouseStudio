@@ -136,6 +136,16 @@ provider-neutral editor setting. When the active Character Swap capability suppo
 the creator chooses `720p` or `1080p` for each explicit submission; the broker validates the choice
 and Pruna receives it with that job. Provider selection remains startup-only and hidden.
 
+On 2026-08-07, Pruna Character Swap prompt ownership moved fully to the server. Its provider-neutral
+capability now removes prompt and enhancement controls, the browser keeps the recipe prompt empty,
+the broker rejects non-empty tampering before provider work, and the adapter always sends one
+app-owned identity-replacement instruction. That instruction makes the reference authoritative only
+for identity, defining appearance, and worn wardrobe; source-person clothing is replaced instead of
+being transferred onto the saved character. Source performance, lip sync, pose, scene, camera,
+audio, and every non-worn held or interacted-with item's visibility and motion remain source-owned.
+New Character Builder generation also adopted a browser-and-server-enforced swap-ready neutral-gray
+staging profile; old uploaded and immutable references remain untouched.
+
 On 2026-08-02, existing-video Character Swap gained a startup-selected Pruna
 `p-video-replace` alternative while realtime Character and all VTO work remained on Decart. The
 browser/API boundary moved from batch model identifiers to provider-neutral Character Swap/VTO

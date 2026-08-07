@@ -517,6 +517,14 @@ export class VideoJobService {
         'Character Swap requires a reference image in this configuration.',
       );
     }
+    if (binding.promptInput === 'server-default' && input.recipe.prompt) {
+      await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
+      throw new AppError(
+        400,
+        'validation_error',
+        'Prompt text is unavailable for Character Swap in this configuration.',
+      );
+    }
     if (!binding.promptEnhancement && input.recipe.enhancePrompt) {
       await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
       throw new AppError(

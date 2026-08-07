@@ -17,6 +17,7 @@ import {
   referenceImageMimeTypeSchema,
   referenceImageRequestIdSchema,
   remoteReferenceImageImportRequestSchema,
+  swapReadyCharacterReferenceOptions,
   uploadReferenceImageResponseSchema,
 } from '@studio/contracts';
 import { randomUUID } from 'node:crypto';
@@ -222,7 +223,13 @@ export const registerReferenceImageRoutes = (
       }
       return withRequestLifetime(request, reply, async (signal) => {
         return optimizeCharacterReferencePromptResponseSchema.parse(
-          await service.optimize(parsed.data, signal),
+          await service.optimize(
+            {
+              ...parsed.data,
+              options: swapReadyCharacterReferenceOptions(parsed.data.options),
+            },
+            signal,
+          ),
         );
       });
     },
@@ -245,6 +252,7 @@ export const registerReferenceImageRoutes = (
           localOwnerId: ownerUserIdForRequest(request),
           signal,
           ...parsed.data,
+          options: swapReadyCharacterReferenceOptions(parsed.data.options),
         });
         return createReferenceImageResponseSchema.parse({ asset });
       });
@@ -296,6 +304,7 @@ export const registerReferenceImageRoutes = (
           sourceAssetId,
           signal,
           ...parsed.data,
+          options: swapReadyCharacterReferenceOptions(parsed.data.options),
         });
         return editReferenceImageResponseSchema.parse({ asset });
       });
@@ -321,6 +330,7 @@ export const registerReferenceImageRoutes = (
           sourceAssetId,
           signal,
           ...parsed.data,
+          options: swapReadyCharacterReferenceOptions(parsed.data.options),
         });
         return composeReferenceImageResponseSchema.parse({ asset });
       });

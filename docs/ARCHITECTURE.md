@@ -187,9 +187,17 @@ Character Builder exclusively owns character create/edit, its resumable IndexedD
 reference upload, prompt optimization, image generation/edit/composition, durable save journal,
 and Shelf persistence. Its completion handoff is destination-specific: general Studio entry
 atomically preloads the Lucy Dock, while uploaded-video entry hydrates and selects the saved
-character in the originating unsubmitted Character Swap step. A saved character with a reference
-hydrates only that image into the step; its stored prompt is not copied, though the creator may
-write a different prompt. A prompt-only character copies its prompt.
+character in the originating unsubmitted Character Swap step. For an editable-prompt binding, a
+saved character with a reference hydrates only that image and a prompt-only character copies its
+prompt. For a server-default binding such as Pruna, only image-backed choices are offered and the
+step prompt is always empty.
+
+New character reference generation uses one provider-neutral swap-ready staging profile. The
+browser removes the background chooser, normalizes restored legacy draft options to neutral gray,
+and normalizes options again before each generation request. The broker independently forces
+neutral gray for optimize, generate, edit, and composition routes, while the final provider prompt
+requires one centered character, even lighting, no scene/depth cues, and no unrelated props.
+Existing uploaded or immutable references are not rewritten.
 
 Prompt Workshop owns only Add, Replace, and Restyle structured object recipes. Recipe Shelf owns
 saved/recent/character metadata and atomic reuse. Neither owns Character generation or a media
@@ -365,11 +373,17 @@ advertises the documented approximate 1 MP (`720p`) and 2 MP (`1080p`) output cl
 provider-neutral capabilities contract. The editor stores one resolution on the visual step and
 the broker validates it against that operation binding before passing it to Pruna. Its prediction
 input also pins `seed=0`, `turbo=false`, `target_fps=original`, `save_audio=true`,
-`ignore_audio=false`, and `disable_safety_checker=false`. A blank or whitespace-only recipe prompt
-resolves server-side to the app-owned Pruna replacement instruction: reference image 1 is
-authoritative for facial identity and defining appearance, the source supplies expression, lip
-sync, pose, movement, timing, and blocking, and every non-character scene/audio property is kept.
-Non-blank creator text is forwarded unchanged. Its server-only sizing policy records
+`ignore_audio=false`, and `disable_safety_checker=false`. Its capability advertises
+`promptInput=server-default`: the browser renders no prompt/enhancement controls and submits an
+empty prompt, the broker rejects non-empty prompt text before provider work, and the adapter always
+uses the app-owned Pruna replacement instruction. Reference image 1 is
+authoritative for facial identity, body, hair, wardrobe, costume, clothing, footwear, and worn
+accessories. Source-person clothing is replaced and must not transfer onto the reference character.
+The source supplies expression, lip sync, gaze, pose, hand placement, gestures, movement, timing,
+and blocking. Every non-worn object and item the source person holds, carries, touches, picks up,
+puts down, or otherwise interacts with retains its appearance, visibility, position, motion,
+contact, occlusion, and interaction timing. Every other non-character scene/audio property is kept.
+Its server-only sizing policy records
 content-free informational metadata for non-canonical dimensions and continues with the inspected
 result; Decart keeps exact canonical 720p validation. When a server-approved result is selected as
 the next frame source, a non-canonical result is fitted locally inside the smallest canonical
@@ -390,7 +404,8 @@ transient removal failures, retains pending cleanup state, and emits at most one
 diagnostic when retries are exhausted.
 
 `GET /api/capabilities` exposes availability, `none | h264-mp4` input preparation,
-`optional | required` reference policy, prompt-enhancement support, and terminal-failure release
+`optional | required` reference policy, `editable | server-default` prompt ownership,
+prompt-enhancement support, and terminal-failure release
 ownership per operation. It exposes no batch model/provider name. When H.264 MP4 preparation is required, the browser converts MOV/WebM at
 explicit Start, revalidates the ephemeral Blob, submits it, and leaves the immutable source and
 audio sidecar unchanged. MP4 remains pass-through unless iterative result editing needs the

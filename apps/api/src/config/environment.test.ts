@@ -27,7 +27,7 @@ describe('parseEnvironment', () => {
       referenceImageTimeoutMs: DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
       openAiPromptOptimizerModel: 'gpt-5.6',
       openAiPromptOptimizerReasoning: 'medium',
-      openAiPromptOptimizerVersion: 'lucy-character-reference-v1',
+      openAiPromptOptimizerVersion: 'character-reference-v2',
       openAiPromptOptimizerTimeoutMs: DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS,
       openAiReferenceImageModel: 'gpt-image-2',
       openAiReferenceImageQuality: 'high',

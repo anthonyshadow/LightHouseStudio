@@ -87,6 +87,7 @@ export interface ExistingVideoOperationBinding {
   readonly outputSizing: VideoJobOutputSizing;
   readonly inputPreparation: 'none' | 'h264-mp4';
   readonly referencePolicy: 'optional' | 'required';
+  readonly promptInput: 'editable' | 'server-default';
   readonly promptEnhancement: boolean;
   readonly terminalFailureRelease?: 'automatic' | 'explicit-user';
 }

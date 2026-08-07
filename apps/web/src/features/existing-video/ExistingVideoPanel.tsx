@@ -92,6 +92,7 @@ export const ExistingVideoPanel = ({
         available: videoProcessingAvailable,
         inputPreparation: 'none',
         referencePolicy: 'optional',
+        promptInput: 'editable',
         promptEnhancement: true,
         terminalFailureRelease: 'automatic',
         outputResolutions: ['720p'],
@@ -100,6 +101,7 @@ export const ExistingVideoPanel = ({
         available: videoProcessingAvailable,
         inputPreparation: 'none',
         referencePolicy: 'optional',
+        promptInput: 'editable',
         promptEnhancement: true,
         terminalFailureRelease: 'automatic',
         outputResolutions: ['720p'],
@@ -211,7 +213,9 @@ export const ExistingVideoPanel = ({
       workflow.updateStep(step.id, {
         savedRecipeId: recipe.id,
         ...(step.modelId === 'lucy-latest'
-          ? savedCharacterStepInput(recipe.prompt, referenceImage?.file ?? null)
+          ? visualCapabilities.characterSwap.promptInput === 'server-default'
+            ? { prompt: '', referenceImage: referenceImage?.file ?? null }
+            : savedCharacterStepInput(recipe.prompt, referenceImage?.file ?? null)
           : {
               prompt: recipe.prompt,
               referenceImage: referenceImage?.file ?? null,
@@ -495,7 +499,12 @@ export const ExistingVideoPanel = ({
                     <div hidden={activeTool !== 'character'}>
                       <ExistingVideoVisualEditor
                         step={activeStep}
-                        savedRecipes={savedRecipes}
+                        savedRecipes={savedRecipes.filter(
+                          (recipe) =>
+                            visualCapabilities.characterSwap.promptInput !== 'server-default' ||
+                            recipe.modelId !== 'lucy-latest' ||
+                            recipe.referenceImageAssetId !== null,
+                        )}
                         recentOutfits={recentOutfits}
                         structureLocked={structureLocked}
                         recipeLocked={recipeLocked}
@@ -506,6 +515,7 @@ export const ExistingVideoPanel = ({
                         promptEnhancementSupported={
                           visualCapabilities.characterSwap.promptEnhancement
                         }
+                        promptInput={visualCapabilities.characterSwap.promptInput}
                         outputResolutions={visualCapabilities.characterSwap.outputResolutions}
                         onApplySavedRecipe={(step, recipeId) =>
                           void applySavedRecipe(step, recipeId)
@@ -533,6 +543,7 @@ export const ExistingVideoPanel = ({
                         promptEnhancementSupported={
                           visualCapabilities.virtualTryOn.promptEnhancement
                         }
+                        promptInput={visualCapabilities.virtualTryOn.promptInput}
                         onApplySavedRecipe={(step, recipeId) =>
                           void applySavedRecipe(step, recipeId)
                         }

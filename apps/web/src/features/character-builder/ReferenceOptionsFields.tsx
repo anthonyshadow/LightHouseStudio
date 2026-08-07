@@ -1,13 +1,12 @@
 import { useTheme } from '@emotion/react';
 import type {
-  CharacterReferenceBackground,
   CharacterReferenceExpression,
   CharacterReferenceFraming,
   CharacterReferenceOptions,
   CharacterReferenceOrientation,
   CharacterReferenceRenderingMode,
 } from '@studio/contracts';
-import { SelectField, TextField } from '../../ui';
+import { SelectField } from '../../ui';
 
 export const DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS: CharacterReferenceOptions = {
   framing: 'full_body',
@@ -106,35 +105,10 @@ export const ReferenceOptionsFields = ({
           ]}
           onValueChange={(value) => update('expression', value as CharacterReferenceExpression)}
         />
-        <SelectField
-          label="Background"
-          value={options.background}
-          disabled={disabled}
-          options={[
-            { value: 'neutral_gray', label: 'Neutral gray' },
-            { value: 'off_white', label: 'Off-white' },
-            { value: 'plain_custom', label: 'Custom plain background' },
-          ]}
-          onValueChange={(value) => {
-            const background = value as CharacterReferenceBackground;
-            onChange({
-              ...options,
-              background,
-              ...(background === 'plain_custom'
-                ? { customBackground: options.customBackground ?? '' }
-                : { customBackground: undefined }),
-            });
-          }}
-        />
-        {options.background === 'plain_custom' ? (
-          <TextField
-            label="Custom plain background"
-            value={options.customBackground ?? ''}
-            maxLength={200}
-            disabled={disabled}
-            onChange={(event) => update('customBackground', event.currentTarget.value)}
-          />
-        ) : null}
+        <p>
+          Generated references use a uniform neutral gray background so the saved image describes
+          the character rather than a scene.
+        </p>
       </div>
     </details>
   );

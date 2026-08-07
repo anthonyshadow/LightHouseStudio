@@ -42,6 +42,7 @@ export const registerSystemRoutes = (
           inputPreparation: availability.videoProcessing.characterSwap?.inputPreparation ?? 'none',
           referencePolicy:
             availability.videoProcessing.characterSwap?.referencePolicy ?? 'optional',
+          promptInput: availability.videoProcessing.characterSwap?.promptInput ?? 'editable',
           promptEnhancement: availability.videoProcessing.characterSwap?.promptEnhancement ?? false,
           terminalFailureRelease:
             availability.videoProcessing.characterSwap?.terminalFailureRelease ?? 'automatic',
@@ -53,6 +54,7 @@ export const registerSystemRoutes = (
           available: availability.videoProcessing.virtualTryOn !== null,
           inputPreparation: availability.videoProcessing.virtualTryOn?.inputPreparation ?? 'none',
           referencePolicy: availability.videoProcessing.virtualTryOn?.referencePolicy ?? 'optional',
+          promptInput: availability.videoProcessing.virtualTryOn?.promptInput ?? 'editable',
           promptEnhancement: availability.videoProcessing.virtualTryOn?.promptEnhancement ?? false,
           terminalFailureRelease:
             availability.videoProcessing.virtualTryOn?.terminalFailureRelease ?? 'automatic',
