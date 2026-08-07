@@ -63,7 +63,8 @@ type JsonSchema<T> = {
 export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
   const response = await fetch(input, { credentials: 'same-origin', ...init });
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-  if (response.status === 401 && !url.includes('/api/auth/login')) {
+  const pathname = new URL(url, window.location.origin).pathname;
+  if (response.status === 401 && pathname !== '/api/auth/login') {
     window.dispatchEvent(new Event('lightframe:authentication-required'));
   }
   if (!response.ok) throw await readError(response);
@@ -336,12 +337,11 @@ export const hydrateReferenceImage = async (
     );
   }
 
-  const response = await fetch(contentUrl, {
+  const response = await apiFetch(contentUrl, {
     cache: 'no-store',
     ...(signal ? { signal } : {}),
     headers: { Accept: metadata.mimeType },
   });
-  if (!response.ok) throw await readError(response);
   const contentType = response.headers.get('content-type')?.split(';', 1)[0]?.trim();
   if (contentType !== metadata.mimeType) {
     throw new ApiClientError(

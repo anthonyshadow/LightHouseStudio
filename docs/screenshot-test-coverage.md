@@ -67,8 +67,10 @@ increasing the 29-case review budget.
 ## Determinism and readiness
 
 Each case uses fixed time, reduced motion, synthetic media, simulated Decart, deterministic
-reference/voice fixtures, seeded v6 creative metadata, and denied unexpected provider traffic.
-No paid or live provider is contacted.
+reference/voice fixtures, seeded v6 creative metadata, hidden test-browser scrollbars, and denied
+unexpected provider traffic. Hiding scrollbars keeps captures independent of host scrollbar
+preferences; scroll containment remains asserted separately. No paid or live provider is
+contacted.
 
 A capture is valid only after the scenario asserts its observable state. Global readiness waits for
 fonts and media, removes animation/caret noise, fixes the synthetic live frame, rejects unresolved
@@ -123,4 +125,5 @@ functional Playwright owns journeys, focus, scrolling, persistence, and network 
 screenshot capture is a review artifact; physical QA and gated provider smoke own release
 validation.
 
-See [active findings](project-audit-findings.md) for the remaining evidence gates.
+See [Manual QA](MANUAL_QA.md), [Browser support](BROWSER_SUPPORT.md), and
+[Live provider smoke](LIVE_PROVIDER_SMOKE.md) for the remaining evidence gates.

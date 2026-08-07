@@ -5,6 +5,7 @@ import { defineConfig, type Plugin } from 'vite';
 const rootPath = fileURLToPath(new URL('../..', import.meta.url));
 const DEVELOPMENT_SEAM_SENTINEL = '__lightframeDevelopmentRealtimeDriver';
 export const DEVELOPMENT_API_PROXY_TIMEOUT_MS = 300_000;
+export const PRODUCTION_CHUNK_SIZE_WARNING_LIMIT_KB = 1_700;
 
 export const DEVELOPMENT_API_PROXY = {
   target: 'http://127.0.0.1:4100',
@@ -50,6 +51,13 @@ export default defineConfig(() => {
     server: {
       proxy: { '/api': DEVELOPMENT_API_PROXY },
     },
-    build: { sourcemap: false, manifest: true },
+    build: {
+      sourcemap: false,
+      manifest: true,
+      // The video editor worker and startup-isolated media/provider modules are
+      // intentionally lazy. Static entry/Studio closure budgets remain enforced
+      // by scripts/check-build-manifest.mjs.
+      chunkSizeWarningLimit: PRODUCTION_CHUNK_SIZE_WARNING_LIMIT_KB,
+    },
   };
 });

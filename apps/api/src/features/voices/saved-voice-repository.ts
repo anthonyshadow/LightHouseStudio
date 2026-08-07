@@ -51,11 +51,30 @@ const emptyLibrary = (ownerUserId: string) => ({
 
 export class MemorySavedVoiceRepository implements SavedVoiceRepository {
   readonly #libraries = new Map<string, ReturnType<typeof emptyLibrary>>();
+
   #library(ownerUserId: string) {
     const current = this.#libraries.get(ownerUserId) ?? emptyLibrary(ownerUserId);
     this.#libraries.set(ownerUserId, current);
     return current;
   }
+
+  hydrate(
+    ownerUserId: string,
+    records: readonly SavedVoiceRecord[],
+    migratedWorkspace: boolean,
+  ): void {
+    this.#libraries.set(ownerUserId, {
+      schemaVersion: 1,
+      ownerUserId,
+      migratedWorkspace,
+      records: records.map((record) => ({ ...record })),
+    });
+  }
+
+  unload(ownerUserId: string): void {
+    this.#libraries.delete(ownerUserId);
+  }
+
   list(ownerUserId: string) {
     return Promise.resolve([...this.#library(ownerUserId).records]);
   }
@@ -88,22 +107,34 @@ export class MemorySavedVoiceRepository implements SavedVoiceRepository {
   migrated(ownerUserId: string) {
     return Promise.resolve(this.#library(ownerUserId).migratedWorkspace);
   }
-  async completeMigration(
+  completeMigration(
     ownerUserId: string,
     voices: readonly { voiceId: string; publicOwnerId: string | null }[],
     savedAt: string,
-  ) {
+  ): Promise<void> {
     const library = this.#library(ownerUserId);
-    for (const voice of voices)
-      await this.save(ownerUserId, voice.voiceId, voice.publicOwnerId, savedAt);
+    const savedVoiceIds = new Set(library.records.map((record) => record.providerVoiceId));
+    for (const voice of voices) {
+      if (savedVoiceIds.has(voice.voiceId)) continue;
+      savedVoiceIds.add(voice.voiceId);
+      library.records.push({
+        id: randomUUID(),
+        ownerUserId,
+        provider: 'elevenlabs',
+        providerVoiceId: voice.voiceId,
+        publicOwnerId: voice.publicOwnerId,
+        savedAt,
+      });
+    }
     library.migratedWorkspace = true;
+    return Promise.resolve();
   }
 }
 
 export class FileSavedVoiceRepository implements SavedVoiceRepository {
   readonly #root: string;
   readonly #memory = new MemorySavedVoiceRepository();
-  readonly #loaded = new Set<string>();
+  readonly #loads = new Map<string, Promise<void>>();
   readonly #migrationState = new Map<string, boolean>();
   readonly #locks = new Map<string, Promise<void>>();
 
@@ -117,25 +148,29 @@ export class FileSavedVoiceRepository implements SavedVoiceRepository {
     );
   }
   async #load(ownerUserId: string) {
-    if (this.#loaded.has(ownerUserId)) return;
+    const existing = this.#loads.get(ownerUserId);
+    if (existing) return existing;
+    const load = (async () => {
+      try {
+        const value = librarySchema.parse(
+          JSON.parse(await readFile(this.#file(ownerUserId), 'utf8')) as unknown,
+        );
+        if (value.ownerUserId !== ownerUserId) throw new Error('Saved voice owner mismatch.');
+        this.#memory.hydrate(ownerUserId, value.records, value.migratedWorkspace);
+        this.#migrationState.set(ownerUserId, value.migratedWorkspace);
+      } catch (error) {
+        if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+        this.#memory.hydrate(ownerUserId, [], false);
+        this.#migrationState.set(ownerUserId, false);
+      }
+    })();
+    this.#loads.set(ownerUserId, load);
     try {
-      const value = librarySchema.parse(
-        JSON.parse(await readFile(this.#file(ownerUserId), 'utf8')) as unknown,
-      );
-      await this.#memory.completeMigration(
-        ownerUserId,
-        value.records.map((item) => ({
-          voiceId: item.providerVoiceId,
-          publicOwnerId: item.publicOwnerId,
-        })),
-        value.records[0]?.savedAt ?? new Date(0).toISOString(),
-      );
-      this.#migrationState.set(ownerUserId, value.migratedWorkspace);
+      await load;
     } catch (error) {
-      if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
+      if (this.#loads.get(ownerUserId) === load) this.#loads.delete(ownerUserId);
+      throw error;
     }
-    this.#loaded.add(ownerUserId);
-    if (!this.#migrationState.has(ownerUserId)) this.#migrationState.set(ownerUserId, false);
   }
   async #persist(
     ownerUserId: string,
@@ -151,17 +186,19 @@ export class FileSavedVoiceRepository implements SavedVoiceRepository {
     });
     const file = this.#file(ownerUserId);
     const temporary = `${file}.tmp-${randomUUID()}`;
-    const handle = await open(temporary, 'wx', 0o600);
+    let handle: Awaited<ReturnType<typeof open>> | undefined;
     try {
+      handle = await open(temporary, 'wx', 0o600);
       await handle.writeFile(`${JSON.stringify(data)}\n`, 'utf8');
       await handle.sync();
-    } finally {
       await handle.close();
-    }
-    await rename(temporary, file).catch(async (error) => {
+      handle = undefined;
+      await rename(temporary, file);
+    } catch (error) {
+      await handle?.close().catch(() => undefined);
       await rm(temporary, { force: true }).catch(() => undefined);
       throw error;
-    });
+    }
   }
   async #exclusive<T>(ownerUserId: string, action: () => Promise<T>): Promise<T> {
     const prior = this.#locks.get(ownerUserId) ?? Promise.resolve();
@@ -175,6 +212,11 @@ export class FileSavedVoiceRepository implements SavedVoiceRepository {
     try {
       await this.#load(ownerUserId);
       return await action();
+    } catch (error) {
+      this.#loads.delete(ownerUserId);
+      this.#memory.unload(ownerUserId);
+      this.#migrationState.delete(ownerUserId);
+      throw error;
     } finally {
       release();
       if (this.#locks.get(ownerUserId) === chain) this.#locks.delete(ownerUserId);
@@ -191,14 +233,14 @@ export class FileSavedVoiceRepository implements SavedVoiceRepository {
   async save(ownerUserId: string, voiceId: string, publicOwnerId: string | null, savedAt: string) {
     return this.#exclusive(ownerUserId, async () => {
       const result = await this.#memory.save(ownerUserId, voiceId, publicOwnerId, savedAt);
-      await this.#persist(ownerUserId);
+      if (result === 'saved') await this.#persist(ownerUserId);
       return result;
     });
   }
   async remove(ownerUserId: string, voiceId: string) {
     return this.#exclusive(ownerUserId, async () => {
       const result = await this.#memory.remove(ownerUserId, voiceId);
-      await this.#persist(ownerUserId);
+      if (result === 'removed') await this.#persist(ownerUserId);
       return result;
     });
   }

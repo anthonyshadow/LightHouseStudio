@@ -16,18 +16,28 @@ export class InMemorySessionRepository implements SessionRepository {
   readonly #sessions = new Map<string, AuthenticatedSessionRecord>();
 
   create(record: AuthenticatedSessionRecord): void {
+    const issuedAt = new Date(record.issuedAt);
+    for (const [jti, session] of this.#sessions) {
+      if (session.revokedAt !== null || new Date(session.expiresAt) <= issuedAt) {
+        this.#sessions.delete(jti);
+      }
+    }
     this.#sessions.set(record.jti, record);
   }
 
   findActive(jti: string, now: Date): AuthenticatedSessionRecord | null {
     const session = this.#sessions.get(jti);
-    if (!session || session.revokedAt !== null || new Date(session.expiresAt) <= now) return null;
+    if (!session) return null;
+    if (session.revokedAt !== null || new Date(session.expiresAt) <= now) {
+      this.#sessions.delete(jti);
+      return null;
+    }
     return session;
   }
 
-  revoke(jti: string, now: Date): void {
+  revoke(jti: string, _now: Date): void {
     const session = this.#sessions.get(jti);
     if (!session || session.revokedAt !== null) return;
-    this.#sessions.set(jti, { ...session, revokedAt: now.toISOString() });
+    this.#sessions.delete(jti);
   }
 }

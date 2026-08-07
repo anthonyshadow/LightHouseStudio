@@ -23,6 +23,7 @@ export interface AssetByteStore {
     readonly assetId: string;
     readonly ownerUserId: string;
     readonly sourcePath: string;
+    readonly checksumSha256?: string;
     readonly mimeType: string;
     readonly filename: string;
     readonly createdAt: string;
@@ -78,6 +79,7 @@ export class LocalAssetByteStore implements AssetByteStore {
     readonly assetId: string;
     readonly ownerUserId: string;
     readonly sourcePath: string;
+    readonly checksumSha256?: string;
     readonly mimeType: string;
     readonly filename: string;
     readonly createdAt: string;
@@ -94,7 +96,7 @@ export class LocalAssetByteStore implements AssetByteStore {
       mimeType: input.mimeType,
       filename: input.filename,
       sizeBytes: source.size,
-      checksumSha256: await fileSha256(input.sourcePath),
+      checksumSha256: input.checksumSha256 ?? (await fileSha256(input.sourcePath)),
       createdAt: input.createdAt,
     });
     try {

@@ -72,13 +72,18 @@ const sendContent = async (
   const result = await service.content(ownerUserIdForRequest(request), videoId, versionId);
   const file = await stat(result.path);
   const range = parseRange(header(request, 'range'), file.size);
-  const download = request.url.includes('download=true');
+  const download =
+    typeof request.query === 'object' &&
+    request.query !== null &&
+    'download' in request.query &&
+    request.query.download === 'true';
+  const filename = result.version.filename.replaceAll(/["\\\r\n]/gu, '_');
   void reply.header('Accept-Ranges', 'bytes');
   void reply.header('Content-Type', result.version.mimeType);
   void reply.header('X-Content-Type-Options', 'nosniff');
   void reply.header(
     'Content-Disposition',
-    `${download ? 'attachment' : 'inline'}; filename="${result.version.filename}"`,
+    `${download ? 'attachment' : 'inline'}; filename="${filename}"`,
   );
   if (range === null) {
     void reply.header('Content-Length', file.size);
@@ -105,6 +110,7 @@ export const registerSavedVideoRoutes = (
         idempotencyKey(request),
         request.body.path,
         uploadMetadata(request),
+        request.body.checksumSha256,
       );
       await reply.status(201).send(savedVideoDetailSchema.parse(detail));
     } finally {
@@ -135,6 +141,7 @@ export const registerSavedVideoRoutes = (
           idempotencyKey(request),
           request.body.path,
           uploadMetadata(request),
+          request.body.checksumSha256,
         );
         await reply.status(201).send(savedVideoDetailSchema.parse(detail));
       } finally {

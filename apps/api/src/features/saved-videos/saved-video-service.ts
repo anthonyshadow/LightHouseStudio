@@ -58,29 +58,45 @@ const publicVersion = (version: StoredVideoVersion) => ({
   createdAt: version.createdAt,
 });
 
-const publicSummary = (aggregate: StoredSavedVideoAggregate): SavedVideoSummary =>
+const publicSummary = (
+  aggregate: StoredSavedVideoAggregate,
+  version = currentVersion(aggregate),
+): SavedVideoSummary =>
   savedVideoSummarySchema.parse({
     id: aggregate.video.id,
     title: aggregate.video.title,
     status: aggregate.video.status,
-    currentVersion: publicVersion(currentVersion(aggregate)),
+    currentVersion: publicVersion(version),
     sourceVideoId: aggregate.video.sourceVideoId,
     versionCount: aggregate.versions.length,
-    thumbnailAvailable: currentVersion(aggregate).thumbnailAssetId !== null,
+    thumbnailAvailable: version.thumbnailAssetId !== null,
     createdAt: aggregate.video.createdAt,
     updatedAt: aggregate.video.updatedAt,
   });
 
-const publicDetail = (aggregate: StoredSavedVideoAggregate): SavedVideoDetail =>
-  savedVideoDetailSchema.parse({
-    ...publicSummary(aggregate),
+const publicDetail = (aggregate: StoredSavedVideoAggregate): SavedVideoDetail => {
+  const version = currentVersion(aggregate);
+  return savedVideoDetailSchema.parse({
+    ...publicSummary(aggregate, version),
     versions: aggregate.versions.map(publicVersion),
   });
+};
 
-const encodeCursor = (offset: number): string =>
-  Buffer.from(JSON.stringify({ version: 1, offset }), 'utf8').toString('base64url');
+const cursorQueryKey = (query: SavedVideosQuery): string =>
+  JSON.stringify({
+    characterName: query.characterName ?? null,
+    format: query.format ?? null,
+    pageSize: query.pageSize,
+    sort: query.sort,
+  });
 
-const decodeCursor = (cursor: string | undefined): number => {
+const encodeCursor = (offset: number, query: SavedVideosQuery): string =>
+  Buffer.from(
+    JSON.stringify({ version: 2, offset, query: cursorQueryKey(query) }),
+    'utf8',
+  ).toString('base64url');
+
+const decodeCursor = (cursor: string | undefined, query: SavedVideosQuery): number => {
   if (cursor === undefined) return 0;
   try {
     const value = JSON.parse(Buffer.from(cursor, 'base64url').toString('utf8')) as unknown;
@@ -88,12 +104,16 @@ const decodeCursor = (cursor: string | undefined): number => {
       typeof value === 'object' &&
       value !== null &&
       'version' in value &&
-      value.version === 1 &&
       'offset' in value &&
       typeof value.offset === 'number' &&
       Number.isInteger(value.offset) &&
       value.offset >= 0 &&
-      value.offset <= 100_000
+      value.offset <= 100_000 &&
+      (value.version === 1 ||
+        (value.version === 2 &&
+          'query' in value &&
+          typeof value.query === 'string' &&
+          value.query === cursorQueryKey(query)))
     )
       return value.offset;
   } catch {
@@ -109,12 +129,15 @@ const videoFormat = (version: StoredVideoVersion): SavedVideoFormat =>
       ? 'landscape'
       : 'portrait';
 
-const compareCreatedAt = (
-  left: StoredSavedVideoAggregate,
-  right: StoredSavedVideoAggregate,
-): number =>
-  left.video.createdAt.localeCompare(right.video.createdAt) ||
-  left.video.id.localeCompare(right.video.id);
+interface IndexedVideo {
+  readonly aggregate: StoredSavedVideoAggregate;
+  readonly version: StoredVideoVersion;
+  readonly format: SavedVideoFormat;
+}
+
+const compareCreatedAt = (left: IndexedVideo, right: IndexedVideo): number =>
+  left.aggregate.video.createdAt.localeCompare(right.aggregate.video.createdAt) ||
+  left.aggregate.video.id.localeCompare(right.aggregate.video.id);
 
 export class SavedVideoService {
   readonly #repository: SavedVideoRepository;
@@ -140,6 +163,7 @@ export class SavedVideoService {
     ordinal: number,
     sourcePath: string,
     metadata: SavedVideoUploadMetadata,
+    checksumSha256?: string,
   ): Promise<StoredVideoVersion> {
     const inspected = await this.#inspect(sourcePath);
     const createdAt = this.#now().toISOString();
@@ -149,6 +173,7 @@ export class SavedVideoService {
       assetId,
       ownerUserId,
       sourcePath,
+      ...(checksumSha256 === undefined ? {} : { checksumSha256 }),
       mimeType: inspected.mimeType,
       filename,
       createdAt,
@@ -173,11 +198,16 @@ export class SavedVideoService {
     };
   }
 
+  async #deleteAsset(ownerUserId: string, assetId: string): Promise<void> {
+    await this.#bytes.delete(ownerUserId, assetId).catch(() => undefined);
+  }
+
   async saveNew(
     ownerUserId: string,
     idempotencyKey: string,
     sourcePath: string,
     metadata: SavedVideoUploadMetadata,
+    checksumSha256?: string,
   ): Promise<SavedVideoDetail> {
     const prior = await this.#repository.findReceipt(ownerUserId, idempotencyKey);
     if (prior !== null) {
@@ -185,7 +215,14 @@ export class SavedVideoService {
       if (aggregate !== null) return publicDetail(aggregate);
     }
     const videoId = randomUUID();
-    const version = await this.#versionFromUpload(ownerUserId, videoId, 1, sourcePath, metadata);
+    const version = await this.#versionFromUpload(
+      ownerUserId,
+      videoId,
+      1,
+      sourcePath,
+      metadata,
+      checksumSha256,
+    );
     const aggregate: StoredSavedVideoAggregate = {
       video: {
         id: videoId,
@@ -207,7 +244,16 @@ export class SavedVideoService {
       versionId: version.id,
       createdAt: version.createdAt,
     };
-    return publicDetail(await this.#repository.create(ownerUserId, aggregate, receipt));
+    try {
+      const saved = await this.#repository.create(ownerUserId, aggregate, receipt);
+      if (!saved.versions.some((savedVersion) => savedVersion.id === version.id)) {
+        await this.#deleteAsset(ownerUserId, version.assetId);
+      }
+      return publicDetail(saved);
+    } catch (error) {
+      await this.#deleteAsset(ownerUserId, version.assetId);
+      throw error;
+    }
   }
 
   async appendVersion(
@@ -217,6 +263,7 @@ export class SavedVideoService {
     idempotencyKey: string,
     sourcePath: string,
     metadata: SavedVideoUploadMetadata,
+    checksumSha256?: string,
   ): Promise<SavedVideoDetail> {
     const prior = await this.#repository.findReceipt(ownerUserId, idempotencyKey);
     if (prior !== null) {
@@ -243,6 +290,7 @@ export class SavedVideoService {
         sourceVideoId: aggregate.video.sourceVideoId,
         sourceVersionId: expectedVersionId,
       },
+      checksumSha256,
     );
     const receipt = {
       idempotencyKey,
@@ -250,13 +298,22 @@ export class SavedVideoService {
       versionId: version.id,
       createdAt: version.createdAt,
     };
-    const result = await this.#repository.append(
-      ownerUserId,
-      videoId,
-      expectedVersionId,
-      version,
-      receipt,
-    );
+    let result: Awaited<ReturnType<SavedVideoRepository['append']>>;
+    try {
+      result = await this.#repository.append(
+        ownerUserId,
+        videoId,
+        expectedVersionId,
+        version,
+        receipt,
+      );
+    } catch (error) {
+      await this.#deleteAsset(ownerUserId, version.assetId);
+      throw error;
+    }
+    if (typeof result === 'string' || !result.versions.some((item) => item.id === version.id)) {
+      await this.#deleteAsset(ownerUserId, version.assetId);
+    }
     if (result === 'not-found')
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
     if (result === 'conflict')
@@ -277,30 +334,29 @@ export class SavedVideoService {
     total: number;
     facets: { characterNames: string[]; formats: SavedVideoFormat[] };
   }> {
-    const offset = decodeCursor(query.cursor);
-    const all = [...(await this.#repository.list(ownerUserId))];
+    const offset = decodeCursor(query.cursor, query);
+    const all = (await this.#repository.list(ownerUserId)).map((aggregate): IndexedVideo => {
+      const version = currentVersion(aggregate);
+      return { aggregate, version, format: videoFormat(version) };
+    });
     const characterNames = [
       ...new Set(
         all
-          .map((aggregate) => currentVersion(aggregate).characterName)
+          .map(({ version }) => version.characterName)
           .filter((name): name is string => name !== null),
       ),
     ].sort((left, right) => left.localeCompare(right));
-    const availableFormats = new Set(
-      all.map((aggregate) => videoFormat(currentVersion(aggregate))),
-    );
+    const availableFormats = new Set(all.map(({ format }) => format));
     const formats = SAVED_VIDEO_FORMATS.filter((format) => availableFormats.has(format));
-    const filtered = all.filter((aggregate) => {
-      const version = currentVersion(aggregate);
+    const filtered = all.filter(({ format, version }) => {
       return (
         (query.characterName === undefined || version.characterName === query.characterName) &&
-        (query.format === undefined || videoFormat(version) === query.format)
+        (query.format === undefined || format === query.format)
       );
     });
     filtered.sort((left, right) => {
       if (query.sort === 'shortest' || query.sort === 'longest') {
-        const durationDifference =
-          currentVersion(left).durationMs - currentVersion(right).durationMs;
+        const durationDifference = left.version.durationMs - right.version.durationMs;
         if (durationDifference !== 0)
           return query.sort === 'shortest' ? durationDifference : -durationDifference;
       }
@@ -309,9 +365,9 @@ export class SavedVideoService {
     });
     const page = filtered.slice(offset, offset + query.pageSize);
     return {
-      videos: page.map(publicSummary),
+      videos: page.map(({ aggregate, version }) => publicSummary(aggregate, version)),
       nextCursor:
-        offset + page.length < filtered.length ? encodeCursor(offset + page.length) : null,
+        offset + page.length < filtered.length ? encodeCursor(offset + page.length, query) : null,
       total: filtered.length,
       facets: { characterNames, formats },
     };
@@ -403,13 +459,25 @@ export class SavedVideoService {
       filename: `${videoId}-${versionId}.webp`,
       createdAt,
     });
-    const updated = await this.#repository.setThumbnail(
-      ownerUserId,
-      videoId,
-      versionId,
-      assetId,
-      createdAt,
-    );
+    let updated: StoredSavedVideoAggregate | null;
+    try {
+      updated = await this.#repository.setThumbnail(
+        ownerUserId,
+        videoId,
+        versionId,
+        assetId,
+        createdAt,
+      );
+    } catch (error) {
+      await this.#deleteAsset(ownerUserId, assetId);
+      throw error;
+    }
+    if (
+      updated === null ||
+      updated.versions.find((item) => item.id === versionId)?.thumbnailAssetId !== assetId
+    ) {
+      await this.#deleteAsset(ownerUserId, assetId);
+    }
     if (updated === null) {
       throw new AppError(404, 'not_found', 'That saved video version is unavailable.');
     }

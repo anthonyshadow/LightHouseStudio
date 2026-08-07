@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -78,6 +78,17 @@ describe('SavedVideoService', () => {
     expect(aggregates).toHaveLength(1);
     expect(await bytes.exists(ownerUserId, aggregates[0]!.versions[0]!.assetId)).toBe(true);
     expect(await bytes.exists(otherUserId, aggregates[0]!.versions[0]!.assetId)).toBe(false);
+  });
+
+  it('removes the losing asset when idempotent saves race', async () => {
+    const key = crypto.randomUUID();
+    const [first, second] = await Promise.all([
+      service.saveNew(ownerUserId, key, sourcePath, metadata()),
+      service.saveNew(ownerUserId, key, sourcePath, metadata()),
+    ]);
+
+    expect(second).toEqual(first);
+    expect(await readdir(path.join(directory, 'media', 'v1', 'assets'))).toHaveLength(1);
   });
 
   it('appends immutable versions only against the expected current version', async () => {
@@ -222,6 +233,13 @@ describe('SavedVideoService', () => {
     expect(pageOne.nextCursor).not.toBeNull();
     expect(pageTwo.nextCursor).toBeNull();
     expect(pageOne.videos[0]).not.toHaveProperty('assetId');
+    await expect(
+      service.list(ownerUserId, {
+        cursor: pageOne.nextCursor!,
+        pageSize: 1,
+        sort: 'oldest',
+      }),
+    ).rejects.toMatchObject({ statusCode: 400, code: 'validation_error' });
   });
 
   it('filters the full library by character and format and sorts by time or duration', async () => {

@@ -127,6 +127,8 @@ const emptyLibrary = (ownerUserId: string): SavedVideoLibrary => ({
 export class FileSavedVideoRepository implements SavedVideoRepository {
   readonly #root: string;
   readonly #locks = new Map<string, Promise<unknown>>();
+  readonly #cache = new Map<string, SavedVideoLibrary>();
+  readonly #loads = new Map<string, Promise<SavedVideoLibrary>>();
 
   constructor(dataDirectory: string) {
     this.#root = path.resolve(dataDirectory, 'metadata', 'v1', 'saved-videos');
@@ -137,33 +139,62 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
     return path.join(this.#root, `${segment}.json`);
   }
 
+  #cacheLibrary(library: SavedVideoLibrary): void {
+    this.#cache.delete(library.ownerUserId);
+    this.#cache.set(library.ownerUserId, library);
+    if (this.#cache.size > 16) {
+      const oldestOwner = this.#cache.keys().next().value;
+      if (oldestOwner !== undefined) this.#cache.delete(oldestOwner);
+    }
+  }
+
   async #read(ownerUserId: string): Promise<SavedVideoLibrary> {
-    try {
-      const raw = JSON.parse(await readFile(this.#file(ownerUserId), 'utf8')) as unknown;
-      const current = librarySchema.safeParse(raw);
-      let library: SavedVideoLibrary;
-      if (current.success) {
-        library = current.data;
-      } else {
-        const legacy = legacyLibrarySchema.parse(raw);
-        library = librarySchema.parse({
-          ...legacy,
-          schemaVersion: 2,
-          videos: legacy.videos.map((aggregate) => ({
-            ...aggregate,
-            versions: aggregate.versions.map((version) => ({
-              ...version,
-              characterName: null,
+    const cached = this.#cache.get(ownerUserId);
+    if (cached !== undefined) {
+      this.#cacheLibrary(cached);
+      return cached;
+    }
+    const active = this.#loads.get(ownerUserId);
+    if (active !== undefined) return active;
+
+    const load = (async () => {
+      try {
+        const raw = JSON.parse(await readFile(this.#file(ownerUserId), 'utf8')) as unknown;
+        const current = librarySchema.safeParse(raw);
+        let library: SavedVideoLibrary;
+        if (current.success) {
+          library = current.data;
+        } else {
+          const legacy = legacyLibrarySchema.parse(raw);
+          library = librarySchema.parse({
+            ...legacy,
+            schemaVersion: 2,
+            videos: legacy.videos.map((aggregate) => ({
+              ...aggregate,
+              versions: aggregate.versions.map((version) => ({
+                ...version,
+                characterName: null,
+              })),
             })),
-          })),
-        });
+          });
+        }
+        if (library.ownerUserId !== ownerUserId) throw new Error('Saved video owner mismatch.');
+        this.#cacheLibrary(library);
+        return library;
+      } catch (error) {
+        if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {
+          const library = emptyLibrary(ownerUserId);
+          this.#cacheLibrary(library);
+          return library;
+        }
+        throw error;
       }
-      if (library.ownerUserId !== ownerUserId) throw new Error('Saved video owner mismatch.');
-      return library;
-    } catch (error) {
-      if (error instanceof Error && 'code' in error && error.code === 'ENOENT')
-        return emptyLibrary(ownerUserId);
-      throw error;
+    })();
+    this.#loads.set(ownerUserId, load);
+    try {
+      return await load;
+    } finally {
+      if (this.#loads.get(ownerUserId) === load) this.#loads.delete(ownerUserId);
     }
   }
 
@@ -172,17 +203,21 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
     await chmod(this.#root, 0o700);
     const filePath = this.#file(library.ownerUserId);
     const temporaryPath = `${filePath}.tmp-${randomUUID()}`;
-    const handle = await open(temporaryPath, 'wx', 0o600);
     try {
-      await handle.writeFile(`${JSON.stringify(librarySchema.parse(library))}\n`, 'utf8');
-      await handle.sync();
-    } finally {
-      await handle.close();
-    }
-    await rename(temporaryPath, filePath).catch(async (error) => {
+      const validated = librarySchema.parse(library);
+      const handle = await open(temporaryPath, 'wx', 0o600);
+      try {
+        await handle.writeFile(`${JSON.stringify(validated)}\n`, 'utf8');
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      await rename(temporaryPath, filePath);
+      this.#cacheLibrary(validated);
+    } catch (error) {
       await rm(temporaryPath, { force: true }).catch(() => undefined);
       throw error;
-    });
+    }
   }
 
   async #mutate<Result>(

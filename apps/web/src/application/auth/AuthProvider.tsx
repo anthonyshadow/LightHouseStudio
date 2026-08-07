@@ -33,10 +33,18 @@ export const AuthProvider = ({
   );
   const [session, setSession] = useState<AuthenticatedSessionResponse | null>(initialSession);
   const restoreRef = useRef<Promise<boolean> | null>(null);
+  const restoreControllerRef = useRef<AbortController | null>(null);
   const loginControllerRef = useRef<AbortController | null>(null);
   const logoutRef = useRef<Promise<void> | null>(null);
+  const logoutControllerRef = useRef<AbortController | null>(null);
+  const operationGenerationRef = useRef(0);
+  const mountedRef = useRef(false);
 
   const expire = useCallback(() => {
+    operationGenerationRef.current += 1;
+    restoreControllerRef.current?.abort('session-expired');
+    loginControllerRef.current?.abort('session-expired');
+    logoutControllerRef.current?.abort('session-expired');
     setSession(null);
     setStatus('unauthenticated');
   }, []);
@@ -45,40 +53,50 @@ export const AuthProvider = ({
     if (session) return Promise.resolve(true);
     if (restoreRef.current) return restoreRef.current;
     const controller = new AbortController();
+    const generation = operationGenerationRef.current;
+    restoreControllerRef.current = controller;
     const request = import('../../adapters/api-client/authApi')
       .then(({ fetchCurrentSession }) => fetchCurrentSession(controller.signal))
       .then((restored) => {
+        if (controller.signal.aborted || generation !== operationGenerationRef.current)
+          return false;
         setSession(restored);
         setStatus('authenticated');
         return true;
       })
       .catch(() => {
+        if (controller.signal.aborted || generation !== operationGenerationRef.current)
+          return false;
         setSession(null);
         setStatus('unauthenticated');
         return false;
       })
       .finally(() => {
         if (restoreRef.current === request) restoreRef.current = null;
+        if (restoreControllerRef.current === controller) restoreControllerRef.current = null;
       });
     restoreRef.current = request;
     return request;
   }, [session]);
 
   const login = useCallback(async (login: string, password: string): Promise<boolean> => {
+    operationGenerationRef.current += 1;
+    restoreControllerRef.current?.abort('login-started');
     loginControllerRef.current?.abort();
     const controller = new AbortController();
+    const generation = operationGenerationRef.current;
     loginControllerRef.current = controller;
     setStatus('authenticating');
     try {
       const authenticated = await import('../../adapters/api-client/authApi').then(
         ({ login: loginRequest }) => loginRequest({ login, password }, controller.signal),
       );
-      if (controller.signal.aborted) return false;
+      if (controller.signal.aborted || generation !== operationGenerationRef.current) return false;
       setSession(authenticated);
       setStatus('authenticated');
       return true;
     } catch (error) {
-      if (!controller.signal.aborted) {
+      if (!controller.signal.aborted && generation === operationGenerationRef.current) {
         setSession(null);
         setStatus('unauthenticated');
       }
@@ -90,23 +108,31 @@ export const AuthProvider = ({
 
   const logout = useCallback((): Promise<void> => {
     if (logoutRef.current) return logoutRef.current;
+    operationGenerationRef.current += 1;
+    const generation = operationGenerationRef.current;
+    restoreControllerRef.current?.abort('logout-started');
+    loginControllerRef.current?.abort('logout-started');
     setStatus('logging-out');
     const controller = new AbortController();
+    logoutControllerRef.current = controller;
     const request = import('../../adapters/api-client/authApi')
       .then(({ logout: logoutRequest }) => logoutRequest(controller.signal))
       .catch(() => undefined)
       .then(() => {
+        if (controller.signal.aborted || generation !== operationGenerationRef.current) return;
         setSession(null);
         setStatus('unauthenticated');
       })
       .finally(() => {
         if (logoutRef.current === request) logoutRef.current = null;
+        if (logoutControllerRef.current === controller) logoutControllerRef.current = null;
       });
     logoutRef.current = request;
     return request;
   }, []);
 
   useEffect(() => {
+    mountedRef.current = true;
     const handleAuthenticationRequired = () => expire();
     window.addEventListener('lightframe:authentication-required', handleAuthenticationRequired);
     return () => {
@@ -114,7 +140,14 @@ export const AuthProvider = ({
         'lightframe:authentication-required',
         handleAuthenticationRequired,
       );
-      loginControllerRef.current?.abort();
+      mountedRef.current = false;
+      queueMicrotask(() => {
+        if (mountedRef.current) return;
+        operationGenerationRef.current += 1;
+        restoreControllerRef.current?.abort('unmount');
+        loginControllerRef.current?.abort();
+        logoutControllerRef.current?.abort('unmount');
+      });
     };
   }, [expire]);
 

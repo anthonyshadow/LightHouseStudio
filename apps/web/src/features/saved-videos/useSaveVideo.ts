@@ -44,10 +44,9 @@ export const useSaveVideo = () => {
       source?: { readonly videoId: string; readonly versionId: string },
       characterName?: string | null,
     ) => {
-      if (state.status === 'saving') return null;
+      if (controller.current !== null) return null;
       const idempotencyKey = keys.current.get(artifact.id) ?? crypto.randomUUID();
       keys.current.set(artifact.id, idempotencyKey);
-      controller.current?.abort('replaced');
       const active = new AbortController();
       controller.current = active;
       setState({ status: 'saving', artifactId: artifact.id });
@@ -71,6 +70,7 @@ export const useSaveVideo = () => {
             if (active.signal.aborted) throw error;
             return video;
           });
+        if (active.signal.aborted) return null;
         setState({ status: 'saved', artifactId: artifact.id, video: saved });
         return saved;
       } catch (error) {
@@ -81,9 +81,11 @@ export const useSaveVideo = () => {
           message: error instanceof Error ? error.message : 'The video could not be saved.',
         });
         return null;
+      } finally {
+        if (controller.current === active) controller.current = null;
       }
     },
-    [state.status],
+    [],
   );
 
   const replace = useCallback(
@@ -93,11 +95,10 @@ export const useSaveVideo = () => {
       title?: string,
       characterName?: string | null,
     ) => {
-      if (state.status === 'saving') return null;
+      if (controller.current !== null) return null;
       const keyId = `${artifact.id}:replace:${target.videoId}:${target.currentVersionId}`;
       const idempotencyKey = keys.current.get(keyId) ?? crypto.randomUUID();
       keys.current.set(keyId, idempotencyKey);
-      controller.current?.abort('replaced');
       const active = new AbortController();
       controller.current = active;
       setState({ status: 'saving', artifactId: artifact.id });
@@ -121,6 +122,7 @@ export const useSaveVideo = () => {
             if (active.signal.aborted) throw error;
             return video;
           });
+        if (active.signal.aborted) return null;
         setState({ status: 'saved', artifactId: artifact.id, video: saved });
         return saved;
       } catch (error) {
@@ -131,13 +133,16 @@ export const useSaveVideo = () => {
           message: error instanceof Error ? error.message : 'The video could not be replaced.',
         });
         return null;
+      } finally {
+        if (controller.current === active) controller.current = null;
       }
     },
-    [state.status],
+    [],
   );
 
   const reset = useCallback(() => {
     controller.current?.abort('reset');
+    controller.current = null;
     setState({ status: 'idle' });
   }, []);
 

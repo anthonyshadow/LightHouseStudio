@@ -3,7 +3,7 @@
 import type { AuthenticatedSessionResponse } from '@studio/contracts';
 import { createPhaseOneEntitlements } from '@studio/domain';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { useState } from 'react';
+import { StrictMode, useEffect, useState } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const api = vi.hoisted(() => ({
@@ -72,6 +72,14 @@ const Probe = () => {
   );
 };
 
+const AutoRestoreProbe = () => {
+  const auth = useAuth();
+  useEffect(() => {
+    if (auth.status === 'unknown') void auth.restore();
+  }, [auth]);
+  return <output aria-label="auto restore status">{auth.status}</output>;
+};
+
 describe('AuthProvider', () => {
   afterEach(cleanup);
 
@@ -98,6 +106,24 @@ describe('AuthProvider', () => {
 
     await waitFor(() =>
       expect(screen.getByLabelText('auth status')).toHaveTextContent('authenticated'),
+    );
+  });
+
+  it('keeps restoration alive through the Strict Mode effect lifecycle probe', async () => {
+    const request = deferred<AuthenticatedSessionResponse>();
+    api.fetchCurrentSession.mockReturnValue(request.promise);
+    render(
+      <StrictMode>
+        <AuthProvider>
+          <AutoRestoreProbe />
+        </AuthProvider>
+      </StrictMode>,
+    );
+
+    await waitFor(() => expect(api.fetchCurrentSession).toHaveBeenCalledOnce());
+    request.resolve(session);
+    await waitFor(() =>
+      expect(screen.getByLabelText('auto restore status')).toHaveTextContent('authenticated'),
     );
   });
 
@@ -147,5 +173,45 @@ describe('AuthProvider', () => {
     );
     fireEvent(window, new Event('lightframe:authentication-required'));
     expect(screen.getByLabelText('auth status')).toHaveTextContent('unauthenticated');
+  });
+
+  it('prevents late restore and login results from reviving an expired or logging-out session', async () => {
+    const restoreRequest = deferred<AuthenticatedSessionResponse>();
+    api.fetchCurrentSession.mockReturnValue(restoreRequest.promise);
+    const view = render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(api.fetchCurrentSession).toHaveBeenCalledOnce());
+    fireEvent(window, new Event('lightframe:authentication-required'));
+    restoreRequest.resolve(session);
+    await restoreRequest.promise;
+    await waitFor(() =>
+      expect(screen.getByLabelText('auth status')).toHaveTextContent('unauthenticated'),
+    );
+
+    view.unmount();
+    const loginRequest = deferred<AuthenticatedSessionResponse>();
+    const logoutRequest = deferred<void>();
+    api.login.mockReturnValue(loginRequest.promise);
+    api.logout.mockReturnValue(logoutRequest.promise);
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }));
+    await waitFor(() => expect(api.login).toHaveBeenCalledOnce());
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }));
+    loginRequest.resolve(session);
+    logoutRequest.resolve();
+    await Promise.all([loginRequest.promise, logoutRequest.promise]);
+    await waitFor(() =>
+      expect(screen.getByLabelText('auth status')).toHaveTextContent('unauthenticated'),
+    );
   });
 });

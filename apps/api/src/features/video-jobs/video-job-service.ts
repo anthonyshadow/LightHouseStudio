@@ -428,13 +428,12 @@ export class VideoJobService {
   async #expireJob(job: VideoJobRecord): Promise<void> {
     if (this.#jobs.get(job.jobId) !== job || job.status === 'expired') return;
     job.operationController.abort();
-    this.#touch(job, 'expired');
     job.result = null;
     job.error = {
       code: 'job_expired',
       message: 'This temporary video job expired. Submit a new job explicitly to retry.',
     };
-    this.#trace(job);
+    this.#touch(job, 'expired');
     await this.#requestCleanup(job, false);
   }
 
@@ -648,12 +647,11 @@ export class VideoJobService {
         await this.#cleanupFiles(job);
         return;
       }
-      this.#touch(job, 'failed');
       job.error =
         error instanceof AppError
           ? { code: error.code as VideoJobErrorCode, message: error.message }
           : safeProviderFailure(error);
-      this.#trace(job);
+      this.#touch(job, 'failed');
       await this.#cleanupFiles(job);
     }
   }
@@ -694,12 +692,11 @@ export class VideoJobService {
         this.#touch(job, 'queued');
         return;
       }
-      this.#touch(job, 'failed');
       job.error =
         error instanceof AppError
           ? { code: error.code as VideoJobErrorCode, message: error.message }
           : safeProviderFailure(error);
-      this.#trace(job);
+      this.#touch(job, 'failed');
       await this.#cleanupFiles(job);
     }
   }
@@ -730,11 +727,10 @@ export class VideoJobService {
           job.providerOutputLocation = providerStatus.outputLocation;
         }
         if (providerStatus.status === 'failed') {
-          this.#touch(job, 'failed');
           job.error = safeProviderFailure(
             new VideoJobProviderError(providerStatus.failureReason ?? 'upstream'),
           );
-          this.#trace(job);
+          this.#touch(job, 'failed');
           await this.#cleanupFiles(job);
           return;
         }
@@ -768,9 +764,8 @@ export class VideoJobService {
             this.#now() + this.#providerPollBackoffMs[job.providerPollAttempt]!;
           return;
         }
-        this.#touch(job, 'failed');
         job.error = safeProviderFailure(error);
-        this.#trace(job);
+        this.#touch(job, 'failed');
         await this.#cleanupFiles(job);
       }
     })().finally(() => {

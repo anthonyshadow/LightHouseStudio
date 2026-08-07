@@ -395,16 +395,19 @@ export const useExistingVideoWorkflow = ({
     setRetryJob(null);
   }, [setElapsedSeconds, setPendingVisual, setRetryJob, setStatus, updateSubmissionOperation]);
 
-  const releaseRetainedJob = useCallback(() => {
+  const releaseRetainedJobAndWait = useCallback(async () => {
     const jobId = retainedJobIdRef.current;
     if (!jobId) return;
     retainedJobIdRef.current = null;
-    void releaseVideoJob(jobId).catch(() => undefined);
+    await releaseVideoJob(jobId).catch(() => undefined);
   }, []);
 
-  const reset = useCallback(
+  const releaseRetainedJob = useCallback(() => {
+    void releaseRetainedJobAndWait();
+  }, [releaseRetainedJobAndWait]);
+
+  const resetWorkflowState = useCallback(
     (discardTake = false) => {
-      releaseRetainedJob();
       clearOperation();
       if (discardTake) recording.discard();
       setSelection(null);
@@ -423,7 +426,6 @@ export const useExistingVideoWorkflow = ({
     [
       clearOperation,
       recording,
-      releaseRetainedJob,
       setComparison,
       setCompletedStepCount,
       setEditBase,
@@ -438,6 +440,20 @@ export const useExistingVideoWorkflow = ({
       setVoiceSelection,
     ],
   );
+
+  const reset = useCallback(
+    (discardTake = false) => {
+      releaseRetainedJob();
+      resetWorkflowState(discardTake);
+    },
+    [releaseRetainedJob, resetWorkflowState],
+  );
+
+  const cleanup = useCallback(async () => {
+    const release = releaseRetainedJobAndWait();
+    resetWorkflowState(false);
+    await release;
+  }, [releaseRetainedJobAndWait, resetWorkflowState]);
 
   const selectFile = useCallback(
     async (file: File) => {
@@ -1602,6 +1618,7 @@ export const useExistingVideoWorkflow = ({
       cancelBeforeAcceptance,
       downloadResult: recording.markDownloaded,
       reset,
+      cleanup,
       startOver,
       setVtonInputKind,
       selectLocalVoice: (effect: LocalVoiceEffectId, voiceName: string) =>
@@ -1642,6 +1659,7 @@ export const useExistingVideoWorkflow = ({
       recording.visual,
       removeStep,
       reset,
+      cleanup,
       startOver,
       setVtonInputKind,
       retryFinalization,

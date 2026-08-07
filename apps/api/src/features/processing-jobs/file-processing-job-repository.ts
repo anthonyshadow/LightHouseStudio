@@ -46,17 +46,19 @@ export class FileProcessingJobRepository implements ProcessingJobTraceWriter {
       await chmod(this.#root, 0o700);
       const file = path.join(this.#root, `${trace.jobId}.json`);
       const temporary = `${file}.tmp-${randomUUID()}`;
-      const handle = await open(temporary, 'wx', 0o600);
       try {
-        await handle.writeFile(`${JSON.stringify(trace)}\n`, 'utf8');
-        await handle.sync();
-      } finally {
-        await handle.close();
-      }
-      await rename(temporary, file).catch(async (error) => {
+        const handle = await open(temporary, 'wx', 0o600);
+        try {
+          await handle.writeFile(`${JSON.stringify(trace)}\n`, 'utf8');
+          await handle.sync();
+        } finally {
+          await handle.close();
+        }
+        await rename(temporary, file);
+      } catch (error) {
         await rm(temporary, { force: true }).catch(() => undefined);
         throw error;
-      });
+      }
     } finally {
       release();
       if (this.#locks.get(trace.jobId) === chain) this.#locks.delete(trace.jobId);

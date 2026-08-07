@@ -4,6 +4,7 @@ import {
   DEVELOPMENT_API_PROXY,
   DEVELOPMENT_API_PROXY_TIMEOUT_MS,
   DEVELOPMENT_OPTIMIZE_DEPS,
+  PRODUCTION_CHUNK_SIZE_WARNING_LIMIT_KB,
 } from './vite.config';
 
 describe('development API proxy', () => {
@@ -26,5 +27,20 @@ describe('development dependency optimization', () => {
 
     expect(DEVELOPMENT_OPTIMIZE_DEPS).toEqual({ include: ['mediabunny'] });
     expect(resolvedConfig.optimizeDeps).toEqual(DEVELOPMENT_OPTIMIZE_DEPS);
+  });
+});
+
+describe('production chunk reporting', () => {
+  it('allows the known lazy media and worker boundary while retaining manifest budgets', () => {
+    const resolvedConfig =
+      typeof viteConfig === 'function'
+        ? viteConfig({ command: 'build', mode: 'test', isSsrBuild: false, isPreview: false })
+        : viteConfig;
+
+    expect(PRODUCTION_CHUNK_SIZE_WARNING_LIMIT_KB).toBe(1_700);
+    expect(resolvedConfig.build?.chunkSizeWarningLimit).toBe(
+      PRODUCTION_CHUNK_SIZE_WARNING_LIMIT_KB,
+    );
+    expect(resolvedConfig.build?.manifest).toBe(true);
   });
 });

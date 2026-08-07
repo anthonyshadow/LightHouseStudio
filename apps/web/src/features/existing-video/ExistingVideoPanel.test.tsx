@@ -75,6 +75,7 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   cancelBeforeAcceptance: vi.fn(),
   downloadResult: vi.fn(),
   reset: vi.fn(),
+  cleanup: vi.fn(),
   startOver: vi.fn(),
   setVtonInputKind: vi.fn(),
   selectLocalVoice: vi.fn(),

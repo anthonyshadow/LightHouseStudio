@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { chmod, mkdtemp, open, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -7,6 +8,7 @@ export interface SpooledAudioUpload {
   readonly kind: 'spooled-audio-upload';
   readonly path: string;
   readonly byteLength: number;
+  readonly checksumSha256: string;
   cleanup(): Promise<void>;
 }
 
@@ -26,6 +28,9 @@ export const isSpooledAudioUpload = (value: unknown): value is SpooledAudioUploa
   typeof value.path === 'string' &&
   'byteLength' in value &&
   typeof value.byteLength === 'number' &&
+  'checksumSha256' in value &&
+  typeof value.checksumSha256 === 'string' &&
+  /^[a-f0-9]{64}$/u.test(value.checksumSha256) &&
   'cleanup' in value &&
   typeof value.cleanup === 'function';
 
@@ -37,6 +42,7 @@ export const spoolAudioUpload = async (
   const filePath = path.join(directory, 'recording.audio');
   let handle: Awaited<ReturnType<typeof open>> | undefined;
   let byteLength = 0;
+  const hash = createHash('sha256');
   try {
     await chmod(directory, 0o700);
     handle = await open(filePath, 'wx', 0o600);
@@ -45,6 +51,7 @@ export const spoolAudioUpload = async (
       byteLength += chunk.byteLength;
       if (byteLength > maximumBytes) throw new SpooledUploadTooLargeError();
       await handle.write(chunk);
+      hash.update(chunk);
     }
     await handle.sync();
     await handle.close();
@@ -54,6 +61,7 @@ export const spoolAudioUpload = async (
       kind: 'spooled-audio-upload',
       path: filePath,
       byteLength,
+      checksumSha256: hash.digest('hex'),
       cleanup: async () => {
         if (cleaned) return;
         cleaned = true;

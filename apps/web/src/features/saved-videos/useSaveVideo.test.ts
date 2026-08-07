@@ -153,4 +153,29 @@ describe('useSaveVideo', () => {
     act(() => result.current.reset());
     expect(result.current.state).toEqual({ status: 'idle' });
   });
+
+  it('coalesces same-tick save attempts before React publishes the saving state', async () => {
+    let resolve!: (value: SavedVideoDetail) => void;
+    api.saveVideo.mockReturnValueOnce(
+      new Promise<SavedVideoDetail>((settle) => {
+        resolve = settle;
+      }),
+    );
+    const { result } = renderHook(() => useSaveVideo());
+    const source = artifact();
+
+    let first!: Promise<SavedVideoDetail | null>;
+    let second!: Promise<SavedVideoDetail | null>;
+    act(() => {
+      first = result.current.save(source);
+      second = result.current.save(source);
+    });
+    await expect(second).resolves.toBeNull();
+    expect(api.saveVideo).toHaveBeenCalledOnce();
+
+    resolve(savedVideo);
+    await act(async () => {
+      await first;
+    });
+  });
 });

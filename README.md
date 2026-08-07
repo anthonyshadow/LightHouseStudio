@@ -256,7 +256,7 @@ pnpm audit:all
 ```
 
 Review the visual baseline inventory for every changed Darwin/Linux image. The exact-candidate
-commands are canonicalized in the [active plan](docs/project-audit-implementation-plan.md).
+commands are canonicalized in the [testing strategy](docs/TESTING.md).
 
 Physical devices and live providers remain separately gated by [manual QA](docs/MANUAL_QA.md) and
 [live provider smoke](docs/LIVE_PROVIDER_SMOKE.md).
@@ -307,7 +307,7 @@ Start with the [documentation map](docs/README.md). Key references:
 - [Implemented journeys](docs/userStories/README.md)
 - [Architecture and ownership](docs/ARCHITECTURE.md)
 - [Privacy and temporary data](docs/PRIVACY_AND_TEMPORARY_DATA.md)
-- [Active implementation plan](docs/project-audit-implementation-plan.md)
+- [Maintainability audit](docs/MAINTAINABILITY_AUDIT.md)
 - [Browser support](docs/BROWSER_SUPPORT.md)
 - [Manual QA](docs/MANUAL_QA.md)
 - [Testing strategy](docs/TESTING.md)

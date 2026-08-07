@@ -235,6 +235,7 @@ export class VoiceService {
   >();
   readonly #sharedPageOperations = new Map<string, SharedOperation<ProviderSharedVoicePage>>();
   readonly #sharedVoiceOperations = new Map<string, SharedOperation<ProviderSharedVoice | null>>();
+  readonly #migrationOperations = new Map<string, SharedOperation<void>>();
   readonly #addOperations = new Map<string, SharedOperation<VoiceLibraryMutationResponse>>();
   readonly #removeOperations = new Map<string, SharedOperation<VoiceLibraryMutationResponse>>();
   #cachedConversionModel: { readonly model: ElevenLabsModel; readonly expiresAt: number } | null =
@@ -255,30 +256,45 @@ export class VoiceService {
 
   async #ensureSavedVoiceMigration(ownerUserId: string, signal: AbortSignal): Promise<void> {
     if (await this.#savedVoices.migrated(ownerUserId)) return;
-    const voices: ProviderVoice[] = [];
-    let nextPageToken: string | null = null;
-    for (let pageNumber = 0; pageNumber < MAX_SAVED_PROVIDER_PAGES_PER_REQUEST; pageNumber += 1) {
-      const page = await this.#provider.listWorkspaceVoices({
-        search: '',
-        language: '',
-        gender: '',
-        age: '',
-        accent: '',
-        useCase: '',
-        descriptive: '',
-        pageSize: 20,
-        nextPageToken,
-        signal,
-      });
-      voices.push(...page.voices);
-      if (!page.hasMore || page.nextPageToken === null) break;
-      nextPageToken = page.nextPageToken;
+    const active = this.#migrationOperations.get(ownerUserId);
+    if (active?.acceptingSubscribers) {
+      return active.subscribe(signal, () => new ProviderError('workspace-voices', 'aborted'));
     }
-    await this.#savedVoices.completeMigration(
-      ownerUserId,
-      voices.map((voice) => ({ voiceId: voice.voiceId, publicOwnerId: voice.publicOwnerId })),
-      new Date().toISOString(),
-    );
+    const operation = createSharedOperation(async (operationSignal) => {
+      if (await this.#savedVoices.migrated(ownerUserId)) return;
+      const voices: ProviderVoice[] = [];
+      let nextPageToken: string | null = null;
+      for (let pageNumber = 0; pageNumber < MAX_SAVED_PROVIDER_PAGES_PER_REQUEST; pageNumber += 1) {
+        const page = await this.#provider.listWorkspaceVoices({
+          search: '',
+          language: '',
+          gender: '',
+          age: '',
+          accent: '',
+          useCase: '',
+          descriptive: '',
+          pageSize: 20,
+          nextPageToken,
+          signal: operationSignal,
+        });
+        voices.push(...page.voices);
+        if (!page.hasMore || page.nextPageToken === null) break;
+        nextPageToken = page.nextPageToken;
+      }
+      await this.#savedVoices.completeMigration(
+        ownerUserId,
+        voices.map((voice) => ({ voiceId: voice.voiceId, publicOwnerId: voice.publicOwnerId })),
+        new Date().toISOString(),
+      );
+    });
+    this.#migrationOperations.set(ownerUserId, operation);
+    const release = (): void => {
+      if (this.#migrationOperations.get(ownerUserId) === operation) {
+        this.#migrationOperations.delete(ownerUserId);
+      }
+    };
+    void operation.result.then(release, release);
+    return operation.subscribe(signal, () => new ProviderError('workspace-voices', 'aborted'));
   }
 
   async #conversionModel(signal: AbortSignal): Promise<ElevenLabsModel> {

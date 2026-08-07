@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { access } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
@@ -7,6 +8,7 @@ describe('spoolAudioUpload', () => {
   it('writes a bounded private upload and cleans it idempotently', async () => {
     const upload = await spoolAudioUpload(Readable.from([Buffer.from('safe-audio')]), 20);
     expect(upload.byteLength).toBe(10);
+    expect(upload.checksumSha256).toBe(createHash('sha256').update('safe-audio').digest('hex'));
     await expect(access(upload.path)).resolves.toBeUndefined();
     await upload.cleanup();
     await upload.cleanup();

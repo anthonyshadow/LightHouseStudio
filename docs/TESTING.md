@@ -126,8 +126,8 @@ Ordinary pushes and pull requests run:
 4. focused functional Playwright journeys.
 
 Coverage, curated visual regression, and broad screenshot capture run only through
-`workflow_dispatch`. Exact-candidate release work still runs the full command list in
-`project-audit-implementation-plan.md`, including coverage and visual regression.
+`workflow_dispatch`. Exact-candidate release work still runs the full release command list in the
+project README, including coverage and visual regression.
 
 ## Adding or retaining a test
 

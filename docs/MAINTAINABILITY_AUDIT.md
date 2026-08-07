@@ -3,8 +3,8 @@
 **Current as of:** 2026-08-05
 
 This document records the repository-wide behavior-preserving cleanup and the placement rules that
-follow from it. Product behavior remains defined by [Architecture](ARCHITECTURE.md), the
-[product state](product-state.md), and the [user stories](userStories/README.md).
+follow from it. Product behavior remains defined by the [project README](../README.md),
+[Architecture](ARCHITECTURE.md), and the [user stories](userStories/README.md).
 
 ## 2026-08-05 simplification pass
 
@@ -248,5 +248,6 @@ Post-change validation:
 `pnpm audit:all` could not reach the registry in the restricted environment, and permission to send
 dependency metadata externally was not granted. Physical-device, assistive-technology, and paid
 live-provider validation were not run. Use those release-only gates exactly as described in
-[Testing](TESTING.md) and the [active audit plan](project-audit-implementation-plan.md); do not
-convert any of these limitations into passing claims.
+[Testing](TESTING.md), [Manual QA](MANUAL_QA.md), and
+[Live provider smoke](LIVE_PROVIDER_SMOKE.md); do not convert any of these limitations into passing
+claims.

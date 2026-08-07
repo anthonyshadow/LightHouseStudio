@@ -1,5 +1,5 @@
 import { useTheme } from '@emotion/react';
-import type { SavedVideoSummary } from '@studio/contracts';
+import { VIDEO_RESULT_MAX_BYTES, type SavedVideoSummary } from '@studio/contracts';
 import { getVideoEditOutputGeometry, resolveCharacterVersion } from '@studio/domain';
 import {
   lazy,
@@ -12,7 +12,8 @@ import {
   useState,
 } from 'react';
 import { useLocation, useNavigate } from 'react-router';
-import { apiFetch, hydrateReferenceImage } from '../adapters/api-client/apiClient';
+import { ApiClientError, apiFetch, hydrateReferenceImage } from '../adapters/api-client/apiClient';
+import { readBoundedBlob } from '../adapters/api-client/readBoundedBlob';
 import { savedVideoContentUrl } from '../adapters/api-client/savedVideosApi';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import { useAuth } from '../application/auth/AuthProvider';
@@ -341,6 +342,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const [wardrobeDirty, setWardrobeDirty] = useState(false);
   const [videoEditDiscardPromptOpen, setVideoEditDiscardPromptOpen] = useState(false);
   const galleryEditRequestedRef = useRef(false);
+  const gallerySourceLoadControllerRef = useRef<AbortController | null>(null);
   const [loadedSavedSource, setLoadedSavedSource] = useState<{
     readonly videoId: string;
     readonly currentVersionId: string;
@@ -1001,10 +1003,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     closeOverlay();
     void startAdvancedModel();
   };
-  const discardTemporaryWork = useCallback(() => {
+  const discardLocalTemporaryWork = useCallback(() => {
+    gallerySourceLoadControllerRef.current?.abort('discard');
+    gallerySourceLoadControllerRef.current = null;
+    galleryEditRequestedRef.current = false;
     adoptingExistingVideoRecordingRef.current = null;
     setRecordingForExistingVideo(false);
-    existingVideo.reset(false);
     processing.cancel();
     recording.discard();
     setShelfDirty(false);
@@ -1012,21 +1016,19 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     setWardrobeDirty(false);
     videoEditor.close();
     savedVideoSave.reset();
-  }, [
-    existingVideo,
-    processing,
-    recording,
-    savedVideoSave,
-    setShelfDirty,
-    updateOutfitBuilderDirty,
-    videoEditor,
-  ]);
+  }, [processing, recording, savedVideoSave, setShelfDirty, updateOutfitBuilderDirty, videoEditor]);
+  const discardTemporaryWork = useCallback(() => {
+    existingVideo.reset(false);
+    discardLocalTemporaryWork();
+  }, [discardLocalTemporaryWork, existingVideo]);
   useEffect(
     () =>
-      sessionCleanup.register('studio-temporary-state', 'cancel-operations', () => {
-        discardTemporaryWork();
+      sessionCleanup.register('studio-temporary-state', 'cancel-operations', async () => {
+        const cleanup = existingVideo.cleanup();
+        discardLocalTemporaryWork();
+        await cleanup;
       }),
-    [discardTemporaryWork, sessionCleanup],
+    [discardLocalTemporaryWork, existingVideo, sessionCleanup],
   );
   useEffect(
     () =>
@@ -1117,26 +1119,50 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const useSavedVideo = useCallback(
     async (video: SavedVideoSummary, intent: 'play' | 'edit') => {
       if (recordingActive || existingVideo.providerActive) return;
-      const response = await apiFetch(savedVideoContentUrl(video.id), {
-        cache: 'no-store',
-        headers: { Accept: video.currentVersion.mimeType },
-      });
-      const blob = await response.blob();
-      const file = new File([blob], video.currentVersion.filename, {
-        type: video.currentVersion.mimeType,
-        lastModified: new Date(video.currentVersion.createdAt).getTime(),
-      });
-      galleryEditRequestedRef.current = intent === 'edit';
-      void navigate(APP_PATHS.studio, { replace: true });
-      openOverlay('video-upload');
-      const artifact = await existingVideo.selectFile(file);
-      if (artifact) {
-        setLoadedSavedSource({
-          videoId: video.id,
-          currentVersionId: video.currentVersion.id,
-          artifactId: artifact.id,
-          characterName: video.currentVersion.characterName,
+      gallerySourceLoadControllerRef.current?.abort('replaced');
+      const controller = new AbortController();
+      gallerySourceLoadControllerRef.current = controller;
+      try {
+        const response = await apiFetch(savedVideoContentUrl(video.id), {
+          cache: 'no-store',
+          headers: { Accept: video.currentVersion.mimeType },
+          signal: controller.signal,
         });
+        const blob = await readBoundedBlob(response, {
+          maximumBytes: VIDEO_RESULT_MAX_BYTES,
+          signal: controller.signal,
+          acceptsContentType: (contentType) => contentType === video.currentVersion.mimeType,
+          createError: (failure) =>
+            new ApiClientError(
+              failure === 'too-large'
+                ? 'The saved video exceeded the app-owned 300 MB safety limit.'
+                : 'The saved video response was empty or invalid.',
+              502,
+              failure === 'too-large' ? 'result_too_large' : 'result_invalid',
+            ),
+          abortMessage: 'Saved video loading was cancelled.',
+        });
+        controller.signal.throwIfAborted();
+        const file = new File([blob], video.currentVersion.filename, {
+          type: video.currentVersion.mimeType,
+          lastModified: new Date(video.currentVersion.createdAt).getTime(),
+        });
+        galleryEditRequestedRef.current = intent === 'edit';
+        void navigate(APP_PATHS.studio, { replace: true });
+        openOverlay('video-upload');
+        const artifact = await existingVideo.selectFile(file);
+        if (artifact && !controller.signal.aborted) {
+          setLoadedSavedSource({
+            videoId: video.id,
+            currentVersionId: video.currentVersion.id,
+            artifactId: artifact.id,
+            characterName: video.currentVersion.characterName,
+          });
+        }
+      } finally {
+        if (gallerySourceLoadControllerRef.current === controller) {
+          gallerySourceLoadControllerRef.current = null;
+        }
       }
     },
     [existingVideo, navigate, openOverlay, recordingActive],

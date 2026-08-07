@@ -69,6 +69,24 @@ describe('VoiceService catalog and saved-library policy', () => {
     expect(provider.sharedSearches).toHaveLength(2);
   });
 
+  it('coalesces the first saved-workspace migration across concurrent callers', async () => {
+    const provider = new FakeElevenLabsProvider();
+    const service = serviceFor(provider);
+    const input = {
+      ...filters,
+      pageSize: 20,
+      nextPageToken: null,
+      refresh: false,
+    };
+
+    await Promise.all([
+      service.listWorkspaceVoices({ ...input, signal: signal() }),
+      service.listWorkspaceVoices({ ...input, signal: signal() }),
+    ]);
+
+    expect(provider.workspaceSearches).toHaveLength(2);
+  });
+
   it('coalesces concurrent adds and revalidates exact standard-rate metadata', async () => {
     const provider = new FakeElevenLabsProvider();
     provider.workspaceVoices = [];

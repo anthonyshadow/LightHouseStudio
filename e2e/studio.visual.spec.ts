@@ -215,6 +215,12 @@ const prepareVisualPage = async (page: Page, entryRoute: boolean): Promise<Netwo
         -webkit-backdrop-filter: none !important;
         transition: none !important;
         caret-color: transparent !important;
+        scrollbar-width: none !important;
+      }
+      *::-webkit-scrollbar {
+        display: none !important;
+        width: 0 !important;
+        height: 0 !important;
       }
     `,
   });

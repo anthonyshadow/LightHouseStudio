@@ -1,4 +1,5 @@
-import { rm } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -64,6 +65,66 @@ describe('saved voice repositories', () => {
     expect((await final.list(ownerUserId)).map((voice) => voice.providerVoiceId).sort()).toEqual([
       'voice-b',
       'voice-c',
+    ]);
+  });
+
+  it('preserves stored record identity and timestamps when a later mutation is persisted', async () => {
+    const root = path.join(tmpdir(), `lightframe-saved-voices-${crypto.randomUUID()}`);
+    roots.push(root);
+    const directory = path.join(root, 'metadata', 'v1', 'saved-voices');
+    const file = path.join(
+      directory,
+      `${createHash('sha256').update(ownerUserId).digest('hex')}.json`,
+    );
+    const originalRecord = {
+      id: 'e08739e1-7eb5-4e5e-9af1-6e3ba8689863',
+      ownerUserId,
+      provider: 'elevenlabs' as const,
+      providerVoiceId: 'voice-original',
+      publicOwnerId: 'owner-original',
+      savedAt: '2026-08-01T09:00:00.000Z',
+    };
+    await mkdir(directory, { recursive: true });
+    await writeFile(
+      file,
+      JSON.stringify({
+        schemaVersion: 1,
+        ownerUserId,
+        migratedWorkspace: true,
+        records: [originalRecord],
+      }),
+    );
+
+    const repository = new FileSavedVoiceRepository(root);
+    await repository.save(ownerUserId, 'voice-later', null, savedAt);
+
+    const persisted = JSON.parse(await readFile(file, 'utf8')) as {
+      records: Array<typeof originalRecord>;
+    };
+    expect(persisted.records[0]).toEqual(originalRecord);
+  });
+
+  it('reloads durable state after a failed write so a retry is not lost', async () => {
+    const root = path.join(tmpdir(), `lightframe-saved-voices-${crypto.randomUUID()}`);
+    roots.push(root);
+    const repository = new FileSavedVoiceRepository(root);
+    const libraryPath = path.join(
+      root,
+      'metadata',
+      'v1',
+      'saved-voices',
+      `${createHash('sha256').update(ownerUserId).digest('hex')}.json`,
+    );
+    await mkdir(libraryPath, { recursive: true });
+
+    await expect(repository.save(ownerUserId, 'voice-retry', null, savedAt)).rejects.toBeInstanceOf(
+      Error,
+    );
+    await rm(libraryPath, { recursive: true, force: true });
+
+    await expect(repository.save(ownerUserId, 'voice-retry', null, savedAt)).resolves.toBe('saved');
+    await expect(repository.list(ownerUserId)).resolves.toMatchObject([
+      { providerVoiceId: 'voice-retry' },
     ]);
   });
 });

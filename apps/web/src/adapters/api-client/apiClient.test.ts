@@ -13,6 +13,7 @@ import {
   composeReferenceImage,
   createReferenceImage,
   editReferenceImage,
+  apiFetch,
   fetchProviderAvailability,
   hydrateReferenceImage,
   importRemoteReferenceImage,
@@ -104,6 +105,33 @@ afterEach(() => {
 });
 
 describe('realtime API client', () => {
+  it('suppresses auth-expiry events only for the exact login endpoint', async () => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(
+        new Response(
+          JSON.stringify({
+            error: { code: 'authentication_required', message: 'Sign in to continue.' },
+          }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } },
+        ),
+      ),
+    );
+    const listener = vi.fn();
+    window.addEventListener('lightframe:authentication-required', listener);
+    try {
+      await expect(apiFetch('/api/auth/login?return=/studio')).rejects.toMatchObject({
+        status: 401,
+      });
+      expect(listener).not.toHaveBeenCalled();
+
+      await expect(apiFetch('/api/auth/login-history')).rejects.toMatchObject({ status: 401 });
+      expect(listener).toHaveBeenCalledOnce();
+    } finally {
+      window.removeEventListener('lightframe:authentication-required', listener);
+    }
+  });
+
   it('preserves the app-owned active-session maximum from the validated token response', async () => {
     vi.stubGlobal(
       'fetch',

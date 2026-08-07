@@ -145,6 +145,44 @@ describe('LocalReferenceImageAssetStore', () => {
     await expect(restarted.getContent(otherOwnerId, assetId)).resolves.toBeNull();
   });
 
+  it('claims every legacy asset before publishing one complete rebuilt index', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-assets-'));
+    directories.push(directory);
+    const assetIds = [assetId, '07dd515e-4660-4d5c-8ed0-f337315dcd9a'];
+    let assetIndex = 0;
+    const legacyStore = new LocalReferenceImageAssetStore(directory, {
+      createAssetId: () => assetIds[assetIndex++]!,
+      now: () => new Date('2026-07-18T12:00:00.000Z'),
+    });
+    const secondRequestId = '1847345b-b792-43d0-bab3-c3cc02d60893';
+    await legacyStore.store(input);
+    await legacyStore.store({ ...input, requestId: secondRequestId });
+
+    const root = path.join(directory, 'reference-images', 'v1');
+    await rm(path.join(root, 'asset-index.json'));
+    const authenticatedOwner = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
+    const claimedStore = new LocalReferenceImageAssetStore(directory, {
+      legacyOwnerUserId: authenticatedOwner,
+    });
+
+    await expect(claimedStore.getMetadata(authenticatedOwner, assetIds[0]!)).resolves.toMatchObject(
+      {
+        localOwnerId: authenticatedOwner,
+      },
+    );
+    await expect(claimedStore.getMetadata(authenticatedOwner, assetIds[1]!)).resolves.toMatchObject(
+      {
+        localOwnerId: authenticatedOwner,
+      },
+    );
+    const rebuilt = JSON.parse(await readFile(path.join(root, 'asset-index.json'), 'utf8')) as {
+      assets: Array<{ assetId: string; localOwnerId: string }>;
+    };
+    expect(rebuilt.assets).toHaveLength(2);
+    expect(rebuilt.assets.map((asset) => asset.assetId).sort()).toEqual([...assetIds].sort());
+    expect(rebuilt.assets.every((asset) => asset.localOwnerId === authenticatedOwner)).toBe(true);
+  });
+
   it('uses a clean persisted index without reading per-asset metadata or mappings', async () => {
     const { directory, store } = await setup();
     await store.store(input);

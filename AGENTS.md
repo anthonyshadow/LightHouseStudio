@@ -20,8 +20,8 @@ ownership/portability remain deferred.
 3. The affected observable journey in [`docs/userStories/`](docs/userStories/README.md).
 4. Provider/data work: [`docs/PRIVACY_AND_TEMPORARY_DATA.md`](docs/PRIVACY_AND_TEMPORARY_DATA.md)
    and [`docs/LIVE_PROVIDER_SMOKE.md`](docs/LIVE_PROVIDER_SMOKE.md).
-5. Audit work: [`docs/project-audit-findings.md`](docs/project-audit-findings.md) and the relevant
-   incomplete phase in [`docs/project-audit-implementation-plan.md`](docs/project-audit-implementation-plan.md).
+5. Audit work: [`docs/MAINTAINABILITY_AUDIT.md`](docs/MAINTAINABILITY_AUDIT.md) and the relevant
+   current audit or plan in the [`docs/` map](docs/README.md).
 
 Inspect the owning presentation, controller/orchestration, pure domain rule, HTTP contract/provider
 adapter, and tests that exercise the complete journey. Do not infer behavior from a component name,
@@ -152,8 +152,8 @@ pnpm audit:prod
   support boundaries change.
 - Keep current behavior separate from recommendations. Preserve historical rationale in
   `docs/PRODUCT_EVOLUTION.md` and `LESSONS.md`.
-- An audit-plan phase moves to `docs/project-audit-completed-work.md` only after all acceptance
-  criteria and required validation pass. The active plan contains incomplete phases only.
+- Mark an audit or plan phase complete only after all acceptance criteria and required validation
+  pass. Current plans contain incomplete phases only; Git history remains the archive.
 - Report files changed, validation results, live/manual limitations, and unresolved decisions.
 
 ## Graphify

@@ -118,6 +118,7 @@ export const VideoGallery = ({
           sort,
           signal: controller.signal,
         });
+        if (controller.signal.aborted) return;
         setVideos((current) => (cursor ? [...current, ...page.videos] : page.videos));
         setNextCursor(page.nextCursor);
         setTotal(page.total);
@@ -129,6 +130,8 @@ export const VideoGallery = ({
         if (controller.signal.aborted) return;
         setStatus('error');
         setMessage(error instanceof Error ? error.message : 'Saved videos could not be loaded.');
+      } finally {
+        if (request.current === controller) request.current = null;
       }
     },
     [characterName, format, sort],

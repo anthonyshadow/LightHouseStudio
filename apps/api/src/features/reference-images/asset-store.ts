@@ -202,10 +202,11 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     }
   }
 
-  async #claimLegacyAssets(
-    assets: readonly StoredReferenceImageMetadata[],
-  ): Promise<readonly StoredReferenceImageMetadata[]> {
-    if (this.#legacyOwnerUserId === undefined) return assets;
+  async #claimLegacyAssets(assets: readonly StoredReferenceImageMetadata[]): Promise<{
+    readonly assets: readonly StoredReferenceImageMetadata[];
+    readonly changed: boolean;
+  }> {
+    if (this.#legacyOwnerUserId === undefined) return { assets, changed: false };
     let changed = false;
     const claimed: StoredReferenceImageMetadata[] = [];
     for (const metadata of assets) {
@@ -223,8 +224,7 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
       );
       await this.#repairMappingIfNeeded(parsed);
     }
-    if (changed) await this.#persistIndex(claimed);
-    return claimed;
+    return { assets: claimed, changed };
   }
 
   async #loadPersistedIndex(): Promise<boolean> {
@@ -236,7 +236,9 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     }
     try {
       const index = parseReferenceImageAssetIndex(await readJson(this.#layout.indexPath));
-      this.#replaceIndexes(await this.#claimLegacyAssets(index.assets));
+      const claimed = await this.#claimLegacyAssets(index.assets);
+      if (claimed.changed) await this.#persistIndex(claimed.assets);
+      this.#replaceIndexes(claimed.assets);
       return true;
     } catch (error) {
       if (isMissingPathError(error) || isReferenceImageCodecError(error)) return false;
@@ -280,7 +282,7 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
       }
       if (metadata === null) continue;
       if (metadata.assetId !== entry.name) continue;
-      const [claimed] = await this.#claimLegacyAssets([metadata]);
+      const [claimed] = (await this.#claimLegacyAssets([metadata])).assets;
       if (claimed === undefined) continue;
       metadataByAssetId.set(claimed.assetId, claimed);
       await this.#repairMappingIfNeeded(claimed);

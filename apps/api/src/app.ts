@@ -295,7 +295,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
           }),
       providerIds: {
         'character-swap': dependencies.config.existingVideoCharacterSwapProvider,
-        'virtual-try-on': 'pruna',
+        'virtual-try-on': 'decart',
       },
     },
   );
