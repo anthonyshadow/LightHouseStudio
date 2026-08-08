@@ -23,6 +23,7 @@ import type { UseCharacterBuilderControllerOptions } from './useCharacterBuilder
 const draftRepositoryFactory = vi.hoisted(() => vi.fn());
 const uploadReferenceImage = vi.hoisted(() => vi.fn());
 const fetchReferenceImageMetadata = vi.hoisted(() => vi.fn());
+const discardReferenceImage = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const validateReferenceImage = vi.hoisted(() => vi.fn());
 const MockCharacterBuilderDraftError = vi.hoisted(
   () =>
@@ -42,7 +43,12 @@ vi.mock('./draftRepository', () => ({
 }));
 vi.mock('../../adapters/api-client/apiClient', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
-  return { ...actual, fetchReferenceImageMetadata, uploadReferenceImage };
+  return {
+    ...actual,
+    discardReferenceImage,
+    fetchReferenceImageMetadata,
+    uploadReferenceImage,
+  };
 });
 vi.mock('../../adapters/browser-media/imageValidation', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -217,6 +223,8 @@ beforeEach(() => {
   draftRepositoryFactory.mockReset();
   uploadReferenceImage.mockReset();
   uploadReferenceImage.mockResolvedValue(uploadedAsset);
+  discardReferenceImage.mockReset();
+  discardReferenceImage.mockResolvedValue(undefined);
   fetchReferenceImageMetadata.mockReset();
   validateReferenceImage.mockReset();
   validateReferenceImage.mockResolvedValue({
@@ -357,6 +365,7 @@ describe('useCharacterBuilderController save transactions', () => {
 
     act(() => rendered.result.current.onRemoveUpload());
     expect(rendered.result.current.state.uploadedReference).toBeNull();
+    expect(discardReferenceImage).toHaveBeenCalledWith(uploadedAsset.assetId);
 
     await act(async () => {
       replacement.resolve({
@@ -367,6 +376,9 @@ describe('useCharacterBuilderController save transactions', () => {
       await replacement.promise;
     });
     expect(rendered.result.current.state.uploadedReference).toBeNull();
+    await waitFor(() =>
+      expect(discardReferenceImage).toHaveBeenCalledWith('37f302df-b78d-48a6-bd42-3df738da7066'),
+    );
   });
 
   it('surfaces upload validation and transport failures and permits a clean retry', async () => {

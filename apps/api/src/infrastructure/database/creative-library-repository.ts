@@ -14,6 +14,25 @@ import { creativeAssets, creativeLibraries } from './schema.js';
 
 type AssetKind = typeof creativeAssets.$inferInsert.kind;
 
+const referencedImageAssetIds = (store: CreativeAssetStore): Set<string> => {
+  const ids = new Set<string>();
+  const add = (value: string | null | undefined) => {
+    if (value) ids.add(value);
+  };
+  for (const item of store.savedPrompts) add(item.referenceImageAssetId);
+  for (const item of store.recentPrompts) add(item.referenceImageAssetId);
+  for (const item of store.savedCharacterPrompts) {
+    add(item.referenceImageAssetId);
+    add(item.uploadedReferenceImageAssetId);
+  }
+  for (const item of store.savedCharacterVariants) {
+    add(item.referenceImageAssetId);
+    add(item.creation.sourceReferenceImageAssetId);
+    if (item.creation.method === 'add-outfit') add(item.creation.garmentReferenceImageAssetId);
+  }
+  return ids;
+};
+
 const assetRows = (
   ownerUserId: string,
   revision: number,
@@ -48,7 +67,13 @@ const emptySnapshot = (): CreativeLibrarySnapshot => ({
 });
 
 export class DrizzleCreativeLibraryRepository implements CreativeLibraryRepository {
-  constructor(private readonly db: LightframeDatabase) {}
+  constructor(
+    private readonly db: LightframeDatabase,
+    private readonly releaseReferenceImages?: (
+      ownerUserId: string,
+      assetIds: readonly string[],
+    ) => Promise<void>,
+  ) {}
 
   async load(ownerUserId: string): Promise<CreativeLibrarySnapshot> {
     const [library] = await this.db
@@ -95,7 +120,12 @@ export class DrizzleCreativeLibraryRepository implements CreativeLibraryReposito
     if (sanitized.recovered || sanitized.droppedRecords > 0) {
       throw new Error('Creative library payload is not canonical.');
     }
-    return this.db.transaction(async (tx) => {
+    const previousReferences =
+      this.releaseReferenceImages === undefined
+        ? new Set<string>()
+        : referencedImageAssetIds((await this.load(ownerUserId)).store);
+    const nextReferences = referencedImageAssetIds(sanitized.store);
+    const result = await this.db.transaction(async (tx) => {
       const [current] = await tx
         .select()
         .from(creativeLibraries)
@@ -125,7 +155,19 @@ export class DrizzleCreativeLibraryRepository implements CreativeLibraryReposito
             updatedAt,
           },
         });
-      return { revision: nextRevision, store: sanitized.store, updatedAt };
+      return {
+        snapshot: { revision: nextRevision, store: sanitized.store, updatedAt },
+        releasedReferenceImageAssetIds: [...previousReferences].filter(
+          (assetId) => !nextReferences.has(assetId),
+        ),
+      };
     });
+    if (result === 'conflict') return result;
+    if (result.releasedReferenceImageAssetIds.length > 0) {
+      await this.releaseReferenceImages?.(ownerUserId, result.releasedReferenceImageAssetIds).catch(
+        () => undefined,
+      );
+    }
+    return result.snapshot;
   }
 }

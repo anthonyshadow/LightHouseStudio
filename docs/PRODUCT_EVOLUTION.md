@@ -82,6 +82,12 @@ Uploaded and generated references are immutable, owner-scoped local assets. Deta
 resetting a draft, or deleting a browser record does not promise byte deletion. Whole-directory
 cleanup is safer than introducing unverified orphan garbage collection.
 
+On 2026-08-07, authoritative Neon/private-R2 reference storage gained the missing relationship-safe
+lifecycle. Canonical creative-library rows now define saved references; explicit discard and saved
+relationship removal delete only after an owner-scoped recheck, while unreferenced assets inactive
+for 24 hours are purged opportunistically. Local filesystem mode deliberately keeps the earlier
+whole-environment retirement policy.
+
 OpenAI, BFL, and Wiro are startup-selected provider passes. They never fall back to one another or
 automatically repeat an initial billable submission.
 

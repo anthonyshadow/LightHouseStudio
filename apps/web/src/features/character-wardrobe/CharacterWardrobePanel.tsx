@@ -3,6 +3,7 @@ import { useTheme } from '@emotion/react';
 import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react';
 import {
   createOutfitTryOn,
+  discardReferenceImage,
   fetchReferenceImageMetadata,
   uploadReferenceImage,
 } from '../../adapters/api-client/apiClient';
@@ -104,6 +105,9 @@ export const CharacterWardrobePanel = ({
   const [deleteCandidateId, setDeleteCandidateId] = useState<string | null>(null);
   const operationRef = useRef<{ controller: AbortController; key: string } | null>(null);
   const retryRef = useRef<{ fingerprint: string; requestId: string } | null>(null);
+  const previewRef = useRef<ReferenceImageAsset | null>(null);
+  const garmentAssetIdRef = useRef<string | null>(null);
+  const committedAssetIdsRef = useRef(new Set<string>());
 
   const sourceAssetId = sourceVariantId
     ? (variants.find((variant) => variant.id === sourceVariantId)?.referenceImageAssetId ?? null)
@@ -128,13 +132,34 @@ export const CharacterWardrobePanel = ({
     onDirtyChange(dirty);
     return () => onDirtyChange(false);
   }, [dirty, onDirtyChange]);
-  useEffect(() => () => operationRef.current?.controller.abort(), []);
+  useEffect(() => {
+    previewRef.current = preview;
+  }, [preview]);
+  useEffect(() => {
+    garmentAssetIdRef.current = garmentAssetId;
+  }, [garmentAssetId]);
+  useEffect(
+    () => () => {
+      operationRef.current?.controller.abort();
+      for (const assetId of [previewRef.current?.assetId, garmentAssetIdRef.current]) {
+        if (assetId && !committedAssetIdsRef.current.has(assetId)) {
+          void discardReferenceImage(assetId).catch(() => undefined);
+        }
+      }
+    },
+    [],
+  );
 
   const featureGeneration = useReferencePreviewGeneration({
     onPhase: () => setBusy(true),
     onOptimizationSuccess: () => undefined,
     onSuccess: (result) => {
-      setPreview(result.asset);
+      setPreview((replaced) => {
+        if (replaced && replaced.assetId !== result.asset.assetId) {
+          void discardReferenceImage(replaced.assetId).catch(() => undefined);
+        }
+        return result.asset;
+      });
       setBusy(false);
       setError(null);
     },
@@ -170,9 +195,17 @@ export const CharacterWardrobePanel = ({
     operationRef.current?.controller.abort();
     operationRef.current = null;
     featureGeneration.cancel();
-    setPreview(null);
+    setPreview((discarded) => {
+      if (discarded) void discardReferenceImage(discarded.assetId).catch(() => undefined);
+      return null;
+    });
     setBusy(false);
     setError(null);
+  };
+
+  const discardGarmentAsset = () => {
+    if (garmentAssetId) void discardReferenceImage(garmentAssetId).catch(() => undefined);
+    setGarmentAssetId(null);
   };
 
   const chooseSource = (value: string) => {
@@ -301,6 +334,8 @@ export const CharacterWardrobePanel = ({
               changeInstructions: instructions.trim(),
             },
     });
+    committedAssetIdsRef.current.add(preview.assetId);
+    if (garmentAssetId) committedAssetIdsRef.current.add(garmentAssetId);
     onDirtyChange(false);
     setCreating(null);
     setTitle('');
@@ -476,7 +511,7 @@ export const CharacterWardrobePanel = ({
           title={
             deleteCandidate ? `Delete “${deleteCandidate.title}”?` : 'Delete character variant?'
           }
-          description="This removes the saved variant and its library links. Immutable local image bytes remain until whole-environment retirement."
+          description="This removes the saved variant and its library links. Cloud-stored image assets are deleted only when no saved item still uses them; local files remain until whole-environment retirement."
           confirmLabel="Delete variant"
           cancelLabel="Keep variant"
           danger
@@ -541,6 +576,9 @@ export const CharacterWardrobePanel = ({
           css={{ justifySelf: 'start' }}
           onClick={() => {
             invalidatePreview();
+            discardGarmentAsset();
+            setGarment(null);
+            setSelectedSavedOutfitId('');
             setAllowDrasticChanges(false);
             setCreating(null);
           }}
@@ -625,9 +663,9 @@ export const CharacterWardrobePanel = ({
                     disabled={busy}
                     onChange={(value) => {
                       invalidatePreview();
+                      discardGarmentAsset();
                       setGarmentInputKind(value);
                       setGarment(null);
-                      setGarmentAssetId(null);
                       setSelectedSavedOutfitId('');
                     }}
                   />
@@ -640,12 +678,12 @@ export const CharacterWardrobePanel = ({
                       allowUrlImport
                       onSelectFile={(file) => {
                         invalidatePreview();
-                        setGarmentAssetId(null);
+                        discardGarmentAsset();
                         setGarment(file);
                       }}
                       onRemove={() => {
                         invalidatePreview();
-                        setGarmentAssetId(null);
+                        discardGarmentAsset();
                         setGarment(null);
                       }}
                     />
@@ -667,6 +705,7 @@ export const CharacterWardrobePanel = ({
                       hint="Only saved outfits with a reference image can generate a wardrobe variant."
                       onValueChange={(value) => {
                         invalidatePreview();
+                        discardGarmentAsset();
                         setSelectedSavedOutfitId(value);
                         setGarmentAssetId(
                           imageBackedOutfits.find((outfit) => outfit.id === value)

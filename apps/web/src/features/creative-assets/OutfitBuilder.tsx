@@ -1,6 +1,6 @@
 import { useTheme } from '@emotion/react';
-import { useLayoutEffect, useRef, useState } from 'react';
-import { uploadReferenceImage } from '../../adapters/api-client/apiClient';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { discardReferenceImage, uploadReferenceImage } from '../../adapters/api-client/apiClient';
 import { validateReferenceImage } from '../../adapters/browser-media/imageValidation';
 import { ReferenceImageInputField } from '../reference-images/ReferenceImageInputField';
 import {
@@ -61,6 +61,17 @@ export const OutfitBuilder = ({
   const [saving, setSaving] = useState(false);
   const requestIdRef = useRef(createRequestId());
   const uploadedAssetIdRef = useRef<string | null>(null);
+  const committedAssetIdsRef = useRef(new Set<string>());
+
+  useEffect(
+    () => () => {
+      const assetId = uploadedAssetIdRef.current;
+      if (assetId && !committedAssetIdsRef.current.has(assetId)) {
+        void discardReferenceImage(assetId).catch(() => undefined);
+      }
+    },
+    [],
+  );
 
   const dirty =
     inputKind !== initialKind ||
@@ -83,7 +94,10 @@ export const OutfitBuilder = ({
       setError(validation.blockingError);
       return;
     }
-    uploadedAssetIdRef.current = null;
+    if (uploadedAssetIdRef.current) {
+      void discardReferenceImage(uploadedAssetIdRef.current).catch(() => undefined);
+      uploadedAssetIdRef.current = null;
+    }
     setRetainedReferenceId(null);
     setReferenceFile(file);
   };
@@ -124,6 +138,7 @@ export const OutfitBuilder = ({
               modelModeId: 'lucy-vton-latest',
               source: 'manual',
             });
+      if (referenceImageAssetId) committedAssetIdsRef.current.add(referenceImageAssetId);
       onDirtyChange(false);
       onSaved(saved);
     } catch (caught) {
@@ -198,6 +213,9 @@ export const OutfitBuilder = ({
                 allowUrlImport
                 onSelectFile={(file) => void chooseReference(file)}
                 onRemove={() => {
+                  if (uploadedAssetIdRef.current) {
+                    void discardReferenceImage(uploadedAssetIdRef.current).catch(() => undefined);
+                  }
                   uploadedAssetIdRef.current = null;
                   setReferenceFile(null);
                   setRetainedReferenceId(null);

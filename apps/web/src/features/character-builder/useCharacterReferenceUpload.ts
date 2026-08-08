@@ -1,6 +1,10 @@
 import { generateStructuredPrompt } from '@studio/domain';
 import { useCallback, useEffect, useRef } from 'react';
-import { uploadReferenceImage, type ApiClientError } from '../../adapters/api-client/apiClient';
+import {
+  discardReferenceImage,
+  uploadReferenceImage,
+  type ApiClientError,
+} from '../../adapters/api-client/apiClient';
 import { validateReferenceImage } from '../../adapters/browser-media/imageValidation';
 import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import {
@@ -105,12 +109,16 @@ export const useCharacterReferenceUpload = ({
         if (controller.signal.aborted || activeRef.current?.epoch !== epoch) return;
 
         const asset = await uploadReferenceImage(file, requestId, controller.signal);
-        if (controller.signal.aborted || activeRef.current?.epoch !== epoch) return;
+        if (controller.signal.aborted || activeRef.current?.epoch !== epoch) {
+          void discardReferenceImage(asset.assetId).catch(() => undefined);
+          return;
+        }
         if (asset.source !== 'uploaded') {
           throw new Error('The local server returned an invalid uploaded-image asset.');
         }
         failedRequestRef.current = null;
         const latest = stateRef.current;
+        const replacedAssetId = latest.uploadedReference?.asset.assetId;
         const sourceKey = createReferencePreviewSourceKey(
           generateStructuredPrompt(latest.draft).prompt,
           latest.options,
@@ -121,6 +129,9 @@ export const useCharacterReferenceUpload = ({
           uploadedReference: { asset, displayName: displayNameForFile(file) },
           sourceKey,
         });
+        if (replacedAssetId && replacedAssetId !== asset.assetId) {
+          void discardReferenceImage(replacedAssetId).catch(() => undefined);
+        }
       } catch (error: unknown) {
         if (controller.signal.aborted || activeRef.current?.epoch !== epoch) return;
         failedRequestRef.current = { selectionKey, requestId };
@@ -147,6 +158,7 @@ export const useCharacterReferenceUpload = ({
     cancel();
     cancelGeneration();
     failedRequestRef.current = null;
+    const discardedAssetId = current.uploadedReference?.asset.assetId;
     dispatch({
       type: 'upload-removed',
       sourceKey: createReferencePreviewSourceKey(
@@ -154,6 +166,9 @@ export const useCharacterReferenceUpload = ({
         current.options,
       ),
     });
+    if (discardedAssetId) {
+      void discardReferenceImage(discardedAssetId).catch(() => undefined);
+    }
   }, [cancel, cancelGeneration, dispatch, hasPendingSave, locksRef, stateRef]);
 
   return { select, remove, cancel } as const;

@@ -199,6 +199,27 @@ describe('reference image API', () => {
     expect(getContent).not.toHaveBeenCalled();
   });
 
+  it('discards only through the trusted owner-scoped lifecycle path', async () => {
+    const discardIfUnreferenced = vi.fn().mockResolvedValue(true);
+    const store: ReferenceImageAssetStore = {
+      findByRequestId: () => Promise.resolve(null),
+      getMetadata: () => Promise.resolve(null),
+      getContent: () => Promise.resolve(null),
+      store: () => Promise.reject(new Error('Unexpected store.')),
+      discardIfUnreferenced,
+    };
+    const app = await setup(null, null, undefined, store);
+    const url = `/api/reference-images/${requestId}`;
+
+    const untrusted = await app.inject({ method: 'DELETE', url });
+    expect(untrusted.statusCode).toBe(403);
+    expect(discardIfUnreferenced).not.toHaveBeenCalled();
+
+    const discarded = await app.inject({ method: 'DELETE', url, headers: localHeaders });
+    expect(discarded.statusCode).toBe(204);
+    expect(discardIfUnreferenced).toHaveBeenCalledWith(expect.any(String), requestId);
+  });
+
   it('requires explicit Wardrobe intent before reporting Add Outfit availability', async () => {
     const app = await setup(null);
     const url = `/api/reference-images/${requestId}/outfit-try-ons`;

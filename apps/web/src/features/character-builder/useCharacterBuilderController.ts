@@ -5,6 +5,7 @@ import {
   type GuidedDesignV1,
 } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
+import { discardReferenceImage } from '../../adapters/api-client/apiClient';
 import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import {
   characterBuilderOperationError,
@@ -59,6 +60,17 @@ const editIsBlocked = (
   locks.discard ||
   saveRecoveryPending ||
   ['restoring', 'saving', 'closing', 'saved'].includes(state.phase);
+
+const discardUnsavedReferenceImages = async (state: CharacterBuilderState): Promise<void> => {
+  const assetIds = new Set(
+    [state.preview?.asset.assetId, state.uploadedReference?.asset.assetId].filter(
+      (assetId): assetId is string => assetId !== undefined,
+    ),
+  );
+  await Promise.all(
+    [...assetIds].map((assetId) => discardReferenceImage(assetId).catch(() => undefined)),
+  );
+};
 
 export const useCharacterBuilderController = ({
   open,
@@ -232,6 +244,7 @@ export const useCharacterBuilderController = ({
       try {
         await waitForWrites();
         await resetStoredDraft();
+        await discardUnsavedReferenceImages(stateRef.current);
         discarded = true;
       } catch (error: unknown) {
         reportPersistenceError(error);
@@ -275,6 +288,7 @@ export const useCharacterBuilderController = ({
       try {
         await waitForWrites();
         await resetStoredDraft();
+        await discardUnsavedReferenceImages(stateRef.current);
         clearSaveJournal();
         setAutosaveMessage(null);
         dispatch(createFreshCharacterBuilderResetAction());

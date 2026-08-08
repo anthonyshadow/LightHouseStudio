@@ -314,6 +314,14 @@ export const fetchReferenceImageMetadata = async (
   return payload;
 };
 
+export const discardReferenceImage = async (assetId: string): Promise<void> => {
+  await apiFetch(`/api/reference-images/${encodeURIComponent(assetId)}`, {
+    method: 'DELETE',
+    cache: 'no-store',
+    headers: { Accept: 'application/json' },
+  });
+};
+
 export type PersistedReferenceImage = {
   kind: 'persisted';
   assetId: string;

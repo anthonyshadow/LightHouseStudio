@@ -74,16 +74,24 @@ export const createConfiguredPersistence = async (
       };
     }
 
+    const referenceImages = new DrizzleReferenceImageAssetStore(connection.db, assetBytes);
     return {
       users,
       sessions: new DrizzleSessionRepository(connection.db),
       savedVideos: new DrizzleSavedVideoRepository(connection.db),
       assetBytes,
       savedVoices: new DrizzleSavedVoiceRepository(connection.db),
-      referenceImages: new DrizzleReferenceImageAssetStore(connection.db, assetBytes),
+      referenceImages,
       processingJobTraces,
       processingJobs: processingJobTraces,
-      creativeLibraries: new DrizzleCreativeLibraryRepository(connection.db),
+      creativeLibraries: new DrizzleCreativeLibraryRepository(
+        connection.db,
+        async (ownerUserId, assetIds) => {
+          await Promise.all(
+            assetIds.map((assetId) => referenceImages.discardIfUnreferenced(ownerUserId, assetId)),
+          );
+        },
+      ),
       close: () => connection.close(),
     };
   } catch (error) {

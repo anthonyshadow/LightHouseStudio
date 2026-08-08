@@ -21,6 +21,7 @@ import {
 
 const cancel = vi.hoisted(() => vi.fn());
 const generate = vi.hoisted(() => vi.fn());
+const discardReferenceImage = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 let generationCallbacks: ReferencePreviewGenerationCallbacks;
 
 vi.mock('./useReferencePreviewGeneration', () => ({
@@ -28,6 +29,10 @@ vi.mock('./useReferencePreviewGeneration', () => ({
     generationCallbacks = callbacks;
     return { cancel, generate };
   },
+}));
+vi.mock('../../adapters/api-client/apiClient', async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  discardReferenceImage,
 }));
 
 import { useCharacterReferenceGeneration } from './useCharacterReferenceGeneration';
@@ -159,6 +164,8 @@ beforeEach(() => {
   cancel.mockReset();
   generate.mockReset();
   generate.mockResolvedValue(undefined);
+  discardReferenceImage.mockReset();
+  discardReferenceImage.mockResolvedValue(undefined);
 });
 
 afterEach(() => {
@@ -313,5 +320,30 @@ describe('useCharacterReferenceGeneration', () => {
     );
 
     expect(rendered.stateRef.current.preview).toBeNull();
+  });
+
+  it('discards a superseded unsaved preview after a healthy replacement arrives', () => {
+    const replacedAsset = {
+      ...generatedAsset,
+      assetId: '0b32d941-6991-4aae-bf4e-17e8a4fc2db0',
+      contentUrl: '/api/reference-images/0b32d941-6991-4aae-bf4e-17e8a4fc2db0/content',
+    };
+    const state = {
+      ...createReadyState(),
+      preview: { asset: replacedAsset, sourceKey: 'old', stale: false },
+    };
+    renderGeneration(state);
+
+    act(() =>
+      generationCallbacks.onSuccess({
+        operationId: 'replacement',
+        requestId: 'replacement-request',
+        asset: generatedAsset,
+        sourceKey: 'new',
+        optimization,
+      }),
+    );
+
+    expect(discardReferenceImage).toHaveBeenCalledWith(replacedAsset.assetId);
   });
 });

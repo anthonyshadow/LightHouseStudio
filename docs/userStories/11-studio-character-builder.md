@@ -74,8 +74,10 @@ erasing existing choices.
 
 - Upload and public-HTTPS import accept JPEG/PNG/WebP up to 10 MiB and 40 megapixels. Remote import
   uses the same bounded loopback broker flow as Existing Video and never retains the URL. A valid
-  selection immediately stores an immutable owner-scoped local asset; **Detach** removes only the
-  draft relationship.
+  selection immediately stages an immutable owner-scoped asset. In authoritative Neon/R2,
+  **Detach**, replacement, Reset, and confirmed draft discard request physical deletion only when
+  the server proves no saved creative record references it; ordinary close keeps the resumable
+  draft and refreshes temporary activity when restored.
 - Prompt-only, direct-upload, and image-only save do not contact the optimizer or image provider.
 - **Generate Preview** normally optimizes the structured direction, then makes one request to the
   startup-selected image provider. **Generate Combined Preview** also supplies the uploaded source.
@@ -94,15 +96,19 @@ erasing existing choices.
 - Wiro availability follows startup configuration. There is no second runtime access-mode layer;
   live use still requires an explicitly authorized, cost-bearing check.
 - Saved Character Wardrobe can delete an individual variant after confirmation. The variant,
-  selected-version relationship, and Recent attribution links are removed; immutable source and
-  result image bytes remain. **Change Features** preserves the selected character by default. The
+  selected-version relationship, and Recent attribution links are removed. Authoritative Neon/R2
+  deletes any source/result/garment asset that then has no saved relationship; local mode retains
+  detached immutable bytes. **Change Features** preserves the selected character by default. The
   default-off **Allow major departure from source** checkbox makes the requested changes
   authoritative, omits the parent prompt, and permits a substantially different identity and
   defining traits.
 
-Uploaded, generated, composed, edited, detached, superseded, and character-deleted assets remain
-immutable local bytes until whole-environment retirement. There is no per-asset deletion or
-garbage-collection flow.
+Uploaded, generated, composed, and edited assets remain immutable. In authoritative Neon/R2 they
+are temporary until canonical creative metadata references them. Explicit discard/replacement
+clears unreferenced assets immediately when storage is available; abandoned assets become eligible
+after 24 hours without metadata/content use and are purged on later cloud-library activity. Saved
+relationships always win the server recheck. Local mode retains bytes until whole-environment
+retirement.
 
 ## Recovery invariants
 
@@ -117,7 +123,7 @@ garbage-collection flow.
 ## Evidence status
 
 Create/edit, all save variants, draft restore/reset, stale preview, optimizer fallback, combined
-generation, regeneration/edit, idempotent save, and responsive single-preview behavior have
+generation, regeneration/edit, idempotent save, owner-scoped unsaved cleanup, and responsive single-preview behavior have
 automated coverage. Live OpenAI/BFL/Wiro work, physical touch/mobile, assistive technology,
-retention cleanup, and provider-output quality remain manual validation areas, not runtime
+R2 deletion failure/retry, and provider-output quality remain manual validation areas, not runtime
 feature gates.

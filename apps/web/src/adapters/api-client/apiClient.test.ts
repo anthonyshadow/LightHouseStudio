@@ -12,6 +12,7 @@ import type {
 import {
   composeReferenceImage,
   createReferenceImage,
+  discardReferenceImage,
   editReferenceImage,
   apiFetch,
   fetchProviderAvailability,
@@ -430,6 +431,17 @@ describe('reference image API client', () => {
     expect(init.body).toBe(file);
     expect(new Headers(init.headers).get('Content-Type')).toBe('image/png');
     expect(new Headers(init.headers).get('Idempotency-Key')).toBe(requestId);
+  });
+
+  it('discards an unsaved reference through the owner-scoped lifecycle endpoint', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(discardReferenceImage(uploadedAsset.assetId)).resolves.toBeUndefined();
+    expect(fetchMock).toHaveBeenCalledWith(
+      `/api/reference-images/${uploadedAsset.assetId}`,
+      expect.objectContaining({ method: 'DELETE', cache: 'no-store' }),
+    );
   });
 
   it('imports a remote image through the explicit same-origin reference-import endpoint', async () => {

@@ -141,6 +141,10 @@ export class ReferenceImageService {
     return this.#provider?.edit !== undefined;
   }
 
+  async discard(localOwnerId: string, assetId: string): Promise<void> {
+    await this.#store.discardIfUnreferenced?.(localOwnerId, assetId);
+  }
+
   async optimize(
     input: OptimizeCharacterReferencePromptRequest,
     signal?: AbortSignal,

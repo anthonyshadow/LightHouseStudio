@@ -1,5 +1,6 @@
 import { generateStructuredPrompt, type CharacterTransformDraft } from '@studio/domain';
 import type { SavedCharacterPrompt } from '../creative-assets/types';
+import { discardReferenceImage } from '../../adapters/api-client/apiClient';
 import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import { createFreshCharacterBuilderDraftValue } from './characterBuilderControllerSupport';
 import { createGuidedDesignFromDraft } from './characterModel';
@@ -123,6 +124,16 @@ export const prepareCharacterBuilderLaunch = async ({
       return false;
     }
     await repository.resetDurably({ expectedRevision: active.revision });
+    const discardedAssetIds = new Set(
+      [active.value.preview?.assetId, active.value.uploadedReference?.assetId].filter(
+        (assetId): assetId is string => assetId !== undefined,
+      ),
+    );
+    await Promise.all(
+      [...discardedAssetIds].map((assetId) =>
+        discardReferenceImage(assetId).catch(() => undefined),
+      ),
+    );
     return true;
   } finally {
     repository.close();

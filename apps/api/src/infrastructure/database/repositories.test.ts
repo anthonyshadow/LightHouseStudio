@@ -551,6 +551,43 @@ describe('DrizzleCreativeLibraryRepository', () => {
     await expect(repository.replace(ownerUserId, 1, emptyStore, now)).resolves.toBe('conflict');
     expect(scripted.remaining()).toBe(0);
   });
+
+  it('releases only reference IDs removed by a successful creative-library CAS', async () => {
+    const previousStore = createSavedPrompt(
+      createEmptyCreativeAssetStore(),
+      {
+        title: 'Image outfit',
+        prompt: '',
+        modelModeId: 'lucy-vton-latest',
+        source: 'manual',
+        referenceImageAssetId: assetId,
+        vtonInputKind: 'saved-outfit',
+      },
+      { now, createId: () => 'image-outfit' },
+    );
+    const previousLibrary = {
+      ownerUserId,
+      revision: 1,
+      schemaVersion: previousStore.schemaVersion,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const scripted = scriptedDatabase(
+      [previousLibrary],
+      [{ kind: 'outfit', payload: previousStore.savedPrompts[0] }],
+      [previousLibrary],
+      [],
+      [],
+    );
+    const releaseReferenceImages = vi.fn().mockResolvedValue(undefined);
+    const repository = new DrizzleCreativeLibraryRepository(scripted.db, releaseReferenceImages);
+
+    await expect(
+      repository.replace(ownerUserId, 1, createEmptyCreativeAssetStore(), now),
+    ).resolves.toMatchObject({ revision: 2 });
+    expect(releaseReferenceImages).toHaveBeenCalledWith(ownerUserId, [assetId]);
+    expect(scripted.remaining()).toBe(0);
+  });
 });
 
 describe('DrizzleReferenceImageAssetStore', () => {
@@ -604,9 +641,13 @@ describe('DrizzleReferenceImageAssetStore', () => {
     });
     const readScript = scriptedDatabase(
       [{ metadata }],
+      [],
       [{ metadata }],
+      [],
       [{ metadata }],
+      [],
       [{ metadata }],
+      [],
     );
     const reader = new DrizzleReferenceImageAssetStore(readScript.db, bytes);
 
@@ -646,9 +687,31 @@ describe('DrizzleReferenceImageAssetStore', () => {
     const repository = new DrizzleReferenceImageAssetStore(importScript.db, bytes);
     await expect(repository.importExisting(metadata, upload.bytes)).resolves.toEqual(metadata);
 
-    const raceScript = scriptedDatabase([], new Error('unique violation'), [{ metadata }]);
+    const raceScript = scriptedDatabase([], new Error('unique violation'), [{ metadata }], []);
     const racingRepository = new DrizzleReferenceImageAssetStore(raceScript.db, bytes);
     await expect(racingRepository.store(upload)).resolves.toEqual(metadata);
     expect(bytes.delete).toHaveBeenCalled();
+  });
+
+  it('deletes only owner assets that no saved creative record references', async () => {
+    const bytes = {
+      delete: vi.fn().mockResolvedValue(undefined),
+    } as unknown as AssetByteStore;
+    const savedScript = scriptedDatabase(
+      [{ id: assetId }],
+      [{ payload: { referenceImageAssetId: assetId } }],
+    );
+    const savedRepository = new DrizzleReferenceImageAssetStore(savedScript.db, bytes);
+    await expect(savedRepository.discardIfUnreferenced(ownerUserId, assetId)).resolves.toBe(false);
+    expect(bytes.delete).not.toHaveBeenCalled();
+    expect(savedScript.remaining()).toBe(0);
+
+    const temporaryScript = scriptedDatabase([{ id: assetId }], [], []);
+    const temporaryRepository = new DrizzleReferenceImageAssetStore(temporaryScript.db, bytes);
+    await expect(temporaryRepository.discardIfUnreferenced(ownerUserId, assetId)).resolves.toBe(
+      true,
+    );
+    expect(bytes.delete).toHaveBeenCalledWith(ownerUserId, assetId);
+    expect(temporaryScript.remaining()).toBe(0);
   });
 });

@@ -368,7 +368,11 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   registerRealtimeRoutes(app, decartProvider);
   registerVideoJobRoutes(app, videoJobService);
   registerSavedVideoRoutes(app, savedVideoService);
-  registerCreativeLibraryRoutes(app, dependencies.persistence?.creativeLibraries);
+  registerCreativeLibraryRoutes(
+    app,
+    dependencies.persistence?.creativeLibraries,
+    referenceImageAssetStore,
+  );
   registerReferenceImageRoutes(app, referenceImageService, {
     ...(dependencies.remoteImageDownloader
       ? { remoteImageDownloader: dependencies.remoteImageDownloader }

@@ -55,6 +55,8 @@ export interface ReferenceImageAssetStore {
   ): Promise<StoredReferenceImageStream | null>;
   listMetadata?(localOwnerId: string): Promise<readonly StoredReferenceImageMetadata[]>;
   store(input: StoreReferenceImageInput): Promise<StoredReferenceImageMetadata>;
+  discardIfUnreferenced?(localOwnerId: string, assetId: string): Promise<boolean>;
+  purgeExpiredUnreferenced?(): Promise<number>;
 }
 
 export class ReferenceImageStorageError extends Error {

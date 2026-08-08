@@ -345,6 +345,16 @@ export const registerReferenceImageRoutes = (
     return referenceImageMetadataResponseSchema.parse(asset);
   });
 
+  app.delete(
+    '/api/reference-images/:assetId',
+    { onRequest: verifyGenerationOrigin },
+    async (request, reply) => {
+      const assetId = requireAssetId(request.params);
+      await service.discard(ownerUserIdForRequest(request), assetId);
+      return reply.status(204).send();
+    },
+  );
+
   app.get('/api/reference-images/:assetId/content', async (request, reply) => {
     const assetId = requireAssetId(request.params);
     const localOwnerId = ownerUserIdForRequest(request);

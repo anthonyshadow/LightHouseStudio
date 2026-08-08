@@ -41,8 +41,12 @@ loopback-only deployment boundary remains in force.
 
 The approved implementation resolves the former open decisions as follows:
 
-- Tombstoned and otherwise unreferenced media bytes remain retained in every persistence mode.
-  There is no seven-day quarantine or automatic physical garbage collector.
+- Tombstoned saved-video and thumbnail bytes remain retained in every persistence mode pending a
+  separately approved gallery/version GC policy. Reference images are narrower: authoritative
+  Neon/private-R2 now treats canonical creative-library relationships as the saved set, deletes
+  explicitly discarded or detached owner assets only after a relationship recheck, and purges
+  unreferenced assets after 24 hours of inactivity on later library activity. Local reference
+  storage keeps conservative whole-environment retirement.
 - Demo sessions use a fixed 24-hour expiry and a persistent cookie `Max-Age`, so they may survive
   browser closure. Broker restart invalidates sessions in local/shadow mode; Neon sessions persist.
 - Retired Guided records were not imported, exposed as gallery items, or retained as hidden
@@ -148,20 +152,20 @@ or a generic data-access framework is not justified.
 
 ### Existing user-generated resource map
 
-| Resource                                  | Owning code today                                                | Related bytes/provider state                                                    | Current deletion/result behavior                                                  |
-| ----------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- |
-| Saved prompt/recipe and VTO outfit prompt | `packages/domain/src/assets/*`; creative-assets repository/Shelf | Optional reference image asset ID                                               | Browser metadata deletion; referenced immutable image remains on server           |
-| Saved character                           | Creative-assets repository; Character Builder save journal       | Original/uploaded/generated reference asset IDs; builder/guided prompt snapshot | Deleting parent cascades browser variant metadata; server bytes retained          |
-| Character wardrobe variant                | Normalized child in creative store; wardrobe panel               | Derived reference image asset; source/garment lineage in server sidecar         | Delete child metadata only; immutable bytes retained                              |
-| Character Builder draft                   | Character draft repository and persistence hooks                 | Opaque asset IDs, no image bytes in draft                                       | Reset/complete writes a revisioned tombstone; session fallback can be non-durable |
-| Legacy Guided project                     | Guided project repository and Legacy Project Manager             | IndexedDB video/audio `Blob`s and reference asset ID                            | User can download or permanently delete project and all browser-local artifacts   |
-| Reference image                           | Reference image service/store/routes                             | Server file plus provider/model/prompt/lineage sidecar                          | No ordinary asset deletion/GC; owner is Host hash                                 |
-| Saved voice                               | Voice service/provider plus Voice Library controller             | ElevenLabs account-workspace membership; preview streamed                       | Remove calls provider voice DELETE today                                          |
-| Local take/upload                         | Recording artifacts and existing-video controller                | In-memory Blob/File, optional original audio sidecar, object URLs               | Discard/unmount revokes URLs; Download is the only durable handoff                |
-| Visual/voice result                       | Existing-video and recording orchestration                       | In-memory validated/transcoded result; temporary provider job files             | Failure preserves last valid artifact; job/result expires/releases                |
-| Editor output                             | Video editor session + Studio commit                             | Worker candidate Blob and runtime child artifact                                | Explicit replace prompt; old runtime source may be downloaded, then revoked       |
-| Video processing job                      | Video job routes/service                                         | Temp input/reference/output and provider job ID                                 | Owner-scoped by Host hash; process/TTL cleanup; no durable trace                  |
-| Realtime/image/voice operation            | Feature service/controller                                       | Provider session/request and transient result                                   | Feature owner aborts/releases; no shared durable user-owned job record            |
+| Resource                                  | Owning code today                                                | Related bytes/provider state                                                    | Current deletion/result behavior                                                                                        |
+| ----------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------- |
+| Saved prompt/recipe and VTO outfit prompt | `packages/domain/src/assets/*`; creative-assets repository/Shelf | Optional reference image asset ID                                               | Browser/Neon metadata deletion; authoritative Neon/R2 deletes the image only after its final saved relationship is gone |
+| Saved character                           | Creative-assets repository; Character Builder save journal       | Original/uploaded/generated reference asset IDs; builder/guided prompt snapshot | Deleting parent cascades variants; authoritative Neon/R2 rechecks and clears unreferenced reference assets              |
+| Character wardrobe variant                | Normalized child in creative store; wardrobe panel               | Derived reference image asset; source/garment lineage in server sidecar         | Delete child metadata and links; authoritative Neon/R2 clears only now-unreferenced result/source/garment assets        |
+| Character Builder draft                   | Character draft repository and persistence hooks                 | Opaque asset IDs, no image bytes in draft                                       | Reset/complete writes a revisioned tombstone; session fallback can be non-durable                                       |
+| Legacy Guided project                     | Guided project repository and Legacy Project Manager             | IndexedDB video/audio `Blob`s and reference asset ID                            | User can download or permanently delete project and all browser-local artifacts                                         |
+| Reference image                           | Reference image service/store/routes                             | Server file/R2 object plus provider/model/prompt/lineage sidecar                | Authenticated owner-scoped discard; saved-relationship check; 24-hour inactive-orphan cleanup in authoritative Neon/R2  |
+| Saved voice                               | Voice service/provider plus Voice Library controller             | ElevenLabs account-workspace membership; preview streamed                       | Remove calls provider voice DELETE today                                                                                |
+| Local take/upload                         | Recording artifacts and existing-video controller                | In-memory Blob/File, optional original audio sidecar, object URLs               | Discard/unmount revokes URLs; Download is the only durable handoff                                                      |
+| Visual/voice result                       | Existing-video and recording orchestration                       | In-memory validated/transcoded result; temporary provider job files             | Failure preserves last valid artifact; job/result expires/releases                                                      |
+| Editor output                             | Video editor session + Studio commit                             | Worker candidate Blob and runtime child artifact                                | Explicit replace prompt; old runtime source may be downloaded, then revoked                                             |
+| Video processing job                      | Video job routes/service                                         | Temp input/reference/output and provider job ID                                 | Owner-scoped by Host hash; process/TTL cleanup; no durable trace                                                        |
+| Realtime/image/voice operation            | Feature service/controller                                       | Provider session/request and transient result                                   | Feature owner aborts/releases; no shared durable user-owned job record                                                  |
 
 Outfits are not currently an independent persisted entity: Recipe Shelf represents them as saved
 prompts using the VTO model/input fields. Phase 1 should owner-scope those records as they exist
@@ -1688,8 +1692,9 @@ The original prerequisites were:
    rollback evidence.
 2. Stable IDs, owner rules, video/version semantics, deletion dependencies, safe job snapshots,
    and storage ports have contract tests.
-3. Retained-unreferenced-bytes policy remains documented until product/privacy owners approve
-   relationship-safe reconciliation and physical deletion. This remains open.
+3. Retained saved-video/thumbnail bytes remain documented until product/privacy owners approve a
+   relationship-safe gallery/version deletion policy. Reference-image reconciliation and physical
+   deletion are approved and implemented only for authoritative Neon/private-R2.
 4. A production authentication/authorization/tenancy/rate/retention/security design is separately
    approved; loopback controls are not treated as public authentication.
 5. Database schema, R2 key strategy, backfill/dual-read plan, observability, backup/restore, and
@@ -1699,7 +1704,9 @@ The original prerequisites were:
 
 ## Resolved Phase 1 decisions
 
-The implementation uses retained bytes pending approved garbage collection, a 24-hour persistent
-demo cookie, no Guided import, and development prefilling of both demo credentials. These
-decisions do not justify client-chosen ownership, committed plaintext credentials, provider
-deletion, destructive saved-version overwrite, or public exposure.
+The implementation retains saved-video and thumbnail bytes pending approved garbage collection;
+authoritative Neon/private-R2 reference images instead use saved creative relationships plus
+owner-scoped discard and 24-hour inactive-orphan cleanup. It also uses a 24-hour persistent demo
+cookie, no Guided import, and development prefilling of both demo credentials. These decisions do
+not justify client-chosen ownership, committed plaintext credentials, provider deletion,
+destructive saved-version overwrite, or public exposure.

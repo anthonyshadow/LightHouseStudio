@@ -14,6 +14,7 @@ import type {
 import { CharacterWardrobePanel } from './CharacterWardrobePanel';
 
 const api = vi.hoisted(() => ({
+  discardReferenceImage: vi.fn().mockResolvedValue(undefined),
   uploadReferenceImage: vi.fn(),
   createOutfitTryOn: vi.fn(),
   fetchReferenceImageMetadata: vi.fn(),
@@ -164,14 +165,16 @@ describe('CharacterWardrobePanel', () => {
     expect(onUse).toHaveBeenCalledWith({ characterId: character.id, variantId: null });
   });
 
-  it('confirms before deleting a saved variant and preserves immutable image bytes', async () => {
+  it('confirms before deleting a saved variant and delegates relationship cleanup', async () => {
     const user = userEvent.setup();
     const onSaved = vi.fn();
     const { repository } = renderPanel({ onSaved });
 
     await user.click(screen.getByRole('button', { name: 'Delete Blue jacket' }));
     const dialog = screen.getByRole('dialog', { name: 'Delete “Blue jacket”?' });
-    expect(dialog).toHaveTextContent('Immutable local image bytes remain');
+    expect(dialog).toHaveTextContent(
+      'Cloud-stored image assets are deleted only when no saved item still uses them',
+    );
     await user.click(within(dialog).getByRole('button', { name: 'Delete variant' }));
 
     expect(repository.deleteSavedCharacterVariant).toHaveBeenCalledWith('variant-one');

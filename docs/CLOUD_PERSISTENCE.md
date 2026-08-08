@@ -27,6 +27,11 @@ account is not production identity or tenancy.
 - A browser creative-library sync seam. The browser remains an immediate local cache; Neon uses a
   revision compare-and-swap. Conflicts pause sync and preserve the local copy instead of applying a
   last-writer-wins overwrite.
+- Relationship-safe reference-image retention in authoritative `neon`: uploads and generated
+  results may be staged in the selected byte store, canonical creative-library rows define the
+  saved set, trusted-origin discard and removed saved relationships delete only after an
+  owner-scoped recheck, and unreferenced rows inactive for 24 hours are purged opportunistically
+  during later library reads/writes.
 - An idempotent local backfill for saved videos/thumbnails, saved voices, and reference images.
   Creative metadata migrates through the authenticated sync API. Local copies are never deleted.
 
@@ -82,9 +87,10 @@ facets in SQL rather than materializing the owner library in application memory.
   fallback or provider selection.
 - Backfill and shadow mode retain local bytes. Rollback means restoring local configuration while
   the approved window remains open; it never means deleting Neon/R2 first.
-- Logical Saved Video delete still retains bytes. Permanent garbage collection is intentionally
-  absent until retention, dependency, legal-hold, backup-expiry, and account-deletion policy is
-  approved. R2 delete support exists for failed/uncommitted saga cleanup, not blanket GC.
+- Logical Saved Video delete still retains bytes. Permanent video/thumbnail garbage collection is
+  intentionally absent until retention, dependency, legal-hold, backup-expiry, and account-deletion
+  policy is approved. Reference images use the narrower saved-relationship and inactive-orphan
+  policy above; R2 delete support is never blanket GC.
 - Database migrations must be applied through reviewed forward migrations. Restore/PITR and R2
   inventory drills require real staging resources and are not claimed by automated local tests.
 

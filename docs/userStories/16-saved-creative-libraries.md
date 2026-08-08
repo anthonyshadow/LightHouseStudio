@@ -21,8 +21,10 @@ reuse or remove a record, and return to creation without losing the shared Studi
 4. Saved Outfits list the user-scoped reusable VTO records. **Use** selects through the existing
    outfit handoff without acquiring camera/media or starting provider work. **Create new saved
    outfit** opens the ordinary Outfit Builder and returns to the library.
-5. Delete uses the repository's existing relationship cleanup. Detached immutable reference bytes
-   remain retained because Phase 1 has no relationship-safe physical garbage collector.
+5. Delete uses the repository's existing relationship cleanup. In authoritative Neon/R2, the
+   successful full-snapshot CAS compares prior and next saved reference relationships, then deletes
+   each detached owner asset only after a second check proves that no saved character, variant,
+   outfit, or recent recipe still uses it. Local mode retains detached immutable bytes.
 6. Loading, empty, error, and populated states have named scroll regions, keyboard operation,
    visible focus, Escape/back behavior, and mobile-safe controls.
 7. When authoritative Neon persistence is enabled, the browser remains the immediate local cache.

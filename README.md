@@ -70,7 +70,10 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
   crop, rotation, flips, lighting and filters, on-device MP4 transcoding, playback, local voice
   effects, and download require no provider credentials or external media traffic.
 - Character Builder saves browser-local character metadata and immutable reference assets under
-  `LIGHTFRAME_DATA_DIR`. Prompt-only save and upload do not generate images. Every newly generated,
+  `LIGHTFRAME_DATA_DIR` in local mode. In authoritative Neon/private-R2 mode, uploads and generated
+  results are staged until a saved creative-library relationship retains them; explicit discard,
+  saved-record deletion, and a 24-hour inactivity sweep remove unreferenced staged bytes and rows.
+  Prompt-only save and upload do not generate images. Every newly generated,
   regenerated, edited, or composed character reference is staged as one character on a uniform
   neutral-gray background with no environment or unrelated props; existing uploaded and immutable
   assets are not rewritten.
@@ -85,8 +88,9 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
   variant-source edits treat the selected image as authoritative and send no parent prompt. An
   optional, default-off major-departure control also treats the selected image as image-only input
   and allows requested identity and defining-trait changes. Saving never selects a variant
-  implicitly. Deleting a variant removes its browser-local metadata and links while retaining
-  immutable image bytes.
+  implicitly. Deleting a variant removes its browser-local metadata and links. Local mode retains
+  immutable image bytes; authoritative Neon/R2 removes result/source/garment assets only after its
+  saved-library relationship check proves that no retained record uses them.
 - Outfit Builder creates reusable prompt or reference-image VTO recipes from Studio or the Saved
   Outfits library. Prompt enhancement is
   remembered with prompt outfits. A selected image remains tab-temporary until final Save, when

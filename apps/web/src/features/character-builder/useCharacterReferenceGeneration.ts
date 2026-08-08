@@ -4,6 +4,7 @@ import {
 } from '@studio/contracts';
 import { generateStructuredPrompt } from '@studio/domain';
 import { useCallback, useEffect, type Dispatch } from 'react';
+import { discardReferenceImage } from '../../adapters/api-client/apiClient';
 import {
   useReferencePreviewGeneration,
   type ReferencePreviewGenerationResult,
@@ -94,12 +95,16 @@ export const useCharacterReferenceGeneration = ({
       });
     },
     onSuccess: (result: ReferencePreviewGenerationResult) => {
+      const replacedAssetId = stateRef.current.preview?.asset.assetId;
       dispatch({
         type: 'preview-succeeded',
         operationId: result.operationId,
         asset: result.asset,
         sourceKey: result.sourceKey,
       });
+      if (replacedAssetId && replacedAssetId !== result.asset.assetId) {
+        void discardReferenceImage(replacedAssetId).catch(() => undefined);
+      }
     },
     onError: (error, operationId, sourceKey) => {
       dispatch({

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { buffer } from 'node:stream/consumers';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, lte } from 'drizzle-orm';
 import type {
   ReferenceImageAssetStore,
   StoredReferenceImageContent,
@@ -16,7 +16,32 @@ import {
 } from '../../features/reference-images/asset-layout.js';
 import type { AssetByteStore } from '../../storage/asset-byte-store.js';
 import type { LightframeDatabase } from './client.js';
-import { referenceImageAssets } from './schema.js';
+import { creativeAssets, referenceImageAssets } from './schema.js';
+
+export const TEMPORARY_REFERENCE_IMAGE_INACTIVITY_MS = 24 * 60 * 60 * 1_000;
+
+const REFERENCE_IMAGE_ID_FIELDS = new Set([
+  'referenceImageAssetId',
+  'uploadedReferenceImageAssetId',
+  'sourceReferenceImageAssetId',
+  'garmentReferenceImageAssetId',
+]);
+
+const collectReferenceImageAssetIds = (value: unknown, result = new Set<string>()): Set<string> => {
+  if (Array.isArray(value)) {
+    for (const item of value) collectReferenceImageAssetIds(item, result);
+    return result;
+  }
+  if (typeof value !== 'object' || value === null) return result;
+  for (const [key, candidate] of Object.entries(value)) {
+    if (REFERENCE_IMAGE_ID_FIELDS.has(key) && typeof candidate === 'string') {
+      result.add(candidate);
+      continue;
+    }
+    collectReferenceImageAssetIds(candidate, result);
+  }
+  return result;
+};
 
 export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore {
   constructor(
@@ -24,6 +49,26 @@ export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore
     private readonly bytes: AssetByteStore,
     private readonly now: () => Date = () => new Date(),
   ) {}
+
+  async #savedReferenceImageAssetIds(localOwnerId: string): Promise<Set<string>> {
+    const rows = await this.db
+      .select({ payload: creativeAssets.payload })
+      .from(creativeAssets)
+      .where(eq(creativeAssets.ownerUserId, localOwnerId));
+    return collectReferenceImageAssetIds(rows.map((row) => row.payload));
+  }
+
+  async #touch(localOwnerId: string, assetId: string): Promise<void> {
+    await this.db
+      .update(referenceImageAssets)
+      .set({ updatedAt: this.now().toISOString() })
+      .where(
+        and(
+          eq(referenceImageAssets.ownerUserId, localOwnerId),
+          eq(referenceImageAssets.id, assetId),
+        ),
+      );
+  }
 
   async findByRequestId(
     localOwnerId: string,
@@ -39,7 +84,10 @@ export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore
         ),
       )
       .limit(1);
-    return row === undefined ? null : parseStoredReferenceImageMetadata(row.metadata);
+    if (row === undefined) return null;
+    const metadata = parseStoredReferenceImageMetadata(row.metadata);
+    await this.#touch(localOwnerId, metadata.assetId);
+    return metadata;
   }
 
   async getMetadata(
@@ -56,7 +104,10 @@ export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore
         ),
       )
       .limit(1);
-    return row === undefined ? null : parseStoredReferenceImageMetadata(row.metadata);
+    if (row === undefined) return null;
+    const metadata = parseStoredReferenceImageMetadata(row.metadata);
+    await this.#touch(localOwnerId, metadata.assetId);
+    return metadata;
   }
 
   async getContentStream(
@@ -125,6 +176,48 @@ export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore
         cause: error,
       });
     }
+  }
+
+  async discardIfUnreferenced(localOwnerId: string, assetId: string): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: referenceImageAssets.id })
+      .from(referenceImageAssets)
+      .where(
+        and(
+          eq(referenceImageAssets.ownerUserId, localOwnerId),
+          eq(referenceImageAssets.id, assetId),
+        ),
+      )
+      .limit(1);
+    if (row === undefined) return false;
+    if ((await this.#savedReferenceImageAssetIds(localOwnerId)).has(assetId)) return false;
+    await this.bytes.delete(localOwnerId, assetId);
+    await this.db
+      .delete(referenceImageAssets)
+      .where(
+        and(
+          eq(referenceImageAssets.ownerUserId, localOwnerId),
+          eq(referenceImageAssets.id, assetId),
+        ),
+      );
+    return true;
+  }
+
+  async purgeExpiredUnreferenced(): Promise<number> {
+    const cutoff = new Date(this.now().getTime() - TEMPORARY_REFERENCE_IMAGE_INACTIVITY_MS);
+    const candidates = await this.db
+      .select({ id: referenceImageAssets.id, ownerUserId: referenceImageAssets.ownerUserId })
+      .from(referenceImageAssets)
+      .where(lte(referenceImageAssets.updatedAt, cutoff.toISOString()));
+    let deleted = 0;
+    for (const candidate of candidates) {
+      try {
+        if (await this.discardIfUnreferenced(candidate.ownerUserId, candidate.id)) deleted += 1;
+      } catch {
+        // A later creative-library read/write retries failed storage cleanup.
+      }
+    }
+    return deleted;
   }
 
   async importExisting(

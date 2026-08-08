@@ -8,9 +8,13 @@ import type { CreativeAssetRepository, SavedPrompt } from './types';
 import { OutfitBuilder } from './OutfitBuilder';
 
 const uploadReferenceImage = vi.hoisted(() => vi.fn());
+const discardReferenceImage = vi.hoisted(() => vi.fn().mockResolvedValue(undefined));
 const validateReferenceImage = vi.hoisted(() => vi.fn());
 
-vi.mock('../../adapters/api-client/apiClient', () => ({ uploadReferenceImage }));
+vi.mock('../../adapters/api-client/apiClient', () => ({
+  discardReferenceImage,
+  uploadReferenceImage,
+}));
 vi.mock('../../adapters/browser-media/imageValidation', () => ({
   REFERENCE_IMAGE_ACCEPT: 'image/jpeg,image/png,image/webp',
   validateReferenceImage,
@@ -61,6 +65,7 @@ const renderBuilder = (repository: CreativeAssetRepository) => {
 
 beforeEach(() => {
   uploadReferenceImage.mockReset().mockResolvedValue({ assetId: 'persisted-coat' });
+  discardReferenceImage.mockReset().mockResolvedValue(undefined);
   validateReferenceImage.mockReset().mockResolvedValue({ blockingError: null, warnings: [] });
 });
 afterEach(cleanup);

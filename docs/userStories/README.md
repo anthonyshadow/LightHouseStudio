@@ -53,8 +53,10 @@ references, not release-readiness claims or future requirements.
 - The recording and Decart session limits are independent: each warns at 270 seconds and ends
   through its own safe path at 300 seconds.
 - Recipe metadata is user-namespaced browser data and may revision-sync to Neon when configured.
-  Builder reference and saved-video bytes are authenticated assets in the selected local/R2 store;
-  Dock portrait and garment uploads are tab-ephemeral.
+  Builder reference and saved-video bytes are authenticated assets in the selected local/R2 store.
+  In authoritative Neon/R2, creative-library relationships retain saved references while explicit
+  discard and 24-hour inactive-orphan cleanup remove unreferenced staged assets. Dock portrait and
+  garment uploads are tab-ephemeral.
 
 ## Evidence boundary
 

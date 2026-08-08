@@ -19,7 +19,8 @@ projects.
 5. Select **Use**. A text recipe commits immediately; an image-backed recipe first validates and
    hydrates its opaque local asset, then commits the complete draft.
 6. Rename, edit, delete, or save a copy as available. Character deletion removes the record and
-   detaches links but does not delete immutable image bytes.
+   detaches links. Authoritative Neon/R2 then deletes only image assets with no remaining saved
+   relationship; local mode retains detached immutable bytes.
 7. A saved-character card or the active-character control opens **Wardrobe**. The wide right panel
    becomes fullscreen on narrow viewports, labels the original first, and searches an internally
    scrolling grid of original/variant versions. **Use** hydrates the exact image before recording
@@ -61,7 +62,8 @@ projects.
 - Wardrobe browsing and Use remain available when Add Outfit or Change Features is unavailable.
   Prompt-only originals remain usable, while creation is disabled with Character Builder guidance.
 - Dirty Wardrobe source/input/result/title state and active generation join the existing
-  discard/route-exit guard. Cancel writes no variant metadata; already stored immutable assets
-  follow the existing retention policy.
+  discard/route-exit guard. Cancel writes no variant metadata and requests cleanup for its staged
+  upload/result. Authoritative Neon/R2 deletes only after the saved-relationship check; local mode
+  keeps its conservative retention policy.
 - In browser fullscreen, the video fills the viewport and the bottom tool and capture rails are
   hidden. Any panel triggered from the stage overlays the video.
