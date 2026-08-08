@@ -50,6 +50,13 @@
       "when": 1786145717396,
       "tag": "0006_kind_ben_parker",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1786203760035,
+      "tag": "0007_omniscient_chronomancer",
+      "breakpoints": true
     }
   ]
 }

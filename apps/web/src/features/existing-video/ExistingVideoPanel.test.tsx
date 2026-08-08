@@ -1032,6 +1032,8 @@ describe('ExistingVideoPanel', () => {
     await waitFor(() =>
       expect(updateStep).toHaveBeenCalledWith('lucy', {
         savedRecipeId: 'anchor',
+        characterName: null,
+        characterVariantName: null,
         prompt: '',
         referenceImage: reference,
       }),
@@ -1068,6 +1070,8 @@ describe('ExistingVideoPanel', () => {
     await waitFor(() =>
       expect(updateStep).toHaveBeenCalledWith('lucy', {
         savedRecipeId: 'prompt-character',
+        characterName: null,
+        characterVariantName: null,
         prompt: 'A prompt-only saved character.',
         referenceImage: null,
       }),
@@ -1271,6 +1275,7 @@ describe('ExistingVideoPanel', () => {
               vtonInputKind: null,
               enhancePrompt: false,
               savedCharacterPromptId: 'host',
+              characterName: 'Professional Anchor',
               originalCharacterVersion: true,
               defaultVoice: {
                 kind: 'elevenlabs',
@@ -1288,6 +1293,8 @@ describe('ExistingVideoPanel', () => {
               enhancePrompt: false,
               savedCharacterPromptId: 'host',
               savedCharacterVariantId: 'host-evening',
+              characterName: 'Professional Anchor',
+              characterVariantName: 'Evening look',
               originalCharacterVersion: false,
               defaultVoice: {
                 kind: 'elevenlabs',
@@ -1314,6 +1321,8 @@ describe('ExistingVideoPanel', () => {
       'lucy',
       expect.objectContaining({
         savedRecipeId: 'host-evening',
+        characterName: 'Professional Anchor',
+        characterVariantName: 'Evening look',
         prompt: '',
         referenceImage: variantReference,
       }),
@@ -1384,6 +1393,8 @@ describe('ExistingVideoPanel', () => {
     await waitFor(() =>
       expect(updateStep).toHaveBeenCalledWith('vton', {
         savedRecipeId: 'prompt-outfit',
+        characterName: null,
+        characterVariantName: null,
         prompt: 'A copper linen overshirt.',
         referenceImage: null,
         inputKind: 'prompt',
@@ -1458,6 +1469,8 @@ describe('ExistingVideoPanel', () => {
     await waitFor(() =>
       expect(updateStep).toHaveBeenCalledWith('vton', {
         savedRecipeId: 'image-outfit',
+        characterName: null,
+        characterVariantName: null,
         prompt: '',
         referenceImage: reference,
         inputKind: 'saved-outfit',
@@ -1498,6 +1511,8 @@ describe('ExistingVideoPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Continue without reference' }));
     expect(updateStep).toHaveBeenCalledWith('vton', {
       savedRecipeId: 'combined-outfit',
+      characterName: null,
+      characterVariantName: null,
       prompt: 'A structured wool coat.',
       referenceImage: null,
       inputKind: 'prompt',
@@ -1537,6 +1552,8 @@ describe('ExistingVideoPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Remove outfit' }));
     expect(updateStep).toHaveBeenCalledWith('vton', {
       savedRecipeId: null,
+      characterName: null,
+      characterVariantName: null,
       prompt: '',
       referenceImage: null,
       inputKind: 'saved-outfit',
@@ -1664,6 +1681,8 @@ describe('ExistingVideoPanel', () => {
     fireEvent.change(prompt, { target: { value: 'Make the character a robot' } });
     expect(updateStep).toHaveBeenCalledWith('lucy', {
       savedRecipeId: null,
+      characterName: null,
+      characterVariantName: null,
       prompt: 'Make the character a robot',
     });
     expect(screen.getByRole('button', { name: 'Clear Character Swap setup' })).toBeDisabled();

@@ -8,6 +8,7 @@ import {
   RecordingAction,
   type RecordingController,
   type RecordingSource,
+  type VideoCharacterAttribution,
 } from '../features/recording';
 import { TakeReviewActions } from '../features/take-review/TakeReviewActions';
 import type { SaveVideoState } from '../features/saved-videos/useSaveVideo';
@@ -18,6 +19,7 @@ type StudioSessionControlBarProps = {
   experienceImageAssetId?: string | null | undefined;
   recording: RecordingController;
   recordingMode: StudioMode;
+  recordingCharacterAttribution?: VideoCharacterAttribution | null;
   recordingSource: RecordingSource | null;
   recordingSupported: boolean;
   recordingBlockedReason?: string | undefined;
@@ -295,6 +297,7 @@ export const StudioSessionControlBar = ({
   experienceImageAssetId,
   recording,
   recordingMode,
+  recordingCharacterAttribution,
   recordingSource,
   recordingSupported,
   recordingBlockedReason,
@@ -343,6 +346,7 @@ export const StudioSessionControlBar = ({
       recording={recording}
       source={recordingSource}
       mode={recordingMode}
+      characterAttribution={recordingCharacterAttribution}
       modelOutputReady={session.transformedVideoUsable}
       supported={recordingSupported}
       {...(recordingBlockedReason ? { blockedReason: recordingBlockedReason } : {})}

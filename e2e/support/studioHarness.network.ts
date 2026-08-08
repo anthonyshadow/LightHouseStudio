@@ -270,6 +270,7 @@ export const installProviderNetworkDriver = async (
             filename: string;
             origin: SavedVideoDetail['currentVersion']['origin'];
             characterName: string | null;
+            characterVariantName: string | null;
             sourceVideoId: string | null;
             sourceVersionId: string | null;
           })
@@ -283,6 +284,7 @@ export const installProviderNetworkDriver = async (
         ordinal: 1,
         origin: metadata?.origin ?? 'recorded',
         characterName: metadata?.characterName ?? null,
+        characterVariantName: metadata?.characterVariantName ?? null,
         sourceVersionId: metadata?.sourceVersionId ?? null,
         mimeType: (route.request().headers()['content-type'] ??
           'video/mp4') as SavedVideoDetail['currentVersion']['mimeType'],

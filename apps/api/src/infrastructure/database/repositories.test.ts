@@ -272,6 +272,7 @@ describe('DrizzleSavedVideoRepository', () => {
     ordinal: 1,
     origin: 'recorded' as const,
     characterName: 'Mara',
+    characterVariantName: 'Evening',
     sourceVersionId: null,
     assetId,
     thumbnailAssetId: null,

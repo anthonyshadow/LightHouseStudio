@@ -35,6 +35,7 @@ const metadata = (override: Partial<SavedVideoUploadMetadata> = {}): SavedVideoU
   title: '  Demo   take  ',
   origin: 'recorded',
   characterName: null,
+  characterVariantName: null,
   filename: '../unsafe name?.mp4',
   sourceVideoId: null,
   sourceVersionId: null,
@@ -397,7 +398,11 @@ describe('SavedVideoService', () => {
       ownerUserId,
       crypto.randomUUID(),
       sourcePath,
-      metadata({ title: 'Mara landscape', characterName: 'Mara' }),
+      metadata({
+        title: 'Mara landscape',
+        characterName: 'Mara',
+        characterVariantName: 'Evening',
+      }),
     );
     await service.saveNew(
       ownerUserId,
@@ -419,6 +424,10 @@ describe('SavedVideoService', () => {
     });
     expect(mara.videos.map((video) => video.title)).toEqual(['Mara landscape', 'Mara square']);
     expect(mara.total).toBe(2);
+    expect(mara.videos[0]?.currentVersion).toMatchObject({
+      characterName: 'Mara',
+      characterVariantName: 'Evening',
+    });
     expect(mara.facets).toEqual({
       characterNames: ['Mara', 'Nova'],
       formats: ['landscape', 'portrait', 'square'],
@@ -540,7 +549,7 @@ describe('SavedVideoService', () => {
       }>;
     };
     expect(migrated).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       videos: [
         {
           video: {
@@ -550,6 +559,7 @@ describe('SavedVideoService', () => {
           versions: [
             {
               characterName: null,
+              characterVariantName: null,
               durationMs: 12_000,
               createdAt: '2026-08-01T12:00:00.000Z',
             },

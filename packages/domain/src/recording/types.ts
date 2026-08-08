@@ -25,6 +25,10 @@ export interface RecordingArtifact<TMedia = unknown> {
   readonly kind?: 'uploaded' | 'recorded' | 'edited' | 'visual' | 'voice';
   /** The artifact used as input for this revision, when it was generated. */
   readonly parentArtifactId?: string | null;
+  /** Parent saved-character identity used for this exact artifact, when applicable. */
+  readonly characterName?: string | null;
+  /** Exact saved-character variant used; display-only and never the gallery filter key. */
+  readonly characterVariantName?: string | null;
   /** Browser adapters may specialize this generic as Blob; the domain never inspects it. */
   readonly media: TMedia;
   readonly objectUrl: string;

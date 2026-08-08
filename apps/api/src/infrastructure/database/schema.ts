@@ -179,6 +179,7 @@ export const videoVersions = pgTable(
     ordinal: integer('ordinal').notNull(),
     origin: savedVideoOrigin('origin').notNull(),
     characterName: text('character_name'),
+    characterVariantName: text('character_variant_name'),
     sourceVersionId: uuid('source_version_id'),
     assetId: uuid('asset_id')
       .notNull()

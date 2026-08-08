@@ -14,12 +14,26 @@ export const savedVideoOriginSchema = z.enum(SAVED_VIDEO_ORIGINS);
 export const savedVideoStatusSchema = z.enum(['ready', 'processing', 'failed', 'missing']);
 export const savedVideoTitleSchema = z.string().trim().min(1).max(120);
 export const savedVideoCharacterNameSchema = z.string().trim().min(1).max(120);
+export const savedVideoCharacterVariantNameSchema = z.string().trim().min(1).max(120);
 export const savedVideoIdSchema = z.uuid();
 export const savedVideoIdempotencyKeySchema = z.uuid();
 export const SAVED_VIDEO_FORMATS = ['landscape', 'portrait', 'square'] as const;
 export const savedVideoFormatSchema = z.enum(SAVED_VIDEO_FORMATS);
 export const SAVED_VIDEO_SORTS = ['latest', 'oldest', 'shortest', 'longest'] as const;
 export const savedVideoSortSchema = z.enum(SAVED_VIDEO_SORTS);
+
+const requireParentCharacterForVariant = (
+  value: { characterName: string | null; characterVariantName: string | null },
+  context: z.RefinementCtx,
+) => {
+  if (value.characterVariantName !== null && value.characterName === null) {
+    context.addIssue({
+      code: 'custom',
+      path: ['characterVariantName'],
+      message: 'A character variant requires a parent character.',
+    });
+  }
+};
 
 export const savedVideoVersionSchema = z
   .object({
@@ -28,6 +42,7 @@ export const savedVideoVersionSchema = z
     ordinal: z.number().int().positive(),
     origin: savedVideoOriginSchema,
     characterName: savedVideoCharacterNameSchema.nullable(),
+    characterVariantName: savedVideoCharacterVariantNameSchema.nullable(),
     sourceVersionId: z.uuid().nullable(),
     mimeType: videoInputMimeTypeSchema,
     filename: z.string().trim().min(1).max(180),
@@ -37,7 +52,8 @@ export const savedVideoVersionSchema = z
     height: z.number().int().positive(),
     createdAt: z.iso.datetime(),
   })
-  .strict();
+  .strict()
+  .superRefine(requireParentCharacterForVariant);
 
 export const savedVideoSummarySchema = z
   .object({
@@ -92,11 +108,13 @@ export const savedVideoUploadMetadataSchema = z
     title: savedVideoTitleSchema,
     origin: savedVideoOriginSchema,
     characterName: savedVideoCharacterNameSchema.nullable().default(null),
+    characterVariantName: savedVideoCharacterVariantNameSchema.nullable().default(null),
     filename: z.string().trim().min(1).max(180),
     sourceVideoId: z.uuid().nullable().default(null),
     sourceVersionId: z.uuid().nullable().default(null),
   })
-  .strict();
+  .strict()
+  .superRefine(requireParentCharacterForVariant);
 
 export type SavedVideoOrigin = z.infer<typeof savedVideoOriginSchema>;
 export type SavedVideoFormat = z.infer<typeof savedVideoFormatSchema>;

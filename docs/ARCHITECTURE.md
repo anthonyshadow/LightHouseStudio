@@ -75,6 +75,11 @@ The mounted Studio owns focused controllers for:
 - account navigation and ordered logout cleanup;
 - overlays and route-owned workspace presentation.
 
+Saved-video character attribution is pinned when a live recording or completed Character Swap
+artifact is created. Each immutable video version stores the parent character name as its gallery
+filter key and an optional exact variant name as display-only metadata. Voice and later local edits
+inherit that pinned attribution; the gallery never treats variants as separate character facets.
+
 `MediaStage` stays mounted once and owns one `<video>` element. A discriminated presentation state
 switches among idle, live, finalizing, and playback. Live media uses `srcObject`; playback uses
 `src`. Opening or closing a tool must not replace the player, restart media, alter playback time,

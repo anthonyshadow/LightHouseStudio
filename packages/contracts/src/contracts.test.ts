@@ -20,6 +20,7 @@ import {
   realtimeTokenResponseSchema,
   sharedVoicesQuerySchema,
   sharedVoicesResponseSchema,
+  savedVideoUploadMetadataSchema,
   remoteReferenceImageImportRequestSchema,
   referenceImageAssetSchema,
   uploadReferenceImageResponseSchema,
@@ -149,6 +150,33 @@ describe('health and capabilities contracts', () => {
           },
         },
         wardrobe: { addOutfitAvailable: false },
+      }).success,
+    ).toBe(false);
+  });
+});
+
+describe('saved video attribution contracts', () => {
+  const metadata = {
+    title: 'Character take',
+    origin: 'character-swap' as const,
+    filename: 'character-take.mp4',
+    sourceVideoId: null,
+    sourceVersionId: null,
+  };
+
+  it('stores the parent character separately from an optional display-only variant', () => {
+    expect(
+      savedVideoUploadMetadataSchema.parse({
+        ...metadata,
+        characterName: 'Mara',
+        characterVariantName: 'Evening',
+      }),
+    ).toMatchObject({ characterName: 'Mara', characterVariantName: 'Evening' });
+    expect(
+      savedVideoUploadMetadataSchema.safeParse({
+        ...metadata,
+        characterName: null,
+        characterVariantName: 'Evening',
       }).success,
     ).toBe(false);
   });

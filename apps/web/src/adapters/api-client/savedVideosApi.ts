@@ -18,6 +18,7 @@ export type SaveVideoInput = Readonly<{
   filename: string;
   origin: SavedVideoOrigin;
   characterName?: string | null;
+  characterVariantName?: string | null;
   idempotencyKey: string;
   sourceVideoId?: string | null;
   sourceVersionId?: string | null;
@@ -34,6 +35,7 @@ const uploadHeaders = (input: SaveVideoInput): HeadersInit => ({
       filename: input.filename,
       origin: input.origin,
       characterName: input.characterName ?? null,
+      characterVariantName: input.characterVariantName ?? null,
       sourceVideoId: input.sourceVideoId ?? null,
       sourceVersionId: input.sourceVersionId ?? null,
     }),

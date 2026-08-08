@@ -1,7 +1,7 @@
 import type { StudioMode } from '../../features/media-session';
 import type { AutomaticRecordingStopReason } from '../../features/recording/types';
 import { selectAudioMime, selectVideoMime } from '../../features/recording/recordingHelpers';
-import type { RecordingSource } from '../../features/recording/types';
+import type { RecordingSource, VideoCharacterAttribution } from '../../features/recording/types';
 
 export const SIDECAR_FINALIZATION_GRACE_MS = 1_500;
 export const RECORDING_FINALIZATION_TIMEOUT_MS = 10_000;
@@ -34,6 +34,7 @@ export type RecordingAttempt = {
   listeners: RecordingAttemptListeners | null;
   sidecarWaitTimer: number | null;
   automaticStopReason: AutomaticRecordingStopReason | null;
+  characterAttribution: VideoCharacterAttribution | null;
 };
 
 export type RecordingAttemptSetup =
@@ -54,6 +55,7 @@ export const createRecordingAttempt = (
   source: RecordingSource,
   mode: StudioMode,
   onSourceEnded: () => void,
+  characterAttribution: VideoCharacterAttribution | null = null,
 ): RecordingAttemptSetup => {
   const videoTrack = source.stream.getVideoTracks().find(liveTrack);
   if (!videoTrack) return { status: 'missing-video' };
@@ -104,6 +106,7 @@ export const createRecordingAttempt = (
       listeners: null,
       sidecarWaitTimer: null,
       automaticStopReason: null,
+      characterAttribution,
     },
   };
 };

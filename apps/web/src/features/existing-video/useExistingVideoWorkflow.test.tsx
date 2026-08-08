@@ -527,6 +527,8 @@ describe('useExistingVideoWorkflow', () => {
     act(() =>
       result.current.updateStep(result.current.steps[0]!.id, {
         prompt: 'Prompt for lucy-latest',
+        characterName: 'Mara',
+        characterVariantName: 'Evening',
       }),
     );
 
@@ -537,6 +539,13 @@ describe('useExistingVideoWorkflow', () => {
     expect(adapters.stripRecordingAudio).not.toHaveBeenCalled();
     expect(adapters.transcodeRecordingToMp4).not.toHaveBeenCalled();
     expect(recording.completeVisualProcessing).toHaveBeenCalledTimes(1);
+    expect(recording.completeVisualProcessing).toHaveBeenCalledWith(
+      expect.any(Blob),
+      'video/mp4',
+      'character-swap-1',
+      recording.original,
+      { characterName: 'Mara', characterVariantName: 'Evening' },
+    );
     expect(onSubmissionAccepted).toHaveBeenCalledTimes(1);
     expect(result.current.completedStepCount).toBe(1);
     expect(adapters.submitVideoJob.mock.calls[0]![1]).toMatchObject({

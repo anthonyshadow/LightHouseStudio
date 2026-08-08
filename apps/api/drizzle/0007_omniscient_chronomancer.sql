@@ -1,0 +1,1 @@
+ALTER TABLE "video_versions" ADD COLUMN "character_variant_name" text;

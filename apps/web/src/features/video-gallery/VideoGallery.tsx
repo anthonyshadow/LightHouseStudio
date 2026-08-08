@@ -246,7 +246,9 @@ export const VideoGallery = ({
             { value: '', label: 'All characters' },
             ...characterNames.map((name) => ({ value: name, label: name })),
           ]}
-          disabled={characterNames.length === 0}
+          {...(characterNames.length === 0
+            ? { hint: 'No saved videos have character attribution yet.' }
+            : {})}
           onValueChange={setCharacterName}
         />
         <SelectField
@@ -349,6 +351,9 @@ export const VideoGallery = ({
                     <span css={chipStyles(theme)}>{FORMAT_LABELS[formatForVideo(video)]}</span>
                     {version.characterName ? (
                       <span css={chipStyles(theme)}>{version.characterName}</span>
+                    ) : null}
+                    {version.characterVariantName ? (
+                      <span css={chipStyles(theme)}>Variant: {version.characterVariantName}</span>
                     ) : null}
                     {video.status !== 'ready' ? (
                       <span css={chipStyles(theme)}>{video.status}</span>
@@ -474,7 +479,10 @@ export const VideoGallery = ({
               <span>{previewVideo.currentVersion.origin}</span>
               <span>{FORMAT_LABELS[formatForVideo(previewVideo)]}</span>
               {previewVideo.currentVersion.characterName ? (
-                <span>{previewVideo.currentVersion.characterName}</span>
+                <span>Character: {previewVideo.currentVersion.characterName}</span>
+              ) : null}
+              {previewVideo.currentVersion.characterVariantName ? (
+                <span>Variant: {previewVideo.currentVersion.characterVariantName}</span>
               ) : null}
               <span>
                 {previewVideo.versionCount} version

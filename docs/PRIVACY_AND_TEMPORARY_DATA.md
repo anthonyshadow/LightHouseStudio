@@ -84,7 +84,9 @@ provider intent. Local Voice uses Web Audio/remux only.
 - Saved Videos list metadata first. Video content and thumbnails are served only through
   authenticated owner checks. Video bytes begin loading only after explicit Preview, Studio, Edit,
   or Download intent. The centered Preview player uses the authenticated content response directly
-  and detaches it on close without creating a retained object URL. Rename updates metadata; replace
+  and detaches it on close without creating a retained object URL. Version metadata may retain the
+  attributed parent character name and optional exact Wardrobe variant name; filtering uses the
+  parent name only. Rename updates metadata; replace
   appends an immutable version; delete tombstones only the chosen record and never requires another
   source or derived record to be deleted first. In local-only storage, detached video and thumbnail
   bytes remain retained pending whole-environment retirement. With private R2 selected, explicit

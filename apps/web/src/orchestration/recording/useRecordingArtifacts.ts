@@ -5,6 +5,7 @@ import type {
   RecordingAudioSidecar,
   RecordingProcessingOperation,
   RestorePersistedOriginalInput,
+  VideoCharacterAttribution,
 } from '../../features/recording/types';
 import {
   createPersistedOriginalRecording,
@@ -105,10 +106,17 @@ export const useRecordingArtifacts = () => {
       mimeType: string,
       label: string,
       explicitSource?: RecordingArtifact,
+      characterAttribution?: VideoCharacterAttribution | null,
     ): RecordingArtifact => {
       const source = explicitSource ?? stateRef.current.original;
       if (!source) throw new Error('Original recording is unavailable.');
-      const artifact = createProcessedRecordingArtifact(source, blob, mimeType, label);
+      const artifact = createProcessedRecordingArtifact(
+        source,
+        blob,
+        mimeType,
+        label,
+        characterAttribution,
+      );
       repairedPlaybackArtifactIdRef.current = null;
       transition({ type: 'complete-visual', artifact });
       return artifact;

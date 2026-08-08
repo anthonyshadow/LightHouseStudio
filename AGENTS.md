@@ -1,193 +1,154 @@
-# Repository working guide
+# Lightframe Studio repository guide
 
-Lightframe Studio is a local-first, single-operator browser camera studio. The current product goal
-is a trustworthy short-form loop: Record or Upload → Review → optional Virtual Try On, Character
-Swap, and/or Voice → Download. Studio starts in the neutral Local Camera mode with camera and
-microphone off until an explicit control-bar or upload-panel action. Live Character/VTO camera
-transformation and Workshop are advanced flows. The server is loopback-only. Drizzle/Neon and
-private Cloudflare R2 are configuration-gated persistence options; do not treat them as authority
-to add public deployment, real accounts, billing, or shared tenancy.
+## Scope
 
-Touch/mobile creation is required and the supported take maximum is 300 seconds. Character, VTO,
-local Voice, ElevenLabs, OpenAI, BFL, Wiro, and Pruna are current product capabilities, but
-configuration does not prove live provider health or physical-device support. OpenAI/BFL/Wiro
-remain separate startup-selected passes with no fallback. Monetization, public cloud operation,
-and creator ownership/portability policy remain deferred.
+This file applies repository-wide. A nearer `AGENTS.md` may add or override
+instructions for its subtree.
 
-## Read before changing behavior
+Lightframe Studio is currently a local-first, single-operator application.
+Do not infer public deployment, shared tenancy, real account registration,
+billing, public sharing, or unrestricted provider use from configuration-gated
+cloud infrastructure.
 
-1. [`README.md`](README.md) for product/setup/commands.
-2. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for ownership and dependency direction.
-3. The affected observable journey in [`docs/userStories/`](docs/userStories/README.md).
-4. Provider/data work: [`docs/PRIVACY_AND_TEMPORARY_DATA.md`](docs/PRIVACY_AND_TEMPORARY_DATA.md)
-   and [`docs/LIVE_PROVIDER_SMOKE.md`](docs/LIVE_PROVIDER_SMOKE.md).
-5. Audit work: [`docs/MAINTAINABILITY_AUDIT.md`](docs/MAINTAINABILITY_AUDIT.md) and the relevant
-   current audit or plan in the [`docs/` map](docs/README.md).
+Implement current repository behavior, not unimplemented target-state plans.
+Do not change the runtime, framework, persistence authority, provider, or
+deployment model unless the task explicitly includes that change.
 
-Inspect the owning presentation, controller/orchestration, pure domain rule, HTTP contract/provider
-adapter, and tests that exercise the complete journey. Do not infer behavior from a component name,
-old story, or intended design.
+## Read selectively
 
-## Runtime and install
+Start with the affected source and its tests. Read only the documentation
+needed for the task:
 
-- Node `>=24 <25`; `.nvmrc` pins the repository default. pnpm `>=11.18 <12`.
-- `pnpm install` for ordinary local work; `pnpm install --frozen-lockfile` when reproducing CI.
-- `/` is the provider-free entry and `/studio` is the only active Studio runtime. Every other path
-  returns to `/`. Do not add aliases for retired pages.
+- Setup, scripts, and product overview: `README.md`
+- Documentation ownership map: `docs/README.md`
+- Architecture and lifecycle ownership: `docs/ARCHITECTURE.md`
+- Observable product behavior: the affected file in `docs/userStories/`
+- Testing and release validation: `docs/TESTING.md`
+- Provider and temporary-data boundaries:
+  `docs/PRIVACY_AND_TEMPORARY_DATA.md`
+- Cloud persistence and migrations: `docs/CLOUD_PERSISTENCE.md`
+- Live or physical-device validation: `docs/LIVE_PROVIDER_SMOKE.md` and
+  `docs/MANUAL_QA.md`
 
-## Architecture and state
+Do not read every document by default. Historical plans and lessons explain
+rationale but are not current implementation authority.
 
-- `packages/domain` and `packages/contracts` stay independent of React and provider payloads.
-- `AppRouter.tsx` owns browser routing, route metadata, and the lazy Studio boundary.
-  `StudioApp.tsx` remains the runtime composition boundary. Keep one persistent `MediaStage`,
-  shared `OverlayPanel`, app-owned contracts, repositories, and existing adapters.
-- The entry route must not mount Studio, load provider/media modules, request capabilities, acquire
-  media, or contact a provider.
-- Keep product policy in domain/orchestration, not presentation components or provider adapters.
-- Split at ownership/lifecycle boundaries, not an arbitrary line count.
-- Do not add a second media node/session, modal system, saved-character store, provider client, or
-  generic repository spanning stores with different transaction models.
-- The Upload Existing Video panel is the sole approved second-video exception: its inline player
-  may borrow the current stream or artifact URL for capture/review, but it never owns tracks,
-  creates a media/provider session, or replaces the persistent `MediaStage`.
-- Browser storage is untrusted: schema-validate/sanitize, version persisted data, preserve opaque
-  IDs/provenance/timestamps, and add migration tests.
-- Temporary state may be session-only only when the current product contract says so. Never treat
-  loopback Host hashes, device IDs, storage paths, or provider IDs as future user identity.
+## Before editing
 
-## Providers and security
+1. Inspect the complete affected path: caller, owner, dependency, contract,
+   cleanup path, and relevant tests.
+2. Search for an existing component, hook, helper, schema, service, adapter,
+   or policy before creating another one.
+3. Identify the lifecycle, transaction, and trust boundary before moving or
+   combining code.
+4. Make the smallest coherent change that satisfies the requested behavior.
+5. Preserve unrelated user changes and do not perform speculative cleanup.
 
-- Provider contact is explicit, cost-sensitive, cancellable where supported, and server-mediated
-  for permanent credentials. Never place secrets in `VITE_*`, browser bundles, logs, fixtures,
-  screenshots, traces, or committed `.env` files.
-- Local Camera must remain independent of provider credentials, token minting, SDK loading, and all
-  external media/network traffic.
-- Decart: use exact app-owned model IDs (`lucy-latest`, pinned `lucy-vton-latest`), scoped short-lived
-  client tokens, lazy SDK loading, atomic full-state updates, explicit Start/Apply, safe normalized
-  errors, and complete listener/client/track cleanup. Do not silently follow aliases or add
-  provider fallback.
-- ElevenLabs: browser through the same-origin API only; saved-library listing/revalidation plus
-  standard-rate shared-catalog browsing and explicit eligible community add/remove; explicit
-  provider-intent header; preview does not upload the take; Apply sends the immutable original
-  audio sidecar; preserve the original on every failure.
-- OpenAI/BFL/Wiro: select one provider at startup; no automatic retry of initial billable
-  submission and no fallback. Upload alone stays local. Keep provider request/poll/download formats
-  inside their adapters.
-- The current Host/Origin checks are a local broker boundary, not public authentication. Do not
-  expose the app through LAN, tunnel, proxy, or public hostname without a separately approved
-  auth/authorization/tenancy/rate/retention/security design.
-- Do not forward raw provider bodies, messages, URLs, prompts, credentials, causes, or arbitrary
-  error codes. Use allowlisted app-owned safe codes.
+Do not infer behavior from filenames, stale plans, or visual resemblance alone.
 
-## Media, recording, and cleanup
+## Code quality
 
-- The creator of a stream, cloned track, recorder, timer, event listener, object URL, audio context,
-  or provider client owns idempotent cleanup.
-- Validate model input before camera/token/provider work. Guard late async results with generation
-  or abort checks. Commit a healthy replacement before releasing an owned current resource.
-- Recording borrows source tracks and never owns/stops them. Pin source identity at Start.
-- Duplicate Stop must coalesce. Final recorder data and the optional sidecar settle before live or
-  provider resources release. Main video remains authoritative if the sidecar fails.
-- Enforce the app-owned 300-second maximum with an accessible warning and safe automatic
-  Stop/finalize. Provider TTL/session callbacks do not replace that recording rule.
-- Playback replaces live media on the same stage. Voice processing always starts from immutable
-  originals; replacement occurs before old URL revocation; failure/cancel preserves the last valid
-  artifact.
-- Route exit cannot abandon recording/finalization. A temporary take, active Voice work, or dirty
-  Shelf edit requires confirmed discard before leaving `/studio`; future `/studio/*` transitions
-  must preserve the shared runtime.
-- Do not solve memory pressure by silently evicting chunks/originals. Follow
-  [`docs/RECORDING_MEMORY_POLICY.md`](docs/RECORDING_MEMORY_POLICY.md).
+- Keep each module responsible for one cohesive behavior or lifecycle.
+- Split code at ownership or lifecycle boundaries, not arbitrary line counts.
+- Prefer feature-local code. Extract shared code only when multiple real
+  consumers have the same semantics and lifecycle.
+- Do not combine superficially similar code with different trust,
+  transaction, cleanup, or ownership requirements.
+- Keep React components presentation-focused and route handlers thin.
+- Keep product policy in domain rules or application orchestration.
+- Do not duplicate HTTP contracts, domain policy, storage ownership rules, or
+  provider normalization.
+- Do not add a dependency unless existing platform or repository utilities are
+  insufficient.
+- Remove dead code only when its lack of callers and compatibility obligations
+  have been verified.
+- Comments should explain constraints or rationale, not restate the code.
+- Do not hand-edit generated artifacts.
 
-## UI, responsive behavior, and accessibility
+## Repository boundaries
 
-- The primary video must not be squashed, cropped unpredictably, or remounted by tools.
-- Drawers, docks, shelves, builders, and review surfaces overlay the workspace and use the shared
-  focus/inert/Escape/return-focus behavior. Named internal regions scroll; the document does not.
-- Stage warnings/errors overlay rather than reflow the player. Camera, mic, AI, Record/Stop,
-  session Close/Stop, and take actions remain quickly reachable.
-- Preserve all five canonical viewports: `1440×960`, `1280×720`, `834×1112`, `390×844`,
-  `320×568`; safe areas, short heights, 200% text/reflow, and touch require deliberate checks.
-- Use semantic HTML, accessible names/states/status regions, visible focus, reduced motion, and
-  approximately 44px touch targets. Never hide the sole high-consequence action.
-- Do not duplicate stateful controls to fix mobile layout. Prefer entry intent, anchored
-  affordances, or progressive disclosure inside the current ownership model.
+- `packages/domain` owns pure product policy.
+- `packages/contracts` owns app-controlled runtime HTTP schemas.
+- `apps/web` owns browser presentation, orchestration, and browser adapters.
+- `apps/api` owns authentication, application services, persistence, storage,
+  and provider adapters.
+- Web code must not import API implementation code.
+- Domain and contracts must not depend on React, browser APIs, persistence
+  clients, or provider payloads.
+- Database schemas, provider payloads, and public HTTP contracts are separate
+  representations and require explicit mapping.
 
-## Testing and screenshots
+## Security, ownership, and cost
 
-Normal implementation gate:
+- Permanent credentials remain server-side and never enter `VITE_*`, browser
+  bundles, logs, fixtures, screenshots, traces, or committed environment files.
+- Authenticated ownership comes only from verified server identity, never from
+  browser-supplied user IDs, storage paths, provider IDs, or device IDs.
+- Provider calls must be explicit, bounded, safely normalized, and cancellable
+  where supported.
+- Do not introduce automatic paid retries, provider fallback, or surprise
+  external traffic.
+- Do not expose raw provider errors, bodies, prompts, URLs, credentials, or
+  arbitrary upstream codes.
+- The creator of a stream, track, timer, worker, listener, object URL, audio
+  context, temporary file, or provider client owns idempotent cleanup.
+- Browser storage is untrusted and must be validated, versioned, and migrated.
 
-```bash
-pnpm quality
-```
+## Validation
 
-Before release also run:
+Use the smallest validation set that proves the affected contract:
 
-```bash
-pnpm test:coverage
-pnpm test:e2e
-pnpm test:production # after build
-pnpm test:visual
-pnpm audit:prod
-```
+- Investigation or review with no changes: no validation commands.
+- Documentation-only change: run documentation checks and formatting for the
+  affected files.
+- Narrow package change: run the affected workspace typecheck and focused
+  tests.
+- Domain or contract change: run its focused tests plus every directly affected
+  consumer test.
+- API change: run focused API integration tests and the affected typecheck.
+- UI behavior change: run focused component/controller tests; use targeted E2E
+  for an observable journey.
+- Visual or responsive change: run the relevant visual cases. Do not run the
+  full visual suite for nonvisual work.
+- Database schema change: run the existing migration generation, inspection,
+  checking, and repository tests. Never migrate production automatically.
+- Cross-package, authentication, security, persistence, dependency, build, or
+  pre-merge change: run `pnpm quality`.
+- Release validation: follow `README.md` and `docs/TESTING.md`.
 
-- Tests deny unexpected external HTTP and WebSockets. Never add paid/live provider traffic to CI,
-  screenshots, stories, or ordinary automated tests.
-- Use pure tests for rules, component/controller tests for state/races, E2E for observable
-  journeys, Storybook for component states, and the curated suite only for high-value visual
-  regressions.
-- Visual tests use fixed time, deterministic synthetic media/provider fixtures, disabled animation,
-  semantic readiness assertions, viewport containment, and platform-specific baselines. The
-  29-case count is a review budget; required state/viewport pairs and unique paths are the
-  invariant.
-- Update screenshots only for intentional visual work. Inspect every changed baseline. Do not run
-  `screenshots:prune` until every expected platform baseline exists; never update snapshots as
-  unrelated cleanup.
-- Use [`docs/MANUAL_QA.md`](docs/MANUAL_QA.md) and gated live smoke for physical device/provider
-  evidence. Do not claim a command passed when it was skipped or blocked.
+Never contact paid or live providers from ordinary automated validation.
+Never claim a check passed when it was skipped, unavailable, or blocked.
 
-## Documentation and completion
+## Documentation
 
-- Update the canonical document named in [`docs/README.md`](docs/README.md) and every affected
-  observable user story when behavior, route, storage, command, environment, provider, privacy, or
-  support boundaries change.
-- Keep current behavior separate from recommendations. Preserve historical rationale in
-  `docs/PRODUCT_EVOLUTION.md` and `LESSONS.md`.
-- Mark an audit or plan phase complete only after all acceptance criteria and required validation
-  pass. Current plans contain incomplete phases only; Git history remains the archive.
-- Report files changed, validation results, live/manual limitations, and unresolved decisions.
+Update only the canonical documents affected by an actual behavior, contract,
+command, environment, privacy, persistence, provider, or support-boundary
+change. Link to existing documentation instead of repeating it.
 
-## Graphify
+Do not update product documentation for an internal refactor that leaves all
+observable behavior and documented ownership unchanged.
 
-When `graphify-out/graph.json` exists, start codebase questions with:
+## Completion
 
-```bash
-graphify query "<question>"
-```
+Report:
 
-Use `graphify path "<A>" "<B>"` for impact/relationships and
-`graphify explain "<concept>"` for focused concepts. Use `graphify-out/wiki/index.md` for broad
-navigation when that optional export exists; otherwise read `graphify-out/GRAPH_REPORT.md` only
-when scoped commands are insufficient. Dirty graph output is expected and not a reason to skip it.
-After code changes run:
+- files changed;
+- important architectural decisions;
+- validation run and its result;
+- checks not run and why;
+- remaining manual or live limitations;
+- unresolved risks or assumptions.
 
-```bash
-graphify update .
-```
+## Stop conditions
 
-## Prohibited shortcuts and stop conditions
+Stop only when completing the task requires:
 
-Do not add retired route aliases, add client secrets, bypass app-owned schemas, weaken explicit
-provider intent, add surprise fallback/cost, leak provider data, replace persistent stage/overlay
-ownership, delete retained media without a relationship-safe policy, weaken tests to pass, or
-blindly accept snapshots.
+- public exposure, real accounts, billing, public sharing, or a new paid
+  provider outside the requested scope;
+- secret access or a paid live call;
+- destructive or irreversible data migration;
+- deletion without an established relationship-safe retention policy; or
+- overwriting unrelated user changes that cannot be preserved.
 
-Stop and ask when:
-
-- a change would expose the app beyond loopback or add accounts, billing, public
-  sharing, moderation enforcement, or a new paid provider;
-- model/provider choice, retention/deletion, supported devices/duration, pricing/credits, or
-  creator data ownership is materially ambiguous;
-- an existing user change overlaps the required files and cannot be preserved;
-- completing the task requires destructive data migration, secret access, paid live calls, or a
-  broad behavior change outside the authorized phase.
+For ordinary ambiguity, inspect the current code, tests, and canonical
+documentation and choose the narrowest conservative interpretation.

@@ -217,6 +217,8 @@ export const ExistingVideoPanel = ({
         : null;
       workflow.updateStep(step.id, {
         savedRecipeId: recipe.id,
+        characterName: recipe.characterName ?? null,
+        characterVariantName: recipe.characterVariantName ?? null,
         ...(step.modelId === 'lucy-latest'
           ? visualCapabilities.characterSwap.promptInput === 'server-default'
             ? { prompt: '', referenceImage: referenceImage?.file ?? null }
@@ -424,6 +426,8 @@ export const ExistingVideoPanel = ({
                       onClick={() => {
                         workflow.updateStep(missingVtonReference.stepId, {
                           savedRecipeId: missingVtonReference.recipe.id,
+                          characterName: null,
+                          characterVariantName: null,
                           prompt: missingVtonReference.recipe.prompt,
                           referenceImage: null,
                           inputKind: 'prompt',
@@ -443,6 +447,8 @@ export const ExistingVideoPanel = ({
                     onClick={() => {
                       workflow.updateStep(missingVtonReference.stepId, {
                         savedRecipeId: null,
+                        characterName: null,
+                        characterVariantName: null,
                         prompt: '',
                         referenceImage: null,
                         inputKind: 'saved-outfit',

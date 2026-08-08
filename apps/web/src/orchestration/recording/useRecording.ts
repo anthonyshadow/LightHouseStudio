@@ -22,6 +22,7 @@ import type {
   RestorePersistedOriginalInput,
   TakeMetadata,
   UseRecordingOptions,
+  VideoCharacterAttribution,
 } from '../../features/recording/types';
 import {
   createOriginalRecordingArtifact,
@@ -352,7 +353,11 @@ export const useRecording = ({
   }, [artifacts, failAttempt, finalizeAttempt, tryFinalize]);
 
   const start = useCallback(
-    (source: RecordingSource, mode: StudioMode): Promise<void> => {
+    (
+      source: RecordingSource,
+      mode: StudioMode,
+      characterAttribution: VideoCharacterAttribution | null = null,
+    ): Promise<void> => {
       if (artifacts.processingState === 'processing') return Promise.resolve();
       if (!('MediaRecorder' in window)) {
         domainLifecycleRef.current = failRecordingLifecycle(
@@ -388,11 +393,16 @@ export const useRecording = ({
         return Promise.resolve();
       }
 
-      const setup = createRecordingAttempt(source, mode, () => {
-        const activeAttempt = attemptRef.current;
-        if (activeAttempt) markAutomaticStop(activeAttempt, 'source-ended');
-        void stop();
-      });
+      const setup = createRecordingAttempt(
+        source,
+        mode,
+        () => {
+          const activeAttempt = attemptRef.current;
+          if (activeAttempt) markAutomaticStop(activeAttempt, 'source-ended');
+          void stop();
+        },
+        characterAttribution,
+      );
       if (setup.status === 'missing-video') {
         domainLifecycleRef.current = failRecordingLifecycle(
           createSafeError('recording-failure', 'A live video source is required before recording.'),

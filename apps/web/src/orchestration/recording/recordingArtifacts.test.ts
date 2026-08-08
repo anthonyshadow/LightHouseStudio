@@ -46,6 +46,22 @@ describe('recording artifact identity', () => {
     expect(first.filename).toMatch(/voice-northstar-\d{8}T\d{6}Z-[0-9a-f]{8}\.mp4$/u);
   });
 
+  it('pins parent character and variant attribution on a visual result', () => {
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:character-result');
+    const result = createProcessedRecordingArtifact(
+      sourceArtifact(),
+      new Blob(['result'], { type: 'video/mp4' }),
+      'video/mp4',
+      'character-swap-1',
+      { characterName: 'Mara', characterVariantName: 'Evening' },
+    );
+
+    expect(result).toMatchObject({
+      characterName: 'Mara',
+      characterVariantName: 'Evening',
+    });
+  });
+
   it('derives safe metadata when restoring a legacy artifact', () => {
     vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:restored');
     const blob = new Blob(['legacy'], { type: 'video/mp4' });

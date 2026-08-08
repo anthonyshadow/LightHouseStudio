@@ -17,6 +17,8 @@ export type ExistingVideoSavedRecipe = Readonly<{
   enhancePrompt: boolean;
   savedCharacterPromptId?: string;
   savedCharacterVariantId?: string;
+  characterName?: string;
+  characterVariantName?: string;
   originalCharacterVersion?: boolean;
   defaultVoice?: SavedCharacterVoicePreference | null;
 }>;

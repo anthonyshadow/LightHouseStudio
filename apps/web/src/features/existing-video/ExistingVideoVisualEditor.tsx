@@ -223,6 +223,9 @@ export const ExistingVideoVisualEditor = ({
                     step.modelId === 'lucy-latest' && step.referenceImage
                       ? step.savedRecipeId
                       : null,
+                  ...(step.modelId === 'lucy-latest' && step.referenceImage
+                    ? {}
+                    : { characterName: null, characterVariantName: null }),
                   prompt: event.currentTarget.value,
                 })
               }
@@ -269,12 +272,21 @@ export const ExistingVideoVisualEditor = ({
           disabled={recipeLocked}
           allowUrlImport
           onSelectFile={(file) => {
-            onUpdate(step.id, { savedRecipeId: null });
+            onUpdate(step.id, {
+              savedRecipeId: null,
+              characterName: null,
+              characterVariantName: null,
+            });
             onChooseReference(step, file);
           }}
           onRemove={() => {
             onClearReferenceError();
-            onUpdate(step.id, { savedRecipeId: null, referenceImage: null });
+            onUpdate(step.id, {
+              savedRecipeId: null,
+              characterName: null,
+              characterVariantName: null,
+              referenceImage: null,
+            });
           }}
         />
       ) : null}

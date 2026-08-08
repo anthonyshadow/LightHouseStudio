@@ -4,6 +4,7 @@ import path from 'node:path';
 import { z } from 'zod';
 import {
   savedVideoCharacterNameSchema,
+  savedVideoCharacterVariantNameSchema,
   savedVideoOriginSchema,
   videoInputMimeTypeSchema,
   type SavedVideoFormat,
@@ -37,6 +38,9 @@ const versionV2Schema = legacyVersionSchema.extend({
 const versionSchema = versionV2Schema.extend({
   durationMs: z.number().int().positive().max(300_000),
 });
+const versionV4Schema = versionSchema.extend({
+  characterVariantName: savedVideoCharacterVariantNameSchema.nullable(),
+});
 
 const videoSchema = z
   .object({
@@ -62,8 +66,11 @@ const legacyAggregateSchema = z
 const aggregateV2Schema = legacyAggregateSchema.extend({
   versions: z.array(versionV2Schema).min(1).max(100),
 });
-const aggregateSchema = legacyAggregateSchema.extend({
+const aggregateV3Schema = legacyAggregateSchema.extend({
   versions: z.array(versionSchema).min(1).max(100),
+});
+const aggregateSchema = legacyAggregateSchema.extend({
+  versions: z.array(versionV4Schema).min(1).max(100),
 });
 const receiptSchema = z
   .object({
@@ -86,12 +93,16 @@ const libraryV2Schema = legacyLibrarySchema.extend({
   schemaVersion: z.literal(2),
   videos: z.array(aggregateV2Schema),
 });
-const librarySchema = legacyLibrarySchema.extend({
+const libraryV3Schema = legacyLibrarySchema.extend({
   schemaVersion: z.literal(3),
+  videos: z.array(aggregateV3Schema),
+});
+const librarySchema = legacyLibrarySchema.extend({
+  schemaVersion: z.literal(4),
   videos: z.array(aggregateSchema),
 });
 
-export type StoredVideoVersion = z.infer<typeof versionSchema>;
+export type StoredVideoVersion = z.infer<typeof versionV4Schema>;
 export type StoredSavedVideoAggregate = z.infer<typeof aggregateSchema>;
 export type SavedVideoReceipt = z.infer<typeof receiptSchema>;
 type SavedVideoLibrary = z.infer<typeof librarySchema>;
@@ -151,7 +162,7 @@ export interface SavedVideoRepository {
 }
 
 const emptyLibrary = (ownerUserId: string): SavedVideoLibrary => ({
-  schemaVersion: 3,
+  schemaVersion: 4,
   ownerUserId,
   revision: 0,
   videos: [],
@@ -201,17 +212,23 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
           library = current.data;
           needsRewrite = JSON.stringify(raw) !== JSON.stringify(library);
         } else {
+          const v3 = libraryV3Schema.safeParse(raw);
           const v2 = libraryV2Schema.safeParse(raw);
-          const legacy = v2.success ? v2.data : legacyLibrarySchema.parse(raw);
+          const legacy = v3.success
+            ? v3.data
+            : v2.success
+              ? v2.data
+              : legacyLibrarySchema.parse(raw);
           library = librarySchema.parse({
             ...legacy,
-            schemaVersion: 3,
+            schemaVersion: 4,
             videos: legacy.videos.map((aggregate) => ({
               ...aggregate,
               versions: aggregate.versions.map((version) => ({
                 ...version,
                 durationMs: Math.max(1, Math.round(version.durationMs)),
                 characterName: 'characterName' in version ? version.characterName : null,
+                characterVariantName: null,
               })),
             })),
           });
@@ -428,7 +445,7 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
       if (versionIndex < 0 || version === undefined) return null;
       if (version.thumbnailAssetId !== null) return current;
       const versions = [...current.versions];
-      versions[versionIndex] = versionSchema.parse({ ...version, thumbnailAssetId: assetId });
+      versions[versionIndex] = versionV4Schema.parse({ ...version, thumbnailAssetId: assetId });
       const next = aggregateSchema.parse({
         ...current,
         video: { ...current.video, updatedAt },

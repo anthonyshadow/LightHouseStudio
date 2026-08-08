@@ -118,6 +118,8 @@ export const createPersistedOriginalRecording = (
     createdAt: input.artifactMetadata.createdAt ?? startedAt,
     kind: input.artifactMetadata.kind ?? 'uploaded',
     parentArtifactId: input.artifactMetadata.parentArtifactId ?? null,
+    characterName: input.artifactMetadata.characterName ?? null,
+    characterVariantName: input.artifactMetadata.characterVariantName ?? null,
     media: input.blob,
     objectUrl: createArtifactObjectUrl(input.blob),
     mimeType,
@@ -151,6 +153,8 @@ export const createOriginalRecordingArtifact = (
     createdAt: identity.createdAt,
     kind: 'recorded',
     parentArtifactId: null,
+    characterName: attempt.characterAttribution?.characterName ?? null,
+    characterVariantName: attempt.characterAttribution?.characterVariantName ?? null,
     media: blob,
     objectUrl: createArtifactObjectUrl(blob),
     mimeType,
@@ -216,6 +220,10 @@ export const createProcessedRecordingArtifact = (
   blob: Blob,
   mimeType: string,
   label: string,
+  characterAttribution?: Readonly<{
+    characterName: string;
+    characterVariantName: string | null;
+  }> | null,
 ): RecordingArtifact => {
   const extension = mimeType.includes('mp4')
     ? 'mp4'
@@ -232,6 +240,12 @@ export const createProcessedRecordingArtifact = (
     createdAt,
     kind: label === 'voice' || label.startsWith('voice-') ? 'voice' : 'visual',
     parentArtifactId: source.id,
+    ...(characterAttribution === undefined
+      ? {}
+      : {
+          characterName: characterAttribution?.characterName ?? null,
+          characterVariantName: characterAttribution?.characterVariantName ?? null,
+        }),
     media: blob,
     objectUrl: createArtifactObjectUrl(blob),
     mimeType,

@@ -43,6 +43,7 @@
     "check:retired-program": "node scripts/check-retired-program-references.mjs",
     "recording:memory:estimate": "node scripts/estimate-recording-memory.mjs",
     "auth:hash-password": "node scripts/hash-demo-password.mjs",
+    "db:migrate": "pnpm --dir apps/api db:migrate",
     "screenshots:capture": "playwright test --config playwright.screenshots.config.ts",
     "quality": "pnpm typecheck && pnpm storybook:typecheck && pnpm lint && pnpm format:check && pnpm check:dead-code && pnpm check:modules && pnpm check:script-references && pnpm check:docs && pnpm check:retired-program && pnpm test && pnpm build && pnpm check:build-manifest && pnpm storybook:build"
   },

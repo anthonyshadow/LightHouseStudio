@@ -26,6 +26,7 @@ const detail: SavedVideoDetail = {
     ordinal: 1,
     origin: 'recorded',
     characterName: 'Mara',
+    characterVariantName: null,
     sourceVersionId: null,
     mimeType: 'video/mp4',
     filename: 'morning-take.mp4',
@@ -88,6 +89,7 @@ describe('saved videos API client', () => {
       filename: 'morning-take.mp4',
       origin: 'recorded' as const,
       characterName: 'Mara',
+      characterVariantName: 'Evening',
       idempotencyKey: '0d4ec50f-28fe-45e8-ad0d-f34b96482b47',
     };
 
@@ -125,7 +127,7 @@ describe('saved videos API client', () => {
           new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('X-Lightframe-Video-Metadata')!,
         ),
       ),
-    ).toMatchObject({ characterName: 'Mara' });
+    ).toMatchObject({ characterName: 'Mara', characterVariantName: 'Evening' });
   });
 
   it('builds owner-checked content, download, and thumbnail paths', () => {

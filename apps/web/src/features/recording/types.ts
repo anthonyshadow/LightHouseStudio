@@ -26,6 +26,11 @@ export type RecordingLifecycle = RecordingLifecycleStatus;
 
 export type RecordingArtifact = DomainRecordingArtifact<Blob>;
 
+export type VideoCharacterAttribution = Readonly<{
+  characterName: string;
+  characterVariantName: string | null;
+}>;
+
 export type RecordingAudioSidecar = {
   state: 'unavailable' | 'recording' | 'ready' | 'error';
   blob: Blob | null;
@@ -100,6 +105,8 @@ export type PersistedRecordingArtifactMetadata = Readonly<{
   createdAt?: string;
   kind?: RecordingArtifact['kind'];
   parentArtifactId?: string | null;
+  characterName?: string | null;
+  characterVariantName?: string | null;
   mimeType: string;
   filename: string;
   sourceModeId: StudioMode;
@@ -161,7 +168,11 @@ export type RecordingController = {
   processingOperation: RecordingProcessingOperation | null;
   processingError: string | null;
   elapsedSeconds: number;
-  start: (source: RecordingSource, mode: StudioMode) => Promise<void>;
+  start: (
+    source: RecordingSource,
+    mode: StudioMode,
+    character?: VideoCharacterAttribution | null,
+  ) => Promise<void>;
   stop: () => Promise<RecordingArtifact | null>;
   restorePersistedOriginal: (input: RestorePersistedOriginalInput) => RecordingArtifact;
   replaceSource: (input: RestorePersistedOriginalInput) => RecordingArtifact;
@@ -173,6 +184,7 @@ export type RecordingController = {
     mimeType: string,
     label: string,
     source?: RecordingArtifact,
+    character?: VideoCharacterAttribution | null,
   ) => RecordingArtifact;
   completeProcessing: (
     blob: Blob,

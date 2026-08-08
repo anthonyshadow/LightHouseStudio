@@ -30,6 +30,7 @@ const video = (override: Partial<SavedVideoSummary> = {}): SavedVideoSummary => 
     ordinal: 1,
     origin: 'recorded',
     characterName: 'Mara',
+    characterVariantName: null,
     sourceVersionId: null,
     mimeType: 'video/mp4',
     filename: 'morning-take.mp4',
@@ -153,10 +154,13 @@ describe('VideoGallery', () => {
   });
 
   it('requests character and format filters with each supported sort order', async () => {
-    const item = video();
+    const item = video({
+      currentVersion: { ...video().currentVersion, characterVariantName: 'Evening' },
+    });
     api.listSavedVideos.mockResolvedValue(page([item]));
     renderGallery();
     await screen.findByRole('heading', { name: 'Morning take' });
+    expect(screen.getByText('Variant: Evening')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Character used' }));
     fireEvent.click(screen.getByRole('option', { name: 'Mara' }));
@@ -183,5 +187,27 @@ describe('VideoGallery', () => {
         ),
       );
     }
+  });
+
+  it('keeps the character control operable when older videos have no attribution', async () => {
+    api.listSavedVideos.mockResolvedValue({
+      videos: [
+        video({
+          currentVersion: {
+            ...video().currentVersion,
+            characterName: null,
+            characterVariantName: null,
+          },
+        }),
+      ],
+      nextCursor: null,
+      total: 1,
+      facets: { characterNames: [], formats: ['landscape'] },
+    });
+    renderGallery();
+
+    await screen.findByRole('heading', { name: 'Morning take' });
+    expect(screen.getByRole('combobox', { name: 'Character used' })).toBeEnabled();
+    expect(screen.getByText('No saved videos have character attribution yet.')).toBeInTheDocument();
   });
 });

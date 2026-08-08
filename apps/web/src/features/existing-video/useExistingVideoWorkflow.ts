@@ -36,7 +36,11 @@ import {
 import { transcodeRecordingToMp4 } from '../../adapters/media-processing/transcodeRecording';
 import { createProcessedRecordingArtifact } from '../../orchestration/recording/recordingArtifacts';
 import { revokeArtifactUrl } from '../recording/recordingHelpers';
-import type { RecordingArtifact, RecordingController } from '../recording/types';
+import type {
+  RecordingArtifact,
+  RecordingController,
+  VideoCharacterAttribution,
+} from '../recording/types';
 import type {
   LocalVoiceEffectId,
   VoiceProcessingController,
@@ -53,6 +57,8 @@ export type ExistingVideoStep = Readonly<{
   referenceImage: File | null;
   inputKind: 'character' | 'saved-outfit' | 'reference-image' | 'prompt';
   outputResolution?: VideoOutputResolution;
+  characterName?: string | null;
+  characterVariantName?: string | null;
 }>;
 
 export type ExistingVideoVoiceSelection =
@@ -89,6 +95,7 @@ type FinalizedVisual = Readonly<{
   source: RecordingArtifact;
   metadata: ValidatedExistingVideo['metadata'];
   generation: number;
+  characterAttribution: VideoCharacterAttribution | null;
 }>;
 
 type ExistingVideoBaseProvenance = 'source' | 'server-approved-result';
@@ -651,6 +658,8 @@ export const useExistingVideoWorkflow = ({
               id: crypto.randomUUID(),
               modelId,
               savedRecipeId: null,
+              characterName: null,
+              characterVariantName: null,
               prompt: '',
               enhancePrompt: false,
               referenceImage: null,
@@ -865,6 +874,13 @@ export const useExistingVideoWorkflow = ({
           hasAudio: selection.metadata.hasAudio,
         },
         generation,
+        characterAttribution:
+          step.modelId === 'lucy-latest' && step.characterName
+            ? {
+                characterName: step.characterName,
+                characterVariantName: step.characterVariantName ?? null,
+              }
+            : null,
       };
     },
     [
@@ -1064,6 +1080,7 @@ export const useExistingVideoWorkflow = ({
           finalized.mimeType,
           finalized.label,
           finalized.source,
+          finalized.characterAttribution,
         );
         completeVisualPlan();
         return;
@@ -1073,6 +1090,7 @@ export const useExistingVideoWorkflow = ({
         finalized.blob,
         finalized.mimeType,
         finalized.label,
+        finalized.characterAttribution,
       );
       try {
         const outcome = await applySelectedVoice(
@@ -1087,6 +1105,7 @@ export const useExistingVideoWorkflow = ({
           finalized.mimeType,
           finalized.label,
           finalized.source,
+          finalized.characterAttribution,
         );
         setComparison('result');
         if (outcome.status === 'canceled') {
@@ -1495,6 +1514,8 @@ export const useExistingVideoWorkflow = ({
           ...current,
           inputKind,
           savedRecipeId: null,
+          characterName: null,
+          characterVariantName: null,
           prompt: '',
           enhancePrompt: false,
           referenceImage: null,

@@ -2,12 +2,13 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useTheme, type CSSObject, type Theme } from '@emotion/react';
 import { Button } from '../../ui';
 import type { StudioMode } from '../media-session';
-import type { RecordingController, RecordingSource } from './types';
+import type { RecordingController, RecordingSource, VideoCharacterAttribution } from './types';
 
 export type RecordingActionProps = {
   recording: RecordingController;
   source: RecordingSource | null;
   mode: StudioMode;
+  characterAttribution?: VideoCharacterAttribution | null | undefined;
   modelOutputReady: boolean;
   supported?: boolean;
   blockedReason?: string;
@@ -86,6 +87,7 @@ export const RecordingAction = ({
   recording,
   source,
   mode,
+  characterAttribution,
   modelOutputReady,
   supported = 'MediaRecorder' in window,
   blockedReason,
@@ -122,8 +124,9 @@ export const RecordingAction = ({
       if (!proceed) return;
     }
     if (recording.original) recording.discard();
-    await recording.start(source, mode);
-  }, [mode, recording, source]);
+    if (characterAttribution) await recording.start(source, mode, characterAttribution);
+    else await recording.start(source, mode);
+  }, [characterAttribution, mode, recording, source]);
 
   useEffect(() => {
     const handleShortcut = (event: KeyboardEvent) => {
