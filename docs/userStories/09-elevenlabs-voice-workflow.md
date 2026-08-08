@@ -35,7 +35,7 @@ original on failure.
    **Use this voice for the edit** only updates the captured plan; conversion waits for the outer
    **Start edit** action.
 8. On success, Studio remuxes the converted audio with local video. Return to treatments or Take
-   Review to download, release, or discard.
+   Review to save, release, or discard. Download is available later from Saved Videos.
 9. A character Wardrobe may attach one saved voice as that character's default. Opening this
    configuration is an explicit lazy library read. Choosing the character in Existing Video
    preselects the default in the edit plan without uploading or processing media; the creator may

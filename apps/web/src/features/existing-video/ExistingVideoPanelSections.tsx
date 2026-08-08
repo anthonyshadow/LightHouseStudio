@@ -93,8 +93,9 @@ export const ExistingVideoResultSummary = ({
       <div>
         <h2 id="existing-video-result-heading">Your result is ready</h2>
         <p>
-          Compare Original and Result beside this summary. Download the healthy result, continue
-          editing either version, or start over from the original source.
+          Compare Original and Result beside this summary. Save the healthy result, continue editing
+          either version, or start over from the original source. Downloads are available from Saved
+          Videos.
         </p>
       </div>
       <div css={appliedSummaryStyles(theme)} aria-label="Applied edits">

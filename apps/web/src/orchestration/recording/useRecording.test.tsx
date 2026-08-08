@@ -283,7 +283,6 @@ describe('useRecording recorder construction failures', () => {
       processed: null,
       presented: restored,
       elapsedSeconds: 4,
-      downloaded: false,
     });
     expect(result.current.original).toMatchObject({
       id: 'take-persisted',
@@ -486,7 +485,6 @@ describe('useRecording recorder construction failures', () => {
         'video/mp4',
         'voice',
       );
-      result.current.markDownloaded();
     });
 
     act(() => result.current.clearVisualProcessing());
@@ -499,7 +497,6 @@ describe('useRecording recorder construction failures', () => {
     expect(result.current.processed).toBeNull();
     expect(result.current.presented?.objectUrl).toBe('blob:source');
     expect(result.current.processingState).toBe('idle');
-    expect(result.current.downloaded).toBe(false);
 
     unmount();
   });
@@ -769,7 +766,7 @@ describe('useRecording recorder construction failures', () => {
     unmount();
   });
 
-  it('keeps review and Download unavailable until H.264 MP4 transcoding completes', async () => {
+  it('keeps review and Save unavailable until H.264 MP4 transcoding completes', async () => {
     installRecorderHarness();
     let finishTranscode!: (value: { blob: Blob; mimeType: 'video/mp4' }) => void;
     recordingTranscode.transcode.mockImplementationOnce(
@@ -796,7 +793,6 @@ describe('useRecording recorder construction failures', () => {
     expect(result.current.lifecycle).toBe('stopping');
     expect(result.current.original).toBeNull();
     expect(result.current.presented).toBeNull();
-    expect(result.current.downloaded).toBe(false);
     expect(recordingTranscode.transcode).toHaveBeenCalledOnce();
     const [rawRecording, transcodeOptions] = recordingTranscode.transcode.mock.calls[0] ?? [];
     expect(rawRecording).toBeInstanceOf(Blob);
@@ -964,7 +960,7 @@ describe('useRecording recorder construction failures', () => {
     unmount();
   });
 
-  it('requires a fresh download after restoring the immutable original', async () => {
+  it('restores the immutable original after processing', async () => {
     installRecorderHarness();
     const { result, unmount } = renderHook(() => useRecording());
 
@@ -974,13 +970,10 @@ describe('useRecording recorder construction failures', () => {
     });
     act(() => {
       result.current.completeProcessing(new Blob(['processed']), 'video/webm', 'robot');
-      result.current.markDownloaded();
     });
-    expect(result.current.downloaded).toBe(true);
 
     act(() => result.current.restoreOriginal());
     expect(result.current.processed).toBeNull();
-    expect(result.current.downloaded).toBe(false);
     unmount();
   });
 

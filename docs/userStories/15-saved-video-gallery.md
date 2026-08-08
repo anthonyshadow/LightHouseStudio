@@ -2,13 +2,14 @@
 
 ## Story
 
-As the authenticated operator, I can save a finalized video separately from downloading it,
-browse lightweight gallery records, and load a chosen version into the existing Studio stage.
+As the authenticated operator, I can save a finalized video, browse lightweight gallery records,
+download only from that gallery, and load a chosen version into the existing Studio stage.
 
 ## Observable behavior
 
-1. A healthy review artifact exposes distinct **Download** and **Save Video** actions. Saving is
+1. A healthy review artifact exposes **Save Video**, never a direct Download action. Saving is
    explicit, reports progress/result, and repeated submission of the same artifact is idempotent.
+   Release remains disabled until the current artifact is saved.
 2. **Save as New Video** creates a titled gallery record and immutable first version. **Replace
    Existing Video** is secondary, requires confirmation, checks the expected current version, and
    appends bytes rather than overwriting history.
@@ -32,7 +33,7 @@ browse lightweight gallery records, and load a chosen version into the existing 
    the visible gallery. Every video can be deleted independently in any order; retained derived
    records keep their historical source lineage even when that source record is deleted. With
    private R2 selected, deletion also removes all unshared immutable-version and thumbnail objects.
-   Download uses an authenticated content response.
+   Download exists only in Saved Videos and uses an authenticated content response.
 
 ## Acceptance checks
 

@@ -128,7 +128,7 @@ const VideoEditWorkspace = lazy(() =>
 const deferredPanelFallback = <p role="status">Loading studio tool…</p>;
 
 const REVIEW_LOCK_REASON =
-  'Download and release or discard the temporary take before starting or changing media.';
+  'Save and release or discard the temporary take before starting or changing media.';
 
 const noopPromptCommitted: PromptCommittedHandler = () => undefined;
 
@@ -514,7 +514,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const characterBuilderOpenBlockedReason =
     characterBuilderActivityBlockedReason ??
     (reviewLocked
-      ? 'Download and release or discard the current take before building a character.'
+      ? 'Save and release or discard the current take before building a character.'
       : undefined);
   const openCharacterBuilderOverlay = useCallback(
     () => openOverlay('character-builder'),
@@ -1241,18 +1241,30 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     setVideoEditDiscardPromptOpen(true);
   }, [returnFromVideoEditor, videoEditor.dirty, videoEditor.phase]);
   const commitVideoEdit = useCallback(
-    (downloadCurrent: boolean) => {
+    async (saveCurrent: boolean) => {
       const source = videoEditor.source;
       const candidate = videoEditor.candidate;
       if (!source || !candidate || videoEditor.phase !== 'awaiting-replacement') return;
       videoEditor.beginCommit();
       try {
-        if (downloadCurrent) {
-          const anchor = document.createElement('a');
-          anchor.href = source.artifact.objectUrl;
-          anchor.download = source.artifact.filename;
-          anchor.rel = 'noopener';
-          anchor.click();
+        if (saveCurrent) {
+          const saved = await savedVideoSave.save(
+            source.artifact,
+            undefined,
+            activeLoadedSavedSource
+              ? {
+                  videoId: activeLoadedSavedSource.videoId,
+                  versionId: activeLoadedSavedSource.currentVersionId,
+                }
+              : undefined,
+            presentedVideoCharacterName,
+          );
+          if (!saved) {
+            videoEditor.failCommit(
+              'The current video could not be saved, so it was not replaced. Your source remains unchanged.',
+            );
+            return;
+          }
         }
         const validated = candidate.validated;
         const artifactId = `video-${crypto.randomUUID()}`;
@@ -1283,7 +1295,15 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         );
       }
     },
-    [existingVideo, openOverlay, recording, videoEditor],
+    [
+      activeLoadedSavedSource,
+      existingVideo,
+      openOverlay,
+      presentedVideoCharacterName,
+      recording,
+      savedVideoSave,
+      videoEditor,
+    ],
   );
   const dismissCharacterBuilder = useCallback(() => {
     if (characterBuilderDestination.kind === 'existing-video' && existingVideo.selection) {
@@ -1413,7 +1433,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                         <span data-guide-step-number aria-hidden="true">
                           2
                         </span>
-                        <span>Virtual Try On · Character Swap · Voice → Download</span>
+                        <span>Virtual Try On · Character Swap · Voice → Save</span>
                       </span>
                     </span>
                     <Button
@@ -1581,17 +1601,17 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           <ConfirmationDialog
             open={videoEditor.phase === 'awaiting-replacement'}
             title="Replace the current video?"
-            description="The validated edit will become the new immutable source for Voice and later video tools. You can download the current source first."
-            confirmLabel="Download Original and Replace"
+            description="The validated edit will become the new immutable source for Voice and later video tools. You can save the current source to Saved Videos first."
+            confirmLabel="Replace and Save"
             cancelLabel="Cancel"
             busy={videoEditor.phase === 'committing'}
             secondaryAction={{
-              label: 'Replace Without Downloading',
-              onAction: () => commitVideoEdit(false),
+              label: 'Replace Without Saving',
+              onAction: () => void commitVideoEdit(false),
             }}
             returnFocusRef={mainRef}
             onCancel={videoEditor.resumeEditing}
-            onConfirm={() => commitVideoEdit(true)}
+            onConfirm={() => void commitVideoEdit(true)}
           />
         </Suspense>
 
@@ -1599,7 +1619,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           open={location.pathname === APP_PATHS.videos}
           onClose={() => void navigate(APP_PATHS.studio)}
           title="Saved Videos"
-          description="Preview, load, edit, download, rename, or remove account videos. Video bytes load only when you choose an action."
+          description="Preview, load, edit, download, rename, or remove account videos. Downloads are available only from this gallery."
           placement="fullscreen"
           size="wide"
           bodyMode="scroll"
@@ -1702,7 +1722,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           open={activeOverlay === 'video-upload'}
           onClose={closeExistingVideo}
           title="Use existing video"
-          description="Add a source, choose optional edits, then compare and download the result."
+          description="Add a source, choose optional edits, then compare and save the result."
           placement="right"
           size="workspace"
           bodyMode="contained"
@@ -1727,6 +1747,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             onCreateCharacter={createCharacterForExistingVideo}
             onCreateWardrobeVariant={openWardrobeForExistingVideo}
             onFinish={finishExistingVideoSetup}
+            {...(recording.presented ? { onSaveVideo: savePresentedVideo } : {})}
+            saveVideoState={savedVideoSave.state}
             onAdjustVideo={openVideoAdjust}
             recordingSupported={
               browser.mediaRecorder && browser.mediaDevices && browser.secureContext

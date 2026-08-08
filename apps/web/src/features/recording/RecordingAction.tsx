@@ -115,9 +115,9 @@ export const RecordingAction = ({
 
   const start = useCallback(async () => {
     if (!source) return;
-    if (recording.original && !recording.downloaded) {
+    if (recording.original) {
       const proceed = window.confirm(
-        'Starting another take replaces the current in-memory clip. Download it first if you want to keep it. Continue?',
+        'Starting another take replaces the current in-memory clip. Save it first if you want to keep it. Continue?',
       );
       if (!proceed) return;
     }

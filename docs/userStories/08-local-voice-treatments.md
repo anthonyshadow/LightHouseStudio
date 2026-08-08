@@ -13,7 +13,7 @@
    stage.
 3. In Latest Take, confirm **Apply treatment**. Studio renders the selected treatment from the
    original sidecar offline and
-   remuxes it as AAC with the original H.264 video in MP4. Playback and download stay locked during
+   remuxes it as AAC with the original H.264 video in MP4. Playback and saving stay locked during
    processing.
 4. In the existing-video editor, confirm **Use this treatment for the edit**. This changes only the
    captured edit plan; rendering waits for the outer **Start edit** action.

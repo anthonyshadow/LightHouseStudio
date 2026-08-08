@@ -379,7 +379,7 @@ export const VoiceWorkspace = ({
                 ) : null}
                 {processingActive ? (
                   <StatusNotice role="status" aria-live="polite" title="Rendering treatment…">
-                    Playback and download remain locked until a complete replacement is ready.
+                    Playback and saving remain locked until a complete replacement is ready.
                     {onCancelProcessing ? (
                       <Button size="small" variant="quiet" onClick={onCancelProcessing}>
                         Cancel processing
@@ -394,7 +394,7 @@ export const VoiceWorkspace = ({
                 ) : null}
                 {treatmentReady ? (
                   <StatusNotice role="status" aria-live="polite" tone="success">
-                    Voice treatment ready. Playback and download are available.
+                    Voice treatment ready. Playback and saving are available.
                   </StatusNotice>
                 ) : null}
               </div>

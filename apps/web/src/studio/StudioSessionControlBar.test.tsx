@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createEmptyDraft, type StudioSessionController } from '../features/media-session';
@@ -73,13 +73,11 @@ const createRecording = (
   processingOperation: null,
   processingError: null,
   elapsedSeconds: 0,
-  downloaded: false,
   start: vi.fn().mockResolvedValue(undefined),
   stop: vi.fn().mockResolvedValue(null),
   restorePersistedOriginal: vi.fn(),
   replaceSource: vi.fn(),
   discard: vi.fn(),
-  markDownloaded: vi.fn(),
   beginProcessing: vi.fn(),
   cancelProcessing: vi.fn(),
   completeVisualProcessing: vi.fn(),
@@ -124,6 +122,8 @@ const renderBar = (
     experienceLabel?: string;
     onDiscardTake?: () => void;
     onStartLocalRecording?: () => void;
+    onSaveVideo?: () => void;
+    saveVideoState?: Parameters<typeof StudioSessionControlBar>[0]['saveVideoState'];
     recordingMode?: StudioSessionController['draft']['mode'];
   } = {},
 ) =>
@@ -143,6 +143,8 @@ const renderBar = (
           : {})}
         onCloseTakeReview={onCloseTakeReview}
         {...(options.onDiscardTake ? { onDiscardTake: options.onDiscardTake } : {})}
+        {...(options.onSaveVideo ? { onSaveVideo: options.onSaveVideo } : {})}
+        {...(options.saveVideoState ? { saveVideoState: options.saveVideoState } : {})}
         onOpenVoiceTreatments={onOpenVoiceTreatments}
         onChooseAiExperience={onChooseAiExperience}
         onChangeExperience={onChooseAiExperience}
@@ -368,6 +370,7 @@ describe('StudioSessionControlBar', () => {
     const artifact = takeArtifact();
     const onCloseTakeReview = vi.fn();
     const onOpenVoiceTreatments = vi.fn();
+    const onSaveVideo = vi.fn();
     const reviewedRecording = createRecording('recorded', {
       original: artifact,
       presented: artifact,
@@ -381,12 +384,14 @@ describe('StudioSessionControlBar', () => {
       true,
       onCloseTakeReview,
       onOpenVoiceTreatments,
+      { onSaveVideo },
     );
 
     const controls = screen.getByRole('region', { name: 'Studio session controls' });
     expect(controls).toHaveAttribute('data-control-visibility', 'visible');
     expect(screen.getByRole('group', { name: 'Recorded take controls' })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: 'Download' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Save' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Download' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Discard' })).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'Edit video' })).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Voice' })).toBeInTheDocument();
@@ -395,27 +400,26 @@ describe('StudioSessionControlBar', () => {
 
     await user.click(screen.getByRole('button', { name: 'Voice' }));
     expect(onOpenVoiceTreatments).toHaveBeenCalledOnce();
-    const download = screen.getByRole('link', { name: 'Download' });
-    download.addEventListener('click', (event) => event.preventDefault(), { once: true });
-    fireEvent.click(download);
-    expect(reviewedRecording.markDownloaded).toHaveBeenCalledOnce();
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+    expect(onSaveVideo).toHaveBeenCalledOnce();
 
-    const downloadedRecording = createRecording('recorded', {
+    const savedRecording = createRecording('recorded', {
       original: artifact,
       presented: artifact,
-      downloaded: true,
     });
     view.rerender(
       <StudioDesignProvider>
         <StudioSessionControlBar
           session={idleSession}
-          recording={downloadedRecording}
+          recording={savedRecording}
           recordingMode="local"
           recordingSource={null}
           recordingSupported
           reviewingTake
           onStopRecording={vi.fn().mockResolvedValue(undefined)}
           onCloseTakeReview={onCloseTakeReview}
+          onSaveVideo={onSaveVideo}
+          saveVideoState={{ status: 'saved', artifactId: artifact.id, video: {} as never }}
           onOpenVoiceTreatments={onOpenVoiceTreatments}
           onChooseAiExperience={vi.fn()}
           onChangeExperience={vi.fn()}
@@ -424,7 +428,7 @@ describe('StudioSessionControlBar', () => {
     );
 
     await user.click(screen.getByRole('button', { name: 'Release' }));
-    expect(downloadedRecording.discard).toHaveBeenCalledOnce();
+    expect(savedRecording.discard).toHaveBeenCalledOnce();
     expect(onCloseTakeReview).toHaveBeenCalledOnce();
 
     view.rerender(

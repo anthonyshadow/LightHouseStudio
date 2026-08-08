@@ -36,15 +36,15 @@ provider. Wardrobe try-on is separately enabled and is never inferred from Chara
 Run these before physical/provider work so later evidence uses the intended owner and clean local
 state:
 
-| Check                    | Pass condition                                                                                                                                                                                                                                    |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `entry-login`            | `/` requests no media/capability/provider work; Login traps focus; development prefills both configured credentials; incorrect credentials use one generic error and clear no unrelated data                                                      |
-| `session-restore`        | Correct login opens Studio; closing/reopening the browser restores direct `/studio` and library routes within 24 hours without exposing a token to URL or browser storage                                                                         |
-| `session-expiry-logout`  | Expired/revoked session returns to entry; logout blocks non-discardable work, confirms discardable work, releases indicators/resources, clears the cookie, and returns to Login                                                                   |
-| `studio-library-routing` | `/studio/videos`, `/studio/characters`, and `/studio/outfits` keep the same stage/runtime; browser Back/Forward, Escape, account-menu arrow/Home/End keys, and return focus behave correctly                                                      |
-| `save-video`             | Download remains distinct; Save is idempotent; optional thumbnail failure is non-fatal; replace confirms and appends a version; rename/download/delete operate on the selected owner record; R2 deletion removes its unshared versions/thumbnails |
-| `video-gallery-states`   | Empty/loading/error/missing/placeholder/populated/load-more states avoid eager video requests; thumbnail Preview darkens the gallery, traps/returns focus, detaches on close, and remains usable at all five viewports and 200% text              |
-| `saved-character-outfit` | Both libraries show the user-scoped records; Use follows existing handoff; delete removes relationships without provider work or unintended immutable-byte deletion                                                                               |
+| Check                    | Pass condition                                                                                                                                                                                                                                                          |
+| ------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `entry-login`            | `/` requests no media/capability/provider work; Login traps focus; development prefills both configured credentials; incorrect credentials use one generic error and clear no unrelated data                                                                            |
+| `session-restore`        | Correct login opens Studio; closing/reopening the browser restores direct `/studio` and library routes within 24 hours without exposing a token to URL or browser storage                                                                                               |
+| `session-expiry-logout`  | Expired/revoked session returns to entry; logout blocks non-discardable work, confirms discardable work, releases indicators/resources, clears the cookie, and returns to Login                                                                                         |
+| `studio-library-routing` | `/studio/videos`, `/studio/characters`, and `/studio/outfits` keep the same stage/runtime; browser Back/Forward, Escape, account-menu arrow/Home/End keys, and return focus behave correctly                                                                            |
+| `save-video`             | Save is idempotent and is the only review durability action; optional thumbnail failure is non-fatal; replace confirms and appends a version; download/rename/delete operate on the selected owner gallery record; R2 deletion removes its unshared versions/thumbnails |
+| `video-gallery-states`   | Empty/loading/error/missing/placeholder/populated/load-more states avoid eager video requests; thumbnail Preview darkens the gallery, traps/returns focus, detaches on close, and remains usable at all five viewports and 200% text                                    |
+| `saved-character-outfit` | Both libraries show the user-scoped records; Use follows existing handoff; delete removes relationships without provider work or unintended immutable-byte deletion                                                                                                     |
 
 Local-only Saved Video deletion conservatively retains detached bytes. With R2 selected, manual
 deletion must remove each unshared version/thumbnail object; force one failed delete in a disposable
@@ -64,7 +64,7 @@ primary flows in [user stories](userStories/README.md) and complete every applic
 | `character-capture`            | Exact Lucy 2.5 Start/Apply, local fallback until usable remote video, short playable take                                                                                                                                                                                  |
 | `vto-capture`                  | Exact pinned VTO Start/Apply, image-only does not invent text, short playable take                                                                                                                                                                                         |
 | `upload-select-replace-remove` | Native picker and drop publish compatible media without camera/provider work; replace/remove revokes only owned URLs                                                                                                                                                       |
-| `upload-local-download`        | A zero-step H.264 MP4/MOV or VP8 WebM source previews and downloads with no external request                                                                                                                                                                               |
+| `upload-local-save`            | A zero-step H.264 MP4/MOV or VP8 WebM source previews and saves with no external request; download is available afterward from Saved Videos                                                                                                                                |
 | `upload-single-visual-step`    | Character Swap/VTO selector switches both ways; only the active operation submits once, returns the selected exact or bounded resolution-class result, and restores source audio                                                                                           |
 | `upload-voice`                 | Local and ElevenLabs Voice use immutable uploaded source audio and apply to the latest visual result                                                                                                                                                                       |
 | `upload-record-to-source`      | Control-bar and panel Record intents use the persistent stage, warn/stop at 270/300 seconds, finalize, and adopt the normalized local artifact into the editor without provider traffic; no inline player participates in capture                                          |
@@ -76,7 +76,7 @@ primary flows in [user stories](userStories/README.md) and complete every applic
 | `record-finalize`              | Main recorder and optional sidecar settle, then device-local H.264/AAC MP4 transcode completes before source/provider release; no raw download fallback                                                                                                                    |
 | `local-voice`                  | Warm/Clear/Robot always start from immutable original; success/cancel/failure preserves a valid take                                                                                                                                                                       |
 | `elevenlabs-voice`             | Saved browse/preview sends no take; Apply sends only original sidecar; remux/original recovery works                                                                                                                                                                       |
-| `download-playback`            | Download dispatch leaves review intact; an inspector/player confirms recorded output is MP4 with H.264 and AAC when audio exists; Release works only after dispatch                                                                                                        |
+| `gallery-download-playback`    | Save leaves review intact and enables Release; Saved Videos download produces an MP4 with H.264 and AAC when audio exists                                                                                                                                                  |
 | `background-foreground`        | Background/foreground, screen lock/call/device interruption recovers safely or finalizes without take loss                                                                                                                                                                 |
 | `memory-checkpoints`           | Complete [300-second memory protocol](RECORDING_MEMORY_POLICY.md) through processing and Release/Discard                                                                                                                                                                   |
 | `cleanup`                      | Camera/mic indicators, WebRTC/provider clients, recorders, timers, listeners, audio contexts, tracks, and superseded URLs terminate once                                                                                                                                   |
@@ -107,8 +107,8 @@ finalizing and become paused playback without reacquiring media.
 | `camera-switch-when-exposed` | Opposite `user`/`environment` mode switches atomically; control is absent when capability is not exposed |
 
 Touch/mobile creation includes primary local recording or native existing-video selection,
-post-recording Character Swap/VTO/Voice setup, preview, and Download. It also includes the
-advanced Character Builder → Character AI → record → optional Voice → Download path—not just
+post-recording Character Swap/VTO/Voice setup, preview, Save, and gallery Download. It also includes the
+advanced Character Builder → Character AI → record → optional Voice → Save → gallery Download path—not just
 responsive shell inspection.
 
 ## Viewport and overlay invariants
@@ -186,13 +186,13 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
 - Cancel a real render, close/reopen after a dirty-discard cancellation, and attempt route exit
   during render. Verify the worker must be explicitly cancelled, stale completion does not publish,
   and the draft/pinned artifact survive render or validation failure. Exercise all replacement
-  actions: Cancel, Replace Without Downloading, and Download Original and Replace; verify the
-  download uses the artifact pinned at editor entry even when it was already a visual/voice Result.
+  actions: Cancel, Replace Without Saving, and Replace and Save; verify Save publishes the artifact
+  pinned at editor entry even when it was already a visual/voice Result, and failed Save prevents replacement.
 - Inspect edited files locally and in an external player. Require non-empty H.264 MP4, AAC plus a
   matching sidecar when source audio exists, silent output for silent input, requested even
   dimensions/orientation, duration within 500 ms, and the 300,000,000-byte maximum. Confirm 16:9
   and 9:16 enable Character/VTO; 1:1, 4:5, and incompatible Freeform disable both before any HTTP
-  while Download and Voice use the edited source/sidecar.
+  while Save and Voice use the edited source/sidecar.
 - In Character Swap, choose a saved image character and confirm only its reference is attached;
   Prompt stays empty but accepts a different manual direction. Choose a prompt-only character and
   confirm its prompt fills the field. In the reference-required configuration, confirm prompt-only
@@ -216,16 +216,16 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
   provider cancellation or deletion.
 - Recording pins source identity. Model recording is unavailable before live transformed video.
 - Final main video remains valid if the sidecar fails or reaches its grace timeout, but review and
-  Download remain unavailable until MediaBunny finishes the required H.264/AAC MP4.
+  Save remains unavailable until MediaBunny finishes the required H.264/AAC MP4.
 - A conversion failure or dropped primary video/audio track exposes no raw recorder URL or
-  downloadable fallback.
+  saveable fallback.
 - Playback stays on the persistent stage; Latest Take opens only through **Take** and contains no
   duplicate player. **Use existing video** is the sole exception and borrows the same artifact URL
   or local stream in its inline player without owning/stopping tracks.
 - While review owns a take, new capture/mode/device changes are blocked. Exit is
-  Download-then-Release or confirmed Discard.
+  Save-then-Release or confirmed Discard.
 - Refresh/close warns about take loss; intentionally leaving proves the take is not durable.
-- Local and cloud Voice lock playback/download during processing, create a healthy replacement
+- Local and cloud Voice lock playback/saving during processing, create a healthy replacement
   before revoking the prior processed URL, and never mutate the immutable original.
 - ElevenLabs preview is bounded to 2 MiB and conversion to 8 MiB; oversize/malformed/cancelled
   output preserves the valid take.
@@ -247,7 +247,7 @@ focus return, reduced motion, and overlay stacking at every canonical viewport a
 Using keyboard and a screen reader:
 
 - traverse skip link, Start/AI choices, fields/files, Apply, settings, Record/Stop, Shelf, Take,
-  Voice, Download, Release/Discard;
+  Voice, Save, Release/Discard;
 - verify names, roles, states, validation, live/status announcements, logical focus, visible focus,
   reduced motion, and approximately 44 px touch actions;
 - ensure topmost overlays alone are active, Tab wraps inside, Escape closes one layer, background

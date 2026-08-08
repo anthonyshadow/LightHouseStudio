@@ -3,7 +3,7 @@
 Lightframe Studio is a local-first browser studio for short-form video creation and reusable
 characters. Its primary loop is:
 
-**Log in → Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Save and/or Download**
+**Log in → Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Save → Download from Saved Videos**
 
 Live AI camera transformation and Workshop remain advanced tools. The app is single-operator and
 binds to loopback. Phase 1 provides one seeded local demo account, authenticated ownership, and
@@ -35,11 +35,10 @@ inputs, but their absence does not disable configured application features.
 5. Optionally choose exactly one visual transformation—**Character Swap** or **Virtual Try On**—
    and/or **Voice**. Combined work completes and validates the visual result before voice
    conversion. Any non-16:9/9:16 upload or local square, 4:5, or incompatible Freeform edit keeps
-   Download and Voice but disables Character Swap/VTO before provider contact.
-6. Preview **Original** and **Result**, revise the plan or edit base, then **Save Video** and/or
-   download the latest healthy result. Save is idempotent and independent of Download. An edit
-   saves as a new, source-linked video by default; explicit replacement confirms before appending
-   an immutable version.
+   Save and Voice but disables Character Swap/VTO before provider contact.
+6. Preview **Original** and **Result**, revise the plan or edit base, then **Save Video**. Save is
+   idempotent. An edit saves as a new, source-linked video by default; explicit replacement
+   confirms before appending an immutable version. Download is available only from Saved Videos.
 7. Prepare advanced live work without starting media: desktop places **Select Character** and
    **Select Outfit** immediately before **Workshop** in the creative-tool rail. Phones and tablets
    use **Dock** for direct Character/VTO recipes and **Shelf** for saved characters, outfits, and
@@ -70,7 +69,8 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
 
 - Local camera, microphone, existing-video validation/preview, recording, non-destructive trim,
   crop, rotation, flips, lighting and filters, on-device MP4 transcoding, playback, local voice
-  effects, and download require no provider credentials or external media traffic.
+  effects, gallery saving, and saved-video download require no provider credentials or external
+  media traffic.
 - Character Builder saves browser-local character metadata and immutable reference assets under
   `LIGHTFRAME_DATA_DIR` in local mode. In authoritative Neon/private-R2 mode, uploads and generated
   results are staged until a saved creative-library relationship retains them; explicit discard,
@@ -304,8 +304,8 @@ provider client owns idempotent cleanup. Recording borrows source tracks and nev
 If a retained playback Blob outlives a stale browser object URL, the artifact owner may rebuild
 that URL once; repeated decode failures are not retried in a loop.
 Finalization settles the video and optional sidecar, transcodes the main recording on-device to
-H.264/AAC MP4, and publishes that downloadable artifact before live resources release. Raw
-recorder output never receives a download URL.
+H.264/AAC MP4, and publishes that gallery-ready artifact before live resources release. Raw
+recorder output is never exposed for saving or download.
 
 The default backend has one configured local user and local persistence. Configuration-gated
 Drizzle/Neon repositories, private Cloudflare R2 bytes, durable sessions, creative-library sync,

@@ -285,21 +285,23 @@ warning/cap timer, MediaBunny conversion, and finalization:
 - settle final recorder data and the optional sidecar before releasing live resources;
 - force the settled main video through an on-device H.264/AAC MP4 conversion;
 - publish only the converted MP4, never the raw recorder container, even when the sidecar fails;
-- cancel conversion and withhold the download artifact if ownership ends or a required track would
+- cancel conversion and withhold the gallery-ready artifact if ownership ends or a required track would
   be dropped; and
 - release local/provider resources only after finalization settles.
 
 MediaBunny uses the browser's AVC/H.264 WebCodecs encoder and its official AAC encoder extension
 when native AAC encoding is unavailable. The conversion keeps the raw recorder Blob private to
 finalization and creates the artifact URL only after a complete MP4 exists. Review, Voice, and
-Download therefore remain unavailable while transcoding.
+Save therefore remain unavailable while transcoding.
 
 Recorded and uploaded media publish through one artifact boundary:
 
 `immutable source → latest healthy result`.
 
 An edited export crosses that boundary only after worker completion, browser-local decode and
-track validation, and a three-action replacement confirmation. The dedicated module worker lazily
+track validation, and a three-action replacement confirmation: Cancel, Replace Without Saving, or
+Replace and Save. The Save path must commit the pinned source to Saved Videos before replacement.
+The dedicated module worker lazily
 loads MediaBunny and its AAC extension, uses `Conversion` for trim/baked rotation/crop and
 H.264/AAC encoding, and runs the shared WebGL shader after geometric transforms for flips, filters,
 and lighting. Its `StreamTarget` writes into offset-aware 4 MiB blocks with a 300,000,000-byte
@@ -315,7 +317,7 @@ when the pinned source has audio. A confirmed controller transaction publishes a
 with `parentArtifactId`, updates selected-video metadata and compatibility, then releases
 superseded source/visual/voice URLs. Failure before publication leaves the prior source and draft
 intact. Provider compatibility is derived from edited output geometry; only 16:9 and 9:16 within
-the existing 1% tolerance can create Character Swap or VTO intent, while Voice and Download remain
+the existing 1% tolerance can create Character Swap or VTO intent, while Voice and Save remain
 available for uploaded or edited sources at other ratios.
 
 The finalized or validated source replaces live media on the same persistent stage. The artifact

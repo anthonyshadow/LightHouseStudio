@@ -12,7 +12,7 @@ type RecordingTranscodeOptions = Readonly<{
 }>;
 
 /**
- * Converts a settled MediaRecorder artifact into the only downloadable
+ * Converts a settled MediaRecorder artifact into the only gallery-ready
  * recording format: MP4 with an AVC/H.264 video track and AAC audio when the
  * source contains audio. The raw recorder Blob remains an input only and never
  * receives an object URL.

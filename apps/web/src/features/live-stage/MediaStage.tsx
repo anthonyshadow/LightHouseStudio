@@ -473,7 +473,7 @@ export const MediaStage = ({
     if (presentation.kind !== 'playback') return;
     const mediaErrorCode = videoRef.current?.error?.code;
     const detail = mediaErrorCode ? ` (media error ${mediaErrorCode})` : '';
-    const message = `This take could not be loaded for playback${detail}. Retry, download it, or discard it from Take Review.`;
+    const message = `This take could not be loaded for playback${detail}. Retry, save it, or discard it from Take Review.`;
     setPlaybackError(message);
     onPlaybackError?.(message);
   };

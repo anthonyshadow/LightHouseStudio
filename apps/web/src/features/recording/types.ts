@@ -161,13 +161,11 @@ export type RecordingController = {
   processingOperation: RecordingProcessingOperation | null;
   processingError: string | null;
   elapsedSeconds: number;
-  downloaded: boolean;
   start: (source: RecordingSource, mode: StudioMode) => Promise<void>;
   stop: () => Promise<RecordingArtifact | null>;
   restorePersistedOriginal: (input: RestorePersistedOriginalInput) => RecordingArtifact;
   replaceSource: (input: RestorePersistedOriginalInput) => RecordingArtifact;
   discard: () => void;
-  markDownloaded: () => void;
   beginProcessing: (operation?: RecordingProcessingOperation) => void;
   cancelProcessing: () => void;
   completeVisualProcessing: (

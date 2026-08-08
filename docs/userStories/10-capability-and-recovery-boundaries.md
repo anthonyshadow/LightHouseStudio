@@ -27,7 +27,7 @@ recovery path without risking a valid artifact.
    Processing failures retain the original/last valid take.
 7. Missing WebGL, dedicated workers, OffscreenCanvas, or worker WebCodecs exposes an actionable
    local-editor unsupported state. Studio does not attempt expensive synchronous processing;
-   ordinary playback, download, Voice, and configured visual workflows remain available.
+   ordinary playback, saving, Voice, and configured visual workflows remain available.
 
 ## Non-negotiable boundaries
 

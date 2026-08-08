@@ -192,8 +192,8 @@ export const useRecording = ({
         }
         failAttempt(
           attempt,
-          'This recording could not be transcoded to downloadable H.264 MP4.',
-          'This recording could not be transcoded to downloadable H.264 MP4. No unconverted file was published.',
+          'This recording could not be transcoded to gallery-ready H.264 MP4.',
+          'This recording could not be transcoded to gallery-ready H.264 MP4. No unconverted file was published.',
         );
         return;
       } finally {
@@ -578,13 +578,11 @@ export const useRecording = ({
       processingOperation: artifacts.processingOperation,
       processingError: artifacts.processingError,
       elapsedSeconds,
-      downloaded: artifacts.downloaded,
       start,
       stop,
       restorePersistedOriginal,
       replaceSource: restorePersistedOriginal,
       discard,
-      markDownloaded: artifacts.markDownloaded,
       beginProcessing: artifacts.beginProcessing,
       cancelProcessing: artifacts.cancelProcessing,
       completeVisualProcessing: artifacts.completeVisualProcessing,

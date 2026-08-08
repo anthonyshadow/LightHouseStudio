@@ -212,23 +212,31 @@ export const LiveCharacterControlBar: Story = {
 };
 
 export const TakeReviewControlBar: Story = {
-  render: () =>
-    controlBarFrame(
+  render: () => {
+    const recording = createRecordedController();
+    return controlBarFrame(
       <StudioSessionControlBar
         session={createSessionController('local', {
           lifecycle: 'ready',
           localStream: emptyMediaStream(),
         })}
-        recording={createRecordedController({ downloaded: true })}
+        recording={recording}
         recordingMode="local"
         recordingSource={null}
         recordingSupported
         reviewingTake
         onStopRecording={fn(() => Promise.resolve())}
         onCloseTakeReview={fn()}
+        onSaveVideo={fn()}
+        saveVideoState={{
+          status: 'saved',
+          artifactId: recording.presented!.id,
+          video: {} as never,
+        }}
         onOpenVoiceTreatments={fn()}
         onChooseAiExperience={fn()}
         onChangeExperience={fn()}
       />,
-    ),
+    );
+  },
 };

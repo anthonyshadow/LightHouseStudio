@@ -50,7 +50,6 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   retryJob: null,
   original: null,
   result: null,
-  downloaded: false,
   editBase: null,
   editBaseMetadata: null,
   currentMetadata: null,
@@ -73,7 +72,6 @@ const workflow = (overrides: Partial<ExistingVideoWorkflow> = {}): ExistingVideo
   retryFinalization: vi.fn(),
   retryExistingJob: vi.fn(),
   cancelBeforeAcceptance: vi.fn(),
-  downloadResult: vi.fn(),
   reset: vi.fn(),
   cleanup: vi.fn(),
   startOver: vi.fn(),
@@ -270,7 +268,7 @@ describe('ExistingVideoPanel', () => {
               compatible: false,
               aspect: 'unsupported',
               reason:
-                'Character Swap and Virtual Try On require a 16:9 or 9:16 source. Local download and Voice remain available.',
+                'Character Swap and Virtual Try On require a 16:9 or 9:16 source. Local saving and Voice remain available.',
             },
           })}
           videoProcessingAvailable
@@ -1675,10 +1673,10 @@ describe('ExistingVideoPanel', () => {
     expect(screen.getByText(/resuming checks the accepted job/u)).toBeVisible();
   });
 
-  it('downloads the result, starts over with the source, or discards the completed video', () => {
+  it('saves the result, starts over with the source, or discards the completed video', () => {
     const reset = vi.fn();
     const startOver = vi.fn();
-    const downloadResult = vi.fn();
+    const saveVideo = vi.fn();
     const editSelected = vi.fn();
     const source = new File(['video'], 'completed-source.mp4', { type: 'video/mp4' });
 
@@ -1709,26 +1707,23 @@ describe('ExistingVideoPanel', () => {
             phase: 'complete',
             result: resultArtifact(),
             startOver,
-            downloadResult,
             editSelected,
             reset,
           })}
           videoProcessingAvailable
           onFinish={vi.fn()}
+          onSaveVideo={saveVideo}
         />
       </StudioDesignProvider>,
     );
 
-    const download = screen.getByRole('link', { name: 'Download result' });
     expect(screen.getByRole('button', { name: 'Original' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'Result' })).toHaveAttribute('aria-pressed', 'true');
     fireEvent.click(screen.getByRole('button', { name: 'Edit result' }));
     expect(editSelected).toHaveBeenCalledOnce();
-    expect(download).toHaveAttribute('href', 'blob:generated-result');
-    expect(download).toHaveAttribute('download', 'source-lucy-1.mp4');
-    download.addEventListener('click', (event) => event.preventDefault(), { once: true });
-    fireEvent.click(download);
-    expect(downloadResult).toHaveBeenCalledOnce();
+    fireEvent.click(screen.getByRole('button', { name: 'Save Video' }));
+    expect(saveVideo).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('link', { name: /Download/u })).not.toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /Review Voice/u })).not.toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: 'Start over from original' }));

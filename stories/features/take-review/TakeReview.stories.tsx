@@ -21,7 +21,7 @@ const meta = {
     docs: {
       description: {
         component:
-          'Take review shows immutable capture metadata and temporary file details, then gates download, discard, release, original restoration, and voice treatment actions around the current in-memory artifact.',
+          'Take review shows immutable capture metadata and temporary file details, then gates save, discard, release, original restoration, and voice treatment actions around the current in-memory artifact.',
       },
     },
   },
@@ -39,6 +39,7 @@ export const LatestTake: Story = {
     view: 'take',
     onCloseTake: fn(),
     onOpenVoiceTreatments: fn(),
+    onSaveVideo: fn(),
   },
   render: (args) => (
     <StoryColumn width="58rem">
@@ -47,29 +48,51 @@ export const LatestTake: Story = {
   ),
 };
 
-export const DownloadStarted: Story = {
-  args: {
-    ...LatestTake.args,
-    recording: createRecordedController({ downloaded: true }),
+export const SavedToGallery: Story = {
+  render: () => {
+    const recording = createRecordedController();
+    return (
+      <StoryColumn width="58rem">
+        <TakeDock
+          recording={recording}
+          processing={createVoiceProcessingController()}
+          elevenLabsAvailable
+          browserCapabilities={{ webAudio: true, offlineAudio: true }}
+          view="take"
+          onCloseTake={fn()}
+          onOpenVoiceTreatments={fn()}
+          onSaveVideo={fn()}
+          saveVideoState={{
+            status: 'saved',
+            artifactId: recording.presented!.id,
+            video: {} as never,
+          }}
+        />
+      </StoryColumn>
+    );
   },
-  render: (args) => (
-    <StoryColumn width="58rem">
-      <TakeDock {...args} />
-    </StoryColumn>
-  ),
 };
 
 export const CompactControlBarActions: Story = {
-  render: () => (
-    <StoryColumn width="42rem">
-      <StorySection title="Playback actions">
-        <TakeReviewActions
-          recording={createRecordedController({ downloaded: true })}
-          presentation="control-bar"
-          onCloseTake={fn()}
-          onOpenVoiceTreatments={fn()}
-        />
-      </StorySection>
-    </StoryColumn>
-  ),
+  render: () => {
+    const recording = createRecordedController();
+    return (
+      <StoryColumn width="42rem">
+        <StorySection title="Playback actions">
+          <TakeReviewActions
+            recording={recording}
+            presentation="control-bar"
+            onCloseTake={fn()}
+            onOpenVoiceTreatments={fn()}
+            onSaveVideo={fn()}
+            saveVideoState={{
+              status: 'saved',
+              artifactId: recording.presented!.id,
+              video: {} as never,
+            }}
+          />
+        </StorySection>
+      </StoryColumn>
+    );
+  },
 };

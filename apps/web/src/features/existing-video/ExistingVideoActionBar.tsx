@@ -2,11 +2,11 @@ import { useTheme } from '@emotion/react';
 import type { RefObject } from 'react';
 import type { VideoProcessingOperationCapability } from '@studio/contracts';
 import { Button } from '../../ui';
+import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 import {
   actionBarStyles,
   actionButtonsStyles,
   actionSummaryStyles,
-  downloadButtonStyles,
 } from './ExistingVideoPanel.styles';
 import {
   existingVideoStepIsComplete,
@@ -24,6 +24,8 @@ export interface ExistingVideoActionBarProps {
   readonly onStartOver: () => void;
   readonly onRequestDiscard: () => void;
   readonly discardButtonRef?: RefObject<HTMLButtonElement | null>;
+  readonly onSaveVideo?: () => void;
+  readonly saveVideoState?: SaveVideoState;
 }
 
 const readyActionLabel = (workflow: ExistingVideoWorkflow): string => {
@@ -36,7 +38,7 @@ const readyActionLabel = (workflow: ExistingVideoWorkflow): string => {
   if (step && voice) return `${retryPrefix}Apply ${visualToolLabel(step)}, then ${voice.voiceName}`;
   if (step) return `${retryPrefix}Apply ${visualToolLabel(step)}`;
   if (voice) return `Apply ${voice.voiceName}${voice.kind === 'local' ? ' locally' : ''}`;
-  return 'Review and download';
+  return 'Review and Save';
 };
 
 export const ExistingVideoActionBar = ({
@@ -48,6 +50,8 @@ export const ExistingVideoActionBar = ({
   onStartOver,
   onRequestDiscard,
   discardButtonRef,
+  onSaveVideo,
+  saveVideoState = { status: 'idle' },
 }: ExistingVideoActionBarProps) => {
   const theme = useTheme();
   const step = workflow.steps[0];
@@ -62,28 +66,32 @@ export const ExistingVideoActionBar = ({
   const visualUnavailable = Boolean(
     step && !(activeVisualCapability?.available ?? videoProcessingAvailable),
   );
+  const saving =
+    saveVideoState.status === 'saving' && saveVideoState.artifactId === workflow.result?.id;
+  const saved =
+    saveVideoState.status === 'saved' && saveVideoState.artifactId === workflow.result?.id;
 
   if (workflow.phase === 'complete') {
     return (
       <div css={actionBarStyles(theme)} aria-label="Result actions">
         <div css={actionSummaryStyles(theme)} role="status" aria-live="polite">
-          <strong>{workflow.downloaded ? 'Download started' : 'Result ready'}</strong>
+          <strong>{saved ? 'Saved to gallery' : 'Result ready'}</strong>
           <span>
-            {workflow.downloaded
-              ? 'Your browser manages saving. This tab still owns the temporary video.'
-              : 'Compare Original and Result, then download or continue editing.'}
+            {saved
+              ? 'Open Saved Videos when you are ready to download.'
+              : 'Compare Original and Result, then save or continue editing.'}
           </span>
         </div>
         <div css={actionButtonsStyles(theme)}>
-          {workflow.result ? (
-            <a
-              href={workflow.result.objectUrl}
-              download={workflow.result.filename}
-              css={downloadButtonStyles(theme)}
-              onClick={workflow.downloadResult}
+          {workflow.result && onSaveVideo ? (
+            <Button
+              variant="primary"
+              busy={saving}
+              disabled={saving || saved}
+              onClick={onSaveVideo}
             >
-              Download result
-            </a>
+              {saving ? 'Saving…' : saved ? 'Saved' : 'Save Video'}
+            </Button>
           ) : null}
           <Button variant="secondary" onClick={onEditSelected}>
             Edit {workflow.comparison}
@@ -172,7 +180,7 @@ export const ExistingVideoActionBar = ({
         </strong>
         <span>
           {visualUnavailable
-            ? 'Visual processing is unavailable. The source can still be reviewed and downloaded.'
+            ? 'Visual processing is unavailable. The source can still be reviewed and saved.'
             : plan.detail}
         </span>
       </div>

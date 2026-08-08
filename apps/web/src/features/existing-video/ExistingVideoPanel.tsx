@@ -39,6 +39,7 @@ import {
   type ExistingVideoStep,
   type ExistingVideoWorkflow,
 } from './useExistingVideoWorkflow';
+import type { SaveVideoState } from '../saved-videos/useSaveVideo';
 import type { VoiceBrowserCapabilities } from '../voice-effects/voiceCapabilities';
 
 type ExistingVideoPanelProps = {
@@ -49,6 +50,8 @@ type ExistingVideoPanelProps = {
   readonly elevenLabsModel?: string | null;
   readonly browserCapabilities?: VoiceBrowserCapabilities;
   readonly onFinish: () => void;
+  readonly onSaveVideo?: () => void;
+  readonly saveVideoState?: SaveVideoState;
   readonly savedRecipes?: readonly ExistingVideoSavedRecipe[];
   readonly onCreateCharacter?: (stepId: string) => void;
   readonly onCreateWardrobeVariant?: (stepId: string, characterId: string) => void;
@@ -78,6 +81,8 @@ export const ExistingVideoPanel = ({
   elevenLabsModel = null,
   browserCapabilities,
   onFinish,
+  onSaveVideo,
+  saveVideoState,
   savedRecipes = [],
   onCreateCharacter,
   onCreateWardrobeVariant,
@@ -570,8 +575,8 @@ export const ExistingVideoPanel = ({
                   {!activeTool ? (
                     <Surface tone="soft" padding="compact">
                       <p>
-                        Choose a tool to configure an edit, or continue directly to review and
-                        download the unchanged video.
+                        Choose a tool to configure an edit, or continue directly to review and save
+                        the unchanged video.
                       </p>
                     </Surface>
                   ) : null}
@@ -594,6 +599,8 @@ export const ExistingVideoPanel = ({
             }
           : {})}
         onFinish={onFinish}
+        {...(onSaveVideo ? { onSaveVideo } : {})}
+        {...(saveVideoState ? { saveVideoState } : {})}
         onEditSelected={() => {
           setActiveTool(null);
           workflow.editSelected();

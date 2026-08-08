@@ -324,7 +324,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         stage.getByText('Record New Video or Upload Video → review', { exact: true }),
       ).toBeVisible();
       await expect(
-        stage.getByText('Virtual Try On · Character Swap · Voice → Download', { exact: true }),
+        stage.getByText('Virtual Try On · Character Swap · Voice → Save', { exact: true }),
       ).toBeVisible();
       const guideTitle = stage.locator('[data-guide-title]');
       await expect(guideTitle).toHaveCSS('white-space', 'nowrap');
@@ -459,7 +459,7 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await createLocalTake(page);
       const review = page.getByRole('dialog', { name: 'Latest Take' });
       await expect(review.getByRole('heading', { name: 'Latest take', exact: true })).toBeVisible();
-      await expect(review.getByRole('link', { name: 'Download take' })).toBeVisible();
+      await expect(review.getByRole('button', { name: 'Save Video' })).toBeVisible();
       await expect(review.getByText('Loading studio tool…', { exact: true })).toHaveCount(0);
     },
   },

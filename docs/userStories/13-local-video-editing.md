@@ -28,8 +28,9 @@ a provider, and replace the immutable source only after a validated export and e
 7. **Save edited video** starts one module worker. Studio announces local render/validation
    progress; cancellation terminates the work and preserves the pinned source and draft.
 8. After validation, the replacement dialog initially focuses **Cancel** and offers **Replace
-   Without Downloading** or **Download Original and Replace**. “Original” is the artifact displayed
-   when this edit session began, including a prior visual or voiced result.
+   Without Saving** or **Replace and Save**. The Save path must finish publishing the artifact that
+   was displayed when this edit session began—including a prior visual or voiced result—before
+   replacement proceeds.
 9. A confirmed replacement creates an `edited` artifact whose `parentArtifactId` identifies that
    pinned source, atomically makes it the immutable source, installs its matching audio sidecar,
    clears superseded visual/voice layers, and returns to **Use existing video**.
@@ -50,9 +51,9 @@ a provider, and replace the immutable source only after a validated export and e
 - 16:9 and 9:16 uploads and edited outputs remain eligible for Character Swap and Virtual Try On
   within the existing 1% tolerance. Other upload ratios and square, 4:5, or incompatible Freeform
   output disable those visual tools before provider intent or HTTP traffic; local adjustment,
-  download, and Voice remain available.
+  saving and Voice remain available.
 - If WebGL, WebCodecs, OffscreenCanvas, or dedicated workers are unavailable, Studio explains that
-  local editing is unsupported. Ordinary playback, download, Voice, and existing provider flows
+  local editing is unsupported. Ordinary playback, saving, Voice, and existing provider flows
   remain usable.
 
 ## Guards and recovery
@@ -70,6 +71,6 @@ a provider, and replace the immutable source only after a validated export and e
 
 Pure and component tests cover geometry, history grouping, worker progress/cancellation/staleness,
 chunk limits, keyboard crop behavior, provider gating, replacement controls, and source ownership.
-Real H.264/AAC export, five-minute and maximum-size memory, browser downloads, external playback,
+Real H.264/AAC export, five-minute and maximum-size memory, gallery downloads, external playback,
 touch hardware, and Safari/Firefox/Chrome codec behavior require physical validation and must
 not be inferred from automation.

@@ -641,22 +641,3 @@ export const actionButtonsStyles = (theme: Theme): CSSObject => ({
     '& > *': { width: '100%', flex: 'none' },
   },
 });
-
-export const downloadButtonStyles = (theme: Theme): CSSObject => ({
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  padding: '0.7rem 1rem',
-  border: '1px solid transparent',
-  borderRadius: theme.radii.medium,
-  color: theme.colors.onAccent,
-  background: `linear-gradient(135deg, ${theme.colors.accentStrong}, ${theme.colors.accent})`,
-  boxShadow: theme.shadows.soft,
-  fontWeight: 720,
-  lineHeight: 1.1,
-  textDecoration: 'none',
-  WebkitTapHighlightColor: 'transparent',
-  '&:hover': { transform: 'translateY(-1px)' },
-  '&:active': { transform: 'translateY(0)' },
-  '&:focus-visible': { outline: `2px solid ${theme.colors.focus}`, outlineOffset: '3px' },
-});

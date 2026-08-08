@@ -41,7 +41,6 @@ describe('recordingArtifactReducer', () => {
       visual,
       processed: null,
       processingState: 'idle',
-      downloaded: false,
     });
   });
 
@@ -53,7 +52,6 @@ describe('recordingArtifactReducer', () => {
       ...initialRecordingArtifactState,
       original,
       visual,
-      downloaded: true,
     };
     const after = recordingArtifactReducer(before, {
       type: 'complete-processing',
@@ -62,6 +60,6 @@ describe('recordingArtifactReducer', () => {
     });
 
     expect(before.visual).toBe(visual);
-    expect(after).toMatchObject({ original, visual: null, processed, downloaded: false });
+    expect(after).toMatchObject({ original, visual: null, processed });
   });
 });

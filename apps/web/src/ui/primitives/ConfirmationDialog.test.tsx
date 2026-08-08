@@ -73,11 +73,11 @@ describe('ConfirmationDialog', () => {
         <ConfirmationDialog
           open
           title="Replace the current video?"
-          description="Choose whether to download the current source first."
-          confirmLabel="Download Original and Replace"
+          description="Choose whether to save the current source first."
+          confirmLabel="Replace and Save"
           cancelLabel="Cancel"
           secondaryAction={{
-            label: 'Replace Without Downloading',
+            label: 'Replace Without Saving',
             onAction: onSecondary,
           }}
           onCancel={onCancel}
@@ -87,7 +87,7 @@ describe('ConfirmationDialog', () => {
     );
 
     await waitFor(() => expect(screen.getByRole('button', { name: 'Cancel' })).toHaveFocus());
-    await user.click(screen.getByRole('button', { name: 'Replace Without Downloading' }));
+    await user.click(screen.getByRole('button', { name: 'Replace Without Saving' }));
     expect(onSecondary).toHaveBeenCalledOnce();
     expect(onCancel).not.toHaveBeenCalled();
     expect(onConfirm).not.toHaveBeenCalled();

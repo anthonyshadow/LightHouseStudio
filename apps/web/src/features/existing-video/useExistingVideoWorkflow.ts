@@ -1047,7 +1047,7 @@ export const useExistingVideoWorkflow = ({
 
   const completeVisualPlan = useCallback(() => {
     setPhase('complete');
-    setMessage('Visual processing is complete. The result is ready to compare and download.');
+    setMessage('Visual processing is complete. The result is ready to compare and save.');
   }, [setMessage, setPhase]);
 
   const completeVisualArtifact = useCallback(
@@ -1593,7 +1593,6 @@ export const useExistingVideoWorkflow = ({
       retryJob,
       original: recording.original,
       result: recording.processed ?? recording.visual,
-      downloaded: recording.downloaded,
       editBase,
       editBaseMetadata,
       currentMetadata,
@@ -1616,7 +1615,6 @@ export const useExistingVideoWorkflow = ({
       retryFinalization,
       retryExistingJob,
       cancelBeforeAcceptance,
-      downloadResult: recording.markDownloaded,
       reset,
       cleanup,
       startOver,
@@ -1649,8 +1647,6 @@ export const useExistingVideoWorkflow = ({
       retryExistingJob,
       retryJob,
       phase,
-      recording.markDownloaded,
-      recording.downloaded,
       recording.original,
       recording.processingOperation,
       recording.sidecar.blob,

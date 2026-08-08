@@ -202,7 +202,7 @@ for (const viewport of representativeViewports) {
     await expect(
       page
         .getByRole('complementary', { name: 'First take guide' })
-        .getByText('Virtual Try On · Character Swap · Voice → Download', { exact: true }),
+        .getByText('Virtual Try On · Character Swap · Voice → Save', { exact: true }),
     ).toBeVisible();
     const stageFrameBox = await page.locator('[data-stage-frame]').boundingBox();
     const guideBox = await page.locator('[data-first-success-guide]').boundingBox();

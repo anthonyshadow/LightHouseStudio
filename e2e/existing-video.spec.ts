@@ -170,7 +170,7 @@ test('Record New Video starts only from the control bar and adopts the local tak
   expectNoExternalProviderTraffic(network);
 });
 
-test('provider-free upload previews and enters the existing take/download surface', async ({
+test('provider-free upload previews and enters the existing take/save surface', async ({
   page,
 }) => {
   await installCameraSentinel(page);
@@ -181,17 +181,18 @@ test('provider-free upload previews and enters the existing take/download surfac
   await selectExistingVideo(page, fixture, 'local-only.mp4');
   const dialog = page.getByRole('dialog', { name: 'Use existing video' });
   await expect(dialog).toContainText('Keep the video local');
-  await dialog.getByRole('button', { name: 'Review and download' }).click();
+  await dialog.getByRole('button', { name: 'Review and Save' }).click();
 
   const review = page.getByRole('dialog', { name: 'Latest take' });
   await expect(review).toBeVisible();
   await expect(review.getByRole('button', { name: 'Edit video' })).toBeVisible();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
-  await page.getByRole('link', { name: 'Download take' }).click();
-  await expect(page.getByText('A download was started.')).toBeVisible();
+  await review.getByRole('button', { name: 'Save Video' }).click();
+  await expect(review.getByRole('button', { name: 'Saved' })).toBeVisible();
+  await expect(review.getByRole('link', { name: /Download/u })).toHaveCount(0);
   expect(await cameraCalls(page)).toBe(0);
   expect(new Set(network.apiRequests.map(({ path }) => path))).toEqual(
-    new Set(['/api/capabilities']),
+    new Set(['/api/capabilities', '/api/creative-library']),
   );
   expect(network.providerSdkRequests).toEqual([]);
   expect(network.blockedExternalRequests).toEqual([]);
@@ -243,16 +244,14 @@ test('provider-free Adjust video renders locally and atomically replaces the per
   const replacement = page.getByRole('dialog', { name: 'Replace the current video?' });
   await expect(replacement).toBeVisible({ timeout: 60_000 });
   await expect(replacement.getByRole('button', { name: 'Cancel' })).toBeFocused();
-  await expect(
-    replacement.getByRole('button', { name: 'Download Original and Replace' }),
-  ).toBeVisible();
+  await expect(replacement.getByRole('button', { name: 'Replace and Save' })).toBeVisible();
   await replacement.getByRole('button', { name: 'Cancel' }).click();
   await expect(replacement).toBeHidden();
   await expect(page.getByRole('slider', { name: 'Brightness' })).toHaveValue('24');
 
   await page.getByRole('button', { name: 'Save edited video' }).click();
   await expect(replacement).toBeVisible({ timeout: 60_000 });
-  await replacement.getByRole('button', { name: 'Replace Without Downloading' }).click();
+  await replacement.getByRole('button', { name: 'Replace Without Saving' }).click();
 
   await expect(upload).toBeVisible();
   await expect(upload.getByTitle(/local-edit-source-edited-/u).first()).toBeVisible();
@@ -272,10 +271,7 @@ test('provider-free Adjust video renders locally and atomically replaces the per
   await page.getByRole('button', { name: '1:1', exact: true }).click();
   await page.getByRole('button', { name: 'Save edited video' }).click();
   await expect(replacement).toBeVisible({ timeout: 60_000 });
-  const downloadPromise = page.waitForEvent('download');
-  await replacement.getByRole('button', { name: 'Download Original and Replace' }).click();
-  const download = await downloadPromise;
-  expect(download.suggestedFilename()).toMatch(/\.mp4$/u);
+  await replacement.getByRole('button', { name: 'Replace and Save' }).click();
 
   await expect(upload).toBeVisible();
   await expect(upload.getByRole('button', { name: 'Character Swap', exact: true })).toBeDisabled();
@@ -283,7 +279,7 @@ test('provider-free Adjust video renders locally and atomically replaces the per
   await expect(upload).toContainText('require a 16:9 or 9:16 source');
   expect(await cameraCalls(page)).toBe(0);
   expect(new Set(network.apiRequests.map(({ path }) => path))).toEqual(
-    new Set(['/api/capabilities']),
+    new Set(['/api/capabilities', '/api/creative-library']),
   );
   expect(network.providerSdkRequests).toEqual([]);
   expect(network.blockedExternalRequests).toEqual([]);
@@ -544,6 +540,7 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
       timeout: 15_000,
     });
     await expect(dialog.getByRole('button', { name: 'Review Voice and Download' })).toHaveCount(0);
+    await expect(dialog.getByRole('link', { name: 'Download result' })).toHaveCount(0);
 
     const submissions = calls.filter(({ method }) => method === 'PUT');
     expect(submissions.map((submission) => submission.operation)).toEqual([operation]);
@@ -564,10 +561,8 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
       await dialog.getByRole('button', { name: 'Result', exact: true }).click();
       await expect(playback).toHaveAttribute('src', resultUrl!);
 
-      const downloadPromise = page.waitForEvent('download');
-      await dialog.getByRole('link', { name: 'Download result' }).click();
-      const download = await downloadPromise;
-      expect(download.suggestedFilename()).toMatch(/\.mp4$/u);
+      await dialog.getByRole('button', { name: 'Save Video' }).click();
+      await expect(dialog.getByRole('button', { name: 'Saved' })).toBeVisible();
 
       for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {
         await page.setViewportSize(viewport);
@@ -575,7 +570,7 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
         for (const control of [
           dialog.getByRole('button', { name: 'Original', exact: true }),
           dialog.getByRole('button', { name: 'Result', exact: true }),
-          dialog.getByRole('link', { name: 'Download result' }),
+          dialog.getByRole('button', { name: 'Saved' }),
           dialog.getByRole('button', { name: 'Start over from original' }),
           dialog.getByRole('button', { name: 'Discard video and result' }),
         ]) {

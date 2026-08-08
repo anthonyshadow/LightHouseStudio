@@ -57,40 +57,6 @@ const actionStyles = (
   },
 });
 
-const downloadStyles = (
-  theme: Theme,
-  locked: boolean,
-  presentation: NonNullable<TakeReviewActionsProps['presentation']>,
-): CSSObject => ({
-  display: 'inline-flex',
-  alignItems: 'center',
-  justifyContent: 'center',
-  minHeight: '2.85rem',
-  minWidth: '2.75rem',
-  padding: presentation === 'control-bar' ? '0.7rem 1rem' : undefined,
-  border: presentation === 'control-bar' ? '1px solid transparent' : undefined,
-  borderRadius: theme.radii.medium,
-  color: presentation === 'control-bar' ? theme.colors.onAccent : theme.colors.canvas,
-  background:
-    presentation === 'control-bar'
-      ? `linear-gradient(135deg, ${theme.colors.accentStrong}, ${theme.colors.accent})`
-      : theme.colors.accent,
-  boxShadow: presentation === 'control-bar' ? theme.shadows.soft : undefined,
-  fontWeight: 760,
-  lineHeight: 1.1,
-  textDecoration: 'none',
-  pointerEvents: locked ? 'none' : 'auto',
-  opacity: locked ? 0.5 : 1,
-  '&:focus-visible': {
-    outline: `2px solid ${theme.colors.focus}`,
-    outlineOffset: '3px',
-  },
-  '@media (max-width: 39.99rem), (max-height: 36rem)': {
-    paddingInline: presentation === 'control-bar' ? theme.space.xs : undefined,
-    fontSize: presentation === 'control-bar' ? theme.fontSizes.caption : undefined,
-  },
-});
-
 export const TakeReviewActions = ({
   recording,
   presentation = 'panel',
@@ -150,22 +116,6 @@ export const TakeReviewActions = ({
           Replace Saved Version
         </Button>
       ) : null}
-      <a
-        href={artifact.objectUrl}
-        download={artifact.filename}
-        aria-disabled={locked}
-        tabIndex={locked ? -1 : undefined}
-        css={downloadStyles(theme, locked, presentation)}
-        onClick={(event) => {
-          if (locked) {
-            event.preventDefault();
-            return;
-          }
-          recording.markDownloaded();
-        }}
-      >
-        {compact ? 'Download' : 'Download take'}
-      </a>
       {onEditVideo ? (
         <Button variant="secondary" disabled={locked} onClick={onEditVideo}>
           Edit video
@@ -181,11 +131,11 @@ export const TakeReviewActions = ({
       ) : null}
       <Button
         variant="secondary"
-        disabled={locked || !recording.downloaded}
+        disabled={locked || !saved}
         title={
-          recording.downloaded
-            ? 'Close review and release the temporary in-memory take.'
-            : 'Start a download before releasing this temporary take.'
+          saved
+            ? 'Close review and release the temporary in-memory take. The saved gallery copy remains available.'
+            : 'Save this video before releasing the temporary take.'
         }
         onClick={closeTake}
       >

@@ -9,6 +9,7 @@ import type {
   OptimizeCharacterReferencePromptRequest,
   OptimizeCharacterReferencePromptResponse,
   OutfitTryOnRequest,
+  SavedVideoDetail,
   UploadedReferenceImageAsset,
 } from '@studio/contracts';
 import { TEST_AUTH_SESSION, TEST_DEMO_CONFIG } from './authFixture.js';
@@ -164,6 +165,8 @@ export const installProviderNetworkDriver = async (
 ): Promise<NetworkJourneyState> => {
   let remainingCapabilityFailures = options.capabilityFailuresBeforeSuccess ?? 0;
   let sharedVoiceSaved = false;
+  let savedVideoSequence = 0;
+  const savedVideos = new Map<string, SavedVideoDetail>();
   const network: NetworkJourneyState = {
     apiRequests: [],
     voiceRequests: [],
@@ -254,6 +257,78 @@ export const installProviderNetworkDriver = async (
           total: 0,
           facets: { characterNames: [], formats: [] },
         }),
+      });
+      return;
+    }
+
+    if (requestUrl.pathname === '/api/videos' && route.request().method() === 'POST') {
+      savedVideoSequence += 1;
+      const metadataHeader = route.request().headers()['x-lightframe-video-metadata'];
+      const metadata = metadataHeader
+        ? (JSON.parse(decodeURIComponent(metadataHeader)) as {
+            title: string;
+            filename: string;
+            origin: SavedVideoDetail['currentVersion']['origin'];
+            characterName: string | null;
+            sourceVideoId: string | null;
+            sourceVersionId: string | null;
+          })
+        : null;
+      const videoId = `10000000-0000-4000-8000-${savedVideoSequence.toString().padStart(12, '0')}`;
+      const versionId = `20000000-0000-4000-8000-${savedVideoSequence.toString().padStart(12, '0')}`;
+      const createdAt = '2030-01-01T00:00:00.000Z';
+      const version = {
+        id: versionId,
+        videoId,
+        ordinal: 1,
+        origin: metadata?.origin ?? 'recorded',
+        characterName: metadata?.characterName ?? null,
+        sourceVersionId: metadata?.sourceVersionId ?? null,
+        mimeType: (route.request().headers()['content-type'] ??
+          'video/mp4') as SavedVideoDetail['currentVersion']['mimeType'],
+        filename: metadata?.filename ?? 'saved-video.mp4',
+        sizeBytes: Math.max(1, route.request().postDataBuffer()?.byteLength ?? 1),
+        durationMs: 1_000,
+        width: 1_280,
+        height: 720,
+        createdAt,
+      };
+      const savedVideo = {
+        id: videoId,
+        title: metadata?.title ?? 'Saved video',
+        status: 'ready' as const,
+        currentVersion: version,
+        sourceVideoId: metadata?.sourceVideoId ?? null,
+        versionCount: 1,
+        thumbnailAvailable: false,
+        createdAt,
+        updatedAt: createdAt,
+        versions: [version],
+      } satisfies SavedVideoDetail;
+      savedVideos.set(videoId, savedVideo);
+      await route.fulfill({
+        status: 201,
+        contentType: 'application/json',
+        body: JSON.stringify(savedVideo),
+      });
+      return;
+    }
+
+    const savedVideoThumbnailMatch = requestUrl.pathname.match(
+      /^\/api\/videos\/([^/]+)\/versions\/([^/]+)\/thumbnail$/u,
+    );
+    if (savedVideoThumbnailMatch && route.request().method() === 'PUT') {
+      const video = savedVideos.get(savedVideoThumbnailMatch[1] ?? '');
+      if (!video || video.currentVersion.id !== savedVideoThumbnailMatch[2]) {
+        await route.fulfill({ status: 404, body: '' });
+        return;
+      }
+      const updated = { ...video, thumbnailAvailable: true } satisfies SavedVideoDetail;
+      savedVideos.set(video.id, updated);
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(updated),
       });
       return;
     }

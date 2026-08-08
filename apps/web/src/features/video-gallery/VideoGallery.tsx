@@ -230,7 +230,7 @@ export const VideoGallery = ({
     return (
       <div>
         <h2>No saved videos yet</h2>
-        <p>Record or upload a video, then choose Save Video. Downloading is optional.</p>
+        <p>Record or upload a video, then choose Save Video. Downloads start from this gallery.</p>
       </div>
     );
   }

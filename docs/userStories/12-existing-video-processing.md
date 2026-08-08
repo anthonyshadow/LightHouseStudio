@@ -4,7 +4,7 @@
 
 Use an uploaded or newly recorded browser-local video as the immutable source, optionally apply
 zero or one visual edit followed by optional Voice, compare the latest healthy result with the
-source, then edit either base, download, start over, or discard.
+source, then edit either base, save, start over, or discard.
 
 ## Journey
 
@@ -38,9 +38,10 @@ source, then edit either base, download, start over, or discard.
    Studio closes the panel and replaces its ordinary tool/capture regions with the local editing
    workspace around the same persistent stage and video node. Trim, crop, 90° rotation, flips,
    lighting, filters, Before, reset, and grouped undo/redo remain draft-only until a dedicated
-   worker renders and validates an H.264/AAC MP4. The final dialog can cancel, replace without a
-   download, or initiate download of the pinned pre-edit artifact and replace. A successful edit
-   becomes the immutable source with parent lineage and an updated audio sidecar.
+   worker renders and validates an H.264/AAC MP4. The final dialog can cancel, **Replace Without
+   Saving**, or **Replace and Save** the pinned pre-edit artifact to Saved Videos before replacing
+   it. A failed Save leaves the source unchanged. A successful edit becomes the immutable source
+   with parent lineage and an updated audio sidecar.
 6. The creator may use confirmed **Replace source video** or **Discard source video**, then choose
    zero or one visual transformation from status-bearing tool cards:
    **Character Swap** or **Virtual Try On**, never both. Availability and input requirements are
@@ -120,15 +121,14 @@ source, then edit either base, download, start over, or discard.
     immutable source; **Edit result** snapshots the latest result and its inspected metadata as the
     next frame source. If an accepted approximate-resolution result is not exactly 16:9 or 9:16,
     the next explicit Start prepares and revalidates a temporary contain-fit canonical copy without
-    changing the retained or downloadable result. Review
-    keeps **Download result**, **Save Video**, the selected edit summary, and the destructive action
-    visible. Save as New is default; confirmed Replace Existing appends an immutable gallery
+    changing the retained or saved result. Review keeps **Save Video**, the selected edit summary,
+    and the destructive action visible. Save as New is default; confirmed Replace Existing appends an immutable gallery
     version and never overwrites prior bytes. Only the immutable runtime source plus latest healthy
     Result remain after successful replacement. A voice failure after visual success retains the
     visual Result.
-11. Every source/result has a UUID, app-owned name, timestamp, kind, and parent lineage. Generated
-    downloads use operation, UTC timestamp, and UUID suffix. Uploaded originals remain unchanged;
-    recorded and all generated results pass the local H.264/AAC MP4 gate before publication.
+11. Every source/result has a UUID, app-owned name, timestamp, kind, and parent lineage. Uploaded
+    originals remain unchanged; recorded and all generated results pass the local H.264/AAC MP4
+    gate before publication. Downloads are available only after Save, from Saved Videos.
 12. **Start over from original** revokes generated visual and voice URLs, retains and presents the uploaded
     original, clears the selected transformation and voice selection, and returns to **Choose your
     edits**. The creator can choose either operation and make another explicit submission.
@@ -145,7 +145,7 @@ source, then edit either base, download, start over, or discard.
 - The picker recommends 16:9 or 9:16 for the best experience and directs creators to **Adjust
   video** to crop after upload. Provider compatibility is derived in the app for uploaded and
   locally edited sources. Other ratios disable Character Swap/VTO before provider intent or HTTP
-  while Download, local adjustment, and Voice stay available.
+  while Save, local adjustment, and Voice stay available.
 - A playable visual-only source remains useful. Voice explains when no usable source-audio
   sidecar exists.
 - HEVC, ProRes, aliases, and undocumented codecs are blocked with export guidance. When the active
@@ -241,11 +241,11 @@ an explicit, potentially billable action with no automatic retry or fallback.
 ## Evidence boundary
 
 Automated tests use deterministic local media and fake provider responses. They prove contract,
-mutual exclusion, single submission, source/result stage comparison, result-download initiation,
+mutual exclusion, single submission, source/result stage comparison, gallery saving,
 source-preserving Start over, responsive controls, failure preservation, immutable active/ready
 expiry, pre-deadline delivery leases, denied post-deadline content, explicit release, shutdown,
 owner isolation, and protection against late-result resurrection. Live model entitlement/output,
 Pruna pricing approval and 720p/1080p dimensions, real mobile pickers, H.264 MOV/WebM preparation,
-five-minute memory, and physical downloads remain
+five-minute memory, and physical gallery downloads remain
 gates in
 [Manual QA](../MANUAL_QA.md) and [Live provider smoke](../LIVE_PROVIDER_SMOKE.md).

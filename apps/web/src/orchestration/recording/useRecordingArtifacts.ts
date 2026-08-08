@@ -176,7 +176,6 @@ export const useRecordingArtifacts = () => {
     (message: string) => transition({ type: 'set-recording-error', message }),
     [transition],
   );
-  const markDownloaded = useCallback(() => transition({ type: 'mark-downloaded' }), [transition]);
   const beginProcessing = useCallback(
     (operation?: RecordingProcessingOperation) =>
       transition({
@@ -255,7 +254,6 @@ export const useRecordingArtifacts = () => {
       failSidecar,
       clearRecordingError,
       reportRecordingError,
-      markDownloaded,
       beginProcessing,
       cancelProcessing,
       completeVisualProcessing,
@@ -274,7 +272,6 @@ export const useRecordingArtifacts = () => {
       failSidecar,
       clearRecordingError,
       reportRecordingError,
-      markDownloaded,
       beginProcessing,
       cancelProcessing,
       completeVisualProcessing,

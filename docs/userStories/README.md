@@ -7,7 +7,7 @@ references, not release-readiness claims or future requirements.
 
 | Flow                                                 | Story                                                                          |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Record or upload, then edit and download             | [Existing video processing](12-existing-video-processing.md)                   |
+| Record or upload, then edit and save                 | [Existing video processing](12-existing-video-processing.md)                   |
 | Trim, crop, relight, filter, and replace a source    | [Local non-destructive video editing](13-local-video-editing.md)               |
 | Choose camera, microphone, local format, and quality | [Configure capture settings](01-configure-capture-settings.md)                 |
 | Preview and record without provider work             | [Local camera capture](02-local-camera-capture.md)                             |
@@ -15,7 +15,7 @@ references, not release-readiness claims or future requirements.
 | Run and record live VTON 3                           | [Virtual try-on session](04-virtual-try-on-session.md)                         |
 | Build Add, Replace, or Restyle directions            | [Structured prompt workshop](05-structured-prompt-workshop.md)                 |
 | Save and reuse recipes                               | [Recipe Shelf](06-recipe-shelf.md)                                             |
-| Review, download, and release a take                 | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
+| Review, save, and release a take                     | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
 | Apply browser-local voice effects                    | [Local voice treatments](08-local-voice-treatments.md)                         |
 | Browse, save, manage, and apply ElevenLabs voices    | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
 | Recover from missing capabilities                    | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md) |

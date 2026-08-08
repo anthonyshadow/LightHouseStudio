@@ -374,7 +374,7 @@ export const VideoEditWorkspace = ({ session, onRequestDiscard }: VideoEditWorks
           {!session.supported ? (
             <StatusNotice tone="warning" title="Local editor unavailable">
               This browser cannot provide the required WebGL, WebCodecs, worker, and OffscreenCanvas
-              path. Your current video is unchanged and remains downloadable.
+              path. Your current video is unchanged and can still be saved.
             </StatusNotice>
           ) : null}
           <ToolSettings session={session} />

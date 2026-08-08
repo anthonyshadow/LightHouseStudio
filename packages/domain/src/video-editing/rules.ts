@@ -170,7 +170,7 @@ export const getVideoEditProviderCompatibility = (
     compatible: false,
     aspect: 'unsupported',
     reason:
-      'Character Swap and Virtual Try On require a 16:9 or 9:16 source. Local download and Voice remain available.',
+      'Character Swap and Virtual Try On require a 16:9 or 9:16 source. Local saving and Voice remain available.',
   };
 };
 

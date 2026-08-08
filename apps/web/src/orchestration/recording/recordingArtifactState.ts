@@ -15,7 +15,6 @@ export interface RecordingArtifactState {
   readonly processingState: VoiceProcessingState;
   readonly processingOperation: RecordingProcessingOperation | null;
   readonly processingError: string | null;
-  readonly downloaded: boolean;
 }
 
 export type RecordingArtifactAction =
@@ -35,7 +34,6 @@ export type RecordingArtifactAction =
   | Readonly<{ type: 'clear-visual' }>
   | Readonly<{ type: 'set-sidecar'; sidecar: RecordingAudioSidecar }>
   | Readonly<{ type: 'set-recording-error'; message: string | null }>
-  | Readonly<{ type: 'mark-downloaded' }>
   | Readonly<{ type: 'begin-processing'; operation: RecordingProcessingOperation }>
   | Readonly<{ type: 'cancel-processing' }>
   | Readonly<{ type: 'fail-processing'; message: string }>
@@ -54,14 +52,12 @@ export const initialRecordingArtifactState: RecordingArtifactState = {
   processingState: 'idle',
   processingOperation: null,
   processingError: null,
-  downloaded: false,
 };
 
 const idleProcessing = {
   processingState: 'idle' as const,
   processingOperation: null,
   processingError: null,
-  downloaded: false,
 };
 
 export const recordingArtifactReducer = (
@@ -85,7 +81,6 @@ export const recordingArtifactReducer = (
         processingState: 'ready',
         processingOperation: null,
         processingError: null,
-        downloaded: false,
       };
     case 'complete-processing':
       return {
@@ -95,7 +90,6 @@ export const recordingArtifactReducer = (
         processingState: 'ready',
         processingOperation: null,
         processingError: null,
-        downloaded: false,
       };
     case 'restore-original':
       return { ...state, processed: null, ...idleProcessing };
@@ -105,8 +99,6 @@ export const recordingArtifactReducer = (
       return { ...state, sidecar: action.sidecar };
     case 'set-recording-error':
       return { ...state, recordingError: action.message };
-    case 'mark-downloaded':
-      return state.downloaded ? state : { ...state, downloaded: true };
     case 'begin-processing':
       return {
         ...state,

@@ -101,6 +101,6 @@ export const planSummary = (
   }
   return {
     title: 'No edits selected',
-    detail: 'Keep the video local and continue to review and download.',
+    detail: 'Keep the video local and continue to review and save.',
   };
 };

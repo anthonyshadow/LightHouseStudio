@@ -240,7 +240,7 @@ export const TakeDock = ({
               Latest take
             </h2>
             <p role="status" aria-live="polite" aria-atomic="true" css={introStyles(theme)}>
-              Playback remains on the main stage. Download this temporary take before releasing it.
+              Playback remains on the main stage. Save this temporary take before releasing it.
             </p>
           </header>
           <div css={reviewBodyStyles(theme)}>
@@ -286,9 +286,10 @@ export const TakeDock = ({
               />
             </div>
           </div>
-          {recording.downloaded ? (
+          {saveVideoState?.status === 'saved' &&
+          saveVideoState.artifactId === recording.presented?.id ? (
             <StatusNotice role="status" aria-live="polite" tone="success">
-              A download was started. This tab still owns the temporary take.
+              Saved to your video gallery. This tab still owns the temporary take.
             </StatusNotice>
           ) : null}
         </div>

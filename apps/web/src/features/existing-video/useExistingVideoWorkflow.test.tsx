@@ -86,13 +86,11 @@ const recordingController = (): RecordingController => {
     processingOperation: null,
     processingError: null,
     elapsedSeconds: 1,
-    downloaded: false,
     start: vi.fn().mockResolvedValue(undefined),
     stop: vi.fn().mockResolvedValue(source),
     restorePersistedOriginal: vi.fn().mockReturnValue(source),
     replaceSource: vi.fn().mockReturnValue(source),
     discard: vi.fn(),
-    markDownloaded: vi.fn(),
     beginProcessing: vi.fn(),
     cancelProcessing: vi.fn(),
     completeVisualProcessing: vi.fn((blob: Blob, mimeType: string, label: string) => {
@@ -546,8 +544,6 @@ describe('useExistingVideoWorkflow', () => {
     });
 
     expect(result.current.result?.objectUrl).toContain('blob:visual-character-swap');
-    act(() => result.current.downloadResult());
-    expect(recording.markDownloaded).toHaveBeenCalledOnce();
 
     act(() => result.current.startOver());
     expect(recording.clearVisualProcessing).toHaveBeenCalledOnce();

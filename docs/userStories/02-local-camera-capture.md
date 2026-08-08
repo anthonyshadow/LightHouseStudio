@@ -25,7 +25,7 @@
 9. Every finalized playback enables **Edit Video** in the creative tool rail. A control-bar
    **Record New Video** take is already retained as the post-recording editor source, where
    Character Swap, Virtual Try On, and Voice are available. A Dock-started local take keeps the
-   compact Download, Discard, Voice, Release, and [detailed review](07-take-review-and-cleanup.md)
+   compact Save, Discard, Voice, Release, and [detailed review](07-take-review-and-cleanup.md)
    path used by advanced live sessions; **Edit Video** opens the existing-video source chooser
    without silently adopting that take.
 

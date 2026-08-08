@@ -373,7 +373,7 @@ test('the independent recording maximum warns and safely opens take review', asy
     page.getByRole('status', { name: 'Recording ended at the 5:00 maximum' }),
   ).toBeVisible();
   const takeControls = controls.getByRole('group', { name: 'Recorded take controls' });
-  await expect(takeControls.getByRole('link', { name: 'Download' })).toBeVisible();
+  await expect(takeControls.getByRole('button', { name: 'Save' })).toBeVisible();
   await expect(takeControls.getByRole('button', { name: 'Discard' })).toBeVisible();
   await expect(takeControls.getByRole('button', { name: 'Voice' })).toBeVisible();
   await expect(takeControls.getByRole('button', { name: 'Release' })).toBeVisible();
@@ -492,10 +492,7 @@ test('no-key Local Camera records and finalizes without provider HTTP, WebSocket
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
   await expect(page.getByRole('dialog', { name: 'Latest Take' })).toBeHidden();
   const takeControls = page.getByRole('group', { name: 'Recorded take controls' });
-  await expect(takeControls.getByRole('link', { name: 'Download' })).toHaveAttribute(
-    'href',
-    /^blob:/,
-  );
+  await expect(takeControls.getByRole('button', { name: 'Save' })).toBeVisible();
   await expectNoAxeViolations(page);
   await takeControls.getByRole('button', { name: 'Discard' }).click();
   await expect(page.getByLabel('Recorded take playback')).toHaveCount(0);
@@ -512,7 +509,7 @@ test('no-key Local Camera records and finalizes without provider HTTP, WebSocket
   expectNoExternalProviderTraffic(network);
 });
 
-test('saved voice preview, Apply, remux, Download, and Restore Original stay explicit and immutable', async ({
+test('saved voice preview, Apply, remux, Save, and Restore Original stay explicit and immutable', async ({
   page,
 }) => {
   test.setTimeout(60_000);
@@ -524,8 +521,8 @@ test('saved voice preview, Apply, remux, Download, and Restore Original stay exp
 
   await createLocalTake(page);
   const takeDialog = page.getByRole('dialog', { name: 'Latest Take' });
-  const originalDownload = takeDialog.getByRole('link', { name: 'Download take' });
-  const originalUrl = await originalDownload.getAttribute('href');
+  const playback = page.getByLabel('Recorded take playback');
+  const originalUrl = await playback.getAttribute('src');
   expect(originalUrl).toMatch(/^blob:/u);
 
   await takeDialog.getByRole('button', { name: 'Voice treatments' }).click();
@@ -571,9 +568,8 @@ test('saved voice preview, Apply, remux, Download, and Restore Original stay exp
   await expect(voiceTreatments.getByRole('button', { name: 'Treatment applied' })).toBeDisabled();
   await voiceTreatments.getByRole('button', { name: 'Back to take review' }).click();
   const processedTakeDialog = page.getByRole('dialog', { name: 'Latest Take' });
-  const processedDownload = processedTakeDialog.getByRole('link', { name: 'Download take' });
-  await expect(processedDownload).toHaveAttribute('href', /^blob:/u);
-  const processedUrl = await processedDownload.getAttribute('href');
+  await expect(playback).toHaveAttribute('src', /^blob:/u);
+  const processedUrl = await playback.getAttribute('src');
   expect(processedUrl).not.toBe(originalUrl);
 
   expect(network.voiceRequests.filter(({ kind }) => kind === 'convert')).toEqual([
@@ -586,9 +582,8 @@ test('saved voice preview, Apply, remux, Download, and Restore Original stay exp
     },
   ]);
 
-  const processedDownloadStarted = page.waitForEvent('download');
-  await processedDownload.click();
-  await processedDownloadStarted;
+  await processedTakeDialog.getByRole('button', { name: 'Save Video' }).click();
+  await expect(processedTakeDialog.getByRole('button', { name: 'Saved' })).toBeVisible();
   await expect(
     processedTakeDialog.getByRole('button', { name: 'Close and release' }),
   ).toBeEnabled();
@@ -598,9 +593,7 @@ test('saved voice preview, Apply, remux, Download, and Restore Original stay exp
   await restoredVoiceTreatments.getByRole('button', { name: 'Original', exact: true }).click();
   await restoredVoiceTreatments.getByRole('button', { name: 'Restore original audio' }).click();
   await restoredVoiceTreatments.getByRole('button', { name: 'Back to take review' }).click();
-  await expect(
-    page.getByRole('dialog', { name: 'Latest Take' }).getByRole('link', { name: 'Download take' }),
-  ).toHaveAttribute('href', originalUrl ?? '');
+  await expect(playback).toHaveAttribute('src', originalUrl ?? '');
   const browser = await readBrowserState(page);
   expect(browser.createdObjectUrls).toContain(originalUrl);
   expect(browser.revokedObjectUrls).toContain(processedUrl);
@@ -684,7 +677,7 @@ test('Edit Video moves to the creative rail for every finalized playback', async
   expectNoExternalProviderTraffic(network);
 });
 
-test('Download initiation enables Release and clears the reviewed take without reacquiring media', async ({
+test('Save enables Release and clears the reviewed take without reacquiring media', async ({
   page,
 }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -703,9 +696,8 @@ test('Download initiation enables Release and clears the reviewed take without r
   const releaseTake = takeControls.getByRole('button', { name: 'Release' });
   await expect(releaseTake).toBeDisabled();
 
-  const downloadStarted = page.waitForEvent('download');
-  await takeControls.getByRole('link', { name: 'Download' }).click();
-  await downloadStarted;
+  await takeControls.getByRole('button', { name: 'Save' }).click();
+  await expect(takeControls.getByRole('button', { name: 'Saved' })).toBeVisible();
   await expect(releaseTake).toBeEnabled();
   await releaseTake.click();
 
@@ -826,7 +818,7 @@ test('a Lucy model take finalizes before the provider session is released', asyn
     page
       .getByRole('dialog', { name: 'Recipe Dock' })
       .getByText(
-        'Download and release or discard the temporary take before starting or changing media.',
+        'Save and release or discard the temporary take before starting or changing media.',
         { exact: true },
       ),
   ).toBeVisible();

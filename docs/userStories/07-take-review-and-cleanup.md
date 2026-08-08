@@ -1,6 +1,6 @@
 # Take review and cleanup
 
-**Outcome:** preserve one finalized take long enough to inspect, optionally process, download, and
+**Outcome:** preserve one finalized take long enough to inspect, optionally process, save, and
 deliberately release or discard it.
 
 ## Journey
@@ -14,8 +14,8 @@ deliberately release or discard it.
    recorder container is never downloadable.
 4. After the converted MP4 becomes authoritative and live/provider resources release, confirm
    **Recorded take playback** on the persistent stage. Primary **Record New Video** opens the
-   post-recording editor; Dock-started local and live AI recordings retain compact Download,
-   Discard, Voice, and Release actions directly beneath the video. They never overlay the take or
+   post-recording editor; Dock-started local and live AI recordings retain compact Save, Discard,
+   Voice, and Release actions directly beneath the video. They never overlay the take or
    its native playback controls, and the narrowest supported viewport wraps them into a second row.
 5. Confirm **Edit Video** is enabled in the creative tool rail for any finalized playback. An
    editor-backed upload or recording reopens its retained editor state; a Dock/live-AI take opens
@@ -29,26 +29,24 @@ deliberately release or discard it.
 6. When the detailed **Latest Take** surface opens after finishing an editor flow or returning from
    Voice, inspect mode, sources, start time, dimensions/frame rate when known, duration, size, and
    MIME type. The panel does not create another player and has no dedicated tool-rail launcher.
-7. Optionally apply a voice treatment. Playback and download remain locked until processing
+7. Optionally apply a voice treatment. Playback and saving remain locked until processing
    settles or is cancelled.
-8. Optionally select **Save Video**. It is distinct from Download, reports progress, and publishes
-   the final validated artifact to the authenticated local gallery without changing review or
-   release ownership. Repeated submission of the same artifact is idempotent.
-9. Select **Download**. Studio records only that download initiation was requested; it cannot
-   verify browser save completion.
-10. Verify the browser saved the file, then select **Release**. Or select **Discard** and confirm
-    irreversible removal without a download.
+8. Select **Save Video**. It reports progress and publishes the final validated artifact to the
+   authenticated local gallery without changing review ownership. Repeated submission of the same
+   artifact is idempotent.
+9. After Save succeeds, select **Release**. The durable gallery copy remains available for preview,
+   reuse, and download. Or select **Discard** and confirm irreversible removal of the temporary
+   take without saving it.
 
 ## Guards and recovery
 
-- Release stays disabled until download initiation. A click can still be blocked or mishandled by
-  the browser, so verify the downloaded file before release.
-- Playback, Voice, Download, and Save Video remain unavailable while device-local transcoding is
+- Release stays disabled until the current artifact is saved to the gallery.
+- Playback, Voice, and Save Video remain unavailable while device-local transcoding is
   active.
 - Main video remains available if the optional sidecar fails, provided the required H.264 MP4
   conversion succeeds.
 - Conversion cancellation, encoder failure, or a dropped video/audio track publishes no raw
-  fallback and no download URL.
+  fallback and no saveable artifact.
 - Processing failure/cancel preserves the original and last valid playable artifact.
 - Dirty local edits require confirmed discard. Active local render/validation must be cancelled
   before route exit and cannot be abandoned by navigation.
@@ -63,5 +61,5 @@ deliberately release or discard it.
 
 Automated journeys cover finalization/transcode ordering, required codec configuration,
 track-preserving failure, local-edit history/cancellation/replacement, maximum-duration races,
-voice locking, download initiation, release, and discard. Browser download completion, real codecs,
+voice locking, gallery save, release, and discard. Gallery download completion, real codecs,
 memory, and interruption recovery remain manual/physical evidence.
