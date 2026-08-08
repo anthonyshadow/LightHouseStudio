@@ -154,4 +154,36 @@ describe('VoiceService catalog and saved-library policy', () => {
     expect(page.voices.map((candidate) => candidate.voiceId)).toEqual(['match']);
     expect(page.voices[0]?.removable).toBe(true);
   });
+
+  it('does not reuse a workspace page cached for different voice filters', async () => {
+    const provider = new FakeElevenLabsProvider();
+    provider.workspaceVoices = [
+      voice({ voiceId: 'english', language: 'en' }),
+      voice({ voiceId: 'french', language: 'fr' }),
+    ];
+    const service = serviceFor(provider);
+
+    await service.listWorkspaceVoices({
+      ...filters,
+      language: 'en',
+      pageSize: 20,
+      nextPageToken: null,
+      refresh: false,
+      signal: signal(),
+    });
+    const french = await service.listWorkspaceVoices({
+      ...filters,
+      language: 'fr',
+      pageSize: 20,
+      nextPageToken: null,
+      refresh: false,
+      signal: signal(),
+    });
+
+    expect(provider.workspaceSearches.slice(-2).map((search) => search.language)).toEqual([
+      'en',
+      'fr',
+    ]);
+    expect(french.voices.map((candidate) => candidate.voiceId)).toEqual(['french']);
+  });
 });

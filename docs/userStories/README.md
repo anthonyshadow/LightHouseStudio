@@ -32,8 +32,8 @@ references, not release-readiness claims or future requirements.
 - Studio begins in neutral Local Camera mode with camera and microphone off. Only an explicit
   control-bar, upload-panel, or Dock action acquires media; only an explicit AI Start contacts a
   provider.
-- Retired Guided project records and media are cleared on authenticated Studio initialization;
-  they are not imported into Saved Videos and cannot revive the retired Guided experience.
+- Retired Guided repositories and presentation code are removed. Their records are not imported
+  into Saved Videos and cannot revive the retired Guided experience.
 - Browser navigation cannot abandon recording/finalization or an active video render. Leaving with
   a temporary take, active Voice process, dirty local video edit, or dirty Shelf form requires
   confirmed discard.
@@ -52,8 +52,9 @@ references, not release-readiness claims or future requirements.
   the single active model before submission; only the active choice is used.
 - The recording and Decart session limits are independent: each warns at 270 seconds and ends
   through its own safe path at 300 seconds.
-- Recipe metadata is user-namespaced browser data. Builder reference bytes and saved video bytes
-  are authenticated local server assets; Dock portrait and garment uploads are tab-ephemeral.
+- Recipe metadata is user-namespaced browser data and may revision-sync to Neon when configured.
+  Builder reference and saved-video bytes are authenticated assets in the selected local/R2 store;
+  Dock portrait and garment uploads are tab-ephemeral.
 
 ## Evidence boundary
 

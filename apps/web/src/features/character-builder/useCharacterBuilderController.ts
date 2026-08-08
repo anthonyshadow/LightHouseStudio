@@ -5,7 +5,6 @@ import {
   type GuidedDesignV1,
 } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from 'react';
-import type { LocalProjectRepository } from '../guided-flow/types';
 import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import {
   characterBuilderOperationError,
@@ -37,7 +36,6 @@ export interface UseCharacterBuilderControllerOptions {
   readonly optimizationAvailable?: boolean;
   readonly editAvailable: boolean;
   readonly saveBlockedReason?: string | undefined;
-  readonly legacyRepository?: LocalProjectRepository | undefined;
   readonly onSaveCharacter: (
     snapshot: CharacterSaveSnapshot,
     characterId: string,
@@ -68,7 +66,6 @@ export const useCharacterBuilderController = ({
   optimizationAvailable = true,
   editAvailable,
   saveBlockedReason,
-  legacyRepository,
   onSaveCharacter,
   onDismiss,
   target = { kind: 'create' },
@@ -101,7 +98,6 @@ export const useCharacterBuilderController = ({
     state,
     stateRef,
     dispatch,
-    legacyRepository,
     initialValue,
     ownerUserId,
   });

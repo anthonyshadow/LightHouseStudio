@@ -57,8 +57,8 @@ the darkened gallery; that scoped player owns no tracks, object URL, recorder, o
 and detaches its authenticated content URL on close. Any saved video can be deleted independently;
 a retained derived video remains usable when its source record is deleted. **Use existing video**
 retains its separate approved source/result player. Every other path returns to `/`. Older Guided
-compatibility videos are deleted locally on the Phase 1 cutover and are not imported into the new
-gallery.
+compatibility videos were not imported during the Phase 1 cutover; their retired repository and UI
+wiring are now removed.
 
 Leaving Studio is blocked during recording/finalization and active local video rendering. A
 temporary take, active Voice work, dirty video edit, or dirty Recipe Shelf/Outfit Builder/Wardrobe
@@ -183,28 +183,32 @@ values before a production-mode loopback smoke.
 All credentials are read by `apps/api`; never place secrets in `VITE_*` variables. `.env.example`
 is the maintained list of defaults and tunables.
 
-| Variable                                        | Purpose                                                                                                                                                   |
-| ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DEMO_AUTH_ENABLED`, `DEMO_AUTH_PREFILL`        | Enables the seeded local login and the non-production development prefill                                                                                 |
-| `DEMO_USER_ID`, `DEMO_USER_LOGIN`               | Stable immutable owner UUID and normalized seeded login                                                                                                   |
-| `DEMO_USER_PASSWORD`, `DEMO_USER_PASSWORD_HASH` | Development prefill and independently generated Argon2id verification hash; plaintext is never used for backend comparison                                |
-| `AUTH_JWT_SECRET`, `AUTH_SESSION_TTL_SECONDS`   | Session-specific JWT signing secret and expiry; default TTL is 24 hours                                                                                   |
-| `AUTH_COOKIE_NAME`, `AUTH_COOKIE_SECURE`        | Host-only HTTP-only SameSite cookie settings; Secure remains false only for loopback HTTP development                                                     |
-| `DECART_API_KEY`                                | Realtime scoped credentials, Decart Character Swap, and Decart-only Virtual Try-On                                                                        |
-| `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`        | Startup Character Swap choice: `decart` (default) or `pruna`; never exposed in the UI                                                                     |
-| `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY`  | Required enablement and shared server credential when Pruna Character Swap is selected                                                                    |
-| `PRUNA_VIDEO_REPLACE_MODEL`                     | Exact pinned `p-video-replace` literal; required when Pruna is selected                                                                                   |
-| `PRUNA_IMAGE_TRY_ON_ENABLED`                    | Enables Wardrobe Add Outfit; defaults to `false` and does not hide saved versions                                                                         |
-| `PRUNA_IMAGE_TRY_ON_MODEL`                      | Exact pinned `p-image-try-on` literal; required with try-on enablement                                                                                    |
-| `OPENAI_API_KEY`                                | Character prompt optimization and OpenAI image work                                                                                                       |
-| `REFERENCE_IMAGE_PROVIDER`                      | Startup choice: `openai` (default), `bfl`, or `wiro`                                                                                                      |
-| `BFL_API_KEY`                                   | BFL image work when BFL is selected                                                                                                                       |
-| `WIRO_API_KEY`, `WIRO_API_SECRET`               | Wiro image work when Wiro is selected                                                                                                                     |
-| `ELEVENLABS_API_KEY`                            | Saved-voice listing, preview, and Voice Changer                                                                                                           |
-| `ELEVENLABS_ENABLE_LOGGING`                     | Provider retention choice; defaults to `false`                                                                                                            |
-| `LIGHTFRAME_DATA_DIR`                           | Owner-scoped local media bytes and atomic metadata; defaults to repository-root `./.lightframe-data`; an existing API-relative default remains compatible |
-| `PORT`                                          | Loopback API port; defaults to `4100`                                                                                                                     |
-| `NODE_ENV`                                      | `development`, `test`, or `production`                                                                                                                    |
+| Variable                                                                                  | Purpose                                                                                                                                                   |
+| ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `DEMO_AUTH_ENABLED`, `DEMO_AUTH_PREFILL`                                                  | Enables the seeded local login and the non-production development prefill                                                                                 |
+| `DEMO_USER_ID`, `DEMO_USER_LOGIN`                                                         | Stable immutable owner UUID and normalized seeded login                                                                                                   |
+| `DEMO_USER_PASSWORD`, `DEMO_USER_PASSWORD_HASH`                                           | Development prefill and independently generated Argon2id verification hash; plaintext is never used for backend comparison                                |
+| `AUTH_JWT_SECRET`, `AUTH_SESSION_TTL_SECONDS`                                             | Session-specific JWT signing secret and expiry; default TTL is 24 hours                                                                                   |
+| `AUTH_COOKIE_NAME`, `AUTH_COOKIE_SECURE`                                                  | Host-only HTTP-only SameSite cookie settings; Secure remains false only for loopback HTTP development                                                     |
+| `DATABASE_MODE`, `DATABASE_URL`                                                           | `local` (default), Neon-backed `shadow`, or authoritative `neon`; URL is server-only                                                                      |
+| `ASSET_STORE_PROVIDER`                                                                    | `local` (default) or private Cloudflare `r2`; R2 requires a Neon-backed database mode                                                                     |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_KEY_PREFIX` | Private R2 S3 endpoint credentials, bucket, and opaque object prefix; never browser-exposed                                                               |
+| `VIDEO_JOB_MAX_ACTIVE`, `VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER`                               | Server admission limits for accepted batch work; defaults to `8` globally and `4` per provider                                                            |
+| `DECART_API_KEY`                                                                          | Realtime scoped credentials, Decart Character Swap, and Decart-only Virtual Try-On                                                                        |
+| `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`                                                  | Startup Character Swap choice: `decart` (default) or `pruna`; never exposed in the UI                                                                     |
+| `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY`                                            | Required enablement and shared server credential when Pruna Character Swap is selected                                                                    |
+| `PRUNA_VIDEO_REPLACE_MODEL`                                                               | Exact pinned `p-video-replace` literal; required when Pruna is selected                                                                                   |
+| `PRUNA_IMAGE_TRY_ON_ENABLED`                                                              | Enables Wardrobe Add Outfit; defaults to `false` and does not hide saved versions                                                                         |
+| `PRUNA_IMAGE_TRY_ON_MODEL`                                                                | Exact pinned `p-image-try-on` literal; required with try-on enablement                                                                                    |
+| `OPENAI_API_KEY`                                                                          | Character prompt optimization and OpenAI image work                                                                                                       |
+| `REFERENCE_IMAGE_PROVIDER`                                                                | Startup choice: `openai` (default), `bfl`, or `wiro`                                                                                                      |
+| `BFL_API_KEY`                                                                             | BFL image work when BFL is selected                                                                                                                       |
+| `WIRO_API_KEY`, `WIRO_API_SECRET`                                                         | Wiro image work when Wiro is selected                                                                                                                     |
+| `ELEVENLABS_API_KEY`                                                                      | Saved-voice listing, preview, and Voice Changer                                                                                                           |
+| `ELEVENLABS_ENABLE_LOGGING`                                                               | Provider retention choice; defaults to `false`                                                                                                            |
+| `LIGHTFRAME_DATA_DIR`                                                                     | Owner-scoped local media bytes and atomic metadata; defaults to repository-root `./.lightframe-data`; an existing API-relative default remains compatible |
+| `PORT`                                                                                    | Loopback API port; defaults to `4100`                                                                                                                     |
+| `NODE_ENV`                                                                                | `development`, `test`, or `production`                                                                                                                    |
 
 `GET /api/capabilities` reports configuration presence, not provider reachability, entitlement, or
 quota. Missing optional configuration disables only the corresponding feature.
@@ -217,6 +221,10 @@ quota. Missing optional configuration disables only the corresponding feature.
 | `pnpm auth:hash-password`                                                                | Interactively generate an Argon2id demo password hash                  |
 | `pnpm build`                                                                             | Build all workspaces                                                   |
 | `pnpm quality`                                                                           | Type, Storybook, lint, format, dead-code, module, unit, and build gate |
+| `pnpm --dir apps/api db:check`                                                           | Validate Drizzle migration history                                     |
+| `pnpm --dir apps/api db:migrate`                                                         | Apply reviewed migrations to `DATABASE_URL`                            |
+| `pnpm --dir apps/api db:backfill-local`                                                  | Dry-run local video/voice/reference inventory                          |
+| `pnpm --dir apps/api db:backfill-local -- --apply`                                       | Idempotently backfill configured Neon/R2, retaining local rollback     |
 | `pnpm test`                                                                              | Essential non-visual unit and API integration suite                    |
 | `pnpm test:unit`                                                                         | Focused domain, contract, web, component, and controller tests         |
 | `pnpm test:integration`                                                                  | Focused API/provider, Vite, and repository utility tests               |
@@ -293,10 +301,10 @@ Finalization settles the video and optional sidecar, transcodes the main recordi
 H.264/AAC MP4, and publishes that downloadable artifact before live resources release. Raw
 recorder output never receives a download URL.
 
-The backend has one configured local user, process-memory sessions/revocation and video jobs, but
-no signup database, durable job queue, cloud tenancy, or session history. Durable local data
-includes owner-scoped saved-video aggregates/bytes/thumbnails, immutable reference assets,
-saved-voice relationships, and safe processing traces. Read
+The default backend has one configured local user and local persistence. Configuration-gated
+Drizzle/Neon repositories, private Cloudflare R2 bytes, durable sessions, creative-library sync,
+and accepted-job restart recovery are also implemented; they do not add signup, public tenancy,
+billing, or remote deployment. Read [the cloud persistence runbook](docs/CLOUD_PERSISTENCE.md) and
 [architecture and ownership](docs/ARCHITECTURE.md) for the full dependency, lifecycle,
 persistence, and HTTP boundaries.
 

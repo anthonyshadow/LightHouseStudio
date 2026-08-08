@@ -31,4 +31,6 @@ browser for up to 24 hours, and log out with temporary work safely cleaned up.
 ## Limits
 
 This is one seeded local user, not signup, recovery, multi-user tenancy, public authentication, or
-a remote deployment. Restarting the broker invalidates its process-memory session records.
+a remote deployment. In default `local` and `shadow` modes, restarting the broker invalidates its
+process-memory session records. In authoritative `neon` mode, the same owner-scoped session and
+revocation records survive restart; this durability does not make the seeded login public-ready.

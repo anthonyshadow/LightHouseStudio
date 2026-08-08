@@ -208,6 +208,48 @@ describe('VideoJobService', () => {
     await Promise.all(services.splice(0).map((service) => service.close()));
   });
 
+  it('restores accepted provider jobs without resubmitting billable work', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-restore-'));
+    const provider = new FakeVideoProvider();
+    provider.nextStatus = 'processing';
+    const now = Date.parse('2026-08-07T12:00:00.000Z');
+    const jobId = crypto.randomUUID();
+    const ownerId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
+    const durableRepository = {
+      listResumable: vi.fn().mockResolvedValue([
+        {
+          jobId,
+          ownerUserId: ownerId,
+          operation: 'character-swap' as const,
+          provider: 'decart',
+          providerJobId: 'provider-restored',
+          requestFingerprint: 'a'.repeat(64),
+          status: 'queued' as const,
+          outputResolution: '720p' as const,
+          providerOutputLocation: null,
+          sourceDurationMs: 1_000,
+          sourceOrientation: 'landscape' as const,
+          createdAt: '2026-08-07T11:59:00.000Z',
+          updatedAt: '2026-08-07T11:59:30.000Z',
+          expiresAt: '2026-08-07T13:00:00.000Z',
+        },
+      ]),
+      upsert: vi.fn().mockResolvedValue(undefined),
+    };
+    const service = createService(provider, root, {
+      now: () => now,
+      durableJobRepository: durableRepository,
+      traceWriter: durableRepository,
+      providerIds: { 'character-swap': 'decart', 'virtual-try-on': 'decart' },
+    });
+    services.push(service);
+
+    await expect(service.existing(jobId, ownerId)).resolves.toMatchObject({ status: 'queued' });
+    await expect(service.status(jobId, ownerId)).resolves.toMatchObject({ status: 'processing' });
+    expect(provider.submissions).toHaveLength(0);
+    expect(provider.statusCalls).toBe(1);
+  });
+
   it('owns capped provider polling cadence and serves cached status under rapid reads', async () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-poll-cadence-'));
     const provider = new FakeVideoProvider();
@@ -921,6 +963,32 @@ describe('VideoJobService', () => {
     await vi.waitFor(async () => {
       expect((await service.status(jobId, ownerId)).status).toBe('expired');
       expect(await pathExists(paths.directory)).toBe(false);
+    });
+  });
+
+  it('bounds retained expired tombstones while preserving the newest duplicate guard', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-tombstones-'));
+    const provider = new FakeVideoProvider();
+    const clock = new ManualDeadlineScheduler();
+    const service = createService(provider, root, {
+      now: clock.now,
+      scheduleDeadline: clock.scheduleDeadline,
+      maximumExpiredTombstones: 1,
+    });
+    services.push(service);
+    const firstJobId = crypto.randomUUID();
+    const secondJobId = crypto.randomUUID();
+
+    await startJob(service, firstJobId, 'owner-tombstone-one');
+    await waitFor(service, firstJobId, 'owner-tombstone-one', 'queued');
+    await startJob(service, secondJobId, 'owner-tombstone-two');
+    await waitFor(service, secondJobId, 'owner-tombstone-two', 'queued');
+    await clock.advanceTo(clock.nowMs + VIDEO_JOB_TTL_MS);
+
+    expect(await service.existing(firstJobId, 'owner-tombstone-one')).toBeNull();
+    expect(await service.existing(secondJobId, 'owner-tombstone-two')).toMatchObject({
+      status: 'expired',
+      error: { code: 'job_expired' },
     });
   });
 

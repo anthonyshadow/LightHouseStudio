@@ -4,14 +4,15 @@ Lightframe Studio is a local-first, single-operator browser camera studio. The c
 is a trustworthy short-form loop: Record or Upload → Review → optional Virtual Try On, Character
 Swap, and/or Voice → Download. Studio starts in the neutral Local Camera mode with camera and
 microphone off until an explicit control-bar or upload-panel action. Live Character/VTO camera
-transformation and Workshop are advanced flows. The server is loopback-only; do not turn future
-accounts, cloud storage, billing, or public deployment into current MVP requirements.
+transformation and Workshop are advanced flows. The server is loopback-only. Drizzle/Neon and
+private Cloudflare R2 are configuration-gated persistence options; do not treat them as authority
+to add public deployment, real accounts, billing, or shared tenancy.
 
 Touch/mobile creation is required and the supported take maximum is 300 seconds. Character, VTO,
 local Voice, ElevenLabs, OpenAI, BFL, Wiro, and Pruna are current product capabilities, but
 configuration does not prove live provider health or physical-device support. OpenAI/BFL/Wiro
-remain separate startup-selected passes with no fallback. Monetization and future cloud
-ownership/portability remain deferred.
+remain separate startup-selected passes with no fallback. Monetization, public cloud operation,
+and creator ownership/portability policy remain deferred.
 
 ## Read before changing behavior
 
@@ -183,7 +184,7 @@ blindly accept snapshots.
 
 Stop and ask when:
 
-- a change would expose the app beyond loopback or add accounts, billing, cloud persistence, public
+- a change would expose the app beyond loopback or add accounts, billing, public
   sharing, moderation enforcement, or a new paid provider;
 - model/provider choice, retention/deletion, supported devices/duration, pricing/credits, or
   creator data ownership is materially ambiguous;

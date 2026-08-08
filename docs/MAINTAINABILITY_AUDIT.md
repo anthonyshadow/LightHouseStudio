@@ -1,10 +1,58 @@
 # Maintainability audit
 
-**Current as of:** 2026-08-05
+**Current as of:** 2026-08-07
 
 This document records the repository-wide behavior-preserving cleanup and the placement rules that
 follow from it. Product behavior remains defined by the [project README](../README.md),
 [Architecture](ARCHITECTURE.md), and the [user stories](userStories/README.md).
+
+## 2026-08-07 persistence-readiness implementation
+
+The repository-wide phase 0–6 implementation addressed the cloud-readiness audit without changing
+the loopback product boundary:
+
+- corrected Pruna safety enablement, voice-cache partitioning, and unbounded expired-job
+  tombstones; batched saved-voice membership lookups;
+- made auth/session, byte, reference-image, saved-video, voice, creative-library, and job
+  persistence injectable and asynchronous at the owning composition boundary;
+- added Drizzle migrations and transactional Neon adapters with separated password credentials,
+  durable sessions, immutable video versions, idempotency receipts, owner-scoped relationships,
+  processing state, and database-level gallery pagination/facets;
+- added private R2 streaming/multipart writes, app-owned SHA-256 verification, range reads, opaque
+  keys, database lifecycle states, abort cleanup, and local/shadow/Neon startup modes;
+- added accepted-provider-job restart recovery without resubmission, configurable global/provider
+  admission, and a cross-instance active-owner uniqueness guard;
+- added revision-CAS creative-library sync that preserves local data on divergence, plus a
+  non-destructive idempotent local-data inventory/backfill and rollback runbook; and
+- removed unreachable Guided/legacy project repositories, UI wiring, fixtures, stories, and
+  migration tests after their reset window, while retaining persisted-schema compatibility fields
+  that current data may still contain.
+
+Permanent media garbage collection, public ingress/accounts/tenancy, distributed workers,
+backup/PITR evidence, and live Neon/R2 validation remain outside this implementation. Retention
+approval is still required before detached bytes are deleted.
+
+### 2026-08-07 validation
+
+- `pnpm quality` passed: application, Storybook, and E2E types; ESLint; Prettier; Knip; documentation,
+  script-reference, retired-program, and build-manifest checks; a 595-file / 1,781-edge module graph
+  with zero cycles; 163 Vitest files and 1,208 tests; package, web, and API builds; and the static
+  Storybook build.
+- Coverage passed the unchanged repository thresholds with 81.02% statements, 72.60% branches,
+  82.24% functions, and 83.72% lines.
+- `drizzle-kit check --config drizzle.config.ts` passed for the seven ordered migrations, and the
+  schema/repository suites cover the database constraints, transaction paths, R2 lifecycle wrapper,
+  persistence-mode factories, paging delegation, durable-job restoration, and creative-library CAS
+  behavior.
+- `pnpm audit:prod` reported no known production vulnerabilities at the high-severity gate.
+- `graphify update .` rebuilt the generated relationship index with 5,482 nodes, 13,082 edges, and
+  327 communities. SQL migrations remain outside Graphify's semantic index because its optional
+  SQL parser is not installed; Drizzle's migration validator covers that chain instead.
+
+No live Neon database, R2 bucket, paid provider, public ingress, destructive backfill, physical
+device, or assistive-technology validation was performed. The normal local implementation gate is
+green; the release-only E2E, production, visual, manual, backup/restore, and live-provider gates
+remain required before deployment.
 
 ## 2026-08-05 simplification pass
 

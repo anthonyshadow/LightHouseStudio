@@ -7,6 +7,7 @@ import {
   resolveLightframeDataDirectory,
   resolveStaticRoot,
 } from './config/environment.js';
+import { createConfiguredPersistence } from './infrastructure/persistence-factory.js';
 
 loadEnvironment({
   path: fileURLToPath(new URL('../../../.env', import.meta.url)),
@@ -24,8 +25,10 @@ const dataDirectory = resolveLightframeDataDirectory(parsedConfig.lightframeData
 const config = { ...parsedConfig, lightframeDataDir: dataDirectory.path };
 const webDistributionPath = fileURLToPath(new URL('../../web/dist/', import.meta.url));
 const staticRoot = resolveStaticRoot(config.nodeEnv, webDistributionPath, existsSync);
+const persistence = await createConfiguredPersistence(config);
 const app = createApp({
   config,
+  ...(persistence === undefined ? {} : { persistence }),
   ...(staticRoot === undefined ? {} : { staticRoot }),
 });
 if (dataDirectory.usesLegacyApiRelativePath) {

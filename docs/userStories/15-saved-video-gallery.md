@@ -39,14 +39,17 @@ browse lightweight gallery records, and load a chosen version into the existing 
   preview states remain operable at all five canonical viewports with approximately 44px touch
   targets.
 - Character/format filters combine, sort applies to the complete filtered result before
-  pagination, and an empty match keeps the controls available for recovery.
+  pagination, and an empty match keeps the controls available for recovery. The Neon repository
+  performs filtering, ordering, counts, and facets in SQL and fetches version rows only for the
+  selected page.
 - List/detail responses expose no local path, asset key, provider URL, credential, or raw error.
 - Wrong-owner and missing records use safe non-enumerating responses. Content supports controlled
   range delivery without reading the full file into application memory.
 
 ## Retention
 
-Logical delete does not physically erase unreferenced video or thumbnail bytes in Phase 1. They
-remain retained until Phase 2 provides a reviewed relationship-safe reconciliation policy. This
-allows a retained derived record to remain usable after its source record is independently deleted.
-Retired Guided videos are intentionally cleared at Studio initialization and are not imported.
+Logical delete does not physically erase unreferenced video or thumbnail bytes in local or cloud
+persistence modes. They remain retained until product/privacy owners approve relationship-safe
+garbage collection, backup expiry, and legal-hold behavior. This lets a retained derived record
+remain usable after its source record is independently deleted. Retired Guided compatibility code
+is removed and those records are not imported.

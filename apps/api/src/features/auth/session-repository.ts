@@ -7,15 +7,15 @@ export interface AuthenticatedSessionRecord {
 }
 
 export interface SessionRepository {
-  create(record: AuthenticatedSessionRecord): void;
-  findActive(jti: string, now: Date): AuthenticatedSessionRecord | null;
-  revoke(jti: string, now: Date): void;
+  create(record: AuthenticatedSessionRecord): Promise<void>;
+  findActive(jti: string, now: Date): Promise<AuthenticatedSessionRecord | null>;
+  revoke(jti: string, now: Date): Promise<void>;
 }
 
 export class InMemorySessionRepository implements SessionRepository {
   readonly #sessions = new Map<string, AuthenticatedSessionRecord>();
 
-  create(record: AuthenticatedSessionRecord): void {
+  create(record: AuthenticatedSessionRecord): Promise<void> {
     const issuedAt = new Date(record.issuedAt);
     for (const [jti, session] of this.#sessions) {
       if (session.revokedAt !== null || new Date(session.expiresAt) <= issuedAt) {
@@ -23,21 +23,23 @@ export class InMemorySessionRepository implements SessionRepository {
       }
     }
     this.#sessions.set(record.jti, record);
+    return Promise.resolve();
   }
 
-  findActive(jti: string, now: Date): AuthenticatedSessionRecord | null {
+  findActive(jti: string, now: Date): Promise<AuthenticatedSessionRecord | null> {
     const session = this.#sessions.get(jti);
-    if (!session) return null;
+    if (!session) return Promise.resolve(null);
     if (session.revokedAt !== null || new Date(session.expiresAt) <= now) {
       this.#sessions.delete(jti);
-      return null;
+      return Promise.resolve(null);
     }
-    return session;
+    return Promise.resolve(session);
   }
 
-  revoke(jti: string, _now: Date): void {
+  revoke(jti: string, _now: Date): Promise<void> {
     const session = this.#sessions.get(jti);
-    if (!session || session.revokedAt !== null) return;
+    if (!session || session.revokedAt !== null) return Promise.resolve();
     this.#sessions.delete(jti);
+    return Promise.resolve();
   }
 }

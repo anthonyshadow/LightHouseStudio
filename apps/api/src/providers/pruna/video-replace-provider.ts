@@ -235,6 +235,7 @@ export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
             target_fps: 'original',
             ignore_audio: false,
             instruction_prompt: DEFAULT_REPLACEMENT_INSTRUCTION,
+            //TODO Before making project public, change to false and make configured for local development by environment variable
             disable_safety_checker: true,
           },
         }),

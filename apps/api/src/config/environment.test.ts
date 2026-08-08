@@ -5,6 +5,8 @@ import {
   DEFAULT_LIGHTFRAME_DATA_DIR,
   DEFAULT_PROMPT_OPTIMIZER_TIMEOUT_MS,
   DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
+  DEFAULT_VIDEO_JOB_MAX_ACTIVE,
+  DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
   DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
   EnvironmentValidationError,
   parseEnvironment,
@@ -18,6 +20,11 @@ describe('parseEnvironment', () => {
       nodeEnv: 'development',
       host: '127.0.0.1',
       port: DEFAULT_API_PORT,
+      databaseMode: 'local',
+      assetStoreProvider: 'local',
+      r2KeyPrefix: 'media/v1',
+      videoJobMaxActive: DEFAULT_VIDEO_JOB_MAX_ACTIVE,
+      videoJobMaxActivePerProvider: DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
       existingVideoCharacterSwapProvider: 'decart',
       prunaVideoReplaceEnabled: false,
       prunaImageTryOnEnabled: false,
@@ -39,6 +46,50 @@ describe('parseEnvironment', () => {
       wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
       wiroReferenceImageTimeoutMs: DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
     });
+  });
+
+  it('accepts an explicit Neon and private R2 configuration', () => {
+    expect(
+      parseEnvironment({
+        DATABASE_MODE: 'neon',
+        DATABASE_URL: 'postgresql://user:password@example.neon.tech/lightframe?sslmode=require',
+        ASSET_STORE_PROVIDER: 'r2',
+        R2_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
+        R2_ACCESS_KEY_ID: ' r2-access ',
+        R2_SECRET_ACCESS_KEY: ' r2-secret ',
+        R2_BUCKET: 'lightframe-private',
+        R2_KEY_PREFIX: 'media/staging/v1',
+        VIDEO_JOB_MAX_ACTIVE: '12',
+        VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER: '5',
+      }),
+    ).toMatchObject({
+      databaseMode: 'neon',
+      databaseUrl: 'postgresql://user:password@example.neon.tech/lightframe?sslmode=require',
+      assetStoreProvider: 'r2',
+      r2AccountId: '0123456789abcdef0123456789abcdef',
+      r2AccessKeyId: 'r2-access',
+      r2SecretAccessKey: 'r2-secret',
+      r2Bucket: 'lightframe-private',
+      r2KeyPrefix: 'media/staging/v1',
+      videoJobMaxActive: 12,
+      videoJobMaxActivePerProvider: 5,
+    });
+  });
+
+  it.each([
+    [{ DATABASE_MODE: 'neon' }, 'DATABASE_URL'],
+    [{ DATABASE_MODE: 'automatic' }, 'DATABASE_MODE'],
+    [{ ASSET_STORE_PROVIDER: 'r2' }, 'DATABASE_MODE'],
+    [
+      {
+        DATABASE_MODE: 'neon',
+        DATABASE_URL: 'postgresql://user:password@example.neon.tech/lightframe',
+        ASSET_STORE_PROVIDER: 'r2',
+      },
+      'R2_ACCOUNT_ID',
+    ],
+  ] as const)('rejects incomplete cloud persistence configuration %#', (environment, variable) => {
+    expect(() => parseEnvironment(environment)).toThrow(variable);
   });
 
   it('trims configured values and parses strict booleans', () => {
@@ -132,6 +183,9 @@ describe('parseEnvironment', () => {
       { PRUNA_VIDEO_REPLACE_MODEL: 'p-video-replace-latest' },
       { PRUNA_IMAGE_TRY_ON_ENABLED: 'TRUE' },
       { PRUNA_IMAGE_TRY_ON_MODEL: 'p-image-try-on-latest' },
+      { VIDEO_JOB_MAX_ACTIVE: '0' },
+      { VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER: '101' },
+      { VIDEO_JOB_MAX_ACTIVE: '2', VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER: '3' },
     ]) {
       expect(() => parseEnvironment(environment), JSON.stringify(environment)).toThrow(
         EnvironmentValidationError,

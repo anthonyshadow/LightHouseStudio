@@ -2,7 +2,6 @@ import { generateStructuredPrompt } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch } from 'react';
 import { fetchReferenceImageMetadata } from '../../adapters/api-client/apiClient';
 import { useStrictModeSafeDisposable } from '../../orchestration/lifecycle/useStrictModeSafeDisposable';
-import type { LocalProjectRepository } from '../guided-flow/types';
 import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import {
   characterBuilderOperationError,
@@ -11,7 +10,6 @@ import {
   toPersistedCharacterBuilderUpload,
   type CharacterBuilderStateRef,
 } from './characterBuilderControllerSupport';
-import { createGuidedDesignFromDraft } from './characterModel';
 import type {
   CharacterBuilderDraftRecord,
   CharacterBuilderDraftRepository,
@@ -23,7 +21,6 @@ import {
   createCharacterBuilderDraftRepository,
 } from './draftRepository';
 import type { CharacterBuilderAction, CharacterBuilderState } from './machine';
-import { DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS } from './ReferenceOptionsFields';
 import {
   sanitizeCharacterBuilderDraftValue,
   type CharacterBuilderDraftValueV1,
@@ -34,7 +31,6 @@ export interface UseCharacterBuilderPersistenceOptions {
   readonly state: CharacterBuilderState;
   readonly stateRef: CharacterBuilderStateRef;
   readonly dispatch: Dispatch<CharacterBuilderAction>;
-  readonly legacyRepository?: LocalProjectRepository | undefined;
   readonly initialValue?: CharacterBuilderDraftValueV1 | undefined;
   readonly ownerUserId?: string | undefined;
 }
@@ -59,50 +55,10 @@ export interface CharacterBuilderPersistenceController {
   readonly reportPersistenceError: (error: unknown) => void;
 }
 
-export const createCharacterBuilderLegacyMigration = (
-  repository: LocalProjectRepository | undefined,
-) =>
-  repository
-    ? {
-        id: 'guided-character-design-v1',
-        async loadNewestCharacterDesign() {
-          await repository.initialize();
-          const record = await repository.loadNewestCharacterDesign();
-          if (!record?.data.characterDraft) return null;
-          const value = sanitizeCharacterBuilderDraftValue({
-            draft: record.data.characterDraft,
-            design:
-              record.data.guidedDesign ?? createGuidedDesignFromDraft(record.data.characterDraft),
-            options: DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS,
-            preview: record.data.referenceImageAssetId
-              ? {
-                  assetId: record.data.referenceImageAssetId,
-                  sourceKey: createReferencePreviewSourceKey(
-                    record.data.characterPrompt,
-                    DEFAULT_CHARACTER_BUILDER_REFERENCE_OPTIONS,
-                  ),
-                  stale: record.data.referenceImageStale,
-                }
-              : null,
-            uploadedReference: null,
-            pendingSave: null,
-          });
-          if (!value) return null;
-          return {
-            sourceId: record.id,
-            sourceRevision: record.revision,
-            sourceUpdatedAt: record.updatedAt,
-            value,
-          };
-        },
-      }
-    : null;
-
 export const useCharacterBuilderPersistence = ({
   state,
   stateRef,
   dispatch,
-  legacyRepository,
   initialValue,
   ownerUserId,
 }: UseCharacterBuilderPersistenceOptions): CharacterBuilderPersistenceController => {
@@ -122,12 +78,11 @@ export const useCharacterBuilderPersistence = ({
     () =>
       createCharacterBuilderDraftRepository({
         sanitizeDraft: sanitizeCharacterBuilderDraftValue,
-        legacyMigration: createCharacterBuilderLegacyMigration(legacyRepository),
         ...(ownerUserId
           ? { databaseName: `${CHARACTER_BUILDER_DRAFT_DATABASE_NAME}.${ownerUserId}` }
           : {}),
       }),
-    [legacyRepository, ownerUserId],
+    [ownerUserId],
   );
   useStrictModeSafeDisposable(repository);
 

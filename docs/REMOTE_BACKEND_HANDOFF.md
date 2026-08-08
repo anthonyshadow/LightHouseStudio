@@ -2,10 +2,10 @@
 
 **Status:** Design boundary only; all approvals pending
 
-**Current product:** Single operator, loopback-only, browser/local persistence
+**Current product:** Single operator, loopback-only, local-first persistence with optional Neon/R2
 
-**Effect:** No authorization to add accounts, public ingress, cloud storage, billing, sharing, or
-remote deployment
+**Effect:** The implemented private persistence adapters do not authorize accounts, public ingress,
+billing, sharing, or remote deployment
 
 ## Why this document exists
 
@@ -18,9 +18,10 @@ The current application remains defined by [Architecture](ARCHITECTURE.md) and
 
 - the API binds to `127.0.0.1`, does not trust proxies, and accepts loopback hosts only;
 - exact Host/Origin checks protect a local credential broker, not a public service;
-- there is one configured seeded local account, but no signup/recovery, tenants, remote product
-  database, remote jobs, billing ledger, or cloud media;
-- browser stores and `LIGHTFRAME_DATA_DIR` are the current persistence mechanisms; and
+- there is one configured seeded account, but no signup/recovery, public tenants, billing ledger,
+  general worker queue, or public cloud operation;
+- browser/local stores remain the default; configuration-gated Neon metadata and private R2 bytes
+  are persistence mechanisms inside the same loopback trust boundary; and
 - the stable seeded user UUID is local Phase 1 identity; legacy Host hashes are migration
   namespaces only and neither becomes remote tenancy proof.
 
@@ -51,17 +52,17 @@ is authorized.
 
 ## Current-to-remote seam map
 
-| Current local detail                                    | Required future boundary                                                           |
-| ------------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| Host-derived owner hash                                 | Discard; use authenticated subject and tenant membership                           |
-| Recipe Shelf `localStorage`                             | Sanitize on explicit import; assign new remote IDs                                 |
-| Builder/legacy IndexedDB                                | Optional, explicit import only; do not revive retired workflows                    |
-| In-memory current take/sidecar/output                   | Upload only after an authenticated, explicit action                                |
-| `LIGHTFRAME_DATA_DIR` references                        | Private object plus tenant-owned metadata; never expose/import local paths or keys |
-| Filesystem request mapping and process-local coalescing | Durable scoped idempotency, operation state, leases, and reconciliation            |
-| Provider correlation metadata                           | Restricted allowlist only; never identity or browser-visible ownership             |
-| `.env` credentials                                      | Independently provisioned managed deployment secrets                               |
-| Capture device IDs/preferences                          | Device-local only; never remote identity or product data                           |
+| Current local detail                              | Required future boundary                                               |
+| ------------------------------------------------- | ---------------------------------------------------------------------- |
+| Host-derived owner hash                           | Discard; use authenticated subject and tenant membership               |
+| Recipe Shelf `localStorage`                       | Sanitize on explicit import; assign new remote IDs                     |
+| Builder/legacy IndexedDB                          | Optional, explicit import only; do not revive retired workflows        |
+| In-memory current take/sidecar/output             | Upload only after an authenticated, explicit action                    |
+| `LIGHTFRAME_DATA_DIR` or private R2 records       | Add approved tenant policy; never expose/import paths or object keys   |
+| Local/Neon request mapping and process coalescing | Complete durable queue, leases, attempts, and operator reconciliation  |
+| Provider correlation metadata                     | Restricted allowlist only; never identity or browser-visible ownership |
+| `.env` credentials                                | Independently provisioned managed deployment secrets                   |
+| Capture device IDs/preferences                    | Device-local only; never remote identity or product data               |
 
 No current schema addition is justified solely by this future design.
 
@@ -125,4 +126,5 @@ The remote phase may begin only when:
 5. a reviewable implementation/test/migration plan is approved; and
 6. rollback, deletion, provider-cost, privacy, and incident obligations have named owners.
 
-Until then, the correct state is the current loopback product with remote work deferred.
+Until then, the correct state is the current loopback product; Neon/R2 may be exercised privately,
+while remote product operation remains deferred.

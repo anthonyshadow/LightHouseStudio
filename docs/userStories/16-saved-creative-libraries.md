@@ -25,11 +25,16 @@ reuse or remove a record, and return to creation without losing the shared Studi
    remain retained because Phase 1 has no relationship-safe physical garbage collector.
 6. Loading, empty, error, and populated states have named scroll regions, keyboard operation,
    visible focus, Escape/back behavior, and mobile-safe controls.
+7. When authoritative Neon persistence is enabled, the browser remains the immediate local cache.
+   An empty cloud library is initialized from the current browser; an empty browser hydrates from
+   the cloud. If both contain different non-empty state or revision CAS conflicts, sync pauses,
+   shows a safe notice, and preserves the browser copy instead of overwriting either side.
 
 ## Ownership and migration
 
 Creative metadata is sanitized as Recipe Shelf v7 and namespaced by the stable authenticated user;
 the user-scoped and global v6 keys are retained as rollback sources after idempotent migration.
-Character Builder uses a
-user-scoped IndexedDB database. Auth changes clear in-memory caches. Browser storage never contains
-the JWT, password, server path, or provider credential.
+Neon stores normalized owner rows behind one library revision and accepts only authenticated
+owner-derived full-snapshot CAS writes. Character Builder drafts remain in user-scoped IndexedDB.
+Auth changes clear in-memory caches. Browser storage never contains the JWT, password, server path,
+R2 key, or provider credential.

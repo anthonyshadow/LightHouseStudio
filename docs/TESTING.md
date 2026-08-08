@@ -68,7 +68,10 @@ The retained suite protects:
 - advanced live AI entry, Start/Apply behavior, Latest Take review, and cleanup remain independent
   from the primary post-recording workflow;
 - versioned/sanitized user-scoped Recipe Shelf and Character Builder persistence, recovery,
-  legacy-key migration, retired Guided reset, and destructive actions;
+  legacy-key migration, Neon creative-library CAS conflict safety, and destructive actions;
+- storage-neutral byte streams, private opaque R2 keys, lifecycle registration, range reads,
+  database-level gallery paging, durable-session boundaries, accepted-job restart without a second
+  billable submission, admission limits, and bounded expired-job tombstones;
 - app-owned saved-voice membership, first-read claim, owner-checked preview/conversion, and proof
   that relationship removal never calls provider voice deletion;
 - loopback Host/Origin, explicit provider intent, bounded response/stream handling, SSRF-resistant
@@ -78,8 +81,10 @@ The retained suite protects:
 - unexpected external HTTP and WebSocket denial in ordinary automated tests.
 
 Physical devices, real codecs and browser memory, assistive-technology output, completed browser
-downloads, live provider entitlement/output/retention, and paid-provider behavior remain outside
-automation. They use `MANUAL_QA.md` and `LIVE_PROVIDER_SMOKE.md`.
+downloads, live provider entitlement/output/retention, paid-provider behavior, real Neon migration
+and restore, and live R2 multipart/inventory behavior remain outside ordinary automation. Database
+and R2 unit tests use fakes and never require credentials or external traffic. Manual/live checks
+use `MANUAL_QA.md`, `LIVE_PROVIDER_SMOKE.md`, and `CLOUD_PERSISTENCE.md`.
 
 ## Browser and visual scope
 

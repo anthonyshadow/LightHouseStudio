@@ -4,8 +4,9 @@ Status: implemented; automated release gates pass, with manual and live-provider
 Audience: product, engineering, security, QA  
 Planning date: 2026-08-05  
 Scope: one seeded demo user, structurally real authentication and ownership, user-scoped local
-persistence, saved media, and a Video Gallery. A real database, Cloudflare R2, signup, billing, and
-public deployment are explicitly deferred.
+persistence, saved media, and a Video Gallery. A 2026-08-07 follow-up added configuration-gated
+Drizzle/Neon and private R2 without changing the account or loopback boundary. Signup, billing,
+and public deployment remain deferred.
 
 ## Executive decision
 
@@ -40,12 +41,12 @@ loopback-only deployment boundary remains in force.
 
 The approved implementation resolves the former open decisions as follows:
 
-- Tombstoned and otherwise unreferenced local media bytes remain retained until Phase 2. Phase 1
-  has no seven-day quarantine or automatic physical garbage collector.
+- Tombstoned and otherwise unreferenced media bytes remain retained in every persistence mode.
+  There is no seven-day quarantine or automatic physical garbage collector.
 - Demo sessions use a fixed 24-hour expiry and a persistent cookie `Max-Age`, so they may survive
-  browser closure. Broker restart still invalidates process-memory session records.
-- All retired Guided project records and media are cleared on authenticated Studio startup. They
-  are not imported, exposed as gallery items, or retained as hidden versions.
+  browser closure. Broker restart invalidates sessions in local/shadow mode; Neon sessions persist.
+- Retired Guided records were not imported, exposed as gallery items, or retained as hidden
+  versions. The compatibility repository and presentation are now removed.
 - Development prefills both configured login and password through the loopback-only demo config.
   Production exposes neither and rejects checked development auth material.
 - Saved Videos, Saved Characters, and Saved Outfits are authenticated routes in the same Studio
@@ -1674,16 +1675,21 @@ Phase 1 is complete only when all of the following are true:
 - Canonical architecture, privacy, setup, testing, manual QA, user stories, and product-state docs
   match the implemented behavior.
 
-## Requirements before Phase 2 may begin
+## Historical Phase 2 prerequisites
 
-Do not begin the database/R2/real-account phase until:
+The persistence seams named below were implemented on 2026-08-07 after the repository-level gates
+were satisfied. Real staging rollback/restore evidence and the public product decisions in items
+4–6 remain open; see `CLOUD_PERSISTENCE.md` and the deferred infrastructure roadmap. This section
+is retained as the original Phase 1 acceptance rationale.
+
+The original prerequisites were:
 
 1. Phase 1 completion is signed off and the three migration boundaries have verified manifests and
    rollback evidence.
 2. Stable IDs, owner rules, video/version semantics, deletion dependencies, safe job snapshots,
    and storage ports have contract tests.
-3. Phase 1's retained-unreferenced-bytes policy remains documented until Phase 2 approves and
-   implements relationship-safe reconciliation and physical deletion.
+3. Retained-unreferenced-bytes policy remains documented until product/privacy owners approve
+   relationship-safe reconciliation and physical deletion. This remains open.
 4. A production authentication/authorization/tenancy/rate/retention/security design is separately
    approved; loopback controls are not treated as public authentication.
 5. Database schema, R2 key strategy, backfill/dual-read plan, observability, backup/restore, and
@@ -1693,7 +1699,7 @@ Do not begin the database/R2/real-account phase until:
 
 ## Resolved Phase 1 decisions
 
-The implementation uses retained bytes until Phase 2, a 24-hour persistent demo cookie, deletion
-of all retired Guided media on Studio initialization, and development prefilling of both demo
-credentials. These decisions do not justify client-chosen ownership, committed plaintext
-credentials, provider deletion, destructive saved-version overwrite, or public exposure.
+The implementation uses retained bytes pending approved garbage collection, a 24-hour persistent
+demo cookie, no Guided import, and development prefilling of both demo credentials. These
+decisions do not justify client-chosen ownership, committed plaintext credentials, provider
+deletion, destructive saved-version overwrite, or public exposure.

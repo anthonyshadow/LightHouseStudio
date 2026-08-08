@@ -6,6 +6,8 @@ import {
   savedVideoCharacterNameSchema,
   savedVideoOriginSchema,
   videoInputMimeTypeSchema,
+  type SavedVideoFormat,
+  type SavedVideosQuery,
 } from '@studio/contracts';
 
 const legacyVersionSchema = z
@@ -83,6 +85,13 @@ export type StoredSavedVideoAggregate = z.infer<typeof aggregateSchema>;
 export type SavedVideoReceipt = z.infer<typeof receiptSchema>;
 type SavedVideoLibrary = z.infer<typeof librarySchema>;
 
+export interface SavedVideoRepositoryPage {
+  readonly videos: readonly StoredSavedVideoAggregate[];
+  readonly total: number;
+  readonly characterNames: readonly string[];
+  readonly formats: readonly SavedVideoFormat[];
+}
+
 export interface SavedVideoRepository {
   findReceipt(ownerUserId: string, idempotencyKey: string): Promise<SavedVideoReceipt | null>;
   create(
@@ -98,6 +107,12 @@ export interface SavedVideoRepository {
     receipt: SavedVideoReceipt,
   ): Promise<StoredSavedVideoAggregate | 'not-found' | 'conflict'>;
   list(ownerUserId: string): Promise<readonly StoredSavedVideoAggregate[]>;
+  /** Storage-level paging is optional so the bounded local JSON repository stays simple. */
+  listPage?(
+    ownerUserId: string,
+    query: SavedVideosQuery,
+    offset: number,
+  ): Promise<SavedVideoRepositoryPage>;
   get(ownerUserId: string, videoId: string): Promise<StoredSavedVideoAggregate | null>;
   rename(
     ownerUserId: string,

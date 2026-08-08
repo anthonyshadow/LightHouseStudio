@@ -174,7 +174,7 @@ For each resolution row:
 4. Confirm exactly two `/v1/files` uploads and exactly one `/v1/predictions` request with synthetic
    names, `Model: p-video-replace`, one `images` entry, the editor-selected `resolution`, `seed=0`,
    `turbo=false`, `target_fps=original`, `save_audio=true`, `ignore_audio=false`,
-   `disable_safety_checker=false`. Verify the browser recipe contains an empty prompt and
+   `disable_safety_checker=true`. Verify the browser recipe contains an empty prompt and
    `instruction_prompt` is always the app-owned Pruna default that requires
    the output character to match reference image 1's facial identity, body, hair, wardrobe,
    clothing, footwear, and worn accessories. Confirm source-person clothing is replaced rather than

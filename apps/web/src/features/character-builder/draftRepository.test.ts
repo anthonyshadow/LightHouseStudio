@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   CHARACTER_BUILDER_DRAFT_STORE,
   CharacterBuilderDraftError,
@@ -235,37 +235,6 @@ describe('createCharacterBuilderDraftRepository', () => {
     await expect(repository.load()).resolves.toBeNull();
   });
 
-  it('imports the newest legacy character-design once and preserves provenance', async () => {
-    const loadNewestCharacterDesign = vi.fn(() =>
-      Promise.resolve({
-        sourceId: 'legacy-project-2',
-        sourceRevision: 7,
-        sourceUpdatedAt: '2026-07-20T12:00:00.000Z',
-        value: { name: 'Legacy Morgan' },
-      }),
-    );
-    const repository = createCharacterBuilderDraftRepository<TestDraft>({
-      indexedDB: null,
-      sanitizeDraft,
-      legacyMigration: { id: 'guided-character-design-v1', loadNewestCharacterDesign },
-    });
-
-    const imported = await repository.load();
-    expect(imported).toMatchObject({
-      revision: 1,
-      value: { name: 'Legacy Morgan' },
-      origin: {
-        kind: 'legacy-character-design',
-        migrationId: 'guided-character-design-v1',
-        sourceId: 'legacy-project-2',
-        sourceRevision: 7,
-      },
-    });
-    await repository.complete({ expectedRevision: imported?.revision ?? 0 });
-    await expect(repository.load()).resolves.toBeNull();
-    expect(loadNewestCharacterDesign).toHaveBeenCalledTimes(1);
-  });
-
   it('persists one active versioned draft across IndexedDB repository instances', async () => {
     const indexedDb = fakeIndexedDb();
     const first = createCharacterBuilderDraftRepository<TestDraft>({
@@ -377,7 +346,7 @@ describe('createCharacterBuilderDraftRepository', () => {
     await expect(repository.load()).resolves.toBeNull();
   });
 
-  it('explicitly repairs an unreadable durable envelope without reimporting legacy data', async () => {
+  it('explicitly repairs an unreadable durable envelope', async () => {
     const indexedDb = fakeIndexedDb();
     indexedDb.values.set('active', {
       schemaVersion: 1,
@@ -386,24 +355,14 @@ describe('createCharacterBuilderDraftRepository', () => {
       active: { damaged: true },
       appliedMigrations: [],
     });
-    const loadNewestCharacterDesign = vi.fn(() =>
-      Promise.resolve({
-        sourceId: 'legacy-project',
-        sourceRevision: 1,
-        sourceUpdatedAt: '2026-07-20T12:00:00.000Z',
-        value: { name: 'Should not return' },
-      }),
-    );
     const repository = createCharacterBuilderDraftRepository<TestDraft>({
       indexedDB: indexedDb.factory,
       databaseName: 'repair-draft-test',
       sanitizeDraft,
-      legacyMigration: { id: 'guided-character-design-v1', loadNewestCharacterDesign },
     });
 
     await expect(repository.load()).rejects.toMatchObject({ code: 'unsupported-schema' });
     await expect(repository.repairDurably()).resolves.toBeUndefined();
     await expect(repository.load()).resolves.toBeNull();
-    expect(loadNewestCharacterDesign).not.toHaveBeenCalled();
   });
 });

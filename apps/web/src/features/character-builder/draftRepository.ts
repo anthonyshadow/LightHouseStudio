@@ -61,24 +61,6 @@ export interface CompleteCharacterBuilderDraftInput {
   readonly expectedRevision: number;
 }
 
-export interface LegacyCharacterDesignDraftCandidate<TDraft> {
-  readonly sourceId: string;
-  readonly sourceRevision: number;
-  readonly sourceUpdatedAt: string;
-  readonly value: TDraft;
-}
-
-/**
- * An adapter owned by the composition layer. It can query the retired Guided
- * project repository for its newest `character-design` checkpoint without
- * coupling this repository to legacy project types.
- */
-export interface LegacyCharacterDesignDraftMigration<TDraft> {
-  /** Bump this stable ID when a materially different import should run once. */
-  readonly id: string;
-  loadNewestCharacterDesign: () => Promise<LegacyCharacterDesignDraftCandidate<TDraft> | null>;
-}
-
 export interface CharacterBuilderDraftRepository<TDraft> {
   load: () => Promise<CharacterBuilderDraftRecord<TDraft> | null>;
   save: (
@@ -112,7 +94,6 @@ export type CharacterBuilderDraftErrorCode =
   | 'invalid-draft'
   | 'not-found'
   | 'revision-conflict'
-  | 'migration-failed'
   | 'unsupported-schema'
   | 'storage-failed';
 
@@ -132,7 +113,6 @@ export interface CharacterBuilderDraftRepositoryOptions<TDraft> {
   readonly now?: () => Date;
   /** Allowlist parser applied to every value crossing the persistence boundary. */
   readonly sanitizeDraft: (value: unknown) => TDraft | null;
-  readonly legacyMigration?: LegacyCharacterDesignDraftMigration<TDraft> | null;
 }
 
 interface StoredDraftEnvelope<TDraft> {
@@ -685,105 +665,19 @@ export const createCharacterBuilderDraftRepository = <TDraft>(
     completeWithDurability(input, true);
 
   const repairDurably = async (): Promise<void> => {
-    const migrationId = options.legacyMigration?.id;
     const envelope: StoredDraftEnvelope<TDraft> = {
       ...emptyEnvelope<TDraft>(),
       revision: 1,
-      appliedMigrations: migrationId && validNonEmptyText(migrationId, 128) ? [migrationId] : [],
+      appliedMigrations: [],
     };
     await durableOperation((target) => target.repair(envelope));
     await memory.replace(envelope);
   };
 
-  const applyLegacyMigration = async (
-    current: CharacterBuilderDraftRecord<TDraft> | null,
-  ): Promise<CharacterBuilderDraftRecord<TDraft> | null> => {
-    const migration = options.legacyMigration;
-    if (!migration) return current;
-    if (!validNonEmptyText(migration.id, 128)) {
-      throw new CharacterBuilderDraftError(
-        'migration-failed',
-        'The legacy character draft migration ID is invalid.',
-      );
-    }
-    const envelope = await operation((target) => target.read());
-    if (envelope.appliedMigrations.includes(migration.id)) return envelope.active;
-
-    let candidate: LegacyCharacterDesignDraftCandidate<TDraft> | null;
-    try {
-      candidate = await migration.loadNewestCharacterDesign();
-    } catch (error) {
-      throw new CharacterBuilderDraftError(
-        'migration-failed',
-        'The newest legacy character design could not be read.',
-        { cause: error },
-      );
-    }
-    const importedValue = candidate
-      ? cloneAndSanitizeDraft(candidate.value, options.sanitizeDraft)
-      : null;
-    if (
-      candidate &&
-      (!validNonEmptyText(candidate.sourceId, 256) ||
-        !validRevision(candidate.sourceRevision) ||
-        candidate.sourceRevision < 1 ||
-        !validTimestamp(candidate.sourceUpdatedAt))
-    ) {
-      throw new CharacterBuilderDraftError(
-        'migration-failed',
-        'The legacy character design migration returned invalid provenance.',
-      );
-    }
-    const importedAt = safeTimestamp(now);
-    return mutate((latest) => {
-      if (latest.appliedMigrations.includes(migration.id)) {
-        return { envelope: latest, result: latest.active };
-      }
-      const revision = latest.revision + 1;
-      const imported: CharacterBuilderDraftRecord<TDraft> | null =
-        latest.active || !candidate || !importedValue
-          ? latest.active
-          : {
-              schemaVersion: CHARACTER_BUILDER_DRAFT_SCHEMA_VERSION,
-              id: DRAFT_STATE_ID,
-              revision,
-              value: importedValue,
-              origin: {
-                kind: 'legacy-character-design',
-                migrationId: migration.id,
-                sourceId: candidate.sourceId,
-                sourceRevision: candidate.sourceRevision,
-                sourceUpdatedAt: candidate.sourceUpdatedAt,
-              },
-              createdAt: importedAt,
-              updatedAt: importedAt,
-            };
-      return {
-        envelope: {
-          ...latest,
-          revision,
-          active: imported
-            ? {
-                ...imported,
-                revision,
-              }
-            : null,
-          appliedMigrations: [...latest.appliedMigrations, migration.id],
-        },
-        result: imported
-          ? {
-              ...imported,
-              revision,
-            }
-          : null,
-      };
-    });
-  };
-
   const load = async (): Promise<CharacterBuilderDraftRecord<TDraft> | null> => {
     const envelope = await operation((target) => target.read());
     await memory.replace(envelope);
-    return applyLegacyMigration(envelope.active);
+    return envelope.active;
   };
 
   const retryDurableStorage = (): Promise<CharacterBuilderDraftStorageState> => {

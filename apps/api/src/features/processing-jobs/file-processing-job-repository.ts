@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { chmod, mkdir, open, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { videoJobStatusSchema } from '@studio/contracts';
+import { videoJobStatusSchema, videoOutputResolutionSchema } from '@studio/contracts';
 
 const traceSchema = z
   .object({
@@ -12,6 +12,15 @@ const traceSchema = z
     operation: z.enum(['character-swap', 'virtual-try-on']),
     provider: z.string().trim().min(1).max(80),
     providerJobId: z.string().trim().min(1).max(500).nullable(),
+    requestFingerprint: z
+      .string()
+      .regex(/^[a-f0-9]{64}$/u)
+      .nullable()
+      .default(null),
+    outputResolution: videoOutputResolutionSchema.nullable().default(null),
+    providerOutputLocation: z.string().trim().min(1).max(2_000).nullable().default(null),
+    sourceDurationMs: z.number().finite().positive().max(300_000).nullable().default(null),
+    sourceOrientation: z.enum(['landscape', 'portrait']).nullable().default(null),
     status: videoJobStatusSchema,
     safeErrorCode: z.string().trim().min(1).max(80).nullable(),
     createdAt: z.iso.datetime(),
@@ -23,6 +32,27 @@ const traceSchema = z
 export type VideoProcessingJobTrace = z.infer<typeof traceSchema>;
 export interface ProcessingJobTraceWriter {
   upsert(trace: VideoProcessingJobTrace): Promise<void>;
+}
+
+export interface ResumableVideoProcessingJob {
+  readonly jobId: string;
+  readonly ownerUserId: string;
+  readonly operation: 'character-swap' | 'virtual-try-on';
+  readonly provider: string;
+  readonly providerJobId: string;
+  readonly requestFingerprint: string;
+  readonly status: 'queued' | 'processing' | 'retrieving';
+  readonly outputResolution: '720p' | '1080p';
+  readonly providerOutputLocation: string | null;
+  readonly sourceDurationMs: number;
+  readonly sourceOrientation: 'landscape' | 'portrait';
+  readonly createdAt: string;
+  readonly updatedAt: string;
+  readonly expiresAt: string;
+}
+
+export interface DurableProcessingJobRepository extends ProcessingJobTraceWriter {
+  listResumable(now: string): Promise<readonly ResumableVideoProcessingJob[]>;
 }
 
 export class FileProcessingJobRepository implements ProcessingJobTraceWriter {

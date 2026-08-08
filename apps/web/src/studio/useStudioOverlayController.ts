@@ -13,7 +13,6 @@ export type ActiveOverlay =
   | 'outfit-selector'
   | 'outfit-builder'
   | 'ai-experience'
-  | 'legacy-projects'
   | 'video-upload'
   | null;
 

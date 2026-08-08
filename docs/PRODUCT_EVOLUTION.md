@@ -17,6 +17,15 @@ Studio runtime. The cutover intentionally clears retired Guided videos instead o
 Saved Voices became Lightframe-owned user relationships, so removal no longer deletes provider
 voices.
 
+## Persistence became storage-neutral without becoming public
+
+The local-first repositories were lifted behind asynchronous ports, then given
+configuration-gated Drizzle/Neon and private Cloudflare R2 adapters. Local remains the default.
+Neon can make sessions, saved media metadata, creative records, and accepted-provider-job state
+durable; R2 stores bytes behind the same authenticated routes. A non-destructive backfill and
+shadow mode preserve rollback. This change deliberately did not add signup, billing, public
+ingress, shared tenancy, automatic media garbage collection, or provider-submission retry.
+
 ## Entry became separate from the Studio runtime
 
 Studio originally rendered directly at `/`, and every retired or unknown path canonicalized to

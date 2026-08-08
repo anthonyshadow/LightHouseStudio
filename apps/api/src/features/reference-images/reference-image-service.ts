@@ -13,7 +13,7 @@ import {
   type ReferenceImageAssetStore,
   type StoreGeneratedReferenceImageInput,
   type StoredReferenceImageContent,
-  type StoredReferenceImageFile,
+  type StoredReferenceImageStream,
   type StoredReferenceImageMetadata,
 } from './asset-store.js';
 import {
@@ -77,8 +77,8 @@ interface ReferenceImageFinalizationInput {
   readonly operation: ReferenceImageFinalizationOperationMetadata;
 }
 
-export type ReferenceImageContentFileLookup =
-  | Readonly<{ status: 'available'; file: StoredReferenceImageFile }>
+export type ReferenceImageContentStreamLookup =
+  | Readonly<{ status: 'available'; content: StoredReferenceImageStream }>
   | Readonly<{ status: 'missing' }>
   | Readonly<{ status: 'streaming-unsupported' }>;
 
@@ -556,12 +556,12 @@ export class ReferenceImageService {
     return this.#store.getContent(localOwnerId, assetId);
   }
 
-  async getContentFile(
+  async getContentStream(
     localOwnerId: string,
     assetId: string,
-  ): Promise<ReferenceImageContentFileLookup> {
-    if (!this.#store.getContentFile) return { status: 'streaming-unsupported' };
-    const file = await this.#store.getContentFile(localOwnerId, assetId);
-    return file === null ? { status: 'missing' } : { status: 'available', file };
+  ): Promise<ReferenceImageContentStreamLookup> {
+    if (!this.#store.getContentStream) return { status: 'streaming-unsupported' };
+    const content = await this.#store.getContentStream(localOwnerId, assetId);
+    return content === null ? { status: 'missing' } : { status: 'available', content };
   }
 }

@@ -21,7 +21,6 @@ import {
   uploadReferenceImageResponseSchema,
 } from '@studio/contracts';
 import { randomUUID } from 'node:crypto';
-import { createReadStream } from 'node:fs';
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { AppError } from '../../http/errors.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
@@ -349,11 +348,11 @@ export const registerReferenceImageRoutes = (
   app.get('/api/reference-images/:assetId/content', async (request, reply) => {
     const assetId = requireAssetId(request.params);
     const localOwnerId = ownerUserIdForRequest(request);
-    const fileLookup = await service.getContentFile(localOwnerId, assetId);
+    const streamLookup = await service.getContentStream(localOwnerId, assetId);
     const content =
-      fileLookup.status === 'available'
-        ? fileLookup.file
-        : fileLookup.status === 'streaming-unsupported'
+      streamLookup.status === 'available'
+        ? streamLookup.content
+        : streamLookup.status === 'streaming-unsupported'
           ? await service.getContent(localOwnerId, assetId)
           : null;
     if (content === null) {
@@ -362,6 +361,6 @@ export const registerReferenceImageRoutes = (
     void reply.header('Content-Type', content.metadata.mimeType);
     void reply.header('Content-Length', content.metadata.byteSize);
     void reply.header('X-Content-Type-Options', 'nosniff');
-    return reply.send('path' in content ? createReadStream(content.path) : content.bytes);
+    return reply.send('createReadStream' in content ? content.createReadStream() : content.bytes);
   });
 };

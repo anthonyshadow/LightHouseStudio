@@ -133,7 +133,6 @@ export type CreativeWorkspaceState = {
     onRetry: () => void;
     onContinueWithoutReference?: (() => void) | undefined;
   } | null;
-  legacyProjectCount?: number | undefined;
   activeRecipe?: ActiveRecipeIdentity | undefined;
   recipeShelfEntryIntent: RecipeShelfEntryIntent | null;
   hasPlaybackVideo: boolean;
@@ -161,7 +160,6 @@ export type CreativeWorkspaceActions = {
   onEditOutfit: (asset: SavedPrompt) => void;
   onSaveOutfitCopy: (asset: SavedPrompt | RecentPrompt) => void;
   onOpenSavedWorkshop: (draft: PromptBuilderDraft, asset: SavedCharacterPrompt) => void;
-  onOpenLegacyProjects?: (() => void) | undefined;
 };
 
 export type CreativeWorkspaceRefs = {
@@ -171,7 +169,6 @@ export type CreativeWorkspaceRefs = {
   editVideoToggleRef: RefObject<HTMLButtonElement | null>;
   characterToggleRef: RefObject<HTMLButtonElement | null>;
   outfitToggleRef: RefObject<HTMLButtonElement | null>;
-  legacyManagerToggleRef?: RefObject<HTMLButtonElement | null> | undefined;
 };
 
 export type CreativeWorkspaceProps = {
@@ -195,8 +192,6 @@ export type CreativePanelContentProps = Pick<
   | 'referenceUsePending'
   | 'referenceUseFailure'
   | 'activeRecipe'
-  | 'legacyManagerToggleRef'
-  | 'legacyProjectCount'
   | 'onWorkshopDraftChange'
   | 'onUseWorkshop'
   | 'onSaveWorkshop'
@@ -206,7 +201,6 @@ export type CreativePanelContentProps = Pick<
   | 'onEditCharacter'
   | 'onOpenWardrobe'
   | 'onOpenSavedWorkshop'
-  | 'onOpenLegacyProjects'
 > & {
   panel: Exclude<AuxiliaryPanel, 'closed'>;
   shelfController: RecipeShelfController;
@@ -224,8 +218,6 @@ export const CreativePanelContent = ({
   referenceUsePending,
   referenceUseFailure,
   activeRecipe,
-  legacyManagerToggleRef,
-  legacyProjectCount = 0,
   onWorkshopDraftChange,
   onUseWorkshop,
   onSaveWorkshop,
@@ -235,7 +227,6 @@ export const CreativePanelContent = ({
   onEditCharacter,
   onOpenWardrobe,
   onOpenSavedWorkshop,
-  onOpenLegacyProjects,
   shelfController,
 }: CreativePanelContentProps) => {
   const theme = useTheme();
@@ -266,7 +257,7 @@ export const CreativePanelContent = ({
         </Suspense>
       ) : (
         <>
-          {recipeInsertionBlocked || (legacyProjectCount > 0 && onOpenLegacyProjects) ? (
+          {recipeInsertionBlocked ? (
             <div css={libraryModeStyles(theme)}>
               {recipeInsertionBlocked ? (
                 <StatusNotice role="status" tone="warning">
@@ -274,15 +265,6 @@ export const CreativePanelContent = ({
                     ? 'Finish the take before inserting a recipe. You can keep browsing and editing this shelf.'
                     : 'Release camera & mic before inserting a recipe for another model. You can keep browsing and editing this shelf.'}
                 </StatusNotice>
-              ) : null}
-              {legacyProjectCount > 0 && onOpenLegacyProjects ? (
-                <Button
-                  ref={legacyManagerToggleRef}
-                  variant="secondary"
-                  onClick={onOpenLegacyProjects}
-                >
-                  Manage Legacy Projects ({legacyProjectCount})
-                </Button>
               ) : null}
             </div>
           ) : null}
@@ -351,7 +333,6 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     hasReferenceImage,
     referenceUsePending,
     referenceUseFailure,
-    legacyProjectCount = 0,
     activeRecipe,
     recipeShelfEntryIntent,
     hasPlaybackVideo,
@@ -378,7 +359,6 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     onEditOutfit,
     onSaveOutfitCopy,
     onOpenSavedWorkshop,
-    onOpenLegacyProjects,
   } = actions;
   const {
     workshopToggleRef,
@@ -387,7 +367,6 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
     editVideoToggleRef,
     characterToggleRef,
     outfitToggleRef,
-    legacyManagerToggleRef,
   } = refs;
   const theme = useTheme();
   const characterWorkshopBlocked =
@@ -580,8 +559,6 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
             referenceUsePending={referenceUsePending}
             referenceUseFailure={referenceUseFailure}
             {...(activeRecipe !== undefined ? { activeRecipe } : {})}
-            {...(legacyManagerToggleRef ? { legacyManagerToggleRef } : {})}
-            legacyProjectCount={legacyProjectCount}
             onWorkshopDraftChange={onWorkshopDraftChange}
             onUseWorkshop={onUseWorkshop}
             onSaveWorkshop={onSaveWorkshop}
@@ -590,7 +567,6 @@ export const CreativeWorkspace = ({ repository, state, actions, refs }: Creative
             {...(onCreateCharacter ? { onCreateCharacter } : {})}
             {...(onEditCharacter ? { onEditCharacter } : {})}
             onOpenSavedWorkshop={onOpenSavedWorkshop}
-            {...(onOpenLegacyProjects ? { onOpenLegacyProjects } : {})}
             shelfController={shelfController}
           />
         ) : null}

@@ -1,6 +1,8 @@
 import { randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { chmod, mkdir, open, readFile, readdir, rename, rm, stat } from 'node:fs/promises';
 import path from 'node:path';
+import type { Readable } from 'node:stream';
 import {
   createReferenceImageLayout,
   createStoredReferenceImageMetadata,
@@ -35,9 +37,9 @@ export interface StoredReferenceImageContent {
   readonly bytes: Buffer;
 }
 
-export interface StoredReferenceImageFile {
+export interface StoredReferenceImageStream {
   readonly metadata: StoredReferenceImageMetadata;
-  readonly path: string;
+  createReadStream(): Readable;
 }
 
 export interface ReferenceImageAssetStore {
@@ -47,7 +49,11 @@ export interface ReferenceImageAssetStore {
   ): Promise<StoredReferenceImageMetadata | null>;
   getMetadata(localOwnerId: string, assetId: string): Promise<StoredReferenceImageMetadata | null>;
   getContent(localOwnerId: string, assetId: string): Promise<StoredReferenceImageContent | null>;
-  getContentFile?(localOwnerId: string, assetId: string): Promise<StoredReferenceImageFile | null>;
+  getContentStream?(
+    localOwnerId: string,
+    assetId: string,
+  ): Promise<StoredReferenceImageStream | null>;
+  listMetadata?(localOwnerId: string): Promise<readonly StoredReferenceImageMetadata[]>;
   store(input: StoreReferenceImageInput): Promise<StoredReferenceImageMetadata>;
 }
 
@@ -338,11 +344,18 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     return metadata?.localOwnerId === localOwnerId ? metadata : null;
   }
 
+  async listMetadata(localOwnerId: string): Promise<readonly StoredReferenceImageMetadata[]> {
+    await this.#initialize();
+    return [...this.#metadataIndex.values()]
+      .filter((metadata) => metadata.localOwnerId === localOwnerId)
+      .sort((left, right) => left.createdAt.localeCompare(right.createdAt));
+  }
+
   async getContent(
     localOwnerId: string,
     assetId: string,
   ): Promise<StoredReferenceImageContent | null> {
-    const file = await this.getContentFile(localOwnerId, assetId);
+    const file = await this.#getContentFile(localOwnerId, assetId);
     if (file === null) return null;
     try {
       const bytes = await readFile(file.path);
@@ -359,10 +372,10 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
     }
   }
 
-  async getContentFile(
+  async #getContentFile(
     localOwnerId: string,
     assetId: string,
-  ): Promise<StoredReferenceImageFile | null> {
+  ): Promise<{ readonly metadata: StoredReferenceImageMetadata; readonly path: string } | null> {
     const metadata = await this.getMetadata(localOwnerId, assetId);
     if (metadata === null) return null;
     const expectedStorageKey = referenceImageStorageKey(metadata.assetId, metadata.mimeType);
@@ -382,6 +395,16 @@ export class LocalReferenceImageAssetStore implements ReferenceImageAssetStore {
         cause: error,
       });
     }
+  }
+
+  async getContentStream(
+    localOwnerId: string,
+    assetId: string,
+  ): Promise<StoredReferenceImageStream | null> {
+    const file = await this.#getContentFile(localOwnerId, assetId);
+    return file === null
+      ? null
+      : { metadata: file.metadata, createReadStream: () => createReadStream(file.path) };
   }
 
   async store(input: StoreReferenceImageInput): Promise<StoredReferenceImageMetadata> {

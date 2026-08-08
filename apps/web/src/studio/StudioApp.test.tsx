@@ -214,7 +214,6 @@ const harness = vi.hoisted(() => {
     fetchReferenceImageMetadata: vi.fn(),
     hydrateReferenceImage: vi.fn(),
     hydratedReference: null as PersistedSessionReference | null,
-    legacyClose: vi.fn(),
     promptCommitted: null as
       | ((
           mode: 'lucy-latest' | 'lucy-vton-latest',
@@ -259,16 +258,6 @@ vi.mock('../features/creative-assets/useCreativeAssetRepository', () => ({
     _repository: unknown,
     selector: (state: ReturnType<typeof harness.repository.getSnapshot>) => unknown,
   ) => selector(harness.repository.getSnapshot()),
-}));
-
-vi.mock('../features/guided-flow/projectRepository', () => ({
-  createLocalProjectRepository: () => ({
-    initialize: () => Promise.resolve({ kind: 'memory', available: true }),
-    count: () => Promise.resolve(0),
-    list: () => Promise.resolve([]),
-    getStorageState: () => ({ kind: 'memory', available: true }),
-    close: harness.legacyClose,
-  }),
 }));
 
 vi.mock('../features/live-stage', () => ({

@@ -13,7 +13,7 @@ import {
   type InspectedVideo,
 } from '@studio/contracts';
 import { normalizeSavedVideoTitle } from '@studio/domain';
-import type { AssetByteStore } from '../../storage/asset-byte-store.js';
+import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
 import { AppError } from '../../http/app-error.js';
 import { inspectSavedVideoFile } from './saved-video-inspection.js';
 import type {
@@ -335,6 +335,21 @@ export class SavedVideoService {
     facets: { characterNames: string[]; formats: SavedVideoFormat[] };
   }> {
     const offset = decodeCursor(query.cursor, query);
+    if (this.#repository.listPage !== undefined) {
+      const page = await this.#repository.listPage(ownerUserId, query, offset);
+      return {
+        videos: page.videos.map((aggregate) => publicSummary(aggregate)),
+        nextCursor:
+          offset + page.videos.length < page.total
+            ? encodeCursor(offset + page.videos.length, query)
+            : null,
+        total: page.total,
+        facets: {
+          characterNames: [...page.characterNames],
+          formats: [...page.formats],
+        },
+      };
+    }
     const all = (await this.#repository.list(ownerUserId)).map((aggregate): IndexedVideo => {
       const version = currentVersion(aggregate);
       return { aggregate, version, format: videoFormat(version) };
@@ -403,7 +418,7 @@ export class SavedVideoService {
     ownerUserId: string,
     videoId: string,
     versionId?: string,
-  ): Promise<{ video: SavedVideoDetail; version: StoredVideoVersion; path: string }> {
+  ): Promise<{ video: SavedVideoDetail; version: StoredVideoVersion; asset: AssetReadHandle }> {
     const aggregate = await this.#repository.get(ownerUserId, videoId);
     if (aggregate === null)
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
@@ -422,7 +437,7 @@ export class SavedVideoService {
         'The saved video file is missing from local storage.',
       );
     }
-    return { video: publicDetail(aggregate), version, path: asset.path };
+    return { video: publicDetail(aggregate), version, asset };
   }
 
   async saveThumbnail(
@@ -488,7 +503,7 @@ export class SavedVideoService {
     ownerUserId: string,
     videoId: string,
     versionId?: string,
-  ): Promise<{ path: string; mimeType: 'image/webp' }> {
+  ): Promise<{ asset: AssetReadHandle; mimeType: 'image/webp' }> {
     const aggregate = await this.#repository.get(ownerUserId, videoId);
     if (aggregate === null)
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
@@ -503,6 +518,6 @@ export class SavedVideoService {
     if (asset === null) {
       throw new AppError(404, 'asset_missing', 'The saved video thumbnail is missing.');
     }
-    return { path: asset.path, mimeType: 'image/webp' };
+    return { asset, mimeType: 'image/webp' };
   }
 }

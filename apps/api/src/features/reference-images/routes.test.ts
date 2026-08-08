@@ -177,13 +177,13 @@ describe('reference image API', () => {
   });
 
   it('does not repeat a missing streaming lookup through buffered fallback', async () => {
-    const getContentFile = vi.fn(() => Promise.resolve(null));
+    const getContentStream = vi.fn(() => Promise.resolve(null));
     const getContent = vi.fn(() => Promise.resolve(null));
     const store: ReferenceImageAssetStore = {
       findByRequestId: () => Promise.resolve(null),
       getMetadata: () => Promise.resolve(null),
       getContent,
-      getContentFile,
+      getContentStream,
       store: () => Promise.reject(new Error('Unexpected store.')),
     };
     const app = await setup(null, null, undefined, store);
@@ -195,7 +195,7 @@ describe('reference image API', () => {
     });
 
     expect(response.statusCode).toBe(404);
-    expect(getContentFile).toHaveBeenCalledOnce();
+    expect(getContentStream).toHaveBeenCalledOnce();
     expect(getContent).not.toHaveBeenCalled();
   });
 

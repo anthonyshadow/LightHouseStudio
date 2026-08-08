@@ -30,6 +30,8 @@ export const DEFAULT_DEMO_USER_PASSWORD_HASH =
 export const DEFAULT_DEMO_JWT_SECRET = 'lightframe-local-demo-signing-key-not-for-production-2026';
 export const DEFAULT_AUTH_SESSION_TTL_SECONDS = 24 * 60 * 60;
 export const DEFAULT_AUTH_COOKIE_NAME = 'lightframe_session';
+export const DEFAULT_VIDEO_JOB_MAX_ACTIVE = 8;
+export const DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER = 4;
 
 const normalizeOptionalString = (value: unknown): unknown => {
   if (typeof value !== 'string') return value;
@@ -65,6 +67,12 @@ const strictBooleanSchema = (defaultValue: boolean) =>
     if (value === 'false') return false;
     return value;
   }, z.boolean());
+
+const positiveLimitSchema = (defaultValue: number) =>
+  z.preprocess(
+    (value) => (value === undefined || value === '' ? defaultValue : value),
+    z.coerce.number().int().min(1).max(100),
+  );
 
 const environmentSchema = z
   .object({
@@ -109,6 +117,49 @@ const environmentSchema = z
         .default(DEFAULT_AUTH_COOKIE_NAME),
     ),
     AUTH_COOKIE_SECURE: strictBooleanSchema(false),
+    DATABASE_MODE: z.preprocess(
+      normalizeOptionalString,
+      z.enum(['local', 'shadow', 'neon']).default('local'),
+    ),
+    DATABASE_URL: z.preprocess(
+      normalizeOptionalString,
+      z
+        .string()
+        .url()
+        .regex(/^postgres(?:ql)?:\/\//u)
+        .optional(),
+    ),
+    ASSET_STORE_PROVIDER: z.preprocess(
+      normalizeOptionalString,
+      z.enum(['local', 'r2']).default('local'),
+    ),
+    R2_ACCOUNT_ID: z.preprocess(
+      normalizeOptionalString,
+      z
+        .string()
+        .regex(/^[a-f0-9]{32}$/u)
+        .optional(),
+    ),
+    R2_ACCESS_KEY_ID: optionalSecretSchema,
+    R2_SECRET_ACCESS_KEY: optionalSecretSchema,
+    R2_BUCKET: z.preprocess(
+      normalizeOptionalString,
+      z
+        .string()
+        .regex(/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/u)
+        .optional(),
+    ),
+    R2_KEY_PREFIX: z.preprocess(
+      normalizeOptionalString,
+      z
+        .string()
+        .regex(/^[a-z0-9][a-z0-9/_-]{0,127}$/u)
+        .default('media/v1'),
+    ),
+    VIDEO_JOB_MAX_ACTIVE: positiveLimitSchema(DEFAULT_VIDEO_JOB_MAX_ACTIVE),
+    VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER: positiveLimitSchema(
+      DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
+    ),
     DECART_API_KEY: optionalSecretSchema,
     EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: z.preprocess(
       normalizeOptionalString,
@@ -199,6 +250,43 @@ const environmentSchema = z
     for (const [variable, valid, message] of required) {
       if (!valid) context.addIssue({ code: 'custom', path: [variable], message });
     }
+    if (value.DATABASE_MODE !== 'local' && value.DATABASE_URL === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DATABASE_URL'],
+        message: 'Set DATABASE_URL when DATABASE_MODE uses Neon.',
+      });
+    }
+    if (value.ASSET_STORE_PROVIDER === 'r2') {
+      if (value.DATABASE_MODE === 'local') {
+        context.addIssue({
+          code: 'custom',
+          path: ['DATABASE_MODE'],
+          message: 'Use DATABASE_MODE=shadow or neon when ASSET_STORE_PROVIDER=r2.',
+        });
+      }
+      for (const [variable, valid] of [
+        ['R2_ACCOUNT_ID', value.R2_ACCOUNT_ID !== undefined],
+        ['R2_ACCESS_KEY_ID', value.R2_ACCESS_KEY_ID !== undefined],
+        ['R2_SECRET_ACCESS_KEY', value.R2_SECRET_ACCESS_KEY !== undefined],
+        ['R2_BUCKET', value.R2_BUCKET !== undefined],
+      ] as const) {
+        if (!valid) {
+          context.addIssue({
+            code: 'custom',
+            path: [variable],
+            message: `Set ${variable} when ASSET_STORE_PROVIDER=r2.`,
+          });
+        }
+      }
+    }
+    if (value.VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER > value.VIDEO_JOB_MAX_ACTIVE) {
+      context.addIssue({
+        code: 'custom',
+        path: ['VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER'],
+        message: 'VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER cannot exceed VIDEO_JOB_MAX_ACTIVE.',
+      });
+    }
     if (value.NODE_ENV === 'production' && value.AUTH_JWT_SECRET === DEFAULT_DEMO_JWT_SECRET) {
       context.addIssue({
         code: 'custom',
@@ -234,6 +322,16 @@ export interface RuntimeConfig {
   readonly authSessionTtlSeconds: number;
   readonly authCookieName: string;
   readonly authCookieSecure: boolean;
+  readonly databaseMode: 'local' | 'shadow' | 'neon';
+  readonly databaseUrl?: string;
+  readonly assetStoreProvider: 'local' | 'r2';
+  readonly r2AccountId?: string;
+  readonly r2AccessKeyId?: string;
+  readonly r2SecretAccessKey?: string;
+  readonly r2Bucket?: string;
+  readonly r2KeyPrefix: string;
+  readonly videoJobMaxActive: number;
+  readonly videoJobMaxActivePerProvider: number;
   readonly decartApiKey?: string;
   readonly existingVideoCharacterSwapProvider: 'decart' | 'pruna';
   readonly prunaVideoReplaceEnabled: boolean;
@@ -360,6 +458,20 @@ export const parseEnvironment = (
     authSessionTtlSeconds: result.data.AUTH_SESSION_TTL_SECONDS,
     authCookieName: result.data.AUTH_COOKIE_NAME,
     authCookieSecure: result.data.AUTH_COOKIE_SECURE,
+    databaseMode: result.data.DATABASE_MODE,
+    ...(result.data.DATABASE_URL === undefined ? {} : { databaseUrl: result.data.DATABASE_URL }),
+    assetStoreProvider: result.data.ASSET_STORE_PROVIDER,
+    ...(result.data.R2_ACCOUNT_ID === undefined ? {} : { r2AccountId: result.data.R2_ACCOUNT_ID }),
+    ...(result.data.R2_ACCESS_KEY_ID === undefined
+      ? {}
+      : { r2AccessKeyId: result.data.R2_ACCESS_KEY_ID }),
+    ...(result.data.R2_SECRET_ACCESS_KEY === undefined
+      ? {}
+      : { r2SecretAccessKey: result.data.R2_SECRET_ACCESS_KEY }),
+    ...(result.data.R2_BUCKET === undefined ? {} : { r2Bucket: result.data.R2_BUCKET }),
+    r2KeyPrefix: result.data.R2_KEY_PREFIX,
+    videoJobMaxActive: result.data.VIDEO_JOB_MAX_ACTIVE,
+    videoJobMaxActivePerProvider: result.data.VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
     ...(result.data.DECART_API_KEY === undefined
       ? {}
       : { decartApiKey: result.data.DECART_API_KEY }),

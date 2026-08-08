@@ -27,6 +27,7 @@ export type SavedVoiceRecord = z.infer<typeof recordSchema>;
 export interface SavedVoiceRepository {
   list(ownerUserId: string): Promise<readonly SavedVoiceRecord[]>;
   has(ownerUserId: string, voiceId: string): Promise<boolean>;
+  savedIds(ownerUserId: string, voiceIds: readonly string[]): Promise<ReadonlySet<string>>;
   save(
     ownerUserId: string,
     voiceId: string,
@@ -81,6 +82,16 @@ export class MemorySavedVoiceRepository implements SavedVoiceRepository {
   has(ownerUserId: string, voiceId: string) {
     return Promise.resolve(
       this.#library(ownerUserId).records.some((item) => item.providerVoiceId === voiceId),
+    );
+  }
+  savedIds(ownerUserId: string, voiceIds: readonly string[]) {
+    const requested = new Set(voiceIds);
+    return Promise.resolve(
+      new Set(
+        this.#library(ownerUserId)
+          .records.map((item) => item.providerVoiceId)
+          .filter((voiceId) => requested.has(voiceId)),
+      ),
     );
   }
   save(ownerUserId: string, voiceId: string, publicOwnerId: string | null, savedAt: string) {
@@ -229,6 +240,10 @@ export class FileSavedVoiceRepository implements SavedVoiceRepository {
   async has(ownerUserId: string, voiceId: string) {
     await this.#load(ownerUserId);
     return this.#memory.has(ownerUserId, voiceId);
+  }
+  async savedIds(ownerUserId: string, voiceIds: readonly string[]) {
+    await this.#load(ownerUserId);
+    return this.#memory.savedIds(ownerUserId, voiceIds);
   }
   async save(ownerUserId: string, voiceId: string, publicOwnerId: string | null, savedAt: string) {
     return this.#exclusive(ownerUserId, async () => {

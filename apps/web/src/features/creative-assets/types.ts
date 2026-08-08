@@ -180,6 +180,9 @@ export interface CreativeAssetRepository {
     referenceImageAssetId: string,
   ) => void;
   search: (query: string, modelModeId?: ModelModeId) => CreativeAssetSearchResults;
+  /** Cloud-sync seam; local writes remain immediately available while the server CAS settles. */
+  replaceFromRemote?: (store: CreativeAssetStore) => void;
+  setSyncNotice?: (notice: string | null) => void;
 }
 
 export interface StorageLike {

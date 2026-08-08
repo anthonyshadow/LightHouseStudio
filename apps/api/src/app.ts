@@ -11,8 +11,14 @@ import Fastify, { LogController, type FastifyInstance } from 'fastify';
 import type { RuntimeConfig } from './config/environment.js';
 import { AuthService } from './features/auth/auth-service.js';
 import { registerAuthRoutes } from './features/auth/routes.js';
-import { SeededUserRepository } from './features/auth/seeded-user-repository.js';
-import { InMemorySessionRepository } from './features/auth/session-repository.js';
+import {
+  SeededUserRepository,
+  type UserRepository,
+} from './features/auth/seeded-user-repository.js';
+import {
+  InMemorySessionRepository,
+  type SessionRepository,
+} from './features/auth/session-repository.js';
 import { registerRealtimeRoutes } from './features/realtime/routes.js';
 import { registerSystemRoutes } from './features/system/routes.js';
 import { registerVideoJobRoutes } from './features/video-jobs/routes.js';
@@ -38,16 +44,26 @@ import { VoiceService } from './features/voices/voice-service.js';
 import {
   FileSavedVoiceRepository,
   MemorySavedVoiceRepository,
+  type SavedVoiceRepository,
 } from './features/voices/saved-voice-repository.js';
 import { AppError, installErrorHandling } from './http/errors.js';
 import { spoolAudioUpload, SpooledUploadTooLargeError } from './application/spooled-upload.js';
 import { installLocalSecurityBoundary } from './http/security.js';
 import { installAuthentication } from './http/authentication.js';
-import { LocalAssetByteStore } from './storage/asset-byte-store.js';
-import { FileSavedVideoRepository } from './features/saved-videos/saved-video-repository.js';
+import { LocalAssetByteStore, type AssetByteStore } from './storage/asset-byte-store.js';
+import {
+  FileSavedVideoRepository,
+  type SavedVideoRepository,
+} from './features/saved-videos/saved-video-repository.js';
 import { SavedVideoService } from './features/saved-videos/saved-video-service.js';
 import { registerSavedVideoRoutes } from './features/saved-videos/routes.js';
-import { FileProcessingJobRepository } from './features/processing-jobs/file-processing-job-repository.js';
+import { registerCreativeLibraryRoutes } from './features/creative-libraries/routes.js';
+import type { CreativeLibraryRepository } from './features/creative-libraries/creative-library-repository.js';
+import {
+  type DurableProcessingJobRepository,
+  FileProcessingJobRepository,
+  type ProcessingJobTraceWriter,
+} from './features/processing-jobs/file-processing-job-repository.js';
 import {
   DecartSdkTokenProvider,
   type DecartTokenProvider,
@@ -78,6 +94,19 @@ import {
 export const OPENAI_CONNECTION_TIMEOUT_MARGIN_MS = 100_000;
 export const SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES = referenceImageMimeTypeSchema.options;
 
+export interface AppPersistenceDependencies {
+  readonly users?: UserRepository;
+  readonly sessions?: SessionRepository;
+  readonly savedVideos?: SavedVideoRepository;
+  readonly assetBytes?: AssetByteStore;
+  readonly savedVoices?: SavedVoiceRepository;
+  readonly referenceImages?: ReferenceImageAssetStore;
+  readonly processingJobTraces?: ProcessingJobTraceWriter;
+  readonly processingJobs?: DurableProcessingJobRepository;
+  readonly creativeLibraries?: CreativeLibraryRepository;
+  readonly close?: () => Promise<void>;
+}
+
 export interface AppDependencies {
   readonly config: RuntimeConfig;
   readonly decartProvider?: DecartTokenProvider | null;
@@ -89,6 +118,7 @@ export interface AppDependencies {
   readonly characterPromptOptimizer?: CharacterPromptOptimizer | null;
   readonly referenceImageAssetStore?: ReferenceImageAssetStore;
   readonly remoteImageDownloader?: RemoteReferenceImageDownloader;
+  readonly persistence?: AppPersistenceDependencies;
   readonly fetchImplementation?: typeof fetch;
   readonly logger?: boolean;
   readonly staticRoot?: string;
@@ -174,13 +204,14 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   installLocalSecurityBoundary(app);
 
   const authService = new AuthService(
-    new SeededUserRepository({
-      id: dependencies.config.demoUserId,
-      login: dependencies.config.demoUserLogin,
-      displayName: dependencies.config.demoUserDisplayName,
-      passwordHash: dependencies.config.demoUserPasswordHash,
-    }),
-    new InMemorySessionRepository(),
+    dependencies.persistence?.users ??
+      new SeededUserRepository({
+        id: dependencies.config.demoUserId,
+        login: dependencies.config.demoUserLogin,
+        displayName: dependencies.config.demoUserDisplayName,
+        passwordHash: dependencies.config.demoUserPasswordHash,
+      }),
+    dependencies.persistence?.sessions ?? new InMemorySessionRepository(),
     dependencies.config.authJwtSecret,
     'lightframe-studio',
     'lightframe-local-api',
@@ -223,9 +254,10 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
           elevenLabsProvider,
           dependencies.config.elevenLabsModelId,
           dependencies.config.elevenLabsEnableLogging,
-          dependencies.config.nodeEnv === 'test'
-            ? new MemorySavedVoiceRepository()
-            : new FileSavedVoiceRepository(dependencies.config.lightframeDataDir),
+          dependencies.persistence?.savedVoices ??
+            (dependencies.config.nodeEnv === 'test'
+              ? new MemorySavedVoiceRepository()
+              : new FileSavedVoiceRepository(dependencies.config.lightframeDataDir)),
         );
 
   const referenceImageProvider = resolveOptionalProvider(dependencies.referenceImageProvider, () =>
@@ -259,6 +291,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   );
   const referenceImageAssetStore =
     dependencies.referenceImageAssetStore ??
+    dependencies.persistence?.referenceImages ??
     new LocalReferenceImageAssetStore(dependencies.config.lightframeDataDir, {
       legacyOwnerUserId: dependencies.config.demoUserId,
     });
@@ -288,20 +321,29 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
     videoJobProviders,
     dependencies.config.lightframeDataDir,
     {
-      ...(dependencies.config.nodeEnv === 'test'
+      ...(dependencies.persistence?.processingJobTraces !== undefined
+        ? { traceWriter: dependencies.persistence.processingJobTraces }
+        : dependencies.config.nodeEnv === 'test'
+          ? {}
+          : {
+              traceWriter: new FileProcessingJobRepository(dependencies.config.lightframeDataDir),
+            }),
+      ...(dependencies.persistence?.processingJobs === undefined
         ? {}
-        : {
-            traceWriter: new FileProcessingJobRepository(dependencies.config.lightframeDataDir),
-          }),
+        : { durableJobRepository: dependencies.persistence.processingJobs }),
       providerIds: {
         'character-swap': dependencies.config.existingVideoCharacterSwapProvider,
         'virtual-try-on': 'decart',
       },
+      maximumActiveJobs: dependencies.config.videoJobMaxActive,
+      maximumActiveJobsPerProvider: dependencies.config.videoJobMaxActivePerProvider,
     },
   );
   const savedVideoService = new SavedVideoService(
-    new FileSavedVideoRepository(dependencies.config.lightframeDataDir),
-    new LocalAssetByteStore(dependencies.config.lightframeDataDir),
+    dependencies.persistence?.savedVideos ??
+      new FileSavedVideoRepository(dependencies.config.lightframeDataDir),
+    dependencies.persistence?.assetBytes ??
+      new LocalAssetByteStore(dependencies.config.lightframeDataDir),
   );
 
   registerAuthRoutes(app, authService, dependencies.config);
@@ -326,6 +368,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   registerRealtimeRoutes(app, decartProvider);
   registerVideoJobRoutes(app, videoJobService);
   registerSavedVideoRoutes(app, savedVideoService);
+  registerCreativeLibraryRoutes(app, dependencies.persistence?.creativeLibraries);
   registerReferenceImageRoutes(app, referenceImageService, {
     ...(dependencies.remoteImageDownloader
       ? { remoteImageDownloader: dependencies.remoteImageDownloader }
@@ -335,6 +378,7 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
   registerVoiceRoutes(app, voiceService);
   app.addHook('onClose', async () => {
     await videoJobService.close();
+    await dependencies.persistence?.close?.();
   });
   installErrorHandling(app, {
     serveSpa: dependencies.staticRoot !== undefined,

@@ -45,11 +45,9 @@ state:
 | `save-video`             | Download remains distinct; Save is idempotent; optional thumbnail failure is non-fatal; replace confirms and appends a version; rename/download/delete operate on the selected owner record                                          |
 | `video-gallery-states`   | Empty/loading/error/missing/placeholder/populated/load-more states avoid eager video requests; thumbnail Preview darkens the gallery, traps/returns focus, detaches on close, and remains usable at all five viewports and 200% text |
 | `saved-character-outfit` | Both libraries show the user-scoped records; Use follows existing handoff; delete removes relationships without provider work or unintended immutable-byte deletion                                                                  |
-| `legacy-reset`           | Pre-existing retired Guided records are cleared on authenticated Studio initialization and do not appear in Saved Videos                                                                                                             |
 
-Use disposable data for `legacy-reset`: the deletion is intentional and cannot be reversed through
-Lightframe. Logical Saved Video deletion is different: gallery metadata is tombstoned, while
-unreferenced media remains retained until Phase 2.
+Logical Saved Video deletion tombstones gallery metadata while unreferenced media remains retained
+until an approved relationship-safe garbage-collection policy exists.
 
 ## Per-target physical protocol
 

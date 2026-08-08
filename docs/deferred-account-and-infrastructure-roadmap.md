@@ -1,15 +1,17 @@
 # Deferred account and infrastructure roadmap
 
-Status: deferred architecture roadmap; not current behavior and not authorization to implement  
-Planning date: 2026-08-05  
+Status: partially implemented infrastructure roadmap; public-product phases remain deferred
+Planning date: 2026-08-07
 Prerequisite: every completion requirement in
 [`user-accounts-phase-1-audit-and-plan.md`](user-accounts-phase-1-audit-and-plan.md) must pass.
 
 ## Purpose and boundary
 
-This roadmap describes how the Phase 1 seeded-user, local-filesystem, and file-backed metadata
-foundation can evolve into a real multi-user service. It deliberately does not turn database,
-Cloudflare R2, signup, billing, public deployment, or cloud ownership into Phase 1 requirements.
+This roadmap separates the implemented persistence foundation from the work required for a real
+multi-user service. Drizzle/Neon repositories, private Cloudflare R2 storage, backfill, durable
+sessions, creative sync, accepted-job recovery, and admission limits are now configuration-gated
+current behavior. Signup, billing, public deployment, cloud ownership policy, a worker fleet, and
+multi-tenant authorization remain deferred.
 
 Phase 2 requires a separately approved public-product security and operations design. The current
 loopback Host/Origin boundary is not authentication for a remotely accessible product. Do not add a
@@ -18,17 +20,17 @@ repository ports exist.
 
 ## Phase 1 seams that Phase 2 should preserve
 
-| Phase 1 seam                     | Local implementation                          | Phase 2 replacement                                                               | Feature code impact                        |
-| -------------------------------- | --------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------ |
-| `UserRepository`                 | One seeded server user                        | Database user/credential/profile records or an approved identity provider mapping | None outside account service/composition   |
-| `SessionRepository`              | Process-memory `jti` registry                 | Durable database/Redis-compatible session store with rotation/revocation          | Auth service only                          |
-| `EntitlementService`             | Equal Free/Plus/Pro matrix                    | Database-backed plan/feature/limit evaluation                                     | Call sites keep consuming snapshots        |
-| Feature repositories             | Atomic file-backed video/voice/job aggregates | Transactional database adapters                                                   | Feature services keep business ports       |
-| `AssetByteStore`                 | Private local filesystem                      | Private Cloudflare R2 adapter                                                     | MediaAssetService keeps byte operations    |
-| `AssetAccessService`             | Protected same-origin content route           | Server proxy or short-lived R2 read grant                                         | Gallery/Studio keep feature URLs/contracts |
-| User-scoped browser repositories | IndexedDB caches/drafts/journals              | Remain local caches; durable records sync through APIs                            | React keeps repository/API ports           |
-| `ProcessingJobRepository`        | File-backed trace + browser-local trace       | Database job table + durable queue/workers                                        | Provider services keep job lifecycle calls |
-| `SavedVideoRepository`           | Atomic per-video aggregate                    | Database video/version rows and transactions                                      | Save/Gallery contracts stay stable         |
+| Phase 1 seam                     | Local implementation                           | Phase 2 replacement                                                               | Feature code impact                        |
+| -------------------------------- | ---------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------ |
+| `UserRepository`                 | One seeded server user                         | Database user/credential/profile records or an approved identity provider mapping | None outside account service/composition   |
+| `SessionRepository`              | Process-memory or Neon `jti` registry          | Rotating multi-device session design for real accounts                            | Auth service only                          |
+| `EntitlementService`             | Equal Free/Plus/Pro matrix                     | Database-backed plan/feature/limit evaluation                                     | Call sites keep consuming snapshots        |
+| Feature repositories             | Atomic files or transactional Drizzle adapters | Multi-tenant policy, quotas, and operations                                       | Feature services keep business ports       |
+| `AssetByteStore`                 | Private local filesystem or Cloudflare R2      | Direct grants only if later required and reviewed                                 | Feature services keep byte operations      |
+| `AssetAccessService`             | Protected same-origin content route            | Server proxy or short-lived R2 read grant                                         | Gallery/Studio keep feature URLs/contracts |
+| User-scoped browser repositories | IndexedDB caches/drafts/journals               | Remain local caches; durable records sync through APIs                            | React keeps repository/API ports           |
+| `ProcessingJobRepository`        | File trace or Neon job/restart state           | Durable queue, leases, attempts, reconciliation workers                           | Provider services keep job lifecycle calls |
+| `SavedVideoRepository`           | File aggregate or Drizzle rows/transactions    | Operational scaling and policy only                                               | Save/Gallery contracts stay stable         |
 
 Do not preserve incidental Phase 1 details such as JSON aggregate paths, the seeded demo UUID, the
 local cookie `Secure=false` exception, process-memory sessions, or server-proxied large uploads when
@@ -70,13 +72,19 @@ security acceptance criteria, and staged launch plan. Until approved, the server
 
 ## Phase 2 — Real database and Cloudflare R2
 
+Implementation checkpoint (2026-08-07): the schema/migrations, Neon adapters, private R2 adapter,
+startup modes, non-destructive backfill, SQL gallery paging, browser-library revision sync,
+durable sessions, accepted-job recovery, and admission controls are implemented. Real staging
+migration/restore evidence, retention approval, R2 inventory/backup drills, production metrics,
+and a distributed queue/worker deployment remain launch gates. See
+[the persistence runbook](CLOUD_PERSISTENCE.md).
+
 ### Phase 2A — Transactional database
 
-Adopt a managed transactional relational database (PostgreSQL is the natural fit for these
-relationships, but vendor choice is deferred). Selection must compare transactional/foreign-key
-support, managed backup/PITR, regional availability/data residency, connection pooling/serverless
-fit, migration tooling, extensions, operational ownership, observability, cost, and tested restore
-portability. Add database adapters behind the existing business repository interfaces.
+The implemented choice is Drizzle with Neon PostgreSQL, using a bounded pooled serverless driver so
+interactive transactions remain available. Environment selection, regional/data-residency review,
+PITR, connection limits, cost, observability, and tested restore portability still require the
+deployment owner. Database adapters stay behind the existing business repository interfaces.
 
 Initial normalized schema should cover:
 
@@ -131,7 +139,7 @@ Use pending asset states plus an outbox/saga so interrupted byte promotion can b
 
 ### Phase 2B — Cloudflare R2 object storage adapter
 
-Implement `R2AssetByteStore` behind the Phase 1 byte-store port. Keep the bucket private and store
+`R2AssetByteStore` is implemented behind the byte-store port. Keep the bucket private and store
 only opaque, server-generated object keys such as `media/v1/<prefix>/<asset-uuid>`. Do not place
 email, login, title, prompt, original filename, provider ID, or other user data in a key.
 
@@ -192,10 +200,12 @@ is simpler to authorize and inspect. If direct browser transfer is later necessa
 CORS is a storage transport control, not authorization. Public buckets and permanent object URLs
 are not appropriate for private creator media.
 
-### Phase 2C — Durable asynchronous processing
+### Phase 2C — Durable asynchronous processing (partial)
 
-Move provider and heavy media operations from process-local maps/workers to a durable queue and
-worker deployment after the database is authoritative.
+Neon now retains safe state for jobs that have already been accepted by a provider. Restart resumes
+status/retrieval and never repeats the initial submission; global, per-provider, and per-owner
+admission are enforced. Moving execution to a durable queue and worker deployment remains future
+work after database authority and operational policy are proven.
 
 Requirements:
 
@@ -215,9 +225,9 @@ Requirements:
 The browser continues to own browser-only capture/editor resources. It may reconnect to a durable
 server job by app job ID but must not adopt provider IDs or worker credentials.
 
-**Why Phase 2 is deferred.** Phase 1 intentionally proves IDs, ownership, lineage, storage ports,
-and migration behavior without choosing vendors or authorizing remote deployment. Database/R2/queue
-work requires staging credentials, cost budgets, retention, backup, and public security decisions.
+**Why the remaining Phase 2 work is deferred.** Local tests do not prove staging credentials,
+restore/PITR, retention, backup expiry, cost budgets, observability, or public security. The
+implemented database/R2 seams do not authorize remote deployment or automatic local-data deletion.
 
 **Phase 1 preparation.** Immutable `ownerUserId`; repository ports; `AssetByteStore` and
 `AssetAccessService`; provider-neutral storage keys; checksums; `MediaAsset`; SavedVideo/version;

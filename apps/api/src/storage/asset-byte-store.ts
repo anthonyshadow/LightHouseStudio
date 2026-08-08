@@ -1,5 +1,7 @@
 import { createHash, randomUUID } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { chmod, copyFile, mkdir, open, readFile, rename, rm, stat } from 'node:fs/promises';
+import type { Readable } from 'node:stream';
 import path from 'node:path';
 import { z } from 'zod';
 
@@ -17,6 +19,11 @@ const manifestSchema = z
   .strict();
 
 export type StoredAssetManifest = z.infer<typeof manifestSchema>;
+
+export interface AssetReadHandle {
+  readonly manifest: StoredAssetManifest;
+  createReadStream(range?: { readonly start: number; readonly end: number }): Readable;
+}
 
 export interface AssetByteStore {
   storeFile(input: {
@@ -36,10 +43,17 @@ export interface AssetByteStore {
     readonly filename: string;
     readonly createdAt: string;
   }): Promise<StoredAssetManifest>;
-  open(
-    ownerUserId: string,
-    assetId: string,
-  ): Promise<{ manifest: StoredAssetManifest; path: string } | null>;
+  storeStream?(input: {
+    readonly assetId: string;
+    readonly ownerUserId: string;
+    readonly createReadStream: () => Readable;
+    readonly sizeBytes: number;
+    readonly checksumSha256: string;
+    readonly mimeType: string;
+    readonly filename: string;
+    readonly createdAt: string;
+  }): Promise<StoredAssetManifest>;
+  open(ownerUserId: string, assetId: string): Promise<AssetReadHandle | null>;
   exists(ownerUserId: string, assetId: string): Promise<boolean>;
   delete(ownerUserId: string, assetId: string): Promise<void>;
 }
@@ -176,10 +190,7 @@ export class LocalAssetByteStore implements AssetByteStore {
     }
   }
 
-  async open(
-    ownerUserId: string,
-    assetId: string,
-  ): Promise<{ manifest: StoredAssetManifest; path: string } | null> {
+  async open(ownerUserId: string, assetId: string): Promise<AssetReadHandle | null> {
     try {
       const directory = this.#directory(assetId);
       const manifest = manifestSchema.parse(
@@ -192,7 +203,10 @@ export class LocalAssetByteStore implements AssetByteStore {
       );
       const file = await stat(contentPath);
       if (!file.isFile() || file.size !== manifest.sizeBytes) return null;
-      return { manifest, path: contentPath };
+      return {
+        manifest,
+        createReadStream: (range) => createReadStream(contentPath, range),
+      };
     } catch (error) {
       if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null;
       throw error;

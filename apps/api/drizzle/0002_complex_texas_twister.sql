@@ -1,0 +1,2 @@
+DROP INDEX "processing_jobs_owner_active_unique";--> statement-breakpoint
+CREATE UNIQUE INDEX "processing_jobs_owner_active_unique" ON "processing_jobs" USING btree ("owner_user_id") WHERE "processing_jobs"."status" in ('pending', 'validating', 'submitting', 'accepted', 'ambiguous', 'queued', 'processing', 'retrieving');

@@ -339,7 +339,7 @@ export class VoiceService {
     refresh: boolean,
     signal: AbortSignal,
   ): Promise<ProviderWorkspaceVoicePage> {
-    const key = JSON.stringify({ search: filters.search, providerToken });
+    const key = JSON.stringify({ filters, providerToken });
     if (!refresh) {
       const cached = this.#workspacePageCache.get(key);
       if (cached !== null) return cached;
@@ -498,10 +498,7 @@ export class VoiceService {
   ): Promise<ReadonlySet<string>> {
     void refresh;
     if (signal.aborted) throw new ProviderError('workspace-voices', 'aborted');
-    const saved = new Set(
-      (await this.#savedVoices.list(ownerUserId)).map((record) => record.providerVoiceId),
-    );
-    return new Set(voiceIds.filter((voiceId) => saved.has(voiceId)));
+    return this.#savedVoices.savedIds(ownerUserId, voiceIds);
   }
 
   async listSharedVoices(input: SharedListInput): Promise<SharedVoicesResponse> {

@@ -5,9 +5,9 @@ export interface SeededUserCredential extends AuthenticatedUser {
 }
 
 export interface UserRepository {
-  findById(id: string): SeededUserCredential | null;
-  findByLogin(login: string): SeededUserCredential | null;
-  recordLastLogin(userId: string, at: string): SeededUserCredential | null;
+  findById(id: string): Promise<SeededUserCredential | null>;
+  findByLogin(login: string): Promise<SeededUserCredential | null>;
+  recordLastLogin(userId: string, at: string): Promise<SeededUserCredential | null>;
 }
 
 export class SeededUserRepository implements UserRepository {
@@ -39,20 +39,22 @@ export class SeededUserRepository implements UserRepository {
     };
   }
 
-  findById(id: string): SeededUserCredential | null {
-    return id === this.#user.id ? this.#user : null;
+  findById(id: string): Promise<SeededUserCredential | null> {
+    return Promise.resolve(id === this.#user.id ? this.#user : null);
   }
 
-  findByLogin(login: string): SeededUserCredential | null {
-    return login.trim().toLocaleLowerCase('en-US') === this.#user.login.toLocaleLowerCase('en-US')
-      ? this.#user
-      : null;
+  findByLogin(login: string): Promise<SeededUserCredential | null> {
+    return Promise.resolve(
+      login.trim().toLocaleLowerCase('en-US') === this.#user.login.toLocaleLowerCase('en-US')
+        ? this.#user
+        : null,
+    );
   }
 
-  recordLastLogin(userId: string, at: string): SeededUserCredential | null {
-    if (userId !== this.#user.id) return null;
+  recordLastLogin(userId: string, at: string): Promise<SeededUserCredential | null> {
+    if (userId !== this.#user.id) return Promise.resolve(null);
     this.#user = { ...this.#user, lastLoginAt: at, updatedAt: at };
-    return this.#user;
+    return Promise.resolve(this.#user);
   }
 }
 

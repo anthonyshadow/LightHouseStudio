@@ -6,12 +6,12 @@ Use the narrowest authoritative document. Do not copy detailed rules into severa
 
 | Document                                                    | Status  | Owner               | Source of truth for                                                           | Last reviewed |
 | ----------------------------------------------------------- | ------- | ------------------- | ----------------------------------------------------------------------------- | ------------- |
-| [Project README](../README.md)                              | Current | Product/engineering | Product overview, setup, configuration, commands, and release posture         | 2026-08-05    |
-| [Repository working guide](../AGENTS.md)                    | Current | Engineering         | Required architecture, validation, and stop conditions                        | 2026-08-05    |
-| [Architecture](ARCHITECTURE.md)                             | Current | Engineering         | Dependency, ownership, lifecycle, persistence, API, and deployment boundaries | 2026-08-05    |
-| [User stories](userStories/README.md)                       | Current | Product/QA          | Observable journeys and manual validation limits                              | 2026-08-05    |
-| [Privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) | Current | Product/engineering | Data location, provider contact, retention, deletion, and cost boundaries     | 2026-08-05    |
-| [Testing strategy](TESTING.md)                              | Current | Engineering/QA      | Test layers, commands, CI scope, visual policy, and release validation        | 2026-08-05    |
+| [Project README](../README.md)                              | Current | Product/engineering | Product overview, setup, configuration, commands, and release posture         | 2026-08-07    |
+| [Repository working guide](../AGENTS.md)                    | Current | Engineering         | Required architecture, validation, and stop conditions                        | 2026-08-07    |
+| [Architecture](ARCHITECTURE.md)                             | Current | Engineering         | Dependency, ownership, lifecycle, persistence, API, and deployment boundaries | 2026-08-07    |
+| [User stories](userStories/README.md)                       | Current | Product/QA          | Observable journeys and manual validation limits                              | 2026-08-07    |
+| [Privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) | Current | Product/engineering | Data location, provider contact, retention, deletion, and cost boundaries     | 2026-08-07    |
+| [Testing strategy](TESTING.md)                              | Current | Engineering/QA      | Test layers, commands, CI scope, visual policy, and release validation        | 2026-08-07    |
 | [Manual QA](MANUAL_QA.md)                                   | Current | QA                  | Physical device, touch, accessibility, media, and cleanup checks              | 2026-08-05    |
 | [Live provider smoke](LIVE_PROVIDER_SMOKE.md)               | Current | Engineering/QA      | Authorized, opt-in, cost-bearing provider validation                          | 2026-08-05    |
 | [Recording memory policy](RECORDING_MEMORY_POLICY.md)       | Current | Engineering/QA      | Real 300-second memory measurement and support limits                         | 2026-08-05    |
@@ -20,13 +20,14 @@ Use the narrowest authoritative document. Do not copy detailed rules into severa
 
 ## Account foundation and deferred infrastructure
 
-Phase 1 is implemented in the current local runtime. The deferred roadmap remains design-only and
-does not authorize public deployment or relax the loopback boundary.
+Phase 1 remains the default local runtime. The database/R2 implementation is configuration-gated
+and does not authorize public deployment or relax the loopback boundary.
 
-| Document                                                                                      | Status   | Owner               | Use                                                                                           |
-| --------------------------------------------------------------------------------------------- | -------- | ------------------- | --------------------------------------------------------------------------------------------- |
-| [User Accounts Phase 1 audit and plan](user-accounts-phase-1-audit-and-plan.md)               | Current  | Product/engineering | Implemented seeded-user/auth/ownership/saved-library decisions and validation checklist       |
-| [Deferred account and infrastructure roadmap](deferred-account-and-infrastructure-roadmap.md) | Deferred | Product/engineering | Post-Phase-1 database, R2, real-account, jobs, billing, operations, and public-readiness path |
+| Document                                                                                      | Status  | Owner               | Use                                                                                     |
+| --------------------------------------------------------------------------------------------- | ------- | ------------------- | --------------------------------------------------------------------------------------- |
+| [User Accounts Phase 1 audit and plan](user-accounts-phase-1-audit-and-plan.md)               | Current | Product/engineering | Implemented seeded-user/auth/ownership/saved-library decisions and validation checklist |
+| [Neon, Drizzle, and Cloudflare R2](CLOUD_PERSISTENCE.md)                                      | Current | Engineering         | Implemented persistence modes, setup, backfill, rollback, and remaining launch gates    |
+| [Deferred account and infrastructure roadmap](deferred-account-and-infrastructure-roadmap.md) | Partial | Product/engineering | Remaining real-account, billing, operations, retention, and public-readiness path       |
 
 ## Focused technical references
 

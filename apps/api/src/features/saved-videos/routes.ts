@@ -1,5 +1,3 @@
-import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
 import {
   savedVideoDetailSchema,
   savedVideoIdempotencyKeySchema,
@@ -70,8 +68,8 @@ const sendContent = async (
   versionId?: string,
 ) => {
   const result = await service.content(ownerUserIdForRequest(request), videoId, versionId);
-  const file = await stat(result.path);
-  const range = parseRange(header(request, 'range'), file.size);
+  const size = result.asset.manifest.sizeBytes;
+  const range = parseRange(header(request, 'range'), size);
   const download =
     typeof request.query === 'object' &&
     request.query !== null &&
@@ -86,13 +84,13 @@ const sendContent = async (
     `${download ? 'attachment' : 'inline'}; filename="${filename}"`,
   );
   if (range === null) {
-    void reply.header('Content-Length', file.size);
-    return reply.send(createReadStream(result.path));
+    void reply.header('Content-Length', size);
+    return reply.send(result.asset.createReadStream());
   }
   void reply.status(206);
-  void reply.header('Content-Range', `bytes ${range.start}-${range.end}/${file.size}`);
+  void reply.header('Content-Range', `bytes ${range.start}-${range.end}/${size}`);
   void reply.header('Content-Length', range.end - range.start + 1);
-  return reply.send(createReadStream(result.path, range));
+  return reply.send(result.asset.createReadStream(range));
 };
 
 const THUMBNAIL_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
@@ -220,11 +218,10 @@ export const registerSavedVideoRoutes = (
     const params = savedVideoParamsSchema.safeParse(request.params);
     if (!params.success) throw new AppError(400, 'validation_error', 'Choose a valid saved video.');
     const thumbnail = await service.thumbnail(ownerUserIdForRequest(request), params.data.videoId);
-    const file = await stat(thumbnail.path);
-    void reply.header('Content-Length', file.size);
+    void reply.header('Content-Length', thumbnail.asset.manifest.sizeBytes);
     void reply.header('Content-Type', thumbnail.mimeType);
     void reply.header('Content-Disposition', 'inline');
     void reply.header('X-Content-Type-Options', 'nosniff');
-    return reply.send(createReadStream(thumbnail.path));
+    return reply.send(thumbnail.asset.createReadStream());
   });
 };

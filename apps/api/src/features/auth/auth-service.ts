@@ -46,14 +46,14 @@ export class AuthService {
     readonly token: string;
     readonly response: AuthenticatedSessionResponse;
   }> {
-    const credential = this.users.findByLogin(input.login);
+    const credential = await this.users.findByLogin(input.login);
     const valid = await verify(credential?.passwordHash ?? this.fakePasswordHash, input.password);
     if (!credential || !valid || credential.status !== 'active') {
       throw new AppError(401, 'invalid_credentials', 'The login or password is incorrect.');
     }
 
     const now = this.now();
-    const currentCredential = this.users.recordLastLogin(credential.id, now.toISOString());
+    const currentCredential = await this.users.recordLastLogin(credential.id, now.toISOString());
     const expiresAt = new Date(now.valueOf() + this.ttlSeconds * 1_000);
     const jti = randomUUID();
     const user = publicUser(currentCredential ?? credential);
@@ -67,7 +67,7 @@ export class AuthService {
       .setExpirationTime(Math.floor(expiresAt.valueOf() / 1_000))
       .sign(this.#secret);
 
-    this.sessions.create({
+    await this.sessions.create({
       jti,
       userId: user.id,
       issuedAt: now.toISOString(),
@@ -96,8 +96,10 @@ export class AuthService {
         currentDate: now,
       });
       if (!payload.sub || !payload.jti) throw authenticationRequired();
-      const session = this.sessions.findActive(payload.jti, now);
-      const credential = this.users.findById(payload.sub);
+      const [session, credential] = await Promise.all([
+        this.sessions.findActive(payload.jti, now),
+        this.users.findById(payload.sub),
+      ]);
       if (
         !session ||
         session.userId !== payload.sub ||
@@ -123,7 +125,7 @@ export class AuthService {
     if (!token) return;
     try {
       const verified = await this.verify(token);
-      this.sessions.revoke(verified.jti, this.now());
+      await this.sessions.revoke(verified.jti, this.now());
     } catch {
       // Logout is idempotent. Invalid or expired cookies are still cleared by the route.
     }

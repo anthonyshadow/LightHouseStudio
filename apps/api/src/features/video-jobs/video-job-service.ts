@@ -20,7 +20,11 @@ import {
   VideoJobProviderError,
 } from '../../providers/video-jobs/video-job-provider.js';
 import { inspectVideoFile } from './media-inspection.js';
-import type { ProcessingJobTraceWriter } from '../processing-jobs/file-processing-job-repository.js';
+import type {
+  DurableProcessingJobRepository,
+  ProcessingJobTraceWriter,
+  ResumableVideoProcessingJob,
+} from '../processing-jobs/file-processing-job-repository.js';
 
 interface ScheduledVideoJobDeadline {
   cancel(): void;
@@ -40,6 +44,10 @@ interface VideoJobServiceOptions {
   ) => ScheduledVideoJobDeadline;
   readonly traceWriter?: ProcessingJobTraceWriter;
   readonly providerIds?: Readonly<Record<VideoTransformOperationId, string>>;
+  readonly maximumExpiredTombstones?: number;
+  readonly maximumActiveJobs?: number;
+  readonly maximumActiveJobsPerProvider?: number;
+  readonly durableJobRepository?: DurableProcessingJobRepository;
 }
 
 type VideoJobRecord = {
@@ -96,6 +104,7 @@ const terminal = (status: VideoJobStatus): boolean =>
   status === 'ready' || status === 'failed' || status === 'expired';
 
 const PROVIDER_POLL_BACKOFF_MS = [2_000, 3_000, 5_000, 8_000, 10_000] as const;
+const DEFAULT_MAXIMUM_EXPIRED_TOMBSTONES = 500;
 
 const recipeFingerprint = (recipe: VideoTransformRecipe): string =>
   createHash('sha256').update(JSON.stringify(recipe), 'utf8').digest('hex');
@@ -196,8 +205,13 @@ export class VideoJobService {
   readonly #providerPollBackoffMs: readonly [number, number, number, number, number];
   readonly #removePath: NonNullable<VideoJobServiceOptions['removePath']>;
   readonly #traceWriter: ProcessingJobTraceWriter | undefined;
+  readonly #durableJobRepository: DurableProcessingJobRepository | undefined;
   readonly #providerIds: Readonly<Record<VideoTransformOperationId, string>>;
   readonly #operations = new Set<Promise<void>>();
+  readonly #expiredTombstones: string[] = [];
+  readonly #maximumExpiredTombstones: number;
+  readonly #maximumActiveJobs: number;
+  readonly #maximumActiveJobsPerProvider: number;
   #deadlineGeneration = 0;
   #deadline: ScheduledVideoJobDeadline | null = null;
   #closed = false;
@@ -215,15 +229,112 @@ export class VideoJobService {
     this.#removePath = options.removePath ?? rm;
     this.#scheduleDeadline = options.scheduleDeadline ?? scheduleSystemDeadline;
     this.#traceWriter = options.traceWriter;
+    this.#durableJobRepository = options.durableJobRepository;
     this.#providerIds = options.providerIds ?? {
       'character-swap': 'configured-provider',
       'virtual-try-on': 'configured-provider',
     };
+    this.#maximumExpiredTombstones = Math.max(
+      1,
+      Math.floor(options.maximumExpiredTombstones ?? DEFAULT_MAXIMUM_EXPIRED_TOMBSTONES),
+    );
+    this.#maximumActiveJobs = Math.max(1, Math.floor(options.maximumActiveJobs ?? 8));
+    this.#maximumActiveJobsPerProvider = Math.max(
+      1,
+      Math.floor(options.maximumActiveJobsPerProvider ?? 4),
+    );
     this.#root = path.resolve(lightframeDataDir, '.tmp', 'video-jobs');
     this.#ready = rm(this.#root, { recursive: true, force: true }).then(async () => {
       if (Object.values(providers).some((binding) => binding !== null) && !this.#closed) {
         await mkdir(this.#root, { recursive: true, mode: 0o700 });
+        await this.#restoreDurableJobs();
       }
+    });
+  }
+
+  async #restoreDurableJobs(): Promise<void> {
+    if (this.#durableJobRepository === undefined || this.#closed) return;
+    const records = await this.#durableJobRepository.listResumable(
+      new Date(this.#now()).toISOString(),
+    );
+    for (const record of records) {
+      if (this.#closed) return;
+      const binding = this.#providers[record.operation];
+      if (binding === null || this.#providerIds[record.operation] !== record.provider) {
+        await this.#markRestoreFailed(record);
+        continue;
+      }
+      const directory = path.join(this.#root, `${record.jobId}-restored`);
+      await mkdir(directory, { recursive: true, mode: 0o700 });
+      const expiresAtMs = Date.parse(record.expiresAt);
+      const job: VideoJobRecord = {
+        jobId: record.jobId,
+        ownerId: record.ownerUserId,
+        operation: record.operation,
+        binding,
+        outputResolution: record.outputResolution,
+        requestFingerprint: record.requestFingerprint,
+        status: record.status,
+        createdAt: record.createdAt,
+        updatedAt: record.updatedAt,
+        expiresAt: record.expiresAt,
+        expiresAtMs,
+        deadlineGeneration: ++this.#deadlineGeneration,
+        providerJobId: record.providerJobId,
+        providerOutputLocation: record.providerOutputLocation,
+        result: null,
+        error: null,
+        directory,
+        inputPath: path.join(directory, 'input.video'),
+        referencePath: null,
+        referenceMimeType: null,
+        outputPath: path.join(directory, 'result.video'),
+        sourceDurationMs: record.sourceDurationMs,
+        sourceOrientation: record.sourceOrientation,
+        statusReadFailures: 0,
+        providerPollAttempt: 0,
+        nextProviderPollAtMs: 0,
+        hasPolledProvider: false,
+        retrievalAttempts: 0,
+        refreshPromise: null,
+        operationController: new AbortController(),
+        activeDeliveries: 0,
+        admissionsClosed: false,
+        cleanupPending: false,
+        deleteAfterCleanup: false,
+        cleanupFailureReported: false,
+      };
+      this.#jobs.set(job.jobId, job);
+      this.#activeJobByOwner.set(job.ownerId, job.jobId);
+      this.#pushDeadline({
+        jobId: job.jobId,
+        expiresAtMs: job.expiresAtMs,
+        generation: job.deadlineGeneration,
+      });
+      if (job.status === 'retrieving') this.#track(this.#retrieve(job));
+    }
+    this.#scheduleNextDeadline();
+  }
+
+  async #markRestoreFailed(record: ResumableVideoProcessingJob): Promise<void> {
+    const updatedAt = new Date(this.#now()).toISOString();
+    await this.#durableJobRepository?.upsert({
+      schemaVersion: 1,
+      jobId: record.jobId,
+      ownerUserId: record.ownerUserId,
+      operation: record.operation,
+      provider: record.provider,
+      providerJobId: record.providerJobId,
+      requestFingerprint: record.requestFingerprint,
+      outputResolution: record.outputResolution,
+      providerOutputLocation: record.providerOutputLocation,
+      sourceDurationMs: record.sourceDurationMs,
+      sourceOrientation: record.sourceOrientation,
+      status: 'failed',
+      safeErrorCode: 'provider_unavailable',
+      createdAt: record.createdAt,
+      updatedAt,
+      completedAt: updatedAt,
     });
   }
 
@@ -232,6 +343,7 @@ export class VideoJobService {
   }
 
   async existing(jobId: string, ownerId: string): Promise<VideoJobStatusResponse | null> {
+    await this.#ready;
     await this.#expireDueJobs();
     const job = this.#jobs.get(jobId);
     return job?.ownerId === ownerId ? this.#snapshot(job) : null;
@@ -297,6 +409,11 @@ export class VideoJobService {
         operation: job.operation,
         provider: this.#providerIds[job.operation],
         providerJobId: job.providerJobId,
+        requestFingerprint: job.requestFingerprint,
+        outputResolution: job.outputResolution,
+        providerOutputLocation: job.providerOutputLocation,
+        sourceDurationMs: job.sourceDurationMs,
+        sourceOrientation: job.sourceOrientation,
         status: job.status,
         safeErrorCode: job.error?.code ?? null,
         createdAt: job.createdAt,
@@ -435,6 +552,17 @@ export class VideoJobService {
     };
     this.#touch(job, 'expired');
     await this.#requestCleanup(job, false);
+    if (!job.cleanupPending && this.#jobs.get(job.jobId) === job) {
+      this.#expiredTombstones.push(job.jobId);
+      while (this.#expiredTombstones.length > this.#maximumExpiredTombstones) {
+        const expiredJobId = this.#expiredTombstones.shift();
+        if (expiredJobId === undefined) break;
+        const expiredJob = this.#jobs.get(expiredJobId);
+        if (expiredJob?.status === 'expired' && !expiredJob.cleanupPending) {
+          this.#jobs.delete(expiredJobId);
+        }
+      }
+    }
   }
 
   async #expireDueJobs(): Promise<void> {
@@ -477,6 +605,7 @@ export class VideoJobService {
     readonly referencePath: string | null;
     readonly referenceMimeType: ImageMimeType | null;
   }): Promise<VideoJobStatusResponse> {
+    await this.#ready;
     await this.#expireDueJobs();
     const duplicate = this.#jobs.get(input.jobId);
     if (duplicate) {
@@ -552,6 +681,20 @@ export class VideoJobService {
         409,
         'generation_in_progress',
         'Finish the active video job before starting another.',
+      );
+    }
+    const activeJobs = [...this.#jobs.values()].filter((job) => !terminal(job.status));
+    const providerId = this.#providerIds[input.recipe.operation];
+    if (
+      activeJobs.length >= this.#maximumActiveJobs ||
+      activeJobs.filter((job) => this.#providerIds[job.operation] === providerId).length >=
+        this.#maximumActiveJobsPerProvider
+    ) {
+      await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
+      throw new AppError(
+        429,
+        'rate_limited',
+        'Visual processing is at capacity. Wait for an active job to finish, then try again.',
       );
     }
     const acceptedAt = this.#now();
@@ -775,6 +918,7 @@ export class VideoJobService {
   }
 
   async status(jobId: string, ownerId: string): Promise<VideoJobStatusResponse> {
+    await this.#ready;
     await this.#expireDueJobs();
     const job = this.#jobs.get(jobId);
     if (!job || job.ownerId !== ownerId) {
@@ -786,6 +930,7 @@ export class VideoJobService {
   }
 
   async content(jobId: string, ownerId: string): Promise<VideoJobContentLease> {
+    await this.#ready;
     await this.#expireDueJobs();
     const job = this.#jobs.get(jobId);
     if (!job || job.ownerId !== ownerId) {
@@ -838,6 +983,7 @@ export class VideoJobService {
   }
 
   async release(jobId: string, ownerId: string): Promise<void> {
+    await this.#ready;
     await this.#expireDueJobs();
     const job = this.#jobs.get(jobId);
     if (!job || job.ownerId !== ownerId) {
@@ -866,6 +1012,7 @@ export class VideoJobService {
     for (const job of this.#jobs.values()) job.operationController.abort();
     this.#jobs.clear();
     this.#activeJobByOwner.clear();
+    this.#expiredTombstones.length = 0;
     this.#deadlineHeap.length = 0;
     await this.#ready.catch(() => undefined);
     while (this.#operations.size > 0) {

@@ -2,11 +2,11 @@ import { createHash } from 'node:crypto';
 import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import sharp from 'sharp';
 import type { SavedVideoUploadMetadata } from '@studio/contracts';
 import { LocalAssetByteStore } from '../../storage/asset-byte-store.js';
-import { FileSavedVideoRepository } from './saved-video-repository.js';
+import { FileSavedVideoRepository, type SavedVideoRepository } from './saved-video-repository.js';
 import { SavedVideoService } from './saved-video-service.js';
 
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
@@ -21,6 +21,14 @@ const inspected = {
   height: 720,
   sizeBytes: 11,
   hasAudio: true,
+};
+
+const readAsset = async (asset: Awaited<ReturnType<SavedVideoService['thumbnail']>>['asset']) => {
+  const chunks: Buffer[] = [];
+  for await (const chunk of asset.createReadStream()) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk as Uint8Array));
+  }
+  return Buffer.concat(chunks);
 };
 
 const metadata = (override: Partial<SavedVideoUploadMetadata> = {}): SavedVideoUploadMetadata => ({
@@ -196,7 +204,7 @@ describe('SavedVideoService', () => {
     expect(updated.thumbnailAvailable).toBe(true);
     expect(updated).not.toHaveProperty('thumbnailAssetId');
     const content = await service.thumbnail(ownerUserId, video.id);
-    await expect(sharp(content.path).metadata()).resolves.toMatchObject({
+    await expect(sharp(await readAsset(content.asset)).metadata()).resolves.toMatchObject({
       format: 'webp',
       width: 480,
       height: 270,
@@ -240,6 +248,31 @@ describe('SavedVideoService', () => {
         sort: 'oldest',
       }),
     ).rejects.toMatchObject({ statusCode: 400, code: 'validation_error' });
+  });
+
+  it('delegates paging to repositories that provide a storage-level query', async () => {
+    await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
+    const [aggregate] = await repository.list(ownerUserId);
+    const listPage = vi.fn().mockResolvedValue({
+      videos: [aggregate],
+      total: 2,
+      characterNames: ['Mara'],
+      formats: ['landscape'],
+    });
+    const databaseService = new SavedVideoService(
+      { listPage } as unknown as SavedVideoRepository,
+      bytes,
+    );
+
+    const page = await databaseService.list(ownerUserId, { pageSize: 1, sort: 'latest' });
+
+    expect(listPage).toHaveBeenCalledWith(ownerUserId, { pageSize: 1, sort: 'latest' }, 0);
+    expect(page).toMatchObject({
+      total: 2,
+      facets: { characterNames: ['Mara'], formats: ['landscape'] },
+    });
+    expect(page.videos).toHaveLength(1);
+    expect(page.nextCursor).not.toBeNull();
   });
 
   it('filters the full library by character and format and sorts by time or duration', async () => {

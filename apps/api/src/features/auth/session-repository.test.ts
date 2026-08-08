@@ -10,15 +10,25 @@ const session = (jti: string, issuedAt: string, expiresAt: string) => ({
 });
 
 describe('InMemorySessionRepository', () => {
-  it('drops expired and revoked records while preserving active sessions', () => {
+  it('drops expired and revoked records while preserving active sessions', async () => {
     const repository = new InMemorySessionRepository();
-    repository.create(session('expired', '2026-08-01T00:00:00.000Z', '2026-08-02T00:00:00.000Z'));
-    repository.create(session('active', '2026-08-03T00:00:00.000Z', '2026-08-05T00:00:00.000Z'));
+    await repository.create(
+      session('expired', '2026-08-01T00:00:00.000Z', '2026-08-02T00:00:00.000Z'),
+    );
+    await repository.create(
+      session('active', '2026-08-03T00:00:00.000Z', '2026-08-05T00:00:00.000Z'),
+    );
 
-    expect(repository.findActive('expired', new Date('2026-08-03T00:00:00.000Z'))).toBeNull();
-    expect(repository.findActive('active', new Date('2026-08-04T00:00:00.000Z'))).not.toBeNull();
+    await expect(
+      repository.findActive('expired', new Date('2026-08-03T00:00:00.000Z')),
+    ).resolves.toBeNull();
+    await expect(
+      repository.findActive('active', new Date('2026-08-04T00:00:00.000Z')),
+    ).resolves.not.toBeNull();
 
-    repository.revoke('active', new Date('2026-08-04T01:00:00.000Z'));
-    expect(repository.findActive('active', new Date('2026-08-04T01:00:00.000Z'))).toBeNull();
+    await repository.revoke('active', new Date('2026-08-04T01:00:00.000Z'));
+    await expect(
+      repository.findActive('active', new Date('2026-08-04T01:00:00.000Z')),
+    ).resolves.toBeNull();
   });
 });

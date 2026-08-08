@@ -26,6 +26,7 @@ import type {
 import type { CharacterSaveStage } from '../features/character-builder/characterBuilderPersistence';
 import { persistCharacterSaveSnapshot } from '../features/character-builder/persistCharacterSaveSnapshot';
 import { createCreativeAssetRepository } from '../features/creative-assets/repository';
+import { useCreativeLibraryCloudSync } from '../features/creative-assets/useCreativeLibraryCloudSync';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
   WARDROBE_CREATIVE_ASSET_STORAGE_KEY,
@@ -90,7 +91,6 @@ import {
   isStudioFormError,
 } from './studioStageNotices';
 import { useCharacterBuilderLaunchController } from './useCharacterBuilderLaunchController';
-import { useLegacyProjectAvailability } from './useLegacyProjectAvailability';
 import { useProviderAvailability } from './useProviderAvailability';
 import { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 import { useTakeReviewFlow } from './useTakeReviewFlow';
@@ -112,11 +112,6 @@ const CharacterBuilderCoordinator = lazy(() =>
 const ConfirmationDialog = lazy(() =>
   import('../ui/primitives/ConfirmationDialog').then((module) => ({
     default: module.ConfirmationDialog,
-  })),
-);
-const LegacyProjectManager = lazy(() =>
-  import('../features/legacy-projects/LegacyProjectManager').then((module) => ({
-    default: module.LegacyProjectManager,
   })),
 );
 const CharacterWardrobePanel = lazy(() =>
@@ -206,6 +201,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       }),
     [auth.session],
   );
+  useCreativeLibraryCloudSync(repository);
   const savedVideoSave = useSaveVideo();
   const sessionCleanup = useMemo(() => new SessionCleanupCoordinator(), []);
   const [logoutPromptOpen, setLogoutPromptOpen] = useState(false);
@@ -298,12 +294,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     },
     [existingVideoSavedRecipes, repository],
   );
-  const {
-    repository: legacyRepository,
-    storage: legacyStorage,
-    projectCount: legacyProjectCount,
-    synchronizeProjectCount: synchronizeLegacyProjectCount,
-  } = useLegacyProjectAvailability();
   const browser = useMemo(() => detectBrowserCapabilities(), []);
   const {
     availability,
@@ -364,7 +354,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const outfitToggleRef = useRef<HTMLButtonElement>(null);
   const workshopToggleRef = useRef<HTMLButtonElement>(null);
   const shelfToggleRef = useRef<HTMLButtonElement>(null);
-  const legacyManagerToggleRef = useRef<HTMLButtonElement>(null);
   const dockToggleRef = useRef<HTMLButtonElement>(null);
   const editVideoToggleRef = useRef<HTMLButtonElement>(null);
   const uploadToggleRef = useRef<HTMLButtonElement>(null);
@@ -777,7 +766,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const openCharacterSelector = () => openOverlay('character-selector');
   const openOutfitSelector = () => openOverlay('outfit-selector');
 
-  const openLegacyProjects = () => openOverlay('legacy-projects');
   const openWardrobe = useCallback(
     (character: SavedCharacterPrompt) => {
       setWardrobeCharacterId(character.id);
@@ -1334,7 +1322,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                 : {}),
             }
           : null,
-        legacyProjectCount,
         activeRecipe,
         recipeShelfEntryIntent,
         hasPlaybackVideo: Boolean(recording.presented),
@@ -1346,7 +1333,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         editVideoToggleRef,
         characterToggleRef: characterSelectorRef,
         outfitToggleRef,
-        legacyManagerToggleRef,
       }}
       actions={{
         onOpenDock: openDock,
@@ -1355,7 +1341,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         onOpenOutfit: openOutfitSelector,
         onOpenWorkshop: openWorkshop,
         onToggleShelf: () => toggleOverlay('recipe-shelf'),
-        onOpenLegacyProjects: openLegacyProjects,
         onClose: closeCreativePanel,
         onLibraryModeChange: changeLibraryMode,
         onWorkshopDraftChange: rememberWorkshopDraft,
@@ -2009,7 +1994,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               {...(activeCharacterBuilderSaveBlockedReason
                 ? { saveBlockedReason: activeCharacterBuilderSaveBlockedReason }
                 : {})}
-              legacyRepository={legacyRepository}
               onSaveCharacter={
                 characterBuilderDestination.kind === 'existing-video'
                   ? saveExistingVideoCharacter
@@ -2035,25 +2019,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             onConfirm={() => resolveCharacterBuilderDraftDiscard(true)}
           />
         </Suspense>
-
-        <OverlayPanel
-          open={activeOverlay === 'legacy-projects'}
-          onClose={closeOverlay}
-          title="Legacy Projects"
-          description="Download or delete browser-local projects from the retired Guided experience."
-          placement="fullscreen"
-          size="wide"
-          bodyMode="scroll"
-          returnFocusRef={legacyManagerToggleRef}
-        >
-          <Suspense fallback={deferredPanelFallback}>
-            <LegacyProjectManager
-              repository={legacyRepository}
-              storage={legacyStorage}
-              onProjectCountChange={synchronizeLegacyProjectCount}
-            />
-          </Suspense>
-        </OverlayPanel>
       </div>
     </div>
   );

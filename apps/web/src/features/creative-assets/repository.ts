@@ -723,5 +723,20 @@ export const createCreativeAssetRepository = (
     recordSuccessfulPrompt,
     enrichNewestMatchingRecent,
     search: (query, modelModeId) => searchCreativeAssets(state.store, query, modelModeId),
+    replaceFromRemote: (remoteStore) => {
+      const sanitized = sanitizeCreativeAssetStore(remoteStore);
+      if (sanitized.recovered || sanitized.droppedRecords > 0) {
+        throw new CreativeAssetError(
+          'storage-write-failed',
+          'The cloud library returned invalid records. The local library was preserved.',
+        );
+      }
+      commit(sanitized.store);
+    },
+    setSyncNotice: (notice) => {
+      if (state.notice === notice) return;
+      state = { ...state, notice };
+      notify();
+    },
   };
 };

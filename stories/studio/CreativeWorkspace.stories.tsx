@@ -51,7 +51,6 @@ const WorkspaceHarness = () => {
     hasReferenceImage: false,
     referenceUsePending: false,
     referenceUseFailure: null,
-    legacyProjectCount: 2,
     recipeShelfEntryIntent: null,
     hasPlaybackVideo: true,
   };
@@ -74,7 +73,6 @@ const WorkspaceHarness = () => {
     onEditOutfit: fn(),
     onSaveOutfitCopy: fn(),
     onOpenSavedWorkshop: fn(),
-    onOpenLegacyProjects: fn(),
   };
 
   return (
