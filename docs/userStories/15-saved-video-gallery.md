@@ -30,8 +30,9 @@ browse lightweight gallery records, and load a chosen version into the existing 
    source path, and returns to the Studio stage/editor with saved video/version lineage.
 8. Rename changes metadata. Delete confirms, tombstones only the chosen record, and removes it from
    the visible gallery. Every video can be deleted independently in any order; retained derived
-   records keep their historical source lineage even when that source record is deleted. Download
-   uses an authenticated content response.
+   records keep their historical source lineage even when that source record is deleted. With
+   private R2 selected, deletion also removes all unshared immutable-version and thumbnail objects.
+   Download uses an authenticated content response.
 
 ## Acceptance checks
 
@@ -51,8 +52,10 @@ browse lightweight gallery records, and load a chosen version into the existing 
 
 ## Retention
 
-Logical delete does not physically erase unreferenced video or thumbnail bytes in local or cloud
-persistence modes. They remain retained until product/privacy owners approve relationship-safe
-garbage collection, backup expiry, and legal-hold behavior. This lets a retained derived record
-remain usable after its source record is independently deleted. Retired Guided compatibility code
-is removed and those records are not imported.
+Local-only deletion retains detached video and thumbnail bytes until whole-environment retirement.
+When private R2 is selected, explicit user deletion tombstones the record first, collects every
+version and thumbnail asset ID, rechecks the owner's remaining active Saved Video relationships,
+and deletes only unshared stored objects. A failed physical deletion returns a safe storage error;
+repeating the delete reuses the tombstoned lineage and retries cleanup. This does not add automatic
+orphan collection, backup expiry, legal-hold, or account deletion. Retired Guided compatibility
+code is removed and those records are not imported.

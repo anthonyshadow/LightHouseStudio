@@ -11,7 +11,9 @@ single-operator design, not a claim of public authentication or multi-user tenan
 temporarily prefills both configured credentials; production does not expose them.
 
 Save Video became distinct from Download. Owner-scoped files back gallery records with immutable
-versions and optional thumbnails; logical deletion retains unreferenced bytes until Phase 2.
+versions and optional thumbnails. The first cut retained bytes after logical deletion; the later R2
+policy physically deletes unshared version/thumbnail objects after explicit user deletion while
+leaving conservative local-only retention unchanged.
 `/studio/videos`, `/studio/characters`, and `/studio/outfits` are private views inside the same
 Studio runtime. The cutover intentionally clears retired Guided videos instead of importing them.
 Saved Voices became Lightframe-owned user relationships, so removal no longer deletes provider
@@ -24,7 +26,8 @@ configuration-gated Drizzle/Neon and private Cloudflare R2 adapters. Local remai
 Neon can make sessions, saved media metadata, creative records, and accepted-provider-job state
 durable; R2 stores bytes behind the same authenticated routes. A non-destructive backfill and
 shadow mode preserve rollback. This change deliberately did not add signup, billing, public
-ingress, shared tenancy, automatic media garbage collection, or provider-submission retry.
+ingress, shared tenancy, automatic media garbage collection, or provider-submission retry. Manual
+R2 deletion is a narrower relationship-checked lifecycle, not automatic garbage collection.
 
 ## Entry became separate from the Studio runtime
 

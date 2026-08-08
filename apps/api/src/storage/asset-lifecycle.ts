@@ -15,6 +15,7 @@ export interface AssetLifecycleRegistry {
   markReady(assetId: string, etag: string | null): Promise<void>;
   markFailed(assetId: string): Promise<void>;
   findReady(ownerUserId: string, assetId: string): Promise<StoredAssetLocation | null>;
+  /** Claims a ready asset or reclaims an interrupted deleting asset for idempotent cleanup. */
   markDeleting(ownerUserId: string, assetId: string): Promise<boolean>;
   markDeleted(ownerUserId: string, assetId: string): Promise<void>;
 }

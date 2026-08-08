@@ -175,7 +175,7 @@ export const VideoGallery = ({
     try {
       await deleteSavedVideo(video.id);
       await load();
-      setMessage('Video removed. Its local media remains retained until Phase 2.');
+      setMessage('Video removed.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'The video could not be deleted.');
     } finally {

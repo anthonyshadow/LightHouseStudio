@@ -28,9 +28,10 @@ the loopback product boundary:
   migration tests after their reset window, while retaining persisted-schema compatibility fields
   that current data may still contain.
 
-Permanent media garbage collection, public ingress/accounts/tenancy, distributed workers,
-backup/PITR evidence, and live Neon/R2 validation remain outside this implementation. Retention
-approval is still required before detached bytes are deleted.
+Automatic orphan/account media garbage collection, public ingress/accounts/tenancy, distributed
+workers, backup/PITR evidence, and live Neon/R2 validation remain outside this implementation.
+Explicit Saved Video and saved-reference deletion use the narrower relationship-checked R2 policy;
+other detached bytes still require retention approval before deletion.
 
 ### 2026-08-07 validation
 

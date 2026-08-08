@@ -36,18 +36,19 @@ provider. Wardrobe try-on is separately enabled and is never inferred from Chara
 Run these before physical/provider work so later evidence uses the intended owner and clean local
 state:
 
-| Check                    | Pass condition                                                                                                                                                                                                                       |
-| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `entry-login`            | `/` requests no media/capability/provider work; Login traps focus; development prefills both configured credentials; incorrect credentials use one generic error and clear no unrelated data                                         |
-| `session-restore`        | Correct login opens Studio; closing/reopening the browser restores direct `/studio` and library routes within 24 hours without exposing a token to URL or browser storage                                                            |
-| `session-expiry-logout`  | Expired/revoked session returns to entry; logout blocks non-discardable work, confirms discardable work, releases indicators/resources, clears the cookie, and returns to Login                                                      |
-| `studio-library-routing` | `/studio/videos`, `/studio/characters`, and `/studio/outfits` keep the same stage/runtime; browser Back/Forward, Escape, account-menu arrow/Home/End keys, and return focus behave correctly                                         |
-| `save-video`             | Download remains distinct; Save is idempotent; optional thumbnail failure is non-fatal; replace confirms and appends a version; rename/download/delete operate on the selected owner record                                          |
-| `video-gallery-states`   | Empty/loading/error/missing/placeholder/populated/load-more states avoid eager video requests; thumbnail Preview darkens the gallery, traps/returns focus, detaches on close, and remains usable at all five viewports and 200% text |
-| `saved-character-outfit` | Both libraries show the user-scoped records; Use follows existing handoff; delete removes relationships without provider work or unintended immutable-byte deletion                                                                  |
+| Check                    | Pass condition                                                                                                                                                                                                                                    |
+| ------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `entry-login`            | `/` requests no media/capability/provider work; Login traps focus; development prefills both configured credentials; incorrect credentials use one generic error and clear no unrelated data                                                      |
+| `session-restore`        | Correct login opens Studio; closing/reopening the browser restores direct `/studio` and library routes within 24 hours without exposing a token to URL or browser storage                                                                         |
+| `session-expiry-logout`  | Expired/revoked session returns to entry; logout blocks non-discardable work, confirms discardable work, releases indicators/resources, clears the cookie, and returns to Login                                                                   |
+| `studio-library-routing` | `/studio/videos`, `/studio/characters`, and `/studio/outfits` keep the same stage/runtime; browser Back/Forward, Escape, account-menu arrow/Home/End keys, and return focus behave correctly                                                      |
+| `save-video`             | Download remains distinct; Save is idempotent; optional thumbnail failure is non-fatal; replace confirms and appends a version; rename/download/delete operate on the selected owner record; R2 deletion removes its unshared versions/thumbnails |
+| `video-gallery-states`   | Empty/loading/error/missing/placeholder/populated/load-more states avoid eager video requests; thumbnail Preview darkens the gallery, traps/returns focus, detaches on close, and remains usable at all five viewports and 200% text              |
+| `saved-character-outfit` | Both libraries show the user-scoped records; Use follows existing handoff; delete removes relationships without provider work or unintended immutable-byte deletion                                                                               |
 
-Logical Saved Video deletion tombstones gallery metadata while unreferenced media remains retained
-until an approved relationship-safe garbage-collection policy exists.
+Local-only Saved Video deletion conservatively retains detached bytes. With R2 selected, manual
+deletion must remove each unshared version/thumbnail object; force one failed delete in a disposable
+environment and confirm the repeated request completes cleanup without restoring the gallery row.
 
 ## Per-target physical protocol
 

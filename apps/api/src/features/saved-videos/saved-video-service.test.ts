@@ -54,12 +54,11 @@ describe('SavedVideoService', () => {
     await writeFile(sourcePath, 'video-bytes');
     repository = new FileSavedVideoRepository(directory);
     bytes = new LocalAssetByteStore(directory);
-    service = new SavedVideoService(
-      repository,
-      bytes,
-      () => new Date('2026-08-05T12:00:00.000Z'),
-      () => Promise.resolve(inspected),
-    );
+    service = new SavedVideoService(repository, bytes, {
+      now: () => new Date('2026-08-05T12:00:00.000Z'),
+      inspect: () => Promise.resolve(inspected),
+      deleteStoredAssetsOnManualDelete: true,
+    });
   });
 
   afterEach(async () => {
@@ -89,12 +88,11 @@ describe('SavedVideoService', () => {
   });
 
   it('rounds inspected fractional milliseconds before persistence', async () => {
-    service = new SavedVideoService(
-      repository,
-      bytes,
-      () => new Date('2026-08-05T12:00:00.000Z'),
-      () => Promise.resolve({ ...inspected, durationMs: 5_034.666_666_666_666 }),
-    );
+    service = new SavedVideoService(repository, bytes, {
+      now: () => new Date('2026-08-05T12:00:00.000Z'),
+      inspect: () => Promise.resolve({ ...inspected, durationMs: 5_034.666_666_666_666 }),
+      deleteStoredAssetsOnManualDelete: true,
+    });
 
     const saved = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
 
@@ -151,7 +149,7 @@ describe('SavedVideoService', () => {
     expect(updated.versions[0]).toEqual(original.currentVersion);
   });
 
-  it('deletes a source independently while retaining its derived record and Phase 2 bytes', async () => {
+  it('deletes a source and its unshared stored bytes while retaining its derived record', async () => {
     const source = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
     const derived = await service.saveNew(
       ownerUserId,
@@ -181,10 +179,97 @@ describe('SavedVideoService', () => {
     await expect(service.content(ownerUserId, derived.id)).resolves.toMatchObject({
       video: { id: derived.id, sourceVideoId: source.id },
     });
-    expect(await bytes.exists(ownerUserId, sourceAssetId)).toBe(true);
+    expect(await bytes.exists(ownerUserId, sourceAssetId)).toBe(false);
 
     await service.delete(ownerUserId, derived.id);
     expect(await repository.list(ownerUserId)).toHaveLength(0);
+  });
+
+  it('deletes every unshared video-version and thumbnail asset for a cloud-backed record', async () => {
+    const first = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
+    const thumbnail = await sharp({
+      create: { width: 640, height: 360, channels: 3, background: '#876c52' },
+    })
+      .webp()
+      .toBuffer();
+    await service.saveThumbnail(ownerUserId, first.id, first.currentVersion.id, thumbnail);
+    const second = await service.appendVersion(
+      ownerUserId,
+      first.id,
+      first.currentVersion.id,
+      crypto.randomUUID(),
+      sourcePath,
+      metadata({ origin: 'editor', sourceVersionId: first.currentVersion.id }),
+    );
+    await service.saveThumbnail(ownerUserId, first.id, second.currentVersion.id, thumbnail);
+    const aggregate = await repository.get(ownerUserId, first.id);
+    const assetIds = aggregate!.versions.flatMap((version) => [
+      version.assetId,
+      version.thumbnailAssetId!,
+    ]);
+
+    await service.delete(ownerUserId, first.id);
+
+    await Promise.all(
+      assetIds.map(async (assetId) => {
+        expect(await bytes.exists(ownerUserId, assetId)).toBe(false);
+      }),
+    );
+  });
+
+  it('keeps a stored object until the last saved-video relationship is deleted', async () => {
+    const first = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
+    const firstAggregate = (await repository.get(ownerUserId, first.id))!;
+    const sharedVideoId = crypto.randomUUID();
+    const sharedVersionId = crypto.randomUUID();
+    const shared = {
+      video: {
+        ...firstAggregate.video,
+        id: sharedVideoId,
+        currentVersionId: sharedVersionId,
+        title: 'Shared bytes',
+      },
+      versions: [
+        {
+          ...firstAggregate.versions[0]!,
+          id: sharedVersionId,
+          videoId: sharedVideoId,
+        },
+      ],
+      revision: 1,
+    };
+    await repository.create(ownerUserId, shared, {
+      idempotencyKey: crypto.randomUUID(),
+      videoId: sharedVideoId,
+      versionId: sharedVersionId,
+      createdAt: firstAggregate.video.createdAt,
+    });
+    const sharedAssetId = firstAggregate.versions[0]!.assetId;
+
+    await service.delete(ownerUserId, first.id);
+    expect(await bytes.exists(ownerUserId, sharedAssetId)).toBe(true);
+
+    await service.delete(ownerUserId, sharedVideoId);
+    expect(await bytes.exists(ownerUserId, sharedAssetId)).toBe(false);
+  });
+
+  it('keeps physical deletion retryable after the record is tombstoned', async () => {
+    const video = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
+    const assetId = (await repository.get(ownerUserId, video.id))!.versions[0]!.assetId;
+    const deleteBytes = bytes.delete.bind(bytes);
+    vi.spyOn(bytes, 'delete')
+      .mockRejectedValueOnce(new Error('storage unavailable'))
+      .mockImplementation(deleteBytes);
+
+    await expect(service.delete(ownerUserId, video.id)).rejects.toMatchObject({
+      statusCode: 503,
+      code: 'storage_failure',
+    });
+    expect(await repository.list(ownerUserId)).toHaveLength(0);
+    expect(await bytes.exists(ownerUserId, assetId)).toBe(true);
+
+    await expect(service.delete(ownerUserId, video.id)).resolves.toBeUndefined();
+    expect(await bytes.exists(ownerUserId, assetId)).toBe(false);
   });
 
   it('returns non-enumerating wrong-owner failures and marks missing local bytes', async () => {
@@ -303,12 +388,11 @@ describe('SavedVideoService', () => {
       '2026-08-05T12:00:00.000Z',
     ];
     let index = 0;
-    service = new SavedVideoService(
-      repository,
-      bytes,
-      () => new Date(dates[index - 1]!),
-      () => Promise.resolve(facts[index++]!),
-    );
+    service = new SavedVideoService(repository, bytes, {
+      now: () => new Date(dates[index - 1]!),
+      inspect: () => Promise.resolve(facts[index++]!),
+      deleteStoredAssetsOnManualDelete: true,
+    });
     await service.saveNew(
       ownerUserId,
       crypto.randomUUID(),

@@ -1692,9 +1692,9 @@ The original prerequisites were:
    rollback evidence.
 2. Stable IDs, owner rules, video/version semantics, deletion dependencies, safe job snapshots,
    and storage ports have contract tests.
-3. Retained saved-video/thumbnail bytes remain documented until product/privacy owners approve a
-   relationship-safe gallery/version deletion policy. Reference-image reconciliation and physical
-   deletion are approved and implemented only for authoritative Neon/private-R2.
+3. Local-only saved-video/thumbnail bytes remain documented until whole-environment retirement.
+   Explicit private-R2 Saved Video deletion and authoritative Neon/private-R2 reference-image
+   deletion are now relationship-checked and retryable; blanket orphan/account cleanup is not.
 4. A production authentication/authorization/tenancy/rate/retention/security design is separately
    approved; loopback controls are not treated as public authentication.
 5. Database schema, R2 key strategy, backfill/dual-read plan, observability, backup/restore, and
@@ -1704,9 +1704,10 @@ The original prerequisites were:
 
 ## Resolved Phase 1 decisions
 
-The implementation retains saved-video and thumbnail bytes pending approved garbage collection;
-authoritative Neon/private-R2 reference images instead use saved creative relationships plus
-owner-scoped discard and 24-hour inactive-orphan cleanup. It also uses a 24-hour persistent demo
-cookie, no Guided import, and development prefilling of both demo credentials. These decisions do
-not justify client-chosen ownership, committed plaintext credentials, provider deletion,
-destructive saved-version overwrite, or public exposure.
+The implementation retains local-only saved-video and thumbnail bytes pending whole-environment
+retirement. Private-R2 Saved Video deletion physically removes unshared version/thumbnail objects
+after an owner relationship recheck; authoritative Neon/private-R2 reference images use saved
+creative relationships plus owner-scoped discard and 24-hour inactive-orphan cleanup. It also uses
+a 24-hour persistent demo cookie, no Guided import, and development prefilling of both demo
+credentials. These decisions do not justify client-chosen ownership, committed plaintext
+credentials, provider deletion, destructive saved-version overwrite, or public exposure.

@@ -434,22 +434,40 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
     return changed ? this.get(ownerUserId, videoId) : null;
   }
 
-  async delete(ownerUserId: string, videoId: string, deletedAt: string): Promise<boolean> {
-    const rows = await this.db
-      .update(savedVideos)
-      .set({
-        status: 'deleted',
-        deletedAt: toIsoTimestamp(deletedAt),
-        updatedAt: toIsoTimestamp(deletedAt),
-      })
-      .where(
-        and(
-          eq(savedVideos.ownerUserId, ownerUserId),
-          eq(savedVideos.id, videoId),
-          isNull(savedVideos.deletedAt),
-        ),
-      )
-      .returning({ id: savedVideos.id });
-    return rows.length === 1;
+  async delete(
+    ownerUserId: string,
+    videoId: string,
+    deletedAt: string,
+  ): Promise<StoredSavedVideoAggregate | null> {
+    return this.db.transaction(async (tx) => {
+      const [video] = await tx
+        .select()
+        .from(savedVideos)
+        .where(and(eq(savedVideos.ownerUserId, ownerUserId), eq(savedVideos.id, videoId)))
+        .limit(1);
+      if (video === undefined) return null;
+      const versions = await tx
+        .select()
+        .from(videoVersions)
+        .where(and(eq(videoVersions.ownerUserId, ownerUserId), eq(videoVersions.videoId, videoId)))
+        .orderBy(asc(videoVersions.ordinal));
+      if (video.deletedAt !== null) return toAggregate(video, versions);
+      const [updated] = await tx
+        .update(savedVideos)
+        .set({
+          status: 'deleted',
+          deletedAt: toIsoTimestamp(deletedAt),
+          updatedAt: toIsoTimestamp(deletedAt),
+        })
+        .where(
+          and(
+            eq(savedVideos.ownerUserId, ownerUserId),
+            eq(savedVideos.id, videoId),
+            isNull(savedVideos.deletedAt),
+          ),
+        )
+        .returning();
+      return updated === undefined ? toAggregate(video, versions) : toAggregate(updated, versions);
+    });
   }
 }

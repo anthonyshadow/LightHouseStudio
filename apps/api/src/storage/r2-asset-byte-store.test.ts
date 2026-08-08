@@ -135,4 +135,44 @@ describe('R2AssetByteStore', () => {
     await expect(store.open(ownerUserId, assetId)).resolves.toBeNull();
     expect(send).not.toHaveBeenCalled();
   });
+
+  it('retries R2 deletion while the lifecycle record remains deleting', async () => {
+    const lifecycle = new MemoryLifecycle();
+    lifecycle.location = {
+      manifest: {
+        schemaVersion: 1,
+        assetId,
+        ownerUserId,
+        mimeType: 'video/mp4',
+        filename: 'take.mp4',
+        sizeBytes: 4,
+        checksumSha256: 'a'.repeat(64),
+        createdAt: '2026-08-07T20:00:00.000Z',
+      },
+      provider: 'r2',
+      storageKey: `media/v1/${assetId.slice(0, 2)}/${assetId}`,
+      etag: null,
+    };
+    const send = vi
+      .fn<(command: unknown) => Promise<unknown>>()
+      .mockRejectedValueOnce(new Error('R2 unavailable'))
+      .mockResolvedValueOnce({});
+    const store = new R2AssetByteStore({
+      accountId: '0123456789abcdef0123456789abcdef',
+      accessKeyId: 'access',
+      secretAccessKey: 'secret',
+      bucket: 'private-assets',
+      client: { send } as unknown as S3Client,
+      lifecycle,
+    });
+
+    await expect(store.delete(ownerUserId, assetId)).rejects.toThrow('R2 unavailable');
+    expect(lifecycle.deleting).toBe(true);
+    expect(lifecycle.location).not.toBeNull();
+
+    await expect(store.delete(ownerUserId, assetId)).resolves.toBeUndefined();
+    expect(lifecycle.location).toBeNull();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls.every(([command]) => command instanceof DeleteObjectCommand)).toBe(true);
+  });
 });

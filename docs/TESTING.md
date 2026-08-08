@@ -51,8 +51,8 @@ The retained suite protects:
 - the shared `/studio`, `/studio/videos`, `/studio/characters`, and `/studio/outfits` runtime,
   centralized logout cleanup, and one persistent media stage across library transitions;
 - idempotent Save Video, immutable append-only replacement, cross-owner denial, metadata-first
-  gallery pagination, lazy thumbnail fallback, range content delivery, tombstones, and retained
-  unreferenced bytes;
+  gallery pagination, lazy thumbnail fallback, range content delivery, tombstones, local-only byte
+  retention, and relationship-safe retryable deletion of R2 versions/thumbnails;
 - reusable Character create/edit/save/preload and atomic reference hydration;
 - Lucy 2.5 and VTO explicit Start/Apply, safe fallback, and independent 300-second boundaries;
 - recording source pinning, duplicate Stop coalescing, recorder/sidecar/transcode ordering, forced

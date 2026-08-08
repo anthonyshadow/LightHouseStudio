@@ -55,7 +55,9 @@ Landscape, Portrait, or Square format, then ordered by Latest, Oldest, Shortest,
 thumbnail Preview opens a centered, focus-managed player over
 the darkened gallery; that scoped player owns no tracks, object URL, recorder, or provider session
 and detaches its authenticated content URL on close. Any saved video can be deleted independently;
-a retained derived video remains usable when its source record is deleted. **Use existing video**
+a retained derived video remains usable when its source record is deleted. With private R2
+selected, manual deletion also removes every unshared version and thumbnail object; interrupted
+object deletion is safe to retry. **Use existing video**
 retains its separate approved source/result player. Every other path returns to `/`. Older Guided
 compatibility videos were not imported during the Phase 1 cutover; their retired repository and UI
 wiring are now removed.

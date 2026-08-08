@@ -297,6 +297,12 @@ describe('DrizzleSavedVideoRepository', () => {
     revision: 2,
     updatedAt: nextVersion.createdAt,
   };
+  const deletedVideo = {
+    ...video,
+    status: 'deleted' as const,
+    deletedAt: now,
+    updatedAt: now,
+  };
   const receipt = {
     idempotencyKey: 'f391033c-6efe-4858-80e8-a91da9947dd7',
     videoId,
@@ -353,7 +359,9 @@ describe('DrizzleSavedVideoRepository', () => {
       [],
       [updatedVideo],
       [{ ...version, thumbnailAssetId: assetId }, nextVersion],
-      [{ id: videoId }],
+      [video],
+      [version, nextVersion],
+      [deletedVideo],
     );
     const repository = new DrizzleSavedVideoRepository(scripted.db);
 
@@ -412,7 +420,10 @@ describe('DrizzleSavedVideoRepository', () => {
     await expect(
       repository.setThumbnail(ownerUserId, videoId, versionId, assetId, now),
     ).resolves.toMatchObject({ versions: [{ thumbnailAssetId: assetId }, nextVersion] });
-    await expect(repository.delete(ownerUserId, videoId, now)).resolves.toBe(true);
+    await expect(repository.delete(ownerUserId, videoId, now)).resolves.toMatchObject({
+      video: { id: videoId, status: 'deleted', deletedAt: now },
+      versions: [version, nextVersion],
+    });
     expect(scripted.remaining()).toBe(0);
   });
 
@@ -451,7 +462,7 @@ describe('DrizzleSavedVideoRepository', () => {
     await expect(
       repository.setThumbnail(ownerUserId, videoId, versionId, assetId, now),
     ).resolves.toBeNull();
-    await expect(repository.delete(ownerUserId, videoId, now)).resolves.toBe(false);
+    await expect(repository.delete(ownerUserId, videoId, now)).resolves.toBeNull();
     expect(scripted.remaining()).toBe(0);
   });
 });

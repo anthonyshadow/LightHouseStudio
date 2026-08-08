@@ -1,4 +1,4 @@
-import { and, eq } from 'drizzle-orm';
+import { and, eq, inArray } from 'drizzle-orm';
 import { toIsoTimestamp } from '../../application/timestamps.js';
 import type { AssetLifecycleRegistry, StoredAssetLocation } from '../../storage/asset-lifecycle.js';
 import type { StoredAssetManifest } from '../../storage/asset-byte-store.js';
@@ -85,7 +85,7 @@ export class DrizzleAssetLifecycleRegistry implements AssetLifecycleRegistry {
         and(
           eq(mediaAssets.id, assetId),
           eq(mediaAssets.ownerUserId, ownerUserId),
-          eq(mediaAssets.status, 'ready'),
+          inArray(mediaAssets.status, ['ready', 'deleting']),
         ),
       )
       .returning({ id: mediaAssets.id });

@@ -32,6 +32,10 @@ account is not production identity or tenancy.
   saved set, trusted-origin discard and removed saved relationships delete only after an
   owner-scoped recheck, and unreferenced rows inactive for 24 hours are purged opportunistically
   during later library reads/writes.
+- Relationship-safe manual Saved Video deletion whenever private R2 is selected: the record is
+  tombstoned first, all immutable versions and thumbnails are collected, active owner relationships
+  are rechecked, and only unshared R2 objects are deleted. `deleting` lifecycle rows remain
+  claimable so an interrupted R2 request can be retried without restoring the gallery record.
 - An idempotent local backfill for saved videos/thumbnails, saved voices, and reference images.
   Saved-video metadata is normalized first to canonical UTC ISO timestamps and integer
   milliseconds, including legacy local records. Creative metadata migrates through the
@@ -88,12 +92,15 @@ facets in SQL rather than materializing the owner library in application memory.
 
 - Switching `DATABASE_MODE` or `ASSET_STORE_PROVIDER` requires restart; there is no runtime
   fallback or provider selection.
-- Backfill and shadow mode retain local bytes. Rollback means restoring local configuration while
-  the approved window remains open; it never means deleting Neon/R2 first.
-- Logical Saved Video delete still retains bytes. Permanent video/thumbnail garbage collection is
-  intentionally absent until retention, dependency, legal-hold, backup-expiry, and account-deletion
-  policy is approved. Reference images use the narrower saved-relationship and inactive-orphan
-  policy above; R2 delete support is never blanket GC.
+- Backfill retains pre-existing local bytes. Shadow writes keep an R2 copy and rollback copy, but an
+  explicit Saved Video deletion removes both copies through the shadow byte-store adapter. Rollback
+  means restoring local configuration while the approved window remains open; it never means
+  deleting Neon/R2 first.
+- Explicit Saved Video deletion physically removes unshared version/thumbnail objects from R2 and
+  remains retryable after a partial failure. Local-only Saved Video deletion remains conservative.
+  Automatic video orphan collection, legal-hold, backup-expiry, and account deletion remain absent.
+  Reference images use the narrower saved-relationship and inactive-orphan policy above; R2 delete
+  support is never blanket GC.
 - Database migrations must be applied through reviewed forward migrations. Restore/PITR and R2
   inventory drills require real staging resources and are not claimed by automated local tests.
 

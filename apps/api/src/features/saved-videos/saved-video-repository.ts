@@ -139,7 +139,15 @@ export interface SavedVideoRepository {
     assetId: string,
     updatedAt: string,
   ): Promise<StoredSavedVideoAggregate | null>;
-  delete(ownerUserId: string, videoId: string, deletedAt: string): Promise<boolean>;
+  /**
+   * Tombstones the owned record and returns its complete asset lineage. Repeated calls for an
+   * already tombstoned record return the same lineage so failed physical cleanup can be retried.
+   */
+  delete(
+    ownerUserId: string,
+    videoId: string,
+    deletedAt: string,
+  ): Promise<StoredSavedVideoAggregate | null>;
 }
 
 const emptyLibrary = (ownerUserId: string): SavedVideoLibrary => ({
@@ -434,21 +442,25 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
     });
   }
 
-  async delete(ownerUserId: string, videoId: string, deletedAt: string): Promise<boolean> {
+  async delete(
+    ownerUserId: string,
+    videoId: string,
+    deletedAt: string,
+  ): Promise<StoredSavedVideoAggregate | null> {
     return this.#mutate(ownerUserId, async (library) => {
-      const index = library.videos.findIndex(
-        (item) => item.video.id === videoId && item.video.deletedAt === null,
-      );
+      const index = library.videos.findIndex((item) => item.video.id === videoId);
       const current = library.videos[index];
-      if (index < 0 || current === undefined) return false;
+      if (index < 0 || current === undefined) return null;
+      if (current.video.deletedAt !== null) return current;
       const videos = [...library.videos];
-      videos[index] = aggregateSchema.parse({
+      const deleted = aggregateSchema.parse({
         ...current,
         video: { ...current.video, status: 'deleted', deletedAt, updatedAt: deletedAt },
         revision: current.revision + 1,
       });
+      videos[index] = deleted;
       await this.#write({ ...library, revision: library.revision + 1, videos });
-      return true;
+      return deleted;
     });
   }
 }

@@ -344,6 +344,9 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
       new FileSavedVideoRepository(dependencies.config.lightframeDataDir),
     dependencies.persistence?.assetBytes ??
       new LocalAssetByteStore(dependencies.config.lightframeDataDir),
+    {
+      deleteStoredAssetsOnManualDelete: dependencies.config.assetStoreProvider === 'r2',
+    },
   );
 
   registerAuthRoutes(app, authService, dependencies.config);

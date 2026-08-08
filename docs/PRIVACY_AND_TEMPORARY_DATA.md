@@ -85,11 +85,13 @@ provider intent. Local Voice uses Web Audio/remux only.
   authenticated owner checks. Video bytes begin loading only after explicit Preview, Studio, Edit,
   or Download intent. The centered Preview player uses the authenticated content response directly
   and detaches it on close without creating a retained object URL. Rename updates metadata; replace
-  appends an immutable version; logical delete tombstones only the chosen record and never requires
-  another source or derived record to be deleted first. A retained derived record keeps its
-  historical lineage and remains usable after source deletion because unreferenced bytes remain
-  retained pending an approved relationship-safe retention policy—there is no seven-day quarantine
-  or automatic physical garbage collection in local, Neon, or R2 mode.
+  appends an immutable version; delete tombstones only the chosen record and never requires another
+  source or derived record to be deleted first. In local-only storage, detached video and thumbnail
+  bytes remain retained pending whole-environment retirement. With private R2 selected, explicit
+  user deletion rechecks the owner's remaining Saved Video relationships and physically deletes
+  every unshared version and thumbnail object. The tombstone preserves lineage and makes an
+  interrupted object deletion idempotently retryable; this is scoped manual cleanup, not blanket
+  orphan garbage collection or an account-deletion/backup-expiry policy.
 - Saved/Browse criteria and page caches are session/process memory only. A saved voice is an
   app-owned relationship. Removing it never calls provider voice deletion; an initial eligible
   community save may still add that voice to the configured provider workspace.

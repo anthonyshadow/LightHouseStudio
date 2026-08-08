@@ -135,6 +135,13 @@ interface IndexedVideo {
   readonly format: SavedVideoFormat;
 }
 
+export interface SavedVideoServiceOptions {
+  readonly now?: () => Date;
+  readonly inspect?: (filePath: string) => Promise<InspectedVideo>;
+  /** R2/shadow mode only. Local-only deletion retains its existing reconciliation policy. */
+  readonly deleteStoredAssetsOnManualDelete?: boolean;
+}
+
 const compareCreatedAt = (left: IndexedVideo, right: IndexedVideo): number =>
   left.aggregate.video.createdAt.localeCompare(right.aggregate.video.createdAt) ||
   left.aggregate.video.id.localeCompare(right.aggregate.video.id);
@@ -144,17 +151,18 @@ export class SavedVideoService {
   readonly #bytes: AssetByteStore;
   readonly #now: () => Date;
   readonly #inspect: (filePath: string) => Promise<InspectedVideo>;
+  readonly #deleteStoredAssetsOnManualDelete: boolean;
 
   constructor(
     repository: SavedVideoRepository,
     bytes: AssetByteStore,
-    now: () => Date = () => new Date(),
-    inspect: (filePath: string) => Promise<InspectedVideo> = inspectSavedVideoFile,
+    options: SavedVideoServiceOptions = {},
   ) {
     this.#repository = repository;
     this.#bytes = bytes;
-    this.#now = now;
-    this.#inspect = inspect;
+    this.#now = options.now ?? (() => new Date());
+    this.#inspect = options.inspect ?? inspectSavedVideoFile;
+    this.#deleteStoredAssetsOnManualDelete = options.deleteStoredAssetsOnManualDelete ?? false;
   }
 
   async #versionFromUpload(
@@ -408,10 +416,44 @@ export class SavedVideoService {
   }
 
   async delete(ownerUserId: string, videoId: string): Promise<void> {
-    if (!(await this.#repository.delete(ownerUserId, videoId, this.#now().toISOString()))) {
+    const deleted = await this.#repository.delete(ownerUserId, videoId, this.#now().toISOString());
+    if (deleted === null) {
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
     }
-    // Phase 1 intentionally retains unreferenced local media until Phase 2 reconciliation.
+    if (!this.#deleteStoredAssetsOnManualDelete) return;
+
+    const retainedAssetIds = new Set(
+      (await this.#repository.list(ownerUserId)).flatMap((aggregate) =>
+        aggregate.versions.flatMap((version) =>
+          version.thumbnailAssetId === null
+            ? [version.assetId]
+            : [version.assetId, version.thumbnailAssetId],
+        ),
+      ),
+    );
+    const discardedAssetIds = new Set(
+      deleted.versions.flatMap((version) =>
+        version.thumbnailAssetId === null
+          ? [version.assetId]
+          : [version.assetId, version.thumbnailAssetId],
+      ),
+    );
+    const results = await Promise.allSettled(
+      [...discardedAssetIds]
+        .filter((assetId) => !retainedAssetIds.has(assetId))
+        .map((assetId) => this.#bytes.delete(ownerUserId, assetId)),
+    );
+    const failed = results.find(
+      (result): result is PromiseRejectedResult => result.status === 'rejected',
+    );
+    if (failed !== undefined) {
+      throw new AppError(
+        503,
+        'storage_failure',
+        'The saved video was removed, but its stored media could not be deleted. Retry deletion.',
+        { cause: failed.reason },
+      );
+    }
   }
 
   async content(
