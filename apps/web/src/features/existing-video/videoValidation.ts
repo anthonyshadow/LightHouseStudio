@@ -69,7 +69,7 @@ const waitForPlayableVideo = async (blob: Blob, signal: AbortSignal): Promise<vo
   }
 };
 
-const extractAudioSidecar = async (
+export const extractExistingVideoAudioSidecar = async (
   inputBlob: Blob,
   container: UploadedTakeMetadata['container'],
   signal: AbortSignal,
@@ -105,6 +105,10 @@ const extractAudioSidecar = async (
     let first = true;
     for await (const packet of sink.packets()) {
       signal.throwIfAborted();
+      // MP4 AAC commonly carries one encoder-priming packet before timestamp zero.
+      // That packet is intentionally not presented, and MP4/WebM muxers reject its
+      // negative timestamp when the audio track is copied into a standalone sidecar.
+      if (packet.timestamp < 0) continue;
       await source.add(packet, first && decoderConfig ? { decoderConfig } : undefined);
       first = false;
     }
@@ -167,7 +171,11 @@ export const validateExistingVideo = async (
     let audioUnavailableReason: string | null = null;
     if (audioTrack) {
       try {
-        audioSidecar = await extractAudioSidecar(file, formatDetails.container, signal);
+        audioSidecar = await extractExistingVideoAudioSidecar(
+          file,
+          formatDetails.container,
+          signal,
+        );
         if (!audioSidecar) {
           audioUnavailableReason =
             'The source audio could not be preserved separately, so Voice is unavailable.';

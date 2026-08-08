@@ -335,6 +335,11 @@ source-preserving Start over revokes the latest result, retains the source, and 
 presentation to that source. Every artifact has a UUID, app-owned name, creation time, kind, and
 parent lineage; generated filenames include the operation, UTC timestamp, and UUID suffix.
 
+Uploaded and restored saved-video audio sidecars are lossless packet remuxes. MP4 AAC encoder-
+priming packets with negative presentation timestamps are excluded because they are not playable
+source audio and standalone MP4/WebM muxers reject negative timestamps. The source video remains
+unchanged; reopening a saved video derives a fresh sidecar from its retained original bytes.
+
 The lazy ElevenLabs library keeps independent Saved and Browse criteria, pagination, error, and
 cache state inside the existing Voice workspace. Browse uses authenticated `/v1/shared-voices`
 server-side search/filter/sort with fixed 20-item pages. The adapter always sends

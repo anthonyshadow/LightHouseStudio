@@ -148,6 +148,9 @@ source, then edit either base, save, start over, or discard.
   while Save, local adjustment, and Voice stay available.
 - A playable visual-only source remains useful. Voice explains when no usable source-audio
   sidecar exists.
+- Standalone sidecar extraction losslessly copies playable audio packets and excludes MP4 AAC
+  encoder-priming packets before timestamp zero. A saved original is re-inspected and receives a
+  fresh sidecar when reopened, so this normalization also applies to videos saved before the fix.
 - HEVC, ProRes, aliases, and undocumented codecs are blocked with export guidance. When the active
   Character Swap capability requires H.264 MP4, H.264 MOV or VP8 WebM is converted locally only
   at explicit Start. The converted Blob is revalidated, remains ephemeral, and never replaces the
