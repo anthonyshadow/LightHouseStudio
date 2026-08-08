@@ -12,6 +12,8 @@ import { passwordCredentials, sessions, users } from './schema.js';
 
 type UserRow = typeof users.$inferSelect;
 
+const toIsoTimestamp = (value: string): string => new Date(value).toISOString();
+
 const toCredential = (row: UserRow, passwordHash: string): SeededUserCredential => ({
   id: row.id,
   login: row.login,
@@ -23,9 +25,9 @@ const toCredential = (row: UserRow, passwordHash: string): SeededUserCredential 
   role: row.role,
   status: row.status,
   passwordHash,
-  createdAt: row.createdAt,
-  updatedAt: row.updatedAt,
-  lastLoginAt: row.lastLoginAt,
+  createdAt: toIsoTimestamp(row.createdAt),
+  updatedAt: toIsoTimestamp(row.updatedAt),
+  lastLoginAt: row.lastLoginAt === null ? null : toIsoTimestamp(row.lastLoginAt),
 });
 
 export class DrizzleUserRepository implements UserRepository {

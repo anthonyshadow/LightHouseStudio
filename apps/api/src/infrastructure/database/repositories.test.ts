@@ -15,6 +15,7 @@ import { DrizzleSavedVoiceRepository } from './saved-voice-repository.js';
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const assetId = '9826fc75-4759-47cc-b07d-d7325ce0ad14';
 const now = '2026-08-07T12:00:00.000Z';
+const postgresNow = '2026-08-07 12:00:00+00';
 
 const scriptedDatabase = (...script: readonly unknown[]) => {
   const remaining = [...script];
@@ -74,8 +75,8 @@ const userRow = {
   planId: 'free' as const,
   role: 'user' as const,
   status: 'active' as const,
-  createdAt: now,
-  updatedAt: now,
+  createdAt: postgresNow,
+  updatedAt: postgresNow,
   lastLoginAt: null,
 };
 
@@ -98,7 +99,12 @@ describe('Drizzle auth repositories', () => {
       [{ user: userRow, passwordHash: '$argon2id$hash' }],
       [{ user: userRow, passwordHash: '$argon2id$hash' }],
       [{ id: ownerUserId }],
-      [{ user: { ...userRow, lastLoginAt: now }, passwordHash: '$argon2id$hash' }],
+      [
+        {
+          user: { ...userRow, lastLoginAt: postgresNow },
+          passwordHash: '$argon2id$hash',
+        },
+      ],
       [],
     );
     const repository = new DrizzleUserRepository(scripted.db);
@@ -112,12 +118,15 @@ describe('Drizzle auth repositories', () => {
     await expect(repository.findById(ownerUserId)).resolves.toMatchObject({
       id: ownerUserId,
       passwordHash: '$argon2id$hash',
+      createdAt: now,
+      updatedAt: now,
     });
     await expect(repository.findByLogin(' DEMO@LIGHTFRAME.LOCAL ')).resolves.toMatchObject({
       login: userRow.login,
     });
     await expect(repository.recordLastLogin(ownerUserId, now)).resolves.toMatchObject({
       lastLoginAt: now,
+      updatedAt: now,
     });
     await expect(repository.findById('9826fc75-4759-47cc-b07d-d7325ce0ad14')).resolves.toBeNull();
     expect(scripted.remaining()).toBe(0);
