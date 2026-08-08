@@ -27,6 +27,7 @@ export const openCharacterOptions = async (page: Page): Promise<void> => {
 
 export {
   closeRecipeDockWhenOverlaid,
+  confirmSaveVideo,
   createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,

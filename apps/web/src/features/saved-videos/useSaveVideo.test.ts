@@ -125,6 +125,7 @@ describe('useSaveVideo', () => {
     expect(api.saveVideo.mock.calls[1]?.[0].idempotencyKey).toBe(
       api.saveVideo.mock.calls[0]?.[0].idempotencyKey,
     );
+    expect(api.saveVideo.mock.calls[1]?.[0].title).toBe('Morning take');
     expect(api.saveVideo.mock.calls.slice(2).map((call) => call[0].origin)).toEqual([
       'uploaded',
       'editor',

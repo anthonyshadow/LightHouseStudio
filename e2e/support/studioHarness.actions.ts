@@ -22,6 +22,15 @@ export const expectNoDocumentOverflow = async (page: Page): Promise<void> => {
   expect(dimensions.bodyHeight).toBeLessThanOrEqual(dimensions.height + 1);
 };
 
+export const confirmSaveVideo = async (page: Page, name?: string): Promise<void> => {
+  const dialog = page.getByRole('dialog', { name: 'Save video' });
+  await expect(dialog).toBeVisible();
+  const nameField = dialog.getByRole('textbox', { name: 'Video name (optional)' });
+  if (name !== undefined) await nameField.fill(name);
+  await dialog.getByRole('button', { name: 'Save Video' }).click();
+  await expect(dialog).toBeHidden();
+};
+
 export const settleVisualPage = async (page: Page): Promise<void> => {
   await page.evaluate(async () => {
     await document.fonts.ready;

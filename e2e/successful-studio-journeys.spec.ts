@@ -2,6 +2,7 @@ import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
 import {
   closeRecipeDockWhenOverlaid,
+  confirmSaveVideo,
   createLocalTake,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
@@ -583,6 +584,7 @@ test('saved voice preview, Apply, remux, Save, and Restore Original stay explici
   ]);
 
   await processedTakeDialog.getByRole('button', { name: 'Save Video' }).click();
+  await confirmSaveVideo(page, 'Northstar narration');
   await expect(processedTakeDialog.getByRole('button', { name: 'Saved' })).toBeVisible();
   await expect(
     processedTakeDialog.getByRole('button', { name: 'Close and release' }),
@@ -697,6 +699,7 @@ test('Save enables Release and clears the reviewed take without reacquiring medi
   await expect(releaseTake).toBeDisabled();
 
   await takeControls.getByRole('button', { name: 'Save' }).click();
+  await confirmSaveVideo(page);
   await expect(takeControls.getByRole('button', { name: 'Saved' })).toBeVisible();
   await expect(releaseTake).toBeEnabled();
   await releaseTake.click();

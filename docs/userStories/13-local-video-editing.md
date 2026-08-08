@@ -28,15 +28,16 @@ a provider, and replace the immutable source only after a validated export and e
 7. **Save edited video** starts one module worker. Studio announces local render/validation
    progress; cancellation terminates the work and preserves the pinned source and draft.
 8. After validation, the replacement dialog initially focuses **Cancel** and offers **Replace
-   Without Saving** or **Replace and Save**. The Save path must finish publishing the artifact that
-   was displayed when this edit session began—including a prior visual or voiced result—before
-   replacement proceeds.
+   Without Saving** or **Replace and Save**. The Save path prompts for an optional gallery name,
+   falling back to the existing generated artifact name when blank, and must finish publishing the
+   artifact that was displayed when this edit session began—including a prior visual or voiced
+   result—before replacement proceeds.
 9. A confirmed replacement creates an `edited` artifact whose `parentArtifactId` identifies that
    pinned source, atomically makes it the immutable source, installs its matching audio sidecar,
    clears superseded visual/voice layers, and returns to **Use existing video**.
-10. **Save Video** can then save the edited artifact as a new gallery record. If the source was
-    loaded from Saved Videos, the secondary confirmed Replace Existing action appends an immutable
-    version using the captured saved video/version lineage.
+10. **Save Video** can then save the edited artifact as a new gallery record after the same optional
+    naming prompt. If the source was loaded from Saved Videos, the secondary confirmed Replace
+    Existing action appends an immutable version using the captured saved video/version lineage.
 
 ## Validation and compatibility
 

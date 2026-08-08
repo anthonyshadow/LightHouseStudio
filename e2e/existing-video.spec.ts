@@ -7,6 +7,7 @@ import {
 } from './support/existingVideoHarness';
 import {
   CREATIVE_ASSET_STORAGE_KEY,
+  confirmSaveVideo,
   expectNoDocumentOverflow,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
@@ -188,6 +189,7 @@ test('provider-free upload previews and enters the existing take/save surface', 
   await expect(review.getByRole('button', { name: 'Edit video' })).toBeVisible();
   await expect(page.getByLabel('Recorded take playback')).toBeVisible();
   await review.getByRole('button', { name: 'Save Video' }).click();
+  await confirmSaveVideo(page);
   await expect(review.getByRole('button', { name: 'Saved' })).toBeVisible();
   await expect(review.getByRole('link', { name: /Download/u })).toHaveCount(0);
   expect(await cameraCalls(page)).toBe(0);
@@ -272,6 +274,7 @@ test('provider-free Adjust video renders locally and atomically replaces the per
   await page.getByRole('button', { name: 'Save edited video' }).click();
   await expect(replacement).toBeVisible({ timeout: 60_000 });
   await replacement.getByRole('button', { name: 'Replace and Save' }).click();
+  await confirmSaveVideo(page, 'Local edit source');
 
   await expect(upload).toBeVisible();
   await expect(upload.getByRole('button', { name: 'Character Swap', exact: true })).toBeDisabled();
@@ -562,6 +565,7 @@ for (const operation of ['character-swap', 'virtual-try-on'] as const) {
       await expect(playback).toHaveAttribute('src', resultUrl!);
 
       await dialog.getByRole('button', { name: 'Save Video' }).click();
+      await confirmSaveVideo(page);
       await expect(dialog.getByRole('button', { name: 'Saved' })).toBeVisible();
 
       for (const viewport of Object.values(STUDIO_VIEWPORT_SIZES)) {

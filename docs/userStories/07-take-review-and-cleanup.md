@@ -31,7 +31,8 @@ deliberately release or discard it.
    MIME type. The panel does not create another player and has no dedicated tool-rail launcher.
 7. Optionally apply a voice treatment. Playback and saving remain locked until processing
    settles or is cancelled.
-8. Select **Save Video**. It reports progress and publishes the final validated artifact to the
+8. Select **Save Video**, optionally name it, and confirm. A blank name keeps the existing generated
+   artifact name. Save reports progress and publishes the final validated artifact to the
    authenticated local gallery without changing review ownership. Repeated submission of the same
    artifact is idempotent.
 9. After Save succeeds, select **Release**. The durable gallery copy remains available for preview,

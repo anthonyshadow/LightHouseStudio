@@ -19,6 +19,12 @@ export type SavedVideoCharacterAttribution = Readonly<{
   characterVariantName: string | null;
 }>;
 
+export const defaultSavedVideoName = (artifact: RecordingArtifact): string =>
+  artifact.name?.trim() || artifact.filename.replace(/\.[^.]+$/u, '');
+
+const savedVideoName = (artifact: RecordingArtifact, requestedName?: string): string =>
+  requestedName?.trim() || defaultSavedVideoName(artifact);
+
 const originForArtifact = (artifact: RecordingArtifact): SavedVideoOrigin => {
   switch (artifact.kind) {
     case 'uploaded':
@@ -58,7 +64,7 @@ export const useSaveVideo = () => {
       try {
         const video = await saveVideo({
           blob: artifact.media,
-          title: title?.trim() || artifact.name || artifact.filename.replace(/\.[^.]+$/u, ''),
+          title: savedVideoName(artifact, title),
           filename: artifact.filename,
           origin: originForArtifact(artifact),
           characterName: character?.characterName ?? null,
@@ -111,7 +117,7 @@ export const useSaveVideo = () => {
       try {
         const video = await appendSavedVideoVersion(target.videoId, target.currentVersionId, {
           blob: artifact.media,
-          title: title?.trim() || artifact.name || artifact.filename.replace(/\.[^.]+$/u, ''),
+          title: savedVideoName(artifact, title),
           filename: artifact.filename,
           origin: originForArtifact(artifact),
           characterName: character?.characterName ?? null,

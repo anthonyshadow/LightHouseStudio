@@ -61,6 +61,7 @@ import {
 import { isModelSessionActive } from '../features/media-session/sessionComposerModel';
 import { persistedReferenceAssetId } from '../features/media-session/types';
 import { CaptureSettingsPanel, RecordingControls } from '../features/recording';
+import type { RecordingArtifact } from '../features/recording/types';
 import { useStudioSession } from '../orchestration/session';
 import { Button, OverlayPanel } from '../ui';
 import {
@@ -96,7 +97,12 @@ import { useReferenceRecipeHandoff } from './useReferenceRecipeHandoff';
 import { useTakeReviewFlow } from './useTakeReviewFlow';
 import { useDesktopStudioLayout } from './useDesktopStudioLayout';
 import { useStudioOverlayController, type ActiveOverlay } from './useStudioOverlayController';
-import { useSaveVideo } from '../features/saved-videos/useSaveVideo';
+import { SaveVideoDialog } from '../features/saved-videos/SaveVideoDialog';
+import {
+  defaultSavedVideoName,
+  useSaveVideo,
+  type SavedVideoCharacterAttribution,
+} from '../features/saved-videos/useSaveVideo';
 import { SessionCleanupCoordinator } from '../orchestration/lifecycle/SessionCleanupCoordinator';
 import { VideoGallery } from '../features/video-gallery/VideoGallery';
 import {
@@ -174,6 +180,18 @@ type OutfitBuilderLaunch = Readonly<{
   saveAndSelect: boolean;
   destination: 'selector' | 'shelf' | 'library';
 }>;
+
+type PendingVideoSave =
+  | Readonly<{
+      intent: 'presented';
+      artifact: RecordingArtifact;
+      source: { readonly videoId: string; readonly versionId: string } | undefined;
+      character: SavedVideoCharacterAttribution | null;
+    }>
+  | Readonly<{
+      intent: 'video-edit-replacement';
+      artifact: RecordingArtifact;
+    }>;
 
 interface StudioExperienceProps {
   focusMainOnMount: boolean;
@@ -334,6 +352,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   );
   const [wardrobeDirty, setWardrobeDirty] = useState(false);
   const [videoEditDiscardPromptOpen, setVideoEditDiscardPromptOpen] = useState(false);
+  const [pendingVideoSave, setPendingVideoSave] = useState<PendingVideoSave | null>(null);
   const galleryEditRequestedRef = useRef(false);
   const gallerySourceLoadControllerRef = useRef<AbortController | null>(null);
   const [loadedSavedSource, setLoadedSavedSource] = useState<{
@@ -1008,6 +1027,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     setShelfDirty(false);
     updateOutfitBuilderDirty(false);
     setWardrobeDirty(false);
+    setPendingVideoSave(null);
     videoEditor.close();
     savedVideoSave.reset();
   }, [processing, recording, savedVideoSave, setShelfDirty, updateOutfitBuilderDirty, videoEditor]);
@@ -1268,21 +1288,21 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       );
     }
   }, [activeLoadedSavedSource, presentedVideoCharacter, recording.presented, savedVideoSave]);
-  const savePresentedVideo = useCallback(() => {
+  const requestSavePresentedVideo = useCallback(() => {
     const artifact = recording.presented;
     if (!artifact) return;
-    void savedVideoSave.save(
+    setPendingVideoSave({
+      intent: 'presented',
       artifact,
-      undefined,
-      activeLoadedSavedSource
+      source: activeLoadedSavedSource
         ? {
             videoId: activeLoadedSavedSource.videoId,
             versionId: activeLoadedSavedSource.currentVersionId,
           }
         : undefined,
-      presentedVideoCharacter,
-    );
-  }, [activeLoadedSavedSource, presentedVideoCharacter, recording.presented, savedVideoSave]);
+      character: presentedVideoCharacter,
+    });
+  }, [activeLoadedSavedSource, presentedVideoCharacter, recording.presented]);
   const returnFromVideoEditor = useCallback(() => {
     videoEditor.close();
     setVideoEditDiscardPromptOpen(false);
@@ -1298,7 +1318,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     setVideoEditDiscardPromptOpen(true);
   }, [returnFromVideoEditor, videoEditor.dirty, videoEditor.phase]);
   const commitVideoEdit = useCallback(
-    async (saveCurrent: boolean) => {
+    async (saveCurrent: boolean, name?: string) => {
       const source = videoEditor.source;
       const candidate = videoEditor.candidate;
       if (!source || !candidate || videoEditor.phase !== 'awaiting-replacement') return;
@@ -1307,7 +1327,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         if (saveCurrent) {
           const saved = await savedVideoSave.save(
             source.artifact,
-            undefined,
+            name,
             activeLoadedSavedSource
               ? {
                   videoId: activeLoadedSavedSource.videoId,
@@ -1367,6 +1387,27 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       savedVideoSave,
       videoEditor,
     ],
+  );
+  const requestSaveAndCommitVideoEdit = useCallback(() => {
+    const source = videoEditor.source;
+    if (!source || !videoEditor.candidate || videoEditor.phase !== 'awaiting-replacement') return;
+    setPendingVideoSave({
+      intent: 'video-edit-replacement',
+      artifact: source.artifact,
+    });
+  }, [videoEditor]);
+  const confirmPendingVideoSave = useCallback(
+    (name?: string) => {
+      const pending = pendingVideoSave;
+      if (!pending) return;
+      setPendingVideoSave(null);
+      if (pending.intent === 'video-edit-replacement') {
+        void commitVideoEdit(true, name);
+        return;
+      }
+      void savedVideoSave.save(pending.artifact, name, pending.source, pending.character);
+    },
+    [commitVideoEdit, pendingVideoSave, savedVideoSave],
   );
   const dismissCharacterBuilder = useCallback(() => {
     if (characterBuilderDestination.kind === 'existing-video' && existingVideo.selection) {
@@ -1543,7 +1584,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                         onChangeExperience={() => openOverlay('ai-experience')}
                         onUploadVideo={openExistingVideo}
                         uploadButtonRef={uploadToggleRef}
-                        {...(recording.presented ? { onSaveVideo: savePresentedVideo } : {})}
+                        {...(recording.presented ? { onSaveVideo: requestSavePresentedVideo } : {})}
                         saveVideoState={savedVideoSave.state}
                         {...(activeLoadedSavedSource &&
                         recording.presented?.id !== activeLoadedSavedSource.artifactId
@@ -1622,6 +1663,14 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           onDiscardTemporaryWork={discardTemporaryWork}
         />
 
+        {pendingVideoSave ? (
+          <SaveVideoDialog
+            fallbackName={defaultSavedVideoName(pendingVideoSave.artifact)}
+            onCancel={() => setPendingVideoSave(null)}
+            onSave={confirmPendingVideoSave}
+          />
+        ) : null}
+
         <Suspense fallback={null}>
           <ConfirmationDialog
             open={logoutPromptOpen}
@@ -1675,7 +1724,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             }}
             returnFocusRef={mainRef}
             onCancel={videoEditor.resumeEditing}
-            onConfirm={() => void commitVideoEdit(true)}
+            onConfirm={requestSaveAndCommitVideoEdit}
           />
         </Suspense>
 
@@ -1811,7 +1860,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             onCreateCharacter={createCharacterForExistingVideo}
             onCreateWardrobeVariant={openWardrobeForExistingVideo}
             onFinish={finishExistingVideoSetup}
-            {...(recording.presented ? { onSaveVideo: savePresentedVideo } : {})}
+            {...(recording.presented ? { onSaveVideo: requestSavePresentedVideo } : {})}
             saveVideoState={savedVideoSave.state}
             onAdjustVideo={openVideoAdjust}
             recordingSupported={
@@ -2041,7 +2090,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           {...(existingVideo.selection ? { onEditVideo: openExistingVideo } : {})}
           onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
           onBackToTakeReview={() => openOverlay('take-review')}
-          {...(recording.presented ? { onSaveVideo: savePresentedVideo } : {})}
+          {...(recording.presented ? { onSaveVideo: requestSavePresentedVideo } : {})}
           saveVideoState={savedVideoSave.state}
           {...(activeLoadedSavedSource &&
           recording.presented?.id !== activeLoadedSavedSource.artifactId

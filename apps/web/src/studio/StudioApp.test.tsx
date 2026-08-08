@@ -3,7 +3,7 @@
 import type { AuthenticatedSessionResponse, ReferenceImageAsset } from '@studio/contracts';
 import { createPhaseOneEntitlements } from '@studio/domain';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import type { PropsWithChildren } from 'react';
+import type { InputHTMLAttributes, PropsWithChildren, ReactNode } from 'react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
@@ -213,6 +213,9 @@ const harness = vi.hoisted(() => {
     latestWorkspace: null as WorkspaceHarnessProps | null,
     fetchReferenceImageMetadata: vi.fn(),
     hydrateReferenceImage: vi.fn(),
+    saveVideo: vi.fn(() => Promise.resolve(null)),
+    replaceSavedVideo: vi.fn(() => Promise.resolve(null)),
+    resetSavedVideo: vi.fn(),
     hydratedReference: null as PersistedSessionReference | null,
     promptCommitted: null as
       | ((
@@ -260,24 +263,41 @@ vi.mock('../features/creative-assets/useCreativeAssetRepository', () => ({
   ) => selector(harness.repository.getSnapshot()),
 }));
 
+vi.mock('../features/saved-videos/useSaveVideo', () => ({
+  defaultSavedVideoName: (artifact: { name?: string; filename: string }) =>
+    artifact.name?.trim() || artifact.filename.replace(/\.[^.]+$/u, ''),
+  useSaveVideo: () => ({
+    state: { status: 'idle' as const },
+    save: harness.saveVideo,
+    replace: harness.replaceSavedVideo,
+    reset: harness.resetSavedVideo,
+  }),
+}));
+
 vi.mock('../features/live-stage', () => ({
   MediaStage: ({
     presentation,
     editPreview,
+    controls,
   }: {
     presentation: { kind: string };
     editPreview?: unknown;
+    controls?: (options: { visible: boolean }) => ReactNode;
   }) => (
-    <div
-      data-testid="media-stage"
-      data-presentation={presentation.kind}
-      data-edit-preview={editPreview ? 'true' : 'false'}
-    />
+    <div>
+      <div
+        data-testid="media-stage"
+        data-presentation={presentation.kind}
+        data-edit-preview={editPreview ? 'true' : 'false'}
+      />
+      {controls?.({ visible: true })}
+    </div>
   ),
 }));
 
 vi.mock('../features/recording', () => ({
   CaptureSettingsPanel: () => <div>Capture settings content</div>,
+  RecordingAction: () => <button type="button">Record</button>,
   RecordingControls: () => <div>Recording controls</div>,
 }));
 
@@ -368,6 +388,17 @@ vi.mock('../ui', async () => {
   return {
     StudioDesignProvider,
     Button,
+    TextField: ({
+      label,
+      hint,
+      ...props
+    }: InputHTMLAttributes<HTMLInputElement> & { label: string; hint?: string }) => (
+      <label>
+        {label}
+        <input aria-label={label} {...props} />
+        {hint ? <span>{hint}</span> : null}
+      </label>
+    ),
     StatusNotice: ({ title, children }: PropsWithChildren<{ title: string }>) => (
       <aside aria-label={title}>{children}</aside>
     ),
@@ -377,8 +408,14 @@ vi.mock('../ui', async () => {
       open,
       title,
       children,
-    }: PropsWithChildren<{ open: boolean; title: string }>) =>
-      open ? <section aria-label={title}>{children}</section> : null,
+      footer,
+    }: PropsWithChildren<{ open: boolean; title: string; footer?: ReactNode }>) =>
+      open ? (
+        <section aria-label={title}>
+          {children}
+          {footer}
+        </section>
+      ) : null,
   };
 });
 
@@ -503,6 +540,9 @@ describe('StudioApp composition lifecycle', () => {
       contentUrl: referenceAsset.contentUrl,
     };
     harness.hydrateReferenceImage.mockReset().mockResolvedValue(harness.hydratedReference);
+    harness.saveVideo.mockClear();
+    harness.replaceSavedVideo.mockClear();
+    harness.resetSavedVideo.mockClear();
   });
 
   it('keeps the mounted stage node stable while overlays change', () => {
@@ -565,6 +605,42 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.getByRole('region', { name: 'Use existing video' })).toBeInTheDocument();
     expect(harness.existingVideo.adoptRecordedArtifact).not.toHaveBeenCalled();
     expect(harness.latestWorkspace?.state.activeTool).toBe('edit-video');
+  });
+
+  it('prompts for an optional name before saving the presented video', async () => {
+    const media = new Blob(['source'], { type: 'video/mp4' });
+    const presented = {
+      id: 'video-presented',
+      name: 'Recorded take · 20260808T140000Z · ab12cd34',
+      createdAt: '2026-08-08T14:00:00.000Z',
+      kind: 'recorded' as const,
+      parentArtifactId: null,
+      media,
+      objectUrl: 'blob:video-presented',
+      mimeType: 'video/mp4',
+      filename: 'local-take-20260808T140000Z.mp4',
+      sourceModeId: 'local' as const,
+      startedAt: '2026-08-08T14:00:00.000Z',
+      durationMs: 10_000,
+      sizeBytes: media.size,
+    };
+    harness.recording.presented = presented;
+    harness.recording.original = presented;
+    harness.takeStagePresentation = { kind: 'playback', mode: 'local' };
+    renderStudio();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+    expect(screen.getByRole('region', { name: 'Save video' })).toBeInTheDocument();
+    expect(harness.saveVideo).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByRole('textbox', { name: 'Video name (optional)' }), {
+      target: { value: 'Studio intro' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save Video' }));
+
+    await waitFor(() =>
+      expect(harness.saveVideo).toHaveBeenCalledWith(presented, 'Studio intro', undefined, null),
+    );
   });
 
   it('enters local editing without replacing the persistent stage or duplicating controls', async () => {

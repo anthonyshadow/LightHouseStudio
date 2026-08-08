@@ -7,9 +7,10 @@ download only from that gallery, and load a chosen version into the existing Stu
 
 ## Observable behavior
 
-1. A healthy review artifact exposes **Save Video**, never a direct Download action. Saving is
-   explicit, reports progress/result, and repeated submission of the same artifact is idempotent.
-   Release remains disabled until the current artifact is saved.
+1. A healthy review artifact exposes **Save Video**, never a direct Download action. Saving first
+   prompts for an optional video name; a blank field keeps the existing generated artifact name.
+   Saving is explicit, reports progress/result, and repeated submission of the same artifact is
+   idempotent. Release remains disabled until the current artifact is saved.
 2. **Save as New Video** creates a titled gallery record and immutable first version. **Replace
    Existing Video** is secondary, requires confirmation, checks the expected current version, and
    appends bytes rather than overwriting history.
