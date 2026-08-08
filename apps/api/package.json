@@ -17,7 +17,7 @@
   "dependencies": {
     "@aws-sdk/client-s3": "3.1106.0",
     "@aws-sdk/lib-storage": "3.1106.0",
-    "@decartai/sdk": "0.1.17",
+    "@decartai/sdk": "0.1.18",
     "@fastify/cookie": "11.1.2",
     "@fastify/helmet": "13.1.0",
     "@fastify/multipart": "10.1.0",
@@ -28,10 +28,10 @@
     "@studio/domain": "workspace:*",
     "dotenv": "17.4.2",
     "drizzle-orm": "0.45.2",
-    "fastify": "5.11.0",
+    "fastify": "5.11.2",
     "jose": "6.2.8",
-    "mediabunny": "1.52.0",
-    "openai": "7.2.0",
+    "mediabunny": "1.52.3",
+    "openai": "7.4.0",
     "sharp": "0.35.3",
     "zod": "4.4.3"
   },

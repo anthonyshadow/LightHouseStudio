@@ -10,12 +10,12 @@
     "typecheck": "tsc --noEmit -p tsconfig.json"
   },
   "dependencies": {
-    "@decartai/sdk": "0.1.17",
+    "@decartai/sdk": "0.1.18",
     "@emotion/react": "11.14.0",
-    "@mediabunny/aac-encoder": "1.52.0",
+    "@mediabunny/aac-encoder": "1.52.3",
     "@studio/contracts": "workspace:*",
     "@studio/domain": "workspace:*",
-    "mediabunny": "1.52.0",
+    "mediabunny": "1.52.3",
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "react-router": "8.3.0"
