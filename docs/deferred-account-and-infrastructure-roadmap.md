@@ -389,6 +389,15 @@ integration in shadow mode → reports/reconciliation → balances/limits → pu
 
 ## Phase 6 — Production security and operations
 
+Before supported public deployment, create and approve `docs/THREAT_MODEL.md`
+and `docs/RUNBOOK.md`. The threat model must cover multi-tenant authorization,
+CSRF and deployed-origin policy, SSRF and remote imports, malicious media,
+provider-cost abuse and rate limiting, and presigned-upload abuse. The runbook
+must cover backups and restore, job recovery, R2 cleanup, key rotation,
+monitoring and incident response, and retention, export, and deletion. These
+documents are deferred while the product remains loopback-oriented; the current
+local and cloud-persistence guides are not substitutes for public operations.
+
 Before public traffic, add:
 
 - layered rate limiting for IP/session/user/tenant/provider/cost scopes, Login brute-force

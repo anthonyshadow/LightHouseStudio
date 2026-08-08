@@ -2,153 +2,121 @@
 
 ## Scope
 
-This file applies repository-wide. A nearer `AGENTS.md` may add or override
-instructions for its subtree.
-
-Lightframe Studio is currently a local-first, single-operator application.
-Do not infer public deployment, shared tenancy, real account registration,
-billing, public sharing, or unrestricted provider use from configuration-gated
-cloud infrastructure.
-
-Implement current repository behavior, not unimplemented target-state plans.
-Do not change the runtime, framework, persistence authority, provider, or
-deployment model unless the task explicitly includes that change.
+This file applies repository-wide; a nearer `AGENTS.md` may override it. The app
+is local-first, loopback-oriented, and single-operator. Configuration-gated
+cloud infrastructure does not imply public deployment, shared tenancy,
+registration, billing, public sharing, or unrestricted provider use. Implement
+current behavior, not a target state. Change the runtime, framework, persistence
+authority, provider, or deployment model only when explicitly in scope.
 
 ## Read selectively
 
-Start with the affected source and its tests. Read only the documentation
-needed for the task:
+Start with affected source and tests. Open only what the task needs:
 
-- Setup, scripts, and product overview: `README.md`
-- Documentation ownership map: `docs/README.md`
-- Architecture and lifecycle ownership: `docs/ARCHITECTURE.md`
-- Observable product behavior: the affected file in `docs/userStories/`
-- Testing and release validation: `docs/TESTING.md`
-- Provider and temporary-data boundaries:
-  `docs/PRIVACY_AND_TEMPORARY_DATA.md`
-- Cloud persistence and migrations: `docs/CLOUD_PERSISTENCE.md`
-- Live or physical-device validation: `docs/LIVE_PROVIDER_SMOKE.md` and
-  `docs/MANUAL_QA.md`
+- `README.md`: setup, scripts, and product overview;
+- `docs/README.md`: documentation ownership;
+- `docs/ARCHITECTURE.md`: architecture and lifecycle ownership;
+- affected file in `docs/userStories/`: observable behavior;
+- `docs/TESTING.md`: testing and release validation;
+- `docs/PRIVACY_AND_TEMPORARY_DATA.md`: provider, privacy, and temporary data;
+- `docs/CLOUD_PERSISTENCE.md`: cloud persistence and migrations;
+- `docs/MANUAL_QA.md` and `docs/LIVE_PROVIDER_SMOKE.md`: live/device checks; and
+- `docs/PRODUCT_EVOLUTION.md` and `LESSONS.md`: historical rationale only.
 
-Do not read every document by default. Historical plans and lessons explain
-rationale but are not current implementation authority.
+Do not read every document by default. Historical plans are not current
+implementation authority.
 
 ## Before editing
 
-1. Inspect the complete affected path: caller, owner, dependency, contract,
-   cleanup path, and relevant tests.
-2. Search for an existing component, hook, helper, schema, service, adapter,
-   or policy before creating another one.
-3. Identify the lifecycle, transaction, and trust boundary before moving or
-   combining code.
-4. Make the smallest coherent change that satisfies the requested behavior.
-5. Preserve unrelated user changes and do not perform speculative cleanup.
-
-Do not infer behavior from filenames, stale plans, or visual resemblance alone.
+Trace the caller, owner, dependency, contract, cleanup path, and relevant tests.
+Search for existing components, hooks, helpers, schemas, services, adapters, and
+policies before creating one. Identify lifecycle, transaction, and trust
+boundaries before moving code. Make the smallest coherent change; preserve
+unrelated work and avoid speculative cleanup. Do not infer behavior from names,
+stale plans, or visual resemblance.
 
 ## Code quality
 
-- Keep each module responsible for one cohesive behavior or lifecycle.
-- Split code at ownership or lifecycle boundaries, not arbitrary line counts.
-- Prefer feature-local code. Extract shared code only when multiple real
-  consumers have the same semantics and lifecycle.
-- Do not combine superficially similar code with different trust,
-  transaction, cleanup, or ownership requirements.
-- Keep React components presentation-focused and route handlers thin.
-- Keep product policy in domain rules or application orchestration.
-- Do not duplicate HTTP contracts, domain policy, storage ownership rules, or
-  provider normalization.
+- Give each module one cohesive responsibility. Split at ownership or lifecycle
+  boundaries, not line counts.
+- Prefer feature-local code. Share only across real consumers with matching
+  semantics and lifecycle; never merge different cleanup, transaction,
+  ownership, or trust boundaries.
+- Keep React components presentation-focused and route handlers thin. Put
+  product policy in domain rules or application orchestration.
+- Do not duplicate HTTP contracts, domain policy, storage rules, provider
+  normalization, or modal/media ownership.
 - Do not add a dependency unless existing platform or repository utilities are
-  insufficient.
-- Remove dead code only when its lack of callers and compatibility obligations
-  have been verified.
-- Comments should explain constraints or rationale, not restate the code.
-- Do not hand-edit generated artifacts.
+  insufficient. Verify callers and compatibility obligations before deleting
+  code.
+- Comments explain constraints or rationale. Do not hand-edit generated files.
 
 ## Repository boundaries
 
-- `packages/domain` owns pure product policy.
-- `packages/contracts` owns app-controlled runtime HTTP schemas.
-- `apps/web` owns browser presentation, orchestration, and browser adapters.
-- `apps/api` owns authentication, application services, persistence, storage,
-  and provider adapters.
-- Web code must not import API implementation code.
-- Domain and contracts must not depend on React, browser APIs, persistence
-  clients, or provider payloads.
-- Database schemas, provider payloads, and public HTTP contracts are separate
-  representations and require explicit mapping.
+- `packages/domain`: pure product policy.
+- `packages/contracts`: app-controlled runtime HTTP schemas.
+- `apps/web`: browser presentation, orchestration, and adapters.
+- `apps/api`: authentication, services, persistence, storage, and providers.
+- Web must not import API implementation. Domain/contracts must not depend on
+  React, browser APIs, persistence clients, or provider payloads.
+- Map provider payloads, database records, domain models, and public contracts
+  explicitly. See `docs/ARCHITECTURE.md` for details.
 
-## Security, ownership, and cost
+## Security, ownership, cost, and cleanup
 
-- Permanent credentials remain server-side and never enter `VITE_*`, browser
-  bundles, logs, fixtures, screenshots, traces, or committed environment files.
-- Authenticated ownership comes only from verified server identity, never from
-  browser-supplied user IDs, storage paths, provider IDs, or device IDs.
-- Provider calls must be explicit, bounded, safely normalized, and cancellable
-  where supported.
-- Do not introduce automatic paid retries, provider fallback, or surprise
-  external traffic.
-- Do not expose raw provider errors, bodies, prompts, URLs, credentials, or
-  arbitrary upstream codes.
-- The creator of a stream, track, timer, worker, listener, object URL, audio
-  context, temporary file, or provider client owns idempotent cleanup.
-- Browser storage is untrusted and must be validated, versioned, and migrated.
+- Keep permanent provider, authentication, database, and storage credentials
+  server-side and out of `VITE_*`, bundles, logs, fixtures, screenshots, traces,
+  and committed environment files. Only documented short-lived,
+  model/origin-scoped credentials may enter the browser through validated
+  app-owned contracts.
+- Derive ownership from verified server identity, never browser IDs, storage
+  paths, provider IDs, or device IDs.
+- Provider work is explicit, bounded, normalized, and cancellable where
+  supported. No automatic paid retry, fallback, or surprise traffic.
+- Never expose raw provider bodies, errors, prompts, internal URLs,
+  permanent/server credentials, causes, or arbitrary upstream codes.
+- Resource creators own idempotent cleanup. Browser persistence is untrusted,
+  validated, versioned, and migrated.
 
 ## Validation
 
-Use the smallest validation set that proves the affected contract:
+Use the smallest set that proves the affected contract:
 
-- Investigation or review with no changes: no validation commands.
-- Documentation-only change: run documentation checks and formatting for the
-  affected files.
-- Narrow package change: run the affected workspace typecheck and focused
-  tests.
-- Domain or contract change: run its focused tests plus every directly affected
-  consumer test.
-- API change: run focused API integration tests and the affected typecheck.
-- UI behavior change: run focused component/controller tests; use targeted E2E
-  for an observable journey.
-- Visual or responsive change: run the relevant visual cases. Do not run the
-  full visual suite for nonvisual work.
-- Database schema change: run the existing migration generation, inspection,
-  checking, and repository tests. Never migrate production automatically.
-- Cross-package, authentication, security, persistence, dependency, build, or
-  pre-merge change: run `pnpm quality`.
-- Release validation: follow `README.md` and `docs/TESTING.md`.
+- review with no changes: no validation commands;
+- documentation only, including security or persistence policy: affected
+  formatting and documentation checks;
+- narrow package: affected workspace typecheck and focused tests;
+- domain/contracts: focused tests plus directly affected consumers;
+- API route/service: focused API integration tests and API typecheck;
+- UI behavior: focused component/controller tests; targeted E2E for its journey;
+- visual/responsive: relevant visual cases only;
+- database schema: existing generation, inspection, migration checks, and
+  repository tests; never migrate production automatically;
+- cross-package changes or high-risk executable/configuration changes to
+  authentication, security, persistence, dependencies, tooling, or build:
+  `pnpm quality`; and
+- release candidate: the full process in `README.md` and `docs/TESTING.md`.
 
-Never contact paid or live providers from ordinary automated validation.
-Never claim a check passed when it was skipped, unavailable, or blocked.
+CI remains the merge safety net. Never contact paid/live providers during
+ordinary validation or claim a skipped, unavailable, or blocked check passed.
 
 ## Documentation
 
-Update only the canonical documents affected by an actual behavior, contract,
-command, environment, privacy, persistence, provider, or support-boundary
-change. Link to existing documentation instead of repeating it.
-
-Do not update product documentation for an internal refactor that leaves all
-observable behavior and documented ownership unchanged.
+Update canonical docs only when behavior, contracts, commands, environment,
+privacy, persistence, provider, or support boundaries change. Link instead of
+duplicating. Internal refactors without observable or ownership changes need no
+broad product-doc update.
 
 ## Completion
 
-Report:
-
-- files changed;
-- important architectural decisions;
-- validation run and its result;
-- checks not run and why;
-- remaining manual or live limitations;
-- unresolved risks or assumptions.
+Report files changed, architectural decisions, validation/results, checks not
+run and why, manual/live limits, and unresolved risks or assumptions.
 
 ## Stop conditions
 
-Stop only when completing the task requires:
-
-- public exposure, real accounts, billing, public sharing, or a new paid
-  provider outside the requested scope;
-- secret access or a paid live call;
-- destructive or irreversible data migration;
-- deletion without an established relationship-safe retention policy; or
-- overwriting unrelated user changes that cannot be preserved.
-
-For ordinary ambiguity, inspect the current code, tests, and canonical
-documentation and choose the narrowest conservative interpretation.
+Stop only for required public exposure, real accounts, billing, public sharing,
+a new paid provider outside scope, secret access, a paid live call, destructive
+or irreversible migration, deletion without relationship-safe retention, or
+unavoidable overwriting of unrelated work. For ordinary ambiguity, inspect
+current code, tests, and canonical docs and choose the narrowest conservative
+interpretation.

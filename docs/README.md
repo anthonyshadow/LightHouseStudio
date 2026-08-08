@@ -7,7 +7,8 @@ Use the narrowest authoritative document. Do not copy detailed rules into severa
 | Document                                                    | Status  | Owner               | Source of truth for                                                           | Last reviewed |
 | ----------------------------------------------------------- | ------- | ------------------- | ----------------------------------------------------------------------------- | ------------- |
 | [Project README](../README.md)                              | Current | Product/engineering | Product overview, setup, configuration, commands, and release posture         | 2026-08-07    |
-| [Repository working guide](../AGENTS.md)                    | Current | Engineering         | Required architecture, validation, and stop conditions                        | 2026-08-07    |
+| [Repository working guide](../AGENTS.md)                    | Current | Engineering         | Repository-wide work, validation, and stop conditions                         | 2026-08-08    |
+| [Security policy](../SECURITY.md)                           | Current | Repository owner    | Private vulnerability reporting scope and expectations                        | 2026-08-08    |
 | [Architecture](ARCHITECTURE.md)                             | Current | Engineering         | Dependency, ownership, lifecycle, persistence, API, and deployment boundaries | 2026-08-07    |
 | [User stories](userStories/README.md)                       | Current | Product/QA          | Observable journeys and manual validation limits                              | 2026-08-07    |
 | [Privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) | Current | Product/engineering | Data location, provider contact, retention, deletion, and cost boundaries     | 2026-08-07    |
@@ -33,6 +34,7 @@ and does not authorize public deployment or relax the loopback boundary.
 
 | Document                                            | Use                                                                                                      |
 | --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| [Architecture decisions](decisions/README.md)       | Accepted, proposed, pending, rejected, and superseded expensive-to-reverse decisions                     |
 | [Maintainability audit](MAINTAINABILITY_AUDIT.md)   | Current repository-wide cleanup record, placement rules, deferred findings, and validation record        |
 | [Reference image generation](Image_Generation.md)   | Optimizer, upload, provider selection, immutable asset, retry, and cleanup flow                          |
 | [Remote backend handoff](REMOTE_BACKEND_HANDOFF.md) | Deferred design boundary for a separately approved remote product; not current behavior or authorization |
@@ -49,3 +51,10 @@ and does not authorize public deployment or relax the loopback boundary.
 The duplicate product-state document and historical project-audit snapshots were removed after
 their current requirements were consolidated into the project README, architecture, user stories,
 testing strategy, manual QA, and focused current plans. Git history remains the archive.
+
+Current documents and accepted ADRs describe implemented authority. Proposed or
+decision-pending ADRs are not current behavior. Dated audit outcomes and
+validation records are historical; maintained placement rules and explicitly
+open audit findings remain current. Product evolution records historical
+rationale, while the infrastructure roadmap owns explicitly deferred
+public-production work.
