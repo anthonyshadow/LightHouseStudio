@@ -259,13 +259,11 @@ export const CreativePanelContent = ({
         <>
           {recipeInsertionBlocked ? (
             <div css={libraryModeStyles(theme)}>
-              {recipeInsertionBlocked ? (
-                <StatusNotice role="status" tone="warning">
-                  {recordingActive
-                    ? 'Finish the take before inserting a recipe. You can keep browsing and editing this shelf.'
-                    : 'Release camera & mic before inserting a recipe for another model. You can keep browsing and editing this shelf.'}
-                </StatusNotice>
-              ) : null}
+              <StatusNotice role="status" tone="warning">
+                {recordingActive
+                  ? 'Finish the take before inserting a recipe. You can keep browsing and editing this shelf.'
+                  : 'Release camera & mic before inserting a recipe for another model. You can keep browsing and editing this shelf.'}
+              </StatusNotice>
             </div>
           ) : null}
           <Suspense fallback={deferredWorkspaceFallback}>

@@ -9,6 +9,7 @@ import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestam
 import type {
   SavedVideoReceipt,
   SavedVideoRepository,
+  SavedVideoRepositoryPage,
   StoredSavedVideoAggregate,
   StoredVideoVersion,
 } from '../../features/saved-videos/saved-video-repository.js';
@@ -87,8 +88,39 @@ const receiptValues = (
   createdAt: toIsoTimestamp(receipt.createdAt),
 });
 
+const groupVersions = (versions: readonly VersionRow[]): ReadonlyMap<string, VersionRow[]> => {
+  const grouped = new Map<string, VersionRow[]>();
+  for (const version of versions) {
+    const group = grouped.get(version.videoId) ?? [];
+    group.push(version);
+    grouped.set(version.videoId, group);
+  }
+  return grouped;
+};
+
+const videoOrder = (sort: SavedVideosQuery['sort']) => {
+  switch (sort) {
+    case 'shortest':
+      return [asc(videoVersions.durationMs), desc(savedVideos.createdAt), desc(savedVideos.id)];
+    case 'longest':
+      return [desc(videoVersions.durationMs), desc(savedVideos.createdAt), desc(savedVideos.id)];
+    case 'oldest':
+      return [asc(savedVideos.createdAt), asc(savedVideos.id)];
+    default:
+      return [desc(savedVideos.createdAt), desc(savedVideos.id)];
+  }
+};
+
 export class DrizzleSavedVideoRepository implements SavedVideoRepository {
   constructor(private readonly db: LightframeDatabase) {}
+
+  async #findByReceipt(
+    ownerUserId: string,
+    idempotencyKey: string,
+  ): Promise<StoredSavedVideoAggregate | null> {
+    const receipt = await this.findReceipt(ownerUserId, idempotencyKey);
+    return receipt === null ? null : this.get(ownerUserId, receipt.videoId);
+  }
 
   async #getWith(
     executor: LightframeDatabase | DatabaseExecutor,
@@ -144,11 +176,8 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
     aggregate: StoredSavedVideoAggregate,
     receipt: SavedVideoReceipt,
   ): Promise<StoredSavedVideoAggregate> {
-    const existingReceipt = await this.findReceipt(ownerUserId, receipt.idempotencyKey);
-    if (existingReceipt !== null) {
-      const existing = await this.get(ownerUserId, existingReceipt.videoId);
-      if (existing !== null) return existing;
-    }
+    const existing = await this.#findByReceipt(ownerUserId, receipt.idempotencyKey);
+    if (existing !== null) return existing;
     try {
       return await this.db.transaction(async (tx) => {
         await tx.insert(savedVideos).values({
@@ -168,11 +197,8 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
         return aggregate;
       });
     } catch (error) {
-      const duplicate = await this.findReceipt(ownerUserId, receipt.idempotencyKey);
-      if (duplicate !== null) {
-        const existing = await this.get(ownerUserId, duplicate.videoId);
-        if (existing !== null) return existing;
-      }
+      const duplicate = await this.#findByReceipt(ownerUserId, receipt.idempotencyKey);
+      if (duplicate !== null) return duplicate;
       throw error;
     }
   }
@@ -245,12 +271,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
         ),
       )
       .orderBy(asc(videoVersions.videoId), asc(videoVersions.ordinal));
-    const grouped = new Map<string, VersionRow[]>();
-    for (const version of versions) {
-      const group = grouped.get(version.videoId) ?? [];
-      group.push(version);
-      grouped.set(version.videoId, group);
-    }
+    const grouped = groupVersions(versions);
     return videos.map((video) => toAggregate(video, grouped.get(video.id) ?? []));
   }
 
@@ -258,12 +279,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
     ownerUserId: string,
     query: SavedVideosQuery,
     offset: number,
-  ): Promise<{
-    videos: readonly StoredSavedVideoAggregate[];
-    total: number;
-    characterNames: readonly string[];
-    formats: readonly SavedVideoFormat[];
-  }> {
+  ): Promise<SavedVideoRepositoryPage> {
     const currentVersion = and(
       eq(videoVersions.id, savedVideos.currentVersionId),
       eq(videoVersions.ownerUserId, savedVideos.ownerUserId),
@@ -281,14 +297,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
         : eq(videoVersions.characterName, query.characterName),
       query.format === undefined ? undefined : sql`${format} = ${query.format}`,
     );
-    const order =
-      query.sort === 'shortest'
-        ? [asc(videoVersions.durationMs), desc(savedVideos.createdAt), desc(savedVideos.id)]
-        : query.sort === 'longest'
-          ? [desc(videoVersions.durationMs), desc(savedVideos.createdAt), desc(savedVideos.id)]
-          : query.sort === 'oldest'
-            ? [asc(savedVideos.createdAt), asc(savedVideos.id)]
-            : [desc(savedVideos.createdAt), desc(savedVideos.id)];
+    const order = videoOrder(query.sort);
 
     const [pageRows, countRows, characterRows, formatRows] = await Promise.all([
       this.db
@@ -323,17 +332,15 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
         .where(and(eq(savedVideos.ownerUserId, ownerUserId), isNull(savedVideos.deletedAt))),
     ]);
     const videos = pageRows.map((row) => row.video);
+    const total = countRows[0]?.count ?? 0;
+    const characterNames = characterRows.flatMap(({ characterName }) =>
+      characterName === null ? [] : [characterName],
+    );
+    const formats = SAVED_VIDEO_FORMATS.filter((item) =>
+      formatRows.some((row) => row.format === item),
+    );
     if (videos.length === 0) {
-      return {
-        videos: [],
-        total: countRows[0]?.count ?? 0,
-        characterNames: characterRows.flatMap(({ characterName }) =>
-          characterName === null ? [] : [characterName],
-        ),
-        formats: SAVED_VIDEO_FORMATS.filter((item) =>
-          formatRows.some((row) => row.format === item),
-        ),
-      };
+      return { videos: [], total, characterNames, formats };
     }
     const versions = await this.db
       .select()
@@ -348,19 +355,12 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
         ),
       )
       .orderBy(asc(videoVersions.videoId), asc(videoVersions.ordinal));
-    const grouped = new Map<string, VersionRow[]>();
-    for (const version of versions) {
-      const group = grouped.get(version.videoId) ?? [];
-      group.push(version);
-      grouped.set(version.videoId, group);
-    }
+    const grouped = groupVersions(versions);
     return {
       videos: videos.map((video) => toAggregate(video, grouped.get(video.id) ?? [])),
-      total: countRows[0]?.count ?? 0,
-      characterNames: characterRows.flatMap(({ characterName }) =>
-        characterName === null ? [] : [characterName],
-      ),
-      formats: SAVED_VIDEO_FORMATS.filter((item) => formatRows.some((row) => row.format === item)),
+      total,
+      characterNames,
+      formats,
     };
   }
 

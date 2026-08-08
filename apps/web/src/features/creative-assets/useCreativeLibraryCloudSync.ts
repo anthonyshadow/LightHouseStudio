@@ -1,16 +1,12 @@
-import { sanitizeCreativeAssetStore } from '@studio/domain';
+import { sanitizeCreativeAssetStore, type CreativeAssetStore } from '@studio/domain';
 import { useEffect } from 'react';
 import type { CreativeAssetRepository } from './types';
 
-const itemCount = (repository: CreativeAssetRepository): number => {
-  const store = repository.getSnapshot().store;
-  return (
-    store.savedPrompts.length +
-    store.recentPrompts.length +
-    store.savedCharacterPrompts.length +
-    store.savedCharacterVariants.length
-  );
-};
+const itemCount = (store: CreativeAssetStore): number =>
+  store.savedPrompts.length +
+  store.recentPrompts.length +
+  store.savedCharacterPrompts.length +
+  store.savedCharacterVariants.length;
 
 const readRemote = async (signal: AbortSignal) => {
   const response = await fetch('/api/creative-library', {
@@ -113,12 +109,8 @@ export const useCreativeLibraryCloudSync = (repository: CreativeAssetRepository)
         if (!active || remote === null) return;
         revision = remote.revision;
         const localStore = repository.getSnapshot().store;
-        const localCount = itemCount(repository);
-        const remoteCount =
-          remote.store.savedPrompts.length +
-          remote.store.recentPrompts.length +
-          remote.store.savedCharacterPrompts.length +
-          remote.store.savedCharacterVariants.length;
+        const localCount = itemCount(localStore);
+        const remoteCount = itemCount(remote.store);
         if (remote.revision === 0 && localCount > 0) {
           const result = await replaceRemote(0, repository, controller.signal);
           if (result === 'conflict') {

@@ -63,6 +63,13 @@ export const OutfitBuilder = ({
   const uploadedAssetIdRef = useRef<string | null>(null);
   const committedAssetIdsRef = useRef(new Set<string>());
 
+  const discardUploadedAsset = () => {
+    if (uploadedAssetIdRef.current) {
+      void discardReferenceImage(uploadedAssetIdRef.current).catch(() => undefined);
+    }
+    uploadedAssetIdRef.current = null;
+  };
+
   useEffect(
     () => () => {
       const assetId = uploadedAssetIdRef.current;
@@ -94,10 +101,7 @@ export const OutfitBuilder = ({
       setError(validation.blockingError);
       return;
     }
-    if (uploadedAssetIdRef.current) {
-      void discardReferenceImage(uploadedAssetIdRef.current).catch(() => undefined);
-      uploadedAssetIdRef.current = null;
-    }
+    discardUploadedAsset();
     setRetainedReferenceId(null);
     setReferenceFile(file);
   };
@@ -213,10 +217,7 @@ export const OutfitBuilder = ({
                 allowUrlImport
                 onSelectFile={(file) => void chooseReference(file)}
                 onRemove={() => {
-                  if (uploadedAssetIdRef.current) {
-                    void discardReferenceImage(uploadedAssetIdRef.current).catch(() => undefined);
-                  }
-                  uploadedAssetIdRef.current = null;
+                  discardUploadedAsset();
                   setReferenceFile(null);
                   setRetainedReferenceId(null);
                 }}

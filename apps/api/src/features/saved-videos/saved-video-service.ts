@@ -135,6 +135,13 @@ interface IndexedVideo {
   readonly format: SavedVideoFormat;
 }
 
+const aggregateAssetIds = (aggregate: StoredSavedVideoAggregate): string[] =>
+  aggregate.versions.flatMap((version) =>
+    version.thumbnailAssetId === null
+      ? [version.assetId]
+      : [version.assetId, version.thumbnailAssetId],
+  );
+
 export interface SavedVideoServiceOptions {
   readonly now?: () => Date;
   readonly inspect?: (filePath: string) => Promise<InspectedVideo>;
@@ -423,21 +430,9 @@ export class SavedVideoService {
     if (!this.#deleteStoredAssetsOnManualDelete) return;
 
     const retainedAssetIds = new Set(
-      (await this.#repository.list(ownerUserId)).flatMap((aggregate) =>
-        aggregate.versions.flatMap((version) =>
-          version.thumbnailAssetId === null
-            ? [version.assetId]
-            : [version.assetId, version.thumbnailAssetId],
-        ),
-      ),
+      (await this.#repository.list(ownerUserId)).flatMap(aggregateAssetIds),
     );
-    const discardedAssetIds = new Set(
-      deleted.versions.flatMap((version) =>
-        version.thumbnailAssetId === null
-          ? [version.assetId]
-          : [version.assetId, version.thumbnailAssetId],
-      ),
-    );
+    const discardedAssetIds = new Set(aggregateAssetIds(deleted));
     const results = await Promise.allSettled(
       [...discardedAssetIds]
         .filter((assetId) => !retainedAssetIds.has(assetId))

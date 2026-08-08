@@ -26,7 +26,7 @@ const toCredential = (row: UserRow, passwordHash: string): SeededUserCredential 
   passwordHash,
   createdAt: toIsoTimestamp(row.createdAt),
   updatedAt: toIsoTimestamp(row.updatedAt),
-  lastLoginAt: row.lastLoginAt === null ? null : toIsoTimestamp(row.lastLoginAt),
+  lastLoginAt: nullableIsoTimestamp(row.lastLoginAt),
 });
 
 export class DrizzleUserRepository implements UserRepository {

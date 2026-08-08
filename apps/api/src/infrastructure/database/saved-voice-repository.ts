@@ -19,6 +19,19 @@ const toRecord = (row: typeof savedVoices.$inferSelect): SavedVoiceRecord => ({
   savedAt: toIsoTimestamp(row.savedAt),
 });
 
+const voiceValues = (
+  ownerUserId: string,
+  voice: { readonly voiceId: string; readonly publicOwnerId: string | null },
+  savedAt: string,
+): typeof savedVoices.$inferInsert => ({
+  id: randomUUID(),
+  ownerUserId,
+  provider: 'elevenlabs',
+  providerVoiceId: voice.voiceId,
+  publicOwnerId: voice.publicOwnerId,
+  savedAt: toIsoTimestamp(savedAt),
+});
+
 export class DrizzleSavedVoiceRepository implements SavedVoiceRepository {
   constructor(private readonly db: LightframeDatabase) {}
 
@@ -68,14 +81,7 @@ export class DrizzleSavedVoiceRepository implements SavedVoiceRepository {
   ): Promise<'saved' | 'already-saved'> {
     const rows = await this.db
       .insert(savedVoices)
-      .values({
-        id: randomUUID(),
-        ownerUserId,
-        provider: 'elevenlabs',
-        providerVoiceId: voiceId,
-        publicOwnerId,
-        savedAt: toIsoTimestamp(savedAt),
-      })
+      .values(voiceValues(ownerUserId, { voiceId, publicOwnerId }, savedAt))
       .onConflictDoNothing()
       .returning({ id: savedVoices.id });
     return rows.length === 0 ? 'already-saved' : 'saved';
@@ -117,16 +123,7 @@ export class DrizzleSavedVoiceRepository implements SavedVoiceRepository {
     if (voices.length > 0) {
       await this.db
         .insert(savedVoices)
-        .values(
-          voices.map((voice) => ({
-            id: randomUUID(),
-            ownerUserId,
-            provider: 'elevenlabs',
-            providerVoiceId: voice.voiceId,
-            publicOwnerId: voice.publicOwnerId,
-            savedAt: toIsoTimestamp(savedAt),
-          })),
-        )
+        .values(voices.map((voice) => voiceValues(ownerUserId, voice, savedAt)))
         .onConflictDoNothing();
     }
     await this.db

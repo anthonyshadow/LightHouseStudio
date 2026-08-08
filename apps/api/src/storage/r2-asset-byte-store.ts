@@ -129,6 +129,13 @@ export class R2AssetByteStore implements AssetByteStore {
     };
   }
 
+  async #discardFailedUpload(assetId: string, key: string): Promise<void> {
+    await this.#client
+      .send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: key }))
+      .catch(() => undefined);
+    await this.#lifecycle?.markFailed(assetId).catch(() => undefined);
+  }
+
   async #uploadStream(manifest: StoredAssetManifest, body: Readable): Promise<StoredAssetManifest> {
     const key = this.#key(manifest.assetId);
     await this.#lifecycle?.prepare(manifest, { provider: 'r2', storageKey: key });
@@ -151,10 +158,7 @@ export class R2AssetByteStore implements AssetByteStore {
       await this.#lifecycle?.markReady(manifest.assetId, result.ETag ?? null);
       return manifest;
     } catch (error) {
-      await this.#client
-        .send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: key }))
-        .catch(() => undefined);
-      await this.#lifecycle?.markFailed(manifest.assetId).catch(() => undefined);
+      await this.#discardFailedUpload(manifest.assetId, key);
       throw error;
     }
   }
@@ -244,10 +248,7 @@ export class R2AssetByteStore implements AssetByteStore {
       await this.#lifecycle?.markReady(manifest.assetId, result.ETag ?? null);
       return manifest;
     } catch (error) {
-      await this.#client
-        .send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: key }))
-        .catch(() => undefined);
-      await this.#lifecycle?.markFailed(manifest.assetId).catch(() => undefined);
+      await this.#discardFailedUpload(manifest.assetId, key);
       throw error;
     }
   }

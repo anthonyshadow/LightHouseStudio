@@ -317,17 +317,16 @@ export const createApp = (dependencies: AppDependencies): FastifyInstance => {
       optimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
     },
   );
+  const processingJobTraceWriter =
+    dependencies.persistence?.processingJobTraces ??
+    (dependencies.config.nodeEnv === 'test'
+      ? undefined
+      : new FileProcessingJobRepository(dependencies.config.lightframeDataDir));
   const videoJobService = new VideoJobService(
     videoJobProviders,
     dependencies.config.lightframeDataDir,
     {
-      ...(dependencies.persistence?.processingJobTraces !== undefined
-        ? { traceWriter: dependencies.persistence.processingJobTraces }
-        : dependencies.config.nodeEnv === 'test'
-          ? {}
-          : {
-              traceWriter: new FileProcessingJobRepository(dependencies.config.lightframeDataDir),
-            }),
+      ...(processingJobTraceWriter === undefined ? {} : { traceWriter: processingJobTraceWriter }),
       ...(dependencies.persistence?.processingJobs === undefined
         ? {}
         : { durableJobRepository: dependencies.persistence.processingJobs }),
