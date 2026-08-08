@@ -2,6 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { chmod, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
+import { persistedTimestampSchema, toIsoTimestamp } from '../../application/timestamps.js';
 
 const recordSchema = z
   .object({
@@ -10,7 +11,7 @@ const recordSchema = z
     provider: z.literal('elevenlabs'),
     providerVoiceId: z.string().trim().min(1).max(200),
     publicOwnerId: z.string().trim().min(1).max(200).nullable(),
-    savedAt: z.iso.datetime(),
+    savedAt: persistedTimestampSchema,
   })
   .strict();
 const librarySchema = z
@@ -104,7 +105,7 @@ export class MemorySavedVoiceRepository implements SavedVoiceRepository {
       provider: 'elevenlabs',
       providerVoiceId: voiceId,
       publicOwnerId,
-      savedAt,
+      savedAt: toIsoTimestamp(savedAt),
     });
     return Promise.resolve('saved' as const);
   }
@@ -134,7 +135,7 @@ export class MemorySavedVoiceRepository implements SavedVoiceRepository {
         provider: 'elevenlabs',
         providerVoiceId: voice.voiceId,
         publicOwnerId: voice.publicOwnerId,
-        savedAt,
+        savedAt: toIsoTimestamp(savedAt),
       });
     }
     library.migratedWorkspace = true;
@@ -163,12 +164,12 @@ export class FileSavedVoiceRepository implements SavedVoiceRepository {
     if (existing) return existing;
     const load = (async () => {
       try {
-        const value = librarySchema.parse(
-          JSON.parse(await readFile(this.#file(ownerUserId), 'utf8')) as unknown,
-        );
+        const raw = JSON.parse(await readFile(this.#file(ownerUserId), 'utf8')) as unknown;
+        const value = librarySchema.parse(raw);
         if (value.ownerUserId !== ownerUserId) throw new Error('Saved voice owner mismatch.');
         this.#memory.hydrate(ownerUserId, value.records, value.migratedWorkspace);
         this.#migrationState.set(ownerUserId, value.migratedWorkspace);
+        if (JSON.stringify(raw) !== JSON.stringify(value)) await this.#persist(ownerUserId);
       } catch (error) {
         if (!(error instanceof Error && 'code' in error && error.code === 'ENOENT')) throw error;
         this.#memory.hydrate(ownerUserId, [], false);

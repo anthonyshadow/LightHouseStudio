@@ -9,6 +9,7 @@ import {
   type SavedVideoFormat,
   type SavedVideosQuery,
 } from '@studio/contracts';
+import { persistedTimestampSchema } from '../../application/timestamps.js';
 
 const legacyVersionSchema = z
   .object({
@@ -26,12 +27,15 @@ const legacyVersionSchema = z
     durationMs: z.number().finite().positive().max(300_000),
     width: z.number().int().positive(),
     height: z.number().int().positive(),
-    createdAt: z.iso.datetime(),
+    createdAt: persistedTimestampSchema,
   })
   .strict();
 
-const versionSchema = legacyVersionSchema.extend({
+const versionV2Schema = legacyVersionSchema.extend({
   characterName: savedVideoCharacterNameSchema.nullable(),
+});
+const versionSchema = versionV2Schema.extend({
+  durationMs: z.number().int().positive().max(300_000),
 });
 
 const videoSchema = z
@@ -42,9 +46,9 @@ const videoSchema = z
     currentVersionId: z.uuid(),
     sourceVideoId: z.uuid().nullable(),
     status: z.enum(['ready', 'missing', 'deleted']),
-    createdAt: z.iso.datetime(),
-    updatedAt: z.iso.datetime(),
-    deletedAt: z.iso.datetime().nullable(),
+    createdAt: persistedTimestampSchema,
+    updatedAt: persistedTimestampSchema,
+    deletedAt: persistedTimestampSchema.nullable(),
   })
   .strict();
 
@@ -55,6 +59,9 @@ const legacyAggregateSchema = z
     revision: z.number().int().positive(),
   })
   .strict();
+const aggregateV2Schema = legacyAggregateSchema.extend({
+  versions: z.array(versionV2Schema).min(1).max(100),
+});
 const aggregateSchema = legacyAggregateSchema.extend({
   versions: z.array(versionSchema).min(1).max(100),
 });
@@ -63,7 +70,7 @@ const receiptSchema = z
     idempotencyKey: z.uuid(),
     videoId: z.uuid(),
     versionId: z.uuid(),
-    createdAt: z.iso.datetime(),
+    createdAt: persistedTimestampSchema,
   })
   .strict();
 const legacyLibrarySchema = z
@@ -75,8 +82,12 @@ const legacyLibrarySchema = z
     receipts: z.array(receiptSchema),
   })
   .strict();
-const librarySchema = legacyLibrarySchema.extend({
+const libraryV2Schema = legacyLibrarySchema.extend({
   schemaVersion: z.literal(2),
+  videos: z.array(aggregateV2Schema),
+});
+const librarySchema = legacyLibrarySchema.extend({
+  schemaVersion: z.literal(3),
   videos: z.array(aggregateSchema),
 });
 
@@ -132,7 +143,7 @@ export interface SavedVideoRepository {
 }
 
 const emptyLibrary = (ownerUserId: string): SavedVideoLibrary => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   ownerUserId,
   revision: 0,
   videos: [],
@@ -177,24 +188,30 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
         const raw = JSON.parse(await readFile(this.#file(ownerUserId), 'utf8')) as unknown;
         const current = librarySchema.safeParse(raw);
         let library: SavedVideoLibrary;
+        let needsRewrite = false;
         if (current.success) {
           library = current.data;
+          needsRewrite = JSON.stringify(raw) !== JSON.stringify(library);
         } else {
-          const legacy = legacyLibrarySchema.parse(raw);
+          const v2 = libraryV2Schema.safeParse(raw);
+          const legacy = v2.success ? v2.data : legacyLibrarySchema.parse(raw);
           library = librarySchema.parse({
             ...legacy,
-            schemaVersion: 2,
+            schemaVersion: 3,
             videos: legacy.videos.map((aggregate) => ({
               ...aggregate,
               versions: aggregate.versions.map((version) => ({
                 ...version,
-                characterName: null,
+                durationMs: Math.max(1, Math.round(version.durationMs)),
+                characterName: 'characterName' in version ? version.characterName : null,
               })),
             })),
           });
+          needsRewrite = true;
         }
         if (library.ownerUserId !== ownerUserId) throw new Error('Saved video owner mismatch.');
-        this.#cacheLibrary(library);
+        if (needsRewrite) await this.#write(library);
+        else this.#cacheLibrary(library);
         return library;
       } catch (error) {
         if (error instanceof Error && 'code' in error && error.code === 'ENOENT') {

@@ -68,7 +68,7 @@ describe('saved voice repositories', () => {
     ]);
   });
 
-  it('preserves stored record identity and timestamps when a later mutation is persisted', async () => {
+  it('normalizes legacy timestamps without changing stored record identity', async () => {
     const root = path.join(tmpdir(), `lightframe-saved-voices-${crypto.randomUUID()}`);
     roots.push(root);
     const directory = path.join(root, 'metadata', 'v1', 'saved-voices');
@@ -82,7 +82,7 @@ describe('saved voice repositories', () => {
       provider: 'elevenlabs' as const,
       providerVoiceId: 'voice-original',
       publicOwnerId: 'owner-original',
-      savedAt: '2026-08-01T09:00:00.000Z',
+      savedAt: '2026-08-01 09:00:00+00',
     };
     await mkdir(directory, { recursive: true });
     await writeFile(
@@ -96,12 +96,17 @@ describe('saved voice repositories', () => {
     );
 
     const repository = new FileSavedVoiceRepository(root);
-    await repository.save(ownerUserId, 'voice-later', null, savedAt);
+    await expect(repository.list(ownerUserId)).resolves.toMatchObject([
+      { id: originalRecord.id, savedAt: '2026-08-01T09:00:00.000Z' },
+    ]);
 
     const persisted = JSON.parse(await readFile(file, 'utf8')) as {
       records: Array<typeof originalRecord>;
     };
-    expect(persisted.records[0]).toEqual(originalRecord);
+    expect(persisted.records[0]).toEqual({
+      ...originalRecord,
+      savedAt: '2026-08-01T09:00:00.000Z',
+    });
   });
 
   it('reloads durable state after a failed write so a retry is not lost', async () => {

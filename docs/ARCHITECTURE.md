@@ -452,6 +452,13 @@ index is durable. Ordinary new reads and misses do not rescan the asset director
 contract distinguishes a missing asset from a backend that cannot return a streamable local file:
 only the latter may fall back to buffered content, so a miss performs one storage lookup.
 
+Persisted timestamps cross application and filesystem boundaries as canonical UTC ISO strings.
+Neon/PostgreSQL may return its native space-separated timestamp representation; every Drizzle
+repository normalizes that value before returning an application contract. Local saved-video,
+saved-voice, and media-manifest reads atomically rewrite parseable legacy timestamp forms to the
+canonical representation. Saved-video durations are integer milliseconds at the repository
+boundary; legacy fractional millisecond values are rounded during migration before a Neon insert.
+
 The retired Guided repository and compatibility presentation were removed after the one-time local
 reset period. No current code lists, imports, downloads, promotes, or hydrates those records. New
 saved media is written only through the authenticated server Saved Video service.

@@ -33,7 +33,9 @@ account is not production identity or tenancy.
   owner-scoped recheck, and unreferenced rows inactive for 24 hours are purged opportunistically
   during later library reads/writes.
 - An idempotent local backfill for saved videos/thumbnails, saved voices, and reference images.
-  Creative metadata migrates through the authenticated sync API. Local copies are never deleted.
+  Saved-video metadata is normalized first to canonical UTC ISO timestamps and integer
+  milliseconds, including legacy local records. Creative metadata migrates through the
+  authenticated sync API. Local copies are never deleted.
 
 ## Runtime modes
 
@@ -75,8 +77,9 @@ facets in SQL rather than materializing the owner library in application memory.
    pnpm --dir apps/api db:backfill-local -- --apply
    ```
 
-   Apply stops on missing bytes, checksum conflicts, inconsistent version lineage, or transaction
-   conflicts. It prints a second verification record after writes complete.
+   Reading the inventory atomically upgrades legacy local saved-video metadata before any remote
+   write. Apply stops on missing bytes, checksum conflicts, inconsistent version lineage, or
+   transaction conflicts. It prints a second verification record after writes complete.
 
 7. Run in `shadow`, exercise save/range/playback/reference/voice flows, and reconcile counts and
    checksums. Switch to `neon` only after that evidence is clean.

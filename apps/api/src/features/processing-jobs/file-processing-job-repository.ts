@@ -3,6 +3,7 @@ import { chmod, mkdir, open, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
 import { videoJobStatusSchema, videoOutputResolutionSchema } from '@studio/contracts';
+import { persistedTimestampSchema } from '../../application/timestamps.js';
 
 const traceSchema = z
   .object({
@@ -23,9 +24,9 @@ const traceSchema = z
     sourceOrientation: z.enum(['landscape', 'portrait']).nullable().default(null),
     status: videoJobStatusSchema,
     safeErrorCode: z.string().trim().min(1).max(80).nullable(),
-    createdAt: z.iso.datetime(),
-    updatedAt: z.iso.datetime(),
-    completedAt: z.iso.datetime().nullable(),
+    createdAt: persistedTimestampSchema,
+    updatedAt: persistedTimestampSchema,
+    completedAt: persistedTimestampSchema.nullable(),
   })
   .strict();
 

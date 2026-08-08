@@ -5,6 +5,7 @@ import {
   type CreativeAssetStore,
 } from '@studio/domain';
 import { asc, eq } from 'drizzle-orm';
+import { toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   CreativeLibraryRepository,
   CreativeLibrarySnapshot,
@@ -107,7 +108,11 @@ export class DrizzleCreativeLibraryRepository implements CreativeLibraryReposito
     if (sanitized.droppedRecords > 0) {
       throw new Error('Stored creative library records are inconsistent.');
     }
-    return { revision: library.revision, store: sanitized.store, updatedAt: library.updatedAt };
+    return {
+      revision: library.revision,
+      store: sanitized.store,
+      updatedAt: toIsoTimestamp(library.updatedAt),
+    };
   }
 
   async replace(

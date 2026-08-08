@@ -191,7 +191,7 @@ export class SavedVideoService {
       mimeType: inspected.mimeType,
       filename,
       sizeBytes: inspected.sizeBytes,
-      durationMs: inspected.durationMs,
+      durationMs: Math.max(1, Math.round(inspected.durationMs)),
       width: inspected.width,
       height: inspected.height,
       createdAt,

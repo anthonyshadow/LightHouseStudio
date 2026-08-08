@@ -33,7 +33,7 @@ export const inspectSavedVideoFile = async (filePath: string): Promise<Inspected
       container,
       videoCodec: (await videoTrack.getCodec()) ?? '',
       audioCodec: audioTrack === null ? null : await audioTrack.getCodec(),
-      durationMs: durationSeconds * 1_000,
+      durationMs: Math.max(1, Math.round(durationSeconds * 1_000)),
       width: Math.round(await videoTrack.getDisplayWidth()),
       height: Math.round(await videoTrack.getDisplayHeight()),
       sizeBytes: file.size,

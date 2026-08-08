@@ -88,6 +88,22 @@ describe('SavedVideoService', () => {
     expect(await bytes.exists(otherUserId, aggregates[0]!.versions[0]!.assetId)).toBe(false);
   });
 
+  it('rounds inspected fractional milliseconds before persistence', async () => {
+    service = new SavedVideoService(
+      repository,
+      bytes,
+      () => new Date('2026-08-05T12:00:00.000Z'),
+      () => Promise.resolve({ ...inspected, durationMs: 5_034.666_666_666_666 }),
+    );
+
+    const saved = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
+
+    expect(saved.currentVersion.durationMs).toBe(5_035);
+    await expect(repository.get(ownerUserId, saved.id)).resolves.toMatchObject({
+      versions: [{ durationMs: 5_035 }],
+    });
+  });
+
   it('removes the losing asset when idempotent saves race', async () => {
     const key = crypto.randomUUID();
     const [first, second] = await Promise.all([
@@ -360,7 +376,7 @@ describe('SavedVideoService', () => {
     ]);
   });
 
-  it('migrates schema v1 manifests without character attribution on the next write', async () => {
+  it('atomically migrates legacy timestamps and fractional durations on read', async () => {
     const videoId = crypto.randomUUID();
     const versionId = crypto.randomUUID();
     const manifestDirectory = path.join(directory, 'metadata', 'v1', 'saved-videos');
@@ -372,7 +388,7 @@ describe('SavedVideoService', () => {
     await writeFile(
       manifestPath,
       JSON.stringify({
-        schemaVersion: 1,
+        schemaVersion: 2,
         ownerUserId,
         revision: 1,
         videos: [
@@ -384,8 +400,8 @@ describe('SavedVideoService', () => {
               currentVersionId: versionId,
               sourceVideoId: null,
               status: 'ready',
-              createdAt: '2026-08-01T12:00:00.000Z',
-              updatedAt: '2026-08-01T12:00:00.000Z',
+              createdAt: '2026-08-01 12:00:00+00',
+              updatedAt: '2026-08-01T08:00:00-04:00',
               deletedAt: null,
             },
             versions: [
@@ -401,10 +417,11 @@ describe('SavedVideoService', () => {
                 mimeType: 'video/mp4',
                 filename: 'legacy.mp4',
                 sizeBytes: 11,
-                durationMs: 12_000,
+                durationMs: 12_000.4,
                 width: 1_280,
                 height: 720,
-                createdAt: '2026-08-01T12:00:00.000Z',
+                createdAt: '2026-08-01 12:00:00+00',
+                characterName: null,
               },
             ],
             revision: 1,
@@ -414,18 +431,47 @@ describe('SavedVideoService', () => {
       }),
     );
 
-    expect((await repository.list(ownerUserId))[0]?.versions[0]?.characterName).toBeNull();
-    await repository.rename(
-      ownerUserId,
-      videoId,
-      'Migrated saved video',
-      '2026-08-06T12:00:00.000Z',
-    );
+    expect((await repository.list(ownerUserId))[0]).toMatchObject({
+      video: {
+        createdAt: '2026-08-01T12:00:00.000Z',
+        updatedAt: '2026-08-01T12:00:00.000Z',
+      },
+      versions: [
+        {
+          characterName: null,
+          durationMs: 12_000,
+          createdAt: '2026-08-01T12:00:00.000Z',
+        },
+      ],
+    });
     const migrated = JSON.parse(await readFile(manifestPath, 'utf8')) as {
       schemaVersion: number;
-      videos: Array<{ versions: Array<{ characterName?: string | null }> }>;
+      videos: Array<{
+        video: { createdAt: string; updatedAt: string };
+        versions: Array<{
+          characterName?: string | null;
+          durationMs: number;
+          createdAt: string;
+        }>;
+      }>;
     };
-    expect(migrated.schemaVersion).toBe(2);
-    expect(migrated.videos[0]?.versions[0]?.characterName).toBeNull();
+    expect(migrated).toMatchObject({
+      schemaVersion: 3,
+      videos: [
+        {
+          video: {
+            createdAt: '2026-08-01T12:00:00.000Z',
+            updatedAt: '2026-08-01T12:00:00.000Z',
+          },
+          versions: [
+            {
+              characterName: null,
+              durationMs: 12_000,
+              createdAt: '2026-08-01T12:00:00.000Z',
+            },
+          ],
+        },
+      ],
+    });
   });
 });

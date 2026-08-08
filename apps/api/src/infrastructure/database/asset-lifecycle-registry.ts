@@ -1,4 +1,5 @@
 import { and, eq } from 'drizzle-orm';
+import { toIsoTimestamp } from '../../application/timestamps.js';
 import type { AssetLifecycleRegistry, StoredAssetLocation } from '../../storage/asset-lifecycle.js';
 import type { StoredAssetManifest } from '../../storage/asset-byte-store.js';
 import type { LightframeDatabase } from './client.js';
@@ -25,8 +26,8 @@ export class DrizzleAssetLifecycleRegistry implements AssetLifecycleRegistry {
         checksumSha256: manifest.checksumSha256,
         etag: null,
         deletedAt: null,
-        createdAt: manifest.createdAt,
-        updatedAt: manifest.createdAt,
+        createdAt: toIsoTimestamp(manifest.createdAt),
+        updatedAt: toIsoTimestamp(manifest.createdAt),
       })
       .onConflictDoNothing({ target: mediaAssets.id });
   }
@@ -68,7 +69,7 @@ export class DrizzleAssetLifecycleRegistry implements AssetLifecycleRegistry {
             filename: row.filename,
             sizeBytes: row.sizeBytes,
             checksumSha256: row.checksumSha256,
-            createdAt: row.createdAt,
+            createdAt: toIsoTimestamp(row.createdAt),
           },
           provider: row.storageProvider,
           storageKey: row.storageKey,

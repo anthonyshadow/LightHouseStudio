@@ -4,6 +4,7 @@ import { chmod, copyFile, mkdir, open, readFile, rename, rm, stat } from 'node:f
 import type { Readable } from 'node:stream';
 import path from 'node:path';
 import { z } from 'zod';
+import { persistedTimestampSchema } from '../application/timestamps.js';
 
 const manifestSchema = z
   .object({
@@ -14,7 +15,7 @@ const manifestSchema = z
     filename: z.string().trim().min(1).max(180),
     sizeBytes: z.number().int().positive(),
     checksumSha256: z.string().regex(/^[a-f0-9]{64}$/u),
-    createdAt: z.iso.datetime(),
+    createdAt: persistedTimestampSchema,
   })
   .strict();
 
@@ -193,9 +194,9 @@ export class LocalAssetByteStore implements AssetByteStore {
   async open(ownerUserId: string, assetId: string): Promise<AssetReadHandle | null> {
     try {
       const directory = this.#directory(assetId);
-      const manifest = manifestSchema.parse(
-        JSON.parse(await readFile(path.join(directory, 'manifest.json'), 'utf8')) as unknown,
-      );
+      const manifestPath = path.join(directory, 'manifest.json');
+      const raw = JSON.parse(await readFile(manifestPath, 'utf8')) as unknown;
+      const manifest = manifestSchema.parse(raw);
       if (manifest.ownerUserId !== ownerUserId) return null;
       const contentPath = path.join(
         directory,
@@ -203,6 +204,22 @@ export class LocalAssetByteStore implements AssetByteStore {
       );
       const file = await stat(contentPath);
       if (!file.isFile() || file.size !== manifest.sizeBytes) return null;
+      if (JSON.stringify(raw) !== JSON.stringify(manifest)) {
+        const temporaryPath = path.join(directory, `.manifest-${randomUUID()}.tmp`);
+        try {
+          const handle = await open(temporaryPath, 'wx', 0o600);
+          try {
+            await handle.writeFile(`${JSON.stringify(manifest)}\n`, 'utf8');
+            await handle.sync();
+          } finally {
+            await handle.close();
+          }
+          await rename(temporaryPath, manifestPath);
+        } catch (error) {
+          await rm(temporaryPath, { force: true }).catch(() => undefined);
+          throw error;
+        }
+      }
       return {
         manifest,
         createReadStream: (range) => createReadStream(contentPath, range),

@@ -45,6 +45,9 @@ browse lightweight gallery records, and load a chosen version into the existing 
 - List/detail responses expose no local path, asset key, provider URL, credential, or raw error.
 - Wrong-owner and missing records use safe non-enumerating responses. Content supports controlled
   range delivery without reading the full file into application memory.
+- Saved timestamps remain canonical UTC ISO strings across local and Neon persistence. Loading
+  legacy local metadata atomically normalizes parseable timestamps and rounds fractional duration
+  milliseconds before any Neon backfill or new version insert.
 
 ## Retention
 

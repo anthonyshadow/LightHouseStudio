@@ -11,6 +11,7 @@ import {
 } from '@aws-sdk/client-s3';
 import { Upload } from '@aws-sdk/lib-storage';
 import { z } from 'zod';
+import { persistedTimestampSchema } from '../application/timestamps.js';
 import type { AssetLifecycleRegistry } from './asset-lifecycle.js';
 import type { AssetByteStore, AssetReadHandle, StoredAssetManifest } from './asset-byte-store.js';
 
@@ -203,7 +204,7 @@ export class R2AssetByteStore implements AssetByteStore {
         .string()
         .regex(/^[a-f0-9]{64}$/u)
         .parse(input.checksumSha256),
-      createdAt: z.iso.datetime().parse(input.createdAt),
+      createdAt: persistedTimestampSchema.parse(input.createdAt),
     };
     return this.#uploadStream(manifest, input.createReadStream());
   }

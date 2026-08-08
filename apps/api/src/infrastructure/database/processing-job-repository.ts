@@ -1,5 +1,6 @@
 import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
 import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
+import { toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   DurableProcessingJobRepository,
   ProcessingJobTraceWriter,
@@ -127,9 +128,9 @@ export class DrizzleProcessingJobTraceWriter
         providerOutputLocation: row.providerOutputLocation,
         sourceDurationMs: row.sourceDurationMs,
         sourceOrientation: row.sourceOrientation,
-        createdAt: row.createdAt,
-        updatedAt: row.updatedAt,
-        expiresAt: row.expiresAt,
+        createdAt: toIsoTimestamp(row.createdAt),
+        updatedAt: toIsoTimestamp(row.updatedAt),
+        expiresAt: toIsoTimestamp(row.expiresAt),
       });
     }
     return resumable;

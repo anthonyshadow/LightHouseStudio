@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { and, eq, inArray } from 'drizzle-orm';
+import { toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   SavedVoiceRecord,
   SavedVoiceRepository,
@@ -15,7 +16,7 @@ const toRecord = (row: typeof savedVoices.$inferSelect): SavedVoiceRecord => ({
   provider: 'elevenlabs',
   providerVoiceId: row.providerVoiceId,
   publicOwnerId: row.publicOwnerId,
-  savedAt: row.savedAt,
+  savedAt: toIsoTimestamp(row.savedAt),
 });
 
 export class DrizzleSavedVoiceRepository implements SavedVoiceRepository {
@@ -73,7 +74,7 @@ export class DrizzleSavedVoiceRepository implements SavedVoiceRepository {
         provider: 'elevenlabs',
         providerVoiceId: voiceId,
         publicOwnerId,
-        savedAt,
+        savedAt: toIsoTimestamp(savedAt),
       })
       .onConflictDoNothing()
       .returning({ id: savedVoices.id });
@@ -123,14 +124,18 @@ export class DrizzleSavedVoiceRepository implements SavedVoiceRepository {
             provider: 'elevenlabs',
             providerVoiceId: voice.voiceId,
             publicOwnerId: voice.publicOwnerId,
-            savedAt,
+            savedAt: toIsoTimestamp(savedAt),
           })),
         )
         .onConflictDoNothing();
     }
     await this.db
       .insert(ownerMigrations)
-      .values({ ownerUserId, migrationId: WORKSPACE_MIGRATION_ID, completedAt: savedAt })
+      .values({
+        ownerUserId,
+        migrationId: WORKSPACE_MIGRATION_ID,
+        completedAt: toIsoTimestamp(savedAt),
+      })
       .onConflictDoNothing();
   }
 }

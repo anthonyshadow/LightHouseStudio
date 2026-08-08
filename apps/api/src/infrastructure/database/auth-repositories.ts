@@ -1,4 +1,5 @@
 import { and, eq, gt, isNotNull, isNull, lte, or } from 'drizzle-orm';
+import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   SeededUserCredential,
   UserRepository,
@@ -11,8 +12,6 @@ import type { LightframeDatabase } from './client.js';
 import { passwordCredentials, sessions, users } from './schema.js';
 
 type UserRow = typeof users.$inferSelect;
-
-const toIsoTimestamp = (value: string): string => new Date(value).toISOString();
 
 const toCredential = (row: UserRow, passwordHash: string): SeededUserCredential => ({
   id: row.id,
@@ -146,7 +145,14 @@ export class DrizzleSessionRepository implements SessionRepository {
         ),
       )
       .limit(1);
-    return row ?? null;
+    return row === undefined
+      ? null
+      : {
+          ...row,
+          issuedAt: toIsoTimestamp(row.issuedAt),
+          expiresAt: toIsoTimestamp(row.expiresAt),
+          revokedAt: nullableIsoTimestamp(row.revokedAt),
+        };
   }
 
   async revoke(jti: string, now: Date): Promise<void> {

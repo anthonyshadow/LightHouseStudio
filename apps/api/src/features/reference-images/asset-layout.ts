@@ -19,6 +19,7 @@ import {
   type CharacterReferenceOptions,
   type ReferenceImageSize,
 } from '@studio/contracts';
+import { persistedTimestampSchema } from '../../application/timestamps.js';
 import { imageFileExtension } from '@studio/domain';
 import type { ValidReferenceImageMimeType } from './image-validation.js';
 
@@ -75,8 +76,8 @@ const storedMetadataCommonShape = {
     .regex(/^[a-f0-9]{64}$/u)
     .optional(),
   requestFingerprintVersion: z.literal(2).optional(),
-  createdAt: z.iso.datetime({ offset: true }),
-  updatedAt: z.iso.datetime({ offset: true }).optional(),
+  createdAt: persistedTimestampSchema,
+  updatedAt: persistedTimestampSchema.optional(),
 } as const;
 
 const storedGeneratedReferenceImageMetadataSchema = z

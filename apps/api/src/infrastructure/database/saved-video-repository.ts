@@ -5,6 +5,7 @@ import {
   type SavedVideoFormat,
   type SavedVideosQuery,
 } from '@studio/contracts';
+import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   SavedVideoReceipt,
   SavedVideoRepository,
@@ -34,7 +35,7 @@ const toVersion = (row: VersionRow): StoredVideoVersion => ({
   durationMs: row.durationMs,
   width: row.width,
   height: row.height,
-  createdAt: row.createdAt,
+  createdAt: toIsoTimestamp(row.createdAt),
 });
 
 const toAggregate = (
@@ -48,9 +49,9 @@ const toAggregate = (
     currentVersionId: video.currentVersionId,
     sourceVideoId: video.sourceVideoId,
     status: video.status,
-    createdAt: video.createdAt,
-    updatedAt: video.updatedAt,
-    deletedAt: video.deletedAt,
+    createdAt: toIsoTimestamp(video.createdAt),
+    updatedAt: toIsoTimestamp(video.updatedAt),
+    deletedAt: nullableIsoTimestamp(video.deletedAt),
   },
   versions: versions.map(toVersion),
   revision: video.revision,
@@ -69,10 +70,10 @@ const versionValues = (version: StoredVideoVersion): typeof videoVersions.$infer
   mimeType: version.mimeType,
   filename: version.filename,
   sizeBytes: version.sizeBytes,
-  durationMs: version.durationMs,
+  durationMs: Math.max(1, Math.round(version.durationMs)),
   width: version.width,
   height: version.height,
-  createdAt: version.createdAt,
+  createdAt: toIsoTimestamp(version.createdAt),
 });
 
 const receiptValues = (
@@ -83,7 +84,7 @@ const receiptValues = (
   idempotencyKey: receipt.idempotencyKey,
   videoId: receipt.videoId,
   versionId: receipt.versionId,
-  createdAt: receipt.createdAt,
+  createdAt: toIsoTimestamp(receipt.createdAt),
 });
 
 export class DrizzleSavedVideoRepository implements SavedVideoRepository {
@@ -134,7 +135,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
           idempotencyKey: row.idempotencyKey,
           videoId: row.videoId,
           versionId: row.versionId,
-          createdAt: row.createdAt,
+          createdAt: toIsoTimestamp(row.createdAt),
         };
   }
 
@@ -158,9 +159,9 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
           sourceVideoId: aggregate.video.sourceVideoId,
           status: aggregate.video.status,
           revision: aggregate.revision,
-          deletedAt: aggregate.video.deletedAt,
-          createdAt: aggregate.video.createdAt,
-          updatedAt: aggregate.video.updatedAt,
+          deletedAt: nullableIsoTimestamp(aggregate.video.deletedAt),
+          createdAt: toIsoTimestamp(aggregate.video.createdAt),
+          updatedAt: toIsoTimestamp(aggregate.video.updatedAt),
         });
         await tx.insert(videoVersions).values(aggregate.versions.map(versionValues));
         await tx.insert(savedVideoReceipts).values(receiptValues(ownerUserId, receipt));
@@ -210,7 +211,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
             currentVersionId: version.id,
             status: 'ready',
             revision: current.revision + 1,
-            updatedAt: version.createdAt,
+            updatedAt: toIsoTimestamp(version.createdAt),
           })
           .where(and(eq(savedVideos.ownerUserId, ownerUserId), eq(savedVideos.id, videoId)));
         await tx.insert(savedVideoReceipts).values(receiptValues(ownerUserId, receipt));
@@ -375,7 +376,11 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
   ): Promise<StoredSavedVideoAggregate | null> {
     const [updated] = await this.db
       .update(savedVideos)
-      .set({ title, updatedAt, revision: sql`${savedVideos.revision} + 1` })
+      .set({
+        title,
+        updatedAt: toIsoTimestamp(updatedAt),
+        revision: sql`${savedVideos.revision} + 1`,
+      })
       .where(
         and(
           eq(savedVideos.ownerUserId, ownerUserId),
@@ -390,7 +395,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
   async markMissing(ownerUserId: string, videoId: string, updatedAt: string): Promise<void> {
     await this.db
       .update(savedVideos)
-      .set({ status: 'missing', updatedAt })
+      .set({ status: 'missing', updatedAt: toIsoTimestamp(updatedAt) })
       .where(
         and(
           eq(savedVideos.ownerUserId, ownerUserId),
@@ -422,7 +427,7 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
       if (version === undefined) return false;
       await tx
         .update(savedVideos)
-        .set({ updatedAt })
+        .set({ updatedAt: toIsoTimestamp(updatedAt) })
         .where(and(eq(savedVideos.ownerUserId, ownerUserId), eq(savedVideos.id, videoId)));
       return true;
     });
@@ -432,7 +437,11 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
   async delete(ownerUserId: string, videoId: string, deletedAt: string): Promise<boolean> {
     const rows = await this.db
       .update(savedVideos)
-      .set({ status: 'deleted', deletedAt, updatedAt: deletedAt })
+      .set({
+        status: 'deleted',
+        deletedAt: toIsoTimestamp(deletedAt),
+        updatedAt: toIsoTimestamp(deletedAt),
+      })
       .where(
         and(
           eq(savedVideos.ownerUserId, ownerUserId),

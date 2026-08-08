@@ -140,7 +140,19 @@ describe('Drizzle auth repositories', () => {
       expiresAt: '2026-08-08T12:00:00.000Z',
       revokedAt: null,
     };
-    const scripted = scriptedDatabase([], [], [record], [], []);
+    const scripted = scriptedDatabase(
+      [],
+      [],
+      [
+        {
+          ...record,
+          issuedAt: postgresNow,
+          expiresAt: '2026-08-08 12:00:00+00',
+        },
+      ],
+      [],
+      [],
+    );
     const repository = new DrizzleSessionRepository(scripted.db);
 
     await repository.create(record);
@@ -165,8 +177,8 @@ describe('DrizzleAssetLifecycleRegistry', () => {
       checksumSha256: manifest.checksumSha256,
       etag: 'etag',
       deletedAt: null,
-      createdAt: now,
-      updatedAt: now,
+      createdAt: postgresNow,
+      updatedAt: postgresNow,
     };
     const scripted = scriptedDatabase([], [], [], [readyRow], [{ id: assetId }], [], [], []);
     const repository = new DrizzleAssetLifecycleRegistry(scripted.db);
@@ -195,7 +207,7 @@ describe('DrizzleSavedVoiceRepository', () => {
       provider: 'elevenlabs' as const,
       providerVoiceId: 'voice-one',
       publicOwnerId: 'public-owner',
-      savedAt: now,
+      savedAt: postgresNow,
     };
     const scripted = scriptedDatabase(
       [row],
@@ -212,7 +224,7 @@ describe('DrizzleSavedVoiceRepository', () => {
     const repository = new DrizzleSavedVoiceRepository(scripted.db);
 
     await expect(repository.list(ownerUserId)).resolves.toMatchObject([
-      { providerVoiceId: 'voice-one' },
+      { providerVoiceId: 'voice-one', savedAt: now },
     ]);
     await expect(repository.has(ownerUserId, 'voice-one')).resolves.toBe(true);
     await expect(repository.savedIds(ownerUserId, ['voice-one', 'voice-one'])).resolves.toEqual(
@@ -291,6 +303,24 @@ describe('DrizzleSavedVideoRepository', () => {
     versionId,
     createdAt: now,
   };
+
+  it('normalizes Neon/Postgres timestamps at the repository boundary', async () => {
+    const scripted = scriptedDatabase(
+      [{ ...receipt, createdAt: postgresNow }],
+      [{ ...video, createdAt: postgresNow, updatedAt: postgresNow }],
+      [{ ...version, createdAt: postgresNow }],
+    );
+    const repository = new DrizzleSavedVideoRepository(scripted.db);
+
+    await expect(repository.findReceipt(ownerUserId, receipt.idempotencyKey)).resolves.toEqual(
+      receipt,
+    );
+    await expect(repository.get(ownerUserId, videoId)).resolves.toMatchObject({
+      video: { createdAt: now, updatedAt: now },
+      versions: [{ createdAt: now }],
+    });
+    expect(scripted.remaining()).toBe(0);
+  });
 
   it('uses transactions for creation/version append and pages the current-version projection in SQL', async () => {
     const scripted = scriptedDatabase(
@@ -458,9 +488,9 @@ describe('DrizzleProcessingJobTraceWriter', () => {
       providerOutputLocation: null,
       sourceDurationMs: trace.sourceDurationMs,
       sourceOrientation: trace.sourceOrientation,
-      createdAt: now,
-      updatedAt: now,
-      expiresAt: '2026-08-07T13:00:00.000Z',
+      createdAt: postgresNow,
+      updatedAt: postgresNow,
+      expiresAt: '2026-08-07 13:00:00+00',
     };
     const scripted = scriptedDatabase(
       [],
@@ -472,7 +502,13 @@ describe('DrizzleProcessingJobTraceWriter', () => {
 
     await repository.upsert(trace);
     await expect(repository.listResumable(now)).resolves.toEqual([
-      expect.objectContaining({ jobId: assetId, providerJobId: 'provider-job' }),
+      expect.objectContaining({
+        jobId: assetId,
+        providerJobId: 'provider-job',
+        createdAt: now,
+        updatedAt: now,
+        expiresAt: '2026-08-07T13:00:00.000Z',
+      }),
     ]);
     expect(scripted.remaining()).toBe(0);
   });
@@ -497,8 +533,8 @@ describe('DrizzleCreativeLibraryRepository', () => {
           ownerUserId,
           revision: 3,
           schemaVersion: store.schemaVersion,
-          createdAt: now,
-          updatedAt: now,
+          createdAt: postgresNow,
+          updatedAt: postgresNow,
         },
       ],
       [{ kind: 'saved-prompt', payload: prompt }],
@@ -520,6 +556,7 @@ describe('DrizzleCreativeLibraryRepository', () => {
     await expect(repository.load(ownerUserId)).resolves.toMatchObject({
       revision: 3,
       store: { savedPrompts: [{ id: 'prompt-one' }] },
+      updatedAt: now,
     });
     await expect(repository.replace(ownerUserId, 3, store, now)).resolves.toMatchObject({
       revision: 4,
