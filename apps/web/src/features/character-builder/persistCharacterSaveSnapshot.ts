@@ -1,11 +1,11 @@
 import type { CreativeAssetRepository } from '../creative-assets/types';
 import type { CharacterSaveSnapshot } from './characterBuilderControllerSupport';
 
-export const persistCharacterSaveSnapshot = (
+export const persistCharacterSaveSnapshot = async (
   repository: CreativeAssetRepository,
   snapshot: CharacterSaveSnapshot,
   characterId: string,
-): void => {
+): Promise<void> => {
   const characterValue = {
     name: snapshot.name,
     prompt: snapshot.prompt,
@@ -20,11 +20,11 @@ export const persistCharacterSaveSnapshot = (
   };
 
   if (snapshot.saveKind === 'edit') {
-    repository.updateSavedCharacterPrompt(characterId, characterValue);
+    await repository.updateSavedCharacterPrompt(characterId, characterValue);
     return;
   }
 
-  repository.persistSavedCharacterPrompt({
+  await repository.persistSavedCharacterPrompt({
     id: characterId,
     ...characterValue,
     source: 'generator',

@@ -134,14 +134,13 @@ export const OutfitBuilder = ({
         vtonInputKind: inputKind,
         enhancePrompt: inputKind === 'prompt' && enhancePrompt,
       } as const;
-      const saved =
-        initialOutfit && !saveAsCopy
-          ? repository.updateSavedPrompt(initialOutfit.id, payload)
-          : repository.createSavedPrompt({
-              ...payload,
-              modelModeId: 'lucy-vton-latest',
-              source: 'manual',
-            });
+      const saved = await (initialOutfit && !saveAsCopy
+        ? repository.updateSavedPrompt(initialOutfit.id, payload)
+        : repository.createSavedPrompt({
+            ...payload,
+            modelModeId: 'lucy-vton-latest',
+            source: 'manual',
+          }));
       if (referenceImageAssetId) committedAssetIdsRef.current.add(referenceImageAssetId);
       onDirtyChange(false);
       onSaved(saved);

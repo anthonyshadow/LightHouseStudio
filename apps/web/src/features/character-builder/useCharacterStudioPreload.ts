@@ -81,7 +81,7 @@ export const useCharacterStudioPreload = ({
         throw new Error('Character save was cancelled. The resumable draft is unchanged.');
       }
 
-      persistCharacterSaveSnapshot(repository, snapshot, characterId);
+      await persistCharacterSaveSnapshot(repository, snapshot, characterId);
       if (stage === 'intent') await progress.markCharacterPersisted();
 
       const preloaded = session.replaceRecipeDraft({

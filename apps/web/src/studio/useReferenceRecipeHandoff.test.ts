@@ -792,8 +792,8 @@ describe('reference recipe handoff', () => {
     expect(fetchReferenceImageMetadata).not.toHaveBeenCalled();
     expect(harness.replaceRecipeDraft).toHaveBeenCalledOnce();
 
-    act(() => {
-      harness.result.current.actions.saveWorkshopPrompt({
+    await act(async () => {
+      await harness.result.current.actions.saveWorkshopPrompt({
         name: 'Saved object edit',
         prompt: character.prompt,
         draft: workshopDraft,

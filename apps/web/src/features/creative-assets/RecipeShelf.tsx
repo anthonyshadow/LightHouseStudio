@@ -101,7 +101,7 @@ export const RecipeShelfView = ({
               onDraftChange={controller.setEditorDraft}
               onDirtyChange={controller.setFormDirty}
               onCancel={controller.closeCreate}
-              onSubmit={controller.createRecipe}
+              onSubmit={(value) => void controller.createRecipe(value)}
             />
           ) : null}
 

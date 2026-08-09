@@ -10,8 +10,8 @@ const updateCharacterRecipe = (
   item: SavedCharacterPrompt,
   value: RecipeFormValue,
 ) =>
-  controller.perform(() => {
-    controller.repository.updateSavedCharacterPrompt(item.id, {
+  controller.perform(async () => {
+    await controller.repository.updateSavedCharacterPrompt(item.id, {
       name: value.title,
       prompt: value.prompt,
       notes: value.notes,
@@ -87,7 +87,7 @@ export const CharacterRecipeList = ({
                 onDraftChange={controller.setEditorDraft}
                 onDirtyChange={controller.setFormDirty}
                 onCancel={controller.closeEditor}
-                onSubmit={(value) => updateCharacterRecipe(controller, item, value)}
+                onSubmit={(value) => void updateCharacterRecipe(controller, item, value)}
               />
             ) : controller.editing?.action === 'rename' ? (
               <RenameForm
@@ -98,7 +98,7 @@ export const CharacterRecipeList = ({
                 onDirtyChange={controller.setFormDirty}
                 onCancel={controller.closeEditor}
                 onRename={(name) =>
-                  controller.perform(() =>
+                  void controller.perform(() =>
                     controller.repository.renameSavedCharacterPrompt(item.id, name),
                   )
                 }
@@ -109,7 +109,7 @@ export const CharacterRecipeList = ({
                 retainedReference={Boolean(item.referenceImageAssetId)}
                 onCancel={controller.closeEditor}
                 onConfirm={() =>
-                  controller.perform(() =>
+                  void controller.perform(() =>
                     controller.repository.deleteSavedCharacterPrompt(item.id),
                   )
                 }

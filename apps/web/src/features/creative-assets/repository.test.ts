@@ -2,6 +2,11 @@ import { createPromptBuilderDraft } from '../prompt-authoring';
 import { describe, expect, it, vi } from 'vitest';
 import { createCreativeAssetRepository } from './repository';
 import {
+  CreativeAssetPersistenceConflictError,
+  type CreativeAssetPersistence,
+  type PersistedCreativeAssetSnapshot,
+} from './creativeAssetPersistence';
+import {
   CREATIVE_ASSET_SCHEMA_VERSION,
   CREATIVE_ASSET_STORAGE_KEY,
   EARLIER_CREATIVE_ASSET_STORAGE_KEY,
@@ -16,6 +21,7 @@ import {
 
 class MemoryStorage implements StorageLike {
   readonly records = new Map<string, string>();
+  readonly persistence = new MemoryPersistence(() => this.failWrites);
   failWrites = false;
 
   getItem(key: string) {
@@ -26,6 +32,62 @@ class MemoryStorage implements StorageLike {
     if (this.failWrites) throw new Error('quota');
     this.records.set(key, value);
   }
+
+  removeItem(key: string) {
+    this.records.delete(key);
+  }
+}
+
+class MemoryPersistence implements CreativeAssetPersistence {
+  private snapshot: PersistedCreativeAssetSnapshot | null = null;
+
+  constructor(private readonly shouldFail: () => boolean) {}
+
+  load() {
+    return Promise.resolve(this.snapshot ? structuredClone(this.snapshot) : null);
+  }
+
+  initialize(_ownerUserId: string, store: Parameters<CreativeAssetPersistence['initialize']>[1]) {
+    if (this.shouldFail()) return Promise.reject(new Error('planned persistence failure'));
+    if (this.snapshot) return Promise.reject(new CreativeAssetPersistenceConflictError());
+    this.snapshot = { revision: 1, store: structuredClone(store) };
+    return Promise.resolve(1);
+  }
+
+  commit(
+    _ownerUserId: string,
+    expectedRevision: number,
+    _previous: Parameters<CreativeAssetPersistence['commit']>[2],
+    next: Parameters<CreativeAssetPersistence['commit']>[3],
+  ) {
+    if (this.shouldFail()) return Promise.reject(new Error('planned persistence failure'));
+    if (!this.snapshot || this.snapshot.revision !== expectedRevision) {
+      return Promise.reject(new CreativeAssetPersistenceConflictError());
+    }
+    const revision = expectedRevision + 1;
+    this.snapshot = { revision, store: structuredClone(next) };
+    return Promise.resolve(revision);
+  }
+
+  repair(
+    _ownerUserId: string,
+    expectedRevision: number,
+    store: Parameters<CreativeAssetPersistence['repair']>[2],
+  ) {
+    if (this.shouldFail()) return Promise.reject(new Error('planned persistence failure'));
+    if (!this.snapshot || this.snapshot.revision !== expectedRevision) {
+      return Promise.reject(new CreativeAssetPersistenceConflictError());
+    }
+    const revision = expectedRevision + 1;
+    this.snapshot = { revision, store: structuredClone(store) };
+    return Promise.resolve(revision);
+  }
+
+  serialized() {
+    return JSON.stringify(this.snapshot?.store ?? null);
+  }
+
+  close() {}
 }
 
 const repositoryFixture = (storage: StorageLike | null = new MemoryStorage()) => {
@@ -33,6 +95,7 @@ const repositoryFixture = (storage: StorageLike | null = new MemoryStorage()) =>
   let minute = 0;
   return createCreativeAssetRepository({
     storage,
+    persistence: storage instanceof MemoryStorage ? storage.persistence : null,
     storageKey: 'test-recipes',
     idFactory: () => `id-${++id}`,
     now: () => new Date(Date.UTC(2026, 6, 14, 12, minute++)),
@@ -62,22 +125,22 @@ const guidedDesign = (): GuidedDesignV1 => ({
 });
 
 describe('createCreativeAssetRepository', () => {
-  it('maps typed domain reasons without inspecting human-readable messages', () => {
+  it('maps typed domain reasons without inspecting human-readable messages', async () => {
     const repository = repositoryFixture();
 
-    expect(() =>
+    await expect(
       repository.createSavedPrompt({
         title: 'Valid title',
         prompt: '   ',
         modelModeId: 'lucy-latest',
       }),
-    ).toThrow(
+    ).rejects.toThrow(
       expect.objectContaining({
         code: 'invalid-prompt',
         message: 'A saved prompt cannot be empty.',
       }),
     );
-    expect(() => repository.renameSavedPrompt('missing', 'Still valid')).toThrow(
+    await expect(repository.renameSavedPrompt('missing', 'Still valid')).rejects.toThrow(
       expect.objectContaining({
         code: 'not-found',
         message: 'Saved prompt was not found.',
@@ -85,15 +148,15 @@ describe('createCreativeAssetRepository', () => {
     );
   });
 
-  it('supports CRUD, mode-scoped search, recent deduplication, usage tracking, and unlink-on-delete', () => {
+  it('supports CRUD, mode-scoped search, recent deduplication, usage tracking, and unlink-on-delete', async () => {
     const repository = repositoryFixture();
-    const saved = repository.createSavedPrompt({
+    const saved = await repository.createSavedPrompt({
       title: '  Copper   jacket ',
       prompt: 'Change the jacket material to brushed copper.',
       modelModeId: 'lucy-latest',
       tags: ['Editorial', 'editorial', ...Array.from({ length: 20 }, (_, index) => `tag-${index}`)],
     });
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Linen overshirt',
       prompt: 'Dress the garment in natural linen.',
       modelModeId: 'lucy-vton-latest',
@@ -104,12 +167,12 @@ describe('createCreativeAssetRepository', () => {
     expect(repository.search('copper', 'lucy-latest').savedPrompts).toHaveLength(1);
     expect(repository.search('linen', 'lucy-latest').savedPrompts).toHaveLength(0);
 
-    repository.recordSuccessfulPrompt({
+    await repository.recordSuccessfulPrompt({
       prompt: '  Change the jacket material to brushed copper.  ',
       modelModeId: 'lucy-latest',
       savedPromptId: saved.id,
     });
-    repository.recordSuccessfulPrompt({
+    await repository.recordSuccessfulPrompt({
       prompt: 'Change   the jacket material to brushed copper.',
       modelModeId: 'lucy-latest',
       savedPromptId: saved.id,
@@ -119,17 +182,17 @@ describe('createCreativeAssetRepository', () => {
       repository.getSnapshot().store.savedPrompts.find((item) => item.id === saved.id)?.useCount,
     ).toBe(2);
 
-    const renamed = repository.renameSavedPrompt(saved.id, 'Copper keynote');
+    const renamed = await repository.renameSavedPrompt(saved.id, 'Copper keynote');
     expect(renamed.title).toBe('Copper keynote');
-    repository.updateSavedPrompt(saved.id, { prompt: 'Change the jacket to copper satin.' });
-    repository.deleteSavedPrompt(saved.id);
+    await repository.updateSavedPrompt(saved.id, { prompt: 'Change the jacket to copper satin.' });
+    await repository.deleteSavedPrompt(saved.id);
     expect(repository.getSnapshot().store.savedPrompts.some((item) => item.id === saved.id)).toBe(
       false,
     );
     expect(repository.getSnapshot().store.recentPrompts[0]?.savedPromptId).toBeUndefined();
   });
 
-  it('persists only allowlisted text metadata and restores character workshop state', () => {
+  it('persists only allowlisted text metadata and restores character workshop state', async () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);
     const draft = {
@@ -139,7 +202,7 @@ describe('createCreativeAssetRepository', () => {
       bodyShape: 'balanced build',
       hairColor: 'black',
     };
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Night host',
       prompt: 'Transform the subject into an adult night-shift radio host.',
       promptIntent: 'character-transform',
@@ -152,31 +215,31 @@ describe('createCreativeAssetRepository', () => {
     expect(character.source).toBe('generator');
     expect(character.builderDraft).toMatchObject({ characterBase: 'night-shift radio host' });
     expect(character.guidedDesign).toEqual(guidedDesign());
-    const serialized = storage.records.get('test-recipes') ?? '';
+    const serialized = storage.persistence.serialized();
     expect(serialized).toContain('session-portrait-not-saved');
     expect(serialized).not.toMatch(/imageData|objectUrl|blob:|deviceId|token/i);
   });
 
-  it('persists exact image versions across recents, saved copies, characters, and refresh', () => {
+  it('persists exact image versions across recents, saved copies, characters, and refresh', async () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);
-    repository.recordSuccessfulPrompt({
+    await repository.recordSuccessfulPrompt({
       prompt: 'Substitute the character with a glassblower.',
       modelModeId: 'lucy-latest',
       referenceImageAssetId: 'asset-a',
     });
-    repository.recordSuccessfulPrompt({
+    await repository.recordSuccessfulPrompt({
       prompt: 'Substitute the character with a glassblower.',
       modelModeId: 'lucy-latest',
       referenceImageAssetId: 'asset-b',
     });
-    const saved = repository.createSavedPrompt({
+    const saved = await repository.createSavedPrompt({
       title: 'Glassblower',
       prompt: 'Substitute the character with a glassblower.',
       modelModeId: 'lucy-latest',
       referenceImageAssetId: 'asset-b',
     });
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Glassblower',
       prompt: saved.prompt,
       promptIntent: 'character-transform',
@@ -190,23 +253,25 @@ describe('createCreativeAssetRepository', () => {
       referenceImageStatus: 'persisted-reference',
       referenceImageAssetId: 'asset-b',
     });
-    expect(repositoryFixture(storage).getSnapshot().store).toMatchObject({
+    const reopened = repositoryFixture(storage);
+    await reopened.ready();
+    expect(reopened.getSnapshot().store).toMatchObject({
       savedPrompts: [expect.objectContaining({ referenceImageAssetId: 'asset-b' })],
       savedCharacterPrompts: [expect.objectContaining({ referenceImageAssetId: 'asset-b' })],
     });
   });
 
-  it('persists normalized wardrobe CRUD, exact Recent attribution, and parent cascade', () => {
+  it('persists normalized wardrobe CRUD, exact Recent attribution, and parent cascade', async () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Wardrobe host',
       prompt: 'Replace the subject with a wardrobe host.',
       promptIntent: 'character-transform',
       referenceImageStatus: 'persisted-reference',
       referenceImageAssetId: 'host-original',
     });
-    const variant = repository.createSavedCharacterVariant({
+    const variant = await repository.createSavedCharacterVariant({
       parentCharacterId: character.id,
       title: 'Green coat',
       referenceImageAssetId: 'host-green-coat',
@@ -216,7 +281,7 @@ describe('createCreativeAssetRepository', () => {
         garmentReferenceImageAssetId: 'green-coat',
       },
     });
-    repository.recordSuccessfulPrompt({
+    await repository.recordSuccessfulPrompt({
       prompt: character.prompt,
       modelModeId: 'lucy-latest',
       savedCharacterPromptId: character.id,
@@ -224,7 +289,9 @@ describe('createCreativeAssetRepository', () => {
       referenceImageAssetId: variant.referenceImageAssetId,
     });
 
-    expect(repositoryFixture(storage).getSnapshot().store).toMatchObject({
+    const reopened = repositoryFixture(storage);
+    await reopened.ready();
+    expect(reopened.getSnapshot().store).toMatchObject({
       savedCharacterPrompts: [
         expect.objectContaining({ selectedWardrobeVariantId: variant.id, useCount: 1 }),
       ],
@@ -240,16 +307,16 @@ describe('createCreativeAssetRepository', () => {
       ],
     });
 
-    repository.deleteSavedCharacterPrompt(character.id);
+    await repository.deleteSavedCharacterPrompt(character.id);
     expect(repository.getSnapshot().store.savedCharacterVariants).toEqual([]);
     expect(repository.getSnapshot().store.recentPrompts[0]).not.toHaveProperty(
       'savedCharacterVariantId',
     );
   });
 
-  it('increments character use only for the exact saved reference version', () => {
+  it('increments character use only for the exact saved reference version', async () => {
     const repository = repositoryFixture();
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Orbital guide',
       prompt: 'Substitute the character with an orbital guide.',
       promptIntent: 'character-transform',
@@ -257,7 +324,7 @@ describe('createCreativeAssetRepository', () => {
       referenceImageAssetId: 'asset-a',
     });
 
-    repository.recordSuccessfulPrompt({
+    await repository.recordSuccessfulPrompt({
       prompt: character.prompt,
       modelModeId: 'lucy-latest',
       savedCharacterPromptId: character.id,
@@ -268,7 +335,7 @@ describe('createCreativeAssetRepository', () => {
         ?.useCount,
     ).toBe(0);
 
-    repository.recordSuccessfulPrompt({
+    await repository.recordSuccessfulPrompt({
       prompt: character.prompt,
       modelModeId: 'lucy-latest',
       savedCharacterPromptId: character.id,
@@ -280,16 +347,16 @@ describe('createCreativeAssetRepository', () => {
     ).toBe(1);
   });
 
-  it('deletes one wardrobe variant and rejects a repeated deletion', () => {
+  it('deletes one wardrobe variant and rejects a repeated deletion', async () => {
     const repository = repositoryFixture();
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Variant owner',
       prompt: 'Replace the subject with a variant owner.',
       promptIntent: 'character-transform',
       referenceImageStatus: 'persisted-reference',
       referenceImageAssetId: 'owner-original',
     });
-    const variant = repository.createSavedCharacterVariant({
+    const variant = await repository.createSavedCharacterVariant({
       parentCharacterId: character.id,
       title: 'Copper form',
       referenceImageAssetId: 'owner-copper',
@@ -299,23 +366,23 @@ describe('createCreativeAssetRepository', () => {
         changeInstructions: 'Make the character copper.',
       },
     });
-    repository.selectCharacterVersion({ characterId: character.id, variantId: variant.id });
+    await repository.selectCharacterVersion({ characterId: character.id, variantId: variant.id });
 
-    repository.deleteSavedCharacterVariant(variant.id);
+    await repository.deleteSavedCharacterVariant(variant.id);
 
     expect(repository.getSnapshot().store.savedCharacterVariants).toEqual([]);
     expect(
       repository.getSnapshot().store.savedCharacterPrompts[0]?.selectedWardrobeVariantId,
     ).toBeNull();
-    expect(() => repository.deleteSavedCharacterVariant(variant.id)).toThrow(
+    await expect(repository.deleteSavedCharacterVariant(variant.id)).rejects.toThrow(
       expect.objectContaining({ code: 'not-found' }),
     );
   });
 
-  it('persists image-only characters and retains their standalone Recent recipe after deletion', () => {
+  it('persists image-only characters and retains their standalone Recent recipe after deletion', async () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Uploaded Character 01',
       prompt: '',
       promptIntent: null,
@@ -328,7 +395,9 @@ describe('createCreativeAssetRepository', () => {
     });
 
     expect(repository.getSnapshot().store.recentPrompts).toEqual([]);
-    expect(repositoryFixture(storage).getSnapshot().store.savedCharacterPrompts[0]).toMatchObject({
+    const reopened = repositoryFixture(storage);
+    await reopened.ready();
+    expect(reopened.getSnapshot().store.savedCharacterPrompts[0]).toMatchObject({
       id: character.id,
       prompt: '',
       referenceImageAssetId: 'uploaded-asset',
@@ -336,7 +405,7 @@ describe('createCreativeAssetRepository', () => {
       finalReferenceKind: 'uploaded',
     });
 
-    repository.recordSuccessfulPrompt({
+    await repository.recordSuccessfulPrompt({
       prompt: '',
       modelModeId: 'lucy-latest',
       savedCharacterPromptId: character.id,
@@ -361,8 +430,10 @@ describe('createCreativeAssetRepository', () => {
       ],
     });
 
-    repository.deleteSavedCharacterPrompt(character.id);
-    expect(repositoryFixture(storage).getSnapshot().store).toMatchObject({
+    await repository.deleteSavedCharacterPrompt(character.id);
+    const reopenedAfterDelete = repositoryFixture(storage);
+    await reopenedAfterDelete.ready();
+    expect(reopenedAfterDelete.getSnapshot().store).toMatchObject({
       savedCharacterPrompts: [],
       recentPrompts: [
         {
@@ -377,18 +448,18 @@ describe('createCreativeAssetRepository', () => {
     );
   });
 
-  it('enriches the newest matching text-only recent without replacing an image version', () => {
+  it('enriches the newest matching text-only recent without replacing an image version', async () => {
     const repository = repositoryFixture();
-    repository.recordSuccessfulPrompt({
+    await repository.recordSuccessfulPrompt({
       prompt: 'Substitute the character with a cartographer.',
       modelModeId: 'lucy-latest',
     });
-    repository.enrichNewestMatchingRecent(
+    await repository.enrichNewestMatchingRecent(
       'Substitute the character with a cartographer.',
       'lucy-latest',
       'asset-a',
     );
-    repository.enrichNewestMatchingRecent(
+    await repository.enrichNewestMatchingRecent(
       'Substitute the character with a cartographer.',
       'lucy-latest',
       'asset-b',
@@ -398,7 +469,7 @@ describe('createCreativeAssetRepository', () => {
     ]);
   });
 
-  it('migrates the original v1 key to v6 and hydrates null references after refresh', () => {
+  it('migrates the original v1 key to v6 and hydrates null references after refresh', async () => {
     const storage = new MemoryStorage();
     storage.records.set(
       ORIGINAL_CREATIVE_ASSET_STORAGE_KEY,
@@ -423,7 +494,8 @@ describe('createCreativeAssetRepository', () => {
       }),
     );
 
-    const migrated = createCreativeAssetRepository({ storage });
+    const migrated = createCreativeAssetRepository({ storage, persistence: storage.persistence });
+    await migrated.ready();
     expect(migrated.getSnapshot()).toMatchObject({
       health: 'ready',
       store: {
@@ -431,13 +503,18 @@ describe('createCreativeAssetRepository', () => {
         savedPrompts: [expect.objectContaining({ referenceImageAssetId: null })],
       },
     });
-    expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
-    expect(createCreativeAssetRepository({ storage }).getSnapshot().store.savedPrompts).toEqual(
+    expect(storage.records.has(ORIGINAL_CREATIVE_ASSET_STORAGE_KEY)).toBe(false);
+    const reopened = createCreativeAssetRepository({
+      storage,
+      persistence: storage.persistence,
+    });
+    await reopened.ready();
+    expect(reopened.getSnapshot().store.savedPrompts).toEqual(
       migrated.getSnapshot().store.savedPrompts,
     );
   });
 
-  it('prefers and migrates the v2 key while preserving reference identities', () => {
+  it('prefers and migrates the v2 key while preserving reference identities', async () => {
     const storage = new MemoryStorage();
     storage.records.set(
       LEGACY_CREATIVE_ASSET_STORAGE_KEY,
@@ -469,7 +546,8 @@ describe('createCreativeAssetRepository', () => {
       }),
     );
 
-    const migrated = createCreativeAssetRepository({ storage });
+    const migrated = createCreativeAssetRepository({ storage, persistence: storage.persistence });
+    await migrated.ready();
     expect(migrated.getSnapshot()).toMatchObject({
       health: 'ready',
       store: {
@@ -488,10 +566,10 @@ describe('createCreativeAssetRepository', () => {
         ],
       },
     });
-    expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
+    expect(storage.records.has(LEGACY_CREATIVE_ASSET_STORAGE_KEY)).toBe(false);
   });
 
-  it('prefers and migrates the v3 key with generated reference provenance', () => {
+  it('prefers and migrates the v3 key with generated reference provenance', async () => {
     const storage = new MemoryStorage();
     storage.records.set(
       EARLIER_CREATIVE_ASSET_STORAGE_KEY,
@@ -521,7 +599,9 @@ describe('createCreativeAssetRepository', () => {
       }),
     );
 
-    expect(createCreativeAssetRepository({ storage }).getSnapshot().store).toMatchObject({
+    const migrated = createCreativeAssetRepository({ storage, persistence: storage.persistence });
+    await migrated.ready();
+    expect(migrated.getSnapshot().store).toMatchObject({
       schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
       savedCharacterPrompts: [
         expect.objectContaining({
@@ -531,10 +611,10 @@ describe('createCreativeAssetRepository', () => {
         }),
       ],
     });
-    expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
+    expect(storage.records.has(EARLIER_CREATIVE_ASSET_STORAGE_KEY)).toBe(false);
   });
 
-  it('prefers and migrates the v4 key with explicit VTO mode inference', () => {
+  it('prefers and migrates the v4 key with explicit VTO mode inference', async () => {
     const storage = new MemoryStorage();
     storage.records.set(
       OLDER_CREATIVE_ASSET_STORAGE_KEY,
@@ -560,7 +640,9 @@ describe('createCreativeAssetRepository', () => {
       }),
     );
 
-    expect(createCreativeAssetRepository({ storage }).getSnapshot()).toMatchObject({
+    const migrated = createCreativeAssetRepository({ storage, persistence: storage.persistence });
+    await migrated.ready();
+    expect(migrated.getSnapshot()).toMatchObject({
       health: 'ready',
       store: {
         schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
@@ -575,7 +657,7 @@ describe('createCreativeAssetRepository', () => {
     });
   });
 
-  it('migrates the v5 key to an empty wardrobe with original selection', () => {
+  it('migrates the v5 key to an empty wardrobe with original selection', async () => {
     const storage = new MemoryStorage();
     storage.records.set(
       PREVIOUS_CREATIVE_ASSET_STORAGE_KEY,
@@ -607,14 +689,16 @@ describe('createCreativeAssetRepository', () => {
       }),
     );
 
-    expect(createCreativeAssetRepository({ storage }).getSnapshot().store).toMatchObject({
+    const migrated = createCreativeAssetRepository({ storage, persistence: storage.persistence });
+    await migrated.ready();
+    expect(migrated.getSnapshot().store).toMatchObject({
       schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
       savedCharacterPrompts: [expect.objectContaining({ selectedWardrobeVariantId: null })],
       savedCharacterVariants: [],
     });
   });
 
-  it('migrates the v6 key and initializes nullable character voice preferences', () => {
+  it('migrates the v6 key and initializes nullable character voice preferences', async () => {
     const storage = new MemoryStorage();
     storage.records.set(
       WARDROBE_CREATIVE_ASSET_STORAGE_KEY,
@@ -648,14 +732,16 @@ describe('createCreativeAssetRepository', () => {
       }),
     );
 
-    expect(createCreativeAssetRepository({ storage }).getSnapshot().store).toMatchObject({
+    const migrated = createCreativeAssetRepository({ storage, persistence: storage.persistence });
+    await migrated.ready();
+    expect(migrated.getSnapshot().store).toMatchObject({
       schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION,
       savedCharacterPrompts: [expect.objectContaining({ defaultVoice: null })],
     });
-    expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
+    expect(storage.records.has(WARDROBE_CREATIVE_ASSET_STORAGE_KEY)).toBe(false);
   });
 
-  it('treats a clean user-scoped v6 envelope as a healthy migration', () => {
+  it('treats a clean user-scoped v6 envelope as a healthy migration', async () => {
     const storage = new MemoryStorage();
     const ownerUserId = 'user-1';
     const legacyKey = `${WARDROBE_CREATIVE_ASSET_STORAGE_KEY}.${ownerUserId}`;
@@ -679,32 +765,38 @@ describe('createCreativeAssetRepository', () => {
       storageKey,
       legacyStorageKeys: [legacyKey],
       ownerUserId,
+      persistence: storage.persistence,
     });
 
+    await repository.ready();
     expect(repository.getSnapshot()).toMatchObject({ health: 'ready', notice: null });
-    expect(storage.records.has(storageKey)).toBe(true);
+    expect(storage.records.has(legacyKey)).toBe(false);
   });
 
-  it('recovers rather than silently treating a corrupt legacy payload as a migration', () => {
+  it('recovers rather than silently treating a corrupt legacy payload as a migration', async () => {
     const storage = new MemoryStorage();
     storage.records.set(LEGACY_CREATIVE_ASSET_STORAGE_KEY, '{not-json');
 
-    const repository = createCreativeAssetRepository({ storage });
+    const repository = createCreativeAssetRepository({
+      storage,
+      persistence: storage.persistence,
+    });
+    await repository.ready();
     expect(repository.getSnapshot()).toMatchObject({
       health: 'recovered',
       store: { schemaVersion: CREATIVE_ASSET_SCHEMA_VERSION, savedPrompts: [] },
     });
-    expect(storage.records.has(CREATIVE_ASSET_STORAGE_KEY)).toBe(true);
+    expect(storage.records.has(LEGACY_CREATIVE_ASSET_STORAGE_KEY)).toBe(false);
   });
 
-  it('drops generated provenance when a character recipe prompt is manually edited', () => {
+  it('drops generated provenance when a character recipe prompt is manually edited', async () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);
     const draft = {
       ...createPromptBuilderDraft('character-transform'),
       characterBase: 'night-shift radio host',
     };
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Night host',
       prompt: 'Transform the subject into an adult night-shift radio host.',
       promptIntent: 'character-transform',
@@ -712,7 +804,7 @@ describe('createCreativeAssetRepository', () => {
       guidedDesign: guidedDesign(),
     });
 
-    const edited = repository.updateSavedCharacterPrompt(character.id, {
+    const edited = await repository.updateSavedCharacterPrompt(character.id, {
       prompt: 'Transform the subject into an adult overnight news anchor.',
     });
 
@@ -722,7 +814,9 @@ describe('createCreativeAssetRepository', () => {
       builderDraft: null,
       guidedDesign: null,
     });
-    expect(repositoryFixture(storage).getSnapshot().store.savedCharacterPrompts[0]).toMatchObject({
+    const reopened = repositoryFixture(storage);
+    await reopened.ready();
+    expect(reopened.getSnapshot().store.savedCharacterPrompts[0]).toMatchObject({
       source: 'manual',
       promptIntent: null,
       builderDraft: null,
@@ -751,7 +845,23 @@ describe('createCreativeAssetRepository', () => {
     expect(JSON.stringify(unknown.getSnapshot().store)).not.toContain('must-not-survive');
   });
 
-  it('rewrites valid legacy records to remove unknown sensitive fields', () => {
+  it('preserves the recovery notice when IndexedDB is unavailable', () => {
+    const storage = new MemoryStorage();
+    storage.records.set('test-recipes', '{not-json');
+
+    const repository = createCreativeAssetRepository({
+      storage,
+      storageKey: 'test-recipes',
+      persistence: null,
+    });
+
+    expect(repository.getSnapshot()).toMatchObject({ health: 'session-only' });
+    expect(repository.getSnapshot().notice).toMatch(/damaged or outdated/i);
+    expect(repository.getSnapshot().notice).toMatch(/tab closes/i);
+    expect(storage.records.has('test-recipes')).toBe(true);
+  });
+
+  it('rewrites valid legacy records to remove unknown sensitive fields', async () => {
     const storage = new MemoryStorage();
     storage.records.set(
       'test-recipes',
@@ -780,16 +890,16 @@ describe('createCreativeAssetRepository', () => {
 
     const repository = repositoryFixture(storage);
     expect(repository.getSnapshot().health).toBe('recovered');
-    expect(storage.records.get('test-recipes')).not.toMatch(
-      /(?:apiKey|objectUrl|must-not-remain)/u,
-    );
+    await repository.ready();
+    expect(storage.persistence.serialized()).not.toMatch(/(?:apiKey|objectUrl|must-not-remain)/u);
+    expect(storage.records.has('test-recipes')).toBe(false);
   });
 
-  it('keeps mutations in memory and discloses session-only mode when writes fail', () => {
+  it('keeps mutations in memory and discloses session-only mode when writes fail', async () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);
     storage.failWrites = true;
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Tab-only recipe',
       prompt: 'Add a small paper moon above the left shoulder.',
       modelModeId: 'lucy-latest',
@@ -800,13 +910,13 @@ describe('createCreativeAssetRepository', () => {
     expect(repository.getSnapshot().store.savedPrompts).toHaveLength(1);
   });
 
-  it('notifies selector subscribers only when their selected slice changes', () => {
+  it('notifies selector subscribers only when their selected slice changes', async () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);
     const listener = vi.fn();
     repository.subscribeSelector((snapshot) => snapshot.health, listener);
 
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Stable storage',
       prompt: 'A calm studio portrait with warm side lighting.',
       modelModeId: 'lucy-latest',
@@ -814,7 +924,7 @@ describe('createCreativeAssetRepository', () => {
     expect(listener).not.toHaveBeenCalled();
 
     storage.failWrites = true;
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Session only',
       prompt: 'A cool studio portrait with soft fill lighting.',
       modelModeId: 'lucy-latest',
@@ -822,15 +932,16 @@ describe('createCreativeAssetRepository', () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
-  it('durably saves a caller-identified character before publishing it', () => {
+  it('durably saves a caller-identified character before publishing it', async () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);
+    await repository.ready();
     let publishedSerialized: string | null = null;
     repository.subscribe(() => {
-      publishedSerialized = storage.getItem('test-recipes');
+      publishedSerialized = storage.persistence.serialized();
     });
 
-    const saved = repository.persistSavedCharacterPrompt({
+    const saved = await repository.persistSavedCharacterPrompt({
       id: 'character-save-1',
       name: 'Morgan',
       prompt: 'An adult documentary presenter in a neutral studio.',
@@ -844,9 +955,10 @@ describe('createCreativeAssetRepository', () => {
     expect(repository.getSnapshot().store.savedCharacterPrompts).toEqual([saved]);
   });
 
-  it('does not publish a character when strict durable storage fails and retries idempotently', () => {
+  it('does not publish a character when strict durable storage fails and retries idempotently', async () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);
+    await repository.ready();
     const listener = vi.fn();
     repository.subscribe(listener);
     const input = {
@@ -859,57 +971,59 @@ describe('createCreativeAssetRepository', () => {
     };
 
     storage.failWrites = true;
-    expect(() => repository.persistSavedCharacterPrompt(input)).toThrowError(
+    await expect(repository.persistSavedCharacterPrompt(input)).rejects.toThrowError(
       expect.objectContaining({ code: 'storage-write-failed', retryable: true }),
     );
     expect(repository.getSnapshot().store.savedCharacterPrompts).toEqual([]);
     expect(listener).not.toHaveBeenCalled();
 
     storage.failWrites = false;
-    const saved = repository.persistSavedCharacterPrompt(input);
-    const retried = repository.persistSavedCharacterPrompt(input);
+    const saved = await repository.persistSavedCharacterPrompt(input);
+    const retried = await repository.persistSavedCharacterPrompt(input);
     expect(retried).toEqual(saved);
     expect(repository.getSnapshot().store.savedCharacterPrompts).toHaveLength(1);
     expect(listener).toHaveBeenCalledTimes(1);
 
     const reopened = repositoryFixture(storage);
-    expect(reopened.persistSavedCharacterPrompt(input)).toEqual(saved);
+    await expect(reopened.persistSavedCharacterPrompt(input)).resolves.toEqual(saved);
     expect(reopened.getSnapshot().store.savedCharacterPrompts).toHaveLength(1);
   });
 
-  it('reports unavailable durable storage as a typed retryable failure', () => {
+  it('reports unavailable durable storage as a typed retryable failure', async () => {
     const repository = repositoryFixture(null);
-    expect(() =>
+    await expect(
       repository.persistSavedCharacterPrompt({
         id: 'character-save-unavailable',
         name: 'Morgan',
         prompt: 'An adult documentary presenter in a neutral studio.',
         promptIntent: 'character-transform',
       }),
-    ).toThrowError(expect.objectContaining({ code: 'storage-unavailable', retryable: true }));
+    ).rejects.toThrowError(
+      expect.objectContaining({ code: 'storage-unavailable', retryable: true }),
+    );
     expect(repository.getSnapshot().store.savedCharacterPrompts).toEqual([]);
   });
 
-  it('rejects a caller ID reused for different character content without writing', () => {
+  it('rejects a caller ID reused for different character content without writing', async () => {
     const storage = new MemoryStorage();
     const repository = repositoryFixture(storage);
-    const original = repository.persistSavedCharacterPrompt({
+    const original = await repository.persistSavedCharacterPrompt({
       id: 'character-save-conflict',
       name: 'Morgan',
       prompt: 'An adult documentary presenter in a neutral studio.',
       promptIntent: 'character-transform',
     });
-    const durableBeforeConflict = storage.getItem('test-recipes');
+    const durableBeforeConflict = storage.persistence.serialized();
 
-    expect(() =>
+    await expect(
       repository.persistSavedCharacterPrompt({
         id: original.id,
         name: 'Taylor',
         prompt: 'An adult field reporter outdoors.',
         promptIntent: 'character-transform',
       }),
-    ).toThrowError(expect.objectContaining({ code: 'id-conflict', retryable: false }));
-    expect(storage.getItem('test-recipes')).toBe(durableBeforeConflict);
+    ).rejects.toThrowError(expect.objectContaining({ code: 'id-conflict', retryable: false }));
+    expect(storage.persistence.serialized()).toBe(durableBeforeConflict);
     expect(repository.getSnapshot().store.savedCharacterPrompts).toEqual([original]);
   });
 });

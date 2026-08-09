@@ -148,44 +148,54 @@ export interface CreateSavedCharacterVariantInput {
 
 export interface CreativeAssetRepository {
   getSnapshot: () => CreativeAssetRepositoryState;
+  /** Resolves after IndexedDB load and any verified localStorage migration complete. */
+  ready: () => Promise<void>;
+  close: () => void;
   subscribe: (listener: () => void) => () => void;
   subscribeSelector: <Selection>(
     selector: (state: CreativeAssetRepositoryState) => Selection,
     listener: () => void,
     isEqual?: (left: Selection, right: Selection) => boolean,
   ) => () => void;
-  createSavedPrompt: (input: CreateSavedPromptInput) => SavedPrompt;
-  updateSavedPrompt: (id: string, input: UpdateSavedPromptInput) => SavedPrompt;
-  renameSavedPrompt: (id: string, title: string) => SavedPrompt;
-  deleteSavedPrompt: (id: string) => void;
-  createSavedCharacterPrompt: (input: CreateSavedCharacterPromptInput) => SavedCharacterPrompt;
+  createSavedPrompt: (input: CreateSavedPromptInput) => Promise<SavedPrompt>;
+  updateSavedPrompt: (id: string, input: UpdateSavedPromptInput) => Promise<SavedPrompt>;
+  renameSavedPrompt: (id: string, title: string) => Promise<SavedPrompt>;
+  deleteSavedPrompt: (id: string) => Promise<void>;
+  createSavedCharacterPrompt: (
+    input: CreateSavedCharacterPromptInput,
+  ) => Promise<SavedCharacterPrompt>;
   /**
    * Writes durable storage before publishing repository state. A failed write
    * never exposes the character through `getSnapshot()` or subscribers.
    */
-  persistSavedCharacterPrompt: (input: PersistSavedCharacterPromptInput) => SavedCharacterPrompt;
+  persistSavedCharacterPrompt: (
+    input: PersistSavedCharacterPromptInput,
+  ) => Promise<SavedCharacterPrompt>;
   updateSavedCharacterPrompt: (
     id: string,
     input: UpdateSavedCharacterPromptInput,
-  ) => SavedCharacterPrompt;
-  renameSavedCharacterPrompt: (id: string, name: string) => SavedCharacterPrompt;
-  deleteSavedCharacterPrompt: (id: string) => void;
-  createSavedCharacterVariant: (input: CreateSavedCharacterVariantInput) => SavedCharacterVariant;
-  deleteSavedCharacterVariant: (id: string) => void;
-  selectCharacterVersion: (selection: CharacterVersionSelection) => void;
-  recordSuccessfulPrompt: (input: RecordSuccessfulPromptInput) => void;
+  ) => Promise<SavedCharacterPrompt>;
+  renameSavedCharacterPrompt: (id: string, name: string) => Promise<SavedCharacterPrompt>;
+  deleteSavedCharacterPrompt: (id: string) => Promise<void>;
+  createSavedCharacterVariant: (
+    input: CreateSavedCharacterVariantInput,
+  ) => Promise<SavedCharacterVariant>;
+  deleteSavedCharacterVariant: (id: string) => Promise<void>;
+  selectCharacterVersion: (selection: CharacterVersionSelection) => Promise<void>;
+  recordSuccessfulPrompt: (input: RecordSuccessfulPromptInput) => Promise<void>;
   enrichNewestMatchingRecent: (
     prompt: string,
     modelModeId: ModelModeId,
     referenceImageAssetId: string,
-  ) => void;
+  ) => Promise<void>;
   search: (query: string, modelModeId?: ModelModeId) => CreativeAssetSearchResults;
   /** Cloud-sync seam; local writes remain immediately available while the server CAS settles. */
-  replaceFromRemote?: (store: CreativeAssetStore) => void;
+  replaceFromRemote?: (store: CreativeAssetStore) => Promise<void>;
   setSyncNotice?: (notice: string | null) => void;
 }
 
 export interface StorageLike {
   getItem: (key: string) => string | null;
   setItem: (key: string, value: string) => void;
+  removeItem?: (key: string) => void;
 }

@@ -315,25 +315,32 @@ export const CharacterWardrobePanel = ({
     }
   };
 
-  const save = () => {
+  const save = async () => {
     if (!preview || !sourceAssetId || !title.trim() || !creating) return;
-    repository.createSavedCharacterVariant({
-      parentCharacterId: character.id,
-      title: title.trim(),
-      referenceImageAssetId: preview.assetId,
-      creation:
-        creating === 'add-outfit'
-          ? {
-              method: 'add-outfit',
-              sourceReferenceImageAssetId: sourceAssetId,
-              garmentReferenceImageAssetId: garmentAssetId!,
-            }
-          : {
-              method: 'change-features',
-              sourceReferenceImageAssetId: sourceAssetId,
-              changeInstructions: instructions.trim(),
-            },
-    });
+    try {
+      await repository.createSavedCharacterVariant({
+        parentCharacterId: character.id,
+        title: title.trim(),
+        referenceImageAssetId: preview.assetId,
+        creation:
+          creating === 'add-outfit'
+            ? {
+                method: 'add-outfit',
+                sourceReferenceImageAssetId: sourceAssetId,
+                garmentReferenceImageAssetId: garmentAssetId!,
+              }
+            : {
+                method: 'change-features',
+                sourceReferenceImageAssetId: sourceAssetId,
+                changeInstructions: instructions.trim(),
+              },
+      });
+    } catch (caught) {
+      setError(
+        caught instanceof Error ? caught.message : 'The character variant could not be saved.',
+      );
+      return;
+    }
     committedAssetIdsRef.current.add(preview.assetId);
     if (garmentAssetId) committedAssetIdsRef.current.add(garmentAssetId);
     onDirtyChange(false);
@@ -372,7 +379,7 @@ export const CharacterWardrobePanel = ({
               <Button
                 variant="secondary"
                 onClick={() =>
-                  repository.updateSavedCharacterPrompt(character.id, { defaultVoice: null })
+                  void repository.updateSavedCharacterPrompt(character.id, { defaultVoice: null })
                 }
               >
                 Remove default voice
@@ -388,7 +395,7 @@ export const CharacterWardrobePanel = ({
             disabled={false}
             selectedVoiceId={character.defaultVoice?.voiceId ?? null}
             onSelect={(voice) =>
-              repository.updateSavedCharacterPrompt(character.id, {
+              void repository.updateSavedCharacterPrompt(character.id, {
                 defaultVoice: {
                   kind: 'elevenlabs',
                   voiceId: voice.voiceId,
@@ -517,20 +524,22 @@ export const CharacterWardrobePanel = ({
           danger
           onCancel={() => setDeleteCandidateId(null)}
           onConfirm={() => {
-            if (!deleteCandidate) return;
-            try {
-              repository.deleteSavedCharacterVariant(deleteCandidate.id);
-              setDeleteCandidateId(null);
-              setError(null);
-              onSaved?.();
-            } catch (caught) {
-              setDeleteCandidateId(null);
-              setError(
-                caught instanceof Error
-                  ? caught.message
-                  : 'The character variant could not be deleted.',
-              );
-            }
+            void (async () => {
+              if (!deleteCandidate) return;
+              try {
+                await repository.deleteSavedCharacterVariant(deleteCandidate.id);
+                setDeleteCandidateId(null);
+                setError(null);
+                onSaved?.();
+              } catch (caught) {
+                setDeleteCandidateId(null);
+                setError(
+                  caught instanceof Error
+                    ? caught.message
+                    : 'The character variant could not be deleted.',
+                );
+              }
+            })();
           }}
         />
       </>
@@ -884,7 +893,7 @@ export const CharacterWardrobePanel = ({
             variant="primary"
             disabled={!canSave || busy}
             aria-describedby="wardrobe-save-guidance"
-            onClick={save}
+            onClick={() => void save()}
           >
             Save variant
           </Button>

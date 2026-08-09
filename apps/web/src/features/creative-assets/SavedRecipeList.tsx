@@ -10,8 +10,8 @@ const updateSavedRecipe = (
   item: SavedPrompt,
   value: RecipeFormValue,
 ) =>
-  controller.perform(() => {
-    controller.repository.updateSavedPrompt(item.id, {
+  controller.perform(async () => {
+    await controller.repository.updateSavedPrompt(item.id, {
       title: value.title,
       prompt: value.prompt,
       tags: value.tags,
@@ -66,7 +66,7 @@ export const SavedRecipeList = ({
                 onDraftChange={controller.setEditorDraft}
                 onDirtyChange={controller.setFormDirty}
                 onCancel={controller.closeEditor}
-                onSubmit={(value) => updateSavedRecipe(controller, item, value)}
+                onSubmit={(value) => void updateSavedRecipe(controller, item, value)}
               />
             ) : controller.editing?.action === 'rename' ? (
               <RenameForm
@@ -77,7 +77,9 @@ export const SavedRecipeList = ({
                 onDirtyChange={controller.setFormDirty}
                 onCancel={controller.closeEditor}
                 onRename={(name) =>
-                  controller.perform(() => controller.repository.renameSavedPrompt(item.id, name))
+                  void controller.perform(() =>
+                    controller.repository.renameSavedPrompt(item.id, name),
+                  )
                 }
               />
             ) : (
@@ -85,7 +87,7 @@ export const SavedRecipeList = ({
                 name={item.title}
                 onCancel={controller.closeEditor}
                 onConfirm={() =>
-                  controller.perform(() => controller.repository.deleteSavedPrompt(item.id))
+                  void controller.perform(() => controller.repository.deleteSavedPrompt(item.id))
                 }
               />
             )}
