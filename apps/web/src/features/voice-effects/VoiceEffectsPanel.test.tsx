@@ -8,6 +8,7 @@ import type { RecordingArtifact } from '../recording';
 import type { RecordingController } from '../recording/types';
 import type { VoiceProcessingController } from './types';
 import { StudioDesignProvider } from '../../ui';
+import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 
 const voiceApi = vi.hoisted(() => ({
   fetchVoicePreview: vi.fn(),
@@ -94,7 +95,11 @@ const createProcessing = (): VoiceProcessingController => ({
 });
 
 const renderWithTheme = (component: ReactNode) =>
-  render(<StudioDesignProvider>{component}</StudioDesignProvider>);
+  render(
+    <RemoteStateTestProvider>
+      <StudioDesignProvider>{component}</StudioDesignProvider>
+    </RemoteStateTestProvider>,
+  );
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -217,7 +222,7 @@ describe('VoiceLibrary accessibility', () => {
       createObjectURL: vi.fn(() => 'blob:voice-preview'),
       revokeObjectURL: vi.fn(),
     });
-    await user.click(screen.getByRole('button', { name: 'Preview Saved Star' }));
+    await user.click(await screen.findByRole('button', { name: 'Preview Saved Star' }));
     expect(await screen.findByLabelText('Listen to Saved Star preview')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Select Saved Star' }));
     expect(onSelect).toHaveBeenCalledWith({

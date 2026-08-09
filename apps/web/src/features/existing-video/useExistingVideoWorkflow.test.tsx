@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook as renderTestingLibraryHook, waitFor } from '@testing-library/react';
 import type { CapabilitiesResponse } from '@studio/contracts';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { ApiClientError } from '../../adapters/api-client/apiClient';
+import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import type { RecordingArtifact, RecordingController } from '../recording/types';
 import type { VoiceProcessingController } from '../voice-effects/types';
 
@@ -36,6 +37,9 @@ vi.mock('../../adapters/media-processing/transcodeRecording', () => ({
 }));
 
 import { savedCharacterStepInput, useExistingVideoWorkflow } from './useExistingVideoWorkflow';
+
+const renderHook = <Result,>(render: () => Result) =>
+  renderTestingLibraryHook(render, { wrapper: RemoteStateTestProvider });
 
 const requiredCharacterSwapCapabilities = {
   characterSwap: {

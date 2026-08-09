@@ -1,9 +1,10 @@
 // @vitest-environment jsdom
 
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { StudioDesignProvider } from '../../ui';
+import { StudioDesignProvider as BaseStudioDesignProvider } from '../../ui';
+import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import type { RecordingArtifact } from '../recording/types';
 import { ExistingVideoPanel } from './ExistingVideoPanel';
 import { ReferenceImageInputField } from '../reference-images/ReferenceImageInputField';
@@ -11,6 +12,12 @@ import type {
   ExistingVideoVoiceSelection,
   ExistingVideoWorkflow,
 } from './useExistingVideoWorkflow';
+
+const StudioDesignProvider = ({ children }: { readonly children: ReactNode }) => (
+  <RemoteStateTestProvider>
+    <BaseStudioDesignProvider>{children}</BaseStudioDesignProvider>
+  </RemoteStateTestProvider>
+);
 
 const api = vi.hoisted(() => ({
   hydrateReferenceImage: vi.fn(),

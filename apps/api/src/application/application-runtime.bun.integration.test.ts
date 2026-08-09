@@ -42,6 +42,11 @@ describe('Bun production listener contract', () => {
       contentType: 'application/json; charset=utf-8',
     });
     expect(result.apiStaticShadow.body).not.toContain('must never be served');
+    expect(result.bodylessDelete).toMatchObject({
+      status: 204,
+      body: '',
+      cacheControl: 'no-store',
+    });
     expect(result.duplicateBindRejected).toBe(true);
     expect(result.repeatedCloseUsesSamePromise).toBe(true);
     expect(result.unauthorizedBodyPulls).toBe(0);

@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 
 import type { SavedVideoSummary } from '@studio/contracts';
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
@@ -18,6 +19,7 @@ vi.mock('../../adapters/api-client/savedVideosApi', () => ({
 }));
 
 import { StudioDesignProvider } from '../../ui';
+import { createRemoteStateQueryClient } from '../../application/remote-state/RemoteStateProvider';
 import { VideoGallery } from './VideoGallery';
 
 const video = (override: Partial<SavedVideoSummary> = {}): SavedVideoSummary => ({
@@ -55,11 +57,17 @@ const page = (videos: readonly SavedVideoSummary[]) => ({
   facets: { characterNames: ['Mara', 'Nova'], formats: ['landscape', 'portrait'] as const },
 });
 
+const queryClients: QueryClient[] = [];
+
 const renderGallery = (onUse = vi.fn().mockResolvedValue(undefined)) => {
+  const queryClient = createRemoteStateQueryClient();
+  queryClients.push(queryClient);
   render(
-    <StudioDesignProvider>
-      <VideoGallery onUse={onUse} />
-    </StudioDesignProvider>,
+    <QueryClientProvider client={queryClient}>
+      <StudioDesignProvider>
+        <VideoGallery onUse={onUse} />
+      </StudioDesignProvider>
+    </QueryClientProvider>,
   );
   return onUse;
 };
@@ -75,6 +83,7 @@ describe('VideoGallery', () => {
 
   afterEach(() => {
     cleanup();
+    for (const queryClient of queryClients.splice(0)) queryClient.clear();
     vi.restoreAllMocks();
   });
 
@@ -126,6 +135,32 @@ describe('VideoGallery', () => {
 
     expect(await screen.findByRole('heading', { name: 'No saved videos yet' })).toBeInTheDocument();
     expect(screen.getByText(/Save Video/u)).toBeInTheDocument();
+  });
+
+  it('aggregates cursor pages through Query', async () => {
+    const first = video();
+    const second = video({
+      id: '347eb6ea-5ad4-4994-967e-c75d5106f548',
+      title: 'Evening take',
+      currentVersion: {
+        ...video().currentVersion,
+        id: '3edb9c78-efb2-43a4-8074-acba56158245',
+        videoId: '347eb6ea-5ad4-4994-967e-c75d5106f548',
+      },
+    });
+    api.listSavedVideos
+      .mockResolvedValueOnce({ ...page([first]), nextCursor: 'page-two', total: 2 })
+      .mockResolvedValueOnce({ ...page([second]), total: 2 });
+    renderGallery();
+
+    await screen.findByRole('heading', { name: 'Morning take' });
+    fireEvent.click(screen.getByRole('button', { name: 'Load more videos' }));
+
+    expect(await screen.findByRole('heading', { name: 'Evening take' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { name: 'Morning take' })).toBeInTheDocument();
+    expect(api.listSavedVideos).toHaveBeenLastCalledWith(
+      expect.objectContaining({ cursor: 'page-two' }),
+    );
   });
 
   it('renames and confirms deletion without loading media bytes', async () => {

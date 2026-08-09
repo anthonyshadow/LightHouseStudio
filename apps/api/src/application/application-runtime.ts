@@ -1,6 +1,6 @@
 import { createReadStream, type ReadStream } from 'node:fs';
 import { stat } from 'node:fs/promises';
-import { createServer, type Server as NodeServer } from 'node:http';
+import { createServer, type IncomingMessage, type Server as NodeServer } from 'node:http';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { staticPlugin } from '@elysiajs/static';
@@ -55,6 +55,14 @@ const SECURITY_HEADERS = {
 } as const;
 
 const LOOPBACK_HOSTNAMES = new Set(['localhost', '127.0.0.1', '::1', '[::1]']);
+
+const incomingRequestHasBody = (request: IncomingMessage): boolean => {
+  const method = request.method ?? 'GET';
+  if (method === 'GET' || method === 'HEAD') return false;
+  if (request.headers['transfer-encoding'] !== undefined) return true;
+  const contentLength = request.headers['content-length'];
+  return contentLength !== undefined && /^\d+$/u.test(contentLength) && Number(contentLength) > 0;
+};
 
 const requireLoopbackHost = (request: Request, allowModuleSentinel: boolean): void => {
   const host = request.headers.get('host');
@@ -1092,16 +1100,17 @@ export class ApplicationRuntime {
               incoming.url ?? '/',
               `http://${listenerUrlHostname}:${listenerPort}`,
             );
+            const hasBody = incomingRequestHasBody(incoming);
             const request = new Request(requestUrl, {
               method: incoming.method ?? 'GET',
               headers: incoming.headers,
               signal: abortController.signal,
-              ...(['GET', 'HEAD'].includes(incoming.method ?? 'GET')
-                ? {}
-                : {
+              ...(hasBody
+                ? {
                     body: Readable.toWeb(incoming) as unknown as BodyInit,
                     duplex: 'half',
-                  }),
+                  }
+                : {}),
             } as RequestInit & { duplex?: 'half' });
             // Claim stream lifecycle ownership before Elysia constructs the
             // response. Otherwise an empty source can reach EOF before the

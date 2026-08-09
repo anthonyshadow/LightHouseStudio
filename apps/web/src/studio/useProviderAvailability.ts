@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { fetchProviderAvailability } from '../adapters/api-client/apiClient';
 import type { ProviderAvailability } from '../features/media-session';
 import type { CapabilityState } from './StudioHeader';
@@ -46,46 +46,21 @@ const unavailableProviders: ProviderAvailability = {
 export const PROVIDER_AVAILABILITY_RETRY_DELAYS_MS = [250, 750, 1_500] as const;
 
 export const useProviderAvailability = () => {
-  const [availability, setAvailability] = useState<ProviderAvailability>(unavailableProviders);
-  const [state, setState] = useState<CapabilityState>('loading');
-  const [revision, setRevision] = useState(0);
+  const query = useQuery({
+    queryKey: ['provider-availability'],
+    queryFn: ({ signal }) => fetchProviderAvailability(signal),
+    // This authenticated configuration read is local, non-billable, and safe to retry while the
+    // concurrently started API becomes ready. Provider-facing reads retain the global no-retry default.
+    retry: PROVIDER_AVAILABILITY_RETRY_DELAYS_MS.length,
+    retryDelay: (attempt) => PROVIDER_AVAILABILITY_RETRY_DELAYS_MS[attempt] ?? 0,
+  });
+  const state: CapabilityState = query.isFetching ? 'loading' : query.isError ? 'error' : 'ready';
 
-  useEffect(() => {
-    let active = true;
-    let retryTimer: number | null = null;
-    let controller: AbortController | null = null;
-    const check = (attempt: number) => {
-      controller = new AbortController();
-      fetchProviderAvailability(controller.signal)
-        .then((next) => {
-          if (!active) return;
-          setAvailability(next);
-          setState('ready');
-        })
-        .catch((error: unknown) => {
-          if (!active || (error instanceof DOMException && error.name === 'AbortError')) return;
-          const delay = PROVIDER_AVAILABILITY_RETRY_DELAYS_MS[attempt];
-          if (delay !== undefined) {
-            retryTimer = window.setTimeout(() => check(attempt + 1), delay);
-            return;
-          }
-          setAvailability(unavailableProviders);
-          setState('error');
-        });
-    };
-
-    check(0);
-    return () => {
-      active = false;
-      controller?.abort();
-      if (retryTimer !== null) window.clearTimeout(retryTimer);
-    };
-  }, [revision]);
-
-  const retry = useCallback(() => {
-    setState('loading');
-    setRevision((value) => value + 1);
-  }, []);
-
-  return { availability, state, retry } as const;
+  return {
+    availability: query.data ?? unavailableProviders,
+    state,
+    retry: () => {
+      void query.refetch();
+    },
+  } as const;
 };

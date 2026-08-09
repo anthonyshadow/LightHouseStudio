@@ -23,9 +23,9 @@ import {
   type Dispatch,
   type SetStateAction,
 } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   downloadVideoJobResult,
-  fetchVideoJob,
   releaseVideoJob,
   submitVideoJob,
 } from '../../adapters/api-client/videoJobsApi';
@@ -47,6 +47,11 @@ import type {
   VoiceProcessingController,
   VoiceProcessingOutcome,
 } from '../voice-effects/types';
+import {
+  isTerminalVideoJobStatus,
+  pollVideoJobStatus,
+  removeVideoJobStatus,
+} from './videoJobStatusQuery';
 import { validateExistingVideo, type ValidatedExistingVideo } from './videoValidation';
 
 export type ExistingVideoStep = Readonly<{
@@ -222,23 +227,6 @@ type UseExistingVideoWorkflowOptions = {
   readonly videoProcessingCapabilities?: CapabilitiesResponse['videoProcessing'];
 };
 
-const waitForPoll = (signal: AbortSignal, milliseconds = 1_500): Promise<void> =>
-  new Promise((resolve, reject) => {
-    if (signal.aborted) {
-      reject(new DOMException('Video processing status check was canceled.', 'AbortError'));
-      return;
-    }
-    const onAbort = () => {
-      window.clearTimeout(timer);
-      reject(new DOMException('Video processing status check was canceled.', 'AbortError'));
-    };
-    const timer = window.setTimeout(() => {
-      signal.removeEventListener('abort', onAbort);
-      resolve();
-    }, milliseconds);
-    signal.addEventListener('abort', onAbort, { once: true });
-  });
-
 const operationForModel = (modelId: VideoTransformModelId): VideoTransformOperationId =>
   modelId === 'lucy-latest' ? 'character-swap' : 'virtual-try-on';
 
@@ -319,6 +307,7 @@ export const useExistingVideoWorkflow = ({
   onSubmissionAccepted,
   videoProcessingCapabilities = defaultVideoProcessingCapabilities,
 }: UseExistingVideoWorkflowOptions) => {
+  const queryClient = useQueryClient();
   const [workflowState, dispatchWorkflowState] = useReducer(
     existingVideoWorkflowReducer,
     initialExistingVideoWorkflowState,
@@ -423,7 +412,8 @@ export const useExistingVideoWorkflow = ({
     if (!jobId) return;
     retainedJobIdRef.current = null;
     await releaseVideoJob(jobId).catch(() => undefined);
-  }, []);
+    removeVideoJobStatus(queryClient, jobId);
+  }, [queryClient]);
 
   const releaseRetainedJob = useCallback(() => {
     void releaseRetainedJobAndWait();
@@ -929,6 +919,7 @@ export const useExistingVideoWorkflow = ({
       const terminalMessage =
         error instanceof ApiClientError ? terminalJobMessage(error.code) : null;
       if (terminalMessage) {
+        removeVideoJobStatus(queryClient, jobId);
         setRetryJob(null);
         updateSubmissionOperation(null);
         return new Error(terminalMessage);
@@ -936,7 +927,7 @@ export const useExistingVideoWorkflow = ({
       setRetryJob({ jobId, stepIndex });
       return new RetryExistingVideoJobError(acceptedJobInterruptionMessage(error, fallback));
     },
-    [setRetryJob, updateSubmissionOperation],
+    [queryClient, setRetryJob, updateSubmissionOperation],
   );
 
   const pollAndFinalize = useCallback(
@@ -947,40 +938,43 @@ export const useExistingVideoWorkflow = ({
       generation: number,
       initialStatus: VideoJobStatusResponse | null = null,
     ): Promise<FinalizedVisual | null> => {
-      let current = initialStatus?.jobId === jobId ? initialStatus : null;
-      while (!current || !['ready', 'failed', 'expired'].includes(current.status)) {
-        controller.signal.throwIfAborted();
-        if (current) {
-          setStatus(current);
-          setPhase(current.status === 'retrieving' ? 'retrieving' : 'processing');
-          const currentStep = steps[stepIndex];
-          recording.beginProcessing({
-            kind: current.status === 'retrieving' ? 'visual-retrieval' : 'visual-generation',
-            title:
-              current.status === 'retrieving'
-                ? 'Retrieving visual result…'
-                : `Generating ${currentStep ? stepLabel(currentStep.modelId).toLowerCase() : 'visual edit'}…`,
-            detail: 'Visual processing is running for the single accepted job.',
-          });
-          await waitForPoll(controller.signal, current.nextPollAfterMs ?? 1_500);
-        }
-        try {
-          current = await fetchVideoJob(jobId, controller.signal);
-        } catch (error) {
-          if (controller.signal.aborted) throw error;
-          throw jobInterruption(
-            error,
-            jobId,
-            stepIndex,
-            'The status check was interrupted. Retry status without creating another visual-processing submission.',
-          );
-        }
-        if (generation !== generationRef.current) return null;
-        const operation = submissionOperationRef.current;
-        if (operation?.jobId === jobId && operation.state === 'acceptance-unknown') {
-          updateSubmissionOperation({ ...operation, state: 'accepted' });
-        }
+      let current: VideoJobStatusResponse;
+      try {
+        current = await pollVideoJobStatus({
+          queryClient,
+          jobId,
+          initialStatus,
+          signal: controller.signal,
+          onStatus: (nextStatus) => {
+            if (generation !== generationRef.current) return;
+            setStatus(nextStatus);
+            const operation = submissionOperationRef.current;
+            if (operation?.jobId === jobId && operation.state === 'acceptance-unknown') {
+              updateSubmissionOperation({ ...operation, state: 'accepted' });
+            }
+            if (isTerminalVideoJobStatus(nextStatus)) return;
+            setPhase(nextStatus.status === 'retrieving' ? 'retrieving' : 'processing');
+            const currentStep = steps[stepIndex];
+            recording.beginProcessing({
+              kind: nextStatus.status === 'retrieving' ? 'visual-retrieval' : 'visual-generation',
+              title:
+                nextStatus.status === 'retrieving'
+                  ? 'Retrieving visual result…'
+                  : `Generating ${currentStep ? stepLabel(currentStep.modelId).toLowerCase() : 'visual edit'}…`,
+              detail: 'Visual processing is running for the single accepted job.',
+            });
+          },
+        });
+      } catch (error) {
+        if (controller.signal.aborted) throw error;
+        throw jobInterruption(
+          error,
+          jobId,
+          stepIndex,
+          'The status check was interrupted. Retry status without creating another visual-processing submission.',
+        );
       }
+      if (generation !== generationRef.current) return null;
       if (current.status !== 'ready') {
         setRetryJob(null);
         const currentStep = steps[stepIndex];
@@ -992,6 +986,7 @@ export const useExistingVideoWorkflow = ({
           retainedJobIdRef.current = jobId;
         } else {
           await releaseVideoJob(jobId).catch(() => undefined);
+          removeVideoJobStatus(queryClient, jobId);
         }
         throw new Error(
           terminalJobMessage(current.error?.code) ??
@@ -1022,6 +1017,7 @@ export const useExistingVideoWorkflow = ({
       if (!current.result) {
         throw new Error('The accepted visual result metadata was unavailable.');
       }
+      removeVideoJobStatus(queryClient, jobId);
       return finalizeVisual(
         blob,
         blob.type || current.result?.mimeType || 'video/mp4',
@@ -1034,6 +1030,7 @@ export const useExistingVideoWorkflow = ({
     [
       finalizeVisual,
       jobInterruption,
+      queryClient,
       recording,
       setPhase,
       setRetryJob,
@@ -1278,7 +1275,6 @@ export const useExistingVideoWorkflow = ({
         } catch {
           // Local recipe recency is auxiliary; it must never affect an accepted paid job.
         }
-        setStatus(submitted);
         const visualArtifact = await pollAndFinalize(
           jobId,
           stepIndex,
@@ -1335,7 +1331,6 @@ export const useExistingVideoWorkflow = ({
       setMessage,
       setPhase,
       setRetryJob,
-      setStatus,
       steps,
       updateSubmissionOperation,
       videoProcessingCapabilities,

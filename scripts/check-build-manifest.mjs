@@ -4,7 +4,9 @@ import { pathToFileURL } from 'node:url';
 
 export const BUILD_CLOSURE_BUDGETS = {
   'index.html': 345_000,
-  'src/studio/StudioApp.tsx': 992_000,
+  // The authenticated Studio owns the intentionally shared TanStack Query remote-state runtime.
+  // Keep the provider-free entry budget unchanged and bound the added Studio-only dependency here.
+  'src/studio/StudioApp.tsx': 1_032_000,
 };
 
 const forbiddenEntryDependencies = [
