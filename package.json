@@ -22,7 +22,8 @@
     "fast-uri@3.1.4": "3.1.5",
     "fast-uri@4.1.1": "4.1.2",
     "js-yaml": "4.3.1",
-    "nanoid": "3.3.18"
+    "nanoid": "3.3.18",
+    "@opentelemetry/sdk-node": "0.221.0"
   },
   "scripts": {
     "build:packages": "bun run --filter @studio/domain build && bun run --filter @studio/contracts build",
