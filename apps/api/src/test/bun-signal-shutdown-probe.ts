@@ -91,7 +91,7 @@ export const runBunSignalShutdownProbe = async (
   closeUsesOnePromise = closeUsesOnePromise && application.close() === application.close();
 
   const replacement = new ApplicationRuntime({ logger: false });
-  let rebindSucceeded = false;
+  let rebindSucceeded: boolean;
   try {
     await replacement.listen({ host: '127.0.0.1', port: address.port });
     rebindSucceeded = true;

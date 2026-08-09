@@ -86,7 +86,7 @@ export const finalizeTakeForReview = async <T>({
   enterReview,
   handleEmpty,
 }: TakeFinalizationCallbacks<T>): Promise<void> => {
-  let artifact: T | null = null;
+  let artifact: T | null;
   try {
     artifact = await finalize();
   } finally {

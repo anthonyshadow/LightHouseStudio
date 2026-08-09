@@ -104,7 +104,7 @@ for (const file of files) {
 
   for (const imported of imports) {
     const specifier = imported.fileName;
-    let target = null;
+    let target;
     if (specifier.startsWith('.')) {
       target = resolveRelative(file, specifier);
       if (!target) {
