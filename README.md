@@ -149,7 +149,7 @@ retention, and provider-contact contract.
 ## Requirements
 
 - Bun `1.3.14` (`.bun-version` and `packageManager` pin the repository runtime and package manager)
-- Node `>=24 <25` (`.nvmrc` pins the retained Vitest, Vite, Playwright, Storybook, and package-build tooling runtime)
+- Node `>=26 <27` (`.nvmrc` pins the retained Vitest, Vite, Playwright, Storybook, and package-build tooling runtime)
 - A current secure-context browser with `getUserMedia`, `MediaRecorder`, and WebCodecs H.264
   decode/encode support
 - A camera and microphone for physical capture

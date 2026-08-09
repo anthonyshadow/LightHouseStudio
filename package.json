@@ -5,7 +5,7 @@
   "type": "module",
   "packageManager": "bun@1.3.14",
   "engines": {
-    "node": ">=24 <25",
+    "node": ">=26 <27",
     "bun": "1.3.14"
   },
   "workspaces": [
@@ -48,7 +48,7 @@
     "test:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots",
     "test:all": "bun run test && bun run build && bun run test:production && bun run test:e2e && bun run test:visual",
     "audit:all": "bun audit --ignore GHSA-67mh-4wv8-2f99",
-    "audit:prod": "bun audit --audit-level high",
+    "audit:prod": "bun audit --prod --audit-level high",
     "screenshots:prune": "node scripts/prune-visual-baselines.mjs",
     "check:dead-code": "knip --no-progress --reporter compact",
     "check:dead-code:production": "knip --production --no-progress --include files,dependencies,unlisted,unresolved --reporter compact",
