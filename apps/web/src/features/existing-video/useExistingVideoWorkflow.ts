@@ -2,6 +2,7 @@ import {
   type CapabilitiesResponse,
   type InspectedVideo,
   type VideoJobStatusResponse,
+  type VideoCharacterSwapProviderId,
   type VideoOutputResolution,
   type VideoTransformModelId,
   type VideoTransformOperationId,
@@ -56,6 +57,7 @@ export type ExistingVideoStep = Readonly<{
   enhancePrompt: boolean;
   referenceImage: File | null;
   inputKind: 'character' | 'saved-outfit' | 'reference-image' | 'prompt';
+  provider?: VideoCharacterSwapProviderId;
   outputResolution?: VideoOutputResolution;
   characterName?: string | null;
   characterVariantName?: string | null;
@@ -244,6 +246,17 @@ const capabilityForModel = (
   modelId: VideoTransformModelId,
   capabilities: CapabilitiesResponse['videoProcessing'],
 ) => (modelId === 'lucy-latest' ? capabilities.characterSwap : capabilities.virtualTryOn);
+
+export const capabilityForExistingVideoStep = (
+  step: Pick<ExistingVideoStep, 'modelId' | 'provider'>,
+  capabilities: CapabilitiesResponse['videoProcessing'],
+): CapabilitiesResponse['videoProcessing']['virtualTryOn'] => {
+  if (step.modelId !== 'lucy-latest') return capabilities.virtualTryOn;
+  const selected = capabilities.characterSwap.providers?.find(
+    (provider) => provider.providerId === step.provider,
+  );
+  return selected ? { ...selected, available: true } : capabilities.characterSwap;
+};
 
 const stepLabel = (modelId: VideoTransformModelId): string =>
   modelId === 'lucy-latest' ? 'Character Swap' : 'Virtual Try-On';
@@ -667,6 +680,10 @@ export const useExistingVideoWorkflow = ({
               enhancePrompt: false,
               referenceImage: null,
               inputKind: modelId === 'lucy-vton-latest' ? 'prompt' : 'character',
+              ...(modelId === 'lucy-latest' &&
+              videoProcessingCapabilities.characterSwap.defaultProvider
+                ? { provider: videoProcessingCapabilities.characterSwap.defaultProvider }
+                : {}),
               outputResolution:
                 capabilityForModel(modelId, videoProcessingCapabilities).outputResolutions[0] ??
                 '720p',
@@ -726,9 +743,15 @@ export const useExistingVideoWorkflow = ({
       if (submissionLocked) return;
       setStep((current) => {
         if (current?.id !== id) return current;
-        const next = { ...current, ...patch };
-        return capabilityForModel(current.modelId, videoProcessingCapabilities).promptInput ===
-          'server-default'
+        let next = { ...current, ...patch };
+        const capability = capabilityForExistingVideoStep(next, videoProcessingCapabilities);
+        if (!capability.outputResolutions.includes(next.outputResolution ?? '720p')) {
+          next = {
+            ...next,
+            outputResolution: capability.outputResolutions[0] ?? '720p',
+          };
+        }
+        return capability.promptInput === 'server-default'
           ? { ...next, prompt: '', enhancePrompt: false }
           : next;
       });
@@ -740,7 +763,7 @@ export const useExistingVideoWorkflow = ({
     setStep((current) => {
       if (
         !current ||
-        capabilityForModel(current.modelId, videoProcessingCapabilities).promptInput !==
+        capabilityForExistingVideoStep(current, videoProcessingCapabilities).promptInput !==
           'server-default' ||
         (!current.prompt && !current.enhancePrompt)
       ) {
@@ -962,7 +985,7 @@ export const useExistingVideoWorkflow = ({
         setRetryJob(null);
         const currentStep = steps[stepIndex];
         const terminalFailureRelease = currentStep
-          ? capabilityForModel(currentStep.modelId, videoProcessingCapabilities)
+          ? capabilityForExistingVideoStep(currentStep, videoProcessingCapabilities)
               .terminalFailureRelease
           : 'automatic';
         if (terminalFailureRelease === 'explicit-user') {
@@ -1138,7 +1161,7 @@ export const useExistingVideoWorkflow = ({
       const step = steps[stepIndex];
       if (!selection || !source || !step || submissionOperationRef.current !== null) return;
       const operation = operationForModel(step.modelId);
-      const capability = capabilityForModel(step.modelId, videoProcessingCapabilities);
+      const capability = capabilityForExistingVideoStep(step, videoProcessingCapabilities);
       if (!capability.available) {
         setPhase('error');
         setMessage(`${stepLabel(step.modelId)} is unavailable in this server configuration.`);
@@ -1183,6 +1206,7 @@ export const useExistingVideoWorkflow = ({
       });
       const recipe: VideoTransformRecipe = {
         operation,
+        ...(operation === 'character-swap' && step.provider ? { provider: step.provider } : {}),
         inputKind: step.inputKind,
         prompt: capability.promptInput === 'server-default' ? '' : step.prompt.trim(),
         enhancePrompt: capability.promptInput === 'server-default' ? false : step.enhancePrompt,

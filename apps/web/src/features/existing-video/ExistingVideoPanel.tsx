@@ -35,6 +35,7 @@ import {
 import { ExistingVideoVisualEditor, type RecentOutfit } from './ExistingVideoVisualEditor';
 import { ExistingVideoVoiceEditor } from './ExistingVideoVoiceEditor';
 import {
+  capabilityForExistingVideoStep,
   savedCharacterStepInput,
   type ExistingVideoStep,
   type ExistingVideoWorkflow,
@@ -220,7 +221,8 @@ export const ExistingVideoPanel = ({
         characterName: recipe.characterName ?? null,
         characterVariantName: recipe.characterVariantName ?? null,
         ...(step.modelId === 'lucy-latest'
-          ? visualCapabilities.characterSwap.promptInput === 'server-default'
+          ? capabilityForExistingVideoStep(step, visualCapabilities).promptInput ===
+            'server-default'
             ? { prompt: '', referenceImage: referenceImage?.file ?? null }
             : savedCharacterStepInput(recipe.prompt, referenceImage?.file ?? null)
           : {
@@ -361,6 +363,9 @@ export const ExistingVideoPanel = ({
   const metadata = workflow.currentMetadata ?? selected.metadata;
   const currentPhase = existingVideoEditorPhase(workflow);
   const activeStep = workflow.steps[0];
+  const activeVisualCapability = activeStep
+    ? capabilityForExistingVideoStep(activeStep, visualCapabilities)
+    : null;
 
   return (
     <div css={panelStackStyles(theme)} data-scroll-region="existing-video-flow">
@@ -512,7 +517,7 @@ export const ExistingVideoPanel = ({
                         step={activeStep}
                         savedRecipes={savedRecipes.filter(
                           (recipe) =>
-                            visualCapabilities.characterSwap.promptInput !== 'server-default' ||
+                            activeVisualCapability?.promptInput !== 'server-default' ||
                             recipe.modelId !== 'lucy-latest' ||
                             recipe.referenceImageAssetId !== null,
                         )}
@@ -520,14 +525,13 @@ export const ExistingVideoPanel = ({
                         structureLocked={structureLocked}
                         recipeLocked={recipeLocked}
                         recipeLoading={recipeLoading}
-                        referenceRequired={
-                          visualCapabilities.characterSwap.referencePolicy === 'required'
-                        }
+                        referenceRequired={activeVisualCapability?.referencePolicy === 'required'}
                         promptEnhancementSupported={
-                          visualCapabilities.characterSwap.promptEnhancement
+                          activeVisualCapability?.promptEnhancement ?? false
                         }
-                        promptInput={visualCapabilities.characterSwap.promptInput}
-                        outputResolutions={visualCapabilities.characterSwap.outputResolutions}
+                        promptInput={activeVisualCapability?.promptInput ?? 'editable'}
+                        outputResolutions={activeVisualCapability?.outputResolutions ?? ['720p']}
+                        providerOptions={visualCapabilities.characterSwap.providers ?? []}
                         onApplySavedRecipe={(step, recipeId) =>
                           void applySavedRecipe(step, recipeId)
                         }
@@ -598,10 +602,7 @@ export const ExistingVideoPanel = ({
         videoProcessingAvailable={videoProcessingAvailable}
         {...(activeStep
           ? {
-              activeVisualCapability:
-                activeStep.modelId === 'lucy-latest'
-                  ? visualCapabilities.characterSwap
-                  : visualCapabilities.virtualTryOn,
+              activeVisualCapability: activeVisualCapability!,
             }
           : {})}
         onFinish={onFinish}

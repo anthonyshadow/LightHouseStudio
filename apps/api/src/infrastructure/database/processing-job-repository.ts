@@ -11,6 +11,9 @@ import type {
 import type { LightframeDatabase } from './client.js';
 import { processingJobs } from './schema.js';
 
+const persistedDurationMs = (durationMs: number | null): number | null =>
+  durationMs === null ? null : Math.round(durationMs);
+
 const valuesForTrace = (trace: VideoProcessingJobTrace) => ({
   id: trace.jobId,
   ownerUserId: trace.ownerUserId,
@@ -20,7 +23,7 @@ const valuesForTrace = (trace: VideoProcessingJobTrace) => ({
   requestFingerprint: trace.requestFingerprint,
   outputResolution: trace.outputResolution,
   providerOutputLocation: trace.providerOutputLocation,
-  sourceDurationMs: trace.sourceDurationMs,
+  sourceDurationMs: persistedDurationMs(trace.sourceDurationMs),
   sourceOrientation: trace.sourceOrientation,
   status: trace.status,
   safeErrorCode: trace.safeErrorCode,
@@ -84,7 +87,7 @@ export class DrizzleProcessingJobTraceWriter
           requestFingerprint: trace.requestFingerprint,
           outputResolution: trace.outputResolution,
           providerOutputLocation: trace.providerOutputLocation,
-          sourceDurationMs: trace.sourceDurationMs,
+          sourceDurationMs: persistedDurationMs(trace.sourceDurationMs),
           sourceOrientation: trace.sourceOrientation,
           status: trace.status,
           safeErrorCode: trace.safeErrorCode,

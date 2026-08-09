@@ -38,6 +38,8 @@ describe('API shell', () => {
           promptEnhancement: false,
           terminalFailureRelease: 'automatic',
           outputResolutions: ['720p'],
+          defaultProvider: null,
+          providers: [],
         },
         virtualTryOn: {
           available: false,
@@ -151,7 +153,7 @@ describe('API shell', () => {
     expect(capabilities.body).not.toContain('server-only-secret');
   });
 
-  it('reports operation-specific Pruna requirements without exposing provider selection', async () => {
+  it('reports Pruna as a selectable Character Swap provider without exposing provider internals', async () => {
     const provider = {} as NonNullable<Parameters<typeof createApp>[0]['prunaVideoProvider']>;
     const app = createApp({
       config: testConfig({
@@ -177,12 +179,18 @@ describe('API shell', () => {
           promptEnhancement: false,
           terminalFailureRelease: 'explicit-user',
           outputResolutions: ['720p', '1080p'],
+          defaultProvider: 'pruna',
+          providers: [
+            {
+              providerId: 'pruna',
+              inputPreparation: 'h264-mp4',
+              referencePolicy: 'required',
+            },
+          ],
         },
         virtualTryOn: { available: false },
       },
     });
-    expect(capabilities.body.toLowerCase()).not.toContain('pruna');
-    expect(capabilities.body.toLowerCase()).not.toContain('decart');
     expect(capabilities.body).not.toContain('p-video-replace');
     expect(capabilities.body).not.toContain('pruna-server-secret');
   });

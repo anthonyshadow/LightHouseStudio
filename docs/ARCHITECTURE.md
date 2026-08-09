@@ -380,8 +380,11 @@ resubmission controls. Recovery performs `GET` for that exact UUID and never rep
 confirmed not-found response unlocks a new explicit submission with a new UUID. A valid submission
 response is passed directly into polling, avoiding a redundant immediate status read.
 
-Startup configuration selects the existing-video Character Swap provider through one centralized
-factory. The default Decart binding keeps its exact Lucy endpoint, multipart fields, fixed 720p
+Startup configuration creates every enabled existing-video Character Swap binding through one
+centralized factory and selects the editor's default. The capabilities contract advertises only
+configured Decart/Pruna choices and their app-owned behavior; the submitted recipe identifies the
+creator's explicit choice, which the broker validates before provider work. The Decart binding keeps
+its exact Lucy endpoint, multipart fields, fixed 720p
 output, and retry behavior. The Pruna binding is Character Swap only: it requires one reference,
 requires H.264 MP4 submission input, disables prompt enhancement, pins `p-video-replace`, and
 advertises the documented approximate 1 MP (`720p`) and 2 MP (`1080p`) output classes through the
@@ -403,8 +406,8 @@ content-free informational metadata for non-canonical dimensions and continues w
 result; Decart keeps exact canonical 720p validation. When a server-approved result is selected as
 the next frame source, a non-canonical result is fitted locally inside the smallest canonical
 16:9/9:16 canvas at explicit Start. That ephemeral H.264 MP4 copy is revalidated before upload;
-the retained result is never cropped, stretched, or replaced. Virtual Try-On always resolves
-independently to Decart. The shared
+the retained result is never cropped, stretched, or replaced. There is no automatic provider
+fallback. Virtual Try-On always resolves independently to Decart. The shared
 server provider contract normalizes submit, queued/processing/completed/failed status, opaque
 output location, bounded download, retryable failure classification, output resolution, and
 safe failure data. Environment reads do not enter UI or orchestration.

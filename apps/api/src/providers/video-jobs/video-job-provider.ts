@@ -1,5 +1,6 @@
 import type {
   VideoInputMimeType,
+  VideoCharacterSwapProviderId,
   VideoOutputResolution,
   VideoTransformOperationId,
   VideoTransformRecipe,
@@ -92,6 +93,10 @@ export interface ExistingVideoOperationBinding {
   readonly terminalFailureRelease?: 'automatic' | 'explicit-user';
 }
 
-export type ExistingVideoProviderRegistry = Readonly<
-  Record<VideoTransformOperationId, ExistingVideoOperationBinding | null>
->;
+export interface ExistingVideoProviderRegistry {
+  readonly characterSwap: Readonly<
+    Partial<Record<VideoCharacterSwapProviderId, ExistingVideoOperationBinding>>
+  >;
+  readonly defaultCharacterSwapProvider: VideoCharacterSwapProviderId;
+  readonly virtualTryOn: ExistingVideoOperationBinding | null;
+}

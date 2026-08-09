@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { REFERENCE_IMAGE_SIZES } from './reference-images';
-import { videoOutputResolutionSchema } from './video-jobs';
+import { videoCharacterSwapProviderIdSchema, videoOutputResolutionSchema } from './video-jobs';
 
 export const videoInputPreparationSchema = z.enum(['none', 'h264-mp4']);
 export const videoReferencePolicySchema = z.enum(['optional', 'required']);
@@ -18,6 +18,18 @@ export const videoProcessingOperationCapabilitySchema = z
   })
   .strict();
 
+export const characterSwapProviderCapabilitySchema = videoProcessingOperationCapabilitySchema
+  .omit({ available: true })
+  .extend({ providerId: videoCharacterSwapProviderIdSchema })
+  .strict();
+
+export const characterSwapCapabilitySchema = videoProcessingOperationCapabilitySchema
+  .extend({
+    defaultProvider: videoCharacterSwapProviderIdSchema.nullable().optional(),
+    providers: z.array(characterSwapProviderCapabilitySchema).max(2).optional(),
+  })
+  .strict();
+
 export const capabilitiesResponseSchema = z
   .object({
     realtimeVideo: z
@@ -27,7 +39,7 @@ export const capabilitiesResponseSchema = z
       .strict(),
     videoProcessing: z
       .object({
-        characterSwap: videoProcessingOperationCapabilitySchema,
+        characterSwap: characterSwapCapabilitySchema,
         virtualTryOn: videoProcessingOperationCapabilitySchema,
       })
       .strict(),

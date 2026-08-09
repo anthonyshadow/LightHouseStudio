@@ -129,6 +129,7 @@ const startJob = async (
   jobId: string,
   ownerId: string,
   outputResolution?: '720p' | '1080p',
+  selectedProvider?: 'decart' | 'pruna',
 ) => {
   const paths = await service.prepareJobDirectory(jobId);
   await writeFile(paths.inputPath, Buffer.from(VIDEO_FIXTURE_BASE64, 'base64'), {
@@ -143,6 +144,7 @@ const startJob = async (
       prompt: 'Change the lighting',
       enhancePrompt: false,
       hasReferenceImage: false,
+      ...(selectedProvider ? { provider: selectedProvider } : {}),
       ...(outputResolution ? { outputResolution } : {}),
     },
     directory: paths.directory,
@@ -182,7 +184,9 @@ const waitFor = async (
 const providerRegistry = (
   providers: ExistingVideoProviderRegistry | ExistingVideoJobProvider | null,
 ): ExistingVideoProviderRegistry => {
-  if (providers === null) return { 'character-swap': null, 'virtual-try-on': null };
+  if (providers === null) {
+    return { characterSwap: {}, defaultCharacterSwapProvider: 'decart', virtualTryOn: null };
+  }
   if (!('submit' in providers)) return providers;
   const binding = {
     provider: providers,
@@ -194,7 +198,11 @@ const providerRegistry = (
     promptInput: 'editable' as const,
     promptEnhancement: true,
   };
-  return { 'character-swap': binding, 'virtual-try-on': binding };
+  return {
+    characterSwap: { decart: binding },
+    defaultCharacterSwapProvider: 'decart',
+    virtualTryOn: binding,
+  };
 };
 
 const createService = (
@@ -246,7 +254,6 @@ describe('VideoJobService', () => {
       now: () => now,
       durableJobRepository: durableRepository,
       traceWriter: durableRepository,
-      providerIds: { 'character-swap': 'decart', 'virtual-try-on': 'decart' },
     });
     services.push(service);
 
@@ -527,17 +534,20 @@ describe('VideoJobService', () => {
     const provider = new FakeVideoProvider();
     const service = createService(
       {
-        'character-swap': {
-          provider,
-          outputResolutions: ['720p', '1080p'],
-          defaultOutputResolution: '720p',
-          outputSizing: 'megapixel-budget',
-          inputPreparation: 'none',
-          referencePolicy: 'optional',
-          promptInput: 'editable',
-          promptEnhancement: false,
+        characterSwap: {
+          decart: {
+            provider,
+            outputResolutions: ['720p', '1080p'],
+            defaultOutputResolution: '720p',
+            outputSizing: 'megapixel-budget',
+            inputPreparation: 'none',
+            referencePolicy: 'optional',
+            promptInput: 'editable',
+            promptEnhancement: false,
+          },
         },
-        'virtual-try-on': null,
+        defaultCharacterSwapProvider: 'decart',
+        virtualTryOn: null,
       },
       root,
     );
@@ -548,6 +558,36 @@ describe('VideoJobService', () => {
     await waitFor(service, jobId, 'owner-resolution', 'queued');
 
     expect(provider.submissions[0]?.outputResolution).toBe('1080p');
+  });
+
+  it('routes Character Swap to the request-selected configured provider', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-provider-choice-'));
+    const decart = new FakeVideoProvider();
+    const pruna = new FakeVideoProvider();
+    const binding = (provider: ExistingVideoJobProvider) => ({
+      provider,
+      outputResolutions: ['720p'] as const,
+      defaultOutputResolution: '720p' as const,
+      outputSizing: 'exact-canonical' as const,
+      inputPreparation: 'none' as const,
+      referencePolicy: 'optional' as const,
+      promptInput: 'editable' as const,
+      promptEnhancement: true,
+    });
+    const service = createService(
+      {
+        characterSwap: { decart: binding(decart), pruna: binding(pruna) },
+        defaultCharacterSwapProvider: 'decart',
+        virtualTryOn: null,
+      },
+      root,
+    );
+    services.push(service);
+
+    await startJob(service, crypto.randomUUID(), 'owner-provider-choice', '720p', 'pruna');
+    await vi.waitFor(() => expect(pruna.submissions).toHaveLength(1));
+
+    expect(decart.submissions).toHaveLength(0);
   });
 
   it('rejects an output resolution not supported by the active operation', async () => {
@@ -591,17 +631,20 @@ describe('VideoJobService', () => {
     const provider = new FakeVideoProvider();
     const service = createService(
       {
-        'character-swap': {
-          provider,
-          outputResolutions: ['720p', '1080p'],
-          defaultOutputResolution: '1080p',
-          outputSizing: 'exact-canonical',
-          inputPreparation: 'h264-mp4',
-          referencePolicy: 'required',
-          promptInput: 'editable',
-          promptEnhancement: false,
+        characterSwap: {
+          decart: {
+            provider,
+            outputResolutions: ['720p', '1080p'],
+            defaultOutputResolution: '1080p',
+            outputSizing: 'exact-canonical',
+            inputPreparation: 'h264-mp4',
+            referencePolicy: 'required',
+            promptInput: 'editable',
+            promptEnhancement: false,
+          },
         },
-        'virtual-try-on': null,
+        defaultCharacterSwapProvider: 'decart',
+        virtualTryOn: null,
       },
       root,
     );
@@ -640,17 +683,20 @@ describe('VideoJobService', () => {
     const provider = new FakeVideoProvider();
     const service = createService(
       {
-        'character-swap': {
-          provider,
-          outputResolutions: ['720p'],
-          defaultOutputResolution: '720p',
-          outputSizing: 'megapixel-budget',
-          inputPreparation: 'none',
-          referencePolicy: 'optional',
-          promptInput: 'server-default',
-          promptEnhancement: false,
+        characterSwap: {
+          decart: {
+            provider,
+            outputResolutions: ['720p'],
+            defaultOutputResolution: '720p',
+            outputSizing: 'megapixel-budget',
+            inputPreparation: 'none',
+            referencePolicy: 'optional',
+            promptInput: 'server-default',
+            promptEnhancement: false,
+          },
         },
-        'virtual-try-on': null,
+        defaultCharacterSwapProvider: 'decart',
+        virtualTryOn: null,
       },
       root,
     );
@@ -767,17 +813,20 @@ describe('VideoJobService', () => {
     const provider = new FakeVideoProvider();
     const service = createService(
       {
-        'character-swap': {
-          provider,
-          outputResolutions: ['720p', '1080p'],
-          defaultOutputResolution: '1080p',
-          outputSizing: 'exact-canonical',
-          inputPreparation: 'h264-mp4',
-          referencePolicy: 'optional',
-          promptInput: 'editable',
-          promptEnhancement: false,
+        characterSwap: {
+          decart: {
+            provider,
+            outputResolutions: ['720p', '1080p'],
+            defaultOutputResolution: '1080p',
+            outputSizing: 'exact-canonical',
+            inputPreparation: 'h264-mp4',
+            referencePolicy: 'optional',
+            promptInput: 'editable',
+            promptEnhancement: false,
+          },
         },
-        'virtual-try-on': null,
+        defaultCharacterSwapProvider: 'decart',
+        virtualTryOn: null,
       },
       root,
     );
@@ -806,18 +855,21 @@ describe('VideoJobService', () => {
     const provider = new FakeVideoProvider();
     const service = createService(
       {
-        'character-swap': {
-          provider,
-          outputResolutions: ['720p', '1080p'],
-          defaultOutputResolution: '1080p',
-          outputSizing: 'megapixel-budget',
-          inputPreparation: 'h264-mp4',
-          referencePolicy: 'optional',
-          promptInput: 'editable',
-          promptEnhancement: false,
-          terminalFailureRelease: 'explicit-user',
+        characterSwap: {
+          decart: {
+            provider,
+            outputResolutions: ['720p', '1080p'],
+            defaultOutputResolution: '1080p',
+            outputSizing: 'megapixel-budget',
+            inputPreparation: 'h264-mp4',
+            referencePolicy: 'optional',
+            promptInput: 'editable',
+            promptEnhancement: false,
+            terminalFailureRelease: 'explicit-user',
+          },
         },
-        'virtual-try-on': null,
+        defaultCharacterSwapProvider: 'decart',
+        virtualTryOn: null,
       },
       root,
     );

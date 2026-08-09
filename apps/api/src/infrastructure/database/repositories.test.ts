@@ -560,7 +560,7 @@ describe('DrizzleProcessingJobTraceWriter', () => {
       requestFingerprint: 'b'.repeat(64),
       outputResolution: '720p',
       providerOutputLocation: null,
-      sourceDurationMs: 1_000,
+      sourceDurationMs: 1_000.4,
       sourceOrientation: 'landscape',
       status: 'queued',
       safeErrorCode: null,
@@ -594,6 +594,12 @@ describe('DrizzleProcessingJobTraceWriter', () => {
     const repository = new DrizzleProcessingJobTraceWriter(scripted.db);
 
     await repository.upsert(trace);
+    expect(scripted.calls.find((call) => call.operation === 'values')?.arguments[0]).toMatchObject({
+      sourceDurationMs: 1_000,
+    });
+    expect(
+      scripted.calls.find((call) => call.operation === 'onConflictDoUpdate')?.arguments[0],
+    ).toMatchObject({ set: { sourceDurationMs: 1_000 } });
     await expect(repository.listResumable(now)).resolves.toEqual([
       expect.objectContaining({
         jobId: assetId,

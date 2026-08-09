@@ -225,6 +225,15 @@ describe('parseEnvironment', () => {
     ).toThrow(variable);
   });
 
+  it('requires the complete Pruna binding whenever its Character Swap option is enabled', () => {
+    expect(() =>
+      parseEnvironment({
+        EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER: 'decart',
+        PRUNA_VIDEO_REPLACE_ENABLED: 'true',
+      }),
+    ).toThrow('PRUNA_API_KEY');
+  });
+
   it('enables the pinned wardrobe model independently of existing-video provider choice', () => {
     expect(
       parseEnvironment({

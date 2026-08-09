@@ -101,10 +101,11 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
   contacts Decart or an image provider.
 - `lucy-latest` and pinned `lucy-vton-latest` start only after explicit user action. Decart receives
   live media and the applied prompt/reference snapshot.
-- Existing-video Character Swap uses one startup-selected server provider: Decart
-  `lucy-latest` by default or Pruna `p-video-replace`. Virtual Try-On remains on Decart
-  `lucy-vton-latest`, independently of that Character Swap choice. Decart output remains fixed
-  720p; when Pruna is active, the editor lets the creator choose its documented approximate 1 MP
+- Existing-video Character Swap exposes every configured server binding in a Decart API / Pruna API
+  toggle, with `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER` controlling the initial choice. Virtual
+  Try-On remains on Decart `lucy-vton-latest`, independently of that Character Swap choice. Decart
+  output remains fixed 720p; when Pruna is selected, the editor lets the creator choose its
+  documented approximate 1 MP
   (`720p`) or 2 MP (`1080p`) resolution class for each submission while retaining source
   orientation. A non-canonical Pruna result size produces a content-free informational server
   record and continues with the inspected dimensions; Decart remains exact-canonical. Selecting
@@ -203,9 +204,9 @@ validated app-owned configuration path.
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_KEY_PREFIX` | Private R2 S3 endpoint credentials, bucket, and opaque object prefix; never browser-exposed                                                               |
 | `VIDEO_JOB_MAX_ACTIVE`, `VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER`                               | Server admission limits for accepted batch work; defaults to `8` globally and `4` per provider                                                            |
 | `DECART_API_KEY`                                                                          | Realtime scoped credentials, Decart Character Swap, and Decart-only Virtual Try-On                                                                        |
-| `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`                                                  | Startup Character Swap choice: `decart` (default) or `pruna`; never exposed in the UI                                                                     |
-| `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY`                                            | Required enablement and shared server credential when Pruna Character Swap is selected                                                                    |
-| `PRUNA_VIDEO_REPLACE_MODEL`                                                               | Exact pinned `p-video-replace` literal; required when Pruna is selected                                                                                   |
+| `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`                                                  | Default Character Swap choice shown in the editor: `decart` (default) or `pruna`                                                                          |
+| `PRUNA_VIDEO_REPLACE_ENABLED`, `PRUNA_API_KEY`                                            | Enables the Pruna Character Swap option and supplies its shared server credential                                                                         |
+| `PRUNA_VIDEO_REPLACE_MODEL`                                                               | Exact pinned `p-video-replace` literal; required when Pruna Character Swap is enabled                                                                     |
 | `PRUNA_IMAGE_TRY_ON_ENABLED`                                                              | Enables Wardrobe Add Outfit; defaults to `false` and does not hide saved versions                                                                         |
 | `PRUNA_IMAGE_TRY_ON_MODEL`                                                                | Exact pinned `p-image-try-on` literal; required with try-on enablement                                                                                    |
 | `OPENAI_API_KEY`                                                                          | Character prompt optimization and OpenAI image work                                                                                                       |

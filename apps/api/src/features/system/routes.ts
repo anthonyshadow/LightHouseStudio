@@ -2,6 +2,7 @@ import {
   capabilitiesResponseSchema,
   healthResponseSchema,
   REFERENCE_IMAGE_SIZES,
+  type VideoCharacterSwapProviderId,
 } from '@studio/contracts';
 import type { ApplicationRuntime } from '../../application/application-runtime.js';
 import type { ExistingVideoOperationBinding } from '../../providers/video-jobs/video-job-provider.js';
@@ -9,7 +10,10 @@ import type { ExistingVideoOperationBinding } from '../../providers/video-jobs/v
 export interface CapabilityAvailability {
   readonly decartAvailable: boolean;
   readonly videoProcessing: {
-    readonly characterSwap: ExistingVideoOperationBinding | null;
+    readonly characterSwap: Readonly<
+      Partial<Record<VideoCharacterSwapProviderId, ExistingVideoOperationBinding>>
+    >;
+    readonly defaultCharacterSwapProvider: VideoCharacterSwapProviderId;
     readonly virtualTryOn: ExistingVideoOperationBinding | null;
   };
   readonly elevenLabsAvailable: boolean;
@@ -29,6 +33,25 @@ export const registerSystemRoutes = (
   app: ApplicationRuntime,
   availability: CapabilityAvailability,
 ): void => {
+  const characterSwapProviders = Object.entries(availability.videoProcessing.characterSwap).map(
+    ([providerId, binding]) => ({
+      providerId: providerId as VideoCharacterSwapProviderId,
+      inputPreparation: binding.inputPreparation,
+      referencePolicy: binding.referencePolicy,
+      promptInput: binding.promptInput,
+      promptEnhancement: binding.promptEnhancement,
+      terminalFailureRelease: binding.terminalFailureRelease ?? 'automatic',
+      outputResolutions: [...binding.outputResolutions],
+    }),
+  );
+  const defaultCharacterSwapProvider =
+    characterSwapProviders.find(
+      ({ providerId }) => providerId === availability.videoProcessing.defaultCharacterSwapProvider,
+    )?.providerId ?? characterSwapProviders[0]?.providerId;
+  const defaultCharacterSwap = defaultCharacterSwapProvider
+    ? availability.videoProcessing.characterSwap[defaultCharacterSwapProvider]
+    : undefined;
+
   app.get('/api/health', () => healthResponseSchema.parse({ ok: true }));
 
   app.get('/api/capabilities', () =>
@@ -38,17 +61,15 @@ export const registerSystemRoutes = (
       },
       videoProcessing: {
         characterSwap: {
-          available: availability.videoProcessing.characterSwap !== null,
-          inputPreparation: availability.videoProcessing.characterSwap?.inputPreparation ?? 'none',
-          referencePolicy:
-            availability.videoProcessing.characterSwap?.referencePolicy ?? 'optional',
-          promptInput: availability.videoProcessing.characterSwap?.promptInput ?? 'editable',
-          promptEnhancement: availability.videoProcessing.characterSwap?.promptEnhancement ?? false,
-          terminalFailureRelease:
-            availability.videoProcessing.characterSwap?.terminalFailureRelease ?? 'automatic',
-          outputResolutions: availability.videoProcessing.characterSwap?.outputResolutions ?? [
-            '720p',
-          ],
+          available: characterSwapProviders.length > 0,
+          inputPreparation: defaultCharacterSwap?.inputPreparation ?? 'none',
+          referencePolicy: defaultCharacterSwap?.referencePolicy ?? 'optional',
+          promptInput: defaultCharacterSwap?.promptInput ?? 'editable',
+          promptEnhancement: defaultCharacterSwap?.promptEnhancement ?? false,
+          terminalFailureRelease: defaultCharacterSwap?.terminalFailureRelease ?? 'automatic',
+          outputResolutions: defaultCharacterSwap?.outputResolutions ?? ['720p'],
+          defaultProvider: defaultCharacterSwapProvider ?? null,
+          providers: characterSwapProviders,
         },
         virtualTryOn: {
           available: availability.videoProcessing.virtualTryOn !== null,

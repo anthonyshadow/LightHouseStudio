@@ -69,6 +69,18 @@ describe('health and capabilities contracts', () => {
             promptEnhancement: false,
             terminalFailureRelease: 'explicit-user',
             outputResolutions: ['720p', '1080p'],
+            defaultProvider: 'pruna',
+            providers: [
+              {
+                providerId: 'pruna',
+                inputPreparation: 'h264-mp4',
+                referencePolicy: 'required',
+                promptInput: 'server-default',
+                promptEnhancement: false,
+                terminalFailureRelease: 'explicit-user',
+                outputResolutions: ['720p', '1080p'],
+              },
+            ],
           },
           virtualTryOn: {
             available: true,
@@ -106,6 +118,18 @@ describe('health and capabilities contracts', () => {
           promptEnhancement: false,
           terminalFailureRelease: 'explicit-user',
           outputResolutions: ['720p', '1080p'],
+          defaultProvider: 'pruna',
+          providers: [
+            {
+              providerId: 'pruna',
+              inputPreparation: 'h264-mp4',
+              referencePolicy: 'required',
+              promptInput: 'server-default',
+              promptEnhancement: false,
+              terminalFailureRelease: 'explicit-user',
+              outputResolutions: ['720p', '1080p'],
+            },
+          ],
         },
         virtualTryOn: {
           available: true,
@@ -197,6 +221,30 @@ describe('existing-video input contracts', () => {
     ).toBe(true);
     expect(
       videoTransformRecipeSchema.safeParse({ ...recipe, outputResolution: '4k' }).success,
+    ).toBe(false);
+  });
+
+  it('accepts an explicit Character Swap provider and rejects provider choice for VTO', () => {
+    const base = {
+      prompt: 'Use this direction',
+      enhancePrompt: false,
+      hasReferenceImage: false,
+    };
+    expect(
+      videoTransformRecipeSchema.safeParse({
+        ...base,
+        operation: 'character-swap',
+        inputKind: 'character',
+        provider: 'pruna',
+      }).success,
+    ).toBe(true);
+    expect(
+      videoTransformRecipeSchema.safeParse({
+        ...base,
+        operation: 'virtual-try-on',
+        inputKind: 'prompt',
+        provider: 'pruna',
+      }).success,
     ).toBe(false);
   });
 

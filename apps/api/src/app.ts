@@ -261,10 +261,6 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
       ...(dependencies.persistence?.processingJobs === undefined
         ? {}
         : { durableJobRepository: dependencies.persistence.processingJobs }),
-      providerIds: {
-        'character-swap': dependencies.config.existingVideoCharacterSwapProvider,
-        'virtual-try-on': 'decart',
-      },
       maximumActiveJobs: dependencies.config.videoJobMaxActive,
       maximumActiveJobsPerProvider: dependencies.config.videoJobMaxActivePerProvider,
     },
@@ -283,8 +279,9 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   registerSystemRoutes(app, {
     decartAvailable: decartProvider !== null,
     videoProcessing: {
-      characterSwap: videoJobProviders['character-swap'],
-      virtualTryOn: videoJobProviders['virtual-try-on'],
+      characterSwap: videoJobProviders.characterSwap,
+      defaultCharacterSwapProvider: videoJobProviders.defaultCharacterSwapProvider,
+      virtualTryOn: videoJobProviders.virtualTryOn,
     },
     elevenLabsAvailable: elevenLabsProvider !== null,
     elevenLabsModelId: dependencies.config.elevenLabsModelId,

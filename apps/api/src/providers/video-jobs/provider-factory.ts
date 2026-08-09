@@ -41,22 +41,22 @@ export const createExistingVideoProviderRegistry = (
         ? null
         : new DecartHttpVideoJobProvider(config.decartApiKey, options.fetchImplementation);
 
-  let characterSwap: ExistingVideoOperationBinding | null = null;
-  if (config.existingVideoCharacterSwapProvider === 'decart') {
-    characterSwap = decart === null ? null : decartBinding(decart);
-  } else {
-    const pruna =
-      options.prunaProvider !== undefined
-        ? options.prunaProvider
-        : (
-            options.createPrunaProvider ??
-            ((apiKey, fetchImplementation) =>
-              new PrunaVideoReplaceProvider(apiKey, fetchImplementation))
-          )(config.prunaApiKey!, options.fetchImplementation);
-    characterSwap =
-      pruna === null
-        ? null
-        : {
+  const pruna = config.prunaVideoReplaceEnabled
+    ? options.prunaProvider !== undefined
+      ? options.prunaProvider
+      : (
+          options.createPrunaProvider ??
+          ((apiKey, fetchImplementation) =>
+            new PrunaVideoReplaceProvider(apiKey, fetchImplementation))
+        )(config.prunaApiKey!, options.fetchImplementation)
+    : null;
+
+  const characterSwap: ExistingVideoProviderRegistry['characterSwap'] = {
+    ...(decart === null ? {} : { decart: decartBinding(decart) }),
+    ...(pruna === null
+      ? {}
+      : {
+          pruna: {
             provider: pruna,
             outputResolutions: ['720p', '1080p'],
             defaultOutputResolution: '720p',
@@ -66,11 +66,13 @@ export const createExistingVideoProviderRegistry = (
             promptInput: 'server-default',
             promptEnhancement: false,
             terminalFailureRelease: 'explicit-user',
-          };
-  }
+          },
+        }),
+  };
 
   return {
-    'character-swap': characterSwap,
-    'virtual-try-on': decart === null ? null : decartBinding(decart),
+    characterSwap,
+    defaultCharacterSwapProvider: config.existingVideoCharacterSwapProvider,
+    virtualTryOn: decart === null ? null : decartBinding(decart),
   };
 };

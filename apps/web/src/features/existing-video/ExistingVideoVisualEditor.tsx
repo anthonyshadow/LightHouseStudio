@@ -1,5 +1,10 @@
 import { useTheme } from '@emotion/react';
-import type { VideoOutputResolution, VideoPromptInput } from '@studio/contracts';
+import type {
+  VideoCharacterSwapProviderId,
+  VideoOutputResolution,
+  VideoProcessingOperationCapability,
+  VideoPromptInput,
+} from '@studio/contracts';
 import { Button, SelectField, Surface } from '../../ui';
 import {
   advancedStyles,
@@ -28,6 +33,9 @@ export interface ExistingVideoVisualEditorProps {
   readonly promptInput?: VideoPromptInput;
   readonly promptEnhancementSupported?: boolean;
   readonly outputResolutions?: readonly VideoOutputResolution[];
+  readonly providerOptions?: readonly (Omit<VideoProcessingOperationCapability, 'available'> & {
+    providerId: VideoCharacterSwapProviderId;
+  })[];
   readonly onApplySavedRecipe: (step: ExistingVideoStep, recipeId: string) => void;
   readonly onChooseReference: (step: ExistingVideoStep, file: File) => void;
   readonly onCreateCharacter?: (stepId: string) => void;
@@ -64,6 +72,7 @@ export const ExistingVideoVisualEditor = ({
   promptInput = 'editable',
   promptEnhancementSupported = true,
   outputResolutions = ['720p'],
+  providerOptions = [],
   onApplySavedRecipe,
   onChooseReference,
   onCreateCharacter,
@@ -152,6 +161,21 @@ export const ExistingVideoVisualEditor = ({
       ) : (
         <>
           <p>Confirm you have rights and consent for submitted media before continuing.</p>
+          {providerOptions.length > 1 ? (
+            <div css={inputModeStyles(theme)} role="group" aria-label="Character Swap API">
+              {providerOptions.map(({ providerId }) => (
+                <Button
+                  key={providerId}
+                  variant={step.provider === providerId ? 'primary' : 'secondary'}
+                  aria-pressed={step.provider === providerId}
+                  disabled={recipeLocked}
+                  onClick={() => onUpdate(step.id, { provider: providerId })}
+                >
+                  {providerId === 'decart' ? 'Decart API' : 'Pruna API'}
+                </Button>
+              ))}
+            </div>
+          ) : null}
           {referenceRequired ? (
             <Surface tone="soft" padding="compact">
               <p>

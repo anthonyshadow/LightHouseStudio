@@ -46,6 +46,18 @@ const requiredCharacterSwapCapabilities = {
     promptEnhancement: false,
     terminalFailureRelease: 'explicit-user',
     outputResolutions: ['720p', '1080p'],
+    defaultProvider: 'pruna',
+    providers: [
+      {
+        providerId: 'pruna',
+        inputPreparation: 'h264-mp4',
+        referencePolicy: 'required',
+        promptInput: 'server-default',
+        promptEnhancement: false,
+        terminalFailureRelease: 'explicit-user',
+        outputResolutions: ['720p', '1080p'],
+      },
+    ],
   },
   virtualTryOn: {
     available: true,
@@ -431,6 +443,7 @@ describe('useExistingVideoWorkflow', () => {
     expect(adapters.submitVideoJob.mock.calls[0]?.[2]).toBe(preparedFile);
     expect(adapters.submitVideoJob.mock.calls[0]?.[1]).toMatchObject({
       operation: 'character-swap',
+      provider: 'pruna',
       prompt: '',
       enhancePrompt: false,
       hasReferenceImage: true,

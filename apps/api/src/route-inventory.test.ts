@@ -107,7 +107,13 @@ const recordRoutes = (cloudPersistence: boolean): RouteRecorder => {
   const recorder = new RouteRecorder();
   const app = recorder as unknown as ApplicationRuntime;
   registerAuthRoutes(app, {} as never, testConfig());
-  registerSystemRoutes(app, {} as never);
+  registerSystemRoutes(app, {
+    videoProcessing: {
+      characterSwap: {},
+      defaultCharacterSwapProvider: 'decart',
+      virtualTryOn: null,
+    },
+  } as never);
   registerRealtimeRoutes(app, null);
   registerVideoJobRoutes(app, {} as never);
   registerSavedVideoRoutes(app, {} as never);

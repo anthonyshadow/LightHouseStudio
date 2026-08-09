@@ -146,7 +146,7 @@ flow. Do not label browser abort, local cleanup, or DELETE as provider cancellat
 
 ## Pruna Character Swap
 
-Start with `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER=pruna`,
+Start with `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER=pruna` to make Pruna the initial UI choice,
 `PRUNA_VIDEO_REPLACE_ENABLED=true`, the exact `PRUNA_VIDEO_REPLACE_MODEL=p-video-replace`, and
 the required server credential. Keep Decart independently configured only if the VTO capability is
 under test. In the editor, run one explicitly approved `720p` submission and one separately
@@ -163,7 +163,8 @@ For each resolution row:
 2. Confirm Character Swap requires one JPEG/PNG/WebP identity reference, prompt-only characters are
    absent, and neither Prompt nor Enhance Prompt is rendered. Confirm the provider-neutral notice
    says the selected identity and source performance/scene are used automatically, with no
-   provider/model selector or provider name. Confirm the editor offers `720p` and
+   model selector. When Decart is also configured, confirm the editor offers a Decart API / Pruna
+   API toggle and leaves Pruna selected for this procedure. Confirm the editor offers `720p` and
    `1080p`, defaults a new Character Swap setup to `720p`, and locks the choice after submission.
    Confirm VTO never contacts Pruna.
 3. Submit H.264 MP4 as pass-through. Separately Start from H.264 MOV and VP8 WebM, confirm local

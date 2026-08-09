@@ -226,8 +226,12 @@ const environmentSchema = z
             [
               'PRUNA_VIDEO_REPLACE_ENABLED',
               value.PRUNA_VIDEO_REPLACE_ENABLED,
-              'Set PRUNA_VIDEO_REPLACE_ENABLED=true when selecting Pruna.',
+              'Set PRUNA_VIDEO_REPLACE_ENABLED=true to use Pruna as the default Character Swap provider.',
             ],
+          ] as const)
+        : []),
+      ...(value.PRUNA_VIDEO_REPLACE_ENABLED
+        ? ([
             ['PRUNA_API_KEY', value.PRUNA_API_KEY !== undefined, 'Set PRUNA_API_KEY.'],
             [
               'PRUNA_VIDEO_REPLACE_MODEL',

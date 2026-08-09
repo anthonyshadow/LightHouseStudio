@@ -14,7 +14,7 @@ describe('createExistingVideoProviderRegistry', () => {
       { decartProvider: decart, createPrunaProvider },
     );
 
-    expect(registry['character-swap']).toMatchObject({
+    expect(registry.characterSwap.decart).toMatchObject({
       provider: decart,
       outputResolutions: ['720p'],
       defaultOutputResolution: '720p',
@@ -24,13 +24,14 @@ describe('createExistingVideoProviderRegistry', () => {
       promptEnhancement: true,
       terminalFailureRelease: 'automatic',
     });
-    expect(registry['virtual-try-on']?.provider).toBe(decart);
+    expect(registry.virtualTryOn?.provider).toBe(decart);
     expect(createPrunaProvider).not.toHaveBeenCalled();
   });
 
-  it('does not construct unselected Pruna even when its values are present', () => {
-    const createPrunaProvider = vi.fn();
-    createExistingVideoProviderRegistry(
+  it('constructs configured Pruna as a user-selectable alternative', () => {
+    const pruna = provider();
+    const createPrunaProvider = vi.fn(() => pruna);
+    const registry = createExistingVideoProviderRegistry(
       testConfig({
         existingVideoCharacterSwapProvider: 'decart',
         prunaVideoReplaceEnabled: true,
@@ -40,7 +41,8 @@ describe('createExistingVideoProviderRegistry', () => {
       { decartProvider: null, createPrunaProvider },
     );
 
-    expect(createPrunaProvider).not.toHaveBeenCalled();
+    expect(createPrunaProvider).toHaveBeenCalledOnce();
+    expect(registry.characterSwap.pruna?.provider).toBe(pruna);
   });
 
   it('routes only Character Swap to selected Pruna with both editor-controlled resolutions', () => {
@@ -60,7 +62,7 @@ describe('createExistingVideoProviderRegistry', () => {
 
     expect(createPrunaProvider).toHaveBeenCalledOnce();
     expect(createPrunaProvider).toHaveBeenCalledWith('pruna-secret', undefined);
-    expect(registry['character-swap']).toMatchObject({
+    expect(registry.characterSwap.pruna).toMatchObject({
       provider: pruna,
       outputResolutions: ['720p', '1080p'],
       defaultOutputResolution: '720p',
@@ -71,6 +73,8 @@ describe('createExistingVideoProviderRegistry', () => {
       promptEnhancement: false,
       terminalFailureRelease: 'explicit-user',
     });
-    expect(registry['virtual-try-on']?.provider).toBe(decart);
+    expect(registry.virtualTryOn?.provider).toBe(decart);
+    expect(registry.characterSwap.decart?.provider).toBe(decart);
+    expect(registry.defaultCharacterSwapProvider).toBe('pruna');
   });
 });

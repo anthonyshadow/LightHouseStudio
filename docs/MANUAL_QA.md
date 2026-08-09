@@ -28,8 +28,8 @@ network archives.
 
 Provider checks use the separate [gated live procedure](LIVE_PROVIDER_SMOKE.md). Pruna 720p,
 Pruna 1080p, Pruna Wardrobe try-on, OpenAI, BFL, and Wiro require separately recorded passes;
-Pruna resolution is chosen in the editor while Pruna remains the startup-selected Character Swap
-provider. Wardrobe try-on is separately enabled and is never inferred from Character Swap.
+Pruna resolution and the configured Decart/Pruna Character Swap provider are chosen in the editor.
+Wardrobe try-on is separately enabled and is never inferred from Character Swap.
 
 ## Account and saved-library checks
 

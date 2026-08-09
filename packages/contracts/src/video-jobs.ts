@@ -7,6 +7,8 @@ export const VIDEO_TRANSFORM_MODEL_IDS = ['lucy-latest', 'lucy-vton-latest'] as 
 export const videoTransformModelIdSchema = z.enum(VIDEO_TRANSFORM_MODEL_IDS);
 export const VIDEO_TRANSFORM_OPERATION_IDS = ['character-swap', 'virtual-try-on'] as const;
 export const videoTransformOperationIdSchema = z.enum(VIDEO_TRANSFORM_OPERATION_IDS);
+export const VIDEO_CHARACTER_SWAP_PROVIDER_IDS = ['decart', 'pruna'] as const;
+export const videoCharacterSwapProviderIdSchema = z.enum(VIDEO_CHARACTER_SWAP_PROVIDER_IDS);
 export const VIDEO_OUTPUT_RESOLUTIONS = ['720p', '1080p'] as const;
 export const videoOutputResolutionSchema = z.enum(VIDEO_OUTPUT_RESOLUTIONS);
 export const VIDEO_TRANSFORM_INPUT_KINDS = [
@@ -59,6 +61,7 @@ export const videoJobErrorCodeSchema = z.enum(VIDEO_JOB_ERROR_CODES);
 export const videoTransformRecipeSchema = z
   .object({
     operation: videoTransformOperationIdSchema,
+    provider: videoCharacterSwapProviderIdSchema.optional(),
     inputKind: videoTransformInputKindSchema.optional(),
     prompt: z
       .string()
@@ -87,6 +90,13 @@ export const videoTransformRecipeSchema = z
         });
       }
       return;
+    }
+    if (value.provider !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['provider'],
+        message: 'Provider selection is available only for Character Swap.',
+      });
     }
     if (value.inputKind === undefined) {
       context.addIssue({
@@ -172,6 +182,7 @@ export const videoJobStatusResponseSchema = z
 
 export type VideoTransformModelId = z.infer<typeof videoTransformModelIdSchema>;
 export type VideoTransformOperationId = z.infer<typeof videoTransformOperationIdSchema>;
+export type VideoCharacterSwapProviderId = z.infer<typeof videoCharacterSwapProviderIdSchema>;
 export type VideoOutputResolution = z.infer<typeof videoOutputResolutionSchema>;
 export type VideoTransformInputKind = z.infer<typeof videoTransformInputKindSchema>;
 export type VideoInputMimeType = z.infer<typeof videoInputMimeTypeSchema>;

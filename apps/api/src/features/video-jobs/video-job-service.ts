@@ -45,7 +45,6 @@ interface VideoJobServiceOptions {
     delayMs: number,
   ) => ScheduledVideoJobDeadline;
   readonly traceWriter?: ProcessingJobTraceWriter;
-  readonly providerIds?: Readonly<Record<VideoTransformOperationId, string>>;
   readonly maximumExpiredTombstones?: number;
   readonly maximumActiveJobs?: number;
   readonly maximumActiveJobsPerProvider?: number;
@@ -56,6 +55,7 @@ type VideoJobRecord = {
   readonly jobId: string;
   readonly ownerId: string;
   readonly operation: VideoTransformOperationId;
+  readonly providerId: string;
   readonly binding: ExistingVideoOperationBinding;
   readonly outputResolution: VideoOutputResolution;
   readonly requestFingerprint: string;
@@ -208,7 +208,6 @@ export class VideoJobService {
   readonly #removePath: NonNullable<VideoJobServiceOptions['removePath']>;
   readonly #traceWriter: ProcessingJobTraceWriter | undefined;
   readonly #durableJobRepository: DurableProcessingJobRepository | undefined;
-  readonly #providerIds: Readonly<Record<VideoTransformOperationId, string>>;
   readonly #operations = new Set<Promise<void>>();
   readonly #traceTails = new Map<string, Promise<void>>();
   readonly #admissions = new Map<string, Promise<void>>();
@@ -234,10 +233,6 @@ export class VideoJobService {
     this.#scheduleDeadline = options.scheduleDeadline ?? scheduleSystemDeadline;
     this.#traceWriter = options.traceWriter ?? options.durableJobRepository;
     this.#durableJobRepository = options.durableJobRepository;
-    this.#providerIds = options.providerIds ?? {
-      'character-swap': 'configured-provider',
-      'virtual-try-on': 'configured-provider',
-    };
     this.#maximumExpiredTombstones = Math.max(
       1,
       Math.floor(options.maximumExpiredTombstones ?? DEFAULT_MAXIMUM_EXPIRED_TOMBSTONES),
@@ -249,7 +244,7 @@ export class VideoJobService {
     );
     this.#root = path.resolve(lightframeDataDir, '.tmp', 'video-jobs');
     this.#ready = rm(this.#root, { recursive: true, force: true }).then(async () => {
-      if (Object.values(providers).some((binding) => binding !== null) && !this.#closed) {
+      if (this.available && !this.#closed) {
         await mkdir(this.#root, { recursive: true, mode: 0o700 });
         await this.#restoreDurableJobs();
       }
@@ -263,8 +258,8 @@ export class VideoJobService {
     );
     for (const record of records) {
       if (this.#closed) return;
-      const binding = this.#providers[record.operation];
-      if (binding === null || this.#providerIds[record.operation] !== record.provider) {
+      const binding = this.#bindingFor(record.operation, record.provider);
+      if (binding === null) {
         await this.#markRestoreFailed(record);
         continue;
       }
@@ -275,6 +270,7 @@ export class VideoJobService {
         jobId: record.jobId,
         ownerId: record.ownerUserId,
         operation: record.operation,
+        providerId: record.provider,
         binding,
         outputResolution: record.outputResolution,
         requestFingerprint: record.requestFingerprint,
@@ -343,7 +339,27 @@ export class VideoJobService {
   }
 
   get available(): boolean {
-    return Object.values(this.#providers).some((binding) => binding !== null);
+    return (
+      this.#providers.virtualTryOn !== null || Object.keys(this.#providers.characterSwap).length > 0
+    );
+  }
+
+  #bindingFor(
+    operation: VideoTransformOperationId,
+    requestedProvider?: string,
+  ): ExistingVideoOperationBinding | null {
+    if (operation === 'virtual-try-on') return this.#providers.virtualTryOn;
+    const provider =
+      requestedProvider === 'decart' || requestedProvider === 'pruna'
+        ? requestedProvider
+        : this.#providers.defaultCharacterSwapProvider;
+    return this.#providers.characterSwap[provider] ?? null;
+  }
+
+  #providerIdForRecipe(recipe: VideoTransformRecipe): string {
+    return recipe.operation === 'character-swap'
+      ? (recipe.provider ?? this.#providers.defaultCharacterSwapProvider)
+      : 'decart';
   }
 
   async existing(jobId: string, ownerId: string): Promise<VideoJobStatusResponse | null> {
@@ -396,7 +412,7 @@ export class VideoJobService {
       jobId: job.jobId,
       ownerUserId: job.ownerId,
       operation: job.operation,
-      provider: this.#providerIds[job.operation],
+      provider: job.providerId,
       providerJobId: job.providerJobId,
       requestFingerprint: job.requestFingerprint,
       outputResolution: job.outputResolution,
@@ -689,7 +705,8 @@ export class VideoJobService {
       await this.#admissions.get(input.jobId);
       return this.#snapshot(duplicate);
     }
-    const binding = this.#providers[input.recipe.operation];
+    const providerId = this.#providerIdForRecipe(input.recipe);
+    const binding = this.#bindingFor(input.recipe.operation, providerId);
     if (this.#closed || !binding) {
       await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
       throw new AppError(
@@ -745,10 +762,9 @@ export class VideoJobService {
       );
     }
     const activeJobs = [...this.#jobs.values()].filter((job) => !terminal(job.status));
-    const providerId = this.#providerIds[input.recipe.operation];
     if (
       activeJobs.length >= this.#maximumActiveJobs ||
-      activeJobs.filter((job) => this.#providerIds[job.operation] === providerId).length >=
+      activeJobs.filter((job) => job.providerId === providerId).length >=
         this.#maximumActiveJobsPerProvider
     ) {
       await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
@@ -765,6 +781,7 @@ export class VideoJobService {
       jobId: input.jobId,
       ownerId: input.ownerId,
       operation: input.recipe.operation,
+      providerId,
       binding,
       outputResolution,
       requestFingerprint,
