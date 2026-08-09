@@ -1,16 +1,10 @@
 // @vitest-environment jsdom
 
 import type { VideoJobStatusResponse } from '@studio/contracts';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRemoteStateQueryClient } from '../../application/remote-state/RemoteStateProvider';
-
-const api = vi.hoisted(() => ({
-  fetchVideoJob: vi.fn(),
-}));
-
-vi.mock('../../adapters/api-client/videoJobsApi', () => ({
-  fetchVideoJob: api.fetchVideoJob,
-}));
+import { jsonScenario, videoJobPollingScenario } from '../../test/msw/handlers';
+import { mockApiServer } from '../../test/msw/server';
 
 import { pollVideoJobStatus } from './videoJobStatusQuery';
 
@@ -44,10 +38,6 @@ const readyResult: NonNullable<VideoJobStatusResponse['result']> = {
 
 const clients = new Set<ReturnType<typeof createRemoteStateQueryClient>>();
 
-beforeEach(() => {
-  api.fetchVideoJob.mockReset();
-});
-
 afterEach(() => {
   for (const client of clients) client.clear();
   clients.clear();
@@ -61,9 +51,12 @@ const queryClient = () => {
 
 describe('video job status Query polling', () => {
   it('uses the submitted status as a seed and follows polling until terminal status', async () => {
-    api.fetchVideoJob
-      .mockResolvedValueOnce(status('processing'))
-      .mockResolvedValueOnce(status('ready', readyResult));
+    let requests = 0;
+    mockApiServer.use(
+      videoJobPollingScenario(jobId, [status('processing'), status('ready', readyResult)], () => {
+        requests += 1;
+      }),
+    );
     const statuses: VideoJobStatusResponse[] = [];
 
     await expect(
@@ -77,11 +70,11 @@ describe('video job status Query polling', () => {
     ).resolves.toMatchObject({ status: 'ready' });
 
     expect(statuses.map((current) => current.status)).toEqual(['queued', 'processing', 'ready']);
-    expect(api.fetchVideoJob).toHaveBeenCalledTimes(2);
-    expect(api.fetchVideoJob).toHaveBeenCalledWith(jobId, expect.any(AbortSignal));
+    expect(requests).toBe(2);
   });
 
   it('does not read status again when the submitted response is already terminal', async () => {
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     await expect(
       pollVideoJobStatus({
         queryClient: queryClient(),
@@ -92,26 +85,17 @@ describe('video job status Query polling', () => {
       }),
     ).resolves.toMatchObject({ status: 'ready' });
 
-    expect(api.fetchVideoJob).not.toHaveBeenCalled();
+    expect(fetchSpy).not.toHaveBeenCalled();
   });
 
   it('cancels the active Query request through its AbortSignal', async () => {
     let querySignal: AbortSignal | undefined;
-    api.fetchVideoJob.mockImplementation(
-      (_jobId: string, signal: AbortSignal) =>
-        new Promise<VideoJobStatusResponse>((_resolve, reject) => {
-          querySignal = signal;
-          signal.addEventListener(
-            'abort',
-            () =>
-              reject(
-                signal.reason instanceof Error
-                  ? signal.reason
-                  : new DOMException('Status request canceled.', 'AbortError'),
-              ),
-            { once: true },
-          );
-        }),
+    let requests = 0;
+    mockApiServer.use(
+      jsonScenario('GET', `/api/video-jobs/${jobId}`, { kind: 'pending' }, (request) => {
+        requests += 1;
+        querySignal = request.signal;
+      }),
     );
     const operation = new AbortController();
     const polling = pollVideoJobStatus({
@@ -126,6 +110,6 @@ describe('video job status Query polling', () => {
 
     await expect(polling).rejects.toMatchObject({ name: 'AbortError' });
     await vi.waitFor(() => expect(querySignal?.aborted).toBe(true));
-    expect(api.fetchVideoJob).toHaveBeenCalledOnce();
+    expect(requests).toBe(1);
   });
 });

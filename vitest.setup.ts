@@ -1,5 +1,6 @@
 import '@testing-library/jest-dom/vitest';
-import { afterEach, beforeEach, vi } from 'vitest';
+import { afterAll, afterEach, beforeAll, beforeEach, expect, vi } from 'vitest';
+import { mockApiServer } from './apps/web/src/test/msw/server';
 
 const TEST_NETWORK_POLICY = 'deny-external';
 
@@ -21,12 +22,24 @@ class BlockedWebSocket {
   }
 }
 
+let usesMockApiServer = false;
+
+beforeAll(() => {
+  usesMockApiServer = expect.getState().testPath?.includes('/apps/web/') ?? false;
+  if (usesMockApiServer) mockApiServer.listen({ onUnhandledRequest: 'error' });
+});
+
 beforeEach(() => {
-  vi.stubGlobal('fetch', blockedFetch);
+  if (!usesMockApiServer) vi.stubGlobal('fetch', blockedFetch);
   vi.stubGlobal('WebSocket', BlockedWebSocket);
 });
 
 afterEach(() => {
+  if (usesMockApiServer) mockApiServer.resetHandlers();
   vi.restoreAllMocks();
   vi.unstubAllGlobals();
+});
+
+afterAll(() => {
+  if (usesMockApiServer) mockApiServer.close();
 });

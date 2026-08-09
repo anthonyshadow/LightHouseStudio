@@ -1,7 +1,9 @@
 // @vitest-environment jsdom
 
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { downloadVideoJobResult, submitVideoJob } from './videoJobsApi';
+import { jsonScenario, responseScenario } from '../../test/msw/handlers';
+import { mockApiServer } from '../../test/msw/server';
 
 const status = (jobId: string) => ({
   jobId,
@@ -14,16 +16,13 @@ const status = (jobId: string) => ({
   error: null,
 });
 
-beforeEach(() => {
-  vi.restoreAllMocks();
-});
-
 describe('videoJobsApi', () => {
   it('uses fixed multipart order, synthetic filenames, and explicit provider intent', async () => {
     const jobId = crypto.randomUUID();
-    const fetchMock = vi
-      .spyOn(globalThis, 'fetch')
-      .mockResolvedValue(new Response(JSON.stringify(status(jobId)), { status: 202 }));
+    mockApiServer.use(
+      jsonScenario('PUT', `/api/video-jobs/${jobId}`, { body: status(jobId), status: 202 }),
+    );
+    const fetchSpy = vi.spyOn(globalThis, 'fetch');
     const privateName = 'private-original-filename.mp4';
     const video = new File(['video'], privateName, { type: 'video/mp4' });
     const reference = new File(['reference'], 'private-reference.png', {
@@ -43,26 +42,27 @@ describe('videoJobsApi', () => {
       new AbortController().signal,
     );
 
-    const request = fetchMock.mock.calls[0]![1]!;
+    const request = fetchSpy.mock.calls[0]![1]!;
     const form = request.body as FormData;
     const entries = [...form.entries()];
     expect(entries.map(([name]) => name)).toEqual(['request', 'data', 'reference_image']);
     expect((entries[1]![1] as File).name).toBe('input.mp4');
     expect((entries[2]![1] as File).name).toBe('reference.png');
     expect(JSON.stringify(entries)).not.toContain(privateName);
-    expect(request.headers).toMatchObject({ 'x-lightframe-provider-intent': 'video' });
+    expect(new Headers(request.headers).get('x-lightframe-provider-intent')).toBe('video');
   });
 
   it('rejects a declared oversized result before buffering it', async () => {
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response('not-read', {
+    const jobId = crypto.randomUUID();
+    mockApiServer.use(
+      responseScenario('GET', `/api/video-jobs/${jobId}/content`, 'not-read', {
         headers: { 'content-length': '300000001', 'content-type': 'video/mp4' },
       }),
     );
 
-    await expect(
-      downloadVideoJobResult(crypto.randomUUID(), new AbortController().signal),
-    ).rejects.toMatchObject({ code: 'result_too_large' });
+    await expect(downloadVideoJobResult(jobId, new AbortController().signal)).rejects.toMatchObject(
+      { code: 'result_too_large' },
+    );
   });
 
   it('cancels a chunked result as soon as its streamed bytes exceed the limit', async () => {
