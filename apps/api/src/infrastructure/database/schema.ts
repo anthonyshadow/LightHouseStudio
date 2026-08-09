@@ -63,6 +63,15 @@ export const outboxStatus = pgEnum('outbox_status', [
   'completed',
   'failed',
 ]);
+export const directUploadStatus = pgEnum('direct_upload_status', [
+  'pending',
+  'uploading',
+  'verifying',
+  'ready',
+  'failed',
+  'aborted',
+  'expired',
+]);
 
 const auditTimestamps = {
   createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' }).notNull().defaultNow(),
@@ -222,6 +231,39 @@ export const savedVideoReceipts = pgTable(
       .defaultNow(),
   },
   (table) => [primaryKey({ columns: [table.ownerUserId, table.idempotencyKey] })],
+);
+
+export const directUploads = pgTable(
+  'direct_uploads',
+  {
+    id: uuid('id').primaryKey(),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    assetId: uuid('asset_id').notNull().unique(),
+    idempotencyKey: uuid('idempotency_key').notNull(),
+    storageKey: text('storage_key').notNull().unique(),
+    providerUploadId: text('provider_upload_id'),
+    status: directUploadStatus('status').notNull().default('pending'),
+    expectedMimeType: text('expected_mime_type').notNull(),
+    expectedSizeBytes: bigint('expected_size_bytes', { mode: 'number' }).notNull(),
+    filename: text('filename').notNull(),
+    request: jsonb('request').notNull(),
+    resultVideoId: uuid('result_video_id').references(() => savedVideos.id, {
+      onDelete: 'restrict',
+    }),
+    expiresAt: timestamp('expires_at', { withTimezone: true, mode: 'string' }).notNull(),
+    completedAt: timestamp('completed_at', { withTimezone: true, mode: 'string' }),
+    ...auditTimestamps,
+  },
+  (table) => [
+    uniqueIndex('direct_uploads_owner_idempotency_unique').on(
+      table.ownerUserId,
+      table.idempotencyKey,
+    ),
+    index('direct_uploads_expiry_idx').on(table.status, table.expiresAt),
+    check('direct_uploads_size_positive', sql`${table.expectedSizeBytes} > 0`),
+  ],
 );
 
 export const savedVoices = pgTable(
@@ -412,6 +454,7 @@ export const databaseSchema = {
   savedVideos,
   videoVersions,
   savedVideoReceipts,
+  directUploads,
   savedVoices,
   ownerMigrations,
   creativeAssets,

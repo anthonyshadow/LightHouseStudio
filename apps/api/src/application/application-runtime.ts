@@ -4,11 +4,19 @@ import { createServer, type Server as NodeServer } from 'node:http';
 import path from 'node:path';
 import { Readable } from 'node:stream';
 import { staticPlugin } from '@elysiajs/static';
+import { opentelemetry } from '@elysia/opentelemetry';
+import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-proto';
+import {
+  BatchSpanProcessor,
+  ParentBasedSampler,
+  TraceIdRatioBasedSampler,
+} from '@opentelemetry/sdk-trace-node';
 import { Elysia, type HTTPMethod } from 'elysia';
 import pino, { type Logger } from 'pino';
 import type { AuthenticatedUser, EntitlementSnapshot } from '@studio/contracts';
 import { isSpooledAudioUpload } from './spooled-upload.js';
 import { AppError } from '../http/app-error.js';
+import { currentTraceId, SanitizingSpanExporter } from '../observability/telemetry.js';
 import {
   parseBody,
   requestInterruptionError,
@@ -110,6 +118,7 @@ export interface HttpRequest {
   readonly markBodyReceived: () => void;
   readonly routeOptions: { readonly url: string };
   readonly log: Logger;
+  readonly traceId?: string;
   body: unknown;
   auth: RequestAuthentication | null;
 }
@@ -132,7 +141,10 @@ export class HttpReply {
   constructor(
     private readonly runtime: ApplicationRuntime,
     readonly request: HttpRequest,
-  ) {}
+  ) {
+    this.headers.set('X-Request-ID', request.id);
+    if (request.traceId !== undefined) this.headers.set('X-Trace-ID', request.traceId);
+  }
 
   get elapsedTime(): number {
     return performance.now() - this.startedAt;
@@ -228,6 +240,11 @@ export interface ApplicationRuntimeOptions {
   readonly requestTimeoutMs?: number;
   readonly receiveTimeoutMs?: number;
   readonly staticRoot?: string;
+  readonly telemetry?: {
+    readonly exporterEndpoint: string;
+    readonly sampleRatio: number;
+    readonly serviceName: string;
+  };
 }
 
 interface RuntimeServerFacade {
@@ -532,6 +549,26 @@ export class ApplicationRuntime {
         idleTimeout: 5,
       },
     });
+    if (options.telemetry !== undefined) {
+      void this.elysia.use(
+        opentelemetry({
+          serviceName: options.telemetry.serviceName,
+          instrumentations: [],
+          recordBody: false,
+          resourceDetectors: [],
+          sampler: new ParentBasedSampler({
+            root: new TraceIdRatioBasedSampler(options.telemetry.sampleRatio),
+          }),
+          spanProcessors: [
+            new BatchSpanProcessor(
+              new SanitizingSpanExporter(
+                new OTLPTraceExporter({ url: options.telemetry.exporterEndpoint }),
+              ),
+            ),
+          ],
+        }),
+      );
+    }
     this.elysia.onRequest((context) => {
       requireLoopbackHost(context.request, this.allowModuleSentinel);
       if (context.request.method !== 'HEAD') return;
@@ -675,8 +712,10 @@ export class ApplicationRuntime {
       this.receiveTimeoutMs,
       this.connectionTimeoutMs,
     );
+    const id = crypto.randomUUID();
+    const traceId = currentTraceId();
     const result: HttpRequest = {
-      id: crypto.randomUUID(),
+      id,
       method: request.method,
       url: `${url.pathname}${url.search}`,
       headers: requestHeaders(request.headers),
@@ -690,7 +729,8 @@ export class ApplicationRuntime {
         onOperationStart();
       },
       routeOptions: { url: route },
-      log: this.log,
+      log: this.log.child({ requestId: id, ...(traceId === undefined ? {} : { traceId }) }),
+      ...(traceId === undefined ? {} : { traceId }),
       body: undefined,
       auth: null,
     };

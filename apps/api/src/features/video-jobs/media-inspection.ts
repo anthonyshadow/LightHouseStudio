@@ -8,6 +8,7 @@ import {
 import { validateUploadedVideoFacts, type UploadedVideoFacts } from '@studio/domain';
 import { ALL_FORMATS, FilePathSource, Input, MP4, QTFF, WEBM } from 'mediabunny';
 import { AppError } from '../../http/app-error.js';
+import { withWorkflowSpan } from '../../observability/telemetry.js';
 import type { VideoJobOutputSizing } from '../../providers/video-jobs/video-job-provider.js';
 
 const containerDetails = (
@@ -164,7 +165,7 @@ export const assertProviderOutputDimensions = (
   );
 };
 
-export const inspectVideoFile = async (
+export const inspectVideoFile = (
   filePath: string,
   operation: VideoTransformOperationId,
   options: {
@@ -174,91 +175,103 @@ export const inspectVideoFile = async (
     readonly expectedResolution?: '720p' | '1080p';
     readonly outputSizing?: VideoJobOutputSizing;
   } = {},
-): Promise<InspectedVideo> => {
-  const providerOutput = options.requireProviderOutputSize === true;
-  const invalidMedia = (message: string): AppError =>
-    providerOutput
-      ? new AppError(
-          502,
-          'result_invalid',
-          'The visual result did not meet the app-owned media requirements.',
-        )
-      : new AppError(400, 'invalid_video', message);
-  const file = await stat(filePath).catch(() => null);
-  if (!file?.isFile() || file.size <= 0) {
-    throw invalidMedia('The uploaded video is empty or invalid.');
-  }
+): Promise<InspectedVideo> =>
+  withWorkflowSpan(
+    'media.inspect.video_job',
+    {
+      'lightframe.operation': operation,
+      'lightframe.provider_output': options.requireProviderOutputSize === true,
+    },
+    async () => {
+      const providerOutput = options.requireProviderOutputSize === true;
+      const invalidMedia = (message: string): AppError =>
+        providerOutput
+          ? new AppError(
+              502,
+              'result_invalid',
+              'The visual result did not meet the app-owned media requirements.',
+            )
+          : new AppError(400, 'invalid_video', message);
+      const file = await stat(filePath).catch(() => null);
+      if (!file?.isFile() || file.size <= 0) {
+        throw invalidMedia('The uploaded video is empty or invalid.');
+      }
 
-  const input = new Input({ formats: ALL_FORMATS, source: new FilePathSource(filePath) });
-  try {
-    if (!(await input.canRead())) {
-      throw invalidMedia('The uploaded video could not be read.');
-    }
-    const format = containerDetails(await input.getFormat());
-    if (!format) {
-      throw providerOutput
-        ? invalidMedia('The visual result used an unsupported container.')
-        : new AppError(400, 'unsupported_container', 'Use an MP4, H.264 MOV, or VP8 WebM video.');
-    }
-    const videoTrack = await input.getPrimaryVideoTrack();
-    if (!videoTrack) {
-      throw invalidMedia('The selected file does not contain a video track.');
-    }
-    const videoCodec = await videoTrack.getCodec();
-    const audioTrack = await input.getPrimaryAudioTrack();
-    const durationSeconds =
-      (await input.getDurationFromMetadata()) ?? (await input.computeDuration());
-    const inspected = validateRawInspectedVideo(
-      {
-        ...format,
-        videoCodec: videoCodec ?? '',
-        audioCodec: audioTrack ? await audioTrack.getCodec() : null,
-        durationMs: durationSeconds * 1_000,
-        width: Math.round(await videoTrack.getDisplayWidth()),
-        height: Math.round(await videoTrack.getDisplayHeight()),
-        sizeBytes: file.size,
-        hasAudio: audioTrack !== null,
-      },
-      operation,
-      {
-        requireProviderOutputSize: providerOutput,
-        outputSizing: options.outputSizing ?? 'exact-canonical',
-      },
-    );
-    if (options.requireProviderOutputSize) {
-      assertProviderOutputDimensions(
-        inspected,
-        options.expectedResolution ?? '720p',
-        options.outputSizing ?? 'exact-canonical',
-        options.expectedOrientation,
-      );
-    }
-    if (
-      options.expectedDurationMs !== undefined &&
-      Math.abs(inspected.durationMs - options.expectedDurationMs) >
-        VIDEO_RESULT_DURATION_TOLERANCE_MS
-    ) {
-      throw new AppError(
-        502,
-        'result_invalid',
-        'The visual result duration is not safe to synchronize with the source audio.',
-      );
-    }
-    return inspected;
-  } catch (error) {
-    if (error instanceof AppError) throw error;
-    if (providerOutput) {
-      throw new AppError(
-        502,
-        'result_invalid',
-        'The visual result could not be inspected safely.',
-        { cause: error },
-      );
-    }
-    throw new AppError(400, 'invalid_video', 'The uploaded video could not be inspected.', {
-      cause: error,
-    });
-  } finally {
-    input.dispose();
-  }
-};
+      const input = new Input({ formats: ALL_FORMATS, source: new FilePathSource(filePath) });
+      try {
+        if (!(await input.canRead())) {
+          throw invalidMedia('The uploaded video could not be read.');
+        }
+        const format = containerDetails(await input.getFormat());
+        if (!format) {
+          throw providerOutput
+            ? invalidMedia('The visual result used an unsupported container.')
+            : new AppError(
+                400,
+                'unsupported_container',
+                'Use an MP4, H.264 MOV, or VP8 WebM video.',
+              );
+        }
+        const videoTrack = await input.getPrimaryVideoTrack();
+        if (!videoTrack) {
+          throw invalidMedia('The selected file does not contain a video track.');
+        }
+        const videoCodec = await videoTrack.getCodec();
+        const audioTrack = await input.getPrimaryAudioTrack();
+        const durationSeconds =
+          (await input.getDurationFromMetadata()) ?? (await input.computeDuration());
+        const inspected = validateRawInspectedVideo(
+          {
+            ...format,
+            videoCodec: videoCodec ?? '',
+            audioCodec: audioTrack ? await audioTrack.getCodec() : null,
+            durationMs: durationSeconds * 1_000,
+            width: Math.round(await videoTrack.getDisplayWidth()),
+            height: Math.round(await videoTrack.getDisplayHeight()),
+            sizeBytes: file.size,
+            hasAudio: audioTrack !== null,
+          },
+          operation,
+          {
+            requireProviderOutputSize: providerOutput,
+            outputSizing: options.outputSizing ?? 'exact-canonical',
+          },
+        );
+        if (options.requireProviderOutputSize) {
+          assertProviderOutputDimensions(
+            inspected,
+            options.expectedResolution ?? '720p',
+            options.outputSizing ?? 'exact-canonical',
+            options.expectedOrientation,
+          );
+        }
+        if (
+          options.expectedDurationMs !== undefined &&
+          Math.abs(inspected.durationMs - options.expectedDurationMs) >
+            VIDEO_RESULT_DURATION_TOLERANCE_MS
+        ) {
+          throw new AppError(
+            502,
+            'result_invalid',
+            'The visual result duration is not safe to synchronize with the source audio.',
+          );
+        }
+        return inspected;
+      } catch (error) {
+        if (error instanceof AppError) throw error;
+        if (providerOutput) {
+          throw new AppError(
+            502,
+            'result_invalid',
+            'The visual result could not be inspected safely.',
+            { cause: error },
+          );
+        }
+        throw new AppError(400, 'invalid_video', 'The uploaded video could not be inspected.', {
+          cause: error,
+        });
+      } finally {
+        input.dispose();
+      }
+    },
+  );

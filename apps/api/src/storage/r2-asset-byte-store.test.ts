@@ -1,9 +1,14 @@
 import { buffer } from 'node:stream/consumers';
 import { Readable } from 'node:stream';
+import { readFile, stat } from 'node:fs/promises';
 import {
+  AbortMultipartUploadCommand,
+  CompleteMultipartUploadCommand,
+  CreateMultipartUploadCommand,
   DeleteObjectCommand,
   GetObjectCommand,
   HeadObjectCommand,
+  ListPartsCommand,
   PutObjectCommand,
   type S3Client,
 } from '@aws-sdk/client-s3';
@@ -88,6 +93,123 @@ class MemoryLifecycle implements AssetLifecycleRegistry {
 }
 
 describe('R2AssetByteStore', () => {
+  it('pins presigned part URLs to the authorized bucket, key, upload, and part', async () => {
+    const store = new R2AssetByteStore({
+      accountId: '0123456789abcdef0123456789abcdef',
+      accessKeyId: 'access',
+      secretAccessKey: 'secret',
+      bucket: 'private-assets',
+    });
+
+    const signed = new URL(await store.signDirectUploadPart(assetId, 'provider-upload-id', 7, 300));
+
+    expect(signed.hostname).toBe(
+      'private-assets.0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com',
+    );
+    expect(signed.pathname).toBe(`/media/v1/${assetId.slice(0, 2)}/${assetId}`);
+    expect(signed.searchParams.get('partNumber')).toBe('7');
+    expect(signed.searchParams.get('uploadId')).toBe('provider-upload-id');
+    expect(signed.searchParams.get('X-Amz-Expires')).toBe('300');
+    expect(signed.searchParams.get('X-Amz-SignedHeaders')).toBe('host');
+  });
+
+  it('creates, enumerates, completes, verifies, registers, and aborts direct multipart uploads', async () => {
+    const payload = Buffer.from('video-bytes');
+    const createdAt = '2026-08-09T14:00:00.000Z';
+    let metadata: Record<string, string> = {};
+    let contentType = '';
+    const send = vi.fn((command: unknown): Promise<unknown> => {
+      if (command instanceof CreateMultipartUploadCommand) {
+        metadata = command.input.Metadata ?? {};
+        contentType = command.input.ContentType ?? '';
+        return Promise.resolve({ UploadId: 'provider-upload-id' });
+      }
+      if (command instanceof ListPartsCommand) {
+        return command.input.PartNumberMarker === undefined
+          ? Promise.resolve({
+              Parts: [{ PartNumber: 1, Size: 5, ETag: '"part-1"' }],
+              IsTruncated: true,
+              NextPartNumberMarker: '1',
+            })
+          : Promise.resolve({
+              Parts: [{ PartNumber: 2, Size: 6, ETag: '"part-2"' }],
+              IsTruncated: false,
+            });
+      }
+      if (command instanceof CompleteMultipartUploadCommand) {
+        return Promise.resolve({ ETag: '"complete-etag"' });
+      }
+      if (command instanceof AbortMultipartUploadCommand) return Promise.resolve({});
+      if (command instanceof HeadObjectCommand) {
+        return Promise.resolve({
+          Metadata: metadata,
+          ContentLength: payload.byteLength,
+          ContentType: contentType,
+          ETag: '"complete-etag"',
+        });
+      }
+      if (command instanceof GetObjectCommand) {
+        return Promise.resolve({ Body: Readable.from(payload) });
+      }
+      throw new Error('Unexpected R2 command.');
+    });
+    const lifecycle = new MemoryLifecycle();
+    const store = new R2AssetByteStore({
+      accountId: '0123456789abcdef0123456789abcdef',
+      accessKeyId: 'access',
+      secretAccessKey: 'secret',
+      bucket: 'private-assets',
+      client: { send } as unknown as S3Client,
+      lifecycle,
+    });
+    const draft = {
+      assetId,
+      ownerUserId,
+      mimeType: 'video/mp4',
+      sizeBytes: payload.byteLength,
+      filename: 'direct take.mp4',
+      createdAt,
+    };
+
+    await expect(store.createDirectMultipartUpload(draft)).resolves.toBe('provider-upload-id');
+    await expect(store.listDirectUploadParts(assetId, 'provider-upload-id')).resolves.toEqual([
+      { PartNumber: 1, Size: 5, ETag: '"part-1"' },
+      { PartNumber: 2, Size: 6, ETag: '"part-2"' },
+    ]);
+    await expect(
+      store.completeDirectMultipartUpload(assetId, 'provider-upload-id', [
+        { PartNumber: 1, ETag: '"part-1"' },
+        { PartNumber: 2, ETag: '"part-2"' },
+      ]),
+    ).resolves.toBe('"complete-etag"');
+    const downloaded = await store.downloadDirectUpload(draft);
+    expect(await readFile(downloaded.sourcePath)).toEqual(payload);
+    expect(downloaded.checksumSha256).toMatch(/^[a-f0-9]{64}$/u);
+    await store.registerDirectUpload(
+      {
+        schemaVersion: 1,
+        assetId,
+        ownerUserId,
+        mimeType: draft.mimeType,
+        filename: draft.filename,
+        sizeBytes: draft.sizeBytes,
+        checksumSha256: downloaded.checksumSha256,
+        createdAt,
+      },
+      downloaded.etag,
+    );
+    expect(lifecycle.location).toMatchObject({
+      provider: 'r2',
+      etag: '"complete-etag"',
+      manifest: { assetId, ownerUserId },
+    });
+    await downloaded.cleanup();
+    await expect(stat(downloaded.sourcePath)).rejects.toMatchObject({ code: 'ENOENT' });
+    await expect(
+      store.abortDirectMultipartUpload(assetId, 'provider-upload-id'),
+    ).resolves.toBeUndefined();
+  });
+
   it('uses opaque keys, registers the asset, supports range reads, and tombstones deletion', async () => {
     const payload = Buffer.from('private-video-bytes');
     let metadata: Record<string, string> = {};

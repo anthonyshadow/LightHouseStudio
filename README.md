@@ -72,6 +72,11 @@ edit requires confirmed discard; saved origin-scoped browser data is unaffected.
   crop, rotation, flips, lighting and filters, on-device MP4 transcoding, playback, local voice
   effects, gallery saving, and saved-video download require no provider credentials or external
   media traffic.
+- In authoritative `DATABASE_MODE=neon` plus private R2, Saved Video bytes upload directly from the
+  browser with headless Uppy multipart transfers. The authenticated API owns the staged row and
+  opaque key, signs only short-lived exact part operations, and verifies size, metadata, checksum,
+  and media structure before attaching the asset. Local and shadow modes retain the existing
+  server-mediated path; transfer-part retries never retry provider or other billable operations.
 - Character Builder saves browser-local character metadata and immutable reference assets under
   `LIGHTFRAME_DATA_DIR` in local mode. In authoritative Neon/private-R2 mode, uploads and generated
   results are staged until a saved creative-library relationship retains them; explicit discard,
@@ -201,7 +206,8 @@ validated app-owned configuration path.
 | `AUTH_COOKIE_NAME`, `AUTH_COOKIE_SECURE`                                                  | Host-only HTTP-only SameSite cookie settings; Secure remains false only for loopback HTTP development                                                     |
 | `DATABASE_MODE`, `DATABASE_URL`                                                           | `local` (default), Neon-backed `shadow`, or authoritative `neon`; URL is server-only                                                                      |
 | `ASSET_STORE_PROVIDER`                                                                    | `local` (default) or private Cloudflare `r2`; R2 requires a Neon-backed database mode                                                                     |
-| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_KEY_PREFIX` | Private R2 S3 endpoint credentials, bucket, and opaque object prefix; never browser-exposed                                                               |
+| `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_KEY_PREFIX` | Private R2 S3 configuration; credentials stay server-only, while the exact bucket/key appear only inside short-lived part URLs in direct-upload mode      |
+| `OTEL_TRACING_ENABLED`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_TRACE_SAMPLE_RATIO`   | Opt-in OTLP/HTTP protobuf traces and explicit `[0,1]` sampling; disabled unless the flag and endpoint are both configured                                 |
 | `VIDEO_JOB_MAX_ACTIVE`, `VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER`                               | Server admission limits for accepted batch work; defaults to `8` globally and `4` per provider                                                            |
 | `DECART_API_KEY`                                                                          | Realtime scoped credentials, Decart Character Swap, and Decart-only Virtual Try-On                                                                        |
 | `EXISTING_VIDEO_CHARACTER_SWAP_PROVIDER`                                                  | Default Character Swap choice shown in the editor: `decart` (default) or `pruna`                                                                          |
@@ -221,6 +227,8 @@ validated app-owned configuration path.
 
 `GET /api/capabilities` reports configuration presence, not provider reachability, entitlement, or
 quota. Missing optional configuration disables only the corresponding feature.
+Private-R2 browser CORS is required only for authoritative direct uploads and must follow the exact
+origin/method/header policy in [Cloud persistence](docs/CLOUD_PERSISTENCE.md).
 
 ## Commands
 

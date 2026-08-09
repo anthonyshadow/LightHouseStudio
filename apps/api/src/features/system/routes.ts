@@ -27,6 +27,7 @@ export interface CapabilityAvailability {
   readonly promptOptimizerModel: string;
   readonly promptOptimizerVersion: string;
   readonly wardrobeAddOutfitAvailable: boolean;
+  readonly directSavedVideoUploadAvailable: boolean;
 }
 
 export const registerSystemRoutes = (
@@ -102,6 +103,9 @@ export const registerSystemRoutes = (
       },
       wardrobe: {
         addOutfitAvailable: availability.wardrobeAddOutfitAvailable,
+      },
+      savedVideos: {
+        directMultipartUpload: availability.directSavedVideoUploadAvailable,
       },
     }),
   );

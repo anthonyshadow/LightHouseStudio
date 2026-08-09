@@ -7,6 +7,7 @@ import {
 import type { ImageMimeType } from '@studio/domain';
 import sharp from 'sharp';
 import { imageDecodeAdmission } from '../../application/cpu-admission-queue.js';
+import { withWorkflowSpan } from '../../observability/telemetry.js';
 import {
   dimensionsForReferenceImageSize,
   MAX_PROVIDER_IMAGE_BYTES,
@@ -140,10 +141,12 @@ export const validateReferenceImageBytes = (
   declaredMimeType?: ValidReferenceImageMimeType,
   signal?: AbortSignal,
 ): Promise<ValidatedReferenceImage> =>
-  imageDecodeAdmission.run(
-    () =>
-      validateReferenceImageBytesWithoutAdmission(providerBytes, expectedSize, declaredMimeType),
-    signal,
+  withWorkflowSpan('media.sharp.reference_image', { 'lightframe.image_source': 'provider' }, () =>
+    imageDecodeAdmission.run(
+      () =>
+        validateReferenceImageBytesWithoutAdmission(providerBytes, expectedSize, declaredMimeType),
+      signal,
+    ),
   );
 
 const validateUploadedReferenceImageWithoutAdmission = async (
@@ -204,7 +207,9 @@ export const validateUploadedReferenceImage = (
   declaredMimeType: ValidReferenceImageMimeType,
   signal?: AbortSignal,
 ): Promise<ValidatedUploadedReferenceImage> =>
-  imageDecodeAdmission.run(
-    () => validateUploadedReferenceImageWithoutAdmission(bytes, declaredMimeType),
-    signal,
+  withWorkflowSpan('media.sharp.reference_image', { 'lightframe.image_source': 'upload' }, () =>
+    imageDecodeAdmission.run(
+      () => validateUploadedReferenceImageWithoutAdmission(bytes, declaredMimeType),
+      signal,
+    ),
   );

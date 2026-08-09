@@ -14,6 +14,7 @@ import {
 } from '@studio/contracts';
 import type { ImageMimeType } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
+import { withWorkflowSpan } from '../../observability/telemetry.js';
 import {
   type ExistingVideoOperationBinding,
   type ExistingVideoProviderRegistry,
@@ -823,7 +824,11 @@ export class VideoJobService {
       generation: job.deadlineGeneration,
     });
     this.#scheduleNextDeadline();
-    const admission = this.#admit(job);
+    const admission = withWorkflowSpan(
+      'job.admission',
+      { 'lightframe.provider': job.providerId, 'lightframe.operation': job.operation },
+      () => this.#admit(job),
+    );
     this.#admissions.set(job.jobId, admission);
     this.#track(admission);
     try {
@@ -871,16 +876,21 @@ export class VideoJobService {
         await this.#cleanupFiles(job);
         return;
       }
-      const submitted = await job.binding.provider.submit({
-        operation: job.operation,
-        recipe,
-        videoPath: job.inputPath,
-        videoMimeType: inspected.mimeType,
-        referenceImagePath: job.referencePath,
-        referenceImageMimeType: job.referenceMimeType,
-        outputResolution: job.outputResolution,
-        signal: job.operationController.signal,
-      });
+      const submitted = await withWorkflowSpan(
+        'provider.video.submit',
+        { 'lightframe.provider': job.providerId, 'lightframe.operation': job.operation },
+        () =>
+          job.binding.provider.submit({
+            operation: job.operation,
+            recipe,
+            videoPath: job.inputPath,
+            videoMimeType: inspected.mimeType,
+            referenceImagePath: job.referencePath,
+            referenceImageMimeType: job.referenceMimeType,
+            outputResolution: job.outputResolution,
+            signal: job.operationController.signal,
+          }),
+      );
       if (!this.#ownsMutableJob(job)) {
         await this.#cleanupFiles(job);
         return;
@@ -906,11 +916,20 @@ export class VideoJobService {
   async #retrieve(job: VideoJobRecord): Promise<void> {
     try {
       job.retrievalAttempts += 1;
-      await job.binding.provider.download(
-        job.providerJobId!,
-        job.outputPath,
-        job.operationController.signal,
-        job.providerOutputLocation,
+      await withWorkflowSpan(
+        'provider.video.retrieve',
+        {
+          'lightframe.provider': job.providerId,
+          'lightframe.operation': job.operation,
+          'lightframe.attempt': job.retrievalAttempts,
+        },
+        () =>
+          job.binding.provider.download(
+            job.providerJobId!,
+            job.outputPath,
+            job.operationController.signal,
+            job.providerOutputLocation,
+          ),
       );
       if (!this.#ownsMutableJob(job)) {
         await this.#cleanupFiles(job);
@@ -963,9 +982,14 @@ export class VideoJobService {
     job.refreshPromise = (async () => {
       try {
         const previousStatus = job.status;
-        const providerStatus = await job.binding.provider.status(
-          job.providerJobId!,
-          job.operationController.signal,
+        const providerStatus = await withWorkflowSpan(
+          'provider.video.poll',
+          {
+            'lightframe.provider': job.providerId,
+            'lightframe.operation': job.operation,
+            'lightframe.attempt': job.providerPollAttempt,
+          },
+          () => job.binding.provider.status(job.providerJobId!, job.operationController.signal),
         );
         if (!this.#ownsMutableJob(job)) return;
         job.hasPolledProvider = true;

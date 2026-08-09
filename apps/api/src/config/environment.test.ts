@@ -31,6 +31,8 @@ describe('parseEnvironment', () => {
       elevenLabsModelId: DEFAULT_ELEVENLABS_STS_MODEL_ID,
       elevenLabsEnableLogging: false,
       lightframeDataDir: DEFAULT_LIGHTFRAME_DATA_DIR,
+      telemetryEnabled: false,
+      otelTraceSampleRatio: 0.1,
       referenceImageTimeoutMs: DEFAULT_REFERENCE_IMAGE_TIMEOUT_MS,
       openAiPromptOptimizerModel: 'gpt-5.6',
       openAiPromptOptimizerReasoning: 'medium',
@@ -46,6 +48,26 @@ describe('parseEnvironment', () => {
       wiroReferenceImageModel: 'seedream-v5-lite-uncensored',
       wiroReferenceImageTimeoutMs: DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
     });
+  });
+
+  it('enables tracing only with an explicit OTLP endpoint and sampling ratio', () => {
+    expect(
+      parseEnvironment({
+        OTEL_TRACING_ENABLED: 'true',
+        OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: ' https://otel.example.test/v1/traces ',
+        OTEL_TRACE_SAMPLE_RATIO: '0.25',
+      }),
+    ).toMatchObject({
+      telemetryEnabled: true,
+      otelExporterEndpoint: 'https://otel.example.test/v1/traces',
+      otelTraceSampleRatio: 0.25,
+    });
+    expect(() => parseEnvironment({ OTEL_TRACING_ENABLED: 'true' })).toThrow(
+      'OTEL_EXPORTER_OTLP_TRACES_ENDPOINT',
+    );
+    expect(() => parseEnvironment({ OTEL_TRACE_SAMPLE_RATIO: '1.01' })).toThrow(
+      EnvironmentValidationError,
+    );
   });
 
   it('accepts an explicit Neon and private R2 configuration', () => {

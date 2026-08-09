@@ -40,6 +40,7 @@ export type ProviderAvailability = {
   referenceImageOptimizerModel?: string | null;
   referenceImageOptimizerVersion?: string | null;
   wardrobeAddOutfitAvailable?: boolean;
+  directSavedVideoUploadAvailable?: boolean;
 };
 
 export type BrowserCapabilities = {

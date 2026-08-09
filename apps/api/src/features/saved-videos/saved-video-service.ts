@@ -15,6 +15,7 @@ import {
 import { normalizeSavedVideoTitle } from '@studio/domain';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
 import { AppError } from '../../http/app-error.js';
+import { withWorkflowSpan } from '../../observability/telemetry.js';
 import { inspectSavedVideoFile } from './saved-video-inspection.js';
 import type {
   SavedVideoReceipt,
@@ -23,7 +24,7 @@ import type {
   StoredVideoVersion,
 } from './saved-video-repository.js';
 
-const safeFilename = (value: string, mimeType: string): string => {
+export const safeSavedVideoFilename = (value: string, mimeType: string): string => {
   const extension =
     mimeType === 'video/mp4' ? '.mp4' : mimeType === 'video/quicktime' ? '.mov' : '.webm';
   const stem =
@@ -184,7 +185,7 @@ export class SavedVideoService {
     const inspected = await this.#inspect(sourcePath);
     const createdAt = this.#now().toISOString();
     const assetId = randomUUID();
-    const filename = safeFilename(metadata.filename, inspected.mimeType);
+    const filename = safeSavedVideoFilename(metadata.filename, inspected.mimeType);
     await this.#bytes.storeFile({
       assetId,
       ownerUserId,
@@ -194,6 +195,26 @@ export class SavedVideoService {
       filename,
       createdAt,
     });
+    return this.#versionFromStoredAsset(
+      ownerUserId,
+      videoId,
+      ordinal,
+      assetId,
+      metadata,
+      inspected,
+      createdAt,
+    );
+  }
+
+  #versionFromStoredAsset(
+    ownerUserId: string,
+    videoId: string,
+    ordinal: number,
+    assetId: string,
+    metadata: SavedVideoUploadMetadata,
+    inspected: InspectedVideo,
+    createdAt: string,
+  ): StoredVideoVersion {
     return {
       id: randomUUID(),
       videoId,
@@ -206,7 +227,7 @@ export class SavedVideoService {
       assetId,
       thumbnailAssetId: null,
       mimeType: inspected.mimeType,
-      filename,
+      filename: safeSavedVideoFilename(metadata.filename, inspected.mimeType),
       sizeBytes: inspected.sizeBytes,
       durationMs: Math.max(1, Math.round(inspected.durationMs)),
       width: inspected.width,
@@ -219,6 +240,22 @@ export class SavedVideoService {
     await this.#bytes.delete(ownerUserId, assetId).catch(() => undefined);
   }
 
+  #findReceipt(ownerUserId: string, idempotencyKey: string): Promise<SavedVideoReceipt | null> {
+    return withWorkflowSpan('db.saved_video.idempotency_lookup', {}, () =>
+      this.#repository.findReceipt(ownerUserId, idempotencyKey),
+    );
+  }
+
+  async #findIdempotentResult(
+    ownerUserId: string,
+    idempotencyKey: string,
+  ): Promise<SavedVideoDetail | null> {
+    const receipt = await this.#findReceipt(ownerUserId, idempotencyKey);
+    if (receipt === null) return null;
+    const aggregate = await this.#repository.get(ownerUserId, receipt.videoId);
+    return aggregate === null ? null : publicDetail(aggregate);
+  }
+
   async saveNew(
     ownerUserId: string,
     idempotencyKey: string,
@@ -226,11 +263,8 @@ export class SavedVideoService {
     metadata: SavedVideoUploadMetadata,
     checksumSha256?: string,
   ): Promise<SavedVideoDetail> {
-    const prior = await this.#repository.findReceipt(ownerUserId, idempotencyKey);
-    if (prior !== null) {
-      const aggregate = await this.#repository.get(ownerUserId, prior.videoId);
-      if (aggregate !== null) return publicDetail(aggregate);
-    }
+    const prior = await this.#findIdempotentResult(ownerUserId, idempotencyKey);
+    if (prior !== null) return prior;
     const videoId = randomUUID();
     const version = await this.#versionFromUpload(
       ownerUserId,
@@ -282,11 +316,8 @@ export class SavedVideoService {
     metadata: SavedVideoUploadMetadata,
     checksumSha256?: string,
   ): Promise<SavedVideoDetail> {
-    const prior = await this.#repository.findReceipt(ownerUserId, idempotencyKey);
-    if (prior !== null) {
-      const aggregate = await this.#repository.get(ownerUserId, prior.videoId);
-      if (aggregate !== null) return publicDetail(aggregate);
-    }
+    const prior = await this.#findIdempotentResult(ownerUserId, idempotencyKey);
+    if (prior !== null) return prior;
     const aggregate = await this.#repository.get(ownerUserId, videoId);
     if (aggregate === null)
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
@@ -330,6 +361,136 @@ export class SavedVideoService {
     }
     if (typeof result === 'string' || !result.versions.some((item) => item.id === version.id)) {
       await this.#deleteAsset(ownerUserId, version.assetId);
+    }
+    if (result === 'not-found')
+      throw new AppError(404, 'not_found', 'That saved video is unavailable.');
+    if (result === 'conflict')
+      throw new AppError(
+        409,
+        'conflict',
+        'The saved video changed before this version could be added.',
+      );
+    return publicDetail(result);
+  }
+
+  async saveNewFromStagedAsset(
+    ownerUserId: string,
+    idempotencyKey: string,
+    assetId: string,
+    metadata: SavedVideoUploadMetadata,
+    inspected: InspectedVideo,
+    createdAt: string,
+  ): Promise<SavedVideoDetail> {
+    const prior = await this.#findIdempotentResult(ownerUserId, idempotencyKey);
+    if (prior !== null) {
+      await this.#deleteAsset(ownerUserId, assetId);
+      return prior;
+    }
+    const videoId = randomUUID();
+    const version = this.#versionFromStoredAsset(
+      ownerUserId,
+      videoId,
+      1,
+      assetId,
+      metadata,
+      inspected,
+      createdAt,
+    );
+    const aggregate: StoredSavedVideoAggregate = {
+      video: {
+        id: videoId,
+        ownerUserId,
+        title: normalizeSavedVideoTitle(metadata.title),
+        currentVersionId: version.id,
+        sourceVideoId: metadata.sourceVideoId,
+        status: 'ready',
+        createdAt,
+        updatedAt: createdAt,
+        deletedAt: null,
+      },
+      versions: [version],
+      revision: 1,
+    };
+    const receipt: SavedVideoReceipt = {
+      idempotencyKey,
+      videoId,
+      versionId: version.id,
+      createdAt,
+    };
+    try {
+      const saved = await this.#repository.create(ownerUserId, aggregate, receipt);
+      if (!saved.versions.some((savedVersion) => savedVersion.id === version.id)) {
+        await this.#deleteAsset(ownerUserId, assetId);
+      }
+      return publicDetail(saved);
+    } catch (error) {
+      await this.#deleteAsset(ownerUserId, assetId);
+      throw error;
+    }
+  }
+
+  async appendVersionFromStagedAsset(
+    ownerUserId: string,
+    videoId: string,
+    expectedVersionId: string,
+    idempotencyKey: string,
+    assetId: string,
+    metadata: SavedVideoUploadMetadata,
+    inspected: InspectedVideo,
+    createdAt: string,
+  ): Promise<SavedVideoDetail> {
+    const prior = await this.#findIdempotentResult(ownerUserId, idempotencyKey);
+    if (prior !== null) {
+      await this.#deleteAsset(ownerUserId, assetId);
+      return prior;
+    }
+    const aggregate = await this.#repository.get(ownerUserId, videoId);
+    if (aggregate === null) {
+      await this.#deleteAsset(ownerUserId, assetId);
+      throw new AppError(404, 'not_found', 'That saved video is unavailable.');
+    }
+    if (aggregate.video.currentVersionId !== expectedVersionId) {
+      await this.#deleteAsset(ownerUserId, assetId);
+      throw new AppError(
+        409,
+        'conflict',
+        'The saved video changed before this version could be added.',
+      );
+    }
+    const version = this.#versionFromStoredAsset(
+      ownerUserId,
+      videoId,
+      aggregate.versions.length + 1,
+      assetId,
+      {
+        ...metadata,
+        sourceVideoId: aggregate.video.sourceVideoId,
+        sourceVersionId: expectedVersionId,
+      },
+      inspected,
+      createdAt,
+    );
+    const receipt: SavedVideoReceipt = {
+      idempotencyKey,
+      videoId,
+      versionId: version.id,
+      createdAt,
+    };
+    let result: Awaited<ReturnType<SavedVideoRepository['append']>>;
+    try {
+      result = await this.#repository.append(
+        ownerUserId,
+        videoId,
+        expectedVersionId,
+        version,
+        receipt,
+      );
+    } catch (error) {
+      await this.#deleteAsset(ownerUserId, assetId);
+      throw error;
+    }
+    if (typeof result === 'string' || !result.versions.some((item) => item.id === version.id)) {
+      await this.#deleteAsset(ownerUserId, assetId);
     }
     if (result === 'not-found')
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
@@ -410,6 +571,13 @@ export class SavedVideoService {
     if (aggregate === null)
       throw new AppError(404, 'not_found', 'That saved video is unavailable.');
     return publicDetail(aggregate);
+  }
+
+  async findByIdempotencyKey(
+    ownerUserId: string,
+    idempotencyKey: string,
+  ): Promise<SavedVideoDetail | null> {
+    return this.#findIdempotentResult(ownerUserId, idempotencyKey);
   }
 
   async rename(ownerUserId: string, videoId: string, title: string): Promise<SavedVideoDetail> {
@@ -493,11 +661,13 @@ export class SavedVideoService {
     if (version.thumbnailAssetId !== null) return publicDetail(aggregate);
     let thumbnail: Buffer;
     try {
-      thumbnail = await sharp(input, { failOn: 'error', limitInputPixels: 20_000_000 })
-        .rotate()
-        .resize(480, 270, { fit: 'cover', position: 'centre', withoutEnlargement: true })
-        .webp({ quality: 78 })
-        .toBuffer();
+      thumbnail = await withWorkflowSpan('media.sharp.saved_video_thumbnail', {}, () =>
+        sharp(input, { failOn: 'error', limitInputPixels: 20_000_000 })
+          .rotate()
+          .resize(480, 270, { fit: 'cover', position: 'centre', withoutEnlargement: true })
+          .webp({ quality: 78 })
+          .toBuffer(),
+      );
     } catch (error) {
       throw new AppError(400, 'validation_error', 'Provide a valid WebP video thumbnail.', {
         cause: error,

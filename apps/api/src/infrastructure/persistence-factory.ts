@@ -8,6 +8,7 @@ import { DrizzleAssetLifecycleRegistry } from './database/asset-lifecycle-regist
 import { DrizzleSessionRepository, DrizzleUserRepository } from './database/auth-repositories.js';
 import { createNeonDatabase } from './database/client.js';
 import { DrizzleCreativeLibraryRepository } from './database/creative-library-repository.js';
+import { DrizzleDirectUploadRepository } from './database/direct-upload-repository.js';
 import { DrizzleProcessingJobTraceWriter } from './database/processing-job-repository.js';
 import { DrizzleReferenceImageAssetStore } from './database/reference-image-asset-store.js';
 import { DrizzleSavedVideoRepository } from './database/saved-video-repository.js';
@@ -54,8 +55,10 @@ export const createConfiguredPersistence = async (
     const lifecycle = new DrizzleAssetLifecycleRegistry(connection.db);
     const localBytes = new LocalAssetByteStore(config.lightframeDataDir);
     let assetBytes: AssetByteStore;
+    let directR2Storage: R2AssetByteStore | undefined;
     if (config.assetStoreProvider === 'r2') {
       const remoteBytes = r2Store(config, lifecycle);
+      directR2Storage = remoteBytes;
       assetBytes =
         config.databaseMode === 'shadow'
           ? new ShadowAssetByteStore(remoteBytes, localBytes)
@@ -92,6 +95,14 @@ export const createConfiguredPersistence = async (
           );
         },
       ),
+      ...(directR2Storage === undefined
+        ? {}
+        : {
+            directVideoUploads: {
+              repository: new DrizzleDirectUploadRepository(connection.db),
+              storage: directR2Storage,
+            },
+          }),
       close: () => connection.close(),
     };
   } catch (error) {

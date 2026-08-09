@@ -1,7 +1,7 @@
 # Neon, Drizzle, and Cloudflare R2
 
 **Status:** implemented, configuration-gated infrastructure; local remains the default  
-**Reviewed:** 2026-08-07
+**Reviewed:** 2026-08-09
 
 This is the canonical setup, migration, rollback, and limitation guide for cloud persistence. It
 does not authorize public exposure: Elysia on Bun still binds only to `127.0.0.1`, and the seeded demo
@@ -18,6 +18,14 @@ account is not production identity or tenancy.
 - A private R2 `AssetByteStore` with opaque keys, streaming/multipart upload, app-owned SHA-256,
   byte-range reads, owner checks, database lifecycle states, multipart abort/cleanup, and deletion
   tombstones. R2 ETags are retained only as transport metadata, never as the integrity checksum.
+- Authoritative Neon/R2 Saved Video uploads use an owner-scoped staged row and headless Uppy. The
+  browser receives only the staged UUID and five-minute exact-part presigned URLs; bucket, key, and
+  provider multipart scope appear only inside those bearer URLs, while credentials stay
+  server-side. Completion verifies R2 HEAD metadata,
+  downloads through a protected bounded temporary file, computes SHA-256, runs MediaBunny
+  inspection, registers the asset, and transactionally attaches it before the row becomes ready.
+  Stages expire after one hour; abandoned parts and untrusted completed objects are aborted or
+  removed. A completed idempotency receipt wins over expiry cleanup after a restart.
 - Restart recovery for provider jobs that already have a durable provider job ID. A restart never
   repeats an initial billable submission. Interrupted submissions without a durable provider ID
   become ambiguous; pre-submission work becomes failed and requires another explicit request.
@@ -51,8 +59,11 @@ account is not production identity or tenancy.
 
 `ASSET_STORE_PROVIDER=r2` requires `DATABASE_MODE=shadow` or `neon`. Reference-image and creative
 metadata stay local in `shadow`; their database adapters become authoritative only in `neon`.
-The R2 adapter streams uploads and reads; it never buffers an entire large video solely to cross
-the storage boundary. Once an asset has been registered, its storage provider, R2 account, bucket,
+Direct browser upload is therefore advertised only for `DATABASE_MODE=neon` with
+`ASSET_STORE_PROVIDER=r2`. `local` preserves the existing filesystem upload; `shadow` preserves
+the existing API-mediated upload because its rollback contract requires the API to create both R2
+and local copies. The R2 adapter streams uploads and reads; it never buffers an entire large video
+solely to cross the storage boundary. Once an asset has been registered, its storage provider, R2 account, bucket,
 and key-prefix namespace are immutable configuration. Changing any of them requires a separately
 reviewed byte migration plus database and bucket inventory verification; changing environment
 values alone is not a migration. The Neon gallery path applies filtering, ordering, pagination,
@@ -65,20 +76,41 @@ counts, and facets in SQL rather than materializing the owner library in applica
 2. Give the R2 key permission only for the selected bucket and object operations used by the app.
 3. Set the server-only variables documented in [`.env.example`](../.env.example). Never use a
    `VITE_*` variable for database or R2 credentials.
-4. Generate/check migrations after schema edits, then apply them to the selected Neon database:
+4. Configure the private bucket CORS policy for only the exact browser origins in use. The normal
+   checked development and built loopback origins are shown below; remove either when it is not
+   used, and replace them with the exact origin of any separately approved deployment. Do not use
+   `*` for origins or headers.
+
+   ```json
+   [
+     {
+       "AllowedOrigins": ["http://127.0.0.1:4173", "http://127.0.0.1:4100"],
+       "AllowedMethods": ["PUT"],
+       "AllowedHeaders": ["Content-Type"],
+       "ExposeHeaders": ["ETag"],
+       "MaxAgeSeconds": 3600
+     }
+   ]
+   ```
+
+   Multipart create, list, sign, abort, and complete calls remain same-origin API operations. Only
+   part `PUT` requests cross directly to R2. Treat each presigned URL as a short-lived bearer
+   capability: never persist, log, trace, or send it elsewhere.
+
+5. Generate/check migrations after schema edits, then apply them to the selected Neon database:
 
    ```bash
    bun run --filter @studio/api db:check
    bun run --filter @studio/api db:migrate
    ```
 
-5. Inventory existing local data without writing to Neon or R2:
+6. Inventory existing local data without writing to Neon or R2:
 
    ```bash
    bun run --filter @studio/api db:backfill-local
    ```
 
-6. After reviewing the JSON counts/bytes/missing-assets result, run the explicit idempotent apply:
+7. After reviewing the JSON counts/bytes/missing-assets result, run the explicit idempotent apply:
 
    ```bash
    bun run --filter @studio/api db:backfill-local -- --apply
@@ -88,8 +120,12 @@ counts, and facets in SQL rather than materializing the owner library in applica
    write. Apply stops on missing bytes, checksum conflicts, inconsistent version lineage, or
    transaction conflicts. It prints a second verification record after writes complete.
 
-7. Run in `shadow`, exercise save/range/playback/reference/voice flows, and reconcile counts and
+8. Run in `shadow`, exercise save/range/playback/reference/voice flows, and reconcile counts and
    checksums. Switch to `neon` only after that evidence is clean.
+
+If the application later becomes geographically distributed, test R2 Local Uploads as a separate
+bucket-setting experiment. It requires no application package and does not change the authorization,
+verification, lifecycle, or cleanup contracts above.
 
 ## Rollback and deletion
 

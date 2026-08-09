@@ -15,6 +15,14 @@ const api = vi.hoisted(() => ({
         input: SaveVideoInput,
       ) => Promise<SavedVideoDetail>
     >(),
+  appendSavedVideoVersionDirect:
+    vi.fn<
+      (
+        videoId: string,
+        expectedVersionId: string,
+        input: SaveVideoInput,
+      ) => Promise<SavedVideoDetail>
+    >(),
   saveSavedVideoThumbnail:
     vi.fn<
       (
@@ -25,13 +33,16 @@ const api = vi.hoisted(() => ({
       ) => Promise<SavedVideoDetail>
     >(),
   saveVideo: vi.fn<(input: SaveVideoInput) => Promise<SavedVideoDetail>>(),
+  saveVideoDirect: vi.fn<(input: SaveVideoInput) => Promise<SavedVideoDetail>>(),
   createSavedVideoThumbnail: vi.fn<(video: Blob, signal: AbortSignal) => Promise<Blob>>(),
 }));
 
 vi.mock('../../adapters/api-client/savedVideosApi', () => ({
   appendSavedVideoVersion: api.appendSavedVideoVersion,
+  appendSavedVideoVersionDirect: api.appendSavedVideoVersionDirect,
   saveSavedVideoThumbnail: api.saveSavedVideoThumbnail,
   saveVideo: api.saveVideo,
+  saveVideoDirect: api.saveVideoDirect,
 }));
 vi.mock('./thumbnailClient', () => ({
   createSavedVideoThumbnail: api.createSavedVideoThumbnail,
@@ -92,8 +103,10 @@ const artifact = (
 describe('useSaveVideo', () => {
   beforeEach(() => {
     api.appendSavedVideoVersion.mockReset().mockResolvedValue(savedVideo);
+    api.appendSavedVideoVersionDirect.mockReset().mockResolvedValue(savedVideo);
     api.saveSavedVideoThumbnail.mockReset().mockResolvedValue(savedVideo);
     api.saveVideo.mockReset().mockResolvedValue(savedVideo);
+    api.saveVideoDirect.mockReset().mockResolvedValue(savedVideo);
     api.createSavedVideoThumbnail
       .mockReset()
       .mockResolvedValue(new Blob(['thumbnail'], { type: 'image/webp' }));
@@ -158,6 +171,23 @@ describe('useSaveVideo', () => {
 
     act(() => result.current.reset());
     expect(result.current.state).toEqual({ status: 'idle' });
+  });
+
+  it('selects direct multipart adapters only when the server capability enables them', async () => {
+    const { result } = renderHook(() => useSaveVideo(true));
+
+    await act(async () => {
+      await result.current.save(artifact());
+      await result.current.replace(artifact('edited'), {
+        videoId,
+        currentVersionId: versionId,
+      });
+    });
+
+    expect(api.saveVideoDirect).toHaveBeenCalledOnce();
+    expect(api.appendSavedVideoVersionDirect).toHaveBeenCalledOnce();
+    expect(api.saveVideo).not.toHaveBeenCalled();
+    expect(api.appendSavedVideoVersion).not.toHaveBeenCalled();
   });
 
   it('coalesces same-tick save attempts before React publishes the saving state', async () => {

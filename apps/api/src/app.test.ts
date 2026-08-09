@@ -27,6 +27,10 @@ describe('API shell', () => {
     const capabilities = await app.inject({ method: 'GET', url: '/api/capabilities' });
 
     expect(health.json()).toEqual({ ok: true });
+    expect(health.headers['x-request-id']).toMatch(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/u,
+    );
+    expect(health.headers['x-trace-id']).toBeUndefined();
     expect(capabilities.json()).toEqual({
       realtimeVideo: { available: false },
       videoProcessing: {
@@ -65,6 +69,7 @@ describe('API shell', () => {
         },
       },
       wardrobe: { addOutfitAvailable: false },
+      savedVideos: { directMultipartUpload: false },
     });
     expect(capabilities.body).not.toContain('apiKey');
   });

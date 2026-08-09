@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SavedVideoDetail, SavedVideoOrigin } from '@studio/contracts';
 import {
   appendSavedVideoVersion,
+  appendSavedVideoVersionDirect,
   saveSavedVideoThumbnail,
   saveVideo,
+  saveVideoDirect,
 } from '../../adapters/api-client/savedVideosApi';
 import type { RecordingArtifact } from '../recording/types';
 import { createSavedVideoThumbnail } from './thumbnailClient';
@@ -41,7 +43,7 @@ const originForArtifact = (artifact: RecordingArtifact): SavedVideoOrigin => {
   }
 };
 
-export const useSaveVideo = () => {
+export const useSaveVideo = (directMultipartUpload = false) => {
   const [state, setState] = useState<SaveVideoState>({ status: 'idle' });
   const keys = useRef(new Map<string, string>());
   const controller = useRef<AbortController | null>(null);
@@ -62,7 +64,7 @@ export const useSaveVideo = () => {
       controller.current = active;
       setState({ status: 'saving', artifactId: artifact.id });
       try {
-        const video = await saveVideo({
+        const video = await (directMultipartUpload ? saveVideoDirect : saveVideo)({
           blob: artifact.media,
           title: savedVideoName(artifact, title),
           filename: artifact.filename,
@@ -97,7 +99,7 @@ export const useSaveVideo = () => {
         if (controller.current === active) controller.current = null;
       }
     },
-    [],
+    [directMultipartUpload],
   );
 
   const replace = useCallback(
@@ -115,7 +117,10 @@ export const useSaveVideo = () => {
       controller.current = active;
       setState({ status: 'saving', artifactId: artifact.id });
       try {
-        const video = await appendSavedVideoVersion(target.videoId, target.currentVersionId, {
+        const saveVersion = directMultipartUpload
+          ? appendSavedVideoVersionDirect
+          : appendSavedVideoVersion;
+        const video = await saveVersion(target.videoId, target.currentVersionId, {
           blob: artifact.media,
           title: savedVideoName(artifact, title),
           filename: artifact.filename,
@@ -150,7 +155,7 @@ export const useSaveVideo = () => {
         if (controller.current === active) controller.current = null;
       }
     },
-    [],
+    [directMultipartUpload],
   );
 
   const reset = useCallback(() => {

@@ -74,6 +74,8 @@ The retained suite protects:
 - versioned/sanitized user-scoped Recipe Shelf and Character Builder persistence, recovery,
   legacy-key migration, Neon creative-library CAS conflict safety, and destructive actions;
 - storage-neutral byte streams, private opaque R2 keys, lifecycle registration, range reads,
+  exact-scope direct-part signing, staged upload ownership/expiry, post-upload declaration and
+  media verification, abandoned multipart cleanup, local/shadow path preservation,
   database-level gallery paging, durable-session boundaries, accepted-job restart without a second
   billable submission, admission limits, and bounded expired-job tombstones;
 - app-owned saved-voice membership, first-read claim, owner-checked preview/conversion, and proof

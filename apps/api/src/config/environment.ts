@@ -74,6 +74,11 @@ const positiveLimitSchema = (defaultValue: number) =>
     z.coerce.number().int().min(1).max(100),
   );
 
+const samplingRatioSchema = z.preprocess(
+  (value) => (value === undefined || value === '' ? 0.1 : value),
+  z.coerce.number().min(0).max(1),
+);
+
 const environmentSchema = z
   .object({
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
@@ -156,6 +161,16 @@ const environmentSchema = z
         .regex(/^[a-z0-9][a-z0-9/_-]{0,127}$/u)
         .default('media/v1'),
     ),
+    OTEL_TRACING_ENABLED: strictBooleanSchema(false),
+    OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: z.preprocess(
+      normalizeOptionalString,
+      z
+        .string()
+        .url()
+        .regex(/^https?:\/\//u)
+        .optional(),
+    ),
+    OTEL_TRACE_SAMPLE_RATIO: samplingRatioSchema,
     VIDEO_JOB_MAX_ACTIVE: positiveLimitSchema(DEFAULT_VIDEO_JOB_MAX_ACTIVE),
     VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER: positiveLimitSchema(
       DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
@@ -291,6 +306,13 @@ const environmentSchema = z
         message: 'VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER cannot exceed VIDEO_JOB_MAX_ACTIVE.',
       });
     }
+    if (value.OTEL_TRACING_ENABLED && value.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['OTEL_EXPORTER_OTLP_TRACES_ENDPOINT'],
+        message: 'Set OTEL_EXPORTER_OTLP_TRACES_ENDPOINT when tracing is enabled.',
+      });
+    }
     if (value.NODE_ENV === 'production' && value.AUTH_JWT_SECRET === DEFAULT_DEMO_JWT_SECRET) {
       context.addIssue({
         code: 'custom',
@@ -334,6 +356,9 @@ export interface RuntimeConfig {
   readonly r2SecretAccessKey?: string;
   readonly r2Bucket?: string;
   readonly r2KeyPrefix: string;
+  readonly telemetryEnabled: boolean;
+  readonly otelExporterEndpoint?: string;
+  readonly otelTraceSampleRatio: number;
   readonly videoJobMaxActive: number;
   readonly videoJobMaxActivePerProvider: number;
   readonly decartApiKey?: string;
@@ -474,6 +499,11 @@ export const parseEnvironment = (
       : { r2SecretAccessKey: result.data.R2_SECRET_ACCESS_KEY }),
     ...(result.data.R2_BUCKET === undefined ? {} : { r2Bucket: result.data.R2_BUCKET }),
     r2KeyPrefix: result.data.R2_KEY_PREFIX,
+    telemetryEnabled: result.data.OTEL_TRACING_ENABLED,
+    ...(result.data.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT === undefined
+      ? {}
+      : { otelExporterEndpoint: result.data.OTEL_EXPORTER_OTLP_TRACES_ENDPOINT }),
+    otelTraceSampleRatio: result.data.OTEL_TRACE_SAMPLE_RATIO,
     videoJobMaxActive: result.data.VIDEO_JOB_MAX_ACTIVE,
     videoJobMaxActivePerProvider: result.data.VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
     ...(result.data.DECART_API_KEY === undefined
