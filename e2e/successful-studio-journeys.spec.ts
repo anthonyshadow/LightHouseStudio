@@ -714,7 +714,11 @@ test('Save enables Release and clears the reviewed take without reacquiring medi
 
   const browser = await readBrowserState(page);
   expect(browser.cameraCalls).toBe(1);
-  expect(browser.createdObjectUrls).toHaveLength(1);
+  // Chromium may reject the synthetic media fixture and exercise the one-shot
+  // object URL repair path before release. Both paths must retain URL ownership.
+  expect(browser.createdObjectUrls.length).toBeGreaterThanOrEqual(1);
+  expect(browser.createdObjectUrls.length).toBeLessThanOrEqual(2);
+  expect(new Set(browser.createdObjectUrls).size).toBe(browser.createdObjectUrls.length);
   expect(browser.revokedObjectUrls).toEqual(browser.createdObjectUrls);
   expect(browser.lifecycleEvents).toContain('local-video-stopped');
   expect(browser.lifecycleEvents).toContain('local-audio-stopped');
