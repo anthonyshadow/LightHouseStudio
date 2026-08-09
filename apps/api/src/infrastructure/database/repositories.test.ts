@@ -588,6 +588,7 @@ describe('DrizzleProcessingJobTraceWriter', () => {
       [],
       [],
       [],
+      [],
       [resumable, { ...resumable, providerJobId: null }],
     );
     const repository = new DrizzleProcessingJobTraceWriter(scripted.db);
@@ -601,6 +602,13 @@ describe('DrizzleProcessingJobTraceWriter', () => {
         updatedAt: now,
         expiresAt: '2026-08-07T13:00:00.000Z',
       }),
+    ]);
+    expect(
+      scripted.calls.filter((call) => call.operation === 'set').map((call) => call.arguments[0]),
+    ).toEqual([
+      expect.objectContaining({ status: 'expired', safeErrorCode: 'job_expired' }),
+      expect.objectContaining({ status: 'ambiguous' }),
+      expect.objectContaining({ status: 'failed' }),
     ]);
     expect(scripted.remaining()).toBe(0);
   });

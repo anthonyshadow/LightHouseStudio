@@ -296,6 +296,9 @@ const acceptedJobInterruptionMessage = (error: unknown, fallback: string): strin
   return fallback;
 };
 
+const submissionAcceptanceIsUnknown = (error: unknown): boolean =>
+  !(error instanceof ApiClientError) || (error.status === 502 && error.code === 'invalid-response');
+
 export const useExistingVideoWorkflow = ({
   recording,
   processing,
@@ -1261,7 +1264,11 @@ export const useExistingVideoWorkflow = ({
         );
         await completeVisualArtifact(visualArtifact, selectedVoice);
       } catch (error) {
-        if (submissionRequestStarted && !submissionAccepted) {
+        if (
+          submissionRequestStarted &&
+          !submissionAccepted &&
+          submissionAcceptanceIsUnknown(error)
+        ) {
           updateSubmissionOperation({ jobId, stepIndex, state: 'acceptance-unknown' });
           setRetryJob({ jobId, stepIndex });
           const safeMessage =

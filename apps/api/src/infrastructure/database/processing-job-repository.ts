@@ -1,5 +1,5 @@
 import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
-import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, lte, sql } from 'drizzle-orm';
 import { toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   DurableProcessingJobRepository,
@@ -102,6 +102,28 @@ export class DrizzleProcessingJobTraceWriter
     await this.db
       .update(processingJobs)
       .set({
+        status: 'expired',
+        safeErrorCode: 'job_expired',
+        completedAt: now,
+        updatedAt: now,
+      })
+      .where(
+        and(
+          inArray(processingJobs.status, [
+            'pending',
+            'validating',
+            'submitting',
+            'accepted',
+            'queued',
+            'processing',
+            'retrieving',
+          ]),
+          lte(processingJobs.expiresAt, now),
+        ),
+      );
+    await this.db
+      .update(processingJobs)
+      .set({
         status: 'ambiguous',
         safeErrorCode: 'provider_rejected',
         completedAt: now,
@@ -109,8 +131,7 @@ export class DrizzleProcessingJobTraceWriter
       })
       .where(
         and(
-          eq(processingJobs.status, 'submitting'),
-          isNull(processingJobs.providerJobId),
+          inArray(processingJobs.status, ['submitting', 'accepted']),
           gt(processingJobs.expiresAt, now),
         ),
       );

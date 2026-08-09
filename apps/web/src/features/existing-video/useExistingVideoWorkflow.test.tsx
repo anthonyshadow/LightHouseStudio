@@ -883,6 +883,31 @@ describe('useExistingVideoWorkflow', () => {
     unmount();
   });
 
+  it('treats an active-job conflict as a known rejection instead of an accepted job', async () => {
+    adapters.submitVideoJob.mockRejectedValueOnce(
+      new ApiClientError(
+        'Finish the active video job before starting another.',
+        409,
+        'generation_in_progress',
+      ),
+    );
+    const { result, unmount } = await configuredVisualWorkflow();
+
+    await act(async () => result.current.submitStep(0));
+
+    expect(result.current.phase).toBe('error');
+    expect(result.current.message).toBe('Finish the active video job before starting another.');
+    expect(result.current.submissionOperation).toBeNull();
+    expect(result.current.acceptedSubmission).toBe(false);
+    expect(result.current.retryJob).toBeNull();
+
+    await act(async () => result.current.submitStep(0));
+
+    expect(adapters.submitVideoJob).toHaveBeenCalledTimes(2);
+    expect(submittedJobIdAt(1)).not.toBe(submittedJobIdAt(0));
+    unmount();
+  });
+
   it('requires confirmed not-found and an explicit action before allocating a new UUID', async () => {
     adapters.submitVideoJob.mockRejectedValueOnce(
       new ApiClientError('The video job response was invalid.', 502, 'invalid-response'),
