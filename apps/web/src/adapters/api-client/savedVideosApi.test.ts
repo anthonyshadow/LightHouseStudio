@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import type { SavedVideoDetail, SavedVideoSummary } from '@studio/contracts';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
 import {
   appendSavedVideoVersion,
   deleteSavedVideo,
@@ -13,6 +13,13 @@ import {
   savedVideoThumbnailUrl,
   saveVideo,
 } from './savedVideosApi';
+import {
+  captureRequests,
+  galleryPaginationScenario,
+  jsonScenario,
+  responseScenario,
+} from '../../test/msw/handlers';
+import { mockApiServer } from '../../test/msw/server';
 
 const videoId = 'c26b5280-1538-44cd-82db-a6b1356acf62';
 const versionId = '2efcc6c3-e82c-419a-8807-c0026170fb75';
@@ -56,32 +63,32 @@ const summary: SavedVideoSummary = {
   updatedAt: detail.updatedAt,
 };
 
-const jsonResponse = (value: unknown): Response =>
-  new Response(JSON.stringify(value), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json' },
-  });
-
 describe('saved videos API client', () => {
-  afterEach(() => vi.unstubAllGlobals());
-
   it('sends create, append, thumbnail, list, rename, and delete contracts', async () => {
-    const fetchMock = vi.fn<typeof fetch>((input) => {
-      const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
-      return Promise.resolve(
-        url.startsWith('/api/videos?')
-          ? jsonResponse({
-              videos: [summary],
-              nextCursor: null,
-              total: 1,
-              facets: { characterNames: ['Mara'], formats: ['landscape'] },
-            })
-          : url === `/api/videos/${videoId}`
-            ? jsonResponse(detail)
-            : jsonResponse(detail),
-      );
-    });
-    vi.stubGlobal('fetch', fetchMock);
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario('POST', '/api/videos', { body: detail }, observe),
+      jsonScenario('POST', `/api/videos/${videoId}/versions`, { body: detail }, observe),
+      jsonScenario(
+        'PUT',
+        `/api/videos/${videoId}/versions/${versionId}/thumbnail`,
+        { body: detail },
+        observe,
+      ),
+      galleryPaginationScenario(
+        {
+          'next page': {
+            videos: [summary],
+            nextCursor: null,
+            total: 1,
+            facets: { characterNames: ['Mara'], formats: ['landscape'] },
+          },
+        },
+        observe,
+      ),
+      jsonScenario('PATCH', `/api/videos/${videoId}`, { body: detail }, observe),
+      responseScenario('DELETE', `/api/videos/${videoId}`, null, { status: 204 }, observe),
+    );
     const blob = new Blob(['video'], { type: 'video/mp4' });
     const input = {
       blob,
@@ -114,19 +121,20 @@ describe('saved videos API client', () => {
     await expect(renameSavedVideo(videoId, 'Renamed')).resolves.toEqual(detail);
     await expect(deleteSavedVideo(videoId)).resolves.toBeUndefined();
 
-    const appendCall = fetchMock.mock.calls[1];
-    expect(appendCall?.[0]).toBe(`/api/videos/${videoId}/versions`);
-    expect(new Headers(appendCall?.[1]?.headers).get('If-Match')).toBe(`"${versionId}"`);
-    expect(fetchMock.mock.calls[3]?.[0]).toContain('cursor=next+page');
-    expect(fetchMock.mock.calls[3]?.[0]).toContain('characterName=Mara');
-    expect(fetchMock.mock.calls[3]?.[0]).toContain('format=landscape');
-    expect(fetchMock.mock.calls[3]?.[0]).toContain('sort=shortest');
+    const appendRequest = requests.find(
+      (request) => new URL(request.url).pathname === `/api/videos/${videoId}/versions`,
+    );
+    expect(appendRequest?.headers.get('If-Match')).toBe(`"${versionId}"`);
+    const listRequest = requests.find((request) => request.method === 'GET');
+    expect(listRequest?.url).toContain('cursor=next+page');
+    expect(listRequest?.url).toContain('characterName=Mara');
+    expect(listRequest?.url).toContain('format=landscape');
+    expect(listRequest?.url).toContain('sort=shortest');
+    const createRequest = requests.find(
+      (request) => request.method === 'POST' && new URL(request.url).pathname === '/api/videos',
+    );
     expect(
-      JSON.parse(
-        decodeURIComponent(
-          new Headers(fetchMock.mock.calls[0]?.[1]?.headers).get('X-Lightframe-Video-Metadata')!,
-        ),
-      ),
+      JSON.parse(decodeURIComponent(createRequest!.headers.get('X-Lightframe-Video-Metadata')!)),
     ).toMatchObject({ characterName: 'Mara', characterVariantName: 'Evening' });
   });
 

@@ -23,6 +23,17 @@ import {
   requestRealtimeToken,
   uploadReferenceImage,
 } from './apiClient';
+import {
+  authenticationExpiryScenario,
+  captureRequests,
+  jsonScenario,
+  malformedContractScenario,
+  providerAvailabilityScenario,
+  responseScenario,
+  serverConflictScenario,
+  uploadFailureScenario,
+} from '../../test/msw/handlers';
+import { mockApiServer } from '../../test/msw/server';
 
 const jpegBytes = new Uint8Array([0xff, 0xd8, 0xff, 0xdb, 0xff, 0xd9]);
 const rawPrompt = 'Substitute the character in the video with an adult lunar cartographer.';
@@ -107,16 +118,9 @@ afterEach(() => {
 
 describe('realtime API client', () => {
   it('suppresses auth-expiry events only for the exact login endpoint', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            error: { code: 'authentication_required', message: 'Sign in to continue.' },
-          }),
-          { status: 401, headers: { 'Content-Type': 'application/json' } },
-        ),
-      ),
+    mockApiServer.use(
+      authenticationExpiryScenario('/api/auth/login'),
+      authenticationExpiryScenario('/api/auth/login-history'),
     );
     const listener = vi.fn();
     window.addEventListener('lightframe:authentication-required', listener);
@@ -134,21 +138,17 @@ describe('realtime API client', () => {
   });
 
   it('preserves the app-owned active-session maximum from the validated token response', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            apiKey: 'short-lived-browser-token',
-            expiresAt: '2030-01-01T00:00:00.000Z',
-            constraints: {
-              model: 'lucy-latest',
-              maxSessionDurationSeconds: 300,
-            },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      ),
+    mockApiServer.use(
+      jsonScenario('POST', '/api/realtime-token', {
+        body: {
+          apiKey: 'short-lived-browser-token',
+          expiresAt: '2030-01-01T00:00:00.000Z',
+          constraints: {
+            model: 'lucy-latest',
+            maxSessionDurationSeconds: 300,
+          },
+        },
+      }),
     );
 
     await expect(
@@ -161,31 +161,25 @@ describe('realtime API client', () => {
   });
 
   it('rejects a missing or mismatched active-session constraint', async () => {
-    const response = (body: unknown) =>
-      new Response(JSON.stringify(body), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      });
-    vi.stubGlobal(
-      'fetch',
-      vi
-        .fn()
-        .mockResolvedValueOnce(
-          response({
+    mockApiServer.use(
+      jsonScenario('POST', '/api/realtime-token', [
+        {
+          body: {
             apiKey: 'short-lived-browser-token',
             expiresAt: '2030-01-01T00:00:00.000Z',
-          }),
-        )
-        .mockResolvedValueOnce(
-          response({
+          },
+        },
+        {
+          body: {
             apiKey: 'short-lived-browser-token',
             expiresAt: '2030-01-01T00:00:00.000Z',
             constraints: {
               model: 'lucy-vton-latest',
               maxSessionDurationSeconds: 300,
             },
-          }),
-        ),
+          },
+        },
+      ]),
     );
 
     await expect(
@@ -205,15 +199,7 @@ describe('reference image API client', () => {
   });
 
   it('normalizes malformed JSON through the endpoint invalid-response contract', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response('{not-json', {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      ),
-    );
+    mockApiServer.use(malformedContractScenario('GET', '/api/capabilities'));
 
     await expect(fetchProviderAvailability()).rejects.toMatchObject({
       code: 'invalid-response',
@@ -221,73 +207,65 @@ describe('reference image API client', () => {
     });
   });
 
-  it('preserves normalized API errors and abort rejections', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValueOnce(
-        new Response(JSON.stringify({ error: { code: 'provider_quota', message: 'Try later.' } }), {
-          status: 429,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      ),
+  it('preserves normalized server conflicts and abort rejections', async () => {
+    mockApiServer.use(
+      serverConflictScenario('GET', '/api/capabilities', 'conflict', 'Refresh capabilities.'),
     );
     await expect(fetchProviderAvailability()).rejects.toMatchObject({
-      code: 'provider_quota',
-      message: 'Try later.',
-      status: 429,
+      code: 'conflict',
+      message: 'Refresh capabilities.',
+      status: 409,
     });
 
-    const aborted = new DOMException('Aborted', 'AbortError');
-    vi.stubGlobal('fetch', vi.fn().mockRejectedValue(aborted));
-    await expect(fetchProviderAvailability(new AbortController().signal)).rejects.toBe(aborted);
+    mockApiServer.use(jsonScenario('GET', '/api/capabilities', { kind: 'pending' }));
+    const controller = new AbortController();
+    const pending = fetchProviderAvailability(controller.signal);
+    controller.abort();
+    await expect(pending).rejects.toMatchObject({ name: 'AbortError' });
   });
 
   it('maps generator and optimizer capability metadata for the workshop', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(
-          JSON.stringify({
-            realtimeVideo: { available: true },
-            videoProcessing: {
-              characterSwap: {
-                available: true,
-                inputPreparation: 'h264-mp4',
-                referencePolicy: 'required',
-                promptInput: 'server-default',
-                promptEnhancement: false,
-                terminalFailureRelease: 'explicit-user',
-                outputResolutions: ['720p', '1080p'],
-              },
-              virtualTryOn: {
-                available: true,
-                inputPreparation: 'none',
-                referencePolicy: 'optional',
-                promptInput: 'editable',
-                promptEnhancement: true,
-                terminalFailureRelease: 'automatic',
-                outputResolutions: ['720p'],
-              },
-            },
-            elevenLabs: { available: false, modelId: null },
-            referenceImages: {
+    mockApiServer.use(
+      providerAvailabilityScenario({
+        body: {
+          realtimeVideo: { available: true },
+          videoProcessing: {
+            characterSwap: {
               available: true,
-              editAvailable: true,
-              providerId: 'openai',
-              modelId: 'gpt-image-2',
-              sizes: ['1024x1024', '1024x1536', '1536x1024'],
-              optimizer: {
-                available: true,
-                model: 'gpt-5.6',
-                version: 'lucy-character-reference-v1',
-              },
+              inputPreparation: 'h264-mp4',
+              referencePolicy: 'required',
+              promptInput: 'server-default',
+              promptEnhancement: false,
+              terminalFailureRelease: 'explicit-user',
+              outputResolutions: ['720p', '1080p'],
             },
-            wardrobe: { addOutfitAvailable: true },
-            savedVideos: { directMultipartUpload: true },
-          }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      ),
+            virtualTryOn: {
+              available: true,
+              inputPreparation: 'none',
+              referencePolicy: 'optional',
+              promptInput: 'editable',
+              promptEnhancement: true,
+              terminalFailureRelease: 'automatic',
+              outputResolutions: ['720p'],
+            },
+          },
+          elevenLabs: { available: false, modelId: null },
+          referenceImages: {
+            available: true,
+            editAvailable: true,
+            providerId: 'openai',
+            modelId: 'gpt-image-2',
+            sizes: ['1024x1024', '1024x1536', '1536x1024'],
+            optimizer: {
+              available: true,
+              model: 'gpt-5.6',
+              version: 'lucy-character-reference-v1',
+            },
+          },
+          wardrobe: { addOutfitAvailable: true },
+          savedVideos: { directMultipartUpload: true },
+        },
+      }),
     );
 
     await expect(fetchProviderAvailability()).resolves.toMatchObject({
@@ -316,38 +294,29 @@ describe('reference image API client', () => {
   });
 
   it('validates the structured prompt-optimization response', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify(optimizationResponse), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'POST',
+        '/api/reference-images/optimize',
+        { body: optimizationResponse },
+        observe,
+      ),
     );
-    vi.stubGlobal('fetch', fetchMock);
     const controller = new AbortController();
 
     await expect(
       optimizeCharacterReferencePrompt({ rawPrompt, options }, controller.signal),
     ).resolves.toEqual(optimizationResponse);
 
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/reference-images/optimize',
-      expect.objectContaining({
-        method: 'POST',
-        cache: 'no-store',
-        signal: controller.signal,
-        body: JSON.stringify({ rawPrompt, options }),
-      }),
-    );
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ method: 'POST', cache: 'no-store' });
+    await expect(requests[0]!.json()).resolves.toEqual({ rawPrompt, options });
   });
 
   it('sends one explicit idempotent generation request and validates safe metadata', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ asset }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
-    );
-    vi.stubGlobal('fetch', fetchMock);
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(jsonScenario('POST', '/api/reference-images', { body: { asset } }, observe));
 
     const request: CreateReferenceImageRequest = {
       requestId: 'c35bd56f-5d16-4d54-b719-8bfb49d73080',
@@ -361,15 +330,9 @@ describe('reference image API client', () => {
     };
     await expect(createReferenceImage(request)).resolves.toEqual(asset);
 
-    expect(fetchMock).toHaveBeenCalledOnce();
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/reference-images',
-      expect.objectContaining({
-        method: 'POST',
-        cache: 'no-store',
-        body: JSON.stringify(request),
-      }),
-    );
+    expect(requests).toHaveLength(1);
+    expect(requests[0]).toMatchObject({ method: 'POST', cache: 'no-store' });
+    await expect(requests[0]!.json()).resolves.toEqual(request);
   });
 
   it('edits by opaque source asset ID without sending source image bytes', async () => {
@@ -379,13 +342,15 @@ describe('reference image API client', () => {
       derivation: { kind: 'edit', sourceAssetId: asset.assetId },
       contentUrl: '/api/reference-images/7bf5e842-3cfe-4c5d-b945-a6ead02a3f01/content',
     };
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ asset: editedAsset }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'POST',
+        `/api/reference-images/${asset.assetId}/edits`,
+        { body: { asset: editedAsset } },
+        observe,
+      ),
     );
-    vi.stubGlobal('fetch', fetchMock);
     const request: EditReferenceImageRequest = {
       requestId: 'cb6ab812-0ebd-455b-8fe1-3a3665daf158',
       rawPrompt,
@@ -399,26 +364,22 @@ describe('reference image API client', () => {
     };
 
     await expect(editReferenceImage(asset.assetId, request)).resolves.toEqual(editedAsset);
-    expect(fetchMock).toHaveBeenCalledWith(
-      `/api/reference-images/${asset.assetId}/edits`,
-      expect.objectContaining({
-        method: 'POST',
-        cache: 'no-store',
-        body: JSON.stringify(request),
-      }),
-    );
+    expect(requests[0]).toMatchObject({ method: 'POST', cache: 'no-store' });
+    await expect(requests[0]!.json()).resolves.toEqual(request);
     expect(JSON.stringify(request)).not.toContain('sourceImage');
     expect(JSON.stringify(request)).not.toContain('base64');
   });
 
-  it('uploads immutable source bytes with a retry-stable idempotency key', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ asset: uploadedAsset }), {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+  it('uploads immutable source bytes with stable idempotency and normalizes upload failures', async () => {
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'POST',
+        '/api/reference-images/uploads',
+        { body: { asset: uploadedAsset }, status: 201 },
+        observe,
+      ),
     );
-    vi.stubGlobal('fetch', fetchMock);
     const file = new File([new Uint8Array([1, 2, 3, 4])], 'portrait.png', {
       type: 'image/png',
       lastModified: 1,
@@ -426,36 +387,52 @@ describe('reference image API client', () => {
     const requestId = '96701f87-aeb6-41b6-ab76-2cbe3275714e';
 
     await expect(uploadReferenceImage(file, requestId)).resolves.toEqual(uploadedAsset);
-    expect(fetchMock).toHaveBeenCalledOnce();
-    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
-    expect(url).toBe('/api/reference-images/uploads');
-    expect(init.method).toBe('POST');
-    expect(init.body).toBe(file);
-    expect(new Headers(init.headers).get('Content-Type')).toBe('image/png');
-    expect(new Headers(init.headers).get('Idempotency-Key')).toBe(requestId);
+    expect(requests).toHaveLength(1);
+    expect(requests[0]!.method).toBe('POST');
+    expect(requests[0]!.headers.get('Content-Type')).toBe('image/png');
+    expect(requests[0]!.headers.get('Idempotency-Key')).toBe(requestId);
+    await expect(requests[0]!.arrayBuffer()).resolves.toEqual(new Uint8Array([1, 2, 3, 4]).buffer);
+
+    mockApiServer.use(uploadFailureScenario('/api/reference-images/uploads'));
+    await expect(uploadReferenceImage(file, requestId)).rejects.toMatchObject({
+      code: 'invalid_image_upload',
+      status: 503,
+    });
   });
 
   it('discards an unsaved reference through the owner-scoped lifecycle endpoint', async () => {
-    const fetchMock = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
-    vi.stubGlobal('fetch', fetchMock);
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      responseScenario(
+        'DELETE',
+        `/api/reference-images/${uploadedAsset.assetId}`,
+        null,
+        { status: 204 },
+        observe,
+      ),
+    );
 
     await expect(discardReferenceImage(uploadedAsset.assetId)).resolves.toBeUndefined();
-    expect(fetchMock).toHaveBeenCalledWith(
-      `/api/reference-images/${uploadedAsset.assetId}`,
-      expect.objectContaining({ method: 'DELETE', cache: 'no-store' }),
-    );
+    expect(requests[0]).toMatchObject({ method: 'DELETE', cache: 'no-store' });
   });
 
   it('imports a remote image through the explicit same-origin reference-import endpoint', async () => {
-    const response = new Response(new Blob([jpegBytes], { type: 'image/jpeg' }), {
-      status: 200,
-      headers: {
-        'Content-Type': 'image/jpeg',
-        'Content-Disposition': 'attachment; filename="imported-reference-ab12cd34.jpg"',
-      },
-    });
-    const fetchMock = vi.fn().mockResolvedValue(response);
-    vi.stubGlobal('fetch', fetchMock);
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      responseScenario(
+        'POST',
+        '/api/reference-images/import',
+        jpegBytes,
+        {
+          status: 200,
+          headers: {
+            'Content-Type': 'image/jpeg',
+            'Content-Disposition': 'attachment; filename="imported-reference-ab12cd34.jpg"',
+          },
+        },
+        observe,
+      ),
+    );
     const controller = new AbortController();
     const sourceUrl = 'https://images.example.test/outfit.jpg';
 
@@ -463,19 +440,9 @@ describe('reference image API client', () => {
 
     expect(imported.name).toBe('imported-reference-ab12cd34.jpg');
     expect(imported.type).toBe('image/jpeg');
-    expect(fetchMock).toHaveBeenCalledWith(
-      '/api/reference-images/import',
-      expect.objectContaining({
-        method: 'POST',
-        cache: 'no-store',
-        signal: controller.signal,
-        body: JSON.stringify({ url: sourceUrl }),
-      }),
-    );
-    const headers = new Headers(
-      (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].headers,
-    );
-    expect(headers.get('x-lightframe-provider-intent')).toBe('reference-image-import');
+    expect(requests[0]).toMatchObject({ method: 'POST', cache: 'no-store' });
+    await expect(requests[0]!.json()).resolves.toEqual({ url: sourceUrl });
+    expect(requests[0]!.headers.get('x-lightframe-provider-intent')).toBe('reference-image-import');
   });
 
   it('composes a generated asset from an opaque uploaded source identity', async () => {
@@ -485,13 +452,15 @@ describe('reference image API client', () => {
       derivation: { kind: 'compose', sourceAssetId: uploadedAsset.assetId },
       contentUrl: '/api/reference-images/48ea3acf-9ef5-4237-bcc7-961d81842569/content',
     };
-    const fetchMock = vi.fn().mockResolvedValue(
-      new Response(JSON.stringify({ asset: composedAsset }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' },
-      }),
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'POST',
+        `/api/reference-images/${uploadedAsset.assetId}/compositions`,
+        { body: { asset: composedAsset } },
+        observe,
+      ),
     );
-    vi.stubGlobal('fetch', fetchMock);
     const request: ComposeReferenceImageRequest = {
       requestId: 'caa39308-f797-4542-84bc-9a14f99afdcf',
       rawPrompt,
@@ -506,23 +475,25 @@ describe('reference image API client', () => {
     await expect(composeReferenceImage(uploadedAsset.assetId, request)).resolves.toEqual(
       composedAsset,
     );
-    expect(fetchMock).toHaveBeenCalledWith(
-      `/api/reference-images/${uploadedAsset.assetId}/compositions`,
-      expect.objectContaining({
-        method: 'POST',
-        body: JSON.stringify(request),
-      }),
-    );
+    expect(requests[0]!.method).toBe('POST');
+    await expect(requests[0]!.json()).resolves.toEqual(request);
     expect(JSON.stringify(request)).not.toContain('sourceImage');
   });
 
   it('hydrates a persisted reference from its stable URL and validates exact integrity', async () => {
-    const response = new Response(jpegBytes, {
-      status: 200,
-      headers: { 'Content-Type': 'image/jpeg' },
-    });
-    const fetchMock = vi.fn().mockResolvedValue(response);
-    vi.stubGlobal('fetch', fetchMock);
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      responseScenario(
+        'GET',
+        asset.contentUrl,
+        jpegBytes,
+        {
+          status: 200,
+          headers: { 'Content-Type': 'image/jpeg' },
+        },
+        observe,
+      ),
+    );
     vi.stubGlobal(
       'createImageBitmap',
       vi.fn().mockResolvedValue({ width: 1024, height: 1024, close: vi.fn() }),
@@ -538,21 +509,16 @@ describe('reference image API client', () => {
     expect(reference.file.name).toBe(`reference-${asset.assetId}.jpg`);
     expect(reference.file.type).toBe('image/jpeg');
     expect(reference.file.size).toBe(jpegBytes.length);
-    expect(fetchMock).toHaveBeenCalledWith(
-      asset.contentUrl,
-      expect.objectContaining({ cache: 'no-store', headers: { Accept: 'image/jpeg' } }),
-    );
+    expect(requests[0]!.cache).toBe('no-store');
+    expect(requests[0]!.headers.get('Accept')).toBe('image/jpeg');
   });
 
   it('rejects content that does not match immutable metadata', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(jpegBytes, {
-          status: 200,
-          headers: { 'Content-Type': 'image/png' },
-        }),
-      ),
+    mockApiServer.use(
+      responseScenario('GET', asset.contentUrl, jpegBytes, {
+        status: 200,
+        headers: { 'Content-Type': 'image/png' },
+      }),
     );
 
     await expect(hydrateReferenceImage(asset.assetId, asset)).rejects.toMatchObject({
@@ -561,8 +527,7 @@ describe('reference image API client', () => {
   });
 
   it('never hydrates a content URL belonging to a different asset identity', async () => {
-    const fetchMock = vi.fn();
-    vi.stubGlobal('fetch', fetchMock);
+    const fetchMock = vi.spyOn(globalThis, 'fetch');
     const otherAsset = 'b29ac560-3c9d-44d7-b927-48f412cb3aa5';
 
     await expect(

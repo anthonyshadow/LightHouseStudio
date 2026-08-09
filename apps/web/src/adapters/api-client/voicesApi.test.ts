@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   VOICE_CONVERSION_OUTPUT_MAX_BYTES,
   VOICE_PREVIEW_MAX_BYTES,
@@ -16,6 +16,13 @@ import {
   removeWorkspaceVoice,
   saveSharedVoice,
 } from './voicesApi';
+import {
+  captureRequests,
+  jsonScenario,
+  malformedContractScenario,
+  responseScenario,
+} from '../../test/msw/handlers';
+import { mockApiServer } from '../../test/msw/server';
 
 const workspaceVoice: WorkspaceVoiceItem = {
   kind: 'workspace',
@@ -70,28 +77,9 @@ const sharedVoice: SharedVoiceItem = {
   },
 };
 
-const requestedUrl = (input: RequestInfo | URL | undefined): string => {
-  if (typeof input === 'string') return input;
-  if (input instanceof URL) return input.href;
-  return input?.url ?? '';
-};
-
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.restoreAllMocks();
-});
-
 describe('voice API provider intent', () => {
   it('uses the voice-specific invalid response for malformed success JSON', async () => {
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response('{not-json', {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      ),
-    );
+    mockApiServer.use(malformedContractScenario('GET', '/api/elevenlabs/voices'));
 
     await expect(
       listWorkspaceVoices(emptyCriteria, null, new AbortController().signal),
@@ -99,53 +87,55 @@ describe('voice API provider intent', () => {
   });
 
   it('marks saved-library reads and preserves the workspace discriminant', async () => {
-    const fetchMock = vi.fn<typeof fetch>().mockResolvedValueOnce(
-      new Response(
-        JSON.stringify({
-          voices: [workspaceVoice.voice],
-          hasMore: false,
-          nextPageToken: null,
-          total: 1,
-        }),
-        { status: 200, headers: { 'Content-Type': 'application/json' } },
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        '/api/elevenlabs/voices',
+        {
+          body: {
+            voices: [workspaceVoice.voice],
+            hasMore: false,
+            nextPageToken: null,
+            total: 1,
+          },
+        },
+        observe,
       ),
     );
-    vi.stubGlobal('fetch', fetchMock);
     const signal = new AbortController().signal;
 
     await expect(listWorkspaceVoices(emptyCriteria, null, signal)).resolves.toMatchObject({
       voices: [workspaceVoice],
     });
 
-    for (const [, init] of fetchMock.mock.calls) {
-      expect(new Headers(init?.headers).get(VOICE_PROVIDER_INTENT_HEADER)).toBe(
-        VOICE_PROVIDER_INTENT_VALUE,
-      );
+    for (const request of requests) {
+      expect(request.headers.get(VOICE_PROVIDER_INTENT_HEADER)).toBe(VOICE_PROVIDER_INTENT_VALUE);
     }
   });
 
   it('maps Browse filters, discriminants, pagination, and mutation routes', async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        new Response(
-          JSON.stringify({ voices: [sharedVoice.voice], hasMore: true, page: 2, total: 21 }),
-          { status: 200, headers: { 'Content-Type': 'application/json' } },
-        ),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ status: 'saved', voiceId: 'shared-voice' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      )
-      .mockResolvedValueOnce(
-        new Response(JSON.stringify({ status: 'removed', voiceId: 'shared-voice' }), {
-          status: 200,
-          headers: { 'Content-Type': 'application/json' },
-        }),
-      );
-    vi.stubGlobal('fetch', fetchMock);
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        '/api/elevenlabs/shared-voices',
+        { body: { voices: [sharedVoice.voice], hasMore: true, page: 2, total: 21 } },
+        observe,
+      ),
+      jsonScenario(
+        'POST',
+        '/api/elevenlabs/shared-voices/owner-one/shared-voice/save',
+        { body: { status: 'saved', voiceId: 'shared-voice' } },
+        observe,
+      ),
+      jsonScenario(
+        'DELETE',
+        '/api/elevenlabs/voices/shared-voice',
+        { body: { status: 'removed', voiceId: 'shared-voice' } },
+        observe,
+      ),
+    );
     const criteria = { ...emptyCriteria, search: 'catalog', language: 'en' };
 
     await expect(
@@ -160,7 +150,7 @@ describe('voice API provider intent', () => {
       removeWorkspaceVoice('shared-voice', new AbortController().signal),
     ).resolves.toMatchObject({ status: 'removed' });
 
-    const browseUrl = new URL(requestedUrl(fetchMock.mock.calls[0]?.[0]), 'http://localhost');
+    const browseUrl = new URL(requests[0]!.url);
     expect(Object.fromEntries(browseUrl.searchParams)).toMatchObject({
       search: 'catalog',
       language: 'en',
@@ -169,31 +159,37 @@ describe('voice API provider intent', () => {
       sort: 'trending',
       refresh: 'true',
     });
-    expect(fetchMock.mock.calls[1]?.[1]).toMatchObject({ method: 'POST' });
-    expect(fetchMock.mock.calls[2]?.[1]).toMatchObject({ method: 'DELETE' });
-    for (const [, init] of fetchMock.mock.calls) {
-      expect(new Headers(init?.headers).get(VOICE_PROVIDER_INTENT_HEADER)).toBe(
-        VOICE_PROVIDER_INTENT_VALUE,
-      );
+    expect(requests[1]!.method).toBe('POST');
+    expect(requests[2]!.method).toBe('DELETE');
+    for (const request of requests) {
+      expect(request.headers.get(VOICE_PROVIDER_INTENT_HEADER)).toBe(VOICE_PROVIDER_INTENT_VALUE);
     }
   });
 
   it('marks preview and conversion requests', async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        new Response('preview', {
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      responseScenario(
+        'GET',
+        '/api/elevenlabs/voices/workspace-voice/preview',
+        'preview',
+        {
           status: 200,
           headers: { 'Content-Type': 'audio/mpeg' },
-        }),
-      )
-      .mockResolvedValueOnce(
-        new Response('converted', {
+        },
+        observe,
+      ),
+      responseScenario(
+        'POST',
+        '/api/elevenlabs/voice-changer/recording',
+        'converted',
+        {
           status: 200,
           headers: { 'Content-Type': 'audio/mpeg' },
-        }),
-      );
-    vi.stubGlobal('fetch', fetchMock);
+        },
+        observe,
+      ),
+    );
     const signal = new AbortController().signal;
 
     await expect(fetchVoicePreview(workspaceVoice, signal)).resolves.toMatchObject({
@@ -207,27 +203,22 @@ describe('voice API provider intent', () => {
       ),
     ).resolves.toMatchObject({ type: 'audio/mpeg' });
 
-    for (const [, init] of fetchMock.mock.calls) {
-      expect(new Headers(init?.headers).get(VOICE_PROVIDER_INTENT_HEADER)).toBe(
-        VOICE_PROVIDER_INTENT_VALUE,
-      );
+    for (const request of requests) {
+      expect(request.headers.get(VOICE_PROVIDER_INTENT_HEADER)).toBe(VOICE_PROVIDER_INTENT_VALUE);
     }
   });
 
   it('rejects declared oversized conversion audio before buffering it', async () => {
     const cancel = vi.fn();
     const body = new ReadableStream<Uint8Array>({ cancel });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(body, {
-          status: 200,
-          headers: {
-            'Content-Type': 'audio/mpeg',
-            'Content-Length': String(VOICE_CONVERSION_OUTPUT_MAX_BYTES + 1),
-          },
-        }),
-      ),
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(body, {
+        status: 200,
+        headers: {
+          'Content-Type': 'audio/mpeg',
+          'Content-Length': String(VOICE_CONVERSION_OUTPUT_MAX_BYTES + 1),
+        },
+      }),
     );
 
     await expect(
@@ -250,14 +241,11 @@ describe('voice API provider intent', () => {
       },
       cancel,
     });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(body, {
-          status: 200,
-          headers: { 'Content-Type': 'audio/mpeg' },
-        }),
-      ),
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(body, {
+        status: 200,
+        headers: { 'Content-Type': 'audio/mpeg' },
+      }),
     );
 
     const error = await fetchVoicePreview(workspaceVoice, new AbortController().signal).catch(
@@ -275,14 +263,11 @@ describe('voice API provider intent', () => {
   it('cancels an in-flight browser audio reader and preserves AbortError semantics', async () => {
     const cancel = vi.fn();
     const body = new ReadableStream<Uint8Array>({ cancel });
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        new Response(body, {
-          status: 200,
-          headers: { 'Content-Type': 'audio/mpeg' },
-        }),
-      ),
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(body, {
+        status: 200,
+        headers: { 'Content-Type': 'audio/mpeg' },
+      }),
     );
     const controller = new AbortController();
     const pending = fetchVoicePreview(workspaceVoice, controller.signal);

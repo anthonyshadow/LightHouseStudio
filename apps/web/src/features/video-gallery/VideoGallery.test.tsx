@@ -4,22 +4,22 @@ import type { SavedVideoSummary } from '@studio/contracts';
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type * as SavedVideosApiModule from '../../adapters/api-client/savedVideosApi';
 
 const api = vi.hoisted(() => ({
   deleteSavedVideo: vi.fn(),
-  listSavedVideos: vi.fn(),
   renameSavedVideo: vi.fn(),
 }));
 
-vi.mock('../../adapters/api-client/savedVideosApi', () => ({
+vi.mock('../../adapters/api-client/savedVideosApi', async (importOriginal) => ({
+  ...(await importOriginal<typeof SavedVideosApiModule>()),
   ...api,
-  downloadSavedVideoUrl: (videoId: string) => `/api/videos/${videoId}/content?download=true`,
-  savedVideoContentUrl: (videoId: string) => `/api/videos/${videoId}/content`,
-  savedVideoThumbnailUrl: (videoId: string) => `/api/videos/${videoId}/thumbnail`,
 }));
 
 import { StudioDesignProvider } from '../../ui';
 import { createRemoteStateQueryClient } from '../../application/remote-state/RemoteStateProvider';
+import { captureRequests, galleryPaginationScenario, jsonScenario } from '../../test/msw/handlers';
+import { mockApiServer } from '../../test/msw/server';
 import { VideoGallery } from './VideoGallery';
 
 const video = (override: Partial<SavedVideoSummary> = {}): SavedVideoSummary => ({
@@ -59,6 +59,12 @@ const page = (videos: readonly SavedVideoSummary[]) => ({
 
 const queryClients: QueryClient[] = [];
 
+const mockGalleryPages = (pages: Readonly<Record<string, unknown>>): Request[] => {
+  const { requests, observe } = captureRequests();
+  mockApiServer.use(galleryPaginationScenario(pages, observe));
+  return requests;
+};
+
 const renderGallery = (onUse = vi.fn().mockResolvedValue(undefined)) => {
   const queryClient = createRemoteStateQueryClient();
   queryClients.push(queryClient);
@@ -76,7 +82,6 @@ describe('VideoGallery', () => {
   beforeEach(() => {
     api.deleteSavedVideo.mockReset().mockResolvedValue(undefined);
     api.renameSavedVideo.mockReset();
-    api.listSavedVideos.mockReset();
     vi.spyOn(HTMLMediaElement.prototype, 'pause').mockImplementation(() => undefined);
     vi.spyOn(HTMLMediaElement.prototype, 'load').mockImplementation(() => undefined);
   });
@@ -89,7 +94,7 @@ describe('VideoGallery', () => {
 
   it('loads metadata and lazy thumbnails without mounting or requesting a video player', async () => {
     const item = video();
-    api.listSavedVideos.mockResolvedValue(page([item]));
+    mockGalleryPages({ '': page([item]) });
     const onUse = renderGallery();
 
     expect(await screen.findByRole('heading', { name: 'Morning take' })).toBeInTheDocument();
@@ -106,7 +111,7 @@ describe('VideoGallery', () => {
 
   it('opens a centered authenticated preview on thumbnail activation and restores focus on close', async () => {
     const item = video();
-    api.listSavedVideos.mockResolvedValue(page([item]));
+    mockGalleryPages({ '': page([item]) });
     renderGallery();
 
     const previewTrigger = await screen.findByRole('button', { name: 'Preview Morning take' });
@@ -125,11 +130,13 @@ describe('VideoGallery', () => {
   });
 
   it('shows an actionable empty state', async () => {
-    api.listSavedVideos.mockResolvedValue({
-      videos: [],
-      nextCursor: null,
-      total: 0,
-      facets: { characterNames: [], formats: [] },
+    mockGalleryPages({
+      '': {
+        videos: [],
+        nextCursor: null,
+        total: 0,
+        facets: { characterNames: [], formats: [] },
+      },
     });
     renderGallery();
 
@@ -148,9 +155,10 @@ describe('VideoGallery', () => {
         videoId: '347eb6ea-5ad4-4994-967e-c75d5106f548',
       },
     });
-    api.listSavedVideos
-      .mockResolvedValueOnce({ ...page([first]), nextCursor: 'page-two', total: 2 })
-      .mockResolvedValueOnce({ ...page([second]), total: 2 });
+    const requests = mockGalleryPages({
+      '': { ...page([first]), nextCursor: 'page-two', total: 2 },
+      'page-two': { ...page([second]), total: 2 },
+    });
     renderGallery();
 
     await screen.findByRole('heading', { name: 'Morning take' });
@@ -158,20 +166,25 @@ describe('VideoGallery', () => {
 
     expect(await screen.findByRole('heading', { name: 'Evening take' })).toBeInTheDocument();
     expect(screen.getByRole('heading', { name: 'Morning take' })).toBeInTheDocument();
-    expect(api.listSavedVideos).toHaveBeenLastCalledWith(
-      expect.objectContaining({ cursor: 'page-two' }),
-    );
+    expect(new URL(requests.at(-1)!.url).searchParams.get('cursor')).toBe('page-two');
   });
 
   it('renames and confirms deletion without loading media bytes', async () => {
     const original = video();
     const renamed = video({ title: 'Renamed take' });
-    api.listSavedVideos.mockResolvedValueOnce(page([original])).mockResolvedValue({
-      videos: [],
-      nextCursor: null,
-      total: 0,
-      facets: { characterNames: [], formats: [] },
-    });
+    mockApiServer.use(
+      jsonScenario('GET', '/api/videos', [
+        { body: page([original]) },
+        {
+          body: {
+            videos: [],
+            nextCursor: null,
+            total: 0,
+            facets: { characterNames: [], formats: [] },
+          },
+        },
+      ]),
+    );
     api.renameSavedVideo.mockResolvedValue(renamed);
     vi.spyOn(window, 'prompt').mockReturnValue('Renamed take');
     vi.spyOn(window, 'confirm').mockReturnValue(true);
@@ -192,7 +205,7 @@ describe('VideoGallery', () => {
     const item = video({
       currentVersion: { ...video().currentVersion, characterVariantName: 'Evening' },
     });
-    api.listSavedVideos.mockResolvedValue(page([item]));
+    const requests = mockGalleryPages({ '': page([item]) });
     renderGallery();
     await screen.findByRole('heading', { name: 'Morning take' });
     expect(screen.getByText('Variant: Evening')).toBeInTheDocument();
@@ -200,44 +213,47 @@ describe('VideoGallery', () => {
     fireEvent.click(screen.getByRole('combobox', { name: 'Character used' }));
     fireEvent.click(screen.getByRole('option', { name: 'Mara' }));
     await waitFor(() =>
-      expect(api.listSavedVideos).toHaveBeenLastCalledWith(
-        expect.objectContaining({ characterName: 'Mara', sort: 'latest' }),
-      ),
+      expect(Object.fromEntries(new URL(requests.at(-1)!.url).searchParams)).toMatchObject({
+        characterName: 'Mara',
+        sort: 'latest',
+      }),
     );
 
     fireEvent.click(screen.getByRole('combobox', { name: 'Video format' }));
     fireEvent.click(screen.getByRole('option', { name: 'Portrait' }));
     await waitFor(() =>
-      expect(api.listSavedVideos).toHaveBeenLastCalledWith(
-        expect.objectContaining({ characterName: 'Mara', format: 'portrait', sort: 'latest' }),
-      ),
+      expect(Object.fromEntries(new URL(requests.at(-1)!.url).searchParams)).toMatchObject({
+        characterName: 'Mara',
+        format: 'portrait',
+        sort: 'latest',
+      }),
     );
 
     for (const label of ['Oldest', 'Shortest', 'Longest']) {
       fireEvent.click(screen.getByRole('combobox', { name: 'Sort by' }));
       fireEvent.click(screen.getByRole('option', { name: label }));
       await waitFor(() =>
-        expect(api.listSavedVideos).toHaveBeenLastCalledWith(
-          expect.objectContaining({ sort: label.toLowerCase() }),
-        ),
+        expect(new URL(requests.at(-1)!.url).searchParams.get('sort')).toBe(label.toLowerCase()),
       );
     }
   });
 
   it('keeps the character control operable when older videos have no attribution', async () => {
-    api.listSavedVideos.mockResolvedValue({
-      videos: [
-        video({
-          currentVersion: {
-            ...video().currentVersion,
-            characterName: null,
-            characterVariantName: null,
-          },
-        }),
-      ],
-      nextCursor: null,
-      total: 1,
-      facets: { characterNames: [], formats: ['landscape'] },
+    mockGalleryPages({
+      '': {
+        videos: [
+          video({
+            currentVersion: {
+              ...video().currentVersion,
+              characterName: null,
+              characterVariantName: null,
+            },
+          }),
+        ],
+        nextCursor: null,
+        total: 1,
+        facets: { characterNames: [], formats: ['landscape'] },
+      },
     });
     renderGallery();
 

@@ -2,9 +2,12 @@
 
 import type { AuthenticatedSessionResponse } from '@studio/contracts';
 import { createPhaseOneEntitlements } from '@studio/domain';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { http, HttpResponse } from 'msw';
 import { ApiClientError } from './apiClient';
 import { fetchCurrentSession, fetchDemoAuthConfig, login, logout } from './authApi';
+import { captureRequests, jsonScenario } from '../../test/msw/handlers';
+import { mockApiServer } from '../../test/msw/server';
 
 const session: AuthenticatedSessionResponse = {
   user: {
@@ -25,27 +28,19 @@ const session: AuthenticatedSessionResponse = {
   expiresAt: '2026-08-06T12:00:00.000Z',
 };
 
-const jsonResponse = (value: unknown, status = 200): Response =>
-  new Response(JSON.stringify(value), {
-    status,
-    headers: { 'Content-Type': 'application/json' },
-  });
-
 describe('auth API client', () => {
-  afterEach(() => vi.unstubAllGlobals());
-
   it('validates demo config, login, and current-session responses', async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(
-        jsonResponse({
+    const { requests: loginRequests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario('GET', '/api/auth/demo-config', {
+        body: {
           enabled: true,
           prefill: { login: 'demo@lightframe.local', password: 'lightframe-demo' },
-        }),
-      )
-      .mockResolvedValueOnce(jsonResponse(session))
-      .mockResolvedValueOnce(jsonResponse(session));
-    vi.stubGlobal('fetch', fetchMock);
+        },
+      }),
+      jsonScenario('POST', '/api/auth/login', { body: session }, observe),
+      jsonScenario('GET', '/api/auth/me', { body: session }),
+    );
 
     await expect(fetchDemoAuthConfig()).resolves.toMatchObject({ enabled: true });
     await expect(
@@ -53,26 +48,26 @@ describe('auth API client', () => {
     ).resolves.toEqual(session);
     await expect(fetchCurrentSession()).resolves.toEqual(session);
 
-    expect(fetchMock).toHaveBeenNthCalledWith(
-      2,
-      '/api/auth/login',
-      expect.objectContaining({
-        method: 'POST',
-        credentials: 'same-origin',
-        body: JSON.stringify({
-          login: 'demo@lightframe.local',
-          password: 'lightframe-demo',
-        }),
-      }),
-    );
+    expect(loginRequests[0]).toMatchObject({ method: 'POST', credentials: 'same-origin' });
+    await expect(loginRequests[0]!.json()).resolves.toEqual({
+      login: 'demo@lightframe.local',
+      password: 'lightframe-demo',
+    });
   });
 
   it('accepts idempotent logout and normalizes a failed logout', async () => {
-    const fetchMock = vi
-      .fn<typeof fetch>()
-      .mockResolvedValueOnce(new Response(null, { status: 204 }))
-      .mockResolvedValueOnce(jsonResponse({ error: { code: 'failed', message: 'private' } }, 500));
-    vi.stubGlobal('fetch', fetchMock);
+    let requests = 0;
+    mockApiServer.use(
+      http.post('*/api/auth/logout', () => {
+        requests += 1;
+        return requests === 1
+          ? new HttpResponse(null, { status: 204 })
+          : HttpResponse.json(
+              { error: { code: 'internal_error', message: 'The request failed.' } },
+              { status: 500 },
+            );
+      }),
+    );
 
     await expect(logout()).resolves.toBeUndefined();
     await expect(logout()).rejects.toBeInstanceOf(ApiClientError);
