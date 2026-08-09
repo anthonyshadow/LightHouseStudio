@@ -27,6 +27,7 @@ import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { AppError } from '../../http/app-error.js';
 import type { SavedVideoService } from './saved-video-service.js';
 import type { DirectSavedVideoUploadService } from './direct-upload-service.js';
+import { contentRangeHeaders, parseByteRange } from './byte-range.js';
 
 const header = (request: HttpRequest, name: string): string | undefined => {
   const value = request.headers[name];
@@ -51,28 +52,6 @@ const idempotencyKey = (request: HttpRequest): string => {
   return parsed.data;
 };
 
-const parseRange = (
-  value: string | undefined,
-  size: number,
-): { start: number; end: number } | null => {
-  if (value === undefined) return null;
-  const match = /^bytes=(\d+)-(\d*)$/u.exec(value);
-  if (match === null) throw new AppError(416, 'validation_error', 'Use a valid byte range.');
-  const start = Number(match[1]);
-  const requestedEnd = match[2] ? Number(match[2]) : size - 1;
-  const end = Math.min(requestedEnd, size - 1);
-  if (
-    !Number.isSafeInteger(start) ||
-    !Number.isSafeInteger(end) ||
-    start < 0 ||
-    start > end ||
-    start >= size
-  ) {
-    throw new AppError(416, 'validation_error', 'The requested byte range is unavailable.');
-  }
-  return { start, end };
-};
-
 const sendContent = async (
   request: HttpRequest,
   reply: HttpReply,
@@ -82,7 +61,7 @@ const sendContent = async (
 ) => {
   const result = await service.content(ownerUserIdForRequest(request), videoId, versionId);
   const size = result.asset.manifest.sizeBytes;
-  const range = parseRange(header(request, 'range'), size);
+  const range = parseByteRange(header(request, 'range'), size);
   const download =
     typeof request.query === 'object' &&
     request.query !== null &&
@@ -100,9 +79,10 @@ const sendContent = async (
     void reply.header('Content-Length', size);
     return reply.send(result.asset.createReadStream());
   }
+  const rangeHeaders = contentRangeHeaders(range, size);
   void reply.status(206);
-  void reply.header('Content-Range', `bytes ${range.start}-${range.end}/${size}`);
-  void reply.header('Content-Length', range.end - range.start + 1);
+  void reply.header('Content-Range', rangeHeaders.contentRange);
+  void reply.header('Content-Length', rangeHeaders.contentLength);
   return reply.send(result.asset.createReadStream(range));
 };
 
