@@ -1,6 +1,7 @@
 import { expect, test } from '@playwright/test';
 import {
   apiErrorResponseSchema,
+  type CapabilitiesResponse,
   VIDEO_PROVIDER_INTENT_HEADER,
   VIDEO_PROVIDER_INTENT_VALUE,
   VOICE_PROVIDER_INTENT_HEADER,
@@ -93,7 +94,8 @@ test.beforeEach(async ({ page, request, baseURL }) => {
           },
         },
         wardrobe: { addOutfitAvailable: false },
-      }),
+        savedVideos: { directMultipartUpload: false },
+      } satisfies CapabilitiesResponse),
     });
   });
 });

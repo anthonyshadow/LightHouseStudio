@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import { expect, test, type Locator, type Page } from '@playwright/test';
+import type { CapabilitiesResponse } from '@studio/contracts';
 import type { CreativeAssetStore } from '@studio/domain';
 import {
   closeRecipeDockWhenOverlaid,
@@ -187,7 +188,8 @@ const installVoiceRoutes = async (page: Page, network: NetworkJourneyState): Pro
             },
           },
           wardrobe: { addOutfitAvailable: false },
-        }),
+          savedVideos: { directMultipartUpload: false },
+        } satisfies CapabilitiesResponse),
       });
     },
   );

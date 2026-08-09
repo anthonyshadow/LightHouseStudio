@@ -1,5 +1,6 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, test, type Page } from '@playwright/test';
+import type { CapabilitiesResponse } from '@studio/contracts';
 import { TEST_AUTH_SESSION } from './support/authFixture';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 import { openCharacterOptions, openRecipeDockWhenOverlaid } from './support/studioHarness';
@@ -109,7 +110,8 @@ const installProviderFreeStudio = async (page: Page): Promise<MockStudioState> =
               },
             },
             wardrobe: { addOutfitAvailable: false },
-          }),
+            savedVideos: { directMultipartUpload: false },
+          } satisfies CapabilitiesResponse),
         });
         return;
       }
