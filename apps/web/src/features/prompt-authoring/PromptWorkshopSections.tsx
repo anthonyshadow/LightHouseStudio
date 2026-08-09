@@ -41,6 +41,8 @@ export const PromptWorkshopAccordion = ({
   onActiveStepChange,
   onDraftChange,
 }: PromptWorkshopAccordionProps) => {
+  'use memo';
+
   const theme = useTheme();
 
   return (
@@ -115,6 +117,8 @@ export const PromptWorkshopReview = ({
   showSummary,
   onToggleSummary,
 }: PromptWorkshopReviewProps) => {
+  'use memo';
+
   const theme = useTheme();
   const summaryId = `${componentId}-recipe-summary`;
 

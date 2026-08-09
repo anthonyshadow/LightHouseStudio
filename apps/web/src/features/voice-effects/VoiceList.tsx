@@ -147,6 +147,8 @@ export const VoiceList = ({
   onAdd,
   onRemove,
 }: VoiceListProps) => {
+  'use memo';
+
   const theme = useTheme();
   return (
     <ul aria-label="Available voices" aria-busy={loading} css={listStyles(theme)}>

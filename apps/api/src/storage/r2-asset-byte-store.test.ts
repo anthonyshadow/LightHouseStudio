@@ -111,6 +111,8 @@ describe('R2AssetByteStore', () => {
     expect(signed.searchParams.get('uploadId')).toBe('provider-upload-id');
     expect(signed.searchParams.get('X-Amz-Expires')).toBe('300');
     expect(signed.searchParams.get('X-Amz-SignedHeaders')).toBe('host');
+    expect(signed.searchParams.has('x-amz-checksum-crc32')).toBe(false);
+    expect(signed.searchParams.has('x-amz-sdk-checksum-algorithm')).toBe(false);
   });
 
   it('creates, enumerates, completes, verifies, registers, and aborts direct multipart uploads', async () => {

@@ -1,11 +1,18 @@
 import { fileURLToPath } from 'node:url';
-import react from '@vitejs/plugin-react';
+import babel from '@rolldown/plugin-babel';
+import react, { reactCompilerPreset } from '@vitejs/plugin-react';
 import { defineConfig, type Plugin } from 'vite';
 
 const rootPath = fileURLToPath(new URL('../..', import.meta.url));
 const DEVELOPMENT_SEAM_SENTINEL = '__lightframeDevelopmentRealtimeDriver';
 export const DEVELOPMENT_API_PROXY_TIMEOUT_MS = 300_000;
 export const PRODUCTION_CHUNK_SIZE_WARNING_LIMIT_KB = 1_700;
+export const REACT_COMPILER_OPTIONS = {
+  // Compile only reviewed presentation boundaries. Expand this set after each
+  // component has focused behavior coverage and verified compiler output.
+  compilationMode: 'annotation',
+} as const;
+export const REACT_COMPILER_PRESET = reactCompilerPreset(REACT_COMPILER_OPTIONS);
 
 export const DEVELOPMENT_API_PROXY = {
   target: 'http://127.0.0.1:4100',
@@ -40,7 +47,11 @@ const productionSeamGuard = (): Plugin => ({
 
 export default defineConfig(() => {
   return {
-    plugins: [react({ jsxImportSource: '@emotion/react' }), productionSeamGuard()],
+    plugins: [
+      react({ jsxImportSource: '@emotion/react' }),
+      babel({ presets: [REACT_COMPILER_PRESET] }),
+      productionSeamGuard(),
+    ],
     resolve: {
       alias: {
         '@studio/domain': `${rootPath}/packages/domain/src/index.ts`,

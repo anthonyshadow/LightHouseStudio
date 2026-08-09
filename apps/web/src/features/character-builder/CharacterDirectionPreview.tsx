@@ -73,6 +73,8 @@ export const CharacterDirectionPreview = ({
   summary,
   showOnNarrow = true,
 }: CharacterDirectionPreviewProps) => {
+  'use memo';
+
   const theme = useTheme();
   return (
     <aside

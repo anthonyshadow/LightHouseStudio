@@ -27,6 +27,8 @@ const renderIssueList = (issues: readonly PromptIssue[], theme: Theme) => (
 );
 
 export const PromptFeedback = ({ validation }: PromptFeedbackProps) => {
+  'use memo';
+
   const theme = useTheme();
   if (validation.blocking.length === 0 && validation.warnings.length === 0) return null;
 

@@ -82,6 +82,8 @@ export const ExistingVideoVisualEditor = ({
   onClear,
   onClearReferenceError,
 }: ExistingVideoVisualEditorProps) => {
+  'use memo';
+
   const theme = useTheme();
   const recentSelection = recentOutfits.find((item) => item.file === step.referenceImage);
 

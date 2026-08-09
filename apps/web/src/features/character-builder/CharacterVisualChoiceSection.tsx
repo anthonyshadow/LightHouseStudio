@@ -45,6 +45,8 @@ export const CharacterOptionButton = ({
   disabled?: boolean;
   onSelect: () => void;
 }) => {
+  'use memo';
+
   const theme = useTheme();
   const fullLength = option.category === 'bodyShape' || option.category === 'outfit';
   return (
@@ -89,6 +91,8 @@ export const CharacterVisualChoiceSection = ({
   disabled = false,
   onChange,
 }: CharacterVisualChoiceSectionProps) => {
+  'use memo';
+
   const theme = useTheme();
   const [showAll, setShowAll] = useState(false);
   const [customOpen, setCustomOpen] = useState(false);

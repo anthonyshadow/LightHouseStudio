@@ -25,6 +25,8 @@ export const SavedRecipeList = ({
   controller: RecipeShelfController;
   useDisabled: boolean;
 }) => {
+  'use memo';
+
   const theme = useTheme();
 
   return (

@@ -54,6 +54,8 @@ export const ExistingVideoToolCards = ({
   virtualTryOnAvailable = true,
   onSelect,
 }: ExistingVideoToolCardsProps) => {
+  'use memo';
+
   const theme = useTheme();
   const configuredVisualTool = toolForStep(workflow.steps[0]);
   const viewedVisualTool = activeTool === 'character' || activeTool === 'vton' ? activeTool : null;

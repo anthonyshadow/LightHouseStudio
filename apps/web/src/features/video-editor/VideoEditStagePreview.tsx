@@ -86,6 +86,8 @@ const updateCrop = (
 };
 
 export const VideoEditStagePreview = ({ videoRef, contract }: Props) => {
+  'use memo';
+
   const theme = useTheme();
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const frameRef = useRef<HTMLDivElement>(null);

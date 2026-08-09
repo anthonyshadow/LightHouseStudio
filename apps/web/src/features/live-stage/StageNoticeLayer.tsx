@@ -20,6 +20,8 @@ const CloseIcon = () => (
 );
 
 export const StageNoticeLayer = ({ notices }: StageNoticeLayerProps) => {
+  'use memo';
+
   const theme = useTheme();
   const labelId = useId();
   const visibleNotices = deriveStageNotices(notices);

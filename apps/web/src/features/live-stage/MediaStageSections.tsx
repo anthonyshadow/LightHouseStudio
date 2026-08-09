@@ -171,6 +171,8 @@ export const MediaStageBlockingLayers = ({
   aiStarting: boolean;
   experienceLabel?: string | undefined;
 }) => {
+  'use memo';
+
   const theme = useTheme();
   return (
     <>

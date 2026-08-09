@@ -22,6 +22,8 @@ export const VoiceEffectsPanel = ({
   elevenLabsModel = null,
   browserCapabilities = detectVoiceBrowserCapabilities(),
 }: VoiceEffectsPanelProps) => {
+  'use memo';
+
   const processingActive = recording.processingState === 'processing';
   const hasAudio = canUseVoiceEffects(
     recording.sidecar.state === 'ready' && recording.sidecar.blob

@@ -10,6 +10,8 @@ export const RecentRecipeList = ({
   controller: RecipeShelfController;
   useDisabled: boolean;
 }) => {
+  'use memo';
+
   const theme = useTheme();
   return (
     <ul css={listStyles(theme)} aria-label="Recent successful prompts">

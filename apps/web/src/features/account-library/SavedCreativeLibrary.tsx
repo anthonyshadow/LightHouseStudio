@@ -229,6 +229,8 @@ export const SavedCharacterLibrary = ({
   onCreateFrom: (item: SavedCharacterPrompt) => void;
   onOpenWardrobe: (item: SavedCharacterPrompt) => void;
 }) => {
+  'use memo';
+
   const theme = useTheme();
   return (
     <div css={characterLibraryStyles(theme)}>
@@ -316,6 +318,8 @@ export const SavedOutfitLibrary = ({
   onUse: (item: SavedPrompt) => void;
   onCreate: () => void;
 }) => {
+  'use memo';
+
   const theme = useTheme();
   return (
     <div css={{ display: 'grid', gap: theme.space.md }}>

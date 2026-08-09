@@ -80,6 +80,143 @@ const formatForVideo = (video: SavedVideoSummary): SavedVideoFormat => {
   return width === height ? 'square' : width > height ? 'landscape' : 'portrait';
 };
 
+const VideoGalleryGrid = ({
+  videos,
+  busyId,
+  brokenThumbnails,
+  onThumbnailError,
+  onOpenPreview,
+  onUse,
+  onRename,
+  onRemove,
+}: {
+  videos: readonly SavedVideoSummary[];
+  busyId: string | null;
+  brokenThumbnails: ReadonlySet<string>;
+  onThumbnailError: (videoId: string) => void;
+  onOpenPreview: (video: SavedVideoSummary, trigger: HTMLButtonElement) => void;
+  onUse: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
+  onRename: (video: SavedVideoSummary) => Promise<void>;
+  onRemove: (video: SavedVideoSummary) => Promise<void>;
+}) => {
+  'use memo';
+
+  const theme = useTheme();
+  return (
+    <div css={gridStyles(theme)} aria-label="Saved videos">
+      {videos.map((video) => {
+        const version = video.currentVersion;
+        const busy = busyId === video.id;
+        return (
+          <article key={video.id} css={cardStyles(theme)} aria-busy={busy || undefined}>
+            <button
+              type="button"
+              css={posterButtonStyles(theme)}
+              disabled={busy || video.status !== 'ready'}
+              aria-label={`Preview ${video.title}`}
+              onClick={(event) => onOpenPreview(video, event.currentTarget)}
+            >
+              <span css={posterStyles(theme)}>
+                {video.thumbnailAvailable && !brokenThumbnails.has(video.id) ? (
+                  <img
+                    css={thumbnailStyles(theme)}
+                    data-gallery-thumbnail=""
+                    src={savedVideoThumbnailUrl(video.id)}
+                    alt=""
+                    loading="lazy"
+                    onError={() => onThumbnailError(video.id)}
+                  />
+                ) : (
+                  <span
+                    css={thumbnailPlaceholderStyles(theme)}
+                    aria-label={
+                      video.thumbnailAvailable
+                        ? 'Thumbnail could not load'
+                        : 'Thumbnail unavailable'
+                    }
+                  >
+                    <VideoPlaceholderIcon />
+                    <span>Preview available</span>
+                  </span>
+                )}
+                <span data-gallery-play="" css={playBadgeStyles(theme)}>
+                  <PlayIcon />
+                </span>
+                <span css={durationBadgeStyles(theme)}>{duration(version.durationMs)}</span>
+              </span>
+            </button>
+            <div css={cardBodyStyles(theme)}>
+              <div css={cardCopyStyles(theme)}>
+                <h3>{video.title}</h3>
+                <p>
+                  {version.width}×{version.height} ·{' '}
+                  <time dateTime={video.createdAt}>
+                    {new Date(video.createdAt).toLocaleDateString()}
+                  </time>
+                </p>
+              </div>
+              <div css={chipRowStyles(theme)} aria-label="Video details">
+                <span css={chipStyles(theme)}>
+                  {video.versionCount} version{video.versionCount === 1 ? '' : 's'}
+                </span>
+                <span css={chipStyles(theme)}>{version.origin}</span>
+                <span css={chipStyles(theme)}>{FORMAT_LABELS[formatForVideo(video)]}</span>
+                {version.characterName ? (
+                  <span css={chipStyles(theme)}>{version.characterName}</span>
+                ) : null}
+                {version.characterVariantName ? (
+                  <span css={chipStyles(theme)}>Variant: {version.characterVariantName}</span>
+                ) : null}
+                {video.status !== 'ready' ? (
+                  <span css={chipStyles(theme)}>{video.status}</span>
+                ) : null}
+              </div>
+              <div css={actionsStyles(theme)}>
+                <Button
+                  variant="primary"
+                  disabled={busy || video.status !== 'ready'}
+                  busy={busy}
+                  onClick={() => void onUse(video, 'play')}
+                >
+                  Load in Studio
+                </Button>
+                <details css={actionMenuStyles(theme)}>
+                  <summary aria-label={`More actions for ${video.title}`}>
+                    <MoreIcon />
+                  </summary>
+                  <div css={actionMenuPopoverStyles(theme)}>
+                    <button
+                      type="button"
+                      disabled={busy || video.status !== 'ready'}
+                      onClick={() => void onUse(video, 'edit')}
+                    >
+                      Edit video
+                    </button>
+                    <a href={downloadSavedVideoUrl(video.id)} download={version.filename}>
+                      Download
+                    </a>
+                    <button type="button" disabled={busy} onClick={() => void onRename(video)}>
+                      Rename
+                    </button>
+                    <button
+                      type="button"
+                      data-danger=""
+                      disabled={busy}
+                      onClick={() => void onRemove(video)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </details>
+              </div>
+            </div>
+          </article>
+        );
+      })}
+    </div>
+  );
+};
+
 export const VideoGallery = ({
   onUse,
 }: {
@@ -289,119 +426,18 @@ export const VideoGallery = ({
           <p>Choose a different character or video format, or clear the filters.</p>
         </div>
       ) : (
-        <div css={gridStyles(theme)} aria-label="Saved videos">
-          {videos.map((video) => {
-            const version = video.currentVersion;
-            const busy = busyId === video.id;
-            return (
-              <article key={video.id} css={cardStyles(theme)} aria-busy={busy || undefined}>
-                <button
-                  type="button"
-                  css={posterButtonStyles(theme)}
-                  disabled={busy || video.status !== 'ready'}
-                  aria-label={`Preview ${video.title}`}
-                  onClick={(event) => openPreview(video, event.currentTarget)}
-                >
-                  <span css={posterStyles(theme)}>
-                    {video.thumbnailAvailable && !brokenThumbnails.has(video.id) ? (
-                      <img
-                        css={thumbnailStyles(theme)}
-                        data-gallery-thumbnail=""
-                        src={savedVideoThumbnailUrl(video.id)}
-                        alt=""
-                        loading="lazy"
-                        onError={() =>
-                          setBrokenThumbnails((current) => new Set(current).add(video.id))
-                        }
-                      />
-                    ) : (
-                      <span
-                        css={thumbnailPlaceholderStyles(theme)}
-                        aria-label={
-                          video.thumbnailAvailable
-                            ? 'Thumbnail could not load'
-                            : 'Thumbnail unavailable'
-                        }
-                      >
-                        <VideoPlaceholderIcon />
-                        <span>Preview available</span>
-                      </span>
-                    )}
-                    <span data-gallery-play="" css={playBadgeStyles(theme)}>
-                      <PlayIcon />
-                    </span>
-                    <span css={durationBadgeStyles(theme)}>{duration(version.durationMs)}</span>
-                  </span>
-                </button>
-                <div css={cardBodyStyles(theme)}>
-                  <div css={cardCopyStyles(theme)}>
-                    <h3>{video.title}</h3>
-                    <p>
-                      {version.width}×{version.height} ·{' '}
-                      <time dateTime={video.createdAt}>
-                        {new Date(video.createdAt).toLocaleDateString()}
-                      </time>
-                    </p>
-                  </div>
-                  <div css={chipRowStyles(theme)} aria-label="Video details">
-                    <span css={chipStyles(theme)}>
-                      {video.versionCount} version{video.versionCount === 1 ? '' : 's'}
-                    </span>
-                    <span css={chipStyles(theme)}>{version.origin}</span>
-                    <span css={chipStyles(theme)}>{FORMAT_LABELS[formatForVideo(video)]}</span>
-                    {version.characterName ? (
-                      <span css={chipStyles(theme)}>{version.characterName}</span>
-                    ) : null}
-                    {version.characterVariantName ? (
-                      <span css={chipStyles(theme)}>Variant: {version.characterVariantName}</span>
-                    ) : null}
-                    {video.status !== 'ready' ? (
-                      <span css={chipStyles(theme)}>{video.status}</span>
-                    ) : null}
-                  </div>
-                  <div css={actionsStyles(theme)}>
-                    <Button
-                      variant="primary"
-                      disabled={busy || video.status !== 'ready'}
-                      busy={busy}
-                      onClick={() => void handleUseVideo(video, 'play')}
-                    >
-                      Load in Studio
-                    </Button>
-                    <details css={actionMenuStyles(theme)}>
-                      <summary aria-label={`More actions for ${video.title}`}>
-                        <MoreIcon />
-                      </summary>
-                      <div css={actionMenuPopoverStyles(theme)}>
-                        <button
-                          type="button"
-                          disabled={busy || video.status !== 'ready'}
-                          onClick={() => void handleUseVideo(video, 'edit')}
-                        >
-                          Edit video
-                        </button>
-                        <a href={downloadSavedVideoUrl(video.id)} download={version.filename}>
-                          Download
-                        </a>
-                        <button type="button" disabled={busy} onClick={() => void rename(video)}>
-                          Rename
-                        </button>
-                        <button
-                          type="button"
-                          data-danger=""
-                          disabled={busy}
-                          onClick={() => void remove(video)}
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </details>
-                  </div>
-                </div>
-              </article>
-            );
-          })}
-        </div>
+        <VideoGalleryGrid
+          videos={videos}
+          busyId={busyId}
+          brokenThumbnails={brokenThumbnails}
+          onThumbnailError={(videoId) =>
+            setBrokenThumbnails((current) => new Set(current).add(videoId))
+          }
+          onOpenPreview={openPreview}
+          onUse={handleUseVideo}
+          onRename={rename}
+          onRemove={remove}
+        />
       )}
       {nextCursor ? (
         <div css={paginationStyles(theme)}>

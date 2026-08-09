@@ -205,11 +205,14 @@ const directUpload = async (
         method: 'DELETE',
         cache: 'no-store',
         keepalive: true,
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: '{}',
       });
     },
     completeMultipartUpload: async (_file, { uploadId, parts, signal }) => {
       const stagedUploadId = requiredDirectUploadId(uploadId);
       const requestSignal = directUploadSignal(input.signal, signal);
+      const completedParts = parts.map(({ PartNumber, ETag }) => ({ PartNumber, ETag }));
       completed = await captureApiFailure(() =>
         requestJson(
           `/api/videos/uploads/${encodeURIComponent(stagedUploadId)}/complete`,
@@ -217,7 +220,7 @@ const directUpload = async (
             method: 'POST',
             cache: 'no-store',
             headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
-            body: JSON.stringify({ parts }),
+            body: JSON.stringify({ parts: completedParts }),
             ...(requestSignal ? { signal: requestSignal } : {}),
           },
           savedVideoDetailSchema,

@@ -28,6 +28,8 @@ export const CharacterVersionSelector = ({
   readonly onSelect: (value: string) => void;
   readonly onDelete?: (value: string) => void;
 }) => {
+  'use memo';
+
   const theme = useTheme();
   return (
     <div

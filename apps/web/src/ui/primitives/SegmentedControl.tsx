@@ -66,6 +66,8 @@ export const SegmentedControl = <T extends string>({
   disabled = false,
   onChange,
 }: SegmentedControlProps<T>) => {
+  'use memo';
+
   const theme = useTheme();
 
   return (
