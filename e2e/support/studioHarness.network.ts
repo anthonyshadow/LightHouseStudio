@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto';
 import type { Page } from '@playwright/test';
 import type {
+  CapabilitiesResponse,
   ComposeReferenceImageRequest,
   CreateReferenceImageRequest,
   DerivedReferenceImageAsset,
@@ -394,7 +395,8 @@ export const installProviderNetworkDriver = async (
           wardrobe: {
             addOutfitAvailable: options.wardrobeAddOutfitAvailable ?? false,
           },
-        }),
+          savedVideos: { directMultipartUpload: false },
+        } satisfies CapabilitiesResponse),
       });
       return;
     }
