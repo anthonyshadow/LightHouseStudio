@@ -13,6 +13,8 @@ export const ExistingVideoPhaseIndicator = ({
 }: {
   readonly current: ExistingVideoEditorPhase;
 }) => {
+  'use memo';
+
   const theme = useTheme();
   const currentIndex = phases.findIndex(({ id }) => id === current);
 

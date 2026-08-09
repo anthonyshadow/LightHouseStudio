@@ -135,6 +135,9 @@ export class R2AssetByteStore implements AssetByteStore {
       new S3Client({
         region: 'auto',
         endpoint: `https://${options.accountId}.r2.cloudflarestorage.com`,
+        // A presigned UploadPart has no body yet, so the SDK cannot calculate the
+        // checksum for the bytes that the browser will subsequently send.
+        requestChecksumCalculation: 'WHEN_REQUIRED',
         credentials: {
           accessKeyId: options.accessKeyId,
           secretAccessKey: options.secretAccessKey,

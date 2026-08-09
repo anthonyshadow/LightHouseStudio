@@ -72,6 +72,8 @@ export const SavedPromptCard = ({
   onUse: () => void;
   onAction: (action: EditAction) => void;
 }) => {
+  'use memo';
+
   const theme = useTheme();
   const promptLabel =
     item.prompt || (item.modelModeId === 'lucy-vton-latest' ? 'Image outfit' : 'Image character');
@@ -182,6 +184,8 @@ export const RecentPromptCard = ({
   onUse: () => void;
   onSave: () => void;
 }) => {
+  'use memo';
+
   const theme = useTheme();
   const imageOnly = !item.prompt.trim() && Boolean(item.referenceImageAssetId);
   const title =
@@ -281,6 +285,8 @@ export const CharacterPromptCard = ({
   onOpenWardrobe?: (() => void) | undefined;
   onAction: (action: EditAction) => void;
 }) => {
+  'use memo';
+
   const theme = useTheme();
   const referenceLabel =
     item.referenceImageStatus === 'persisted-reference'

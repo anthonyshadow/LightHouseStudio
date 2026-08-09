@@ -26,6 +26,8 @@ export const CharacterRecipeList = ({
   controller: RecipeShelfController;
   useDisabled: boolean;
 }) => {
+  'use memo';
+
   const theme = useTheme();
 
   return (

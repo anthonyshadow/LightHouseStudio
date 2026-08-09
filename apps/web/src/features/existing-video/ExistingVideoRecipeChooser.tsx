@@ -145,6 +145,8 @@ export const ExistingVideoRecipeChooser = ({
   onCreateCharacter,
   onCreateWardrobeVariant,
 }: ExistingVideoRecipeChooserProps) => {
+  'use memo';
+
   const theme = useTheme();
   const copy = chooserCopy(modelId);
   const canCreateCharacter = modelId === 'lucy-latest' && Boolean(onCreateCharacter);

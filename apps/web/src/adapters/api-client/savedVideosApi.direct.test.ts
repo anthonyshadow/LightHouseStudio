@@ -37,11 +37,22 @@ vi.mock('@uppy/core', () => ({
       };
       await this.pluginOptions.signPart?.({}, { uploadId: created.uploadId, partNumber: 1 });
       if (uppyState.failTransfer) {
+        await this.pluginOptions.abortMultipartUpload?.({}, { uploadId: created.uploadId });
         return { failed: [{ error: new Error('PUT https://signed.r2.test/private-object') }] };
       }
       await this.pluginOptions.completeMultipartUpload?.(
         {},
-        { uploadId: created.uploadId, parts: [{ PartNumber: 1, ETag: '"part-1"' }] },
+        {
+          uploadId: created.uploadId,
+          parts: [
+            {
+              PartNumber: 1,
+              'content-length': '0',
+              etag: '"part-1"',
+              ETag: '"part-1"',
+            },
+          ],
+        },
       );
       return { failed: [] };
     }
@@ -98,6 +109,7 @@ describe('direct saved-video API adapter', () => {
   beforeEach(() => {
     uppyState.failTransfer = false;
     uppyState.uploadCalls = 0;
+    api.apiFetch.mockClear();
     api.requestJson.mockReset().mockImplementation((url: string) => {
       if (url === '/api/videos/uploads') {
         return Promise.resolve({
@@ -141,6 +153,10 @@ describe('direct saved-video API adapter', () => {
       '/api/videos/uploads/1a0a22d4-00f7-4c64-88fd-196c97589c8f/parts/1',
       '/api/videos/uploads/1a0a22d4-00f7-4c64-88fd-196c97589c8f/complete',
     ]);
+    const completeCall = api.requestJson.mock.calls[2];
+    expect(JSON.parse((completeCall?.[1] as RequestInit).body as string)).toEqual({
+      parts: [{ PartNumber: 1, ETag: '"part-1"' }],
+    });
   });
 
   it('returns an already-completed idempotent result without starting Uppy', async () => {
@@ -161,5 +177,15 @@ describe('direct saved-video API adapter', () => {
       message: 'The video transfer did not complete. Choose Save to try again.',
       code: 'upload_failed',
     });
+    expect(api.apiFetch).toHaveBeenCalledWith(
+      '/api/videos/uploads/1a0a22d4-00f7-4c64-88fd-196c97589c8f',
+      {
+        method: 'DELETE',
+        cache: 'no-store',
+        keepalive: true,
+        headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+        body: '{}',
+      },
+    );
   });
 });

@@ -38,6 +38,8 @@ export const RecipeShelfView = ({
   embedded = false,
   controller,
 }: RecipeShelfViewProps) => {
+  'use memo';
+
   const theme = useTheme();
   const categoryLabel =
     controller.visibleCategory === 'saved'

@@ -274,6 +274,8 @@ export const CaptureSettingsPanel = ({
   disabledReason,
   presentation = 'overlay',
 }: CaptureSettingsPanelProps) => {
+  'use memo';
+
   const theme = useTheme();
   const localMode = mode === 'local';
   const controlsDisabled = disabled || controller.applying;

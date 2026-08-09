@@ -34,6 +34,8 @@ export const OutfitSelector = ({
   onSaveCopy,
   onSelect,
 }: OutfitSelectorProps) => {
+  'use memo';
+
   const theme = useTheme();
   const [view, setView] = useState<'saved' | 'recent'>('saved');
   const [error, setError] = useState<string | null>(null);

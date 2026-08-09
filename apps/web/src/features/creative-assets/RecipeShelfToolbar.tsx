@@ -16,6 +16,8 @@ export const RecipeShelfToolbar = ({
   controller: RecipeShelfController;
   activeMode: ModelModeId;
 }) => {
+  'use memo';
+
   const theme = useTheme();
   const categories = [
     ['saved', 'Saved'],
