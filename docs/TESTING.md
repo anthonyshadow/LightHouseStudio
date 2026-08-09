@@ -131,8 +131,17 @@ Ordinary pushes and pull requests run:
 
 1. dependency audit;
 2. `bun run quality`, including the static Storybook build;
-3. the built production smoke; and
-4. focused functional Playwright journeys.
+3. the built production smoke;
+4. focused functional Playwright journeys;
+5. on pull requests and `main` pushes, CodeQL JavaScript/TypeScript analysis with the
+   `security-extended` query suite; and
+6. on pull requests, dependency review for newly introduced direct and transitive vulnerabilities
+   and denied licenses.
+
+The required `Quality` check aggregates the essential and functional-browser jobs. Repository
+branch protection also requires the separate `Dependency Review` and `CodeQL` checks. CodeQL runs
+weekly in addition to ordinary push and pull-request analysis. GitHub Actions are pinned to full
+commit SHAs; the `github-actions` Dependabot entry remains responsible for proposing pin updates.
 
 Coverage, curated visual regression, and broad screenshot capture run only through
 `workflow_dispatch`. Exact-candidate release work still runs the full release command list in the
