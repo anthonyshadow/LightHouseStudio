@@ -36,6 +36,7 @@ const unavailableProviders: ProviderAvailability = {
   referenceImageOptimizerModel: null,
   referenceImageOptimizerVersion: null,
   wardrobeAddOutfitAvailable: false,
+  directSavedVideoUploadAvailable: false,
 };
 
 /**

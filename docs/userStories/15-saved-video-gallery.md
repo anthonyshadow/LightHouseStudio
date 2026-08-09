@@ -14,6 +14,9 @@ download only from that gallery, and load a chosen version into the existing Stu
 2. **Save as New Video** creates a titled gallery record and immutable first version. **Replace
    Existing Video** is secondary, requires confirmation, checks the expected current version, and
    appends bytes rather than overwriting history.
+   In authoritative Neon/private-R2 mode, the authenticated API stages the save and the browser
+   transfers multipart bytes directly to R2; the result is not visible until the API verifies and
+   attaches it. Local and shadow modes retain their existing API-mediated upload behavior.
 3. `/studio/videos` reuses the mounted `StudioApp` and persistent `MediaStage`. The gallery first
    loads filtered/sorted metadata in cursor pages; it does not eagerly load video bytes. The
    default order is Latest, with Oldest, Shortest, and Longest alternatives.
@@ -50,6 +53,10 @@ download only from that gallery, and load a chosen version into the existing Stu
   performs filtering, ordering, counts, and facets in SQL and fetches version rows only for the
   selected page.
 - List/detail responses expose no local path, asset key, provider URL, credential, or raw error.
+- Direct-upload contracts expose only an owner-checked staged UUID, bounded part metadata, and a
+  five-minute exact-part URL. Wrong-owner signing/list/abort/complete is non-enumerating. A size,
+  metadata, checksum, or media-inspection mismatch never creates a ready gallery version; expired
+  multipart state is aborted and discarded. Transfer retries never repeat provider operations.
 - Wrong-owner and missing records use safe non-enumerating responses. Content supports controlled
   range delivery without reading the full file into application memory.
 - Saved timestamps remain canonical UTC ISO strings across local and Neon persistence. Loading

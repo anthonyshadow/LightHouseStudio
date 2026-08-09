@@ -70,6 +70,11 @@ export const capabilitiesResponseSchema = z
         addOutfitAvailable: z.boolean(),
       })
       .strict(),
+    savedVideos: z
+      .object({
+        directMultipartUpload: z.boolean(),
+      })
+      .strict(),
   })
   .strict();
 

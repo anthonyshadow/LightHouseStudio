@@ -1,4 +1,11 @@
 import {
+  completeDirectSavedVideoUploadRequestSchema,
+  createDirectSavedVideoUploadRequestSchema,
+  directSavedVideoUploadParamsSchema,
+  directSavedVideoUploadPartParamsSchema,
+  directSavedVideoUploadPartsResponseSchema,
+  directSavedVideoUploadPartUrlSchema,
+  directSavedVideoUploadResponseSchema,
   savedVideoDetailSchema,
   savedVideoIdempotencyKeySchema,
   savedVideoParamsSchema,
@@ -19,6 +26,7 @@ import { isSpooledAudioUpload } from '../../application/spooled-upload.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { AppError } from '../../http/app-error.js';
 import type { SavedVideoService } from './saved-video-service.js';
+import type { DirectSavedVideoUploadService } from './direct-upload-service.js';
 
 const header = (request: HttpRequest, name: string): string | undefined => {
   const value = request.headers[name];
@@ -103,7 +111,67 @@ const THUMBNAIL_UPLOAD_MAX_BYTES = 5 * 1024 * 1024;
 export const registerSavedVideoRoutes = (
   app: ApplicationRuntime,
   service: SavedVideoService,
+  directUploads?: DirectSavedVideoUploadService,
 ): void => {
+  if (directUploads !== undefined) {
+    app.post('/api/videos/uploads', async (request, reply) => {
+      const body = createDirectSavedVideoUploadRequestSchema.safeParse(request.body);
+      if (!body.success) {
+        throw new AppError(400, 'validation_error', 'Provide valid staged-video metadata.');
+      }
+      const staged = await directUploads.stage(ownerUserIdForRequest(request), body.data);
+      reply.status(201).send(directSavedVideoUploadResponseSchema.parse(staged));
+    });
+
+    app.get('/api/videos/uploads/:uploadId/parts', async (request) => {
+      const params = directSavedVideoUploadParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        throw new AppError(400, 'validation_error', 'Choose a valid staged video upload.');
+      }
+      return directSavedVideoUploadPartsResponseSchema.parse({
+        parts: await directUploads.listParts(ownerUserIdForRequest(request), params.data.uploadId),
+      });
+    });
+
+    app.post('/api/videos/uploads/:uploadId/parts/:partNumber', async (request) => {
+      const params = directSavedVideoUploadPartParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        throw new AppError(400, 'validation_error', 'Choose a valid staged upload part.');
+      }
+      return directSavedVideoUploadPartUrlSchema.parse(
+        await directUploads.signPart(
+          ownerUserIdForRequest(request),
+          params.data.uploadId,
+          params.data.partNumber,
+        ),
+      );
+    });
+
+    app.post('/api/videos/uploads/:uploadId/complete', async (request) => {
+      const params = directSavedVideoUploadParamsSchema.safeParse(request.params);
+      const body = completeDirectSavedVideoUploadRequestSchema.safeParse(request.body);
+      if (!params.success || !body.success) {
+        throw new AppError(400, 'validation_error', 'Provide valid completed upload parts.');
+      }
+      return savedVideoDetailSchema.parse(
+        await directUploads.complete(
+          ownerUserIdForRequest(request),
+          params.data.uploadId,
+          body.data.parts,
+        ),
+      );
+    });
+
+    app.delete('/api/videos/uploads/:uploadId', async (request, reply) => {
+      const params = directSavedVideoUploadParamsSchema.safeParse(request.params);
+      if (!params.success) {
+        throw new AppError(400, 'validation_error', 'Choose a valid staged video upload.');
+      }
+      await directUploads.abort(ownerUserIdForRequest(request), params.data.uploadId);
+      reply.status(204).send();
+    });
+  }
+
   app.post(
     '/api/videos',
     {

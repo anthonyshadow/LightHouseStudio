@@ -116,6 +116,76 @@ export const savedVideoUploadMetadataSchema = z
   .strict()
   .superRefine(requireParentCharacterForVariant);
 
+export const directSavedVideoUploadTargetSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('new') }).strict(),
+  z
+    .object({
+      kind: z.literal('version'),
+      videoId: savedVideoIdSchema,
+      expectedVersionId: z.uuid(),
+    })
+    .strict(),
+]);
+
+export const createDirectSavedVideoUploadRequestSchema = z
+  .object({
+    idempotencyKey: savedVideoIdempotencyKeySchema,
+    mimeType: videoInputMimeTypeSchema,
+    sizeBytes: z.number().int().positive().max(VIDEO_RESULT_MAX_BYTES),
+    metadata: savedVideoUploadMetadataSchema,
+    target: directSavedVideoUploadTargetSchema,
+  })
+  .strict();
+
+export const directSavedVideoUploadIdSchema = z.uuid();
+export const directSavedVideoUploadParamsSchema = z
+  .object({ uploadId: directSavedVideoUploadIdSchema })
+  .strict();
+export const directSavedVideoUploadPartParamsSchema = z
+  .object({
+    uploadId: directSavedVideoUploadIdSchema,
+    partNumber: z.coerce.number().int().min(1).max(10_000),
+  })
+  .strict();
+export const directSavedVideoUploadResponseSchema = z
+  .object({
+    uploadId: directSavedVideoUploadIdSchema,
+    expiresAt: z.iso.datetime(),
+    result: savedVideoDetailSchema.nullable(),
+  })
+  .strict();
+export const directSavedVideoUploadPartUrlSchema = z
+  .object({
+    url: z.url(),
+    expiresAt: z.iso.datetime(),
+  })
+  .strict();
+export const directSavedVideoUploadPartSchema = z
+  .object({
+    PartNumber: z.number().int().min(1).max(10_000),
+    Size: z.number().int().positive(),
+    ETag: z.string().trim().min(1).max(200),
+  })
+  .strict();
+export const directSavedVideoUploadPartsResponseSchema = z
+  .object({ parts: z.array(directSavedVideoUploadPartSchema).max(10_000) })
+  .strict();
+export const completeDirectSavedVideoUploadRequestSchema = z
+  .object({
+    parts: z
+      .array(
+        z
+          .object({
+            PartNumber: z.number().int().min(1).max(10_000),
+            ETag: z.string().trim().min(1).max(200),
+          })
+          .strict(),
+      )
+      .min(1)
+      .max(10_000),
+  })
+  .strict();
+
 export type SavedVideoOrigin = z.infer<typeof savedVideoOriginSchema>;
 export type SavedVideoFormat = z.infer<typeof savedVideoFormatSchema>;
 export type SavedVideoSort = z.infer<typeof savedVideoSortSchema>;
@@ -125,3 +195,8 @@ export type SavedVideoDetail = z.infer<typeof savedVideoDetailSchema>;
 export type SavedVideosResponse = z.infer<typeof savedVideosResponseSchema>;
 export type SavedVideosQuery = z.infer<typeof savedVideosQuerySchema>;
 export type SavedVideoUploadMetadata = z.infer<typeof savedVideoUploadMetadataSchema>;
+export type DirectSavedVideoUploadTarget = z.infer<typeof directSavedVideoUploadTargetSchema>;
+export type CreateDirectSavedVideoUploadRequest = z.infer<
+  typeof createDirectSavedVideoUploadRequestSchema
+>;
+export type DirectSavedVideoUploadPart = z.infer<typeof directSavedVideoUploadPartSchema>;

@@ -3,6 +3,7 @@ import { chmod, mkdtemp, open, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import type { Readable } from 'node:stream';
+import { withWorkflowSpan } from '../observability/telemetry.js';
 
 export interface SpooledAudioUpload {
   readonly kind: 'spooled-audio-upload';
@@ -34,43 +35,48 @@ export const isSpooledAudioUpload = (value: unknown): value is SpooledAudioUploa
   'cleanup' in value &&
   typeof value.cleanup === 'function';
 
-export const spoolAudioUpload = async (
+export const spoolAudioUpload = (
   source: Readable,
   maximumBytes: number,
-): Promise<SpooledAudioUpload> => {
-  const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-voice-upload-'));
-  const filePath = path.join(directory, 'recording.audio');
-  let handle: Awaited<ReturnType<typeof open>> | undefined;
-  let byteLength = 0;
-  const hash = createHash('sha256');
-  try {
-    await chmod(directory, 0o700);
-    handle = await open(filePath, 'wx', 0o600);
-    for await (const rawChunk of source) {
-      const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk as Uint8Array);
-      byteLength += chunk.byteLength;
-      if (byteLength > maximumBytes) throw new SpooledUploadTooLargeError();
-      await handle.write(chunk);
-      hash.update(chunk);
-    }
-    await handle.sync();
-    await handle.close();
-    handle = undefined;
-    let cleaned = false;
-    return {
-      kind: 'spooled-audio-upload',
-      path: filePath,
-      byteLength,
-      checksumSha256: hash.digest('hex'),
-      cleanup: async () => {
-        if (cleaned) return;
-        cleaned = true;
-        await rm(directory, { recursive: true, force: true });
-      },
-    };
-  } catch (error) {
-    await handle?.close().catch(() => undefined);
-    await rm(directory, { recursive: true, force: true }).catch(() => undefined);
-    throw error;
-  }
-};
+): Promise<SpooledAudioUpload> =>
+  withWorkflowSpan(
+    'temporary_file.create',
+    { 'lightframe.maximum_bytes': maximumBytes },
+    async () => {
+      const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-voice-upload-'));
+      const filePath = path.join(directory, 'recording.audio');
+      let handle: Awaited<ReturnType<typeof open>> | undefined;
+      let byteLength = 0;
+      const hash = createHash('sha256');
+      try {
+        await chmod(directory, 0o700);
+        handle = await open(filePath, 'wx', 0o600);
+        for await (const rawChunk of source) {
+          const chunk = Buffer.isBuffer(rawChunk) ? rawChunk : Buffer.from(rawChunk as Uint8Array);
+          byteLength += chunk.byteLength;
+          if (byteLength > maximumBytes) throw new SpooledUploadTooLargeError();
+          await handle.write(chunk);
+          hash.update(chunk);
+        }
+        await handle.sync();
+        await handle.close();
+        handle = undefined;
+        let cleaned = false;
+        return {
+          kind: 'spooled-audio-upload',
+          path: filePath,
+          byteLength,
+          checksumSha256: hash.digest('hex'),
+          cleanup: async () => {
+            if (cleaned) return;
+            cleaned = true;
+            await rm(directory, { recursive: true, force: true });
+          },
+        };
+      } catch (error) {
+        await handle?.close().catch(() => undefined);
+        await rm(directory, { recursive: true, force: true }).catch(() => undefined);
+        throw error;
+      }
+    },
+  );

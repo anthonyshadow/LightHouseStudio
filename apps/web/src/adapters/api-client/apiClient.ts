@@ -119,6 +119,7 @@ export const fetchProviderAvailability = async (
     referenceImageOptimizerModel: payload.referenceImages.optimizer.model,
     referenceImageOptimizerVersion: payload.referenceImages.optimizer.version,
     wardrobeAddOutfitAvailable: payload.wardrobe.addOutfitAvailable,
+    directSavedVideoUploadAvailable: payload.savedVideos.directMultipartUpload,
   };
 };
 

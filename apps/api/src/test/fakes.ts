@@ -34,6 +34,8 @@ export const testConfig = (overrides: Partial<RuntimeConfig> = {}): RuntimeConfi
   databaseMode: 'local',
   assetStoreProvider: 'local',
   r2KeyPrefix: 'media/v1',
+  telemetryEnabled: false,
+  otelTraceSampleRatio: 0.1,
   videoJobMaxActive: 8,
   videoJobMaxActivePerProvider: 4,
   existingVideoCharacterSwapProvider: 'decart',

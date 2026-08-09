@@ -43,8 +43,11 @@ import {
 } from './features/saved-videos/saved-video-repository.js';
 import { SavedVideoService } from './features/saved-videos/saved-video-service.js';
 import { registerSavedVideoRoutes } from './features/saved-videos/routes.js';
+import { DirectSavedVideoUploadService } from './features/saved-videos/direct-upload-service.js';
 import { registerCreativeLibraryRoutes } from './features/creative-libraries/routes.js';
 import type { CreativeLibraryRepository } from './features/creative-libraries/creative-library-repository.js';
+import type { DirectUploadRepository } from './storage/direct-upload.js';
+import type { R2AssetByteStore } from './storage/r2-asset-byte-store.js';
 import {
   type DurableProcessingJobRepository,
   FileProcessingJobRepository,
@@ -90,6 +93,10 @@ export interface AppPersistenceDependencies {
   readonly processingJobTraces?: ProcessingJobTraceWriter;
   readonly processingJobs?: DurableProcessingJobRepository;
   readonly creativeLibraries?: CreativeLibraryRepository;
+  readonly directVideoUploads?: {
+    readonly repository: DirectUploadRepository;
+    readonly storage: R2AssetByteStore;
+  };
   readonly close?: () => Promise<void>;
 }
 
@@ -129,6 +136,16 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
         dependencies.config.referenceImageTimeoutMs,
         dependencies.config.openAiPromptOptimizerTimeoutMs,
       ) + OPENAI_CONNECTION_TIMEOUT_MARGIN_MS,
+    ...(dependencies.config.telemetryEnabled &&
+    dependencies.config.otelExporterEndpoint !== undefined
+      ? {
+          telemetry: {
+            exporterEndpoint: dependencies.config.otelExporterEndpoint,
+            sampleRatio: dependencies.config.otelTraceSampleRatio,
+            serviceName: 'lightframe-api',
+          },
+        }
+      : {}),
     ...(dependencies.staticRoot === undefined ? {} : { staticRoot: dependencies.staticRoot }),
   });
 
@@ -274,6 +291,15 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
       deleteStoredAssetsOnManualDelete: dependencies.config.assetStoreProvider === 'r2',
     },
   );
+  const directSavedVideoUploads = dependencies.persistence?.directVideoUploads;
+  const directSavedVideoUploadService =
+    directSavedVideoUploads === undefined
+      ? undefined
+      : new DirectSavedVideoUploadService(
+          directSavedVideoUploads.repository,
+          directSavedVideoUploads.storage,
+          savedVideoService,
+        );
 
   registerAuthRoutes(app, authService, dependencies.config);
   registerSystemRoutes(app, {
@@ -294,10 +320,11 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     promptOptimizerModel: dependencies.config.openAiPromptOptimizerModel,
     promptOptimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
     wardrobeAddOutfitAvailable: outfitTryOnService.available,
+    directSavedVideoUploadAvailable: directSavedVideoUploadService !== undefined,
   });
   registerRealtimeRoutes(app, decartProvider);
   registerVideoJobRoutes(app, videoJobService);
-  registerSavedVideoRoutes(app, savedVideoService);
+  registerSavedVideoRoutes(app, savedVideoService, directSavedVideoUploadService);
   registerCreativeLibraryRoutes(
     app,
     dependencies.persistence?.creativeLibraries,
@@ -311,6 +338,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   });
   registerVoiceRoutes(app, voiceService);
   app.addHook('onClose', async () => {
+    await directSavedVideoUploadService?.close();
     await videoJobService.close();
     await dependencies.persistence?.close?.();
   });

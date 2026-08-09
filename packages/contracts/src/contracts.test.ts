@@ -10,7 +10,9 @@ import {
   apiErrorResponseSchema,
   capabilitiesResponseSchema,
   characterPromptOptimizationResultSchema,
+  completeDirectSavedVideoUploadRequestSchema,
   composeReferenceImageRequestSchema,
+  createDirectSavedVideoUploadRequestSchema,
   createReferenceImageRequestSchema,
   editReferenceImageRequestSchema,
   healthResponseSchema,
@@ -21,6 +23,7 @@ import {
   sharedVoicesQuerySchema,
   sharedVoicesResponseSchema,
   savedVideoUploadMetadataSchema,
+  directSavedVideoUploadPartParamsSchema,
   remoteReferenceImageImportRequestSchema,
   referenceImageAssetSchema,
   uploadReferenceImageResponseSchema,
@@ -106,6 +109,7 @@ describe('health and capabilities contracts', () => {
           },
         },
         wardrobe: { addOutfitAvailable: true },
+        savedVideos: { directMultipartUpload: true },
       }),
     ).toEqual({
       realtimeVideo: { available: true },
@@ -155,6 +159,7 @@ describe('health and capabilities contracts', () => {
         },
       },
       wardrobe: { addOutfitAvailable: true },
+      savedVideos: { directMultipartUpload: true },
     });
     expect(
       capabilitiesResponseSchema.safeParse({
@@ -174,6 +179,7 @@ describe('health and capabilities contracts', () => {
           },
         },
         wardrobe: { addOutfitAvailable: false },
+        savedVideos: { directMultipartUpload: false },
       }).success,
     ).toBe(false);
   });
@@ -201,6 +207,41 @@ describe('saved video attribution contracts', () => {
         ...metadata,
         characterName: null,
         characterVariantName: 'Evening',
+      }).success,
+    ).toBe(false);
+  });
+
+  it('keeps direct multipart authority opaque and bounded', () => {
+    const idempotencyKey = '2efcc6c3-e82c-419a-8807-c0026170fb75';
+    const upload = {
+      idempotencyKey,
+      mimeType: 'video/mp4' as const,
+      sizeBytes: 8 * 1_024 * 1_024,
+      metadata: {
+        ...metadata,
+        characterName: 'Mara',
+        characterVariantName: null,
+      },
+      target: { kind: 'new' as const },
+    };
+
+    expect(createDirectSavedVideoUploadRequestSchema.safeParse(upload).success).toBe(true);
+    expect(
+      createDirectSavedVideoUploadRequestSchema.safeParse({
+        ...upload,
+        bucket: 'private-assets',
+        key: 'media/untrusted',
+      }).success,
+    ).toBe(false);
+    expect(
+      directSavedVideoUploadPartParamsSchema.safeParse({
+        uploadId: idempotencyKey,
+        partNumber: '10001',
+      }).success,
+    ).toBe(false);
+    expect(
+      completeDirectSavedVideoUploadRequestSchema.safeParse({
+        parts: [{ PartNumber: 1, ETag: '"part-1"', url: 'https://example.test' }],
       }).success,
     ).toBe(false);
   });

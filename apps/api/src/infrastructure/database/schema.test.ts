@@ -5,6 +5,8 @@ import {
   assetStorageProvider,
   creativeAssets,
   creativeLibraries,
+  directUploads,
+  directUploadStatus,
   mediaAssets,
   operationStatus,
   outbox,
@@ -35,6 +37,7 @@ describe('Drizzle persistence schema', () => {
       savedVideos,
       videoVersions,
       savedVideoReceipts,
+      directUploads,
       savedVoices,
       ownerMigrations,
       creativeAssets,
@@ -78,5 +81,14 @@ describe('Drizzle persistence schema', () => {
     ]);
     expect(operationStatus.enumValues).toContain('ambiguous');
     expect(outboxStatus.enumValues).toEqual(['pending', 'processing', 'completed', 'failed']);
+    expect(directUploadStatus.enumValues).toEqual([
+      'pending',
+      'uploading',
+      'verifying',
+      'ready',
+      'failed',
+      'aborted',
+      'expired',
+    ]);
   });
 });

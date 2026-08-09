@@ -220,7 +220,6 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     [auth.session],
   );
   useCreativeLibraryCloudSync(repository);
-  const savedVideoSave = useSaveVideo();
   const sessionCleanup = useMemo(() => new SessionCleanupCoordinator(), []);
   const [logoutPromptOpen, setLogoutPromptOpen] = useState(false);
   const [logoutBlockedOpen, setLogoutBlockedOpen] = useState(false);
@@ -321,6 +320,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     state: capabilityState,
     retry: retryProviderAvailability,
   } = useProviderAvailability();
+  const savedVideoSave = useSaveVideo(Boolean(availability.directSavedVideoUploadAvailable));
   const {
     active: activeOverlay,
     open: openOverlay,
