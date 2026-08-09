@@ -1,6 +1,7 @@
 import type { RuntimeConfig } from '../../config/environment.js';
 import { DecartHttpVideoJobProvider } from '../decart/video-job-provider.js';
 import { PrunaVideoReplaceProvider } from '../pruna/video-replace-provider.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import type {
   ExistingVideoJobProvider,
   ExistingVideoOperationBinding,
@@ -8,12 +9,12 @@ import type {
 } from './video-job-provider.js';
 
 export interface ExistingVideoProviderFactoryOptions {
-  readonly fetchImplementation?: typeof fetch;
+  readonly fetchImplementation?: ProviderFetch;
   readonly decartProvider?: ExistingVideoJobProvider | null;
   readonly prunaProvider?: ExistingVideoJobProvider | null;
   readonly createPrunaProvider?: (
     apiKey: string,
-    fetchImplementation?: typeof fetch,
+    fetchImplementation?: ProviderFetch,
   ) => ExistingVideoJobProvider;
 }
 

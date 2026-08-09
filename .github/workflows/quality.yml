@@ -22,15 +22,16 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm audit:all
-      - run: pnpm quality
-      - run: pnpm test:production
+      - run: bun ci
+      - run: bun run audit:all
+      - run: bun run quality
+      - run: bun run test:production
       - name: Upload unit failure report
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
@@ -47,13 +48,14 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm test:coverage
+      - run: bun ci
+      - run: bun run test:coverage
       - name: Upload coverage report
         if: ${{ always() }}
         uses: actions/upload-artifact@v7
@@ -69,14 +71,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium webkit
-      - run: pnpm test:e2e
+      - run: bun ci
+      - run: bunx playwright install --with-deps chromium webkit
+      - run: bun run test:e2e
       - name: Upload browser failure artifacts
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
@@ -95,14 +98,15 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm test:visual
+      - run: bun ci
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run test:visual
       - name: Upload visual failure artifacts
         if: ${{ failure() }}
         uses: actions/upload-artifact@v7
@@ -121,14 +125,15 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
-      - uses: pnpm/action-setup@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version-file: .bun-version
       - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm exec playwright install --with-deps chromium
-      - run: pnpm screenshots:capture
+      - run: bun ci
+      - run: bunx playwright install --with-deps chromium
+      - run: bun run screenshots:capture
       - name: Upload broad captures
         if: ${{ always() }}
         uses: actions/upload-artifact@v7

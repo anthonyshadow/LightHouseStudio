@@ -97,14 +97,14 @@ baseline is missing:
 
 ```bash
 node scripts/prune-visual-baselines.mjs --check
-pnpm test:visual
+bun run test:visual
 ```
 
-Use `pnpm test:visual:update` only for an intentional UI/matrix change. Inspect every changed
+Use `bun run test:visual:update` only for an intentional UI/matrix change. Inspect every changed
 image on every affected platform and viewport before accepting it. Do not prune until replacement
 baselines exist.
 
-Visual regression does not run in `pnpm test`, `pnpm quality`, or ordinary push/pull-request CI.
+Visual regression does not run in `bun run test`, `bun run quality`, or ordinary push/pull-request CI.
 Run it explicitly for material UI/UX changes and every exact release candidate. The manual CI
 workflow also exposes it through `workflow_dispatch`.
 

@@ -8,7 +8,7 @@ screenshots, ordinary tests, or shared environments.
 
 ## Preflight
 
-1. Run deterministic release gates, including `pnpm quality` and `pnpm test:e2e`.
+1. Run deterministic release gates, including `bun run quality` and `bun run test:e2e`.
 2. Confirm the person running the check is authorized to use the credentials and approve spend.
 3. Review current account model availability, pricing, quota, content policy, and retention. Stop
    if they differ from the approved configuration.

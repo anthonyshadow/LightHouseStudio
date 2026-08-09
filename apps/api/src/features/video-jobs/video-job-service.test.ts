@@ -5,6 +5,11 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
 import { VideoJobService } from './video-job-service.js';
 import type {
+  DurableProcessingJobRepository,
+  ProcessingJobAdmissionResult,
+  VideoProcessingJobTrace,
+} from '../processing-jobs/file-processing-job-repository.js';
+import type {
   ExistingVideoJobProvider,
   ExistingVideoProviderRegistry,
   VideoJobProviderFailureReason,
@@ -216,6 +221,7 @@ describe('VideoJobService', () => {
     const jobId = crypto.randomUUID();
     const ownerId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
     const durableRepository = {
+      admit: vi.fn().mockResolvedValue('admitted' as const),
       listResumable: vi.fn().mockResolvedValue([
         {
           jobId,
@@ -248,6 +254,133 @@ describe('VideoJobService', () => {
     await expect(service.status(jobId, ownerId)).resolves.toMatchObject({ status: 'processing' });
     expect(provider.submissions).toHaveLength(0);
     expect(provider.statusCalls).toBe(1);
+  });
+
+  it('awaits durable admission and the submitting trace before provider submission', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-admission-'));
+    const provider = new FakeVideoProvider();
+    const admission = deferred<ProcessingJobAdmissionResult>();
+    const submittingTrace = deferred<void>();
+    const traces: VideoProcessingJobTrace[] = [];
+    const durableRepository: DurableProcessingJobRepository = {
+      admit: vi.fn(() => admission.promise),
+      listResumable: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn((trace: VideoProcessingJobTrace) => {
+        traces.push(trace);
+        return trace.status === 'submitting' ? submittingTrace.promise : Promise.resolve();
+      }),
+    };
+    const service = createService(provider, root, { durableJobRepository: durableRepository });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = crypto.randomUUID();
+
+    const starting = startJob(service, jobId, ownerId);
+    await vi.waitFor(() => expect(durableRepository.admit).toHaveBeenCalledOnce());
+    expect(provider.submissions).toHaveLength(0);
+
+    admission.resolve('admitted');
+    await starting;
+    await vi.waitFor(() => expect(traces.map((trace) => trace.status)).toContain('submitting'));
+    expect(provider.submissions).toHaveLength(0);
+
+    submittingTrace.resolve(undefined);
+    await vi.waitFor(() => expect(provider.submissions).toHaveLength(1));
+  });
+
+  it.each([
+    ['duplicate', 'generation_in_progress', 409],
+    ['owner-conflict', 'generation_in_progress', 409],
+    ['request-conflict', 'request_id_conflict', 409],
+    ['owner-mismatch', 'not_found', 404],
+  ] as const)(
+    'rejects durable %s admission without paid provider work',
+    async (admissionResult, errorCode, statusCode) => {
+      const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-conflict-'));
+      const provider = new FakeVideoProvider();
+      const durableRepository: DurableProcessingJobRepository = {
+        admit: vi.fn().mockResolvedValue(admissionResult),
+        listResumable: vi.fn().mockResolvedValue([]),
+        upsert: vi.fn().mockResolvedValue(undefined),
+      };
+      const service = createService(provider, root, { durableJobRepository: durableRepository });
+      services.push(service);
+
+      await expect(
+        startJob(service, crypto.randomUUID(), crypto.randomUUID()),
+      ).rejects.toMatchObject({ code: errorCode, statusCode });
+      expect(provider.submissions).toHaveLength(0);
+      expect(durableRepository.upsert).not.toHaveBeenCalled();
+    },
+  );
+
+  it('admits only one provider submission across two service instances', async () => {
+    const firstRoot = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-instance-a-'));
+    const secondRoot = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-instance-b-'));
+    const provider = new FakeVideoProvider();
+    const admittedJobByOwner = new Map<string, VideoProcessingJobTrace>();
+    const durableRepository: DurableProcessingJobRepository = {
+      admit: vi.fn((trace: VideoProcessingJobTrace): Promise<ProcessingJobAdmissionResult> => {
+        if (admittedJobByOwner.has(trace.ownerUserId)) return Promise.resolve('owner-conflict');
+        admittedJobByOwner.set(trace.ownerUserId, trace);
+        return Promise.resolve('admitted');
+      }),
+      listResumable: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn().mockResolvedValue(undefined),
+    };
+    const firstService = createService(provider, firstRoot, {
+      durableJobRepository: durableRepository,
+    });
+    const secondService = createService(provider, secondRoot, {
+      durableJobRepository: durableRepository,
+    });
+    services.push(firstService, secondService);
+    const firstJobId = crypto.randomUUID();
+    const secondJobId = crypto.randomUUID();
+    const ownerId = crypto.randomUUID();
+
+    const starts = await Promise.allSettled([
+      startJob(firstService, firstJobId, ownerId),
+      startJob(secondService, secondJobId, ownerId),
+    ]);
+    await vi.waitFor(() => expect(provider.submissions).toHaveLength(1));
+
+    expect(starts.filter((result) => result.status === 'fulfilled')).toHaveLength(1);
+    const rejected = starts.find((result) => result.status === 'rejected');
+    expect(rejected).toMatchObject({
+      status: 'rejected',
+      reason: { code: 'generation_in_progress', statusCode: 409 },
+    });
+    expect(durableRepository.admit).toHaveBeenCalledTimes(2);
+    expect(provider.submissions).toHaveLength(1);
+  });
+
+  it('serializes per-job durable traces when later state changes finish first', async () => {
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-video-job-trace-order-'));
+    const provider = new FakeVideoProvider();
+    const queuedTrace = deferred<void>();
+    const writtenStatuses: string[] = [];
+    const durableRepository: DurableProcessingJobRepository = {
+      admit: vi.fn().mockResolvedValue('admitted' as const),
+      listResumable: vi.fn().mockResolvedValue([]),
+      upsert: vi.fn((trace: VideoProcessingJobTrace) => {
+        writtenStatuses.push(trace.status);
+        return trace.status === 'queued' ? queuedTrace.promise : Promise.resolve();
+      }),
+    };
+    const service = createService(provider, root, { durableJobRepository: durableRepository });
+    services.push(service);
+    const jobId = crypto.randomUUID();
+    const ownerId = crypto.randomUUID();
+
+    await startJob(service, jobId, ownerId);
+    await vi.waitFor(() => expect(writtenStatuses).toEqual(['submitting', 'queued']));
+    provider.nextStatus = 'processing';
+    await expect(service.status(jobId, ownerId)).resolves.toMatchObject({ status: 'processing' });
+    expect(writtenStatuses).toEqual(['submitting', 'queued']);
+
+    queuedTrace.resolve(undefined);
+    await vi.waitFor(() => expect(writtenStatuses).toEqual(['submitting', 'queued', 'processing']));
   });
 
   it('owns capped provider polling cadence and serves cached status under rapid reads', async () => {

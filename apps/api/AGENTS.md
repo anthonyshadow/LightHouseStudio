@@ -6,8 +6,10 @@ user story for detailed contracts.
 
 ## Runtime and boundaries
 
-- Fastify is the implemented runtime. Preserve the current loopback Host/Origin
-  boundary and deny-by-default private API behavior.
+- Bun and Elysia are the implemented runtime and HTTP framework. The Bun process intentionally uses
+  its exclusive loopback `node:http` compatibility listener so fixed-length streams retain
+  `Content-Length` and delivery leases observe socket close. Preserve that listener, the current
+  Host/Origin boundary, and deny-by-default private API behavior.
 - Route handlers validate app-owned contracts and delegate. Application services
   own sequencing; repositories own persistence; provider adapters own provider
   request, response, polling, and error formats.
@@ -26,6 +28,6 @@ user story for detailed contracts.
 
 ## Validation
 
-- Prefer focused Fastify integration tests and the API typecheck for narrow API
+- Prefer focused Elysia integration tests and the API typecheck for narrow API
   work. Add repository or provider tests at the boundary whose contract changes.
 - Use fakes for Neon and R2 in ordinary automated tests.

@@ -1,3 +1,5 @@
+import type { ProviderFetch } from './provider-fetch.js';
+
 export const MAX_PROVIDER_JSON_BYTES = 1024 * 1024;
 
 export interface BoundedJsonErrorOptions {
@@ -9,7 +11,7 @@ export type BoundedJsonErrorFactory = (options?: BoundedJsonErrorOptions) => Err
 
 /** Authenticated provider requests must never follow a redirect with application credentials. */
 export const authenticatedProviderFetch = (
-  fetchImplementation: typeof fetch,
+  fetchImplementation: ProviderFetch,
   input: RequestInfo | URL,
   init: RequestInit,
 ): Promise<Response> => fetchImplementation(input, { ...init, redirect: 'error' });

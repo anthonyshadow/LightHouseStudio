@@ -1,37 +1,34 @@
-import type { FastifyReply, FastifyRequest } from 'fastify';
+import type {
+  HttpReply,
+  HttpRequest,
+  StreamLifecycle,
+} from '../application/application-runtime.js';
 import type { AudioStream } from '../application/audio-stream.js';
 
 export interface RequestLifetime {
   readonly signal: AbortSignal;
+  abort(reason?: unknown): void;
   release(): void;
 }
 
-export const createRequestLifetime = (
-  request: FastifyRequest,
-  reply: FastifyReply,
-): RequestLifetime => {
+export const createRequestLifetime = (request: HttpRequest, _reply: HttpReply): RequestLifetime => {
   const controller = new AbortController();
-  const abortForRequest = (): void => controller.abort('client-aborted');
-  const abortForResponse = (): void => {
-    if (!reply.raw.writableEnded) controller.abort('client-disconnected');
-  };
-
-  request.raw.once('aborted', abortForRequest);
-  reply.raw.once('close', abortForResponse);
+  const abortForRequest = (): void => controller.abort(request.signal.reason ?? 'client-aborted');
+  request.signal.addEventListener('abort', abortForRequest, { once: true });
 
   return {
     signal: controller.signal,
+    abort: (reason?: unknown) => controller.abort(reason ?? 'client-disconnected'),
     release: () => {
-      request.raw.off('aborted', abortForRequest);
-      reply.raw.off('close', abortForResponse);
+      request.signal.removeEventListener('abort', abortForRequest);
     },
   };
 };
 
 /** Runs a buffered JSON handler with request-abort propagation and deterministic listener cleanup. */
 export const withRequestLifetime = async <Result>(
-  request: FastifyRequest,
-  reply: FastifyReply,
+  request: HttpRequest,
+  reply: HttpReply,
   handler: (signal: AbortSignal) => Promise<Result>,
 ): Promise<Result> => {
   const lifetime = createRequestLifetime(request, reply);
@@ -42,11 +39,15 @@ export const withRequestLifetime = async <Result>(
   }
 };
 
-export const sendAudioStream = (reply: FastifyReply, audio: AudioStream): FastifyReply => {
+export const sendAudioStream = (
+  reply: HttpReply,
+  audio: AudioStream,
+  lifecycle?: StreamLifecycle,
+): HttpReply => {
   void reply.type(audio.contentType);
   void reply.header('Content-Disposition', 'inline');
   if (audio.contentLength !== undefined) {
     void reply.header('Content-Length', String(audio.contentLength));
   }
-  return reply.send(audio.body);
+  return reply.sendStream(audio.body, lifecycle);
 };

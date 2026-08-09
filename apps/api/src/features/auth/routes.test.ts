@@ -135,6 +135,39 @@ describe('demo authentication API', () => {
     expect(tampered.headers['set-cookie']).toContain('lightframe_session=;');
   });
 
+  it('rejects an untrusted login origin before reading credential bytes', async () => {
+    const app = setup();
+    let pulls = 0;
+    const payload = new ReadableStream<Uint8Array>(
+      {
+        pull(controller) {
+          pulls += 1;
+          controller.enqueue(
+            new TextEncoder().encode(
+              JSON.stringify({ login: 'demo@lightframe.local', password: 'lightframe-demo' }),
+            ),
+          );
+          controller.close();
+        },
+      },
+      { highWaterMark: 0 },
+    );
+
+    const response = await app.inject({
+      method: 'POST',
+      url: '/api/auth/login',
+      headers: {
+        host: headers.host,
+        origin: 'https://malicious.example',
+        'content-type': 'application/json',
+      },
+      payload,
+    });
+
+    expect(response.statusCode).toBe(403);
+    expect(pulls).toBe(0);
+  });
+
   it('fails closed when demo authentication is disabled outside the test harness', async () => {
     const app = createApp({
       config: testConfig({ nodeEnv: 'development', demoAuthEnabled: false }),

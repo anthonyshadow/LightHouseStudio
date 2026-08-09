@@ -1,51 +1,53 @@
-# 0002: API runtime decision
+# 0002: Bun and Elysia API runtime
 
-- Status: Decision Pending
+- Status: Accepted
 - Date: 2026-08-08
 
 ## Context
 
-The current API is implemented on Fastify. Its hooks enforce the loopback,
-origin, authentication, and response boundaries; route tests use Fastify
-injection; plugins own cookies, multipart uploads, headers, and static serving;
-and feature services integrate streaming, cancellation, provider adapters, and
-safe error translation.
+The loopback API previously used Node and Fastify. Its hooks and plugins enforced Host/Origin,
+authentication, cookies, bounded uploads, response normalization, streaming cleanup, and static
+production serving. The package manager was pnpm, while the retained TypeScript, Vitest, Vite,
+Playwright, Storybook, and shared-package build tools were already separable from the production
+runtime.
 
-The repository owner has not selected a different long-term runtime. A runtime
-migration is therefore not part of the current architecture cleanup.
+The migration requires one app-owned HTTP contract across development and production, faster and
+more direct TypeScript execution, and a single package-manager lockfile without weakening the
+local-only security, provider-cost, data-ownership, or cleanup boundaries.
 
-## Current state
+## Decision
 
-Fastify remains the implemented API runtime because no replacement has been
-selected or authorized. This is existing repository behavior, not a long-term
-runtime selection by this pending record. Ordinary work preserves that behavior
-under the repository-wide current-state rule; this ADR does not govern work as
-an accepted decision. Elysia or another runtime is not selected by this record.
+Bun `1.3.14` is the package manager, API development runtime, production runtime, and API bundler.
+Elysia `1.4.29` is the API framework. The server remains loopback-only and continues to serve the
+built web app and `/api` from one origin in production.
 
-Fastify currently provides mature plugin composition, request lifecycle hooks,
-schema-compatible TypeScript integration, injection-based testing, streaming
-responses, and one production server for the loopback API and built web app. Its
-constraints include framework-specific hooks and plugins, a large composition
-boundary, and migration cost that grows with route and lifecycle coverage.
+Node `24.x` remains an explicit tooling runtime for the retained Vitest, Vite, Playwright,
+Storybook, tsup declaration builds, and repository scripts where substituting Bun would change the
+tool's runtime contract without product benefit. These tools are invoked through `bun run`; bare
+`bun test` is not the repository test command.
 
-## Criteria for a future decision
-
-A proposed replacement must demonstrate a material benefit in maintainability,
-correctness, performance, security, or operations against the current workload.
-Evidence must cover feature parity, typed app-owned contracts, loopback/origin
-and authentication hooks, multipart and bounded uploads, response streaming and
-disconnect cleanup, provider routes, error sanitization, static production
-serving, observability, dependency risk, and supported Node/tooling versions.
-
-The migration plan must account for Fastify injection tests, middleware and
-plugin replacement, authentication ordering, streaming semantics, provider
-resource lifetimes, production startup/serving, incremental cutover or rollback,
-and operational risk. Benchmark results alone are insufficient.
+The migration preserves app-owned schemas, safe errors, exact authentication and Origin ordering,
+streaming/backpressure, bounded multipart and raw uploads, disconnect cancellation, provider
+deadlines, static SPA fallback, and deterministic shutdown. Framework payloads and errors do not
+become public contracts.
 
 ## Consequences
 
-While the decision remains pending, the repository avoids an unproven
-cross-cutting migration and preserves current runtime behavior. Some framework
-coupling remains intentionally in the API composition and integration tests. A
-future runtime choice remains open and requires an accepted ADR with migration
-evidence before implementation.
+The repository commits text `bun.lock`, declares workspaces and overrides in the root manifest,
+uses isolated dependency linking, and disables Bun's automatic dotenv loading so the API keeps its
+explicit repository-root configuration path. Native and Node-compatibility dependencies require
+clean-install and runtime checks on maintained Darwin and Linux environments.
+
+Elysia integration tests exercise the app-owned HTTP boundary rather than depending on Fastify
+injection. Runtime-sensitive DNS pinning, Node/Web stream adapters, large-media spooling, R2
+multipart/range behavior, Neon pooling, and provider SDKs retain focused compatibility tests and
+manual live gates where credentials or paid calls are required.
+
+The Bun process uses its exclusive loopback `node:http` compatibility listener and delegates every
+request to Elysia. This is intentional: Bun's native listener cannot preserve both fixed
+`Content-Length` responses and socket-finish delivery-lease semantics for the app's backpressured
+file streams. The compatibility listener has no pre-Elysia body ceiling, so every route remains
+bounded by app-owned declared-length and counted or spooled readers at 310,551,296 bytes or less.
+This preserves Host/authentication/error precedence without authorizing a larger application
+payload. The HTTP adapter also separates the 100-second absolute receive phase from the fresh
+post-parse handler/response inactivity phase.

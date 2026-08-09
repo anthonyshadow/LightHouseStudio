@@ -1,10 +1,10 @@
 import type { ApiErrorResponse } from '@studio/contracts';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
-import Fastify, { type FastifyInstance, type FastifyRequest } from 'fastify';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createApp } from '../../app.js';
+import { ApplicationRuntime, type HttpRequest } from '../../application/application-runtime.js';
 import { testConfig } from '../../test/fakes.js';
 import { registerVideoJobRoutes } from './routes.js';
 import type { VideoJobService } from './video-job-service.js';
@@ -16,9 +16,9 @@ const trustedHeaders = {
   'x-lightframe-provider-intent': 'video',
 };
 
-const installRouteTestAuth = (app: FastifyInstance) => {
+const installRouteTestAuth = (app: ApplicationRuntime) => {
   app.decorateRequest('auth', null);
-  app.addHook('onRequest', async (request: FastifyRequest) => {
+  app.addHook('onRequest', async (request: HttpRequest) => {
     await Promise.resolve();
     request.auth = {
       user: {
@@ -46,7 +46,9 @@ describe('video job route boundary', () => {
   const directories: string[] = [];
   afterEach(async () => {
     await Promise.all(apps.splice(0).map((app) => app.close()));
-    await Promise.all(directories.splice(0).map((directory) => rm(directory, { recursive: true })));
+    await Promise.all(
+      directories.splice(0).map((directory) => rm(directory, { recursive: true, force: true })),
+    );
   });
 
   it('requires the exact trusted loopback origin on submit, status, content, and cleanup', async () => {
@@ -176,6 +178,62 @@ describe('video job route boundary', () => {
     expect(response.json<ApiErrorResponse>().error.code).toBe('validation_error');
   });
 
+  it('streams an ordered multipart recipe and video through the Busboy boundary', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-video-multipart-route-'));
+    directories.push(directory);
+    const jobId = crypto.randomUUID();
+    const inputPath = path.join(directory, 'input.video');
+    const referencePath = path.join(directory, 'reference.image');
+    const start = vi.fn((_input: Parameters<VideoJobService['start']>[0]) =>
+      Promise.resolve({ jobId, status: 'queued' } as Awaited<ReturnType<VideoJobService['start']>>),
+    );
+    const service = {
+      available: true,
+      existing: vi.fn().mockResolvedValue(null),
+      prepareJobDirectory: vi.fn().mockResolvedValue({ directory, inputPath, referencePath }),
+      start,
+    } as unknown as VideoJobService;
+    const app = new ApplicationRuntime();
+    installRouteTestAuth(app);
+    registerVideoJobRoutes(app, service);
+    apps.push(app);
+    const form = new FormData();
+    form.append(
+      'request',
+      JSON.stringify({
+        operation: 'character-swap',
+        inputKind: 'character',
+        prompt: 'Change the lighting',
+        enhancePrompt: false,
+        hasReferenceImage: false,
+        outputResolution: '720p',
+      }),
+    );
+    form.append('data', new Blob(['video-bytes'], { type: 'video/mp4' }), 'source.mp4');
+
+    const response = await app.inject({
+      method: 'PUT',
+      url: `/api/video-jobs/${jobId}`,
+      headers: trustedHeaders,
+      payload: form,
+    });
+
+    expect(response.statusCode).toBe(202);
+    expect(await readFile(inputPath, 'utf8')).toBe('video-bytes');
+    expect(start).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobId,
+        inputPath,
+        referencePath: null,
+        referenceMimeType: null,
+      }),
+    );
+    expect(start.mock.calls[0]?.[0].recipe).toMatchObject({
+      operation: 'character-swap',
+      hasReferenceImage: false,
+    });
+  });
+
   it('settles an admitted content lease exactly once after a successful response', async () => {
     const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-video-route-'));
     directories.push(directory);
@@ -201,7 +259,7 @@ describe('video job route boundary', () => {
       available: true,
       content,
     } as unknown as VideoJobService;
-    const app = Fastify();
+    const app = new ApplicationRuntime();
     installRouteTestAuth(app);
     registerVideoJobRoutes(app, service);
     apps.push(app);
@@ -217,6 +275,38 @@ describe('video job route boundary', () => {
     expect(response.rawPayload.toString()).toBe('result-bytes');
     expect(content).toHaveBeenCalledWith(jobId, expect.any(String));
     await vi.waitFor(() => expect(settle).toHaveBeenCalledOnce());
+    expect(settle).toHaveBeenCalledWith(true);
+  });
+
+  it('settles and closes a content lease exactly once for explicit HEAD parity', async () => {
+    const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-video-head-route-'));
+    directories.push(directory);
+    const outputPath = path.join(directory, 'result.video');
+    await writeFile(outputPath, 'result-bytes');
+    const settle = vi.fn().mockResolvedValue(undefined);
+    const service = {
+      available: true,
+      content: vi.fn().mockResolvedValue({
+        path: outputPath,
+        media: { mimeType: 'video/mp4', sizeBytes: 12 },
+        settle,
+      }),
+    } as unknown as VideoJobService;
+    const app = new ApplicationRuntime();
+    installRouteTestAuth(app);
+    registerVideoJobRoutes(app, service);
+    apps.push(app);
+
+    const response = await app.inject({
+      method: 'HEAD',
+      url: `/api/video-jobs/${crypto.randomUUID()}/content`,
+      headers: trustedHeaders,
+    });
+
+    expect(response.statusCode).toBe(200);
+    expect(response.rawPayload).toHaveLength(0);
+    expect(response.headers['content-length']).toBe('12');
+    expect(settle).toHaveBeenCalledOnce();
     expect(settle).toHaveBeenCalledWith(true);
   });
 
@@ -243,7 +333,7 @@ describe('video job route boundary', () => {
       prepareJobDirectory,
       start,
     } as unknown as VideoJobService;
-    const app = Fastify();
+    const app = new ApplicationRuntime();
     installRouteTestAuth(app);
     registerVideoJobRoutes(app, service);
     apps.push(app);

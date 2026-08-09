@@ -8,7 +8,12 @@ import {
   type S3Client,
 } from '@aws-sdk/client-s3';
 import { describe, expect, it, vi } from 'vitest';
-import type { AssetLifecycleRegistry, StoredAssetLocation } from './asset-lifecycle.js';
+import type {
+  AssetDeletionClaim,
+  AssetLifecycleRegistry,
+  AssetStorageProvider,
+  StoredAssetLocation,
+} from './asset-lifecycle.js';
 import type { StoredAssetManifest } from './asset-byte-store.js';
 import { R2AssetByteStore } from './r2-asset-byte-store.js';
 
@@ -18,6 +23,7 @@ const assetId = 'f7c32ea0-b108-4e21-93ab-b376106605bb';
 class MemoryLifecycle implements AssetLifecycleRegistry {
   location: StoredAssetLocation | null = null;
   deleting = false;
+  markDeletedFailures = 0;
 
   prepare(
     manifest: StoredAssetManifest,
@@ -41,12 +47,42 @@ class MemoryLifecycle implements AssetLifecycleRegistry {
         : null,
     );
   }
-  markDeleting(): Promise<boolean> {
+  claimDeletion(
+    requestOwner: string,
+    requestAssetId: string,
+    expectedProvider: AssetStorageProvider,
+  ): Promise<AssetDeletionClaim | null> {
+    if (
+      this.location === null ||
+      this.location.manifest.ownerUserId !== requestOwner ||
+      this.location.manifest.assetId !== requestAssetId ||
+      this.location.provider !== expectedProvider
+    ) {
+      return Promise.resolve(null);
+    }
     this.deleting = true;
-    return Promise.resolve(true);
+    return Promise.resolve({
+      provider: this.location.provider,
+      storageKey: this.location.storageKey,
+    });
   }
-  markDeleted(): Promise<void> {
-    this.location = null;
+  markDeleted(
+    requestOwner: string,
+    requestAssetId: string,
+    claim: AssetDeletionClaim,
+  ): Promise<void> {
+    if (this.markDeletedFailures > 0) {
+      this.markDeletedFailures -= 1;
+      return Promise.reject(new Error('Database finalization unavailable'));
+    }
+    if (
+      this.location?.manifest.ownerUserId === requestOwner &&
+      this.location.manifest.assetId === requestAssetId &&
+      this.location.provider === claim.provider &&
+      this.location.storageKey === claim.storageKey
+    ) {
+      this.location = null;
+    }
     return Promise.resolve();
   }
 }
@@ -174,5 +210,120 @@ describe('R2AssetByteStore', () => {
     expect(lifecycle.location).toBeNull();
     expect(send).toHaveBeenCalledTimes(2);
     expect(send.mock.calls.every(([command]) => command instanceof DeleteObjectCommand)).toBe(true);
+  });
+
+  it('retries idempotent R2 deletion when database finalization fails', async () => {
+    const persistedKey = `media/v1/${assetId.slice(0, 2)}/${assetId}`;
+    const lifecycle = new MemoryLifecycle();
+    lifecycle.location = {
+      manifest: {
+        schemaVersion: 1,
+        assetId,
+        ownerUserId,
+        mimeType: 'video/mp4',
+        filename: 'take.mp4',
+        sizeBytes: 4,
+        checksumSha256: 'a'.repeat(64),
+        createdAt: '2026-08-07T20:00:00.000Z',
+      },
+      provider: 'r2',
+      storageKey: persistedKey,
+      etag: null,
+    };
+    lifecycle.markDeletedFailures = 1;
+    const send = vi.fn().mockResolvedValue({});
+    const store = new R2AssetByteStore({
+      accountId: '0123456789abcdef0123456789abcdef',
+      accessKeyId: 'access',
+      secretAccessKey: 'secret',
+      bucket: 'private-assets',
+      client: { send } as unknown as S3Client,
+      lifecycle,
+    });
+
+    await expect(store.delete(ownerUserId, assetId)).rejects.toThrow(
+      'Database finalization unavailable',
+    );
+    expect(lifecycle.deleting).toBe(true);
+    expect(lifecycle.location).not.toBeNull();
+
+    await expect(store.delete(ownerUserId, assetId)).resolves.toBeUndefined();
+    expect(lifecycle.location).toBeNull();
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls.map(([command]) => (command as DeleteObjectCommand).input.Key)).toEqual([
+      persistedKey,
+      persistedKey,
+    ]);
+  });
+
+  it('deletes the persisted R2 key after a prefix change', async () => {
+    const persistedKey = `media/legacy/${assetId.slice(0, 2)}/${assetId}`;
+    const lifecycle = new MemoryLifecycle();
+    lifecycle.location = {
+      manifest: {
+        schemaVersion: 1,
+        assetId,
+        ownerUserId,
+        mimeType: 'video/mp4',
+        filename: 'take.mp4',
+        sizeBytes: 4,
+        checksumSha256: 'a'.repeat(64),
+        createdAt: '2026-08-07T20:00:00.000Z',
+      },
+      provider: 'r2',
+      storageKey: persistedKey,
+      etag: null,
+    };
+    const send = vi.fn().mockResolvedValue({});
+    const store = new R2AssetByteStore({
+      accountId: '0123456789abcdef0123456789abcdef',
+      accessKeyId: 'access',
+      secretAccessKey: 'secret',
+      bucket: 'private-assets',
+      keyPrefix: 'media/current',
+      client: { send } as unknown as S3Client,
+      lifecycle,
+    });
+
+    await store.delete(ownerUserId, assetId);
+
+    expect(send).toHaveBeenCalledOnce();
+    expect(send.mock.calls[0]?.[0]).toBeInstanceOf(DeleteObjectCommand);
+    expect((send.mock.calls[0]?.[0] as DeleteObjectCommand).input.Key).toBe(persistedKey);
+    expect(lifecycle.location).toBeNull();
+  });
+
+  it('does not delete or tombstone a lifecycle row owned by another storage provider', async () => {
+    const lifecycle = new MemoryLifecycle();
+    lifecycle.location = {
+      manifest: {
+        schemaVersion: 1,
+        assetId,
+        ownerUserId,
+        mimeType: 'video/mp4',
+        filename: 'take.mp4',
+        sizeBytes: 4,
+        checksumSha256: 'a'.repeat(64),
+        createdAt: '2026-08-07T20:00:00.000Z',
+      },
+      provider: 'local',
+      storageKey: assetId,
+      etag: null,
+    };
+    const send = vi.fn();
+    const store = new R2AssetByteStore({
+      accountId: '0123456789abcdef0123456789abcdef',
+      accessKeyId: 'access',
+      secretAccessKey: 'secret',
+      bucket: 'private-assets',
+      client: { send } as unknown as S3Client,
+      lifecycle,
+    });
+
+    await store.delete(ownerUserId, assetId);
+
+    expect(send).not.toHaveBeenCalled();
+    expect(lifecycle.deleting).toBe(false);
+    expect(lifecycle.location?.provider).toBe('local');
   });
 });

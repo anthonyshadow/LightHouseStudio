@@ -422,6 +422,7 @@ test('uploaded draft references restore across reload and Detach does not contac
   await expect(dialog.getByAltText('Current uploaded character reference')).toHaveCount(0);
   await expect(dialog.getByRole('button', { name: 'Save & Use Image Only' })).toHaveCount(0);
   await dialog.getByRole('button', { name: 'Close character builder' }).click();
+  await expect(dialog).toBeHidden();
   await page.reload();
   await openBuilder(page);
   await expect(

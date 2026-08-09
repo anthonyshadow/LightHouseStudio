@@ -1,6 +1,7 @@
 import { createHmac } from 'node:crypto';
 import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import {
   WIRO_SEEDREAM_RUN_ENDPOINT,
   WIRO_TASK_DELETE_ENDPOINT,
@@ -60,7 +61,7 @@ const image = (width: number, height: number): Promise<Buffer> =>
 describe('WiroSeedreamReferenceImageProvider', () => {
   it('signs one billable submission, polls through post-processing, normalizes output, and deletes remote files on acknowledgement', async () => {
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(jsonResponse(submitResponse))
       .mockResolvedValueOnce(jsonResponse(taskDetail('task_start')))
       .mockResolvedValueOnce(
@@ -148,7 +149,7 @@ describe('WiroSeedreamReferenceImageProvider', () => {
 
   it('uses multipart input for edits while preserving the same size and output contract', async () => {
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(jsonResponse(submitResponse))
       .mockResolvedValueOnce(jsonResponse(taskDetail('task_postprocess_end')));
     const provider = new WiroSeedreamReferenceImageProvider('wiro-key', 'wiro-secret', {
@@ -190,7 +191,7 @@ describe('WiroSeedreamReferenceImageProvider', () => {
 
   it('does not treat task_error as terminal and requires postprocess success', async () => {
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(jsonResponse(submitResponse))
       .mockResolvedValueOnce(jsonResponse(taskDetail('task_error')))
       .mockResolvedValueOnce(
@@ -225,7 +226,7 @@ describe('WiroSeedreamReferenceImageProvider', () => {
     'maps initial HTTP %s without retrying the billable Run request',
     async (status, reason) => {
       const fetchImplementation = vi
-        .fn<typeof fetch>()
+        .fn<ProviderFetch>()
         .mockResolvedValue(jsonResponse({ result: false, errors: [] }, status));
       const provider = new WiroSeedreamReferenceImageProvider('wiro-key', 'wiro-secret', {
         fetchImplementation,
@@ -242,7 +243,7 @@ describe('WiroSeedreamReferenceImageProvider', () => {
 
   it('bounds polling retries without ever resubmitting the billable Run request', async () => {
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(jsonResponse(submitResponse))
       .mockResolvedValue(jsonResponse({ result: false, errors: ['concurrency limit'] }, 429));
     const provider = new WiroSeedreamReferenceImageProvider('wiro-key', 'wiro-secret', {
@@ -268,7 +269,7 @@ describe('WiroSeedreamReferenceImageProvider', () => {
   });
 
   it('maps caller cancellation and the shared operation deadline distinctly', async () => {
-    const hangingFetch = vi.fn<typeof fetch>((_input, init) => {
+    const hangingFetch = vi.fn<ProviderFetch>((_input, init) => {
       return new Promise((_resolve, reject) => {
         init?.signal?.addEventListener(
           'abort',
@@ -304,7 +305,7 @@ describe('WiroSeedreamReferenceImageProvider', () => {
 
   it('keeps cleanup best-effort and reports only safe lifecycle metadata', async () => {
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(jsonResponse(submitResponse))
       .mockResolvedValueOnce(jsonResponse(taskDetail('task_postprocess_end')))
       .mockResolvedValueOnce(jsonResponse({ result: false, errors: ['private error'] }, 500));

@@ -15,6 +15,7 @@ import {
   authenticatedProviderFetch,
   readBoundedJson,
 } from '../transport/bounded-provider-transport.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import {
   type ExistingVideoJobProvider,
   VideoJobProviderError,
@@ -47,12 +48,12 @@ const safeRequestSignal = (
 
 export class DecartHttpVideoJobProvider implements ExistingVideoJobProvider {
   readonly #apiKey: string;
-  readonly #fetch: typeof fetch;
+  readonly #fetch: ProviderFetch;
   readonly #baseUrl: string;
 
   constructor(
     apiKey: string,
-    fetchImplementation: typeof fetch = fetch,
+    fetchImplementation: ProviderFetch = fetch,
     baseUrl = 'https://api.decart.ai',
   ) {
     this.#apiKey = apiKey;

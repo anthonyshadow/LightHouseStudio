@@ -8,6 +8,7 @@ import {
   WiroSeedreamReferenceImageProvider,
   type WiroLifecycleObserver,
 } from '../wiro/seedream-reference-image-provider.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import type {
   ReferenceImageProvider,
   ReferenceImageProviderDescriptor,
@@ -16,7 +17,7 @@ import type {
 export const createConfiguredReferenceImageProvider = (
   config: RuntimeConfig,
   options: {
-    readonly fetchImplementation?: typeof fetch;
+    readonly fetchImplementation?: ProviderFetch;
     readonly observeBflLifecycle?: BflLifecycleObserver;
     readonly observeWiroLifecycle?: WiroLifecycleObserver;
   } = {},

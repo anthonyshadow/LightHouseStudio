@@ -3,7 +3,7 @@ import {
   healthResponseSchema,
   REFERENCE_IMAGE_SIZES,
 } from '@studio/contracts';
-import type { FastifyInstance } from 'fastify';
+import type { ApplicationRuntime } from '../../application/application-runtime.js';
 import type { ExistingVideoOperationBinding } from '../../providers/video-jobs/video-job-provider.js';
 
 export interface CapabilityAvailability {
@@ -26,7 +26,7 @@ export interface CapabilityAvailability {
 }
 
 export const registerSystemRoutes = (
-  app: FastifyInstance,
+  app: ApplicationRuntime,
   availability: CapabilityAvailability,
 ): void => {
   app.get('/api/health', () => healthResponseSchema.parse({ ok: true }));

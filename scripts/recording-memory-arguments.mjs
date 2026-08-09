@@ -1,4 +1,4 @@
-export const recordingMemoryUsage = `Usage: pnpm recording:memory:estimate \\
+export const recordingMemoryUsage = `Usage: bun run recording:memory:estimate \\
   --duration-seconds <seconds> \\
   --main-mib-per-minute <MiB> [--sidecar-mib-per-minute <MiB>] \\
   [--sample-rate <Hz>] [--channels <count>] [--processed-output-multiplier <factor>]`;

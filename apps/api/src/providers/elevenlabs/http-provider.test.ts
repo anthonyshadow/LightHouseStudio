@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { VOICE_CONVERSION_CONTENT_TYPES, type VoiceConversionContentType } from '@studio/contracts';
 import { ProviderError } from '../provider-error.js';
 import { MAX_PROVIDER_JSON_BYTES } from '../transport/bounded-provider-transport.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import { ElevenLabsHttpProvider } from './http-provider.js';
 
 const jsonResponse = (value: unknown, status = 200): Response =>
@@ -40,7 +41,7 @@ const conversionExtensions = {
 
 describe('ElevenLabsHttpProvider', () => {
   it('normalizes saved-library voices and sends only provider-required query/header values', async () => {
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         jsonResponse({
           voices: [
@@ -107,7 +108,7 @@ describe('ElevenLabsHttpProvider', () => {
   ] as const)(
     'rejects a provider voice page with %s requested entries and %s returned entries',
     async (pageSize, returnedCount) => {
-      const fetchMock = vi.fn<typeof fetch>(() =>
+      const fetchMock = vi.fn<ProviderFetch>(() =>
         Promise.resolve(
           jsonResponse({
             voices: Array.from({ length: returnedCount }, (_, index) => ({
@@ -137,7 +138,7 @@ describe('ElevenLabsHttpProvider', () => {
   );
 
   it('maps every supported shared-catalog filter and fails closed on missing eligibility fields', async () => {
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         jsonResponse({
           voices: [
@@ -223,7 +224,7 @@ describe('ElevenLabsHttpProvider', () => {
 
   it('looks up exact shared metadata and maps documented add and delete operations', async () => {
     const fetchMock = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(
         jsonResponse({
           voices: [
@@ -275,7 +276,7 @@ describe('ElevenLabsHttpProvider', () => {
       },
       cancel,
     });
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         new Response(body, {
           status: 200,
@@ -307,7 +308,7 @@ describe('ElevenLabsHttpProvider', () => {
       },
       cancel,
     });
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         new Response(body, {
           status: 200,
@@ -341,7 +342,7 @@ describe('ElevenLabsHttpProvider', () => {
         },
         cancel,
       });
-      const fetchMock = vi.fn<typeof fetch>(() =>
+      const fetchMock = vi.fn<ProviderFetch>(() =>
         Promise.resolve(
           new Response(body, {
             status: 429,
@@ -366,7 +367,7 @@ describe('ElevenLabsHttpProvider', () => {
   );
 
   it('revalidates a submitted voice id against the saved library', async () => {
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         jsonResponse({
           voices: [],
@@ -388,7 +389,7 @@ describe('ElevenLabsHttpProvider', () => {
   });
 
   it('refuses untrusted provider preview URLs before making a fetch', async () => {
-    const fetchMock = vi.fn<typeof fetch>();
+    const fetchMock = vi.fn<ProviderFetch>();
     const provider = new ElevenLabsHttpProvider('server-only-placeholder', fetchMock, 1_000);
 
     await expect(
@@ -401,7 +402,7 @@ describe('ElevenLabsHttpProvider', () => {
     const previewBytes = Buffer.from([
       0x49, 0x44, 0x33, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x23, 0x54, 0x53,
     ]);
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         new Response(previewBytes, {
           status: 200,
@@ -430,7 +431,7 @@ describe('ElevenLabsHttpProvider', () => {
   });
 
   it('rejects mislabeled preview content without an MP3 signature', async () => {
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         new Response('not audio', {
           status: 200,
@@ -453,7 +454,7 @@ describe('ElevenLabsHttpProvider', () => {
 
   it('uses multipart audio for provider conversion while returning a streamed result', async () => {
     const convertedBytes = mp3Bytes(9);
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         new Response(convertedBytes, {
           status: 200,
@@ -492,7 +493,7 @@ describe('ElevenLabsHttpProvider', () => {
     'uses the exhaustive filename extension for validated %s audio',
     async (mimeType) => {
       const convertedBytes = mp3Bytes(3);
-      const fetchMock = vi.fn<typeof fetch>(() =>
+      const fetchMock = vi.fn<ProviderFetch>(() =>
         Promise.resolve(
           new Response(convertedBytes, {
             status: 200,
@@ -523,7 +524,7 @@ describe('ElevenLabsHttpProvider', () => {
   it('accepts below-boundary and exact-boundary conversion audio', async () => {
     const limits = { previewBytes: 8, conversionBytes: 12 };
     const responses = [mp3Bytes(11), mp3Bytes(12)];
-    const fetchMock = vi.fn<typeof fetch>(() => {
+    const fetchMock = vi.fn<ProviderFetch>(() => {
       const bytes = responses.shift();
       if (!bytes) throw new Error('Missing audio fixture.');
       return Promise.resolve(
@@ -572,7 +573,7 @@ describe('ElevenLabsHttpProvider', () => {
       },
       cancel,
     });
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         new Response(body, {
           status: 200,
@@ -610,7 +611,7 @@ describe('ElevenLabsHttpProvider', () => {
       },
       cancel,
     });
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         new Response(body, {
           status: 200,
@@ -643,7 +644,7 @@ describe('ElevenLabsHttpProvider', () => {
   it('cancels a successful response body when the caller cancels during streaming', async () => {
     const cancel = vi.fn();
     const body = new ReadableStream<Uint8Array>({ cancel });
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         new Response(body, {
           status: 200,
@@ -677,7 +678,7 @@ describe('ElevenLabsHttpProvider', () => {
 
   it('rejects a successful audio response with a malformed declared length or MP3 body', async () => {
     const fetchMock = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(
         new Response(mp3Bytes(4), {
           status: 200,
@@ -709,7 +710,7 @@ describe('ElevenLabsHttpProvider', () => {
   });
 
   it('rejects malformed provider booleans instead of silently changing capability truth', async () => {
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         jsonResponse([
           {
@@ -728,7 +729,7 @@ describe('ElevenLabsHttpProvider', () => {
   });
 
   it('does not expose raw upstream error bodies', async () => {
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         new Response('sensitive upstream diagnostic', {
           status: 401,
@@ -745,7 +746,7 @@ describe('ElevenLabsHttpProvider', () => {
   });
 
   it('identifies a zero-retention entitlement failure only from bounded code and parameter data', async () => {
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         jsonResponse(
           {
@@ -784,7 +785,7 @@ describe('ElevenLabsHttpProvider', () => {
   ] as const)(
     'classifies safe provider status metadata for upstream %s responses',
     async (status, providerStatus, reason) => {
-      const fetchMock = vi.fn<typeof fetch>(() =>
+      const fetchMock = vi.fn<ProviderFetch>(() =>
         Promise.resolve(
           jsonResponse(
             { detail: { code: providerStatus, status: 'legacy-value', message: 'not exposed' } },
@@ -813,7 +814,7 @@ describe('ElevenLabsHttpProvider', () => {
   );
 
   it('propagates caller cancellation to an in-flight upstream fetch', async () => {
-    const fetchMock = vi.fn<typeof fetch>(
+    const fetchMock = vi.fn<ProviderFetch>(
       (_input, init) =>
         new Promise<Response>((_resolve, reject) => {
           init?.signal?.addEventListener(
@@ -839,7 +840,7 @@ describe('ElevenLabsHttpProvider', () => {
       },
       cancel,
     });
-    const fetchMock = vi.fn<typeof fetch>(() =>
+    const fetchMock = vi.fn<ProviderFetch>(() =>
       Promise.resolve(
         new Response(body, {
           status: 200,

@@ -33,7 +33,13 @@ export default defineConfig({
         'packages/contracts/src/**/*.ts',
         'packages/domain/src/**/*.ts',
       ],
-      exclude: ['**/*.test.*', '**/*.d.ts', '**/dist/**', 'e2e/**'],
+      exclude: [
+        '**/*.test.*',
+        'apps/api/src/test/bun-*-probe.ts',
+        '**/*.d.ts',
+        '**/dist/**',
+        'e2e/**',
+      ],
       thresholds: {
         statements: 81,
         branches: 69,

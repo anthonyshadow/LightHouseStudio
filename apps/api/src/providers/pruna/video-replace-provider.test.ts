@@ -3,6 +3,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
 import type { VideoJobProviderError } from '../video-jobs/video-job-provider.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import { PrunaVideoReplaceProvider } from './video-replace-provider.js';
 
 const jsonResponse = (body: unknown, status = 200): Response =>
@@ -48,7 +49,7 @@ describe('PrunaVideoReplaceProvider', () => {
     'uploads synthetic-named media and submits the editor-selected %s resolution exactly once',
     async (resolution) => {
       const { videoPath, referencePath } = await fixture();
-      const fetchImplementation = vi.fn<typeof fetch>();
+      const fetchImplementation = vi.fn<ProviderFetch>();
       fetchImplementation
         .mockResolvedValueOnce(
           jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-video' } }, 201),
@@ -123,7 +124,7 @@ describe('PrunaVideoReplaceProvider', () => {
 
   it('rejects creator prompt text before provider contact', async () => {
     const { videoPath, referencePath } = await fixture();
-    const fetchImplementation = vi.fn<typeof fetch>();
+    const fetchImplementation = vi.fn<ProviderFetch>();
     const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
 
     await expect(
@@ -150,7 +151,7 @@ describe('PrunaVideoReplaceProvider', () => {
     async (providerStatus, expectedStatus, expectedFailureReason) => {
       const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
       const fetchImplementation = vi
-        .fn<typeof fetch>()
+        .fn<ProviderFetch>()
         .mockResolvedValue(
           jsonResponse({ status: providerStatus, message: 'private status detail' }),
         );
@@ -186,7 +187,7 @@ describe('PrunaVideoReplaceProvider', () => {
   ] as const)('classifies failed prediction details as safe %s failure', async (error, reason) => {
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValue(jsonResponse({ status: 'failed', error }));
     const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
 
@@ -204,7 +205,7 @@ describe('PrunaVideoReplaceProvider', () => {
   it('allowlists succeeded delivery URLs and performs an authenticated bounded download', async () => {
     const { root } = await fixture();
     const destinationPath = path.join(root, 'result.mp4');
-    const fetchImplementation = vi.fn<typeof fetch>();
+    const fetchImplementation = vi.fn<ProviderFetch>();
     fetchImplementation
       .mockResolvedValueOnce(
         jsonResponse({
@@ -244,7 +245,7 @@ describe('PrunaVideoReplaceProvider', () => {
     'https://api.pruna.ai/v1/predictions/delivery/token/output.mp4?secret=1',
   ])('rejects non-allowlisted delivery URL %s without downloading', async (generationUrl) => {
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValue(jsonResponse({ status: 'succeeded', generation_url: generationUrl }));
     const provider = new PrunaVideoReplaceProvider('server-secret', fetchImplementation);
 
@@ -259,7 +260,7 @@ describe('PrunaVideoReplaceProvider', () => {
   it('does not retry an initial billable prediction submission', async () => {
     const { videoPath, referencePath } = await fixture();
     const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
-    const fetchImplementation = vi.fn<typeof fetch>();
+    const fetchImplementation = vi.fn<ProviderFetch>();
     fetchImplementation
       .mockResolvedValueOnce(
         jsonResponse({ urls: { get: 'https://api.pruna.ai/v1/files/file-video' } }, 201),
@@ -286,7 +287,7 @@ describe('PrunaVideoReplaceProvider', () => {
   });
 
   it('bounds JSON/media and maps aborts without exposing upstream bodies', async () => {
-    const fetchImplementation = vi.fn<typeof fetch>();
+    const fetchImplementation = vi.fn<ProviderFetch>();
     fetchImplementation.mockResolvedValueOnce(
       new Response('x', { status: 200, headers: { 'content-length': '1048577' } }),
     );
@@ -305,7 +306,7 @@ describe('PrunaVideoReplaceProvider', () => {
   });
 
   it('bounds status requests with a provider timeout', async () => {
-    const fetchImplementation = vi.fn<typeof fetch>().mockImplementation(
+    const fetchImplementation = vi.fn<ProviderFetch>().mockImplementation(
       (_url, init) =>
         new Promise<Response>((_resolve, reject) => {
           init?.signal?.addEventListener(

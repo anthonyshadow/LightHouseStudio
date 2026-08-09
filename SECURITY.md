@@ -32,7 +32,7 @@ it.
 
 ## Scope
 
-Reports may cover the web app, Fastify API, authentication and ownership,
+Reports may cover the web app, Elysia API, authentication and ownership,
 uploads and media handling, remote imports, provider integrations, local or
 cloud persistence, temporary-data cleanup, and credential exposure. The current
 loopback-only product boundary reduces some exposure but does not make defects in

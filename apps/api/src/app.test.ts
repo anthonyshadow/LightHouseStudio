@@ -1,5 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { fileURLToPath } from 'node:url';
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
 import type { ApiErrorResponse } from '@studio/contracts';
 import { createApp, OPENAI_CONNECTION_TIMEOUT_MARGIN_MS } from './app.js';
 import { ReferenceImageStorageError } from './features/reference-images/asset-store.js';
@@ -86,16 +89,31 @@ describe('API shell', () => {
 
   it('keeps response sockets open beyond the longest configured OpenAI timeout', () => {
     const config = testConfig({
-      referenceImageTimeoutMs: 12_345,
+      referenceImageTimeoutMs: 180_000,
       openAiPromptOptimizerTimeoutMs: 23_456,
     });
     const app = createApp({ config });
     apps.push(app);
 
     expect(app.server.timeout).toBe(
-      config.openAiPromptOptimizerTimeoutMs + OPENAI_CONNECTION_TIMEOUT_MARGIN_MS,
+      Math.max(config.referenceImageTimeoutMs, config.openAiPromptOptimizerTimeoutMs) +
+        OPENAI_CONNECTION_TIMEOUT_MARGIN_MS,
     );
     expect(app.server.requestTimeout).toBe(100_000);
+    expect(app.server.timeout).toBeGreaterThan(255_000);
+  });
+
+  it('keeps strict paths and explicit HEAD response parity', async () => {
+    const app = createApp({ config: testConfig() });
+    apps.push(app);
+
+    const head = await app.inject({ method: 'HEAD', url: '/api/health' });
+    const trailingSlash = await app.inject({ method: 'GET', url: '/api/health/' });
+
+    expect(head.statusCode).toBe(200);
+    expect(head.body).toBe('');
+    expect(head.headers['content-length']).toBe('11');
+    expect(trailingSlash.statusCode).toBe(404);
   });
 
   it('reports exact batch video capability independently from realtime availability', async () => {
@@ -375,6 +393,70 @@ describe('API shell', () => {
     },
   );
 
+  it('never serves a matching static file through the API namespace', async () => {
+    const staticRoot = await mkdtemp(path.join(tmpdir(), 'lightframe-static-boundary-'));
+    await mkdir(path.join(staticRoot, 'api'));
+    await writeFile(path.join(staticRoot, 'api', 'shadow'), 'private static bytes');
+    const app = createApp({ config: testConfig(), staticRoot });
+    apps.push(app);
+
+    try {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/shadow',
+        headers: { accept: 'text/html' },
+      });
+
+      expect(response.statusCode).toBe(404);
+      expect(response.headers['content-type']).toContain('application/json');
+      expect(response.body).not.toContain('private static bytes');
+      expect(response.json()).toEqual({
+        error: { code: 'not_found', message: 'No API route matches this request.' },
+      });
+    } finally {
+      await rm(staticRoot, { recursive: true, force: true });
+    }
+  });
+
+  it('serves the SPA index only through the explicit HTML fallback', async () => {
+    const staticRoot = await mkdtemp(path.join(tmpdir(), 'lightframe-spa-fallback-'));
+    await writeFile(path.join(staticRoot, 'index.html'), '<main>Studio shell</main>');
+    const app = createApp({ config: testConfig(), staticRoot });
+    apps.push(app);
+
+    try {
+      const nonHtmlRoot = await app.inject({
+        method: 'GET',
+        url: '/',
+        headers: { accept: 'application/json' },
+      });
+      const htmlNavigation = await app.inject({
+        method: 'GET',
+        url: '/studio/deep-link',
+        headers: { accept: 'text/html' },
+      });
+      const htmlRoot = await app.inject({
+        method: 'GET',
+        url: '/',
+        headers: { accept: 'text/html' },
+      });
+      const exactAsset = await app.inject({ method: 'GET', url: '/index.html' });
+
+      expect(nonHtmlRoot.statusCode).toBe(404);
+      expect(nonHtmlRoot.headers['content-type']).toContain('application/json');
+      expect(htmlNavigation.statusCode).toBe(200);
+      expect(htmlNavigation.headers['content-type']).toContain('text/html');
+      expect(htmlNavigation.body).toBe('<main>Studio shell</main>');
+      expect(htmlRoot.statusCode).toBe(200);
+      expect(htmlRoot.body).toBe('<main>Studio shell</main>');
+      expect(exactAsset.statusCode).toBe(200);
+      expect(exactAsset.headers['cache-control']).toBe('no-store');
+      expect(exactAsset.headers['x-frame-options']).toBe('SAMEORIGIN');
+    } finally {
+      await rm(staticRoot, { recursive: true, force: true });
+    }
+  });
+
   it('rejects non-loopback Host headers before routing', async () => {
     const app = createApp({ config: testConfig() });
     apps.push(app);
@@ -387,4 +469,52 @@ describe('API shell', () => {
     expect(response.statusCode).toBe(421);
     expect(response.json<ApiErrorResponse>().error.code).toBe('forbidden_origin');
   });
+
+  it('rejects Elysia module-sentinel URLs after static modules initialize', async () => {
+    const app = createApp({
+      config: testConfig(),
+      staticRoot: fileURLToPath(new URL('./test', import.meta.url)),
+    });
+    apps.push(app);
+
+    const response = await app.handle(new Request('http://ely.sia/index.html'));
+    const body = (await response.json()) as ApiErrorResponse;
+
+    expect(response.status).toBe(421);
+    expect(body.error.code).toBe('forbidden_origin');
+  });
+
+  it.each(['localhost?x', 'localhost#x', 'localhost\\evil', 'localhost/path'])(
+    'rejects the path-like Host %s before reading a request body',
+    async (host) => {
+      const app = createApp({ config: testConfig() });
+      apps.push(app);
+      let pulls = 0;
+      const payload = new ReadableStream<Uint8Array>(
+        {
+          pull(controller) {
+            pulls += 1;
+            controller.enqueue(new TextEncoder().encode('{}'));
+            controller.close();
+          },
+        },
+        { highWaterMark: 0 },
+      );
+
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/realtime-token',
+        headers: {
+          host,
+          origin: 'http://localhost',
+          'content-type': 'application/json',
+        },
+        payload,
+      });
+
+      expect(response.statusCode).toBe(421);
+      expect(response.json<ApiErrorResponse>().error.code).toBe('forbidden_origin');
+      expect(pulls).toBe(0);
+    },
+  );
 });

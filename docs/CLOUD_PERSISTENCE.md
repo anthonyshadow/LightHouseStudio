@@ -4,7 +4,7 @@
 **Reviewed:** 2026-08-07
 
 This is the canonical setup, migration, rollback, and limitation guide for cloud persistence. It
-does not authorize public exposure: Fastify still binds only to `127.0.0.1`, and the seeded demo
+does not authorize public exposure: Elysia on Bun still binds only to `127.0.0.1`, and the seeded demo
 account is not production identity or tenancy.
 
 ## What is implemented
@@ -52,8 +52,11 @@ account is not production identity or tenancy.
 `ASSET_STORE_PROVIDER=r2` requires `DATABASE_MODE=shadow` or `neon`. Reference-image and creative
 metadata stay local in `shadow`; their database adapters become authoritative only in `neon`.
 The R2 adapter streams uploads and reads; it never buffers an entire large video solely to cross
-the storage boundary. The Neon gallery path applies filtering, ordering, pagination, counts, and
-facets in SQL rather than materializing the owner library in application memory.
+the storage boundary. Once an asset has been registered, its storage provider, R2 account, bucket,
+and key-prefix namespace are immutable configuration. Changing any of them requires a separately
+reviewed byte migration plus database and bucket inventory verification; changing environment
+values alone is not a migration. The Neon gallery path applies filtering, ordering, pagination,
+counts, and facets in SQL rather than materializing the owner library in application memory.
 
 ## Initial setup
 
@@ -65,20 +68,20 @@ facets in SQL rather than materializing the owner library in application memory.
 4. Generate/check migrations after schema edits, then apply them to the selected Neon database:
 
    ```bash
-   pnpm --dir apps/api db:check
-   pnpm --dir apps/api db:migrate
+   bun run --filter @studio/api db:check
+   bun run --filter @studio/api db:migrate
    ```
 
 5. Inventory existing local data without writing to Neon or R2:
 
    ```bash
-   pnpm --dir apps/api db:backfill-local
+   bun run --filter @studio/api db:backfill-local
    ```
 
 6. After reviewing the JSON counts/bytes/missing-assets result, run the explicit idempotent apply:
 
    ```bash
-   pnpm --dir apps/api db:backfill-local -- --apply
+   bun run --filter @studio/api db:backfill-local -- --apply
    ```
 
    Reading the inventory atomically upgrades legacy local saved-video metadata before any remote
@@ -91,13 +94,16 @@ facets in SQL rather than materializing the owner library in application memory.
 ## Rollback and deletion
 
 - Switching `DATABASE_MODE` or `ASSET_STORE_PROVIDER` requires restart; there is no runtime
-  fallback or provider selection.
+  fallback or provider selection. Do not switch the configured asset provider, R2 account, bucket,
+  or key prefix after writes without first completing the reviewed data migration above.
 - Backfill retains pre-existing local bytes. Shadow writes keep an R2 copy and rollback copy, but an
   explicit Saved Video deletion removes both copies through the shadow byte-store adapter. Rollback
   means restoring local configuration while the approved window remains open; it never means
   deleting Neon/R2 first.
 - Explicit Saved Video deletion physically removes unshared version/thumbnail objects from R2 and
-  remains retryable after a partial failure. Local-only Saved Video deletion remains conservative.
+  remains retryable after a partial failure. The deletion claim returns the persisted provider and
+  object key, and finalization is conditional on that same identity, so configuration drift cannot
+  silently tombstone a recomputed object key. Local-only Saved Video deletion remains conservative.
   Automatic video orphan collection, legal-hold, backup-expiry, and account deletion remain absent.
   Reference images use the narrower saved-relationship and inactive-orphan policy above; R2 delete
   support is never blanket GC.

@@ -504,7 +504,7 @@ test('no-key Local Camera records and finalizes without provider HTTP, WebSocket
   expect(browser.recorderStops).toBe(2);
   expect(browser.connections).toEqual([]);
   expect(new Set(network.apiRequests.map(({ path }) => path))).toEqual(
-    new Set(['/api/capabilities']),
+    new Set(['/api/capabilities', '/api/creative-library']),
   );
   expect(network.providerSdkRequests).toEqual([]);
   expectNoExternalProviderTraffic(network);
@@ -1022,7 +1022,7 @@ test('Space records and finishes only outside editable controls', async ({ page 
   expect(browser.recorderStops).toBe(2);
   expect(browser.connections).toEqual([]);
   expect(new Set(network.apiRequests.map(({ path }) => path))).toEqual(
-    new Set(['/api/capabilities']),
+    new Set(['/api/capabilities', '/api/creative-library']),
   );
   expectNoExternalProviderTraffic(network);
 });

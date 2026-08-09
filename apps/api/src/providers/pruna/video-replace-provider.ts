@@ -10,6 +10,7 @@ import {
   authenticatedProviderFetch,
   readBoundedJson,
 } from '../transport/bounded-provider-transport.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import {
   type ExistingVideoJobProvider,
   VideoJobProviderError,
@@ -119,12 +120,12 @@ const failureReasonForPrediction = (
 
 export class PrunaVideoReplaceProvider implements ExistingVideoJobProvider {
   readonly #apiKey: string;
-  readonly #fetch: typeof fetch;
+  readonly #fetch: ProviderFetch;
   readonly #timeouts: Readonly<{ uploadMs: number; statusMs: number; downloadMs: number }>;
 
   constructor(
     apiKey: string,
-    fetchImplementation: typeof fetch = fetch,
+    fetchImplementation: ProviderFetch = fetch,
     timeouts: Readonly<{ uploadMs: number; statusMs: number; downloadMs: number }> = {
       uploadMs: 180_000,
       statusMs: 30_000,

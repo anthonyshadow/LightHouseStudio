@@ -10,6 +10,7 @@ import {
   createProviderOperationDeadline,
   readBoundedJson,
 } from '../transport/bounded-provider-transport.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 
 const PRUNA_API_ORIGIN = 'https://api.pruna.ai' as const;
 const PRUNA_FILES_PATH = '/v1/files' as const;
@@ -103,14 +104,14 @@ const readLimitedJson = (response: Response): Promise<unknown> =>
 export class PrunaImageTryOnProvider implements OutfitTryOnProvider {
   readonly modelId = PRUNA_IMAGE_TRY_ON_MODEL;
   readonly #apiKey: string;
-  readonly #fetch: typeof fetch;
+  readonly #fetch: ProviderFetch;
   readonly #timeoutMs: number;
   readonly #initialPollDelayMs: number;
 
   constructor(
     apiKey: string,
     options: {
-      readonly fetchImplementation?: typeof fetch;
+      readonly fetchImplementation?: ProviderFetch;
       readonly timeoutMs?: number;
       readonly pollDelayMs?: number;
     } = {},

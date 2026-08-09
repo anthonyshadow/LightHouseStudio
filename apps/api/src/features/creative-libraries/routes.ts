@@ -1,5 +1,5 @@
 import { sanitizeCreativeAssetStore } from '@studio/domain';
-import type { FastifyInstance } from 'fastify';
+import type { ApplicationRuntime } from '../../application/application-runtime.js';
 import { z } from 'zod';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
 import { AppError } from '../../http/app-error.js';
@@ -11,7 +11,7 @@ const replaceRequestSchema = z
   .strict();
 
 export const registerCreativeLibraryRoutes = (
-  app: FastifyInstance,
+  app: ApplicationRuntime,
   repository: CreativeLibraryRepository | undefined,
   referenceImages?: ReferenceImageAssetStore,
 ): void => {

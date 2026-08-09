@@ -3,6 +3,7 @@ import { and, eq, gt, inArray, isNull, sql } from 'drizzle-orm';
 import { toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   DurableProcessingJobRepository,
+  ProcessingJobAdmissionResult,
   ProcessingJobTraceWriter,
   ResumableVideoProcessingJob,
   VideoProcessingJobTrace,
@@ -10,39 +11,72 @@ import type {
 import type { LightframeDatabase } from './client.js';
 import { processingJobs } from './schema.js';
 
+const valuesForTrace = (trace: VideoProcessingJobTrace) => ({
+  id: trace.jobId,
+  ownerUserId: trace.ownerUserId,
+  operation: trace.operation,
+  provider: trace.provider,
+  providerJobId: trace.providerJobId,
+  requestFingerprint: trace.requestFingerprint,
+  outputResolution: trace.outputResolution,
+  providerOutputLocation: trace.providerOutputLocation,
+  sourceDurationMs: trace.sourceDurationMs,
+  sourceOrientation: trace.sourceOrientation,
+  status: trace.status,
+  safeErrorCode: trace.safeErrorCode,
+  inputAssetId: null,
+  outputAssetId: null,
+  leaseOwner: null,
+  leaseExpiresAt: null,
+  attempt: 0,
+  acceptedAt: trace.providerJobId === null ? null : trace.updatedAt,
+  completedAt: trace.completedAt,
+  expiresAt: new Date(Date.parse(trace.createdAt) + VIDEO_JOB_TTL_MS).toISOString(),
+  createdAt: trace.createdAt,
+  updatedAt: trace.updatedAt,
+});
+
 export class DrizzleProcessingJobTraceWriter
   implements ProcessingJobTraceWriter, DurableProcessingJobRepository
 {
   constructor(private readonly db: LightframeDatabase) {}
 
+  async admit(trace: VideoProcessingJobTrace): Promise<ProcessingJobAdmissionResult> {
+    const inserted = await this.db
+      .insert(processingJobs)
+      .values(valuesForTrace(trace))
+      .onConflictDoNothing()
+      .returning({ id: processingJobs.id });
+    if (inserted.length === 1) return 'admitted';
+
+    const [existing] = await this.db
+      .select({
+        ownerUserId: processingJobs.ownerUserId,
+        operation: processingJobs.operation,
+        provider: processingJobs.provider,
+        requestFingerprint: processingJobs.requestFingerprint,
+        outputResolution: processingJobs.outputResolution,
+      })
+      .from(processingJobs)
+      .where(eq(processingJobs.id, trace.jobId))
+      .limit(1);
+    if (existing === undefined) return 'owner-conflict';
+    if (existing.ownerUserId !== trace.ownerUserId) return 'owner-mismatch';
+    if (
+      existing.operation !== trace.operation ||
+      existing.provider !== trace.provider ||
+      existing.requestFingerprint !== trace.requestFingerprint ||
+      existing.outputResolution !== trace.outputResolution
+    ) {
+      return 'request-conflict';
+    }
+    return 'duplicate';
+  }
+
   async upsert(trace: VideoProcessingJobTrace): Promise<void> {
-    const expiresAt = new Date(Date.parse(trace.createdAt) + VIDEO_JOB_TTL_MS).toISOString();
     await this.db
       .insert(processingJobs)
-      .values({
-        id: trace.jobId,
-        ownerUserId: trace.ownerUserId,
-        operation: trace.operation,
-        provider: trace.provider,
-        providerJobId: trace.providerJobId,
-        requestFingerprint: trace.requestFingerprint,
-        outputResolution: trace.outputResolution,
-        providerOutputLocation: trace.providerOutputLocation,
-        sourceDurationMs: trace.sourceDurationMs,
-        sourceOrientation: trace.sourceOrientation,
-        status: trace.status,
-        safeErrorCode: trace.safeErrorCode,
-        inputAssetId: null,
-        outputAssetId: null,
-        leaseOwner: null,
-        leaseExpiresAt: null,
-        attempt: 0,
-        acceptedAt: trace.providerJobId === null ? null : trace.updatedAt,
-        completedAt: trace.completedAt,
-        expiresAt,
-        createdAt: trace.createdAt,
-        updatedAt: trace.updatedAt,
-      })
+      .values(valuesForTrace(trace))
       .onConflictDoUpdate({
         target: processingJobs.id,
         set: {

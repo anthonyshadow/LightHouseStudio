@@ -3,7 +3,7 @@ import {
   realtimeTokenResponseSchema,
   SUPPORTED_MODEL_IDS,
 } from '@studio/contracts';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { ApplicationRuntime, HttpRequest } from '../../application/application-runtime.js';
 import { AppError } from '../../http/errors.js';
 import { requireTrustedOrigin } from '../../http/security.js';
 import { withRequestLifetime } from '../../http/streaming.js';
@@ -12,13 +12,13 @@ import type { DecartTokenProvider } from '../../providers/decart/token-provider.
 const TOKEN_EXPIRY_SECONDS = 300;
 const MAX_SESSION_DURATION_SECONDS = 300;
 
-const verifyProviderOrigin = (request: FastifyRequest): Promise<void> => {
+const verifyProviderOrigin = (request: HttpRequest): Promise<void> => {
   requireTrustedOrigin(request);
   return Promise.resolve();
 };
 
 export const registerRealtimeRoutes = (
-  app: FastifyInstance,
+  app: ApplicationRuntime,
   provider: DecartTokenProvider | null,
 ): void => {
   app.post(

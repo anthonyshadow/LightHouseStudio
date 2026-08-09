@@ -3,7 +3,7 @@
 ## Current boundary
 
 The browser never calls an image provider or receives provider credentials. It uses the loopback,
-same-origin Fastify broker. `REFERENCE_IMAGE_PROVIDER` selects exactly one image provider at
+same-origin Elysia broker on Bun. `REFERENCE_IMAGE_PROVIDER` selects exactly one image provider at
 startup (`openai`, `bfl`, or `wiro`); there is no browser selector or provider fallback.
 Pruna Wardrobe try-on is a separate optional binding used only by **Add Outfit**; it does not
 change the startup-selected reference-image provider or **Change Features**.

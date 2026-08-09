@@ -41,7 +41,7 @@ const lifecycle = (overrides: Partial<AssetLifecycleRegistry> = {}): AssetLifecy
     storageKey: assetId,
     etag: null,
   }),
-  markDeleting: vi.fn().mockResolvedValue(true),
+  claimDeletion: vi.fn().mockResolvedValue({ provider: 'local', storageKey: assetId }),
   markDeleted: vi.fn().mockResolvedValue(undefined),
   ...overrides,
 });
@@ -82,7 +82,11 @@ describe('ManagedLocalAssetByteStore', () => {
     });
     expect(registry.markReady).toHaveBeenCalledTimes(2);
     expect(bytes.delete).toHaveBeenCalledWith(ownerUserId, assetId);
-    expect(registry.markDeleted).toHaveBeenCalledWith(ownerUserId, assetId);
+    expect(registry.claimDeletion).toHaveBeenCalledWith(ownerUserId, assetId, 'local');
+    expect(registry.markDeleted).toHaveBeenCalledWith(ownerUserId, assetId, {
+      provider: 'local',
+      storageKey: assetId,
+    });
   });
 
   it('hides non-ready assets, skips an already-deleted row, and cleans bytes after registration failure', async () => {
@@ -91,7 +95,7 @@ describe('ManagedLocalAssetByteStore', () => {
     const registry = lifecycle({
       prepare: vi.fn().mockRejectedValue(registrationError),
       findReady: vi.fn().mockResolvedValue(null),
-      markDeleting: vi.fn().mockResolvedValue(false),
+      claimDeletion: vi.fn().mockResolvedValue(null),
     });
     const store = new ManagedLocalAssetByteStore(bytes, registry);
 
@@ -111,6 +115,24 @@ describe('ManagedLocalAssetByteStore', () => {
 
     expect(bytes.delete).toHaveBeenCalledTimes(1);
     expect(registry.markFailed).toHaveBeenCalledWith(assetId);
+  });
+
+  it('deletes the persisted local key and skips provider mismatches', async () => {
+    const persistedStorageKey = '3bf65e85-39a8-4e7b-aa17-a1acdaea7088';
+    const bytes = byteStore();
+    const claim = { provider: 'local' as const, storageKey: persistedStorageKey };
+    const registry = lifecycle({ claimDeletion: vi.fn().mockResolvedValue(claim) });
+    const store = new ManagedLocalAssetByteStore(bytes, registry);
+
+    await store.delete(ownerUserId, assetId);
+
+    expect(bytes.delete).toHaveBeenCalledWith(ownerUserId, persistedStorageKey);
+    expect(registry.markDeleted).toHaveBeenCalledWith(ownerUserId, assetId, claim);
+
+    vi.mocked(registry.claimDeletion).mockResolvedValueOnce(null);
+    await store.delete(ownerUserId, assetId);
+    expect(bytes.delete).toHaveBeenCalledTimes(1);
+    expect(registry.markDeleted).toHaveBeenCalledTimes(1);
   });
 });
 

@@ -11,7 +11,11 @@ import {
   workspaceVoicesQuerySchema,
   workspaceVoicesResponseSchema,
 } from '@studio/contracts';
-import type { FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type {
+  ApplicationRuntime,
+  HttpReply,
+  HttpRequest,
+} from '../../application/application-runtime.js';
 import type { AudioStream } from '../../application/audio-stream.js';
 import { isSpooledAudioUpload } from '../../application/spooled-upload.js';
 import { AppError } from '../../http/errors.js';
@@ -41,37 +45,50 @@ const requireVoiceService = (service: VoiceService | null): VoiceService => {
 const validationError = (message: string): AppError =>
   new AppError(400, 'validation_error', message);
 
-const verifyProviderOrigin = (request: FastifyRequest): Promise<void> => {
+const verifyProviderOrigin = (request: HttpRequest): Promise<void> => {
   requireTrustedOrigin(request);
   requireVoiceProviderIntent(request);
   return Promise.resolve();
 };
 
-const verifyProviderIntent = (request: FastifyRequest): Promise<void> => {
+const verifyProviderIntent = (request: HttpRequest): Promise<void> => {
   requireVoiceProviderIntent(request);
   return Promise.resolve();
 };
 
 const streamProviderAudio = async (
-  request: FastifyRequest,
-  reply: FastifyReply,
+  request: HttpRequest,
+  reply: HttpReply,
   load: (signal: AbortSignal) => Promise<AudioStream>,
-): Promise<FastifyReply> => {
+): Promise<HttpReply> => {
   const lifetime = createRequestLifetime(request, reply);
   try {
     const audio = await load(lifetime.signal);
-    audio.body.once('close', () => lifetime.release());
-    return sendAudioStream(reply, audio);
+    return sendAudioStream(reply, audio, {
+      signal: lifetime.signal,
+      onComplete: () => lifetime.release(),
+      onCancel: (reason) => {
+        lifetime.abort(reason);
+        lifetime.release();
+      },
+      onError: (error) => {
+        lifetime.abort(error);
+        lifetime.release();
+      },
+    });
   } catch (error) {
     lifetime.release();
     throw error;
   }
 };
 
-const contentTypeEssence = (request: FastifyRequest): string =>
+const contentTypeEssence = (request: HttpRequest): string =>
   request.headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase() ?? '';
 
-export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService | null): void => {
+export const registerVoiceRoutes = (
+  app: ApplicationRuntime,
+  service: VoiceService | null,
+): void => {
   app.get('/api/elevenlabs/voices', { onRequest: verifyProviderIntent }, async (request, reply) => {
     const parsed = workspaceVoicesQuerySchema.safeParse(request.query);
     if (!parsed.success) {
@@ -190,7 +207,17 @@ export const registerVoiceRoutes = (app: FastifyInstance, service: VoiceService 
 
   app.post(
     '/api/elevenlabs/voice-changer/recording',
-    { bodyLimit: MAX_RECORDING_AUDIO_BYTES, onRequest: verifyProviderOrigin },
+    {
+      bodyLimit: MAX_RECORDING_AUDIO_BYTES,
+      bodyParser: 'spooled',
+      acceptedContentTypes: SUPPORTED_AUDIO_CONTENT_TYPES,
+      unsupportedMediaType: {
+        statusCode: 400,
+        message: 'Use WebM, MP4, Ogg, WAV, MPEG, or AAC audio.',
+      },
+      payloadTooLargeMessage: 'The audio sidecar must be 25 MiB or smaller.',
+      onRequest: verifyProviderOrigin,
+    },
     async (request, reply) => {
       const query = voiceChangerQuerySchema.safeParse(request.query);
       if (!query.success) throw validationError('Choose a valid saved-library voice.');

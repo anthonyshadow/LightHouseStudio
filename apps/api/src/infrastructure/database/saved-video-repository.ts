@@ -442,10 +442,13 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
     deletedAt: string,
   ): Promise<StoredSavedVideoAggregate | null> {
     return this.db.transaction(async (tx) => {
+      // append() takes this lock before inserting a child version. Lock before the
+      // snapshot so deletion returns the complete asset set for physical cleanup.
       const [video] = await tx
         .select()
         .from(savedVideos)
         .where(and(eq(savedVideos.ownerUserId, ownerUserId), eq(savedVideos.id, videoId)))
+        .for('update')
         .limit(1);
       if (video === undefined) return null;
       const versions = await tx

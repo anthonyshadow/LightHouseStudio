@@ -2,29 +2,11 @@ import { readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
-const builtinPnpmCommands = new Set([
-  'add',
-  'audit',
-  'deploy',
-  'dlx',
-  'exec',
-  'fetch',
-  'install',
-  'list',
-  'outdated',
-  'publish',
-  'remove',
-  'run',
-  'store',
-  'update',
-  'view',
-]);
-
 export const referencedRootScripts = (source) => {
   const commands = new Set();
-  for (const match of source.matchAll(/\bpnpm\s+([a-z][a-z0-9:_-]*)/giu)) {
+  for (const match of source.matchAll(/\bbun\s+run\s+([a-z][a-z0-9:_-]*)/giu)) {
     const command = match[1];
-    if (!builtinPnpmCommands.has(command)) commands.add(command);
+    commands.add(command);
   }
   return commands;
 };
@@ -57,9 +39,10 @@ export const checkScriptReferences = async (rootDirectory = path.resolve('.')) =
   }
   if (missing.length > 0) {
     throw new Error(
-      `Unknown root pnpm commands:\n${missing
+      `Unknown root Bun commands:\n${missing
         .map(
-          ({ command, filePath }) => `- ${path.relative(rootDirectory, filePath)}: pnpm ${command}`,
+          ({ command, filePath }) =>
+            `- ${path.relative(rootDirectory, filePath)}: bun run ${command}`,
         )
         .join('\n')}`,
     );
@@ -74,7 +57,7 @@ const calledDirectly =
 if (calledDirectly) {
   try {
     const result = await checkScriptReferences();
-    console.log(`Validated root pnpm command references across ${result.checkedFiles} files.`);
+    console.log(`Validated root Bun command references across ${result.checkedFiles} files.`);
   } catch (error) {
     console.error(error instanceof Error ? error.message : 'Script-reference check failed.');
     process.exitCode = 1;

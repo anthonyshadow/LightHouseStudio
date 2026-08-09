@@ -11,6 +11,7 @@ import { DrizzleProcessingJobTraceWriter } from './processing-job-repository.js'
 import { DrizzleReferenceImageAssetStore } from './reference-image-asset-store.js';
 import { DrizzleSavedVideoRepository } from './saved-video-repository.js';
 import { DrizzleSavedVoiceRepository } from './saved-voice-repository.js';
+import { savedVideos } from './schema.js';
 
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const assetId = '9826fc75-4759-47cc-b07d-d7325ce0ad14';
@@ -20,6 +21,7 @@ const postgresNow = '2026-08-07 12:00:00+00';
 const scriptedDatabase = (...script: readonly unknown[]) => {
   const remaining = [...script];
   const operations: string[] = [];
+  const calls: { operation: string; arguments: readonly unknown[] }[] = [];
   const query = (): object => {
     const target = {
       then: (fulfilled?: (value: unknown) => unknown, rejected?: (reason: unknown) => unknown) => {
@@ -34,8 +36,10 @@ const scriptedDatabase = (...script: readonly unknown[]) => {
     const proxy: object = new Proxy(target, {
       get(current, property, receiver) {
         if (property === 'then') return current.then.bind(receiver);
-        return (..._arguments: readonly unknown[]) => {
-          operations.push(String(property));
+        return (...arguments_: readonly unknown[]) => {
+          const operation = String(property);
+          operations.push(operation);
+          calls.push({ operation, arguments: arguments_ });
           return proxy;
         };
       },
@@ -50,8 +54,10 @@ const scriptedDatabase = (...script: readonly unknown[]) => {
           return (callback: (tx: LightframeDatabase) => unknown) =>
             callback(database as LightframeDatabase);
         }
-        return (..._arguments: readonly unknown[]) => {
-          operations.push(String(property));
+        return (...arguments_: readonly unknown[]) => {
+          const operation = String(property);
+          operations.push(operation);
+          calls.push({ operation, arguments: arguments_ });
           return query();
         };
       },
@@ -59,6 +65,7 @@ const scriptedDatabase = (...script: readonly unknown[]) => {
   );
   return {
     db: database as LightframeDatabase,
+    calls,
     operations,
     remaining: () => remaining.length,
   };
@@ -180,7 +187,11 @@ describe('DrizzleAssetLifecycleRegistry', () => {
       createdAt: postgresNow,
       updatedAt: postgresNow,
     };
-    const scripted = scriptedDatabase([], [], [], [readyRow], [{ id: assetId }], [], [], []);
+    const deletionClaim = {
+      provider: readyRow.storageProvider,
+      storageKey: readyRow.storageKey,
+    };
+    const scripted = scriptedDatabase([], [], [], [readyRow], [deletionClaim], [], [], []);
     const repository = new DrizzleAssetLifecycleRegistry(scripted.db);
 
     await repository.prepare(manifest, { provider: 'r2', storageKey: readyRow.storageKey });
@@ -191,10 +202,12 @@ describe('DrizzleAssetLifecycleRegistry', () => {
       provider: 'r2',
       etag: 'etag',
     });
-    await expect(repository.markDeleting(ownerUserId, assetId)).resolves.toBe(true);
-    await repository.markDeleted(ownerUserId, assetId);
+    await expect(repository.claimDeletion(ownerUserId, assetId, 'r2')).resolves.toEqual(
+      deletionClaim,
+    );
+    await repository.markDeleted(ownerUserId, assetId, deletionClaim);
     await expect(repository.findReady(ownerUserId, 'missing')).resolves.toBeNull();
-    await expect(repository.markDeleting(ownerUserId, 'missing')).resolves.toBe(false);
+    await expect(repository.claimDeletion(ownerUserId, 'missing', 'r2')).resolves.toBeNull();
     expect(scripted.remaining()).toBe(0);
   });
 });
@@ -428,6 +441,73 @@ describe('DrizzleSavedVideoRepository', () => {
     expect(scripted.remaining()).toBe(0);
   });
 
+  it('serializes version append and deletion before either changes version membership', async () => {
+    const appendScripted = scriptedDatabase(
+      [],
+      [video],
+      [],
+      [],
+      [],
+      [updatedVideo],
+      [version, nextVersion],
+    );
+    const appendRepository = new DrizzleSavedVideoRepository(appendScripted.db);
+
+    await expect(
+      appendRepository.append(ownerUserId, videoId, versionId, nextVersion, {
+        ...receipt,
+        idempotencyKey: nextVersionId,
+        versionId: nextVersionId,
+        createdAt: nextVersion.createdAt,
+      }),
+    ).resolves.toMatchObject({
+      video: { currentVersionId: nextVersionId },
+      versions: [version, nextVersion],
+    });
+
+    const appendLockIndex = appendScripted.calls.findIndex(
+      (call) => call.operation === 'for' && call.arguments[0] === 'update',
+    );
+    const appendLockedTable = appendScripted.calls
+      .slice(0, appendLockIndex)
+      .filter((call) => call.operation === 'from')
+      .at(-1)?.arguments[0];
+    const versionInsertIndex = appendScripted.calls.findIndex(
+      (call) => call.operation === 'insert',
+    );
+    expect(appendLockIndex).toBeGreaterThan(-1);
+    expect(appendLockedTable).toBe(savedVideos);
+    expect(versionInsertIndex).toBeGreaterThan(appendLockIndex);
+    expect(appendScripted.remaining()).toBe(0);
+
+    const deleteScripted = scriptedDatabase(
+      [updatedVideo],
+      [version, nextVersion],
+      [{ ...deletedVideo, currentVersionId: nextVersionId, revision: 2 }],
+    );
+    const deleteRepository = new DrizzleSavedVideoRepository(deleteScripted.db);
+
+    await expect(deleteRepository.delete(ownerUserId, videoId, now)).resolves.toMatchObject({
+      video: { status: 'deleted', currentVersionId: nextVersionId },
+      versions: [version, nextVersion],
+    });
+
+    const deleteLockIndex = deleteScripted.calls.findIndex(
+      (call) => call.operation === 'for' && call.arguments[0] === 'update',
+    );
+    const deleteLockedTable = deleteScripted.calls
+      .slice(0, deleteLockIndex)
+      .filter((call) => call.operation === 'from')
+      .at(-1)?.arguments[0];
+    const versionSnapshotIndex = deleteScripted.calls.findIndex(
+      (call, index) => index > deleteLockIndex && call.operation === 'select',
+    );
+    expect(deleteLockIndex).toBeGreaterThan(-1);
+    expect(deleteLockedTable).toBe(savedVideos);
+    expect(versionSnapshotIndex).toBeGreaterThan(deleteLockIndex);
+    expect(deleteScripted.remaining()).toBe(0);
+  });
+
   it('returns bounded empty and conflict results without loading version history', async () => {
     const scripted = scriptedDatabase(
       [],
@@ -523,6 +603,64 @@ describe('DrizzleProcessingJobTraceWriter', () => {
       }),
     ]);
     expect(scripted.remaining()).toBe(0);
+  });
+
+  it('atomically classifies durable admission conflicts before provider work', async () => {
+    const trace: VideoProcessingJobTrace = {
+      schemaVersion: 1,
+      jobId: assetId,
+      ownerUserId,
+      operation: 'character-swap',
+      provider: 'decart',
+      providerJobId: null,
+      requestFingerprint: 'b'.repeat(64),
+      outputResolution: '720p',
+      providerOutputLocation: null,
+      sourceDurationMs: null,
+      sourceOrientation: null,
+      status: 'validating',
+      safeErrorCode: null,
+      createdAt: now,
+      updatedAt: now,
+      completedAt: null,
+    };
+    const matching = {
+      ownerUserId,
+      operation: trace.operation,
+      provider: trace.provider,
+      requestFingerprint: trace.requestFingerprint,
+      outputResolution: trace.outputResolution,
+    };
+
+    const admitted = scriptedDatabase([{ id: trace.jobId }]);
+    await expect(new DrizzleProcessingJobTraceWriter(admitted.db).admit(trace)).resolves.toBe(
+      'admitted',
+    );
+    expect(admitted.remaining()).toBe(0);
+
+    const duplicate = scriptedDatabase([], [matching]);
+    await expect(new DrizzleProcessingJobTraceWriter(duplicate.db).admit(trace)).resolves.toBe(
+      'duplicate',
+    );
+    expect(duplicate.remaining()).toBe(0);
+
+    const requestConflict = scriptedDatabase([], [{ ...matching, provider: 'other-provider' }]);
+    await expect(
+      new DrizzleProcessingJobTraceWriter(requestConflict.db).admit(trace),
+    ).resolves.toBe('request-conflict');
+    expect(requestConflict.remaining()).toBe(0);
+
+    const ownerMismatch = scriptedDatabase([], [{ ...matching, ownerUserId: crypto.randomUUID() }]);
+    await expect(new DrizzleProcessingJobTraceWriter(ownerMismatch.db).admit(trace)).resolves.toBe(
+      'owner-mismatch',
+    );
+    expect(ownerMismatch.remaining()).toBe(0);
+
+    const ownerConflict = scriptedDatabase([], []);
+    await expect(new DrizzleProcessingJobTraceWriter(ownerConflict.db).admit(trace)).resolves.toBe(
+      'owner-conflict',
+    );
+    expect(ownerConflict.remaining()).toBe(0);
   });
 });
 

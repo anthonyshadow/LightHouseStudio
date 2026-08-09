@@ -22,8 +22,10 @@ import {
 import { inspectVideoFile } from './media-inspection.js';
 import type {
   DurableProcessingJobRepository,
+  ProcessingJobAdmissionResult,
   ProcessingJobTraceWriter,
   ResumableVideoProcessingJob,
+  VideoProcessingJobTrace,
 } from '../processing-jobs/file-processing-job-repository.js';
 
 interface ScheduledVideoJobDeadline {
@@ -208,6 +210,8 @@ export class VideoJobService {
   readonly #durableJobRepository: DurableProcessingJobRepository | undefined;
   readonly #providerIds: Readonly<Record<VideoTransformOperationId, string>>;
   readonly #operations = new Set<Promise<void>>();
+  readonly #traceTails = new Map<string, Promise<void>>();
+  readonly #admissions = new Map<string, Promise<void>>();
   readonly #expiredTombstones: string[] = [];
   readonly #maximumExpiredTombstones: number;
   readonly #maximumActiveJobs: number;
@@ -228,7 +232,7 @@ export class VideoJobService {
     this.#providerPollBackoffMs = options.providerPollBackoffMs ?? PROVIDER_POLL_BACKOFF_MS;
     this.#removePath = options.removePath ?? rm;
     this.#scheduleDeadline = options.scheduleDeadline ?? scheduleSystemDeadline;
-    this.#traceWriter = options.traceWriter;
+    this.#traceWriter = options.traceWriter ?? options.durableJobRepository;
     this.#durableJobRepository = options.durableJobRepository;
     this.#providerIds = options.providerIds ?? {
       'character-swap': 'configured-provider',
@@ -386,7 +390,28 @@ export class VideoJobService {
     });
   }
 
-  #touch(job: VideoJobRecord, status: VideoJobStatus): void {
+  #traceValue(job: VideoJobRecord): VideoProcessingJobTrace {
+    return {
+      schemaVersion: 1,
+      jobId: job.jobId,
+      ownerUserId: job.ownerId,
+      operation: job.operation,
+      provider: this.#providerIds[job.operation],
+      providerJobId: job.providerJobId,
+      requestFingerprint: job.requestFingerprint,
+      outputResolution: job.outputResolution,
+      providerOutputLocation: job.providerOutputLocation,
+      sourceDurationMs: job.sourceDurationMs,
+      sourceOrientation: job.sourceOrientation,
+      status: job.status,
+      safeErrorCode: job.error?.code ?? null,
+      createdAt: job.createdAt,
+      updatedAt: job.updatedAt,
+      completedAt: terminal(job.status) ? job.updatedAt : null,
+    };
+  }
+
+  #touch(job: VideoJobRecord, status: VideoJobStatus, requireTrace = false): Promise<void> {
     job.status = status;
     job.updatedAt = new Date(this.#now()).toISOString();
     if (terminal(status)) {
@@ -396,36 +421,26 @@ export class VideoJobService {
     } else {
       this.#activeJobByOwner.set(job.ownerId, job.jobId);
     }
-    this.#trace(job);
+    return this.#trace(job, requireTrace);
   }
 
-  #trace(job: VideoJobRecord): void {
-    if (this.#traceWriter === undefined) return;
-    const trace = this.#traceWriter
-      .upsert({
-        schemaVersion: 1,
-        jobId: job.jobId,
-        ownerUserId: job.ownerId,
-        operation: job.operation,
-        provider: this.#providerIds[job.operation],
-        providerJobId: job.providerJobId,
-        requestFingerprint: job.requestFingerprint,
-        outputResolution: job.outputResolution,
-        providerOutputLocation: job.providerOutputLocation,
-        sourceDurationMs: job.sourceDurationMs,
-        sourceOrientation: job.sourceOrientation,
-        status: job.status,
-        safeErrorCode: job.error?.code ?? null,
-        createdAt: job.createdAt,
-        updatedAt: job.updatedAt,
-        completedAt: terminal(job.status) ? job.updatedAt : null,
-      })
+  #trace(job: VideoJobRecord, required = false): Promise<void> {
+    if (this.#traceWriter === undefined) return Promise.resolve();
+    const trace = this.#traceValue(job);
+    const previous = this.#traceTails.get(job.jobId) ?? Promise.resolve();
+    const write = previous.then(() => this.#traceWriter!.upsert(trace));
+    const tail = write
       .catch(() => {
         console.warn('[video-jobs] Durable processing trace could not be updated.', {
           jobId: job.jobId,
         });
+      })
+      .finally(() => {
+        if (this.#traceTails.get(job.jobId) === tail) this.#traceTails.delete(job.jobId);
       });
-    this.#track(trace);
+    this.#traceTails.set(job.jobId, tail);
+    this.#track(tail);
+    return required ? write : tail;
   }
 
   #pushDeadline(entry: VideoJobDeadlineEntry): void {
@@ -497,6 +512,53 @@ export class VideoJobService {
     void tracked.catch(() => undefined);
   }
 
+  async #admit(job: VideoJobRecord): Promise<void> {
+    const repository = this.#durableJobRepository;
+    if (repository === undefined) {
+      await this.#trace(job);
+      return;
+    }
+
+    let result: ProcessingJobAdmissionResult;
+    try {
+      result = await repository.admit(this.#traceValue(job));
+    } catch {
+      throw new AppError(
+        503,
+        'provider_unavailable',
+        'Temporary video processing is unavailable because durable admission could not be confirmed.',
+      );
+    }
+
+    if (result === 'admitted') return;
+    if (result === 'owner-mismatch') {
+      throw new AppError(404, 'not_found', 'That temporary video job is unavailable.');
+    }
+    if (result === 'request-conflict') {
+      throw new AppError(
+        409,
+        'request_id_conflict',
+        'That temporary video job ID already belongs to different processing settings.',
+      );
+    }
+    throw new AppError(
+      409,
+      'generation_in_progress',
+      'Finish the active video job before starting another.',
+    );
+  }
+
+  async #discardUnadmittedJob(job: VideoJobRecord): Promise<void> {
+    job.admissionsClosed = true;
+    job.operationController.abort();
+    if (this.#jobs.get(job.jobId) === job) this.#jobs.delete(job.jobId);
+    if (this.#activeJobByOwner.get(job.ownerId) === job.jobId) {
+      this.#activeJobByOwner.delete(job.ownerId);
+    }
+    this.#scheduleNextDeadline();
+    await this.#removePath(job.directory, { recursive: true, force: true }).catch(() => undefined);
+  }
+
   async #cleanupFiles(job: VideoJobRecord, keepOutput = false): Promise<boolean> {
     for (let attempt = 1; attempt <= 3; attempt += 1) {
       try {
@@ -550,7 +612,7 @@ export class VideoJobService {
       code: 'job_expired',
       message: 'This temporary video job expired. Submit a new job explicitly to retry.',
     };
-    this.#touch(job, 'expired');
+    void this.#touch(job, 'expired');
     await this.#requestCleanup(job, false);
     if (!job.cleanupPending && this.#jobs.get(job.jobId) === job) {
       this.#expiredTombstones.push(job.jobId);
@@ -607,15 +669,13 @@ export class VideoJobService {
   }): Promise<VideoJobStatusResponse> {
     await this.#ready;
     await this.#expireDueJobs();
+    const requestFingerprint = recipeFingerprint(input.recipe);
     const duplicate = this.#jobs.get(input.jobId);
     if (duplicate) {
       if (duplicate.ownerId !== input.ownerId) {
         throw new AppError(404, 'not_found', 'That temporary video job is unavailable.');
       }
-      if (
-        duplicate.status !== 'expired' &&
-        duplicate.requestFingerprint !== recipeFingerprint(input.recipe)
-      ) {
+      if (duplicate.status !== 'expired' && duplicate.requestFingerprint !== requestFingerprint) {
         await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
         throw new AppError(
           409,
@@ -626,6 +686,7 @@ export class VideoJobService {
       if (input.directory !== duplicate.directory) {
         await rm(input.directory, { recursive: true, force: true }).catch(() => undefined);
       }
+      await this.#admissions.get(input.jobId);
       return this.#snapshot(duplicate);
     }
     const binding = this.#providers[input.recipe.operation];
@@ -706,7 +767,7 @@ export class VideoJobService {
       operation: input.recipe.operation,
       binding,
       outputResolution,
-      requestFingerprint: recipeFingerprint(input.recipe),
+      requestFingerprint,
       status: 'validating',
       createdAt: timestamp,
       updatedAt: timestamp,
@@ -745,7 +806,21 @@ export class VideoJobService {
       generation: job.deadlineGeneration,
     });
     this.#scheduleNextDeadline();
-    this.#trace(job);
+    const admission = this.#admit(job);
+    this.#admissions.set(job.jobId, admission);
+    this.#track(admission);
+    try {
+      await admission;
+    } catch (error) {
+      await this.#discardUnadmittedJob(job);
+      throw error;
+    } finally {
+      if (this.#admissions.get(job.jobId) === admission) this.#admissions.delete(job.jobId);
+    }
+    if (!this.#ownsMutableJob(job)) {
+      await this.#discardUnadmittedJob(job);
+      throw new AppError(503, 'provider_unavailable', 'Temporary video jobs are unavailable.');
+    }
     this.#track(this.#submit(job, input.recipe));
     return this.#snapshot(job);
   }
@@ -766,7 +841,19 @@ export class VideoJobService {
       }
       job.sourceDurationMs = inspected.durationMs;
       job.sourceOrientation = inspected.width > inspected.height ? 'landscape' : 'portrait';
-      this.#touch(job, 'submitting');
+      try {
+        await this.#touch(job, 'submitting', this.#durableJobRepository !== undefined);
+      } catch {
+        throw new AppError(
+          503,
+          'provider_unavailable',
+          'Temporary video processing is unavailable because durable submission state could not be confirmed.',
+        );
+      }
+      if (!this.#ownsMutableJob(job)) {
+        await this.#cleanupFiles(job);
+        return;
+      }
       const submitted = await job.binding.provider.submit({
         operation: job.operation,
         recipe,
@@ -783,7 +870,7 @@ export class VideoJobService {
       }
       job.providerJobId = submitted.providerJobId;
       job.providerOutputLocation = submitted.outputLocation ?? null;
-      this.#touch(job, submitted.status === 'processing' ? 'processing' : 'queued');
+      await this.#touch(job, submitted.status === 'processing' ? 'processing' : 'queued');
       await this.#cleanupFiles(job, true);
     } catch (error) {
       if (!this.#ownsMutableJob(job)) {
@@ -794,7 +881,7 @@ export class VideoJobService {
         error instanceof AppError
           ? { code: error.code as VideoJobErrorCode, message: error.message }
           : safeProviderFailure(error);
-      this.#touch(job, 'failed');
+      void this.#touch(job, 'failed');
       await this.#cleanupFiles(job);
     }
   }
@@ -824,7 +911,7 @@ export class VideoJobService {
         return;
       }
       job.result = result;
-      this.#touch(job, 'ready');
+      void this.#touch(job, 'ready');
     } catch (error) {
       if (!this.#ownsMutableJob(job)) {
         await this.#cleanupFiles(job);
@@ -832,14 +919,14 @@ export class VideoJobService {
       }
       if (error instanceof VideoJobProviderError && error.retryable && job.retrievalAttempts < 3) {
         await rm(job.outputPath, { force: true }).catch(() => undefined);
-        this.#touch(job, 'queued');
+        void this.#touch(job, 'queued');
         return;
       }
       job.error =
         error instanceof AppError
           ? { code: error.code as VideoJobErrorCode, message: error.message }
           : safeProviderFailure(error);
-      this.#touch(job, 'failed');
+      void this.#touch(job, 'failed');
       await this.#cleanupFiles(job);
     }
   }
@@ -873,17 +960,17 @@ export class VideoJobService {
           job.error = safeProviderFailure(
             new VideoJobProviderError(providerStatus.failureReason ?? 'upstream'),
           );
-          this.#touch(job, 'failed');
+          void this.#touch(job, 'failed');
           await this.#cleanupFiles(job);
           return;
         }
         if (providerStatus.status === 'completed') {
-          this.#touch(job, 'retrieving');
+          void this.#touch(job, 'retrieving');
           this.#track(this.#retrieve(job));
           return;
         }
         const nextStatus = providerStatus.status === 'processing' ? 'processing' : 'queued';
-        this.#touch(job, nextStatus);
+        void this.#touch(job, nextStatus);
         job.providerPollAttempt =
           nextStatus === previousStatus
             ? Math.min(job.providerPollAttempt + 1, this.#providerPollBackoffMs.length - 1)
@@ -908,7 +995,7 @@ export class VideoJobService {
           return;
         }
         job.error = safeProviderFailure(error);
-        this.#touch(job, 'failed');
+        void this.#touch(job, 'failed');
         await this.#cleanupFiles(job);
       }
     })().finally(() => {

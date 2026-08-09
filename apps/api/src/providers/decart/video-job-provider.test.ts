@@ -2,6 +2,7 @@ import { mkdtemp, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { describe, expect, it, vi } from 'vitest';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import { DecartHttpVideoJobProvider, DecartVideoProviderError } from './video-job-provider.js';
 
 describe('DecartHttpVideoJobProvider', () => {
@@ -11,7 +12,7 @@ describe('DecartHttpVideoJobProvider', () => {
     const referencePath = path.join(root, 'reference.image');
     await writeFile(videoPath, 'video');
     await writeFile(referencePath, 'reference');
-    const fetchImplementation = vi.fn<typeof fetch>();
+    const fetchImplementation = vi.fn<ProviderFetch>();
     fetchImplementation.mockResolvedValue(
       new Response(JSON.stringify({ job_id: 'provider-job', status: 'pending' }), {
         status: 200,
@@ -58,7 +59,7 @@ describe('DecartHttpVideoJobProvider', () => {
     const root = await mkdtemp(path.join(tmpdir(), 'lightframe-decart-no-retry-'));
     const videoPath = path.join(root, 'input.video');
     await writeFile(videoPath, 'video');
-    const fetchImplementation = vi.fn<typeof fetch>();
+    const fetchImplementation = vi.fn<ProviderFetch>();
     fetchImplementation.mockResolvedValue(new Response('', { status: 503 }));
     const provider = new DecartHttpVideoJobProvider(
       'server-secret',
@@ -101,7 +102,7 @@ describe('DecartHttpVideoJobProvider', () => {
       const videoPath = path.join(root, 'input.video');
       await writeFile(videoPath, 'video');
       const fetchImplementation = vi
-        .fn<typeof fetch>()
+        .fn<ProviderFetch>()
         .mockResolvedValue(
           new Response(null, { status, headers: { Location: 'https://evil.test' } }),
         );

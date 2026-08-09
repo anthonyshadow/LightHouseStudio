@@ -306,7 +306,9 @@ for (const viewport of representativeViewports) {
     expect(await cameraCalls(page)).toBe(0);
     expect(network.blockedExternalRequests).toEqual([]);
     expect(network.blockedExternalWebSockets).toEqual([]);
-    expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
+    expect(new Set(network.apiRequests)).toEqual(
+      new Set(['/api/capabilities', '/api/creative-library']),
+    );
   });
 }
 
@@ -337,7 +339,9 @@ test('small-mobile Builder steps survive 200% text and keep one preview', async 
   await expectNoDocumentOverflow(page);
   await expectNoAxeViolations(page);
   expect(await cameraCalls(page)).toBe(0);
-  expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
+  expect(new Set(network.apiRequests)).toEqual(
+    new Set(['/api/capabilities', '/api/creative-library']),
+  );
   expect(network.blockedExternalRequests).toEqual([]);
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
@@ -416,7 +420,9 @@ test('desktop Outfit Builder saves and selects a prompt outfit without media or 
   await selectedOutfit.click();
   await expect(page.getByRole('dialog', { name: 'Outfit' })).toContainText('Copper overshirt');
   expect(await cameraCalls(page)).toBe(0);
-  expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
+  expect(new Set(network.apiRequests)).toEqual(
+    new Set(['/api/capabilities', '/api/creative-library']),
+  );
   expect(network.blockedExternalRequests).toEqual([]);
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
@@ -462,7 +468,9 @@ test('small-mobile Recipe Dock scrolls internally and Escape restores launcher f
   await expect(launcher).toBeFocused();
   await expectNoDocumentOverflow(page);
   expect(await cameraCalls(page)).toBe(0);
-  expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
+  expect(new Set(network.apiRequests)).toEqual(
+    new Set(['/api/capabilities', '/api/creative-library']),
+  );
   expect(network.blockedExternalRequests).toEqual([]);
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
@@ -484,7 +492,9 @@ test('empty VTON Start is blocked before camera access or token issuance', async
   ).toBeVisible();
   expect(await cameraCalls(page)).toBe(0);
   expect(network.apiRequests).not.toContain('/api/realtime-token');
-  expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
+  expect(new Set(network.apiRequests)).toEqual(
+    new Set(['/api/capabilities', '/api/creative-library']),
+  );
   expect(network.blockedExternalRequests).toEqual([]);
   expect(network.blockedExternalWebSockets).toEqual([]);
 });
@@ -522,7 +532,9 @@ test('explicit local Start surfaces a sanitized camera denial without provider w
   );
   expect(await cameraCalls(page)).toBe(2);
   expect(network.apiRequests).not.toContain('/api/realtime-token');
-  expect(new Set(network.apiRequests)).toEqual(new Set(['/api/capabilities']));
+  expect(new Set(network.apiRequests)).toEqual(
+    new Set(['/api/capabilities', '/api/creative-library']),
+  );
   expect(network.blockedExternalRequests).toEqual([]);
   expect(network.blockedExternalWebSockets).toEqual([]);
 });

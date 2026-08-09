@@ -21,7 +21,7 @@ import {
   uploadReferenceImageResponseSchema,
 } from '@studio/contracts';
 import { randomUUID } from 'node:crypto';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { ApplicationRuntime, HttpRequest } from '../../application/application-runtime.js';
 import { AppError } from '../../http/errors.js';
 import { ownerUserIdForRequest } from '../../http/authentication.js';
 import {
@@ -46,18 +46,18 @@ export interface RemoteReferenceImageDownloader {
   ) => Promise<Readonly<{ bytes: Buffer; mimeType: ValidReferenceImageMimeType }>>;
 }
 
-const verifyGenerationOrigin = (request: FastifyRequest): Promise<void> => {
+const verifyGenerationOrigin = (request: HttpRequest): Promise<void> => {
   requireTrustedOrigin(request);
   return Promise.resolve();
 };
 
-const verifyRemoteImportIntent = (request: FastifyRequest): Promise<void> => {
+const verifyRemoteImportIntent = (request: HttpRequest): Promise<void> => {
   requireTrustedOrigin(request);
   requireReferenceImageImportIntent(request);
   return Promise.resolve();
 };
 
-const verifyWardrobeProviderIntent = (request: FastifyRequest): Promise<void> => {
+const verifyWardrobeProviderIntent = (request: HttpRequest): Promise<void> => {
   requireTrustedOrigin(request);
   requireWardrobeProviderIntent(request);
   return Promise.resolve();
@@ -79,7 +79,7 @@ const requireSourceAssetId = (params: unknown): string => {
   return parsed.data.sourceAssetId;
 };
 
-const requireUploadRequestId = (headers: FastifyRequest['headers']): string => {
+const requireUploadRequestId = (headers: HttpRequest['headers']): string => {
   const parsed = referenceImageRequestIdSchema.safeParse(headers['idempotency-key']);
   if (!parsed.success) {
     throw new AppError(
@@ -91,7 +91,7 @@ const requireUploadRequestId = (headers: FastifyRequest['headers']): string => {
   return parsed.data;
 };
 
-const requireUploadMimeType = (headers: FastifyRequest['headers']) => {
+const requireUploadMimeType = (headers: HttpRequest['headers']) => {
   const contentType = headers['content-type']?.split(';', 1)[0]?.trim().toLowerCase();
   const parsed = referenceImageMimeTypeSchema.safeParse(contentType);
   if (!parsed.success) {
@@ -101,7 +101,7 @@ const requireUploadMimeType = (headers: FastifyRequest['headers']) => {
 };
 
 export const registerReferenceImageRoutes = (
-  app: FastifyInstance,
+  app: ApplicationRuntime,
   service: ReferenceImageService,
   options: {
     readonly remoteImageDownloader?: RemoteReferenceImageDownloader;
@@ -262,6 +262,7 @@ export const registerReferenceImageRoutes = (
     '/api/reference-images/uploads',
     {
       bodyLimit: REFERENCE_IMAGE_UPLOAD_MAX_BYTES,
+      bodyParser: 'buffer',
       onRequest: verifyGenerationOrigin,
     },
     async (request, reply) => {

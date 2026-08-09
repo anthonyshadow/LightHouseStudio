@@ -8,7 +8,7 @@ import {
   WARDROBE_PROVIDER_INTENT_HEADER,
   WARDROBE_PROVIDER_INTENT_VALUE,
 } from '@studio/contracts';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { ApplicationRuntime, HttpRequest } from '../application/application-runtime.js';
 import { AppError } from './errors.js';
 
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1']);
@@ -17,9 +17,26 @@ const isLoopbackHostname = (hostname: string): boolean =>
   LOOPBACK_HOSTS.has(hostname.toLowerCase());
 
 const parseHostHeader = (header: string): URL | undefined => {
-  if (header.includes(',') || header.includes('/') || header.includes('@')) return undefined;
+  if (
+    header.includes(',') ||
+    header.includes('/') ||
+    header.includes('\\') ||
+    header.includes('@') ||
+    header.includes('?') ||
+    header.includes('#')
+  )
+    return undefined;
   try {
-    return new URL(`http://${header}`);
+    const parsed = new URL(`http://${header}`);
+    if (
+      parsed.username !== '' ||
+      parsed.password !== '' ||
+      parsed.pathname !== '/' ||
+      parsed.search !== '' ||
+      parsed.hash !== ''
+    )
+      return undefined;
+    return parsed;
   } catch {
     return undefined;
   }
@@ -50,7 +67,7 @@ const canonicalLoopbackReferrerOrigin = (value: string): string | undefined => {
   }
 };
 
-export const requireTrustedOrigin = (request: FastifyRequest): string => {
+export const requireTrustedOrigin = (request: HttpRequest): string => {
   const originHeader = request.headers.origin;
   const explicitOrigin =
     typeof originHeader === 'string' ? canonicalLoopbackOrigin(originHeader) : undefined;
@@ -90,7 +107,7 @@ export const requireTrustedOrigin = (request: FastifyRequest): string => {
 };
 
 const requireProviderIntent = (
-  request: FastifyRequest,
+  request: HttpRequest,
   header: string,
   value: string,
   message: string,
@@ -100,7 +117,7 @@ const requireProviderIntent = (
   }
 };
 
-export const requireVoiceProviderIntent = (request: FastifyRequest): void => {
+export const requireVoiceProviderIntent = (request: HttpRequest): void => {
   requireProviderIntent(
     request,
     VOICE_PROVIDER_INTENT_HEADER,
@@ -110,7 +127,7 @@ export const requireVoiceProviderIntent = (request: FastifyRequest): void => {
 };
 
 export const requireVideoProviderIntent = (
-  request: FastifyRequest,
+  request: HttpRequest,
   message = 'This video provider action requires explicit local Studio intent.',
 ): void => {
   requireProviderIntent(
@@ -121,7 +138,7 @@ export const requireVideoProviderIntent = (
   );
 };
 
-export const requireReferenceImageImportIntent = (request: FastifyRequest): void => {
+export const requireReferenceImageImportIntent = (request: HttpRequest): void => {
   requireProviderIntent(
     request,
     REFERENCE_IMAGE_IMPORT_INTENT_HEADER,
@@ -130,7 +147,7 @@ export const requireReferenceImageImportIntent = (request: FastifyRequest): void
   );
 };
 
-export const requireWardrobeProviderIntent = (request: FastifyRequest): void => {
+export const requireWardrobeProviderIntent = (request: HttpRequest): void => {
   requireProviderIntent(
     request,
     WARDROBE_PROVIDER_INTENT_HEADER,
@@ -139,7 +156,7 @@ export const requireWardrobeProviderIntent = (request: FastifyRequest): void => 
   );
 };
 
-export const installLocalSecurityBoundary = (app: FastifyInstance): void => {
+export const installLocalSecurityBoundary = (app: ApplicationRuntime): void => {
   app.addHook('onRequest', (request) => {
     const hostHeader = request.headers.host;
     const parsedHost = typeof hostHeader === 'string' ? parseHostHeader(hostHeader) : undefined;
@@ -153,7 +170,7 @@ export const installLocalSecurityBoundary = (app: FastifyInstance): void => {
     return Promise.resolve();
   });
 
-  app.addHook('onSend', async (_request, reply, payload) => {
+  app.addHook('onSend', (_request, reply, payload) => {
     void reply.header('Cache-Control', 'no-store');
     void reply.header('Pragma', 'no-cache');
     return payload;

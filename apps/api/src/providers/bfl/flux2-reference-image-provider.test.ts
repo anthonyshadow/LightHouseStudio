@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import {
   BFL_FLUX_2_PRO_ENDPOINT,
   BflFlux2ReferenceImageProvider,
@@ -23,7 +24,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
   it('submits a prompt-only task once, polls the exact returned URL, and returns downloaded bytes with provenance', async () => {
     const pollingUrl = 'https://api.us1.bfl.ai/v1/get_result?id=task-one&token=signed';
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(
         jsonResponse({
           id: 'task-one',
@@ -132,7 +133,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
   ])('accepts the returned BFL API polling origin %s', async (origin) => {
     const pollingUrl = `${origin}/v1/get_result?id=regional-task`;
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(
         jsonResponse({
           id: 'regional-task',
@@ -169,7 +170,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
     'https://api.us2.bfl.ai:8443/v1/get_result?id=untrusted-task',
     'http://api.us2.bfl.ai/v1/get_result?id=untrusted-task',
   ])('rejects untrusted polling URL %s before forwarding the API key', async (pollingUrl) => {
-    const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValueOnce(
+    const fetchImplementation = vi.fn<ProviderFetch>().mockResolvedValueOnce(
       jsonResponse({
         id: 'untrusted-task',
         polling_url: pollingUrl,
@@ -192,7 +193,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
 
   it('submits a prompt-and-reference task with raw base64 and no data URL prefix', async () => {
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(
         jsonResponse({
           id: 'task-edit',
@@ -234,7 +235,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
 
   it('accepts nullable submit usage and pending result fields from the published API schema', async () => {
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(
         jsonResponse({
           id: 'task-nullable',
@@ -273,7 +274,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
 
   it('classifies native transport failures by provider stage without exposing URLs', async () => {
     const submissionProvider = new BflFlux2ReferenceImageProvider('bfl-secret', {
-      fetchImplementation: vi.fn<typeof fetch>().mockRejectedValue(new Error('socket failed')),
+      fetchImplementation: vi.fn<ProviderFetch>().mockRejectedValue(new Error('socket failed')),
       pollDelayMs: 0,
     });
     await expect(
@@ -286,7 +287,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
 
     const pollingProvider = new BflFlux2ReferenceImageProvider('bfl-secret', {
       fetchImplementation: vi
-        .fn<typeof fetch>()
+        .fn<ProviderFetch>()
         .mockResolvedValueOnce(
           jsonResponse({
             id: 'poll-connection-task',
@@ -307,7 +308,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
 
     const downloadProvider = new BflFlux2ReferenceImageProvider('bfl-secret', {
       fetchImplementation: vi
-        .fn<typeof fetch>()
+        .fn<ProviderFetch>()
         .mockResolvedValueOnce(
           jsonResponse({
             id: 'download-connection-task',
@@ -340,7 +341,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
     [422, 'invalid-request'],
     [503, 'failure'],
   ] as const)('maps initial HTTP %s without retrying the billable POST', async (status, reason) => {
-    const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(jsonResponse({}, status));
+    const fetchImplementation = vi.fn<ProviderFetch>().mockResolvedValue(jsonResponse({}, status));
     const provider = new BflFlux2ReferenceImageProvider('bfl-secret', {
       fetchImplementation,
       pollDelayMs: 0,
@@ -354,7 +355,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
 
   it('maps terminal moderation and keeps the task id for safe diagnostics', async () => {
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(
         jsonResponse({
           id: 'moderated-task',
@@ -378,7 +379,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
 
   it('bounds retryable polling failures without resubmitting the task', async () => {
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(
         jsonResponse({
           id: 'rate-limited-task',
@@ -405,7 +406,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
   });
 
   it('applies one deadline across submission, polling, and download', async () => {
-    const fetchImplementation = vi.fn<typeof fetch>((_input, init) => {
+    const fetchImplementation = vi.fn<ProviderFetch>((_input, init) => {
       return new Promise((_resolve, reject) => {
         init?.signal?.addEventListener(
           'abort',
@@ -427,7 +428,7 @@ describe('BflFlux2ReferenceImageProvider', () => {
   });
 
   it('propagates caller cancellation without converting it to a timeout', async () => {
-    const fetchImplementation = vi.fn<typeof fetch>((_input, init) => {
+    const fetchImplementation = vi.fn<ProviderFetch>((_input, init) => {
       return new Promise((_resolve, reject) => {
         init?.signal?.addEventListener(
           'abort',

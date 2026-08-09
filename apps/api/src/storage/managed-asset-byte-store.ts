@@ -43,8 +43,9 @@ export class ManagedLocalAssetByteStore implements AssetByteStore {
   }
 
   async delete(ownerUserId: string, assetId: string): Promise<void> {
-    if (!(await this.lifecycle.markDeleting(ownerUserId, assetId))) return;
-    await this.bytes.delete(ownerUserId, assetId);
-    await this.lifecycle.markDeleted(ownerUserId, assetId);
+    const claim = await this.lifecycle.claimDeletion(ownerUserId, assetId, 'local');
+    if (claim === null) return;
+    await this.bytes.delete(ownerUserId, claim.storageKey);
+    await this.lifecycle.markDeleted(ownerUserId, assetId, claim);
   }
 }

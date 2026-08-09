@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
+import type { ProviderFetch } from './provider-fetch.js';
 import {
   abortableDelay,
   authenticatedProviderFetch,
@@ -26,7 +27,7 @@ const createTooLargeError = (options?: BoundedJsonErrorOptions): Error => {
 
 describe('bounded provider transport primitives', () => {
   it('forces redirect rejection for authenticated requests', async () => {
-    const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(new Response('{}'));
+    const fetchImplementation = vi.fn<ProviderFetch>().mockResolvedValue(new Response('{}'));
 
     await authenticatedProviderFetch(fetchImplementation, 'https://provider.invalid/resource', {
       redirect: 'follow',

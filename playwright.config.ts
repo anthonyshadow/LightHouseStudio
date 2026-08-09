@@ -35,7 +35,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm dev',
+    command: 'bun run dev',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !runningInCi,
     timeout: 120_000,

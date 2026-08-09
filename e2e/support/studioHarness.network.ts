@@ -399,6 +399,18 @@ export const installProviderNetworkDriver = async (
       return;
     }
 
+    if (requestUrl.pathname === '/api/creative-library' && route.request().method() === 'GET') {
+      network.apiRequests.push({ path: requestUrl.pathname, model: null });
+      await route.fulfill({
+        status: 404,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          error: { code: 'not_found', message: 'No API route matches this request.' },
+        }),
+      });
+      return;
+    }
+
     if (
       requestUrl.pathname === '/api/reference-images/optimize' &&
       route.request().method() === 'POST'

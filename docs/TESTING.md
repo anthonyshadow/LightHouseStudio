@@ -6,15 +6,16 @@ security, data, lifecycle, provider, accessibility, or release regression.
 
 ## Retained layers
 
-| Layer                      | Owns                                                                                              |
-| -------------------------- | ------------------------------------------------------------------------------------------------- |
-| Domain and contract tests  | Pure policy, validation, migrations, schemas, safe errors, recording limits, and state rules      |
-| Component/controller tests | Async races, resource cleanup, focus/inert behavior, destructive confirmation, and complex state  |
-| API integration tests      | Loopback/origin policy, route schemas, provider intent, bounded transport, and safe normalization |
-| Functional Playwright      | Critical journeys, persistent-stage ownership, recovery, responsive actions, and network denial   |
-| Production smoke           | Built entry, direct Studio, and health routes from one loopback origin                            |
-| Curated visual regression  | High-risk composition at the five canonical viewports; always explicit                            |
-| Manual/live validation     | Physical media, codecs, memory, assistive technology, downloads, and paid provider behavior       |
+| Layer                      | Owns                                                                                               |
+| -------------------------- | -------------------------------------------------------------------------------------------------- |
+| Domain and contract tests  | Pure policy, validation, migrations, schemas, safe errors, recording limits, and state rules       |
+| Component/controller tests | Async races, resource cleanup, focus/inert behavior, destructive confirmation, and complex state   |
+| API integration tests      | Loopback/origin policy, route schemas, provider intent, bounded transport, and safe normalization  |
+| Real Bun listener probes   | Pre-parse security, body ceilings, HEAD/static behavior, disconnects, bind ownership, and shutdown |
+| Functional Playwright      | Critical journeys, persistent-stage ownership, recovery, responsive actions, and network denial    |
+| Production smoke           | Built entry, direct Studio, and health routes from one loopback origin                             |
+| Curated visual regression  | High-risk composition at the five canonical viewports; always explicit                             |
+| Manual/live validation     | Physical media, codecs, memory, assistive technology, downloads, and paid provider behavior        |
 
 Storybook remains a typed, statically built review catalog. Its previous browser sweep rendered
 every story in addition to component and journey tests, so it is no longer a separate automated
@@ -23,23 +24,26 @@ opens those stories.
 
 ## Commands
 
-| Command                           | Scope                                                                             |
-| --------------------------------- | --------------------------------------------------------------------------------- |
-| `pnpm test`                       | Default essential non-visual Vitest suite, including API integration tests        |
-| `pnpm test:unit`                  | Domain, contracts, web adapters, components, and controllers                      |
-| `pnpm test:integration`           | API routes/providers, Vite integration, and repository utility scripts            |
-| `pnpm test:coverage`              | Explicit coverage gate using the retained Vitest suite                            |
-| `pnpm test:e2e`                   | Focused functional browser journeys                                               |
-| `pnpm test:production`            | Built loopback static-serving smoke; run `pnpm build` first                       |
-| `pnpm test:visual`                | Explicit curated visual regression suite                                          |
-| `pnpm test:visual:update`         | Intentionally regenerate curated baselines for an approved visual change          |
-| `pnpm screenshots:capture`        | Broad non-baseline screenshot artifact for manual design review                   |
-| `pnpm test:all`                   | Vitest, build, production smoke, functional E2E, and visual regression            |
-| `pnpm quality`                    | Normal implementation gate: types, lint, format, architecture, Vitest, and builds |
-| `pnpm check:dead-code:production` | Production file/dependency reachability; excludes test-only exports               |
+| Command                              | Scope                                                                             |
+| ------------------------------------ | --------------------------------------------------------------------------------- |
+| `bun run test`                       | Default essential non-visual Vitest suite, including API integration tests        |
+| `bun run test:unit`                  | Domain, contracts, web adapters, components, and controllers                      |
+| `bun run test:integration`           | API routes/providers, Vite integration, and repository utility scripts            |
+| `bun run test:coverage`              | Explicit coverage gate using the retained Vitest suite                            |
+| `bun run test:e2e`                   | Focused functional browser journeys                                               |
+| `bun run test:production`            | Built loopback static-serving smoke; run `bun run build` first                    |
+| `bun run test:visual`                | Explicit curated visual regression suite                                          |
+| `bun run test:visual:update`         | Intentionally regenerate curated baselines for an approved visual change          |
+| `bun run screenshots:capture`        | Broad non-baseline screenshot artifact for manual design review                   |
+| `bun run test:all`                   | Vitest, build, production smoke, functional E2E, and visual regression            |
+| `bun run quality`                    | Normal implementation gate: types, lint, format, architecture, Vitest, and builds |
+| `bun run check:dead-code:production` | Production file/dependency reachability; excludes test-only exports               |
 
-`test:unit` and `test:integration` are useful focused subsets; `pnpm test` runs both categories
-once through a single Vitest invocation.
+`test:unit` and `test:integration` are useful focused subsets; `bun run test` runs both categories
+once through a single Node-backed Vitest invocation. Bun owns package installation and the API
+runtime, but `bun test` is a different runner and is not an alias for this retained suite. Selected
+Vitest cases spawn the pinned Bun executable with `--no-env-file` to exercise the production
+listener rather than Node's framework-neutral request harness.
 
 ## Critical automated journeys
 
@@ -97,26 +101,26 @@ The current visual matrix contains 29 cases within the 29-case review budget. It
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,
 Shelf, playback, existing-video setup at all five viewports, processing/result, VTO, Voice,
 finalizing, and permission-error compositions. Visual
-tests are not part of `pnpm test`, `pnpm quality`, or ordinary push/pull-request CI.
+tests are not part of `bun run test`, `bun run quality`, or ordinary push/pull-request CI.
 
-Run `pnpm test:visual` when:
+Run `bun run test:visual` when:
 
 - work materially changes layout, responsive behavior, overlays, stage composition, typography,
   design tokens, or a protected visual state;
 - reviewing an intentional baseline or visual-matrix change; or
 - validating an exact release candidate.
 
-Run `pnpm screenshots:capture` only for broad manual design review. Its 125 captures are artifacts,
+Run `bun run screenshots:capture` only for broad manual design review. Its 125 captures are artifacts,
 not assertions or baselines.
 
 ### Safe baseline updates
 
 1. Make the intentional UI or matrix change.
-2. Run `pnpm test:visual` and inspect the failure against the product contract.
-3. Run `pnpm test:visual:update` only when the new rendering is approved.
+2. Run `bun run test:visual` and inspect the failure against the product contract.
+3. Run `bun run test:visual:update` only when the new rendering is approved.
 4. Inspect every changed Darwin/Linux image at every affected viewport.
 5. Run `node scripts/prune-visual-baselines.mjs --check`.
-6. Run `pnpm test:visual` again without update mode.
+6. Run `bun run test:visual` again without update mode.
 
 Never regenerate a baseline merely to make a failure pass. Do not run `screenshots:prune` until
 every required platform baseline exists.
@@ -126,7 +130,7 @@ every required platform baseline exists.
 Ordinary pushes and pull requests run:
 
 1. dependency audit;
-2. `pnpm quality`, including the static Storybook build;
+2. `bun run quality`, including the static Storybook build;
 3. the built production smoke; and
 4. focused functional Playwright journeys.
 

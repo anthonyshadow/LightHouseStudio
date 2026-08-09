@@ -330,15 +330,19 @@ export class R2AssetByteStore implements AssetByteStore {
   }
 
   async delete(ownerUserId: string, assetId: string): Promise<void> {
+    let key: string;
     if (this.#lifecycle === undefined) {
       if ((await this.open(ownerUserId, assetId)) === null) return;
+      key = this.#key(assetId);
     } else {
       // `deleting` remains claimable so a failed R2 request can be retried idempotently.
-      if (!(await this.#lifecycle.markDeleting(ownerUserId, assetId))) return;
+      const claim = await this.#lifecycle.claimDeletion(ownerUserId, assetId, 'r2');
+      if (claim === null) return;
+      key = claim.storageKey;
+      await this.#client.send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: key }));
+      await this.#lifecycle.markDeleted(ownerUserId, assetId, claim);
+      return;
     }
-    await this.#client.send(
-      new DeleteObjectCommand({ Bucket: this.#bucket, Key: this.#key(assetId) }),
-    );
-    await this.#lifecycle?.markDeleted(ownerUserId, assetId);
+    await this.#client.send(new DeleteObjectCommand({ Bucket: this.#bucket, Key: key }));
   }
 }

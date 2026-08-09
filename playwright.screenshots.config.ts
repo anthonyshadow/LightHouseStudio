@@ -38,7 +38,7 @@ export default defineConfig({
     },
   ],
   webServer: {
-    command: 'pnpm build:packages && pnpm --filter @studio/web dev -- --strictPort',
+    command: 'bun run build:packages && bun run --filter @studio/web dev -- --strictPort',
     url: 'http://127.0.0.1:4173',
     reuseExistingServer: !runningInCi,
     timeout: 120_000,

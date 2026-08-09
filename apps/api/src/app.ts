@@ -1,14 +1,5 @@
-import cookie from '@fastify/cookie';
-import helmet from '@fastify/helmet';
-import multipart from '@fastify/multipart';
-import fastifyStatic from '@fastify/static';
-import {
-  referenceImageMimeTypeSchema,
-  VIDEO_INPUT_MIME_TYPES,
-  VIDEO_RESULT_MAX_BYTES,
-} from '@studio/contracts';
-import Fastify, { LogController, type FastifyInstance } from 'fastify';
 import type { RuntimeConfig } from './config/environment.js';
+import { ApplicationRuntime } from './application/application-runtime.js';
 import { AuthService } from './features/auth/auth-service.js';
 import { registerAuthRoutes } from './features/auth/routes.js';
 import {
@@ -35,19 +26,14 @@ import {
 import { ReferenceImageService } from './features/reference-images/reference-image-service.js';
 import { OutfitTryOnService } from './features/reference-images/outfit-try-on-service.js';
 import { translateVoiceServiceError } from './features/voices/error-mapper.js';
-import {
-  MAX_RECORDING_AUDIO_BYTES,
-  registerVoiceRoutes,
-  SUPPORTED_AUDIO_CONTENT_TYPES,
-} from './features/voices/routes.js';
+import { registerVoiceRoutes } from './features/voices/routes.js';
 import { VoiceService } from './features/voices/voice-service.js';
 import {
   FileSavedVoiceRepository,
   MemorySavedVoiceRepository,
   type SavedVoiceRepository,
 } from './features/voices/saved-voice-repository.js';
-import { AppError, installErrorHandling } from './http/errors.js';
-import { spoolAudioUpload, SpooledUploadTooLargeError } from './application/spooled-upload.js';
+import { installErrorHandling } from './http/errors.js';
 import { installLocalSecurityBoundary } from './http/security.js';
 import { installAuthentication } from './http/authentication.js';
 import { LocalAssetByteStore, type AssetByteStore } from './storage/asset-byte-store.js';
@@ -79,6 +65,7 @@ import {
 import { translateOpenAIError } from './providers/openai/error-mapper.js';
 import { translatePrunaImageTryOnError } from './providers/pruna/image-try-on-error-mapper.js';
 import { translateWiroError } from './providers/wiro/error-mapper.js';
+import type { ProviderFetch } from './providers/transport/provider-fetch.js';
 import {
   configuredReferenceImageDescriptor,
   createConfiguredReferenceImageProvider,
@@ -92,7 +79,6 @@ import {
 } from './providers/pruna/image-try-on-provider.js';
 
 export const OPENAI_CONNECTION_TIMEOUT_MARGIN_MS = 100_000;
-export const SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES = referenceImageMimeTypeSchema.options;
 
 export interface AppPersistenceDependencies {
   readonly users?: UserRepository;
@@ -119,7 +105,7 @@ export interface AppDependencies {
   readonly referenceImageAssetStore?: ReferenceImageAssetStore;
   readonly remoteImageDownloader?: RemoteReferenceImageDownloader;
   readonly persistence?: AppPersistenceDependencies;
-  readonly fetchImplementation?: typeof fetch;
+  readonly fetchImplementation?: ProviderFetch;
   readonly logger?: boolean;
   readonly staticRoot?: string;
 }
@@ -129,77 +115,22 @@ const resolveOptionalProvider = <Provider>(
   createProvider: () => Provider | null,
 ): Provider | null => (provided === undefined ? createProvider() : provided);
 
-export const createApp = (dependencies: AppDependencies): FastifyInstance => {
-  const app = Fastify({
+export const createApp = (dependencies: AppDependencies): ApplicationRuntime => {
+  const app = new ApplicationRuntime({
     logger: dependencies.logger ?? dependencies.config.nodeEnv !== 'test',
-    // Default Fastify request logs include the full query string. Voice searches and
-    // provider ids are ephemeral user data, so this local broker never logs request URLs.
-    logController: new LogController({ disableRequestLogging: true }),
-    bodyLimit: 1024 * 1024,
-    requestTimeout: 100_000,
-    // Node's socket timeout also covers the quiet interval while a handler waits
-    // for OpenAI. It must outlive both provider timeouts plus image validation and
-    // atomic storage, otherwise the client loses the structured error response while
-    // upstream work may still be settling.
-    connectionTimeout:
+    hostname: dependencies.config.host,
+    port: dependencies.config.port,
+    requestTimeoutMs: 100_000,
+    // The application-owned post-parse inactivity watchdog must outlive both
+    // provider timeouts plus image validation and atomic storage. Bun's per-request
+    // idle timer is disabled only after the separately bounded receive phase.
+    connectionTimeoutMs:
       Math.max(
         dependencies.config.referenceImageTimeoutMs,
         dependencies.config.openAiPromptOptimizerTimeoutMs,
       ) + OPENAI_CONNECTION_TIMEOUT_MARGIN_MS,
-    keepAliveTimeout: 5_000,
-    trustProxy: false,
+    ...(dependencies.staticRoot === undefined ? {} : { staticRoot: dependencies.staticRoot }),
   });
-
-  void app.register(helmet, {
-    // Provider WebSocket/media destinations vary by account and SDK release. A CSP
-    // should be added only once those production origins are deployment-configured.
-    contentSecurityPolicy: false,
-    crossOriginEmbedderPolicy: false,
-  });
-  void app.register(cookie);
-  void app.register(multipart);
-
-  if (dependencies.staticRoot !== undefined) {
-    void app.register(fastifyStatic, {
-      root: dependencies.staticRoot,
-      wildcard: false,
-      cacheControl: dependencies.config.nodeEnv === 'production',
-      maxAge: dependencies.config.nodeEnv === 'production' ? '1h' : 0,
-    });
-  }
-
-  app.addContentTypeParser([...SUPPORTED_AUDIO_CONTENT_TYPES], (_request, payload, done) => {
-    void spoolAudioUpload(payload, MAX_RECORDING_AUDIO_BYTES).then(
-      (body) => done(null, body),
-      (error: unknown) =>
-        done(
-          error instanceof SpooledUploadTooLargeError
-            ? new AppError(413, 'payload_too_large', 'The audio sidecar must be 25 MiB or smaller.')
-            : (error as Error),
-        ),
-    );
-  });
-  app.addContentTypeParser(
-    [...SUPPORTED_REFERENCE_IMAGE_CONTENT_TYPES],
-    { parseAs: 'buffer' },
-    (_request, body, done) => done(null, body),
-  );
-  app.addContentTypeParser([...VIDEO_INPUT_MIME_TYPES], (_request, payload, done) => {
-    void spoolAudioUpload(payload, VIDEO_RESULT_MAX_BYTES).then(
-      (body) => done(null, body),
-      (error: unknown) =>
-        done(
-          error instanceof SpooledUploadTooLargeError
-            ? new AppError(413, 'payload_too_large', 'The saved video must be 300 MB or smaller.')
-            : (error as Error),
-        ),
-    );
-  });
-  // Let the upload route return its image-specific 415 response for unsupported
-  // image declarations instead of Fastify's generic content-parser error.
-  app.addContentTypeParser(/^image\//u, { parseAs: 'buffer' }, (_request, body, done) =>
-    done(null, body),
-  );
 
   installLocalSecurityBoundary(app);
 

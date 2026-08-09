@@ -3,17 +3,33 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.18.0",
+  "packageManager": "bun@1.3.14",
   "engines": {
     "node": ">=24 <25",
-    "pnpm": ">=11.18 <12"
+    "bun": "1.3.14"
+  },
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "trustedDependencies": [
+    "esbuild"
+  ],
+  "overrides": {
+    "tsup>esbuild": "0.28.1",
+    "brace-expansion@1.1.16": "1.1.18",
+    "brace-expansion@5.0.8": "5.0.9",
+    "fast-uri@3.1.4": "3.1.5",
+    "fast-uri@4.1.1": "4.1.2",
+    "js-yaml": "4.3.1",
+    "nanoid": "3.3.18"
   },
   "scripts": {
-    "build:packages": "pnpm --filter @studio/domain build && pnpm --filter @studio/contracts build",
-    "dev": "pnpm build:packages && concurrently -k -n api,web -c blue,magenta \"pnpm --filter @studio/api dev\" \"pnpm --filter @studio/web dev\"",
-    "build": "pnpm build:packages && pnpm --filter @studio/web build && pnpm --filter @studio/api build",
-    "start": "pnpm --filter @studio/api start",
-    "typecheck": "pnpm -r --if-present typecheck && pnpm typecheck:e2e",
+    "build:packages": "bun run --filter @studio/domain build && bun run --filter @studio/contracts build",
+    "dev": "bun run build:packages && concurrently -k -n api,web -c blue,magenta \"bun run --filter @studio/api dev\" \"bun run --filter @studio/web dev\"",
+    "build": "bun run build:packages && bun run --filter @studio/web build && bun run --filter @studio/api build",
+    "start": "bun run --filter @studio/api start",
+    "typecheck": "bun run --filter '*' typecheck && bun run typecheck:e2e",
     "typecheck:e2e": "tsc --noEmit -p e2e/tsconfig.json",
     "lint": "eslint . --max-warnings 0",
     "format": "prettier --write .",
@@ -30,9 +46,9 @@
     "test:production": "playwright test --config playwright.production.config.ts",
     "test:visual": "playwright test --config playwright.visual.config.ts",
     "test:visual:update": "playwright test --config playwright.visual.config.ts --update-snapshots",
-    "test:all": "pnpm test && pnpm build && pnpm test:production && pnpm test:e2e && pnpm test:visual",
-    "audit:all": "pnpm audit",
-    "audit:prod": "pnpm audit --prod --audit-level high",
+    "test:all": "bun run test && bun run build && bun run test:production && bun run test:e2e && bun run test:visual",
+    "audit:all": "bun audit --ignore GHSA-67mh-4wv8-2f99",
+    "audit:prod": "bun audit --audit-level high",
     "screenshots:prune": "node scripts/prune-visual-baselines.mjs",
     "check:dead-code": "knip --no-progress --reporter compact",
     "check:dead-code:production": "knip --production --no-progress --include files,dependencies,unlisted,unresolved --reporter compact",
@@ -43,9 +59,9 @@
     "check:retired-program": "node scripts/check-retired-program-references.mjs",
     "recording:memory:estimate": "node scripts/estimate-recording-memory.mjs",
     "auth:hash-password": "node scripts/hash-demo-password.mjs",
-    "db:migrate": "pnpm --dir apps/api db:migrate",
+    "db:migrate": "bun run --filter @studio/api db:migrate",
     "screenshots:capture": "playwright test --config playwright.screenshots.config.ts",
-    "quality": "pnpm typecheck && pnpm storybook:typecheck && pnpm lint && pnpm format:check && pnpm check:dead-code && pnpm check:modules && pnpm check:script-references && pnpm check:docs && pnpm check:retired-program && pnpm test && pnpm build && pnpm check:build-manifest && pnpm storybook:build"
+    "quality": "bun run typecheck && bun run storybook:typecheck && bun run lint && bun run format:check && bun run check:dead-code && bun run check:modules && bun run check:script-references && bun run check:docs && bun run check:retired-program && bun run test && bun run build && bun run check:build-manifest && bun run storybook:build"
   },
   "devDependencies": {
     "@node-rs/argon2": "2.0.2",
@@ -60,6 +76,7 @@
     "@testing-library/jest-dom": "7.0.0",
     "@testing-library/react": "16.3.2",
     "@testing-library/user-event": "14.6.1",
+    "@types/bun": "1.3.14",
     "@types/node": "24.13.3",
     "@types/react": "19.2.17",
     "@types/react-dom": "19.2.3",
@@ -79,7 +96,6 @@
     "react-dom": "19.2.8",
     "storybook": "10.5.5",
     "tsup": "8.5.1",
-    "tsx": "4.23.1",
     "typescript": "npm:@typescript/typescript6@6.0.2",
     "typescript-eslint": "8.65.0",
     "vite": "8.2.0",

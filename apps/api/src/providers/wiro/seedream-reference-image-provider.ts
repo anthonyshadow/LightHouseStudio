@@ -18,6 +18,7 @@ import { normalizeWiroImage } from './normalize-image.js';
 import { SafeWiroImageDownloader } from './safe-image-downloader.js';
 import type { DownloadedRemoteImage } from '../transport/safe-remote-image-downloader.js';
 import { nextProviderPollDelayMs } from '../transport/provider-polling.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 
 export const WIRO_SEEDREAM_MODEL = 'seedream-v5-lite-uncensored' as const;
 export const WIRO_SEEDREAM_OWNER = 'ByteDance' as const;
@@ -189,7 +190,7 @@ export class WiroSeedreamReferenceImageProvider implements ReferenceImageProvide
   readonly descriptor;
   readonly #apiKey: string;
   readonly #apiSecret: string;
-  readonly #fetch: typeof fetch;
+  readonly #fetch: ProviderFetch;
   readonly #downloader: Pick<SafeWiroImageDownloader, 'download'>;
   readonly #timeoutMs: number;
   readonly #pollDelayMs: number;
@@ -202,7 +203,7 @@ export class WiroSeedreamReferenceImageProvider implements ReferenceImageProvide
     options: {
       readonly model?: typeof WIRO_SEEDREAM_MODEL;
       readonly timeoutMs?: number;
-      readonly fetchImplementation?: typeof fetch;
+      readonly fetchImplementation?: ProviderFetch;
       readonly downloader?: Pick<SafeWiroImageDownloader, 'download'>;
       readonly pollDelayMs?: number;
       readonly createNonce?: () => string;

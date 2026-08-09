@@ -3,7 +3,7 @@ import {
   demoAuthConfigResponseSchema,
   loginRequestSchema,
 } from '@studio/contracts';
-import type { FastifyInstance, FastifyReply } from 'fastify';
+import type { ApplicationRuntime, HttpReply } from '../../application/application-runtime.js';
 import type { RuntimeConfig } from '../../config/environment.js';
 import { AppError } from '../../http/errors.js';
 import { requireTrustedOrigin } from '../../http/security.js';
@@ -17,7 +17,7 @@ const sessionCookieOptions = (config: RuntimeConfig) => ({
   maxAge: config.authSessionTtlSeconds,
 });
 
-const clearSessionCookie = (reply: FastifyReply, config: RuntimeConfig): void => {
+const clearSessionCookie = (reply: HttpReply, config: RuntimeConfig): void => {
   reply.clearCookie(config.authCookieName, {
     path: '/',
     httpOnly: true,
@@ -27,7 +27,7 @@ const clearSessionCookie = (reply: FastifyReply, config: RuntimeConfig): void =>
 };
 
 export const registerAuthRoutes = (
-  app: FastifyInstance,
+  app: ApplicationRuntime,
   auth: AuthService,
   config: RuntimeConfig,
 ): void => {
@@ -42,22 +42,29 @@ export const registerAuthRoutes = (
     });
   });
 
-  app.post('/api/auth/login', async (request, reply) => {
-    requireTrustedOrigin(request);
-    const parsed = loginRequestSchema.safeParse(request.body);
-    if (!parsed.success) {
-      throw new AppError(400, 'validation_error', 'Enter a valid login and password.');
-    }
-    if (!config.demoAuthEnabled) {
-      throw new AppError(503, 'feature_unavailable', 'Demo login is not enabled.');
-    }
-    const result = await auth.login(parsed.data);
-    reply.header('Cache-Control', 'no-store');
-    reply.setCookie(config.authCookieName, result.token, sessionCookieOptions(config));
-    return authenticatedSessionResponseSchema.parse(result.response);
-  });
+  app.post(
+    '/api/auth/login',
+    {
+      onRequest: (request) => {
+        requireTrustedOrigin(request);
+      },
+    },
+    async (request, reply) => {
+      const parsed = loginRequestSchema.safeParse(request.body);
+      if (!parsed.success) {
+        throw new AppError(400, 'validation_error', 'Enter a valid login and password.');
+      }
+      if (!config.demoAuthEnabled) {
+        throw new AppError(503, 'feature_unavailable', 'Demo login is not enabled.');
+      }
+      const result = await auth.login(parsed.data);
+      reply.header('Cache-Control', 'no-store');
+      reply.setCookie(config.authCookieName, result.token, sessionCookieOptions(config));
+      return authenticatedSessionResponseSchema.parse(result.response);
+    },
+  );
 
-  app.get('/api/auth/me', async (request, reply) => {
+  app.get('/api/auth/me', (request, reply) => {
     const authenticated = request.auth;
     if (!authenticated) throw new AppError(401, 'authentication_required', 'Log in to continue.');
     reply.header('Cache-Control', 'no-store');
@@ -68,10 +75,17 @@ export const registerAuthRoutes = (
     });
   });
 
-  app.post('/api/auth/logout', async (request, reply) => {
-    requireTrustedOrigin(request);
-    await auth.revoke(request.cookies[config.authCookieName]);
-    clearSessionCookie(reply, config);
-    reply.header('Cache-Control', 'no-store').code(204).send();
-  });
+  app.post(
+    '/api/auth/logout',
+    {
+      onRequest: (request) => {
+        requireTrustedOrigin(request);
+      },
+    },
+    async (request, reply) => {
+      await auth.revoke(request.cookies[config.authCookieName]);
+      clearSessionCookie(reply, config);
+      reply.header('Cache-Control', 'no-store').code(204).send();
+    },
+  );
 };

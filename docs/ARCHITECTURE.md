@@ -1,6 +1,6 @@
 # Architecture and ownership
 
-Lightframe Studio is a TypeScript workspace with a React browser app, a loopback Fastify broker,
+Lightframe Studio is a TypeScript workspace with a React browser app, a loopback Bun/Elysia broker,
 pure domain rules, and runtime API contracts. Its design is local-first and single-operator.
 
 ## Dependency boundaries
@@ -439,15 +439,15 @@ errors. The URL is neither persisted nor forwarded to a visual provider.
 
 ## Persistence
 
-| Store                       | Data                                                                                                                                       | Lifetime and trust boundary                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Recipe Shelf `localStorage` | User-namespaced v7 prompt, character, outfit, wardrobe metadata, voice preferences, and opaque asset IDs                                   | Immediate schema-validated browser cache. In `neon`, a complete snapshot synchronizes through an owner-derived revision CAS; divergence pauses sync and preserves the browser copy. Never stores bytes or credentials.                                                                                                                                                                                                                                                                       |
-| Character Builder IndexedDB | User-scoped resumable draft and save journal                                                                                               | Compare-and-swap autosave prevents duplicate save/preload after retry or reload. Drafts remain device-local.                                                                                                                                                                                                                                                                                                                                                                                 |
-| Local persistence           | Saved-video aggregates/versions, thumbnails, references, saved voices, and safe processing traces                                          | Default `local` mode under `LIGHTFRAME_DATA_DIR`; atomic publication, checksums, idempotent receipts, and owner checks remain supported. Sessions are process-memory.                                                                                                                                                                                                                                                                                                                        |
-| Neon PostgreSQL             | Users/credentials, sessions, videos/versions/receipts, voices, references, creative records, jobs, media lifecycle, references, and outbox | `shadow` records safe jobs while files remain authoritative. `neon` makes injected Drizzle repositories authoritative. Transactions protect version append and creative revision replacement; saved creative rows are the retention authority for reference assets.                                                                                                                                                                                                                          |
-| Cloudflare R2               | Private video, thumbnail, and reference bytes selected through `AssetByteStore`                                                            | Opaque app keys, server-mediated range reads, SHA-256 verification, multipart abort, and database pending/ready/deleting/deleted states. Manual Saved Video deletion removes unshared version/thumbnail objects after an active-relationship recheck; interrupted `deleting` rows are retryable. Unsaved reference bytes may be staged, but owner-scoped discard and 24-hour inactive-orphan cleanup also recheck saved relationships. The bucket and credentials are never browser-visible. |
-| Session memory              | Auth snapshot, streams, tokens, files, direct-import outfit recents, device IDs, takes, and sidecars                                       | JWT remains only in the HTTP-only cookie; other state is cleaned on auth change, replacement, release/discard, unmount, or tab close as applicable.                                                                                                                                                                                                                                                                                                                                          |
-| Video-job temp root         | Streamed input/reference and inspected provider output                                                                                     | Process-temporary. Accepted provider jobs can resume status/retrieval from Neon after restart, but input is purged and an unconfirmed submission is never repeated. The fixed accepted-at-plus-60-minute deadline remains authoritative.                                                                                                                                                                                                                                                     |
+| Store                       | Data                                                                                                                                       | Lifetime and trust boundary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recipe Shelf `localStorage` | User-namespaced v7 prompt, character, outfit, wardrobe metadata, voice preferences, and opaque asset IDs                                   | Immediate schema-validated browser cache. In `neon`, a complete snapshot synchronizes through an owner-derived revision CAS; divergence pauses sync and preserves the browser copy. Never stores bytes or credentials.                                                                                                                                                                                                                                                                                                       |
+| Character Builder IndexedDB | User-scoped resumable draft and save journal                                                                                               | Compare-and-swap autosave prevents duplicate save/preload after retry or reload. Drafts remain device-local.                                                                                                                                                                                                                                                                                                                                                                                                                 |
+| Local persistence           | Saved-video aggregates/versions, thumbnails, references, saved voices, and safe processing traces                                          | Default `local` mode under `LIGHTFRAME_DATA_DIR`; atomic publication, checksums, idempotent receipts, and owner checks remain supported. Sessions are process-memory.                                                                                                                                                                                                                                                                                                                                                        |
+| Neon PostgreSQL             | Users/credentials, sessions, videos/versions/receipts, voices, references, creative records, jobs, media lifecycle, references, and outbox | `shadow` records safe jobs while files remain authoritative. `neon` makes injected Drizzle repositories authoritative. Transactions protect version append and creative revision replacement; saved creative rows are the retention authority for reference assets.                                                                                                                                                                                                                                                          |
+| Cloudflare R2               | Private video, thumbnail, and reference bytes selected through `AssetByteStore`                                                            | Opaque app keys, server-mediated range reads, SHA-256 verification, multipart abort, and database pending/ready/deleting/deleted states. Deletion claims the persisted provider/key identity and interrupted `deleting` rows are retryable. Provider, account, bucket, or prefix changes require a reviewed byte/data migration. Unsaved reference bytes may be staged, but owner-scoped discard and 24-hour inactive-orphan cleanup also recheck saved relationships. The bucket and credentials are never browser-visible. |
+| Session memory              | Auth snapshot, streams, tokens, files, direct-import outfit recents, device IDs, takes, and sidecars                                       | JWT remains only in the HTTP-only cookie; other state is cleaned on auth change, replacement, release/discard, unmount, or tab close as applicable.                                                                                                                                                                                                                                                                                                                                                                          |
+| Video-job temp root         | Streamed input/reference and inspected provider output                                                                                     | Process-temporary. Accepted provider jobs can resume status/retrieval from Neon after restart, but input is purged and an unconfirmed submission is never repeated. The fixed accepted-at-plus-60-minute deadline remains authoritative.                                                                                                                                                                                                                                                                                     |
 
 Browser storage is untrusted, schema-migrated, and user-namespaced. Opaque IDs, provenance, and
 timestamps are preserved. The filesystem store uses atomic publication and never exposes internal paths,
@@ -492,14 +492,29 @@ discard/replacement or the fixed deadline; browser polling does not issue an aut
 
 ## Backend boundary
 
-Fastify binds to `127.0.0.1`, rejects non-loopback Host headers, and requires exact loopback Origin
-checks for provider or reference mutations. Browsers may omit `Origin` on same-origin `GET`
+The Bun process binds an exclusive `node:http` compatibility listener to `127.0.0.1` and delegates
+every request to Elysia for routing and lifecycle hooks. This listener is intentional: it preserves
+fixed `Content-Length` responses and socket finish/close semantics for backpressured file streams,
+which the pinned Bun native listener cannot provide together. The boundary rejects non-loopback
+Host headers and requires exact loopback Origin checks for provider or reference mutations.
+Public request/socket events drive cancellation first. Bun 1.3.14 does not emit those events when a
+client disconnects after its request body is complete but before a waiting handler sends headers,
+so a feature-detected, request-scoped compatibility watchdog observes only the native handle's
+boolean closed state. It is cleared on response finish, close, or error; if Bun changes that private
+shape, provider and application timeouts remain the fail-safe.
+Browsers may omit `Origin` on same-origin `GET`
 requests, so provider reads accept an exact loopback `Origin` or referrer, or browser
 `Sec-Fetch-Site: same-origin`; their explicit provider-intent header remains mandatory. ElevenLabs
 provider-contact routes require `X-Lightframe-Provider-Intent: voice`; visual batch routes require
 `X-Lightframe-Provider-Intent: video`; remote reference import requires
 `X-Lightframe-Provider-Intent: reference-image-import`; Pruna Wardrobe generation requires the
 independent `X-Lightframe-Provider-Intent: wardrobe`. Responses are `no-store`.
+
+The compatibility listener leaves body acceptance to the app-owned Elysia boundary so Host,
+authentication, Origin, and provider-intent hooks run before any body is consumed. Every route uses
+its exact declared-length and counted/spooled limit; the largest accepted application request is
+310,551,296 bytes. Request receipt has an absolute 100-second deadline, after which handlers and
+response streams receive a fresh activity-based lifetime budget.
 
 Permanent keys remain in server environment memory. App-owned schemas validate every HTTP
 boundary. Provider adapters normalize upstream data into allowlisted safe codes; raw messages,
@@ -553,15 +568,15 @@ borrows source tracks.
 ## Deployment and tests
 
 Development uses Vite on `127.0.0.1:4173` and the API on `127.0.0.1:4100`. Production mode serves
-the built client and API from Fastify on one loopback origin. There is no supported public
-deployment, authentication, tenancy, billing, infrastructure automation, backup, remote
-observability, or asset garbage collection.
+the built client and API from Elysia through Bun's loopback `node:http` compatibility listener on
+one origin. There is no supported public deployment, authentication, tenancy, billing,
+infrastructure automation, backup, remote observability, or asset garbage collection.
 
 Tests keep provider and browser effects behind injectable seams:
 
 - domain tests cover pure policy;
 - component/controller tests cover state, races, focus, and cleanup;
-- Fastify tests inject provider dependencies and fetch;
+- Elysia tests inject provider dependencies and exercise the app-owned HTTP boundary;
 - Storybook uses typed local doubles and is typechecked/statically built as a review catalog;
 - Playwright uses deterministic synthetic media and denies unexpected HTTP/WebSockets;
 - live provider and physical-device checks are manual release evidence.

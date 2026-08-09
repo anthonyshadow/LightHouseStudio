@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { testConfig } from '../../test/fakes.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import { BflFlux2ReferenceImageProvider } from '../bfl/flux2-reference-image-provider.js';
 import { OpenAIReferenceImageProvider } from '../openai/reference-image-provider.js';
 import { WiroSeedreamReferenceImageProvider } from '../wiro/seedream-reference-image-provider.js';
@@ -49,7 +50,7 @@ describe('reference image provider factory', () => {
   });
 
   it('carries the selected BFL safety configuration through the factory to the wire request', async () => {
-    const fetchImplementation = vi.fn<typeof fetch>().mockResolvedValue(
+    const fetchImplementation = vi.fn<ProviderFetch>().mockResolvedValue(
       new Response('{}', {
         status: 401,
         headers: { 'content-type': 'application/json' },

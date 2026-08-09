@@ -2,6 +2,7 @@ import sharp from 'sharp';
 import { describe, expect, it, vi } from 'vitest';
 import { PRUNA_IMAGE_TRY_ON_MODEL } from '@studio/contracts';
 import { ReferenceImageProviderError } from '../reference-images/reference-image-provider.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import { PrunaImageTryOnProvider } from './image-try-on-provider.js';
 
 const json = (body: unknown, status = 200) =>
@@ -25,7 +26,7 @@ describe('PrunaImageTryOnProvider', () => {
   it('uploads both images, submits exactly one pinned asynchronous prediction, polls, and downloads', async () => {
     const output = await jpeg();
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(
         json({ id: 'file-person', urls: { get: 'https://api.pruna.ai/v1/files/file-person' } }),
       )
@@ -101,7 +102,7 @@ describe('PrunaImageTryOnProvider', () => {
   it('rejects an untrusted delivery URL without downloading it', async () => {
     const bytes = await jpeg();
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(json({ urls: { get: 'https://api.pruna.ai/v1/files/person' } }))
       .mockResolvedValueOnce(json({ urls: { get: 'https://api.pruna.ai/v1/files/garment' } }))
       .mockResolvedValueOnce(
@@ -129,7 +130,7 @@ describe('PrunaImageTryOnProvider', () => {
   it('does not retry a failed billable submission', async () => {
     const bytes = await jpeg();
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(json({ urls: { get: 'https://api.pruna.ai/v1/files/person' } }))
       .mockResolvedValueOnce(json({ urls: { get: 'https://api.pruna.ai/v1/files/garment' } }))
       .mockResolvedValueOnce(json({ error: 'private upstream body' }, 500));
@@ -143,7 +144,7 @@ describe('PrunaImageTryOnProvider', () => {
     const bytes = await jpeg();
     const controller = new AbortController();
     const fetchImplementation = vi
-      .fn<typeof fetch>()
+      .fn<ProviderFetch>()
       .mockResolvedValueOnce(json({ urls: { get: 'https://api.pruna.ai/v1/files/person' } }))
       .mockResolvedValueOnce(json({ urls: { get: 'https://api.pruna.ai/v1/files/garment' } }))
       .mockResolvedValueOnce(

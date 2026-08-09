@@ -14,6 +14,7 @@ import {
   authenticatedProviderFetch,
   readBoundedJson,
 } from '../transport/bounded-provider-transport.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 import type { AudioStream } from '../../application/audio-stream.js';
 import type {
   ElevenLabsModel,
@@ -378,13 +379,13 @@ const classifyProviderFailure = async (
 
 export class ElevenLabsHttpProvider implements ElevenLabsProvider {
   readonly #apiKey: string;
-  readonly #fetch: typeof fetch;
+  readonly #fetch: ProviderFetch;
   readonly #timeoutMs: number;
   readonly #audioLimits: ElevenLabsAudioLimits;
 
   constructor(
     apiKey: string,
-    fetchImplementation: typeof fetch = fetch,
+    fetchImplementation: ProviderFetch = fetch,
     timeoutMs = 30_000,
     audioLimits: ElevenLabsAudioLimits = DEFAULT_AUDIO_LIMITS,
   ) {

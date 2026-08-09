@@ -172,7 +172,9 @@ test('prepares an object recipe accessibly without camera or provider work', asy
   });
   expect(cameraCalls).toBe(0);
   expect(apiRequests.length).toBeGreaterThan(0);
-  expect(new Set(apiRequests)).toEqual(new Set(['/api/auth/me', '/api/capabilities']));
+  expect(new Set(apiRequests)).toEqual(
+    new Set(['/api/auth/me', '/api/capabilities', '/api/creative-library']),
+  );
   expect(apiRequests).not.toContain('/api/realtime-token');
 });
 

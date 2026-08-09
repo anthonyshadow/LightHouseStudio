@@ -12,13 +12,13 @@ do not replace it.
 Run the exact release candidate:
 
 ```bash
-pnpm quality
-pnpm test:coverage
-pnpm test:e2e
-pnpm test:production
-pnpm test:visual
-pnpm audit:all
-pnpm audit:prod
+bun run quality
+bun run test:coverage
+bun run test:e2e
+bun run test:production
+bun run test:visual
+bun run audit:all
+bun run audit:prod
 ```
 
 Use the five canonical viewports below and the currently supported browser/device targets. Record

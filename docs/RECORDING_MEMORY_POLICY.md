@@ -75,7 +75,7 @@ For every supported device/browser target at the canonical viewports:
 Use actual per-minute sizes with the planning estimator:
 
 ```bash
-pnpm recording:memory:estimate \
+bun run recording:memory:estimate \
   --duration-seconds 300 \
   --main-mib-per-minute 12 \
   --sidecar-mib-per-minute 1

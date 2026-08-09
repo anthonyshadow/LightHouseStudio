@@ -52,7 +52,11 @@ export interface ResumableVideoProcessingJob {
   readonly expiresAt: string;
 }
 
+export type ProcessingJobAdmissionResult =
+  'admitted' | 'duplicate' | 'request-conflict' | 'owner-conflict' | 'owner-mismatch';
+
 export interface DurableProcessingJobRepository extends ProcessingJobTraceWriter {
+  admit(trace: VideoProcessingJobTrace): Promise<ProcessingJobAdmissionResult>;
   listResumable(now: string): Promise<readonly ResumableVideoProcessingJob[]>;
 }
 

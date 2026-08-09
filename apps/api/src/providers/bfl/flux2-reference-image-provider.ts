@@ -15,6 +15,7 @@ import {
 import { SafeBflImageDownloader } from './safe-image-downloader.js';
 import type { DownloadedRemoteImage } from '../transport/safe-remote-image-downloader.js';
 import { nextProviderPollDelayMs } from '../transport/provider-polling.js';
+import type { ProviderFetch } from '../transport/provider-fetch.js';
 
 export const BFL_FLUX_2_PRO_MODEL = 'flux-2-pro' as const;
 export const BFL_FLUX_2_PRO_ENDPOINT = 'https://api.us2.bfl.ai/v1/flux-2-pro';
@@ -123,7 +124,7 @@ const connectionError = (
 export class BflFlux2ReferenceImageProvider implements ReferenceImageProvider {
   readonly descriptor;
   readonly #apiKey: string;
-  readonly #fetch: typeof fetch;
+  readonly #fetch: ProviderFetch;
   readonly #downloader: Pick<SafeBflImageDownloader, 'download'>;
   readonly #timeoutMs: number;
   readonly #safetyTolerance: number;
@@ -138,7 +139,7 @@ export class BflFlux2ReferenceImageProvider implements ReferenceImageProvider {
       readonly timeoutMs?: number;
       readonly safetyTolerance?: number;
       readonly disablePromptUpsampling?: boolean;
-      readonly fetchImplementation?: typeof fetch;
+      readonly fetchImplementation?: ProviderFetch;
       readonly downloader?: Pick<SafeBflImageDownloader, 'download'>;
       readonly observeLifecycle?: BflLifecycleObserver;
       readonly pollDelayMs?: number;

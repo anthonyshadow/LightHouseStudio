@@ -3,7 +3,11 @@ import {
   type ApiErrorCode,
   type ApiErrorResponse,
 } from '@studio/contracts';
-import type { FastifyError, FastifyInstance, FastifyReply, FastifyRequest } from 'fastify';
+import type {
+  ApplicationRuntime,
+  HttpReply,
+  HttpRequest,
+} from '../application/application-runtime.js';
 import { AppError } from './app-error.js';
 
 export { AppError } from './app-error.js';
@@ -32,35 +36,11 @@ const errorBody = (
     error: { code, message, ...(upstreamStatus === undefined ? {} : { upstreamStatus }) },
   });
 
-const isFastifyError = (error: unknown): error is FastifyError =>
-  error instanceof Error && 'code' in error && typeof error.code === 'string';
-
-const normalizeFastifyError = (error: FastifyError): AppError | undefined => {
-  if (error.code === 'FST_ERR_CTP_BODY_TOO_LARGE') {
-    return new AppError(413, 'payload_too_large', 'The request body exceeds the allowed size.');
-  }
-  if (error.code === 'FST_ERR_CTP_INVALID_MEDIA_TYPE') {
-    return new AppError(
-      400,
-      'unsupported_media_type',
-      'Use a supported audio recording format such as WebM, MP4, Ogg, WAV, MPEG, or AAC.',
-    );
-  }
-  if (error.code.startsWith('FST_ERR_CTP_') || error.statusCode === 400) {
-    return new AppError(400, 'bad_request', 'The request body is not valid.');
-  }
-  return undefined;
-};
-
 const translateFrameworkError = (error: Error): ErrorTranslation | undefined => {
   if (error instanceof AppError) {
     return { appError: error, diagnostic: { errorClass: 'AppError' } };
   }
-  if (!isFastifyError(error)) return undefined;
-  const appError = normalizeFastifyError(error);
-  return appError === undefined
-    ? undefined
-    : { appError, diagnostic: { errorClass: 'FastifyError' } };
+  return undefined;
 };
 
 const translateError = (
@@ -95,7 +75,7 @@ const sanitizeStackFrames = (error: Error): readonly string[] =>
     });
 
 export const installErrorHandling = (
-  app: FastifyInstance,
+  app: ApplicationRuntime,
   options: {
     readonly serveSpa?: boolean;
     readonly translators?: readonly ErrorTranslator[];
@@ -113,45 +93,43 @@ export const installErrorHandling = (
       await reply.sendFile('index.html');
       return;
     }
-    await reply.status(404).send(errorBody('not_found', 'No API route matches this request.'));
+    reply.status(404).send(errorBody('not_found', 'No API route matches this request.'));
   });
 
-  app.setErrorHandler(
-    async (error: Error, request: FastifyRequest, reply: FastifyReply): Promise<void> => {
-      const translation = translateError(error, options.translators ?? []);
-      const safeError = translation.appError;
+  app.setErrorHandler((error: Error, request: HttpRequest, reply: HttpReply): void => {
+    const translation = translateError(error, options.translators ?? []);
+    const safeError = translation.appError;
 
-      if (safeError.statusCode >= 500) {
-        const diagnostic = translation.diagnostic;
-        request.log.error(
-          {
-            requestId: request.id,
-            method: request.method,
-            route: request.routeOptions.url,
-            elapsedMs: Math.round(reply.elapsedTime),
-            statusCode: safeError.statusCode,
-            code: safeError.code,
-            errorClass: diagnostic.errorClass,
-            ...(diagnostic.reason === undefined ? {} : { reason: diagnostic.reason }),
-            ...(diagnostic.providerId === undefined ? {} : { providerId: diagnostic.providerId }),
-            ...(diagnostic.providerRequestId === undefined
-              ? {}
-              : { providerRequestId: diagnostic.providerRequestId }),
-            ...(diagnostic.providerStage === undefined
-              ? {}
-              : { providerStage: diagnostic.providerStage }),
-            ...(safeError.upstreamStatus === undefined
-              ? {}
-              : { upstreamStatus: safeError.upstreamStatus }),
-            stackFrames: sanitizeStackFrames(error),
-          },
-          'API request failed',
-        );
-      }
+    if (safeError.statusCode >= 500) {
+      const diagnostic = translation.diagnostic;
+      request.log.error(
+        {
+          requestId: request.id,
+          method: request.method,
+          route: request.routeOptions.url,
+          elapsedMs: Math.round(reply.elapsedTime),
+          statusCode: safeError.statusCode,
+          code: safeError.code,
+          errorClass: diagnostic.errorClass,
+          ...(diagnostic.reason === undefined ? {} : { reason: diagnostic.reason }),
+          ...(diagnostic.providerId === undefined ? {} : { providerId: diagnostic.providerId }),
+          ...(diagnostic.providerRequestId === undefined
+            ? {}
+            : { providerRequestId: diagnostic.providerRequestId }),
+          ...(diagnostic.providerStage === undefined
+            ? {}
+            : { providerStage: diagnostic.providerStage }),
+          ...(safeError.upstreamStatus === undefined
+            ? {}
+            : { upstreamStatus: safeError.upstreamStatus }),
+          stackFrames: sanitizeStackFrames(error),
+        },
+        'API request failed',
+      );
+    }
 
-      await reply
-        .status(safeError.statusCode)
-        .send(errorBody(safeError.code, safeError.message, safeError.upstreamStatus));
-    },
-  );
+    reply
+      .status(safeError.statusCode)
+      .send(errorBody(safeError.code, safeError.message, safeError.upstreamStatus));
+  });
 };

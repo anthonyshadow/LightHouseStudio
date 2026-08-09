@@ -147,8 +147,8 @@ retention, and provider-contact contract.
 
 ## Requirements
 
-- Node `>=24 <25` (`.nvmrc` pins the repository default)
-- pnpm `>=11.18 <12`
+- Bun `1.3.14` (`.bun-version` and `packageManager` pin the repository runtime and package manager)
+- Node `>=24 <25` (`.nvmrc` pins the retained Vitest, Vite, Playwright, Storybook, and package-build tooling runtime)
 - A current secure-context browser with `getUserMedia`, `MediaRecorder`, and WebCodecs H.264
   decode/encode support
 - A camera and microphone for physical capture
@@ -161,10 +161,9 @@ Desktop Chromium is the baseline for the fullest codec and remux support. Consul
 
 ```bash
 nvm use
-corepack enable
-pnpm install
+bun install
 cp .env.example .env
-pnpm dev
+bun run dev
 ```
 
 Open <http://127.0.0.1:4173> for the entry or <http://127.0.0.1:4173/studio> for a direct Studio
@@ -177,8 +176,8 @@ the fully local path.
 For the production-mode loopback smoke:
 
 ```bash
-pnpm build
-NODE_ENV=production pnpm start
+bun run build
+NODE_ENV=production bun run start
 ```
 
 Open <http://127.0.0.1:4100>. Production startup fails when `apps/web/dist` is absent.
@@ -188,7 +187,9 @@ values before a production-mode loopback smoke.
 ## Configuration
 
 All credentials are read by `apps/api`; never place secrets in `VITE_*` variables. `.env.example`
-is the maintained list of defaults and tunables.
+is the maintained list of defaults and tunables. Repository `bunfig.toml` disables Bun's automatic
+`.env` loading so API startup can continue to load only the repository-root `.env` through the
+validated app-owned configuration path.
 
 | Variable                                                                                  | Purpose                                                                                                                                                   |
 | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -222,32 +223,40 @@ quota. Missing optional configuration disables only the corresponding feature.
 
 ## Commands
 
-| Command                                                                                  | Purpose                                                                |
-| ---------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `pnpm dev`                                                                               | Build shared packages and run API/web watchers                         |
-| `pnpm auth:hash-password`                                                                | Interactively generate an Argon2id demo password hash                  |
-| `pnpm build`                                                                             | Build all workspaces                                                   |
-| `pnpm quality`                                                                           | Type, Storybook, lint, format, dead-code, module, unit, and build gate |
-| `pnpm --dir apps/api db:check`                                                           | Validate Drizzle migration history                                     |
-| `pnpm --dir apps/api db:migrate`                                                         | Apply reviewed migrations to `DATABASE_URL`                            |
-| `pnpm --dir apps/api db:backfill-local`                                                  | Dry-run local video/voice/reference inventory                          |
-| `pnpm --dir apps/api db:backfill-local -- --apply`                                       | Idempotently backfill configured Neon/R2, retaining local rollback     |
-| `pnpm test`                                                                              | Essential non-visual unit and API integration suite                    |
-| `pnpm test:unit`                                                                         | Focused domain, contract, web, component, and controller tests         |
-| `pnpm test:integration`                                                                  | Focused API/provider, Vite, and repository utility tests               |
-| `pnpm test:coverage`                                                                     | Coverage gate                                                          |
-| `pnpm test:e2e`                                                                          | Functional Playwright journeys                                         |
-| `pnpm test:production`                                                                   | Built Fastify static-serving smoke; run build first                    |
-| `pnpm test:visual`                                                                       | Explicit curated visual regression suite                               |
-| `pnpm test:all`                                                                          | All automated test categories, including visual regression             |
-| `pnpm audit:all`                                                                         | Complete dependency audit                                              |
-| `pnpm audit:prod`                                                                        | Production dependency audit                                            |
-| `pnpm check:dead-code:production`                                                        | Production files and dependency reachability                           |
-| `pnpm storybook`                                                                         | Local component catalog on port 6006                                   |
-| `pnpm recording:memory:estimate --duration-seconds 300 --main-mib-per-minute <measured>` | Estimate recording memory from measured output                         |
+| Command                                                                                     | Purpose                                                                |
+| ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
+| `bun run dev`                                                                               | Build shared packages and run API/web watchers                         |
+| `bun run auth:hash-password`                                                                | Interactively generate an Argon2id demo password hash                  |
+| `bun run build`                                                                             | Build all workspaces                                                   |
+| `bun run quality`                                                                           | Type, Storybook, lint, format, dead-code, module, unit, and build gate |
+| `bun run --filter @studio/api db:check`                                                     | Validate Drizzle migration history                                     |
+| `bun run --filter @studio/api db:migrate`                                                   | Apply reviewed migrations to `DATABASE_URL`                            |
+| `bun run --filter @studio/api db:backfill-local`                                            | Dry-run local video/voice/reference inventory                          |
+| `bun run --filter @studio/api db:backfill-local -- --apply`                                 | Idempotently backfill configured Neon/R2, retaining local rollback     |
+| `bun run test`                                                                              | Essential non-visual unit and API integration suite                    |
+| `bun run test:unit`                                                                         | Focused domain, contract, web, component, and controller tests         |
+| `bun run test:integration`                                                                  | Focused API/provider, Vite, and repository utility tests               |
+| `bun run test:coverage`                                                                     | Coverage gate                                                          |
+| `bun run test:e2e`                                                                          | Functional Playwright journeys                                         |
+| `bun run test:production`                                                                   | Built Elysia static-serving smoke; run build first                     |
+| `bun run test:visual`                                                                       | Explicit curated visual regression suite                               |
+| `bun run test:all`                                                                          | All automated test categories, including visual regression             |
+| `bun run audit:all`                                                                         | Full-graph audit with the documented Drizzle CLI advisory exception    |
+| `bun run audit:prod`                                                                        | High-severity audit of the complete dependency graph                   |
+| `bun run check:dead-code:production`                                                        | Production files and dependency reachability                           |
+| `bun run storybook`                                                                         | Local component catalog on port 6006                                   |
+| `bun run recording:memory:estimate --duration-seconds 300 --main-mib-per-minute <measured>` | Estimate recording memory from measured output                         |
 
-Install Playwright browsers once with `pnpm exec playwright install`. Default tests use synthetic
+Install Playwright browsers once with `bunx playwright install`. `bun run` intentionally launches
+the retained Node-backed Vitest, Vite, Playwright, Storybook, and tsup executables; do not replace
+the Vitest suite with Bun's separate `bun test` runner. Default tests use synthetic
 media and deny unexpected external HTTP and WebSockets; they never make paid/live provider calls.
+Pinned Bun `1.3.14` does not expose a production-only audit filter, so the retained `audit:prod`
+script honestly applies the high-severity gate to the complete lock graph; `audit:all` reports every
+severity except GHSA-67mh-4wv8-2f99. That moderate esbuild advisory is confined to Drizzle CLI's
+non-served TypeScript configuration-transform loader; the path calls esbuild transform APIs and
+never starts the affected development server. The unignored high gate still blocks any severity
+increase or other high advisory.
 Curated visual regression and broad screenshot capture are not part of the default test or
 ordinary push/pull-request CI workflows. See the [testing strategy](docs/TESTING.md) for layer
 ownership, focused commands, CI behavior, and safe baseline updates.
@@ -255,19 +264,19 @@ ownership, focused commands, CI behavior, and safe baseline updates.
 Normal implementation gate:
 
 ```bash
-pnpm quality
+bun run quality
 ```
 
 Exact-candidate release gate:
 
 ```bash
-pnpm quality
-pnpm test:coverage
-pnpm test:e2e
-pnpm test:production
-pnpm test:visual
-pnpm audit:prod
-pnpm audit:all
+bun run quality
+bun run test:coverage
+bun run test:e2e
+bun run test:production
+bun run test:visual
+bun run audit:prod
+bun run audit:all
 ```
 
 Review the visual baseline inventory for every changed Darwin/Linux image. The exact-candidate
@@ -293,7 +302,7 @@ apps/web presentation
 packages/domain     packages/contracts
 pure policy         runtime HTTP schemas
                          │
-                  apps/api Fastify broker
+                   apps/api Elysia broker
                     │              │
           auth + ownership    local asset store
                     │              │

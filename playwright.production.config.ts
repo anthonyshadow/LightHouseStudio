@@ -17,7 +17,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   webServer: {
-    command: `NODE_ENV=production PORT=${productionPort} AUTH_JWT_SECRET=lightframe-production-smoke-signing-key-2026-only DEMO_AUTH_PREFILL=false DEMO_USER_PASSWORD=lightframe-demo DEMO_USER_PASSWORD_HASH='${productionSmokePasswordHash}' pnpm start`,
+    command: `NODE_ENV=production PORT=${productionPort} AUTH_JWT_SECRET=lightframe-production-smoke-signing-key-2026-only DEMO_AUTH_PREFILL=false DEMO_USER_PASSWORD=lightframe-demo DEMO_USER_PASSWORD_HASH='${productionSmokePasswordHash}' bun run start`,
     url: `${baseURL}/api/health`,
     reuseExistingServer: false,
     timeout: 120_000,

@@ -1,6 +1,11 @@
 import { and, eq, inArray } from 'drizzle-orm';
 import { toIsoTimestamp } from '../../application/timestamps.js';
-import type { AssetLifecycleRegistry, StoredAssetLocation } from '../../storage/asset-lifecycle.js';
+import type {
+  AssetDeletionClaim,
+  AssetLifecycleRegistry,
+  AssetStorageProvider,
+  StoredAssetLocation,
+} from '../../storage/asset-lifecycle.js';
 import type { StoredAssetManifest } from '../../storage/asset-byte-store.js';
 import type { LightframeDatabase } from './client.js';
 import { mediaAssets } from './schema.js';
@@ -77,26 +82,46 @@ export class DrizzleAssetLifecycleRegistry implements AssetLifecycleRegistry {
         };
   }
 
-  async markDeleting(ownerUserId: string, assetId: string): Promise<boolean> {
-    const rows = await this.db
+  async claimDeletion(
+    ownerUserId: string,
+    assetId: string,
+    expectedProvider: AssetStorageProvider,
+  ): Promise<AssetDeletionClaim | null> {
+    const [row] = await this.db
       .update(mediaAssets)
       .set({ status: 'deleting', updatedAt: new Date().toISOString() })
       .where(
         and(
           eq(mediaAssets.id, assetId),
           eq(mediaAssets.ownerUserId, ownerUserId),
+          eq(mediaAssets.storageProvider, expectedProvider),
           inArray(mediaAssets.status, ['ready', 'deleting']),
         ),
       )
-      .returning({ id: mediaAssets.id });
-    return rows.length === 1;
+      .returning({
+        provider: mediaAssets.storageProvider,
+        storageKey: mediaAssets.storageKey,
+      });
+    return row ?? null;
   }
 
-  async markDeleted(ownerUserId: string, assetId: string): Promise<void> {
+  async markDeleted(
+    ownerUserId: string,
+    assetId: string,
+    claim: AssetDeletionClaim,
+  ): Promise<void> {
     const now = new Date().toISOString();
     await this.db
       .update(mediaAssets)
       .set({ status: 'deleted', deletedAt: now, updatedAt: now })
-      .where(and(eq(mediaAssets.id, assetId), eq(mediaAssets.ownerUserId, ownerUserId)));
+      .where(
+        and(
+          eq(mediaAssets.id, assetId),
+          eq(mediaAssets.ownerUserId, ownerUserId),
+          eq(mediaAssets.storageProvider, claim.provider),
+          eq(mediaAssets.storageKey, claim.storageKey),
+          eq(mediaAssets.status, 'deleting'),
+        ),
+      );
   }
 }

@@ -1,21 +1,10 @@
-import type { AuthenticatedUser, EntitlementSnapshot } from '@studio/contracts';
 import { createPhaseOneEntitlements } from '@studio/domain';
-import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { ApplicationRuntime, HttpRequest } from '../application/application-runtime.js';
 import type { RuntimeConfig } from '../config/environment.js';
 import type { AuthService } from '../features/auth/auth-service.js';
 import { createHash } from 'node:crypto';
 import { AppError } from './errors.js';
 import { requireTrustedOrigin } from './security.js';
-
-declare module 'fastify' {
-  interface FastifyRequest {
-    auth: {
-      readonly user: AuthenticatedUser;
-      readonly entitlements: EntitlementSnapshot;
-      readonly expiresAt: string;
-    } | null;
-  }
-}
 
 const PUBLIC_API_ROUTES = new Set([
   'GET /api/health',
@@ -26,7 +15,7 @@ const PUBLIC_API_ROUTES = new Set([
 
 const isMutation = (method: string): boolean => !['GET', 'HEAD', 'OPTIONS'].includes(method);
 
-const testOwnerUserId = (request: FastifyRequest): string => {
+const testOwnerUserId = (request: HttpRequest): string => {
   const digest = createHash('sha256')
     .update(typeof request.headers.host === 'string' ? request.headers.host.toLowerCase() : 'test')
     .digest('hex');
@@ -34,12 +23,12 @@ const testOwnerUserId = (request: FastifyRequest): string => {
 };
 
 export const installAuthentication = (
-  app: FastifyInstance,
+  app: ApplicationRuntime,
   authService: AuthService,
   config: RuntimeConfig,
 ): void => {
   app.decorateRequest('auth', null);
-  app.addHook('onRequest', async (request: FastifyRequest, reply) => {
+  app.addHook('onRequest', async (request: HttpRequest, reply) => {
     if (!request.url.startsWith('/api/')) return;
     if (config.nodeEnv === 'test' && !config.demoAuthEnabled) {
       const now = new Date();
@@ -87,7 +76,7 @@ export const installAuthentication = (
   });
 };
 
-export const ownerUserIdForRequest = (request: FastifyRequest): string => {
+export const ownerUserIdForRequest = (request: HttpRequest): string => {
   if (request.auth == null) {
     throw new AppError(401, 'authentication_required', 'Log in to continue.');
   }

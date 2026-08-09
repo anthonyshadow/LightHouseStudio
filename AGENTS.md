@@ -94,7 +94,7 @@ Use the smallest set that proves the affected contract:
   repository tests; never migrate production automatically;
 - cross-package changes or high-risk executable/configuration changes to
   authentication, security, persistence, dependencies, tooling, or build:
-  `pnpm quality`; and
+  `bun run quality`; and
 - release candidate: the full process in `README.md` and `docs/TESTING.md`.
 
 CI remains the merge safety net. Never contact paid/live providers during
