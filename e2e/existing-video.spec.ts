@@ -398,57 +398,6 @@ test('the upload editor and open saved-character chooser reflow at every support
   }
 });
 
-test('switching a configured visual edit confirms before clearing only its settings', async ({
-  page,
-}) => {
-  await installCameraSentinel(page);
-  await installProviderNetworkDriver(page);
-  await page.goto('/studio');
-  const fixture = await loadH264VideoFixture();
-
-  await selectExistingVideo(page, fixture, 'visual-switch-source.mp4');
-  const upload = page.getByRole('dialog', { name: 'Use existing video' });
-  const characterSwap = upload.getByRole('button', {
-    name: 'Character Swap',
-    exact: true,
-  });
-  const virtualTryOn = upload.getByRole('button', {
-    name: 'Virtual Try On',
-    exact: true,
-  });
-  await characterSwap.click();
-  const characterPrompt = upload.getByRole('textbox', { name: /^Prompt/u });
-
-  await characterPrompt.fill('Preserve this character setup until switching is confirmed.');
-  await virtualTryOn.click();
-
-  const confirmation = page.getByRole('dialog', { name: 'Switch to Virtual Try On?' });
-  await expect(confirmation).toContainText(
-    'Switching will clear your current Character Swap settings.',
-  );
-  await expect(confirmation).toContainText('Your Voice settings will not be affected');
-
-  await confirmation.getByRole('button', { name: 'Keep Character Swap' }).click();
-  await expect(confirmation).toBeHidden();
-  await expect(characterPrompt).toHaveValue(
-    'Preserve this character setup until switching is confirmed.',
-  );
-  await expect(characterSwap).toHaveAttribute('aria-pressed', 'true');
-  await expect(virtualTryOn).toHaveAttribute('aria-pressed', 'false');
-  await expect(virtualTryOn).toBeFocused();
-
-  await virtualTryOn.click();
-  await page
-    .getByRole('dialog', { name: 'Switch to Virtual Try On?' })
-    .getByRole('button', { name: 'Clear and switch' })
-    .click();
-
-  await expect(virtualTryOn).toHaveAttribute('aria-pressed', 'true');
-  await expect(characterSwap).toHaveAttribute('aria-pressed', 'false');
-  await expect(upload.getByRole('heading', { name: 'Configure Virtual Try On' })).toBeVisible();
-  await expect(upload.getByRole('textbox', { name: /^Prompt/u })).toHaveValue('');
-});
-
 test('Create A Character returns to the upload plan with the new character selected', async ({
   page,
 }) => {

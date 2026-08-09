@@ -42,6 +42,14 @@ export const pollVideoJobStatus = ({
   if (signal.aborted) return Promise.reject(abortError(signal));
 
   const seededStatus = initialStatus?.jobId === jobId ? initialStatus : undefined;
+  if (seededStatus && isTerminalVideoJobStatus(seededStatus)) {
+    try {
+      onStatus(seededStatus);
+      return Promise.resolve(seededStatus);
+    } catch (error) {
+      return Promise.reject(normalizedError(error));
+    }
+  }
   const queryKey = videoJobQueryKeys.status(jobId);
   const observer = new QueryObserver<
     VideoJobStatusResponse,

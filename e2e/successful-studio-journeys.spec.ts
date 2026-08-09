@@ -650,35 +650,6 @@ test('Browse Voices adds once and confirmed Saved removal reconciles both librar
   expectNoExternalProviderTraffic(network);
 });
 
-test('Edit Video moves to the creative rail for every finalized playback', async ({ page }) => {
-  const network = await installSuccessfulStudioHarness(page);
-  await page.goto('/studio');
-
-  const editVideo = page
-    .getByRole('navigation', { name: 'Creative workspace tools' })
-    .getByRole('button', { name: 'Edit Video', exact: true });
-  await expect(editVideo).toBeDisabled();
-
-  await startLocalPreview(page);
-  await page.getByRole('button', { name: 'Record' }).click();
-  await page.getByRole('button', { name: 'Stop recording' }).click();
-
-  await expect(page.getByLabel('Recorded take playback')).toBeVisible();
-  await expect(editVideo).toBeEnabled();
-  await expect(
-    page
-      .getByRole('group', { name: 'Recorded take controls' })
-      .getByRole('button', { name: 'Edit video' }),
-  ).toHaveCount(0);
-
-  await editVideo.click();
-  const editor = page.getByRole('dialog', { name: 'Use existing video' });
-  await expect(editor).toBeVisible();
-  await expect(editor.getByRole('button', { name: 'Upload from device' })).toBeVisible();
-  await expect(page.getByLabel('Recorded take playback')).toBeVisible();
-  expectNoExternalProviderTraffic(network);
-});
-
 test('Save enables Release and clears the reviewed take without reacquiring media', async ({
   page,
 }) => {

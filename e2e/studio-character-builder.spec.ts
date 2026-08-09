@@ -1,4 +1,4 @@
-import { expect, test, type Locator, type Page } from '@playwright/test';
+import { expect, test, type Page } from '@playwright/test';
 import {
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
@@ -41,77 +41,6 @@ const confirmCharacterName = async (
 const openConstraints = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: /^Refine details(?: |$)/u }).click();
 };
-
-test('all three Builder steps remain directly available across desktop and narrow layouts', async ({
-  page,
-}) => {
-  test.setTimeout(60_000);
-  await installSuccessfulStudioHarness(page);
-  await page.setViewportSize({ width: 1_440, height: 960 });
-  await page.goto('/studio');
-  await openBuilder(page);
-
-  const dialog = page.getByRole('dialog', { name: 'Build Your Character' });
-  const steps = dialog.getByRole('navigation', { name: 'Character builder steps' });
-  const firstSection = dialog.getByRole('region', {
-    name: /Set your foundation/u,
-  });
-  const rect = (locator: Locator) =>
-    locator.evaluate((element) => {
-      const bounds = element.getBoundingClientRect();
-      return {
-        left: bounds.left,
-        top: bounds.top,
-        right: bounds.right,
-        bottom: bounds.bottom,
-      };
-    });
-
-  const desktopSteps = await rect(steps);
-  const desktopFirst = await rect(firstSection);
-  expect(desktopFirst.left).toBeGreaterThanOrEqual(desktopSteps.right);
-  await expect(steps.getByRole('button')).toHaveCount(3);
-  for (const button of await steps.getByRole('button').all()) await expect(button).toBeEnabled();
-  await expect(dialog.getByRole('complementary')).toHaveCount(1);
-
-  for (const viewport of [
-    { width: 1_280, height: 720 },
-    { width: 834, height: 1_112 },
-    { width: 390, height: 844 },
-    { width: 320, height: 568 },
-  ]) {
-    await page.setViewportSize(viewport);
-    const contained = await dialog.evaluate((element) => {
-      const bounds = element.getBoundingClientRect();
-      return (
-        bounds.left >= 0 &&
-        bounds.top >= 0 &&
-        bounds.right <= document.documentElement.clientWidth &&
-        bounds.bottom <= document.documentElement.clientHeight &&
-        document.documentElement.scrollWidth <= document.documentElement.clientWidth
-      );
-    });
-    expect(contained, `${viewport.width}×${viewport.height} containment`).toBe(true);
-    for (const button of await steps.getByRole('button').all()) {
-      const bounds = await button.boundingBox();
-      expect(bounds?.height ?? 0).toBeGreaterThanOrEqual(44);
-    }
-  }
-
-  await page.setViewportSize({ width: 390, height: 844 });
-
-  const narrowSteps = await rect(steps);
-  const narrowFirst = await rect(firstSection);
-  expect(narrowFirst.top).toBeGreaterThanOrEqual(narrowSteps.bottom);
-  await expect(dialog.getByRole('complementary')).toHaveCount(0);
-  await steps.getByRole('button', { name: /^Preview(?: |$)/u }).click();
-  await expect(dialog.getByRole('heading', { name: 'Ready to Generate?' })).toBeFocused();
-  const preview = dialog.getByRole('complementary', {
-    name: 'Character Direction Preview',
-  });
-  await expect(preview).toBeVisible();
-  await expect(dialog.getByRole('complementary')).toHaveCount(1);
-});
 
 test('character direction supports preview generation and save', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);

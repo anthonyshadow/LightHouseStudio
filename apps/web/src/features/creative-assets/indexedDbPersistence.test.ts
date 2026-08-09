@@ -53,12 +53,26 @@ describe('IndexedDB creative-asset persistence', () => {
   it('commits per-record changes atomically and rejects a stale revision', async () => {
     const name = databaseName();
     const persistence = createIndexedDbCreativeAssetPersistence(name);
-    const original = storeWithPrompt('prompt-1', 'Original');
+    const original = createSavedPrompt(
+      storeWithPrompt('prompt-a', 'Original'),
+      {
+        title: 'Newer',
+        prompt: 'Newer prompt',
+        modelModeId: 'lucy-latest',
+        source: 'manual',
+      },
+      { now: '2026-08-09T12:01:00.000Z', createId: () => 'prompt-z' },
+    );
     const revision = await persistence.initialize('owner-1', original);
 
     await expect(persistence.load('owner-1')).resolves.toMatchObject({
       revision,
-      store: { savedPrompts: [{ id: 'prompt-1', title: 'Original' }] },
+      store: {
+        savedPrompts: [
+          { id: 'prompt-z', title: 'Newer' },
+          { id: 'prompt-a', title: 'Original' },
+        ],
+      },
     });
 
     const next = storeWithPrompt('prompt-2', 'Replacement');

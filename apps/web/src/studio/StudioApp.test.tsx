@@ -325,6 +325,30 @@ vi.mock('../features/existing-video/ExistingVideoPanel', () => ({
   ),
 }));
 
+vi.mock('../features/creative-assets/OutfitSelector', () => ({
+  OutfitSelector: ({ onCreate }: { onCreate: () => void }) => (
+    <div>
+      Deferred outfit selector
+      <button type="button" onClick={onCreate}>
+        Create deferred outfit
+      </button>
+    </div>
+  ),
+}));
+
+vi.mock('../features/creative-assets/OutfitBuilder', () => ({
+  OutfitBuilder: () => <div>Deferred outfit builder</div>,
+}));
+
+vi.mock('../features/account-library/SavedCreativeLibrary', () => ({
+  SavedCharacterLibrary: () => <div>Deferred saved characters</div>,
+  SavedOutfitLibrary: () => <div>Deferred saved outfits</div>,
+}));
+
+vi.mock('../features/video-gallery/VideoGallery', () => ({
+  VideoGallery: () => <div>Deferred saved videos</div>,
+}));
+
 vi.mock('../features/existing-video/useExistingVideoWorkflow', () => ({
   useExistingVideoWorkflow: () => harness.existingVideo,
 }));
@@ -379,12 +403,61 @@ vi.mock('./useTakeReviewFlow', () => ({
 }));
 
 vi.mock('./StudioHeader', () => ({
-  StudioHeader: () => <div>Studio header</div>,
+  StudioHeader: ({
+    onOpenVideos,
+    onOpenCharacters,
+    onOpenOutfits,
+  }: {
+    onOpenVideos: () => void;
+    onOpenCharacters: () => void;
+    onOpenOutfits: () => void;
+  }) => (
+    <div>
+      Studio header
+      <button type="button" onClick={onOpenVideos}>
+        Open saved videos
+      </button>
+      <button type="button" onClick={onOpenCharacters}>
+        Open saved characters
+      </button>
+      <button type="button" onClick={onOpenOutfits}>
+        Open saved outfits
+      </button>
+    </div>
+  ),
 }));
 
 vi.mock('../ui', async () => {
+  const { useEffect, useRef } = await import('react');
   const { StudioDesignProvider } = await import('../ui/StudioDesignProvider');
   const { Button } = await import('../ui/primitives/Button');
+  const OverlayPanel = ({
+    open,
+    title,
+    children,
+    footer,
+    onClose,
+  }: PropsWithChildren<{
+    open: boolean;
+    title: string;
+    footer?: ReactNode;
+    onClose: () => void;
+  }>) => {
+    const panelRef = useRef<HTMLElement>(null);
+    useEffect(() => {
+      if (open) panelRef.current?.focus();
+    }, [open]);
+
+    return open ? (
+      <section ref={panelRef} aria-label={title} tabIndex={-1}>
+        {children}
+        {footer}
+        <button type="button" onClick={onClose}>
+          Close {title}
+        </button>
+      </section>
+    ) : null;
+  };
   return {
     StudioDesignProvider,
     Button,
@@ -404,18 +477,7 @@ vi.mock('../ui', async () => {
     ),
     ConfirmationDialog: ({ open }: { open: boolean }) =>
       open ? <section aria-label="Discard temporary work and leave?" /> : null,
-    OverlayPanel: ({
-      open,
-      title,
-      children,
-      footer,
-    }: PropsWithChildren<{ open: boolean; title: string; footer?: ReactNode }>) =>
-      open ? (
-        <section aria-label={title}>
-          {children}
-          {footer}
-        </section>
-      ) : null,
+    OverlayPanel,
   };
 });
 
@@ -440,6 +502,9 @@ vi.mock('./CreativeWorkspace', () => ({
         </button>
         <button type="button" onClick={props.actions.onOpenCharacter}>
           Open character options
+        </button>
+        <button type="button" onClick={props.actions.onOpenOutfit}>
+          Open outfit options
         </button>
         <button type="button" onClick={() => props.actions.onShelfDirtyChange(true)}>
           Mark shelf dirty
@@ -504,7 +569,7 @@ const renderStudio = (initialIntent?: 'upload') =>
           router={createMemoryRouter(
             [
               {
-                path: '/studio',
+                path: '/studio/*',
                 element: <StudioApp {...(initialIntent ? { initialIntent } : {})} />,
               },
             ],
@@ -545,7 +610,7 @@ describe('StudioApp composition lifecycle', () => {
     harness.resetSavedVideo.mockClear();
   });
 
-  it('keeps the mounted stage node stable while overlays change', () => {
+  it('keeps the mounted stage node stable while overlays and deferred tools change', async () => {
     renderStudio();
     const stage = screen.getByTestId('media-stage');
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
@@ -559,15 +624,45 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.getByTestId('creative-panel')).toHaveTextContent('shelf');
     expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Upload Video' }));
+    const existingVideoPanel = screen.getByRole('region', { name: 'Use existing video' });
+    expect(existingVideoPanel).toHaveFocus();
+    expect(screen.getByTestId('media-stage')).toBe(stage);
+    expect(harness.session.startLocal).not.toHaveBeenCalled();
+    await screen.findByRole('button', { name: 'Record a local video' });
+    expect(existingVideoPanel).toHaveFocus();
+    expect(screen.getByTestId('media-stage')).toBe(stage);
+    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open saved videos' }));
+    await screen.findByText('Deferred saved videos');
+    expect(screen.getByTestId('media-stage')).toBe(stage);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open saved characters' }));
+    await screen.findByText('Deferred saved characters');
+    expect(screen.getByTestId('media-stage')).toBe(stage);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open saved outfits' }));
+    await screen.findByText('Deferred saved outfits');
+    expect(screen.getByTestId('media-stage')).toBe(stage);
+    fireEvent.click(screen.getByRole('button', { name: 'Close Saved Outfits' }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open outfit options' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Create deferred outfit' }));
+    await screen.findByText('Deferred outfit builder');
+    expect(screen.getByTestId('media-stage')).toBe(stage);
+    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
+    expect(harness.session.startLocal).not.toHaveBeenCalled();
   });
 
-  it('closes Use existing video and hands local recording to the persistent stage', () => {
+  it('closes Use existing video and hands local recording to the persistent stage', async () => {
     renderStudio('upload');
     const stage = screen.getByTestId('media-stage');
 
     expect(screen.getByRole('region', { name: 'Use existing video' })).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Record a local video' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Record a local video' }));
 
     expect(screen.queryByRole('region', { name: 'Use existing video' })).not.toBeInTheDocument();
     expect(harness.session.startLocal).toHaveBeenCalledOnce();
@@ -583,7 +678,7 @@ describe('StudioApp composition lifecycle', () => {
     });
     renderStudio('upload');
 
-    fireEvent.click(screen.getByRole('button', { name: 'Record a local video' }));
+    fireEvent.click(await screen.findByRole('button', { name: 'Record a local video' }));
 
     await waitFor(() => expect(harness.existingVideo.adoptRecordedArtifact).toHaveBeenCalledOnce());
     await waitFor(() =>

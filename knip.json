@@ -30,7 +30,7 @@
     },
     "apps/web": {
       "entry": ["src/main.tsx!", "src/**/*.test.{ts,tsx}"],
-      "project": ["src/**/*.{ts,tsx}!", "vite.config{,.test}.ts"],
+      "project": ["src/**/*.{ts,tsx}!", "!src/test/**!", "vite.config{,.test}.ts"],
       "ignoreExportsUsedInFile": true
     },
     "packages/contracts": {
