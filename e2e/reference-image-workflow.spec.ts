@@ -101,6 +101,7 @@ test('optimized reference hydrates its stored Lucy prompt atomically and survive
       enhance: true,
     },
   ]);
+  await expect.poll(async () => (await readCreativeAssetStore(page))?.recentPrompts.length).toBe(2);
 
   await page.reload();
   await page.getByRole('button', { name: 'Shelf', exact: true }).click();

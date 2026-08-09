@@ -191,6 +191,7 @@ class IndexedDbCreativeAssetPersistence implements CreativeAssetPersistence {
 
   async load(ownerUserId: string): Promise<PersistedCreativeAssetSnapshot | null> {
     const database = await this.getDatabase();
+    const ownerTimestampRange = IDBKeyRange.bound([ownerUserId, ''], [ownerUserId, '\uffff']);
     const transaction = database.transaction(
       [
         SAVED_PROMPTS_STORE,
@@ -206,20 +207,20 @@ class IndexedDbCreativeAssetPersistence implements CreativeAssetPersistence {
       .get([ownerUserId, REPOSITORY_METADATA_KEY]);
     const savedPromptsRequest = transaction
       .objectStore(SAVED_PROMPTS_STORE)
-      .index('byOwner')
-      .getAll(ownerUserId);
+      .index('byOwnerUpdatedAt')
+      .getAll(ownerTimestampRange);
     const recentPromptsRequest = transaction
       .objectStore(RECENT_PROMPTS_STORE)
-      .index('byOwner')
-      .getAll(ownerUserId);
+      .index('byOwnerUsedAt')
+      .getAll(ownerTimestampRange);
     const charactersRequest = transaction
       .objectStore(CHARACTERS_STORE)
-      .index('byOwner')
-      .getAll(ownerUserId);
+      .index('byOwnerUpdatedAt')
+      .getAll(ownerTimestampRange);
     const variantsRequest = transaction
       .objectStore(CHARACTER_VARIANTS_STORE)
-      .index('byOwner')
-      .getAll(ownerUserId);
+      .index('byOwnerUpdatedAt')
+      .getAll(ownerTimestampRange);
     const [metadata, savedPrompts, recentPrompts, savedCharacterPrompts, savedCharacterVariants] =
       await Promise.all([
         metadataRequest,
@@ -234,10 +235,10 @@ class IndexedDbCreativeAssetPersistence implements CreativeAssetPersistence {
       revision: metadata.revision,
       store: {
         schemaVersion: metadata.schemaVersion,
-        savedPrompts: savedPrompts.map(stripOwner),
-        recentPrompts: recentPrompts.map(stripOwner),
-        savedCharacterPrompts: savedCharacterPrompts.map(stripOwner),
-        savedCharacterVariants: savedCharacterVariants.map(stripOwner),
+        savedPrompts: savedPrompts.reverse().map(stripOwner),
+        recentPrompts: recentPrompts.reverse().map(stripOwner),
+        savedCharacterPrompts: savedCharacterPrompts.reverse().map(stripOwner),
+        savedCharacterVariants: savedCharacterVariants.reverse().map(stripOwner),
       },
     };
   }

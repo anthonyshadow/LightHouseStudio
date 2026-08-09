@@ -42,9 +42,6 @@ import type {
   SavedPrompt,
 } from '../features/creative-assets/types';
 import { useCreativeAssetSelector } from '../features/creative-assets/useCreativeAssetRepository';
-import { OutfitBuilder } from '../features/creative-assets/OutfitBuilder';
-import { OutfitSelector } from '../features/creative-assets/OutfitSelector';
-import { ExistingVideoPanel } from '../features/existing-video/ExistingVideoPanel';
 import type { ExistingVideoSavedRecipe } from '../features/existing-video/ExistingVideoRecipeChooser';
 import {
   savedCharacterStepInput,
@@ -105,11 +102,6 @@ import {
   type SavedVideoCharacterAttribution,
 } from '../features/saved-videos/useSaveVideo';
 import { SessionCleanupCoordinator } from '../orchestration/lifecycle/SessionCleanupCoordinator';
-import { VideoGallery } from '../features/video-gallery/VideoGallery';
-import {
-  SavedCharacterLibrary,
-  SavedOutfitLibrary,
-} from '../features/account-library/SavedCreativeLibrary';
 
 const CharacterBuilderCoordinator = lazy(() =>
   import('../features/character-builder/CharacterBuilderCoordinator').then((module) => ({
@@ -124,6 +116,36 @@ const ConfirmationDialog = lazy(() =>
 const CharacterWardrobePanel = lazy(() =>
   import('../features/character-wardrobe/CharacterWardrobePanel').then((module) => ({
     default: module.CharacterWardrobePanel,
+  })),
+);
+const ExistingVideoPanel = lazy(() =>
+  import('../features/existing-video/ExistingVideoPanel').then((module) => ({
+    default: module.ExistingVideoPanel,
+  })),
+);
+const OutfitBuilder = lazy(() =>
+  import('../features/creative-assets/OutfitBuilder').then((module) => ({
+    default: module.OutfitBuilder,
+  })),
+);
+const OutfitSelector = lazy(() =>
+  import('../features/creative-assets/OutfitSelector').then((module) => ({
+    default: module.OutfitSelector,
+  })),
+);
+const SavedCharacterLibrary = lazy(() =>
+  import('../features/account-library/SavedCreativeLibrary').then((module) => ({
+    default: module.SavedCharacterLibrary,
+  })),
+);
+const SavedOutfitLibrary = lazy(() =>
+  import('../features/account-library/SavedCreativeLibrary').then((module) => ({
+    default: module.SavedOutfitLibrary,
+  })),
+);
+const VideoGallery = lazy(() =>
+  import('../features/video-gallery/VideoGallery').then((module) => ({
+    default: module.VideoGallery,
   })),
 );
 const VideoEditWorkspace = lazy(() =>
@@ -1740,7 +1762,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           bodyMode="scroll"
           returnFocusRef={mainRef}
         >
-          {location.pathname === APP_PATHS.videos ? <VideoGallery onUse={useSavedVideo} /> : null}
+          {location.pathname === APP_PATHS.videos ? (
+            <Suspense fallback={deferredPanelFallback}>
+              <VideoGallery onUse={useSavedVideo} />
+            </Suspense>
+          ) : null}
         </OverlayPanel>
 
         <OverlayPanel
@@ -1778,30 +1804,32 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           returnFocusRef={mainRef}
         >
           {location.pathname === APP_PATHS.characters ? (
-            <SavedCharacterLibrary
-              items={repositoryStore.savedCharacterPrompts}
-              repository={repository}
-              onCreateFrom={(character) => {
-                void navigate(APP_PATHS.studio);
-                copyCharacter(character);
-              }}
-              onOpenWardrobe={(character) => {
-                void navigate(APP_PATHS.studio);
-                openWardrobe(character);
-              }}
-              onUse={(character) => {
-                applyRecipeSelection({
-                  origin: 'character-prompt',
-                  prompt: character.prompt,
-                  modelModeId: 'lucy-latest',
-                  assetId: character.id,
-                  characterName: character.name,
-                  referenceImageAssetId: character.referenceImageAssetId,
-                  ...(character.builderDraft ? { builderDraft: character.builderDraft } : {}),
-                });
-                void navigate(APP_PATHS.studio);
-              }}
-            />
+            <Suspense fallback={deferredPanelFallback}>
+              <SavedCharacterLibrary
+                items={repositoryStore.savedCharacterPrompts}
+                repository={repository}
+                onCreateFrom={(character) => {
+                  void navigate(APP_PATHS.studio);
+                  copyCharacter(character);
+                }}
+                onOpenWardrobe={(character) => {
+                  void navigate(APP_PATHS.studio);
+                  openWardrobe(character);
+                }}
+                onUse={(character) => {
+                  applyRecipeSelection({
+                    origin: 'character-prompt',
+                    prompt: character.prompt,
+                    modelModeId: 'lucy-latest',
+                    assetId: character.id,
+                    characterName: character.name,
+                    referenceImageAssetId: character.referenceImageAssetId,
+                    ...(character.builderDraft ? { builderDraft: character.builderDraft } : {}),
+                  });
+                  void navigate(APP_PATHS.studio);
+                }}
+              />
+            </Suspense>
           ) : null}
         </OverlayPanel>
 
@@ -1816,20 +1844,22 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           returnFocusRef={mainRef}
         >
           {location.pathname === APP_PATHS.outfits ? (
-            <SavedOutfitLibrary
-              items={repositoryStore.savedPrompts.filter(
-                (item) => item.modelModeId === 'lucy-vton-latest',
-              )}
-              repository={repository}
-              onCreate={() => {
-                void navigate(APP_PATHS.studio);
-                openNewOutfitBuilder(false, 'library');
-              }}
-              onUse={(outfit) => {
-                selectSavedOutfit(outfit);
-                void navigate(APP_PATHS.studio);
-              }}
-            />
+            <Suspense fallback={deferredPanelFallback}>
+              <SavedOutfitLibrary
+                items={repositoryStore.savedPrompts.filter(
+                  (item) => item.modelModeId === 'lucy-vton-latest',
+                )}
+                repository={repository}
+                onCreate={() => {
+                  void navigate(APP_PATHS.studio);
+                  openNewOutfitBuilder(false, 'library');
+                }}
+                onUse={(outfit) => {
+                  selectSavedOutfit(outfit);
+                  void navigate(APP_PATHS.studio);
+                }}
+              />
+            </Suspense>
           ) : null}
         </OverlayPanel>
 
@@ -1845,31 +1875,33 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           closeOnBackdrop={!existingVideo.selection}
           returnFocusRef={recording.presented ? editVideoToggleRef : uploadToggleRef}
         >
-          <ExistingVideoPanel
-            key={existingVideo.selection?.metadata.selectedAt ?? 'empty-existing-video'}
-            workflow={existingVideo}
-            videoProcessingAvailable={Boolean(
-              availability.videoProcessing?.characterSwap.available ||
-              availability.videoProcessing?.virtualTryOn.available,
-            )}
-            {...(availability.videoProcessing
-              ? { videoProcessingCapabilities: availability.videoProcessing }
-              : {})}
-            elevenLabsAvailable={availability.elevenLabs}
-            elevenLabsModel={availability.elevenLabsModel}
-            browserCapabilities={browser}
-            savedRecipes={existingVideoSavedRecipes}
-            onCreateCharacter={createCharacterForExistingVideo}
-            onCreateWardrobeVariant={openWardrobeForExistingVideo}
-            onFinish={finishExistingVideoSetup}
-            {...(recording.presented ? { onSaveVideo: requestSavePresentedVideo } : {})}
-            saveVideoState={savedVideoSave.state}
-            onAdjustVideo={openVideoAdjust}
-            recordingSupported={
-              browser.mediaRecorder && browser.mediaDevices && browser.secureContext
-            }
-            onRecordVideo={startExistingVideoRecording}
-          />
+          <Suspense fallback={deferredPanelFallback}>
+            <ExistingVideoPanel
+              key={existingVideo.selection?.metadata.selectedAt ?? 'empty-existing-video'}
+              workflow={existingVideo}
+              videoProcessingAvailable={Boolean(
+                availability.videoProcessing?.characterSwap.available ||
+                availability.videoProcessing?.virtualTryOn.available,
+              )}
+              {...(availability.videoProcessing
+                ? { videoProcessingCapabilities: availability.videoProcessing }
+                : {})}
+              elevenLabsAvailable={availability.elevenLabs}
+              elevenLabsModel={availability.elevenLabsModel}
+              browserCapabilities={browser}
+              savedRecipes={existingVideoSavedRecipes}
+              onCreateCharacter={createCharacterForExistingVideo}
+              onCreateWardrobeVariant={openWardrobeForExistingVideo}
+              onFinish={finishExistingVideoSetup}
+              {...(recording.presented ? { onSaveVideo: requestSavePresentedVideo } : {})}
+              saveVideoState={savedVideoSave.state}
+              onAdjustVideo={openVideoAdjust}
+              recordingSupported={
+                browser.mediaRecorder && browser.mediaDevices && browser.secureContext
+              }
+              onRecordVideo={startExistingVideoRecording}
+            />
+          </Suspense>
         </OverlayPanel>
 
         <OverlayPanel
@@ -1882,24 +1914,26 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           returnFocusRef={desktopStudioLayout ? outfitToggleRef : shelfToggleRef}
         >
           {activeOverlay === 'outfit-selector' ? (
-            <OutfitSelector
-              repository={repository}
-              activeOutfitLabel={
-                session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
-                  ? (activeRecipeLabel ?? 'Configured VTO')
-                  : undefined
-              }
-              onClear={unselectAi}
-              disabledReason={
-                recipeInsertionBlocked
-                  ? 'Release the active media session before selecting another outfit.'
-                  : characterBuilderOpenBlockedReason
-              }
-              onCreate={() => openNewOutfitBuilder(true, 'selector')}
-              onEdit={(outfit) => openOutfitEditor(outfit, false, 'selector')}
-              onSaveCopy={(outfit) => openOutfitEditor(outfit, true, 'selector')}
-              onSelect={applyRecipeSelection}
-            />
+            <Suspense fallback={deferredPanelFallback}>
+              <OutfitSelector
+                repository={repository}
+                activeOutfitLabel={
+                  session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
+                    ? (activeRecipeLabel ?? 'Configured VTO')
+                    : undefined
+                }
+                onClear={unselectAi}
+                disabledReason={
+                  recipeInsertionBlocked
+                    ? 'Release the active media session before selecting another outfit.'
+                    : characterBuilderOpenBlockedReason
+                }
+                onCreate={() => openNewOutfitBuilder(true, 'selector')}
+                onEdit={(outfit) => openOutfitEditor(outfit, false, 'selector')}
+                onSaveCopy={(outfit) => openOutfitEditor(outfit, true, 'selector')}
+                onSelect={applyRecipeSelection}
+              />
+            </Suspense>
           ) : null}
         </OverlayPanel>
 
@@ -1920,31 +1954,37 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           }
         >
           {activeOverlay === 'outfit-builder' ? (
-            <OutfitBuilder
-              key={`${outfitBuilderLaunch.outfit?.id ?? 'new'}:${outfitBuilderLaunch.saveAsCopy ? 'copy' : 'edit'}`}
-              repository={repository}
-              {...(outfitBuilderLaunch.outfit ? { initialOutfit: outfitBuilderLaunch.outfit } : {})}
-              saveAsCopy={outfitBuilderLaunch.saveAsCopy}
-              saveAndSelect={outfitBuilderLaunch.saveAndSelect}
-              disabledReason={characterBuilderOpenBlockedReason}
-              onDirtyChange={updateOutfitBuilderDirty}
-              onCancel={closeOutfitBuilder}
-              onSaved={(outfit) => {
-                if (outfitBuilderLaunch.saveAndSelect) {
-                  selectSavedOutfit(outfit);
-                  return;
-                }
-                updateOutfitBuilderDirty(false);
-                if (outfitBuilderLaunch.destination === 'library') {
-                  closeOverlay();
-                  void navigate(APP_PATHS.outfits);
-                  return;
-                }
-                openOverlay(
-                  outfitBuilderLaunch.destination === 'shelf' ? 'recipe-shelf' : 'outfit-selector',
-                );
-              }}
-            />
+            <Suspense fallback={deferredPanelFallback}>
+              <OutfitBuilder
+                key={`${outfitBuilderLaunch.outfit?.id ?? 'new'}:${outfitBuilderLaunch.saveAsCopy ? 'copy' : 'edit'}`}
+                repository={repository}
+                {...(outfitBuilderLaunch.outfit
+                  ? { initialOutfit: outfitBuilderLaunch.outfit }
+                  : {})}
+                saveAsCopy={outfitBuilderLaunch.saveAsCopy}
+                saveAndSelect={outfitBuilderLaunch.saveAndSelect}
+                disabledReason={characterBuilderOpenBlockedReason}
+                onDirtyChange={updateOutfitBuilderDirty}
+                onCancel={closeOutfitBuilder}
+                onSaved={(outfit) => {
+                  if (outfitBuilderLaunch.saveAndSelect) {
+                    selectSavedOutfit(outfit);
+                    return;
+                  }
+                  updateOutfitBuilderDirty(false);
+                  if (outfitBuilderLaunch.destination === 'library') {
+                    closeOverlay();
+                    void navigate(APP_PATHS.outfits);
+                    return;
+                  }
+                  openOverlay(
+                    outfitBuilderLaunch.destination === 'shelf'
+                      ? 'recipe-shelf'
+                      : 'outfit-selector',
+                  );
+                }}
+              />
+            </Suspense>
           ) : null}
         </OverlayPanel>
 

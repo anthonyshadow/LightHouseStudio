@@ -43,6 +43,17 @@ import {
 const isRecord = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
 
+const stableJson = (value: unknown): string | undefined =>
+  JSON.stringify(value, (_key, candidate: unknown) =>
+    isRecord(candidate)
+      ? Object.fromEntries(
+          Object.entries(candidate).sort(([left], [right]) =>
+            left < right ? -1 : left > right ? 1 : 0,
+          ),
+        )
+      : candidate,
+  );
+
 const validDate = (value: unknown): string | null => {
   if (typeof value !== 'string') return null;
   const date = new Date(value);
@@ -763,7 +774,7 @@ export const sanitizeCreativeAssetStore = (value: unknown): SanitizeCreativeAsse
   };
   let inputMatchesSanitizedStore = false;
   try {
-    inputMatchesSanitizedStore = JSON.stringify(migrated) === JSON.stringify(store);
+    inputMatchesSanitizedStore = stableJson(migrated) === stableJson(store);
   } catch {
     // Untrusted in-memory input can be cyclic or otherwise non-serializable. It must be rewritten.
   }

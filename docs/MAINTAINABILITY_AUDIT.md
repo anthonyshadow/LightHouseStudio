@@ -1,10 +1,160 @@
 # Maintainability audit
 
-**Current as of:** 2026-08-07
+**Current as of:** 2026-08-09
 
 This document records the repository-wide behavior-preserving cleanup and the placement rules that
 follow from it. Product behavior remains defined by the [project README](../README.md),
 [Architecture](ARCHITECTURE.md), and the [user stories](userStories/README.md).
+
+## 2026-08-09 test, quality, and performance audit
+
+### Executive summary
+
+The current architecture is healthy and its boundaries are enforced: Knip reports no dead files or
+dependencies, the 644-file / 2,004-edge local module graph has zero cycles, and type checking,
+linting, formatting, builds, the dependency audit, the built production smoke, and all 63
+functional browser cases pass. The suite is not broadly over-tested; most of its size protects
+security, ownership, persistence, provider cost, media lifetime, and asynchronous state. The main
+opportunity is to remove a small set of implementation-specific or duplicated tests while leaving
+those high-risk contracts intact.
+
+The audit found one real correctness/performance defect. A terminal video-job response seeded into
+TanStack Query uses the server's zero-millisecond poll value as a one-millisecond stale window.
+Instrumentation can therefore make the observer issue one unnecessary status request before the
+terminal response settles. The implementation will return a validated terminal seed before
+constructing the observer and retain the existing no-resubmission contract.
+
+The authenticated Studio static closure is also at 1,025,796 of its 1,032,000-byte budget (99.4%).
+Several route- or action-only surfaces are still imported eagerly. They can be split at existing
+UI ownership boundaries without changing the persistent stage or media lifecycle.
+
+### Pre-change measurements
+
+| Measure                                                                            |                           Baseline |
+| ---------------------------------------------------------------------------------- | ---------------------------------: |
+| Production TypeScript/TSX lines (`apps` and `packages`, generated output excluded) |                             74,360 |
+| Automated test lines                                                               |                             49,869 |
+| Vitest files / cases                                                               |                        188 / 1,359 |
+| Functional Playwright cases / wall time                                            |                   63 / 2.1 minutes |
+| Production smoke cases                                                             |                                  1 |
+| Curated visual cases                                                               |                                 29 |
+| Provider-free entry static closure                                                 |            317,440 / 345,000 bytes |
+| Authenticated Studio static closure                                                |        1,025,796 / 1,032,000 bytes |
+| Module graph                                                                       | 644 files / 2,004 edges / 0 cycles |
+
+The default Vitest run completed discovery and 1,353 non-listener cases in 23.83 seconds; its six
+real-socket cases were blocked by the restricted audit sandbox and then passed 6/6 with loopback
+listener access. The fresh coverage run exposed the terminal-seed request above and stopped at
+1,358/1,359, so the older 2026-08-08 coverage artifact is not treated as a current passing result.
+
+### Test audit
+
+| Classification | Logical test groups                                                                                                                                                                                                                                                 | Decision                                                                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| Keep           | Domain and contract policy; authentication, Origin/Host, ownership, bounded transport, provider sanitization, persistence, R2/direct upload, media cleanup, state races, focus/destructive actions, property tests, production smoke, and the 29-case visual matrix | These tests protect costly, destructive, security-sensitive, or lifecycle-sensitive regressions at the lowest practical layer.          |
+| Improve        | Terminal video-job polling, optional-surface Studio composition, and global web-network setup                                                                                                                                                                       | Make terminal polling deterministic, extend the existing stage-identity assertion across lazy loading, and load MSW only for web tests. |
+| Replace        | API route inventory's parallel recorder model                                                                                                                                                                                                                       | Compare the two real Elysia inventories directly, including their explicit HEAD siblings and conditional cloud routes.                  |
+| Remove         | Static IconButton rendering; compiler-emitted cache-call counts; repeated chunk-warning configuration; and four browser cases already owned by router, component, or visual tests                                                                                   | These assert framework/configuration implementation or duplicate stronger retained coverage without a distinct regression.              |
+
+The four removed functional browser cases are noncanonical route redirection, configured visual
+switch confirmation, Builder step availability across layouts, and Edit Video rail placement.
+Their behavior remains covered respectively by `AppRouter`, `ExistingVideoPanel`,
+`CharacterBuilderPanel` plus the visual matrix, and `CreativeWorkspace` plus the editor matrix.
+
+### Risk-based coverage matrix
+
+| Feature / workflow                                | Failure impact                                 | Current coverage                                                | Recommended coverage                                                                        | Type                   | Priority | Reason                                                           |
+| ------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------------- | ------------------------------------------------------------------------------------------- | ---------------------- | -------- | ---------------------------------------------------------------- |
+| Terminal accepted video job                       | Duplicate reads and misleading resume activity | Existing test becomes timing-sensitive under coverage           | Return the terminal seed before Query observation; assert one notification and zero fetches | Controller/integration | P0       | Prevents unnecessary API work and stabilizes the coverage gate.  |
+| Persistent Studio stage across deferred tools     | Media restart, lost take, or focus regression  | Strong composition and E2E coverage                             | Extend the existing identity test across Suspense fallbacks                                 | Component              | P1       | Code splitting must not create a second media owner.             |
+| Route inventory and HEAD parity                   | Unintended public/conditional route surface    | Duplicate recorder and real-runtime tests                       | Retain only exact real-runtime local/cloud inventories                                      | API integration        | P1       | Preserves the security oracle with less parallel implementation. |
+| Local/Neon/R2 persistence and provider boundaries | Data loss, ownership leak, or paid retry       | Extensive repository/service/provider coverage                  | Keep unchanged                                                                              | Integration/property   | P1       | Failure consequences justify the current breadth.                |
+| Static leaf presentation and compiler internals   | Cosmetic or implementation-only drift          | Dedicated unit/build-output cases plus stronger UI/build checks | Remove the dedicated low-signal cases                                                       | Component/build        | P3       | No distinct user or release regression remains unprotected.      |
+
+No additional feature-level P0 or P1 test gap was found. New cases are not justified merely to
+raise coverage.
+
+### Code quality, performance, and scalability findings
+
+- Fix now: early-return terminal job seeds; lazy-load optional Studio surfaces; remove the parallel
+  route model and low-value test fixtures; avoid loading MSW in non-web suites.
+- Keep: `StudioApp`, `ApplicationRuntime`, and `VideoJobService` remain cohesive composition or
+  lifecycle owners. Their line counts do not justify high-risk decomposition.
+- Keep: provider-specific wrappers remain separate where request, billing, error, or cleanup
+  contracts can diverge. Knip and the module graph found no safe dead-code or dependency removal.
+- Defer: Neon gallery paging uses offsets and recomputes facets, the local saved-video repository
+  scans and rewrites an owner library, and provider orchestration remains process-local. These are
+  acceptable for the implemented loopback single-operator product. Keyset paging, incremental
+  local indexes, distributed workers, and public observability belong to a separately approved
+  high-volume or public architecture.
+- Retain: the large media/editor/provider chunks are already lazy and excluded from the
+  provider-free entry closure. No speculative cache, worker, queue, or memoization is warranted.
+
+### Implementation outcome
+
+The planned cleanup is complete. Terminal seeded video jobs now notify once and return without a
+Query observer or follow-up read. Studio defers Existing Video, Saved Videos, saved-character and
+saved-outfit libraries, Outfit Selector, and Outfit Builder behind accessible Suspense fallbacks.
+Composition coverage exercises every new boundary while retaining one stage node, panel focus,
+media ownership, and provider-free startup. MSW starts only for web Vitest files, the API route
+oracle compares the two real Elysia inventories, and the specified low-signal unit/build and four
+duplicated browser cases are removed.
+
+Functional validation exposed a second correctness issue: IndexedDB returned creative-library
+records in primary-key order, while domain sanitation requires newest-first order. Random UUID
+ordering could therefore be misclassified as damaged persisted data and fail closed to a
+session-only empty library on refresh. The adapter now reads through its timestamp indexes in
+canonical newest-first order, and sanitation compares object keys independently of insertion
+order while retaining array order, unknown-field detection, normalization, and corruption
+recovery. An existing persistence test and the retained refresh journey were strengthened without
+adding a test case.
+
+No public route, HTTP schema, database schema, browser storage shape, provider contract, media
+owner, or exported type changed.
+
+### Before and after measurements
+
+| Measure                       |                             Before |                              After |            Variance |
+| ----------------------------- | ---------------------------------: | ---------------------------------: | ------------------: |
+| Production TypeScript/TSX LOC |                             74,360 |                             74,421 |        +61 (+0.08%) |
+| Automated test LOC            |                             49,869 |                             49,639 |       -230 (-0.46%) |
+| Vitest files / cases          |                        188 / 1,359 |                        187 / 1,353 |  -1 file / -6 cases |
+| Vitest wall time              |                      23.83 seconds |                      23.51 seconds |       -0.32 seconds |
+| Functional Playwright         |                   63 / 2.1 minutes |                   59 / 2.1 minutes |            -4 cases |
+| Production smoke              |                                  1 |                    1 / 5.9 seconds |           unchanged |
+| Curated visual matrix         |                                 29 |                   29 / 1.2 minutes |           unchanged |
+| Total executed cases          |                              1,452 |                              1,442 |           -10 cases |
+| Entry static closure          |            317,440 / 345,000 bytes |            317,622 / 345,000 bytes |       +182 (+0.06%) |
+| Studio static closure         |        1,025,796 / 1,032,000 bytes |          902,293 / 1,000,000 bytes |  -123,503 (-12.04%) |
+| Module graph                  | 644 files / 2,004 edges / 0 cycles | 643 files / 1,994 edges / 0 cycles | -1 file / -10 edges |
+
+The final Studio budget is the next 10,000-byte boundary above 110% of the measured 902,293-byte
+closure: 1,000,000 bytes. This leaves about 10% regression headroom. The provider-free entry budget
+and lazy media/worker boundaries are unchanged. The expected 187/1,353 Vitest inventory, 59
+functional cases, and 1,442 total executed cases all matched exactly.
+
+Fresh coverage passed in 27.62 seconds with 81.67% statements, 73.37% branches, 82.22% functions,
+and 84.46% lines. A direct coverage percentage comparison is intentionally omitted because the
+pre-change fresh run failed on the terminal-seed defect; the older artifact was not a passing
+baseline for this audit.
+
+### 2026-08-09 validation
+
+- `bun run quality` passed application, Storybook, and E2E types; ESLint; Prettier; normal Knip;
+  module, script-reference, documentation, and retired-program checks; 187 Vitest files and 1,353
+  cases; package, web, API, manifest, and Storybook builds.
+- `bun run test:coverage`, `bun run check:dead-code:production`, `bun run test:production`, and
+  `bun run test:e2e` passed. The functional matrix passed 59/59, including the strengthened
+  persisted-reference refresh journey; its focused race regression also passed 5/5.
+- `bun run test:visual` passed 29/29 without baseline regeneration, and
+  `node scripts/prune-visual-baselines.mjs --check` verified 29 curated baselines across two
+  platforms with zero prunable files.
+- `bun run audit:all` reported no known dependency vulnerability at the configured gate.
+
+No live provider, Neon, R2, paid service, public ingress, physical device, destructive migration,
+or manual assistive-technology check was used. Offset Neon pagination/facets, whole-library local
+JSON work, and process-local orchestration remain documented redesign candidates only for an
+explicitly approved public or high-volume product.
 
 ## 2026-08-07 persistence-readiness implementation
 

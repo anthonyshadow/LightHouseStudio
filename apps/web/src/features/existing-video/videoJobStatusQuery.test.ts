@@ -75,16 +75,20 @@ describe('video job status Query polling', () => {
 
   it('does not read status again when the submitted response is already terminal', async () => {
     const fetchSpy = vi.spyOn(globalThis, 'fetch');
+    const onStatus = vi.fn();
+    const initialStatus = status('ready', readyResult);
     await expect(
       pollVideoJobStatus({
         queryClient: queryClient(),
         jobId,
-        initialStatus: status('ready', readyResult),
+        initialStatus,
         signal: new AbortController().signal,
-        onStatus: vi.fn(),
+        onStatus,
       }),
     ).resolves.toMatchObject({ status: 'ready' });
 
+    expect(onStatus).toHaveBeenCalledOnce();
+    expect(onStatus).toHaveBeenCalledWith(initialStatus);
     expect(fetchSpy).not.toHaveBeenCalled();
   });
 

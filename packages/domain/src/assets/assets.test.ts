@@ -846,6 +846,13 @@ describe('creative asset sanitation and recovery', () => {
     expect(result.droppedRecords).toBe(0);
     expect(result.recovered).toBe(true);
     expect(JSON.stringify(result.store)).not.toMatch(/(?:apiKey|imageData)/u);
+
+    const reordered = Object.fromEntries(Object.entries(result.store).reverse());
+    expect(sanitizeCreativeAssetStore(reordered)).toEqual({
+      store: result.store,
+      recovered: false,
+      droppedRecords: 0,
+    });
   });
 
   it('deduplicates untrusted recents by mode and canonical prompt', () => {

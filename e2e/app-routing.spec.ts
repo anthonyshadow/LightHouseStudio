@@ -109,21 +109,6 @@ test('saved video, character, and outfit routes preserve the shared Studio stage
   }
 });
 
-test('noncanonical paths return to entry without mounting Studio', async ({ page }) => {
-  await installSuccessfulStudioHarness(page);
-  for (const path of [
-    '/advanced',
-    '/guided',
-    '/projects?project=project-42',
-    '/arbitrary-path?project=project-42',
-  ]) {
-    await page.goto(path);
-    await expect(page).toHaveURL(/\/$/u);
-    await expect(page.getByRole('button', { name: 'Log in' })).toBeVisible();
-    await expect(page.getByLabel('Studio media stage')).toHaveCount(0);
-  }
-});
-
 test('recording and temporary-take work cannot be lost silently through Back', async ({ page }) => {
   await installSuccessfulStudioHarness(page);
   await page.goto(ENTRY_PATH);
