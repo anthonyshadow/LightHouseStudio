@@ -219,6 +219,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       }),
     [auth.session],
   );
+  useEffect(() => () => repository.close?.(), [repository]);
   useCreativeLibraryCloudSync(repository);
   const sessionCleanup = useMemo(() => new SessionCleanupCoordinator(), []);
   const [logoutPromptOpen, setLogoutPromptOpen] = useState(false);
@@ -290,7 +291,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         ? repository.getSnapshot().store.savedPrompts.find((item) => item.id === step.savedRecipeId)
         : undefined;
       if (!step.prompt.trim() && !recipe?.referenceImageAssetId) return;
-      repository.recordSuccessfulPrompt({
+      void repository.recordSuccessfulPrompt({
         prompt: recipe?.prompt ?? step.prompt,
         modelModeId: step.modelId,
         ...(saved ? { savedPromptId: saved.id } : {}),
@@ -670,7 +671,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       }
 
       if (stage === 'intent') {
-        persistCharacterSaveSnapshot(repository, snapshot, characterId);
+        await persistCharacterSaveSnapshot(repository, snapshot, characterId);
         await progress.markCharacterPersisted();
       }
 
@@ -1469,7 +1470,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         onLibraryModeChange: changeLibraryMode,
         onWorkshopDraftChange: rememberWorkshopDraft,
         onUseWorkshop: applyWorkshopPrompt,
-        onSaveWorkshop: saveWorkshopPrompt,
+        onSaveWorkshop: (action) => void saveWorkshopPrompt(action),
         onShelfDirtyChange: setShelfDirty,
         onRecipeShelfEntryIntentConsumed: consumeRecipeShelfEntryIntent,
         onUseRecipe: applyRecipeSelection,

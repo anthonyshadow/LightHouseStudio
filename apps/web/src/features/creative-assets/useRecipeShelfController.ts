@@ -303,9 +303,9 @@ export const useRecipeShelfController = ({
     action();
   };
 
-  const perform = (action: () => void) => {
+  const perform = async (action: () => void | Promise<unknown>) => {
     try {
-      action();
+      await action();
       dispatchShelfAction({ type: 'leave' });
       setActionError(null);
       focusShelfHeading();
@@ -357,8 +357,8 @@ export const useRecipeShelfController = ({
   };
 
   const createRecipe = (value: RecipeFormValue) =>
-    perform(() => {
-      repository.createSavedPrompt({
+    perform(async () => {
+      await repository.createSavedPrompt({
         title: value.title,
         prompt: value.prompt,
         modelModeId: activeMode,

@@ -11,7 +11,7 @@ import { useCharacterStudioPreload } from './useCharacterStudioPreload';
 describe('useCharacterStudioPreload', () => {
   it('updates an edited character in place without dropping shelf metadata', async () => {
     const repository = createCreativeAssetRepository({ storage: null });
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Original host',
       prompt: 'Original character prompt.',
       promptIntent: 'character-transform',

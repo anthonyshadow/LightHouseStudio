@@ -100,8 +100,8 @@ export const useReferenceRecipeWorkshop = ({
   );
 
   const saveWorkshopPrompt = useCallback(
-    (action: SavePromptWorkshopAction) => {
-      repository.createSavedCharacterPrompt({
+    async (action: SavePromptWorkshopAction) => {
+      await repository.createSavedCharacterPrompt({
         name: action.name,
         prompt: action.prompt,
         source: 'generator',

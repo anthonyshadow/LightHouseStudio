@@ -35,11 +35,11 @@ const launchRepository = (
 });
 
 describe('Character Builder launches', () => {
-  it('hydrates a structured saved character for in-place editing', () => {
+  it('hydrates a structured saved character for in-place editing', async () => {
     const repository = createCreativeAssetRepository({ storage: null });
     const draft = createPromptBuilderDraft('character-transform');
     if (draft.intent !== 'character-transform') throw new Error('Expected character draft.');
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Field explorer',
       prompt: 'Transform the subject into an adult field explorer.',
       promptIntent: 'character-transform',
@@ -69,9 +69,9 @@ describe('Character Builder launches', () => {
     expect(value.pendingSave).toBeNull();
   });
 
-  it('hydrates a saved character into a new independent create target', () => {
+  it('hydrates a saved character into a new independent create target', async () => {
     const repository = createCreativeAssetRepository({ storage: null });
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Field explorer',
       prompt: 'Transform the subject into an adult field explorer.',
       promptIntent: 'character-transform',
@@ -86,12 +86,12 @@ describe('Character Builder launches', () => {
     expect(value.pendingSave).toBeNull();
   });
 
-  it('carries saved upload and generated-preview provenance into edit mode', () => {
+  it('carries saved upload and generated-preview provenance into edit mode', async () => {
     const repository = createCreativeAssetRepository({ storage: null });
     const draft = createPromptBuilderDraft('character-transform');
     const uploadedAssetId = '8f45ea24-c274-41a5-a988-aa0602115191';
     const generatedAssetId = 'deaa355e-1b08-4f78-a465-7291644b2812';
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Presenter',
       prompt: 'Transform the subject into a presenter.',
       promptIntent: 'character-transform',

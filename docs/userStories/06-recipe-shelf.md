@@ -55,10 +55,11 @@ projects.
   records use a null VTO kind/false enhancement. Older characters receive an empty Wardrobe with
   the original selected. Dangling/cross-parent/malformed selections are repaired and Wardrobe
   metadata is capped at 500 records. V6 characters gain a null default voice.
-- If `localStorage` is unavailable, the Shelf continues in session-only mode and says changes will
+- If IndexedDB is unavailable, the Shelf continues in session-only mode and says changes will
   be lost when the tab closes.
-- Browser storage contains allowlisted metadata, provenance, and opaque reference IDs—not image
-  bytes, recordings, device IDs, or provider secrets.
+- IndexedDB contains allowlisted metadata, provenance, and opaque reference IDs—not video blobs,
+  recordings, device IDs, or provider secrets. Large media remains in the File System Access or R2
+  path.
 - Wardrobe browsing and Use remain available when Add Outfit or Change Features is unavailable.
   Prompt-only originals remain usable, while creation is disabled with Character Builder guidance.
 - Dirty Wardrobe source/input/result/title state and active generation join the existing

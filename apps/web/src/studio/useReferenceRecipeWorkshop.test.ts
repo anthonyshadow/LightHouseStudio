@@ -42,7 +42,7 @@ const store: CreativeAssetStore = {
 };
 
 describe('useReferenceRecipeWorkshop', () => {
-  it('retains an exact legacy source through open/use and preserves feature-owned save effects', () => {
+  it('retains an exact legacy source through open/use and preserves feature-owned save effects', async () => {
     const createSavedCharacterPrompt = vi.fn();
     const repository = {
       getSnapshot: () => ({ store, health: 'ready', notice: null }),
@@ -81,8 +81,8 @@ describe('useReferenceRecipeWorkshop', () => {
       preserveCurrentReference: false,
     });
 
-    act(() => {
-      result.current.saveWorkshopPrompt({
+    await act(async () => {
+      await result.current.saveWorkshopPrompt({
         name: 'Ceramic mug',
         prompt: character.prompt,
         draft,

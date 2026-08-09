@@ -14,7 +14,7 @@ const jsonResponse = (body: unknown, status = 200): Response =>
 
 const addPrompt = (title: string) => {
   const repository = createCreativeAssetRepository({ storage: null });
-  repository.createSavedPrompt({
+  void repository.createSavedPrompt({
     title,
     prompt: `${title} prompt`,
     modelModeId: 'lucy-vton-latest',

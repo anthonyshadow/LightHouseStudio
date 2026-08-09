@@ -171,7 +171,7 @@ export const useReferenceRecipeAttribution = ({
         standaloneRecentCharacterRef.current.referenceImageAssetId === committedReferenceAssetId
           ? standaloneRecentCharacterRef.current
           : null;
-      repository.recordSuccessfulPrompt({
+      void repository.recordSuccessfulPrompt({
         prompt:
           activeRecipeStillMatches && activeFingerprint ? activeFingerprint.assetPrompt : prompt,
         modelModeId: mode,
@@ -301,14 +301,14 @@ export const useReferenceRecipeAttribution = ({
       }
 
       if (exactCharacterPromptId) {
-        repository.selectCharacterVersion({
+        void repository.selectCharacterVersion({
           characterId: exactCharacterPromptId,
           variantId: pending.savedCharacterVariantId ?? null,
         });
       }
 
       if (storedReferenceMetadata?.source === 'generated' && referenceMatchesPendingPrompt) {
-        repository.enrichNewestMatchingRecent(
+        void repository.enrichNewestMatchingRecent(
           pending.prompt,
           pending.mode,
           storedReferenceMetadata.assetId,

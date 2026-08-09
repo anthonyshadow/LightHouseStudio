@@ -12,9 +12,9 @@ describe('saved creative libraries', () => {
     vi.restoreAllMocks();
   });
 
-  it('shows character empty state, use handoff, reference image, and confirmed deletion', () => {
+  it('shows character empty state, use handoff, reference image, and confirmed deletion', async () => {
     const repository = createCreativeAssetRepository({ storage: null });
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Field host',
       prompt: 'A documentary field host',
       promptIntent: null,
@@ -64,9 +64,9 @@ describe('saved creative libraries', () => {
     expect(remove).toHaveBeenCalledWith(character.id);
   });
 
-  it('shows outfit empty state, use handoff, and declines deletion', () => {
+  it('shows outfit empty state, use handoff, and declines deletion', async () => {
     const repository = createCreativeAssetRepository({ storage: null });
-    const outfit = repository.createSavedPrompt({
+    const outfit = await repository.createSavedPrompt({
       title: 'Evening coat',
       prompt: '',
       modelModeId: 'lucy-vton-latest',

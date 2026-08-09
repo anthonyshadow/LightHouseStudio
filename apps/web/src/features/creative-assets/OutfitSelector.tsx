@@ -112,7 +112,7 @@ export const OutfitSelector = ({
                     onClick={() => {
                       if (!window.confirm(`Remove ${item.title} from saved outfits?`)) return;
                       try {
-                        repository.deleteSavedPrompt(item.id);
+                        void repository.deleteSavedPrompt(item.id);
                         setError(null);
                       } catch (caught) {
                         setError(

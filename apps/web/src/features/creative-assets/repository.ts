@@ -48,6 +48,10 @@ import {
   type UpdateSavedCharacterPromptInput,
   type UpdateSavedPromptInput,
 } from './types';
+import {
+  CreativeAssetPersistenceConflictError,
+  type CreativeAssetPersistence,
+} from './creativeAssetPersistence';
 
 export type CreativeAssetErrorCode =
   | 'invalid-id'
@@ -56,7 +60,8 @@ export type CreativeAssetErrorCode =
   | 'not-found'
   | 'id-conflict'
   | 'storage-unavailable'
-  | 'storage-write-failed';
+  | 'storage-write-failed'
+  | 'storage-conflict';
 
 export class CreativeAssetError extends Error {
   readonly code: CreativeAssetErrorCode;
@@ -82,6 +87,8 @@ export interface CreativeAssetRepositoryOptions {
   readonly now?: () => Date;
   readonly idFactory?: () => string;
   readonly ownerUserId?: string;
+  /** Test/adapter seam. Browser callers use the idb-backed default. */
+  readonly persistence?: CreativeAssetPersistence | null;
 }
 
 const normalizeCharacterPromptInput = (input: CreateSavedCharacterPromptInput) => ({
@@ -117,15 +124,65 @@ const browserStorage = (): StorageLike | null => {
   }
 };
 
+const browserSupportsIndexedDb = (): boolean => {
+  try {
+    return typeof indexedDB !== 'undefined';
+  } catch {
+    return false;
+  }
+};
+
+class LazyIndexedDbCreativeAssetPersistence implements CreativeAssetPersistence {
+  private persistence: Promise<CreativeAssetPersistence> | null = null;
+
+  private getPersistence() {
+    this.persistence ??= import('./indexedDbPersistence').then((module) =>
+      module.createIndexedDbCreativeAssetPersistence(),
+    );
+    return this.persistence;
+  }
+
+  async load(ownerUserId: string) {
+    return (await this.getPersistence()).load(ownerUserId);
+  }
+
+  async initialize(ownerUserId: string, store: CreativeAssetStore) {
+    return (await this.getPersistence()).initialize(ownerUserId, store);
+  }
+
+  async commit(
+    ownerUserId: string,
+    expectedRevision: number,
+    previous: CreativeAssetStore,
+    next: CreativeAssetStore,
+  ) {
+    return (await this.getPersistence()).commit(ownerUserId, expectedRevision, previous, next);
+  }
+
+  async repair(ownerUserId: string, expectedRevision: number, store: CreativeAssetStore) {
+    return (await this.getPersistence()).repair(ownerUserId, expectedRevision, store);
+  }
+
+  close() {
+    void this.persistence?.then((persistence) => persistence.close());
+    this.persistence = null;
+  }
+}
+
 const storageNotice = (health: CreativeAssetRepositoryState['health']) => {
   if (health === 'recovered') {
     return 'Some damaged or outdated Recipe Shelf data was removed. Your library is safe to keep using.';
   }
   if (health === 'session-only') {
-    return 'Browser storage is unavailable. Recipe Shelf changes will last only until this tab closes.';
+    return 'IndexedDB is unavailable. Recipe Shelf changes will last only until this tab closes.';
   }
   return null;
 };
+
+const sessionOnlyNotice = (legacyHealth: CreativeAssetRepositoryState['health']): string =>
+  legacyHealth === 'recovered'
+    ? `${storageNotice('recovered')} ${storageNotice('session-only')}`
+    : storageNotice('session-only')!;
 
 const isSupportedLegacyPayload = (serialized: string): boolean => {
   try {
@@ -148,42 +205,48 @@ const isSupportedLegacyPayload = (serialized: string): boolean => {
   }
 };
 
-const loadInitialState = (
+interface LegacyCreativeAssetCandidate {
+  readonly state: CreativeAssetRepositoryState;
+  readonly sourceKey: string | null;
+}
+
+const loadLegacyCandidate = (
   storage: StorageLike | null,
   storageKey: string,
   legacyStorageKeys: readonly string[],
   ownerUserId?: string,
-): { state: CreativeAssetRepositoryState; storage: StorageLike | null } => {
+): LegacyCreativeAssetCandidate => {
   if (!storage) {
-    const health = 'session-only' as const;
     return {
-      state: { store: createEmptyCreativeAssetStore(), health, notice: storageNotice(health) },
-      storage: null,
+      state: { store: createEmptyCreativeAssetStore(), health: 'ready', notice: null },
+      sourceKey: null,
     };
   }
 
   let serialized: string | null;
   let migratedLegacy = false;
+  let sourceKey: string | null = null;
   try {
     serialized = storage.getItem(storageKey);
+    if (serialized !== null) sourceKey = storageKey;
     for (const legacyStorageKey of legacyStorageKeys) {
       if (serialized !== null) break;
       if (legacyStorageKey === storageKey) continue;
       serialized = storage.getItem(legacyStorageKey);
       migratedLegacy = serialized !== null;
+      if (serialized !== null) sourceKey = legacyStorageKey;
     }
   } catch {
-    const health = 'session-only' as const;
     return {
-      state: { store: createEmptyCreativeAssetStore(), health, notice: storageNotice(health) },
-      storage: null,
+      state: { store: createEmptyCreativeAssetStore(), health: 'ready', notice: null },
+      sourceKey: null,
     };
   }
 
   if (serialized === null) {
     return {
       state: { store: createEmptyCreativeAssetStore(), health: 'ready', notice: null },
-      storage,
+      sourceKey: null,
     };
   }
 
@@ -200,7 +263,7 @@ const loadInitialState = (
         if (envelope.ownerUserId !== ownerUserId) {
           return {
             state: { store: createEmptyCreativeAssetStore(), health: 'ready', notice: null },
-            storage,
+            sourceKey: null,
           };
         }
         candidate = JSON.stringify(envelope.store);
@@ -213,25 +276,10 @@ const loadInitialState = (
   const isCleanLegacyMigration =
     migratedLegacy && isSupportedLegacyPayload(serialized) && result.droppedRecords === 0;
   const health = result.recovered && !isCleanLegacyMigration ? 'recovered' : 'ready';
-  if (result.recovered || migratedLegacy) {
-    try {
-      storage.setItem(
-        storageKey,
-        JSON.stringify(ownerUserId ? { ownerUserId, store: result.store } : result.store),
-      );
-    } catch {
-      const fallbackHealth = 'session-only' as const;
-      return {
-        state: {
-          store: result.store,
-          health: fallbackHealth,
-          notice: storageNotice(fallbackHealth),
-        },
-        storage: null,
-      };
-    }
-  }
-  return { state: { store: result.store, health, notice: storageNotice(health) }, storage };
+  return {
+    state: { store: result.store, health, notice: storageNotice(health) },
+    sourceKey,
+  };
 };
 
 const mapDomainError = (error: unknown): never => {
@@ -262,11 +310,30 @@ export const createCreativeAssetRepository = (
       : options.legacyStorageKey === null
         ? []
         : [options.legacyStorageKey];
-  const durableStorage = options.storage === undefined ? browserStorage() : options.storage;
-  let storage = durableStorage;
-  const initial = loadInitialState(storage, storageKey, legacyStorageKeys, options.ownerUserId);
-  storage = initial.storage;
-  let state = initial.state;
+  const legacyStorage = options.storage === undefined ? browserStorage() : options.storage;
+  const ownerUserId = options.ownerUserId ?? 'local-operator';
+  const legacy = loadLegacyCandidate(
+    legacyStorage,
+    storageKey,
+    legacyStorageKeys,
+    options.ownerUserId,
+  );
+  let persistence =
+    options.persistence === undefined
+      ? options.storage !== null && browserSupportsIndexedDb()
+        ? new LazyIndexedDbCreativeAssetPersistence()
+        : null
+      : options.persistence;
+  let state: CreativeAssetRepositoryState = persistence
+    ? legacy.state
+    : {
+        ...legacy.state,
+        health: 'session-only',
+        notice: sessionOnlyNotice(legacy.state.health),
+      };
+  let revision = 0;
+  let initialized = persistence === null;
+  let closed = false;
   const listeners = new Set<() => void>();
   const selectorListeners = new Set<{
     readonly selector: (state: CreativeAssetRepositoryState) => unknown;
@@ -301,29 +368,114 @@ export const createCreativeAssetRepository = (
     } while (notificationPending);
   };
 
-  const commit = (nextStore: CreativeAssetStore) => {
+  const verifyCommittedStore = async (expected: CreativeAssetStore) => {
+    const committed = await persistence?.load(ownerUserId);
+    if (!committed) throw new Error('The committed creative library could not be re-read.');
+    const verified = sanitizeCreativeAssetStore(committed.store);
+    if (
+      verified.recovered ||
+      verified.droppedRecords > 0 ||
+      JSON.stringify(verified.store) !== JSON.stringify(expected)
+    ) {
+      throw new Error('The committed creative library did not pass verification.');
+    }
+    return committed.revision;
+  };
+
+  const initialization = initialized
+    ? Promise.resolve()
+    : (async () => {
+        try {
+          let persisted = await persistence?.load(ownerUserId);
+          if (!persisted) {
+            try {
+              revision = (await persistence?.initialize(ownerUserId, legacy.state.store)) ?? 0;
+            } catch (error) {
+              if (!(error instanceof CreativeAssetPersistenceConflictError)) throw error;
+              persisted = await persistence?.load(ownerUserId);
+              if (!persisted) throw error;
+            }
+            if (!persisted) {
+              revision = await verifyCommittedStore(legacy.state.store);
+              if (legacy.sourceKey) {
+                legacyStorage?.removeItem?.(legacy.sourceKey);
+              }
+              state = legacy.state;
+            }
+          }
+          if (persisted) {
+            const parsed = sanitizeCreativeAssetStore(persisted.store);
+            revision = persisted.revision;
+            const repaired = parsed.recovered || parsed.droppedRecords > 0;
+            if (repaired) {
+              revision = await persistence!.repair(ownerUserId, revision, parsed.store);
+              revision = await verifyCommittedStore(parsed.store);
+            }
+            const health = repaired || legacy.state.health === 'recovered' ? 'recovered' : 'ready';
+            state = { store: parsed.store, health, notice: storageNotice(health) };
+            if (
+              legacy.sourceKey &&
+              JSON.stringify(parsed.store) === JSON.stringify(legacy.state.store)
+            ) {
+              legacyStorage?.removeItem?.(legacy.sourceKey);
+            }
+          }
+        } catch {
+          persistence?.close();
+          persistence = null;
+          state = {
+            ...legacy.state,
+            health: 'session-only',
+            notice: sessionOnlyNotice(legacy.state.health),
+          };
+        } finally {
+          initialized = true;
+          if (!closed) notify();
+        }
+      })();
+
+  let mutationTail: Promise<void> = initialization;
+  let pendingMutations = 0;
+  const runMutation = <Result>(mutation: () => Promise<Result>): Promise<Result> => {
+    const result = initialized && pendingMutations === 0 ? mutation() : mutationTail.then(mutation);
+    pendingMutations += 1;
+    mutationTail = result.then(
+      () => {
+        pendingMutations -= 1;
+      },
+      () => {
+        pendingMutations -= 1;
+      },
+    );
+    return result;
+  };
+
+  const commit = async (nextStore: CreativeAssetStore) => {
     const store = sanitizeCreativeAssetStore(nextStore).store;
     let health = state.health;
     let notice = state.notice;
-    if (storage) {
+    if (persistence) {
       try {
-        storage.setItem(
-          storageKey,
-          JSON.stringify(options.ownerUserId ? { ownerUserId: options.ownerUserId, store } : store),
-        );
-      } catch {
-        storage = null;
+        revision = await persistence.commit(ownerUserId, revision, state.store, store);
+        health = 'ready';
+        notice = null;
+      } catch (error) {
+        persistence.close();
+        persistence = null;
         health = 'session-only';
-        notice = storageNotice(health);
+        notice =
+          error instanceof CreativeAssetPersistenceConflictError
+            ? 'Recipe Shelf persistence paused because another browser context changed the library. This tab kept its in-memory copy.'
+            : storageNotice(health);
       }
     }
     state = { store, health, notice };
     notify();
   };
 
-  const commitDurably = (nextStore: CreativeAssetStore, publish: boolean) => {
+  const commitDurably = async (nextStore: CreativeAssetStore, publish: boolean) => {
     const store = sanitizeCreativeAssetStore(nextStore).store;
-    if (!durableStorage) {
+    if (!persistence) {
       throw new CreativeAssetError(
         'storage-unavailable',
         'Durable browser storage is unavailable. The character was not saved.',
@@ -331,18 +483,17 @@ export const createCreativeAssetRepository = (
       );
     }
     try {
-      durableStorage.setItem(
-        storageKey,
-        JSON.stringify(options.ownerUserId ? { ownerUserId: options.ownerUserId, store } : store),
-      );
+      revision = await persistence.commit(ownerUserId, revision, state.store, store);
     } catch (error) {
+      const conflict = error instanceof CreativeAssetPersistenceConflictError;
       throw new CreativeAssetError(
-        'storage-write-failed',
-        'Durable browser storage could not save the character. No character was published.',
+        conflict ? 'storage-conflict' : 'storage-write-failed',
+        conflict
+          ? 'The durable creative library changed in another browser context. Reload before retrying.'
+          : 'Durable browser storage could not save the character. No character was published.',
         { cause: error, retryable: true },
       );
     }
-    storage = durableStorage;
     if (!publish && state.health === 'ready') return;
     state = { store, health: 'ready', notice: null };
     notify();
@@ -445,7 +596,7 @@ export const createCreativeAssetRepository = (
     }
   };
 
-  const createSavedPrompt = (input: CreateSavedPromptInput): SavedPrompt => {
+  const createSavedPrompt = async (input: CreateSavedPromptInput): Promise<SavedPrompt> => {
     const context = mutationContext();
     const id = context.createId();
     try {
@@ -464,14 +615,17 @@ export const createCreativeAssetRepository = (
         { ...context, createId: () => id },
       );
       const item = createdSavedPrompt(next, id);
-      commit(next);
+      await commit(next);
       return item;
     } catch (error) {
       return mapDomainError(error);
     }
   };
 
-  const updateSavedPrompt = (id: string, input: UpdateSavedPromptInput): SavedPrompt => {
+  const updateSavedPrompt = async (
+    id: string,
+    input: UpdateSavedPromptInput,
+  ): Promise<SavedPrompt> => {
     try {
       const next = updateDomainSavedPrompt(
         state.store,
@@ -489,23 +643,23 @@ export const createCreativeAssetRepository = (
         timestamp(),
       );
       const item = createdSavedPrompt(next, id);
-      commit(next);
+      await commit(next);
       return item;
     } catch (error) {
       return mapDomainError(error);
     }
   };
 
-  const deleteSavedPrompt = (id: string) => {
+  const deleteSavedPrompt = async (id: string) => {
     if (!state.store.savedPrompts.some((item) => item.id === id)) {
       throw new CreativeAssetError('not-found', 'That saved prompt is no longer in this library.');
     }
-    commit(deleteDomainSavedPrompt(state.store, id));
+    await commit(deleteDomainSavedPrompt(state.store, id));
   };
 
-  const createSavedCharacterPrompt = (
+  const createSavedCharacterPrompt = async (
     input: CreateSavedCharacterPromptInput,
-  ): SavedCharacterPrompt => {
+  ): Promise<SavedCharacterPrompt> => {
     const context = mutationContext();
     const id = context.createId();
     try {
@@ -514,16 +668,16 @@ export const createCreativeAssetRepository = (
         createId: () => id,
       });
       const item = createdCharacterPrompt(next, id);
-      commit(next);
+      await commit(next);
       return item;
     } catch (error) {
       return mapDomainError(error);
     }
   };
 
-  const persistSavedCharacterPrompt = (
+  const persistSavedCharacterPrompt = async (
     input: PersistSavedCharacterPromptInput,
-  ): SavedCharacterPrompt => {
+  ): Promise<SavedCharacterPrompt> => {
     const createdAt = timestamp();
     const candidate = candidateForDurableCharacter(input, createdAt);
     if (
@@ -544,7 +698,7 @@ export const createCreativeAssetRepository = (
           `Character save ID ${input.id} already belongs to a different character.`,
         );
       }
-      commitDurably(state.store, state.health !== 'ready');
+      await commitDurably(state.store, state.health !== 'ready');
       return state.store.savedCharacterPrompts.find((item) => item.id === input.id) ?? existing;
     }
     try {
@@ -552,17 +706,17 @@ export const createCreativeAssetRepository = (
         now: createdAt,
         createId: () => input.id,
       });
-      commitDurably(next, true);
+      await commitDurably(next, true);
       return createdCharacterPrompt(state.store, input.id);
     } catch (error) {
       return mapDomainError(error);
     }
   };
 
-  const updateSavedCharacterPrompt = (
+  const updateSavedCharacterPrompt = async (
     id: string,
     input: UpdateSavedCharacterPromptInput,
-  ): SavedCharacterPrompt => {
+  ): Promise<SavedCharacterPrompt> => {
     try {
       const next = updateDomainCharacterPrompt(
         state.store,
@@ -591,26 +745,26 @@ export const createCreativeAssetRepository = (
         timestamp(),
       );
       const item = createdCharacterPrompt(next, id);
-      commit(next);
+      await commit(next);
       return item;
     } catch (error) {
       return mapDomainError(error);
     }
   };
 
-  const deleteSavedCharacterPrompt = (id: string) => {
+  const deleteSavedCharacterPrompt = async (id: string) => {
     if (!state.store.savedCharacterPrompts.some((item) => item.id === id)) {
       throw new CreativeAssetError(
         'not-found',
         'That character recipe is no longer in this library.',
       );
     }
-    commit(deleteDomainCharacterPrompt(state.store, id));
+    await commit(deleteDomainCharacterPrompt(state.store, id));
   };
 
-  const createSavedCharacterVariant = (
+  const createSavedCharacterVariant = async (
     input: CreateSavedCharacterVariantInput,
-  ): SavedCharacterVariant => {
+  ): Promise<SavedCharacterVariant> => {
     const context = mutationContext();
     const id = context.createId();
     try {
@@ -619,26 +773,28 @@ export const createCreativeAssetRepository = (
         createId: () => id,
       });
       const item = createdCharacterVariant(next, id);
-      commit(next);
+      await commit(next);
       return item;
     } catch (error) {
       return mapDomainError(error);
     }
   };
 
-  const deleteSavedCharacterVariant = (id: string) => {
+  const deleteSavedCharacterVariant = async (id: string) => {
     if (!state.store.savedCharacterVariants.some((variant) => variant.id === id)) {
       throw new CreativeAssetError(
         'not-found',
         'That character variant is no longer in this library.',
       );
     }
-    commit(deleteDomainCharacterVariant(state.store, id));
+    await commit(deleteDomainCharacterVariant(state.store, id));
   };
 
-  const selectCharacterVersion: CreativeAssetRepository['selectCharacterVersion'] = (selection) => {
+  const selectCharacterVersion = async (
+    selection: Parameters<CreativeAssetRepository['selectCharacterVersion']>[0],
+  ) => {
     try {
-      commit(
+      await commit(
         selectDomainCharacterVersion(
           state.store,
           selection.characterId,
@@ -651,7 +807,7 @@ export const createCreativeAssetRepository = (
     }
   };
 
-  const recordSuccessfulPrompt = (input: RecordSuccessfulPromptInput) => {
+  const recordSuccessfulPrompt = async (input: RecordSuccessfulPromptInput) => {
     const context = mutationContext();
     const next = recordSuccessfulPromptUse(
       state.store,
@@ -672,13 +828,13 @@ export const createCreativeAssetRepository = (
       },
       context,
     );
-    if (next !== state.store) commit(next);
+    if (next !== state.store) await commit(next);
   };
 
-  const enrichNewestMatchingRecent: CreativeAssetRepository['enrichNewestMatchingRecent'] = (
-    prompt,
-    modelModeId,
-    referenceImageAssetId,
+  const enrichNewestMatchingRecent = async (
+    prompt: string,
+    modelModeId: RecordSuccessfulPromptInput['modelModeId'],
+    referenceImageAssetId: string,
   ) => {
     try {
       const next = enrichNewestMatchingRecentWithReferenceImage(state.store, {
@@ -686,7 +842,7 @@ export const createCreativeAssetRepository = (
         modelModeId,
         referenceImageAssetId,
       });
-      if (next !== state.store) commit(next);
+      if (next !== state.store) await commit(next);
     } catch (error) {
       mapDomainError(error);
     }
@@ -694,6 +850,11 @@ export const createCreativeAssetRepository = (
 
   return {
     getSnapshot: () => state,
+    ready: () => initialization,
+    close: () => {
+      closed = true;
+      persistence?.close();
+    },
     subscribe: (listener) => {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -708,31 +869,35 @@ export const createCreativeAssetRepository = (
       selectorListeners.add(subscription);
       return () => selectorListeners.delete(subscription);
     },
-    createSavedPrompt,
-    updateSavedPrompt,
-    renameSavedPrompt: (id, title) => updateSavedPrompt(id, { title }),
-    deleteSavedPrompt,
-    createSavedCharacterPrompt,
-    persistSavedCharacterPrompt,
-    updateSavedCharacterPrompt,
-    renameSavedCharacterPrompt: (id, name) => updateSavedCharacterPrompt(id, { name }),
-    deleteSavedCharacterPrompt,
-    createSavedCharacterVariant,
-    deleteSavedCharacterVariant,
-    selectCharacterVersion,
-    recordSuccessfulPrompt,
-    enrichNewestMatchingRecent,
+    createSavedPrompt: (input) => runMutation(() => createSavedPrompt(input)),
+    updateSavedPrompt: (id, input) => runMutation(() => updateSavedPrompt(id, input)),
+    renameSavedPrompt: (id, title) => runMutation(() => updateSavedPrompt(id, { title })),
+    deleteSavedPrompt: (id) => runMutation(() => deleteSavedPrompt(id)),
+    createSavedCharacterPrompt: (input) => runMutation(() => createSavedCharacterPrompt(input)),
+    persistSavedCharacterPrompt: (input) => runMutation(() => persistSavedCharacterPrompt(input)),
+    updateSavedCharacterPrompt: (id, input) =>
+      runMutation(() => updateSavedCharacterPrompt(id, input)),
+    renameSavedCharacterPrompt: (id, name) =>
+      runMutation(() => updateSavedCharacterPrompt(id, { name })),
+    deleteSavedCharacterPrompt: (id) => runMutation(() => deleteSavedCharacterPrompt(id)),
+    createSavedCharacterVariant: (input) => runMutation(() => createSavedCharacterVariant(input)),
+    deleteSavedCharacterVariant: (id) => runMutation(() => deleteSavedCharacterVariant(id)),
+    selectCharacterVersion: (selection) => runMutation(() => selectCharacterVersion(selection)),
+    recordSuccessfulPrompt: (input) => runMutation(() => recordSuccessfulPrompt(input)),
+    enrichNewestMatchingRecent: (prompt, modelModeId, referenceImageAssetId) =>
+      runMutation(() => enrichNewestMatchingRecent(prompt, modelModeId, referenceImageAssetId)),
     search: (query, modelModeId) => searchCreativeAssets(state.store, query, modelModeId),
-    replaceFromRemote: (remoteStore) => {
-      const sanitized = sanitizeCreativeAssetStore(remoteStore);
-      if (sanitized.recovered || sanitized.droppedRecords > 0) {
-        throw new CreativeAssetError(
-          'storage-write-failed',
-          'The cloud library returned invalid records. The local library was preserved.',
-        );
-      }
-      commit(sanitized.store);
-    },
+    replaceFromRemote: (remoteStore) =>
+      runMutation(async () => {
+        const sanitized = sanitizeCreativeAssetStore(remoteStore);
+        if (sanitized.recovered || sanitized.droppedRecords > 0) {
+          throw new CreativeAssetError(
+            'storage-write-failed',
+            'The cloud library returned invalid records. The local library was preserved.',
+          );
+        }
+        await commit(sanitized.store);
+      }),
     setSyncNotice: (notice) => {
       if (state.notice === notice) return;
       state = { ...state, notice };

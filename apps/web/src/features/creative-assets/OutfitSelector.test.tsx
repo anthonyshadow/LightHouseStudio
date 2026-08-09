@@ -22,19 +22,19 @@ describe('OutfitSelector', () => {
   it('selects saved and recent outfits while excluding other model recipes', async () => {
     const user = userEvent.setup();
     const repository = createRepository();
-    const saved = repository.createSavedPrompt({
+    const saved = await repository.createSavedPrompt({
       title: 'Copper coat',
       prompt: 'Dress the subject in a structured copper coat.',
       modelModeId: 'lucy-vton-latest',
       source: 'manual',
     });
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Character recipe',
       prompt: 'Transform the subject into a cartographer.',
       modelModeId: 'lucy-latest',
       source: 'manual',
     });
-    repository.recordSuccessfulPrompt({
+    await repository.recordSuccessfulPrompt({
       prompt: saved.prompt,
       modelModeId: 'lucy-vton-latest',
       savedPromptId: saved.id,
@@ -79,7 +79,7 @@ describe('OutfitSelector', () => {
   it('locks selection controls for an active operation but keeps library maintenance available', async () => {
     const user = userEvent.setup();
     const repository = createRepository();
-    const saved = repository.createSavedPrompt({
+    const saved = await repository.createSavedPrompt({
       title: 'Linen jacket',
       prompt: 'Dress the subject in a linen jacket.',
       modelModeId: 'lucy-vton-latest',

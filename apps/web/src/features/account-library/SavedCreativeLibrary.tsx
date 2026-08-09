@@ -291,7 +291,7 @@ export const SavedCharacterLibrary = ({
                       }}
                       onClick={() => {
                         if (window.confirm(`Delete “${item.name}” and its wardrobe records?`))
-                          repository.deleteSavedCharacterPrompt(item.id);
+                          void repository.deleteSavedCharacterPrompt(item.id);
                       }}
                     >
                       <CharacterActionIcon name="delete" />
@@ -349,7 +349,7 @@ export const SavedOutfitLibrary = ({
                 variant="danger"
                 onClick={() => {
                   if (window.confirm(`Delete “${item.title}”?`))
-                    repository.deleteSavedPrompt(item.id);
+                    void repository.deleteSavedPrompt(item.id);
                 }}
               >
                 Delete

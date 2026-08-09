@@ -109,7 +109,7 @@ describe('RecipeShelf', () => {
   it('protects a dirty inline form and can disable recipe insertion without blocking edits', async () => {
     const user = userEvent.setup();
     const repository = createRepository();
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Night host',
       prompt: 'Transform the adult subject into a night host.',
       modelModeId: 'lucy-latest',
@@ -152,7 +152,7 @@ describe('RecipeShelf', () => {
       ...createPromptBuilderDraft('character-transform'),
       characterBase: 'botanical explorer',
     };
-    repository.createSavedCharacterPrompt({
+    await repository.createSavedCharacterPrompt({
       name: 'Field explorer',
       prompt: 'Transform the subject into an adult botanical explorer.',
       promptIntent: 'character-transform',
@@ -182,7 +182,7 @@ describe('RecipeShelf', () => {
   it('explains that deleting a character record detaches but does not erase reference bytes', async () => {
     const user = userEvent.setup();
     const repository = createRepository();
-    repository.createSavedCharacterPrompt({
+    await repository.createSavedCharacterPrompt({
       name: 'Retained portrait',
       prompt: 'Transform the subject into an adult studio host.',
       promptIntent: 'character-transform',
@@ -210,7 +210,7 @@ describe('RecipeShelf', () => {
       objectDescription: 'paper lantern',
       placement: 'above the doorway',
     };
-    repository.createSavedCharacterPrompt({
+    await repository.createSavedCharacterPrompt({
       name: 'Doorway lantern',
       prompt: 'Add a paper lantern above the doorway.',
       promptIntent: 'add-object',
@@ -231,12 +231,12 @@ describe('RecipeShelf', () => {
   it('shows persisted reference thumbnails and carries exact assets through Use and Save a copy', async () => {
     const user = userEvent.setup();
     const repository = createRepository();
-    repository.recordSuccessfulPrompt({
+    await repository.recordSuccessfulPrompt({
       prompt: 'Substitute the character with an orbital cartographer.',
       modelModeId: 'lucy-latest',
       referenceImageAssetId: 'recent-reference-1',
     });
-    repository.createSavedCharacterPrompt({
+    await repository.createSavedCharacterPrompt({
       name: 'Orbital cartographer',
       prompt: 'Substitute the character with an orbital cartographer.',
       promptIntent: 'character-transform',
@@ -286,13 +286,13 @@ describe('RecipeShelf', () => {
   it('derives tag filters from local recipes and exposes an accessible selected-card state', async () => {
     const user = userEvent.setup();
     const repository = createRepository();
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Editorial host',
       prompt: 'Give the adult presenter a refined editorial wardrobe.',
       modelModeId: 'lucy-latest',
       tags: ['Editorial', 'Studio'],
     });
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Casual host',
       prompt: 'Give the adult presenter a relaxed casual wardrobe.',
       modelModeId: 'lucy-latest',
@@ -324,13 +324,13 @@ describe('RecipeShelf', () => {
   it('reveals and highlights a Studio-controlled active character', async () => {
     const user = userEvent.setup();
     const repository = createRepository();
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Editorial host',
       prompt: 'Give the presenter an editorial wardrobe.',
       modelModeId: 'lucy-latest',
       tags: ['Editorial'],
     });
-    const character = repository.createSavedCharacterPrompt({
+    const character = await repository.createSavedCharacterPrompt({
       name: 'Active cartographer',
       prompt: 'Substitute the character with an orbital cartographer.',
       promptIntent: 'character-transform',
@@ -372,14 +372,14 @@ describe('RecipeShelf', () => {
     expect(within(characterHeading).getByRole('button')).toHaveAttribute('aria-pressed', 'true');
   });
 
-  it('shows only the active model library without inventing unsupported collections', () => {
+  it('shows only the active model library without inventing unsupported collections', async () => {
     const repository = createRepository();
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Character direction',
       prompt: 'Create a composed studio host.',
       modelModeId: 'lucy-latest',
     });
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Garment direction',
       prompt: 'Apply the linen overshirt.',
       modelModeId: 'lucy-vton-latest',
@@ -401,12 +401,12 @@ describe('RecipeShelf', () => {
   it('consumes one-shot category intent without persisting it as selection state', async () => {
     const user = userEvent.setup();
     const repository = createRepository();
-    repository.createSavedPrompt({
+    await repository.createSavedPrompt({
       title: 'Editorial host',
       prompt: 'Give the presenter an editorial wardrobe.',
       modelModeId: 'lucy-latest',
     });
-    repository.createSavedCharacterPrompt({
+    await repository.createSavedCharacterPrompt({
       name: 'Field correspondent',
       prompt: 'Transform the subject into an adult field correspondent.',
       promptIntent: 'character-transform',

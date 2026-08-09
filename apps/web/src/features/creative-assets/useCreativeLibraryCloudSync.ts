@@ -105,6 +105,8 @@ export const useCreativeLibraryCloudSync = (repository: CreativeAssetRepository)
 
     void (async () => {
       try {
+        await repository.ready();
+        if (!active) return;
         const remote = await readRemote(controller.signal);
         if (!active || remote === null) return;
         revision = remote.revision;
@@ -119,7 +121,7 @@ export const useCreativeLibraryCloudSync = (repository: CreativeAssetRepository)
           }
           revision = result;
         } else if (remoteCount > 0 && localCount === 0) {
-          repository.replaceFromRemote?.(remote.store);
+          await repository.replaceFromRemote?.(remote.store);
         } else if (
           remote.revision > 0 &&
           JSON.stringify(localStore) !== JSON.stringify(remote.store)

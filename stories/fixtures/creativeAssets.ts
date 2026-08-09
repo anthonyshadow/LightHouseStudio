@@ -11,7 +11,7 @@ export const createSeededCreativeAssetRepository = (): CreativeAssetRepository =
     now: () => new Date('2026-07-25T14:00:00.000Z'),
   });
 
-  repository.createSavedPrompt({
+  void repository.createSavedPrompt({
     title: 'Midnight culture host',
     prompt:
       'Transform the adult subject into a polished midnight culture host in a structured navy jacket.',
@@ -19,18 +19,18 @@ export const createSeededCreativeAssetRepository = (): CreativeAssetRepository =
     source: 'manual',
     tags: ['editorial', 'host', 'night'],
   });
-  repository.createSavedPrompt({
+  void repository.createSavedPrompt({
     title: 'Copper runway jacket',
     prompt: 'Replace the garment with a sculpted copper satin runway jacket.',
     modelModeId: 'lucy-vton-latest',
     source: 'generated',
     tags: ['fashion', 'copper'],
   });
-  repository.recordSuccessfulPrompt({
+  void repository.recordSuccessfulPrompt({
     prompt: 'Transform the adult subject into a sunlit botanical field explorer.',
     modelModeId: 'lucy-latest',
   });
-  repository.createSavedCharacterPrompt({
+  void repository.createSavedCharacterPrompt({
     name: 'Botanical explorer',
     prompt: 'Transform the adult subject into a tactile, sunlit botanical explorer.',
     promptIntent: 'character-transform',
