@@ -17,6 +17,7 @@ import { readBoundedBlob } from '../adapters/api-client/readBoundedBlob';
 import { savedVideoContentUrl } from '../adapters/api-client/savedVideosApi';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import { useAuth } from '../application/auth/AuthProvider';
+import { RemoteStateProvider } from '../application/remote-state/RemoteStateProvider';
 import { APP_PATHS } from '../app/paths';
 import type { PromptCommittedHandler } from '../application/types';
 import type {
@@ -2166,8 +2167,10 @@ export interface StudioAppProps {
 }
 
 export const StudioApp = ({ focusMainOnMount = false, initialIntent }: StudioAppProps) => (
-  <StudioExperience
-    focusMainOnMount={focusMainOnMount}
-    {...(initialIntent ? { initialIntent } : {})}
-  />
+  <RemoteStateProvider>
+    <StudioExperience
+      focusMainOnMount={focusMainOnMount}
+      {...(initialIntent ? { initialIntent } : {})}
+    />
+  </RemoteStateProvider>
 );

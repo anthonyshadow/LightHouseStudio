@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { SharedVoicesQuery } from '@studio/contracts';
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   listSharedVoices,
   listWorkspaceVoices,
@@ -59,40 +60,34 @@ const EMPTY_CRITERIA: VoiceFilterCriteria = {
 };
 
 const CLIENT_CACHE_TTL_MS = 5 * 60_000;
-const CLIENT_CACHE_LIMIT = 40;
 
-type CachedPage =
-  | { readonly tab: 'saved'; readonly page: WorkspaceVoicePage }
-  | { readonly tab: 'browse'; readonly page: SharedVoicePage };
-
-type CacheEntry = Readonly<{ value: CachedPage; expiresAt: number }>;
-
-const readCache = (cache: Map<string, CacheEntry>, key: string): CachedPage | null => {
-  const entry = cache.get(key);
-  if (!entry) return null;
-  if (entry.expiresAt <= Date.now()) {
-    cache.delete(key);
-    return null;
-  }
-  cache.delete(key);
-  cache.set(key, entry);
-  return entry.value;
+const voiceLibraryQueryKeys = {
+  all: ['voice-library'] as const,
+  saved: ['voice-library', 'saved'] as const,
+  browse: ['voice-library', 'browse'] as const,
+  savedScope: (clientScope: string) => ['voice-library', 'saved', clientScope] as const,
+  browseScope: (clientScope: string) => ['voice-library', 'browse', clientScope] as const,
+  savedPage: (clientScope: string, criteria: VoiceFilterCriteria, pageToken: string | null) =>
+    ['voice-library', 'saved', clientScope, { criteria, pageToken }] as const,
+  browsePage: (
+    clientScope: string,
+    criteria: VoiceFilterCriteria,
+    sort: SharedVoicesQuery['sort'],
+    page: number,
+  ) => ['voice-library', 'browse', clientScope, { criteria, sort, page }] as const,
 };
 
-const writeCache = (cache: Map<string, CacheEntry>, key: string, value: CachedPage): void => {
-  cache.delete(key);
-  cache.set(key, { value, expiresAt: Date.now() + CLIENT_CACHE_TTL_MS });
-  while (cache.size > CLIENT_CACHE_LIMIT) {
-    const oldest = cache.keys().next().value;
-    if (!oldest) return;
-    cache.delete(oldest);
-  }
-};
+const customClientScopes = new WeakMap<VoiceLibraryClient, string>();
+let customClientSequence = 0;
 
-const invalidateCacheTab = (cache: Map<string, CacheEntry>, tab: VoiceLibraryTab): void => {
-  for (const key of cache.keys()) {
-    if (key.startsWith(`${tab}:`)) cache.delete(key);
-  }
+const scopeForClient = (client: VoiceLibraryClient): string => {
+  if (client === defaultVoiceLibraryClient) return 'default';
+  const existing = customClientScopes.get(client);
+  if (existing) return existing;
+  customClientSequence += 1;
+  const scope = `custom-${customClientSequence}`;
+  customClientScopes.set(client, scope);
+  return scope;
 };
 
 const errorMessage = (caught: unknown): string =>
@@ -107,42 +102,35 @@ const searchHintFor = (query: string): string | null => {
   return length > 0 && length < 3 ? 'Type at least 3 characters to search.' : null;
 };
 
+type VoiceMutationRequest =
+  | Readonly<{ kind: 'add'; item: SharedVoiceItem; controller: AbortController }>
+  | Readonly<{ kind: 'remove'; item: WorkspaceVoiceItem; controller: AbortController }>;
+
+type VoiceMutationResult = Readonly<{
+  request: VoiceMutationRequest;
+  status: string;
+}>;
+
 export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibraryClient) => {
+  const queryClient = useQueryClient();
+  const clientScope = useMemo(() => scopeForClient(client), [client]);
   const [tab, setTab] = useState<VoiceLibraryTab>('saved');
   const [savedQuery, setSavedQuery] = useState('');
   const [browseQuery, setBrowseQuery] = useState('');
   const [savedCriteria, setSavedCriteria] = useState(EMPTY_CRITERIA);
   const [browseCriteria, setBrowseCriteria] = useState(EMPTY_CRITERIA);
   const [browseSort, setBrowseSort] = useState<SharedVoicesQuery['sort']>('trending');
-  const [savedVoices, setSavedVoices] = useState<WorkspaceVoiceItem[]>([]);
-  const [browseVoices, setBrowseVoices] = useState<SharedVoiceItem[]>([]);
   const [selected, setSelected] = useState<WorkspaceVoiceItem | null>(null);
-  const [savedLoading, setSavedLoading] = useState(true);
-  const [browseLoading, setBrowseLoading] = useState(false);
-  const [savedError, setSavedError] = useState<string | null>(null);
-  const [browseError, setBrowseError] = useState<string | null>(null);
-  const [interactionError, setInteractionError] = useState<string | null>(null);
-  const [savedHasMore, setSavedHasMore] = useState(false);
-  const [browseHasMore, setBrowseHasMore] = useState(false);
   const [savedTokens, setSavedTokens] = useState<Array<string | null>>([null]);
   const [savedIndex, setSavedIndex] = useState(0);
-  const [savedNextToken, setSavedNextToken] = useState<string | null>(null);
   const [browsePage, setBrowsePage] = useState(0);
-  const [savedRevision, setSavedRevision] = useState(0);
-  const [browseRevision, setBrowseRevision] = useState(0);
-  const [announcement, setAnnouncement] = useState('');
-  const [mutationVoiceId, setMutationVoiceId] = useState<string | null>(null);
+  const [interactionError, setInteractionError] = useState<string | null>(null);
   const [mutationMessage, setMutationMessage] = useState<string | null>(null);
-  const cacheRef = useRef(new Map<string, CacheEntry>());
-  const generationRef = useRef(0);
   const mutationControllerRef = useRef<AbortController | null>(null);
-  const savedRefreshRef = useRef(false);
-  const browseRefreshRef = useRef(false);
 
   const resetSavedPage = useCallback(() => {
     setSavedTokens([null]);
     setSavedIndex(0);
-    setSavedNextToken(null);
   }, []);
   const resetBrowsePage = useCallback(() => setBrowsePage(0), []);
 
@@ -183,107 +171,95 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
   }, [browseQuery, resetBrowsePage]);
 
   const savedToken = savedTokens[savedIndex] ?? null;
-  const savedRequest = useMemo(
-    () => ({
-      tab: 'saved' as const,
-      key: `saved:${JSON.stringify(savedCriteria)}:${savedToken ?? 'first'}`,
-      criteria: savedCriteria,
-      token: savedToken,
-      revision: savedRevision,
-    }),
-    [savedCriteria, savedRevision, savedToken],
-  );
-  const browseRequest = useMemo(
-    () => ({
-      tab: 'browse' as const,
-      key: `browse:${JSON.stringify(browseCriteria)}:${browseSort}:${browsePage}`,
-      criteria: browseCriteria,
-      page: browsePage,
-      sort: browseSort,
-      revision: browseRevision,
-    }),
-    [browseCriteria, browsePage, browseRevision, browseSort],
-  );
-  const request = tab === 'saved' ? savedRequest : browseRequest;
+  const savedPageQuery = useQuery({
+    queryKey: voiceLibraryQueryKeys.savedPage(clientScope, savedCriteria, savedToken),
+    queryFn: ({ signal }) => client.listWorkspaceVoices(savedCriteria, savedToken, signal, false),
+    enabled: tab === 'saved',
+    placeholderData: keepPreviousData,
+    staleTime: CLIENT_CACHE_TTL_MS,
+    gcTime: CLIENT_CACHE_TTL_MS,
+  });
+  const browsePageQuery = useQuery({
+    queryKey: voiceLibraryQueryKeys.browsePage(clientScope, browseCriteria, browseSort, browsePage),
+    queryFn: ({ signal }) =>
+      client.listSharedVoices(browseCriteria, browsePage, browseSort, signal, false),
+    enabled: tab === 'browse',
+    placeholderData: keepPreviousData,
+    staleTime: CLIENT_CACHE_TTL_MS,
+    gcTime: CLIENT_CACHE_TTL_MS,
+  });
 
-  useEffect(() => {
-    const generation = generationRef.current + 1;
-    generationRef.current = generation;
-    const controller = new AbortController();
-    const refresh = request.tab === 'saved' ? savedRefreshRef.current : browseRefreshRef.current;
-    if (request.tab === 'saved') savedRefreshRef.current = false;
-    else browseRefreshRef.current = false;
-    const cached = refresh ? null : readCache(cacheRef.current, request.key);
-
-    if (cached?.tab === 'saved') {
-      setSavedVoices(cached.page.voices);
-      setSavedHasMore(cached.page.hasMore);
-      setSavedNextToken(cached.page.nextPageToken);
-      setSavedError(null);
-      setSavedLoading(false);
-      setAnnouncement(`${cached.page.voices.length} saved voices shown.`);
-      return () => controller.abort();
-    }
-    if (cached?.tab === 'browse') {
-      setBrowseVoices(cached.page.voices);
-      setBrowseHasMore(cached.page.hasMore);
-      setBrowseError(null);
-      setBrowseLoading(false);
-      setAnnouncement(`${cached.page.voices.length} catalog voices shown.`);
-      return () => controller.abort();
-    }
-
-    if (request.tab === 'saved') setSavedLoading(true);
-    else setBrowseLoading(true);
-    setInteractionError(null);
-
-    const load = async () => {
-      try {
-        if (request.tab === 'saved') {
-          const page = await client.listWorkspaceVoices(
-            request.criteria,
-            request.token,
-            controller.signal,
-            refresh,
-          );
-          if (controller.signal.aborted || generationRef.current !== generation) return;
-          writeCache(cacheRef.current, request.key, { tab: 'saved', page });
-          setSavedVoices(page.voices);
-          setSavedHasMore(page.hasMore);
-          setSavedNextToken(page.nextPageToken);
-          setSavedError(null);
-          setAnnouncement(`${page.voices.length} saved voices shown.`);
-        } else {
-          const page = await client.listSharedVoices(
-            request.criteria,
-            request.page,
-            request.sort,
-            controller.signal,
-            refresh,
-          );
-          if (controller.signal.aborted || generationRef.current !== generation) return;
-          writeCache(cacheRef.current, request.key, { tab: 'browse', page });
-          setBrowseVoices(page.voices);
-          setBrowseHasMore(page.hasMore);
-          setBrowseError(null);
-          setAnnouncement(`${page.voices.length} catalog voices shown.`);
-        }
-      } catch (caught) {
-        if (controller.signal.aborted || generationRef.current !== generation || aborted(caught)) {
-          return;
-        }
-        if (request.tab === 'saved') setSavedError(errorMessage(caught));
-        else setBrowseError(errorMessage(caught));
-      } finally {
-        if (!controller.signal.aborted && generationRef.current === generation) {
-          if (request.tab === 'saved') setSavedLoading(false);
-          else setBrowseLoading(false);
-        }
+  const mutation = useMutation({
+    mutationFn: async (request: VoiceMutationRequest): Promise<VoiceMutationResult> => {
+      const result =
+        request.kind === 'add'
+          ? await client.saveSharedVoice(request.item, request.controller.signal)
+          : await client.removeWorkspaceVoice(
+              request.item.voice.voiceId,
+              request.controller.signal,
+            );
+      return { request, status: result.status };
+    },
+    onSuccess: ({ request, status }) => {
+      if (request.kind === 'add') {
+        queryClient.setQueriesData<SharedVoicePage>(
+          { queryKey: voiceLibraryQueryKeys.browseScope(clientScope) },
+          (page) =>
+            page
+              ? {
+                  ...page,
+                  voices: page.voices.map((candidate) =>
+                    candidate.voice.voiceId === request.item.voice.voiceId
+                      ? { ...candidate, voice: { ...candidate.voice, saved: true } }
+                      : candidate,
+                  ),
+                }
+              : page,
+        );
+        setMutationMessage(
+          status === 'already-saved'
+            ? `${request.item.voice.name} is already saved.`
+            : `${request.item.voice.name} was added to Saved Voices.`,
+        );
+      } else {
+        queryClient.setQueriesData<WorkspaceVoicePage>(
+          { queryKey: voiceLibraryQueryKeys.savedScope(clientScope) },
+          (page) =>
+            page
+              ? {
+                  ...page,
+                  voices: page.voices.filter(
+                    (candidate) => candidate.voice.voiceId !== request.item.voice.voiceId,
+                  ),
+                }
+              : page,
+        );
+        queryClient.setQueriesData<SharedVoicePage>(
+          { queryKey: voiceLibraryQueryKeys.browseScope(clientScope) },
+          (page) =>
+            page
+              ? {
+                  ...page,
+                  voices: page.voices.map((candidate) =>
+                    candidate.voice.voiceId === request.item.voice.voiceId
+                      ? { ...candidate, voice: { ...candidate.voice, saved: false } }
+                      : candidate,
+                  ),
+                }
+              : page,
+        );
+        setMutationMessage(
+          status === 'already-removed'
+            ? `${request.item.voice.name} was already removed.`
+            : `${request.item.voice.name} was removed from Saved Voices.`,
+        );
       }
-    };
-    void load();
-    return () => controller.abort();
-  }, [client, request]);
+      void queryClient.invalidateQueries({
+        queryKey: voiceLibraryQueryKeys.all,
+        refetchType: 'none',
+      });
+    },
+  });
 
   useEffect(
     () => () => {
@@ -318,10 +294,11 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
 
   const next = () => {
     if (tab === 'saved') {
-      if (!savedNextToken) return;
-      setSavedTokens((current) => [...current.slice(0, savedIndex + 1), savedNextToken]);
+      const nextToken = savedPageQuery.data?.nextPageToken;
+      if (!nextToken) return;
+      setSavedTokens((current) => [...current.slice(0, savedIndex + 1), nextToken]);
       setSavedIndex((current) => current + 1);
-    } else if (browseHasMore) {
+    } else if (browsePageQuery.data?.hasMore) {
       setBrowsePage((current) => current + 1);
     }
   };
@@ -333,103 +310,84 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
 
   const refresh = () => {
     if (tab === 'saved') {
-      savedRefreshRef.current = true;
-      invalidateCacheTab(cacheRef.current, 'saved');
-      setSavedRevision((current) => current + 1);
+      void queryClient
+        .invalidateQueries({
+          queryKey: voiceLibraryQueryKeys.savedScope(clientScope),
+          refetchType: 'none',
+        })
+        .then(() =>
+          queryClient.fetchQuery({
+            queryKey: voiceLibraryQueryKeys.savedPage(clientScope, savedCriteria, savedToken),
+            queryFn: ({ signal }) =>
+              client.listWorkspaceVoices(savedCriteria, savedToken, signal, true),
+            staleTime: 0,
+          }),
+        )
+        .catch(() => undefined);
     } else {
-      browseRefreshRef.current = true;
-      invalidateCacheTab(cacheRef.current, 'browse');
-      setBrowseRevision((current) => current + 1);
+      void queryClient
+        .invalidateQueries({
+          queryKey: voiceLibraryQueryKeys.browseScope(clientScope),
+          refetchType: 'none',
+        })
+        .then(() =>
+          queryClient.fetchQuery({
+            queryKey: voiceLibraryQueryKeys.browsePage(
+              clientScope,
+              browseCriteria,
+              browseSort,
+              browsePage,
+            ),
+            queryFn: ({ signal }) =>
+              client.listSharedVoices(browseCriteria, browsePage, browseSort, signal, true),
+            staleTime: 0,
+          }),
+        )
+        .catch(() => undefined);
     }
   };
 
   const retry = () => {
     setInteractionError(null);
-    if (tab === 'saved') setSavedRevision((current) => current + 1);
-    else setBrowseRevision((current) => current + 1);
+    if (tab === 'saved') void savedPageQuery.refetch();
+    else void browsePageQuery.refetch();
   };
 
   const setError = (message: string | null) => {
     setInteractionError(message);
-    if (message === null) {
-      if (tab === 'saved') setSavedError(null);
-      else setBrowseError(null);
-    }
   };
 
   const runMutation = async (
-    voiceId: string,
-    action: (signal: AbortSignal) => Promise<void>,
+    request: Omit<VoiceMutationRequest, 'controller'>,
   ): Promise<boolean> => {
     mutationControllerRef.current?.abort();
     const controller = new AbortController();
     mutationControllerRef.current = controller;
-    setMutationVoiceId(voiceId);
     setInteractionError(null);
     try {
-      await action(controller.signal);
+      await mutation.mutateAsync({ ...request, controller } as VoiceMutationRequest);
       return true;
     } catch (caught) {
       if (!aborted(caught)) setInteractionError(errorMessage(caught));
       return false;
     } finally {
-      if (mutationControllerRef.current === controller) {
-        mutationControllerRef.current = null;
-        setMutationVoiceId(null);
-      }
+      if (mutationControllerRef.current === controller) mutationControllerRef.current = null;
     }
   };
 
-  const addVoice = (item: SharedVoiceItem): Promise<boolean> =>
-    runMutation(item.voice.voiceId, async (signal) => {
-      const result = await client.saveSharedVoice(item, signal);
-      setBrowseVoices((current) =>
-        current.map((candidate) =>
-          candidate.voice.voiceId === item.voice.voiceId
-            ? { ...candidate, voice: { ...candidate.voice, saved: true } }
-            : candidate,
-        ),
-      );
-      invalidateCacheTab(cacheRef.current, 'saved');
-      invalidateCacheTab(cacheRef.current, 'browse');
-      setSavedRevision((current) => current + 1);
-      const message =
-        result.status === 'already-saved'
-          ? `${item.voice.name} is already saved.`
-          : `${item.voice.name} was added to Saved Voices.`;
-      setMutationMessage(message);
-    });
-
+  const addVoice = (item: SharedVoiceItem): Promise<boolean> => runMutation({ kind: 'add', item });
   const removeVoice = (item: WorkspaceVoiceItem): Promise<boolean> =>
-    runMutation(item.voice.voiceId, async (signal) => {
-      const result = await client.removeWorkspaceVoice(item.voice.voiceId, signal);
-      setSavedVoices((current) =>
-        current.filter((candidate) => candidate.voice.voiceId !== item.voice.voiceId),
-      );
-      setBrowseVoices((current) =>
-        current.map((candidate) =>
-          candidate.voice.voiceId === item.voice.voiceId
-            ? { ...candidate, voice: { ...candidate.voice, saved: false } }
-            : candidate,
-        ),
-      );
-      invalidateCacheTab(cacheRef.current, 'saved');
-      invalidateCacheTab(cacheRef.current, 'browse');
-      setSavedRevision((current) => current + 1);
-      const message =
-        result.status === 'already-removed'
-          ? `${item.voice.name} was already removed.`
-          : `${item.voice.name} was removed from Saved Voices.`;
-      setMutationMessage(message);
-    });
+    runMutation({ kind: 'remove', item });
 
   const activeCriteria = tab === 'saved' ? savedCriteria : browseCriteria;
   const query = tab === 'saved' ? savedQuery : browseQuery;
-  const voices: readonly VoiceLibraryItem[] = tab === 'saved' ? savedVoices : browseVoices;
-  const loading = tab === 'saved' ? savedLoading : browseLoading;
-  const pageError = tab === 'saved' ? savedError : browseError;
-  const hasMore = tab === 'saved' ? savedHasMore : browseHasMore;
+  const activePageQuery = tab === 'saved' ? savedPageQuery : browsePageQuery;
+  const voices: readonly VoiceLibraryItem[] = activePageQuery.data?.voices ?? [];
+  const loading = activePageQuery.isPending || activePageQuery.isFetching;
+  const pageError = activePageQuery.error ? errorMessage(activePageQuery.error) : null;
+  const hasMore = activePageQuery.data?.hasMore ?? false;
   const pageNumber = tab === 'saved' ? savedIndex + 1 : browsePage + 1;
+  const mutationVoiceId = mutation.isPending ? mutation.variables.item.voice.voiceId : null;
 
   return {
     tab,
@@ -443,7 +401,7 @@ export const useVoiceLibrary = (client: VoiceLibraryClient = defaultVoiceLibrary
     pageNumber,
     previousDisabled: pageNumber === 1,
     searchHint: searchHintFor(query),
-    announcement,
+    announcement: `${voices.length} ${tab === 'saved' ? 'saved' : 'catalog'} voices shown.`,
     mutationMessage,
     mutationVoiceId,
     browseSort,

@@ -26,6 +26,7 @@ export interface BunRuntimeContractProbeResult {
   readonly spaHtml: ProbeResponse;
   readonly spaJson: ProbeResponse;
   readonly apiStaticShadow: ProbeResponse;
+  readonly bodylessDelete: ProbeResponse;
   readonly duplicateBindRejected: boolean;
   readonly repeatedCloseUsesSamePromise: boolean;
   readonly unauthorizedBodyPulls: number;
@@ -210,6 +211,7 @@ export const runBunRuntimeContractProbe = async (): Promise<BunRuntimeContractPr
       },
     });
   });
+  application.delete('/bodyless-delete-probe', (_request, reply) => reply.status(204).send());
   const secureApplication = createApp({
     config: testConfig({ demoAuthEnabled: true }),
   });
@@ -240,6 +242,9 @@ export const runBunRuntimeContractProbe = async (): Promise<BunRuntimeContractPr
     );
     const apiStaticShadow = await responseSnapshot(
       await fetch(`${origin}/api/shadow`, { headers: { accept: 'text/html' } }),
+    );
+    const bodylessDelete = await responseSnapshot(
+      await fetch(`${origin}/bodyless-delete-probe`, { method: 'DELETE' }),
     );
 
     duplicateApplication = createApp({ config: testConfig() });
@@ -363,6 +368,7 @@ export const runBunRuntimeContractProbe = async (): Promise<BunRuntimeContractPr
       spaHtml,
       spaJson,
       apiStaticShadow,
+      bodylessDelete,
       duplicateBindRejected,
       repeatedCloseUsesSamePromise,
       unauthorizedBodyPulls,

@@ -6,6 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { studioTheme } from '../../ui';
+import { RemoteStateTestProvider } from '../../test/RemoteStateTestProvider';
 import type {
   CreativeAssetRepository,
   CreativeAssetStore,
@@ -101,19 +102,21 @@ const renderPanel = (overrides: Partial<Parameters<typeof CharacterWardrobePanel
   } as unknown as CreativeAssetRepository;
   const onUse = vi.fn();
   render(
-    <ThemeProvider theme={studioTheme}>
-      <CharacterWardrobePanel
-        repository={repository}
-        store={store}
-        character={character}
-        addOutfitAvailable
-        changeFeaturesAvailable
-        onUse={onUse}
-        onDirtyChange={vi.fn()}
-        onClose={vi.fn()}
-        {...overrides}
-      />
-    </ThemeProvider>,
+    <RemoteStateTestProvider>
+      <ThemeProvider theme={studioTheme}>
+        <CharacterWardrobePanel
+          repository={repository}
+          store={store}
+          character={character}
+          addOutfitAvailable
+          changeFeaturesAvailable
+          onUse={onUse}
+          onDirtyChange={vi.fn()}
+          onClose={vi.fn()}
+          {...overrides}
+        />
+      </ThemeProvider>
+    </RemoteStateTestProvider>,
   );
   return { repository, onUse };
 };

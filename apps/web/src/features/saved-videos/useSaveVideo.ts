@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SavedVideoDetail, SavedVideoOrigin } from '@studio/contracts';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   appendSavedVideoVersion,
   appendSavedVideoVersionDirect,
@@ -8,6 +9,7 @@ import {
   saveVideoDirect,
 } from '../../adapters/api-client/savedVideosApi';
 import type { RecordingArtifact } from '../recording/types';
+import { savedVideoQueryKeys } from './savedVideoQueryKeys';
 import { createSavedVideoThumbnail } from './thumbnailClient';
 
 export type SaveVideoState =
@@ -43,10 +45,33 @@ const originForArtifact = (artifact: RecordingArtifact): SavedVideoOrigin => {
   }
 };
 
+const saveThumbnailWhenAvailable = async (
+  video: SavedVideoDetail,
+  media: Blob,
+  signal: AbortSignal,
+): Promise<SavedVideoDetail> =>
+  createSavedVideoThumbnail(media, signal)
+    .then((thumbnail) =>
+      saveSavedVideoThumbnail(video.id, video.currentVersion.id, thumbnail, signal),
+    )
+    .catch((error: unknown) => {
+      if (signal.aborted) throw error;
+      return video;
+    });
+
 export const useSaveVideo = (directMultipartUpload = false) => {
+  const queryClient = useQueryClient();
   const [state, setState] = useState<SaveVideoState>({ status: 'idle' });
   const keys = useRef(new Map<string, string>());
   const controller = useRef<AbortController | null>(null);
+
+  const completeSave = useCallback(
+    (artifactId: string, video: SavedVideoDetail) => {
+      void queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists });
+      setState({ status: 'saved', artifactId, video });
+    },
+    [queryClient],
+  );
 
   useEffect(() => () => controller.current?.abort('unmount'), []);
 
@@ -76,16 +101,9 @@ export const useSaveVideo = (directMultipartUpload = false) => {
           sourceVersionId: source?.versionId ?? null,
           signal: active.signal,
         });
-        const saved = await createSavedVideoThumbnail(artifact.media, active.signal)
-          .then((thumbnail) =>
-            saveSavedVideoThumbnail(video.id, video.currentVersion.id, thumbnail, active.signal),
-          )
-          .catch((error: unknown) => {
-            if (active.signal.aborted) throw error;
-            return video;
-          });
+        const saved = await saveThumbnailWhenAvailable(video, artifact.media, active.signal);
         if (active.signal.aborted) return null;
-        setState({ status: 'saved', artifactId: artifact.id, video: saved });
+        completeSave(artifact.id, saved);
         return saved;
       } catch (error) {
         if (active.signal.aborted) return null;
@@ -99,7 +117,7 @@ export const useSaveVideo = (directMultipartUpload = false) => {
         if (controller.current === active) controller.current = null;
       }
     },
-    [directMultipartUpload],
+    [completeSave, directMultipartUpload],
   );
 
   const replace = useCallback(
@@ -132,16 +150,9 @@ export const useSaveVideo = (directMultipartUpload = false) => {
           sourceVersionId: target.currentVersionId,
           signal: active.signal,
         });
-        const saved = await createSavedVideoThumbnail(artifact.media, active.signal)
-          .then((thumbnail) =>
-            saveSavedVideoThumbnail(video.id, video.currentVersion.id, thumbnail, active.signal),
-          )
-          .catch((error: unknown) => {
-            if (active.signal.aborted) throw error;
-            return video;
-          });
+        const saved = await saveThumbnailWhenAvailable(video, artifact.media, active.signal);
         if (active.signal.aborted) return null;
-        setState({ status: 'saved', artifactId: artifact.id, video: saved });
+        completeSave(artifact.id, saved);
         return saved;
       } catch (error) {
         if (active.signal.aborted) return null;
@@ -155,7 +166,7 @@ export const useSaveVideo = (directMultipartUpload = false) => {
         if (controller.current === active) controller.current = null;
       }
     },
-    [directMultipartUpload],
+    [completeSave, directMultipartUpload],
   );
 
   const reset = useCallback(() => {

@@ -15,6 +15,7 @@
     "@mediabunny/aac-encoder": "1.52.3",
     "@studio/contracts": "workspace:*",
     "@studio/domain": "workspace:*",
+    "@tanstack/react-query": "5.101.4",
     "@uppy/aws-s3": "5.1.0",
     "@uppy/core": "5.2.0",
     "idb": "8.0.3",

@@ -75,6 +75,18 @@ The mounted Studio owns focused controllers for:
 - account navigation and ordered logout cleanup;
 - overlays and route-owned workspace presentation.
 
+The authenticated Studio composition boundary owns one TanStack Query client for lightweight
+same-origin server state; the provider-free entry does not load that runtime. The client is
+recreated when the authenticated user changes and its previous cache is cleared. Queries and
+mutations do not retry by default and do not refetch on window focus or reconnect. The local,
+non-billable capability read is the only bounded automatic retry. Saved-video metadata/cursor pages,
+voice-library metadata pages, and accepted video-job status reads use Query cancellation and
+targeted cache updates or invalidation; voice pages remain fresh for five minutes. Video-job status
+polling follows the server-provided cadence and never retries a failed read automatically. Video
+bytes and Blobs, editor and camera state, current timeline edits, temporary UI state, local
+creative-asset repositories, provider submission, result retrieval, and finalization remain under
+their existing owners and never enter this cache.
+
 Saved-video character attribution is pinned when a live recording or completed Character Swap
 artifact is created. Each immutable video version stores the parent character name as its gallery
 filter key and an optional exact variant name as display-only metadata. Voice and later local edits
@@ -565,7 +577,7 @@ The creator of a resource owns idempotent cleanup.
 | Session orchestration | Owned local/remote streams, cloned provider input, provider client, token abort, active-session clock                                                          |
 | Session draft         | Ephemeral files and preview object URLs                                                                                                                        |
 | Recording/review      | Recorders, chunks, conversion abort, immutable source/sidecar, edited/visual/voice artifact URLs, cap timer, unload protection                                 |
-| Existing-video flow   | Validation generations, one ephemeral visual draft, provider polling/download                                                                                  |
+| Existing-video flow   | Validation generations, one ephemeral visual draft, job-status observer, provider-result download                                                              |
 | Video edit session    | Pinned source/draft/history, module worker generation, render candidate, chunk accumulator, validation abort                                                   |
 | Character Wardrobe    | Variant creation draft, generation abort, stale-result rejection, uncommitted reference discard, exact version handoff                                         |
 | Voice processing      | Abort controllers, Web Audio/Mediabunny resources, temporary processed URLs                                                                                    |

@@ -1,7 +1,10 @@
 // @vitest-environment jsdom
 
+import { QueryClientProvider } from '@tanstack/react-query';
 import { act, renderHook } from '@testing-library/react';
+import type { PropsWithChildren } from 'react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { createRemoteStateQueryClient } from '../application/remote-state/RemoteStateProvider';
 import type { ProviderAvailability } from '../features/media-session';
 import {
   PROVIDER_AVAILABILITY_RETRY_DELAYS_MS,
@@ -32,6 +35,13 @@ const flushPromises = async (): Promise<void> => {
   await Promise.resolve();
 };
 
+const createWrapper = () => {
+  const client = createRemoteStateQueryClient();
+  return ({ children }: PropsWithChildren) => (
+    <QueryClientProvider client={client}>{children}</QueryClientProvider>
+  );
+};
+
 beforeEach(() => {
   vi.useFakeTimers();
   fetchProviderAvailability.mockReset();
@@ -49,7 +59,9 @@ describe('useProviderAvailability', () => {
       .mockRejectedValueOnce(new TypeError('API is still starting'))
       .mockResolvedValueOnce(availableProviders);
 
-    const { result, unmount } = renderHook(() => useProviderAvailability());
+    const { result, unmount } = renderHook(() => useProviderAvailability(), {
+      wrapper: createWrapper(),
+    });
 
     await act(flushPromises);
     expect(fetchProviderAvailability).toHaveBeenCalledTimes(1);
@@ -73,7 +85,9 @@ describe('useProviderAvailability', () => {
   it('lets a manual retry recover immediately and cancels the queued automatic retry', async () => {
     fetchProviderAvailability.mockRejectedValue(new TypeError('Capability request failed'));
 
-    const { result, unmount } = renderHook(() => useProviderAvailability());
+    const { result, unmount } = renderHook(() => useProviderAvailability(), {
+      wrapper: createWrapper(),
+    });
 
     await act(async () => {
       await flushPromises();
@@ -86,8 +100,11 @@ describe('useProviderAvailability', () => {
     expect(result.current.state).toBe('error');
 
     fetchProviderAvailability.mockResolvedValueOnce(availableProviders);
-    act(() => result.current.retry());
-    await act(flushPromises);
+    await act(async () => {
+      result.current.retry();
+      await vi.runAllTimersAsync();
+      await flushPromises();
+    });
 
     expect(fetchProviderAvailability).toHaveBeenCalledTimes(
       PROVIDER_AVAILABILITY_RETRY_DELAYS_MS.length + 2,

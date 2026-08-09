@@ -1,9 +1,12 @@
 // @vitest-environment jsdom
 
 import type { SavedVideoDetail } from '@studio/contracts';
-import { act, renderHook } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
+import { act, renderHook as renderTestingLibraryHook } from '@testing-library/react';
+import { createElement } from 'react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { SaveVideoInput } from '../../adapters/api-client/savedVideosApi';
+import { createRemoteStateQueryClient } from '../../application/remote-state/RemoteStateProvider';
 import type { RecordingArtifact } from '../recording/types';
 
 const api = vi.hoisted(() => ({
@@ -49,6 +52,19 @@ vi.mock('./thumbnailClient', () => ({
 }));
 
 import { useSaveVideo } from './useSaveVideo';
+import { savedVideoQueryKeys } from './savedVideoQueryKeys';
+
+const queryClients: QueryClient[] = [];
+
+const renderHook = <Result>(render: () => Result) => {
+  const queryClient = createRemoteStateQueryClient();
+  queryClients.push(queryClient);
+  const hook = renderTestingLibraryHook(render, {
+    wrapper: ({ children }) =>
+      createElement(QueryClientProvider, { client: queryClient }, children),
+  });
+  return { ...hook, queryClient };
+};
 
 const videoId = 'c26b5280-1538-44cd-82db-a6b1356acf62';
 const versionId = '2efcc6c3-e82c-419a-8807-c0026170fb75';
@@ -110,6 +126,10 @@ describe('useSaveVideo', () => {
     api.createSavedVideoThumbnail
       .mockReset()
       .mockResolvedValue(new Blob(['thumbnail'], { type: 'image/webp' }));
+  });
+
+  afterEach(() => {
+    for (const queryClient of queryClients.splice(0)) queryClient.clear();
   });
 
   it('saves every runtime origin, reuses idempotency, and uploads an optional thumbnail', async () => {
@@ -188,6 +208,34 @@ describe('useSaveVideo', () => {
     expect(api.appendSavedVideoVersionDirect).toHaveBeenCalledOnce();
     expect(api.saveVideo).not.toHaveBeenCalled();
     expect(api.appendSavedVideoVersion).not.toHaveBeenCalled();
+  });
+
+  it('invalidates saved-video metadata after save and replace, but not after failure', async () => {
+    const { result, queryClient } = renderHook(() => useSaveVideo());
+    const listKey = [...savedVideoQueryKeys.lists, { sort: 'latest' }] as const;
+    const seedList = () => queryClient.setQueryData(listKey, { videos: [] });
+
+    seedList();
+    await act(async () => {
+      await result.current.save(artifact());
+    });
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true);
+
+    seedList();
+    await act(async () => {
+      await result.current.replace(artifact('edited'), {
+        videoId,
+        currentVersionId: versionId,
+      });
+    });
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(true);
+
+    seedList();
+    api.saveVideo.mockRejectedValueOnce(new Error('disk unavailable'));
+    await act(async () => {
+      await result.current.save(artifact());
+    });
+    expect(queryClient.getQueryState(listKey)?.isInvalidated).toBe(false);
   });
 
   it('coalesces same-tick save attempts before React publishes the saving state', async () => {

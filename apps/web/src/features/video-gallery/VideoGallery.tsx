@@ -1,6 +1,18 @@
 import { useTheme } from '@emotion/react';
-import type { SavedVideoFormat, SavedVideoSort, SavedVideoSummary } from '@studio/contracts';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import type {
+  SavedVideoFormat,
+  SavedVideoSort,
+  SavedVideoSummary,
+  SavedVideosResponse,
+} from '@studio/contracts';
+import {
+  keepPreviousData,
+  useInfiniteQuery,
+  useMutation,
+  useQueryClient,
+  type InfiniteData,
+} from '@tanstack/react-query';
+import { useEffect, useRef, useState } from 'react';
 import {
   deleteSavedVideo,
   downloadSavedVideoUrl,
@@ -10,6 +22,7 @@ import {
   savedVideoThumbnailUrl,
 } from '../../adapters/api-client/savedVideosApi';
 import { Button, OverlayPanel, SelectField, StatusNotice } from '../../ui';
+import { savedVideoQueryKeys } from '../saved-videos/savedVideoQueryKeys';
 import {
   actionMenuPopoverStyles,
   actionMenuStyles,
@@ -223,64 +236,77 @@ export const VideoGallery = ({
   onUse: (video: SavedVideoSummary, intent: 'play' | 'edit') => Promise<void>;
 }) => {
   const theme = useTheme();
-  const [videos, setVideos] = useState<readonly SavedVideoSummary[]>([]);
-  const [nextCursor, setNextCursor] = useState<string | null>(null);
-  const [total, setTotal] = useState(0);
-  const [characterNames, setCharacterNames] = useState<readonly string[]>([]);
-  const [availableFormats, setAvailableFormats] = useState<readonly SavedVideoFormat[]>([]);
+  const queryClient = useQueryClient();
   const [characterName, setCharacterName] = useState('');
   const [format, setFormat] = useState<SavedVideoFormat | ''>('');
   const [sort, setSort] = useState<SavedVideoSort>('latest');
-  const [status, setStatus] = useState<'loading' | 'ready' | 'error'>('loading');
   const [message, setMessage] = useState<string | null>(null);
-  const [busyId, setBusyId] = useState<string | null>(null);
+  const [useBusyId, setUseBusyId] = useState<string | null>(null);
   const [previewVideo, setPreviewVideo] = useState<SavedVideoSummary | null>(null);
   const [previewError, setPreviewError] = useState(false);
   const [brokenThumbnails, setBrokenThumbnails] = useState<ReadonlySet<string>>(() => new Set());
-  const request = useRef<AbortController | null>(null);
   const previewTriggerRef = useRef<HTMLButtonElement | null>(null);
   const previewPlayerRef = useRef<HTMLVideoElement | null>(null);
 
-  const load = useCallback(
-    async (cursor?: string) => {
-      request.current?.abort('replaced');
-      const controller = new AbortController();
-      request.current = controller;
-      if (!cursor) setStatus('loading');
-      try {
-        const page = await listSavedVideos({
-          ...(cursor ? { cursor } : {}),
-          ...(characterName ? { characterName } : {}),
-          ...(format ? { format } : {}),
-          sort,
-          signal: controller.signal,
-        });
-        if (controller.signal.aborted) return;
-        setVideos((current) => (cursor ? [...current, ...page.videos] : page.videos));
-        setNextCursor(page.nextCursor);
-        setTotal(page.total);
-        setCharacterNames(page.facets.characterNames);
-        setAvailableFormats(page.facets.formats);
-        setStatus('ready');
-        setMessage(null);
-      } catch (error) {
-        if (controller.signal.aborted) return;
-        setStatus('error');
-        setMessage(error instanceof Error ? error.message : 'Saved videos could not be loaded.');
-      } finally {
-        if (request.current === controller) request.current = null;
-      }
-    },
-    [characterName, format, sort],
-  );
+  const videosQuery = useInfiniteQuery({
+    queryKey: [
+      ...savedVideoQueryKeys.lists,
+      {
+        characterName: characterName || null,
+        format: format || null,
+        sort,
+      },
+    ],
+    queryFn: ({ pageParam, signal }) =>
+      listSavedVideos({
+        ...(pageParam ? { cursor: pageParam } : {}),
+        ...(characterName ? { characterName } : {}),
+        ...(format ? { format } : {}),
+        sort,
+        signal,
+      }),
+    initialPageParam: null as string | null,
+    getNextPageParam: (page) => page.nextCursor,
+    placeholderData: keepPreviousData,
+  });
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => void load(), 0);
-    return () => {
-      window.clearTimeout(timer);
-      request.current?.abort('unmount');
-    };
-  }, [load]);
+  const renameMutation = useMutation({
+    mutationFn: ({ videoId, title }: { readonly videoId: string; readonly title: string }) =>
+      renameSavedVideo(videoId, title),
+    onSuccess: (updated) => {
+      queryClient.setQueriesData<InfiniteData<SavedVideosResponse>>(
+        { queryKey: savedVideoQueryKeys.lists },
+        (current) =>
+          current
+            ? {
+                ...current,
+                pages: current.pages.map((page) => ({
+                  ...page,
+                  videos: page.videos.map((video) => (video.id === updated.id ? updated : video)),
+                })),
+              }
+            : current,
+      );
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (videoId: string) => deleteSavedVideo(videoId),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: savedVideoQueryKeys.lists });
+    },
+  });
+
+  const pages = videosQuery.data?.pages ?? [];
+  const latestPage = pages[pages.length - 1];
+  const videos = pages.flatMap((page) => page.videos);
+  const total = latestPage?.total ?? 0;
+  const characterNames = latestPage?.facets.characterNames ?? [];
+  const availableFormats = latestPage?.facets.formats ?? [];
+  const busyId =
+    useBusyId ??
+    (renameMutation.isPending ? renameMutation.variables.videoId : null) ??
+    (deleteMutation.isPending ? deleteMutation.variables : null);
 
   useEffect(() => {
     if (!previewVideo) return;
@@ -294,40 +320,32 @@ export const VideoGallery = ({
   const rename = async (video: SavedVideoSummary) => {
     const title = window.prompt('Rename saved video', video.title)?.trim();
     if (!title || title === video.title) return;
-    setBusyId(video.id);
     try {
-      const updated = await renameSavedVideo(video.id, title);
-      setVideos((current) => current.map((item) => (item.id === video.id ? updated : item)));
+      await renameMutation.mutateAsync({ videoId: video.id, title });
       setMessage('Video renamed.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'The video could not be renamed.');
-    } finally {
-      setBusyId(null);
     }
   };
 
   const remove = async (video: SavedVideoSummary) => {
     if (!window.confirm(`Delete “${video.title}” from Saved Videos?`)) return;
-    setBusyId(video.id);
     try {
-      await deleteSavedVideo(video.id);
-      await load();
+      await deleteMutation.mutateAsync(video.id);
       setMessage('Video removed.');
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'The video could not be deleted.');
-    } finally {
-      setBusyId(null);
     }
   };
 
   const handleUseVideo = async (video: SavedVideoSummary, intent: 'play' | 'edit') => {
-    setBusyId(video.id);
+    setUseBusyId(video.id);
     try {
       await onUse(video, intent);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : 'The video could not be loaded.');
     } finally {
-      setBusyId(null);
+      setUseBusyId(null);
     }
   };
 
@@ -350,13 +368,16 @@ export const VideoGallery = ({
     setPreviewError(false);
   };
 
-  if (status === 'loading') {
+  if (videosQuery.isPending) {
     return <p role="status">Loading saved videos…</p>;
   }
-  if (status === 'error') {
+  if (videosQuery.isError && !videosQuery.data) {
     return (
       <StatusNotice tone="danger" role="alert">
-        {message} <Button onClick={() => void load()}>Retry</Button>
+        {videosQuery.error instanceof Error
+          ? videosQuery.error.message
+          : 'Saved videos could not be loaded.'}{' '}
+        <Button onClick={() => void videosQuery.refetch()}>Retry</Button>
       </StatusNotice>
     );
   }
@@ -439,9 +460,14 @@ export const VideoGallery = ({
           onRemove={remove}
         />
       )}
-      {nextCursor ? (
+      {videosQuery.hasNextPage ? (
         <div css={paginationStyles(theme)}>
-          <Button variant="secondary" onClick={() => void load(nextCursor)}>
+          <Button
+            variant="secondary"
+            busy={videosQuery.isFetchingNextPage}
+            disabled={videosQuery.isFetchingNextPage}
+            onClick={() => void videosQuery.fetchNextPage()}
+          >
             Load more videos
           </Button>
         </div>

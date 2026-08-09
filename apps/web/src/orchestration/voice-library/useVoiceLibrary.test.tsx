@@ -1,8 +1,15 @@
 // @vitest-environment jsdom
 
+import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
+import type { PropsWithChildren } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { WorkspaceVoiceItem, WorkspaceVoicePage } from '../../application/types';
+import { createRemoteStateQueryClient } from '../../application/remote-state/RemoteStateProvider';
+import type {
+  SharedVoiceItem,
+  WorkspaceVoiceItem,
+  WorkspaceVoicePage,
+} from '../../application/types';
 import { useVoiceLibrary, type VoiceLibraryClient } from './useVoiceLibrary';
 
 const emptyWorkspacePage = (overrides: Partial<WorkspaceVoicePage> = {}): WorkspaceVoicePage => ({
@@ -55,6 +62,15 @@ const secondSavedVoice: WorkspaceVoiceItem = {
   },
 };
 
+const sharedVoice: SharedVoiceItem = {
+  kind: 'shared',
+  voice: {
+    ...savedVoice.voice,
+    publicOwnerId: 'owner-one',
+    saved: false,
+  },
+};
+
 const deferred = <Value,>() => {
   let resolve!: (value: Value) => void;
   const promise = new Promise<Value>((settle) => {
@@ -63,7 +79,20 @@ const deferred = <Value,>() => {
   return { promise, resolve };
 };
 
+const queryClients: QueryClient[] = [];
+
+const renderVoiceLibrary = (client: VoiceLibraryClient) => {
+  const queryClient = createRemoteStateQueryClient();
+  queryClients.push(queryClient);
+  return renderHook(() => useVoiceLibrary(client), {
+    wrapper: ({ children }: PropsWithChildren) => (
+      <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+    ),
+  });
+};
+
 afterEach(() => {
+  for (const queryClient of queryClients.splice(0)) queryClient.clear();
   vi.useRealTimers();
 });
 
@@ -71,7 +100,7 @@ describe('useVoiceLibrary', () => {
   it('debounces searches for 300 ms after the third character', async () => {
     vi.useFakeTimers();
     const client = createClient();
-    const { result } = renderHook(() => useVoiceLibrary(client));
+    const { result } = renderVoiceLibrary(client);
     await act(() => Promise.resolve());
 
     expect(client.listWorkspaceVoices).toHaveBeenCalledTimes(1);
@@ -98,7 +127,7 @@ describe('useVoiceLibrary', () => {
     vi.mocked(client.listWorkspaceVoices).mockResolvedValue(
       emptyWorkspacePage({ voices: [savedVoice] }),
     );
-    const { result } = renderHook(() => useVoiceLibrary(client));
+    const { result } = renderVoiceLibrary(client);
     await act(() => Promise.resolve());
 
     act(() => result.current.setQuery('north'));
@@ -121,7 +150,7 @@ describe('useVoiceLibrary', () => {
       requestSignal = signal;
       return new Promise<WorkspaceVoicePage>(() => undefined);
     });
-    const { unmount } = renderHook(() => useVoiceLibrary(client));
+    const { unmount } = renderVoiceLibrary(client);
 
     await waitFor(() => expect(requestSignal).toBeDefined());
     unmount();
@@ -136,7 +165,7 @@ describe('useVoiceLibrary', () => {
     vi.mocked(client.listWorkspaceVoices)
       .mockReturnValueOnce(first.promise)
       .mockReturnValueOnce(second.promise);
-    const { result } = renderHook(() => useVoiceLibrary(client));
+    const { result } = renderVoiceLibrary(client);
 
     await waitFor(() => expect(client.listWorkspaceVoices).toHaveBeenCalledTimes(1));
     act(() => result.current.setFilter('language', 'en'));
@@ -146,7 +175,7 @@ describe('useVoiceLibrary', () => {
       second.resolve(emptyWorkspacePage({ voices: [secondSavedVoice] }));
       await second.promise;
     });
-    expect(result.current.voices).toEqual([secondSavedVoice]);
+    await waitFor(() => expect(result.current.voices).toEqual([secondSavedVoice]));
 
     await act(async () => {
       first.resolve(emptyWorkspacePage({ voices: [savedVoice] }));
@@ -166,7 +195,7 @@ describe('useVoiceLibrary', () => {
         }),
       )
       .mockResolvedValueOnce(emptyWorkspacePage({ voices: [secondSavedVoice] }));
-    const { result } = renderHook(() => useVoiceLibrary(client));
+    const { result } = renderVoiceLibrary(client);
 
     await waitFor(() => expect(result.current.voices).toEqual([savedVoice]));
     act(() => result.current.next());
@@ -182,7 +211,7 @@ describe('useVoiceLibrary', () => {
     vi.mocked(client.listWorkspaceVoices).mockResolvedValue(
       emptyWorkspacePage({ voices: [savedVoice], total: 1 }),
     );
-    const { result } = renderHook(() => useVoiceLibrary(client));
+    const { result } = renderVoiceLibrary(client);
 
     await waitFor(() => expect(result.current.voices).toEqual([savedVoice]));
     act(() => result.current.setSelected(savedVoice));
@@ -194,5 +223,28 @@ describe('useVoiceLibrary', () => {
 
     expect(result.current.criteria.language).toBe('en');
     expect(result.current.selected).toEqual(savedVoice);
+  });
+
+  it('updates catalog metadata and invalidates saved pages after adding a voice', async () => {
+    const client = createClient();
+    vi.mocked(client.listSharedVoices).mockResolvedValue({
+      voices: [sharedVoice],
+      hasMore: false,
+      page: 0,
+      total: 1,
+    });
+    const { result } = renderVoiceLibrary(client);
+    await waitFor(() => expect(client.listWorkspaceVoices).toHaveBeenCalledOnce());
+
+    act(() => result.current.setTab('browse'));
+    await waitFor(() => expect(result.current.voices).toEqual([sharedVoice]));
+    await act(async () => {
+      await expect(result.current.addVoice(sharedVoice)).resolves.toBe(true);
+    });
+
+    expect(client.saveSharedVoice).toHaveBeenCalledWith(sharedVoice, expect.any(AbortSignal));
+    expect(result.current.voices[0]).toMatchObject({ kind: 'shared', voice: { saved: true } });
+    act(() => result.current.setTab('saved'));
+    await waitFor(() => expect(client.listWorkspaceVoices).toHaveBeenCalledTimes(2));
   });
 });

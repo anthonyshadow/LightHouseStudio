@@ -1,4 +1,5 @@
 import eslint from '@eslint/js';
+import tanstackQuery from '@tanstack/eslint-plugin-query';
 import hooks from 'eslint-plugin-react-hooks';
 import jsxA11y from 'eslint-plugin-jsx-a11y';
 import globals from 'globals';
@@ -22,6 +23,7 @@ export default tseslint.config(
     ],
   },
   eslint.configs.recommended,
+  ...tanstackQuery.configs['flat/recommended'],
   ...tseslint.configs.recommendedTypeChecked.map((config) => ({
     ...config,
     files: ['**/*.{ts,tsx}'],
