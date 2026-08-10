@@ -14,6 +14,7 @@ security, data, lifecycle, provider, accessibility, or release regression.
 | Real Bun listener probes   | Pre-parse security, body ceilings, HEAD/static behavior, disconnects, bind ownership, and shutdown |
 | Functional Playwright      | Critical journeys, persistent-stage ownership, recovery, responsive actions, and network denial    |
 | Production smoke           | Built entry, direct Studio, and health routes from one loopback origin                             |
+| Development database smoke | Local PostgreSQL migrations, transaction rollback, seeded-user write, and cleanup                  |
 | Curated visual regression  | High-risk composition at the five canonical viewports; always explicit                             |
 | Manual/live validation     | Physical media, codecs, memory, assistive technology, downloads, and paid provider behavior        |
 
@@ -38,6 +39,7 @@ opens those stories.
 | `bun run test:all`                   | Vitest, build, production smoke, functional E2E, and visual regression            |
 | `bun run quality`                    | Normal implementation gate: types, lint, format, architecture, Vitest, and builds |
 | `bun run check:dead-code:production` | Production file/dependency reachability; excludes test-only exports               |
+| `bun run db:smoke:development`       | Local PostgreSQL connection, transaction, seeded-user, and cleanup smoke          |
 
 `test:unit` and `test:integration` are useful focused subsets; `bun run test` runs both categories
 once through a single Node-backed Vitest invocation. Bun owns package installation and the API
@@ -89,8 +91,10 @@ The retained suite protects:
 Physical devices, real codecs and browser memory, assistive-technology output, completed browser
 downloads, live provider entitlement/output/retention, paid-provider behavior, real Neon migration
 and restore, and live R2 multipart/inventory behavior remain outside ordinary automation. Database
-and R2 unit tests use fakes and never require credentials or external traffic. Manual/live checks
-use `MANUAL_QA.md`, `LIVE_PROVIDER_SMOKE.md`, and `CLOUD_PERSISTENCE.md`.
+and R2 unit tests use fakes and never require credentials or external traffic. The dedicated CI
+database job starts ephemeral PostgreSQL, applies migrations, and uses fake R2 configuration; it
+does not receive GitHub Environment secrets or contact Neon/R2. Manual/live checks use
+`MANUAL_QA.md`, `LIVE_PROVIDER_SMOKE.md`, and `CLOUD_PERSISTENCE.md`.
 
 ## Browser and visual scope
 
@@ -135,12 +139,13 @@ Ordinary pushes and pull requests run:
 2. `bun run quality`, including the static Storybook build;
 3. the built production smoke;
 4. focused functional Playwright journeys;
-5. on pull requests and `main` pushes, CodeQL JavaScript/TypeScript analysis with the
+5. an isolated PostgreSQL migration/transaction smoke with fake R2 configuration;
+6. on pull requests and `develop`/`main` pushes, CodeQL JavaScript/TypeScript analysis with the
    `security-extended` query suite; and
-6. on pull requests, dependency review for newly introduced direct and transitive vulnerabilities
+7. on pull requests, dependency review for newly introduced direct and transitive vulnerabilities
    and denied licenses.
 
-The required `Quality` check aggregates the essential and functional-browser jobs. Repository
+The required `Quality` check aggregates the essential, functional-browser, and database jobs. Repository
 branch protection also requires the separate `Dependency Review` and `CodeQL` checks. CodeQL runs
 weekly in addition to ordinary push and pull-request analysis. GitHub Actions are pinned to full
 commit SHAs; the `github-actions` Dependabot entry remains responsible for proposing pin updates.

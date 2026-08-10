@@ -32,7 +32,9 @@ describe('useCreativeLibraryCloudSync', () => {
       jsonScenario('PUT', '/api/creative-library', { body: { revision: 1 } }, observe),
     );
 
-    const rendered = renderHook(() => useCreativeLibraryCloudSync(repository));
+    const rendered = renderHook(() =>
+      useCreativeLibraryCloudSync(repository, { initializeEmptyRemoteFromLocal: true }),
+    );
 
     await waitFor(() => expect(requests).toHaveLength(2));
     expect(requests[1]!.method).toBe('PUT');
@@ -52,6 +54,26 @@ describe('useCreativeLibraryCloudSync', () => {
       expect(repository.getSnapshot().notice).toContain('another session changed the library'),
     );
     expect(repository.getSnapshot().store.savedPrompts).toHaveLength(2);
+    rendered.unmount();
+  });
+
+  it('clears stale local data when empty remote initialization is disabled', async () => {
+    const repository = addPrompt('Stale development look');
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        '/api/creative-library',
+        { body: { revision: 0, store: createEmptyCreativeAssetStore() } },
+        observe,
+      ),
+    );
+
+    const rendered = renderHook(() => useCreativeLibraryCloudSync(repository));
+
+    await waitFor(() => expect(repository.getSnapshot().store.savedPrompts).toEqual([]));
+    expect(requests).toHaveLength(1);
+    expect(repository.getSnapshot().notice).toBeNull();
     rendered.unmount();
   });
 

@@ -319,7 +319,8 @@ export const discardReferenceImage = async (assetId: string): Promise<void> => {
   await apiFetch(`/api/reference-images/${encodeURIComponent(assetId)}`, {
     method: 'DELETE',
     cache: 'no-store',
-    headers: { Accept: 'application/json' },
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: '{}',
   });
 };
 

@@ -102,6 +102,11 @@ import {
   type SavedVideoCharacterAttribution,
 } from '../features/saved-videos/useSaveVideo';
 import { SessionCleanupCoordinator } from '../orchestration/lifecycle/SessionCleanupCoordinator';
+import {
+  currentBrowserPersistenceScope,
+  environmentScopedPersistenceName,
+  legacyPersistenceNamesForScope,
+} from '../persistence/environmentScope';
 
 const CharacterBuilderCoordinator = lazy(() =>
   import('../features/character-builder/CharacterBuilderCoordinator').then((module) => ({
@@ -229,21 +234,31 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const desktopStudioLayout = useDesktopStudioLayout();
+  const browserPersistenceScope = currentBrowserPersistenceScope();
   const repository = useMemo(
     () =>
       createCreativeAssetRepository({
-        storageKey: `${CREATIVE_ASSET_STORAGE_KEY}.${auth.session!.user.id}`,
-        legacyStorageKeys: [
-          `${WARDROBE_CREATIVE_ASSET_STORAGE_KEY}.${auth.session!.user.id}`,
+        storageKey: environmentScopedPersistenceName(
           CREATIVE_ASSET_STORAGE_KEY,
-          WARDROBE_CREATIVE_ASSET_STORAGE_KEY,
-        ],
+          auth.session!.user.id,
+          browserPersistenceScope,
+        ),
+        legacyStorageKeys: legacyPersistenceNamesForScope(
+          [
+            `${WARDROBE_CREATIVE_ASSET_STORAGE_KEY}.${auth.session!.user.id}`,
+            CREATIVE_ASSET_STORAGE_KEY,
+            WARDROBE_CREATIVE_ASSET_STORAGE_KEY,
+          ],
+          browserPersistenceScope,
+        ),
         ownerUserId: auth.session!.user.id,
       }),
-    [auth.session],
+    [auth.session, browserPersistenceScope],
   );
   useEffect(() => () => repository.close?.(), [repository]);
-  useCreativeLibraryCloudSync(repository);
+  useCreativeLibraryCloudSync(repository, {
+    initializeEmptyRemoteFromLocal: browserPersistenceScope === 'production',
+  });
   const sessionCleanup = useMemo(() => new SessionCleanupCoordinator(), []);
   const [logoutPromptOpen, setLogoutPromptOpen] = useState(false);
   const [logoutBlockedOpen, setLogoutBlockedOpen] = useState(false);

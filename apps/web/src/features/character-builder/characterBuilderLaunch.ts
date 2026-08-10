@@ -1,6 +1,7 @@
 import { generateStructuredPrompt, type CharacterTransformDraft } from '@studio/domain';
 import type { SavedCharacterPrompt } from '../creative-assets/types';
 import { discardReferenceImage } from '../../adapters/api-client/apiClient';
+import { environmentScopedPersistenceName } from '../../persistence/environmentScope';
 import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import { createFreshCharacterBuilderDraftValue } from './characterBuilderControllerSupport';
 import { createGuidedDesignFromDraft } from './characterModel';
@@ -105,7 +106,12 @@ export const prepareCharacterBuilderLaunch = async ({
   repository = createCharacterBuilderDraftRepository({
     sanitizeDraft: sanitizeCharacterBuilderDraftValue,
     ...(ownerUserId
-      ? { databaseName: `${CHARACTER_BUILDER_DRAFT_DATABASE_NAME}.${ownerUserId}` }
+      ? {
+          databaseName: environmentScopedPersistenceName(
+            CHARACTER_BUILDER_DRAFT_DATABASE_NAME,
+            ownerUserId,
+          ),
+        }
       : {}),
   }),
 }: PrepareCharacterBuilderLaunchOptions): Promise<boolean> => {

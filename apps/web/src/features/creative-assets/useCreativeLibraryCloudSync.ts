@@ -55,7 +55,14 @@ const replaceRemote = async (
   return body.revision;
 };
 
-export const useCreativeLibraryCloudSync = (repository: CreativeAssetRepository): void => {
+export interface CreativeLibraryCloudSyncOptions {
+  readonly initializeEmptyRemoteFromLocal?: boolean;
+}
+
+export const useCreativeLibraryCloudSync = (
+  repository: CreativeAssetRepository,
+  { initializeEmptyRemoteFromLocal = false }: CreativeLibraryCloudSyncOptions = {},
+): void => {
   useEffect(() => {
     if (repository.replaceFromRemote === undefined || repository.setSyncNotice === undefined)
       return;
@@ -114,12 +121,16 @@ export const useCreativeLibraryCloudSync = (repository: CreativeAssetRepository)
         const localCount = itemCount(localStore);
         const remoteCount = itemCount(remote.store);
         if (remote.revision === 0 && localCount > 0) {
-          const result = await replaceRemote(0, repository, controller.signal);
-          if (result === 'conflict') {
-            failClosed('Cloud library sync paused because another session initialized it first.');
-            return;
+          if (initializeEmptyRemoteFromLocal) {
+            const result = await replaceRemote(0, repository, controller.signal);
+            if (result === 'conflict') {
+              failClosed('Cloud library sync paused because another session initialized it first.');
+              return;
+            }
+            revision = result;
+          } else {
+            await repository.replaceFromRemote?.(remote.store);
           }
-          revision = result;
         } else if (remoteCount > 0 && localCount === 0) {
           await repository.replaceFromRemote?.(remote.store);
         } else if (
@@ -153,5 +164,5 @@ export const useCreativeLibraryCloudSync = (repository: CreativeAssetRepository)
       if (timer !== null) clearTimeout(timer);
       unsubscribe?.();
     };
-  }, [repository]);
+  }, [initializeEmptyRemoteFromLocal, repository]);
 };

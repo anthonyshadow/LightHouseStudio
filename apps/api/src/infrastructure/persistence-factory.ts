@@ -6,7 +6,7 @@ import { R2AssetByteStore } from '../storage/r2-asset-byte-store.js';
 import { ShadowAssetByteStore } from '../storage/shadow-asset-byte-store.js';
 import { DrizzleAssetLifecycleRegistry } from './database/asset-lifecycle-registry.js';
 import { DrizzleSessionRepository, DrizzleUserRepository } from './database/auth-repositories.js';
-import { createNeonDatabase } from './database/client.js';
+import { createPostgresDatabase } from './database/client.js';
 import { DrizzleCreativeLibraryRepository } from './database/creative-library-repository.js';
 import { DrizzleDirectUploadRepository } from './database/direct-upload-repository.js';
 import { DrizzleProcessingJobTraceWriter } from './database/processing-job-repository.js';
@@ -41,9 +41,9 @@ export const createConfiguredPersistence = async (
 ): Promise<AppPersistenceDependencies | undefined> => {
   if (config.databaseMode === 'local') return undefined;
   if (config.databaseUrl === undefined) {
-    throw new Error('Neon persistence requires DATABASE_URL.');
+    throw new Error('Relational persistence requires DATABASE_URL.');
   }
-  const connection = createNeonDatabase(config.databaseUrl);
+  const connection = createPostgresDatabase(config.databaseUrl);
   try {
     const users = new DrizzleUserRepository(connection.db);
     await users.ensureSeededUser({

@@ -32,6 +32,7 @@ export const DEFAULT_AUTH_SESSION_TTL_SECONDS = 24 * 60 * 60;
 export const DEFAULT_AUTH_COOKIE_NAME = 'lightframe_session';
 export const DEFAULT_VIDEO_JOB_MAX_ACTIVE = 8;
 export const DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER = 4;
+export const DEVELOPMENT_R2_BUCKET = 'lightframe-studio-development';
 
 const normalizeOptionalString = (value: unknown): unknown => {
   if (typeof value !== 'string') return value;
@@ -81,6 +82,7 @@ const samplingRatioSchema = z.preprocess(
 
 const environmentSchema = z
   .object({
+    LIGHTFRAME_ENV: z.enum(['development', 'production']).optional(),
     NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
     PORT: portSchema,
     DEMO_AUTH_ENABLED: strictBooleanSchema(true),
@@ -124,7 +126,7 @@ const environmentSchema = z
     AUTH_COOKIE_SECURE: strictBooleanSchema(false),
     DATABASE_MODE: z.preprocess(
       normalizeOptionalString,
-      z.enum(['local', 'shadow', 'neon']).default('local'),
+      z.enum(['local', 'shadow', 'postgres', 'neon']).default('local'),
     ),
     DATABASE_URL: z.preprocess(
       normalizeOptionalString,
@@ -273,7 +275,7 @@ const environmentSchema = z
       context.addIssue({
         code: 'custom',
         path: ['DATABASE_URL'],
-        message: 'Set DATABASE_URL when DATABASE_MODE uses Neon.',
+        message: 'Set DATABASE_URL when DATABASE_MODE uses relational persistence.',
       });
     }
     if (value.ASSET_STORE_PROVIDER === 'r2') {
@@ -281,7 +283,7 @@ const environmentSchema = z
         context.addIssue({
           code: 'custom',
           path: ['DATABASE_MODE'],
-          message: 'Use DATABASE_MODE=shadow or neon when ASSET_STORE_PROVIDER=r2.',
+          message: 'Use DATABASE_MODE=shadow, postgres, or neon when ASSET_STORE_PROVIDER=r2.',
         });
       }
       for (const [variable, valid] of [
@@ -312,6 +314,79 @@ const environmentSchema = z
         path: ['OTEL_EXPORTER_OTLP_TRACES_ENDPOINT'],
         message: 'Set OTEL_EXPORTER_OTLP_TRACES_ENDPOINT when tracing is enabled.',
       });
+    }
+    if (value.LIGHTFRAME_ENV === 'development') {
+      if (value.NODE_ENV !== 'development') {
+        context.addIssue({
+          code: 'custom',
+          path: ['NODE_ENV'],
+          message: 'Use NODE_ENV=development with LIGHTFRAME_ENV=development.',
+        });
+      }
+      if (value.DATABASE_MODE !== 'postgres') {
+        context.addIssue({
+          code: 'custom',
+          path: ['DATABASE_MODE'],
+          message: 'Development requires DATABASE_MODE=postgres.',
+        });
+      }
+      if (value.DATABASE_URL !== undefined) {
+        const hostname = new URL(value.DATABASE_URL).hostname;
+        if (hostname !== '127.0.0.1' && hostname !== 'localhost' && hostname !== '[::1]') {
+          context.addIssue({
+            code: 'custom',
+            path: ['DATABASE_URL'],
+            message: 'Development DATABASE_URL must use a loopback PostgreSQL host.',
+          });
+        }
+      }
+      if (value.ASSET_STORE_PROVIDER !== 'r2') {
+        context.addIssue({
+          code: 'custom',
+          path: ['ASSET_STORE_PROVIDER'],
+          message: 'Development requires the isolated private R2 asset store.',
+        });
+      }
+      if (value.R2_BUCKET !== undefined && value.R2_BUCKET !== DEVELOPMENT_R2_BUCKET) {
+        context.addIssue({
+          code: 'custom',
+          path: ['R2_BUCKET'],
+          message: `Development requires R2_BUCKET=${DEVELOPMENT_R2_BUCKET}.`,
+        });
+      }
+    }
+    if (value.LIGHTFRAME_ENV === 'production') {
+      if (value.NODE_ENV !== 'production') {
+        context.addIssue({
+          code: 'custom',
+          path: ['NODE_ENV'],
+          message: 'Use NODE_ENV=production with LIGHTFRAME_ENV=production.',
+        });
+      }
+      if (value.DATABASE_MODE !== 'neon') {
+        context.addIssue({
+          code: 'custom',
+          path: ['DATABASE_MODE'],
+          message: 'Production requires DATABASE_MODE=neon.',
+        });
+      }
+      if (value.DATABASE_URL !== undefined) {
+        const hostname = new URL(value.DATABASE_URL).hostname;
+        if (hostname === '127.0.0.1' || hostname === 'localhost' || hostname === '[::1]') {
+          context.addIssue({
+            code: 'custom',
+            path: ['DATABASE_URL'],
+            message: 'Production DATABASE_URL must not use a loopback PostgreSQL host.',
+          });
+        }
+      }
+      if (value.ASSET_STORE_PROVIDER !== 'r2') {
+        context.addIssue({
+          code: 'custom',
+          path: ['ASSET_STORE_PROVIDER'],
+          message: 'Production requires the private R2 asset store.',
+        });
+      }
     }
     if (value.NODE_ENV === 'production' && value.AUTH_JWT_SECRET === DEFAULT_DEMO_JWT_SECRET) {
       context.addIssue({
@@ -348,7 +423,7 @@ export interface RuntimeConfig {
   readonly authSessionTtlSeconds: number;
   readonly authCookieName: string;
   readonly authCookieSecure: boolean;
-  readonly databaseMode: 'local' | 'shadow' | 'neon';
+  readonly databaseMode: 'local' | 'shadow' | 'postgres' | 'neon';
   readonly databaseUrl?: string;
   readonly assetStoreProvider: 'local' | 'r2';
   readonly r2AccountId?: string;

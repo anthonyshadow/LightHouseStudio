@@ -4,15 +4,19 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun run --no-env-file --watch src/server.ts",
+    "dev": "LIGHTFRAME_ENV=development bun run --no-env-file --watch src/server.ts",
     "build": "bun build src/server.ts --target=bun --format=esm --packages=external --sourcemap=external --outdir=dist",
     "start": "bun run --no-env-file dist/server.js",
+    "start:production": "LIGHTFRAME_ENV=production bun run --no-env-file dist/server.js",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run --root ../.. apps/api/src",
     "db:generate": "drizzle-kit generate --config drizzle.config.ts",
     "db:check": "drizzle-kit check --config drizzle.config.ts",
-    "db:migrate": "drizzle-kit migrate --config drizzle.config.ts",
-    "db:backfill-local": "bun run --no-env-file scripts/backfill-local-data.ts"
+    "db:migrate:development": "LIGHTFRAME_ENV=development drizzle-kit migrate --config drizzle.config.ts",
+    "db:migrate:production": "LIGHTFRAME_ENV=production drizzle-kit migrate --config drizzle.config.ts",
+    "db:smoke:development": "LIGHTFRAME_ENV=development bun run --no-env-file scripts/database-smoke.ts",
+    "db:backfill-local": "LIGHTFRAME_ENV=production bun run --no-env-file scripts/backfill-local-data.ts",
+    "env:prepare": "bun run --no-env-file scripts/prepare-environment-files.ts"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.1106.0",
@@ -35,11 +39,13 @@
     "jose": "6.2.8",
     "mediabunny": "1.52.3",
     "openai": "7.4.0",
+    "pg": "8.16.3",
     "pino": "10.3.1",
     "sharp": "0.35.3",
     "zod": "4.4.3"
   },
   "devDependencies": {
+    "@types/pg": "8.15.5",
     "drizzle-kit": "0.31.10"
   }
 }

@@ -2,6 +2,7 @@ import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnvironment } from 'dotenv';
 import { createApp } from './app.js';
+import { loadSelectedEnvironmentFile } from './config/environment-file.js';
 import {
   parseEnvironment,
   resolveLightframeDataDirectory,
@@ -9,13 +10,15 @@ import {
 } from './config/environment.js';
 import { createConfiguredPersistence } from './infrastructure/persistence-factory.js';
 
-loadEnvironment({
-  path: fileURLToPath(new URL('../../../.env', import.meta.url)),
-  quiet: true,
+const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+loadSelectedEnvironmentFile({
+  repositoryRoot,
+  environment: process.env,
+  load: (path, environment) =>
+    loadEnvironment({ path, processEnv: environment, quiet: true, override: false }),
 });
 
 const parsedConfig = parseEnvironment(process.env);
-const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
 const apiRoot = fileURLToPath(new URL('../', import.meta.url));
 const dataDirectory = resolveLightframeDataDirectory(parsedConfig.lightframeDataDir, {
   repositoryRoot,

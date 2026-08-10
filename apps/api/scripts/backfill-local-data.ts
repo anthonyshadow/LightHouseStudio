@@ -1,6 +1,7 @@
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { config as loadEnvironment } from 'dotenv';
+import { loadSelectedEnvironmentFile } from '../src/config/environment-file.js';
 import { parseEnvironment, resolveLightframeDataDirectory } from '../src/config/environment.js';
 import { LocalReferenceImageAssetStore } from '../src/features/reference-images/asset-store.js';
 import { FileSavedVideoRepository } from '../src/features/saved-videos/saved-video-repository.js';
@@ -11,14 +12,16 @@ import { ManagedLocalAssetByteStore } from '../src/storage/managed-asset-byte-st
 import { R2AssetByteStore } from '../src/storage/r2-asset-byte-store.js';
 import { DrizzleAssetLifecycleRegistry } from '../src/infrastructure/database/asset-lifecycle-registry.js';
 import { DrizzleUserRepository } from '../src/infrastructure/database/auth-repositories.js';
-import { createNeonDatabase } from '../src/infrastructure/database/client.js';
+import { createPostgresDatabase } from '../src/infrastructure/database/client.js';
 import { DrizzleReferenceImageAssetStore } from '../src/infrastructure/database/reference-image-asset-store.js';
 import { DrizzleSavedVideoRepository } from '../src/infrastructure/database/saved-video-repository.js';
 import { DrizzleSavedVoiceRepository } from '../src/infrastructure/database/saved-voice-repository.js';
 
-loadEnvironment({
-  path: fileURLToPath(new URL('../../../.env', import.meta.url)),
-  quiet: true,
+loadSelectedEnvironmentFile({
+  repositoryRoot: fileURLToPath(new URL('../../../', import.meta.url)),
+  environment: process.env,
+  load: (path, environment) =>
+    loadEnvironment({ path, processEnv: environment, quiet: true, override: false }),
 });
 
 const apply = process.argv.includes('--apply');
@@ -79,10 +82,12 @@ if (missingSavedVideoAssets > 0) {
   throw new Error('Backfill stopped because saved-video assets are missing locally.');
 }
 if (config.databaseMode === 'local' || config.databaseUrl === undefined) {
-  throw new Error('Use DATABASE_MODE=shadow or neon and set DATABASE_URL before --apply.');
+  throw new Error(
+    'Use DATABASE_MODE=shadow, postgres, or neon and set DATABASE_URL before --apply.',
+  );
 }
 
-const connection = createNeonDatabase(config.databaseUrl);
+const connection = createPostgresDatabase(config.databaseUrl);
 try {
   const users = new DrizzleUserRepository(connection.db);
   await users.ensureSeededUser({
