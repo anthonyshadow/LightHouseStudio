@@ -155,6 +155,7 @@ retention, and provider-contact contract.
 
 - Bun `1.3.14` (`.bun-version` and `packageManager` pin the repository runtime and package manager)
 - Node `>=26 <27` (`.nvmrc` pins the retained Vitest, Vite, Playwright, Storybook, and package-build tooling runtime)
+- Docker with Compose support (the development PostgreSQL service binds only to `127.0.0.1:5433`)
 - A current secure-context browser with `getUserMedia`, `MediaRecorder`, and WebCodecs H.264
   decode/encode support
 - A camera and microphone for physical capture
@@ -168,22 +169,30 @@ Desktop Chromium is the baseline for the fullest codec and remux support. Consul
 ```bash
 nvm use
 bun install
-cp .env.example .env
+bun run env:prepare
+# Fill the private development R2 credentials in .env.development.
 bun run dev
 ```
+
+`bun run dev` starts the persistent development PostgreSQL service, waits for its health check,
+applies pending development migrations, builds the shared packages, and then starts the API and web
+watchers. The database remains running when the watchers stop; use `bun run db:development:down`
+when you want to stop it without deleting its named volume.
 
 Open <http://127.0.0.1:4173> for the entry or <http://127.0.0.1:4173/studio> for a direct Studio
 load. Vite proxies `/api` to `127.0.0.1:4100`; keep `PORT=4100` for the normal development and
 functional Playwright paths. The checked development defaults prefill
 `demo@lightframe.local` / `lightframe-demo`; change the plaintext prefill and its independently
-generated hash together when rotating the demo credential. Leave provider keys empty to exercise
-the fully local path.
+generated hash together when rotating the demo credential. Paid-provider keys remain empty until
+separate restricted development credentials are issued. `bun run env:prepare` never overwrites an
+existing profile and preserves the legacy ignored `.env` as a fallback; when present, that file is
+used only to seed `.env.production` without its Cloudflare management credentials.
 
 For the production-mode loopback smoke:
 
 ```bash
 bun run build
-NODE_ENV=production bun run start
+bun run start:production
 ```
 
 Open <http://127.0.0.1:4100>. Production startup fails when `apps/web/dist` is absent.
@@ -192,20 +201,22 @@ values before a production-mode loopback smoke.
 
 ## Configuration
 
-All credentials are read by `apps/api`; never place secrets in `VITE_*` variables. `.env.example`
-is the maintained list of defaults and tunables. Repository `bunfig.toml` disables Bun's automatic
-`.env` loading so API startup can continue to load only the repository-root `.env` through the
-validated app-owned configuration path.
+All credentials are read by `apps/api`; never place secrets in `VITE_*` variables.
+`.env.development.example` and `.env.production.example` are the complete profiles, while
+`.env.example` remains an environment-neutral reference. Repository `bunfig.toml` disables Bun's
+automatic dotenv loading so startup reads only the file selected by `LIGHTFRAME_ENV`. An explicit
+`LIGHTFRAME_ENV_SOURCE=process` is reserved for isolated CI/production-smoke processes.
 
 | Variable                                                                                  | Purpose                                                                                                                                                   |
 | ----------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LIGHTFRAME_ENV`                                                                          | Explicitly selects the ignored `development` or `production` profile; it is never inferred from the Git branch                                            |
 | `DEMO_AUTH_ENABLED`, `DEMO_AUTH_PREFILL`                                                  | Enables the seeded local login and the non-production development prefill                                                                                 |
 | `DEMO_USER_ID`, `DEMO_USER_LOGIN`                                                         | Stable immutable owner UUID and normalized seeded login                                                                                                   |
 | `DEMO_USER_PASSWORD`, `DEMO_USER_PASSWORD_HASH`                                           | Development prefill and independently generated Argon2id verification hash; plaintext is never used for backend comparison                                |
 | `AUTH_JWT_SECRET`, `AUTH_SESSION_TTL_SECONDS`                                             | Session-specific JWT signing secret and expiry; default TTL is 24 hours                                                                                   |
 | `AUTH_COOKIE_NAME`, `AUTH_COOKIE_SECURE`                                                  | Host-only HTTP-only SameSite cookie settings; Secure remains false only for loopback HTTP development                                                     |
-| `DATABASE_MODE`, `DATABASE_URL`                                                           | `local` (default), Neon-backed `shadow`, or authoritative `neon`; URL is server-only                                                                      |
-| `ASSET_STORE_PROVIDER`                                                                    | `local` (default) or private Cloudflare `r2`; R2 requires a Neon-backed database mode                                                                     |
+| `DATABASE_MODE`, `DATABASE_URL`                                                           | `local`, Neon-backed `shadow`, authoritative local `postgres`, or production `neon`; URL is server-only                                                   |
+| `ASSET_STORE_PROVIDER`                                                                    | `local` or private Cloudflare `r2`; R2 requires relational lifecycle metadata                                                                             |
 | `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY`, `R2_BUCKET`, `R2_KEY_PREFIX` | Private R2 S3 configuration; credentials stay server-only, while the exact bucket/key appear only inside short-lived part URLs in direct-upload mode      |
 | `OTEL_TRACING_ENABLED`, `OTEL_EXPORTER_OTLP_TRACES_ENDPOINT`, `OTEL_TRACE_SAMPLE_RATIO`   | Opt-in OTLP/HTTP protobuf traces and explicit `[0,1]` sampling; disabled unless the flag and endpoint are both configured                                 |
 | `VIDEO_JOB_MAX_ACTIVE`, `VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER`                               | Server admission limits for accepted batch work; defaults to `8` globally and `4` per provider                                                            |
@@ -230,16 +241,36 @@ quota. Missing optional configuration disables only the corresponding feature.
 Private-R2 browser CORS is required only for authoritative direct uploads and must follow the exact
 origin/method/header policy in [Cloud persistence](docs/CLOUD_PERSISTENCE.md).
 
+## Branch and environment workflow
+
+`develop` is the default daily branch and accepts direct pushes; force-push and deletion remain
+blocked. `main` is the production promotion branch and accepts only a same-repository
+`develop` → `main` pull request after the required Quality, CodeQL, Dependency Review, and Release
+Source checks. Branch names never select credentials at runtime: commands set `LIGHTFRAME_ENV`
+explicitly, and ordinary CI cannot read the protected GitHub `development` or `production`
+Environment secrets.
+
+Recipe Shelf `localStorage` and Character Builder IndexedDB names include both the runtime mode and
+authenticated user. Development therefore starts with empty browser persistence even when the same
+loopback origin and demo user were previously used in production; only production reads and
+migrates the pre-separation browser keys.
+
 ## Commands
 
 | Command                                                                                     | Purpose                                                                |
 | ------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------- |
-| `bun run dev`                                                                               | Build shared packages and run API/web watchers                         |
+| `bun run env:prepare`                                                                       | Create private development/production profiles without overwriting     |
+| `bun run dev`                                                                               | Start/migrate PostgreSQL, then build and run API/web watchers          |
+| `bun run start:production`                                                                  | Start the built loopback app with `.env.production`                    |
+| `bun run db:development:up` / `bun run db:development:down`                                 | Start/stop the persistent local PostgreSQL service                     |
+| `bun run db:development:reset`                                                              | Explicitly delete the development PostgreSQL volume                    |
+| `bun run db:migrate:development`                                                            | Apply reviewed migrations to local development PostgreSQL              |
+| `bun run db:migrate:production`                                                             | Explicitly apply reviewed migrations to production Neon; never CI-run  |
+| `bun run db:smoke:development`                                                              | Verify local connection, transaction, seed, and cleanup                |
 | `bun run auth:hash-password`                                                                | Interactively generate an Argon2id demo password hash                  |
 | `bun run build`                                                                             | Build all workspaces                                                   |
 | `bun run quality`                                                                           | Type, Storybook, lint, format, dead-code, module, unit, and build gate |
 | `bun run --filter @studio/api db:check`                                                     | Validate Drizzle migration history                                     |
-| `bun run --filter @studio/api db:migrate`                                                   | Apply reviewed migrations to `DATABASE_URL`                            |
 | `bun run --filter @studio/api db:backfill-local`                                            | Dry-run local video/voice/reference inventory                          |
 | `bun run --filter @studio/api db:backfill-local -- --apply`                                 | Idempotently backfill configured Neon/R2, retaining local rollback     |
 | `bun run test`                                                                              | Essential non-visual unit and API integration suite                    |
@@ -327,7 +358,7 @@ H.264/AAC MP4, and publishes that gallery-ready artifact before live resources r
 recorder output is never exposed for saving or download.
 
 The default backend has one configured local user and local persistence. Configuration-gated
-Drizzle/Neon repositories, private Cloudflare R2 bytes, durable sessions, creative-library sync,
+Drizzle/PostgreSQL repositories (local Docker or Neon), private Cloudflare R2 bytes, durable sessions, creative-library sync,
 and accepted-job restart recovery are also implemented; they do not add signup, public tenancy,
 billing, or remote deployment. Read [the cloud persistence runbook](docs/CLOUD_PERSISTENCE.md) and
 [architecture and ownership](docs/ARCHITECTURE.md) for the full dependency, lifecycle,

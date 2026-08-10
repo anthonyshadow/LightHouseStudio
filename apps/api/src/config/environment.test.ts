@@ -8,6 +8,7 @@ import {
   DEFAULT_VIDEO_JOB_MAX_ACTIVE,
   DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER,
   DEFAULT_WIRO_REFERENCE_IMAGE_TIMEOUT_MS,
+  DEVELOPMENT_R2_BUCKET,
   EnvironmentValidationError,
   parseEnvironment,
   resolveLightframeDataDirectory,
@@ -96,6 +97,93 @@ describe('parseEnvironment', () => {
       videoJobMaxActive: 12,
       videoJobMaxActivePerProvider: 5,
     });
+  });
+
+  it('accepts the isolated development PostgreSQL and R2 profile', () => {
+    expect(
+      parseEnvironment({
+        LIGHTFRAME_ENV: 'development',
+        NODE_ENV: 'development',
+        DATABASE_MODE: 'postgres',
+        DATABASE_URL: 'postgresql://lightframe:local@127.0.0.1:5433/lightframe_development',
+        ASSET_STORE_PROVIDER: 'r2',
+        R2_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
+        R2_ACCESS_KEY_ID: 'development-access',
+        R2_SECRET_ACCESS_KEY: 'development-secret',
+        R2_BUCKET: DEVELOPMENT_R2_BUCKET,
+      }),
+    ).toMatchObject({
+      nodeEnv: 'development',
+      databaseMode: 'postgres',
+      r2Bucket: DEVELOPMENT_R2_BUCKET,
+    });
+  });
+
+  it.each([
+    [
+      {
+        LIGHTFRAME_ENV: 'development',
+        NODE_ENV: 'development',
+        DATABASE_MODE: 'postgres',
+        DATABASE_URL: 'postgresql://user:password@example.neon.tech/lightframe',
+        ASSET_STORE_PROVIDER: 'r2',
+        R2_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
+        R2_ACCESS_KEY_ID: 'development-access',
+        R2_SECRET_ACCESS_KEY: 'development-secret',
+        R2_BUCKET: DEVELOPMENT_R2_BUCKET,
+      },
+      'loopback',
+    ],
+    [
+      {
+        LIGHTFRAME_ENV: 'development',
+        NODE_ENV: 'development',
+        DATABASE_MODE: 'postgres',
+        DATABASE_URL: 'postgresql://lightframe:local@127.0.0.1:5433/lightframe_development',
+        ASSET_STORE_PROVIDER: 'r2',
+        R2_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
+        R2_ACCESS_KEY_ID: 'development-access',
+        R2_SECRET_ACCESS_KEY: 'development-secret',
+        R2_BUCKET: 'production-media',
+      },
+      DEVELOPMENT_R2_BUCKET,
+    ],
+    [
+      {
+        LIGHTFRAME_ENV: 'production',
+        NODE_ENV: 'production',
+        DATABASE_MODE: 'postgres',
+        DATABASE_URL: 'postgresql://lightframe:local@127.0.0.1:5433/lightframe_development',
+        ASSET_STORE_PROVIDER: 'r2',
+        R2_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
+        R2_ACCESS_KEY_ID: 'production-access',
+        R2_SECRET_ACCESS_KEY: 'production-secret',
+        R2_BUCKET: 'production-media',
+        AUTH_JWT_SECRET: 'production-test-signing-secret-that-is-not-a-default',
+        DEMO_USER_PASSWORD_HASH:
+          '$argon2id$v=19$m=19456,t=2,p=1$3Jc1DI4gFLxlnIHlbUmVvg$HvHo3eFp60xDrSTIRQaDaLilJgFBNQ6fJ4xwlL+I+iA',
+      },
+      'DATABASE_MODE=neon',
+    ],
+  ] as const)('rejects cross-environment persistence configuration %#', (environment, message) => {
+    expect(() => parseEnvironment(environment)).toThrow(message);
+  });
+
+  it('blocks production while the default demo password hash is still configured', () => {
+    expect(() =>
+      parseEnvironment({
+        LIGHTFRAME_ENV: 'production',
+        NODE_ENV: 'production',
+        DATABASE_MODE: 'neon',
+        DATABASE_URL: 'postgresql://user:password@example.neon.tech/lightframe',
+        ASSET_STORE_PROVIDER: 'r2',
+        R2_ACCOUNT_ID: '0123456789abcdef0123456789abcdef',
+        R2_ACCESS_KEY_ID: 'production-access',
+        R2_SECRET_ACCESS_KEY: 'production-secret',
+        R2_BUCKET: 'production-media',
+        AUTH_JWT_SECRET: 'production-test-signing-secret-that-is-not-a-default',
+      }),
+    ).toThrow('DEMO_USER_PASSWORD_HASH');
   });
 
   it.each([

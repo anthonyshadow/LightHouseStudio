@@ -7,7 +7,7 @@ describe('createConfiguredPersistence', () => {
     await expect(createConfiguredPersistence(testConfig())).resolves.toBeUndefined();
   });
 
-  it('fails before opening Neon when a non-local mode has no database URL', async () => {
+  it('fails before opening PostgreSQL when a non-local mode has no database URL', async () => {
     await expect(createConfiguredPersistence(testConfig({ databaseMode: 'neon' }))).rejects.toThrow(
       'DATABASE_URL',
     );

@@ -2,6 +2,7 @@ import { generateStructuredPrompt } from '@studio/domain';
 import { useCallback, useEffect, useMemo, useRef, useState, type Dispatch } from 'react';
 import { fetchReferenceImageMetadata } from '../../adapters/api-client/apiClient';
 import { useStrictModeSafeDisposable } from '../../orchestration/lifecycle/useStrictModeSafeDisposable';
+import { environmentScopedPersistenceName } from '../../persistence/environmentScope';
 import { createReferencePreviewSourceKey } from './characterReferenceIdentity';
 import {
   characterBuilderOperationError,
@@ -79,7 +80,12 @@ export const useCharacterBuilderPersistence = ({
       createCharacterBuilderDraftRepository({
         sanitizeDraft: sanitizeCharacterBuilderDraftValue,
         ...(ownerUserId
-          ? { databaseName: `${CHARACTER_BUILDER_DRAFT_DATABASE_NAME}.${ownerUserId}` }
+          ? {
+              databaseName: environmentScopedPersistenceName(
+                CHARACTER_BUILDER_DRAFT_DATABASE_NAME,
+                ownerUserId,
+              ),
+            }
           : {}),
       }),
     [ownerUserId],

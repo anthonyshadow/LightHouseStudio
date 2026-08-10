@@ -21,6 +21,7 @@
         "scripts/**/*.mjs"
       ],
       "ignoreDependencies": ["@emnapi/runtime"],
+      "ignoreBinaries": ["docker", "docker-compose"],
       "ignoreExportsUsedInFile": true
     },
     "apps/api": {

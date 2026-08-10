@@ -18,6 +18,14 @@
 
 <!-- State implications and mitigations, or "None". -->
 
+## Environment and promotion
+
+<!-- State whether development or production configuration changes. Main-bound releases must be develop -> main. -->
+
+- [ ] No environment secrets or real credentials are committed.
+- [ ] Database/R2 resources remain isolated by environment.
+- [ ] Production migrations and live-provider checks were not run automatically.
+
 ## Validation run
 
 <!-- List exact commands/checks and results. -->

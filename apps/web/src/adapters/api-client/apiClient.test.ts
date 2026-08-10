@@ -414,6 +414,8 @@ describe('reference image API client', () => {
 
     await expect(discardReferenceImage(uploadedAsset.assetId)).resolves.toBeUndefined();
     expect(requests[0]).toMatchObject({ method: 'DELETE', cache: 'no-store' });
+    expect(requests[0]?.headers.get('Content-Type')).toBe('application/json');
+    await expect(requests[0]?.text()).resolves.toBe('{}');
   });
 
   it('imports a remote image through the explicit same-origin reference-import endpoint', async () => {

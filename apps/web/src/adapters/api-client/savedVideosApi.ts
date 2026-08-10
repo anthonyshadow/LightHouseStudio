@@ -328,6 +328,8 @@ export const deleteSavedVideo = async (videoId: string): Promise<void> => {
   await apiFetch(`/api/videos/${encodeURIComponent(videoId)}`, {
     method: 'DELETE',
     cache: 'no-store',
+    headers: { Accept: 'application/json', 'Content-Type': 'application/json' },
+    body: '{}',
   });
 };
 

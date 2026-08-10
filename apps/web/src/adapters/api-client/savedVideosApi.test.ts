@@ -133,6 +133,9 @@ describe('saved videos API client', () => {
     const createRequest = requests.find(
       (request) => request.method === 'POST' && new URL(request.url).pathname === '/api/videos',
     );
+    const deleteRequest = requests.find((request) => request.method === 'DELETE');
+    expect(deleteRequest?.headers.get('Content-Type')).toBe('application/json');
+    await expect(deleteRequest?.text()).resolves.toBe('{}');
     expect(
       JSON.parse(decodeURIComponent(createRequest!.headers.get('X-Lightframe-Video-Metadata')!)),
     ).toMatchObject({ characterName: 'Mara', characterVariantName: 'Evening' });
