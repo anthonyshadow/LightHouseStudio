@@ -81,6 +81,17 @@ jobs:
       - run: bun ci
       - run: bunx playwright install --with-deps chromium webkit
       - run: bun run test:e2e
+        env:
+          LIGHTFRAME_ENV_SOURCE: process
+          NODE_ENV: development
+          DATABASE_MODE: postgres
+          DATABASE_URL: postgresql://lightframe:lightframe-local-development@127.0.0.1:5433/lightframe_development
+          ASSET_STORE_PROVIDER: r2
+          R2_ACCOUNT_ID: 0123456789abcdef0123456789abcdef
+          R2_ACCESS_KEY_ID: ci-fake-access-key
+          R2_SECRET_ACCESS_KEY: ci-fake-secret-key
+          R2_BUCKET: lightframe-studio-development
+          AUTH_JWT_SECRET: lightframe-ci-signing-key-with-at-least-32-characters
       - name: Upload browser failure artifacts
         if: ${{ failure() }}
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
