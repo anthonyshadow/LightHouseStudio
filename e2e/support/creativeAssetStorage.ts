@@ -2,8 +2,15 @@ import type { CreativeAssetStore } from '@studio/domain';
 import type { Page } from '@playwright/test';
 import { TEST_AUTH_SESSION } from './authFixture.js';
 
-export const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v7';
-const PREVIOUS_CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v6';
+const developmentStorageKey = (baseName: string): string =>
+  `${baseName}.development.${TEST_AUTH_SESSION.user.id}`;
+
+export const CREATIVE_ASSET_STORAGE_KEY = developmentStorageKey(
+  'realtime-creator-studio.creative-assets.v7',
+);
+const PREVIOUS_CREATIVE_ASSET_STORAGE_KEY = developmentStorageKey(
+  'realtime-creator-studio.creative-assets.v6',
+);
 const CREATIVE_ASSET_DATABASE_NAME = 'lightframe.creative-assets';
 const REPOSITORY_METADATA_KEY = 'creativeAssetRepository';
 

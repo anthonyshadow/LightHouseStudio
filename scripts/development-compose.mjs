@@ -2,6 +2,7 @@ import { spawn } from 'node:child_process';
 import { execFileSync } from 'node:child_process';
 import { mkdir, writeFile } from 'node:fs/promises';
 import path from 'node:path';
+import { resolveDockerComposeCommand } from './docker-compose-command.mjs';
 
 const commands = {
   up: ['up', '-d', '--wait', 'postgres'],
@@ -31,12 +32,32 @@ const dockerHost = execFileSync(
   ['context', 'inspect', dockerContext, '--format', '{{.Endpoints.docker.Host}}'],
   { encoding: 'utf8' },
 ).trim();
-
-const child = spawn('docker-compose', ['--env-file', 'compose.env', ...commands[command]], {
-  cwd: process.cwd(),
-  env: { ...process.env, DOCKER_CONFIG: dockerConfig, DOCKER_HOST: dockerHost },
-  stdio: 'inherit',
+const composeEnvironment = {
+  ...process.env,
+  DOCKER_CONFIG: dockerConfig,
+  DOCKER_HOST: dockerHost,
+};
+const composeCommand = resolveDockerComposeCommand(({ executable, prefixArguments }) => {
+  try {
+    execFileSync(executable, [...prefixArguments, 'version'], {
+      env: composeEnvironment,
+      stdio: 'ignore',
+    });
+    return true;
+  } catch {
+    return false;
+  }
 });
+
+const child = spawn(
+  composeCommand.executable,
+  [...composeCommand.prefixArguments, '--env-file', 'compose.env', ...commands[command]],
+  {
+    cwd: process.cwd(),
+    env: composeEnvironment,
+    stdio: 'inherit',
+  },
+);
 const exitCode = await new Promise((resolve, reject) => {
   child.once('error', reject);
   child.once('exit', (code, signal) => {
