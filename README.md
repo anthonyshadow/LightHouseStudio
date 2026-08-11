@@ -1,21 +1,45 @@
 # Lightframe Studio
 
-Lightframe Studio is a local-first browser studio for short-form video creation and reusable
-characters. Its primary loop is:
+Lightframe Studio is a creative workspace for producing, customizing, organizing, and delivering
+digital marketing assets. It is being designed for brands, marketers, creators, agencies, and
+small creative teams that want to move from an idea or existing asset to campaign-ready content
+without stitching together disconnected creative tools.
+
+The implemented product is currently a local-first, single-operator browser studio centered on
+video. Its primary loop is:
 
 **Log in → Record or Upload → Review → optional Virtual Try On, Character Swap, and/or Voice → Save → Download from Saved Videos**
 
-Live AI camera transformation and Workshop remain advanced tools. The app is single-operator and
-binds to loopback. Phase 1 provides one seeded local demo account, authenticated ownership, and
-durable local saved-media records; it does not provide signup, billing, or public multi-user
-deployment. A durable Project domain/database foundation exists, but no Project routes or UI are
-user-facing yet. It is not approved for LAN, tunnel, proxy, or public exposure.
+Live character transformation and Workshop remain advanced tools. The app binds to loopback. Phase
+1 provides one seeded local demo account, authenticated ownership, and durable local saved-media
+records; it does not provide signup, billing, collaboration, or public multi-user deployment. A
+durable, video-oriented Project domain/database foundation exists, but no Project routes or UI are
+user-facing yet. Campaigns and multi-format content creation are future product directions, not
+current features. The app is not approved for LAN, tunnel, proxy, or public exposure.
 
 ## Status
 
 The core workflow is implemented and automated tests cover local, Character, VTO, recording,
 review, and voice paths. Physical-device and live-provider results remain useful validation
 inputs, but their absence does not disable configured application features.
+
+## Product direction
+
+Today, Lightframe Studio brings recording, import, local video editing, optional creative
+transformations, reusable Characters/Outfits/Voices, saved video versions, gallery organization,
+and download into one Studio. These capabilities address repeated setup, disconnected outputs,
+lost lineage, and the difficulty of reusing creative resources across content production.
+
+The long-term vision is a content creation and campaign workspace organized around **Campaigns →
+Projects → Assets**. Users should eventually be able to create or import content, edit and
+transform it, make purposeful variations, organize and review work, and export or publish approved
+assets. Video is the initial primary medium; future formats may include images, graphics, audio,
+product imagery, social creative, and advertising creative. AI providers and models remain
+implementation choices behind user-facing capabilities rather than the definition of the product.
+
+Read the [product vision](docs/PRODUCT_VISION.md) for positioning, audiences, principles, and core
+terminology, and the [product roadmap](docs/PRODUCT_ROADMAP.md) for the current-to-future sequence.
+Neither document changes the current loopback, account, provider, privacy, or deployment limits.
 
 ## Product flow
 
@@ -369,6 +393,8 @@ persistence, and HTTP boundaries.
 
 Start with the [documentation map](docs/README.md). Key references:
 
+- [Product vision and terminology](docs/PRODUCT_VISION.md)
+- [Product roadmap](docs/PRODUCT_ROADMAP.md)
 - [Implemented journeys](docs/userStories/README.md)
 - [Architecture and ownership](docs/ARCHITECTURE.md)
 - [Privacy and temporary data](docs/PRIVACY_AND_TEMPORARY_DATA.md)

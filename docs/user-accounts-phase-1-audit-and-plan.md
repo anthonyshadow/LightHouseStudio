@@ -1,12 +1,22 @@
 # User Accounts Phase 1: architecture audit and implementation plan
 
-Status: implemented; automated release gates pass, with manual and live-provider validation remaining  
-Audience: product, engineering, security, QA  
-Planning date: 2026-08-05  
+Status: historical implementation plan; Phase 1 is implemented, with manual and live-provider
+validation remaining
+
+Audience: product, engineering, security, QA
+
+Planning date: 2026-08-05
+
 Scope: one seeded demo user, structurally real authentication and ownership, user-scoped local
 persistence, saved media, and a Video Gallery. A 2026-08-07 follow-up added configuration-gated
 Drizzle/Neon and private R2 without changing the account or loopback boundary. Signup, billing,
 and public deployment remain deferred.
+
+This file preserves the original audit, sequencing, and cutover rationale, so proposed paths and
+pre-migration findings remain in historical tense below. It is not current product positioning or
+the product roadmap. Use the [README](../README.md), [Architecture](ARCHITECTURE.md),
+[Product Vision](PRODUCT_VISION.md), [Product Roadmap](PRODUCT_ROADMAP.md), and
+[cloud persistence runbook](CLOUD_PERSISTENCE.md) for current authority.
 
 ## Executive decision
 

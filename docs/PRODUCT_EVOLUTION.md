@@ -1,7 +1,9 @@
 # Product evolution
 
 This file preserves durable rationale for intentional product changes. Current behavior belongs in
-[Architecture](ARCHITECTURE.md) and the [observable user stories](userStories/README.md).
+[Architecture](ARCHITECTURE.md) and the [observable user stories](userStories/README.md). Current
+positioning and future direction belong in [Product Vision](PRODUCT_VISION.md) and
+[Product Roadmap](PRODUCT_ROADMAP.md); this historical record is neither.
 
 ## Local ownership added accounts and saved libraries
 
@@ -49,8 +51,9 @@ confirmed discard. This routing layer does not authorize public deployment.
 retired project data is cleared during authenticated Studio initialization.
 
 One persistent media stage now owns preview, transformed video, recording, finalization, and
-playback. Dock, Capture Settings, Workshop, Shelf, Character Builder, Take Review, Voice, and
-Legacy Projects are overlays. This avoided parallel media sessions, modal systems, and stores.
+playback. Dock, Capture Settings, Workshop, Shelf, Character Builder, Take Review, and Voice are
+overlays or Studio-owned workspace modes. The retired Legacy Projects surface is removed. This
+avoided parallel media sessions, modal systems, and stores.
 
 ## Local preview preceded provider work
 
@@ -64,10 +67,11 @@ two experiences were not interchangeable and had no fallback.
 ## Post-recording editing became the primary workflow
 
 The first-run loop is now **Record or Upload → Review → optional Virtual Try On, Character Swap,
-and/or Voice → Download**. Studio still initializes Local Camera mode, but entry alone does not
-request camera/microphone permission or start AI. Control-bar and upload-panel recording intents
-reuse the stage-owned local lifecycle, then adopt the finalized artifact into the existing-video
-editor. Dock-started local preview and live Character/VTO retain the advanced Latest Take flow.
+and/or Voice → Save → Download from Saved Videos**. Studio still initializes Local Camera mode,
+but entry alone does not request camera/microphone permission or start AI. Recording intents from
+the control bar and upload panel reuse the stage-owned local lifecycle, then adopt the finalized
+artifact into the existing-video editor. Dock-started local preview and live Character/VTO retain
+the advanced Latest Take flow.
 
 ## Characters became reusable, resumable assets
 
@@ -125,10 +129,11 @@ creation, and library mutation were removed.
 
 ## Existing video joined the take pipeline
 
-Upload became a peer to camera entry without adding a route, player, media library, saved-video
-store, or durable job database. Recorded and uploaded sources now enter one temporary layered take:
-immutable source, latest successful visual result, optional voiced result, and the presented
-highest valid layer.
+Upload first became a peer to camera entry without adding a route, player, media library, Saved
+Videos store, or durable job database. Recorded and uploaded sources now enter one temporary
+layered take: immutable source, latest successful visual result, optional voiced result, and the
+presented highest valid layer. Later Phase 1 work added the Saved Videos store and gallery without
+changing that temporary editing-layer model.
 
 The initial batch design used exact, server-mediated, asynchronous Lucy and VTO jobs and allowed
 each to run once in either order. That chain paused after the first result because Continue was
@@ -196,6 +201,9 @@ overlay, and no-retry/no-fallback rule; local abort does not claim remote cancel
 
 ## Scope remains intentionally local
 
-Accounts, remote hosting, cloud projects, take history, collaboration, sharing, billing, and public
-moderation remain outside the current product. The loopback owner hash, device IDs, provider IDs,
-and storage paths must never become future user identity.
+Self-service accounts, remote hosting, user-facing Projects, Campaigns, collaboration, sharing,
+billing, direct publishing, and public moderation remain outside the current product. A seeded
+authenticated account, durable video history, configuration-gated Project persistence, and private
+cloud storage adapters do exist, but they do not authorize public or multi-user operation. Device
+IDs, provider IDs, storage paths, and retired Host-hash values must never become future user
+identity.

@@ -1,28 +1,31 @@
 # Lightframe Studio user stories
 
 These stories describe observable behavior in the current local-first Studio. They are journey
-references, not release-readiness claims or future requirements.
+references, not release-readiness claims or future requirements. They use **video** and current
+feature names deliberately where the implemented contract is video-specific; the broader
+Campaign, Project, and Asset vocabulary in [Product Vision](../PRODUCT_VISION.md) does not make
+future features current.
 
 ## Journeys
 
-| Flow                                                 | Story                                                                          |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------ |
-| Record or upload, then edit and save                 | [Existing video processing](12-existing-video-processing.md)                   |
-| Trim, crop, relight, filter, and replace a source    | [Local non-destructive video editing](13-local-video-editing.md)               |
-| Choose camera, microphone, local format, and quality | [Configure capture settings](01-configure-capture-settings.md)                 |
-| Preview and record without provider work             | [Local camera capture](02-local-camera-capture.md)                             |
-| Run and record live Lucy 2.5                         | [Character AI session](03-character-ai-session.md)                             |
-| Run and record live VTON 3                           | [Virtual try-on session](04-virtual-try-on-session.md)                         |
-| Build Add, Replace, or Restyle directions            | [Structured prompt workshop](05-structured-prompt-workshop.md)                 |
-| Save and reuse recipes                               | [Recipe Shelf](06-recipe-shelf.md)                                             |
-| Review, save, and release a take                     | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
-| Apply browser-local voice effects                    | [Local voice treatments](08-local-voice-treatments.md)                         |
-| Browse, save, manage, and apply ElevenLabs voices    | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
-| Recover from missing capabilities                    | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md) |
-| Build and preload a reusable character               | [Studio character builder](11-studio-character-builder.md)                     |
-| Log in, restore, and log out safely                  | [Login and local session](14-login-and-session.md)                             |
-| Save, browse, version, and reload local videos       | [Saved Video Gallery](15-saved-video-gallery.md)                               |
-| Reuse saved characters and outfits                   | [Saved creative libraries](16-saved-creative-libraries.md)                     |
+| Flow                                                   | Story                                                                          |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| Record or upload, then edit and save                   | [Existing video processing](12-existing-video-processing.md)                   |
+| Trim, crop, relight, filter, and replace a source      | [Local non-destructive video editing](13-local-video-editing.md)               |
+| Choose camera, microphone, local format, and quality   | [Configure capture settings](01-configure-capture-settings.md)                 |
+| Preview and record without provider work               | [Local camera capture](02-local-camera-capture.md)                             |
+| Run and record a live character transformation         | [Live character transformation](03-character-ai-session.md)                    |
+| Run and record live virtual try-on                     | [Virtual try-on session](04-virtual-try-on-session.md)                         |
+| Build Add, Replace, or Restyle directions              | [Structured prompt workshop](05-structured-prompt-workshop.md)                 |
+| Save and reuse recipes                                 | [Recipe Shelf](06-recipe-shelf.md)                                             |
+| Review, save, and release a take                       | [Take review and cleanup](07-take-review-and-cleanup.md)                       |
+| Apply browser-local voice effects                      | [Local voice treatments](08-local-voice-treatments.md)                         |
+| Browse, save, manage, and apply provider-backed voices | [ElevenLabs voice workflow](09-elevenlabs-voice-workflow.md)                   |
+| Recover from missing capabilities                      | [Capability and recovery boundaries](10-capability-and-recovery-boundaries.md) |
+| Build and preload a reusable character                 | [Studio character builder](11-studio-character-builder.md)                     |
+| Log in, restore, and log out safely                    | [Login and local session](14-login-and-session.md)                             |
+| Save, browse, version, and reload local videos         | [Saved Video Gallery](15-saved-video-gallery.md)                               |
+| Reuse saved characters and outfits                     | [Saved creative libraries](16-saved-creative-libraries.md)                     |
 
 ## Shared runtime rules
 
@@ -40,7 +43,10 @@ references, not release-readiness claims or future requirements.
 - Camera access, provider contact, and billable work require an explicit action. Local Camera does
   not request provider credentials, load the Decart SDK, or send media externally.
 - The primary flow records or uploads a source, reviews it, and optionally applies Character Swap,
-  Virtual Try On, and/or Voice. Live Character/VTO transformation and Workshop are advanced flows.
+  Virtual Try On, and/or Voice, then saves the result before download from Saved Videos. Live
+  Character/VTO transformation and Workshop are advanced flows.
+- Campaigns and user-facing Projects do not exist in these journeys. The durable Project
+  domain/database foundation is not a current navigation or save destination.
 - Character Builder owns true character creation and editing. Workshop owns only Add, Replace, and
   Restyle object recipes.
 - Saved Character Wardrobe owns normalized original/variant browsing and variant creation while

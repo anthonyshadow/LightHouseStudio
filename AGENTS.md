@@ -15,6 +15,8 @@ Start with affected source and tests. Open only what the task needs:
 
 - `README.md`: setup, scripts, and product overview;
 - `docs/README.md`: documentation ownership;
+- `docs/PRODUCT_VISION.md`: product positioning, hierarchy, principles, and terminology;
+- `docs/PRODUCT_ROADMAP.md`: current-to-future capability direction and future architecture notes;
 - `docs/ARCHITECTURE.md`: architecture and lifecycle ownership;
 - affected file in `docs/userStories/`: observable behavior;
 - `docs/TESTING.md`: testing and release validation;

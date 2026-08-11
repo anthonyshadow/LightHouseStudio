@@ -18,8 +18,10 @@ foundation must not add Project routes, Project UI, public tenancy, or automatic
 
 - The user-facing product name remains **Lightframe Studio**. The GitHub repository remains
   `anthonyshadow/LightHouseStudio`; this decision does not rename it.
-- A `Project` is the durable workspace aggregate. It owns a title, materialized/validated status,
-  aggregate CAS version, current revision identity, lifecycle timestamps, and immutable owner.
+- A `Project` is the durable workspace aggregate for one focused production effort. It owns a
+  title, materialized/validated status, aggregate CAS version, current revision identity, lifecycle
+  timestamps, and immutable owner. It is not a Campaign: no Campaign domain, relationship, route,
+  or UI is introduced by this decision.
 - Every Project begins with revision 1, including an empty named Project. Project revisions are
   immutable, monotonically numbered snapshots with an explicit parent, author/source metadata,
   and a schema version. The Project points to a revision belonging to that same owner and Project.
@@ -71,6 +73,10 @@ plan.
 The one-active-context model does not yet support several independently resumable works-in-progress
 inside one Project. The deferred [Project Deliverable child model](../PROJECT_DELIVERABLE_MODEL.md)
 defines that possible extension without making it current behavior.
+
+A future Campaign may group Projects through a separately designed, owner-constrained
+relationship. That addition must define standalone Project behavior and archive, detach, delete,
+and retention semantics instead of repurposing the Project aggregate as campaign metadata.
 
 ## Alternatives considered
 

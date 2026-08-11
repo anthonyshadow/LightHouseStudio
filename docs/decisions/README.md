@@ -19,7 +19,12 @@ target-state work explicitly.
 ## Current records
 
 - [0001: Local and cloud persistence boundaries](0001-local-and-cloud-persistence-boundaries.md)
+- [0002: Bun and Elysia API runtime](0002-api-runtime-decision.md)
 - [0002: Durable Project aggregate](0002-durable-project-aggregate.md)
+
+Two accepted records were assigned `0002` before the sequence conflict was noticed. Their
+filenames remain stable to preserve existing links and history; use `0003` for the next ADR and do
+not reuse an existing number.
 
 ## Template
 

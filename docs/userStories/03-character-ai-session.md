@@ -1,7 +1,8 @@
-# Character AI session
+# Live character transformation
 
-**Outcome:** deliberately start, refine, and optionally record a `lucy-latest` transformation while
-retaining local preview as the fallback.
+**Outcome:** deliberately start, refine, and optionally record a live character transformation
+while retaining local preview as the fallback. The current configured implementation uses the
+pinned `lucy-latest` model.
 
 ## Journey
 
