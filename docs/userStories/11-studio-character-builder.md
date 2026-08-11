@@ -1,7 +1,8 @@
 # Studio character builder
 
-**Outcome:** create or edit one reusable Lucy 2.5 character, optionally with a local or generated
-reference, then select it in the originating Studio or uploaded-video context without starting AI.
+**Outcome:** create or edit one reusable Character, optionally with a local or generated reference,
+then select it in the originating Studio or uploaded-video context without starting provider work.
+The current live character workflow uses Lucy 2.5.
 
 ## Entry and journey
 

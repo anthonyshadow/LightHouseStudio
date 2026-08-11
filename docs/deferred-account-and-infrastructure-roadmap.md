@@ -1,7 +1,9 @@
 # Deferred account and infrastructure roadmap
 
 Status: partially implemented infrastructure roadmap; public-product phases remain deferred
-Planning date: 2026-08-07
+
+Original planning date: 2026-08-07
+
 Prerequisite: every completion requirement in
 [`user-accounts-phase-1-audit-and-plan.md`](user-accounts-phase-1-audit-and-plan.md) must pass.
 
@@ -12,6 +14,10 @@ multi-user service. Drizzle/Neon repositories, private Cloudflare R2 storage, ba
 sessions, creative sync, accepted-job recovery, and admission limits are now configuration-gated
 current behavior. Signup, billing, public deployment, cloud ownership policy, a worker fleet, and
 multi-tenant authorization remain deferred.
+
+This is the service-readiness roadmap, not the product capability roadmap. Campaigns, user-facing
+Projects, multi-format content, distribution, and collaboration direction are maintained in the
+[Product Roadmap](PRODUCT_ROADMAP.md).
 
 Phase 2 requires a separately approved public-product security and operations design. The current
 loopback Host/Origin boundary is not authentication for a remotely accessible product. Do not add a
@@ -520,8 +526,11 @@ Passing Phase 1 tests is necessary but not evidence for any of these gates.
 
 - Real signup, email verification, password reset, MFA/passkeys, social login, organizations, and
   resource sharing.
-- Database, Redis/session infrastructure, durable queues/workers, and multi-region design.
-- Cloudflare R2, direct browser object transfer, CDN/custom-domain delivery, and public links.
+- Production database operations, any additional session infrastructure, durable queues/workers,
+  and multi-region design. Configuration-gated PostgreSQL/Neon persistence and durable sessions
+  already exist.
+- CDN/custom-domain delivery and public links. Private R2 storage and direct multipart browser
+  transfer for authoritative PostgreSQL/R2 Saved Video writes already exist.
 - Billing/payment processing, real plan restrictions, credit deduction, overages, taxes, and refunds.
 - Production rate limiting/abuse systems, moderation enforcement, public support/admin tooling.
 - Multi-device sync/conflict UX, account export/deletion, legal hold, and formal retention automation.

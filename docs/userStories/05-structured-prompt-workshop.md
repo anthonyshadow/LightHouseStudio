@@ -1,7 +1,8 @@
 # Structured prompt workshop
 
-**Outcome:** compose a focused Add, Replace, or Restyle object direction for Lucy 2.5 without
-starting media or provider work.
+**Outcome:** compose a focused Add, Replace, or Restyle object direction for the current live
+character transformation without starting media or provider work. The configured implementation
+uses Lucy 2.5.
 
 Character creation, editing, upload, and reference generation belong to
 [Character Builder](11-studio-character-builder.md), not Workshop.

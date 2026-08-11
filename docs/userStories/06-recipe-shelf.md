@@ -1,7 +1,8 @@
 # Recipe Shelf
 
-**Outcome:** save, find, maintain, and reuse Character or Try-On recipes without accounts or cloud
-projects.
+**Outcome:** save, find, maintain, and reuse Character or Try-On recipes without creating a Project
+or contacting a provider. The recipes remain owner-scoped browser records and may revision-sync to
+authoritative persistence when configured.
 
 ## Journey
 

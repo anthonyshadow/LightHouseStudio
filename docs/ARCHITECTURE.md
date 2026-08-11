@@ -3,6 +3,29 @@
 Lightframe Studio is a TypeScript workspace with a React browser app, a loopback Bun/Elysia broker,
 pure domain rules, and runtime API contracts. Its design is local-first and single-operator.
 
+## Product model boundary
+
+The implemented runtime is a video-focused creative Studio. Current user-facing durable concepts
+are Saved Videos and their immutable versions, reusable Characters and Character variants,
+Outfits, Voices, recipes, and reference media. The generic word **asset** is appropriate when
+describing byte storage, media ownership, or future product direction, but it must not obscure an
+actual video-, image-, audio-, or feature-specific contract and lifecycle.
+
+The intended product hierarchy is **Workspace → Campaign → Project → Assets**, with two important
+current-state qualifications:
+
+- Campaign has no domain model, schema, contract, route, or UI.
+- Project has domain rules, contracts, relational tables, and a repository in authoritative
+  persistence modes, but no application route or browser UI. Snapshot v1 is video-oriented by
+  design.
+
+A future Campaign may group multiple Projects, while a Project represents a focused resumable
+production effort and may remain independent if product policy permits. The current Project must
+not be presented as a Campaign or expanded through unversioned fields. Multi-format support
+requires explicit format-specific contracts, snapshot migration, validation, storage, preview,
+retention, and cleanup decisions. See [Product Vision](PRODUCT_VISION.md) and
+[Product Roadmap](PRODUCT_ROADMAP.md); neither document changes current runtime authority.
+
 ## Dependency boundaries
 
 | Boundary                      | Owns                                                              | Must not own                                 |
@@ -456,10 +479,15 @@ errors. The URL is neither persisted nor forwarded to a visual provider.
 
 The Project foundation is implemented in domain, contracts, and authoritative relational
 persistence, but it has no HTTP routes or browser UI yet. `Project` is the owner-scoped durable
-workspace; Saved Videos remain outputs and immutable output versions rather than work-in-progress
-authority. One Project can link any number of Saved Video outputs while its current revision keeps
-one active working context. The separately documented deferred Deliverable model is required only
-when several child video workflows must remain independently editable and resumable at once.
+workspace for one focused production effort; Saved Videos remain outputs and immutable output
+versions rather than work-in-progress authority. One Project can link any number of Saved Video
+outputs while its current revision keeps one active working context. The separately documented
+deferred Deliverable model is required only when several child video workflows must remain
+independently editable and resumable at once.
+
+Project is not a Campaign surrogate. There is no `campaignId` or campaign aggregate today. A
+future Campaign relationship must be additive, owner-constrained, and governed by explicit
+standalone membership, archive, detach, deletion, and retention rules.
 
 Every Project starts with an immutable revision 1, including an empty named Project. Snapshot V1
 stores only validated creative intent and durable IDs: source and working/presented media,
@@ -468,6 +496,11 @@ metadata, prompt/recipe and authored intent, local edit/export specifications, l
 workflow phase. Media bytes, Blob/object URLs, provider credentials/bodies/locations, and browser or
 React state are excluded. A source-bearing Project is resumable only after the same-owner media
 asset is `ready` in the configured durable byte store.
+
+Snapshot V1 remains deliberately video-specific: its local edit type and MP4 export specification
+are not a generic multi-format asset contract. Supporting images, graphics, or another content type
+requires a new validated snapshot version or a separately owned workflow payload, plus migration
+and unknown-version behavior; documentation terminology alone cannot broaden this schema safely.
 
 `projects.version` is the aggregate compare-and-swap token. Revision append also compares the
 current revision number, locks the Project, verifies the linear parent and same-owner ready assets,

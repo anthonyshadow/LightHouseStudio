@@ -1,7 +1,8 @@
 # Virtual try-on session
 
-**Outcome:** deliberately preview and optionally record an advanced live `lucy-vton-latest`
-garment transformation. Post-recording Virtual Try On is also available in the primary editor.
+**Outcome:** deliberately preview and optionally record an advanced live garment transformation.
+The current implementation pins `lucy-vton-latest`; post-recording Virtual Try On is also available
+in the primary editor.
 
 ## Journey
 
