@@ -6,6 +6,9 @@
 
 **Product model and principles:** [Product vision](PRODUCT_VISION.md)
 
+**Next implementation program:** [Campaign and Project MVP definition](MVP_DEFINITION.md) and
+[remaining implementation sequence](implementation/LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md)
+
 This roadmap describes how Lightframe Studio can grow from the implemented video-focused Studio
 into a broader content creation and campaign workspace. Phases express product dependency and
 learning order, not promised dates. Every future phase requires validated user need, explicit
@@ -44,7 +47,9 @@ processing jobs, and Saved Video outputs. No Project routes or browser UI use it
 Saved Videos are not assigned to Projects.
 
 This foundation should be evolved, not advertised as a finished Project experience. It represents
-a focused production effort, not a Campaign.
+a focused production effort, not a Campaign. Before Project writes become user-facing, the known
+revision-lineage, exact-Version-reference, output-replay, retention, current-status, bounded-read,
+and local-persistence gaps in the [MVP alignment audit](MVP_ALIGNMENT_AUDIT.md) must be corrected.
 
 ## Parallel enabling track — Account and service readiness
 
@@ -58,36 +63,49 @@ must reach the appropriate gate before shared workspaces, direct publishing, or 
 offered. The [account and infrastructure roadmap](deferred-account-and-infrastructure-roadmap.md)
 owns the detailed sequence and launch evidence.
 
-## Phase 2 — User-facing Project workspace
+## Phase 2 — Campaign and Project video workspace MVP
 
 **Status: planned direction.**
 
-- Add owner-derived Project application services, HTTP routes, and accessible Studio UI.
-- Create, name, resume, archive, and safely delete or restore Projects.
-- Connect Project revisions to exact source assets, creative selections, edit specifications,
-  provider jobs, saved outputs, and export intent.
-- Present lineage and recovery without loading large media eagerly.
-- Add Project-level organization such as search, filters, tags, status, and recently used creative
-  resources only after their semantics and persistence authority are defined.
-- Decide whether independently resumable deliverables are required inside a Project before
-  implementing the deferred child model.
+- Correct the dormant Project foundation's revision and media-reference lineage, transaction/replay,
+  retention, status, read-bounding, and cleanup invariants before exposing writes.
+- Add owner-derived Project services, HTTP routes, local/relational persistence parity, and an
+  accessible Projects workspace for create, list, open, rename, archive, and restore.
+- Introduce a deliberately small Campaign aggregate—name and optional brief—that groups Projects
+  without owning their media or processing state.
+- Keep Campaign membership optional: one Campaign may group many Projects, a Project belongs to
+  zero or one Campaign, and “No Campaign” is a virtual view rather than a default row.
+- Allow owner-checked Project move/detach. Campaign archive never archives Projects, and guarded
+  Campaign deletion requires all Projects to be detached or moved.
+- Accept a durable recorded, uploaded, or explicitly reused video source before calling a Project
+  resumable; restore exact Project state after navigation or restart.
+- Connect Project revisions to exact applied creative intent, current edit specifications,
+  processing jobs, durable results, and Saved Video/Video Version outputs.
+- Preserve Project Revision as creative state and Video Version as playable media history; expose
+  bounded history and download an exact ready Version.
+- Keep one active focused video workflow per Project. Do not implement the deferred Deliverable
+  child or a generic user-facing Asset platform for this MVP.
 
-A Project may initially stand alone. Campaigns should not be simulated through Project titles or
-unstructured tags.
+The objective criteria and twelve focused implementation prompts are maintained in the linked MVP
+documents. This phase remains local-first, loopback-only, single-operator, and video-focused; it is
+not a public-service launch.
 
-## Phase 3 — Campaign organization and creative variations
+## Phase 3 — Post-MVP organization and creative variations
 
-**Status: long-term direction; no Campaign model exists.**
+**Status: future direction after the Campaign/Project MVP is validated.**
 
-- Introduce Campaigns as a separate owner-scoped aggregate above Projects while deciding whether
-  Projects may also stand alone.
-- Capture a campaign brief, goal, audience, channels or placements, and shared creative context.
-- Group Projects and approved assets without transferring or weakening their ownership.
+- Enrich Campaign briefs only with demonstrated needs such as goals, audiences, channels,
+  placements, timing, or shared context.
+- Add Project/Campaign search, filters, tags, favorites, folders, bulk organization, or review states
+  only after their semantics and persistence authority are defined.
 - Represent deliberate variations for audience, message, platform, aspect ratio, placement, or
-  experiment separately from immutable version history.
-- Add campaign-level asset views, tags, grouping, and review states.
-- Define archive, detach, delete, retention, and portability behavior across Campaign–Project–Asset
-  relationships before schema or UI work.
+  experiment separately from immutable Project revisions and Video Versions.
+- Evaluate independently resumable Project Deliverables only if one focused workflow per Project
+  proves insufficient.
+- Add campaign-level approved-asset views without transferring asset, output, or reusable-resource
+  ownership.
+- Defer calendars, approvals, analytics, scheduling, publishing, and integrations to their explicit
+  product and service-readiness gates.
 
 ## Phase 4 — Multi-format content Studio
 
@@ -170,17 +188,19 @@ These considerations guide later design; none are implementation claims.
 
 ### Campaign and Project relationships
 
-Add Campaigns through an explicit owner-constrained relationship. Do not repurpose the current
-Project table as a Campaign or make a Project title carry campaign semantics. Decide whether
-Projects may stand alone, move between Campaigns, or belong to more than one Campaign before
-choosing keys and deletion rules.
+The MVP decision is an explicit owner-constrained one-to-many relationship: a Campaign has many
+Projects, and a Project belongs to zero or one Campaign. Projects may stand alone, move, or detach;
+they do not belong to several Campaigns. “No Campaign” is a virtual query bucket. Campaign archive
+and guarded tombstone never cascade into Projects or content. Do not repurpose the Project table as
+a Campaign or make a Project title carry campaign semantics.
 
 ### Media-neutral asset identity
 
 The existing media-asset boundary already provides opaque IDs, ownership, byte lifecycle, MIME and
-inspection metadata, and relationship-safe retention. Future content types should extend that
-boundary with a discriminated media kind and format-specific metadata rather than funneling every
-record through `SavedVideo` or assuming all assets are playable media.
+inspection metadata, and relationship-aware retention for its current consumers. It does not yet
+consult dormant Project relationships; that gap is Phase 2 work. Future content types should extend
+the boundary with a discriminated media kind and format-specific metadata rather than funneling
+every record through `SavedVideo` or assuming all assets are playable media.
 
 ### Versions, variations, and derivatives
 

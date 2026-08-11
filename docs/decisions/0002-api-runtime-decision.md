@@ -21,7 +21,7 @@ Bun `1.3.14` is the package manager, API development runtime, production runtime
 Elysia `1.4.29` is the API framework. The server remains loopback-only and continues to serve the
 built web app and `/api` from one origin in production.
 
-Node `24.x` remains an explicit tooling runtime for the retained Vitest, Vite, Playwright,
+Node `26.x` remains an explicit tooling runtime for the retained Vitest, Vite, Playwright,
 Storybook, tsup declaration builds, and repository scripts where substituting Bun would change the
 tool's runtime contract without product benefit. These tools are invoked through `bun run`; bare
 `bun test` is not the repository test command.
