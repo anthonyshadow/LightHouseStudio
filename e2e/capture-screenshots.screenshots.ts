@@ -4,6 +4,7 @@ import { expect, test, type Locator, type Page } from '@playwright/test';
 import type { CapabilitiesResponse } from '@studio/contracts';
 import type { CreativeAssetStore } from '@studio/domain';
 import {
+  CREATIVE_ASSET_STORAGE_KEY,
   closeRecipeDockWhenOverlaid,
   createLocalTake,
   expectNoDocumentOverflow,
@@ -23,7 +24,6 @@ const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
 const SCREENSHOT_ROOT = path.resolve(
   process.env.LIGHTFRAME_SCREENSHOT_ROOT ?? path.join(process.cwd(), 'test-results', 'captures'),
 );
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v7';
 const FIXED_WEBP = Buffer.from(
   'UklGRiIAAABXRUJQVlA4IBYAAAAwAQCdASoBAAEAAUAmJaQAA3AA/v3AgAA=',
   'base64',

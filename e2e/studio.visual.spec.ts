@@ -6,6 +6,7 @@ import {
   loadH264VideoFixture,
 } from './support/existingVideoHarness';
 import {
+  CREATIVE_ASSET_STORAGE_KEY,
   closeRecipeDockWhenOverlaid,
   createLocalTake,
   expectNoDocumentOverflow,
@@ -21,7 +22,6 @@ import { REFERENCE_PNG } from './support/mediaFixtures';
 import { VISUAL_CASE_MATRIX, type VisualScenarioId } from './studioVisualMatrix';
 
 const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
-const CREATIVE_ASSET_STORAGE_KEY = 'realtime-creator-studio.creative-assets.v7';
 const SEEDED_CHARACTER_STORE = {
   schemaVersion: 7,
   savedPrompts: [],
