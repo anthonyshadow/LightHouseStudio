@@ -16,6 +16,11 @@ Use a four-digit sequence and a short kebab-case title, for example
 links to its replacement. Separate implemented current behavior from deferred or
 target-state work explicitly.
 
+## Current records
+
+- [0001: Local and cloud persistence boundaries](0001-local-and-cloud-persistence-boundaries.md)
+- [0002: Durable Project aggregate](0002-durable-project-aggregate.md)
+
 ## Template
 
 ```md

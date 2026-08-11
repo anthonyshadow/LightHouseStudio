@@ -10,6 +10,7 @@ import { createPostgresDatabase } from './database/client.js';
 import { DrizzleCreativeLibraryRepository } from './database/creative-library-repository.js';
 import { DrizzleDirectUploadRepository } from './database/direct-upload-repository.js';
 import { DrizzleProcessingJobTraceWriter } from './database/processing-job-repository.js';
+import { DrizzleProjectRepository } from './database/project-repository.js';
 import { DrizzleReferenceImageAssetStore } from './database/reference-image-asset-store.js';
 import { DrizzleSavedVideoRepository } from './database/saved-video-repository.js';
 import { DrizzleSavedVoiceRepository } from './database/saved-voice-repository.js';
@@ -87,6 +88,7 @@ export const createConfiguredPersistence = async (
       referenceImages,
       processingJobTraces,
       processingJobs: processingJobTraces,
+      projects: new DrizzleProjectRepository(connection.db),
       creativeLibraries: new DrizzleCreativeLibraryRepository(
         connection.db,
         async (ownerUserId, assetIds) => {

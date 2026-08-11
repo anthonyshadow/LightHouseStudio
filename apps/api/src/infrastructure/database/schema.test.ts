@@ -14,6 +14,15 @@ import {
   ownerMigrations,
   passwordCredentials,
   processingJobs,
+  projectAssetRole,
+  projectAssets,
+  projectJobs,
+  projectOutputs,
+  projectRevisionAuthorKind,
+  projectRevisions,
+  projectRevisionSource,
+  projects,
+  projectStatus,
   referenceImageAssets,
   resourceReferences,
   savedVideoReceipts,
@@ -44,6 +53,11 @@ describe('Drizzle persistence schema', () => {
       creativeLibraries,
       referenceImageAssets,
       processingJobs,
+      projects,
+      projectRevisions,
+      projectAssets,
+      projectJobs,
+      projectOutputs,
       outbox,
       resourceReferences,
     ];
@@ -61,6 +75,18 @@ describe('Drizzle persistence schema', () => {
     );
     expect(getTableConfig(mediaAssets).indexes).toHaveLength(3);
     expect(getTableConfig(creativeAssets).primaryKeys).toHaveLength(1);
+    expect(getTableConfig(projectRevisions).indexes.map(({ config }) => config.name)).toContain(
+      'project_revisions_project_number_unique',
+    );
+    expect(getTableConfig(projectRevisions).uniqueConstraints).toHaveLength(1);
+    expect(getTableConfig(projects).foreignKeys.map((foreignKey) => foreignKey.getName())).toEqual(
+      expect.arrayContaining(['projects_current_revision_same_project_fk']),
+    );
+    expect(
+      [projectAssets, projectJobs, projectOutputs].every(
+        (table) => getTableConfig(table).foreignKeys.length >= 3,
+      ),
+    ).toBe(true);
     expect(
       references.every(({ columns, foreignColumns }) => columns.length === foreignColumns.length),
     ).toBe(true);
@@ -89,6 +115,33 @@ describe('Drizzle persistence schema', () => {
       'failed',
       'aborted',
       'expired',
+    ]);
+    expect(projectStatus.enumValues).toEqual([
+      'draft',
+      'ready',
+      'processing',
+      'needs-attention',
+      'completed',
+      'archived',
+      'deleted',
+    ]);
+    expect(projectAssetRole.enumValues).toEqual([
+      'source',
+      'working',
+      'presented',
+      'reference',
+      'job-input',
+      'job-output',
+      'audio',
+      'thumbnail',
+    ]);
+    expect(projectRevisionAuthorKind.enumValues).toEqual(['user', 'system', 'migration']);
+    expect(projectRevisionSource.enumValues).toEqual([
+      'create',
+      'user-edit',
+      'job-result',
+      'restore',
+      'migration',
     ]);
   });
 });

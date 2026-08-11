@@ -1,7 +1,7 @@
 # PostgreSQL, Neon, Drizzle, and Cloudflare R2
 
 **Status:** implemented, configuration-gated infrastructure; local remains the default  
-**Reviewed:** 2026-08-09
+**Reviewed:** 2026-08-11
 
 This is the canonical setup, migration, rollback, and limitation guide for cloud persistence. It
 does not authorize public exposure: Elysia on Bun still binds only to `127.0.0.1`, and the seeded demo
@@ -9,13 +9,19 @@ account is not production identity or tenancy.
 
 ## What is implemented
 
-- Drizzle migrations for users/credentials, durable sessions, saved voices, saved videos and
-  versions, private media assets, reference images, creative-library records, processing jobs,
-  leases, resource references, idempotency receipts, and an outbox.
+- Drizzle migrations for users/credentials, durable sessions, Projects/revisions/relationships,
+  saved voices, saved videos and versions, private media assets, reference images,
+  creative-library records, processing jobs, leases, resource references, idempotency receipts,
+  and an outbox.
 - Transactional PostgreSQL repositories behind the existing application ports. Development uses
   Docker-hosted PostgreSQL through `node-postgres`; production uses Neon through the same Drizzle
   boundary. Password credentials are separate from public user rows. Saved-video version append
   and creative-library replacement use database transactions and optimistic concurrency.
+- An authoritative `postgres`/`neon` Project repository with a Project-version CAS, monotonic
+  immutable revision history, validated snapshot V1, same-owner composite foreign keys, and
+  normalized asset/job/Saved Video output links. Source links require a same-owner `ready` media
+  asset inside the create/append transaction. Existing videos/jobs are not backfilled, and no
+  Project route or UI writes these tables yet. `shadow` does not make Projects authoritative.
 - A private R2 `AssetByteStore` with opaque keys, streaming/multipart upload, app-owned SHA-256,
   byte-range reads, owner checks, database lifecycle states, multipart abort/cleanup, and deletion
   tombstones. R2 ETags are retained only as transport metadata, never as the integrity checksum.
@@ -155,6 +161,10 @@ verification, lifecycle, or cleanup contracts above.
   support is never blanket GC.
 - Database migrations must be applied through reviewed forward migrations. Restore/PITR and R2
   inventory drills require real staging resources and are not claimed by automated local tests.
+- Project migration `0009` is additive and does not assign, rewrite, or delete existing videos,
+  jobs, or assets. An application rollback may leave the new empty/retained tables unused. Dropping
+  them after Project writes is destructive and requires a separate reviewed migration, inventory,
+  backup, and restore plan; it is not an automatic rollback step.
 
 ## Operational checks before any non-loopback deployment
 
