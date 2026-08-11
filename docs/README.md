@@ -32,12 +32,13 @@ and does not authorize public deployment or relax the loopback boundary.
 
 ## Focused technical references
 
-| Document                                            | Use                                                                                                      |
-| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| [Architecture decisions](decisions/README.md)       | Accepted, proposed, pending, rejected, and superseded expensive-to-reverse decisions                     |
-| [Maintainability audit](MAINTAINABILITY_AUDIT.md)   | Current repository-wide cleanup record, placement rules, deferred findings, and validation record        |
-| [Reference image generation](Image_Generation.md)   | Optimizer, upload, provider selection, immutable asset, retry, and cleanup flow                          |
-| [Remote backend handoff](REMOTE_BACKEND_HANDOFF.md) | Deferred design boundary for a separately approved remote product; not current behavior or authorization |
+| Document                                                           | Use                                                                                                      |
+| ------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
+| [Architecture decisions](decisions/README.md)                      | Accepted, proposed, pending, rejected, and superseded expensive-to-reverse decisions                     |
+| [Deferred Project Deliverable model](PROJECT_DELIVERABLE_MODEL.md) | Future child aggregate for independently resumable videos inside one Project; not implemented            |
+| [Maintainability audit](MAINTAINABILITY_AUDIT.md)                  | Current repository-wide cleanup record, placement rules, deferred findings, and validation record        |
+| [Reference image generation](Image_Generation.md)                  | Optimizer, upload, provider selection, immutable asset, retry, and cleanup flow                          |
+| [Remote backend handoff](REMOTE_BACKEND_HANDOFF.md)                | Deferred design boundary for a separately approved remote product; not current behavior or authorization |
 
 ## Rationale and UI catalog
 

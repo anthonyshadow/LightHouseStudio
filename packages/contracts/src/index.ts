@@ -7,5 +7,6 @@ export * from './reference-images';
 export * from './saved-videos';
 export * from './media-assets';
 export * from './processing-jobs';
+export * from './projects';
 export * from './voices';
 export * from './video-jobs';

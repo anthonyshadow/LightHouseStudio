@@ -1,7 +1,9 @@
 import { sql } from 'drizzle-orm';
 import {
+  type AnyPgColumn,
   bigint,
   check,
+  foreignKey,
   index,
   integer,
   jsonb,
@@ -10,6 +12,7 @@ import {
   primaryKey,
   text,
   timestamp,
+  unique,
   uniqueIndex,
   uuid,
 } from 'drizzle-orm/pg-core';
@@ -71,6 +74,37 @@ export const directUploadStatus = pgEnum('direct_upload_status', [
   'failed',
   'aborted',
   'expired',
+]);
+export const projectStatus = pgEnum('project_status', [
+  'draft',
+  'ready',
+  'processing',
+  'needs-attention',
+  'completed',
+  'archived',
+  'deleted',
+]);
+export const projectAssetRole = pgEnum('project_asset_role', [
+  'source',
+  'working',
+  'presented',
+  'reference',
+  'job-input',
+  'job-output',
+  'audio',
+  'thumbnail',
+]);
+export const projectRevisionAuthorKind = pgEnum('project_revision_author_kind', [
+  'user',
+  'system',
+  'migration',
+]);
+export const projectRevisionSource = pgEnum('project_revision_source', [
+  'create',
+  'user-edit',
+  'job-result',
+  'restore',
+  'migration',
 ]);
 
 const auditTimestamps = {
@@ -143,6 +177,7 @@ export const mediaAssets = pgTable(
   },
   (table) => [
     uniqueIndex('media_assets_storage_key_unique').on(table.storageProvider, table.storageKey),
+    unique('media_assets_id_owner_unique').on(table.id, table.ownerUserId),
     index('media_assets_owner_status_idx').on(table.ownerUserId, table.status, table.createdAt),
     index('media_assets_owner_checksum_idx').on(table.ownerUserId, table.checksumSha256),
     check('media_assets_size_positive', sql`${table.sizeBytes} > 0`),
@@ -165,6 +200,7 @@ export const savedVideos = pgTable(
     ...auditTimestamps,
   },
   (table) => [
+    unique('saved_videos_id_owner_unique').on(table.id, table.ownerUserId),
     index('saved_videos_gallery_idx').on(
       table.ownerUserId,
       table.deletedAt,
@@ -208,6 +244,7 @@ export const videoVersions = pgTable(
   },
   (table) => [
     uniqueIndex('video_versions_ordinal_unique').on(table.videoId, table.ordinal),
+    unique('video_versions_video_owner_id_unique').on(table.videoId, table.ownerUserId, table.id),
     index('video_versions_character_idx').on(table.ownerUserId, table.characterName),
     index('video_versions_duration_idx').on(table.ownerUserId, table.durationMs, table.id),
   ],
@@ -387,6 +424,7 @@ export const processingJobs = pgTable(
     ...auditTimestamps,
   },
   (table) => [
+    unique('processing_jobs_id_owner_unique').on(table.id, table.ownerUserId),
     index('processing_jobs_owner_status_idx').on(table.ownerUserId, table.status, table.createdAt),
     index('processing_jobs_lease_idx').on(table.status, table.leaseExpiresAt),
     uniqueIndex('processing_jobs_owner_active_unique')
@@ -394,6 +432,243 @@ export const processingJobs = pgTable(
       .where(
         sql`${table.status} in ('pending', 'validating', 'submitting', 'accepted', 'queued', 'processing', 'retrieving')`,
       ),
+  ],
+);
+
+const projectRevisionProjectIdColumn = (): AnyPgColumn => projectRevisions.projectId;
+const projectRevisionOwnerUserIdColumn = (): AnyPgColumn => projectRevisions.ownerUserId;
+const projectRevisionIdColumn = (): AnyPgColumn => projectRevisions.id;
+const projectRevisionNumberColumn = (): AnyPgColumn => projectRevisions.revisionNumber;
+const projectIdColumn = (): AnyPgColumn => projects.id;
+const projectOwnerUserIdColumn = (): AnyPgColumn => projects.ownerUserId;
+
+export const projects = pgTable(
+  'projects',
+  {
+    id: uuid('id').primaryKey(),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    title: text('title').notNull(),
+    status: projectStatus('status').notNull().default('draft'),
+    version: integer('version').notNull().default(1),
+    currentRevisionId: uuid('current_revision_id'),
+    currentRevisionNumber: integer('current_revision_number').notNull().default(0),
+    archivedAt: timestamp('archived_at', { withTimezone: true, mode: 'string' }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'string' }),
+    ...auditTimestamps,
+  },
+  (table) => [
+    unique('projects_id_owner_unique').on(table.id, table.ownerUserId),
+    index('projects_owner_status_recent_idx').on(
+      table.ownerUserId,
+      table.status,
+      table.deletedAt,
+      table.updatedAt,
+    ),
+    index('projects_owner_title_idx').on(table.ownerUserId, table.title),
+    index('projects_owner_lifecycle_idx').on(table.ownerUserId, table.archivedAt, table.deletedAt),
+    check('projects_version_positive', sql`${table.version} > 0`),
+    check(
+      'projects_current_revision_consistent',
+      sql`(${table.currentRevisionId} is null and ${table.currentRevisionNumber} = 0) or (${table.currentRevisionId} is not null and ${table.currentRevisionNumber} > 0)`,
+    ),
+    check(
+      'projects_lifecycle_consistent',
+      sql`(${table.status} = 'deleted' and ${table.deletedAt} is not null and ${table.archivedAt} is not null) or (${table.status} = 'archived' and ${table.archivedAt} is not null and ${table.deletedAt} is null) or (${table.status} not in ('archived', 'deleted') and ${table.archivedAt} is null and ${table.deletedAt} is null)`,
+    ),
+    foreignKey({
+      name: 'projects_current_revision_same_project_fk',
+      columns: [table.id, table.ownerUserId, table.currentRevisionId, table.currentRevisionNumber],
+      foreignColumns: [
+        projectRevisionProjectIdColumn(),
+        projectRevisionOwnerUserIdColumn(),
+        projectRevisionIdColumn(),
+        projectRevisionNumberColumn(),
+      ],
+    }).onDelete('restrict'),
+  ],
+);
+
+export const projectRevisions = pgTable(
+  'project_revisions',
+  {
+    id: uuid('id').primaryKey(),
+    projectId: uuid('project_id').notNull(),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    revisionNumber: integer('revision_number').notNull(),
+    parentRevisionId: uuid('parent_revision_id'),
+    parentRevisionNumber: integer('parent_revision_number'),
+    snapshotSchemaVersion: integer('snapshot_schema_version').notNull(),
+    snapshot: jsonb('snapshot').notNull(),
+    authorKind: projectRevisionAuthorKind('author_kind').notNull(),
+    authorId: text('author_id').notNull(),
+    source: projectRevisionSource('source').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('project_revisions_project_number_unique').on(
+      table.projectId,
+      table.revisionNumber,
+    ),
+    unique('project_revisions_project_owner_id_number_unique').on(
+      table.projectId,
+      table.ownerUserId,
+      table.id,
+      table.revisionNumber,
+    ),
+    index('project_revisions_project_created_idx').on(table.projectId, table.createdAt),
+    check('project_revisions_number_positive', sql`${table.revisionNumber} > 0`),
+    check('project_revisions_snapshot_version_supported', sql`${table.snapshotSchemaVersion} = 1`),
+    check(
+      'project_revisions_parent_consistent',
+      sql`(${table.revisionNumber} = 1 and ${table.parentRevisionId} is null and ${table.parentRevisionNumber} is null) or (${table.revisionNumber} > 1 and ${table.parentRevisionId} is not null and ${table.parentRevisionNumber} = ${table.revisionNumber} - 1)`,
+    ),
+    foreignKey({
+      name: 'project_revisions_project_owner_fk',
+      columns: [table.projectId, table.ownerUserId],
+      foreignColumns: [projectIdColumn(), projectOwnerUserIdColumn()],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_revisions_parent_same_project_fk',
+      columns: [
+        table.projectId,
+        table.ownerUserId,
+        table.parentRevisionId,
+        table.parentRevisionNumber,
+      ],
+      foreignColumns: [table.projectId, table.ownerUserId, table.id, table.revisionNumber],
+    }).onDelete('restrict'),
+  ],
+);
+
+export const projectAssets = pgTable(
+  'project_assets',
+  {
+    projectId: uuid('project_id').notNull(),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    assetId: uuid('asset_id').notNull(),
+    role: projectAssetRole('role').notNull(),
+    revisionId: uuid('revision_id').notNull(),
+    revisionNumber: integer('revision_number').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.projectId, table.assetId, table.role] }),
+    index('project_assets_project_role_idx').on(table.projectId, table.role, table.createdAt),
+    index('project_assets_asset_idx').on(table.ownerUserId, table.assetId),
+    foreignKey({
+      name: 'project_assets_project_owner_fk',
+      columns: [table.projectId, table.ownerUserId],
+      foreignColumns: [projects.id, projects.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_assets_asset_owner_fk',
+      columns: [table.assetId, table.ownerUserId],
+      foreignColumns: [mediaAssets.id, mediaAssets.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_assets_revision_same_project_fk',
+      columns: [table.projectId, table.ownerUserId, table.revisionId, table.revisionNumber],
+      foreignColumns: [
+        projectRevisions.projectId,
+        projectRevisions.ownerUserId,
+        projectRevisions.id,
+        projectRevisions.revisionNumber,
+      ],
+    }).onDelete('restrict'),
+  ],
+);
+
+export const projectJobs = pgTable(
+  'project_jobs',
+  {
+    projectId: uuid('project_id').notNull(),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    jobId: uuid('job_id').notNull(),
+    revisionId: uuid('revision_id').notNull(),
+    revisionNumber: integer('revision_number').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.projectId, table.jobId] }),
+    index('project_jobs_project_idx').on(table.projectId, table.createdAt),
+    index('project_jobs_job_idx').on(table.ownerUserId, table.jobId),
+    foreignKey({
+      name: 'project_jobs_project_owner_fk',
+      columns: [table.projectId, table.ownerUserId],
+      foreignColumns: [projects.id, projects.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_jobs_job_owner_fk',
+      columns: [table.jobId, table.ownerUserId],
+      foreignColumns: [processingJobs.id, processingJobs.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_jobs_revision_same_project_fk',
+      columns: [table.projectId, table.ownerUserId, table.revisionId, table.revisionNumber],
+      foreignColumns: [
+        projectRevisions.projectId,
+        projectRevisions.ownerUserId,
+        projectRevisions.id,
+        projectRevisions.revisionNumber,
+      ],
+    }).onDelete('restrict'),
+  ],
+);
+
+export const projectOutputs = pgTable(
+  'project_outputs',
+  {
+    projectId: uuid('project_id').notNull(),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    savedVideoId: uuid('saved_video_id').notNull(),
+    videoVersionId: uuid('video_version_id').notNull(),
+    revisionId: uuid('revision_id').notNull(),
+    revisionNumber: integer('revision_number').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.projectId, table.savedVideoId, table.videoVersionId] }),
+    index('project_outputs_project_idx').on(table.projectId, table.createdAt),
+    index('project_outputs_video_idx').on(
+      table.ownerUserId,
+      table.savedVideoId,
+      table.videoVersionId,
+    ),
+    foreignKey({
+      name: 'project_outputs_project_owner_fk',
+      columns: [table.projectId, table.ownerUserId],
+      foreignColumns: [projects.id, projects.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_outputs_video_owner_fk',
+      columns: [table.savedVideoId, table.ownerUserId],
+      foreignColumns: [savedVideos.id, savedVideos.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_outputs_version_same_video_fk',
+      columns: [table.savedVideoId, table.ownerUserId, table.videoVersionId],
+      foreignColumns: [videoVersions.videoId, videoVersions.ownerUserId, videoVersions.id],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_outputs_revision_same_project_fk',
+      columns: [table.projectId, table.ownerUserId, table.revisionId, table.revisionNumber],
+      foreignColumns: [
+        projectRevisions.projectId,
+        projectRevisions.ownerUserId,
+        projectRevisions.id,
+        projectRevisions.revisionNumber,
+      ],
+    }).onDelete('restrict'),
   ],
 );
 
@@ -461,6 +736,11 @@ export const databaseSchema = {
   creativeLibraries,
   referenceImageAssets,
   processingJobs,
+  projects,
+  projectRevisions,
+  projectAssets,
+  projectJobs,
+  projectOutputs,
   outbox,
   resourceReferences,
 };

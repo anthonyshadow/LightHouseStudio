@@ -7,8 +7,9 @@ characters. Its primary loop is:
 
 Live AI camera transformation and Workshop remain advanced tools. The app is single-operator and
 binds to loopback. Phase 1 provides one seeded local demo account, authenticated ownership, and
-durable local saved-media records; it does not provide signup, billing, cloud projects, or public
-multi-user deployment. It is not approved for LAN, tunnel, proxy, or public exposure.
+durable local saved-media records; it does not provide signup, billing, or public multi-user
+deployment. A durable Project domain/database foundation exists, but no Project routes or UI are
+user-facing yet. It is not approved for LAN, tunnel, proxy, or public exposure.
 
 ## Status
 
