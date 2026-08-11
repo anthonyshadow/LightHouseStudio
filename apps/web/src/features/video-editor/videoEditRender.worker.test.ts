@@ -30,8 +30,8 @@ const loadWorker = async () => {
   if (!listener) throw new Error('The worker did not install its message listener.');
   return {
     postMessage,
-    send: (request: VideoEditWorkerRequest) =>
-      listener?.({ data: request } as MessageEvent<VideoEditWorkerRequest>),
+    send: (request: VideoEditWorkerRequest, origin = '') =>
+      listener?.({ data: request, origin } as MessageEvent<VideoEditWorkerRequest>),
   };
 };
 
@@ -42,7 +42,7 @@ afterEach(() => {
 });
 
 describe('videoEditRender worker runtime', () => {
-  it('acknowledges cancellation while the media runtime is still loading and suppresses stale errors', async () => {
+  it('rejects non-worker origins and acknowledges cancellation while the media runtime loads', async () => {
     let resolveMediaRuntime: ((exports: Record<string, unknown>) => void) | undefined;
     vi.doMock(
       'mediabunny',
@@ -55,6 +55,8 @@ describe('videoEditRender worker runtime', () => {
 
     worker.send(renderRequest(17));
     await vi.waitFor(() => expect(resolveMediaRuntime).toBeTypeOf('function'));
+    worker.send({ type: 'cancel', operationId: 17 }, 'https://untrusted.example');
+    expect(worker.postMessage).not.toHaveBeenCalled();
     worker.send({ type: 'cancel', operationId: 17 });
     expect(worker.postMessage).toHaveBeenCalledExactlyOnceWith({
       type: 'canceled',

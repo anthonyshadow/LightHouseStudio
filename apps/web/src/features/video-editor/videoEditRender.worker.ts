@@ -190,6 +190,9 @@ const render = async (
 };
 
 workerScope.addEventListener('message', (event) => {
+  // Dedicated-worker messages arrive through the worker's private MessagePort, whose
+  // MessageEvent origin is empty. Reject any event that does not match that channel contract.
+  if (event.origin !== '') return;
   const request = event.data;
   if (request.type === 'cancel') {
     if (activeOperationId !== request.operationId) return;
