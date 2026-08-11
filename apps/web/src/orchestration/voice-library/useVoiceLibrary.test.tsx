@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { QueryClientProvider, type QueryClient } from '@tanstack/react-query';
-import { act, renderHook, waitFor } from '@testing-library/react';
+import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import type { PropsWithChildren } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRemoteStateQueryClient } from '../../application/remote-state/RemoteStateProvider';
@@ -91,8 +91,10 @@ const renderVoiceLibrary = (client: VoiceLibraryClient) => {
   });
 };
 
-afterEach(() => {
+afterEach(async () => {
+  cleanup();
   for (const queryClient of queryClients.splice(0)) queryClient.clear();
+  if (vi.isFakeTimers()) await vi.runOnlyPendingTimersAsync();
   vi.useRealTimers();
 });
 
