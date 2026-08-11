@@ -74,7 +74,7 @@
   },
   "devDependencies": {
     "@axe-core/playwright": "4.12.1",
-    "@babel/core": "7.29.7",
+    "@babel/core": "8.0.1",
     "@emnapi/runtime": "1.11.3",
     "@emotion/react": "11.14.0",
     "@eslint/js": "10.0.1",
