@@ -7,22 +7,25 @@ describe implemented behavior and constraints.
 
 ## Start here
 
-| Document                                                    | Status  | Owner               | Source of truth for                                                           | Last reviewed |
-| ----------------------------------------------------------- | ------- | ------------------- | ----------------------------------------------------------------------------- | ------------- |
-| [Product Vision](PRODUCT_VISION.md)                         | Current | Product             | Positioning, audiences, product hierarchy, principles, and terminology        | 2026-08-11    |
-| [Product Roadmap](PRODUCT_ROADMAP.md)                       | Current | Product/engineering | Directional phases and future architecture considerations                     | 2026-08-11    |
-| [Project README](../README.md)                              | Current | Product/engineering | Current product overview, setup, configuration, commands, and release posture | 2026-08-11    |
-| [Repository working guide](../AGENTS.md)                    | Current | Engineering         | Repository-wide work, validation, and stop conditions                         | 2026-08-08    |
-| [Security policy](../SECURITY.md)                           | Current | Repository owner    | Private vulnerability reporting scope and expectations                        | 2026-08-08    |
-| [Architecture](ARCHITECTURE.md)                             | Current | Engineering         | Dependency, ownership, lifecycle, persistence, API, and deployment boundaries | 2026-08-11    |
-| [User stories](userStories/README.md)                       | Current | Product/QA          | Observable current journeys and manual validation limits                      | 2026-08-11    |
-| [Privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md) | Current | Product/engineering | Data location, provider contact, retention, deletion, and cost boundaries     | 2026-08-07    |
-| [Testing strategy](TESTING.md)                              | Current | Engineering/QA      | Test layers, commands, CI scope, visual policy, and release validation        | 2026-08-08    |
-| [Manual QA](MANUAL_QA.md)                                   | Current | QA                  | Physical device, touch, accessibility, media, and cleanup checks              | 2026-08-08    |
-| [Live provider smoke](LIVE_PROVIDER_SMOKE.md)               | Current | Engineering/QA      | Authorized, opt-in, cost-bearing provider validation                          | 2026-08-08    |
-| [Recording memory policy](RECORDING_MEMORY_POLICY.md)       | Current | Engineering/QA      | Real 300-second memory measurement and support limits                         | 2026-08-08    |
-| [Browser support](BROWSER_SUPPORT.md)                       | Current | Engineering/QA      | Claimed browser/device support and remaining manual checks                    | 2026-08-05    |
-| [Screenshot coverage](screenshot-test-coverage.md)          | Current | Engineering/QA      | Curated visual matrix, platform baselines, and readiness rules                | 2026-08-08    |
+| Document                                                                                          | Status   | Owner               | Source of truth for                                                           | Last reviewed |
+| ------------------------------------------------------------------------------------------------- | -------- | ------------------- | ----------------------------------------------------------------------------- | ------------- |
+| [Product Vision](PRODUCT_VISION.md)                                                               | Current  | Product             | Positioning, audiences, product hierarchy, principles, and terminology        | 2026-08-11    |
+| [Product Roadmap](PRODUCT_ROADMAP.md)                                                             | Current  | Product/engineering | Directional phases and future architecture considerations                     | 2026-08-11    |
+| [MVP alignment audit](MVP_ALIGNMENT_AUDIT.md)                                                     | Planning | Product/engineering | Evidence-backed post-Prompt-01 audit, gaps, and old-plan disposition          | 2026-08-11    |
+| [Campaign and Project MVP definition](MVP_DEFINITION.md)                                          | Planned  | Product/engineering | Bounded Campaign/Project/video MVP model and objective completion criteria    | 2026-08-11    |
+| [Remaining MVP implementation sequence](implementation/LIGHTFRAME_MVP_IMPLEMENTATION_SEQUENCE.md) | Planned  | Product/engineering | Twelve ordered, re-audited implementation prompts from the current foundation | 2026-08-11    |
+| [Project README](../README.md)                                                                    | Current  | Product/engineering | Current product overview, setup, configuration, commands, and release posture | 2026-08-11    |
+| [Repository working guide](../AGENTS.md)                                                          | Current  | Engineering         | Repository-wide work, validation, and stop conditions                         | 2026-08-08    |
+| [Security policy](../SECURITY.md)                                                                 | Current  | Repository owner    | Private vulnerability reporting scope and expectations                        | 2026-08-08    |
+| [Architecture](ARCHITECTURE.md)                                                                   | Current  | Engineering         | Dependency, ownership, lifecycle, persistence, API, and deployment boundaries | 2026-08-11    |
+| [User stories](userStories/README.md)                                                             | Current  | Product/QA          | Observable current journeys and manual validation limits                      | 2026-08-11    |
+| [Privacy and temporary data](PRIVACY_AND_TEMPORARY_DATA.md)                                       | Current  | Product/engineering | Data location, provider contact, retention, deletion, and cost boundaries     | 2026-08-07    |
+| [Testing strategy](TESTING.md)                                                                    | Current  | Engineering/QA      | Test layers, commands, CI scope, visual policy, and release validation        | 2026-08-08    |
+| [Manual QA](MANUAL_QA.md)                                                                         | Current  | QA                  | Physical device, touch, accessibility, media, and cleanup checks              | 2026-08-08    |
+| [Live provider smoke](LIVE_PROVIDER_SMOKE.md)                                                     | Current  | Engineering/QA      | Authorized, opt-in, cost-bearing provider validation                          | 2026-08-08    |
+| [Recording memory policy](RECORDING_MEMORY_POLICY.md)                                             | Current  | Engineering/QA      | Real 300-second memory measurement and support limits                         | 2026-08-08    |
+| [Browser support](BROWSER_SUPPORT.md)                                                             | Current  | Engineering/QA      | Claimed browser/device support and remaining manual checks                    | 2026-08-05    |
+| [Screenshot coverage](screenshot-test-coverage.md)                                                | Current  | Engineering/QA      | Curated visual matrix, platform baselines, and readiness rules                | 2026-08-08    |
 
 ## Account foundation and deferred infrastructure
 

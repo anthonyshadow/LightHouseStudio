@@ -91,17 +91,22 @@ placed in a Project, and existing Saved Videos are not backfilled into one.
 ### Near-term product direction
 
 The next coherent product layer is a user-facing Project workspace over the existing durable
-foundation. It should connect working context, source media, creative choices, jobs, versions, and
-outputs without turning a Saved Video into editable project state. Organization, search, tags,
-review states, and reusable defaults should be introduced only with explicit ownership and
-lifecycle rules.
+foundation, with a deliberately lightweight optional Campaign organizer. A Project remains one
+focused video workflow and may stand alone; one Campaign may group many Projects through an
+owner-constrained, non-cascading relationship. The initial Campaign adds only a name, optional
+brief, lifecycle, and fast New Project path.
+
+Project should connect working context, source media, creative choices, jobs, versions, and outputs
+without turning a Saved Video into editable project state. Rich Campaign planning, search, tags,
+review states, and reusable defaults should be introduced only with validated value and explicit
+ownership and lifecycle rules. See the [MVP definition](MVP_DEFINITION.md) for the bounded target.
 
 ### Long-term product vision
 
-Future versions are expected to add Campaigns above Projects, broaden Assets beyond video, deepen
-brand and creative reuse, support structured review and collaboration, and help deliver approved
-content through channel-appropriate export and publishing workflows. These are roadmap directions,
-not current commitments or capabilities.
+Future versions are expected to enrich Campaign planning, broaden Assets beyond video, deepen brand
+and creative reuse, support structured review and collaboration, and help deliver approved content
+through channel-appropriate export and publishing workflows. These are roadmap directions, not
+current commitments or capabilities.
 
 See the [product roadmap](PRODUCT_ROADMAP.md) for the proposed progression and the separate
 [account and infrastructure roadmap](deferred-account-and-infrastructure-roadmap.md) for account,
@@ -112,7 +117,7 @@ public-service, security, and operational gates.
 | Concept           | Durable meaning                                                                                        | Current status                                                                                           |
 | ----------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
 | Workspace         | The user's overall Lightframe Studio environment, libraries, settings, and accessible work             | One authenticated, single-operator Studio exists; shared/team workspaces do not                          |
-| Campaign          | A marketing or creative initiative that can group Projects, goals, audiences, channels, and assets     | Vision only; no schema, contract, route, or UI                                                           |
+| Campaign          | A marketing or creative initiative that can group Projects; richer planning context can evolve later   | Planned in minimal optional MVP form; no schema, contract, route, or UI currently                        |
 | Project           | A focused production effort with resumable creative intent, sources, revisions, jobs, and outputs      | Domain/contracts and relational persistence exist; no route or UI                                        |
 | Content           | Creative material and messaging independent of file format or storage representation                   | Broad product term; current finished output is primarily video                                           |
 | Asset             | A piece of imported, generated, transformed, or organized content with ownership, type, and lineage    | Media/reference asset infrastructure exists, but user-facing saved outputs and workflows are video-led   |
@@ -126,9 +131,10 @@ public-service, security, and operational gates.
 | Export            | Producing a validated deliverable in a chosen file, format, size, or channel-ready specification       | Video rendering and download exist; broader export presets do not                                        |
 | Publish           | Sending an approved asset to an external destination through an authorized integration                 | Vision only; no publishing or scheduling integration exists                                              |
 
-Campaigns and Projects should be separate concepts. A future Campaign may own or group several
-Projects; a Project may also be allowed to stand alone if product policy chooses. The current
-`Project` aggregate must not be relabeled as a Campaign or overloaded with campaign planning.
+Campaigns and Projects are separate concepts. The MVP decision allows one Campaign to group many
+Projects while a Project belongs to zero or one Campaign and may stand alone. Campaign lifecycle
+does not cascade into Projects. The current `Project` aggregate must not be relabeled as a Campaign
+or overloaded with campaign planning.
 
 ## Asset model
 
@@ -154,25 +160,28 @@ those lifecycles interchangeable.
 
 ## Campaign and Project model
 
-A Campaign should supply context—initiative, brief, goals, audience, channels, timing, and shared
-brand or product resources—without becoming the owner of media-processing state. Projects should
-own focused production work and its resumable creative history. Assets and outputs should link to
-the exact Project revision and processing operation that produced them.
+A Campaign should supply organization and, over time, useful initiative context without becoming
+the owner of media-processing state. MVP Campaign context is only name and optional brief; goals,
+audience, channels, timing, and shared planning are deferred. Projects own focused production work
+and its resumable creative history. Referenced source/working media links to the exact Project
+revision that used it; generated outputs also record the exact producing revision and processing
+operation.
 
-A likely future relationship is:
+The planned MVP relationship is:
 
 ```text
-Workspace / account
-└── Campaign (future and optional according to product policy)
-    ├── Project
-    │   ├── source and working Assets
-    │   ├── revisions and processing Jobs
-    │   └── outputs, Versions, and Variations
-    └── shared campaign resources and approved Assets
+Workspace / authenticated owner scope
+├── Campaign (optional organizer)
+│   └── Project
+│       ├── source and working media references
+│       ├── revisions and processing Jobs
+│       └── Saved Video / Video Version outputs
+└── standalone Project
 ```
 
-This is a product model, not an implemented schema. Ownership must continue to derive from verified
-server identity, and every relationship needs explicit retention and deletion behavior.
+This is a product model, not an implemented schema. “No Campaign” is a virtual view rather than a
+default Campaign row. Ownership must continue to derive from verified server identity, and every
+relationship needs explicit retention and non-cascading deletion behavior.
 
 ## Creation and editing workflows
 

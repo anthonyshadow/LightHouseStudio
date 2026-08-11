@@ -8,9 +8,10 @@ source, then edit either base, save, start over, or discard.
 
 ## Journey
 
-1. From `/`, the creator chooses **Record New Video** or **Upload Video**. Direct `/studio` visits
-   keep neutral Local Camera mode with camera, microphone, and AI off.
-2. The idle Studio control bar exposes the same **Record New Video** and **Upload Video** actions.
+1. From `/`, the creator logs in or enters Studio. The entry route does not mount Studio, request
+   media, or offer the creation actions. Direct `/studio` visits keep neutral Local Camera mode with
+   camera, microphone, and AI off.
+2. The idle Studio control bar exposes **Record New Video** and **Upload Video** actions.
    Upload needs no camera permission, provider credentials, Decart SDK, or external traffic.
 3. Studio accepts a file picker or drop, validates browser metadata and decode, and publishes a
    playable temporary source on the persistent stage and the upload panel's accessible inline
