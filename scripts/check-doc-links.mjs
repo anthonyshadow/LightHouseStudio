@@ -1,4 +1,4 @@
-import { readdir, readFile, stat } from 'node:fs/promises';
+import { open, readdir, readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
@@ -12,13 +12,43 @@ const collectMarkdown = async (directory) => {
   return files;
 };
 
+const inspectLinkedFile = async (filePath, readSource) => {
+  const handle = await open(filePath, 'r');
+  try {
+    if (!(await handle.stat()).isFile()) throw new Error('not a file');
+    return readSource ? await handle.readFile('utf8') : undefined;
+  } finally {
+    await handle.close();
+  }
+};
+
+const withoutHtmlTags = (source) => {
+  let result = '';
+  let tagDepth = 0;
+  let remainingTagEnds = 0;
+  for (const character of source) {
+    if (character === '>') remainingTagEnds += 1;
+  }
+  for (const character of source) {
+    if (character === '<' && remainingTagEnds > 0) {
+      tagDepth += 1;
+    } else if (character === '>') {
+      remainingTagEnds -= 1;
+      if (tagDepth > 0) tagDepth -= 1;
+      else result += character;
+    } else if (tagDepth === 0) {
+      result += character;
+    }
+  }
+  return result;
+};
+
 export const markdownAnchorIds = (source) => {
   const anchors = new Set();
   const counts = new Map();
   for (const match of source.matchAll(/^#{1,6}\s+(.+?)\s*#*\s*$/gmu)) {
-    const base = match[1]
+    const base = withoutHtmlTags(match[1])
       .toLowerCase()
-      .replace(/<[^>]+>/gu, '')
       .replace(/[`*_~]/gu, '')
       .replace(/[^\p{L}\p{N}\s-]/gu, '')
       .trim()
@@ -57,14 +87,18 @@ export const checkDocumentationLinks = async (rootDirectory = path.resolve('.'))
       const targetPath = fileTarget
         ? path.resolve(path.dirname(sourcePath), fileTarget)
         : sourcePath;
+      let targetSource = sourceCache.get(targetPath);
       try {
-        if (!(await stat(targetPath)).isFile()) throw new Error('not a file');
+        const inspectedSource = await inspectLinkedFile(
+          targetPath,
+          rawAnchor !== undefined && targetSource === undefined,
+        );
+        targetSource ??= inspectedSource;
       } catch {
         violations.push(`${path.relative(rootDirectory, sourcePath)} -> ${rawTarget}`);
         continue;
       }
       if (rawAnchor) {
-        const targetSource = sourceCache.get(targetPath) ?? (await readFile(targetPath, 'utf8'));
         sourceCache.set(targetPath, targetSource);
         const anchor = decodeURIComponent(rawAnchor).toLowerCase();
         if (!markdownAnchorIds(targetSource).has(anchor)) {

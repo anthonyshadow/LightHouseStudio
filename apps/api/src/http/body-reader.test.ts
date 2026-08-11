@@ -1,5 +1,6 @@
+import { writeSync } from 'node:fs';
 import { access, readFile } from 'node:fs/promises';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { isSpooledAudioUpload } from '../application/spooled-upload.js';
 import { AppError } from './app-error.js';
 import { parseBody, requestInterruptionError, type BodyReaderOptions } from './body-reader.js';
@@ -23,6 +24,10 @@ const expectAppError = async (
 };
 
 describe('HTTP body reader', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('maps each interruption phase to the app-owned status and safe message', () => {
     expect(requestInterruptionError('request-receive-timeout')).toMatchObject({
       statusCode: 408,
@@ -250,6 +255,44 @@ describe('HTTP body reader', () => {
     await parsed.cleanup();
     await parsed.cleanup();
     await expect(access(parsed.path)).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('keeps the exclusive descriptor as the Bun file-sink target', async () => {
+    let bunFileTarget: unknown;
+    vi.stubGlobal('Bun', {
+      file: (fileDescriptor: number) => {
+        bunFileTarget = fileDescriptor;
+        return {
+          writer: () => {
+            const chunks: Buffer[] = [];
+            return {
+              write: (chunk: Uint8Array) => {
+                chunks.push(Buffer.from(chunk));
+                return Promise.resolve(chunk.byteLength);
+              },
+              flush: () => Promise.resolve(),
+              end: () => writeSync(fileDescriptor, Buffer.concat(chunks)),
+            };
+          },
+        };
+      },
+    });
+
+    const parsed = await parse(
+      new Request('http://localhost/audio', {
+        method: 'POST',
+        headers: { 'content-type': 'audio/wav' },
+        body: 'bun-voice-data',
+      }),
+      14,
+      { bodyParser: 'spooled', acceptedContentTypePrefixes: ['audio/'] },
+    );
+
+    expect(isSpooledAudioUpload(parsed)).toBe(true);
+    if (!isSpooledAudioUpload(parsed)) throw new Error('Expected a spooled upload.');
+    expect(bunFileTarget).toEqual(expect.any(Number));
+    await expect(readFile(parsed.path, 'utf8')).resolves.toBe('bun-voice-data');
+    await parsed.cleanup();
   });
 
   it('maps a streamed spool overrun to the route-specific payload message', async () => {

@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -41,7 +41,7 @@ describe('saved voice repositories', () => {
   });
 
   it('persists serialized mutations and migration state across repository instances', async () => {
-    const root = path.join(tmpdir(), `lightframe-saved-voices-${crypto.randomUUID()}`);
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-saved-voices-'));
     roots.push(root);
     const repository = new FileSavedVoiceRepository(root);
     await expect(repository.migrated(ownerUserId)).resolves.toBe(false);
@@ -69,7 +69,7 @@ describe('saved voice repositories', () => {
   });
 
   it('normalizes legacy timestamps without changing stored record identity', async () => {
-    const root = path.join(tmpdir(), `lightframe-saved-voices-${crypto.randomUUID()}`);
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-saved-voices-'));
     roots.push(root);
     const directory = path.join(root, 'metadata', 'v1', 'saved-voices');
     const file = path.join(
@@ -110,7 +110,7 @@ describe('saved voice repositories', () => {
   });
 
   it('reloads durable state after a failed write so a retry is not lost', async () => {
-    const root = path.join(tmpdir(), `lightframe-saved-voices-${crypto.randomUUID()}`);
+    const root = await mkdtemp(path.join(tmpdir(), 'lightframe-saved-voices-'));
     roots.push(root);
     const repository = new FileSavedVoiceRepository(root);
     const libraryPath = path.join(

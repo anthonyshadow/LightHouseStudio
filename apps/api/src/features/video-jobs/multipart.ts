@@ -80,12 +80,12 @@ const writeBunFilePart = async (
   destination: string,
   maximumBytes: number,
 ): Promise<void> => {
+  let handle: Awaited<ReturnType<typeof open>> | undefined;
   let writer: FileSink | undefined;
   let received = 0;
   try {
-    const initialHandle = await open(destination, 'wx', 0o600);
-    await initialHandle.close();
-    writer = Bun.file(destination).writer({
+    handle = await open(destination, 'wx', 0o600);
+    writer = Bun.file(handle.fd).writer({
       highWaterMark: BUN_FILE_SINK_HIGH_WATER_MARK_BYTES,
     });
     for await (const rawChunk of file) {
@@ -100,12 +100,9 @@ const writeBunFilePart = async (
     assertCompletedFilePart(file);
     await writer.end();
     writer = undefined;
-    const completedHandle = await open(destination, 'r');
-    try {
-      await completedHandle.sync();
-    } finally {
-      await completedHandle.close();
-    }
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
   } catch (error) {
     file.destroy(error instanceof Error ? error : undefined);
     if (writer !== undefined) {
@@ -113,6 +110,7 @@ const writeBunFilePart = async (
         () => undefined,
       );
     }
+    await handle?.close().catch(() => undefined);
     await rm(destination, { force: true }).catch(() => undefined);
     throw error;
   }

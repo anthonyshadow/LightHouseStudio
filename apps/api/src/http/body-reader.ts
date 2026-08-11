@@ -117,6 +117,7 @@ const spoolBunRequestBody = async (
   const filePath = path.join(directory, UPLOAD_FILE_NAME);
   const reader = body.getReader();
   const hash = createHash('sha256');
+  let handle: Awaited<ReturnType<typeof open>> | undefined;
   let writer: FileSink | undefined;
   let byteLength = 0;
   const cancel = (): void => {
@@ -127,9 +128,8 @@ const spoolBunRequestBody = async (
 
   try {
     await chmod(directory, 0o700);
-    const initialHandle = await open(filePath, 'wx', 0o600);
-    await initialHandle.close();
-    writer = Bun.file(filePath).writer({
+    handle = await open(filePath, 'wx', 0o600);
+    writer = Bun.file(handle.fd).writer({
       highWaterMark: BUN_FILE_SINK_HIGH_WATER_MARK_BYTES,
     });
 
@@ -149,12 +149,9 @@ const spoolBunRequestBody = async (
 
     await writer.end();
     writer = undefined;
-    const completedHandle = await open(filePath, 'r');
-    try {
-      await completedHandle.sync();
-    } finally {
-      await completedHandle.close();
-    }
+    await handle.sync();
+    await handle.close();
+    handle = undefined;
 
     let cleaned = false;
     return {
@@ -174,6 +171,7 @@ const spoolBunRequestBody = async (
         () => undefined,
       );
     }
+    await handle?.close().catch(() => undefined);
     await rm(directory, { recursive: true, force: true }).catch(() => undefined);
     throw error;
   } finally {

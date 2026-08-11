@@ -1,4 +1,5 @@
-import { access, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { writeSync } from 'node:fs';
+import { access, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -47,20 +48,24 @@ describe('video-job multipart boundary', () => {
   });
 
   it('uses the Bun file-sink path without buffering the completed upload', async () => {
+    let bunFileTarget: unknown;
     vi.stubGlobal('Bun', {
-      file: (filePath: string) => ({
-        writer: () => {
-          const chunks: Buffer[] = [];
-          return {
-            write: (chunk: Uint8Array) => {
-              chunks.push(Buffer.from(chunk));
-              return Promise.resolve(chunk.byteLength);
-            },
-            flush: () => Promise.resolve(),
-            end: () => writeFile(filePath, Buffer.concat(chunks)),
-          };
-        },
-      }),
+      file: (fileDescriptor: number) => {
+        bunFileTarget = fileDescriptor;
+        return {
+          writer: () => {
+            const chunks: Buffer[] = [];
+            return {
+              write: (chunk: Uint8Array) => {
+                chunks.push(Buffer.from(chunk));
+                return Promise.resolve(chunk.byteLength);
+              },
+              flush: () => Promise.resolve(),
+              end: () => writeSync(fileDescriptor, Buffer.concat(chunks)),
+            };
+          },
+        };
+      },
     });
     const uploadPaths = await paths();
     const form = new FormData();
@@ -75,6 +80,7 @@ describe('video-job multipart boundary', () => {
     );
 
     expect(parsed.referenceReceived).toBe(false);
+    expect(bunFileTarget).toEqual(expect.any(Number));
     await expect(readFile(uploadPaths.inputPath, 'utf8')).resolves.toBe('bun-video');
   });
 
