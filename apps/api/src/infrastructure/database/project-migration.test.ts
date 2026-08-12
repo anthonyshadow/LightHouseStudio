@@ -6,6 +6,11 @@ const correctionMigrationUrl = new URL(
   '../../../drizzle/0010_quiet_wind_dancer.sql',
   import.meta.url,
 );
+const receiptMigrationUrl = new URL('../../../drizzle/0012_huge_black_tom.sql', import.meta.url);
+const lifecycleIndexMigrationUrl = new URL(
+  '../../../drizzle/0013_natural_the_phantom.sql',
+  import.meta.url,
+);
 
 describe('Project aggregate migration', () => {
   it('is additive and creates every normalized Project relationship', async () => {
@@ -58,5 +63,29 @@ describe('Project invariant correction migration', () => {
     expect(migration).toContain('CREATE TABLE "project_version_references"');
     expect(migration).toContain("WHERE media.value ->> 'kind' = 'saved-video-version'");
     expect(migration).not.toMatch(/\b(?:TRUNCATE|DELETE\s+FROM)\b/u);
+  });
+});
+
+describe('Project operation receipt migration', () => {
+  it('adds only the owner-scoped durable create receipt and supporting index', async () => {
+    const migration = await readFile(receiptMigrationUrl, 'utf8');
+
+    expect(migration).toContain('CREATE TABLE "project_operation_receipts"');
+    expect(migration).toContain('PRIMARY KEY("owner_user_id","operation_key")');
+    expect(migration).toContain('project_operation_receipts_project_idx');
+    expect(migration).toContain('"operation" = \'create\'');
+    expect(migration).not.toMatch(/\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"/u);
+  });
+});
+
+describe('Project lifecycle index migration', () => {
+  it('adds owner-scoped indexes for both recent lifecycle feeds', async () => {
+    const migration = await readFile(lifecycleIndexMigrationUrl, 'utf8');
+
+    expect(migration).toContain('projects_owner_active_recent_idx');
+    expect(migration).toContain('projects_owner_archived_recent_idx');
+    expect(migration).toContain('"updated_at" DESC');
+    expect(migration).toContain('"id" DESC');
+    expect(migration).not.toMatch(/\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"/u);
   });
 });

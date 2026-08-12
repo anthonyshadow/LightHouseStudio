@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
+  createProjectRequestSchema,
+  projectConflictResponseSchema,
+  projectCurrentResponseSchema,
   projectOutputLinkSchema,
   projectSnapshotSchema,
   projectStatusFactsSchema,
@@ -135,5 +138,32 @@ describe('Project snapshot contract', () => {
     expect(projectOutputLinkSchema.safeParse({ ...link, ownerUserId: assetId }).success).toBe(
       false,
     );
+  });
+
+  it('keeps lifecycle HTTP contracts strict, owner-free, and typed for conflicts', () => {
+    expect(createProjectRequestSchema.parse({ title: 'Empty Project' })).toEqual({
+      title: 'Empty Project',
+    });
+    expect(
+      createProjectRequestSchema.safeParse({ title: 'Empty Project', ownerUserId: assetId })
+        .success,
+    ).toBe(false);
+    expect(
+      projectConflictResponseSchema.parse({
+        error: { code: 'conflict', message: 'Refresh the Project.' },
+        conflict: {
+          kind: 'project-version',
+          projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
+          expectedVersion: 1,
+          actualVersion: 2,
+        },
+      }),
+    ).toMatchObject({ conflict: { kind: 'project-version', actualVersion: 2 } });
+    expect(
+      projectCurrentResponseSchema.safeParse({
+        project: { ownerUserId: assetId },
+        revision: { snapshot: validSnapshot() },
+      }).success,
+    ).toBe(false);
   });
 });

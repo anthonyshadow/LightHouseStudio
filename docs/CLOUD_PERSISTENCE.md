@@ -9,7 +9,8 @@ account is not production identity or tenancy.
 
 ## What is implemented
 
-- Drizzle migrations for users/credentials, durable sessions, Projects/revisions/relationships,
+- Drizzle migrations for users/credentials, durable sessions, Projects/revisions/relationships and
+  owner-scoped Project operation receipts,
   saved voices, saved videos and versions, private media assets, reference images,
   creative-library records, processing jobs, leases, resource references, idempotency receipts,
   and an outbox.
@@ -23,8 +24,12 @@ account is not production identity or tenancy.
   producing revision per output Version. Exact replay is idempotent; changed replay conflicts.
   Snapshot Versions require an active same-owner Saved Video and exact Version at link time, output
   pointers require an existing exact Project output, and normal current/history reads are bounded.
-  Existing videos/jobs are not backfilled, and no Project route or UI writes these tables yet.
-  `shadow` does not make Projects authoritative.
+  Authenticated empty-Project lifecycle routes write these tables in authoritative modes. Existing
+  videos/jobs are not backfilled, and there is no Project browser UI yet.
+- A schema-version-1 local Project repository is authoritative in `local` and `shadow`. It uses an
+  owner namespace, owner lock, atomic primary/backup replacement, strict startup parsing, and a
+  prepared create journal containing the durable receipt and next metadata state. `shadow` does not
+  make Drizzle Project tables authoritative or claim Project replication.
 - A private R2 `AssetByteStore` with opaque keys, streaming/multipart upload, app-owned SHA-256,
   byte-range reads, owner checks, database lifecycle states, multipart abort/cleanup, and deletion
   tombstones. R2 ETags are retained only as transport metadata, never as the integrity checksum.
@@ -64,12 +69,12 @@ account is not production identity or tenancy.
 
 ## Runtime modes
 
-| `DATABASE_MODE` | Metadata authority                    | Sessions/jobs                                      | Bytes                                                                                      |
-| --------------- | ------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `local`         | Existing local files/browser stores   | Process-local sessions/jobs plus safe file traces  | Existing private local store                                                               |
-| `shadow`        | Local files remain authoritative      | Neon safe job traces and restart records           | `local`, or new saved-video writes to both R2 and local with R2-first/local-fallback reads |
-| `postgres`      | Local PostgreSQL Drizzle repositories | Durable local sessions and resumable accepted jobs | Registered local objects or the isolated development R2 bucket                             |
-| `neon`          | Neon Drizzle repositories             | Durable Neon sessions and resumable accepted jobs  | Registered local objects or private R2, selected at startup                                |
+| `DATABASE_MODE` | Metadata authority                                   | Sessions/jobs                                      | Bytes                                                                                      |
+| --------------- | ---------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `local`         | Local files, including Project authority             | Process-local sessions/jobs plus safe file traces  | Existing private local store                                                               |
+| `shadow`        | Local files remain authoritative, including Projects | Neon safe job traces and restart records           | `local`, or new saved-video writes to both R2 and local with R2-first/local-fallback reads |
+| `postgres`      | Local PostgreSQL Drizzle repositories                | Durable local sessions and resumable accepted jobs | Registered local objects or the isolated development R2 bucket                             |
+| `neon`          | Neon Drizzle repositories                            | Durable Neon sessions and resumable accepted jobs  | Registered local objects or private R2, selected at startup                                |
 
 `ASSET_STORE_PROVIDER=r2` requires `DATABASE_MODE=shadow`, `postgres`, or `neon`. Reference-image
 and creative metadata stay local in `shadow`; their database adapters become authoritative in
@@ -180,7 +185,11 @@ verification, lifecycle, or cleanup contracts above.
   column/key contract; restore the pre-migration database or deploy compatible code. Never drop the
   retained tables or relations as an automatic rollback step. Follow-up migration `0011` changes
   indexes only: Project relation indexes follow revision cursors, and Saved Video Version indexes
-  support owner-scoped asset-retention batches without rewriting application data.
+  support owner-scoped asset-retention batches without rewriting application data. Additive
+  migration `0012` creates the owner/operation-key Project create receipt, request fingerprint, and
+  result Project ID. It does not rewrite Projects or content. Rolling application code back before
+  Prompt 03 leaves this extra table unused; dropping it would discard create replay history and is
+  not an automatic rollback step.
 
 ## Operational checks before any non-loopback deployment
 

@@ -11,11 +11,13 @@ import { createPostgresDatabase, type DatabaseConnection } from './client.js';
 import { DrizzleAssetLifecycleRegistry } from './asset-lifecycle-registry.js';
 import { DrizzleProjectRepository } from './project-repository.js';
 import { DrizzleProjectRetentionPolicy } from './project-retention-policy.js';
+import { ProjectService } from '../../features/projects/project-service.js';
 import {
   mediaAssets,
   processingJobs,
   projectAssets,
   projectJobs,
+  projectOperationReceipts,
   projectOutputs,
   projectRevisions,
   projects,
@@ -478,6 +480,90 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       await connection.db.delete(videoVersions).where(eq(videoVersions.id, videoVersionId));
       await connection.db.delete(savedVideos).where(eq(savedVideos.id, savedVideoId));
       await connection.db.delete(mediaAssets).where(eq(mediaAssets.ownerUserId, ownerUserId));
+      await connection.db.delete(users).where(eq(users.id, ownerUserId));
+      await connection.db.delete(users).where(eq(users.id, otherOwnerUserId));
+    }
+  }, 20_000);
+
+  it('keeps lifecycle lists and create idempotency owner-scoped across service restart', async () => {
+    const ownerUserId = randomUUID();
+    const otherOwnerUserId = randomUUID();
+    const operationKey = randomUUID();
+    const now = '2026-08-11T14:00:00.000Z';
+    let createdProjectId: string | undefined;
+    try {
+      await connection.db.insert(users).values([
+        {
+          id: ownerUserId,
+          login: `${ownerUserId}@lifecycle.test`,
+          normalizedLogin: `${ownerUserId}@lifecycle.test`,
+          username: `l-${ownerUserId}`,
+          email: `${ownerUserId}@lifecycle.test`,
+          displayName: 'Lifecycle owner',
+        },
+        {
+          id: otherOwnerUserId,
+          login: `${otherOwnerUserId}@lifecycle.test`,
+          normalizedLogin: `${otherOwnerUserId}@lifecycle.test`,
+          username: `l-${otherOwnerUserId}`,
+          email: `${otherOwnerUserId}@lifecycle.test`,
+          displayName: 'Other lifecycle owner',
+        },
+      ]);
+      const service = new ProjectService(new DrizzleProjectRepository(connection.db), {
+        now: () => new Date(now),
+      });
+      const created = await service.create(ownerUserId, operationKey, 'Relational lifecycle');
+      if (!created.ok) throw new Error('Expected relational Project create.');
+      createdProjectId = created.current.project.id;
+      const replay = await new ProjectService(new DrizzleProjectRepository(connection.db), {
+        now: () => new Date(now),
+      }).create(ownerUserId, operationKey, 'Relational lifecycle');
+      expect(replay).toEqual(created);
+      await expect(service.create(ownerUserId, operationKey, 'Mismatched create')).resolves.toEqual(
+        {
+          ok: false,
+          conflict: { kind: 'operation-key', operation: 'create' },
+        },
+      );
+      await expect(service.get(otherOwnerUserId, createdProjectId)).rejects.toMatchObject({
+        statusCode: 404,
+      });
+      await expect(
+        service.list(ownerUserId, { lifecycle: 'active', pageSize: 20 }),
+      ).resolves.toMatchObject({
+        projects: [{ id: createdProjectId }],
+        nextCursor: null,
+      });
+
+      const renamed = await service.rename(ownerUserId, createdProjectId, 1, 'Relational renamed');
+      expect(renamed).toMatchObject({ ok: true, current: { project: { version: 2 } } });
+      const archived = await service.archive(ownerUserId, createdProjectId, 2);
+      expect(archived).toMatchObject({ ok: true, current: { project: { status: 'archived' } } });
+      expect(
+        (await service.list(ownerUserId, { lifecycle: 'active', pageSize: 20 })).projects,
+      ).toEqual([]);
+      expect(
+        (await service.list(ownerUserId, { lifecycle: 'archived', pageSize: 20 })).projects,
+      ).toMatchObject([{ id: createdProjectId }]);
+      await expect(service.restore(ownerUserId, createdProjectId, 3)).resolves.toMatchObject({
+        ok: true,
+        current: { project: { status: 'draft', version: 4 } },
+      });
+    } finally {
+      await connection.db
+        .delete(projectOperationReceipts)
+        .where(eq(projectOperationReceipts.ownerUserId, ownerUserId));
+      if (createdProjectId !== undefined) {
+        await connection.db
+          .update(projects)
+          .set({ currentRevisionId: null, currentRevisionNumber: 0 })
+          .where(eq(projects.id, createdProjectId));
+        await connection.db
+          .delete(projectRevisions)
+          .where(eq(projectRevisions.projectId, createdProjectId));
+        await connection.db.delete(projects).where(eq(projects.id, createdProjectId));
+      }
       await connection.db.delete(users).where(eq(users.id, ownerUserId));
       await connection.db.delete(users).where(eq(users.id, otherOwnerUserId));
     }

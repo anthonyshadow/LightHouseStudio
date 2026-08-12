@@ -93,6 +93,9 @@ The retained suite protects:
   Version references, immutable initiating/producing provenance, concurrent exact-versus-mismatched
   replay, active-job archive blocking, bounded current/history reads, migration preflight, and
   Project-retained byte cleanup across Saved Video/reference/generic paths;
+- versioned local Project parsing, backup and prepared-journal recovery, restart-safe create
+  receipts, owner isolation, lifecycle CAS, bounded active/archived lists, authenticated route
+  validation/Origin policy, and local/shadow/relational authority composition;
 - app-owned saved-voice membership, first-read claim, owner-checked preview/conversion, and proof
   that relationship removal never calls provider voice deletion;
 - loopback Host/Origin, explicit provider intent, bounded response/stream handling, SSRF-resistant

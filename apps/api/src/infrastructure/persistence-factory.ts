@@ -1,5 +1,7 @@
 import type { AppPersistenceDependencies } from '../app.js';
 import type { RuntimeConfig } from '../config/environment.js';
+import { FileProjectRepository } from '../features/projects/file-project-repository.js';
+import { FileSavedVideoRepository } from '../features/saved-videos/saved-video-repository.js';
 import { LocalAssetByteStore, type AssetByteStore } from '../storage/asset-byte-store.js';
 import { ManagedLocalAssetByteStore } from '../storage/managed-asset-byte-store.js';
 import { R2AssetByteStore } from '../storage/r2-asset-byte-store.js';
@@ -15,6 +17,17 @@ import { DrizzleProjectRetentionPolicy } from './database/project-retention-poli
 import { DrizzleReferenceImageAssetStore } from './database/reference-image-asset-store.js';
 import { DrizzleSavedVideoRepository } from './database/saved-video-repository.js';
 import { DrizzleSavedVoiceRepository } from './database/saved-voice-repository.js';
+
+const createLocalMetadataPersistence = (
+  dataDirectory: string,
+): Pick<AppPersistenceDependencies, 'savedVideos' | 'projects' | 'projectRetention'> => {
+  const projects = new FileProjectRepository(dataDirectory);
+  return {
+    savedVideos: new FileSavedVideoRepository(dataDirectory),
+    projects,
+    projectRetention: projects,
+  };
+};
 
 const r2Store = (
   config: RuntimeConfig,
@@ -41,7 +54,9 @@ const r2Store = (
 export const createConfiguredPersistence = async (
   config: RuntimeConfig,
 ): Promise<AppPersistenceDependencies | undefined> => {
-  if (config.databaseMode === 'local') return undefined;
+  if (config.databaseMode === 'local') {
+    return createLocalMetadataPersistence(config.lightframeDataDir);
+  }
   if (config.databaseUrl === undefined) {
     throw new Error('Relational persistence requires DATABASE_URL.');
   }
@@ -75,6 +90,7 @@ export const createConfiguredPersistence = async (
 
     if (config.databaseMode === 'shadow') {
       return {
+        ...createLocalMetadataPersistence(config.lightframeDataDir),
         ...(config.assetStoreProvider === 'r2' ? { assetBytes } : {}),
         processingJobTraces,
         processingJobs: processingJobTraces,

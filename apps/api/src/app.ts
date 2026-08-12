@@ -52,6 +52,9 @@ import type {
   ProjectRepository,
   ProjectRetentionPolicy,
 } from './features/projects/project-repository.js';
+import { FileProjectRepository } from './features/projects/file-project-repository.js';
+import { ProjectService } from './features/projects/project-service.js';
+import { registerProjectRoutes } from './features/projects/routes.js';
 import type { R2AssetByteStore } from './storage/r2-asset-byte-store.js';
 import {
   type DurableProcessingJobRepository,
@@ -290,16 +293,26 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
       maximumActiveJobsPerProvider: dependencies.config.videoJobMaxActivePerProvider,
     },
   );
-  const savedVideoService = new SavedVideoService(
+  const savedVideoRepository =
     dependencies.persistence?.savedVideos ??
-      new FileSavedVideoRepository(dependencies.config.lightframeDataDir),
+    new FileSavedVideoRepository(dependencies.config.lightframeDataDir);
+  const projectRepository =
+    dependencies.persistence?.projects ??
+    (dependencies.config.databaseMode === 'local' || dependencies.config.databaseMode === 'shadow'
+      ? new FileProjectRepository(dependencies.config.lightframeDataDir)
+      : undefined);
+  const projectRetention =
+    dependencies.persistence?.projectRetention ??
+    (projectRepository instanceof FileProjectRepository ? projectRepository : undefined);
+  const projectService =
+    projectRepository === undefined ? undefined : new ProjectService(projectRepository);
+  const savedVideoService = new SavedVideoService(
+    savedVideoRepository,
     dependencies.persistence?.assetBytes ??
       new LocalAssetByteStore(dependencies.config.lightframeDataDir),
     {
       deleteStoredAssetsOnManualDelete: dependencies.config.assetStoreProvider === 'r2',
-      ...(dependencies.persistence?.projectRetention === undefined
-        ? {}
-        : { projectRetention: dependencies.persistence.projectRetention }),
+      ...(projectRetention === undefined ? {} : { projectRetention }),
     },
   );
   const directSavedVideoUploads = dependencies.persistence?.directVideoUploads;
@@ -336,6 +349,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   registerRealtimeRoutes(app, decartProvider);
   registerVideoJobRoutes(app, videoJobService);
   registerSavedVideoRoutes(app, savedVideoService, directSavedVideoUploadService);
+  registerProjectRoutes(app, projectService);
   registerCreativeLibraryRoutes(
     app,
     dependencies.persistence?.creativeLibraries,
