@@ -96,6 +96,15 @@ const expectStandardStudioLayout = async (
   const videoEditorActive = (await page.locator('[data-video-edit-active="true"]').count()) > 0;
   const toolRail = page.locator('[data-studio-tool-rail]');
   const capture = page.locator('[data-capture-controls]');
+  const projectContextActive = (await page.locator('[data-project-context="true"]').count()) > 0;
+  if (projectContextActive) {
+    const [stageBox, frameBox] = await Promise.all([stage.boundingBox(), frame.boundingBox()]);
+    expect(stageBox).not.toBeNull();
+    expect(frameBox).not.toBeNull();
+    await expect(toolRail).toHaveCount(0);
+    await expect(capture).toHaveCount(0);
+    return;
+  }
   const [stageBox, frameBox, controlsBox, toolRailBox, captureBox] = await Promise.all([
     stage.boundingBox(),
     frame.boundingBox(),
@@ -549,7 +558,10 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
       await installProjectHarness(page, true);
       await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
       await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Record video' })).toBeDisabled();
+      await expect(page.getByLabel('Studio media stage')).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Record', exact: true })).toBeEnabled();
+      await expect(page.getByRole('button', { name: 'Upload', exact: true })).toBeEnabled();
+      await expect(page.getByRole('button', { name: 'Use Saved Video' })).toBeEnabled();
     },
   },
   'vton-prepared-with-reference': {

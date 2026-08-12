@@ -26,7 +26,7 @@ future features current.
 | Log in, restore, and log out safely                    | [Login and local session](14-login-and-session.md)                             |
 | Save, browse, version, and reload local videos         | [Saved Video Gallery](15-saved-video-gallery.md)                               |
 | Reuse saved characters and outfits                     | [Saved creative libraries](16-saved-creative-libraries.md)                     |
-| Create and manage durable empty Projects               | [Empty Project lifecycle workspace](17-empty-project-lifecycle.md)             |
+| Create Projects and retain one immutable video source  | [Project lifecycle and immutable source](17-empty-project-lifecycle.md)        |
 | Organize Projects with optional Campaigns              | [Campaign organization](18-campaign-organization.md)                           |
 
 ## Shared runtime rules
@@ -47,7 +47,7 @@ future features current.
 - The primary flow records or uploads a source, reviews it, and optionally applies Character Swap,
   Virtual Try On, and/or Voice, then saves the result before download from Saved Videos. Live
   Character/VTO transformation and Workshop are advanced flows.
-- Campaign and empty Project lifecycle management is user-facing, including optional membership,
+- Campaign and Project lifecycle/source management is user-facing, including optional membership,
   move/detach, and the virtual No Campaign group. Source resume, autosave, creative integration,
   processing, and Project output history are not.
 - Character Builder owns true character creation and editing. Workshop owns only Add, Replace, and

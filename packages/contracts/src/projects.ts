@@ -35,6 +35,7 @@ export const PROJECT_WORKFLOW_PHASES = [
   'export',
   'complete',
 ] as const;
+export const PROJECT_SOURCE_KINDS = ['uploaded', 'recorded', 'saved-video-version'] as const;
 const VIDEO_EDIT_CROP_PRESETS = ['original', 'freeform', '16:9', '9:16', '1:1', '4:5'] as const;
 const VIDEO_EDIT_FILTERS = ['original', 'vivid', 'warm', 'cool', 'mono', 'fade'] as const;
 
@@ -324,7 +325,12 @@ export const projectStatusFactsSchema = z
   .strict();
 
 export const projectConflictSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('operation-key'), operation: z.literal('create') }).strict(),
+  z
+    .object({
+      kind: z.literal('operation-key'),
+      operation: z.enum(['create', 'source-accept']),
+    })
+    .strict(),
   z
     .object({
       kind: z.literal('project-version'),
@@ -342,6 +348,7 @@ export const projectConflictSchema = z.discriminatedUnion('kind', [
     .strict(),
   z.object({ kind: z.literal('active-jobs'), projectId: projectIdSchema }).strict(),
   z.object({ kind: z.literal('campaign-membership'), projectId: projectIdSchema }).strict(),
+  z.object({ kind: z.literal('immutable-source'), projectId: projectIdSchema }).strict(),
   z
     .object({
       kind: z.literal('revision'),
@@ -399,6 +406,96 @@ export const appendProjectRevisionRequestSchema = z
   })
   .strict();
 
+export const projectSourceKindSchema = z.enum(PROJECT_SOURCE_KINDS);
+
+export const projectSourceUploadMetadataSchema = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    expectedRevisionNumber: z.number().int().positive(),
+    kind: z.enum(['uploaded', 'recorded']),
+    filename: z.string().trim().min(1).max(180),
+  })
+  .strict();
+
+export const reuseProjectSourceRequestSchema = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    expectedRevisionNumber: z.number().int().positive(),
+    savedVideoId: z.uuid(),
+    videoVersionId: z.uuid(),
+  })
+  .strict();
+
+export const projectSourceResponseSchema = z
+  .object({
+    project: projectSchema,
+    revision: projectRevisionSchema,
+    source: z
+      .object({
+        kind: projectSourceKindSchema,
+        savedVideoId: z.uuid().nullable(),
+        videoVersionId: z.uuid().nullable(),
+        mimeType: z.enum(['video/mp4', 'video/quicktime', 'video/webm']),
+        filename: z.string().trim().min(1).max(180),
+        sizeBytes: z.number().int().positive().max(300_000_000),
+        container: z.enum(['mp4', 'quicktime', 'webm']),
+        videoCodec: z.enum(['avc', 'vp8']),
+        audioCodec: z.string().trim().min(1).max(32).nullable(),
+        durationMs: z.number().int().positive().max(300_000),
+        width: z.number().int().positive(),
+        height: z.number().int().positive(),
+        hasAudio: z.boolean(),
+        acceptedAt: z.iso.datetime(),
+        contentUrl: z
+          .string()
+          .regex(
+            /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/source\/content$/u,
+          ),
+      })
+      .strict(),
+  })
+  .strict()
+  .superRefine((value, context) => {
+    const reused = value.source.kind === 'saved-video-version';
+    if (reused !== (value.source.savedVideoId !== null && value.source.videoVersionId !== null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['source'],
+        message: 'Saved Video source lineage must be exact and complete.',
+      });
+    }
+    if (
+      value.revision.projectId !== value.project.id ||
+      value.revision.id !== value.project.currentRevisionId ||
+      value.revision.revisionNumber !== value.project.currentRevisionNumber ||
+      value.revision.snapshot.sourceAssetId === null ||
+      value.source.contentUrl !== `/api/projects/${value.project.id}/source/content`
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['revision'],
+        message: 'Project source responses must describe the exact current accepted revision.',
+      });
+    }
+    const expectedMedia = reused
+      ? {
+          kind: 'saved-video-version',
+          savedVideoId: value.source.savedVideoId,
+          videoVersionId: value.source.videoVersionId,
+        }
+      : { kind: 'asset', assetId: value.revision.snapshot.sourceAssetId };
+    if (
+      JSON.stringify(value.revision.snapshot.workingMedia) !== JSON.stringify(expectedMedia) ||
+      JSON.stringify(value.revision.snapshot.presentedMedia) !== JSON.stringify(expectedMedia)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['revision', 'snapshot'],
+        message: 'The current working and presented media must match the immutable source.',
+      });
+    }
+  });
+
 export type ProjectSnapshotContract = z.infer<typeof projectSnapshotSchema>;
 export type ProjectStatusContract = z.infer<typeof projectStatusSchema>;
 export type ProjectAssetRoleContract = z.infer<typeof projectAssetRoleSchema>;
@@ -411,3 +508,7 @@ export type ProjectStatusFactsContract = z.infer<typeof projectStatusFactsSchema
 export type ProjectConflictContract = z.infer<typeof projectConflictSchema>;
 export type ProjectsQuery = z.infer<typeof projectsQuerySchema>;
 export type ProjectCurrentResponse = z.infer<typeof projectCurrentResponseSchema>;
+export type ProjectSourceKindContract = z.infer<typeof projectSourceKindSchema>;
+export type ProjectSourceUploadMetadata = z.infer<typeof projectSourceUploadMetadataSchema>;
+export type ReuseProjectSourceRequest = z.infer<typeof reuseProjectSourceRequestSchema>;
+export type ProjectSourceResponse = z.infer<typeof projectSourceResponseSchema>;

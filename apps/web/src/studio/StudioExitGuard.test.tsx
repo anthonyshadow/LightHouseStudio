@@ -27,9 +27,42 @@ const GuardHarness = (props: StudioExitGuardProps) => {
       >
         Open Studio child
       </button>
+      <button
+        type="button"
+        onClick={() => {
+          void navigate('/studio/projects/730c73ca-a6af-4509-83c0-b3c18c1ee81a');
+        }}
+      >
+        Switch Project
+      </button>
       <StudioExitGuard {...props} />
     </main>
   );
+};
+
+const renderProjectGuard = (overrides: Partial<StudioExitGuardProps> = {}) => {
+  const props: StudioExitGuardProps = {
+    recordingOrFinalizing: false,
+    videoRenderingActive: false,
+    hasTemporaryTake: false,
+    voiceProcessingActive: false,
+    shelfDirty: false,
+    onDiscardTemporaryWork: vi.fn(),
+    ...overrides,
+  };
+  const router = createMemoryRouter(
+    [
+      { path: '/studio/projects/:projectId', element: <GuardHarness {...props} /> },
+      { path: '/studio/character', element: <h1>Studio child route</h1> },
+    ],
+    { initialEntries: ['/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391'] },
+  );
+  const view = render(
+    <StudioDesignProvider>
+      <RouterProvider router={router} />
+    </StudioDesignProvider>,
+  );
+  return { ...view, props, router };
 };
 
 const renderGuard = (overrides: Partial<StudioExitGuardProps> = {}) => {
@@ -128,5 +161,44 @@ describe('StudioExitGuard', () => {
     window.dispatchEvent(event);
 
     expect(event.defaultPrevented).toBe(true);
+  });
+
+  it('explicitly aborts cancellable source staging before switching Projects', async () => {
+    const abort = vi.fn();
+    const onDiscardTemporaryWork = vi.fn();
+    const { router } = renderProjectGuard({
+      projectSourceActivity: {
+        projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
+        accepted: false,
+        busy: true,
+        abort,
+      },
+      onDiscardTemporaryWork,
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Project' }));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Discard staged source work and switch Projects?',
+      }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toContain('18b120ac');
+    fireEvent.click(screen.getByRole('button', { name: 'Discard and switch' }));
+
+    await waitFor(() => expect(router.state.location.pathname).toContain('730c73ca'));
+    expect(abort).toHaveBeenCalledOnce();
+    expect(onDiscardTemporaryWork).toHaveBeenCalledOnce();
+  });
+
+  it('requires an active Project recording to reach a safe point before switching', async () => {
+    const { router } = renderProjectGuard({ recordingOrFinalizing: true });
+    fireEvent.click(screen.getByRole('button', { name: 'Switch Project' }));
+
+    expect(
+      await screen.findByRole('heading', {
+        name: 'Finish the take before switching Projects',
+      }),
+    ).toBeInTheDocument();
+    expect(router.state.location.pathname).toContain('18b120ac');
   });
 });

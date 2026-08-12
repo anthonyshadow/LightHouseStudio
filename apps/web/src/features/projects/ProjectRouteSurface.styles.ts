@@ -196,7 +196,7 @@ export const detailHeaderStyles = (theme: Theme): CSSObject => ({
 
 export const emptyProjectStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr) minmax(16rem, 0.8fr)',
+  gridTemplateColumns: 'minmax(0, 1fr)',
   gap: theme.space.lg,
   padding: `clamp(${theme.space.lg}, 4vw, ${theme.space.xxl})`,
   border: `1px solid ${theme.colors.border}`,
@@ -212,7 +212,6 @@ export const emptyProjectStyles = (theme: Theme): CSSObject => ({
     fontSize: theme.fontSizes.caption,
     lineHeight: 1.5,
   },
-  '@media (max-width: 48rem)': { gridTemplateColumns: 'minmax(0, 1fr)' },
 });
 
 export const dialogActionsStyles = (theme: Theme): CSSObject => ({

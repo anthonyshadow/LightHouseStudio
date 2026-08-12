@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import {
+  acceptProjectSource,
   appendProjectRevision,
   createEmptyProjectSnapshot,
   createProject,
@@ -12,6 +13,7 @@ import { DrizzleAssetLifecycleRegistry } from './asset-lifecycle-registry.js';
 import { DrizzleProjectRepository } from './project-repository.js';
 import { DrizzleProjectRetentionPolicy } from './project-retention-policy.js';
 import { ProjectService } from '../../features/projects/project-service.js';
+import type { ProjectSourceRecord } from '../../features/projects/project-repository.js';
 import {
   mediaAssets,
   processingJobs,
@@ -21,6 +23,7 @@ import {
   projectOutputs,
   projectRevisions,
   projects,
+  projectSources,
   projectVersionReferences,
   savedVideos,
   users,
@@ -566,6 +569,142 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       }
       await connection.db.delete(users).where(eq(users.id, ownerUserId));
       await connection.db.delete(users).where(eq(users.id, otherOwnerUserId));
+    }
+  }, 20_000);
+
+  it('atomically accepts and replays one inspected ready Project source', async () => {
+    const ownerUserId = randomUUID();
+    const projectId = randomUUID();
+    const assetId = randomUUID();
+    const operationKey = randomUUID();
+    const firstRevisionId = randomUUID();
+    const sourceRevisionId = randomUUID();
+    const createdAt = '2026-08-12T12:00:00.000Z';
+    const acceptedAt = '2026-08-12T12:05:00.000Z';
+    const repository = new DrizzleProjectRepository(connection.db);
+
+    try {
+      await connection.db.insert(users).values({
+        id: ownerUserId,
+        login: `${ownerUserId}@project-source.test`,
+        normalizedLogin: `${ownerUserId}@project-source.test`,
+        username: `ps-${ownerUserId}`,
+        email: `${ownerUserId}@project-source.test`,
+        displayName: 'Project Source Integration',
+      });
+      await connection.db.insert(mediaAssets).values({
+        id: assetId,
+        ownerUserId,
+        storageProvider: 'local',
+        storageKey: assetId,
+        status: 'ready',
+        mimeType: 'video/mp4',
+        filename: 'project-source.mp4',
+        sizeBytes: 1_024,
+        checksumSha256: 'c'.repeat(64),
+      });
+      const created = createProject(
+        {
+          id: projectId,
+          ownerUserId,
+          title: 'Project source transaction',
+          author: { kind: 'user', authorId: ownerUserId },
+          facts: {
+            sourceStatus: 'none',
+            currentAttempt: { status: 'none' },
+            validatedLastSuccessfulOutput: null,
+          },
+        },
+        { now: createdAt, createId: () => firstRevisionId },
+      );
+      await repository.create(created);
+      const accepted = acceptProjectSource(
+        created,
+        {
+          expectedProjectVersion: 1,
+          expectedRevisionNumber: 1,
+          assetId,
+          mediaReference: { kind: 'asset', assetId },
+          author: { kind: 'user', authorId: ownerUserId },
+        },
+        { now: acceptedAt, createId: () => sourceRevisionId },
+      );
+      if (!accepted.ok) throw new Error('Expected source acceptance to be formed.');
+      const revision = accepted.value.revisions.at(-1)!;
+      const assetLinks: ProjectAssetLink[] = ['source', 'working', 'presented'].map((role) => ({
+        projectId,
+        ownerUserId,
+        assetId,
+        role: role as ProjectAssetLink['role'],
+        revisionId: sourceRevisionId,
+        revisionNumber: 2,
+        createdAt: acceptedAt,
+      }));
+      const source: ProjectSourceRecord = {
+        projectId,
+        ownerUserId,
+        assetId,
+        kind: 'uploaded',
+        savedVideoId: null,
+        videoVersionId: null,
+        acceptedRevisionId: sourceRevisionId,
+        acceptedRevisionNumber: 2,
+        operationKey,
+        requestFingerprint: 'd'.repeat(64),
+        mimeType: 'video/mp4',
+        filename: 'project-source.mp4',
+        sizeBytes: 1_024,
+        checksumSha256: 'c'.repeat(64),
+        container: 'mp4',
+        videoCodec: 'avc',
+        audioCodec: 'aac',
+        durationMs: 12_000,
+        width: 1_280,
+        height: 720,
+        hasAudio: true,
+        acceptedAt,
+      };
+      const input = {
+        ownerUserId,
+        projectId,
+        expectedVersion: 1,
+        expectedRevisionNumber: 1,
+        nextProject: accepted.value.project,
+        revision,
+        assetLinks,
+        source,
+      };
+
+      await expect(repository.acceptSource(input)).resolves.toMatchObject({
+        kind: 'accepted',
+        current: { project: { version: 2 }, revision: { id: sourceRevisionId } },
+        source: { operationKey },
+      });
+      await expect(repository.acceptSource(input)).resolves.toMatchObject({
+        kind: 'replayed',
+        source: { operationKey },
+      });
+      await expect(repository.getSource(ownerUserId, projectId)).resolves.toEqual(source);
+      await expect(
+        repository.acceptSource({
+          ...input,
+          source: { ...source, requestFingerprint: 'e'.repeat(64) },
+        }),
+      ).resolves.toEqual({
+        kind: 'conflict',
+        conflict: { kind: 'operation-key', operation: 'source-accept' },
+      });
+    } finally {
+      await connection.db.delete(projectSources).where(eq(projectSources.projectId, projectId));
+      await connection.db.delete(projectAssets).where(eq(projectAssets.projectId, projectId));
+      await connection.db
+        .update(projects)
+        .set({ currentRevisionId: null, currentRevisionNumber: 0 })
+        .where(eq(projects.id, projectId));
+      await connection.db.delete(projectRevisions).where(eq(projectRevisions.projectId, projectId));
+      await connection.db.delete(projects).where(eq(projects.id, projectId));
+      await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, assetId));
+      await connection.db.delete(users).where(eq(users.id, ownerUserId));
     }
   }, 20_000);
 });

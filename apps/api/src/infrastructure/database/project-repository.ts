@@ -15,9 +15,11 @@ import { and, desc, eq, inArray, isNull, lt, or, sql, type SQLWrapper } from 'dr
 import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   AppendProjectRevisionPersistenceInput,
+  AcceptProjectSourcePersistenceInput,
   ProjectCreateReceipt,
   ProjectCreatePersistenceResult,
   ProjectCurrentRead,
+  ProjectCurrentSourceRead,
   ProjectLinkHistoryKind,
   ProjectLinkHistoryPage,
   ProjectLinkMutationResult,
@@ -26,6 +28,8 @@ import type {
   ProjectRevisionHistoryPage,
   ProjectSummaryPage,
   ProjectSummaryPageInput,
+  ProjectSourceAcceptanceResult,
+  ProjectSourceRecord,
 } from '../../features/projects/project-repository.js';
 import type { LightframeDatabase } from './client.js';
 import {
@@ -37,6 +41,7 @@ import {
   projectOperationReceipts,
   projectOutputs,
   projectRevisions,
+  projectSources,
   projectVersionReferences,
   projects,
   savedVideos,
@@ -50,6 +55,7 @@ type ProjectAssetRow = typeof projectAssets.$inferSelect;
 type ProjectJobRow = typeof projectJobs.$inferSelect;
 type ProjectOutputRow = typeof projectOutputs.$inferSelect;
 type ProjectVersionReferenceRow = typeof projectVersionReferences.$inferSelect;
+type ProjectSourceRow = typeof projectSources.$inferSelect;
 
 export type ProjectPersistenceErrorCode =
   'invalid-aggregate' | 'asset-not-ready' | 'version-not-ready' | 'output-not-linked';
@@ -123,6 +129,31 @@ const toProject = (row: ProjectRow): Project => {
     updatedAt: toIsoTimestamp(row.updatedAt),
   };
 };
+
+const toProjectSource = (row: ProjectSourceRow): ProjectSourceRecord => ({
+  projectId: row.projectId,
+  ownerUserId: row.ownerUserId,
+  assetId: row.assetId,
+  kind: row.kind,
+  savedVideoId: row.savedVideoId,
+  videoVersionId: row.videoVersionId,
+  acceptedRevisionId: row.acceptedRevisionId,
+  acceptedRevisionNumber: row.acceptedRevisionNumber,
+  operationKey: row.operationKey,
+  requestFingerprint: row.requestFingerprint,
+  mimeType: row.mimeType as ProjectSourceRecord['mimeType'],
+  filename: row.filename,
+  sizeBytes: row.sizeBytes,
+  checksumSha256: row.checksumSha256,
+  container: row.container as ProjectSourceRecord['container'],
+  videoCodec: row.videoCodec as ProjectSourceRecord['videoCodec'],
+  audioCodec: row.audioCodec,
+  durationMs: row.durationMs,
+  width: row.width,
+  height: row.height,
+  hasAudio: row.hasAudio,
+  acceptedAt: toIsoTimestamp(row.acceptedAt),
+});
 
 export const mapProjectAggregate = (
   projectRow: ProjectRow,
@@ -285,6 +316,31 @@ const versionReferenceValues = (
   createdAt: toIsoTimestamp(link.createdAt),
 });
 
+const projectSourceValues = (source: ProjectSourceRecord): typeof projectSources.$inferInsert => ({
+  projectId: source.projectId,
+  ownerUserId: source.ownerUserId,
+  assetId: source.assetId,
+  kind: source.kind,
+  savedVideoId: source.savedVideoId,
+  videoVersionId: source.videoVersionId,
+  acceptedRevisionId: source.acceptedRevisionId,
+  acceptedRevisionNumber: source.acceptedRevisionNumber,
+  operationKey: source.operationKey,
+  requestFingerprint: source.requestFingerprint,
+  mimeType: source.mimeType,
+  filename: source.filename,
+  sizeBytes: source.sizeBytes,
+  checksumSha256: source.checksumSha256,
+  container: source.container,
+  videoCodec: source.videoCodec,
+  audioCodec: source.audioCodec,
+  durationMs: source.durationMs,
+  width: source.width,
+  height: source.height,
+  hasAudio: source.hasAudio,
+  acceptedAt: toIsoTimestamp(source.acceptedAt),
+});
+
 const assertRevisionAssetLinks = (
   revision: ProjectRevision,
   links: readonly ProjectAssetLink[],
@@ -313,39 +369,73 @@ const assertRevisionAssetLinks = (
   }
 };
 
+type ReadyAsset = Pick<
+  typeof mediaAssets.$inferSelect,
+  'id' | 'mimeType' | 'filename' | 'sizeBytes' | 'checksumSha256'
+>;
+
+type ReadyVersionReference = Pick<
+  typeof videoVersions.$inferSelect,
+  'assetId' | 'mimeType' | 'filename' | 'sizeBytes' | 'durationMs' | 'width' | 'height'
+> & {
+  readonly savedVideoId: string;
+  readonly videoVersionId: string;
+};
+
+const versionReferenceKey = (savedVideoId: string, videoVersionId: string): string =>
+  `${savedVideoId}:${videoVersionId}`;
+
 const assertReadyAssets = async (
   executor: LightframeDatabase | DatabaseExecutor,
   ownerUserId: string,
   links: readonly ProjectAssetLink[],
-): Promise<void> => {
+): Promise<ReadonlyMap<string, ReadyAsset>> => {
   const assetIds = [...new Set(links.map(({ assetId }) => assetId))];
-  if (assetIds.length === 0) return;
+  if (assetIds.length === 0) return new Map();
   const rows = await executor
-    .select({ id: mediaAssets.id, status: mediaAssets.status })
+    .select({
+      id: mediaAssets.id,
+      status: mediaAssets.status,
+      mimeType: mediaAssets.mimeType,
+      filename: mediaAssets.filename,
+      sizeBytes: mediaAssets.sizeBytes,
+      checksumSha256: mediaAssets.checksumSha256,
+    })
     .from(mediaAssets)
     .where(and(eq(mediaAssets.ownerUserId, ownerUserId), inArray(mediaAssets.id, assetIds)))
     .for('share');
-  const readyAssetIds = new Set(
-    rows.filter(({ status }) => status === 'ready').map(({ id }) => id),
+  const readyAssets = new Map(
+    rows.filter(({ status }) => status === 'ready').map((asset) => [asset.id, asset] as const),
   );
-  if (assetIds.some((assetId) => !readyAssetIds.has(assetId))) {
+  if (assetIds.some((assetId) => !readyAssets.has(assetId))) {
     throw new ProjectPersistenceError(
       'asset-not-ready',
       'A missing, deleted, or unaccepted asset cannot be linked to a Project revision.',
     );
   }
+  return readyAssets;
 };
 
 const assertReadyVersionReferences = async (
   executor: DatabaseExecutor,
   ownerUserId: string,
   links: readonly ProjectVersionReferenceLink[],
-): Promise<void> => {
-  if (links.length === 0) return;
+): Promise<ReadonlyMap<string, ReadyVersionReference>> => {
+  if (links.length === 0) return new Map();
   const savedVideoIds = [...new Set(links.map(({ savedVideoId }) => savedVideoId))];
   const videoVersionIds = [...new Set(links.map(({ videoVersionId }) => videoVersionId))];
   const rows = await executor
-    .select({ savedVideoId: savedVideos.id, videoVersionId: videoVersions.id })
+    .select({
+      savedVideoId: savedVideos.id,
+      videoVersionId: videoVersions.id,
+      assetId: videoVersions.assetId,
+      mimeType: videoVersions.mimeType,
+      filename: videoVersions.filename,
+      sizeBytes: videoVersions.sizeBytes,
+      durationMs: videoVersions.durationMs,
+      width: videoVersions.width,
+      height: videoVersions.height,
+    })
     .from(savedVideos)
     .innerJoin(
       videoVersions,
@@ -364,18 +454,70 @@ const assertReadyVersionReferences = async (
       ),
     )
     .for('share');
-  const readyReferences = new Set(
-    rows.map(({ savedVideoId, videoVersionId }) => `${savedVideoId}:${videoVersionId}`),
+  const readyReferences = new Map(
+    rows.map((version) => [
+      versionReferenceKey(version.savedVideoId, version.videoVersionId),
+      version,
+    ]),
   );
   if (
     links.some(
       ({ savedVideoId, videoVersionId }) =>
-        !readyReferences.has(`${savedVideoId}:${videoVersionId}`),
+        !readyReferences.has(versionReferenceKey(savedVideoId, videoVersionId)),
     )
   ) {
     throw new ProjectPersistenceError(
       'version-not-ready',
       'A missing, deleted, cross-owner, or mismatched Saved Video Version cannot be linked.',
+    );
+  }
+  return readyReferences;
+};
+
+const assertReadyProjectSource = (
+  source: ProjectSourceRecord,
+  revision: ProjectRevision,
+  asset: ReadyAsset | undefined,
+  version: ReadyVersionReference | undefined,
+): void => {
+  if (
+    source.projectId !== revision.projectId ||
+    source.ownerUserId !== revision.ownerUserId ||
+    source.acceptedRevisionId !== revision.id ||
+    source.acceptedRevisionNumber !== revision.revisionNumber ||
+    source.assetId !== revision.snapshot.sourceAssetId
+  ) {
+    throw new ProjectPersistenceError(
+      'invalid-aggregate',
+      'The Project source record must name its accepting revision and source asset.',
+    );
+  }
+  if (
+    asset === undefined ||
+    asset.mimeType !== source.mimeType ||
+    asset.filename !== source.filename ||
+    asset.sizeBytes !== source.sizeBytes ||
+    asset.checksumSha256 !== source.checksumSha256
+  ) {
+    throw new ProjectPersistenceError(
+      'asset-not-ready',
+      'The Project source asset is missing, unready, or does not match inspected metadata.',
+    );
+  }
+  if (source.kind !== 'saved-video-version') return;
+  if (
+    version === undefined ||
+    version.assetId !== source.assetId ||
+    version.mimeType !== source.mimeType ||
+    version.filename !== source.filename ||
+    version.sizeBytes !== source.sizeBytes ||
+    version.durationMs !== source.durationMs ||
+    version.width !== source.width ||
+    version.height !== source.height
+  ) {
+    throw new ProjectPersistenceError(
+      'version-not-ready',
+      'The exact active Saved Video Version does not match the accepted Project source.',
     );
   }
 };
@@ -664,6 +806,70 @@ export class DrizzleProjectRepository implements ProjectRepository {
       );
     }
     return { project: toProject(row.project), revision: toRevision(row.revision) };
+  }
+
+  async getCurrentWithSource(
+    ownerUserId: string,
+    projectId: string,
+  ): Promise<ProjectCurrentSourceRead | null> {
+    const [row] = await this.db
+      .select({ project: projects, revision: projectRevisions, source: projectSources })
+      .from(projects)
+      .leftJoin(
+        projectRevisions,
+        and(
+          eq(projectRevisions.projectId, projects.id),
+          eq(projectRevisions.ownerUserId, projects.ownerUserId),
+          eq(projectRevisions.id, projects.currentRevisionId),
+          eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
+        ),
+      )
+      .leftJoin(
+        projectSources,
+        and(
+          eq(projectSources.projectId, projects.id),
+          eq(projectSources.ownerUserId, projects.ownerUserId),
+        ),
+      )
+      .where(
+        and(
+          eq(projects.id, projectId),
+          eq(projects.ownerUserId, ownerUserId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .for('share', { of: projects })
+      .limit(1);
+    if (row === undefined) return null;
+    if (row.revision === null) {
+      throw new ProjectPersistenceError(
+        'invalid-aggregate',
+        'The stored Project current revision is unavailable.',
+      );
+    }
+    return {
+      current: { project: toProject(row.project), revision: toRevision(row.revision) },
+      source: row.source === null ? null : toProjectSource(row.source),
+    };
+  }
+
+  async getSource(ownerUserId: string, projectId: string): Promise<ProjectSourceRecord | null> {
+    const [row] = await this.db
+      .select({ source: projectSources })
+      .from(projectSources)
+      .innerJoin(
+        projects,
+        and(
+          eq(projects.id, projectSources.projectId),
+          eq(projects.ownerUserId, projectSources.ownerUserId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .where(
+        and(eq(projectSources.projectId, projectId), eq(projectSources.ownerUserId, ownerUserId)),
+      )
+      .limit(1);
+    return row === undefined ? null : toProjectSource(row.source);
   }
 
   async list(ownerUserId: string, input: ProjectSummaryPageInput): Promise<ProjectSummaryPage> {
@@ -1045,6 +1251,186 @@ export class DrizzleProjectRepository implements ProjectRepository {
         })
         .where(and(eq(projects.id, current.id), eq(projects.ownerUserId, current.ownerUserId)));
       return { kind: 'updated' } as const;
+    });
+  }
+
+  async acceptSource(
+    input: AcceptProjectSourcePersistenceInput,
+  ): Promise<ProjectSourceAcceptanceResult> {
+    return this.db.transaction(async (tx) => {
+      const [priorSourceRow] = await tx
+        .select()
+        .from(projectSources)
+        .where(
+          and(
+            eq(projectSources.ownerUserId, input.ownerUserId),
+            eq(projectSources.operationKey, input.source.operationKey),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (priorSourceRow !== undefined) {
+        const priorSource = toProjectSource(priorSourceRow);
+        if (
+          priorSource.projectId !== input.projectId ||
+          priorSource.requestFingerprint !== input.source.requestFingerprint
+        ) {
+          return {
+            kind: 'conflict',
+            conflict: { kind: 'operation-key', operation: 'source-accept' },
+          } as const;
+        }
+        const [replayed] = await tx
+          .select({ project: projects, revision: projectRevisions })
+          .from(projects)
+          .innerJoin(
+            projectRevisions,
+            and(
+              eq(projectRevisions.projectId, projects.id),
+              eq(projectRevisions.ownerUserId, projects.ownerUserId),
+              eq(projectRevisions.id, projects.currentRevisionId),
+              eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
+            ),
+          )
+          .where(
+            and(
+              eq(projects.id, input.projectId),
+              eq(projects.ownerUserId, input.ownerUserId),
+              isNull(projects.deletedAt),
+            ),
+          )
+          .limit(1);
+        if (replayed === undefined) {
+          throw new ProjectPersistenceError(
+            'invalid-aggregate',
+            'Project source receipt has no retained result.',
+          );
+        }
+        return {
+          kind: 'replayed',
+          current: {
+            project: toProject(replayed.project),
+            revision: toRevision(replayed.revision),
+          },
+          source: priorSource,
+        } as const;
+      }
+
+      const [current] = await tx
+        .select()
+        .from(projects)
+        .where(
+          and(
+            eq(projects.id, input.projectId),
+            eq(projects.ownerUserId, input.ownerUserId),
+            isNull(projects.deletedAt),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (current === undefined) return { kind: 'not-found' } as const;
+      const [acceptedSource] = await tx
+        .select({ projectId: projectSources.projectId })
+        .from(projectSources)
+        .where(
+          and(
+            eq(projectSources.projectId, input.projectId),
+            eq(projectSources.ownerUserId, input.ownerUserId),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (acceptedSource !== undefined) {
+        return {
+          kind: 'conflict',
+          conflict: { kind: 'immutable-source', projectId: input.projectId },
+        } as const;
+      }
+      if (current.version !== input.expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'project-version',
+            projectId: input.projectId,
+            expectedVersion: input.expectedVersion,
+            actualVersion: current.version,
+          },
+        } as const;
+      }
+      if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'revision',
+            projectId: input.projectId,
+            expectedRevisionNumber: input.expectedRevisionNumber,
+            actualRevisionNumber: current.currentRevisionNumber,
+          },
+        } as const;
+      }
+      const revision: ProjectRevision = {
+        ...input.revision,
+        snapshot: projectSnapshotSchema.parse(input.revision.snapshot),
+      };
+      const validNextState =
+        input.nextProject.id === current.id &&
+        input.nextProject.ownerUserId === current.ownerUserId &&
+        input.nextProject.version === current.version + 1 &&
+        current.archivedAt === null &&
+        revision.projectId === current.id &&
+        revision.ownerUserId === current.ownerUserId &&
+        revision.parentRevisionId === current.currentRevisionId &&
+        revision.parentRevisionNumber === current.currentRevisionNumber &&
+        revision.revisionNumber === current.currentRevisionNumber + 1 &&
+        input.nextProject.currentRevisionId === revision.id &&
+        input.nextProject.currentRevisionNumber === revision.revisionNumber;
+      if (!validNextState) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          'The accepted Project source revision does not continue the locked aggregate.',
+        );
+      }
+      assertRevisionAssetLinks(revision, input.assetLinks);
+      const versionReferenceLinks = snapshotVersionReferenceLinks(revision);
+      const readyAssets = await assertReadyAssets(tx, input.ownerUserId, input.assetLinks);
+      const readyVersionReferences = await assertReadyVersionReferences(
+        tx,
+        input.ownerUserId,
+        versionReferenceLinks,
+      );
+      assertReadyProjectSource(
+        input.source,
+        revision,
+        readyAssets.get(input.source.assetId),
+        input.source.savedVideoId === null || input.source.videoVersionId === null
+          ? undefined
+          : readyVersionReferences.get(
+              versionReferenceKey(input.source.savedVideoId, input.source.videoVersionId),
+            ),
+      );
+      await tx.insert(projectRevisions).values(revisionValues(revision));
+      await tx.insert(projectAssets).values(input.assetLinks.map(assetLinkValues));
+      if (versionReferenceLinks.length > 0) {
+        await tx
+          .insert(projectVersionReferences)
+          .values(versionReferenceLinks.map(versionReferenceValues));
+      }
+      await tx.insert(projectSources).values(projectSourceValues(input.source));
+      await tx
+        .update(projects)
+        .set({
+          status: input.nextProject.status,
+          version: input.nextProject.version,
+          currentRevisionId: input.nextProject.currentRevisionId,
+          currentRevisionNumber: input.nextProject.currentRevisionNumber,
+          updatedAt: toIsoTimestamp(input.nextProject.updatedAt),
+        })
+        .where(and(eq(projects.id, current.id), eq(projects.ownerUserId, current.ownerUserId)));
+      return {
+        kind: 'accepted',
+        current: { project: input.nextProject, revision },
+        source: input.source,
+      } as const;
     });
   }
 

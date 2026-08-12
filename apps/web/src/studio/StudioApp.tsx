@@ -58,8 +58,12 @@ import {
 } from '../features/media-session';
 import { isModelSessionActive } from '../features/media-session/sessionComposerModel';
 import { persistedReferenceAssetId } from '../features/media-session/types';
-import { CaptureSettingsPanel, RecordingControls } from '../features/recording';
+import { CaptureSettingsPanel, RecordingAction, RecordingControls } from '../features/recording';
 import type { RecordingArtifact } from '../features/recording/types';
+import type {
+  ProjectSourceActivity,
+  ProjectSourceRuntime,
+} from '../features/projects/useProjectSourceController';
 import { useStudioSession } from '../orchestration/session';
 import { Button, OverlayPanel } from '../ui';
 import {
@@ -244,7 +248,12 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const projectRouteActive = isProjectsPath(location.pathname);
   const campaignRouteActive = isCampaignsPath(location.pathname);
   const organizationRouteActive = projectRouteActive || campaignRouteActive;
-  const projectContextActive = projectIdFromPath(location.pathname) !== null;
+  const activeProjectId = projectIdFromPath(location.pathname);
+  const projectContextActive = activeProjectId !== null;
+  const activeProjectIdRef = useRef(activeProjectId);
+  useLayoutEffect(() => {
+    activeProjectIdRef.current = activeProjectId;
+  }, [activeProjectId]);
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const desktopStudioLayout = useDesktopStudioLayout();
@@ -277,6 +286,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const [logoutPromptOpen, setLogoutPromptOpen] = useState(false);
   const [logoutBlockedOpen, setLogoutBlockedOpen] = useState(false);
   const [logoutBusy, setLogoutBusy] = useState(false);
+  const [projectSourceActivity, setProjectSourceActivity] = useState<ProjectSourceActivity | null>(
+    null,
+  );
   const repositoryStore = useCreativeAssetSelector(repository, (state) => state.store);
   const existingVideoSavedRecipes = useMemo<readonly ExistingVideoSavedRecipe[]>(() => {
     const variantsByCharacter = new Map<string, SavedCharacterVariant[]>();
@@ -465,6 +477,30 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     session,
     onReviewCleared: handleReviewCleared,
   });
+  const publishProjectSourceRef = useRef(publishUploadedVideo);
+  const discardProjectSourceRef = useRef(recording.discard);
+  useLayoutEffect(() => {
+    publishProjectSourceRef.current = publishUploadedVideo;
+    discardProjectSourceRef.current = recording.discard;
+  }, [publishUploadedVideo, recording.discard]);
+  const projectSourceRuntime = useMemo<ProjectSourceRuntime>(
+    () => ({
+      present: (projectId, input) => {
+        if (activeProjectIdRef.current !== projectId) return;
+        publishProjectSourceRef.current(input);
+      },
+      clear: (projectId) => {
+        if (activeProjectIdRef.current !== projectId) return;
+        discardProjectSourceRef.current();
+      },
+    }),
+    [],
+  );
+  const handleProjectSourceActivity = useCallback((activity: ProjectSourceActivity) => {
+    if (activeProjectIdRef.current === activity.projectId) setProjectSourceActivity(activity);
+  }, []);
+  const activeProjectSourceActivity =
+    projectSourceActivity?.projectId === activeProjectId ? projectSourceActivity : null;
   const activeLoadedSavedSource =
     !loadedSavedSource ||
     !recording.original ||
@@ -923,6 +959,34 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     activeCharacter?.referenceImageAssetId ??
     persistedReferenceAssetId(session.draft.referenceImage);
   const effectiveRecordingMode = currentExperienceLabel ? session.draft.mode : recordingMode;
+  const projectRecordingCandidate = useMemo(() => {
+    if (recording.lifecycle !== 'recorded' || !recording.original) return null;
+    const artifact = recording.original;
+    return {
+      file: new File([artifact.media], artifact.filename, {
+        type: artifact.mimeType,
+        lastModified: new Date(artifact.startedAt).valueOf(),
+      }),
+      ready: true,
+    } as const;
+  }, [recording.lifecycle, recording.original]);
+  const startProjectRecording = useCallback(() => {
+    if (
+      activeProjectIdRef.current === null ||
+      activeProjectSourceActivity?.accepted ||
+      activeProjectSourceActivity?.busy ||
+      !browser.mediaRecorder ||
+      !browser.mediaDevices ||
+      !browser.secureContext
+    ) {
+      return;
+    }
+    setRecordingForExistingVideo(false);
+    closeOverlay();
+    recording.discard();
+    window.requestAnimationFrame(() => mainRef.current?.focus());
+    void session.startLocal();
+  }, [activeProjectSourceActivity, browser, closeOverlay, recording, session]);
   const activeCharacterRecord = activeCharacter
     ? repositoryStore.savedCharacterPrompts.find((candidate) => candidate.id === activeCharacter.id)
     : undefined;
@@ -1536,6 +1600,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       }}
     />
   );
+  const projectRecordingAvailable =
+    activeProjectId !== null &&
+    activeProjectSourceActivity !== null &&
+    !activeProjectSourceActivity.accepted &&
+    !activeProjectSourceActivity.busy;
 
   return (
     <div css={pageStyles(theme)}>
@@ -1564,12 +1633,18 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           />
         </div>
 
-        <main ref={mainRef} id="studio-main" tabIndex={-1} css={mainGridStyles()}>
+        <main
+          ref={mainRef}
+          id="studio-main"
+          tabIndex={-1}
+          css={mainGridStyles(projectContextActive)}
+        >
           <div
             ref={fullscreenWorkspaceRef}
-            hidden={organizationRouteActive}
+            hidden={organizationRouteActive && !projectContextActive}
             css={stageColumnStyles(theme)}
             data-video-edit-active={videoEditing ? 'true' : 'false'}
+            data-project-context={projectContextActive ? 'true' : undefined}
           >
             <MediaStage
               presentation={stagePresentation}
@@ -1580,7 +1655,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               aspectRatio={stageAspectRatio}
               realtimeSessionTiming={session.realtimeSessionTiming}
               idleAction={
-                stagePresentation.kind === 'idle' && firstSuccessGuideVisible ? (
+                !projectContextActive &&
+                stagePresentation.kind === 'idle' &&
+                firstSuccessGuideVisible ? (
                   <aside
                     aria-label="First take guide"
                     data-first-success-guide=""
@@ -1616,51 +1693,69 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
                 ) : null
               }
               {...(currentExperienceLabel ? { experienceLabel: currentExperienceLabel } : {})}
-              {...(!videoEditing
+              {...(projectContextActive
                 ? {
-                    controls: ({ visible }: { visible: boolean }) => (
-                      <StudioSessionControlBar
-                        session={session}
-                        {...(currentExperienceLabel
-                          ? { experienceLabel: currentExperienceLabel }
-                          : {})}
-                        experienceImageAssetId={currentExperienceImageAssetId}
-                        recording={recording}
-                        recordingMode={effectiveRecordingMode}
-                        recordingCharacterAttribution={recordingCharacterAttribution}
-                        recordingSource={activeRecordingSource}
-                        recordingSupported={browser.mediaRecorder}
-                        {...(captureBlockedReason
-                          ? { recordingBlockedReason: captureBlockedReason }
-                          : {})}
-                        reviewingTake={stagePresentation.kind === 'playback'}
-                        visible={visible}
-                        controlsLocked={reviewLocked || finalizingStartedAt !== null}
-                        onStopRecording={finishTake}
-                        onStartLocalRecording={startExistingVideoRecording}
-                        onCloseTakeReview={closeTakeReview}
-                        onDiscardTake={discardExistingVideoSelection}
-                        onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
-                        onChooseAiExperience={() => openOverlay('ai-experience')}
-                        onChangeExperience={() => openOverlay('ai-experience')}
-                        onUploadVideo={openExistingVideo}
-                        uploadButtonRef={uploadToggleRef}
-                        {...(recording.presented ? { onSaveVideo: requestSavePresentedVideo } : {})}
-                        saveVideoState={savedVideoSave.state}
-                        {...(activeLoadedSavedSource &&
-                        recording.presented?.id !== activeLoadedSavedSource.artifactId
-                          ? { onReplaceSavedVideo: () => void replaceLoadedSavedVideo() }
-                          : {})}
-                      />
-                    ),
+                    controls: ({ visible }: { visible: boolean }) =>
+                      projectRecordingAvailable ? (
+                        <div hidden={!visible} aria-label="Project recording controls">
+                          <RecordingAction
+                            recording={recording}
+                            source={activeRecordingSource}
+                            mode="local"
+                            modelOutputReady={false}
+                            supported={browser.mediaRecorder}
+                            onStop={finishTake}
+                          />
+                        </div>
+                      ) : null,
                   }
-                : {})}
+                : !videoEditing
+                  ? {
+                      controls: ({ visible }: { visible: boolean }) => (
+                        <StudioSessionControlBar
+                          session={session}
+                          {...(currentExperienceLabel
+                            ? { experienceLabel: currentExperienceLabel }
+                            : {})}
+                          experienceImageAssetId={currentExperienceImageAssetId}
+                          recording={recording}
+                          recordingMode={effectiveRecordingMode}
+                          recordingCharacterAttribution={recordingCharacterAttribution}
+                          recordingSource={activeRecordingSource}
+                          recordingSupported={browser.mediaRecorder}
+                          {...(captureBlockedReason
+                            ? { recordingBlockedReason: captureBlockedReason }
+                            : {})}
+                          reviewingTake={stagePresentation.kind === 'playback'}
+                          visible={visible}
+                          controlsLocked={reviewLocked || finalizingStartedAt !== null}
+                          onStopRecording={finishTake}
+                          onStartLocalRecording={startExistingVideoRecording}
+                          onCloseTakeReview={closeTakeReview}
+                          onDiscardTake={discardExistingVideoSelection}
+                          onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
+                          onChooseAiExperience={() => openOverlay('ai-experience')}
+                          onChangeExperience={() => openOverlay('ai-experience')}
+                          onUploadVideo={openExistingVideo}
+                          uploadButtonRef={uploadToggleRef}
+                          {...(recording.presented
+                            ? { onSaveVideo: requestSavePresentedVideo }
+                            : {})}
+                          saveVideoState={savedVideoSave.state}
+                          {...(activeLoadedSavedSource &&
+                          recording.presented?.id !== activeLoadedSavedSource.artifactId
+                            ? { onReplaceSavedVideo: () => void replaceLoadedSavedVideo() }
+                            : {})}
+                        />
+                      ),
+                    }
+                  : {})}
               notices={stageNotices}
               onPlaybackError={recording.repairPresentedObjectUrl}
               fullscreenTargetRef={fullscreenWorkspaceRef}
               {...(videoEditPreview ? { editPreview: videoEditPreview } : {})}
             />
-            {videoEditing ? (
+            {projectContextActive ? null : videoEditing ? (
               <Suspense fallback={deferredPanelFallback}>
                 <VideoEditWorkspace
                   session={videoEditor}
@@ -1710,7 +1805,15 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           </div>
           {projectRouteActive ? (
             <Suspense fallback={<p role="status">Loading Projects workspace…</p>}>
-              <ProjectRouteSurface />
+              <ProjectRouteSurface
+                sourceRuntime={projectSourceRuntime}
+                recordingCandidate={projectRecordingCandidate}
+                recordingActive={
+                  recordingActive || finalizingStartedAt !== null || finalizingStream !== null
+                }
+                onStartRecording={startProjectRecording}
+                onSourceActivityChange={handleProjectSourceActivity}
+              />
             </Suspense>
           ) : null}
           {campaignRouteActive ? (
@@ -1731,6 +1834,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           hasTemporaryTake={Boolean(recording.presented)}
           voiceProcessingActive={recording.processingState === 'processing'}
           shelfDirty={shelfDirty || outfitBuilderDirty || wardrobeDirty || videoEditor.dirty}
+          projectSourceActivity={activeProjectSourceActivity}
           onDiscardTemporaryWork={discardTemporaryWork}
         />
 

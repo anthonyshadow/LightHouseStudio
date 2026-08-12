@@ -245,13 +245,24 @@ export const capabilityDetailStyles = (theme: Theme): CSSObject => ({
   },
 });
 
-export const mainGridStyles = (): CSSObject => ({
+export const mainGridStyles = (projectContextActive = false): CSSObject => ({
   display: 'grid',
-  gridTemplateColumns: 'minmax(0, 1fr)',
+  gridTemplateColumns: projectContextActive
+    ? 'minmax(0, 1.45fr) minmax(20rem, 0.7fr)'
+    : 'minmax(0, 1fr)',
+  gap: projectContextActive ? 'clamp(0.5rem, 1.2vw, 1rem)' : 0,
   alignItems: 'stretch',
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
+  ...(projectContextActive
+    ? {
+        '@media (max-width: 63.99rem)': {
+          gridTemplateColumns: 'minmax(0, 1fr)',
+          gridTemplateRows: 'minmax(12rem, 45%) minmax(0, 1fr)',
+        },
+      }
+    : {}),
 });
 
 export const stageColumnStyles = (theme: Theme): CSSObject => ({
@@ -299,6 +310,11 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
   '&[data-video-edit-active="true"]': {
     gridTemplateRows: 'minmax(8rem, 1fr) 3.15rem minmax(11rem, 38vh)',
   },
+  '&[data-project-context="true"]': {
+    gridTemplateColumns: 'minmax(0, 1fr)',
+    gridTemplateRows: 'minmax(0, 1fr)',
+    '& > [data-media-stage-layout]': { gridColumn: 1, gridRow: 1 },
+  },
   '@media (max-width: 39.99rem)': {
     gridTemplateRows: 'minmax(0, 1fr) 3.15rem 2.85rem',
     '&[data-video-edit-active="true"]': {
@@ -320,6 +336,12 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
     '& > [data-capture-controls]': { gridColumn: 3, gridRow: 1 },
     '&[data-video-edit-active="true"]': {
       gridTemplateRows: 'minmax(0, 1fr)',
+    },
+    '&[data-project-context="true"]': {
+      gridTemplateColumns: 'minmax(0, 1fr)',
+      gridTemplateRows: 'minmax(0, 1fr)',
+      gap: 0,
+      '& > [data-media-stage-layout]': { gridColumn: 1, gridRow: 1 },
     },
   },
   '@media (min-width: 64rem) and (max-height: 48rem)': {

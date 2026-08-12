@@ -55,6 +55,7 @@ import type {
 import { FileProjectRepository } from './features/projects/file-project-repository.js';
 import { ProjectService } from './features/projects/project-service.js';
 import { registerProjectRoutes } from './features/projects/routes.js';
+import { ProjectSourceService } from './features/projects/project-source-service.js';
 import type { CampaignRepository } from './features/campaigns/campaign-repository.js';
 import { CampaignService } from './features/campaigns/campaign-service.js';
 import { registerCampaignRoutes } from './features/campaigns/routes.js';
@@ -315,15 +316,19 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     (projectRepository instanceof FileProjectRepository ? projectRepository : undefined);
   const campaignService =
     campaignRepository === undefined ? undefined : new CampaignService(campaignRepository);
-  const savedVideoService = new SavedVideoService(
-    savedVideoRepository,
+  const assetBytes =
     dependencies.persistence?.assetBytes ??
-      new LocalAssetByteStore(dependencies.config.lightframeDataDir),
-    {
-      deleteStoredAssetsOnManualDelete: dependencies.config.assetStoreProvider === 'r2',
-      ...(projectRetention === undefined ? {} : { projectRetention }),
-    },
-  );
+    new LocalAssetByteStore(dependencies.config.lightframeDataDir);
+  const savedVideoService = new SavedVideoService(savedVideoRepository, assetBytes, {
+    deleteStoredAssetsOnManualDelete: dependencies.config.assetStoreProvider === 'r2',
+    ...(projectRetention === undefined ? {} : { projectRetention }),
+  });
+  const projectSourceService =
+    projectRepository === undefined
+      ? undefined
+      : new ProjectSourceService(projectRepository, savedVideoRepository, assetBytes, {
+          ...(projectRetention === undefined ? {} : { projectRetention }),
+        });
   const directSavedVideoUploads = dependencies.persistence?.directVideoUploads;
   const directSavedVideoUploadService =
     directSavedVideoUploads === undefined
@@ -358,7 +363,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   registerRealtimeRoutes(app, decartProvider);
   registerVideoJobRoutes(app, videoJobService);
   registerSavedVideoRoutes(app, savedVideoService, directSavedVideoUploadService);
-  registerProjectRoutes(app, projectService);
+  registerProjectRoutes(app, projectService, projectSourceService);
   registerCampaignRoutes(app, campaignService);
   registerCreativeLibraryRoutes(
     app,

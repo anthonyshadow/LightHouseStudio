@@ -21,6 +21,11 @@ tenancy are not.
 - Appropriate user-scoped drafts, journals, cached creative metadata, and
   preferences remain in validated, versioned browser storage. Browser storage is
   untrusted and is not an ownership authority.
+- Project identity, revisions, source acceptance, and source media never use the
+  dormant browser Project/upload/outbox stores. They remain server-authoritative;
+  the browser holds only cancellable controller/cache state and asks the existing
+  recording-artifact owner to create a fresh playback URL from authenticated
+  content after each hydration.
 - In default local mode, the API owns durable media/reference bytes and related
   records under the configured private local data directory.
 - Drizzle with PostgreSQL/Neon may own relational metadata, durable sessions,

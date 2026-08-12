@@ -15,9 +15,11 @@ Live character transformation and Workshop remain advanced tools. The app binds 
 records; it does not provide signup, billing, collaboration, or public multi-user deployment. A
 durable, video-oriented Project authority and lightweight optional Campaigns now support bounded
 lists, Quick Start/New Project, open, edit/rename, move/detach, archive, restore, and guarded
-Campaign deletion in every persistence mode. Projects do not yet accept or resume media, and rich
-Campaign planning and multi-format content creation remain future product directions. The app is
-not approved for LAN, tunnel, proxy, or public exposure.
+Campaign deletion in every persistence mode. An open Project can now durably accept one inspected
+upload, finalized local recording, or exact active Saved Video Version as its immutable original
+and restore it from the same URL. Project creative autosave, processing, and output saving remain
+future steps. Rich Campaign planning and multi-format content creation remain future product
+directions. The app is not approved for LAN, tunnel, proxy, or public exposure.
 
 ## Status
 
@@ -75,14 +77,16 @@ Neither document changes the current loopback, account, provider, privacy, or de
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio`,
 `/studio/campaigns`, `/studio/campaigns/:campaignId`, `/studio/projects`,
 `/studio/projects/:projectId`, `/studio/videos`, `/studio/characters`, and `/studio/outfits` share
-one persistent `StudioApp` and one stage. Campaigns and Projects provide bounded active/archived
-lists plus lifecycle and optional membership controls; these full workspaces hide the existing
-stage without creating another shell, player, media session, provider action, or browser authority
-store. **Quick Start** creates a standalone `Untitled Project`; **New Project** creates one inside
+one persistent `StudioApp` and one stage. Campaigns and the Project list hide the stage; an open
+Project reuses that same stage beside its source controls without creating another shell, player,
+media session, provider action, or browser authority store. **Quick Start** creates a standalone
+`Untitled Project`; **New Project** creates one inside
 an active Campaign. **No Campaign** is a virtual Project group, never a default database row.
 Campaign archive is non-cascading and Campaign deletion requires archive plus zero attached
-Projects. An open empty Project is durable and
-deep-linkable but truthfully has no resumable source yet. The full-screen library surfaces likewise
+Projects. An empty Project offers **Record**, **Upload**, and **Use Saved Video**. It becomes
+resumable only after the API stores or verifies the bytes, inspects the media, commits the
+owner-bound source record and revision, and reports **All changes saved**. The first accepted
+original cannot be replaced; another original requires another Project. The full-screen library surfaces likewise
 never create another media session. The gallery
 loads metadata and lazy thumbnails first, then fetches video bytes only for an explicit Preview,
 Studio, Edit, or Download action. Saved Videos can be filtered by attributed parent character and
@@ -98,9 +102,12 @@ retains its separate approved source/result player. Every other path returns to 
 compatibility videos were not imported during the Phase 1 cutover; their retired repository and UI
 wiring are now removed.
 
-Leaving Studio is blocked during recording/finalization and active local video rendering. A
-temporary take, active Voice work, dirty video edit, or dirty Recipe Shelf/Outfit Builder/Wardrobe
-edit requires confirmed discard; saved origin-scoped browser data is unaffected.
+Leaving Studio is blocked during recording/finalization and active local video rendering. Switching
+Projects is also blocked during recording/finalization and requires an explicit abort/discard for
+cancellable source staging or a finalized unaccepted Project take. A temporary take, active Project
+source transfer, active Voice work, dirty video edit, or dirty Recipe Shelf/Outfit Builder/Wardrobe
+edit requires confirmed discard; an already committed source remains bound to its original Project
+and cannot replace the newly opened stage.
 
 ## Capabilities and provider boundaries
 

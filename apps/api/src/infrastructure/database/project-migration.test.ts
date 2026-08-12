@@ -16,6 +16,10 @@ const campaignListIndexMigrationUrl = new URL(
   '../../../drizzle/0015_wooden_invaders.sql',
   import.meta.url,
 );
+const projectSourceMigrationUrl = new URL(
+  '../../../drizzle/0016_purple_layla_miller.sql',
+  import.meta.url,
+);
 
 describe('Project aggregate migration', () => {
   it('is additive and creates every normalized Project relationship', async () => {
@@ -117,6 +121,22 @@ describe('Campaign organization migration', () => {
     expect(migration).toContain('"campaign_id"');
     expect(migration).not.toMatch(
       /\b(?:DROP|TRUNCATE|ALTER\s+TABLE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"/u,
+    );
+  });
+});
+
+describe('Project source migration', () => {
+  it('adds immutable exact-lineage source authority without backfill or byte duplication', async () => {
+    const migration = await readFile(projectSourceMigrationUrl, 'utf8');
+
+    expect(migration).toContain('CREATE TABLE "project_sources"');
+    expect(migration).toContain('project_sources_owner_operation_unique');
+    expect(migration).toContain('project_sources_revision_same_project_fk');
+    expect(migration).toContain('project_sources_asset_owner_fk');
+    expect(migration).toContain('project_sources_version_same_video_fk');
+    expect(migration).toContain('project_sources_lineage_consistent');
+    expect(migration).not.toMatch(
+      /\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b/u,
     );
   });
 });
