@@ -13,6 +13,7 @@ import {
   ProjectRuleError,
   renameProject,
   restoreProject,
+  moveProjectToCampaign,
   type Project,
   type ProjectConflict,
 } from '@studio/domain';
@@ -31,6 +32,7 @@ const emptyFacts = {
 
 const publicProject = (project: Project): ProjectContract => ({
   id: project.id,
+  campaignId: project.campaignId,
   title: project.title,
   status: project.status,
   version: project.version,
@@ -59,7 +61,11 @@ const publicCurrent = ({ project, revision }: ProjectCurrentRead): ProjectCurren
   });
 
 const cursorCriteria = (query: ProjectsQuery): string =>
-  JSON.stringify({ lifecycle: query.lifecycle, pageSize: query.pageSize });
+  JSON.stringify({
+    lifecycle: query.lifecycle,
+    campaignId: query.campaignId ?? null,
+    pageSize: query.pageSize,
+  });
 
 const encodeCursor = (cursor: ProjectSummaryCursor, query: ProjectsQuery): string =>
   Buffer.from(
@@ -120,6 +126,7 @@ export class ProjectService {
     ownerUserId: string,
     operationKey: string,
     titleValue: string,
+    campaignId: string | null = null,
   ): Promise<ProjectServiceMutationResult> {
     let title: string;
     try {
@@ -137,13 +144,20 @@ export class ProjectService {
         id: projectId,
         ownerUserId,
         title,
+        campaignId,
         author: { kind: 'user', authorId: ownerUserId },
         facts: emptyFacts,
       },
       { now, createId: this.#createId },
     );
     const requestFingerprint = createHash('sha256')
-      .update(JSON.stringify({ version: 1, operation: 'create', title }))
+      .update(
+        JSON.stringify(
+          campaignId === null
+            ? { version: 1, operation: 'create', title }
+            : { version: 2, operation: 'create', title, campaignId },
+        ),
+      )
       .digest('hex');
     const result = await this.#repository.createIdempotent({
       aggregate,
@@ -158,6 +172,7 @@ export class ProjectService {
     const cursor = decodeCursor(query.cursor, query);
     const page = await this.#repository.list(ownerUserId, {
       lifecycle: query.lifecycle,
+      ...(query.campaignId === undefined ? {} : { campaignId: query.campaignId }),
       ...(cursor === undefined ? {} : { cursor }),
       pageSize: query.pageSize,
     });
@@ -220,6 +235,44 @@ export class ProjectService {
         now,
       );
     });
+  }
+
+  async moveToCampaign(
+    ownerUserId: string,
+    projectId: string,
+    expectedVersion: number,
+    campaignId: string | null,
+  ): Promise<ProjectServiceMutationResult> {
+    const current = await this.#repository.getCurrent(ownerUserId, projectId);
+    if (current === null) throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    let next;
+    try {
+      next = moveProjectToCampaign(
+        current.project,
+        campaignId,
+        expectedVersion,
+        this.#now().toISOString(),
+      );
+    } catch (error) {
+      if (error instanceof ProjectRuleError) {
+        throw new AppError(409, 'conflict', error.message);
+      }
+      throw error;
+    }
+    if (!next.ok) return { ok: false, conflict: next.conflict };
+    const persisted = await this.#repository.updateCampaignMembership(
+      ownerUserId,
+      expectedVersion,
+      next.value,
+    );
+    if (persisted.kind === 'not-found') {
+      throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    }
+    if (persisted.kind === 'conflict') return { ok: false, conflict: persisted.conflict };
+    return {
+      ok: true,
+      current: publicCurrent({ project: next.value, revision: current.revision }),
+    };
   }
 
   async #metadataMutation(

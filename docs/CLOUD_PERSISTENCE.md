@@ -9,8 +9,8 @@ account is not production identity or tenancy.
 
 ## What is implemented
 
-- Drizzle migrations for users/credentials, durable sessions, Projects/revisions/relationships and
-  owner-scoped Project operation receipts,
+- Drizzle migrations for users/credentials, durable sessions, Campaigns, Projects/revisions/
+  relationships, nullable same-owner Campaign membership, and owner-scoped operation receipts,
   saved voices, saved videos and versions, private media assets, reference images,
   creative-library records, processing jobs, leases, resource references, idempotency receipts,
   and an outbox.
@@ -24,12 +24,12 @@ account is not production identity or tenancy.
   producing revision per output Version. Exact replay is idempotent; changed replay conflicts.
   Snapshot Versions require an active same-owner Saved Video and exact Version at link time, output
   pointers require an existing exact Project output, and normal current/history reads are bounded.
-  Authenticated empty-Project lifecycle routes write these tables in authoritative modes. Existing
-  videos/jobs are not backfilled, and there is no Project browser UI yet.
-- A schema-version-1 local Project repository is authoritative in `local` and `shadow`. It uses an
-  owner namespace, owner lock, atomic primary/backup replacement, strict startup parsing, and a
-  prepared create journal containing the durable receipt and next metadata state. `shadow` does not
-  make Drizzle Project tables authoritative or claim Project replication.
+  Authenticated Campaign/empty-Project lifecycle routes write these tables in authoritative modes.
+  Existing videos/jobs are not backfilled.
+- A schema-version-2 local Campaign/Project repository is authoritative in `local` and `shadow`.
+  It uses one owner namespace/lock/journal, atomic primary/backup replacement, strict v1→v2 startup
+  migration, and durable Campaign/Project create receipts. `shadow` does not make Drizzle
+  Campaign/Project tables authoritative or claim their replication.
 - A private R2 `AssetByteStore` with opaque keys, streaming/multipart upload, app-owned SHA-256,
   byte-range reads, owner checks, database lifecycle states, multipart abort/cleanup, and deletion
   tombstones. R2 ETags are retained only as transport metadata, never as the integrity checksum.
@@ -69,12 +69,12 @@ account is not production identity or tenancy.
 
 ## Runtime modes
 
-| `DATABASE_MODE` | Metadata authority                                   | Sessions/jobs                                      | Bytes                                                                                      |
-| --------------- | ---------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| `local`         | Local files, including Project authority             | Process-local sessions/jobs plus safe file traces  | Existing private local store                                                               |
-| `shadow`        | Local files remain authoritative, including Projects | Neon safe job traces and restart records           | `local`, or new saved-video writes to both R2 and local with R2-first/local-fallback reads |
-| `postgres`      | Local PostgreSQL Drizzle repositories                | Durable local sessions and resumable accepted jobs | Registered local objects or the isolated development R2 bucket                             |
-| `neon`          | Neon Drizzle repositories                            | Durable Neon sessions and resumable accepted jobs  | Registered local objects or private R2, selected at startup                                |
+| `DATABASE_MODE` | Metadata authority                                             | Sessions/jobs                                      | Bytes                                                                                      |
+| --------------- | -------------------------------------------------------------- | -------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| `local`         | Local files, including Campaign/Project authority              | Process-local sessions/jobs plus safe file traces  | Existing private local store                                                               |
+| `shadow`        | Local files remain authoritative, including Campaigns/Projects | Neon safe job traces and restart records           | `local`, or new saved-video writes to both R2 and local with R2-first/local-fallback reads |
+| `postgres`      | Local PostgreSQL Drizzle repositories                          | Durable local sessions and resumable accepted jobs | Registered local objects or the isolated development R2 bucket                             |
+| `neon`          | Neon Drizzle repositories                                      | Durable Neon sessions and resumable accepted jobs  | Registered local objects or private R2, selected at startup                                |
 
 `ASSET_STORE_PROVIDER=r2` requires `DATABASE_MODE=shadow`, `postgres`, or `neon`. Reference-image
 and creative metadata stay local in `shadow`; their database adapters become authoritative in
@@ -106,6 +106,18 @@ configuration fail closed before opening a pool otherwise.
    checked development and built loopback origins are shown below; remove either when it is not
    used, and replace them with the exact origin of any separately approved deployment. Do not use
    `*` for origins or headers.
+
+   The checked Wrangler policy is
+   [`apps/api/config/r2-cors.development.json`](../apps/api/config/r2-cors.development.json). Apply
+   it with an authenticated Cloudflare identity that can edit the development bucket, then verify
+   the stored policy:
+
+   ```bash
+   bun run r2:cors:development:set
+   bun run r2:cors:development:check
+   ```
+
+   The equivalent dashboard JSON is:
 
    ```json
    [
@@ -190,6 +202,14 @@ verification, lifecycle, or cleanup contracts above.
   result Project ID. It does not rewrite Projects or content. Rolling application code back before
   Prompt 03 leaves this extra table unused; dropping it would discard create replay history and is
   not an automatic rollback step.
+- Additive migration `0014` creates Campaign lifecycle/receipt tables and nullable
+  `projects.campaign_id`, with a restrictive composite owner foreign key and no legacy assignment.
+  Additive migration `0015` adds only active/archived Campaign-membership Project list indexes.
+  Older compatible code ignores the new tables/column, but dropping Campaign receipts loses
+  replay history and dropping membership requires every Project to be detached first. Do not
+  remove these objects as an automatic rollback. Local schema v2 is not readable by the old v1
+  parser; downgrade requires restoring a verified pre-upgrade metadata backup or deploying
+  compatible reader code, never ad hoc field stripping.
 
 ## Operational checks before any non-loopback deployment
 

@@ -254,6 +254,13 @@ Using keyboard and a screen reader:
   is inert, and focus returns to the exact launcher; and
 - confirm the 270-second recording and AI warnings announce once without moving the stage or
   hiding Stop.
+- At desktop, compact, tablet, mobile, and small-mobile sizes, open Campaigns, create/edit a
+  Campaign, open detail, create a Project, move it to another active Campaign, detach it to the
+  virtual No Campaign group, and archive/restore the Campaign. Confirm deep links and Back work,
+  lists remain bounded and scrollable, and no media/provider work starts.
+- At 200% text, keyboard through Campaign create/edit, move/detach, archive/restore, and guarded
+  delete overlays. Confirm initial/returned focus, inert background, visible safe errors, and that
+  deleting a nonempty Campaign offers no cascade action or claim of content-byte erasure.
 
 ## Result
 

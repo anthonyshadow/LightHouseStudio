@@ -7,6 +7,7 @@ import {
 } from './support/studioHarness';
 import { ENTRY_PATH, STUDIO_PATH } from './support/studioRoutes';
 import { installProjectHarness, TEST_PROJECT_ID } from './support/projectHarness';
+import { installCampaignHarness, TEST_CAMPAIGN_ID } from './support/campaignHarness';
 
 const loginFromEntry = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Log in' }).click();
@@ -159,6 +160,35 @@ test('Projects Quick Start, lifecycle, refresh, and explicit library exit stay i
   await page.reload();
   await expect(page).toHaveURL(/\/studio\/videos$/u);
   await expect(page.getByRole('dialog', { name: 'Saved Videos' })).toBeVisible();
+  expectNoExternalProviderTraffic(network);
+});
+
+test('Campaign creation reaches a Campaign Project without activating media or providers', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  const campaigns = await installCampaignHarness(page);
+  await page.goto('/studio/campaigns');
+
+  await expect(page).toHaveTitle('Campaigns · Lightframe Studio');
+  await expect(page.getByText('No Campaigns yet', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Studio media stage')).toBeHidden();
+  await page.getByRole('button', { name: 'Create Campaign' }).click();
+  const create = page.getByRole('dialog', { name: 'Create Campaign' });
+  await create.getByRole('textbox', { name: /Campaign name/u }).fill('Summer launch');
+  await create.getByRole('textbox', { name: /Brief/u }).fill('Keep the launch focused.');
+  await create.getByRole('button', { name: 'Create Campaign' }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/studio/campaigns/${TEST_CAMPAIGN_ID}$`, 'u'));
+  await expect(page.getByRole('heading', { name: 'Summer launch' })).toBeVisible();
+  await page.getByRole('button', { name: 'New Project' }).click();
+  await expect(page).toHaveURL(new RegExp(`/studio/projects/${TEST_PROJECT_ID}$`, 'u'));
+  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+  expect(campaigns.campaignOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
+  expect(campaigns.projectOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
+  await expect
+    .poll(async () => readBrowserState(page))
+    .toMatchObject({ cameraCalls: 0, requirementModels: [], connections: [], recorderStarts: 0 });
   expectNoExternalProviderTraffic(network);
 });
 

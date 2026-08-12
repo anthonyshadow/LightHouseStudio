@@ -84,6 +84,7 @@ export const projectStatus = pgEnum('project_status', [
   'archived',
   'deleted',
 ]);
+export const campaignStatus = pgEnum('campaign_status', ['active', 'archived', 'deleted']);
 export const projectAssetRole = pgEnum('project_asset_role', [
   'source',
   'working',
@@ -447,6 +448,69 @@ const projectRevisionIdColumn = (): AnyPgColumn => projectRevisions.id;
 const projectRevisionNumberColumn = (): AnyPgColumn => projectRevisions.revisionNumber;
 const projectIdColumn = (): AnyPgColumn => projects.id;
 const projectOwnerUserIdColumn = (): AnyPgColumn => projects.ownerUserId;
+const campaignIdColumn = (): AnyPgColumn => campaigns.id;
+const campaignOwnerUserIdColumn = (): AnyPgColumn => campaigns.ownerUserId;
+
+export const campaigns = pgTable(
+  'campaigns',
+  {
+    id: uuid('id').primaryKey(),
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    name: text('name').notNull(),
+    brief: text('brief'),
+    status: campaignStatus('status').notNull().default('active'),
+    version: integer('version').notNull().default(1),
+    archivedAt: timestamp('archived_at', { withTimezone: true, mode: 'string' }),
+    deletedAt: timestamp('deleted_at', { withTimezone: true, mode: 'string' }),
+    ...auditTimestamps,
+  },
+  (table) => [
+    unique('campaigns_id_owner_unique').on(table.id, table.ownerUserId),
+    index('campaigns_owner_active_recent_idx')
+      .on(table.ownerUserId, table.updatedAt.desc(), table.id.desc())
+      .where(sql`${table.deletedAt} is null and ${table.status} = 'active'`),
+    index('campaigns_owner_archived_recent_idx')
+      .on(table.ownerUserId, table.updatedAt.desc(), table.id.desc())
+      .where(sql`${table.deletedAt} is null and ${table.status} = 'archived'`),
+    check('campaigns_version_positive', sql`${table.version} > 0`),
+    check('campaigns_name_length', sql`length(trim(${table.name})) between 1 and 120`),
+    check('campaigns_brief_length', sql`${table.brief} is null or length(${table.brief}) <= 1000`),
+    check(
+      'campaigns_lifecycle_consistent',
+      sql`(${table.status} = 'deleted' and ${table.deletedAt} is not null and ${table.archivedAt} is not null) or (${table.status} = 'archived' and ${table.archivedAt} is not null and ${table.deletedAt} is null) or (${table.status} = 'active' and ${table.archivedAt} is null and ${table.deletedAt} is null)`,
+    ),
+  ],
+);
+
+export const campaignOperationReceipts = pgTable(
+  'campaign_operation_receipts',
+  {
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    operationKey: uuid('operation_key').notNull(),
+    operation: text('operation').notNull(),
+    requestFingerprint: text('request_fingerprint').notNull(),
+    campaignId: uuid('campaign_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ownerUserId, table.operationKey] }),
+    index('campaign_operation_receipts_campaign_idx').on(table.ownerUserId, table.campaignId),
+    check(
+      'campaign_operation_receipts_operation_supported',
+      sql`${table.operation} = 'campaign-create'`,
+    ),
+    check(
+      'campaign_operation_receipts_fingerprint_length',
+      sql`length(${table.requestFingerprint}) = 64`,
+    ),
+  ],
+);
 
 export const projects = pgTable(
   'projects',
@@ -455,6 +519,7 @@ export const projects = pgTable(
     ownerUserId: uuid('owner_user_id')
       .notNull()
       .references(() => users.id, { onDelete: 'restrict' }),
+    campaignId: uuid('campaign_id'),
     title: text('title').notNull(),
     status: projectStatus('status').notNull().default('draft'),
     version: integer('version').notNull().default(1),
@@ -480,6 +545,12 @@ export const projects = pgTable(
     index('projects_owner_archived_recent_idx')
       .on(table.ownerUserId, table.updatedAt.desc(), table.id.desc())
       .where(sql`${table.deletedAt} is null and ${table.status} = 'archived'`),
+    index('projects_owner_campaign_active_recent_idx')
+      .on(table.ownerUserId, table.campaignId, table.updatedAt.desc(), table.id.desc())
+      .where(sql`${table.deletedAt} is null and ${table.status} <> 'archived'`),
+    index('projects_owner_campaign_archived_recent_idx')
+      .on(table.ownerUserId, table.campaignId, table.updatedAt.desc(), table.id.desc())
+      .where(sql`${table.deletedAt} is null and ${table.status} = 'archived'`),
     check('projects_version_positive', sql`${table.version} > 0`),
     check(
       'projects_current_revision_consistent',
@@ -489,6 +560,11 @@ export const projects = pgTable(
       'projects_lifecycle_consistent',
       sql`(${table.status} = 'deleted' and ${table.deletedAt} is not null and ${table.archivedAt} is not null) or (${table.status} = 'archived' and ${table.archivedAt} is not null and ${table.deletedAt} is null) or (${table.status} not in ('archived', 'deleted') and ${table.archivedAt} is null and ${table.deletedAt} is null)`,
     ),
+    foreignKey({
+      name: 'projects_campaign_same_owner_fk',
+      columns: [table.campaignId, table.ownerUserId],
+      foreignColumns: [campaignIdColumn(), campaignOwnerUserIdColumn()],
+    }).onDelete('restrict'),
     foreignKey({
       name: 'projects_current_revision_same_project_fk',
       columns: [table.id, table.ownerUserId, table.currentRevisionId, table.currentRevisionNumber],
@@ -859,6 +935,8 @@ export const databaseSchema = {
   creativeLibraries,
   referenceImageAssets,
   processingJobs,
+  campaigns,
+  campaignOperationReceipts,
   projects,
   projectOperationReceipts,
   projectRevisions,

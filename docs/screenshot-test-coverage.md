@@ -54,7 +54,7 @@ local-live/recording state/viewport pair.
 | Desktop               | `07-existing-video/result.png`                       |
 | Desktop               | `08-video-editor/lighting-dirty.png`                 |
 | Small mobile          | `08-video-editor/crop-dirty.png`                     |
-| Desktop               | `09-projects/workspace.png`                          |
+| Desktop               | `10-campaigns/workspace.png`                         |
 | Small mobile          | `09-projects/empty-detail.png`                       |
 | Desktop               | `05-virtual-try-on/prepared-with-reference.png`      |
 | Desktop               | `06-voice/voice-browser-loaded.png`                  |
@@ -63,8 +63,8 @@ local-live/recording state/viewport pair.
 
 The matrix intentionally emphasizes the record/upload first impression, neutral Local Camera
 startup, provider-free live capture, dominant recording Stop, the densest Builder/review states,
-deterministic dirty Lighting/Crop editor layouts, the active/archived Projects workspace, the empty
-Project detail boundary, and representative loading/error states. The Projects cases raise the
+deterministic dirty Lighting/Crop editor layouts, the active/archived Campaigns workspace, the empty
+Project detail boundary, and representative loading/error states. These organization cases keep the
 review budget from 29 to 31 because durable lifecycle and source-truthfulness are new protected
 composition contracts.
 

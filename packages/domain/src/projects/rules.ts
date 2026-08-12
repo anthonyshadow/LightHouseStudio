@@ -227,6 +227,7 @@ export interface CreateProjectInput {
   readonly id: string;
   readonly ownerUserId: string;
   readonly title: string;
+  readonly campaignId?: string | null;
   readonly snapshot?: ProjectSnapshot;
   readonly author: ProjectRevisionAuthor;
   readonly facts: ProjectStatusFacts;
@@ -254,6 +255,10 @@ export const createProject = (
   const project: Project = {
     id: projectId,
     ownerUserId,
+    campaignId:
+      input.campaignId === null || input.campaignId === undefined
+        ? null
+        : requireId(input.campaignId, 'Campaign'),
     title: normalizeProjectTitle(input.title),
     status: deriveProjectStatus(snapshot, input.facts),
     version: 1,
@@ -283,6 +288,30 @@ export const createProject = (
     versionReferenceLinks: [],
     jobLinks: [],
     outputLinks: [],
+  };
+};
+
+export const moveProjectToCampaign = (
+  project: Project,
+  campaignId: string | null,
+  expectedVersion: number,
+  nowValue: string,
+): ProjectMutationResult<Project> => {
+  if (project.version !== expectedVersion) return projectVersionConflict(project, expectedVersion);
+  if (project.deletedAt !== null) {
+    throw new ProjectRuleError(
+      'invalid-transition',
+      'A deleted Project cannot change Campaign membership.',
+    );
+  }
+  return {
+    ok: true,
+    value: {
+      ...project,
+      campaignId: campaignId === null ? null : requireId(campaignId, 'Campaign'),
+      version: project.version + 1,
+      updatedAt: requireTimestamp(nowValue),
+    },
   };
 };
 

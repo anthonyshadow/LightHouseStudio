@@ -1,5 +1,6 @@
 export * from './assets';
 export * from './accounts';
+export * from './campaigns';
 export * from './saved-videos';
 export * from './media-assets';
 export * from './processing-jobs';

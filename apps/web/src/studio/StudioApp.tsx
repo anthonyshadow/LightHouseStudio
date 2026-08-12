@@ -18,7 +18,7 @@ import { savedVideoContentUrl } from '../adapters/api-client/savedVideosApi';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import { useAuth } from '../application/auth/AuthProvider';
 import { RemoteStateProvider } from '../application/remote-state/RemoteStateProvider';
-import { APP_PATHS, isProjectsPath, projectIdFromPath } from '../app/paths';
+import { APP_PATHS, isCampaignsPath, isProjectsPath, projectIdFromPath } from '../app/paths';
 import type { PromptCommittedHandler } from '../application/types';
 import type {
   CharacterSaveProgress,
@@ -163,6 +163,11 @@ const ProjectRouteSurface = lazy(() =>
     default: module.ProjectRouteSurface,
   })),
 );
+const CampaignRouteSurface = lazy(() =>
+  import('../features/campaigns/CampaignRouteSurface').then((module) => ({
+    default: module.CampaignRouteSurface,
+  })),
+);
 
 const deferredPanelFallback = <p role="status">Loading studio tool…</p>;
 
@@ -237,6 +242,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const navigate = useNavigate();
   const location = useLocation();
   const projectRouteActive = isProjectsPath(location.pathname);
+  const campaignRouteActive = isCampaignsPath(location.pathname);
+  const organizationRouteActive = projectRouteActive || campaignRouteActive;
   const projectContextActive = projectIdFromPath(location.pathname) !== null;
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
@@ -1543,10 +1550,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             capabilityState={capabilityState}
             user={auth.session!.user}
             accountBusy={logoutBusy}
-            activeDestination={projectRouteActive ? 'projects' : 'studio'}
+            activeDestination={
+              campaignRouteActive ? 'campaigns' : projectRouteActive ? 'projects' : 'studio'
+            }
             projectContextActive={projectContextActive}
             onOpenStudio={() => void navigate(APP_PATHS.studio)}
             onOpenProjects={() => void navigate(APP_PATHS.projects)}
+            onOpenCampaigns={() => void navigate(APP_PATHS.campaigns)}
             onOpenVideos={() => void navigate(APP_PATHS.videos)}
             onOpenCharacters={() => void navigate(APP_PATHS.characters)}
             onOpenOutfits={() => void navigate(APP_PATHS.outfits)}
@@ -1557,7 +1567,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         <main ref={mainRef} id="studio-main" tabIndex={-1} css={mainGridStyles()}>
           <div
             ref={fullscreenWorkspaceRef}
-            hidden={projectRouteActive}
+            hidden={organizationRouteActive}
             css={stageColumnStyles(theme)}
             data-video-edit-active={videoEditing ? 'true' : 'false'}
           >
@@ -1701,6 +1711,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           {projectRouteActive ? (
             <Suspense fallback={<p role="status">Loading Projects workspace…</p>}>
               <ProjectRouteSurface />
+            </Suspense>
+          ) : null}
+          {campaignRouteActive ? (
+            <Suspense fallback={<p role="status">Loading Campaigns workspace…</p>}>
+              <CampaignRouteSurface />
             </Suspense>
           ) : null}
         </main>

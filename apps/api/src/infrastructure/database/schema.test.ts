@@ -3,6 +3,9 @@ import { getTableConfig, type AnyPgTable } from 'drizzle-orm/pg-core';
 import {
   assetStatus,
   assetStorageProvider,
+  campaignOperationReceipts,
+  campaigns,
+  campaignStatus,
   creativeAssets,
   creativeLibraries,
   directUploads,
@@ -55,6 +58,8 @@ describe('Drizzle persistence schema', () => {
       creativeLibraries,
       referenceImageAssets,
       processingJobs,
+      campaigns,
+      campaignOperationReceipts,
       projects,
       projectRevisions,
       projectAssets,
@@ -97,7 +102,16 @@ describe('Drizzle persistence schema', () => {
       ]),
     );
     expect(getTableConfig(projects).foreignKeys.map((foreignKey) => foreignKey.getName())).toEqual(
-      expect.arrayContaining(['projects_current_revision_same_project_fk']),
+      expect.arrayContaining([
+        'projects_campaign_same_owner_fk',
+        'projects_current_revision_same_project_fk',
+      ]),
+    );
+    expect(getTableConfig(projects).indexes.map(({ config }) => config.name)).toEqual(
+      expect.arrayContaining([
+        'projects_owner_campaign_active_recent_idx',
+        'projects_owner_campaign_archived_recent_idx',
+      ]),
     );
     expect(
       [projectAssets, projectJobs, projectOutputs].every(
@@ -142,6 +156,7 @@ describe('Drizzle persistence schema', () => {
       'archived',
       'deleted',
     ]);
+    expect(campaignStatus.enumValues).toEqual(['active', 'archived', 'deleted']);
     expect(projectAssetRole.enumValues).toEqual([
       'source',
       'working',

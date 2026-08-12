@@ -1,14 +1,15 @@
 import { createEmptyProjectSnapshot, createProject, type ProjectAssetLink } from '@studio/domain';
 import { describe, expect, it } from 'vitest';
-import type { LightframeDatabase } from './client.js';
 import {
   DrizzleProjectRepository,
   mapProjectAggregate,
   ProjectPersistenceError,
 } from './project-repository.js';
+import { scriptedDatabase } from './scripted-database.test-support.js';
 import { projectAssets, projectOperationReceipts, projectRevisions, projects } from './schema.js';
 
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
+const campaignId = '20ce94fa-15d1-42c6-abd3-77ff61516b48';
 const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
 const revisionId = '3ac244b9-ec36-4a1e-b95e-7bcf37eb0b2d';
 const secondRevisionId = '4159225b-60f4-4f94-a3d5-08feee91a91d';
@@ -20,53 +21,6 @@ const secondVideoId = '4a3e43b7-c237-4f07-9ff7-eb5ab6a14d12';
 const secondVersionId = 'cc6b6098-c83b-42cd-b435-d3542e584f9c';
 const now = '2026-08-11T12:00:00.000Z';
 const postgresNow = '2026-08-11 12:00:00+00';
-
-const scriptedDatabase = (...script: readonly unknown[]) => {
-  const remaining = [...script];
-  const calls: { operation: string; arguments: readonly unknown[] }[] = [];
-  const query = (): object => {
-    const target = {
-      then: (fulfilled?: (value: unknown) => unknown, rejected?: (reason: unknown) => unknown) => {
-        if (remaining.length === 0) return Promise.reject(new Error('Database script exhausted.'));
-        const value = remaining.shift();
-        return (value instanceof Error ? Promise.reject(value) : Promise.resolve(value)).then(
-          fulfilled,
-          rejected,
-        );
-      },
-    };
-    const proxy: object = new Proxy(target, {
-      get(current, property, receiver) {
-        if (property === 'then') return current.then.bind(receiver);
-        return (...arguments_: readonly unknown[]) => {
-          calls.push({ operation: String(property), arguments: arguments_ });
-          return proxy;
-        };
-      },
-    });
-    return proxy;
-  };
-  const database: object = new Proxy(
-    {},
-    {
-      get(_target, property) {
-        if (property === 'transaction') {
-          return (callback: (tx: LightframeDatabase) => unknown) =>
-            callback(database as LightframeDatabase);
-        }
-        return (...arguments_: readonly unknown[]) => {
-          calls.push({ operation: String(property), arguments: arguments_ });
-          return query();
-        };
-      },
-    },
-  );
-  return {
-    db: database as LightframeDatabase,
-    calls,
-    remaining: () => remaining.length,
-  };
-};
 
 const sourceAggregate = () => {
   const snapshot = {
@@ -207,6 +161,7 @@ describe('Project persistence mapping and transactions', () => {
         id: projectId,
         ownerUserId,
         title: 'Idempotent empty Project',
+        campaignId,
         author: { kind: 'user', authorId: ownerUserId },
         facts: {
           sourceStatus: 'none',
@@ -222,7 +177,13 @@ describe('Project persistence mapping and transactions', () => {
       projectId,
       createdAt: now,
     };
-    const createdDatabase = scriptedDatabase([{ operationKey: receipt.operationKey }], [], [], []);
+    const createdDatabase = scriptedDatabase(
+      [{ operationKey: receipt.operationKey }],
+      [{ id: campaignId }],
+      [],
+      [],
+      [],
+    );
     const repository = new DrizzleProjectRepository(createdDatabase.db);
     await expect(repository.createIdempotent({ aggregate, receipt })).resolves.toMatchObject({
       kind: 'created',
@@ -233,6 +194,7 @@ describe('Project persistence mapping and transactions', () => {
         .filter(({ operation }) => operation === 'insert')
         .map(({ arguments: [table] }) => table),
     ).toEqual([projectOperationReceipts, projects, projectRevisions]);
+    expect(createdDatabase.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
     expect(createdDatabase.remaining()).toBe(0);
 
     const replayDatabase = scriptedDatabase(

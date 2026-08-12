@@ -50,6 +50,9 @@ LIGHTFRAME_RUN_PROJECT_POSTGRES_TEST=true node --env-file=.env.development \
   apps/api/src/infrastructure/database/project-repository.postgres.integration.test.ts
 ```
 
+Campaign migration/repository integration cases use the same isolated database gate and run with
+the Project case when `LIGHTFRAME_RUN_PROJECT_POSTGRES_TEST=true`; ordinary tests never contact Neon.
+
 `test:unit` and `test:integration` are useful focused subsets; `bun run test` runs both categories
 once through a single Node-backed Vitest invocation. Bun owns package installation and the API
 runtime, but `bun test` is a different runner and is not an alias for this retained suite. Selected
@@ -100,6 +103,10 @@ The retained suite protects:
   owner, bounded Project controller pagination, replay-safe Quick Start, open/refresh, lifecycle
   cache invalidation, stale-rename preservation, focus/announcements, explicit library exit, and no
   empty-Project media/provider start;
+- Campaign domain/contract parity, v1→v2 local migration, restart-safe receipts, owner/CAS and
+  active-membership rules, relational same-owner/restrict constraints, authenticated routes,
+  create/detail/New Project, move/detach, virtual No Campaign filtering, non-cascading lifecycle,
+  blocked nonempty tombstone, and archived-empty tombstone;
 - app-owned saved-voice membership, first-read claim, owner-checked preview/conversion, and proof
   that relationship removal never calls provider voice deletion;
 - loopback Host/Origin, explicit provider intent, bounded response/stream handling, SSRF-resistant
@@ -126,7 +133,7 @@ every desktop journey under every engine by default.
 The current visual matrix contains 31 cases within the 31-case review budget. It retains Local live
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,
 Shelf, playback, existing-video setup at all five viewports, processing/result, VTO, Voice,
-finalizing, permission-error, desktop Projects workspace, and small-mobile empty-Project detail
+finalizing, permission-error, desktop Campaigns workspace, and small-mobile empty-Project detail
 compositions. Visual
 tests are not part of `bun run test`, `bun run quality`, or ordinary push/pull-request CI.
 

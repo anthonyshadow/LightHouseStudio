@@ -4,6 +4,7 @@ import type { CapabilitiesResponse } from '@studio/contracts';
 import { TEST_AUTH_SESSION } from './support/authFixture';
 import { STUDIO_VIEWPORT_SIZES } from './support/studioViewports';
 import { openCharacterOptions, openRecipeDockWhenOverlaid } from './support/studioHarness';
+import { installCampaignHarness } from './support/campaignHarness';
 
 type MockStudioState = {
   apiRequests: string[];
@@ -344,6 +345,32 @@ test('small-mobile Builder steps survive 200% text and keep one preview', async 
   expect(new Set(network.apiRequests)).toEqual(
     new Set(['/api/capabilities', '/api/creative-library']),
   );
+  expect(network.blockedExternalRequests).toEqual([]);
+  expect(network.blockedExternalWebSockets).toEqual([]);
+});
+
+test('mobile Campaign organization remains keyboard-accessible at 200% text', async ({ page }) => {
+  const network = await installProviderFreeStudio(page);
+  await installCampaignHarness(page, true);
+  await page.setViewportSize(STUDIO_VIEWPORT_SIZES.mobilePortrait);
+  await page.goto('/studio/campaigns');
+  await page.evaluate(() => {
+    document.documentElement.style.fontSize = '200%';
+  });
+
+  await expect(page.getByRole('heading', { name: 'Campaigns', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Summer launch' })).toBeVisible();
+  await expectNoDocumentOverflow(page);
+  const createTrigger = page.getByRole('button', { name: 'Create Campaign' });
+  await createTrigger.focus();
+  await page.keyboard.press('Enter');
+  const dialog = page.getByRole('dialog', { name: 'Create Campaign' });
+  await expect(dialog.getByRole('heading', { name: 'Create Campaign' })).toBeFocused();
+  await expectNoDocumentOverflow(page);
+  await expectNoAxeViolations(page);
+  await page.keyboard.press('Escape');
+  await expect(createTrigger).toBeFocused();
+  expect(await cameraCalls(page)).toBe(0);
   expect(network.blockedExternalRequests).toEqual([]);
   expect(network.blockedExternalWebSockets).toEqual([]);
 });

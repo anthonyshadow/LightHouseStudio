@@ -38,6 +38,7 @@ const headerProps = {
   activeDestination: 'studio' as const,
   onOpenStudio: vi.fn(),
   onOpenProjects: vi.fn(),
+  onOpenCampaigns: vi.fn(),
   onOpenVideos: vi.fn(),
   onOpenCharacters: vi.fn(),
   onOpenOutfits: vi.fn(),
@@ -63,7 +64,7 @@ afterEach(() => {
 });
 
 describe('StudioHeader', () => {
-  it('exposes Studio and Projects as the one primary navigation', async () => {
+  it('exposes Studio, Campaigns, and Projects as the one primary navigation', async () => {
     const user = userEvent.setup();
     renderHeader();
     const navigation = screen.getByRole('navigation', { name: 'Primary' });
@@ -74,6 +75,8 @@ describe('StudioHeader', () => {
     );
     await user.click(within(navigation).getByRole('button', { name: 'Projects' }));
     expect(headerProps.onOpenProjects).toHaveBeenCalledOnce();
+    await user.click(within(navigation).getByRole('button', { name: 'Campaigns' }));
+    expect(headerProps.onOpenCampaigns).toHaveBeenCalledOnce();
   });
 
   it('keeps status before the far-right account control and omits Select AI', () => {

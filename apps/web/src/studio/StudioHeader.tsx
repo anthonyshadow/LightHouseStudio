@@ -24,10 +24,11 @@ type StudioHeaderProps = {
   capabilityState: CapabilityState;
   user: AuthenticatedUser;
   accountBusy?: boolean;
-  activeDestination: 'studio' | 'projects';
+  activeDestination: 'studio' | 'campaigns' | 'projects';
   projectContextActive?: boolean;
   onOpenStudio: () => void;
   onOpenProjects: () => void;
+  onOpenCampaigns: () => void;
   onOpenVideos: () => void;
   onOpenCharacters: () => void;
   onOpenOutfits: () => void;
@@ -145,6 +146,7 @@ export const StudioHeader = ({
   projectContextActive = false,
   onOpenStudio,
   onOpenProjects,
+  onOpenCampaigns,
   onOpenVideos,
   onOpenCharacters,
   onOpenOutfits,
@@ -197,6 +199,14 @@ export const StudioHeader = ({
           onClick={onOpenProjects}
         >
           Projects
+        </Button>
+        <Button
+          size="small"
+          variant="quiet"
+          aria-current={activeDestination === 'campaigns' ? 'page' : undefined}
+          onClick={onOpenCampaigns}
+        >
+          Campaigns
         </Button>
       </nav>
       <div css={headerActionsStyles(theme)}>
