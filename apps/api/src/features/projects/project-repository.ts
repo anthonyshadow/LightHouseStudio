@@ -19,6 +19,20 @@ export type ProjectPersistenceMutationResult =
   | { readonly kind: 'not-found' }
   | { readonly kind: 'conflict'; readonly conflict: ProjectConflict };
 
+export interface ProjectCreateReceipt {
+  readonly operationKey: string;
+  readonly requestFingerprint: string;
+  readonly projectId: string;
+  readonly createdAt: string;
+}
+
+export type ProjectCreatePersistenceResult =
+  | { readonly kind: 'created' | 'replayed'; readonly current: ProjectCurrentRead }
+  | {
+      readonly kind: 'conflict';
+      readonly conflict: Extract<ProjectConflict, { readonly kind: 'operation-key' }>;
+    };
+
 export interface AppendProjectRevisionPersistenceInput {
   readonly ownerUserId: string;
   readonly projectId: string;
@@ -37,6 +51,22 @@ export interface ProjectCurrentRead {
 export interface ProjectRevisionHistoryPage {
   readonly revisions: readonly ProjectRevision[];
   readonly nextRevisionNumber: number | null;
+}
+
+export interface ProjectSummaryCursor {
+  readonly updatedAt: string;
+  readonly projectId: string;
+}
+
+export interface ProjectSummaryPageInput {
+  readonly lifecycle: 'active' | 'archived';
+  readonly cursor?: ProjectSummaryCursor;
+  readonly pageSize: number;
+}
+
+export interface ProjectSummaryPage {
+  readonly projects: readonly Project[];
+  readonly nextCursor: ProjectSummaryCursor | null;
 }
 
 export type ProjectLinkHistoryKind = 'asset' | 'version-reference' | 'job' | 'output';
@@ -91,7 +121,12 @@ export interface ProjectRetentionPolicy {
 
 export interface ProjectRepository {
   create(aggregate: ProjectAggregate): Promise<void>;
+  createIdempotent(input: {
+    readonly aggregate: ProjectAggregate;
+    readonly receipt: ProjectCreateReceipt;
+  }): Promise<ProjectCreatePersistenceResult>;
   getCurrent(ownerUserId: string, projectId: string): Promise<ProjectCurrentRead | null>;
+  list(ownerUserId: string, input: ProjectSummaryPageInput): Promise<ProjectSummaryPage>;
   listRevisionHistory(
     ownerUserId: string,
     projectId: string,

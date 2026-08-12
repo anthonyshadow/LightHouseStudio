@@ -60,8 +60,13 @@ foundation must not add Project routes, Project UI, public tenancy, or automatic
   remain attributable to that revision, but future orchestration must not promote it into the
   current snapshot unless the Project/revision CAS still matches. Initial paid submission remains
   explicit and is never automatically repeated.
-- The Drizzle Project repository is composed only in authoritative `postgres`/`neon` persistence.
-  There are deliberately no Project HTTP routes or browser UI in this decision.
+- The Drizzle Project repository is authoritative only in `postgres`/`neon`. A versioned,
+  owner-namespaced local Project repository is authoritative in `local` and `shadow`; its atomic
+  backup, owner lock, prepared create journal, and receipt reconcile interrupted creates without
+  making the shadow database authoritative.
+- Authenticated lifecycle routes expose bounded list, idempotent empty create, current read, rename,
+  archive, and restore. They derive owner from the verified session, use Project-version CAS, and
+  return finite typed conflicts. There is deliberately no browser Project route or UI yet.
 - Normal reads return only the Project and current revision. Revision and relation history have
   bounded cursor-based repository reads. A common owner-scoped Project retention policy protects
   direct assets and Version/output assets in Saved Video, reference-image, and generic byte cleanup
@@ -78,7 +83,9 @@ pointers, and producer uniqueness before changing constraints. It reconstructs o
 snapshot-declared direct references; it does not create Projects, jobs, Saved Videos, or inferred
 roles/provenance.
 
-Snapshot evolution now requires explicit version parsing and migration. Project mutations must use
+Additive migration `0012` adds relational Project-create receipts keyed by owner and operation UUID;
+the local receipt is stored inside the versioned Project metadata/journal envelope. Snapshot
+evolution still requires explicit version parsing and migration. Project mutations must use
 the repository transaction/CAS boundary, and media cleanup must treat Project links as retained
 relationships. Application rollback across `0010` is not schema-compatible because key shapes and
 initiating/producing column names changed. Restore the pre-migration database or deploy compatible

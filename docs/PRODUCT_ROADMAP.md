@@ -34,17 +34,20 @@ to that capability.
 - Use local persistence by default, with configuration-gated PostgreSQL/Neon and private R2
   infrastructure.
 
-This phase does not include Campaigns, user-facing Projects, collaboration, multi-format output, or
-publishing.
+This phase does not include Campaigns, a browser Projects workspace, collaboration, multi-format
+output, or publishing. Empty Project lifecycle authority and APIs are implemented as Phase 2
+infrastructure but are not yet a user-facing browser capability.
 
 ## Foundation already present — Durable Project model
 
-**Status: implemented technical foundation; not a user-facing capability.**
+**Status: implemented technical authority and lifecycle API; not a user-facing browser capability.**
 
-The domain, HTTP schemas, database schema, and authoritative relational repository define a
+The domain, HTTP schemas, database schema, local/shadow file authority, and authoritative
+relational repository define a
 video-oriented `Project` aggregate with immutable revisions and links to source/working media,
-processing jobs, and Saved Video outputs. No Project routes or browser UI use it, and existing
-Saved Videos are not assigned to Projects.
+processing jobs, and Saved Video outputs. Authenticated APIs support empty create, bounded list,
+current read, rename, archive, and restore; no browser UI uses them, and existing Saved Videos are
+not assigned to Projects.
 
 This foundation should be evolved, not advertised as a finished Project experience. It represents
 a focused production effort, not a Campaign. Before Project writes become user-facing, the known
@@ -65,7 +68,7 @@ owns the detailed sequence and launch evidence.
 
 ## Phase 2 — Campaign and Project video workspace MVP
 
-**Status: planned direction.**
+**Status: in progress; invariant correction and lifecycle authority/API are implemented.**
 
 - Correct the dormant Project foundation's revision and media-reference lineage, transaction/replay,
   retention, status, read-bounding, and cleanup invariants before exposing writes.

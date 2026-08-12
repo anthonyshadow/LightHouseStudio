@@ -231,6 +231,10 @@ export interface ProjectStatusFacts {
 
 export type ProjectConflict =
   | {
+      readonly kind: 'operation-key';
+      readonly operation: 'create';
+    }
+  | {
       readonly kind: 'project-version';
       readonly projectId: string;
       readonly expectedVersion: number;

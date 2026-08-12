@@ -474,6 +474,12 @@ export const projects = pgTable(
     ),
     index('projects_owner_title_idx').on(table.ownerUserId, table.title),
     index('projects_owner_lifecycle_idx').on(table.ownerUserId, table.archivedAt, table.deletedAt),
+    index('projects_owner_active_recent_idx')
+      .on(table.ownerUserId, table.updatedAt.desc(), table.id.desc())
+      .where(sql`${table.deletedAt} is null and ${table.status} <> 'archived'`),
+    index('projects_owner_archived_recent_idx')
+      .on(table.ownerUserId, table.updatedAt.desc(), table.id.desc())
+      .where(sql`${table.deletedAt} is null and ${table.status} = 'archived'`),
     check('projects_version_positive', sql`${table.version} > 0`),
     check(
       'projects_current_revision_consistent',
@@ -493,6 +499,31 @@ export const projects = pgTable(
         projectRevisionNumberColumn(),
       ],
     }).onDelete('restrict'),
+  ],
+);
+
+export const projectOperationReceipts = pgTable(
+  'project_operation_receipts',
+  {
+    ownerUserId: uuid('owner_user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'restrict' }),
+    operationKey: uuid('operation_key').notNull(),
+    operation: text('operation').notNull(),
+    requestFingerprint: text('request_fingerprint').notNull(),
+    projectId: uuid('project_id').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.ownerUserId, table.operationKey] }),
+    index('project_operation_receipts_project_idx').on(table.ownerUserId, table.projectId),
+    check('project_operation_receipts_operation_supported', sql`${table.operation} = 'create'`),
+    check(
+      'project_operation_receipts_fingerprint_length',
+      sql`length(${table.requestFingerprint}) = 64`,
+    ),
   ],
 );
 
@@ -829,6 +860,7 @@ export const databaseSchema = {
   referenceImageAssets,
   processingJobs,
   projects,
+  projectOperationReceipts,
   projectRevisions,
   projectAssets,
   projectVersionReferences,
