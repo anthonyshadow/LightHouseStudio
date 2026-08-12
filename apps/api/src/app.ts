@@ -55,6 +55,9 @@ import type {
 import { FileProjectRepository } from './features/projects/file-project-repository.js';
 import { ProjectService } from './features/projects/project-service.js';
 import { registerProjectRoutes } from './features/projects/routes.js';
+import type { CampaignRepository } from './features/campaigns/campaign-repository.js';
+import { CampaignService } from './features/campaigns/campaign-service.js';
+import { registerCampaignRoutes } from './features/campaigns/routes.js';
 import type { R2AssetByteStore } from './storage/r2-asset-byte-store.js';
 import {
   type DurableProcessingJobRepository,
@@ -101,6 +104,7 @@ export interface AppPersistenceDependencies {
   readonly processingJobTraces?: ProcessingJobTraceWriter;
   readonly processingJobs?: DurableProcessingJobRepository;
   readonly projects?: ProjectRepository;
+  readonly campaigns?: CampaignRepository;
   readonly projectOutputMetadata?: ProjectOutputMetadataUnitOfWork;
   readonly projectRetention?: ProjectRetentionPolicy;
   readonly creativeLibraries?: CreativeLibraryRepository;
@@ -306,6 +310,11 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     (projectRepository instanceof FileProjectRepository ? projectRepository : undefined);
   const projectService =
     projectRepository === undefined ? undefined : new ProjectService(projectRepository);
+  const campaignRepository =
+    dependencies.persistence?.campaigns ??
+    (projectRepository instanceof FileProjectRepository ? projectRepository : undefined);
+  const campaignService =
+    campaignRepository === undefined ? undefined : new CampaignService(campaignRepository);
   const savedVideoService = new SavedVideoService(
     savedVideoRepository,
     dependencies.persistence?.assetBytes ??
@@ -350,6 +359,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   registerVideoJobRoutes(app, videoJobService);
   registerSavedVideoRoutes(app, savedVideoService, directSavedVideoUploadService);
   registerProjectRoutes(app, projectService);
+  registerCampaignRoutes(app, campaignService);
   registerCreativeLibraryRoutes(
     app,
     dependencies.persistence?.creativeLibraries,

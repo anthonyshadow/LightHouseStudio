@@ -13,6 +13,7 @@ import { DrizzleCreativeLibraryRepository } from './database/creative-library-re
 import { DrizzleDirectUploadRepository } from './database/direct-upload-repository.js';
 import { DrizzleProcessingJobTraceWriter } from './database/processing-job-repository.js';
 import { DrizzleProjectRepository } from './database/project-repository.js';
+import { DrizzleCampaignRepository } from './database/campaign-repository.js';
 import { DrizzleProjectRetentionPolicy } from './database/project-retention-policy.js';
 import { DrizzleReferenceImageAssetStore } from './database/reference-image-asset-store.js';
 import { DrizzleSavedVideoRepository } from './database/saved-video-repository.js';
@@ -20,11 +21,15 @@ import { DrizzleSavedVoiceRepository } from './database/saved-voice-repository.j
 
 const createLocalMetadataPersistence = (
   dataDirectory: string,
-): Pick<AppPersistenceDependencies, 'savedVideos' | 'projects' | 'projectRetention'> => {
+): Pick<
+  AppPersistenceDependencies,
+  'savedVideos' | 'projects' | 'campaigns' | 'projectRetention'
+> => {
   const projects = new FileProjectRepository(dataDirectory);
   return {
     savedVideos: new FileSavedVideoRepository(dataDirectory),
     projects,
+    campaigns: projects,
     projectRetention: projects,
   };
 };
@@ -114,6 +119,7 @@ export const createConfiguredPersistence = async (
       processingJobTraces,
       processingJobs: processingJobTraces,
       projects: new DrizzleProjectRepository(connection.db),
+      campaigns: new DrizzleCampaignRepository(connection.db),
       projectRetention,
       creativeLibraries: new DrizzleCreativeLibraryRepository(
         connection.db,

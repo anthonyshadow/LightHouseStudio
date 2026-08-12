@@ -1,7 +1,7 @@
 # Lightframe Studio Campaign and Project MVP definition
 
-**Status:** proposed planning target for review; capabilities remain unimplemented until the linked
-sequence is approved and completed
+**Status:** active MVP product target; objective criteria 1–4 organization/lifecycle foundations
+are implemented, while source/resume and later criteria remain sequenced work
 
 **Defined:** 2026-08-11
 

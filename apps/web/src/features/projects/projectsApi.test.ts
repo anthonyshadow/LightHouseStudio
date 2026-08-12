@@ -22,6 +22,7 @@ const currentProject = (overrides: Partial<ProjectCurrentResponse['project']> = 
   ({
     project: {
       id: projectId,
+      campaignId: null,
       title: 'Launch cut',
       status: 'draft',
       version: 1,
@@ -107,7 +108,10 @@ describe('Projects API adapter', () => {
       currentProject(),
     );
     expect(observed.requests[0]!.headers.get('idempotency-key')).toBe(operationKey);
-    expect(await observed.requests[0]!.json()).toEqual({ title: 'Untitled Project' });
+    expect(await observed.requests[0]!.json()).toEqual({
+      title: 'Untitled Project',
+      campaignId: null,
+    });
   });
 
   it('maps get, rename, archive, and restore through strict current-state responses', async () => {

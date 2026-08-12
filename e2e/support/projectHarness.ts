@@ -8,6 +8,7 @@ const PROJECT_TIMESTAMP = '2030-01-01T00:00:00.000Z';
 export const emptyProjectFixture = (): ProjectCurrentResponse => ({
   project: {
     id: TEST_PROJECT_ID,
+    campaignId: null,
     title: 'Untitled Project',
     status: 'draft',
     version: 1,

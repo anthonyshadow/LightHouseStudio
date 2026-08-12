@@ -13,11 +13,11 @@ video. Its primary loop is:
 Live character transformation and Workshop remain advanced tools. The app binds to loopback. Phase
 1 provides one seeded local demo account, authenticated ownership, and durable local saved-media
 records; it does not provide signup, billing, collaboration, or public multi-user deployment. A
-durable, video-oriented Project authority, authenticated lifecycle API, and Projects workspace now
-support listing, Quick Start, open, rename, archive, and restore for empty Projects in every
-persistence mode. Projects do not yet accept or resume media, and Campaigns and multi-format
-content creation remain future product directions. The app is not approved for LAN, tunnel, proxy,
-or public exposure.
+durable, video-oriented Project authority and lightweight optional Campaigns now support bounded
+lists, Quick Start/New Project, open, edit/rename, move/detach, archive, restore, and guarded
+Campaign deletion in every persistence mode. Projects do not yet accept or resume media, and rich
+Campaign planning and multi-format content creation remain future product directions. The app is
+not approved for LAN, tunnel, proxy, or public exposure.
 
 ## Status
 
@@ -73,11 +73,15 @@ Neither document changes the current loopback, account, provider, privacy, or de
    Dock and recorded through the existing live flow.
 
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio`,
-`/studio/projects`, `/studio/projects/:projectId`, `/studio/videos`, `/studio/characters`, and
-`/studio/outfits` share one persistent `StudioApp` and one stage. Projects provides bounded active
-and archived lists plus empty-Project lifecycle controls; its full workspace hides the existing
-stage without creating another shell, player, media session, provider action, or browser Project
-store. **Quick Start** creates `Untitled Project`; an open empty Project is durable and
+`/studio/campaigns`, `/studio/campaigns/:campaignId`, `/studio/projects`,
+`/studio/projects/:projectId`, `/studio/videos`, `/studio/characters`, and `/studio/outfits` share
+one persistent `StudioApp` and one stage. Campaigns and Projects provide bounded active/archived
+lists plus lifecycle and optional membership controls; these full workspaces hide the existing
+stage without creating another shell, player, media session, provider action, or browser authority
+store. **Quick Start** creates a standalone `Untitled Project`; **New Project** creates one inside
+an active Campaign. **No Campaign** is a virtual Project group, never a default database row.
+Campaign archive is non-cascading and Campaign deletion requires archive plus zero attached
+Projects. An open empty Project is durable and
 deep-linkable but truthfully has no resumable source yet. The full-screen library surfaces likewise
 never create another media session. The gallery
 loads metadata and lazy thumbnails first, then fetches video bytes only for an explicit Preview,
@@ -299,6 +303,8 @@ migrates the pre-separation browser keys.
 | `bun run db:migrate:development`                                                            | Apply reviewed migrations to local development PostgreSQL              |
 | `bun run db:migrate:production`                                                             | Explicitly apply reviewed migrations to production Neon; never CI-run  |
 | `bun run db:smoke:development`                                                              | Verify local connection, transaction, seed, and cleanup                |
+| `bun run r2:cors:development:set`                                                           | Apply the exact development direct-upload CORS policy                  |
+| `bun run r2:cors:development:check`                                                         | Read back the development R2 bucket CORS policy                        |
 | `bun run auth:hash-password`                                                                | Interactively generate an Argon2id demo password hash                  |
 | `bun run build`                                                                             | Build all workspaces                                                   |
 | `bun run quality`                                                                           | Type, Storybook, lint, format, dead-code, module, unit, and build gate |

@@ -143,6 +143,7 @@ describe('Project snapshot contract', () => {
   it('keeps lifecycle HTTP contracts strict, owner-free, and typed for conflicts', () => {
     expect(createProjectRequestSchema.parse({ title: 'Empty Project' })).toEqual({
       title: 'Empty Project',
+      campaignId: null,
     });
     expect(
       createProjectRequestSchema.safeParse({ title: 'Empty Project', ownerUserId: assetId })

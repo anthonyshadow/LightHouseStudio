@@ -241,6 +241,7 @@ export const projectSnapshotSchema = z
 export const projectSchema = z
   .object({
     id: projectIdSchema,
+    campaignId: z.uuid().nullable(),
     title: projectTitleSchema,
     status: projectStatusSchema,
     version: z.number().int().positive(),
@@ -340,6 +341,7 @@ export const projectConflictSchema = z.discriminatedUnion('kind', [
     })
     .strict(),
   z.object({ kind: z.literal('active-jobs'), projectId: projectIdSchema }).strict(),
+  z.object({ kind: z.literal('campaign-membership'), projectId: projectIdSchema }).strict(),
   z
     .object({
       kind: z.literal('revision'),
@@ -350,17 +352,23 @@ export const projectConflictSchema = z.discriminatedUnion('kind', [
     .strict(),
 ]);
 
-export const createProjectRequestSchema = z.object({ title: projectTitleSchema }).strict();
+export const createProjectRequestSchema = z
+  .object({ title: projectTitleSchema, campaignId: z.uuid().nullable().optional().default(null) })
+  .strict();
 export const renameProjectRequestSchema = z
   .object({ title: projectTitleSchema, expectedVersion: z.number().int().positive() })
   .strict();
 export const projectLifecycleRequestSchema = z
   .object({ expectedVersion: z.number().int().positive() })
   .strict();
+export const moveProjectCampaignRequestSchema = z
+  .object({ campaignId: z.uuid().nullable(), expectedVersion: z.number().int().positive() })
+  .strict();
 export const projectParamsSchema = z.object({ projectId: projectIdSchema }).strict();
 export const projectsQuerySchema = z
   .object({
     lifecycle: z.enum(['active', 'archived']).default('active'),
+    campaignId: z.union([z.uuid(), z.literal('none')]).optional(),
     cursor: z.string().trim().min(1).max(500).optional(),
     pageSize: z.coerce.number().int().min(1).max(40).default(20),
   })

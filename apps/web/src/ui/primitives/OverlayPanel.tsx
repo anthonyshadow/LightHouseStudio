@@ -165,23 +165,27 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
     const opener =
       returnFocusTargetRef.current?.current ??
       (document.activeElement instanceof HTMLElement ? document.activeElement : null);
-    const panel = panelRef.current;
-    const preferredTarget = initialFocusTargetRef.current?.current;
-    const initialTarget =
-      preferredTarget &&
-      panel?.contains(preferredTarget) &&
-      isFocusableElement(preferredTarget, panel)
+    const resolveInitialTarget = (): HTMLElement | null => {
+      const panel = panelRef.current;
+      const preferredTarget = initialFocusTargetRef.current?.current;
+      return preferredTarget &&
+        panel?.contains(preferredTarget) &&
+        isFocusableElement(preferredTarget, panel)
         ? preferredTarget
         : initialFocus === 'heading'
           ? headingRef.current
           : panel
             ? (getFocusableElements(panel)[0] ?? panel)
             : null;
+    };
 
     // Move focus out of the application root before aria-hiding it. Browsers may reject
     // aria-hidden on an ancestor that still contains the active element.
-    initialTarget?.focus();
+    resolveInitialTarget()?.focus();
     const unregister = registerOverlay({ id: overlayId, root });
+    const initialFocusFrame = window.requestAnimationFrame(() => {
+      if (isTopmostOverlay(overlayId)) resolveInitialTarget()?.focus();
+    });
 
     const handleKeyDown = (event: globalThis.KeyboardEvent) => {
       const panel = panelRef.current;
@@ -220,6 +224,7 @@ export const OverlayPanel = forwardRef<HTMLDivElement, OverlayPanelProps>(functi
     document.addEventListener('keydown', handleKeyDown);
 
     return () => {
+      window.cancelAnimationFrame(initialFocusFrame);
       document.removeEventListener('keydown', handleKeyDown);
       unregister();
 

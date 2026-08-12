@@ -8,6 +8,7 @@ import {
   deleteProject,
   deriveProjectStatus,
   isProjectResumable,
+  moveProjectToCampaign,
   ProjectRuleError,
   renameProject,
   restoreProject,
@@ -323,5 +324,25 @@ describe('Project aggregate rules', () => {
       value: { status: 'deleted', archivedAt: later, deletedAt: later, version: 4 },
     });
     expect(canTransitionProjectStatus('deleted', 'draft')).toBe(false);
+  });
+
+  it('moves and detaches optional Campaign membership through Project CAS', () => {
+    const initial = emptyProject().project;
+    const campaignId = 'f5029fb5-d0a1-4cc0-ad4f-f0ce43b0e0b2';
+    expect(initial.campaignId).toBeNull();
+    expect(moveProjectToCampaign(initial, campaignId, 9, later)).toMatchObject({
+      ok: false,
+      conflict: { kind: 'project-version', actualVersion: 1 },
+    });
+    const moved = moveProjectToCampaign(initial, campaignId, 1, later);
+    expect(moved).toMatchObject({
+      ok: true,
+      value: { campaignId, version: 2, currentRevisionId: firstRevisionId },
+    });
+    if (!moved.ok) throw new Error('Expected Campaign membership move.');
+    expect(moveProjectToCampaign(moved.value, null, 2, later)).toMatchObject({
+      ok: true,
+      value: { campaignId: null, version: 3 },
+    });
   });
 });
