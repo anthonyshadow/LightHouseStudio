@@ -20,6 +20,7 @@ import {
 } from './support/studioHarness';
 import { REFERENCE_PNG } from './support/mediaFixtures';
 import { VISUAL_CASE_MATRIX, type VisualScenarioId } from './studioVisualMatrix';
+import { installProjectHarness, TEST_PROJECT_ID } from './support/projectHarness';
 
 const CAPTURE_TIME = new Date('2026-07-18T14:30:00.000Z');
 const SEEDED_CHARACTER_STORE = {
@@ -87,7 +88,7 @@ const expectStandardStudioLayout = async (
   viewport: { width: number; height: number },
 ): Promise<void> => {
   const stage = page.getByLabel('Studio media stage');
-  if ((await stage.count()) === 0) return;
+  if ((await stage.count()) === 0 || !(await stage.isVisible())) return;
 
   const frame = stage.locator('[data-stage-frame]');
   const controls = stage.locator('[data-stage-controls-region]');
@@ -530,6 +531,24 @@ const VISUAL_SCENARIOS: Record<VisualScenarioId, VisualScenario> = {
         'aria-pressed',
         'true',
       );
+    },
+  },
+  'projects-workspace': {
+    id: 'projects-workspace',
+    setup: async (page) => {
+      await installProjectHarness(page, true);
+      await page.getByRole('button', { name: 'Projects', exact: true }).click();
+      await expect(page.getByRole('heading', { name: 'Active Projects' })).toBeVisible();
+      await expect(page.getByRole('heading', { name: 'Untitled Project' })).toBeVisible();
+    },
+  },
+  'empty-project-detail': {
+    id: 'empty-project-detail',
+    setup: async (page) => {
+      await installProjectHarness(page, true);
+      await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+      await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Record video' })).toBeDisabled();
     },
   },
   'vton-prepared-with-reference': {

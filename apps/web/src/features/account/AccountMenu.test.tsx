@@ -93,4 +93,24 @@ describe('AccountMenu', () => {
     await userInput.click(screen.getByRole('button', { name: 'Outside' }));
     expect(screen.queryByRole('menu')).not.toBeInTheDocument();
   });
+
+  it('labels global-library navigation as an explicit Project-context exit', async () => {
+    const userInput = userEvent.setup();
+    render(
+      <StudioDesignProvider>
+        <AccountMenuHarness
+          user={user}
+          projectContextActive
+          onOpenVideos={vi.fn()}
+          onOpenCharacters={vi.fn()}
+          onOpenOutfits={vi.fn()}
+          onLogout={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    await userInput.click(screen.getByRole('button', { name: 'Lightframe Demo account menu' }));
+    expect(screen.getByText('Global libraries · exits Project')).toBeVisible();
+    expect(screen.getByRole('menuitem', { name: 'Saved Videos (exits Project)' })).toBeVisible();
+  });
 });

@@ -52,6 +52,9 @@ const meta = {
     browser: browserCapabilities,
     capabilityState: 'ready',
     user: headerUser,
+    activeDestination: 'studio',
+    onOpenStudio: fn(),
+    onOpenProjects: fn(),
     onOpenVideos: fn(),
     onOpenCharacters: fn(),
     onOpenOutfits: fn(),
@@ -78,6 +81,9 @@ const HeaderHarness = () => {
         browser={browserCapabilities}
         capabilityState="ready"
         user={headerUser}
+        activeDestination="studio"
+        onOpenStudio={fn()}
+        onOpenProjects={fn()}
         onOpenVideos={fn()}
         onOpenCharacters={fn()}
         onOpenOutfits={fn()}

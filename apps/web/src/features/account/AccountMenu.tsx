@@ -8,6 +8,7 @@ interface AccountMenuProps {
   readonly open: boolean;
   readonly onOpenChange: (open: boolean) => void;
   readonly busy?: boolean | undefined;
+  readonly projectContextActive?: boolean | undefined;
   readonly onOpenVideos: () => void;
   readonly onOpenCharacters: () => void;
   readonly onOpenOutfits: () => void;
@@ -19,6 +20,7 @@ export const AccountMenu = ({
   open,
   onOpenChange,
   busy = false,
+  projectContextActive = false,
   onOpenVideos,
   onOpenCharacters,
   onOpenOutfits,
@@ -65,6 +67,11 @@ export const AccountMenu = ({
     onOpenChange(false);
     action();
   };
+  const libraryItems = [
+    { label: 'Saved Videos', open: onOpenVideos },
+    { label: 'Saved Characters', open: onOpenCharacters },
+    { label: 'Saved Outfits', open: onOpenOutfits },
+  ] as const;
 
   return (
     <div
@@ -180,17 +187,19 @@ export const AccountMenu = ({
             {user.login}
           </p>
           <span role="presentation" data-menu-section-label>
-            Saved libraries
+            {projectContextActive ? 'Global libraries · exits Project' : 'Saved libraries'}
           </span>
-          <Button role="menuitem" variant="quiet" onClick={() => run(onOpenVideos)}>
-            Saved Videos
-          </Button>
-          <Button role="menuitem" variant="quiet" onClick={() => run(onOpenCharacters)}>
-            Saved Characters
-          </Button>
-          <Button role="menuitem" variant="quiet" onClick={() => run(onOpenOutfits)}>
-            Saved Outfits
-          </Button>
+          {libraryItems.map(({ label, open: openLibrary }) => (
+            <Button
+              key={label}
+              role="menuitem"
+              variant="quiet"
+              aria-label={projectContextActive ? `${label} (exits Project)` : undefined}
+              onClick={() => run(openLibrary)}
+            >
+              {label}
+            </Button>
+          ))}
           <Button data-logout role="menuitem" variant="danger" onClick={() => run(onLogout)}>
             Log out
           </Button>

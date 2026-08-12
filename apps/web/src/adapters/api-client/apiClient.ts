@@ -43,9 +43,17 @@ export class ApiClientError extends Error {
   }
 }
 
-const readError = async (response: Response): Promise<ApiClientError> => {
+export type ApiErrorPayloadParser = (payload: unknown, status: number) => ApiClientError | null;
+
+const readError = async (
+  response: Response,
+  parsePayload?: ApiErrorPayloadParser,
+): Promise<ApiClientError> => {
   try {
-    const payload = apiErrorResponseSchema.safeParse(await response.json());
+    const value: unknown = await response.json();
+    const specialized = parsePayload?.(value, response.status);
+    if (specialized) return specialized;
+    const payload = apiErrorResponseSchema.safeParse(value);
     return new ApiClientError(
       payload.success ? payload.data.error.message : 'The request could not be completed.',
       response.status,
@@ -60,14 +68,18 @@ type JsonSchema<T> = {
   safeParse(value: unknown): { success: true; data: T } | { success: false };
 };
 
-export const apiFetch = async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
+export const apiFetch = async (
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  parseErrorPayload?: ApiErrorPayloadParser,
+): Promise<Response> => {
   const response = await fetch(input, { credentials: 'same-origin', ...init });
   const url = typeof input === 'string' ? input : input instanceof URL ? input.href : input.url;
   const pathname = new URL(url, window.location.origin).pathname;
   if (response.status === 401 && pathname !== '/api/auth/login') {
     window.dispatchEvent(new Event('lightframe:authentication-required'));
   }
-  if (!response.ok) throw await readError(response);
+  if (!response.ok) throw await readError(response, parseErrorPayload);
   return response;
 };
 
@@ -80,8 +92,9 @@ export const requestJson = async <T>(
   init: RequestInit | undefined,
   schema: JsonSchema<T>,
   invalidResponse: () => Error,
+  parseErrorPayload?: ApiErrorPayloadParser,
 ): Promise<T> => {
-  const response = await apiFetch(input, init);
+  const response = await apiFetch(input, init, parseErrorPayload);
   let payload: unknown;
   try {
     payload = await response.json();

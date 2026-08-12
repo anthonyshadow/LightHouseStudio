@@ -149,9 +149,26 @@ describe('AppRouter', () => {
   );
 
   it.each([
+    ['/studio/projects', 'Projects · Lightframe Studio'],
+    ['/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391', 'Project · Lightframe Studio'],
+  ])(
+    'protects the canonical Project route %s with the shared Studio runtime',
+    async (path, title) => {
+      renderApplication(path);
+
+      expect(await screen.findByText('Studio route')).toBeInTheDocument();
+      expect(appHarness.renderCount).toBe(1);
+      expect(appHarness.latestProps?.focusMainOnMount).toBe(false);
+      expect(document.title).toBe(title);
+    },
+  );
+
+  it.each([
     '/advanced',
     '/guided',
     '/projects?project=project-42',
+    '/studio/not-a-route',
+    '/studio/projects/project-42/history',
     '/not-a-route?project=untrusted',
   ])('replaces the noncanonical path %s with the entry page', async (path) => {
     const { router } = renderApplication(path);

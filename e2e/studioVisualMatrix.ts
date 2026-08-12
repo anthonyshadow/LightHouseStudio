@@ -89,6 +89,14 @@ export const FOCUSED_VISUAL_SCENARIOS = {
     id: 'video-edit-crop-dirty',
     baseline: '08-video-editor/crop-dirty.png',
   },
+  projectsWorkspace: {
+    id: 'projects-workspace',
+    baseline: '09-projects/workspace.png',
+  },
+  emptyProjectDetail: {
+    id: 'empty-project-detail',
+    baseline: '09-projects/empty-detail.png',
+  },
 } as const;
 
 export const DESKTOP_VISUAL_SCENARIOS = [
@@ -147,6 +155,8 @@ export const VISUAL_CASE_MATRIX = [
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.uploadResult },
   { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.videoEditLightingDirty },
   { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.videoEditCropDirty },
+  { viewport: desktopViewport, scenario: FOCUSED_VISUAL_SCENARIOS.projectsWorkspace },
+  { viewport: smallMobileViewport, scenario: FOCUSED_VISUAL_SCENARIOS.emptyProjectDetail },
   ...DESKTOP_VISUAL_SCENARIOS.map((scenario) => ({ viewport: desktopViewport, scenario })),
   ...SMALL_MOBILE_VISUAL_SCENARIOS.map((scenario) => ({
     viewport: smallMobileViewport,
@@ -158,7 +168,7 @@ export const VISUAL_BASELINE_PATHS = VISUAL_CASE_MATRIX.map(
   ({ viewport, scenario }) => `${viewport.folder}/${scenario.baseline}`,
 );
 
-const VISUAL_CASE_BUDGET = 29;
+const VISUAL_CASE_BUDGET = 31;
 const coveredViewportIds = new Set(VISUAL_CASE_MATRIX.map(({ viewport }) => viewport.id));
 const corePairs = new Set(
   VISUAL_CASE_MATRIX.map(({ viewport, scenario }) => `${viewport.id}/${scenario.id}`),

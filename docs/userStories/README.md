@@ -26,12 +26,13 @@ future features current.
 | Log in, restore, and log out safely                    | [Login and local session](14-login-and-session.md)                             |
 | Save, browse, version, and reload local videos         | [Saved Video Gallery](15-saved-video-gallery.md)                               |
 | Reuse saved characters and outfits                     | [Saved creative libraries](16-saved-creative-libraries.md)                     |
+| Create and manage durable empty Projects               | [Empty Project lifecycle workspace](17-empty-project-lifecycle.md)             |
 
 ## Shared runtime rules
 
-- `/` is the provider-free entry and Login surface. `/studio`, `/studio/videos`,
-  `/studio/characters`, and `/studio/outfits` are authenticated views of one active Studio
-  runtime; every other path returns to `/`.
+- `/` is the provider-free entry and Login surface. `/studio`, `/studio/projects`,
+  `/studio/projects/:projectId`, `/studio/videos`, `/studio/characters`, and `/studio/outfits` are
+  authenticated views of one active Studio runtime; every other path returns to `/`.
 - Studio begins in neutral Local Camera mode with camera and microphone off. Only an explicit
   control-bar, upload-panel, or Dock action acquires media; only an explicit AI Start contacts a
   provider.
@@ -45,8 +46,8 @@ future features current.
 - The primary flow records or uploads a source, reviews it, and optionally applies Character Swap,
   Virtual Try On, and/or Voice, then saves the result before download from Saved Videos. Live
   Character/VTO transformation and Workshop are advanced flows.
-- Campaigns and user-facing Projects do not exist in these journeys. The durable Project
-  domain/database foundation is not a current navigation or save destination.
+- Campaigns do not exist in these journeys. Empty Project lifecycle management is user-facing,
+  but source resume, autosave, creative integration, processing, and output history are not.
 - Character Builder owns true character creation and editing. Workshop owns only Add, Replace, and
   Restyle object recipes.
 - Saved Character Wardrobe owns normalized original/variant browsing and variant creation while

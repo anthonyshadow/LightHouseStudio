@@ -15,8 +15,9 @@ The intended product hierarchy is **Workspace → Campaign → Project → Asset
 current-state qualifications:
 
 - Campaign has no domain model, schema, contract, route, or UI.
-- Project has domain rules, contracts, local and relational authority, and authenticated lifecycle
-  APIs for empty Projects, but no browser route or UI. Snapshot v1 is video-oriented by design.
+- Project has domain rules, contracts, local and relational authority, authenticated lifecycle APIs,
+  and browser lifecycle routes/UI for empty Projects. Snapshot v1 is video-oriented by design;
+  source/session resume is not implemented.
 
 A future Campaign may group multiple Projects, while a Project represents a focused resumable
 production effort and may remain independent if product policy permits. The current Project must
@@ -69,11 +70,12 @@ JWT secret and password hash.
 ## Studio composition
 
 `AppRouter.tsx` is the browser URL boundary. React Router's data browser router renders the
-provider-free entry at `/` and protects the lazy Studio route family: `/studio`,
-`/studio/videos`, `/studio/characters`, and `/studio/outfits`. The data-router form is required for
-route blocking. Route metadata, focus handoff, and loading/error surfaces remain router-owned;
-unknown paths return to `/`. All Studio children render the same `StudioApp` instance so moving
-between a workspace and its libraries preserves the one media stage and active controller state.
+provider-free entry at `/` and protects the recognized lazy Studio route family: `/studio`,
+`/studio/projects`, `/studio/projects/:projectId`, `/studio/videos`, `/studio/characters`, and
+`/studio/outfits`. The data-router form is required for route blocking. Route metadata, protected
+Login return, focus handoff, and loading/error surfaces remain router-owned; unknown paths return
+to `/`. All Studio children render the same `StudioApp` instance so moving between a workspace and
+its libraries preserves the one media-stage owner and active controller state.
 
 The entry does not mount `StudioApp`, request capabilities, acquire media, load Decart, open a
 WebSocket, or contact a provider. `StudioApp.tsx` remains the sole runtime composition boundary.
@@ -93,7 +95,8 @@ The mounted Studio owns focused controllers for:
 - recording, review, and voice processing;
 - existing-video selection, local inspection, and one mutually exclusive batch transformation;
 - Character Builder, Outfit Builder, Prompt Workshop, and Recipe Shelf handoff;
-- Saved Videos, Saved Characters, and Saved Outfits library presentation and handoff;
+- Projects lifecycle queries/mutations and Saved Videos, Saved Characters, and Saved Outfits
+  library presentation and handoff;
 - account navigation and ordered logout cleanup;
 - overlays and route-owned workspace presentation.
 
@@ -101,9 +104,12 @@ The authenticated Studio composition boundary owns one TanStack Query client for
 same-origin server state; the provider-free entry does not load that runtime. The client is
 recreated when the authenticated user changes and its previous cache is cleared. Queries and
 mutations do not retry by default and do not refetch on window focus or reconnect. The local,
-non-billable capability read is the only bounded automatic retry. Saved-video metadata/cursor pages,
-voice-library metadata pages, and accepted video-job status reads use Query cancellation and
-targeted cache updates or invalidation; voice pages remain fresh for five minutes. Video-job status
+non-billable capability read is the only bounded automatic retry. Project summary/current reads,
+saved-video metadata/cursor pages, voice-library metadata pages, and accepted video-job status reads
+use Query cancellation and targeted cache updates or invalidation. Project lists use separate
+bounded active/archived cursor pages. Quick Start retains one operation key through an uncertain
+response; rename/archive/restore reconcile server CAS before invalidating the current Project and
+list caches. Voice pages remain fresh for five minutes. Video-job status
 polling follows the server-provided cadence and never retries a failed read automatically. Video
 bytes and Blobs, editor and camera state, current timeline edits, temporary UI state, local
 creative-asset repositories, provider submission, result retrieval, and finalization remain under
@@ -114,7 +120,9 @@ artifact is created. Each immutable video version stores the parent character na
 filter key and an optional exact variant name as display-only metadata. Voice and later local edits
 inherit that pinned attribution; the gallery never treats variants as separate character facets.
 
-`MediaStage` stays mounted once and owns one `<video>` element. A discriminated presentation state
+`MediaStage` stays mounted once and owns one `<video>` element. The Projects route renders a full
+workspace in the same `StudioApp` and hides this existing stage; it never creates another player,
+media session, or Project authority. A discriminated presentation state
 switches among idle, live, finalizing, and playback. Live media uses `srcObject`; playback uses
 `src`. Opening or closing a tool must not replace the player, restart media, alter playback time,
 or create a second take player. One scoped exception is the **Use existing video** panel's inline
@@ -476,9 +484,10 @@ errors. The URL is neither persisted nor forwarded to a visual provider.
 
 ## Durable Project authority and lifecycle API
 
-The Project aggregate is implemented in domain, contracts, versioned local metadata, and
-authoritative relational persistence. Authenticated lifecycle routes exist, but there is no browser
-adapter, route, or UI yet. `Project` is the owner-scoped durable
+The Project aggregate is implemented in domain, contracts, versioned local metadata, authoritative
+relational persistence, and one feature-local browser adapter/controller. Authenticated lifecycle
+routes back `/studio/projects` and `/studio/projects/:projectId`, where the operator can list,
+Quick Start, open, rename, archive, and restore empty Projects. `Project` is the owner-scoped durable
 workspace for one focused production effort; Saved Videos remain outputs and immutable output
 versions rather than work-in-progress authority. One Project can link any number of Saved Video
 outputs while its current revision keeps one active working context. The separately documented
@@ -519,6 +528,15 @@ implemented yet. One owner-scoped Project retention policy is consulted by Saved
 reference-image cleanup, and the generic relational byte deletion claim. Direct asset links,
 used-by Version links, and produced outputs retain bytes for active, archived, and tombstoned
 Projects. Physical Project purge remains undefined.
+
+The browser treats TanStack Query/controller state only as an owner-scoped cache. Active and
+archived summary lists are separately bounded and never request snapshots or media. Project detail
+requests current summary/revision only. Quick Start sends `Untitled Project` with an app-owned UUID
+operation key; exact response-loss replay resolves through the durable server receipt. Metadata
+mutations use Project-version CAS. A stale rename retains the proposed title until explicit reload
+and retry or discard. Empty detail does not hydrate media, start camera/provider work, or claim
+resumability. Active Project identity exists only in `/studio/projects/:projectId`; global library
+URLs are explicit Project-context exits. No dormant IndexedDB Project store is activated.
 
 `local` and `shadow` use an owner-namespaced Project metadata file as authority. Its schema version
 1 file is strictly parsed and atomically replaced with a validated backup. Create first publishes a
