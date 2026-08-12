@@ -47,7 +47,11 @@ import { DirectSavedVideoUploadService } from './features/saved-videos/direct-up
 import { registerCreativeLibraryRoutes } from './features/creative-libraries/routes.js';
 import type { CreativeLibraryRepository } from './features/creative-libraries/creative-library-repository.js';
 import type { DirectUploadRepository } from './storage/direct-upload.js';
-import type { ProjectRepository } from './features/projects/project-repository.js';
+import type {
+  ProjectOutputMetadataUnitOfWork,
+  ProjectRepository,
+  ProjectRetentionPolicy,
+} from './features/projects/project-repository.js';
 import type { R2AssetByteStore } from './storage/r2-asset-byte-store.js';
 import {
   type DurableProcessingJobRepository,
@@ -94,6 +98,8 @@ export interface AppPersistenceDependencies {
   readonly processingJobTraces?: ProcessingJobTraceWriter;
   readonly processingJobs?: DurableProcessingJobRepository;
   readonly projects?: ProjectRepository;
+  readonly projectOutputMetadata?: ProjectOutputMetadataUnitOfWork;
+  readonly projectRetention?: ProjectRetentionPolicy;
   readonly creativeLibraries?: CreativeLibraryRepository;
   readonly directVideoUploads?: {
     readonly repository: DirectUploadRepository;
@@ -291,6 +297,9 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
       new LocalAssetByteStore(dependencies.config.lightframeDataDir),
     {
       deleteStoredAssetsOnManualDelete: dependencies.config.assetStoreProvider === 'r2',
+      ...(dependencies.persistence?.projectRetention === undefined
+        ? {}
+        : { projectRetention: dependencies.persistence.projectRetention }),
     },
   );
   const directSavedVideoUploads = dependencies.persistence?.directVideoUploads;

@@ -105,6 +105,11 @@ const librarySchema = legacyLibrarySchema.extend({
 export type StoredVideoVersion = z.infer<typeof versionV4Schema>;
 export type StoredSavedVideoAggregate = z.infer<typeof aggregateSchema>;
 export type SavedVideoReceipt = z.infer<typeof receiptSchema>;
+export interface SavedVideoReceiptLookup {
+  readonly ownerUserId: string;
+  readonly idempotencyKey: string;
+}
+export type OwnedSavedVideoReceipt = SavedVideoReceipt & { readonly ownerUserId: string };
 type SavedVideoLibrary = z.infer<typeof librarySchema>;
 
 export interface SavedVideoRepositoryPage {
@@ -116,6 +121,9 @@ export interface SavedVideoRepositoryPage {
 
 export interface SavedVideoRepository {
   findReceipt(ownerUserId: string, idempotencyKey: string): Promise<SavedVideoReceipt | null>;
+  findActiveReceipts(
+    lookups: readonly SavedVideoReceiptLookup[],
+  ): Promise<readonly OwnedSavedVideoReceipt[]>;
   create(
     ownerUserId: string,
     aggregate: StoredSavedVideoAggregate,
@@ -135,6 +143,10 @@ export interface SavedVideoRepository {
     query: SavedVideosQuery,
     offset: number,
   ): Promise<SavedVideoRepositoryPage>;
+  referencedAssetIds(
+    ownerUserId: string,
+    assetIds: readonly string[],
+  ): Promise<ReadonlySet<string>>;
   get(ownerUserId: string, videoId: string): Promise<StoredSavedVideoAggregate | null>;
   rename(
     ownerUserId: string,
@@ -308,6 +320,33 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
     );
   }
 
+  async findActiveReceipts(
+    lookups: readonly SavedVideoReceiptLookup[],
+  ): Promise<readonly OwnedSavedVideoReceipt[]> {
+    const keysByOwner = new Map<string, Set<string>>();
+    for (const { ownerUserId, idempotencyKey } of lookups) {
+      const keys = keysByOwner.get(ownerUserId) ?? new Set<string>();
+      keys.add(idempotencyKey);
+      keysByOwner.set(ownerUserId, keys);
+    }
+    const matches = await Promise.all(
+      [...keysByOwner].map(async ([ownerUserId, keys]) => {
+        const library = await this.#read(ownerUserId);
+        const activeVideoIds = new Set(
+          library.videos
+            .filter(({ video }) => video.deletedAt === null)
+            .map(({ video }) => video.id),
+        );
+        return library.receipts
+          .filter(
+            (receipt) => keys.has(receipt.idempotencyKey) && activeVideoIds.has(receipt.videoId),
+          )
+          .map((receipt) => ({ ...receipt, ownerUserId }));
+      }),
+    );
+    return matches.flat();
+  }
+
   async create(
     ownerUserId: string,
     aggregate: StoredSavedVideoAggregate,
@@ -375,6 +414,25 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
 
   async list(ownerUserId: string): Promise<readonly StoredSavedVideoAggregate[]> {
     return (await this.#read(ownerUserId)).videos.filter((item) => item.video.deletedAt === null);
+  }
+
+  async referencedAssetIds(
+    ownerUserId: string,
+    assetIds: readonly string[],
+  ): Promise<ReadonlySet<string>> {
+    const candidates = new Set(assetIds);
+    const referenced = new Set<string>();
+    if (candidates.size === 0) return referenced;
+
+    for (const aggregate of await this.list(ownerUserId)) {
+      for (const version of aggregate.versions) {
+        if (candidates.has(version.assetId)) referenced.add(version.assetId);
+        if (version.thumbnailAssetId !== null && candidates.has(version.thumbnailAssetId)) {
+          referenced.add(version.thumbnailAssetId);
+        }
+      }
+    }
+    return referenced;
   }
 
   async get(ownerUserId: string, videoId: string): Promise<StoredSavedVideoAggregate | null> {

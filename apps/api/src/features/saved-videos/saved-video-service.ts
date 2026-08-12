@@ -14,11 +14,13 @@ import {
 } from '@studio/contracts';
 import { normalizeSavedVideoTitle } from '@studio/domain';
 import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
+import type { ProjectRetentionPolicy } from '../projects/project-repository.js';
 import { AppError } from '../../http/app-error.js';
 import { withWorkflowSpan } from '../../observability/telemetry.js';
 import { inspectSavedVideoFile } from './saved-video-inspection.js';
 import type {
   SavedVideoReceipt,
+  SavedVideoReceiptLookup,
   SavedVideoRepository,
   StoredSavedVideoAggregate,
   StoredVideoVersion,
@@ -149,6 +151,7 @@ export interface SavedVideoServiceOptions {
   readonly inspect?: (filePath: string) => Promise<InspectedVideo>;
   /** R2/shadow mode only. Local-only deletion retains its existing reconciliation policy. */
   readonly deleteStoredAssetsOnManualDelete?: boolean;
+  readonly projectRetention?: ProjectRetentionPolicy;
 }
 
 const compareCreatedAt = (left: IndexedVideo, right: IndexedVideo): number =>
@@ -161,6 +164,7 @@ export class SavedVideoService {
   readonly #now: () => Date;
   readonly #inspect: (filePath: string) => Promise<InspectedVideo>;
   readonly #deleteStoredAssetsOnManualDelete: boolean;
+  readonly #projectRetention: ProjectRetentionPolicy | undefined;
 
   constructor(
     repository: SavedVideoRepository,
@@ -172,6 +176,7 @@ export class SavedVideoService {
     this.#now = options.now ?? (() => new Date());
     this.#inspect = options.inspect ?? inspectSavedVideoFile;
     this.#deleteStoredAssetsOnManualDelete = options.deleteStoredAssetsOnManualDelete ?? false;
+    this.#projectRetention = options.projectRetention;
   }
 
   async #versionFromUpload(
@@ -237,6 +242,7 @@ export class SavedVideoService {
   }
 
   async #deleteAsset(ownerUserId: string, assetId: string): Promise<void> {
+    if (await this.#projectRetention?.retainsAsset(ownerUserId, assetId)) return;
     await this.#bytes.delete(ownerUserId, assetId).catch(() => undefined);
   }
 
@@ -580,6 +586,12 @@ export class SavedVideoService {
     return this.#findIdempotentResult(ownerUserId, idempotencyKey);
   }
 
+  findActiveReceipts(
+    lookups: readonly SavedVideoReceiptLookup[],
+  ): ReturnType<SavedVideoRepository['findActiveReceipts']> {
+    return this.#repository.findActiveReceipts(lookups);
+  }
+
   async rename(ownerUserId: string, videoId: string, title: string): Promise<SavedVideoDetail> {
     const aggregate = await this.#repository.rename(
       ownerUserId,
@@ -599,14 +611,17 @@ export class SavedVideoService {
     }
     if (!this.#deleteStoredAssetsOnManualDelete) return;
 
-    const retainedAssetIds = new Set(
-      (await this.#repository.list(ownerUserId)).flatMap(aggregateAssetIds),
+    const discardedAssetIds = [...new Set(aggregateAssetIds(deleted))];
+    const [savedVideoRetainedIds, projectRetainedIds] = await Promise.all([
+      this.#repository.referencedAssetIds(ownerUserId, discardedAssetIds),
+      this.#projectRetention?.retainedAssetIds(ownerUserId, discardedAssetIds) ??
+        Promise.resolve<ReadonlySet<string>>(new Set()),
+    ]);
+    const deletableAssetIds = discardedAssetIds.filter(
+      (assetId) => !savedVideoRetainedIds.has(assetId) && !projectRetainedIds.has(assetId),
     );
-    const discardedAssetIds = new Set(aggregateAssetIds(deleted));
     const results = await Promise.allSettled(
-      [...discardedAssetIds]
-        .filter((assetId) => !retainedAssetIds.has(assetId))
-        .map((assetId) => this.#bytes.delete(ownerUserId, assetId)),
+      deletableAssetIds.map((assetId) => this.#bytes.delete(ownerUserId, assetId)),
     );
     const failed = results.find(
       (result): result is PromiseRejectedResult => result.status === 'rejected',

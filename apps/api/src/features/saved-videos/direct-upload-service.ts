@@ -36,6 +36,9 @@ const matchesRequest = (
 const safeStorageFailure = (message: string, cause: unknown): AppError =>
   new AppError(503, 'storage_failure', message, { cause });
 
+const receiptLookupKey = (ownerUserId: string, idempotencyKey: string): string =>
+  `${ownerUserId}:${idempotencyKey}`;
+
 type DirectUploadStorage = Pick<
   R2AssetByteStore,
   | 'directUploadKey'
@@ -437,17 +440,25 @@ export class DirectSavedVideoUploadService {
 
   async cleanupExpired(): Promise<void> {
     const expired = await this.#repository.findExpired(this.#now().toISOString(), 25);
+    const activeReceipts = await this.#savedVideos.findActiveReceipts(
+      expired.map(({ ownerUserId, idempotencyKey }) => ({ ownerUserId, idempotencyKey })),
+    );
+    const attachedVideoIds = new Map(
+      activeReceipts.map(({ ownerUserId, idempotencyKey, videoId }) => [
+        receiptLookupKey(ownerUserId, idempotencyKey),
+        videoId,
+      ]),
+    );
     for (const upload of expired) {
       try {
-        const attached = await this.#savedVideos.findByIdempotencyKey(
-          upload.ownerUserId,
-          upload.idempotencyKey,
+        const attachedVideoId = attachedVideoIds.get(
+          receiptLookupKey(upload.ownerUserId, upload.idempotencyKey),
         );
-        if (attached !== null) {
+        if (attachedVideoId !== undefined) {
           await this.#repository.markReady(
             upload.ownerUserId,
             upload.id,
-            attached.id,
+            attachedVideoId,
             this.#now().toISOString(),
           );
           continue;

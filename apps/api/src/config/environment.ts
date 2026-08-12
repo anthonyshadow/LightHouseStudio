@@ -34,6 +34,11 @@ export const DEFAULT_VIDEO_JOB_MAX_ACTIVE = 8;
 export const DEFAULT_VIDEO_JOB_MAX_ACTIVE_PER_PROVIDER = 4;
 export const DEVELOPMENT_R2_BUCKET = 'lightframe-studio-development';
 
+export const databaseUrlUsesEncryptedTransport = (value: string): boolean => {
+  const sslMode = new URL(value).searchParams.get('sslmode');
+  return sslMode === 'require' || sslMode === 'verify-ca' || sslMode === 'verify-full';
+};
+
 const normalizeOptionalString = (value: unknown): unknown => {
   if (typeof value !== 'string') return value;
   const trimmed = value.trim();
@@ -276,6 +281,18 @@ const environmentSchema = z
         code: 'custom',
         path: ['DATABASE_URL'],
         message: 'Set DATABASE_URL when DATABASE_MODE uses relational persistence.',
+      });
+    }
+    if (
+      value.DATABASE_MODE === 'neon' &&
+      value.DATABASE_URL !== undefined &&
+      !databaseUrlUsesEncryptedTransport(value.DATABASE_URL)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['DATABASE_URL'],
+        message:
+          'Neon DATABASE_URL must explicitly require encrypted transport with sslmode=require or stronger.',
       });
     }
     if (value.ASSET_STORE_PROVIDER === 'r2') {

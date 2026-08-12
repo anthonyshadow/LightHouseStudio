@@ -23,9 +23,8 @@ const now = '2026-08-11T12:00:00.000Z';
 const later = '2026-08-11T12:05:00.000Z';
 const emptyFacts = {
   sourceStatus: 'none',
-  activeJobCount: 0,
-  failedJobCount: 0,
-  successfulOutputCount: 0,
+  currentAttempt: { status: 'none' },
+  validatedLastSuccessfulOutput: null,
 } as const;
 const readyFacts = { ...emptyFacts, sourceStatus: 'ready' } as const;
 
@@ -65,15 +64,41 @@ describe('Project aggregate rules', () => {
   });
 
   it('derives status from durable source, jobs, failures, outputs, and lifecycle', () => {
-    expect(deriveProjectStatus(emptyFacts)).toBe('draft');
-    expect(deriveProjectStatus(readyFacts)).toBe('ready');
-    expect(deriveProjectStatus({ ...readyFacts, activeJobCount: 1 })).toBe('processing');
-    expect(deriveProjectStatus({ ...readyFacts, failedJobCount: 1 })).toBe('needs-attention');
-    expect(deriveProjectStatus({ ...readyFacts, successfulOutputCount: 3 })).toBe('completed');
-    expect(deriveProjectStatus(readyFacts, { archivedAt: later, deletedAt: null })).toBe(
+    const noOutput = { lastSuccessfulOutput: null };
+    const output = {
+      savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
+      videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+    };
+    expect(deriveProjectStatus(noOutput, emptyFacts)).toBe('draft');
+    expect(deriveProjectStatus(noOutput, readyFacts)).toBe('ready');
+    expect(
+      deriveProjectStatus(noOutput, {
+        ...readyFacts,
+        currentAttempt: { status: 'active', jobId: secondRevisionId },
+      }),
+    ).toBe('processing');
+    expect(
+      deriveProjectStatus(noOutput, {
+        ...readyFacts,
+        currentAttempt: { status: 'failed', jobId: secondRevisionId },
+      }),
+    ).toBe('needs-attention');
+    expect(
+      deriveProjectStatus(noOutput, {
+        ...readyFacts,
+        currentAttempt: { status: 'succeeded', jobId: secondRevisionId },
+      }),
+    ).toBe('ready');
+    expect(
+      deriveProjectStatus(
+        { lastSuccessfulOutput: output },
+        { ...readyFacts, validatedLastSuccessfulOutput: output },
+      ),
+    ).toBe('completed');
+    expect(deriveProjectStatus(noOutput, readyFacts, { archivedAt: later, deletedAt: null })).toBe(
       'archived',
     );
-    expect(deriveProjectStatus(readyFacts, { archivedAt: later, deletedAt: later })).toBe(
+    expect(deriveProjectStatus(noOutput, readyFacts, { archivedAt: later, deletedAt: later })).toBe(
       'deleted',
     );
   });
@@ -212,6 +237,55 @@ describe('Project aggregate rules', () => {
     ).toMatchObject({ ok: false, conflict: { kind: 'revision', actualRevisionNumber: 1 } });
   });
 
+  it('clears a completed pointer when a later revision changes material working state', () => {
+    const output = {
+      savedVideoId: 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338',
+      videoVersionId: 'b276694b-58c4-40d3-8fb6-315e32b66fd0',
+    };
+    const snapshot = {
+      ...createEmptyProjectSnapshot(now),
+      sourceAssetId,
+      workingMedia: { kind: 'asset' as const, assetId: sourceAssetId },
+      lastSuccessfulOutput: output,
+    };
+    const initial = createProject(
+      {
+        id: projectId,
+        ownerUserId,
+        title: 'Completed Project',
+        snapshot,
+        author: { kind: 'user', authorId: ownerUserId },
+        facts: { ...readyFacts, validatedLastSuccessfulOutput: output },
+      },
+      { now, createId: () => firstRevisionId },
+    );
+
+    const appended = appendProjectRevision(
+      initial,
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        snapshot: {
+          ...snapshot,
+          creativeIntent: { ...snapshot.creativeIntent, userIntent: 'A material change' },
+          updatedAt: later,
+        },
+        author: { kind: 'user', authorId: ownerUserId },
+        source: 'user-edit',
+        facts: { ...readyFacts, validatedLastSuccessfulOutput: output },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+
+    expect(appended).toMatchObject({
+      ok: true,
+      value: {
+        project: { status: 'ready' },
+        revisions: [{}, { snapshot: { lastSuccessfulOutput: null } }],
+      },
+    });
+  });
+
   it('uses project version CAS for rename and archive-first deletion', () => {
     const initial = emptyProject().project;
     expect(renameProject(initial, 'Campaign 2027', 9, later)).toMatchObject({
@@ -224,10 +298,24 @@ describe('Project aggregate rules', () => {
     expect(() => deleteProject(renamed.value, 2, 'permanent-delete', later)).toThrow(
       'Archive the project',
     );
-    const archived = archiveProject(renamed.value, 2, later);
+    expect(() =>
+      archiveProject(
+        renamed.value,
+        2,
+        { currentAttempt: { status: 'active', jobId: secondRevisionId } },
+        later,
+      ),
+    ).toThrow('Active Project work');
+    const archived = archiveProject(renamed.value, 2, readyFacts, later);
     if (!archived.ok) throw new Error('Expected archive to succeed.');
     expect(() => deleteProject(archived.value, 3, null, later)).toThrow('explicit confirmation');
-    const restored = restoreProject(archived.value, 3, emptyFacts, later);
+    const restored = restoreProject(
+      archived.value,
+      3,
+      { lastSuccessfulOutput: null },
+      emptyFacts,
+      later,
+    );
     expect(restored).toMatchObject({ ok: true, value: { status: 'draft', archivedAt: null } });
     const deleted = deleteProject(archived.value, 3, 'permanent-delete', later);
     expect(deleted).toMatchObject({

@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, inArray, isNotNull, isNull, sql } from 'drizzle-orm';
+import { and, asc, desc, eq, inArray, isNotNull, isNull, or, sql } from 'drizzle-orm';
+import { unionAll } from 'drizzle-orm/pg-core';
 import {
   SAVED_VIDEO_FORMATS,
   videoInputMimeTypeSchema,
@@ -7,7 +8,9 @@ import {
 } from '@studio/contracts';
 import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
 import type {
+  OwnedSavedVideoReceipt,
   SavedVideoReceipt,
+  SavedVideoReceiptLookup,
   SavedVideoRepository,
   SavedVideoRepositoryPage,
   StoredSavedVideoAggregate,
@@ -173,6 +176,47 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
         };
   }
 
+  async findActiveReceipts(
+    lookups: readonly SavedVideoReceiptLookup[],
+  ): Promise<readonly OwnedSavedVideoReceipt[]> {
+    const uniqueLookups = [
+      ...new Map(
+        lookups.map((lookup) => [`${lookup.ownerUserId}:${lookup.idempotencyKey}`, lookup]),
+      ).values(),
+    ];
+    if (uniqueLookups.length === 0) return [];
+    const rows = await this.db
+      .select({
+        ownerUserId: savedVideoReceipts.ownerUserId,
+        idempotencyKey: savedVideoReceipts.idempotencyKey,
+        videoId: savedVideoReceipts.videoId,
+        versionId: savedVideoReceipts.versionId,
+        createdAt: savedVideoReceipts.createdAt,
+      })
+      .from(savedVideoReceipts)
+      .innerJoin(
+        savedVideos,
+        and(
+          eq(savedVideos.id, savedVideoReceipts.videoId),
+          eq(savedVideos.ownerUserId, savedVideoReceipts.ownerUserId),
+        ),
+      )
+      .where(
+        and(
+          isNull(savedVideos.deletedAt),
+          or(
+            ...uniqueLookups.map(({ ownerUserId, idempotencyKey }) =>
+              and(
+                eq(savedVideoReceipts.ownerUserId, ownerUserId),
+                eq(savedVideoReceipts.idempotencyKey, idempotencyKey),
+              ),
+            ),
+          ),
+        ),
+      );
+    return rows.map((row) => ({ ...row, createdAt: toIsoTimestamp(row.createdAt) }));
+  }
+
   async create(
     ownerUserId: string,
     aggregate: StoredSavedVideoAggregate,
@@ -275,6 +319,51 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
       .orderBy(asc(videoVersions.videoId), asc(videoVersions.ordinal));
     const grouped = groupVersions(versions);
     return videos.map((video) => toAggregate(video, grouped.get(video.id) ?? []));
+  }
+
+  async referencedAssetIds(
+    ownerUserId: string,
+    assetIds: readonly string[],
+  ): Promise<ReadonlySet<string>> {
+    const candidates = new Set(assetIds);
+    if (candidates.size === 0) return new Set();
+    const ids = [...candidates];
+    const videoAssets = this.db
+      .selectDistinct({ assetId: videoVersions.assetId })
+      .from(videoVersions)
+      .innerJoin(
+        savedVideos,
+        and(
+          eq(savedVideos.id, videoVersions.videoId),
+          eq(savedVideos.ownerUserId, videoVersions.ownerUserId),
+        ),
+      )
+      .where(
+        and(
+          eq(savedVideos.ownerUserId, ownerUserId),
+          isNull(savedVideos.deletedAt),
+          inArray(videoVersions.assetId, ids),
+        ),
+      );
+    const thumbnailAssets = this.db
+      .selectDistinct({ assetId: sql<string>`${videoVersions.thumbnailAssetId}` })
+      .from(videoVersions)
+      .innerJoin(
+        savedVideos,
+        and(
+          eq(savedVideos.id, videoVersions.videoId),
+          eq(savedVideos.ownerUserId, videoVersions.ownerUserId),
+        ),
+      )
+      .where(
+        and(
+          eq(savedVideos.ownerUserId, ownerUserId),
+          isNull(savedVideos.deletedAt),
+          inArray(videoVersions.thumbnailAssetId, ids),
+        ),
+      );
+    const rows = await unionAll(videoAssets, thumbnailAssets);
+    return new Set(rows.map(({ assetId }) => assetId));
   }
 
   async listPage(

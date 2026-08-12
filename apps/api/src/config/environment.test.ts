@@ -99,6 +99,21 @@ describe('parseEnvironment', () => {
     });
   });
 
+  it('requires Neon transport encryption explicitly', () => {
+    expect(() =>
+      parseEnvironment({
+        DATABASE_MODE: 'neon',
+        DATABASE_URL: 'postgresql://user:password@example.neon.tech/lightframe',
+      }),
+    ).toThrow('encrypted transport');
+    expect(
+      parseEnvironment({
+        DATABASE_MODE: 'neon',
+        DATABASE_URL: 'postgresql://user:password@example.neon.tech/lightframe?sslmode=verify-full',
+      }).databaseUrl,
+    ).toContain('sslmode=verify-full');
+  });
+
   it('accepts the isolated development PostgreSQL and R2 profile', () => {
     expect(
       parseEnvironment({
