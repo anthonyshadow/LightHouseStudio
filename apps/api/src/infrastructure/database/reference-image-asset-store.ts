@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { buffer } from 'node:stream/consumers';
-import { and, eq, lte } from 'drizzle-orm';
+import { and, eq, inArray, lte } from 'drizzle-orm';
 import type {
   ReferenceImageAssetStore,
   StoredReferenceImageContent,
@@ -15,6 +15,7 @@ import {
   type StoreReferenceImageInput,
 } from '../../features/reference-images/asset-layout.js';
 import type { AssetByteStore } from '../../storage/asset-byte-store.js';
+import type { ProjectRetentionPolicy } from '../../features/projects/project-repository.js';
 import type { LightframeDatabase } from './client.js';
 import { creativeAssets, referenceImageAssets } from './schema.js';
 
@@ -48,6 +49,7 @@ export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore
     private readonly db: LightframeDatabase,
     private readonly bytes: AssetByteStore,
     private readonly now: () => Date = () => new Date(),
+    private readonly projectRetention?: ProjectRetentionPolicy,
   ) {}
 
   async #savedReferenceImageAssetIds(localOwnerId: string): Promise<Set<string>> {
@@ -179,28 +181,65 @@ export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore
   }
 
   async discardIfUnreferenced(localOwnerId: string, assetId: string): Promise<boolean> {
-    const [row] = await this.db
+    return (await this.discardManyIfUnreferenced(localOwnerId, [assetId])) > 0;
+  }
+
+  async #discardCandidates(
+    localOwnerId: string,
+    assetIds: readonly string[],
+  ): Promise<{ readonly deletedCount: number; readonly failure?: unknown }> {
+    const candidates = [...new Set(assetIds)];
+    if (candidates.length === 0) return { deletedCount: 0 };
+    const rows = await this.db
       .select({ id: referenceImageAssets.id })
       .from(referenceImageAssets)
       .where(
         and(
           eq(referenceImageAssets.ownerUserId, localOwnerId),
-          eq(referenceImageAssets.id, assetId),
-        ),
-      )
-      .limit(1);
-    if (row === undefined) return false;
-    if ((await this.#savedReferenceImageAssetIds(localOwnerId)).has(assetId)) return false;
-    await this.bytes.delete(localOwnerId, assetId);
-    await this.db
-      .delete(referenceImageAssets)
-      .where(
-        and(
-          eq(referenceImageAssets.ownerUserId, localOwnerId),
-          eq(referenceImageAssets.id, assetId),
+          inArray(referenceImageAssets.id, candidates),
         ),
       );
-    return true;
+    if (rows.length === 0) return { deletedCount: 0 };
+    const savedAssetIds = await this.#savedReferenceImageAssetIds(localOwnerId);
+    const unretainedByLibrary = rows.map(({ id }) => id).filter((id) => !savedAssetIds.has(id));
+    const projectRetainedIds =
+      unretainedByLibrary.length === 0
+        ? new Set<string>()
+        : ((await this.projectRetention?.retainedAssetIds(localOwnerId, unretainedByLibrary)) ??
+          new Set<string>());
+    const deletableIds = unretainedByLibrary.filter((id) => !projectRetainedIds.has(id));
+    const deletedIds: string[] = [];
+    let failure: unknown;
+    for (const id of deletableIds) {
+      try {
+        await this.bytes.delete(localOwnerId, id);
+        deletedIds.push(id);
+      } catch (error) {
+        failure ??= error;
+      }
+    }
+    if (deletedIds.length > 0) {
+      await this.db
+        .delete(referenceImageAssets)
+        .where(
+          and(
+            eq(referenceImageAssets.ownerUserId, localOwnerId),
+            inArray(referenceImageAssets.id, deletedIds),
+          ),
+        );
+    }
+    return failure === undefined
+      ? { deletedCount: deletedIds.length }
+      : { deletedCount: deletedIds.length, failure };
+  }
+
+  async discardManyIfUnreferenced(
+    localOwnerId: string,
+    assetIds: readonly string[],
+  ): Promise<number> {
+    const result = await this.#discardCandidates(localOwnerId, assetIds);
+    if ('failure' in result) throw result.failure;
+    return result.deletedCount;
   }
 
   async purgeExpiredUnreferenced(): Promise<number> {
@@ -209,12 +248,20 @@ export class DrizzleReferenceImageAssetStore implements ReferenceImageAssetStore
       .select({ id: referenceImageAssets.id, ownerUserId: referenceImageAssets.ownerUserId })
       .from(referenceImageAssets)
       .where(lte(referenceImageAssets.updatedAt, cutoff.toISOString()));
-    let deleted = 0;
+    const candidatesByOwner = new Map<string, string[]>();
     for (const candidate of candidates) {
+      const ownerCandidates = candidatesByOwner.get(candidate.ownerUserId) ?? [];
+      ownerCandidates.push(candidate.id);
+      candidatesByOwner.set(candidate.ownerUserId, ownerCandidates);
+    }
+    let deleted = 0;
+    for (const [ownerUserId, assetIds] of candidatesByOwner) {
       try {
-        if (await this.discardIfUnreferenced(candidate.ownerUserId, candidate.id)) deleted += 1;
+        const result = await this.#discardCandidates(ownerUserId, assetIds);
+        deleted += result.deletedCount;
+        // A later creative-library read/write retries any failed storage cleanup.
       } catch {
-        // A later creative-library read/write retries failed storage cleanup.
+        // A later purge retries database or policy failures for this owner.
       }
     }
     return deleted;

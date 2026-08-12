@@ -173,12 +173,26 @@ export interface ProjectAssetLink {
   readonly createdAt: string;
 }
 
+export type ProjectVersionReferenceRole = 'working' | 'presented';
+
+/** A revision-scoped used-by relation. It never claims that this Project produced the Version. */
+export interface ProjectVersionReferenceLink {
+  readonly projectId: string;
+  readonly ownerUserId: string;
+  readonly savedVideoId: string;
+  readonly videoVersionId: string;
+  readonly role: ProjectVersionReferenceRole;
+  readonly revisionId: string;
+  readonly revisionNumber: number;
+  readonly createdAt: string;
+}
+
 export interface ProjectJobLink {
   readonly projectId: string;
   readonly ownerUserId: string;
   readonly jobId: string;
-  readonly revisionId: string;
-  readonly revisionNumber: number;
+  readonly initiatingRevisionId: string;
+  readonly initiatingRevisionNumber: number;
   readonly createdAt: string;
 }
 
@@ -187,8 +201,9 @@ export interface ProjectOutputLink {
   readonly ownerUserId: string;
   readonly savedVideoId: string;
   readonly videoVersionId: string;
-  readonly revisionId: string;
-  readonly revisionNumber: number;
+  /** Immutable provenance for the revision that actually produced this Version. */
+  readonly producingRevisionId: string;
+  readonly producingRevisionNumber: number;
   readonly createdAt: string;
 }
 
@@ -196,15 +211,22 @@ export interface ProjectAggregate {
   readonly project: Project;
   readonly revisions: readonly ProjectRevision[];
   readonly assetLinks: readonly ProjectAssetLink[];
+  readonly versionReferenceLinks: readonly ProjectVersionReferenceLink[];
   readonly jobLinks: readonly ProjectJobLink[];
   readonly outputLinks: readonly ProjectOutputLink[];
 }
 
 export interface ProjectStatusFacts {
   readonly sourceStatus: 'none' | 'ready' | 'unavailable';
-  readonly activeJobCount: number;
-  readonly failedJobCount: number;
-  readonly successfulOutputCount: number;
+  /** Facts for the current attempt only; historical jobs cannot be folded into this value. */
+  readonly currentAttempt:
+    | { readonly status: 'none' }
+    | {
+        readonly status: 'active' | 'failed' | 'succeeded';
+        readonly jobId: string;
+      };
+  /** Exact, owner-validated retained output for the current snapshot, or null. */
+  readonly validatedLastSuccessfulOutput: ProjectOutputReference | null;
 }
 
 export type ProjectConflict =
@@ -219,6 +241,15 @@ export type ProjectConflict =
       readonly projectId: string;
       readonly expectedRevisionNumber: number;
       readonly actualRevisionNumber: number;
+    }
+  | {
+      readonly kind: 'relation-mismatch';
+      readonly projectId: string;
+      readonly relation: 'job' | 'output';
+    }
+  | {
+      readonly kind: 'active-jobs';
+      readonly projectId: string;
     };
 
 export type ProjectMutationResult<T> =

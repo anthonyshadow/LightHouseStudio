@@ -191,7 +191,17 @@ describe('DrizzleAssetLifecycleRegistry', () => {
       provider: readyRow.storageProvider,
       storageKey: readyRow.storageKey,
     };
-    const scripted = scriptedDatabase([], [], [], [readyRow], [deletionClaim], [], [], []);
+    const scripted = scriptedDatabase(
+      [],
+      [],
+      [],
+      [readyRow],
+      [deletionClaim],
+      [deletionClaim],
+      [],
+      [],
+      [],
+    );
     const repository = new DrizzleAssetLifecycleRegistry(scripted.db);
 
     await repository.prepare(manifest, { provider: 'r2', storageKey: readyRow.storageKey });
@@ -208,6 +218,21 @@ describe('DrizzleAssetLifecycleRegistry', () => {
     await repository.markDeleted(ownerUserId, assetId, deletionClaim);
     await expect(repository.findReady(ownerUserId, 'missing')).resolves.toBeNull();
     await expect(repository.claimDeletion(ownerUserId, 'missing', 'r2')).resolves.toBeNull();
+    expect(scripted.remaining()).toBe(0);
+  });
+
+  it('does not claim bytes retained by any Project lifecycle state', async () => {
+    const deletionClaim = { provider: 'r2' as const, storageKey: `media/v1/${assetId}` };
+    const scripted = scriptedDatabase([deletionClaim]);
+    const projectRetention = { retainsAssetWith: vi.fn().mockResolvedValue(true) };
+    const repository = new DrizzleAssetLifecycleRegistry(scripted.db, projectRetention);
+
+    await expect(repository.claimDeletion(ownerUserId, assetId, 'r2')).resolves.toBeNull();
+    expect(projectRetention.retainsAssetWith.mock.calls[0]?.slice(1)).toEqual([
+      ownerUserId,
+      assetId,
+    ]);
+    expect(scripted.operations).not.toContain('update');
     expect(scripted.remaining()).toBe(0);
   });
 });
@@ -339,6 +364,30 @@ describe('DrizzleSavedVideoRepository', () => {
       video: { createdAt: now, updatedAt: now },
       versions: [{ createdAt: now }],
     });
+    expect(scripted.remaining()).toBe(0);
+  });
+
+  it('checks active Saved Video asset references in one batch query', async () => {
+    const scripted = scriptedDatabase([{ assetId }, { assetId: nextVersionId }]);
+    const repository = new DrizzleSavedVideoRepository(scripted.db);
+
+    await expect(
+      repository.referencedAssetIds(ownerUserId, [assetId, nextVersionId]),
+    ).resolves.toEqual(new Set([assetId, nextVersionId]));
+    expect(scripted.remaining()).toBe(0);
+  });
+
+  it('loads active idempotency receipts in one batch query', async () => {
+    const scripted = scriptedDatabase([{ ...receipt, ownerUserId, createdAt: postgresNow }]);
+    const repository = new DrizzleSavedVideoRepository(scripted.db);
+
+    await expect(
+      repository.findActiveReceipts([
+        { ownerUserId, idempotencyKey: receipt.idempotencyKey },
+        { ownerUserId, idempotencyKey: nextVersionId },
+      ]),
+    ).resolves.toEqual([{ ...receipt, ownerUserId }]);
+    expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
     expect(scripted.remaining()).toBe(0);
   });
 
@@ -914,5 +963,25 @@ describe('DrizzleReferenceImageAssetStore', () => {
     );
     expect(bytes.delete).toHaveBeenCalledWith(ownerUserId, assetId);
     expect(temporaryScript.remaining()).toBe(0);
+
+    vi.mocked(bytes.delete).mockClear();
+    const retainedScript = scriptedDatabase([{ id: assetId }], []);
+    const projectRetention = {
+      retainsAsset: vi.fn().mockResolvedValue(true),
+      retainedAssetIds: vi.fn().mockResolvedValue(new Set([assetId])),
+    };
+    const retainedRepository = new DrizzleReferenceImageAssetStore(
+      retainedScript.db,
+      bytes,
+      undefined,
+      projectRetention,
+    );
+    await expect(retainedRepository.discardIfUnreferenced(ownerUserId, assetId)).resolves.toBe(
+      false,
+    );
+    expect(projectRetention.retainedAssetIds).toHaveBeenCalledWith(ownerUserId, [assetId]);
+    expect(projectRetention.retainsAsset).not.toHaveBeenCalled();
+    expect(bytes.delete).not.toHaveBeenCalled();
+    expect(retainedScript.remaining()).toBe(0);
   });
 });

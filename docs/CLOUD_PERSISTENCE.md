@@ -19,9 +19,12 @@ account is not production identity or tenancy.
   and creative-library replacement use database transactions and optimistic concurrency.
 - An authoritative `postgres`/`neon` Project repository with a Project-version CAS, monotonic
   immutable revision history, validated snapshot V1, same-owner composite foreign keys, and
-  normalized asset/job/Saved Video output links. Source links require a same-owner `ready` media
-  asset inside the create/append transaction. Existing videos/jobs are not backfilled, and no
-  Project route or UI writes these tables yet. `shadow` does not make Projects authoritative.
+  normalized revision-scoped asset/used-Version links plus one initiating revision per job and one
+  producing revision per output Version. Exact replay is idempotent; changed replay conflicts.
+  Snapshot Versions require an active same-owner Saved Video and exact Version at link time, output
+  pointers require an existing exact Project output, and normal current/history reads are bounded.
+  Existing videos/jobs are not backfilled, and no Project route or UI writes these tables yet.
+  `shadow` does not make Projects authoritative.
 - A private R2 `AssetByteStore` with opaque keys, streaming/multipart upload, app-owned SHA-256,
   byte-range reads, owner checks, database lifecycle states, multipart abort/cleanup, and deletion
   tombstones. R2 ETags are retained only as transport metadata, never as the integrity checksum.
@@ -51,6 +54,9 @@ account is not production identity or tenancy.
   tombstoned first, all immutable versions and thumbnails are collected, active owner relationships
   are rechecked, and only unshared R2 objects are deleted. `deleting` lifecycle rows remain
   claimable so an interrupted R2 request can be retried without restoring the gallery record.
+- One owner-scoped Project retention query protects direct assets and exact Version/output assets
+  across Saved Video, reference-image, and generic lifecycle deletion. Archive and tombstone retain
+  these relations; no Project physical-purge policy is implemented.
 - An idempotent local backfill for saved videos/thumbnails, saved voices, and reference images.
   Saved-video metadata is normalized first to canonical UTC ISO timestamps and integer
   milliseconds, including legacy local records. Creative metadata migrates through the
@@ -76,6 +82,9 @@ and key-prefix namespace are immutable configuration. Changing any of them requi
 reviewed byte migration plus database and bucket inventory verification; changing environment
 values alone is not a migration. The Neon gallery path applies filtering, ordering, pagination,
 counts, and facets in SQL rather than materializing the owner library in application memory.
+`DATABASE_MODE=neon` also requires `DATABASE_URL` to state encrypted transport explicitly with
+`sslmode=require`, `sslmode=verify-ca`, or `sslmode=verify-full`; application startup and migration
+configuration fail closed before opening a pool otherwise.
 
 ## Initial setup
 
@@ -162,9 +171,16 @@ verification, lifecycle, or cleanup contracts above.
 - Database migrations must be applied through reviewed forward migrations. Restore/PITR and R2
   inventory drills require real staging resources and are not claimed by automated local tests.
 - Project migration `0009` is additive and does not assign, rewrite, or delete existing videos,
-  jobs, or assets. An application rollback may leave the new empty/retained tables unused. Dropping
-  them after Project writes is destructive and requires a separate reviewed migration, inventory,
-  backup, and restore plan; it is not an automatic rollback step.
+  jobs, or assets. Corrective migration `0010` is forward and data-preserving but not purely
+  additive: it preflights strict snapshots/provable relations, replaces the Project asset primary
+  key with a revision-granular key, makes job/output producer uniqueness global, renames their
+  revision columns to initiating/producing, and reconstructs only snapshot-declared direct and
+  used-Version references. Any irreconcilable row aborts with IDs and a safe repair hint before
+  constraint changes. Rolling application code back across `0010` is not compatible with the new
+  column/key contract; restore the pre-migration database or deploy compatible code. Never drop the
+  retained tables or relations as an automatic rollback step. Follow-up migration `0011` changes
+  indexes only: Project relation indexes follow revision cursors, and Saved Video Version indexes
+  support owner-scoped asset-retention batches without rewriting application data.
 
 ## Operational checks before any non-loopback deployment
 

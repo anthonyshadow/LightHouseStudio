@@ -41,6 +41,15 @@ opens those stories.
 | `bun run check:dead-code:production` | Production file/dependency reachability; excludes test-only exports               |
 | `bun run db:smoke:development`       | Local PostgreSQL connection, transaction, seeded-user, and cleanup smoke          |
 
+The focused Project repository transaction test runs automatically in the CI database environment.
+Against the isolated local development database, run it explicitly after migrations:
+
+```bash
+LIGHTFRAME_RUN_PROJECT_POSTGRES_TEST=true node --env-file=.env.development \
+  ./node_modules/vitest/vitest.mjs run \
+  apps/api/src/infrastructure/database/project-repository.postgres.integration.test.ts
+```
+
 `test:unit` and `test:integration` are useful focused subsets; `bun run test` runs both categories
 once through a single Node-backed Vitest invocation. Bun owns package installation and the API
 runtime, but `bun test` is a different runner and is not an alias for this retained suite. Selected
@@ -80,6 +89,10 @@ The retained suite protects:
   media verification, abandoned multipart cleanup, local/shadow path preservation,
   database-level gallery paging, durable-session boundaries, accepted-job restart without a second
   billable submission, admission limits, and bounded expired-job tombstones;
+- revision-granular Project media lineage, strict/canonical snapshots, normalized exact Saved Video
+  Version references, immutable initiating/producing provenance, concurrent exact-versus-mismatched
+  replay, active-job archive blocking, bounded current/history reads, migration preflight, and
+  Project-retained byte cleanup across Saved Video/reference/generic paths;
 - app-owned saved-voice membership, first-read claim, owner-checked preview/conversion, and proof
   that relationship removal never calls provider voice deletion;
 - loopback Host/Origin, explicit provider intent, bounded response/stream handling, SSRF-resistant

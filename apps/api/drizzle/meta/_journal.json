@@ -71,6 +71,20 @@
       "when": 1786485967974,
       "tag": "0009_boring_marvel_apes",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1786493202353,
+      "tag": "0010_quiet_wind_dancer",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1786496244325,
+      "tag": "0011_small_human_fly",
+      "breakpoints": true
     }
   ]
 }

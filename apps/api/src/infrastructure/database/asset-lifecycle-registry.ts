@@ -9,9 +9,13 @@ import type {
 import type { StoredAssetManifest } from '../../storage/asset-byte-store.js';
 import type { LightframeDatabase } from './client.js';
 import { mediaAssets } from './schema.js';
+import type { DrizzleProjectRetentionPolicy } from './project-retention-policy.js';
 
 export class DrizzleAssetLifecycleRegistry implements AssetLifecycleRegistry {
-  constructor(private readonly db: LightframeDatabase) {}
+  constructor(
+    private readonly db: LightframeDatabase,
+    private readonly projectRetention?: Pick<DrizzleProjectRetentionPolicy, 'retainsAssetWith'>,
+  ) {}
 
   async prepare(
     manifest: StoredAssetManifest,
@@ -87,22 +91,42 @@ export class DrizzleAssetLifecycleRegistry implements AssetLifecycleRegistry {
     assetId: string,
     expectedProvider: AssetStorageProvider,
   ): Promise<AssetDeletionClaim | null> {
-    const [row] = await this.db
-      .update(mediaAssets)
-      .set({ status: 'deleting', updatedAt: new Date().toISOString() })
-      .where(
-        and(
-          eq(mediaAssets.id, assetId),
-          eq(mediaAssets.ownerUserId, ownerUserId),
-          eq(mediaAssets.storageProvider, expectedProvider),
-          inArray(mediaAssets.status, ['ready', 'deleting']),
-        ),
-      )
-      .returning({
-        provider: mediaAssets.storageProvider,
-        storageKey: mediaAssets.storageKey,
-      });
-    return row ?? null;
+    return this.db.transaction(async (tx) => {
+      const [candidate] = await tx
+        .select({
+          provider: mediaAssets.storageProvider,
+          storageKey: mediaAssets.storageKey,
+        })
+        .from(mediaAssets)
+        .where(
+          and(
+            eq(mediaAssets.id, assetId),
+            eq(mediaAssets.ownerUserId, ownerUserId),
+            eq(mediaAssets.storageProvider, expectedProvider),
+            inArray(mediaAssets.status, ['ready', 'deleting']),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (candidate === undefined) return null;
+      if (await this.projectRetention?.retainsAssetWith(tx, ownerUserId, assetId)) return null;
+      const [row] = await tx
+        .update(mediaAssets)
+        .set({ status: 'deleting', updatedAt: new Date().toISOString() })
+        .where(
+          and(
+            eq(mediaAssets.id, assetId),
+            eq(mediaAssets.ownerUserId, ownerUserId),
+            eq(mediaAssets.storageProvider, expectedProvider),
+            inArray(mediaAssets.status, ['ready', 'deleting']),
+          ),
+        )
+        .returning({
+          provider: mediaAssets.storageProvider,
+          storageKey: mediaAssets.storageKey,
+        });
+      return row ?? null;
+    });
   }
 
   async markDeleted(

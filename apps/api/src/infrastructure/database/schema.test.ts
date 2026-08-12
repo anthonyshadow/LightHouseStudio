@@ -23,6 +23,8 @@ import {
   projectRevisionSource,
   projects,
   projectStatus,
+  projectVersionReferenceRole,
+  projectVersionReferences,
   referenceImageAssets,
   resourceReferences,
   savedVideoReceipts,
@@ -56,6 +58,7 @@ describe('Drizzle persistence schema', () => {
       projects,
       projectRevisions,
       projectAssets,
+      projectVersionReferences,
       projectJobs,
       projectOutputs,
       outbox,
@@ -79,6 +82,20 @@ describe('Drizzle persistence schema', () => {
       'project_revisions_project_number_unique',
     );
     expect(getTableConfig(projectRevisions).uniqueConstraints).toHaveLength(1);
+    expect(
+      [videoVersions, projectAssets, projectVersionReferences, projectJobs, projectOutputs].flatMap(
+        (table) => getTableConfig(table).indexes.map(({ config }) => config.name),
+      ),
+    ).toEqual(
+      expect.arrayContaining([
+        'video_versions_asset_idx',
+        'video_versions_thumbnail_asset_idx',
+        'project_assets_project_revision_idx',
+        'project_version_references_project_revision_idx',
+        'project_jobs_project_revision_idx',
+        'project_outputs_project_revision_idx',
+      ]),
+    );
     expect(getTableConfig(projects).foreignKeys.map((foreignKey) => foreignKey.getName())).toEqual(
       expect.arrayContaining(['projects_current_revision_same_project_fk']),
     );
@@ -135,6 +152,7 @@ describe('Drizzle persistence schema', () => {
       'audio',
       'thumbnail',
     ]);
+    expect(projectVersionReferenceRole.enumValues).toEqual(['working', 'presented']);
     expect(projectRevisionAuthorKind.enumValues).toEqual(['user', 'system', 'migration']);
     expect(projectRevisionSource.enumValues).toEqual([
       'create',

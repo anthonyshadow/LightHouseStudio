@@ -11,6 +11,7 @@ import { DrizzleCreativeLibraryRepository } from './database/creative-library-re
 import { DrizzleDirectUploadRepository } from './database/direct-upload-repository.js';
 import { DrizzleProcessingJobTraceWriter } from './database/processing-job-repository.js';
 import { DrizzleProjectRepository } from './database/project-repository.js';
+import { DrizzleProjectRetentionPolicy } from './database/project-retention-policy.js';
 import { DrizzleReferenceImageAssetStore } from './database/reference-image-asset-store.js';
 import { DrizzleSavedVideoRepository } from './database/saved-video-repository.js';
 import { DrizzleSavedVoiceRepository } from './database/saved-voice-repository.js';
@@ -44,7 +45,9 @@ export const createConfiguredPersistence = async (
   if (config.databaseUrl === undefined) {
     throw new Error('Relational persistence requires DATABASE_URL.');
   }
-  const connection = createPostgresDatabase(config.databaseUrl);
+  const connection = createPostgresDatabase(config.databaseUrl, {
+    requireTls: config.databaseMode === 'neon',
+  });
   try {
     const users = new DrizzleUserRepository(connection.db);
     await users.ensureSeededUser({
@@ -53,7 +56,8 @@ export const createConfiguredPersistence = async (
       displayName: config.demoUserDisplayName,
       passwordHash: config.demoUserPasswordHash,
     });
-    const lifecycle = new DrizzleAssetLifecycleRegistry(connection.db);
+    const projectRetention = new DrizzleProjectRetentionPolicy(connection.db);
+    const lifecycle = new DrizzleAssetLifecycleRegistry(connection.db, projectRetention);
     const localBytes = new LocalAssetByteStore(config.lightframeDataDir);
     let assetBytes: AssetByteStore;
     let directR2Storage: R2AssetByteStore | undefined;
@@ -78,7 +82,12 @@ export const createConfiguredPersistence = async (
       };
     }
 
-    const referenceImages = new DrizzleReferenceImageAssetStore(connection.db, assetBytes);
+    const referenceImages = new DrizzleReferenceImageAssetStore(
+      connection.db,
+      assetBytes,
+      undefined,
+      projectRetention,
+    );
     return {
       users,
       sessions: new DrizzleSessionRepository(connection.db),
@@ -89,12 +98,11 @@ export const createConfiguredPersistence = async (
       processingJobTraces,
       processingJobs: processingJobTraces,
       projects: new DrizzleProjectRepository(connection.db),
+      projectRetention,
       creativeLibraries: new DrizzleCreativeLibraryRepository(
         connection.db,
         async (ownerUserId, assetIds) => {
-          await Promise.all(
-            assetIds.map((assetId) => referenceImages.discardIfUnreferenced(ownerUserId, assetId)),
-          );
+          await referenceImages.discardManyIfUnreferenced(ownerUserId, assetIds);
         },
       ),
       ...(directR2Storage === undefined
