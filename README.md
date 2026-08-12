@@ -13,8 +13,9 @@ video. Its primary loop is:
 Live character transformation and Workshop remain advanced tools. The app binds to loopback. Phase
 1 provides one seeded local demo account, authenticated ownership, and durable local saved-media
 records; it does not provide signup, billing, collaboration, or public multi-user deployment. A
-durable, video-oriented Project domain/database foundation exists, but no Project routes or UI are
-user-facing yet. Campaigns and multi-format content creation are future product directions, not
+durable, video-oriented Project authority and authenticated lifecycle API now support empty
+Projects in every persistence mode, but no Project route or workspace is user-facing in the browser
+yet. Campaigns and multi-format content creation are future product directions, not
 current features. The app is not approved for LAN, tunnel, proxy, or public exposure.
 
 ## Status

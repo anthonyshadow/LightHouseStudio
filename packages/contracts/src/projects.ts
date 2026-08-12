@@ -45,6 +45,7 @@ export const projectWorkflowPhaseSchema = z.enum(PROJECT_WORKFLOW_PHASES);
 export const projectIdSchema = z.uuid();
 export const projectRevisionIdSchema = z.uuid();
 export const projectTitleSchema = z.string().trim().min(1).max(120);
+export const projectOperationKeySchema = z.uuid();
 
 const creativeAssetIdSchema = z
   .string()
@@ -322,6 +323,7 @@ export const projectStatusFactsSchema = z
   .strict();
 
 export const projectConflictSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('operation-key'), operation: z.literal('create') }).strict(),
   z
     .object({
       kind: z.literal('project-version'),
@@ -348,11 +350,37 @@ export const projectConflictSchema = z.discriminatedUnion('kind', [
     .strict(),
 ]);
 
-export const createProjectRequestSchema = z
-  .object({ title: projectTitleSchema, snapshot: projectSnapshotSchema.optional() })
-  .strict();
+export const createProjectRequestSchema = z.object({ title: projectTitleSchema }).strict();
 export const renameProjectRequestSchema = z
   .object({ title: projectTitleSchema, expectedVersion: z.number().int().positive() })
+  .strict();
+export const projectLifecycleRequestSchema = z
+  .object({ expectedVersion: z.number().int().positive() })
+  .strict();
+export const projectParamsSchema = z.object({ projectId: projectIdSchema }).strict();
+export const projectsQuerySchema = z
+  .object({
+    lifecycle: z.enum(['active', 'archived']).default('active'),
+    cursor: z.string().trim().min(1).max(500).optional(),
+    pageSize: z.coerce.number().int().min(1).max(40).default(20),
+  })
+  .strict();
+export const projectCurrentResponseSchema = z
+  .object({ project: projectSchema, revision: projectRevisionSchema })
+  .strict();
+export const projectsResponseSchema = z
+  .object({
+    projects: z.array(projectSchema).max(40),
+    nextCursor: z.string().max(500).nullable(),
+  })
+  .strict();
+export const projectConflictResponseSchema = z
+  .object({
+    error: z
+      .object({ code: z.literal('conflict'), message: z.string().trim().min(1).max(300) })
+      .strict(),
+    conflict: projectConflictSchema,
+  })
   .strict();
 export const appendProjectRevisionRequestSchema = z
   .object({
@@ -373,3 +401,5 @@ export type ProjectOutputLinkContract = z.infer<typeof projectOutputLinkSchema>;
 export type ProjectVersionReferenceLinkContract = z.infer<typeof projectVersionReferenceLinkSchema>;
 export type ProjectStatusFactsContract = z.infer<typeof projectStatusFactsSchema>;
 export type ProjectConflictContract = z.infer<typeof projectConflictSchema>;
+export type ProjectsQuery = z.infer<typeof projectsQuerySchema>;
+export type ProjectCurrentResponse = z.infer<typeof projectCurrentResponseSchema>;

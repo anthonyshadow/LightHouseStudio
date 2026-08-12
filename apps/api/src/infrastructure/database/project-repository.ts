@@ -15,6 +15,8 @@ import { and, desc, eq, inArray, isNull, lt, or, sql, type SQLWrapper } from 'dr
 import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   AppendProjectRevisionPersistenceInput,
+  ProjectCreateReceipt,
+  ProjectCreatePersistenceResult,
   ProjectCurrentRead,
   ProjectLinkHistoryKind,
   ProjectLinkHistoryPage,
@@ -22,6 +24,8 @@ import type {
   ProjectPersistenceMutationResult,
   ProjectRepository,
   ProjectRevisionHistoryPage,
+  ProjectSummaryPage,
+  ProjectSummaryPageInput,
 } from '../../features/projects/project-repository.js';
 import type { LightframeDatabase } from './client.js';
 import {
@@ -29,6 +33,7 @@ import {
   processingJobs,
   projectAssets,
   projectJobs,
+  projectOperationReceipts,
   projectOutputs,
   projectRevisions,
   projectVersionReferences,
@@ -435,7 +440,7 @@ const replayOrRelationConflict = <Row>(
 export class DrizzleProjectRepository implements ProjectRepository {
   constructor(private readonly db: LightframeDatabase) {}
 
-  async create(aggregate: ProjectAggregate): Promise<void> {
+  async #persistNewAggregate(tx: DatabaseExecutor, aggregate: ProjectAggregate): Promise<void> {
     const { project } = aggregate;
     const [rawInitialRevision] = aggregate.revisions;
     const initialRevision =
@@ -467,29 +472,119 @@ export class DrizzleProjectRepository implements ProjectRepository {
     }
     assertRevisionAssetLinks(initialRevision, aggregate.assetLinks);
     const versionReferenceLinks = snapshotVersionReferenceLinks(initialRevision);
-    await this.db.transaction(async (tx) => {
+    await tx
+      .insert(projects)
+      .values(projectValues(project, { currentRevisionId: null, currentRevisionNumber: 0 }));
+    await tx.insert(projectRevisions).values(revisionValues(initialRevision));
+    await assertReadyAssets(tx, project.ownerUserId, aggregate.assetLinks);
+    await assertReadyVersionReferences(tx, project.ownerUserId, versionReferenceLinks);
+    await assertLastSuccessfulOutput(tx, initialRevision);
+    if (aggregate.assetLinks.length > 0) {
+      await tx.insert(projectAssets).values(aggregate.assetLinks.map(assetLinkValues));
+    }
+    if (versionReferenceLinks.length > 0) {
       await tx
-        .insert(projects)
-        .values(projectValues(project, { currentRevisionId: null, currentRevisionNumber: 0 }));
-      await tx.insert(projectRevisions).values(revisionValues(initialRevision));
-      await assertReadyAssets(tx, project.ownerUserId, aggregate.assetLinks);
-      await assertReadyVersionReferences(tx, project.ownerUserId, versionReferenceLinks);
-      await assertLastSuccessfulOutput(tx, initialRevision);
-      if (aggregate.assetLinks.length > 0) {
-        await tx.insert(projectAssets).values(aggregate.assetLinks.map(assetLinkValues));
+        .insert(projectVersionReferences)
+        .values(versionReferenceLinks.map(versionReferenceValues));
+    }
+    await tx
+      .update(projects)
+      .set({
+        currentRevisionId: project.currentRevisionId,
+        currentRevisionNumber: project.currentRevisionNumber,
+      })
+      .where(and(eq(projects.id, project.id), eq(projects.ownerUserId, project.ownerUserId)));
+  }
+
+  async create(aggregate: ProjectAggregate): Promise<void> {
+    await this.db.transaction((tx) => this.#persistNewAggregate(tx, aggregate));
+  }
+
+  async createIdempotent(input: {
+    readonly aggregate: ProjectAggregate;
+    readonly receipt: ProjectCreateReceipt;
+  }): Promise<ProjectCreatePersistenceResult> {
+    return this.db.transaction(async (tx) => {
+      if (input.receipt.projectId !== input.aggregate.project.id) {
+        throw new ProjectPersistenceError('invalid-aggregate', 'Project create receipt mismatch.');
       }
-      if (versionReferenceLinks.length > 0) {
-        await tx
-          .insert(projectVersionReferences)
-          .values(versionReferenceLinks.map(versionReferenceValues));
-      }
-      await tx
-        .update(projects)
-        .set({
-          currentRevisionId: project.currentRevisionId,
-          currentRevisionNumber: project.currentRevisionNumber,
+      const inserted = await tx
+        .insert(projectOperationReceipts)
+        .values({
+          ownerUserId: input.aggregate.project.ownerUserId,
+          operationKey: input.receipt.operationKey,
+          operation: 'create',
+          requestFingerprint: input.receipt.requestFingerprint,
+          projectId: input.receipt.projectId,
+          createdAt: toIsoTimestamp(input.receipt.createdAt),
         })
-        .where(and(eq(projects.id, project.id), eq(projects.ownerUserId, project.ownerUserId)));
+        .onConflictDoNothing({
+          target: [projectOperationReceipts.ownerUserId, projectOperationReceipts.operationKey],
+        })
+        .returning({ operationKey: projectOperationReceipts.operationKey });
+      if (inserted.length > 0) {
+        await this.#persistNewAggregate(tx, input.aggregate);
+        return {
+          kind: 'created',
+          current: {
+            project: input.aggregate.project,
+            revision: input.aggregate.revisions[0]!,
+          },
+        };
+      }
+
+      const [row] = await tx
+        .select({
+          receipt: projectOperationReceipts,
+          project: projects,
+          revision: projectRevisions,
+        })
+        .from(projectOperationReceipts)
+        .leftJoin(
+          projects,
+          and(
+            eq(projects.id, projectOperationReceipts.projectId),
+            eq(projects.ownerUserId, projectOperationReceipts.ownerUserId),
+            isNull(projects.deletedAt),
+          ),
+        )
+        .leftJoin(
+          projectRevisions,
+          and(
+            eq(projectRevisions.projectId, projects.id),
+            eq(projectRevisions.ownerUserId, projects.ownerUserId),
+            eq(projectRevisions.id, projects.currentRevisionId),
+            eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
+          ),
+        )
+        .where(
+          and(
+            eq(projectOperationReceipts.ownerUserId, input.aggregate.project.ownerUserId),
+            eq(projectOperationReceipts.operationKey, input.receipt.operationKey),
+          ),
+        )
+        .for('update', { of: projectOperationReceipts })
+        .limit(1);
+      if (
+        row === undefined ||
+        row.receipt.requestFingerprint !== input.receipt.requestFingerprint ||
+        row.receipt.operation !== 'create'
+      ) {
+        return {
+          kind: 'conflict',
+          conflict: { kind: 'operation-key', operation: 'create' },
+        };
+      }
+      if (row.project === null || row.revision === null) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          'Project create receipt has no retained result.',
+        );
+      }
+      return {
+        kind: 'replayed',
+        current: { project: toProject(row.project), revision: toRevision(row.revision) },
+      };
     });
   }
 
@@ -523,6 +618,46 @@ export class DrizzleProjectRepository implements ProjectRepository {
       );
     }
     return { project: toProject(row.project), revision: toRevision(row.revision) };
+  }
+
+  async list(ownerUserId: string, input: ProjectSummaryPageInput): Promise<ProjectSummaryPage> {
+    if (!Number.isInteger(input.pageSize) || input.pageSize < 1 || input.pageSize > 40) {
+      throw new ProjectPersistenceError('invalid-aggregate', 'Use a bounded Project summary page.');
+    }
+    const cursorTimestamp =
+      input.cursor === undefined ? undefined : toIsoTimestamp(input.cursor.updatedAt);
+    const rows = await this.db
+      .select()
+      .from(projects)
+      .where(
+        and(
+          eq(projects.ownerUserId, ownerUserId),
+          isNull(projects.deletedAt),
+          input.lifecycle === 'archived'
+            ? eq(projects.status, 'archived')
+            : sql`${projects.status} <> 'archived'`,
+          input.cursor === undefined
+            ? undefined
+            : or(
+                lt(projects.updatedAt, cursorTimestamp!),
+                and(
+                  eq(projects.updatedAt, cursorTimestamp!),
+                  lt(projects.id, input.cursor.projectId),
+                ),
+              ),
+        ),
+      )
+      .orderBy(desc(projects.updatedAt), desc(projects.id))
+      .limit(input.pageSize + 1);
+    const page = rows.slice(0, input.pageSize).map(toProject);
+    const last = page.at(-1);
+    return {
+      projects: page,
+      nextCursor:
+        rows.length > input.pageSize && last !== undefined
+          ? { updatedAt: last.updatedAt, projectId: last.id }
+          : null,
+    };
   }
 
   async #hasProject(ownerUserId: string, projectId: string): Promise<boolean> {

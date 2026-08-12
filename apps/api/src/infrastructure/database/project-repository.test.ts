@@ -6,7 +6,7 @@ import {
   mapProjectAggregate,
   ProjectPersistenceError,
 } from './project-repository.js';
-import { projectAssets, projectRevisions, projects } from './schema.js';
+import { projectAssets, projectOperationReceipts, projectRevisions, projects } from './schema.js';
 
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
@@ -198,6 +198,91 @@ describe('Project persistence mapping and transactions', () => {
     expect(insertedTables).toEqual([projects, projectRevisions, projectAssets]);
     expect(scripted.calls.filter(({ operation }) => operation === 'insert')).toHaveLength(3);
     expect(scripted.calls.some(({ operation }) => operation === 'update')).toBe(true);
+    expect(scripted.remaining()).toBe(0);
+  });
+
+  it('commits the create receipt with an empty Project and replays the stored result', async () => {
+    const aggregate = createProject(
+      {
+        id: projectId,
+        ownerUserId,
+        title: 'Idempotent empty Project',
+        author: { kind: 'user', authorId: ownerUserId },
+        facts: {
+          sourceStatus: 'none',
+          currentAttempt: { status: 'none' },
+          validatedLastSuccessfulOutput: null,
+        },
+      },
+      { now, createId: () => revisionId },
+    );
+    const receipt = {
+      operationKey: '0264e60f-2dc5-4d4b-a9f6-25c91a66285c',
+      requestFingerprint: 'a'.repeat(64),
+      projectId,
+      createdAt: now,
+    };
+    const createdDatabase = scriptedDatabase([{ operationKey: receipt.operationKey }], [], [], []);
+    const repository = new DrizzleProjectRepository(createdDatabase.db);
+    await expect(repository.createIdempotent({ aggregate, receipt })).resolves.toMatchObject({
+      kind: 'created',
+      current: { project: { id: projectId }, revision: { id: revisionId } },
+    });
+    expect(
+      createdDatabase.calls
+        .filter(({ operation }) => operation === 'insert')
+        .map(({ arguments: [table] }) => table),
+    ).toEqual([projectOperationReceipts, projects, projectRevisions]);
+    expect(createdDatabase.remaining()).toBe(0);
+
+    const replayDatabase = scriptedDatabase(
+      [],
+      [
+        {
+          receipt: { ...receipt, ownerUserId, operation: 'create' },
+          project: {
+            ...aggregate.project,
+            archivedAt: null,
+            deletedAt: null,
+            createdAt: postgresNow,
+            updatedAt: postgresNow,
+          },
+          revision: {
+            ...aggregate.revisions[0]!,
+            snapshotSchemaVersion: 1,
+            snapshot: aggregate.revisions[0]!.snapshot,
+            authorKind: 'user',
+            authorId: ownerUserId,
+            createdAt: postgresNow,
+          },
+        },
+      ],
+    );
+    await expect(
+      new DrizzleProjectRepository(replayDatabase.db).createIdempotent({ aggregate, receipt }),
+    ).resolves.toMatchObject({ kind: 'replayed', current: { project: { id: projectId } } });
+    expect(replayDatabase.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
+    expect(replayDatabase.remaining()).toBe(0);
+  });
+
+  it('returns bounded lifecycle summaries in stable recent order', async () => {
+    const aggregate = sourceAggregate();
+    const scripted = scriptedDatabase([
+      {
+        ...aggregate.project,
+        archivedAt: null,
+        deletedAt: null,
+        createdAt: postgresNow,
+        updatedAt: postgresNow,
+      },
+    ]);
+    await expect(
+      new DrizzleProjectRepository(scripted.db).list(ownerUserId, {
+        lifecycle: 'active',
+        pageSize: 20,
+      }),
+    ).resolves.toMatchObject({ projects: [{ id: projectId }], nextCursor: null });
+    expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
     expect(scripted.remaining()).toBe(0);
   });
 
