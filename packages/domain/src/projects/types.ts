@@ -133,6 +133,8 @@ export interface ProjectSnapshot {
 export interface Project {
   readonly id: string;
   readonly ownerUserId: string;
+  /** Optional organizer only; Campaign never owns Project working state. */
+  readonly campaignId: string | null;
   readonly title: string;
   readonly status: ProjectStatus;
   /** CAS token for every aggregate mutation, including metadata and lifecycle changes. */
@@ -253,6 +255,10 @@ export type ProjectConflict =
     }
   | {
       readonly kind: 'active-jobs';
+      readonly projectId: string;
+    }
+  | {
+      readonly kind: 'campaign-membership';
       readonly projectId: string;
     };
 

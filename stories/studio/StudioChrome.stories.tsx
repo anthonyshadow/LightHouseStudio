@@ -54,6 +54,7 @@ const meta = {
     user: headerUser,
     activeDestination: 'studio',
     onOpenStudio: fn(),
+    onOpenCampaigns: fn(),
     onOpenProjects: fn(),
     onOpenVideos: fn(),
     onOpenCharacters: fn(),
@@ -83,6 +84,7 @@ const HeaderHarness = () => {
         user={headerUser}
         activeDestination="studio"
         onOpenStudio={fn()}
+        onOpenCampaigns={fn()}
         onOpenProjects={fn()}
         onOpenVideos={fn()}
         onOpenCharacters={fn()}

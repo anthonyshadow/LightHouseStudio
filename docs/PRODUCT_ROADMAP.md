@@ -34,20 +34,19 @@ to that capability.
 - Use local persistence by default, with configuration-gated PostgreSQL/Neon and private R2
   infrastructure.
 
-This phase does not include Campaigns, a browser Projects workspace, collaboration, multi-format
-output, or publishing. Empty Project lifecycle authority and APIs are implemented as Phase 2
-infrastructure but are not yet a user-facing browser capability.
+This phase does not include the Phase 2 Campaign/Project organization layer, collaboration,
+multi-format output, or publishing. Those organization capabilities are now implemented in Phase 2.
 
 ## Foundation already present — Durable Project model
 
-**Status: implemented technical authority and lifecycle API; not a user-facing browser capability.**
+**Status: implemented technical authority, lifecycle API, and empty-Project browser capability.**
 
 The domain, HTTP schemas, database schema, local/shadow file authority, and authoritative
 relational repository define a
 video-oriented `Project` aggregate with immutable revisions and links to source/working media,
 processing jobs, and Saved Video outputs. Authenticated APIs support empty create, bounded list,
-current read, rename, archive, and restore; no browser UI uses them, and existing Saved Videos are
-not assigned to Projects.
+current read, rename, archive, and restore; the browser uses these lifecycle capabilities, while
+existing Saved Videos remain unassigned.
 
 This foundation should be evolved, not advertised as a finished Project experience. It represents
 a focused production effort, not a Campaign. Before Project writes become user-facing, the known
@@ -68,15 +67,15 @@ owns the detailed sequence and launch evidence.
 
 ## Phase 2 — Campaign and Project video workspace MVP
 
-**Status: in progress; invariant correction, lifecycle authority/API, and the empty-Project
-workspace are implemented. Campaign organization is next.**
+**Status: in progress; invariant correction, lifecycle authority/API, the empty-Project workspace,
+and optional Campaign organization are implemented. Durable Project source acceptance is next.**
 
 - Correct the dormant Project foundation's revision and media-reference lineage, transaction/replay,
   retention, status, read-bounding, and cleanup invariants before exposing writes.
 - Maintain the implemented owner-derived Project services, HTTP routes, local/relational
   persistence parity, and accessible Projects workspace for Quick Start, list, open, rename,
   archive, and restore. The workspace remains lifecycle-only until durable source acceptance.
-- Introduce a deliberately small Campaign aggregate—name and optional brief—that groups Projects
+- Maintain the implemented deliberately small Campaign aggregate—name and optional brief—that groups Projects
   without owning their media or processing state.
 - Keep Campaign membership optional: one Campaign may group many Projects, a Project belongs to
   zero or one Campaign, and “No Campaign” is a virtual view rather than a default row.

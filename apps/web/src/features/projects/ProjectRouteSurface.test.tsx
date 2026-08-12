@@ -23,6 +23,7 @@ const currentProject = (
 ): ProjectCurrentResponse => ({
   project: {
     id,
+    campaignId: null,
     title: id === activeId ? 'Launch cut' : 'Archived concept',
     status: id === archivedId ? 'archived' : 'draft',
     version: 1,

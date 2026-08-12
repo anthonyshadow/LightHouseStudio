@@ -11,6 +11,11 @@ const lifecycleIndexMigrationUrl = new URL(
   '../../../drizzle/0013_natural_the_phantom.sql',
   import.meta.url,
 );
+const campaignMigrationUrl = new URL('../../../drizzle/0014_violet_namor.sql', import.meta.url);
+const campaignListIndexMigrationUrl = new URL(
+  '../../../drizzle/0015_wooden_invaders.sql',
+  import.meta.url,
+);
 
 describe('Project aggregate migration', () => {
   it('is additive and creates every normalized Project relationship', async () => {
@@ -87,5 +92,31 @@ describe('Project lifecycle index migration', () => {
     expect(migration).toContain('"updated_at" DESC');
     expect(migration).toContain('"id" DESC');
     expect(migration).not.toMatch(/\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"/u);
+  });
+});
+
+describe('Campaign organization migration', () => {
+  it('adds owner-scoped Campaigns and nullable restrictive Project membership without backfill', async () => {
+    const migration = await readFile(campaignMigrationUrl, 'utf8');
+
+    expect(migration).toContain('CREATE TABLE "campaigns"');
+    expect(migration).toContain('CREATE TABLE "campaign_operation_receipts"');
+    expect(migration).toContain('ALTER TABLE "projects" ADD COLUMN "campaign_id" uuid');
+    expect(migration).toContain('projects_campaign_same_owner_fk');
+    expect(migration).toContain('ON DELETE restrict');
+    expect(migration).toContain('campaigns_owner_active_recent_idx');
+    expect(migration).toContain('campaigns_owner_archived_recent_idx');
+    expect(migration).not.toMatch(/\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"/u);
+  });
+
+  it('adds only the grouped active/archived Project list indexes', async () => {
+    const migration = await readFile(campaignListIndexMigrationUrl, 'utf8');
+
+    expect(migration).toContain('projects_owner_campaign_active_recent_idx');
+    expect(migration).toContain('projects_owner_campaign_archived_recent_idx');
+    expect(migration).toContain('"campaign_id"');
+    expect(migration).not.toMatch(
+      /\b(?:DROP|TRUNCATE|ALTER\s+TABLE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"/u,
+    );
   });
 });

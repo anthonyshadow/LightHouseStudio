@@ -1,10 +1,11 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { FileProjectRepository } from './file-project-repository.js';
 import { ProjectService } from './project-service.js';
+import { CampaignService } from '../campaigns/campaign-service.js';
 
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const otherOwnerUserId = '458c4aca-a9fa-4c25-a2c8-d218768216a1';
@@ -158,5 +159,69 @@ describe('FileProjectRepository', () => {
         pageSize: 20,
       }),
     ).rejects.toThrow();
+  });
+
+  it('migrates v1 Project metadata to v2 without inventing Campaign membership', async () => {
+    const service = new ProjectService(new FileProjectRepository(directory));
+    const created = await service.create(ownerUserId, randomUUID(), 'Legacy standalone');
+    if (!created.ok) throw new Error('Expected a Project create.');
+    const paths = metadataPaths(directory, ownerUserId);
+    const current = JSON.parse(await readFile(paths.primary, 'utf8')) as {
+      schemaVersion: number;
+      campaigns?: unknown;
+      campaignCreateReceipts?: unknown;
+      projects: Array<{ project: { campaignId?: string | null } }>;
+    };
+    current.schemaVersion = 1;
+    delete current.campaigns;
+    delete current.campaignCreateReceipts;
+    for (const aggregate of current.projects) delete aggregate.project.campaignId;
+    await writeFile(paths.primary, `${JSON.stringify(current)}\n`, 'utf8');
+    await writeFile(paths.backup, `${JSON.stringify(current)}\n`, 'utf8');
+
+    const restarted = new ProjectService(new FileProjectRepository(directory));
+    await expect(restarted.get(ownerUserId, created.current.project.id)).resolves.toMatchObject({
+      project: { campaignId: null, title: 'Legacy standalone' },
+    });
+    const migrated = JSON.parse(await readFile(paths.primary, 'utf8')) as {
+      schemaVersion: number;
+      campaigns: unknown[];
+    };
+    expect(migrated).toMatchObject({ schemaVersion: 2, campaigns: [] });
+  });
+
+  it('recovers Campaign create receipts and preserves membership across restart', async () => {
+    const key = randomUUID();
+    const repository = new FileProjectRepository(directory);
+    const campaigns = new CampaignService(repository);
+    const created = await campaigns.create(ownerUserId, key, {
+      name: 'Launch',
+      brief: 'A concise brief',
+    });
+    if (!created.ok) throw new Error('Expected a Campaign create.');
+    await expect(repository.getCampaign(otherOwnerUserId, created.campaign.id)).resolves.toBeNull();
+    await expect(
+      repository.listCampaigns(otherOwnerUserId, { lifecycle: 'active', pageSize: 20 }),
+    ).resolves.toEqual({ campaigns: [], nextCursor: null });
+    const projects = new ProjectService(repository);
+    await expect(
+      projects.create(otherOwnerUserId, randomUUID(), 'Cross-owner Project', created.campaign.id),
+    ).resolves.toMatchObject({ ok: false, conflict: { kind: 'campaign-membership' } });
+    const project = await projects.create(
+      ownerUserId,
+      randomUUID(),
+      'Campaign Project',
+      created.campaign.id,
+    );
+    if (!project.ok) throw new Error('Expected a Project create.');
+
+    const restartedRepository = new FileProjectRepository(directory);
+    const restartedCampaigns = new CampaignService(restartedRepository);
+    await expect(
+      restartedCampaigns.create(ownerUserId, key, { name: 'Launch', brief: 'A concise brief' }),
+    ).resolves.toEqual(created);
+    await expect(
+      new ProjectService(restartedRepository).get(ownerUserId, project.current.project.id),
+    ).resolves.toMatchObject({ project: { campaignId: created.campaign.id } });
   });
 });

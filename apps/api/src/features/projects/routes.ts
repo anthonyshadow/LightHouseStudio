@@ -3,6 +3,7 @@ import {
   projectConflictResponseSchema,
   projectLifecycleRequestSchema,
   projectOperationKeySchema,
+  moveProjectCampaignRequestSchema,
   projectParamsSchema,
   projectsQuerySchema,
   renameProjectRequestSchema,
@@ -45,6 +46,8 @@ const conflictMessage = (conflict: ProjectConflict): string => {
       return 'The Project has active work and cannot be archived yet.';
     case 'relation-mismatch':
       return 'The Project relationship changed and the request was not applied.';
+    case 'campaign-membership':
+      return 'Choose an active Campaign you can access, or detach the Project.';
   }
 };
 
@@ -84,6 +87,7 @@ export const registerProjectRoutes = (
       ownerUserIdForRequest(request),
       operationKey.data,
       body.data.title,
+      body.data.campaignId,
     );
     if (result.ok) {
       reply.status(201);
@@ -144,6 +148,27 @@ export const registerProjectRoutes = (
         ownerUserIdForRequest(request),
         params.data.projectId,
         body.data.expectedVersion,
+      ),
+    );
+  });
+
+  app.post('/api/projects/:projectId/campaign', async (request, reply) => {
+    const params = projectParamsSchema.safeParse(request.params);
+    const body = moveProjectCampaignRequestSchema.safeParse(request.body);
+    if (!params.success || !body.success) {
+      throw new AppError(
+        400,
+        'validation_error',
+        'Provide a valid Project, Campaign, and version.',
+      );
+    }
+    return sendMutation(
+      reply,
+      await requireService(service).moveToCampaign(
+        ownerUserIdForRequest(request),
+        params.data.projectId,
+        body.data.expectedVersion,
+        body.data.campaignId,
       ),
     );
   });

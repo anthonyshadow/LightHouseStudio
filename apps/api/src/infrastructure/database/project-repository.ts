@@ -29,6 +29,7 @@ import type {
 } from '../../features/projects/project-repository.js';
 import type { LightframeDatabase } from './client.js';
 import {
+  campaigns,
   mediaAssets,
   processingJobs,
   projectAssets,
@@ -110,6 +111,7 @@ const toProject = (row: ProjectRow): Project => {
   return {
     id: row.id,
     ownerUserId: row.ownerUserId,
+    campaignId: row.campaignId,
     title: row.title,
     status: row.status,
     version: row.version,
@@ -194,6 +196,7 @@ const projectValues = (
 ): typeof projects.$inferInsert => ({
   id: project.id,
   ownerUserId: project.ownerUserId,
+  campaignId: project.campaignId,
   title: project.title,
   status: project.status,
   version: project.version,
@@ -440,6 +443,24 @@ const replayOrRelationConflict = <Row>(
 export class DrizzleProjectRepository implements ProjectRepository {
   constructor(private readonly db: LightframeDatabase) {}
 
+  async #campaignMembershipIsValid(tx: DatabaseExecutor, project: Project): Promise<boolean> {
+    if (project.campaignId === null) return true;
+    const [campaign] = await tx
+      .select({ id: campaigns.id })
+      .from(campaigns)
+      .where(
+        and(
+          eq(campaigns.id, project.campaignId),
+          eq(campaigns.ownerUserId, project.ownerUserId),
+          eq(campaigns.status, 'active'),
+          isNull(campaigns.deletedAt),
+        ),
+      )
+      .for('update')
+      .limit(1);
+    return campaign !== undefined;
+  }
+
   async #persistNewAggregate(tx: DatabaseExecutor, aggregate: ProjectAggregate): Promise<void> {
     const { project } = aggregate;
     const [rawInitialRevision] = aggregate.revisions;
@@ -497,7 +518,15 @@ export class DrizzleProjectRepository implements ProjectRepository {
   }
 
   async create(aggregate: ProjectAggregate): Promise<void> {
-    await this.db.transaction((tx) => this.#persistNewAggregate(tx, aggregate));
+    await this.db.transaction(async (tx) => {
+      if (!(await this.#campaignMembershipIsValid(tx, aggregate.project))) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          'The target Campaign is unavailable.',
+        );
+      }
+      await this.#persistNewAggregate(tx, aggregate);
+    });
   }
 
   async createIdempotent(input: {
@@ -523,6 +552,23 @@ export class DrizzleProjectRepository implements ProjectRepository {
         })
         .returning({ operationKey: projectOperationReceipts.operationKey });
       if (inserted.length > 0) {
+        if (!(await this.#campaignMembershipIsValid(tx, input.aggregate.project))) {
+          await tx
+            .delete(projectOperationReceipts)
+            .where(
+              and(
+                eq(projectOperationReceipts.ownerUserId, input.aggregate.project.ownerUserId),
+                eq(projectOperationReceipts.operationKey, input.receipt.operationKey),
+              ),
+            );
+          return {
+            kind: 'conflict',
+            conflict: {
+              kind: 'campaign-membership',
+              projectId: input.aggregate.project.id,
+            },
+          };
+        }
         await this.#persistNewAggregate(tx, input.aggregate);
         return {
           kind: 'created',
@@ -636,6 +682,11 @@ export class DrizzleProjectRepository implements ProjectRepository {
           input.lifecycle === 'archived'
             ? eq(projects.status, 'archived')
             : sql`${projects.status} <> 'archived'`,
+          input.campaignId === undefined
+            ? undefined
+            : input.campaignId === 'none'
+              ? isNull(projects.campaignId)
+              : eq(projects.campaignId, input.campaignId),
           input.cursor === undefined
             ? undefined
             : or(
@@ -1023,6 +1074,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
       }
       if (
         nextProject.ownerUserId !== current.ownerUserId ||
+        nextProject.campaignId !== current.campaignId ||
         nextProject.version !== current.version + 1 ||
         nextProject.currentRevisionId !== current.currentRevisionId ||
         nextProject.currentRevisionNumber !== current.currentRevisionNumber
@@ -1075,6 +1127,84 @@ export class DrizzleProjectRepository implements ProjectRepository {
           version: nextProject.version,
           archivedAt: nullableIsoTimestamp(nextProject.archivedAt),
           deletedAt: nullableIsoTimestamp(nextProject.deletedAt),
+          updatedAt: toIsoTimestamp(nextProject.updatedAt),
+        })
+        .where(and(eq(projects.id, current.id), eq(projects.ownerUserId, current.ownerUserId)));
+      return { kind: 'updated' } as const;
+    });
+  }
+
+  async updateCampaignMembership(
+    ownerUserId: string,
+    expectedVersion: number,
+    nextProject: Project,
+  ): Promise<ProjectPersistenceMutationResult> {
+    return this.db.transaction(async (tx) => {
+      if (nextProject.campaignId !== null) {
+        const [campaign] = await tx
+          .select({ id: campaigns.id })
+          .from(campaigns)
+          .where(
+            and(
+              eq(campaigns.id, nextProject.campaignId),
+              eq(campaigns.ownerUserId, ownerUserId),
+              eq(campaigns.status, 'active'),
+              isNull(campaigns.deletedAt),
+            ),
+          )
+          .for('update')
+          .limit(1);
+        if (campaign === undefined) {
+          return {
+            kind: 'conflict',
+            conflict: { kind: 'campaign-membership', projectId: nextProject.id },
+          } as const;
+        }
+      }
+      const [current] = await tx
+        .select()
+        .from(projects)
+        .where(
+          and(
+            eq(projects.id, nextProject.id),
+            eq(projects.ownerUserId, ownerUserId),
+            isNull(projects.deletedAt),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (current === undefined) return { kind: 'not-found' } as const;
+      if (current.version !== expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'project-version',
+            projectId: current.id,
+            expectedVersion,
+            actualVersion: current.version,
+          },
+        } as const;
+      }
+      if (
+        nextProject.ownerUserId !== current.ownerUserId ||
+        nextProject.version !== current.version + 1 ||
+        nextProject.currentRevisionId !== current.currentRevisionId ||
+        nextProject.currentRevisionNumber !== current.currentRevisionNumber ||
+        nextProject.title !== current.title ||
+        nextProject.status !== current.status ||
+        nullableIsoTimestamp(nextProject.archivedAt) !== nullableIsoTimestamp(current.archivedAt) ||
+        nullableIsoTimestamp(nextProject.deletedAt) !== nullableIsoTimestamp(current.deletedAt)
+      ) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          'A Campaign membership update cannot change unrelated Project metadata.',
+        );
+      }
+      await tx
+        .update(projects)
+        .set({
+          campaignId: nextProject.campaignId,
+          version: nextProject.version,
           updatedAt: toIsoTimestamp(nextProject.updatedAt),
         })
         .where(and(eq(projects.id, current.id), eq(projects.ownerUserId, current.ownerUserId)));

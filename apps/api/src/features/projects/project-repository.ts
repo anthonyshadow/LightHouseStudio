@@ -30,7 +30,10 @@ export type ProjectCreatePersistenceResult =
   | { readonly kind: 'created' | 'replayed'; readonly current: ProjectCurrentRead }
   | {
       readonly kind: 'conflict';
-      readonly conflict: Extract<ProjectConflict, { readonly kind: 'operation-key' }>;
+      readonly conflict: Extract<
+        ProjectConflict,
+        { readonly kind: 'operation-key' | 'campaign-membership' }
+      >;
     };
 
 export interface AppendProjectRevisionPersistenceInput {
@@ -60,6 +63,7 @@ export interface ProjectSummaryCursor {
 
 export interface ProjectSummaryPageInput {
   readonly lifecycle: 'active' | 'archived';
+  readonly campaignId?: string;
   readonly cursor?: ProjectSummaryCursor;
   readonly pageSize: number;
 }
@@ -145,6 +149,11 @@ export interface ProjectRepository {
     input: AppendProjectRevisionPersistenceInput,
   ): Promise<ProjectPersistenceMutationResult>;
   updateMetadata(
+    ownerUserId: string,
+    expectedVersion: number,
+    nextProject: Project,
+  ): Promise<ProjectPersistenceMutationResult>;
+  updateCampaignMembership(
     ownerUserId: string,
     expectedVersion: number,
     nextProject: Project,

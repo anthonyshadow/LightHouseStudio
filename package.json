@@ -69,6 +69,8 @@
     "db:migrate:development": "bun run --filter @studio/api db:migrate:development",
     "db:migrate:production": "bun run --filter @studio/api db:migrate:production",
     "db:smoke:development": "bun run --filter @studio/api db:smoke:development",
+    "r2:cors:development:set": "bunx wrangler@4.121.0 r2 bucket cors set lightframe-studio-development --file apps/api/config/r2-cors.development.json",
+    "r2:cors:development:check": "bunx wrangler@4.121.0 r2 bucket cors list lightframe-studio-development",
     "screenshots:capture": "playwright test --config playwright.screenshots.config.ts",
     "quality": "bun run typecheck && bun run storybook:typecheck && bun run lint && bun run format:check && bun run check:dead-code && bun run check:modules && bun run check:script-references && bun run check:docs && bun run check:retired-program && bun run test && bun run build && bun run check:build-manifest && bun run storybook:build"
   },

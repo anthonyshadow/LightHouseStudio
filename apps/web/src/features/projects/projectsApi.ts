@@ -42,6 +42,7 @@ const jsonHeaders = { Accept: 'application/json', 'Content-Type': 'application/j
 
 export const listProjects = (
   input: Pick<ProjectsQuery, 'lifecycle' | 'pageSize'> & {
+    readonly campaignId?: ProjectsQuery['campaignId'];
     readonly cursor?: string | undefined;
     readonly signal?: AbortSignal | undefined;
   },
@@ -51,6 +52,7 @@ export const listProjects = (
     pageSize: String(input.pageSize),
   });
   if (input.cursor) query.set('cursor', input.cursor);
+  if (input.campaignId) query.set('campaignId', input.campaignId);
   return requestJson(
     `/api/projects?${query.toString()}`,
     {
@@ -66,6 +68,7 @@ export const listProjects = (
 export const createProject = (
   title: string,
   operationKey: string,
+  campaignId: string | null = null,
   signal?: AbortSignal,
 ): Promise<ProjectCurrentResponse> =>
   requestJson(
@@ -74,7 +77,7 @@ export const createProject = (
       method: 'POST',
       cache: 'no-store',
       headers: { ...jsonHeaders, 'Idempotency-Key': operationKey },
-      body: JSON.stringify({ title }),
+      body: JSON.stringify({ title, campaignId }),
       ...(signal ? { signal } : {}),
     },
     projectCurrentResponseSchema,
@@ -150,3 +153,23 @@ export const restoreProject = (
   signal?: AbortSignal,
 ): Promise<ProjectCurrentResponse> =>
   changeProjectLifecycle(projectId, 'restore', expectedVersion, signal);
+
+export const moveProjectToCampaign = (
+  projectId: string,
+  campaignId: string | null,
+  expectedVersion: number,
+  signal?: AbortSignal,
+): Promise<ProjectCurrentResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(projectId)}/campaign`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: jsonHeaders,
+      body: JSON.stringify({ campaignId, expectedVersion }),
+      ...(signal ? { signal } : {}),
+    },
+    projectCurrentResponseSchema,
+    invalidProjectResponse,
+    parseProjectConflict,
+  );

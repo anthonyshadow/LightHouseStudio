@@ -20,6 +20,8 @@ import { Button } from '../ui/primitives/Button';
 import { EntryPage } from './EntryPage';
 import {
   APP_PATHS,
+  campaignIdFromPath,
+  isCampaignsPath,
   isProjectsPath,
   isRestorableStudioPath,
   isStudioPath,
@@ -48,10 +50,13 @@ const routeSurfaceStyles = {
 
 const titleForPath = (pathname: string): string => {
   if (projectIdFromPath(pathname) !== null) return 'Project · Lightframe Studio';
+  if (campaignIdFromPath(pathname) !== null) return 'Campaign · Lightframe Studio';
 
   switch (pathname) {
     case APP_PATHS.projects:
       return 'Projects · Lightframe Studio';
+    case APP_PATHS.campaigns:
+      return 'Campaigns · Lightframe Studio';
     case APP_PATHS.videos:
       return 'Saved Videos · Lightframe Studio';
     case APP_PATHS.characters:
@@ -158,7 +163,9 @@ export const RoutedApplication = () => {
     setHasVisitedStudio(true);
   }
   const focusMainOnMount =
-    (location.pathname === APP_PATHS.studio || isProjectsPath(location.pathname)) &&
+    (location.pathname === APP_PATHS.studio ||
+      isProjectsPath(location.pathname) ||
+      isCampaignsPath(location.pathname)) &&
     location.key !== 'default';
 
   return (

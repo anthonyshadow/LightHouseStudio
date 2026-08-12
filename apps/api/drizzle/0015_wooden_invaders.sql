@@ -1,0 +1,2 @@
+CREATE INDEX "projects_owner_campaign_active_recent_idx" ON "projects" USING btree ("owner_user_id","campaign_id","updated_at" DESC NULLS LAST,"id" DESC NULLS LAST) WHERE "projects"."deleted_at" is null and "projects"."status" <> 'archived';--> statement-breakpoint
+CREATE INDEX "projects_owner_campaign_archived_recent_idx" ON "projects" USING btree ("owner_user_id","campaign_id","updated_at" DESC NULLS LAST,"id" DESC NULLS LAST) WHERE "projects"."deleted_at" is null and "projects"."status" = 'archived';

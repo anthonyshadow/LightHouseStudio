@@ -17,8 +17,8 @@ The implemented product is narrower than that vision. Today, Lightframe Studio i
 single-operator studio centered on video creation and transformation. It records or imports video,
 supports local editing and optional creative transformations, maintains reusable characters,
 outfits, and voices, saves versioned video outputs, and downloads finished work from Saved Videos.
-Campaigns, user-facing Projects, multi-format creation, collaboration, and direct publishing do not
-exist yet.
+It also provides user-facing empty Projects and lightweight optional Campaign organization.
+Project source/resume, multi-format creation, collaboration, and direct publishing do not exist yet.
 
 The intended product lifecycle is:
 
@@ -83,18 +83,19 @@ The current Studio supports:
   versions;
 - a Saved Videos gallery with metadata, filtering, preview, rename, delete, reuse, and download;
   and
-- a durable video-oriented `Project` domain/database foundation in authoritative relational modes.
+- durable empty Projects plus lightweight optional Campaigns, with lifecycle and membership parity
+  across local/shadow and authoritative relational modes.
 
-The `Project` foundation has no browser UI or HTTP routes. Current creative work is not automatically
-placed in a Project, and existing Saved Videos are not backfilled into one.
+Projects and Campaigns have authenticated browser and HTTP lifecycle surfaces. Current Studio
+creative work is not automatically placed in a Project, existing Saved Videos are not backfilled,
+and empty Projects do not yet accept or resume media.
 
 ### Near-term product direction
 
-The next coherent product layer is a user-facing Project workspace over the existing durable
-foundation, with a deliberately lightweight optional Campaign organizer. A Project remains one
-focused video workflow and may stand alone; one Campaign may group many Projects through an
-owner-constrained, non-cascading relationship. The initial Campaign adds only a name, optional
-brief, lifecycle, and fast New Project path.
+The next coherent product layer attaches one immutable durable video source to the existing Project
+workspace. A Project remains one focused video workflow and may stand alone; the implemented
+Campaign relationship remains optional, owner-constrained, and non-cascading. Campaign has only a
+name, optional brief, lifecycle, and fast New Project path.
 
 Project should connect working context, source media, creative choices, jobs, versions, and outputs
 without turning a Saved Video into editable project state. Rich Campaign planning, search, tags,
@@ -117,8 +118,8 @@ public-service, security, and operational gates.
 | Concept           | Durable meaning                                                                                        | Current status                                                                                           |
 | ----------------- | ------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------- |
 | Workspace         | The user's overall Lightframe Studio environment, libraries, settings, and accessible work             | One authenticated, single-operator Studio exists; shared/team workspaces do not                          |
-| Campaign          | A marketing or creative initiative that can group Projects; richer planning context can evolve later   | Planned in minimal optional MVP form; no schema, contract, route, or UI currently                        |
-| Project           | A focused production effort with resumable creative intent, sources, revisions, jobs, and outputs      | Domain/contracts and relational persistence exist; no route or UI                                        |
+| Campaign          | A marketing or creative initiative that can group Projects; richer planning context can evolve later   | Minimal optional aggregate, local/relational persistence, lifecycle API/UI, and guarded deletion exist   |
+| Project           | A focused production effort with resumable creative intent, sources, revisions, jobs, and outputs      | Empty lifecycle UI/API and durable authority exist; source/session resume is not implemented             |
 | Content           | Creative material and messaging independent of file format or storage representation                   | Broad product term; current finished output is primarily video                                           |
 | Asset             | A piece of imported, generated, transformed, or organized content with ownership, type, and lineage    | Media/reference asset infrastructure exists, but user-facing saved outputs and workflows are video-led   |
 | Version           | An immutable state in the history of the same logical record                                           | Implemented for Saved Videos and Project revisions; not a generic all-content version model              |
@@ -167,7 +168,7 @@ and its resumable creative history. Referenced source/working media links to the
 revision that used it; generated outputs also record the exact producing revision and processing
 operation.
 
-The planned MVP relationship is:
+The implemented organization relationship and planned media hierarchy are:
 
 ```text
 Workspace / authenticated owner scope
@@ -179,9 +180,9 @@ Workspace / authenticated owner scope
 └── standalone Project
 ```
 
-This is a product model, not an implemented schema. “No Campaign” is a virtual view rather than a
-default Campaign row. Ownership must continue to derive from verified server identity, and every
-relationship needs explicit retention and non-cascading deletion behavior.
+Campaign and nullable Project membership are implemented schema. The source/revision/output branch
+remains the bounded Project target. “No Campaign” is a virtual view rather than a default Campaign
+row. Ownership derives from verified server identity; Campaign lifecycle is non-cascading.
 
 ## Creation and editing workflows
 
@@ -264,7 +265,8 @@ provider ID, device ID, or browser-supplied value with ownership.
 
 ## Current non-claims
 
-Lightframe Studio does not currently provide Campaign UI, Project UI, generic multi-format asset
-management, direct social or advertising publishing, scheduling, collaborative review, team roles,
+Lightframe Studio does not currently provide Project source/resume, rich Campaign planning,
+generic multi-format asset management, direct social or advertising publishing, scheduling,
+collaborative review, team roles,
 public sharing, self-service signup, billing, or an approved public deployment. The broader vision
 does not relax the current loopback, privacy, provider-cost, or manual/live validation boundaries.

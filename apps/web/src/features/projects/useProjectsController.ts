@@ -6,6 +6,7 @@ import {
   createProject,
   getProject,
   listProjects,
+  moveProjectToCampaign,
   renameProject,
   restoreProject,
 } from './projectsApi';
@@ -22,12 +23,13 @@ export const projectQueryKeys = {
 const lifecycleForProject = (project: ProjectContract): 'active' | 'archived' =>
   project.archivedAt === null ? 'active' : 'archived';
 
-export const useProjectList = (lifecycle: 'active' | 'archived') =>
+export const useProjectList = (lifecycle: 'active' | 'archived', campaignId?: string) =>
   useInfiniteQuery({
-    queryKey: projectQueryKeys.list(lifecycle),
+    queryKey: [...projectQueryKeys.list(lifecycle), campaignId ?? 'all'],
     queryFn: ({ pageParam, signal }) =>
       listProjects({
         lifecycle,
+        ...(campaignId === undefined ? {} : { campaignId }),
         pageSize: PROJECT_PAGE_SIZE,
         ...(pageParam ? { cursor: pageParam } : {}),
         signal,
@@ -64,10 +66,10 @@ export const useProjectsController = () => {
   );
 
   const createMutation = useMutation({
-    mutationFn: async () => {
+    mutationFn: async (campaignId: string | null = null) => {
       const operationKey = pendingCreateKey.current ?? crypto.randomUUID();
       pendingCreateKey.current = operationKey;
-      return createProject('Untitled Project', operationKey);
+      return createProject('Untitled Project', operationKey, campaignId);
     },
     onSuccess: async (current) => {
       pendingCreateKey.current = null;
@@ -95,6 +97,15 @@ export const useProjectsController = () => {
   const restoreMutation = useMutation({
     mutationFn: (input: { readonly projectId: string; readonly expectedVersion: number }) =>
       restoreProject(input.projectId, input.expectedVersion),
+    onSuccess: reconcile,
+    onError: (_error, input) => invalidateProject(input.projectId),
+  });
+  const moveMutation = useMutation({
+    mutationFn: (input: {
+      readonly projectId: string;
+      readonly campaignId: string | null;
+      readonly expectedVersion: number;
+    }) => moveProjectToCampaign(input.projectId, input.campaignId, input.expectedVersion),
     onSuccess: reconcile,
     onError: (_error, input) => invalidateProject(input.projectId),
   });
@@ -146,6 +157,7 @@ export const useProjectsController = () => {
     renameMutation,
     archiveMutation,
     restoreMutation,
+    moveMutation,
     latestProject,
     renameLatest,
     changeLatestLifecycle,

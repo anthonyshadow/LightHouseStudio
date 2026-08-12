@@ -2,12 +2,14 @@ import { createHash, randomUUID } from 'node:crypto';
 import { chmod, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import {
+  campaignStatusSchema,
   projectAssetRoleSchema,
   projectSnapshotSchema,
   projectStatusSchema,
   projectRevisionSourceSchema,
 } from '@studio/contracts';
 import type {
+  Campaign,
   Project,
   ProjectAggregate,
   ProjectJobLink,
@@ -17,6 +19,15 @@ import type {
 } from '@studio/domain';
 import { z } from 'zod';
 import { persistedTimestampSchema } from '../../application/timestamps.js';
+import type {
+  CampaignCreatePersistenceResult,
+  CampaignCreateReceipt,
+  CampaignPersistenceMutationResult,
+  CampaignRepository,
+  CampaignSummaryPage as CampaignPage,
+  CampaignSummaryPageInput as CampaignPageInput,
+  CampaignWithAttachedProjectCount,
+} from '../campaigns/campaign-repository.js';
 import type {
   AppendProjectRevisionPersistenceInput,
   ProjectCreateReceipt,
@@ -42,6 +53,7 @@ const storedProjectSchema = z
   .object({
     id: projectIdSchema,
     ownerUserId: ownerIdSchema,
+    campaignId: z.uuid().nullable(),
     title: z.string().trim().min(1).max(120),
     status: projectStatusSchema,
     version: z.number().int().positive(),
@@ -152,6 +164,30 @@ const storedAggregateSchema = z
     }
   });
 
+const storedCampaignSchema = z
+  .object({
+    id: z.uuid(),
+    ownerUserId: ownerIdSchema,
+    name: z.string().trim().min(1).max(120),
+    brief: z.string().max(1_000).nullable(),
+    status: campaignStatusSchema,
+    version: z.number().int().positive(),
+    archivedAt: persistedTimestampSchema.nullable(),
+    deletedAt: persistedTimestampSchema.nullable(),
+    createdAt: persistedTimestampSchema,
+    updatedAt: persistedTimestampSchema,
+  })
+  .strict();
+
+const campaignCreateReceiptSchema = z
+  .object({
+    operationKey: z.uuid(),
+    requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+    campaignId: z.uuid(),
+    createdAt: persistedTimestampSchema,
+  })
+  .strict();
+
 const createReceiptSchema = z
   .object({
     operationKey: z.uuid(),
@@ -163,22 +199,36 @@ const createReceiptSchema = z
 
 const librarySchema = z
   .object({
-    schemaVersion: z.literal(1),
+    schemaVersion: z.literal(2),
     ownerUserId: ownerIdSchema,
     revision: z.number().int().nonnegative(),
+    campaigns: z.array(storedCampaignSchema),
     projects: z.array(storedAggregateSchema),
     createReceipts: z.array(createReceiptSchema),
+    campaignCreateReceipts: z.array(campaignCreateReceiptSchema),
   })
   .strict()
   .superRefine((library, context) => {
     const projectIds = library.projects.map(({ project }) => project.id);
+    const campaignIds = library.campaigns.map(({ id }) => id);
     const operationKeys = library.createReceipts.map(({ operationKey }) => operationKey);
+    const campaignOperationKeys = library.campaignCreateReceipts.map(
+      ({ operationKey }) => operationKey,
+    );
     const projectIdSet = new Set(projectIds);
+    const campaignIdSet = new Set(campaignIds);
     if (
       projectIdSet.size !== projectIds.length ||
+      campaignIdSet.size !== campaignIds.length ||
       new Set(operationKeys).size !== operationKeys.length ||
+      new Set(campaignOperationKeys).size !== campaignOperationKeys.length ||
+      library.campaigns.some(({ ownerUserId }) => ownerUserId !== library.ownerUserId) ||
       library.projects.some(({ project }) => project.ownerUserId !== library.ownerUserId) ||
-      library.createReceipts.some(({ projectId }) => !projectIdSet.has(projectId))
+      library.projects.some(
+        ({ project }) => project.campaignId !== null && !campaignIdSet.has(project.campaignId),
+      ) ||
+      library.createReceipts.some(({ projectId }) => !projectIdSet.has(projectId)) ||
+      library.campaignCreateReceipts.some(({ campaignId }) => !campaignIdSet.has(campaignId))
     ) {
       context.addIssue({ code: 'custom', message: 'Stored Project library identity is invalid.' });
     }
@@ -186,7 +236,97 @@ const librarySchema = z
 
 type ProjectLibrary = z.infer<typeof librarySchema>;
 
+const legacyLibraryEnvelopeSchema = z
+  .object({
+    schemaVersion: z.literal(1),
+    ownerUserId: ownerIdSchema,
+    revision: z.number().int().nonnegative(),
+    projects: z.array(z.unknown()),
+    createReceipts: z.array(createReceiptSchema),
+  })
+  .strict();
+
+const parseLibrary = (
+  value: unknown,
+): { readonly library: ProjectLibrary; readonly migrated: boolean } => {
+  const current = librarySchema.safeParse(value);
+  if (current.success) return { library: current.data, migrated: false };
+  const legacy = legacyLibraryEnvelopeSchema.parse(value);
+  const projects = legacy.projects.map((aggregateValue) => {
+    const aggregate = z
+      .object({ project: z.record(z.string(), z.unknown()) })
+      .passthrough()
+      .parse(aggregateValue);
+    return storedAggregateSchema.parse({
+      ...(aggregateValue as object),
+      project: { ...aggregate.project, campaignId: null },
+    });
+  });
+  return {
+    migrated: true,
+    library: librarySchema.parse({
+      schemaVersion: 2,
+      ownerUserId: legacy.ownerUserId,
+      revision: legacy.revision,
+      campaigns: [],
+      projects,
+      createReceipts: legacy.createReceipts,
+      campaignCreateReceipts: [],
+    }),
+  };
+};
+
 const journalSchema = z
+  .object({
+    schemaVersion: z.literal(2),
+    ownerUserId: ownerIdSchema,
+    transactionId: z.uuid(),
+    state: z.literal('prepared'),
+    operation: z.discriminatedUnion('kind', [
+      z
+        .object({
+          kind: z.literal('project-create'),
+          operationKey: z.uuid(),
+          requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+          projectId: projectIdSchema,
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('campaign-create'),
+          operationKey: z.uuid(),
+          requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+          campaignId: z.uuid(),
+        })
+        .strict(),
+    ]),
+    preparedAt: persistedTimestampSchema,
+    writes: z.object({ metadata: librarySchema }).strict(),
+  })
+  .strict()
+  .superRefine((journal, context) => {
+    const metadata = journal.writes.metadata;
+    const operation = journal.operation;
+    const consistent =
+      operation.kind === 'project-create'
+        ? metadata.createReceipts.some(
+            (receipt) =>
+              receipt.operationKey === operation.operationKey &&
+              receipt.projectId === operation.projectId &&
+              receipt.requestFingerprint === operation.requestFingerprint,
+          )
+        : metadata.campaignCreateReceipts.some(
+            (receipt) =>
+              receipt.operationKey === operation.operationKey &&
+              receipt.campaignId === operation.campaignId &&
+              receipt.requestFingerprint === operation.requestFingerprint,
+          );
+    if (metadata.ownerUserId !== journal.ownerUserId || !consistent) {
+      context.addIssue({ code: 'custom', message: 'Prepared Project journal is inconsistent.' });
+    }
+  });
+
+const legacyJournalSchema = z
   .object({
     schemaVersion: z.literal(1),
     ownerUserId: ownerIdSchema,
@@ -201,28 +341,34 @@ const journalSchema = z
       })
       .strict(),
     preparedAt: persistedTimestampSchema,
-    writes: z.object({ projectMetadata: librarySchema }).strict(),
+    writes: z.object({ projectMetadata: z.unknown() }).strict(),
   })
-  .strict()
-  .superRefine((journal, context) => {
-    const receipt = journal.writes.projectMetadata.createReceipts.find(
-      ({ operationKey }) => operationKey === journal.operation.operationKey,
-    );
-    if (
-      journal.writes.projectMetadata.ownerUserId !== journal.ownerUserId ||
-      receipt?.projectId !== journal.operation.projectId ||
-      receipt.requestFingerprint !== journal.operation.requestFingerprint
-    ) {
-      context.addIssue({ code: 'custom', message: 'Prepared Project journal is inconsistent.' });
-    }
+  .strict();
+
+const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
+  const current = journalSchema.safeParse(value);
+  if (current.success) return current.data;
+  const legacy = legacyJournalSchema.parse(value);
+  const metadata = parseLibrary(legacy.writes.projectMetadata).library;
+  return journalSchema.parse({
+    schemaVersion: 2,
+    ownerUserId: legacy.ownerUserId,
+    transactionId: legacy.transactionId,
+    state: legacy.state,
+    operation: legacy.operation,
+    preparedAt: legacy.preparedAt,
+    writes: { metadata },
   });
+};
 
 const emptyLibrary = (ownerUserId: string): ProjectLibrary => ({
-  schemaVersion: 1,
+  schemaVersion: 2,
   ownerUserId: ownerIdSchema.parse(ownerUserId),
   revision: 0,
+  campaigns: [],
   projects: [],
   createReceipts: [],
+  campaignCreateReceipts: [],
 });
 
 const isMissingFile = (error: unknown): boolean =>
@@ -256,7 +402,9 @@ export interface FileProjectRepositoryOptions {
   readonly afterJournalPrepared?: () => Promise<void> | void;
 }
 
-export class FileProjectRepository implements ProjectRepository, ProjectRetentionPolicy {
+export class FileProjectRepository
+  implements ProjectRepository, ProjectRetentionPolicy, CampaignRepository
+{
   readonly #root: string;
   readonly #locks = new Map<string, Promise<unknown>>();
   readonly #afterJournalPrepared: (() => Promise<void> | void) | undefined;
@@ -291,9 +439,11 @@ export class FileProjectRepository implements ProjectRepository, ProjectRetentio
     }
   }
 
-  async #readParsed(filePath: string): Promise<ProjectLibrary | null> {
+  async #readParsed(
+    filePath: string,
+  ): Promise<{ readonly library: ProjectLibrary; readonly migrated: boolean } | null> {
     try {
-      return librarySchema.parse(JSON.parse(await readFile(filePath, 'utf8')) as unknown);
+      return parseLibrary(JSON.parse(await readFile(filePath, 'utf8')) as unknown);
     } catch (error) {
       if (isMissingFile(error)) return null;
       throw error;
@@ -309,9 +459,9 @@ export class FileProjectRepository implements ProjectRepository, ProjectRetentio
       if (!isMissingFile(error)) throw error;
     }
     if (rawJournal !== undefined) {
-      const journal = journalSchema.parse(rawJournal);
+      const journal = parseJournal(rawJournal);
       if (journal.ownerUserId !== ownerUserId) throw new Error('Project journal owner mismatch.');
-      const recovered = librarySchema.parse(journal.writes.projectMetadata);
+      const recovered = librarySchema.parse(journal.writes.metadata);
       await this.#atomicWrite(paths.primary, recovered);
       await this.#atomicWrite(paths.backup, recovered);
       await rm(paths.journal, { force: true });
@@ -321,24 +471,31 @@ export class FileProjectRepository implements ProjectRepository, ProjectRetentio
     try {
       const primary = await this.#readParsed(paths.primary);
       if (primary !== null) {
-        if (primary.ownerUserId !== ownerUserId)
+        if (primary.library.ownerUserId !== ownerUserId)
           throw new Error('Project metadata owner mismatch.');
-        return primary;
+        if (primary.migrated) {
+          await this.#atomicWrite(paths.primary, primary.library);
+          await this.#atomicWrite(paths.backup, primary.library);
+        }
+        return primary.library;
       }
     } catch (primaryError) {
       const backup = await this.#readParsed(paths.backup).catch(() => null);
       if (backup === null) throw primaryError;
-      if (backup.ownerUserId !== ownerUserId) {
+      if (backup.library.ownerUserId !== ownerUserId) {
         throw new Error('Project backup owner mismatch.', { cause: primaryError });
       }
-      await this.#atomicWrite(paths.primary, backup);
-      return backup;
+      await this.#atomicWrite(paths.primary, backup.library);
+      if (backup.migrated) await this.#atomicWrite(paths.backup, backup.library);
+      return backup.library;
     }
     const backup = await this.#readParsed(paths.backup);
     if (backup !== null) {
-      if (backup.ownerUserId !== ownerUserId) throw new Error('Project backup owner mismatch.');
-      await this.#atomicWrite(paths.primary, backup);
-      return backup;
+      if (backup.library.ownerUserId !== ownerUserId)
+        throw new Error('Project backup owner mismatch.');
+      await this.#atomicWrite(paths.primary, backup.library);
+      if (backup.migrated) await this.#atomicWrite(paths.backup, backup.library);
+      return backup.library;
     }
     return emptyLibrary(ownerUserId);
   }
@@ -387,6 +544,17 @@ export class FileProjectRepository implements ProjectRepository, ProjectRetentio
       if (library.projects.some(({ project }) => project.id === aggregate.project.id)) {
         throw new Error('A Project with that identifier already exists.');
       }
+      if (
+        aggregate.project.campaignId !== null &&
+        !library.campaigns.some(
+          (campaign) =>
+            campaign.id === aggregate.project.campaignId &&
+            campaign.status === 'active' &&
+            campaign.deletedAt === null,
+        )
+      ) {
+        throw new Error('The target Campaign is unavailable.');
+      }
       await this.#write(library, {
         ...library,
         revision: library.revision + 1,
@@ -427,6 +595,20 @@ export class FileProjectRepository implements ProjectRepository, ProjectRetentio
       if (library.projects.some(({ project }) => project.id === aggregate.project.id)) {
         throw new Error('A Project with that identifier already exists.');
       }
+      if (
+        aggregate.project.campaignId !== null &&
+        !library.campaigns.some(
+          (campaign) =>
+            campaign.id === aggregate.project.campaignId &&
+            campaign.status === 'active' &&
+            campaign.deletedAt === null,
+        )
+      ) {
+        return {
+          kind: 'conflict',
+          conflict: { kind: 'campaign-membership', projectId: aggregate.project.id },
+        };
+      }
       const next = librarySchema.parse({
         ...library,
         revision: library.revision + 1,
@@ -434,7 +616,7 @@ export class FileProjectRepository implements ProjectRepository, ProjectRetentio
         createReceipts: [...library.createReceipts, receipt],
       });
       await this.#write(library, next, {
-        schemaVersion: 1,
+        schemaVersion: 2,
         ownerUserId: aggregate.project.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -445,7 +627,7 @@ export class FileProjectRepository implements ProjectRepository, ProjectRetentio
           projectId: receipt.projectId,
         },
         preparedAt: receipt.createdAt,
-        writes: { projectMetadata: next },
+        writes: { metadata: next },
       });
       return {
         kind: 'created',
@@ -480,11 +662,17 @@ export class FileProjectRepository implements ProjectRepository, ProjectRetentio
           (input.lifecycle === 'archived'
             ? project.status === 'archived'
             : project.status !== 'archived');
+        const matchesCampaign =
+          input.campaignId === undefined
+            ? true
+            : input.campaignId === 'none'
+              ? project.campaignId === null
+              : project.campaignId === input.campaignId;
         const followsCursor =
           input.cursor === undefined ||
           project.updatedAt < input.cursor.updatedAt ||
           (project.updatedAt === input.cursor.updatedAt && project.id < input.cursor.projectId);
-        return matchesLifecycle && followsCursor;
+        return matchesLifecycle && matchesCampaign && followsCursor;
       })
       .sort(
         (left, right) =>
@@ -666,6 +854,7 @@ export class FileProjectRepository implements ProjectRepository, ProjectRetentio
       }
       if (
         aggregate.project.ownerUserId !== nextProject.ownerUserId ||
+        aggregate.project.campaignId !== nextProject.campaignId ||
         aggregate.project.currentRevisionId !== nextProject.currentRevisionId ||
         aggregate.project.currentRevisionNumber !== nextProject.currentRevisionNumber ||
         nextProject.version !== expectedVersion + 1
@@ -685,6 +874,221 @@ export class FileProjectRepository implements ProjectRepository, ProjectRetentio
       const projects = [...library.projects];
       projects[index] = storedAggregateSchema.parse({ ...aggregate, project: nextProject });
       await this.#write(library, { ...library, revision: library.revision + 1, projects });
+      return { kind: 'updated' };
+    });
+  }
+
+  async updateCampaignMembership(
+    ownerUserId: string,
+    expectedVersion: number,
+    nextProject: Project,
+  ): Promise<ProjectPersistenceMutationResult> {
+    return this.#withOwnerLock(ownerUserId, async () => {
+      const library = await this.#read(ownerUserId);
+      const index = library.projects.findIndex(({ project }) => project.id === nextProject.id);
+      const aggregate = library.projects[index];
+      if (aggregate === undefined || aggregate.project.deletedAt !== null) {
+        return { kind: 'not-found' };
+      }
+      if (aggregate.project.version !== expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'project-version',
+            projectId: nextProject.id,
+            expectedVersion,
+            actualVersion: aggregate.project.version,
+          },
+        };
+      }
+      if (
+        aggregate.project.ownerUserId !== nextProject.ownerUserId ||
+        aggregate.project.currentRevisionId !== nextProject.currentRevisionId ||
+        aggregate.project.currentRevisionNumber !== nextProject.currentRevisionNumber ||
+        aggregate.project.title !== nextProject.title ||
+        aggregate.project.status !== nextProject.status ||
+        aggregate.project.archivedAt !== nextProject.archivedAt ||
+        aggregate.project.deletedAt !== nextProject.deletedAt ||
+        nextProject.version !== expectedVersion + 1
+      ) {
+        throw new Error('A Project Campaign update changed unrelated metadata.');
+      }
+      if (
+        nextProject.campaignId !== null &&
+        !library.campaigns.some(
+          (campaign) =>
+            campaign.id === nextProject.campaignId &&
+            campaign.status === 'active' &&
+            campaign.deletedAt === null,
+        )
+      ) {
+        return {
+          kind: 'conflict',
+          conflict: { kind: 'campaign-membership', projectId: nextProject.id },
+        };
+      }
+      const projects = [...library.projects];
+      projects[index] = storedAggregateSchema.parse({ ...aggregate, project: nextProject });
+      await this.#write(library, { ...library, revision: library.revision + 1, projects });
+      return { kind: 'updated' };
+    });
+  }
+
+  async createCampaignIdempotent(input: {
+    readonly campaign: Campaign;
+    readonly receipt: CampaignCreateReceipt;
+  }): Promise<CampaignCreatePersistenceResult> {
+    const campaign = storedCampaignSchema.parse(input.campaign) as Campaign;
+    const receipt = campaignCreateReceiptSchema.parse(input.receipt);
+    if (campaign.id !== receipt.campaignId) throw new Error('Campaign receipt mismatch.');
+    return this.#withOwnerLock(campaign.ownerUserId, async () => {
+      const library = await this.#read(campaign.ownerUserId);
+      const prior = library.campaignCreateReceipts.find(
+        ({ operationKey }) => operationKey === receipt.operationKey,
+      );
+      if (prior !== undefined) {
+        if (prior.requestFingerprint !== receipt.requestFingerprint) {
+          return {
+            kind: 'conflict',
+            conflict: { kind: 'operation-key', operation: 'campaign-create' },
+          };
+        }
+        const existing = library.campaigns.find(({ id }) => id === prior.campaignId);
+        if (existing === undefined) throw new Error('Campaign create receipt has no result.');
+        return { kind: 'replayed', campaign: existing };
+      }
+      if (library.campaigns.some(({ id }) => id === campaign.id)) {
+        throw new Error('A Campaign with that identifier already exists.');
+      }
+      const next = librarySchema.parse({
+        ...library,
+        revision: library.revision + 1,
+        campaigns: [...library.campaigns, campaign],
+        campaignCreateReceipts: [...library.campaignCreateReceipts, receipt],
+      });
+      await this.#write(library, next, {
+        schemaVersion: 2,
+        ownerUserId: campaign.ownerUserId,
+        transactionId: randomUUID(),
+        state: 'prepared',
+        operation: {
+          kind: 'campaign-create',
+          operationKey: receipt.operationKey,
+          requestFingerprint: receipt.requestFingerprint,
+          campaignId: receipt.campaignId,
+        },
+        preparedAt: receipt.createdAt,
+        writes: { metadata: next },
+      });
+      return { kind: 'created', campaign };
+    });
+  }
+
+  async getCampaign(ownerUserId: string, campaignId: string): Promise<Campaign | null> {
+    const campaign = (await this.#read(ownerUserId)).campaigns.find(
+      ({ id, deletedAt }) => id === campaignId && deletedAt === null,
+    );
+    return campaign ?? null;
+  }
+
+  async getCampaignWithAttachedProjectCount(
+    ownerUserId: string,
+    campaignId: string,
+  ): Promise<CampaignWithAttachedProjectCount | null> {
+    const library = await this.#read(ownerUserId);
+    const campaign = library.campaigns.find(
+      ({ id, deletedAt }) => id === campaignId && deletedAt === null,
+    );
+    if (campaign === undefined) return null;
+    return {
+      campaign,
+      attachedProjectCount: library.projects.filter(
+        ({ project }) => project.campaignId === campaignId,
+      ).length,
+    };
+  }
+
+  async listCampaigns(ownerUserId: string, input: CampaignPageInput): Promise<CampaignPage> {
+    if (!Number.isInteger(input.pageSize) || input.pageSize < 1 || input.pageSize > 40) {
+      throw new Error('Use a bounded Campaign summary page.');
+    }
+    const campaigns = (await this.#read(ownerUserId)).campaigns
+      .filter((campaign) => {
+        const matchesLifecycle =
+          campaign.deletedAt === null &&
+          (input.lifecycle === 'archived'
+            ? campaign.status === 'archived'
+            : campaign.status === 'active');
+        const followsCursor =
+          input.cursor === undefined ||
+          campaign.updatedAt < input.cursor.updatedAt ||
+          (campaign.updatedAt === input.cursor.updatedAt && campaign.id < input.cursor.campaignId);
+        return matchesLifecycle && followsCursor;
+      })
+      .sort(
+        (left, right) =>
+          right.updatedAt.localeCompare(left.updatedAt) || right.id.localeCompare(left.id),
+      );
+    const page = campaigns.slice(0, input.pageSize);
+    const last = page.at(-1);
+    return {
+      campaigns: page,
+      nextCursor:
+        campaigns.length > input.pageSize && last !== undefined
+          ? { updatedAt: last.updatedAt, campaignId: last.id }
+          : null,
+    };
+  }
+
+  async updateCampaignMetadata(input: {
+    readonly ownerUserId: string;
+    readonly expectedVersion: number;
+    readonly campaign: Campaign;
+    readonly requireNoAttachedProjects?: boolean;
+  }): Promise<CampaignPersistenceMutationResult> {
+    const nextCampaign = storedCampaignSchema.parse(input.campaign) as Campaign;
+    return this.#withOwnerLock(input.ownerUserId, async () => {
+      const library = await this.#read(input.ownerUserId);
+      const index = library.campaigns.findIndex(({ id }) => id === nextCampaign.id);
+      const current = library.campaigns[index];
+      if (current === undefined || current.deletedAt !== null) return { kind: 'not-found' };
+      if (current.version !== input.expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'campaign-version',
+            campaignId: current.id,
+            expectedVersion: input.expectedVersion,
+            actualVersion: current.version,
+          },
+        };
+      }
+      if (
+        current.ownerUserId !== nextCampaign.ownerUserId ||
+        nextCampaign.ownerUserId !== input.ownerUserId ||
+        nextCampaign.version !== input.expectedVersion + 1 ||
+        nextCampaign.createdAt !== current.createdAt
+      ) {
+        throw new Error('A Campaign update changed immutable identity.');
+      }
+      if (input.requireNoAttachedProjects) {
+        const attachedProjectCount = library.projects.filter(
+          ({ project }) => project.campaignId === current.id,
+        ).length;
+        if (attachedProjectCount > 0) {
+          return {
+            kind: 'conflict',
+            conflict: {
+              kind: 'campaign-not-empty',
+              campaignId: current.id,
+              attachedProjectCount,
+            },
+          };
+        }
+      }
+      const campaigns = [...library.campaigns];
+      campaigns[index] = storedCampaignSchema.parse(nextCampaign);
+      await this.#write(library, { ...library, revision: library.revision + 1, campaigns });
       return { kind: 'updated' };
     });
   }
