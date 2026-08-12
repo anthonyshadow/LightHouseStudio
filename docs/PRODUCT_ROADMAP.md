@@ -68,12 +68,14 @@ owns the detailed sequence and launch evidence.
 
 ## Phase 2 — Campaign and Project video workspace MVP
 
-**Status: in progress; invariant correction and lifecycle authority/API are implemented.**
+**Status: in progress; invariant correction, lifecycle authority/API, and the empty-Project
+workspace are implemented. Campaign organization is next.**
 
 - Correct the dormant Project foundation's revision and media-reference lineage, transaction/replay,
   retention, status, read-bounding, and cleanup invariants before exposing writes.
-- Add owner-derived Project services, HTTP routes, local/relational persistence parity, and an
-  accessible Projects workspace for create, list, open, rename, archive, and restore.
+- Maintain the implemented owner-derived Project services, HTTP routes, local/relational
+  persistence parity, and accessible Projects workspace for Quick Start, list, open, rename,
+  archive, and restore. The workspace remains lifecycle-only until durable source acceptance.
 - Introduce a deliberately small Campaign aggregate—name and optional brief—that groups Projects
   without owning their media or processing state.
 - Keep Campaign membership optional: one Campaign may group many Projects, a Project belongs to

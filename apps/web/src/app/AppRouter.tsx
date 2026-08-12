@@ -18,7 +18,13 @@ import {
 } from 'react-router';
 import { Button } from '../ui/primitives/Button';
 import { EntryPage } from './EntryPage';
-import { APP_PATHS, isStudioPath } from './paths';
+import {
+  APP_PATHS,
+  isProjectsPath,
+  isRestorableStudioPath,
+  isStudioPath,
+  projectIdFromPath,
+} from './paths';
 import { ProtectedRoute } from './ProtectedRoute';
 
 const LazyStudioApp = lazy(() =>
@@ -40,19 +46,27 @@ const routeSurfaceStyles = {
   textAlign: 'center' as const,
 };
 
+const titleForPath = (pathname: string): string => {
+  if (projectIdFromPath(pathname) !== null) return 'Project · Lightframe Studio';
+
+  switch (pathname) {
+    case APP_PATHS.projects:
+      return 'Projects · Lightframe Studio';
+    case APP_PATHS.videos:
+      return 'Saved Videos · Lightframe Studio';
+    case APP_PATHS.characters:
+      return 'Saved Characters · Lightframe Studio';
+    case APP_PATHS.outfits:
+      return 'Saved Outfits · Lightframe Studio';
+    default:
+      return isRestorableStudioPath(pathname) ? 'Lightframe Studio' : 'Enter Lightframe Studio';
+  }
+};
+
 const RouteMetadata = () => {
   const location = useLocation();
-  const studioRoute = isStudioPath(location.pathname);
-  const title =
-    location.pathname === APP_PATHS.videos
-      ? 'Saved Videos · Lightframe Studio'
-      : location.pathname === APP_PATHS.characters
-        ? 'Saved Characters · Lightframe Studio'
-        : location.pathname === APP_PATHS.outfits
-          ? 'Saved Outfits · Lightframe Studio'
-          : studioRoute
-            ? 'Lightframe Studio'
-            : 'Enter Lightframe Studio';
+  const studioRoute = isRestorableStudioPath(location.pathname);
+  const title = titleForPath(location.pathname);
 
   useLayoutEffect(() => {
     document.title = title;
@@ -143,7 +157,9 @@ export const RoutedApplication = () => {
   if (!hasVisitedStudio && isStudioPath(location.pathname)) {
     setHasVisitedStudio(true);
   }
-  const focusMainOnMount = location.pathname === APP_PATHS.studio && location.key !== 'default';
+  const focusMainOnMount =
+    (location.pathname === APP_PATHS.studio || isProjectsPath(location.pathname)) &&
+    location.key !== 'default';
 
   return (
     <>
@@ -157,9 +173,13 @@ export const RoutedApplication = () => {
           <Route
             path={`${APP_PATHS.studio}/*`}
             element={
-              <ProtectedRoute>
-                <StudioRoute focusMainOnMount={focusMainOnMount} />
-              </ProtectedRoute>
+              isRestorableStudioPath(location.pathname) ? (
+                <ProtectedRoute>
+                  <StudioRoute focusMainOnMount={focusMainOnMount} />
+                </ProtectedRoute>
+              ) : (
+                <Navigate replace to={APP_PATHS.entry} />
+              )
             }
           />
           <Route path="*" element={<Navigate replace to={APP_PATHS.entry} />} />

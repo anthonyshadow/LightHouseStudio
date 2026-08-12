@@ -11,7 +11,7 @@ accessibility, physical-device, and live-provider behavior belongs to other test
 
 ## Matrix
 
-The current matrix has 29 Chromium cases:
+The current matrix has 31 Chromium cases:
 
 | Group             | States | Viewports                    | Cases |
 | ----------------- | -----: | ---------------------------- | ----: |
@@ -21,9 +21,10 @@ The current matrix has 29 Chromium cases:
 | Focused high-risk |     10 | risk-selected viewport pairs |    12 |
 | Desktop-specific  |      2 | desktop                      |     2 |
 | Small-mobile risk |      2 | small mobile                 |     2 |
+| Projects          |      2 | desktop and small mobile     |     2 |
 
-Twenty-nine is the review budget, not the definition of correctness. The current matrix uses all
-29 cases. The executable invariants require unique paths, all five viewport IDs, and every
+Thirty-one is the review budget, not the definition of correctness. The current matrix uses all 31
+cases. The executable invariants require unique paths, all five viewport IDs, and every
 local-live/recording state/viewport pair.
 
 | Viewport ID    |       Size |
@@ -53,6 +54,8 @@ local-live/recording state/viewport pair.
 | Desktop               | `07-existing-video/result.png`                       |
 | Desktop               | `08-video-editor/lighting-dirty.png`                 |
 | Small mobile          | `08-video-editor/crop-dirty.png`                     |
+| Desktop               | `09-projects/workspace.png`                          |
+| Small mobile          | `09-projects/empty-detail.png`                       |
 | Desktop               | `05-virtual-try-on/prepared-with-reference.png`      |
 | Desktop               | `06-voice/voice-browser-loaded.png`                  |
 | Small mobile          | `01-studio/take-finalizing.png`                      |
@@ -60,9 +63,10 @@ local-live/recording state/viewport pair.
 
 The matrix intentionally emphasizes the record/upload first impression, neutral Local Camera
 startup, provider-free live capture, dominant recording Stop, the densest Builder/review states,
-deterministic dirty Lighting/Crop editor layouts, and representative loading/error boundaries. The
-desktop and small-mobile validated-upload cases were exchanged for those editor states without
-increasing the 29-case review budget.
+deterministic dirty Lighting/Crop editor layouts, the active/archived Projects workspace, the empty
+Project detail boundary, and representative loading/error states. The Projects cases raise the
+review budget from 29 to 31 because durable lifecycle and source-truthfulness are new protected
+composition contracts.
 
 ## Determinism and readiness
 

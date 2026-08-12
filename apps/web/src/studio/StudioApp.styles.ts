@@ -74,6 +74,35 @@ export const headerActionsStyles = (theme: Theme): CSSObject => ({
   '@media (max-width: 39.99rem)': { gap: theme.space.xs },
 });
 
+export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
+  display: 'flex',
+  flex: '0 0 auto',
+  alignItems: 'center',
+  gap: theme.space.xxs,
+  padding: theme.space.xxs,
+  border: `1px solid ${theme.colors.border}`,
+  borderRadius: theme.radii.round,
+  background: theme.colors.canvasRaised,
+  '& > button': {
+    minHeight: '2.4rem',
+    minWidth: 0,
+    padding: `0.45rem ${theme.space.md}`,
+    borderRadius: theme.radii.round,
+    fontSize: theme.fontSizes.metadata,
+    whiteSpace: 'nowrap',
+  },
+  '& > button[aria-current="page"]': {
+    color: theme.colors.onAccent,
+    background: theme.colors.accent,
+  },
+  '@media (max-width: 39.99rem), (max-height: 36rem)': {
+    '& > button': { paddingInline: theme.space.sm, fontSize: theme.fontSizes.caption },
+  },
+  '@media (max-width: 22rem)': {
+    '& > button': { paddingInline: theme.space.xs },
+  },
+});
+
 export const brandStyles = (theme: Theme): CSSObject => ({
   display: 'grid',
   gridTemplateColumns: '2.4rem minmax(0, 1fr)',
@@ -235,6 +264,7 @@ export const stageColumnStyles = (theme: Theme): CSSObject => ({
   minWidth: 0,
   minHeight: 0,
   overflow: 'hidden',
+  '&[hidden]': { display: 'none' },
   '& > [data-media-stage-layout]': { gridColumn: 1, gridRow: 1 },
   '& > [data-studio-tool-rail]': { gridColumn: 1, gridRow: 2 },
   '& > [data-capture-controls]': { gridColumn: 1, gridRow: 3 },

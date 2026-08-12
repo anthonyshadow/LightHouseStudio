@@ -13,10 +13,11 @@ video. Its primary loop is:
 Live character transformation and Workshop remain advanced tools. The app binds to loopback. Phase
 1 provides one seeded local demo account, authenticated ownership, and durable local saved-media
 records; it does not provide signup, billing, collaboration, or public multi-user deployment. A
-durable, video-oriented Project authority and authenticated lifecycle API now support empty
-Projects in every persistence mode, but no Project route or workspace is user-facing in the browser
-yet. Campaigns and multi-format content creation are future product directions, not
-current features. The app is not approved for LAN, tunnel, proxy, or public exposure.
+durable, video-oriented Project authority, authenticated lifecycle API, and Projects workspace now
+support listing, Quick Start, open, rename, archive, and restore for empty Projects in every
+persistence mode. Projects do not yet accept or resume media, and Campaigns and multi-format
+content creation remain future product directions. The app is not approved for LAN, tunnel, proxy,
+or public exposure.
 
 ## Status
 
@@ -72,8 +73,13 @@ Neither document changes the current loopback, account, provider, privacy, or de
    Dock and recorded through the existing live flow.
 
 `/` is a minimal provider-free entry and lazily loads no Studio/media runtime. `/studio`,
-`/studio/videos`, `/studio/characters`, and `/studio/outfits` share one persistent `StudioApp` and
-one stage; their full-screen library surfaces never create another media session. The gallery
+`/studio/projects`, `/studio/projects/:projectId`, `/studio/videos`, `/studio/characters`, and
+`/studio/outfits` share one persistent `StudioApp` and one stage. Projects provides bounded active
+and archived lists plus empty-Project lifecycle controls; its full workspace hides the existing
+stage without creating another shell, player, media session, provider action, or browser Project
+store. **Quick Start** creates `Untitled Project`; an open empty Project is durable and
+deep-linkable but truthfully has no resumable source yet. The full-screen library surfaces likewise
+never create another media session. The gallery
 loads metadata and lazy thumbnails first, then fetches video bytes only for an explicit Preview,
 Studio, Edit, or Download action. Saved Videos can be filtered by attributed parent character and
 Landscape, Portrait, or Square format, then ordered by Latest, Oldest, Shortest, or Longest. When

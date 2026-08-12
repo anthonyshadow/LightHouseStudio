@@ -1,8 +1,8 @@
 # Lightframe Studio remaining MVP implementation sequence
 
-**Status:** active execution program; Prompt 03 implemented
+**Status:** active execution program; Prompt 04 implemented
 
-**Starts from:** Prompt 03 is complete; Prompt 04 is the next implementation boundary
+**Starts from:** Prompt 04 is complete; Prompt 05 is the next implementation boundary
 
 **Defined:** 2026-08-11
 
@@ -38,7 +38,7 @@ backfill.
 | ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | 02 — implemented | Correct the dormant relational Project foundation so lineage, exact references, replay, retention, status facts, and reads are safe before writes are exposed. |
 | 03 — implemented | Add local/shadow Project authority plus owner-derived Project application services and lifecycle APIs, without browser UI.                                     |
-| 04               | Establish authenticated Project/Studio routing and a minimal Projects workspace for lifecycle management.                                                      |
+| 04 — implemented | Establish authenticated Project/Studio routing and a minimal Projects workspace for lifecycle management.                                                      |
 | 05               | Add optional lightweight Campaigns and safe Project membership without imposing Campaign creation on Quick Start.                                              |
 | 06               | Accept, hydrate, and resume one immutable durable video source for an open Project.                                                                            |
 | 07               | Add a URL-owned Project session, semantic autosave, conflict handling, and switch/exit protection without creative-tool integration.                           |
