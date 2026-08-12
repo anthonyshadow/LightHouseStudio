@@ -7,6 +7,8 @@ import {
   projectSnapshotSchema,
   projectStatusSchema,
   projectRevisionSourceSchema,
+  projectSourceKindSchema,
+  videoInputMimeTypeSchema,
 } from '@studio/contracts';
 import type {
   Campaign,
@@ -30,9 +32,11 @@ import type {
 } from '../campaigns/campaign-repository.js';
 import type {
   AppendProjectRevisionPersistenceInput,
+  AcceptProjectSourcePersistenceInput,
   ProjectCreateReceipt,
   ProjectCreatePersistenceResult,
   ProjectCurrentRead,
+  ProjectCurrentSourceRead,
   ProjectLinkHistoryItem,
   ProjectLinkHistoryKind,
   ProjectLinkHistoryPage,
@@ -43,6 +47,8 @@ import type {
   ProjectRevisionHistoryPage,
   ProjectSummaryPage,
   ProjectSummaryPageInput,
+  ProjectSourceAcceptanceResult,
+  ProjectSourceRecord,
 } from './project-repository.js';
 
 const ownerIdSchema = z.uuid();
@@ -131,6 +137,39 @@ const storedOutputLinkSchema = z
   })
   .strict();
 
+const storedProjectSourceSchema = z
+  .object({
+    projectId: projectIdSchema,
+    ownerUserId: ownerIdSchema,
+    assetId: z.uuid(),
+    kind: projectSourceKindSchema,
+    savedVideoId: z.uuid().nullable(),
+    videoVersionId: z.uuid().nullable(),
+    acceptedRevisionId: z.uuid(),
+    acceptedRevisionNumber: z.number().int().positive(),
+    operationKey: z.uuid(),
+    requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+    mimeType: videoInputMimeTypeSchema,
+    filename: z.string().trim().min(1).max(180),
+    sizeBytes: z.number().int().positive().max(300_000_000),
+    checksumSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+    container: z.enum(['mp4', 'quicktime', 'webm']),
+    videoCodec: z.enum(['avc', 'vp8']),
+    audioCodec: z.string().trim().min(1).max(32).nullable(),
+    durationMs: z.number().int().positive().max(300_000),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    hasAudio: z.boolean(),
+    acceptedAt: persistedTimestampSchema,
+  })
+  .strict()
+  .superRefine((source, context) => {
+    const reused = source.kind === 'saved-video-version';
+    if (reused !== (source.savedVideoId !== null && source.videoVersionId !== null)) {
+      context.addIssue({ code: 'custom', message: 'Stored Project source lineage is invalid.' });
+    }
+  });
+
 const storedAggregateSchema = z
   .object({
     project: storedProjectSchema,
@@ -139,6 +178,7 @@ const storedAggregateSchema = z
     versionReferenceLinks: z.array(storedVersionReferenceLinkSchema),
     jobLinks: z.array(storedJobLinkSchema),
     outputLinks: z.array(storedOutputLinkSchema),
+    source: storedProjectSourceSchema.nullable().default(null),
   })
   .strict()
   .superRefine((aggregate, context) => {
@@ -161,6 +201,15 @@ const storedAggregateSchema = z
         code: 'custom',
         message: 'Stored Project ownership or revision is invalid.',
       });
+    }
+    if (
+      aggregate.source !== null &&
+      (!owned(aggregate.source) ||
+        aggregate.source.assetId !==
+          aggregate.revisions.find(({ id }) => id === aggregate.source?.acceptedRevisionId)
+            ?.snapshot.sourceAssetId)
+    ) {
+      context.addIssue({ code: 'custom', message: 'Stored Project source is inconsistent.' });
     }
   });
 
@@ -199,7 +248,7 @@ const createReceiptSchema = z
 
 const librarySchema = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
     ownerUserId: ownerIdSchema,
     revision: z.number().int().nonnegative(),
     campaigns: z.array(storedCampaignSchema),
@@ -236,6 +285,18 @@ const librarySchema = z
 
 type ProjectLibrary = z.infer<typeof librarySchema>;
 
+const previousLibraryEnvelopeSchema = z
+  .object({
+    schemaVersion: z.literal(2),
+    ownerUserId: ownerIdSchema,
+    revision: z.number().int().nonnegative(),
+    campaigns: z.array(storedCampaignSchema),
+    projects: z.array(z.unknown()),
+    createReceipts: z.array(createReceiptSchema),
+    campaignCreateReceipts: z.array(campaignCreateReceiptSchema),
+  })
+  .strict();
+
 const legacyLibraryEnvelopeSchema = z
   .object({
     schemaVersion: z.literal(1),
@@ -251,6 +312,17 @@ const parseLibrary = (
 ): { readonly library: ProjectLibrary; readonly migrated: boolean } => {
   const current = librarySchema.safeParse(value);
   if (current.success) return { library: current.data, migrated: false };
+  const previous = previousLibraryEnvelopeSchema.safeParse(value);
+  if (previous.success) {
+    return {
+      migrated: true,
+      library: librarySchema.parse({
+        ...previous.data,
+        schemaVersion: 3,
+        projects: previous.data.projects.map((aggregate) => storedAggregateSchema.parse(aggregate)),
+      }),
+    };
+  }
   const legacy = legacyLibraryEnvelopeSchema.parse(value);
   const projects = legacy.projects.map((aggregateValue) => {
     const aggregate = z
@@ -265,7 +337,7 @@ const parseLibrary = (
   return {
     migrated: true,
     library: librarySchema.parse({
-      schemaVersion: 2,
+      schemaVersion: 3,
       ownerUserId: legacy.ownerUserId,
       revision: legacy.revision,
       campaigns: [],
@@ -278,7 +350,7 @@ const parseLibrary = (
 
 const journalSchema = z
   .object({
-    schemaVersion: z.literal(2),
+    schemaVersion: z.literal(3),
     ownerUserId: ownerIdSchema,
     transactionId: z.uuid(),
     state: z.literal('prepared'),
@@ -286,6 +358,14 @@ const journalSchema = z
       z
         .object({
           kind: z.literal('project-create'),
+          operationKey: z.uuid(),
+          requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+          projectId: projectIdSchema,
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('project-source-accept'),
           operationKey: z.uuid(),
           requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
           projectId: projectIdSchema,
@@ -315,16 +395,35 @@ const journalSchema = z
               receipt.projectId === operation.projectId &&
               receipt.requestFingerprint === operation.requestFingerprint,
           )
-        : metadata.campaignCreateReceipts.some(
-            (receipt) =>
-              receipt.operationKey === operation.operationKey &&
-              receipt.campaignId === operation.campaignId &&
-              receipt.requestFingerprint === operation.requestFingerprint,
-          );
+        : operation.kind === 'campaign-create'
+          ? metadata.campaignCreateReceipts.some(
+              (receipt) =>
+                receipt.operationKey === operation.operationKey &&
+                receipt.campaignId === operation.campaignId &&
+                receipt.requestFingerprint === operation.requestFingerprint,
+            )
+          : metadata.projects.some(
+              ({ source }) =>
+                source?.projectId === operation.projectId &&
+                source.operationKey === operation.operationKey &&
+                source.requestFingerprint === operation.requestFingerprint,
+            );
     if (metadata.ownerUserId !== journal.ownerUserId || !consistent) {
       context.addIssue({ code: 'custom', message: 'Prepared Project journal is inconsistent.' });
     }
   });
+
+const previousJournalSchema = z
+  .object({
+    schemaVersion: z.literal(2),
+    ownerUserId: ownerIdSchema,
+    transactionId: z.uuid(),
+    state: z.literal('prepared'),
+    operation: journalSchema.shape.operation,
+    preparedAt: persistedTimestampSchema,
+    writes: z.object({ metadata: z.unknown() }).strict(),
+  })
+  .strict();
 
 const legacyJournalSchema = z
   .object({
@@ -348,10 +447,18 @@ const legacyJournalSchema = z
 const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
   const current = journalSchema.safeParse(value);
   if (current.success) return current.data;
+  const previous = previousJournalSchema.safeParse(value);
+  if (previous.success) {
+    return journalSchema.parse({
+      ...previous.data,
+      schemaVersion: 3,
+      writes: { metadata: parseLibrary(previous.data.writes.metadata).library },
+    });
+  }
   const legacy = legacyJournalSchema.parse(value);
   const metadata = parseLibrary(legacy.writes.projectMetadata).library;
   return journalSchema.parse({
-    schemaVersion: 2,
+    schemaVersion: 3,
     ownerUserId: legacy.ownerUserId,
     transactionId: legacy.transactionId,
     state: legacy.state,
@@ -362,7 +469,7 @@ const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
 };
 
 const emptyLibrary = (ownerUserId: string): ProjectLibrary => ({
-  schemaVersion: 2,
+  schemaVersion: 3,
   ownerUserId: ownerIdSchema.parse(ownerUserId),
   revision: 0,
   campaigns: [],
@@ -374,7 +481,19 @@ const emptyLibrary = (ownerUserId: string): ProjectLibrary => ({
 const isMissingFile = (error: unknown): boolean =>
   error instanceof Error && 'code' in error && error.code === 'ENOENT';
 
-const asAggregate = (value: z.infer<typeof storedAggregateSchema>): ProjectAggregate => value;
+type StoredProjectAggregate = z.infer<typeof storedAggregateSchema>;
+
+const asAggregate = (value: StoredProjectAggregate): ProjectAggregate => value;
+
+const currentRead = (aggregate: StoredProjectAggregate): ProjectCurrentRead => {
+  const revision = aggregate.revisions.find(
+    ({ id, revisionNumber }) =>
+      id === aggregate.project.currentRevisionId &&
+      revisionNumber === aggregate.project.currentRevisionNumber,
+  );
+  if (revision === undefined) throw new Error('Project current revision is unavailable.');
+  return { project: aggregate.project, revision };
+};
 
 const versionReferenceLinks = (revision: ProjectRevision): ProjectVersionReferenceLink[] => {
   const links: ProjectVersionReferenceLink[] = [];
@@ -616,7 +735,7 @@ export class FileProjectRepository
         createReceipts: [...library.createReceipts, receipt],
       });
       await this.#write(library, next, {
-        schemaVersion: 2,
+        schemaVersion: 3,
         ownerUserId: aggregate.project.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -640,14 +759,28 @@ export class FileProjectRepository
     const aggregate = (await this.#read(ownerUserId)).projects.find(
       ({ project }) => project.id === projectId && project.deletedAt === null,
     );
-    if (aggregate === undefined) return null;
-    const revision = aggregate.revisions.find(
-      ({ id, revisionNumber }) =>
-        id === aggregate.project.currentRevisionId &&
-        revisionNumber === aggregate.project.currentRevisionNumber,
+    return aggregate === undefined ? null : currentRead(aggregate);
+  }
+
+  async getCurrentWithSource(
+    ownerUserId: string,
+    projectId: string,
+  ): Promise<ProjectCurrentSourceRead | null> {
+    const aggregate = (await this.#read(ownerUserId)).projects.find(
+      ({ project }) => project.id === projectId && project.deletedAt === null,
     );
-    if (revision === undefined) throw new Error('Project current revision is unavailable.');
-    return { project: aggregate.project, revision };
+    if (aggregate === undefined) return null;
+    return {
+      current: currentRead(aggregate),
+      source: aggregate.source ?? null,
+    };
+  }
+
+  async getSource(ownerUserId: string, projectId: string): Promise<ProjectSourceRecord | null> {
+    const aggregate = (await this.#read(ownerUserId)).projects.find(
+      ({ project }) => project.id === projectId && project.deletedAt === null,
+    );
+    return aggregate?.source ?? null;
   }
 
   async list(ownerUserId: string, input: ProjectSummaryPageInput): Promise<ProjectSummaryPage> {
@@ -831,6 +964,123 @@ export class FileProjectRepository
     });
   }
 
+  async acceptSource(
+    input: AcceptProjectSourcePersistenceInput,
+  ): Promise<ProjectSourceAcceptanceResult> {
+    const source = storedProjectSourceSchema.parse(input.source) as ProjectSourceRecord;
+    return this.#withOwnerLock(input.ownerUserId, async () => {
+      const library = await this.#read(input.ownerUserId);
+      const prior = library.projects.find(
+        (aggregate) => aggregate.source?.operationKey === source.operationKey,
+      );
+      if (prior?.source !== undefined && prior.source !== null) {
+        if (
+          prior.source.projectId !== input.projectId ||
+          prior.source.requestFingerprint !== source.requestFingerprint
+        ) {
+          return {
+            kind: 'conflict',
+            conflict: { kind: 'operation-key', operation: 'source-accept' },
+          };
+        }
+        const revision = prior.revisions.find(
+          ({ id, revisionNumber }) =>
+            id === prior.project.currentRevisionId &&
+            revisionNumber === prior.project.currentRevisionNumber,
+        );
+        if (revision === undefined)
+          throw new Error('Project source receipt has no current result.');
+        return {
+          kind: 'replayed',
+          current: { project: prior.project, revision },
+          source: prior.source,
+        };
+      }
+
+      const index = library.projects.findIndex(({ project }) => project.id === input.projectId);
+      const aggregate = library.projects[index];
+      if (aggregate === undefined || aggregate.project.deletedAt !== null) {
+        return { kind: 'not-found' };
+      }
+      if (
+        aggregate.source !== null ||
+        aggregate.revisions.some(({ snapshot }) => snapshot.sourceAssetId !== null)
+      ) {
+        return {
+          kind: 'conflict',
+          conflict: { kind: 'immutable-source', projectId: input.projectId },
+        };
+      }
+      if (aggregate.project.version !== input.expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'project-version',
+            projectId: input.projectId,
+            expectedVersion: input.expectedVersion,
+            actualVersion: aggregate.project.version,
+          },
+        };
+      }
+      if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'revision',
+            projectId: input.projectId,
+            expectedRevisionNumber: input.expectedRevisionNumber,
+            actualRevisionNumber: aggregate.project.currentRevisionNumber,
+          },
+        };
+      }
+      const validSource =
+        source.projectId === input.projectId &&
+        source.ownerUserId === input.ownerUserId &&
+        source.assetId === input.revision.snapshot.sourceAssetId &&
+        source.acceptedRevisionId === input.revision.id &&
+        source.acceptedRevisionNumber === input.revision.revisionNumber;
+      if (!validSource) throw new Error('Project source acceptance record is inconsistent.');
+
+      const nextAggregate = storedAggregateSchema.parse({
+        ...aggregate,
+        project: input.nextProject,
+        revisions: [...aggregate.revisions, input.revision],
+        assetLinks: [...aggregate.assetLinks, ...input.assetLinks],
+        versionReferenceLinks: [
+          ...aggregate.versionReferenceLinks,
+          ...versionReferenceLinks(input.revision),
+        ],
+        source,
+      });
+      const projects = [...library.projects];
+      projects[index] = nextAggregate;
+      const next = librarySchema.parse({
+        ...library,
+        revision: library.revision + 1,
+        projects,
+      });
+      await this.#write(library, next, {
+        schemaVersion: 3,
+        ownerUserId: input.ownerUserId,
+        transactionId: randomUUID(),
+        state: 'prepared',
+        operation: {
+          kind: 'project-source-accept',
+          operationKey: source.operationKey,
+          requestFingerprint: source.requestFingerprint,
+          projectId: input.projectId,
+        },
+        preparedAt: source.acceptedAt,
+        writes: { metadata: next },
+      });
+      return {
+        kind: 'accepted',
+        current: { project: input.nextProject, revision: input.revision },
+        source,
+      };
+    });
+  }
+
   async updateMetadata(
     ownerUserId: string,
     expectedVersion: number,
@@ -967,7 +1217,7 @@ export class FileProjectRepository
         campaignCreateReceipts: [...library.campaignCreateReceipts, receipt],
       });
       await this.#write(library, next, {
-        schemaVersion: 2,
+        schemaVersion: 3,
         ownerUserId: campaign.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',

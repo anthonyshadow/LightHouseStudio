@@ -68,6 +68,13 @@ const cloudOnlyRoutes: readonly Route[] = [
   'PUT /api/creative-library',
 ];
 
+const projectSourceRoutes: readonly Route[] = [
+  'GET /api/projects/:projectId/source',
+  'GET /api/projects/:projectId/source/content',
+  'POST /api/projects/:projectId/source',
+  'POST /api/projects/:projectId/source/reuse',
+];
+
 const withExplicitHeadSiblings = (routes: readonly Route[]): Route[] =>
   routes.flatMap((route) => {
     const separator = route.indexOf(' ');
@@ -107,7 +114,7 @@ describe('API route inventory oracle', () => {
   it('registers the exact local Elysia inventory with a HEAD sibling for every GET', () => {
     const app = createApp({ config: testConfig() });
     apps.push(app);
-    const expected = withExplicitHeadSiblings(alwaysRegisteredRoutes);
+    const expected = withExplicitHeadSiblings([...alwaysRegisteredRoutes, ...projectSourceRoutes]);
     const actual = registeredElysiaRoutes(app);
 
     expect(new Set(actual).size).toBe(actual.length);

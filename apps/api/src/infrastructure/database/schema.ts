@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm';
 import {
   type AnyPgColumn,
   bigint,
+  boolean,
   check,
   foreignKey,
   index,
@@ -110,6 +111,11 @@ export const projectRevisionSource = pgEnum('project_revision_source', [
   'job-result',
   'restore',
   'migration',
+]);
+export const projectSourceKind = pgEnum('project_source_kind', [
+  'uploaded',
+  'recorded',
+  'saved-video-version',
 ]);
 
 const auditTimestamps = {
@@ -765,6 +771,88 @@ export const projectVersionReferences = pgTable(
   ],
 );
 
+export const projectSources = pgTable(
+  'project_sources',
+  {
+    projectId: uuid('project_id').primaryKey(),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    assetId: uuid('asset_id').notNull(),
+    kind: projectSourceKind('kind').notNull(),
+    savedVideoId: uuid('saved_video_id'),
+    videoVersionId: uuid('video_version_id'),
+    acceptedRevisionId: uuid('accepted_revision_id').notNull(),
+    acceptedRevisionNumber: integer('accepted_revision_number').notNull(),
+    operationKey: uuid('operation_key').notNull(),
+    requestFingerprint: text('request_fingerprint').notNull(),
+    mimeType: text('mime_type').notNull(),
+    filename: text('filename').notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+    checksumSha256: text('checksum_sha256').notNull(),
+    container: text('container').notNull(),
+    videoCodec: text('video_codec').notNull(),
+    audioCodec: text('audio_codec'),
+    durationMs: integer('duration_ms').notNull(),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    hasAudio: boolean('has_audio').notNull(),
+    acceptedAt: timestamp('accepted_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    uniqueIndex('project_sources_owner_operation_unique').on(table.ownerUserId, table.operationKey),
+    index('project_sources_asset_idx').on(table.ownerUserId, table.assetId),
+    foreignKey({
+      name: 'project_sources_project_owner_fk',
+      columns: [table.projectId, table.ownerUserId],
+      foreignColumns: [projects.id, projects.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_sources_asset_owner_fk',
+      columns: [table.assetId, table.ownerUserId],
+      foreignColumns: [mediaAssets.id, mediaAssets.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_sources_revision_same_project_fk',
+      columns: [
+        table.projectId,
+        table.ownerUserId,
+        table.acceptedRevisionId,
+        table.acceptedRevisionNumber,
+      ],
+      foreignColumns: [
+        projectRevisions.projectId,
+        projectRevisions.ownerUserId,
+        projectRevisions.id,
+        projectRevisions.revisionNumber,
+      ],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_sources_saved_video_owner_fk',
+      columns: [table.savedVideoId, table.ownerUserId],
+      foreignColumns: [savedVideos.id, savedVideos.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_sources_version_same_video_fk',
+      columns: [table.savedVideoId, table.ownerUserId, table.videoVersionId],
+      foreignColumns: [videoVersions.videoId, videoVersions.ownerUserId, videoVersions.id],
+    }).onDelete('restrict'),
+    check(
+      'project_sources_lineage_consistent',
+      sql`(${table.kind} = 'saved-video-version' and ${table.savedVideoId} is not null and ${table.videoVersionId} is not null) or (${table.kind} <> 'saved-video-version' and ${table.savedVideoId} is null and ${table.videoVersionId} is null)`,
+    ),
+    check('project_sources_revision_positive', sql`${table.acceptedRevisionNumber} > 0`),
+    check('project_sources_size_positive', sql`${table.sizeBytes} > 0`),
+    check('project_sources_duration_positive', sql`${table.durationMs} > 0`),
+    check('project_sources_dimensions_positive', sql`${table.width} > 0 and ${table.height} > 0`),
+    check('project_sources_fingerprint_length', sql`length(${table.requestFingerprint}) = 64`),
+    check(
+      'project_sources_media_supported',
+      sql`${table.mimeType} in ('video/mp4', 'video/quicktime', 'video/webm') and ${table.container} in ('mp4', 'quicktime', 'webm') and ${table.videoCodec} in ('avc', 'vp8')`,
+    ),
+  ],
+);
+
 export const projectJobs = pgTable(
   'project_jobs',
   {
@@ -942,6 +1030,7 @@ export const databaseSchema = {
   projectRevisions,
   projectAssets,
   projectVersionReferences,
+  projectSources,
   projectJobs,
   projectOutputs,
   outbox,

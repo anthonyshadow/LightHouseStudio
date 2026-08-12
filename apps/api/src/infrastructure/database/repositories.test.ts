@@ -367,6 +367,23 @@ describe('DrizzleSavedVideoRepository', () => {
     expect(scripted.remaining()).toBe(0);
   });
 
+  it('loads one exact active Saved Video Version in one query', async () => {
+    const scripted = scriptedDatabase([
+      {
+        video: { ...video, createdAt: postgresNow, updatedAt: postgresNow },
+        version: { ...version, createdAt: postgresNow },
+      },
+    ]);
+    const repository = new DrizzleSavedVideoRepository(scripted.db);
+
+    await expect(repository.getVersion(ownerUserId, videoId, versionId)).resolves.toMatchObject({
+      video: { id: videoId, status: 'ready' },
+      version: { id: versionId, assetId },
+    });
+    expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
+    expect(scripted.remaining()).toBe(0);
+  });
+
   it('checks active Saved Video asset references in one batch query', async () => {
     const scripted = scriptedDatabase([{ assetId }, { assetId: nextVersionId }]);
     const repository = new DrizzleSavedVideoRepository(scripted.db);

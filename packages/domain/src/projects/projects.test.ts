@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  acceptProjectSource,
   appendProjectRevision,
   archiveProject,
   canTransitionProjectStatus,
@@ -236,6 +237,59 @@ describe('Project aggregate rules', () => {
         { now: later, createId: () => secondRevisionId },
       ),
     ).toMatchObject({ ok: false, conflict: { kind: 'revision', actualRevisionNumber: 1 } });
+  });
+
+  it('accepts one ready immutable source and preserves exact source lineage without a save target', () => {
+    const initial = emptyProject();
+    const savedVideoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
+    const videoVersionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
+    const accepted = acceptProjectSource(
+      initial,
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'saved-video-version', savedVideoId, videoVersionId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+
+    expect(accepted).toMatchObject({
+      ok: true,
+      value: {
+        project: { status: 'ready', version: 2, currentRevisionNumber: 2 },
+        revisions: [
+          {},
+          {
+            snapshot: {
+              sourceAssetId,
+              workingMedia: { kind: 'saved-video-version', savedVideoId, videoVersionId },
+              presentedMedia: { kind: 'saved-video-version', savedVideoId, videoVersionId },
+              lastSuccessfulOutput: null,
+              workflowPhase: 'creative',
+            },
+          },
+        ],
+      },
+    });
+    if (!accepted.ok) throw new Error('Expected Project source acceptance.');
+    expect(
+      acceptProjectSource(
+        accepted.value,
+        {
+          expectedProjectVersion: 2,
+          expectedRevisionNumber: 2,
+          assetId: '65cd938f-5ff6-4730-953b-4137136354c7',
+          mediaReference: {
+            kind: 'asset',
+            assetId: '65cd938f-5ff6-4730-953b-4137136354c7',
+          },
+          author: { kind: 'user', authorId: ownerUserId },
+        },
+        { now: later, createId: () => '80eb98cb-0dd4-4aac-8507-084789045d71' },
+      ),
+    ).toEqual({ ok: false, conflict: { kind: 'immutable-source', projectId } });
   });
 
   it('clears a completed pointer when a later revision changes material working state', () => {

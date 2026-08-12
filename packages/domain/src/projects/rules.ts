@@ -6,6 +6,7 @@ import type {
   ProjectRevision,
   ProjectRevisionAuthor,
   ProjectRevisionSource,
+  ProjectMediaReference,
   ProjectSnapshot,
   ProjectStatus,
   ProjectStatusFacts,
@@ -528,4 +529,75 @@ export const appendProjectRevision = (
       revisions: [...aggregate.revisions, revision],
     },
   };
+};
+
+export interface AcceptProjectSourceInput {
+  readonly expectedProjectVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly assetId: string;
+  readonly mediaReference: ProjectMediaReference;
+  readonly author: ProjectRevisionAuthor;
+}
+
+/**
+ * Accepts the one immutable MVP original. Storage readiness and exact Saved Video lineage are
+ * verified by the repository transaction before this semantic revision is committed.
+ */
+export const acceptProjectSource = (
+  aggregate: ProjectAggregate,
+  input: AcceptProjectSourceInput,
+  context: ProjectMutationContext,
+): ProjectMutationResult<ProjectAggregate> => {
+  const currentRevision = aggregate.revisions.find(
+    ({ id }) => id === aggregate.project.currentRevisionId,
+  );
+  if (currentRevision === undefined) {
+    throw new ProjectRuleError('invalid-snapshot', 'The current project revision is missing.');
+  }
+  if (currentRevision.snapshot.sourceAssetId !== null) {
+    return {
+      ok: false,
+      conflict: { kind: 'immutable-source', projectId: aggregate.project.id },
+    };
+  }
+  const now = requireTimestamp(context.now);
+  const assetId = requireId(input.assetId, 'Source asset');
+  const mediaReference =
+    input.mediaReference.kind === 'asset'
+      ? { kind: 'asset' as const, assetId: requireId(input.mediaReference.assetId, 'Media asset') }
+      : {
+          kind: 'saved-video-version' as const,
+          savedVideoId: requireId(input.mediaReference.savedVideoId, 'Saved video'),
+          videoVersionId: requireId(input.mediaReference.videoVersionId, 'Video version'),
+        };
+  if (mediaReference.kind === 'asset' && mediaReference.assetId !== assetId) {
+    throw new ProjectRuleError(
+      'invalid-snapshot',
+      'An uploaded Project source must present the accepted source asset.',
+    );
+  }
+  return appendProjectRevision(
+    aggregate,
+    {
+      expectedProjectVersion: input.expectedProjectVersion,
+      expectedRevisionNumber: input.expectedRevisionNumber,
+      snapshot: {
+        ...currentRevision.snapshot,
+        sourceAssetId: assetId,
+        workingMedia: mediaReference,
+        presentedMedia: mediaReference,
+        lastSuccessfulOutput: null,
+        workflowPhase: 'creative',
+        updatedAt: now,
+      },
+      author: input.author,
+      source: 'user-edit',
+      facts: {
+        sourceStatus: 'ready',
+        currentAttempt: { status: 'none' },
+        validatedLastSuccessfulOutput: null,
+      },
+    },
+    { ...context, now },
+  );
 };

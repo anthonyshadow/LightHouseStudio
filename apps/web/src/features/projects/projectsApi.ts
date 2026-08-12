@@ -1,9 +1,11 @@
 import {
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
+  projectSourceResponseSchema,
   projectsResponseSchema,
   type ProjectConflictContract,
   type ProjectCurrentResponse,
+  type ProjectSourceResponse,
   type ProjectsQuery,
 } from '@studio/contracts';
 import {
@@ -170,6 +172,84 @@ export const moveProjectToCampaign = (
       ...(signal ? { signal } : {}),
     },
     projectCurrentResponseSchema,
+    invalidProjectResponse,
+    parseProjectConflict,
+  );
+
+export const getProjectSource = (
+  projectId: string,
+  signal?: AbortSignal,
+): Promise<ProjectSourceResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(projectId)}/source`,
+    {
+      cache: 'no-store',
+      headers: { Accept: 'application/json' },
+      ...(signal ? { signal } : {}),
+    },
+    projectSourceResponseSchema,
+    invalidProjectResponse,
+  );
+
+export const uploadProjectSource = (input: {
+  readonly projectId: string;
+  readonly file: File;
+  readonly operationKey: string;
+  readonly expectedVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly kind: 'uploaded' | 'recorded';
+  readonly signal?: AbortSignal;
+}): Promise<ProjectSourceResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(input.projectId)}/source`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': input.file.type,
+        'Idempotency-Key': input.operationKey,
+        'X-Lightframe-Project-Source': encodeURIComponent(
+          JSON.stringify({
+            expectedVersion: input.expectedVersion,
+            expectedRevisionNumber: input.expectedRevisionNumber,
+            kind: input.kind,
+            filename: input.file.name,
+          }),
+        ),
+      },
+      body: input.file,
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
+    projectSourceResponseSchema,
+    invalidProjectResponse,
+    parseProjectConflict,
+  );
+
+export const reuseSavedVideoAsProjectSource = (input: {
+  readonly projectId: string;
+  readonly operationKey: string;
+  readonly expectedVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly savedVideoId: string;
+  readonly videoVersionId: string;
+  readonly signal?: AbortSignal;
+}): Promise<ProjectSourceResponse> =>
+  requestJson(
+    `/api/projects/${encodeURIComponent(input.projectId)}/source/reuse`,
+    {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { ...jsonHeaders, 'Idempotency-Key': input.operationKey },
+      body: JSON.stringify({
+        expectedVersion: input.expectedVersion,
+        expectedRevisionNumber: input.expectedRevisionNumber,
+        savedVideoId: input.savedVideoId,
+        videoVersionId: input.videoVersionId,
+      }),
+      ...(input.signal ? { signal: input.signal } : {}),
+    },
+    projectSourceResponseSchema,
     invalidProjectResponse,
     parseProjectConflict,
   );

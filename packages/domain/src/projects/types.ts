@@ -177,6 +177,10 @@ export interface ProjectAssetLink {
 
 export type ProjectVersionReferenceRole = 'working' | 'presented';
 
+export const PROJECT_SOURCE_KINDS = ['uploaded', 'recorded', 'saved-video-version'] as const;
+
+export type ProjectSourceKind = (typeof PROJECT_SOURCE_KINDS)[number];
+
 /** A revision-scoped used-by relation. It never claims that this Project produced the Version. */
 export interface ProjectVersionReferenceLink {
   readonly projectId: string;
@@ -234,7 +238,7 @@ export interface ProjectStatusFacts {
 export type ProjectConflict =
   | {
       readonly kind: 'operation-key';
-      readonly operation: 'create';
+      readonly operation: 'create' | 'source-accept';
     }
   | {
       readonly kind: 'project-version';
@@ -259,6 +263,10 @@ export type ProjectConflict =
     }
   | {
       readonly kind: 'campaign-membership';
+      readonly projectId: string;
+    }
+  | {
+      readonly kind: 'immutable-source';
       readonly projectId: string;
     };
 

@@ -22,6 +22,13 @@ import {
   workspaceStyles,
 } from './ProjectRouteSurface.styles';
 import { useProjectDetail, useProjectList, useProjectsController } from './useProjectsController';
+import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
+import {
+  useProjectSourceController,
+  type ProjectSourceActivity,
+  type ProjectSourcePhase,
+  type ProjectSourceRuntime,
+} from './useProjectSourceController';
 
 const projectStatusLabel = (status: ProjectContract['status']): string =>
   status === 'needs-attention'
@@ -501,8 +508,8 @@ const ProjectsWorkspace = () => {
             Projects
           </h2>
           <p>
-            Create and manage focused video work. Source resume and creative tools are added in a
-            later step; empty Projects are already durable server-owned records.
+            Create and manage focused video work. Each Project can retain one inspected immutable
+            video original; creative-session autosave and output saving arrive later.
           </p>
         </div>
         <Button
@@ -591,17 +598,220 @@ const ProjectsWorkspace = () => {
   );
 };
 
-const isEmptyProject = (current: ProjectCurrentResponse): boolean => {
-  const snapshot = current.revision.snapshot;
+export interface ProjectRecordingCandidate {
+  readonly file: File;
+  readonly ready: boolean;
+}
+
+export interface ProjectRouteSurfaceProps {
+  readonly sourceRuntime?: ProjectSourceRuntime;
+  readonly recordingCandidate?: ProjectRecordingCandidate | null;
+  readonly recordingActive?: boolean;
+  readonly onStartRecording?: () => void;
+  readonly onSourceActivityChange?: (activity: ProjectSourceActivity) => void;
+}
+
+const unavailableSourceRuntime: ProjectSourceRuntime = {
+  present: () => undefined,
+  clear: () => undefined,
+};
+
+interface ProjectSourceNotice {
+  readonly title: string;
+  readonly tone: 'neutral' | 'success' | 'warning' | 'danger';
+  readonly body: string;
+}
+
+const projectSourceNotice = (
+  phase: ProjectSourcePhase,
+  message: string | null,
+): ProjectSourceNotice | null => {
+  switch (phase) {
+    case 'hydrating':
+      return {
+        title: 'Preparing source',
+        tone: 'neutral',
+        body: 'Restoring the durable Project source into the media stage.',
+      };
+    case 'preparing':
+      return {
+        title: 'Preparing source',
+        tone: 'neutral',
+        body: 'Transferring and inspecting source media. This Project is not resumable until acceptance completes.',
+      };
+    case 'saving':
+      return {
+        title: 'Saving changes',
+        tone: 'neutral',
+        body: 'Committing the immutable original and Project revision.',
+      };
+    case 'saved':
+      return {
+        title: 'All changes saved',
+        tone: 'success',
+        body: 'This original is durable, inspected, and ready to resume from this Project URL.',
+      };
+    case 'conflict':
+      return {
+        title: 'Conflict',
+        tone: 'warning',
+        body: message ?? 'The Project changed. Refresh before trying again.',
+      };
+    case 'error':
+      return {
+        title: 'Source not saved',
+        tone: 'danger',
+        body: message ?? 'The staged source was not accepted.',
+      };
+    case 'idle':
+      return null;
+  }
+};
+
+const ProjectSourceSection = ({
+  current,
+  runtime,
+  recordingCandidate,
+  recordingActive = false,
+  onStartRecording,
+  onActivityChange,
+}: {
+  readonly current: ProjectCurrentResponse;
+  readonly runtime: ProjectSourceRuntime;
+  readonly recordingCandidate?: ProjectRecordingCandidate | null | undefined;
+  readonly recordingActive?: boolean | undefined;
+  readonly onStartRecording?: (() => void) | undefined;
+  readonly onActivityChange?: ((activity: ProjectSourceActivity) => void) | undefined;
+}) => {
+  const theme = useTheme();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const savedVideoTriggerRef = useRef<HTMLButtonElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const controller = useProjectSourceController(
+    current.project.id,
+    current,
+    runtime,
+    onActivityChange,
+  );
+  const archived = current.project.archivedAt !== null;
+  const controlsDisabled = archived || controller.busy || controller.accepted;
+  const stateNotice = projectSourceNotice(controller.phase, controller.message);
+
   return (
-    snapshot.sourceAssetId === null &&
-    snapshot.workingMedia === null &&
-    snapshot.presentedMedia === null &&
-    snapshot.lastSuccessfulOutput === null
+    <>
+      <section css={emptyProjectStyles(theme)} aria-labelledby="project-source-heading">
+        <div>
+          <h3 id="project-source-heading">
+            {controller.accepted ? 'Immutable original' : 'No source yet'}
+          </h3>
+          {controller.accepted && controller.source ? (
+            <>
+              <p>
+                {controller.source.filename} · {controller.source.width}×{controller.source.height}{' '}
+                · {Math.round(controller.source.durationMs / 1_000)} seconds
+              </p>
+              <p>
+                {controller.source.kind === 'saved-video-version'
+                  ? 'This Project references the exact Saved Video Version and its existing bytes; it does not claim to have produced it.'
+                  : 'The accepted original is retained by this Project and cannot be replaced. Start a new Project for a different original.'}
+              </p>
+            </>
+          ) : (
+            <>
+              <p>
+                Choose one video as this Project&apos;s immutable original. Upload and finalized
+                recording previews stay local while the server stores and inspects the source.
+              </p>
+              <p>
+                A failed or cancelled staging attempt can be replaced. After acceptance, a different
+                original always starts a new Project.
+              </p>
+            </>
+          )}
+          {stateNotice ? (
+            <StatusNotice
+              role={
+                controller.phase === 'error' || controller.phase === 'conflict' ? 'alert' : 'status'
+              }
+              tone={stateNotice.tone}
+              title={stateNotice.title}
+              css={{ marginBlockStart: theme.space.md }}
+            >
+              {stateNotice.body}
+            </StatusNotice>
+          ) : null}
+        </div>
+        <div data-source-actions>
+          <input
+            ref={inputRef}
+            type="file"
+            accept="video/mp4,video/quicktime,video/webm"
+            hidden
+            disabled={controlsDisabled}
+            onChange={(event) => {
+              const file = event.target.files?.[0];
+              event.currentTarget.value = '';
+              if (file) void controller.upload(file);
+            }}
+          />
+          {recordingCandidate?.ready && !controller.accepted ? (
+            <Button
+              variant="primary"
+              busy={controller.busy}
+              disabled={archived || controller.busy}
+              onClick={() => void controller.acceptRecording(recordingCandidate.file)}
+            >
+              Use finalized recording
+            </Button>
+          ) : (
+            <Button
+              disabled={controlsDisabled || onStartRecording === undefined}
+              busy={recordingActive}
+              onClick={onStartRecording}
+            >
+              Record
+            </Button>
+          )}
+          <Button
+            disabled={controlsDisabled || runtime === unavailableSourceRuntime}
+            onClick={() => inputRef.current?.click()}
+          >
+            Upload
+          </Button>
+          <Button
+            ref={savedVideoTriggerRef}
+            disabled={controlsDisabled || runtime === unavailableSourceRuntime}
+            onClick={() => setPickerOpen(true)}
+          >
+            Use Saved Video
+          </Button>
+          <small>
+            No provider starts from source selection, hydration, recording acceptance, or resume.
+          </small>
+        </div>
+      </section>
+      <ProjectSavedVideoPicker
+        open={pickerOpen}
+        busy={controller.busy}
+        returnFocusRef={savedVideoTriggerRef}
+        onClose={() => setPickerOpen(false)}
+        onSelect={(video) => {
+          setPickerOpen(false);
+          void controller.reuseSavedVideo(video);
+        }}
+      />
+    </>
   );
 };
 
-const ProjectDetail = ({ projectId }: { readonly projectId: string }) => {
+const ProjectDetail = ({
+  projectId,
+  sourceRuntime = unavailableSourceRuntime,
+  recordingCandidate,
+  recordingActive,
+  onStartRecording,
+  onSourceActivityChange,
+}: { readonly projectId: string } & ProjectRouteSurfaceProps) => {
   const theme = useTheme();
   const navigate = useNavigate();
   const query = useProjectDetail(projectId);
@@ -712,36 +922,15 @@ const ProjectDetail = ({ projectId }: { readonly projectId: string }) => {
         {announcement}
       </div>
 
-      {isEmptyProject(current) ? (
-        <section css={emptyProjectStyles(theme)} aria-labelledby="empty-project-heading">
-          <div>
-            <h3 id="empty-project-heading">No source yet</h3>
-            <p>
-              This Project is durable and can be reopened from this URL. Video source acceptance and
-              resumable creative state are not available yet, so nothing is claimed as saved media
-              or resumable work.
-            </p>
-            <p>
-              Opening Studio or a global saved library explicitly exits this Project context. Return
-              to work through this Project URL.
-            </p>
-          </div>
-          <div data-source-actions aria-describedby="future-source-explanation">
-            <Button disabled>Record video</Button>
-            <Button disabled>Upload video</Button>
-            <Button disabled>Use Saved Video</Button>
-            <small id="future-source-explanation">
-              Source actions arrive after durable source acceptance is implemented. No camera,
-              upload, player, or provider work starts from this screen.
-            </small>
-          </div>
-        </section>
-      ) : (
-        <StatusNotice tone="warning" title="Source session not available yet">
-          This Project has durable media references, but this lifecycle workspace does not fetch or
-          mount them. Source hydration arrives in the next implementation boundary.
-        </StatusNotice>
-      )}
+      <ProjectSourceSection
+        key={current.project.id}
+        current={current}
+        runtime={sourceRuntime}
+        recordingCandidate={recordingCandidate}
+        recordingActive={recordingActive}
+        onStartRecording={onStartRecording}
+        onActivityChange={onSourceActivityChange}
+      />
 
       {renameTarget ? (
         <RenameProjectDialog
@@ -784,7 +973,7 @@ const ProjectDetail = ({ projectId }: { readonly projectId: string }) => {
   );
 };
 
-export const ProjectRouteSurface = () => {
+export const ProjectRouteSurface = (props: ProjectRouteSurfaceProps = {}) => {
   const theme = useTheme();
   const location = useLocation();
   const projectId = projectIdFromPath(location.pathname);
@@ -796,7 +985,11 @@ export const ProjectRouteSurface = () => {
 
   return (
     <div ref={routeRef} css={workspaceStyles(theme)} data-project-route="">
-      {projectId === null ? <ProjectsWorkspace /> : <ProjectDetail projectId={projectId} />}
+      {projectId === null ? (
+        <ProjectsWorkspace />
+      ) : (
+        <ProjectDetail projectId={projectId} {...props} />
+      )}
     </div>
   );
 };

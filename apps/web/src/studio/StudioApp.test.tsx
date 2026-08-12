@@ -12,6 +12,7 @@ import type {
   CreativeWorkspaceState,
 } from './CreativeWorkspace';
 import type { PersistedSessionReference } from '../features/media-session';
+import type { ProjectRouteSurfaceProps } from '../features/projects/ProjectRouteSurface';
 
 type WorkspaceHarnessProps = {
   state: CreativeWorkspaceState;
@@ -211,6 +212,7 @@ const harness = vi.hoisted(() => {
     existingVideo,
     takeStagePresentation,
     latestWorkspace: null as WorkspaceHarnessProps | null,
+    latestProjectSurfaceProps: null as ProjectRouteSurfaceProps | null,
     fetchReferenceImageMetadata: vi.fn(),
     hydrateReferenceImage: vi.fn(),
     saveVideo: vi.fn(() => Promise.resolve(null)),
@@ -350,7 +352,10 @@ vi.mock('../features/video-gallery/VideoGallery', () => ({
 }));
 
 vi.mock('../features/projects/ProjectRouteSurface', () => ({
-  ProjectRouteSurface: () => <div>Deferred Projects workspace</div>,
+  ProjectRouteSurface: (props: ProjectRouteSurfaceProps) => {
+    harness.latestProjectSurfaceProps = props;
+    return <div>Deferred Projects workspace</div>;
+  },
 }));
 
 vi.mock('../features/existing-video/useExistingVideoWorkflow', () => ({
@@ -600,6 +605,7 @@ describe('StudioApp composition lifecycle', () => {
   beforeEach(() => {
     window.history.replaceState(null, '', '/');
     harness.latestWorkspace = null;
+    harness.latestProjectSurfaceProps = null;
     harness.promptCommitted = null;
     harness.recording.original = null;
     harness.recording.presented = null;
@@ -685,6 +691,19 @@ describe('StudioApp composition lifecycle', () => {
     );
     expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(stage.closest('[hidden]')).not.toBeInTheDocument();
+  });
+
+  it('keeps the same media-stage owner visible in an open Project and supplies source lifecycle seams', async () => {
+    renderStudio(undefined, '/studio/projects/18b120ac-1578-46e3-8c3d-42307772f391');
+    const stage = screen.getByTestId('media-stage');
+
+    expect(await screen.findByText('Deferred Projects workspace')).toBeInTheDocument();
+    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
+    expect(stage.closest('[hidden]')).not.toBeInTheDocument();
+    expect(typeof harness.latestProjectSurfaceProps?.sourceRuntime?.present).toBe('function');
+    expect(typeof harness.latestProjectSurfaceProps?.sourceRuntime?.clear).toBe('function');
+    expect(typeof harness.latestProjectSurfaceProps?.onStartRecording).toBe('function');
+    expect(typeof harness.latestProjectSurfaceProps?.onSourceActivityChange).toBe('function');
   });
 
   it('closes Use existing video and hands local recording to the persistent stage', async () => {

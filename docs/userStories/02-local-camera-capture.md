@@ -28,6 +28,11 @@
    compact Save, Discard, Voice, Release, and [detailed review](07-take-review-and-cleanup.md)
    path used by advanced live sessions; **Edit Video** opens the existing-video source chooser
    without silently adopting that take.
+10. In an open empty Project, **Record** uses this same local preview, recorder, Stop/finalization,
+    and artifact owner. The Project remains **No source yet** until the operator chooses **Use
+    finalized recording** and the API durably stores, inspects, and atomically accepts it. A failed
+    acceptance leaves a replaceable local take; an accepted recording becomes that Project's
+    immutable original and returns after refresh without contacting a provider.
 
 ## Guards and recovery
 
@@ -41,6 +46,9 @@
   session.
 - The local path does not request a Decart token, load its SDK, open provider WebRTC, or send media
   externally.
+- Switching Projects is blocked while recording/finalization owns the take. A finalized but
+  unaccepted Project take requires explicit discard before switching; acceptance completion stays
+  bound to its initiating Project.
 
 ## Evidence status
 

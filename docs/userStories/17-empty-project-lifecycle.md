@@ -1,10 +1,10 @@
-# Empty Project lifecycle workspace
+# Project lifecycle and immutable source
 
 ## Story
 
-As the authenticated operator, I can create and manage durable empty Projects from one canonical
-workspace, reopen the same Project by URL, and resolve concurrent metadata changes without losing
-my proposed name or starting media/provider work.
+As the authenticated operator, I can create and manage Projects from one canonical workspace,
+accept one durable video original, reopen the same Project/source by URL, and resolve concurrent
+metadata or source changes without unsafe overwrite or implicit provider work.
 
 ## Observable behavior
 
@@ -27,19 +27,37 @@ my proposed name or starting media/provider work.
    **Reload and retry rename** or **Discard change**. Reload fetches current server authority;
    response-loss replay is reconciled when the requested result is already current.
 6. Refreshing or directly opening an empty Project fetches its identity and current revision from
-   server authority. The detail truthfully says **No source yet**. Record, Upload, and Use Saved
-   Video are visible only as disabled future affordances and do not acquire camera/media, mount a
-   second player, contact a provider, or claim source/session resumability.
+   server authority. The detail truthfully says **No source yet** and offers **Record**, **Upload**,
+   and **Use Saved Video** without a wizard. Upload previews immediately on the existing stage;
+   Record starts local media only after the explicit action and offers a finalized take for
+   acceptance; Use Saved Video selects the current exact active Version.
 7. `StudioApp` remains the sole authenticated composition root and owns the one mounted media
-   stage. The Projects full workspace hides that existing stage rather than mounting another
-   Studio, player, media session, shell, or Project store.
+   stage. Project list and Campaign routes hide it; an open Project reuses it beside Project source
+   controls rather than mounting another Studio, player, media session, object-URL owner, shell, or
+   Project store.
 8. Active Project identity is URL-owned. **Studio** navigation and global-library navigation are
    labelled as Project-context exits. Refreshing `/studio/videos`, `/studio/characters`, or
    `/studio/outfits` restores that global library and cannot resurrect the prior Project from
    mounted React state.
+9. The UI distinguishes **Preparing source**, **Saving changes**, **All changes saved**,
+   **Conflict**, and safe failure. A Project becomes resumable only after durable byte storage or
+   exact Version verification, server inspection, checksum/owner validation, and atomic source
+   revision acceptance. A failed/unaccepted staging attempt can be replaced.
+10. The first accepted source is the immutable original. A different accepted original requires a
+    new Project. Exact Saved Video Version reuse references existing bytes and used-by lineage; it
+    does not claim that the Project produced that Version or infer a later Add Version target.
+11. Accepted source metadata exposes only normalized media facts and a controlled Project content
+    URL. Owner-checked range/HEAD content rehydrates a fresh Blob through the existing recording
+    artifact owner after navigation, browser refresh/restart, or app restart. Blob/data URLs,
+    checksums, storage paths/keys, and provider bodies remain private.
+12. Recording/finalization blocks Project switching until safe. Upload/inspection/acceptance and a
+    finalized unaccepted take require explicit stay or abort/discard. Every operation remains bound
+    to its initiating Project, and an old Project's late completion cannot replace the new stage.
 
 ## Boundaries
 
-This story adds no Campaign, source acceptance, media hydration, autosave, creative integration,
-processing, output, history, download, browser Project authority, or IndexedDB Project data.
-Project server/repository authority and retention behavior remain as documented in Architecture.
+This story adds no Campaign expansion, Project autosave, creative integration, processing, output
+save, Version-history UI, browser Project authority, or IndexedDB Project data. Project source
+selection starts no provider. The standalone existing-video workflow remains tab-temporary unless
+its result is separately saved. Project server/repository authority, retention, and cleanup remain
+as documented in Architecture.
