@@ -273,6 +273,32 @@ describe('SavedVideoService', () => {
     expect(await bytes.exists(ownerUserId, assetId)).toBe(false);
   });
 
+  it('tombstones library metadata without deleting Project-retained Version bytes', async () => {
+    const video = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
+    const assetId = (await repository.get(ownerUserId, video.id))!.versions[0]!.assetId;
+    const projectRetention = {
+      retainsAsset: vi.fn().mockResolvedValue(true),
+      retainedAssetIds: vi
+        .fn()
+        .mockImplementation((_ownerUserId: string, assetIds: readonly string[]) =>
+          Promise.resolve(new Set(assetIds)),
+        ),
+    };
+    service = new SavedVideoService(repository, bytes, {
+      now: () => new Date('2026-08-05T12:00:00.000Z'),
+      inspect: () => Promise.resolve(inspected),
+      deleteStoredAssetsOnManualDelete: true,
+      projectRetention,
+    });
+
+    await service.delete(ownerUserId, video.id);
+
+    expect(await repository.list(ownerUserId)).toHaveLength(0);
+    expect(await bytes.exists(ownerUserId, assetId)).toBe(true);
+    expect(projectRetention.retainedAssetIds).toHaveBeenCalledWith(ownerUserId, [assetId]);
+    expect(projectRetention.retainsAsset).not.toHaveBeenCalled();
+  });
+
   it('returns non-enumerating wrong-owner failures and marks missing local bytes', async () => {
     const video = await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
     await expect(service.get(otherUserId, video.id)).rejects.toMatchObject({

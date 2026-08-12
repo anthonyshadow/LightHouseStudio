@@ -66,6 +66,10 @@ export const projectMediaReferenceSchema = z.discriminatedUnion('kind', [
     .strict(),
 ]);
 
+export const projectOutputReferenceSchema = z
+  .object({ savedVideoId: z.uuid(), videoVersionId: z.uuid() })
+  .strict();
+
 const projectVoiceSelectionSchema = z.discriminatedUnion('kind', [
   z
     .object({
@@ -198,10 +202,7 @@ export const projectSnapshotSchema = z
       })
       .strict()
       .nullable(),
-    lastSuccessfulOutput: z
-      .object({ savedVideoId: z.uuid(), videoVersionId: z.uuid() })
-      .strict()
-      .nullable(),
+    lastSuccessfulOutput: projectOutputReferenceSchema.nullable(),
     workflowPhase: projectWorkflowPhaseSchema,
     createdAt: z.iso.datetime(),
     updatedAt: z.iso.datetime(),
@@ -229,7 +230,12 @@ export const projectSnapshotSchema = z
         message: 'Virtual Try-On requires a selected outfit.',
       });
     }
-  });
+  })
+  .transform((value) => ({
+    ...value,
+    createdAt: new Date(value.createdAt).toISOString(),
+    updatedAt: new Date(value.updatedAt).toISOString(),
+  }));
 
 export const projectSchema = z
   .object({
@@ -275,8 +281,8 @@ export const projectJobLinkSchema = z
   .object({
     projectId: projectIdSchema,
     jobId: z.uuid(),
-    revisionId: projectRevisionIdSchema,
-    revisionNumber: z.number().int().positive(),
+    initiatingRevisionId: projectRevisionIdSchema,
+    initiatingRevisionNumber: z.number().int().positive(),
     createdAt: z.iso.datetime(),
   })
   .strict();
@@ -286,9 +292,32 @@ export const projectOutputLinkSchema = z
     projectId: projectIdSchema,
     savedVideoId: z.uuid(),
     videoVersionId: z.uuid(),
+    producingRevisionId: projectRevisionIdSchema,
+    producingRevisionNumber: z.number().int().positive(),
+    createdAt: z.iso.datetime(),
+  })
+  .strict();
+
+export const projectVersionReferenceLinkSchema = z
+  .object({
+    projectId: projectIdSchema,
+    savedVideoId: z.uuid(),
+    videoVersionId: z.uuid(),
+    role: z.enum(['working', 'presented']),
     revisionId: projectRevisionIdSchema,
     revisionNumber: z.number().int().positive(),
     createdAt: z.iso.datetime(),
+  })
+  .strict();
+
+export const projectStatusFactsSchema = z
+  .object({
+    sourceStatus: z.enum(['none', 'ready', 'unavailable']),
+    currentAttempt: z.discriminatedUnion('status', [
+      z.object({ status: z.literal('none') }).strict(),
+      z.object({ status: z.enum(['active', 'failed', 'succeeded']), jobId: z.uuid() }).strict(),
+    ]),
+    validatedLastSuccessfulOutput: projectOutputReferenceSchema.nullable(),
   })
   .strict();
 
@@ -301,6 +330,14 @@ export const projectConflictSchema = z.discriminatedUnion('kind', [
       actualVersion: z.number().int().positive(),
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal('relation-mismatch'),
+      projectId: projectIdSchema,
+      relation: z.enum(['job', 'output']),
+    })
+    .strict(),
+  z.object({ kind: z.literal('active-jobs'), projectId: projectIdSchema }).strict(),
   z
     .object({
       kind: z.literal('revision'),
@@ -333,4 +370,6 @@ export type ProjectContract = z.infer<typeof projectSchema>;
 export type ProjectRevisionContract = z.infer<typeof projectRevisionSchema>;
 export type ProjectJobLinkContract = z.infer<typeof projectJobLinkSchema>;
 export type ProjectOutputLinkContract = z.infer<typeof projectOutputLinkSchema>;
+export type ProjectVersionReferenceLinkContract = z.infer<typeof projectVersionReferenceLinkSchema>;
+export type ProjectStatusFactsContract = z.infer<typeof projectStatusFactsSchema>;
 export type ProjectConflictContract = z.infer<typeof projectConflictSchema>;

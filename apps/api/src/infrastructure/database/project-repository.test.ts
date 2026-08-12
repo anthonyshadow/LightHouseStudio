@@ -11,9 +11,13 @@ import { projectAssets, projectRevisions, projects } from './schema.js';
 const ownerUserId = '2d7914b2-f912-4b96-b17d-54100a2ffea3';
 const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
 const revisionId = '3ac244b9-ec36-4a1e-b95e-7bcf37eb0b2d';
+const secondRevisionId = '4159225b-60f4-4f94-a3d5-08feee91a91d';
 const assetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
+const jobId = '4ad4594c-acde-4cba-acde-584509d9db91';
 const videoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
 const versionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
+const secondVideoId = '4a3e43b7-c237-4f07-9ff7-eb5ab6a14d12';
+const secondVersionId = 'cc6b6098-c83b-42cd-b435-d3542e584f9c';
 const now = '2026-08-11T12:00:00.000Z';
 const postgresNow = '2026-08-11 12:00:00+00';
 
@@ -80,9 +84,8 @@ const sourceAggregate = () => {
       author: { kind: 'user', authorId: ownerUserId },
       facts: {
         sourceStatus: 'ready',
-        activeJobCount: 0,
-        failedJobCount: 0,
-        successfulOutputCount: 0,
+        currentAttempt: { status: 'none' },
+        validatedLastSuccessfulOutput: null,
       },
     },
     { now, createId: () => revisionId },
@@ -128,8 +131,8 @@ describe('Project persistence mapping and transactions', () => {
       ownerUserId,
       savedVideoId: `${videoId.slice(0, -1)}${offset}`,
       videoVersionId: `${versionId.slice(0, -1)}${offset}`,
-      revisionId,
-      revisionNumber: 1,
+      producingRevisionId: revisionId,
+      producingRevisionNumber: 1,
       createdAt: postgresNow,
     }));
 
@@ -150,6 +153,37 @@ describe('Project persistence mapping and transactions', () => {
         [],
       ),
     ).toThrow();
+  });
+
+  it('loads the current Project and revision in one query', async () => {
+    const aggregate = sourceAggregate();
+    const scripted = scriptedDatabase([
+      {
+        project: {
+          ...aggregate.project,
+          archivedAt: null,
+          deletedAt: null,
+          createdAt: postgresNow,
+          updatedAt: postgresNow,
+        },
+        revision: {
+          ...aggregate.revisions[0]!,
+          snapshotSchemaVersion: 1,
+          snapshot: aggregate.revisions[0]!.snapshot,
+          authorKind: 'user',
+          authorId: ownerUserId,
+          createdAt: postgresNow,
+        },
+      },
+    ]);
+    const repository = new DrizzleProjectRepository(scripted.db);
+
+    await expect(repository.getCurrent(ownerUserId, projectId)).resolves.toMatchObject({
+      project: { id: projectId, currentRevisionNumber: 1 },
+      revision: { id: revisionId, revisionNumber: 1 },
+    });
+    expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
+    expect(scripted.remaining()).toBe(0);
   });
 
   it('creates the parent, revision, ready asset links, and current pointer in one transaction', async () => {
@@ -209,5 +243,176 @@ describe('Project persistence mapping and transactions', () => {
     expect(scripted.calls.some(({ operation }) => operation === 'for')).toBe(true);
     expect(scripted.calls.filter(({ operation }) => operation === 'insert')).toHaveLength(0);
     expect(scripted.remaining()).toBe(0);
+  });
+
+  it('persists the same asset and role again for a later revision', async () => {
+    const aggregate = sourceAggregate();
+    const revision = {
+      ...aggregate.revisions[0]!,
+      id: secondRevisionId,
+      revisionNumber: 2,
+      parentRevisionId: revisionId,
+      parentRevisionNumber: 1,
+      source: 'user-edit' as const,
+      snapshot: { ...aggregate.revisions[0]!.snapshot, updatedAt: now },
+    };
+    const nextProject = {
+      ...aggregate.project,
+      version: 2,
+      currentRevisionId: secondRevisionId,
+      currentRevisionNumber: 2,
+    };
+    const assetLinks = aggregate.assetLinks.map((link) => ({
+      ...link,
+      revisionId: secondRevisionId,
+      revisionNumber: 2,
+    }));
+    const scripted = scriptedDatabase(
+      [{ ...aggregate.project, archivedAt: null, deletedAt: null }],
+      [{ id: assetId, status: 'ready' }],
+      [],
+      [],
+      [],
+    );
+    const repository = new DrizzleProjectRepository(scripted.db);
+
+    await expect(
+      repository.appendRevision({
+        ownerUserId,
+        projectId,
+        expectedVersion: 1,
+        expectedRevisionNumber: 1,
+        nextProject,
+        revision,
+        assetLinks,
+      }),
+    ).resolves.toEqual({ kind: 'updated' });
+
+    const insertedTables = scripted.calls
+      .filter(({ operation }) => operation === 'insert')
+      .map(({ arguments: [table] }) => table);
+    expect(insertedTables).toEqual([projectRevisions, projectAssets]);
+    expect(scripted.calls.some(({ operation }) => operation === 'onConflictDoNothing')).toBe(false);
+    expect(scripted.remaining()).toBe(0);
+  });
+
+  it('rejects missing, deleted, wrong-owner, or wrong-video snapshot Version references', async () => {
+    const snapshot = {
+      ...createEmptyProjectSnapshot(now),
+      workingMedia: {
+        kind: 'saved-video-version' as const,
+        savedVideoId: videoId,
+        videoVersionId: versionId,
+      },
+    };
+    const aggregate = createProject(
+      {
+        id: projectId,
+        ownerUserId,
+        title: 'Imported working media',
+        snapshot,
+        author: { kind: 'user', authorId: ownerUserId },
+        facts: {
+          sourceStatus: 'none',
+          currentAttempt: { status: 'none' },
+          validatedLastSuccessfulOutput: null,
+        },
+      },
+      { now, createId: () => revisionId },
+    );
+    const scripted = scriptedDatabase([], [], []);
+    const repository = new DrizzleProjectRepository(scripted.db);
+
+    await expect(repository.create(aggregate)).rejects.toMatchObject({
+      code: 'version-not-ready',
+    });
+    expect(scripted.remaining()).toBe(0);
+  });
+
+  it('validates every snapshot Version reference in one batch query', async () => {
+    const snapshot = {
+      ...createEmptyProjectSnapshot(now),
+      workingMedia: {
+        kind: 'saved-video-version' as const,
+        savedVideoId: videoId,
+        videoVersionId: versionId,
+      },
+      presentedMedia: {
+        kind: 'saved-video-version' as const,
+        savedVideoId: secondVideoId,
+        videoVersionId: secondVersionId,
+      },
+    };
+    const aggregate = createProject(
+      {
+        id: projectId,
+        ownerUserId,
+        title: 'Version references',
+        snapshot,
+        author: { kind: 'user', authorId: ownerUserId },
+        facts: {
+          sourceStatus: 'none',
+          currentAttempt: { status: 'none' },
+          validatedLastSuccessfulOutput: null,
+        },
+      },
+      { now, createId: () => revisionId },
+    );
+    const scripted = scriptedDatabase(
+      [],
+      [],
+      [
+        { savedVideoId: videoId, videoVersionId: versionId },
+        { savedVideoId: secondVideoId, videoVersionId: secondVersionId },
+      ],
+      [],
+      [],
+    );
+    const repository = new DrizzleProjectRepository(scripted.db);
+
+    await expect(repository.create(aggregate)).resolves.toBeUndefined();
+    expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
+    expect(scripted.remaining()).toBe(0);
+  });
+
+  it('treats an exact job replay as idempotent and a revision mismatch as a no-op conflict', async () => {
+    const link = {
+      projectId,
+      ownerUserId,
+      jobId,
+      initiatingRevisionId: revisionId,
+      initiatingRevisionNumber: 1,
+      createdAt: now,
+    };
+    const exactScript = scriptedDatabase(
+      [{ id: projectId }],
+      [{ id: revisionId }],
+      [{ id: jobId }],
+      [{ ...link, createdAt: postgresNow }],
+    );
+    await expect(new DrizzleProjectRepository(exactScript.db).linkJob(link)).resolves.toEqual({
+      kind: 'linked',
+      replayed: true,
+    });
+    expect(exactScript.calls.some(({ operation }) => operation === 'insert')).toBe(false);
+
+    const mismatchScript = scriptedDatabase(
+      [{ id: projectId }],
+      [{ id: revisionId }],
+      [{ id: jobId }],
+      [
+        {
+          ...link,
+          initiatingRevisionId: secondRevisionId,
+          initiatingRevisionNumber: 2,
+          createdAt: postgresNow,
+        },
+      ],
+    );
+    await expect(new DrizzleProjectRepository(mismatchScript.db).linkJob(link)).resolves.toEqual({
+      kind: 'conflict',
+      conflict: { kind: 'relation-mismatch', projectId, relation: 'job' },
+    });
+    expect(mismatchScript.calls.some(({ operation }) => operation === 'insert')).toBe(false);
   });
 });

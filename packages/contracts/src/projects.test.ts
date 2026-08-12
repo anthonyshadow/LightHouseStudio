@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { projectOutputLinkSchema, projectSnapshotSchema } from './projects';
+import {
+  projectOutputLinkSchema,
+  projectSnapshotSchema,
+  projectStatusFactsSchema,
+} from './projects';
 
 const assetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
 const videoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
@@ -93,13 +97,38 @@ describe('Project snapshot contract', () => {
     ).toBe(false);
   });
 
+  it('canonicalizes timestamps and requires explicitly current status facts', () => {
+    expect(
+      projectSnapshotSchema.parse({
+        ...validSnapshot(),
+        createdAt: '2026-08-11T12:00:00Z',
+        updatedAt: '2026-08-11T12:00:00Z',
+      }),
+    ).toMatchObject({ createdAt: now, updatedAt: now });
+    expect(
+      projectStatusFactsSchema.safeParse({
+        sourceStatus: 'ready',
+        activeJobCount: 1,
+        failedJobCount: 3,
+        successfulOutputCount: 4,
+      }).success,
+    ).toBe(false);
+    expect(
+      projectStatusFactsSchema.safeParse({
+        sourceStatus: 'ready',
+        currentAttempt: { status: 'none' },
+        validatedLastSuccessfulOutput: null,
+      }).success,
+    ).toBe(true);
+  });
+
   it('keeps relationship contracts owner-free and strict', () => {
     const link = {
       projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
       savedVideoId: videoId,
       videoVersionId: versionId,
-      revisionId: '3ac244b9-ec36-4a1e-b95e-7bcf37eb0b2d',
-      revisionNumber: 1,
+      producingRevisionId: '3ac244b9-ec36-4a1e-b95e-7bcf37eb0b2d',
+      producingRevisionNumber: 1,
       createdAt: now,
     };
     expect(projectOutputLinkSchema.parse(link)).toEqual(link);

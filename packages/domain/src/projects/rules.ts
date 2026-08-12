@@ -125,7 +125,7 @@ export const validateProjectSnapshot = (snapshot: ProjectSnapshot): ProjectSnaps
     requireId(snapshot.lastSuccessfulOutput.savedVideoId, 'Saved video');
     requireId(snapshot.lastSuccessfulOutput.videoVersionId, 'Video version');
   }
-  return snapshot;
+  return { ...snapshot, createdAt, updatedAt };
 };
 
 export const createEmptyProjectSnapshot = (nowValue: string): ProjectSnapshot => {
@@ -150,28 +150,43 @@ export const createEmptyProjectSnapshot = (nowValue: string): ProjectSnapshot =>
   };
 };
 
+const materialSnapshot = (snapshot: ProjectSnapshot) => ({
+  sourceAssetId: snapshot.sourceAssetId,
+  workingMedia: snapshot.workingMedia,
+  presentedMedia: snapshot.presentedMedia,
+  selectedCharacter: snapshot.selectedCharacter,
+  selectedOutfit: snapshot.selectedOutfit,
+  selectedVoice: snapshot.selectedVoice,
+  visualTreatment: snapshot.visualTreatment,
+  liveMode: snapshot.liveMode,
+  creativeIntent: snapshot.creativeIntent,
+  localEdit: snapshot.localEdit,
+  exportSpecification: snapshot.exportSpecification,
+});
+
 export const deriveProjectStatus = (
+  snapshot: Pick<ProjectSnapshot, 'lastSuccessfulOutput'>,
   facts: ProjectStatusFacts,
   lifecycle: Pick<Project, 'archivedAt' | 'deletedAt'> = {
     archivedAt: null,
     deletedAt: null,
   },
 ): ProjectStatus => {
-  if (
-    ![facts.activeJobCount, facts.failedJobCount, facts.successfulOutputCount].every(
-      (value) => Number.isInteger(value) && value >= 0,
-    )
-  ) {
-    throw new ProjectRuleError(
-      'invalid-snapshot',
-      'Project status counts must be non-negative integers.',
-    );
-  }
   if (lifecycle.deletedAt !== null) return 'deleted';
   if (lifecycle.archivedAt !== null) return 'archived';
-  if (facts.activeJobCount > 0) return 'processing';
-  if (facts.sourceStatus === 'unavailable' || facts.failedJobCount > 0) return 'needs-attention';
-  if (facts.successfulOutputCount > 0) return 'completed';
+  if (facts.currentAttempt.status === 'active') return 'processing';
+  if (facts.sourceStatus === 'unavailable' || facts.currentAttempt.status === 'failed') {
+    return 'needs-attention';
+  }
+  if (
+    snapshot.lastSuccessfulOutput !== null &&
+    facts.validatedLastSuccessfulOutput?.savedVideoId ===
+      snapshot.lastSuccessfulOutput.savedVideoId &&
+    facts.validatedLastSuccessfulOutput.videoVersionId ===
+      snapshot.lastSuccessfulOutput.videoVersionId
+  ) {
+    return 'completed';
+  }
   return facts.sourceStatus === 'ready' ? 'ready' : 'draft';
 };
 
@@ -240,7 +255,7 @@ export const createProject = (
     id: projectId,
     ownerUserId,
     title: normalizeProjectTitle(input.title),
-    status: deriveProjectStatus(input.facts),
+    status: deriveProjectStatus(snapshot, input.facts),
     version: 1,
     currentRevisionId: revisionId,
     currentRevisionNumber: 1,
@@ -261,7 +276,14 @@ export const createProject = (
     source: 'create',
     createdAt: now,
   };
-  return { project, revisions: [revision], assetLinks: [], jobLinks: [], outputLinks: [] };
+  return {
+    project,
+    revisions: [revision],
+    assetLinks: [],
+    versionReferenceLinks: [],
+    jobLinks: [],
+    outputLinks: [],
+  };
 };
 
 const projectVersionConflict = (
@@ -301,9 +323,16 @@ export const renameProject = (
 export const archiveProject = (
   project: Project,
   expectedVersion: number,
+  facts: Pick<ProjectStatusFacts, 'currentAttempt'>,
   nowValue: string,
 ): ProjectMutationResult<Project> => {
   if (project.version !== expectedVersion) return projectVersionConflict(project, expectedVersion);
+  if (facts.currentAttempt.status === 'active') {
+    throw new ProjectRuleError(
+      'invalid-transition',
+      'Active Project work must finish or be handled before archive.',
+    );
+  }
   const now = requireTimestamp(nowValue);
   assertStatusTransition(project.status, 'archived');
   return {
@@ -321,6 +350,7 @@ export const archiveProject = (
 export const restoreProject = (
   project: Project,
   expectedVersion: number,
+  currentSnapshot: Pick<ProjectSnapshot, 'lastSuccessfulOutput'>,
   facts: ProjectStatusFacts,
   nowValue: string,
 ): ProjectMutationResult<Project> => {
@@ -328,7 +358,7 @@ export const restoreProject = (
   if (project.status !== 'archived' || project.archivedAt === null) {
     throw new ProjectRuleError('not-archived', 'Only an archived project can be restored.');
   }
-  const status = deriveProjectStatus(facts);
+  const status = deriveProjectStatus(currentSnapshot, facts);
   assertStatusTransition(project.status, status);
   return {
     ok: true,
@@ -413,7 +443,7 @@ export const appendProjectRevision = (
   }
   const now = requireTimestamp(context.now);
   requireId(input.author.authorId, 'Revision author');
-  const snapshot = validateProjectSnapshot(input.snapshot);
+  let snapshot = validateProjectSnapshot(input.snapshot);
   if (snapshot.createdAt !== currentRevision.snapshot.createdAt || snapshot.updatedAt !== now) {
     throw new ProjectRuleError(
       'invalid-snapshot',
@@ -431,7 +461,14 @@ export const appendProjectRevision = (
       'A durable source can be recorded only after its asset is ready.',
     );
   }
-  const status = deriveProjectStatus(input.facts);
+  if (
+    snapshot.lastSuccessfulOutput !== null &&
+    JSON.stringify(materialSnapshot(snapshot)) !==
+      JSON.stringify(materialSnapshot(currentRevision.snapshot))
+  ) {
+    snapshot = { ...snapshot, lastSuccessfulOutput: null };
+  }
+  const status = deriveProjectStatus(snapshot, input.facts);
   assertStatusTransition(project.status, status);
   const revisionId = requireId(context.createId(), 'Project revision');
   const revisionNumber = project.currentRevisionNumber + 1;

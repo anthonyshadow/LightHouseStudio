@@ -31,44 +31,58 @@ foundation must not add Project routes, Project UI, public tenancy, or automatic
   references and authored intent, local edit/export specifications, last successful output,
   workflow phase, and timestamps. It stores no media bytes, object URLs, provider credentials,
   provider bodies, internal storage locations, or React/component state.
-- Normalized `project_assets`, `project_jobs`, and `project_outputs` relationships preserve
-  queryable lifecycle and lineage. A Project may have any number of Saved Video outputs; one
-  snapshot still represents one active working context. Existing Saved Videos and jobs remain
-  unassigned because no reliable Project lineage exists, and no backfill runs in this change.
+- Normalized `project_assets`, `project_version_references`, `project_jobs`, and `project_outputs`
+  relationships preserve queryable lifecycle and lineage. Asset and reused-Version relations are
+  revision-scoped. A `project_output` records immutable producing-revision provenance; a later
+  revision reuses that Version through a used-by reference without rewriting or duplicating the
+  producer relation. Existing Saved Videos and jobs remain unassigned because no reliable Project
+  lineage exists, and no backfill runs in this change.
 - Owner is repeated only on relationship rows needed for composite foreign keys. Those constraints
   require the Project, revision, media asset, processing job, Saved Video, and output version to
   have the same owner. Restrictive foreign keys prevent physical parent deletion while protected
   relationships remain.
 - The persisted Project `version` is the aggregate CAS token for every mutation. Revision append
   also requires the expected current revision number, locks the Project row, verifies the linear
-  parent, validates all directly referenced media as same-owner `ready` assets, inserts the
-  immutable revision/links, and advances the current pointer in one transaction. A stale writer
-  receives a typed Project-version or revision conflict; it never overwrites.
-- Status is not arbitrary UI text. Active status is derived from durable source availability,
-  active/failed jobs, and successful outputs. `archived` and `deleted` are lifecycle overrides.
-  A Project is resumable only while its referenced source asset is durably `ready`.
+  parent, strictly parses/canonicalizes snapshot v1, validates exact same-owner active media, and
+  verifies any current output pointer against an existing Project output relation before advancing
+  the pointer in one transaction.
+- Status is not arbitrary UI text. Callers supply current-revision source, current-attempt, and
+  exact validated-output facts rather than historical counts. Processing completion alone is not
+  Project completion. A later material change clears an output pointer it no longer represents.
+  Archive is blocked while a linked job is active; a later cancel/detach policy must be explicit.
 - Normal deletion archives first. The separately confirmed permanent-delete rule writes a deleted
   tombstone; it does not physically delete Project rows, revisions, links, media, jobs, or Saved
   Videos. Physical retention/erasure remains a separately reviewed lifecycle operation.
-- An asynchronous job link records the revision that initiated the work. A later stale result may
+- A processing job has one initiating Project revision and an output Video Version has at most one
+  producing Project revision. Exact relation replay is idempotent; a replay that changes Project,
+  revision, or related resource is a typed no-op conflict. An asynchronous job link records the
+  revision that initiated the work. A later stale result may
   remain attributable to that revision, but future orchestration must not promote it into the
   current snapshot unless the Project/revision CAS still matches. Initial paid submission remains
   explicit and is never automatically repeated.
 - The Drizzle Project repository is composed only in authoritative `postgres`/`neon` persistence.
   There are deliberately no Project HTTP routes or browser UI in this decision.
+- Normal reads return only the Project and current revision. Revision and relation history have
+  bounded cursor-based repository reads. A common owner-scoped Project retention policy protects
+  direct assets and Version/output assets in Saved Video, reference-image, and generic byte cleanup
+  while active, archived, and tombstoned Project lineage exists.
 
 ## Consequences
 
 Projects can represent a resumable creative session and retain many output videos without relying
-on mounted React state. Existing Saved Video and processing-job contracts remain unchanged. The
-schema migration is additive: it creates Project tables/enums and owner-consistency constraints but
-does not modify, assign, or delete existing records.
+on mounted React state. Migration `0009` was the additive foundation. Corrective migration `0010`
+replaces deficient Project relationship keys, preserves job/output revision columns under explicit
+initiating/producing names, and adds normalized revision-scoped Saved Video Version references. Its
+preflight checks supported snapshots, truthful links, provable same-owner resources, exact output
+pointers, and producer uniqueness before changing constraints. It reconstructs only
+snapshot-declared direct references; it does not create Projects, jobs, Saved Videos, or inferred
+roles/provenance.
 
 Snapshot evolution now requires explicit version parsing and migration. Project mutations must use
 the repository transaction/CAS boundary, and media cleanup must treat Project links as retained
-relationships. Rolling application code back can leave the additive tables unused; dropping them
-after Project writes would be destructive and requires a separate reviewed migration and backup
-plan.
+relationships. Application rollback across `0010` is not schema-compatible because key shapes and
+initiating/producing column names changed. Restore the pre-migration database or deploy compatible
+code rather than dropping or renaming retained lineage ad hoc.
 
 The one-active-context model does not yet support several independently resumable works-in-progress
 inside one Project. The deferred [Project Deliverable child model](../PROJECT_DELIVERABLE_MODEL.md)
