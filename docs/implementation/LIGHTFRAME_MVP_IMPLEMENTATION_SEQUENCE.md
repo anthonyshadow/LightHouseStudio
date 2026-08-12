@@ -1,8 +1,8 @@
 # Lightframe Studio remaining MVP implementation sequence
 
-**Status:** active execution program; Prompt 05 implemented
+**Status:** active execution program; Prompt 06 implemented
 
-**Starts from:** Prompt 05 is complete; Prompt 06 is the next implementation boundary
+**Starts from:** Prompt 06 is complete; Prompt 07 is the next implementation boundary
 
 **Defined:** 2026-08-11
 

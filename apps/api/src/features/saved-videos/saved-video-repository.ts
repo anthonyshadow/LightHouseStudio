@@ -104,6 +104,10 @@ const librarySchema = legacyLibrarySchema.extend({
 
 export type StoredVideoVersion = z.infer<typeof versionV4Schema>;
 export type StoredSavedVideoAggregate = z.infer<typeof aggregateSchema>;
+export interface StoredVideoVersionRead {
+  readonly video: StoredSavedVideoAggregate['video'];
+  readonly version: StoredVideoVersion;
+}
 export type SavedVideoReceipt = z.infer<typeof receiptSchema>;
 export interface SavedVideoReceiptLookup {
   readonly ownerUserId: string;
@@ -148,6 +152,11 @@ export interface SavedVideoRepository {
     assetIds: readonly string[],
   ): Promise<ReadonlySet<string>>;
   get(ownerUserId: string, videoId: string): Promise<StoredSavedVideoAggregate | null>;
+  getVersion(
+    ownerUserId: string,
+    videoId: string,
+    versionId: string,
+  ): Promise<StoredVideoVersionRead | null>;
   rename(
     ownerUserId: string,
     videoId: string,
@@ -441,6 +450,16 @@ export class FileSavedVideoRepository implements SavedVideoRepository {
         (item) => item.video.id === videoId && item.video.deletedAt === null,
       ) ?? null
     );
+  }
+
+  async getVersion(
+    ownerUserId: string,
+    videoId: string,
+    versionId: string,
+  ): Promise<StoredVideoVersionRead | null> {
+    const aggregate = await this.get(ownerUserId, videoId);
+    const version = aggregate?.versions.find(({ id }) => id === versionId);
+    return aggregate === null || version === undefined ? null : { video: aggregate.video, version };
   }
 
   async rename(

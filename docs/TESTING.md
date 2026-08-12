@@ -99,10 +99,15 @@ The retained suite protects:
 - versioned local Project parsing, backup and prepared-journal recovery, restart-safe create
   receipts, owner isolation, lifecycle CAS, bounded active/archived lists, authenticated route
   validation/Origin policy, and local/shadow/relational authority composition;
+- immutable Project-source domain/contracts; upload/finalized-record acceptance; exact active
+  Saved Video Version reuse without a byte copy or output target; owner/ready/inspection checks;
+  local prepared-journal recovery; relational source transaction/replay; retention-aware losing
+  cleanup; controlled metadata plus range/HEAD content; and response-loss idempotency;
 - recognized protected Project list/detail routes and Login return, one shared Studio/media-stage
   owner, bounded Project controller pagination, replay-safe Quick Start, open/refresh, lifecycle
-  cache invalidation, stale-rename preservation, focus/announcements, explicit library exit, and no
-  empty-Project media/provider start;
+  cache invalidation, stale-rename preservation, focus/announcements, explicit library exit,
+  accepted-source fresh hydration/object-URL delegation, cancellable staging, Project-switch and
+  late-completion isolation, and no implicit provider start;
 - Campaign domain/contract parity, v1→v2 local migration, restart-safe receipts, owner/CAS and
   active-membership rules, relational same-owner/restrict constraints, authenticated routes,
   create/detail/New Project, move/detach, virtual No Campaign filtering, non-cascading lifecycle,

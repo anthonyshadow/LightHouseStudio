@@ -247,6 +247,12 @@ bounded tab-local recent registry and are never automatically persisted.
 The UI reports one planned submission, not credits or currency. Every provider submission remains
 an explicit, potentially billable action with no automatic retry or fallback.
 
+An explicit **Use Saved Video** action inside an empty Project is a separate source command, not
+this editing workflow. It selects the exact current Version, verifies same-owner active lineage,
+and retains the existing bytes as the Project's immutable source without copying them, starting a
+provider, or selecting an Add Version output target. That accepted Project source is durable and
+rehydrates through the Project content route; this standalone workflow remains temporary.
+
 ## Evidence boundary
 
 Automated tests use deterministic local media and fake provider responses. They prove contract,

@@ -44,7 +44,10 @@ const publicProject = (project: Project): ProjectContract => ({
   updatedAt: project.updatedAt,
 });
 
-const publicCurrent = ({ project, revision }: ProjectCurrentRead): ProjectCurrentResponse =>
+export const publicProjectCurrent = ({
+  project,
+  revision,
+}: ProjectCurrentRead): ProjectCurrentResponse =>
   projectCurrentResponseSchema.parse({
     project: publicProject(project),
     revision: {
@@ -165,7 +168,7 @@ export class ProjectService {
     });
     return result.kind === 'conflict'
       ? { ok: false, conflict: result.conflict }
-      : { ok: true, current: publicCurrent(result.current) };
+      : { ok: true, current: publicProjectCurrent(result.current) };
   }
 
   async list(ownerUserId: string, query: ProjectsQuery) {
@@ -185,7 +188,7 @@ export class ProjectService {
   async get(ownerUserId: string, projectId: string): Promise<ProjectCurrentResponse> {
     const current = await this.#repository.getCurrent(ownerUserId, projectId);
     if (current === null) throw new AppError(404, 'not_found', 'That Project is unavailable.');
-    return publicCurrent(current);
+    return publicProjectCurrent(current);
   }
 
   async rename(
@@ -271,7 +274,7 @@ export class ProjectService {
     if (persisted.kind === 'conflict') return { ok: false, conflict: persisted.conflict };
     return {
       ok: true,
-      current: publicCurrent({ project: next.value, revision: current.revision }),
+      current: publicProjectCurrent({ project: next.value, revision: current.revision }),
     };
   }
 
@@ -313,7 +316,7 @@ export class ProjectService {
     if (persisted.kind === 'conflict') return { ok: false, conflict: persisted.conflict };
     return {
       ok: true,
-      current: publicCurrent({ project: next.value, revision: current.revision }),
+      current: publicProjectCurrent({ project: next.value, revision: current.revision }),
     };
   }
 }

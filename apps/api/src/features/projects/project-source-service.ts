@@ -1,0 +1,464 @@
+import { createHash, randomUUID } from 'node:crypto';
+import { createWriteStream } from 'node:fs';
+import { chmod, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { pipeline } from 'node:stream/promises';
+import {
+  projectSourceResponseSchema,
+  type InspectedVideo,
+  type ProjectSourceResponse,
+} from '@studio/contracts';
+import {
+  acceptProjectSource,
+  ProjectRuleError,
+  type ProjectAggregate,
+  type ProjectAssetLink,
+  type ProjectConflict,
+  type ProjectMediaReference,
+  type ProjectSourceKind,
+} from '@studio/domain';
+import type { AssetByteStore, AssetReadHandle } from '../../storage/asset-byte-store.js';
+import { AppError } from '../../http/app-error.js';
+import type {
+  SavedVideoRepository,
+  StoredVideoVersion,
+} from '../saved-videos/saved-video-repository.js';
+import { inspectSavedVideoFile } from '../saved-videos/saved-video-inspection.js';
+import { safeSavedVideoFilename } from '../saved-videos/saved-video-service.js';
+import type {
+  ProjectCurrentRead,
+  ProjectRepository,
+  ProjectRetentionPolicy,
+  ProjectSourceRecord,
+} from './project-repository.js';
+import { publicProjectCurrent } from './project-service.js';
+
+export type ProjectSourceMutationResult =
+  | { readonly ok: true; readonly response: ProjectSourceResponse; readonly replayed: boolean }
+  | { readonly ok: false; readonly conflict: ProjectConflict };
+
+interface UploadSourceInput {
+  readonly ownerUserId: string;
+  readonly projectId: string;
+  readonly operationKey: string;
+  readonly expectedVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly kind: 'uploaded' | 'recorded';
+  readonly sourcePath: string;
+  readonly checksumSha256: string;
+  readonly filename: string;
+}
+
+interface ReuseSourceInput {
+  readonly ownerUserId: string;
+  readonly projectId: string;
+  readonly operationKey: string;
+  readonly expectedVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly savedVideoId: string;
+  readonly videoVersionId: string;
+}
+
+const fingerprint = (value: unknown): string =>
+  createHash('sha256').update(JSON.stringify(value)).digest('hex');
+
+const sourceContentUrl = (projectId: string): string =>
+  `/api/projects/${encodeURIComponent(projectId)}/source/content`;
+
+const sourceResponse = (
+  current: ProjectCurrentRead,
+  source: ProjectSourceRecord,
+): ProjectSourceResponse =>
+  projectSourceResponseSchema.parse({
+    ...publicProjectCurrent(current),
+    source: {
+      kind: source.kind,
+      savedVideoId: source.savedVideoId,
+      videoVersionId: source.videoVersionId,
+      mimeType: source.mimeType,
+      filename: source.filename,
+      sizeBytes: source.sizeBytes,
+      container: source.container,
+      videoCodec: source.videoCodec,
+      audioCodec: source.audioCodec,
+      durationMs: source.durationMs,
+      width: source.width,
+      height: source.height,
+      hasAudio: source.hasAudio,
+      acceptedAt: source.acceptedAt,
+      contentUrl: sourceContentUrl(source.projectId),
+    },
+  });
+
+const inspectStoredAsset = async (
+  asset: AssetReadHandle,
+  inspect: (filePath: string) => Promise<InspectedVideo>,
+): Promise<InspectedVideo> => {
+  const directory = await mkdtemp(path.join(tmpdir(), 'lightframe-project-source-'));
+  await chmod(directory, 0o700);
+  const filePath = path.join(directory, 'source');
+  try {
+    await pipeline(asset.createReadStream(), createWriteStream(filePath, { mode: 0o600 }));
+    return await inspect(filePath);
+  } finally {
+    await rm(directory, { recursive: true, force: true }).catch(() => undefined);
+  }
+};
+
+const currentAggregate = (current: ProjectCurrentRead): ProjectAggregate => ({
+  project: current.project,
+  revisions: [current.revision],
+  assetLinks: [],
+  versionReferenceLinks: [],
+  jobLinks: [],
+  outputLinks: [],
+});
+
+const sourceAssetLinks = (
+  revision: ProjectCurrentRead['revision'],
+): readonly ProjectAssetLink[] => {
+  const roles: ProjectAssetLink['role'][] = ['source'];
+  if (revision.snapshot.workingMedia?.kind === 'asset') roles.push('working');
+  if (revision.snapshot.presentedMedia?.kind === 'asset') roles.push('presented');
+  return roles.map((role) => ({
+    projectId: revision.projectId,
+    ownerUserId: revision.ownerUserId,
+    assetId: revision.snapshot.sourceAssetId!,
+    role,
+    revisionId: revision.id,
+    revisionNumber: revision.revisionNumber,
+    createdAt: revision.createdAt,
+  }));
+};
+
+const versionMediaReference = (
+  savedVideoId: string,
+  videoVersionId: string,
+): ProjectMediaReference => ({ kind: 'saved-video-version', savedVideoId, videoVersionId });
+
+export class ProjectSourceService {
+  readonly #locks = new Map<string, Promise<unknown>>();
+
+  constructor(
+    private readonly projects: ProjectRepository,
+    private readonly savedVideos: SavedVideoRepository,
+    private readonly bytes: AssetByteStore,
+    private readonly options: {
+      readonly now?: () => Date;
+      readonly createId?: () => string;
+      readonly inspect?: (filePath: string) => Promise<InspectedVideo>;
+      readonly projectRetention?: ProjectRetentionPolicy;
+    } = {},
+  ) {}
+
+  get #now(): () => Date {
+    return this.options.now ?? (() => new Date());
+  }
+
+  get #createId(): () => string {
+    return this.options.createId ?? randomUUID;
+  }
+
+  get #inspect(): (filePath: string) => Promise<InspectedVideo> {
+    return this.options.inspect ?? inspectSavedVideoFile;
+  }
+
+  async #withLock<Result>(key: string, operation: () => Promise<Result>): Promise<Result> {
+    const prior = this.#locks.get(key) ?? Promise.resolve();
+    let release!: () => void;
+    const next = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const chain = prior.then(() => next);
+    this.#locks.set(key, chain);
+    await prior;
+    try {
+      return await operation();
+    } finally {
+      release();
+      if (this.#locks.get(key) === chain) this.#locks.delete(key);
+    }
+  }
+
+  async #assertProjectAccessible(ownerUserId: string, projectId: string): Promise<void> {
+    if ((await this.projects.getCurrent(ownerUserId, projectId)) === null) {
+      throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    }
+  }
+
+  async #deleteIfUnretained(ownerUserId: string, assetId: string): Promise<void> {
+    if (await this.options.projectRetention?.retainsAsset(ownerUserId, assetId)) return;
+    await this.bytes.delete(ownerUserId, assetId).catch(() => undefined);
+  }
+
+  async upload(input: UploadSourceInput): Promise<ProjectSourceMutationResult> {
+    return this.#withLock(`${input.ownerUserId}:${input.operationKey}`, async () => {
+      await this.#assertProjectAccessible(input.ownerUserId, input.projectId);
+      const inspected = await this.#inspect(input.sourcePath);
+      const filename = safeSavedVideoFilename(input.filename, inspected.mimeType);
+      const requestFingerprint = fingerprint({
+        version: 1,
+        projectId: input.projectId,
+        expectedVersion: input.expectedVersion,
+        expectedRevisionNumber: input.expectedRevisionNumber,
+        kind: input.kind,
+        filename,
+        checksumSha256: input.checksumSha256,
+        inspected,
+      });
+      const existing = await this.bytes.open(input.ownerUserId, input.operationKey);
+      let created = false;
+      let manifest = existing?.manifest;
+      if (manifest !== undefined) {
+        if (
+          manifest.checksumSha256 !== input.checksumSha256 ||
+          manifest.sizeBytes !== inspected.sizeBytes ||
+          manifest.mimeType !== inspected.mimeType ||
+          manifest.filename !== filename
+        ) {
+          throw new AppError(
+            409,
+            'conflict',
+            'That source operation was already used for different media.',
+          );
+        }
+      } else {
+        manifest = await this.bytes.storeFile({
+          assetId: input.operationKey,
+          ownerUserId: input.ownerUserId,
+          sourcePath: input.sourcePath,
+          checksumSha256: input.checksumSha256,
+          mimeType: inspected.mimeType,
+          filename,
+          createdAt: this.#now().toISOString(),
+        });
+        created = true;
+      }
+      try {
+        const result = await this.#accept({
+          ownerUserId: input.ownerUserId,
+          projectId: input.projectId,
+          operationKey: input.operationKey,
+          requestFingerprint,
+          expectedVersion: input.expectedVersion,
+          expectedRevisionNumber: input.expectedRevisionNumber,
+          kind: input.kind,
+          assetId: manifest.assetId,
+          savedVideoId: null,
+          videoVersionId: null,
+          mediaReference: { kind: 'asset', assetId: manifest.assetId },
+          inspected,
+          manifest,
+        });
+        if (!result.ok && created) {
+          await this.#deleteIfUnretained(input.ownerUserId, manifest.assetId);
+        }
+        return result;
+      } catch (error) {
+        if (created) await this.#deleteIfUnretained(input.ownerUserId, manifest.assetId);
+        throw error;
+      }
+    });
+  }
+
+  async reuseSavedVideo(input: ReuseSourceInput): Promise<ProjectSourceMutationResult> {
+    return this.#withLock(`${input.ownerUserId}:${input.operationKey}`, async () => {
+      await this.#assertProjectAccessible(input.ownerUserId, input.projectId);
+      const savedVersion = await this.savedVideos.getVersion(
+        input.ownerUserId,
+        input.savedVideoId,
+        input.videoVersionId,
+      );
+      if (savedVersion === null || savedVersion.video.status !== 'ready') {
+        throw new AppError(404, 'not_found', 'That Saved Video Version is unavailable.');
+      }
+      const { version } = savedVersion;
+      const asset = await this.bytes.open(input.ownerUserId, version.assetId);
+      if (asset === null) {
+        throw new AppError(404, 'asset_missing', 'That Saved Video source file is unavailable.');
+      }
+      const inspected = await inspectStoredAsset(asset, this.#inspect);
+      this.#assertVersionMatchesInspection(version, inspected, asset);
+      return this.#accept({
+        ownerUserId: input.ownerUserId,
+        projectId: input.projectId,
+        operationKey: input.operationKey,
+        requestFingerprint: fingerprint({
+          version: 1,
+          projectId: input.projectId,
+          expectedVersion: input.expectedVersion,
+          expectedRevisionNumber: input.expectedRevisionNumber,
+          kind: 'saved-video-version',
+          savedVideoId: input.savedVideoId,
+          videoVersionId: input.videoVersionId,
+          assetId: version.assetId,
+          checksumSha256: asset.manifest.checksumSha256,
+        }),
+        expectedVersion: input.expectedVersion,
+        expectedRevisionNumber: input.expectedRevisionNumber,
+        kind: 'saved-video-version',
+        assetId: version.assetId,
+        savedVideoId: input.savedVideoId,
+        videoVersionId: input.videoVersionId,
+        mediaReference: versionMediaReference(input.savedVideoId, input.videoVersionId),
+        inspected,
+        manifest: asset.manifest,
+      });
+    });
+  }
+
+  async #accept(input: {
+    readonly ownerUserId: string;
+    readonly projectId: string;
+    readonly operationKey: string;
+    readonly requestFingerprint: string;
+    readonly expectedVersion: number;
+    readonly expectedRevisionNumber: number;
+    readonly kind: ProjectSourceKind;
+    readonly assetId: string;
+    readonly savedVideoId: string | null;
+    readonly videoVersionId: string | null;
+    readonly mediaReference: ProjectMediaReference;
+    readonly inspected: InspectedVideo;
+    readonly manifest: AssetReadHandle['manifest'];
+  }): Promise<ProjectSourceMutationResult> {
+    const projectRead = await this.projects.getCurrentWithSource(
+      input.ownerUserId,
+      input.projectId,
+    );
+    if (projectRead === null) throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    const { current, source: existingSource } = projectRead;
+    if (existingSource !== null) {
+      if (
+        existingSource.operationKey === input.operationKey &&
+        existingSource.requestFingerprint === input.requestFingerprint
+      ) {
+        return {
+          ok: true,
+          response: sourceResponse(current, existingSource),
+          replayed: true,
+        };
+      }
+      return {
+        ok: false,
+        conflict: { kind: 'immutable-source', projectId: input.projectId },
+      };
+    }
+    let accepted;
+    try {
+      accepted = acceptProjectSource(
+        currentAggregate(current),
+        {
+          expectedProjectVersion: input.expectedVersion,
+          expectedRevisionNumber: input.expectedRevisionNumber,
+          assetId: input.assetId,
+          mediaReference: input.mediaReference,
+          author: { kind: 'user', authorId: input.ownerUserId },
+        },
+        { now: this.#now().toISOString(), createId: this.#createId },
+      );
+    } catch (error) {
+      if (error instanceof ProjectRuleError) {
+        throw new AppError(409, 'conflict', error.message);
+      }
+      throw error;
+    }
+    if (!accepted.ok) return { ok: false, conflict: accepted.conflict };
+    const revision = accepted.value.revisions.at(-1)!;
+    const source: ProjectSourceRecord = {
+      projectId: input.projectId,
+      ownerUserId: input.ownerUserId,
+      assetId: input.assetId,
+      kind: input.kind,
+      savedVideoId: input.savedVideoId,
+      videoVersionId: input.videoVersionId,
+      acceptedRevisionId: revision.id,
+      acceptedRevisionNumber: revision.revisionNumber,
+      operationKey: input.operationKey,
+      requestFingerprint: input.requestFingerprint,
+      mimeType: input.inspected.mimeType,
+      filename: input.manifest.filename,
+      sizeBytes: input.inspected.sizeBytes,
+      checksumSha256: input.manifest.checksumSha256,
+      container: input.inspected.container,
+      videoCodec: input.inspected.videoCodec,
+      audioCodec: input.inspected.audioCodec,
+      durationMs: Math.max(1, Math.round(input.inspected.durationMs)),
+      width: input.inspected.width,
+      height: input.inspected.height,
+      hasAudio: input.inspected.hasAudio,
+      acceptedAt: revision.createdAt,
+    };
+    const persisted = await this.projects.acceptSource({
+      ownerUserId: input.ownerUserId,
+      projectId: input.projectId,
+      expectedVersion: input.expectedVersion,
+      expectedRevisionNumber: input.expectedRevisionNumber,
+      nextProject: accepted.value.project,
+      revision,
+      assetLinks: sourceAssetLinks(revision),
+      source,
+    });
+    if (persisted.kind === 'not-found') {
+      throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    }
+    if (persisted.kind === 'conflict') return { ok: false, conflict: persisted.conflict };
+    return {
+      ok: true,
+      response: sourceResponse(persisted.current, persisted.source),
+      replayed: persisted.kind === 'replayed',
+    };
+  }
+
+  #assertVersionMatchesInspection(
+    version: StoredVideoVersion,
+    inspected: InspectedVideo,
+    asset: AssetReadHandle,
+  ): void {
+    if (
+      version.assetId !== asset.manifest.assetId ||
+      version.mimeType !== inspected.mimeType ||
+      version.sizeBytes !== inspected.sizeBytes ||
+      version.durationMs !== Math.round(inspected.durationMs) ||
+      version.width !== inspected.width ||
+      version.height !== inspected.height
+    ) {
+      throw new AppError(
+        409,
+        'conflict',
+        'That Saved Video Version no longer matches its inspected media.',
+      );
+    }
+  }
+
+  async get(ownerUserId: string, projectId: string): Promise<ProjectSourceResponse> {
+    const projectRead = await this.projects.getCurrentWithSource(ownerUserId, projectId);
+    if (projectRead === null) {
+      throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    }
+    const { current, source } = projectRead;
+    if (source === null || current.revision.snapshot.sourceAssetId !== source.assetId) {
+      throw new AppError(404, 'not_found', 'This Project does not have an accepted source.');
+    }
+    if ((await this.bytes.open(ownerUserId, source.assetId)) === null) {
+      throw new AppError(404, 'asset_missing', 'The Project source file is unavailable.');
+    }
+    return sourceResponse(current, source);
+  }
+
+  async content(
+    ownerUserId: string,
+    projectId: string,
+  ): Promise<{ readonly source: ProjectSourceRecord; readonly asset: AssetReadHandle }> {
+    const source = await this.projects.getSource(ownerUserId, projectId);
+    if (source === null) {
+      throw new AppError(404, 'not_found', 'This Project does not have an accepted source.');
+    }
+    const asset = await this.bytes.open(ownerUserId, source.assetId);
+    if (asset === null) {
+      throw new AppError(404, 'asset_missing', 'The Project source file is unavailable.');
+    }
+    return { source, asset };
+  }
+}

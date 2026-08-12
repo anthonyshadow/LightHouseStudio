@@ -24,11 +24,19 @@ account is not production identity or tenancy.
   producing revision per output Version. Exact replay is idempotent; changed replay conflicts.
   Snapshot Versions require an active same-owner Saved Video and exact Version at link time, output
   pointers require an existing exact Project output, and normal current/history reads are bounded.
-  Authenticated Campaign/empty-Project lifecycle routes write these tables in authoritative modes.
+  Authenticated Campaign/Project lifecycle routes write these tables in authoritative modes.
   Existing videos/jobs are not backfilled.
-- A schema-version-2 local Campaign/Project repository is authoritative in `local` and `shadow`.
-  It uses one owner namespace/lock/journal, atomic primary/backup replacement, strict v1→v2 startup
-  migration, and durable Campaign/Project create receipts. `shadow` does not make Drizzle
+- Project source acceptance uses additive migration `0016`: one immutable source row is tied by
+  restrictive same-owner keys to its Project, accepting revision, ready media asset, and optional
+  exact active Saved Video Version. The same transaction appends source/working/presented lineage
+  and advances the current pointer. Upload/record bytes use the configured `AssetByteStore`; exact
+  Version reuse keeps the existing object and adds no duplicate byte object or output save target.
+  Owner-checked metadata plus range/HEAD content remain application routes, never direct storage
+  identity.
+- A schema-version-3 local Campaign/Project repository is authoritative in `local` and `shadow`.
+  It uses one owner namespace/lock/journal, atomic primary/backup replacement, strict v1/v2→v3 startup
+  migration, durable Campaign/Project create receipts, and a prepared source-acceptance envelope
+  that reconciles metadata after interruption. `shadow` does not make Drizzle
   Campaign/Project tables authoritative or claim their replication.
 - A private R2 `AssetByteStore` with opaque keys, streaming/multipart upload, app-owned SHA-256,
   byte-range reads, owner checks, database lifecycle states, multipart abort/cleanup, and deletion

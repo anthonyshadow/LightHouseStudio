@@ -258,6 +258,13 @@ Using keyboard and a screen reader:
   Campaign, open detail, create a Project, move it to another active Campaign, detach it to the
   virtual No Campaign group, and archive/restore the Campaign. Confirm deep links and Back work,
   lists remain bounded and scrollable, and no media/provider work starts.
+- At those same viewports, open an empty Project and exercise **Upload**, a synthetic finalized
+  **Record**, and **Use Saved Video** on separate Projects. Confirm the one existing stage remains
+  visible, progress reads Preparing/Saving/Saved truthfully, accepted media returns after refresh
+  and API restart, a second original is rejected, exact Version reuse creates no duplicate bytes or
+  save target, content seek/range works, and no provider request occurs. During upload or recording,
+  attempt a Project switch and verify stay/abort/discard copy, focus restoration, and that late work
+  from the old Project never replaces the new stage.
 - At 200% text, keyboard through Campaign create/edit, move/detach, archive/restore, and guarded
   delete overlays. Confirm initial/returned focus, inert background, visible safe errors, and that
   deleting a nonempty Campaign offers no cascade action or claim of content-byte erasure.

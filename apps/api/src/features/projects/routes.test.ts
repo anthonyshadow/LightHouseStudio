@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto';
-import { mkdtemp, rm } from 'node:fs/promises';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
@@ -120,6 +120,88 @@ describe('Project lifecycle routes', () => {
       payload: { expectedVersion: 3 },
     });
     expect(restored.json()).toMatchObject({ project: { status: 'draft', version: 4 } });
+  });
+
+  it('accepts, replays, hydrates, and range-streams an inspected Project source', async () => {
+    const app = localApp();
+    const created = (await create(app, 'Durable source')).response;
+    const projectId = json<{ project: { id: string } }>(created).project.id;
+    const fixture = Buffer.from(
+      (
+        await readFile(
+          new URL('../../../../../e2e/fixtures/decodable-h264-video.base64', import.meta.url),
+          'utf8',
+        )
+      ).replaceAll(/\s/gu, ''),
+      'base64',
+    );
+    const operationKey = randomUUID();
+    const metadata = encodeURIComponent(
+      JSON.stringify({
+        expectedVersion: 1,
+        expectedRevisionNumber: 1,
+        kind: 'uploaded',
+        filename: '../durable source?.mp4',
+      }),
+    );
+    const upload = () =>
+      app.inject({
+        method: 'POST',
+        url: `/api/projects/${projectId}/source`,
+        headers: {
+          ...browserHeaders,
+          'content-type': 'video/mp4',
+          'idempotency-key': operationKey,
+          'x-lightframe-project-source': metadata,
+        },
+        payload: fixture,
+      });
+
+    const accepted = await upload();
+    expect(accepted.statusCode).toBe(201);
+    expect(accepted.json()).toMatchObject({
+      project: { id: projectId, status: 'ready', version: 2 },
+      revision: { revisionNumber: 2, snapshot: { sourceAssetId: operationKey } },
+      source: {
+        kind: 'uploaded',
+        filename: 'durable-source.mp4',
+        contentUrl: `/api/projects/${projectId}/source/content`,
+      },
+    });
+    expect(accepted.body).not.toContain('checksum');
+    expect(accepted.body).not.toContain(directory);
+
+    const replayed = await upload();
+    expect(replayed.statusCode).toBe(200);
+    expect(replayed.json()).toEqual(accepted.json());
+    const hydrated = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/source`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(hydrated.json()).toEqual(accepted.json());
+
+    const ranged = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/source/content`,
+      headers: { host: browserHeaders.host, range: 'bytes=2-7' },
+    });
+    expect(ranged.statusCode).toBe(206);
+    expect(ranged.rawPayload).toEqual(fixture.subarray(2, 8));
+    expect(ranged.headers).toMatchObject({
+      'accept-ranges': 'bytes',
+      'content-range': `bytes 2-7/${fixture.byteLength}`,
+      'content-length': '6',
+      'content-type': 'video/mp4',
+    });
+    const head = await app.inject({
+      method: 'HEAD',
+      url: `/api/projects/${projectId}/source/content`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(head.statusCode).toBe(200);
+    expect(head.body).toBe('');
+    expect(head.headers['content-length']).toBe(String(fixture.byteLength));
   });
 
   it('keeps pagination cursors filter-bound and create idempotency durable across app restart', async () => {

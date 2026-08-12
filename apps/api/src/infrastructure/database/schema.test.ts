@@ -25,6 +25,8 @@ import {
   projectRevisions,
   projectRevisionSource,
   projects,
+  projectSourceKind,
+  projectSources,
   projectStatus,
   projectVersionReferenceRole,
   projectVersionReferences,
@@ -66,6 +68,7 @@ describe('Drizzle persistence schema', () => {
       projectVersionReferences,
       projectJobs,
       projectOutputs,
+      projectSources,
       outbox,
       resourceReferences,
     ];
@@ -111,6 +114,13 @@ describe('Drizzle persistence schema', () => {
       expect.arrayContaining([
         'projects_owner_campaign_active_recent_idx',
         'projects_owner_campaign_archived_recent_idx',
+      ]),
+    );
+    expect(getTableConfig(projectSources).foreignKeys).toHaveLength(5);
+    expect(getTableConfig(projectSources).indexes.map(({ config }) => config.name)).toEqual(
+      expect.arrayContaining([
+        'project_sources_owner_operation_unique',
+        'project_sources_asset_idx',
       ]),
     );
     expect(
@@ -176,5 +186,6 @@ describe('Drizzle persistence schema', () => {
       'restore',
       'migration',
     ]);
+    expect(projectSourceKind.enumValues).toEqual(['uploaded', 'recorded', 'saved-video-version']);
   });
 });

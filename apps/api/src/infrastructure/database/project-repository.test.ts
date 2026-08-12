@@ -140,6 +140,64 @@ describe('Project persistence mapping and transactions', () => {
     expect(scripted.remaining()).toBe(0);
   });
 
+  it('loads the current Project, revision, and source in one query', async () => {
+    const aggregate = sourceAggregate();
+    const scripted = scriptedDatabase([
+      {
+        project: {
+          ...aggregate.project,
+          archivedAt: null,
+          deletedAt: null,
+          createdAt: postgresNow,
+          updatedAt: postgresNow,
+        },
+        revision: {
+          ...aggregate.revisions[0]!,
+          snapshotSchemaVersion: 1,
+          snapshot: aggregate.revisions[0]!.snapshot,
+          authorKind: 'user',
+          authorId: ownerUserId,
+          createdAt: postgresNow,
+        },
+        source: {
+          projectId,
+          ownerUserId,
+          assetId,
+          kind: 'uploaded',
+          savedVideoId: null,
+          videoVersionId: null,
+          acceptedRevisionId: revisionId,
+          acceptedRevisionNumber: 1,
+          operationKey: '0264e60f-2dc5-4d4b-a9f6-25c91a66285c',
+          requestFingerprint: 'a'.repeat(64),
+          mimeType: 'video/mp4',
+          filename: 'source.mp4',
+          sizeBytes: 1_024,
+          checksumSha256: 'b'.repeat(64),
+          container: 'mp4',
+          videoCodec: 'avc',
+          audioCodec: 'aac',
+          durationMs: 12_000,
+          width: 1_280,
+          height: 720,
+          hasAudio: true,
+          acceptedAt: postgresNow,
+        },
+      },
+    ]);
+    const repository = new DrizzleProjectRepository(scripted.db);
+
+    await expect(repository.getCurrentWithSource(ownerUserId, projectId)).resolves.toMatchObject({
+      current: {
+        project: { id: projectId, currentRevisionNumber: 1 },
+        revision: { id: revisionId, revisionNumber: 1 },
+      },
+      source: { projectId, assetId, kind: 'uploaded' },
+    });
+    expect(scripted.calls.filter(({ operation }) => operation === 'select')).toHaveLength(1);
+    expect(scripted.remaining()).toBe(0);
+  });
+
   it('creates the parent, revision, ready asset links, and current pointer in one transaction', async () => {
     const scripted = scriptedDatabase([], [], [{ id: assetId, status: 'ready' }], [], []);
     const repository = new DrizzleProjectRepository(scripted.db);

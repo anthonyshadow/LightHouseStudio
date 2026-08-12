@@ -120,8 +120,8 @@ describe('Project route surface', () => {
       expect(router.state.location.pathname).toBe(`/studio/projects/${activeId}`),
     );
     expect(await screen.findByRole('heading', { name: 'No source yet' })).toBeVisible();
-    expect(screen.getByRole('button', { name: 'Record video' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'Upload video' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Record' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Upload' })).toBeDisabled();
     expect(screen.getByRole('button', { name: 'Use Saved Video' })).toBeDisabled();
     expect(screen.queryByRole('video')).not.toBeInTheDocument();
   });

@@ -4,6 +4,8 @@ import {
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
   projectOutputLinkSchema,
+  projectSourceResponseSchema,
+  projectSourceUploadMetadataSchema,
   projectSnapshotSchema,
   projectStatusFactsSchema,
 } from './projects';
@@ -164,6 +166,86 @@ describe('Project snapshot contract', () => {
       projectCurrentResponseSchema.safeParse({
         project: { ownerUserId: assetId },
         revision: { snapshot: validSnapshot() },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('requires exact Saved Video Version lineage and a controlled Project content URL', () => {
+    const response = {
+      project: {
+        id: '18b120ac-1578-46e3-8c3d-42307772f391',
+        campaignId: null,
+        title: 'Source Project',
+        status: 'ready' as const,
+        version: 2,
+        currentRevisionId: '3ac244b9-ec36-4a1e-b95e-7bcf37eb0b2d',
+        currentRevisionNumber: 2,
+        archivedAt: null,
+        deletedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      revision: {
+        id: '3ac244b9-ec36-4a1e-b95e-7bcf37eb0b2d',
+        projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
+        revisionNumber: 2,
+        parentRevisionId: '4159225b-60f4-4f94-a3d5-08feee91a91d',
+        parentRevisionNumber: 1,
+        snapshot: {
+          ...validSnapshot(),
+          workingMedia: {
+            kind: 'saved-video-version' as const,
+            savedVideoId: videoId,
+            videoVersionId: versionId,
+          },
+          presentedMedia: {
+            kind: 'saved-video-version' as const,
+            savedVideoId: videoId,
+            videoVersionId: versionId,
+          },
+        },
+        authorKind: 'user' as const,
+        source: 'user-edit' as const,
+        createdAt: now,
+      },
+      source: {
+        kind: 'saved-video-version' as const,
+        savedVideoId: videoId,
+        videoVersionId: versionId,
+        mimeType: 'video/mp4' as const,
+        filename: 'source.mp4',
+        sizeBytes: 1024,
+        container: 'mp4' as const,
+        videoCodec: 'avc' as const,
+        audioCodec: 'aac',
+        durationMs: 10_000,
+        width: 1920,
+        height: 1080,
+        hasAudio: true,
+        acceptedAt: now,
+        contentUrl: '/api/projects/18b120ac-1578-46e3-8c3d-42307772f391/source/content',
+      },
+    };
+    expect(projectSourceResponseSchema.parse(response)).toEqual(response);
+    expect(
+      projectSourceResponseSchema.safeParse({
+        ...response,
+        source: { ...response.source, videoVersionId: null },
+      }).success,
+    ).toBe(false);
+    expect(
+      projectSourceResponseSchema.safeParse({
+        ...response,
+        source: { ...response.source, contentUrl: 'https://storage.example/secret' },
+      }).success,
+    ).toBe(false);
+    expect(
+      projectSourceUploadMetadataSchema.safeParse({
+        expectedVersion: 1,
+        expectedRevisionNumber: 1,
+        kind: 'uploaded',
+        filename: 'source.mp4',
+        saveTargetVideoId: videoId,
       }).success,
     ).toBe(false);
   });

@@ -8,6 +8,7 @@ import {
 import { ENTRY_PATH, STUDIO_PATH } from './support/studioRoutes';
 import { installProjectHarness, TEST_PROJECT_ID } from './support/projectHarness';
 import { installCampaignHarness, TEST_CAMPAIGN_ID } from './support/campaignHarness';
+import { loadDecodableH264VideoFixture } from './support/existingVideoHarness';
 
 const loginFromEntry = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Log in' }).click();
@@ -160,6 +161,44 @@ test('Projects Quick Start, lifecycle, refresh, and explicit library exit stay i
   await page.reload();
   await expect(page).toHaveURL(/\/studio\/videos$/u);
   await expect(page.getByRole('dialog', { name: 'Saved Videos' })).toBeVisible();
+  expectNoExternalProviderTraffic(network);
+});
+
+test('an uploaded Project source accepts once and resumes on the same stage after refresh', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  const projects = await installProjectHarness(page, true);
+  const fixture = await loadDecodableH264VideoFixture();
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+
+  const stage = page.getByLabel('Studio media stage');
+  const stageVideo = stage.locator('video');
+  await expect(stage).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+  await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+    name: 'project-source.mp4',
+    mimeType: 'video/mp4',
+    buffer: fixture,
+  });
+
+  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+  await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
+  await expect(stageVideo).toHaveAttribute('src', /^blob:/u);
+  const firstObjectUrl = await stageVideo.getAttribute('src');
+  expect(projects.sourceOperationKeys).toHaveLength(1);
+  expect(projects.sourceOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
+
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+  await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
+  await expect(stageVideo).toHaveAttribute('src', /^blob:/u);
+  expect(await stageVideo.getAttribute('src')).not.toBe(firstObjectUrl);
+  await expect(page.getByRole('button', { name: 'Upload' })).toBeDisabled();
+  expect(projects.sourceOperationKeys).toHaveLength(1);
+  await expect
+    .poll(async () => readBrowserState(page))
+    .toMatchObject({ requirementModels: [], connections: [] });
   expectNoExternalProviderTraffic(network);
 });
 

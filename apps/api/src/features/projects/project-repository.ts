@@ -6,6 +6,7 @@ import type {
   ProjectJobLink,
   ProjectOutputLink,
   ProjectRevision,
+  ProjectSourceKind,
   ProjectVersionReferenceLink,
 } from '@studio/domain';
 import type {
@@ -49,6 +50,58 @@ export interface AppendProjectRevisionPersistenceInput {
 export interface ProjectCurrentRead {
   readonly project: Project;
   readonly revision: ProjectRevision;
+}
+
+export interface ProjectSourceRecord {
+  readonly projectId: string;
+  readonly ownerUserId: string;
+  readonly assetId: string;
+  readonly kind: ProjectSourceKind;
+  readonly savedVideoId: string | null;
+  readonly videoVersionId: string | null;
+  readonly acceptedRevisionId: string;
+  readonly acceptedRevisionNumber: number;
+  readonly operationKey: string;
+  readonly requestFingerprint: string;
+  readonly mimeType: 'video/mp4' | 'video/quicktime' | 'video/webm';
+  readonly filename: string;
+  readonly sizeBytes: number;
+  readonly checksumSha256: string;
+  readonly container: 'mp4' | 'quicktime' | 'webm';
+  readonly videoCodec: 'avc' | 'vp8';
+  readonly audioCodec: string | null;
+  readonly durationMs: number;
+  readonly width: number;
+  readonly height: number;
+  readonly hasAudio: boolean;
+  readonly acceptedAt: string;
+}
+
+export interface ProjectCurrentSourceRead {
+  readonly current: ProjectCurrentRead;
+  readonly source: ProjectSourceRecord | null;
+}
+
+export type ProjectSourceAcceptanceResult =
+  | {
+      readonly kind: 'accepted' | 'replayed';
+      readonly current: ProjectCurrentRead;
+      readonly source: ProjectSourceRecord;
+    }
+  | { readonly kind: 'not-found' }
+  | {
+      readonly kind: 'conflict';
+      readonly conflict: Extract<
+        ProjectConflict,
+        | { readonly kind: 'operation-key' }
+        | { readonly kind: 'project-version' }
+        | { readonly kind: 'revision' }
+        | { readonly kind: 'immutable-source' }
+      >;
+    };
+
+export interface AcceptProjectSourcePersistenceInput extends AppendProjectRevisionPersistenceInput {
+  readonly source: ProjectSourceRecord;
 }
 
 export interface ProjectRevisionHistoryPage {
@@ -130,6 +183,11 @@ export interface ProjectRepository {
     readonly receipt: ProjectCreateReceipt;
   }): Promise<ProjectCreatePersistenceResult>;
   getCurrent(ownerUserId: string, projectId: string): Promise<ProjectCurrentRead | null>;
+  getCurrentWithSource(
+    ownerUserId: string,
+    projectId: string,
+  ): Promise<ProjectCurrentSourceRead | null>;
+  getSource(ownerUserId: string, projectId: string): Promise<ProjectSourceRecord | null>;
   list(ownerUserId: string, input: ProjectSummaryPageInput): Promise<ProjectSummaryPage>;
   listRevisionHistory(
     ownerUserId: string,
@@ -148,6 +206,7 @@ export interface ProjectRepository {
   appendRevision(
     input: AppendProjectRevisionPersistenceInput,
   ): Promise<ProjectPersistenceMutationResult>;
+  acceptSource(input: AcceptProjectSourcePersistenceInput): Promise<ProjectSourceAcceptanceResult>;
   updateMetadata(
     ownerUserId: string,
     expectedVersion: number,

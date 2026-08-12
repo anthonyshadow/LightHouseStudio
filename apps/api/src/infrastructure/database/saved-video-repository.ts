@@ -15,6 +15,7 @@ import type {
   SavedVideoRepositoryPage,
   StoredSavedVideoAggregate,
   StoredVideoVersion,
+  StoredVideoVersionRead,
 } from '../../features/saved-videos/saved-video-repository.js';
 import type { LightframeDatabase } from './client.js';
 import { savedVideoReceipts, savedVideos, videoVersions } from './schema.js';
@@ -43,21 +44,23 @@ const toVersion = (row: VersionRow): StoredVideoVersion => ({
   createdAt: toIsoTimestamp(row.createdAt),
 });
 
+const toVideo = (video: VideoRow): StoredSavedVideoAggregate['video'] => ({
+  id: video.id,
+  ownerUserId: video.ownerUserId,
+  title: video.title,
+  currentVersionId: video.currentVersionId,
+  sourceVideoId: video.sourceVideoId,
+  status: video.status,
+  createdAt: toIsoTimestamp(video.createdAt),
+  updatedAt: toIsoTimestamp(video.updatedAt),
+  deletedAt: nullableIsoTimestamp(video.deletedAt),
+});
+
 const toAggregate = (
   video: VideoRow,
   versions: readonly VersionRow[],
 ): StoredSavedVideoAggregate => ({
-  video: {
-    id: video.id,
-    ownerUserId: video.ownerUserId,
-    title: video.title,
-    currentVersionId: video.currentVersionId,
-    sourceVideoId: video.sourceVideoId,
-    status: video.status,
-    createdAt: toIsoTimestamp(video.createdAt),
-    updatedAt: toIsoTimestamp(video.updatedAt),
-    deletedAt: nullableIsoTimestamp(video.deletedAt),
-  },
+  video: toVideo(video),
   versions: versions.map(toVersion),
   revision: video.revision,
 });
@@ -457,6 +460,35 @@ export class DrizzleSavedVideoRepository implements SavedVideoRepository {
 
   get(ownerUserId: string, videoId: string): Promise<StoredSavedVideoAggregate | null> {
     return this.#getWith(this.db, ownerUserId, videoId);
+  }
+
+  async getVersion(
+    ownerUserId: string,
+    videoId: string,
+    versionId: string,
+  ): Promise<StoredVideoVersionRead | null> {
+    const [row] = await this.db
+      .select({ video: savedVideos, version: videoVersions })
+      .from(savedVideos)
+      .innerJoin(
+        videoVersions,
+        and(
+          eq(videoVersions.videoId, savedVideos.id),
+          eq(videoVersions.ownerUserId, savedVideos.ownerUserId),
+        ),
+      )
+      .where(
+        and(
+          eq(savedVideos.ownerUserId, ownerUserId),
+          eq(savedVideos.id, videoId),
+          isNull(savedVideos.deletedAt),
+          eq(videoVersions.id, versionId),
+        ),
+      )
+      .limit(1);
+    return row === undefined
+      ? null
+      : { video: toVideo(row.video), version: toVersion(row.version) };
   }
 
   async rename(
