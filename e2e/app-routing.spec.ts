@@ -6,6 +6,7 @@ import {
   startLocalPreview,
 } from './support/studioHarness';
 import { ENTRY_PATH, STUDIO_PATH } from './support/studioRoutes';
+import { installProjectHarness, TEST_PROJECT_ID } from './support/projectHarness';
 
 const loginFromEntry = async (page: Page): Promise<void> => {
   await page.getByRole('button', { name: 'Log in' }).click();
@@ -107,6 +108,79 @@ test('saved video, character, and outfit routes preserve the shared Studio stage
     await dialog.getByRole('button', { name: 'Close panel' }).click();
     await expect(page).toHaveURL(/\/studio$/u);
   }
+});
+
+test('Projects Quick Start, lifecycle, refresh, and explicit library exit stay in one Studio shell', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  const projects = await installProjectHarness(page);
+  await page.goto('/studio/projects');
+
+  await expect(page).toHaveTitle('Projects · Lightframe Studio');
+  await expect(page.getByText('No active Projects yet', { exact: true })).toBeVisible();
+  await expect(page.getByLabel('Studio media stage')).toHaveCount(1);
+  await expect(page.getByLabel('Studio media stage')).toBeHidden();
+  await page.getByRole('button', { name: 'Quick Start' }).click();
+
+  await expect(page).toHaveURL(new RegExp(`/studio/projects/${TEST_PROJECT_ID}$`, 'u'));
+  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
+  expect(projects.operationKeys).toHaveLength(1);
+  expect(projects.operationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
+  await expect
+    .poll(async () => readBrowserState(page))
+    .toMatchObject({ cameraCalls: 0, requirementModels: [], connections: [], recorderStarts: 0 });
+
+  await page.getByRole('button', { name: 'Rename' }).click();
+  const rename = page.getByRole('dialog', { name: 'Rename Project' });
+  await rename.getByRole('textbox', { name: /Project name/u }).fill('Launch edit');
+  await rename.getByRole('button', { name: 'Rename Project' }).click();
+  await expect(page.getByRole('heading', { name: 'Launch edit' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Archive' }).click();
+  await page
+    .getByRole('dialog', { name: 'Archive Project' })
+    .getByRole('button', { name: 'Archive Project' })
+    .click();
+  await expect(page.getByText('Archived', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('heading', { name: 'Launch edit' })).toBeVisible();
+  await page.getByRole('button', { name: 'Restore' }).click();
+  await page
+    .getByRole('dialog', { name: 'Restore Project' })
+    .getByRole('button', { name: 'Restore Project' })
+    .click();
+  await expect(page.getByText('Draft', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Lightframe Demo account menu' }).click();
+  await expect(page.getByText('Global libraries · exits Project')).toBeVisible();
+  await page.getByRole('menuitem', { name: 'Saved Videos (exits Project)' }).click();
+  await expect(page).toHaveURL(/\/studio\/videos$/u);
+  await page.reload();
+  await expect(page).toHaveURL(/\/studio\/videos$/u);
+  await expect(page.getByRole('dialog', { name: 'Saved Videos' })).toBeVisible();
+  expectNoExternalProviderTraffic(network);
+});
+
+test('a protected Project deep link returns to the same URL after login', async ({ page }) => {
+  await installSuccessfulStudioHarness(page);
+  await installProjectHarness(page, true);
+  await page.route('**/api/auth/me', async (route) => {
+    await route.fulfill({
+      status: 401,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        error: { code: 'authentication_required', message: 'Sign in to continue.' },
+      }),
+    });
+  });
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+
+  const login = page.getByRole('dialog', { name: 'Log in to Lightframe' });
+  await expect(login).toBeVisible();
+  await login.getByRole('button', { name: 'Log in' }).click();
+  await expect(page).toHaveURL(new RegExp(`/studio/projects/${TEST_PROJECT_ID}$`, 'u'));
+  await expect(page.getByRole('heading', { name: 'No source yet' })).toBeVisible();
 });
 
 test('recording and temporary-take work cannot be lost silently through Back', async ({ page }) => {

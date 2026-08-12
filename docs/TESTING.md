@@ -96,6 +96,10 @@ The retained suite protects:
 - versioned local Project parsing, backup and prepared-journal recovery, restart-safe create
   receipts, owner isolation, lifecycle CAS, bounded active/archived lists, authenticated route
   validation/Origin policy, and local/shadow/relational authority composition;
+- recognized protected Project list/detail routes and Login return, one shared Studio/media-stage
+  owner, bounded Project controller pagination, replay-safe Quick Start, open/refresh, lifecycle
+  cache invalidation, stale-rename preservation, focus/announcements, explicit library exit, and no
+  empty-Project media/provider start;
 - app-owned saved-voice membership, first-read claim, owner-checked preview/conversion, and proof
   that relationship removal never calls provider voice deletion;
 - loopback Host/Origin, explicit provider intent, bounded response/stream handling, SSRF-resistant
@@ -119,10 +123,11 @@ The touch project runs that smoke plus the dedicated control-timeout/recording-S
 browser-specific test must be tagged in its title with `@cross-browser` or `@touch`; do not run
 every desktop journey under every engine by default.
 
-The current visual matrix contains 29 cases within the 29-case review budget. It retains Local live
+The current visual matrix contains 31 cases within the 31-case review budget. It retains Local live
 and recording at all five canonical viewports, plus selected entry, idle, Character, Builder,
 Shelf, playback, existing-video setup at all five viewports, processing/result, VTO, Voice,
-finalizing, and permission-error compositions. Visual
+finalizing, permission-error, desktop Projects workspace, and small-mobile empty-Project detail
+compositions. Visual
 tests are not part of `bun run test`, `bun run quality`, or ordinary push/pull-request CI.
 
 Run `bun run test:visual` when:

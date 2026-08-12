@@ -349,6 +349,10 @@ vi.mock('../features/video-gallery/VideoGallery', () => ({
   VideoGallery: () => <div>Deferred saved videos</div>,
 }));
 
+vi.mock('../features/projects/ProjectRouteSurface', () => ({
+  ProjectRouteSurface: () => <div>Deferred Projects workspace</div>,
+}));
+
 vi.mock('../features/existing-video/useExistingVideoWorkflow', () => ({
   useExistingVideoWorkflow: () => harness.existingVideo,
 }));
@@ -404,16 +408,26 @@ vi.mock('./useTakeReviewFlow', () => ({
 
 vi.mock('./StudioHeader', () => ({
   StudioHeader: ({
+    onOpenStudio,
+    onOpenProjects,
     onOpenVideos,
     onOpenCharacters,
     onOpenOutfits,
   }: {
+    onOpenStudio: () => void;
+    onOpenProjects: () => void;
     onOpenVideos: () => void;
     onOpenCharacters: () => void;
     onOpenOutfits: () => void;
   }) => (
     <div>
       Studio header
+      <button type="button" onClick={onOpenStudio}>
+        Open Studio
+      </button>
+      <button type="button" onClick={onOpenProjects}>
+        Open Projects
+      </button>
       <button type="button" onClick={onOpenVideos}>
         Open saved videos
       </button>
@@ -561,7 +575,7 @@ const testSession: AuthenticatedSessionResponse = {
   expiresAt: '2099-08-06T12:00:00.000Z',
 };
 
-const renderStudio = (initialIntent?: 'upload') =>
+const renderStudio = (initialIntent?: 'upload', initialPath = '/studio') =>
   render(
     <StudioDesignProvider>
       <AuthProvider initialSession={testSession}>
@@ -573,7 +587,7 @@ const renderStudio = (initialIntent?: 'upload') =>
                 element: <StudioApp {...(initialIntent ? { initialIntent } : {})} />,
               },
             ],
-            { initialEntries: ['/studio'] },
+            { initialEntries: [initialPath] },
           )}
         />
       </AuthProvider>
@@ -654,6 +668,23 @@ describe('StudioApp composition lifecycle', () => {
     expect(screen.getByTestId('media-stage')).toBe(stage);
     expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
     expect(harness.session.startLocal).not.toHaveBeenCalled();
+  });
+
+  it('keeps one hidden media-stage owner while the full Projects workspace is active', async () => {
+    renderStudio(undefined, '/studio/projects');
+    const stage = screen.getByTestId('media-stage');
+
+    expect(await screen.findByText('Deferred Projects workspace')).toBeInTheDocument();
+    expect(screen.getAllByTestId('media-stage')).toHaveLength(1);
+    expect(stage.closest('[hidden]')).toBeInTheDocument();
+    expect(harness.session.startLocal).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open Studio' }));
+    await waitFor(() =>
+      expect(screen.queryByText('Deferred Projects workspace')).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId('media-stage')).toBe(stage);
+    expect(stage.closest('[hidden]')).not.toBeInTheDocument();
   });
 
   it('closes Use existing video and hands local recording to the persistent stage', async () => {

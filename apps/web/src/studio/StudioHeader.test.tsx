@@ -35,6 +35,9 @@ const headerProps = {
     updatedAt: '2026-08-05T12:00:00.000Z',
     lastLoginAt: '2026-08-05T12:00:00.000Z',
   },
+  activeDestination: 'studio' as const,
+  onOpenStudio: vi.fn(),
+  onOpenProjects: vi.fn(),
   onOpenVideos: vi.fn(),
   onOpenCharacters: vi.fn(),
   onOpenOutfits: vi.fn(),
@@ -54,9 +57,25 @@ const renderHeader = () =>
     </StudioDesignProvider>,
   );
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.clearAllMocks();
+});
 
 describe('StudioHeader', () => {
+  it('exposes Studio and Projects as the one primary navigation', async () => {
+    const user = userEvent.setup();
+    renderHeader();
+    const navigation = screen.getByRole('navigation', { name: 'Primary' });
+
+    expect(within(navigation).getByRole('button', { name: 'Studio' })).toHaveAttribute(
+      'aria-current',
+      'page',
+    );
+    await user.click(within(navigation).getByRole('button', { name: 'Projects' }));
+    expect(headerProps.onOpenProjects).toHaveBeenCalledOnce();
+  });
+
   it('keeps status before the far-right account control and omits Select AI', () => {
     renderHeader();
     const header = screen.getByRole('banner');

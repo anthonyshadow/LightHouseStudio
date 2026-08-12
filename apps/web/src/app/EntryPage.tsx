@@ -4,7 +4,7 @@ import { useLocation, useNavigate } from 'react-router';
 import { useAuth } from '../application/auth/AuthProvider';
 import { Button } from '../ui/primitives/Button';
 import { visuallyHiddenStyles } from '../ui/primitives/VisuallyHidden';
-import { APP_PATHS, isStudioPath } from './paths';
+import { APP_PATHS, isRestorableStudioPath } from './paths';
 
 const LoginDialog = lazy(() =>
   import('../features/auth/LoginDialog').then((module) => ({ default: module.LoginDialog })),
@@ -80,7 +80,9 @@ export const EntryPage = ({ focusEnterOnMount }: EntryPageProps) => {
               setLoginOpen(false);
               const requestedPath = typeof routeState?.from === 'string' ? routeState.from : null;
               void navigate(
-                requestedPath && isStudioPath(requestedPath) ? requestedPath : APP_PATHS.studio,
+                requestedPath && isRestorableStudioPath(requestedPath)
+                  ? requestedPath
+                  : APP_PATHS.studio,
               );
             }}
           />

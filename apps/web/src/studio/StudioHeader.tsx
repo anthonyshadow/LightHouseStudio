@@ -3,12 +3,14 @@ import type { AuthenticatedUser } from '@studio/contracts';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { AccountMenu } from '../features/account/AccountMenu';
 import type { BrowserCapabilities, ProviderAvailability } from '../features/media-session';
+import { Button } from '../ui';
 import {
   brandStyles,
   capabilityDetailStyles,
   capabilityStyles,
   headerActionsStyles,
   headerStyles,
+  primaryNavigationStyles,
   systemStatusDotStyles,
 } from './StudioApp.styles';
 
@@ -22,6 +24,10 @@ type StudioHeaderProps = {
   capabilityState: CapabilityState;
   user: AuthenticatedUser;
   accountBusy?: boolean;
+  activeDestination: 'studio' | 'projects';
+  projectContextActive?: boolean;
+  onOpenStudio: () => void;
+  onOpenProjects: () => void;
   onOpenVideos: () => void;
   onOpenCharacters: () => void;
   onOpenOutfits: () => void;
@@ -135,6 +141,10 @@ export const StudioHeader = ({
   capabilityState,
   user,
   accountBusy,
+  activeDestination,
+  projectContextActive = false,
+  onOpenStudio,
+  onOpenProjects,
   onOpenVideos,
   onOpenCharacters,
   onOpenOutfits,
@@ -170,6 +180,25 @@ export const StudioHeader = ({
           <span>Local-first studio</span>
         </div>
       </div>
+      <nav aria-label="Primary" css={primaryNavigationStyles(theme)}>
+        <Button
+          size="small"
+          variant="quiet"
+          aria-label={projectContextActive ? 'Exit Project to Studio' : undefined}
+          aria-current={activeDestination === 'studio' ? 'page' : undefined}
+          onClick={onOpenStudio}
+        >
+          Studio
+        </Button>
+        <Button
+          size="small"
+          variant="quiet"
+          aria-current={activeDestination === 'projects' ? 'page' : undefined}
+          onClick={onOpenProjects}
+        >
+          Projects
+        </Button>
+      </nav>
       <div css={headerActionsStyles(theme)}>
         <StatusMenu
           open={openMenu === 'status'}
@@ -185,6 +214,7 @@ export const StudioHeader = ({
           open={openMenu === 'account'}
           onOpenChange={(open) => setMenuOpen('account', open)}
           busy={accountBusy}
+          projectContextActive={projectContextActive}
           onOpenVideos={onOpenVideos}
           onOpenCharacters={onOpenCharacters}
           onOpenOutfits={onOpenOutfits}

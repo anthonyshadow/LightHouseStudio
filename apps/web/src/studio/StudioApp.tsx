@@ -18,7 +18,7 @@ import { savedVideoContentUrl } from '../adapters/api-client/savedVideosApi';
 import { detectBrowserCapabilities } from '../adapters/browser-media/browserMedia';
 import { useAuth } from '../application/auth/AuthProvider';
 import { RemoteStateProvider } from '../application/remote-state/RemoteStateProvider';
-import { APP_PATHS } from '../app/paths';
+import { APP_PATHS, isProjectsPath, projectIdFromPath } from '../app/paths';
 import type { PromptCommittedHandler } from '../application/types';
 import type {
   CharacterSaveProgress,
@@ -158,6 +158,11 @@ const VideoEditWorkspace = lazy(() =>
     default: module.VideoEditWorkspace,
   })),
 );
+const ProjectRouteSurface = lazy(() =>
+  import('../features/projects/ProjectRouteSurface').then((module) => ({
+    default: module.ProjectRouteSurface,
+  })),
+);
 
 const deferredPanelFallback = <p role="status">Loading studio tool…</p>;
 
@@ -231,6 +236,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const auth = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+  const projectRouteActive = isProjectsPath(location.pathname);
+  const projectContextActive = projectIdFromPath(location.pathname) !== null;
   const fullscreenWorkspaceRef = useRef<HTMLDivElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const desktopStudioLayout = useDesktopStudioLayout();
@@ -735,7 +742,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   useLayoutEffect(() => {
     if (!focusMainOnMount) return;
     mainRef.current?.focus();
-  }, [focusMainOnMount]);
+  }, [focusMainOnMount, location.key]);
 
   useLayoutEffect(() => {
     promptCommittedHandlerRef.current = recordCommittedPrompt;
@@ -1536,6 +1543,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             capabilityState={capabilityState}
             user={auth.session!.user}
             accountBusy={logoutBusy}
+            activeDestination={projectRouteActive ? 'projects' : 'studio'}
+            projectContextActive={projectContextActive}
+            onOpenStudio={() => void navigate(APP_PATHS.studio)}
+            onOpenProjects={() => void navigate(APP_PATHS.projects)}
             onOpenVideos={() => void navigate(APP_PATHS.videos)}
             onOpenCharacters={() => void navigate(APP_PATHS.characters)}
             onOpenOutfits={() => void navigate(APP_PATHS.outfits)}
@@ -1546,6 +1557,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         <main ref={mainRef} id="studio-main" tabIndex={-1} css={mainGridStyles()}>
           <div
             ref={fullscreenWorkspaceRef}
+            hidden={projectRouteActive}
             css={stageColumnStyles(theme)}
             data-video-edit-active={videoEditing ? 'true' : 'false'}
           >
@@ -1686,6 +1698,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
               </>
             )}
           </div>
+          {projectRouteActive ? (
+            <Suspense fallback={<p role="status">Loading Projects workspace…</p>}>
+              <ProjectRouteSurface />
+            </Suspense>
+          ) : null}
         </main>
 
         <StudioExitGuard
