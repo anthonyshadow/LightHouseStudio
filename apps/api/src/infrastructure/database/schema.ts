@@ -402,6 +402,7 @@ export const referenceImageAssets = pgTable(
   },
   (table) => [
     uniqueIndex('reference_images_owner_request_unique').on(table.ownerUserId, table.requestId),
+    index('reference_images_updated_at_idx').on(table.updatedAt),
   ],
 );
 
@@ -440,6 +441,7 @@ export const processingJobs = pgTable(
     unique('processing_jobs_id_owner_unique').on(table.id, table.ownerUserId),
     index('processing_jobs_owner_status_idx').on(table.ownerUserId, table.status, table.createdAt),
     index('processing_jobs_lease_idx').on(table.status, table.leaseExpiresAt),
+    index('processing_jobs_expiry_idx').on(table.status, table.expiresAt),
     uniqueIndex('processing_jobs_owner_active_unique')
       .on(table.ownerUserId)
       .where(
@@ -1007,32 +1009,3 @@ export const resourceReferences = pgTable(
     index('resource_references_target_idx').on(table.ownerUserId, table.targetAssetId),
   ],
 );
-
-export const databaseSchema = {
-  users,
-  passwordCredentials,
-  sessions,
-  mediaAssets,
-  savedVideos,
-  videoVersions,
-  savedVideoReceipts,
-  directUploads,
-  savedVoices,
-  ownerMigrations,
-  creativeAssets,
-  creativeLibraries,
-  referenceImageAssets,
-  processingJobs,
-  campaigns,
-  campaignOperationReceipts,
-  projects,
-  projectOperationReceipts,
-  projectRevisions,
-  projectAssets,
-  projectVersionReferences,
-  projectSources,
-  projectJobs,
-  projectOutputs,
-  outbox,
-  resourceReferences,
-};

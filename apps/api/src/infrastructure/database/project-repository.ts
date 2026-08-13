@@ -1,14 +1,11 @@
 import { projectSnapshotSchema } from '@studio/contracts';
 import {
-  PROJECT_SNAPSHOT_SCHEMA_VERSION,
   type Project,
   type ProjectAggregate,
   type ProjectAssetLink,
   type ProjectJobLink,
   type ProjectOutputLink,
   type ProjectRevision,
-  type ProjectRevisionAuthor,
-  type ProjectSnapshot,
   type ProjectVersionReferenceLink,
 } from '@studio/domain';
 import { and, desc, eq, inArray, isNull, lt, or, sql, type SQLWrapper } from 'drizzle-orm';
@@ -32,6 +29,20 @@ import type {
   ProjectSourceRecord,
 } from '../../features/projects/project-repository.js';
 import type { LightframeDatabase } from './client.js';
+import { ProjectPersistenceError } from './project-persistence-errors.js';
+import {
+  assetLinkValues,
+  parseSnapshot,
+  projectSourceValues,
+  projectValues,
+  revisionValues,
+  snapshotAssetLinks,
+  snapshotVersionReferenceLinks,
+  toProject,
+  toProjectSource,
+  toRevision,
+  versionReferenceValues,
+} from './project-repository-mappers.js';
 import {
   campaigns,
   mediaAssets,
@@ -49,297 +60,11 @@ import {
 } from './schema.js';
 
 type DatabaseExecutor = Parameters<Parameters<LightframeDatabase['transaction']>[0]>[0];
-type ProjectRow = typeof projects.$inferSelect;
-type ProjectRevisionRow = typeof projectRevisions.$inferSelect;
-type ProjectAssetRow = typeof projectAssets.$inferSelect;
 type ProjectJobRow = typeof projectJobs.$inferSelect;
 type ProjectOutputRow = typeof projectOutputs.$inferSelect;
-type ProjectVersionReferenceRow = typeof projectVersionReferences.$inferSelect;
-type ProjectSourceRow = typeof projectSources.$inferSelect;
 
-export type ProjectPersistenceErrorCode =
-  'invalid-aggregate' | 'asset-not-ready' | 'version-not-ready' | 'output-not-linked';
-
-export class ProjectPersistenceError extends Error {
-  constructor(
-    readonly code: ProjectPersistenceErrorCode,
-    message: string,
-  ) {
-    super(message);
-    this.name = 'ProjectPersistenceError';
-  }
-}
-
-const toRevisionAuthor = (row: ProjectRevisionRow): ProjectRevisionAuthor => {
-  switch (row.authorKind) {
-    case 'user':
-      return { kind: 'user', authorId: row.authorId };
-    case 'system':
-      return { kind: 'system', authorId: row.authorId };
-    case 'migration':
-      return { kind: 'migration', authorId: row.authorId };
-  }
-};
-
-const parseSnapshot = (schemaVersion: number, snapshot: unknown): ProjectSnapshot => {
-  if (schemaVersion !== PROJECT_SNAPSHOT_SCHEMA_VERSION) {
-    throw new ProjectPersistenceError(
-      'invalid-aggregate',
-      'The stored Project snapshot version is unsupported.',
-    );
-  }
-  return projectSnapshotSchema.parse(snapshot);
-};
-
-const toSnapshot = (row: ProjectRevisionRow): ProjectSnapshot =>
-  parseSnapshot(row.snapshotSchemaVersion, row.snapshot);
-
-const toRevision = (row: ProjectRevisionRow): ProjectRevision => ({
-  id: row.id,
-  projectId: row.projectId,
-  ownerUserId: row.ownerUserId,
-  revisionNumber: row.revisionNumber,
-  parentRevisionId: row.parentRevisionId,
-  parentRevisionNumber: row.parentRevisionNumber,
-  snapshot: toSnapshot(row),
-  author: toRevisionAuthor(row),
-  source: row.source,
-  createdAt: toIsoTimestamp(row.createdAt),
-});
-
-const toProject = (row: ProjectRow): Project => {
-  if (row.currentRevisionId === null || row.currentRevisionNumber < 1) {
-    throw new ProjectPersistenceError(
-      'invalid-aggregate',
-      'The stored Project has no current revision.',
-    );
-  }
-  return {
-    id: row.id,
-    ownerUserId: row.ownerUserId,
-    campaignId: row.campaignId,
-    title: row.title,
-    status: row.status,
-    version: row.version,
-    currentRevisionId: row.currentRevisionId,
-    currentRevisionNumber: row.currentRevisionNumber,
-    archivedAt: nullableIsoTimestamp(row.archivedAt),
-    deletedAt: nullableIsoTimestamp(row.deletedAt),
-    createdAt: toIsoTimestamp(row.createdAt),
-    updatedAt: toIsoTimestamp(row.updatedAt),
-  };
-};
-
-const toProjectSource = (row: ProjectSourceRow): ProjectSourceRecord => ({
-  projectId: row.projectId,
-  ownerUserId: row.ownerUserId,
-  assetId: row.assetId,
-  kind: row.kind,
-  savedVideoId: row.savedVideoId,
-  videoVersionId: row.videoVersionId,
-  acceptedRevisionId: row.acceptedRevisionId,
-  acceptedRevisionNumber: row.acceptedRevisionNumber,
-  operationKey: row.operationKey,
-  requestFingerprint: row.requestFingerprint,
-  mimeType: row.mimeType as ProjectSourceRecord['mimeType'],
-  filename: row.filename,
-  sizeBytes: row.sizeBytes,
-  checksumSha256: row.checksumSha256,
-  container: row.container as ProjectSourceRecord['container'],
-  videoCodec: row.videoCodec as ProjectSourceRecord['videoCodec'],
-  audioCodec: row.audioCodec,
-  durationMs: row.durationMs,
-  width: row.width,
-  height: row.height,
-  hasAudio: row.hasAudio,
-  acceptedAt: toIsoTimestamp(row.acceptedAt),
-});
-
-export const mapProjectAggregate = (
-  projectRow: ProjectRow,
-  revisionRows: readonly ProjectRevisionRow[],
-  assetRows: readonly ProjectAssetRow[],
-  jobRows: readonly ProjectJobRow[],
-  outputRows: readonly ProjectOutputRow[],
-  versionReferenceRows: readonly ProjectVersionReferenceRow[] = [],
-): ProjectAggregate => {
-  const project = toProject(projectRow);
-  const revisions: ProjectRevision[] = revisionRows.map(toRevision);
-  if (
-    !revisions.some(
-      ({ id, revisionNumber }) =>
-        id === project.currentRevisionId && revisionNumber === project.currentRevisionNumber,
-    )
-  ) {
-    throw new ProjectPersistenceError(
-      'invalid-aggregate',
-      'The stored Project current revision is outside its revision history.',
-    );
-  }
-  return {
-    project,
-    revisions,
-    assetLinks: assetRows.map((row) => ({
-      projectId: row.projectId,
-      ownerUserId: row.ownerUserId,
-      assetId: row.assetId,
-      role: row.role,
-      revisionId: row.revisionId,
-      revisionNumber: row.revisionNumber,
-      createdAt: toIsoTimestamp(row.createdAt),
-    })),
-    versionReferenceLinks: versionReferenceRows.map((row) => ({
-      projectId: row.projectId,
-      ownerUserId: row.ownerUserId,
-      savedVideoId: row.savedVideoId,
-      videoVersionId: row.videoVersionId,
-      role: row.role,
-      revisionId: row.revisionId,
-      revisionNumber: row.revisionNumber,
-      createdAt: toIsoTimestamp(row.createdAt),
-    })),
-    jobLinks: jobRows.map((row) => ({
-      projectId: row.projectId,
-      ownerUserId: row.ownerUserId,
-      jobId: row.jobId,
-      initiatingRevisionId: row.initiatingRevisionId,
-      initiatingRevisionNumber: row.initiatingRevisionNumber,
-      createdAt: toIsoTimestamp(row.createdAt),
-    })),
-    outputLinks: outputRows.map((row) => ({
-      projectId: row.projectId,
-      ownerUserId: row.ownerUserId,
-      savedVideoId: row.savedVideoId,
-      videoVersionId: row.videoVersionId,
-      producingRevisionId: row.producingRevisionId,
-      producingRevisionNumber: row.producingRevisionNumber,
-      createdAt: toIsoTimestamp(row.createdAt),
-    })),
-  };
-};
-
-const projectValues = (
-  project: Project,
-  current: {
-    readonly currentRevisionId: string | null;
-    readonly currentRevisionNumber: number;
-  },
-): typeof projects.$inferInsert => ({
-  id: project.id,
-  ownerUserId: project.ownerUserId,
-  campaignId: project.campaignId,
-  title: project.title,
-  status: project.status,
-  version: project.version,
-  currentRevisionId: current.currentRevisionId,
-  currentRevisionNumber: current.currentRevisionNumber,
-  archivedAt: nullableIsoTimestamp(project.archivedAt),
-  deletedAt: nullableIsoTimestamp(project.deletedAt),
-  createdAt: toIsoTimestamp(project.createdAt),
-  updatedAt: toIsoTimestamp(project.updatedAt),
-});
-
-const revisionValues = (revision: ProjectRevision): typeof projectRevisions.$inferInsert => ({
-  id: revision.id,
-  projectId: revision.projectId,
-  ownerUserId: revision.ownerUserId,
-  revisionNumber: revision.revisionNumber,
-  parentRevisionId: revision.parentRevisionId,
-  parentRevisionNumber: revision.parentRevisionNumber,
-  snapshotSchemaVersion: revision.snapshot.schemaVersion,
-  snapshot: projectSnapshotSchema.parse(revision.snapshot),
-  authorKind: revision.author.kind,
-  authorId: revision.author.authorId,
-  source: revision.source,
-  createdAt: toIsoTimestamp(revision.createdAt),
-});
-
-const assetLinkValues = (link: ProjectAssetLink): typeof projectAssets.$inferInsert => ({
-  projectId: link.projectId,
-  ownerUserId: link.ownerUserId,
-  assetId: link.assetId,
-  role: link.role,
-  revisionId: link.revisionId,
-  revisionNumber: link.revisionNumber,
-  createdAt: toIsoTimestamp(link.createdAt),
-});
-
-const snapshotAssetLinks = (
-  revision: ProjectRevision,
-): readonly Readonly<{ assetId: string; role: ProjectAssetLink['role'] }>[] => {
-  const links: { assetId: string; role: ProjectAssetLink['role'] }[] = [];
-  if (revision.snapshot.sourceAssetId !== null) {
-    links.push({ assetId: revision.snapshot.sourceAssetId, role: 'source' });
-  }
-  if (revision.snapshot.workingMedia?.kind === 'asset') {
-    links.push({ assetId: revision.snapshot.workingMedia.assetId, role: 'working' });
-  }
-  if (revision.snapshot.presentedMedia?.kind === 'asset') {
-    links.push({ assetId: revision.snapshot.presentedMedia.assetId, role: 'presented' });
-  }
-  return links;
-};
-
-const snapshotVersionReferenceLinks = (
-  revision: ProjectRevision,
-): readonly ProjectVersionReferenceLink[] => {
-  const links: ProjectVersionReferenceLink[] = [];
-  for (const [role, reference] of [
-    ['working', revision.snapshot.workingMedia],
-    ['presented', revision.snapshot.presentedMedia],
-  ] as const) {
-    if (reference?.kind !== 'saved-video-version') continue;
-    links.push({
-      projectId: revision.projectId,
-      ownerUserId: revision.ownerUserId,
-      savedVideoId: reference.savedVideoId,
-      videoVersionId: reference.videoVersionId,
-      role,
-      revisionId: revision.id,
-      revisionNumber: revision.revisionNumber,
-      createdAt: revision.createdAt,
-    });
-  }
-  return links;
-};
-
-const versionReferenceValues = (
-  link: ProjectVersionReferenceLink,
-): typeof projectVersionReferences.$inferInsert => ({
-  projectId: link.projectId,
-  ownerUserId: link.ownerUserId,
-  savedVideoId: link.savedVideoId,
-  videoVersionId: link.videoVersionId,
-  role: link.role,
-  revisionId: link.revisionId,
-  revisionNumber: link.revisionNumber,
-  createdAt: toIsoTimestamp(link.createdAt),
-});
-
-const projectSourceValues = (source: ProjectSourceRecord): typeof projectSources.$inferInsert => ({
-  projectId: source.projectId,
-  ownerUserId: source.ownerUserId,
-  assetId: source.assetId,
-  kind: source.kind,
-  savedVideoId: source.savedVideoId,
-  videoVersionId: source.videoVersionId,
-  acceptedRevisionId: source.acceptedRevisionId,
-  acceptedRevisionNumber: source.acceptedRevisionNumber,
-  operationKey: source.operationKey,
-  requestFingerprint: source.requestFingerprint,
-  mimeType: source.mimeType,
-  filename: source.filename,
-  sizeBytes: source.sizeBytes,
-  checksumSha256: source.checksumSha256,
-  container: source.container,
-  videoCodec: source.videoCodec,
-  audioCodec: source.audioCodec,
-  durationMs: source.durationMs,
-  width: source.width,
-  height: source.height,
-  hasAudio: source.hasAudio,
-  acceptedAt: toIsoTimestamp(source.acceptedAt),
-});
+export { ProjectPersistenceError } from './project-persistence-errors.js';
+export { mapProjectAggregate } from './project-repository-mappers.js';
 
 const assertRevisionAssetLinks = (
   revision: ProjectRevision,

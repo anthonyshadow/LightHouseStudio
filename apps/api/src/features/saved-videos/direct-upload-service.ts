@@ -439,7 +439,7 @@ export class DirectSavedVideoUploadService {
   }
 
   async cleanupExpired(): Promise<void> {
-    const expired = await this.#repository.findExpired(this.#now().toISOString(), 25);
+    const expired = await this.#repository.claimExpired(this.#now().toISOString(), 25);
     const activeReceipts = await this.#savedVideos.findActiveReceipts(
       expired.map(({ ownerUserId, idempotencyKey }) => ({ ownerUserId, idempotencyKey })),
     );

@@ -54,5 +54,6 @@ export interface DirectUploadRepository {
     status: 'failed' | 'aborted' | 'expired',
     updatedAt: string,
   ): Promise<void>;
-  findExpired(now: string, limit: number): Promise<readonly StoredDirectUpload[]>;
+  /** Claims the oldest eligible rows by advancing their retry order before cleanup begins. */
+  claimExpired(now: string, limit: number): Promise<readonly StoredDirectUpload[]>;
 }
