@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  appendProjectRevisionRequestSchema,
   createProjectRequestSchema,
   projectConflictResponseSchema,
   projectCurrentResponseSchema,
@@ -166,6 +167,34 @@ describe('Project snapshot contract', () => {
       projectCurrentResponseSchema.safeParse({
         project: { ownerUserId: assetId },
         revision: { snapshot: validSnapshot() },
+      }).success,
+    ).toBe(false);
+  });
+
+  it('accepts only the bounded Prompt 07 semantic session proposal', () => {
+    expect(
+      appendProjectRevisionRequestSchema.parse({
+        expectedVersion: 2,
+        expectedRevisionNumber: 2,
+        proposal: {
+          workflowPhase: 'creative',
+          liveMode: {
+            modeId: 'local',
+            captureFormat: 'landscape',
+            audioSource: 'local-microphone',
+          },
+        },
+      }),
+    ).toMatchObject({ proposal: { workflowPhase: 'creative' } });
+    expect(
+      appendProjectRevisionRequestSchema.safeParse({
+        expectedVersion: 2,
+        expectedRevisionNumber: 2,
+        proposal: {
+          workflowPhase: 'creative',
+          liveMode: null,
+          selectedCharacter: { characterId: 'not-enabled-yet', variantId: null },
+        },
       }).success,
     ).toBe(false);
   });

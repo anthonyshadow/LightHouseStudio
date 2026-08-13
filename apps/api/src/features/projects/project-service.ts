@@ -2,11 +2,13 @@ import { createHash, randomUUID } from 'node:crypto';
 import {
   projectCurrentResponseSchema,
   projectsResponseSchema,
+  type AppendProjectRevisionRequest,
   type ProjectContract,
   type ProjectCurrentResponse,
   type ProjectsQuery,
 } from '@studio/contracts';
 import {
+  appendProjectRevision,
   archiveProject,
   createProject,
   normalizeProjectTitle,
@@ -15,7 +17,10 @@ import {
   restoreProject,
   moveProjectToCampaign,
   type Project,
+  type ProjectAggregate,
+  type ProjectAssetLink,
   type ProjectConflict,
+  type ProjectRevision,
 } from '@studio/domain';
 import { AppError } from '../../http/app-error.js';
 import type {
@@ -29,6 +34,46 @@ const emptyFacts = {
   currentAttempt: { status: 'none' as const },
   validatedLastSuccessfulOutput: null,
 };
+
+const currentAggregate = (current: ProjectCurrentRead): ProjectAggregate => ({
+  project: current.project,
+  revisions: [current.revision],
+  assetLinks: [],
+  versionReferenceLinks: [],
+  jobLinks: [],
+  outputLinks: [],
+});
+
+export const projectAssetLinksForRevision = (
+  revision: ProjectRevision,
+): readonly ProjectAssetLink[] => {
+  const references: Array<Pick<ProjectAssetLink, 'assetId' | 'role'>> = [];
+  if (revision.snapshot.sourceAssetId !== null) {
+    references.push({ assetId: revision.snapshot.sourceAssetId, role: 'source' });
+  }
+  if (revision.snapshot.workingMedia?.kind === 'asset') {
+    references.push({ assetId: revision.snapshot.workingMedia.assetId, role: 'working' });
+  }
+  if (revision.snapshot.presentedMedia?.kind === 'asset') {
+    references.push({ assetId: revision.snapshot.presentedMedia.assetId, role: 'presented' });
+  }
+  return references.map(({ assetId, role }) => ({
+    projectId: revision.projectId,
+    ownerUserId: revision.ownerUserId,
+    assetId,
+    role,
+    revisionId: revision.id,
+    revisionNumber: revision.revisionNumber,
+    createdAt: revision.createdAt,
+  }));
+};
+
+const sessionProposalMatches = (
+  current: ProjectCurrentRead,
+  proposal: AppendProjectRevisionRequest['proposal'],
+): boolean =>
+  current.revision.snapshot.workflowPhase === proposal.workflowPhase &&
+  JSON.stringify(current.revision.snapshot.liveMode) === JSON.stringify(proposal.liveMode);
 
 const publicProject = (project: Project): ProjectContract => ({
   id: project.id,
@@ -189,6 +234,71 @@ export class ProjectService {
     const current = await this.#repository.getCurrent(ownerUserId, projectId);
     if (current === null) throw new AppError(404, 'not_found', 'That Project is unavailable.');
     return publicProjectCurrent(current);
+  }
+
+  async checkpoint(
+    ownerUserId: string,
+    projectId: string,
+    input: AppendProjectRevisionRequest,
+  ): Promise<ProjectServiceMutationResult> {
+    const current = await this.#repository.getCurrent(ownerUserId, projectId);
+    if (current === null) throw new AppError(404, 'not_found', 'That Project is unavailable.');
+
+    // A lost response followed by the same semantic proposal converges without another revision.
+    if (sessionProposalMatches(current, input.proposal)) {
+      return { ok: true, current: publicProjectCurrent(current) };
+    }
+
+    const now = this.#now().toISOString();
+    let next;
+    try {
+      next = appendProjectRevision(
+        currentAggregate(current),
+        {
+          expectedProjectVersion: input.expectedVersion,
+          expectedRevisionNumber: input.expectedRevisionNumber,
+          snapshot: {
+            ...current.revision.snapshot,
+            workflowPhase: input.proposal.workflowPhase,
+            liveMode: input.proposal.liveMode,
+            updatedAt: now,
+          },
+          author: { kind: 'user', authorId: ownerUserId },
+          source: 'user-edit',
+          facts: {
+            sourceStatus: current.revision.snapshot.sourceAssetId === null ? 'none' : 'ready',
+            currentAttempt: { status: 'none' },
+            validatedLastSuccessfulOutput: current.revision.snapshot.lastSuccessfulOutput,
+          },
+        },
+        { now, createId: this.#createId },
+      );
+    } catch (error) {
+      if (error instanceof ProjectRuleError) {
+        throw new AppError(409, 'conflict', error.message);
+      }
+      throw error;
+    }
+    if (!next.ok) return { ok: false, conflict: next.conflict };
+    const revision = next.value.revisions.at(-1);
+    if (revision === undefined) throw new Error('Project checkpoint did not create a revision.');
+    const persisted = await this.#repository.appendRevision({
+      ownerUserId,
+      projectId,
+      expectedVersion: input.expectedVersion,
+      expectedRevisionNumber: input.expectedRevisionNumber,
+      nextProject: next.value.project,
+      revision,
+      assetLinks: projectAssetLinksForRevision(revision),
+    });
+    if (persisted.kind === 'not-found') {
+      throw new AppError(404, 'not_found', 'That Project is unavailable.');
+    }
+    if (persisted.kind === 'conflict') return { ok: false, conflict: persisted.conflict };
+    return {
+      ok: true,
+      current: publicProjectCurrent({ project: next.value.project, revision }),
+    };
   }
 
   async rename(

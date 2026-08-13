@@ -96,6 +96,15 @@ const projectVoiceSelectionSchema = z.discriminatedUnion('kind', [
     .strict(),
 ]);
 
+const projectLiveModeMetadataSchema = z
+  .object({
+    modeId: creativeAssetIdSchema,
+    captureFormat: z.enum(['landscape', 'portrait', 'freeform']),
+    audioSource: z.enum(['local-microphone', 'model-output', 'none']),
+  })
+  .strict()
+  .nullable();
+
 const videoEditSpecSchema = z
   .object({
     trim: z
@@ -173,14 +182,7 @@ export const projectSnapshotSchema = z
       z.object({ kind: z.literal('character-swap') }).strict(),
       z.object({ kind: z.literal('virtual-try-on') }).strict(),
     ]),
-    liveMode: z
-      .object({
-        modeId: creativeAssetIdSchema,
-        captureFormat: z.enum(['landscape', 'portrait', 'freeform']),
-        audioSource: z.enum(['local-microphone', 'model-output', 'none']),
-      })
-      .strict()
-      .nullable(),
+    liveMode: projectLiveModeMetadataSchema,
     creativeIntent: z
       .object({
         promptId: creativeAssetIdSchema.nullable(),
@@ -397,12 +399,18 @@ export const projectConflictResponseSchema = z
     conflict: projectConflictSchema,
   })
   .strict();
+export const projectSessionProposalSchema = z
+  .object({
+    workflowPhase: projectWorkflowPhaseSchema,
+    liveMode: projectLiveModeMetadataSchema,
+  })
+  .strict();
+
 export const appendProjectRevisionRequestSchema = z
   .object({
     expectedVersion: z.number().int().positive(),
     expectedRevisionNumber: z.number().int().positive(),
-    snapshot: projectSnapshotSchema,
-    source: z.enum(['user-edit', 'job-result', 'restore']),
+    proposal: projectSessionProposalSchema,
   })
   .strict();
 
@@ -497,6 +505,8 @@ export const projectSourceResponseSchema = z
   });
 
 export type ProjectSnapshotContract = z.infer<typeof projectSnapshotSchema>;
+export type ProjectSessionProposalContract = z.infer<typeof projectSessionProposalSchema>;
+export type AppendProjectRevisionRequest = z.infer<typeof appendProjectRevisionRequestSchema>;
 export type ProjectStatusContract = z.infer<typeof projectStatusSchema>;
 export type ProjectAssetRoleContract = z.infer<typeof projectAssetRoleSchema>;
 export type ProjectContract = z.infer<typeof projectSchema>;

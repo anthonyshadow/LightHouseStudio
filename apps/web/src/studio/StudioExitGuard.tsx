@@ -1,6 +1,7 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import { useBlocker, useLocation } from 'react-router';
 import { isStudioPath, projectIdFromPath } from '../app/paths';
+import type { ProjectSessionPort } from '../features/projects/useProjectSession';
 import { Button } from '../ui/primitives/Button';
 import { ConfirmationDialog } from '../ui/primitives/ConfirmationDialog';
 import { OverlayPanel } from '../ui/primitives/OverlayPanel';
@@ -17,8 +18,18 @@ export interface StudioExitGuardProps {
     busy: boolean;
     abort: (() => void) | null;
   }> | null;
+  readonly projectSession?: ProjectSessionPort | null;
   readonly onDiscardTemporaryWork: () => void;
 }
+
+const hasUnacceptedProjectDraft = (
+  currentProjectId: string | null,
+  hasTemporaryTake: boolean,
+  projectSourceActivity: StudioExitGuardProps['projectSourceActivity'],
+): boolean =>
+  hasTemporaryTake &&
+  (currentProjectId === null ||
+    (projectSourceActivity?.projectId === currentProjectId && !projectSourceActivity.accepted));
 
 export const shouldBlockStudioExit = (
   currentPathname: string,
@@ -47,21 +58,26 @@ export const StudioExitGuard = ({
   voiceProcessingActive,
   shelfDirty,
   projectSourceActivity = null,
+  projectSession = null,
   onDiscardTemporaryWork,
 }: StudioExitGuardProps) => {
   const location = useLocation();
   const projectSourceStaging = projectSourceActivity?.busy ?? false;
+  const projectSavePending =
+    projectSession?.hasLocalProposal === true || projectSession?.phase === 'saving';
   const hasDiscardableWork =
     hasTemporaryTake || voiceProcessingActive || shelfDirty || projectSourceStaging;
-  const unsafeWorkActive = recordingOrFinalizing || videoRenderingActive || hasDiscardableWork;
+  const unsafeWorkActive =
+    recordingOrFinalizing || videoRenderingActive || hasDiscardableWork || projectSavePending;
   const blocker = useBlocker(({ currentLocation, nextLocation }) => {
     const currentProjectId = projectIdFromPath(currentLocation.pathname);
-    const projectDraftActive =
-      hasTemporaryTake &&
-      (currentProjectId === null ||
-        (projectSourceActivity?.projectId === currentProjectId && !projectSourceActivity.accepted));
+    const projectDraftActive = hasUnacceptedProjectDraft(
+      currentProjectId,
+      hasTemporaryTake,
+      projectSourceActivity,
+    );
     const unsafeProjectWorkActive =
-      recordingOrFinalizing || projectSourceStaging || projectDraftActive;
+      recordingOrFinalizing || projectSourceStaging || projectDraftActive || projectSavePending;
     return (
       shouldBlockStudioExit(currentLocation.pathname, nextLocation.pathname, unsafeWorkActive) ||
       shouldBlockProjectContextChange(
@@ -72,13 +88,69 @@ export const StudioExitGuard = ({
     );
   });
 
+  const otherWorkBlocks = useCallback(
+    (nextPathname: string): boolean => {
+      const currentProjectId = projectIdFromPath(location.pathname);
+      const projectDraftActive = hasUnacceptedProjectDraft(
+        currentProjectId,
+        hasTemporaryTake,
+        projectSourceActivity,
+      );
+      const outsideStudioBlocked = shouldBlockStudioExit(
+        location.pathname,
+        nextPathname,
+        recordingOrFinalizing || videoRenderingActive || hasDiscardableWork,
+      );
+      const projectChangeBlocked = shouldBlockProjectContextChange(
+        location.pathname,
+        nextPathname,
+        recordingOrFinalizing || projectSourceStaging || projectDraftActive,
+      );
+      return outsideStudioBlocked || projectChangeBlocked;
+    },
+    [
+      hasDiscardableWork,
+      hasTemporaryTake,
+      location.pathname,
+      projectSourceActivity,
+      projectSourceStaging,
+      recordingOrFinalizing,
+      videoRenderingActive,
+    ],
+  );
+
+  const saveAttemptRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (blocker.state !== 'blocked') {
+      saveAttemptRef.current = null;
+      return;
+    }
+    if (
+      projectSession === null ||
+      projectSession.projectId !== projectIdFromPath(location.pathname) ||
+      !projectSavePending ||
+      projectSession.phase === 'conflict' ||
+      projectSession.phase === 'error'
+    ) {
+      return;
+    }
+    const destination = blocker.location.pathname;
+    if (saveAttemptRef.current === destination) return;
+    saveAttemptRef.current = destination;
+    void projectSession.flush().then((saved) => {
+      saveAttemptRef.current = null;
+      if (saved && !otherWorkBlocks(destination) && blocker.state === 'blocked') blocker.proceed();
+    });
+  }, [blocker, location.pathname, otherWorkBlocks, projectSavePending, projectSession]);
+
   useEffect(() => {
     if (
       !recordingOrFinalizing &&
       !videoRenderingActive &&
       !voiceProcessingActive &&
       !shelfDirty &&
-      !projectSourceStaging
+      !projectSourceStaging &&
+      !projectSavePending
     )
       return;
 
@@ -90,6 +162,7 @@ export const StudioExitGuard = ({
     return () => window.removeEventListener('beforeunload', protectTransientWork);
   }, [
     projectSourceStaging,
+    projectSavePending,
     recordingOrFinalizing,
     shelfDirty,
     videoRenderingActive,
@@ -103,9 +176,18 @@ export const StudioExitGuard = ({
   const discardAndLeave = useCallback(() => {
     if (blocker.state !== 'blocked') return;
     projectSourceActivity?.abort?.();
+    projectSession?.discard();
     onDiscardTemporaryWork();
     blocker.proceed();
-  }, [blocker, onDiscardTemporaryWork, projectSourceActivity]);
+  }, [blocker, onDiscardTemporaryWork, projectSession, projectSourceActivity]);
+
+  const retrySaveAndLeave = useCallback(() => {
+    if (blocker.state !== 'blocked' || projectSession === null) return;
+    const destination = blocker.location.pathname;
+    void projectSession.retry().then((saved) => {
+      if (saved && !otherWorkBlocks(destination) && blocker.state === 'blocked') blocker.proceed();
+    });
+  }, [blocker, otherWorkBlocks, projectSession]);
 
   const navigationBlocked = blocker.state === 'blocked';
   const projectContextChangeBlocked =
@@ -113,13 +195,19 @@ export const StudioExitGuard = ({
     shouldBlockProjectContextChange(location.pathname, blocker.location.pathname, true);
   const activeWorkExitBlocked =
     navigationBlocked && (recordingOrFinalizing || videoRenderingActive);
-  const projectDiscardConfirmationOpen =
-    projectContextChangeBlocked && !activeWorkExitBlocked && hasDiscardableWork;
-  const discardConfirmationOpen =
+  const projectSaveBlocked =
+    navigationBlocked && !activeWorkExitBlocked && projectSavePending && projectSession !== null;
+  const projectSaveFailed =
+    projectSaveBlocked && (projectSession.phase === 'conflict' || projectSession.phase === 'error');
+  const projectSaveInProgress = projectSaveBlocked && !projectSaveFailed;
+  const temporaryWorkPromptOpen =
     navigationBlocked &&
-    !projectContextChangeBlocked &&
     !activeWorkExitBlocked &&
+    !projectSaveInProgress &&
+    !projectSaveFailed &&
     hasDiscardableWork;
+  const projectDiscardConfirmationOpen = temporaryWorkPromptOpen && projectContextChangeBlocked;
+  const discardConfirmationOpen = temporaryWorkPromptOpen && !projectContextChangeBlocked;
   const activeWorkCopy = videoRenderingActive
     ? {
         title: 'Cancel the video render before leaving',
@@ -156,6 +244,47 @@ export const StudioExitGuard = ({
         }
       >
         <p>{activeWorkCopy.detail}</p>
+      </OverlayPanel>
+
+      <OverlayPanel
+        open={projectSaveInProgress}
+        onClose={stayInStudio}
+        title="Saving Project before leaving"
+        description="Lightframe is flushing the current semantic checkpoint before changing Project context."
+        placement="bottom"
+        size="standard"
+        closeOnBackdrop={false}
+        footer={
+          <Button onClick={stayInStudio}>
+            {projectContextChangeBlocked ? 'Stay in Project' : 'Stay in Studio'}
+          </Button>
+        }
+      >
+        <p role="status">Saving changes…</p>
+      </OverlayPanel>
+
+      <OverlayPanel
+        open={projectSaveFailed}
+        onClose={stayInStudio}
+        title={projectSession?.phase === 'conflict' ? 'Project save conflict' : 'Project not saved'}
+        description="The destination was not opened. Your local semantic proposal remains available in this Project."
+        placement="bottom"
+        size="standard"
+        closeOnBackdrop={false}
+        footer={
+          <>
+            <Button onClick={stayInStudio}>Stay in Project</Button>
+            <Button onClick={retrySaveAndLeave}>Reapply and leave</Button>
+            <Button variant="danger" onClick={discardAndLeave}>
+              Discard and leave
+            </Button>
+          </>
+        }
+      >
+        <p role="alert">
+          {projectSession?.message ??
+            'Project authority is unavailable. Retry the preserved proposal or explicitly discard it.'}
+        </p>
       </OverlayPanel>
 
       <ConfirmationDialog
