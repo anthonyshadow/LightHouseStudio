@@ -13,7 +13,6 @@ import {
   acceptProjectSource,
   ProjectRuleError,
   type ProjectAggregate,
-  type ProjectAssetLink,
   type ProjectConflict,
   type ProjectMediaReference,
   type ProjectSourceKind,
@@ -32,7 +31,7 @@ import type {
   ProjectRetentionPolicy,
   ProjectSourceRecord,
 } from './project-repository.js';
-import { publicProjectCurrent } from './project-service.js';
+import { projectAssetLinksForRevision, publicProjectCurrent } from './project-service.js';
 
 export type ProjectSourceMutationResult =
   | { readonly ok: true; readonly response: ProjectSourceResponse; readonly replayed: boolean }
@@ -114,23 +113,6 @@ const currentAggregate = (current: ProjectCurrentRead): ProjectAggregate => ({
   jobLinks: [],
   outputLinks: [],
 });
-
-const sourceAssetLinks = (
-  revision: ProjectCurrentRead['revision'],
-): readonly ProjectAssetLink[] => {
-  const roles: ProjectAssetLink['role'][] = ['source'];
-  if (revision.snapshot.workingMedia?.kind === 'asset') roles.push('working');
-  if (revision.snapshot.presentedMedia?.kind === 'asset') roles.push('presented');
-  return roles.map((role) => ({
-    projectId: revision.projectId,
-    ownerUserId: revision.ownerUserId,
-    assetId: revision.snapshot.sourceAssetId!,
-    role,
-    revisionId: revision.id,
-    revisionNumber: revision.revisionNumber,
-    createdAt: revision.createdAt,
-  }));
-};
 
 const versionMediaReference = (
   savedVideoId: string,
@@ -397,7 +379,7 @@ export class ProjectSourceService {
       expectedRevisionNumber: input.expectedRevisionNumber,
       nextProject: accepted.value.project,
       revision,
-      assetLinks: sourceAssetLinks(revision),
+      assetLinks: projectAssetLinksForRevision(revision),
       source,
     });
     if (persisted.kind === 'not-found') {

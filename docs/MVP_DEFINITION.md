@@ -1,7 +1,7 @@
 # Lightframe Studio Campaign and Project MVP definition
 
-**Status:** active MVP product target; objective criteria 1–4 organization/lifecycle foundations
-are implemented, while source/resume and later criteria remain sequenced work
+**Status:** active MVP product target; objective criteria 1–6 plus the bounded Project-session
+foundation are implemented, while creative integration and later criteria remain sequenced work
 
 **Defined:** 2026-08-11
 

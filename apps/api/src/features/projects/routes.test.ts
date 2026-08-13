@@ -122,6 +122,59 @@ describe('Project lifecycle routes', () => {
     expect(restored.json()).toMatchObject({ project: { status: 'draft', version: 4 } });
   });
 
+  it('checkpoints bounded session metadata, converges exact replay, and preserves CAS conflicts', async () => {
+    const app = localApp();
+    const created = (await create(app, 'Session checkpoint')).response;
+    const projectId = json<{ project: { id: string } }>(created).project.id;
+    const proposal = {
+      workflowPhase: 'creative',
+      liveMode: {
+        modeId: 'local',
+        captureFormat: 'landscape',
+        audioSource: 'local-microphone',
+      },
+    };
+    const checkpoint = () =>
+      app.inject({
+        method: 'POST',
+        url: `/api/projects/${projectId}/revisions`,
+        headers: { ...browserHeaders, 'content-type': 'application/json' },
+        payload: { expectedVersion: 1, expectedRevisionNumber: 1, proposal },
+      });
+
+    const saved = await checkpoint();
+    expect(saved.statusCode).toBe(200);
+    expect(saved.json()).toMatchObject({
+      project: { version: 2, currentRevisionNumber: 2 },
+      revision: { revisionNumber: 2, snapshot: proposal },
+    });
+
+    const exactReplay = await checkpoint();
+    expect(exactReplay.statusCode).toBe(200);
+    expect(exactReplay.json()).toEqual(saved.json());
+
+    const staleDifferent = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/revisions`,
+      headers: { ...browserHeaders, 'content-type': 'application/json' },
+      payload: {
+        expectedVersion: 1,
+        expectedRevisionNumber: 1,
+        proposal: { workflowPhase: 'review', liveMode: null },
+      },
+    });
+    expect(staleDifferent.statusCode).toBe(409);
+    expect(staleDifferent.json()).toMatchObject({
+      conflict: { kind: 'project-version', expectedVersion: 1, actualVersion: 2 },
+    });
+    const current = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(current.json()).toEqual(saved.json());
+  });
+
   it('accepts, replays, hydrates, and range-streams an inspected Project source', async () => {
     const app = localApp();
     const created = (await create(app, 'Durable source')).response;

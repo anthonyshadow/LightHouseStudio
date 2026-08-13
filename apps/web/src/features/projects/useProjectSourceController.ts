@@ -116,6 +116,7 @@ export const useProjectSourceController = (
   current: ProjectCurrentResponse,
   runtime: ProjectSourceRuntime,
   onActivityChange?: (activity: ProjectSourceActivity) => void,
+  onCurrentChange?: (current: ProjectCurrentResponse) => void,
 ) => {
   const queryClient = useQueryClient();
   const [phase, setPhase] = useState<ProjectSourcePhase>(
@@ -189,6 +190,7 @@ export const useProjectSourceController = (
         await presentAccepted(response, controller.signal);
         if (generation !== generationRef.current || !mountedRef.current) return;
         hydratedRevisionRef.current = response.revision.id;
+        onCurrentChange?.({ project: response.project, revision: response.revision });
         setSource(response.source);
         setPhase('saved');
       })
@@ -211,6 +213,7 @@ export const useProjectSourceController = (
     presentAccepted,
     projectId,
     runtime,
+    onCurrentChange,
   ]);
 
   const finishAcceptance = useCallback(
@@ -227,6 +230,7 @@ export const useProjectSourceController = (
         project: response.project,
         revision: response.revision,
       });
+      onCurrentChange?.({ project: response.project, revision: response.revision });
       await queryClient.invalidateQueries({ queryKey: projectQueryKeys.lists });
       if (previewFile === undefined) await presentAccepted(response, controller.signal);
       else runtime.present(projectId, artifactInput(previewFile, response.source));
@@ -237,7 +241,7 @@ export const useProjectSourceController = (
       setMessage(null);
       setPhase('saved');
     },
-    [presentAccepted, projectId, queryClient, runtime],
+    [onCurrentChange, presentAccepted, projectId, queryClient, runtime],
   );
 
   const operationKeyFor = useCallback((signature: string): string => {

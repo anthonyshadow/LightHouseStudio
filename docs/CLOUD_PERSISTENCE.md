@@ -33,6 +33,12 @@ account is not production identity or tenancy.
   Version reuse keeps the existing object and adds no duplicate byte object or output save target.
   Owner-checked metadata plus range/HEAD content remain application routes, never direct storage
   identity.
+- Project semantic checkpoints use the existing revision transaction in every authority mode.
+  The browser sends only workflow phase, explicit live-session metadata, and both CAS tokens;
+  server authority preserves immutable source/current media references and supplies timestamps.
+  Exact semantic replay converges without another revision, while a different stale write
+  conflicts. Prompt 07 adds no relational/local-format migration and activates no Project
+  IndexedDB store.
 - A schema-version-3 local Campaign/Project repository is authoritative in `local` and `shadow`.
   It uses one owner namespace/lock/journal, atomic primary/backup replacement, strict v1/v2→v3 startup
   migration, durable Campaign/Project create receipts, and a prepared source-acceptance envelope

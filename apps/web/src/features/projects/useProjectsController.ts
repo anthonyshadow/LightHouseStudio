@@ -1,5 +1,5 @@
 import type { ProjectContract, ProjectCurrentResponse } from '@studio/contracts';
-import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useCallback, useRef } from 'react';
 import {
   archiveProject,
@@ -36,12 +36,6 @@ export const useProjectList = (lifecycle: 'active' | 'archived', campaignId?: st
       }),
     initialPageParam: null as string | null,
     getNextPageParam: (page) => page.nextCursor,
-  });
-
-export const useProjectDetail = (projectId: string) =>
-  useQuery({
-    queryKey: projectQueryKeys.detail(projectId),
-    queryFn: ({ signal }) => getProject(projectId, signal),
   });
 
 export const useProjectsController = () => {
