@@ -99,7 +99,15 @@ export const primaryNavigationStyles = (theme: Theme): CSSObject => ({
     '& > button': { paddingInline: theme.space.sm, fontSize: theme.fontSizes.caption },
   },
   '@media (max-width: 22rem)': {
-    '& > button': { paddingInline: theme.space.xs },
+    flex: '1 1 auto',
+    minWidth: 0,
+    overflow: 'hidden',
+    '& > button': {
+      flex: '1 1 auto',
+      paddingInline: theme.space.xxs,
+      overflow: 'hidden',
+      textOverflow: 'ellipsis',
+    },
   },
 });
 
@@ -131,6 +139,7 @@ export const brandStyles = (theme: Theme): CSSObject => ({
     '& img': { width: '2.1rem', height: '2.1rem' },
     '& > div': { display: 'none' },
   },
+  '@media (max-width: 22rem)': { display: 'none' },
 });
 
 export const capabilityStyles = (theme: Theme): CSSObject => ({
