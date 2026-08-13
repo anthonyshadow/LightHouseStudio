@@ -10,7 +10,10 @@ import {
   type ProjectVersionReferenceLink,
 } from '@studio/domain';
 import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
-import type { ProjectSourceRecord } from '../../features/projects/project-repository.js';
+import type {
+  ProjectSourceRecord,
+  ProjectWorkingMediaRecord,
+} from '../../features/projects/project-repository.js';
 import { ProjectPersistenceError } from './project-persistence-errors.js';
 import type {
   projectAssets,
@@ -18,6 +21,7 @@ import type {
   projectOutputs,
   projectRevisions,
   projectSources,
+  projectWorkingMediaAdoptions,
   projectVersionReferences,
   projects,
 } from './schema.js';
@@ -29,6 +33,7 @@ type ProjectJobRow = typeof projectJobs.$inferSelect;
 type ProjectOutputRow = typeof projectOutputs.$inferSelect;
 type ProjectVersionReferenceRow = typeof projectVersionReferences.$inferSelect;
 type ProjectSourceRow = typeof projectSources.$inferSelect;
+type ProjectWorkingMediaRow = typeof projectWorkingMediaAdoptions.$inferSelect;
 
 const toRevisionAuthor = (row: ProjectRevisionRow): ProjectRevisionAuthor => {
   switch (row.authorKind) {
@@ -42,7 +47,7 @@ const toRevisionAuthor = (row: ProjectRevisionRow): ProjectRevisionAuthor => {
 };
 
 export const parseSnapshot = (schemaVersion: number, snapshot: unknown): ProjectSnapshot => {
-  if (schemaVersion !== PROJECT_SNAPSHOT_SCHEMA_VERSION) {
+  if (schemaVersion !== 1 && schemaVersion !== PROJECT_SNAPSHOT_SCHEMA_VERSION) {
     throw new ProjectPersistenceError(
       'invalid-aggregate',
       'The stored Project snapshot version is unsupported.',
@@ -110,6 +115,66 @@ export const toProjectSource = (row: ProjectSourceRow): ProjectSourceRecord => (
   height: row.height,
   hasAudio: row.hasAudio,
   acceptedAt: toIsoTimestamp(row.acceptedAt),
+});
+
+export const toProjectWorkingMedia = (row: ProjectWorkingMediaRow): ProjectWorkingMediaRecord => ({
+  projectId: row.projectId,
+  ownerUserId: row.ownerUserId,
+  kind: row.kind as ProjectWorkingMediaRecord['kind'],
+  mediaReference:
+    row.kind === 'saved-video-version'
+      ? {
+          kind: 'saved-video-version',
+          savedVideoId: row.savedVideoId!,
+          videoVersionId: row.videoVersionId!,
+        }
+      : { kind: 'asset', assetId: row.assetId },
+  assetId: row.assetId,
+  savedVideoId: row.savedVideoId,
+  videoVersionId: row.videoVersionId,
+  adoptedRevisionId: row.adoptedRevisionId,
+  adoptedRevisionNumber: row.adoptedRevisionNumber,
+  operationKey: row.operationKey,
+  requestFingerprint: row.requestFingerprint,
+  mimeType: row.mimeType as ProjectWorkingMediaRecord['mimeType'],
+  filename: row.filename,
+  sizeBytes: row.sizeBytes,
+  checksumSha256: row.checksumSha256,
+  container: row.container as ProjectWorkingMediaRecord['container'],
+  videoCodec: row.videoCodec as ProjectWorkingMediaRecord['videoCodec'],
+  audioCodec: row.audioCodec,
+  durationMs: row.durationMs,
+  width: row.width,
+  height: row.height,
+  hasAudio: row.hasAudio,
+  adoptedAt: toIsoTimestamp(row.adoptedAt),
+});
+
+export const projectWorkingMediaValues = (
+  media: ProjectWorkingMediaRecord,
+): typeof projectWorkingMediaAdoptions.$inferInsert => ({
+  projectId: media.projectId,
+  ownerUserId: media.ownerUserId,
+  kind: media.kind,
+  assetId: media.assetId,
+  savedVideoId: media.savedVideoId,
+  videoVersionId: media.videoVersionId,
+  adoptedRevisionId: media.adoptedRevisionId,
+  adoptedRevisionNumber: media.adoptedRevisionNumber,
+  operationKey: media.operationKey,
+  requestFingerprint: media.requestFingerprint,
+  mimeType: media.mimeType,
+  filename: media.filename,
+  sizeBytes: media.sizeBytes,
+  checksumSha256: media.checksumSha256,
+  container: media.container,
+  videoCodec: media.videoCodec,
+  audioCodec: media.audioCodec,
+  durationMs: media.durationMs,
+  width: media.width,
+  height: media.height,
+  hasAudio: media.hasAudio,
+  adoptedAt: toIsoTimestamp(media.adoptedAt),
 });
 
 export const mapProjectAggregate = (
@@ -222,45 +287,6 @@ export const assetLinkValues = (link: ProjectAssetLink): typeof projectAssets.$i
   revisionNumber: link.revisionNumber,
   createdAt: toIsoTimestamp(link.createdAt),
 });
-
-export const snapshotAssetLinks = (
-  revision: ProjectRevision,
-): readonly Readonly<{ assetId: string; role: ProjectAssetLink['role'] }>[] => {
-  const links: { assetId: string; role: ProjectAssetLink['role'] }[] = [];
-  if (revision.snapshot.sourceAssetId !== null) {
-    links.push({ assetId: revision.snapshot.sourceAssetId, role: 'source' });
-  }
-  if (revision.snapshot.workingMedia?.kind === 'asset') {
-    links.push({ assetId: revision.snapshot.workingMedia.assetId, role: 'working' });
-  }
-  if (revision.snapshot.presentedMedia?.kind === 'asset') {
-    links.push({ assetId: revision.snapshot.presentedMedia.assetId, role: 'presented' });
-  }
-  return links;
-};
-
-export const snapshotVersionReferenceLinks = (
-  revision: ProjectRevision,
-): readonly ProjectVersionReferenceLink[] => {
-  const links: ProjectVersionReferenceLink[] = [];
-  for (const [role, reference] of [
-    ['working', revision.snapshot.workingMedia],
-    ['presented', revision.snapshot.presentedMedia],
-  ] as const) {
-    if (reference?.kind !== 'saved-video-version') continue;
-    links.push({
-      projectId: revision.projectId,
-      ownerUserId: revision.ownerUserId,
-      savedVideoId: reference.savedVideoId,
-      videoVersionId: reference.videoVersionId,
-      role,
-      revisionId: revision.id,
-      revisionNumber: revision.revisionNumber,
-      createdAt: revision.createdAt,
-    });
-  }
-  return links;
-};
 
 export const versionReferenceValues = (
   link: ProjectVersionReferenceLink,

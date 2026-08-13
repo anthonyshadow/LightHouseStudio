@@ -1,7 +1,7 @@
 # PostgreSQL, Neon, Drizzle, and Cloudflare R2
 
 **Status:** implemented, configuration-gated infrastructure; local remains the default  
-**Reviewed:** 2026-08-12
+**Reviewed:** 2026-08-13
 
 This is the canonical setup, migration, rollback, and limitation guide for cloud persistence. It
 does not authorize public exposure: Elysia on Bun still binds only to `127.0.0.1`, and the seeded demo
@@ -21,7 +21,7 @@ account is not production identity or tenancy.
   `@neondatabase/serverless` remains an intentional production-integration dependency even though
   the current repository connection is the shared Drizzle/`node-postgres` adapter.
 - An authoritative `postgres`/`neon` Project repository with a Project-version CAS, monotonic
-  immutable revision history, validated snapshot V1, same-owner composite foreign keys, and
+  immutable revision history, validated snapshot V2 with an explicit V1 read migration, same-owner composite foreign keys, and
   normalized revision-scoped asset/used-Version links plus one initiating revision per job and one
   producing revision per output Version. Exact replay is idempotent; changed replay conflicts.
   Snapshot Versions require an active same-owner Saved Video and exact Version at link time, output
@@ -36,15 +36,21 @@ account is not production identity or tenancy.
   Owner-checked metadata plus range/HEAD content remain application routes, never direct storage
   identity.
 - Project semantic checkpoints use the existing revision transaction in every authority mode.
-  The browser sends only workflow phase, explicit live-session metadata, and both CAS tokens;
-  server authority preserves immutable source/current media references and supplies timestamps.
-  Exact semantic replay converges without another revision, while a different stale write
-  conflicts. Prompt 07 adds no relational/local-format migration and activates no Project
-  IndexedDB store.
-- A schema-version-3 local Campaign/Project repository is authoritative in `local` and `shadow`.
-  It uses one owner namespace/lock/journal, atomic primary/backup replacement, strict v1/v2→v3 startup
-  migration, durable Campaign/Project create receipts, and a prepared source-acceptance envelope
-  that reconciles metadata after interruption. `shadow` does not make Drizzle
+  The browser sends one bounded proposal containing workflow phase, live metadata, exact applied
+  creative resource IDs/labels/revisions/settings, one visual treatment, optional Voice, intent,
+  validated local edit, and both CAS tokens. Server authority preserves immutable source/current
+  media references and supplies timestamps. Exact semantic replay converges without another
+  revision, while a different stale write conflicts. No Project IndexedDB store is activated.
+- Project working-media adoption uses additive migration `0018`, which admits snapshot v2 and adds
+  one owner-scoped operation receipt/adoption row tied to the exact Project revision and retained
+  media asset or Saved Video Version. Local renders are durably stored, checksummed, inspected, and
+  attached in the revision transaction. Exact retained media is reused without copying bytes.
+  Exact replay returns the original revision; changed media/edit/base tokens conflict. The source
+  row and source asset remain unchanged, and no output or Add Version relation is created.
+- A schema-version-4 local Campaign/Project repository is authoritative in `local` and `shadow`.
+  It uses one owner namespace/lock/journal, atomic primary/backup replacement, strict v1/v2/v3→v4
+  startup migration, durable operation receipts, and prepared source-acceptance/working-media
+  envelopes that reconcile metadata after interruption. `shadow` does not make Drizzle
   Campaign/Project tables authoritative or claim their replication.
 - A private R2 `AssetByteStore` with opaque keys, streaming/multipart upload, app-owned SHA-256,
   byte-range reads, owner checks, database lifecycle states, multipart abort/cleanup, and deletion
@@ -64,6 +70,9 @@ account is not production identity or tenancy.
 - Additive migration `0017` adds only `processing_jobs(status, expires_at)` and
   `reference_images(updated_at)` indexes for expiry/activity scans. It rewrites no application
   records and is not applied automatically to production.
+- Additive migration `0018` changes the Project snapshot-version check from V1-only to V1/V2 and
+  creates the working-media adoption authority. It does not rewrite existing Project snapshots or
+  copy media bytes and is not applied automatically to production.
 - Restart recovery for provider jobs that already have a durable provider job ID. A restart never
   repeats an initial billable submission. Interrupted submissions without a durable provider ID
   become ambiguous; pre-submission work becomes failed and requires another explicit request.
@@ -230,9 +239,11 @@ verification, lifecycle, or cleanup contracts above.
   Additive migration `0015` adds only active/archived Campaign-membership Project list indexes.
   Older compatible code ignores the new tables/column, but dropping Campaign receipts loses
   replay history and dropping membership requires every Project to be detached first. Do not
-  remove these objects as an automatic rollback. Local schema v2 is not readable by the old v1
-  parser; downgrade requires restoring a verified pre-upgrade metadata backup or deploying
-  compatible reader code, never ad hoc field stripping.
+  remove these objects as an automatic rollback. Additive migration `0016` owns immutable Project
+  source rows; `0018` owns snapshot-v2 admission and working-media adoption receipts. Dropping
+  either would discard replay/lineage authority and is not an automatic rollback. Local schema v4
+  is not readable by older parsers; downgrade requires restoring a verified pre-upgrade metadata
+  backup or deploying compatible reader code, never ad hoc field stripping.
 
 ## Operational checks before any non-loopback deployment
 

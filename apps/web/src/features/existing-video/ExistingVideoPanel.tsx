@@ -60,6 +60,7 @@ type ExistingVideoPanelProps = {
   readonly recordingSupported?: boolean;
   readonly onRecordVideo?: () => void;
   readonly onAdjustVideo?: () => void;
+  readonly providerStartBlockedReason?: string;
 };
 
 const initialActiveTool = (workflow: ExistingVideoWorkflow): ExistingVideoToolId | null =>
@@ -81,6 +82,7 @@ export const ExistingVideoPanel = ({
   recordingSupported = false,
   onRecordVideo,
   onAdjustVideo,
+  providerStartBlockedReason,
 }: ExistingVideoPanelProps) => {
   const theme = useTheme();
   const visualCapabilities: CapabilitiesResponse['videoProcessing'] =
@@ -488,6 +490,7 @@ export const ExistingVideoPanel = ({
         }}
         onRequestDiscard={() => setDiscardConfirmationOpen(true)}
         discardButtonRef={discardButtonRef}
+        {...(providerStartBlockedReason ? { providerStartBlockedReason } : {})}
       />
 
       <input

@@ -39,6 +39,18 @@ a provider, and replace the immutable source only after a validated export and e
     naming prompt. If the source was loaded from Saved Videos, the secondary confirmed Replace
     Existing action appends an immutable version using the captured saved video/version lineage.
 
+### Project working-media path
+
+In an open source-bearing Project, the editor uses the same stage, normalized `VideoEditSpec`,
+grouped history, and worker, but the primary action is **Render preview**. The validated candidate
+remains temporary and does not replace the source. **Adopt as working media** flushes the one
+Project session, durably stores/inspects/checksums the candidate, and CAS-appends its exact edit plus
+working/presented reference. Success closes the editor only after server acceptance and reports
+that no Saved Video or Version was created. Conflict/failure preserves the candidate for retry.
+Refresh hydrates adopted working media while the first accepted original remains immutable. The
+applied edit is shown as a historical baseline; new controls start neutral over already-rendered
+bytes so prior changes are not applied twice.
+
 ## Validation and compatibility
 
 - Preview and export use the same WebGL color shader; the editor never depends on
@@ -65,8 +77,9 @@ a provider, and replace the immutable source only after a validated export and e
   route exit and must be cancelled explicitly before discard.
 - Discard, cancellation, render or validation failure, failed replacement, and stale completion
   never publish or revoke the prior artifact. The draft remains available after recoverable errors.
-- Editing is browser-session-only. Refresh, crash, tab closure, or device restart does not recover
-  the draft or candidate.
+- Editing drafts and candidates are browser-session-only. Refresh, crash, tab closure, or device
+  restart does not recover them. A successfully adopted Project candidate is no longer a candidate:
+  its ready bytes, exact spec, and revision rehydrate from Project authority.
 
 ## Evidence status
 

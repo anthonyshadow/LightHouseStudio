@@ -17,8 +17,9 @@ current-state qualifications:
 - Campaign is a deliberately lightweight optional organizer with name, optional brief, lifecycle,
   version CAS, and non-cascading Project membership.
 - Project has domain rules, contracts, local and relational authority, authenticated lifecycle and
-  immutable-source APIs, and browser lifecycle/source UI. Snapshot v1 is video-oriented by design;
-  durable source resume is implemented, while creative-session autosave is not.
+  immutable-source/working-media APIs, and browser lifecycle/source UI. Snapshot v2 is
+  video-oriented by design; durable source and current working-media resume plus explicit creative
+  checkpoints are implemented, while provider-backed Project processing and output save are not.
 
 One Campaign may group multiple Projects, while a Project represents a focused resumable production
 effort and may remain independent. Campaign never owns Project/media processing state. Multi-format support
@@ -200,8 +201,8 @@ Character Builder is fullscreen and uses one preview/generation DOM.
 Narrow screens reveal that same region through **Review & Generate** instead of duplicating
 stateful controls.
 
-`StudioExitGuard` blocks navigation leaving `/studio` while recording, finalization, or local video
-render/validation is active. A temporary take, active Voice process, dirty video-edit draft, or
+`StudioExitGuard` blocks navigation leaving `/studio` while recording, finalization, local video
+render/validation, or Project working-media adoption is active. A temporary take, active Voice process, dirty video-edit draft, or
 dirty Shelf or Outfit Builder form requires confirmed discard before the route proceeds. Rendering
 must be cancelled before discard; navigation cannot abandon the worker. A URL-owned Project
 session removes the prior blanket exemption for `/studio/*` navigation: changing Project identity
@@ -527,13 +528,16 @@ synthetic row. Campaign archive leaves Projects unchanged and rejects new member
 requires an archived Campaign with zero attached active or archived Projects and never deletes
 Project, revision, job, output, resource, or media data.
 
-Every Project starts with an immutable revision 1, including an empty named Project. Snapshot V1
-stores only validated creative intent and durable IDs: source and working/presented media,
-Character/Variant, Outfit and Voice selections, one Character Swap or VTO choice, relevant live
-metadata, prompt/recipe and authored intent, local edit/export specifications, last output, and
-workflow phase. Media bytes, Blob/object URLs, provider credentials/bodies/locations, and browser or
-React state are excluded. A source-bearing Project is resumable only after the same-owner media
-asset is `ready` in the configured durable byte store.
+Every Project starts with an immutable revision 1, including an empty named Project. Snapshot V2
+stores validated creative intent and durable IDs: source and working/presented media, exact applied
+Character/Variant and Outfit labels/revisions/reference IDs, Voice settings, one Character Swap or
+VTO choice, relevant live metadata, prompt/recipe labels and applied prompt/revision, the validated
+`VideoEditSpec`, export specification, last output, and workflow phase. The explicit V1 read
+migration maps missing applied provenance to `null`; it never fabricates labels, revisions, prompts,
+or references. Media bytes, Blob/object URLs, provider credentials/bodies/locations, mutable
+creative-library records, undo history, render candidates, and browser or React state are excluded.
+A source-bearing Project is resumable only after the same-owner media asset is `ready` in the
+configured durable byte store.
 
 The first accepted Project source is immutable for MVP. Upload and finalized-recording commands
 store an owner-bound ready asset, server-computed checksum, inspected video metadata, source record,
@@ -543,14 +547,14 @@ the used-by relationship does not claim Project production and does not select a
 target. Authenticated metadata and byte-range/HEAD content routes expose only normalized metadata
 and a controlled relative content URL, never storage keys, paths, checksums, or provider bodies.
 
-Snapshot V1 remains deliberately video-specific: its local edit type and MP4 export specification
+Snapshot V2 remains deliberately video-specific: its local edit type and MP4 export specification
 are not a generic multi-format asset contract. Supporting images, graphics, or another content type
 requires a new validated snapshot version or a separately owned workflow payload, plus migration
 and unknown-version behavior; documentation terminology alone cannot broaden this schema safely.
 
 `projects.version` is the aggregate compare-and-swap token. Revision append also compares the
 current revision number, locks the Project, verifies the linear parent, strictly parses/canonicalizes
-snapshot v1, and validates exact same-owner ready assets and active Saved Video Versions. Direct
+snapshot v2, and validates exact same-owner ready assets and active Saved Video Versions. Direct
 asset and used-by Version links are revision-scoped. Job links keep one immutable initiating
 revision; output links keep one immutable producing revision per Video Version. Later reuse is a
 used-by relation, not another producer. Exact link replay is idempotent and a changed replay is a
@@ -566,6 +570,16 @@ reference-image cleanup, and the generic relational byte deletion claim. Direct 
 used-by Version links, and produced outputs retain bytes for active, archived, and tombstoned
 Projects. Physical Project purge remains undefined.
 
+The owner-derived **Adopt Project Working Media** command accepts either a validated local render
+whose durable bytes were inspected and checksummed or an exact same-owner ready Media Asset/Saved
+Video Version. It flushes the Project session, uses Project/revision CAS plus an operation-key
+fingerprint, appends normalized working/presented lineage and the exact local edit, clears obsolete
+output status, and never changes `sourceAssetId`, chooses an Add Version target, or adds produced-by
+provenance. Exact replay returns the original adoption revision; changing media, edit, or base
+tokens under the key conflicts. A Render preview remains worker-owned and temporary until this
+command succeeds. The creator aborts or releases failures and consults Project retention before
+deleting any staged durable bytes.
+
 The browser treats TanStack Query/controller state only as an owner-scoped cache. Active and
 archived summary lists are separately bounded and never request snapshots or media. Project detail
 requests current summary/revision only. Quick Start sends `Untitled Project` with an app-owned UUID
@@ -579,28 +593,36 @@ isolates late completion.
 
 One feature-local Project session controller owns URL-derived detail hydration, the current server
 base, a typed semantic proposal, a 750 ms bounded coalescing timer, Project/revision CAS, and flush.
-Prompt 07 permits only workflow phase and explicit live-session metadata in that proposal; source,
-working, and presented media remain copied from server authority and continue through their
-existing command/lifecycle owners. A same-semantic response-loss replay returns current authority
-without appending another revision. A different stale CAS preserves the proposal, fetches current
-authority, and waits for explicit reapply or discard; there is no collaborative merge. The
-controller publishes a narrow proposal/flush/retry/discard port to `StudioApp` and delegates fresh
-source Blobs to the existing recording-artifact owner. Active Project identity exists only in
-`/studio/projects/:projectId`; global-library URLs are explicit guarded exits. No dormant IndexedDB
-Project store is activated, so only the current tab retains an unsaved proposal and confirmed
-reload/crash may discard it.
+Feature-local creative adapters publish explicit semantic checkpoints for applied reusable
+resources, one visual treatment, optional Voice, live metadata, intent, and local edit; they never
+append per keystroke, frame, slider tick, or undo entry and never become a second session. Source,
+working, and presented media remain copied from server authority and change only through their
+existing commands. Hydration validates reusable records through the owner-scoped creative store;
+saved Voices use a minimal app-owned relationship read that derives the owner from authentication
+and never contacts ElevenLabs. A missing, tombstoned, wrong-owner, or changed record does not fail
+the Project or reveal cross-owner existence: historical applied labels/prompt/reference/settings
+remain explanatory and the UI offers **Choose another**. A same-semantic response-loss replay returns current authority without
+appending another revision. A different stale CAS preserves the proposal, fetches current authority,
+and waits for explicit reapply or discard; there is no collaborative merge. The controller
+publishes a narrow proposal/flush/retry/discard port to `StudioApp` and delegates fresh source and
+working-media Blobs to the existing recording-artifact owner. Active Project identity exists only
+in `/studio/projects/:projectId`; global-library URLs are explicit guarded exits. No dormant
+IndexedDB Project store is activated, so only the current tab retains an unsaved proposal and
+confirmed reload/crash may discard it. Project provider-backed Starts are composition-gated until
+recoverable processing UX exists; configuration makes no provider request.
 
 `local` and `shadow` use one owner-namespaced Campaign/Project metadata file as authority. Schema
-version 3 migrates v1 Projects to null membership, preserves v2 Campaigns/receipts, and adds an
-explicit nullable immutable-source record without inferring a source. It is atomically replaced
-with a validated backup. Create, membership, and
-source-acceptance mutations publish a
+version 4 explicitly migrates v1/v2/v3 metadata, preserves Campaigns/receipts and immutable source,
+and adds working-media adoption records plus prepared-journal replay without inferring media or
+applied provenance. It is atomically replaced with a validated backup. Create, membership,
+source-acceptance, and working-media-adoption mutations publish a
 versioned prepared journal containing the next metadata and owner-scoped operation receipt;
 startup either observes the committed receipt or reconciles that journal before serving reads.
 The owner lock serializes local metadata changes. Exact create replay returns the original Project,
 while reuse of an `Idempotency-Key` with a different normalized request is a typed conflict. The
-shared owner lock/journal makes Campaign create, Project membership, and source acceptance atomic without a second
-transaction mechanism; it remains a metadata mechanism, not a general event system.
+shared owner lock/journal makes Campaign create, Project membership, source acceptance, and
+working-media adoption atomic without a second transaction mechanism; it remains a metadata
+mechanism, not a general event system.
 
 Persistence representation is kept adjacent but separate from transaction mechanics. The local
 repository delegates strict schema evolution and prepared-journal parsing to its persistence-schema
@@ -621,20 +643,22 @@ receipts, nullable Project membership, lifecycle/list checks/indexes, and a rest
 same-owner foreign key. Existing Projects remain unassigned. Additive migration `0015` adds the
 active/archived Campaign-membership list indexes used by grouped Project views.
 Additive migration `0016` adds the one-row-per-Project inspected source authority, exact owner/
-revision/asset/Version foreign keys, and owner-scoped operation-key uniqueness. See
+revision/asset/Version foreign keys, and owner-scoped operation-key uniqueness. Additive migration
+`0018` permits snapshot schema v2 and adds the owner-scoped working-media adoption table with exact
+revision/media/edit fingerprint replay. See
 [ADR 0002](decisions/0002-durable-project-aggregate.md).
 
 ## Persistence
 
-| Store                       | Data                                                                                                                                                                           | Lifetime and trust boundary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
-| --------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Recipe Shelf IndexedDB      | Environment-and-user-namespaced v7 prompt, character, outfit, wardrobe metadata, voice preferences, and opaque asset IDs                                                       | The `idb` adapter stores owner-scoped logical records and indexes in strict transactions. Production alone migrates pre-separation browser keys and may initialize an empty remote library from that browser copy. Development treats local PostgreSQL as authoritative on startup, including when empty. Later changes synchronize through an owner-derived revision CAS; divergence pauses sync and preserves the browser copy. Never stores media bytes or credentials.                                                                                                                                                                                                                                                                                                                                                                                    |
-| Character Builder IndexedDB | Environment-and-user-scoped resumable draft and save journal                                                                                                                   | Compare-and-swap autosave prevents duplicate save/preload after retry or reload. Drafts remain device-local, production alone retains access to the pre-separation database name, and development starts in a distinct database.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
-| Local persistence           | Campaign/Project metadata and create/source journals, Project source assets, saved-video aggregates/versions, thumbnails, references, saved voices, and safe processing traces | Default `local` authority under `LIGHTFRAME_DATA_DIR`; Campaign/Project and saved-video metadata use versioned owner namespaces, atomic publication, validated recovery, durable idempotent receipts, and owner checks. `shadow` retains local Campaign/Project authority. Accepted source bytes are separate private assets and remain protected by Project retention. Sessions are process-memory.                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| PostgreSQL / Neon           | Users/credentials, sessions, Campaigns, Projects/revisions/relationships, videos/versions/receipts, voices, references, creative records, jobs, media lifecycle, and outbox    | Standard `node-postgres` transport supports Docker PostgreSQL in authoritative `postgres` development and Neon in `shadow`/`neon` production. Neon URLs explicitly require TLS through `sslmode=require`, `verify-ca`, or `verify-full`. Transactions protect Campaign/Project CAS and membership, Project revision append, exact link replay, byte-deletion claims, video version append, and creative revision replacement. Campaign/Project persistence is not authoritative in `shadow`.                                                                                                                                                                                                                                                                                                                                                                  |
-| Cloudflare R2               | Private video, thumbnail, and reference bytes selected through `AssetByteStore`                                                                                                | Opaque app keys, server-mediated range reads, SHA-256 verification, multipart abort, and database pending/ready/deleting/deleted states. Authoritative PostgreSQL/R2 and Neon/R2 Saved Video writes use owner-scoped one-hour staged rows and five-minute exact-part presigned URLs; only the browser-to-R2 part PUT bypasses the API. The API verifies object metadata, bounded bytes, checksum, and media structure before registration and attachment. Deletion claims the persisted provider/key identity and interrupted cleanup remains retryable. Provider, account, bucket, or prefix changes require a reviewed migration. Unsaved references remain subject to relationship-safe discard and 24-hour inactive-orphan cleanup. Credentials remain server-only; bucket, key, and provider multipart scope appear only inside short-lived signed URLs. |
-| Session memory              | Auth snapshot, URL-owned Project proposal/base token, streams, tokens, files, direct-import outfit recents, device IDs, takes, and sidecars                                    | JWT remains only in the HTTP-only cookie. The bounded Project proposal contains only workflow/live-session metadata and is cleared after server save, explicit discard, Project exit, logout, or tab close; it is never browser authority. Other state is cleaned on auth change, replacement, release/discard, unmount, or tab close as applicable.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
-| Video-job temp root         | Streamed input/reference and inspected provider output                                                                                                                         | Process-temporary. Accepted provider jobs can resume status/retrieval from Neon after restart, but input is purged and an unconfirmed submission is never repeated. The fixed accepted-at-plus-60-minute deadline remains authoritative.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| Store                       | Data                                                                                                                                                                                                                  | Lifetime and trust boundary                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                   |
+| --------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Recipe Shelf IndexedDB      | Environment-and-user-namespaced v7 prompt, character, outfit, wardrobe metadata, voice preferences, and opaque asset IDs                                                                                              | The `idb` adapter stores owner-scoped logical records and indexes in strict transactions. Production alone migrates pre-separation browser keys and may initialize an empty remote library from that browser copy. Development treats local PostgreSQL as authoritative on startup, including when empty. Later changes synchronize through an owner-derived revision CAS; divergence pauses sync and preserves the browser copy. Never stores media bytes or credentials.                                                                                                                                                                                                                                                                                                                                                                                    |
+| Character Builder IndexedDB | Environment-and-user-scoped resumable draft and save journal                                                                                                                                                          | Compare-and-swap autosave prevents duplicate save/preload after retry or reload. Drafts remain device-local, production alone retains access to the pre-separation database name, and development starts in a distinct database.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| Local persistence           | Campaign/Project metadata and create/source/working-media journals, Project source and adopted local-render assets, saved-video aggregates/versions, thumbnails, references, saved voices, and safe processing traces | Default `local` authority under `LIGHTFRAME_DATA_DIR`; Campaign/Project and saved-video metadata use versioned owner namespaces, atomic publication, validated recovery, durable idempotent receipts, and owner checks. `shadow` retains local Campaign/Project authority. Accepted source and adopted working-media bytes are separate private assets protected by Project retention. Sessions and unadopted render candidates are process/tab memory.                                                                                                                                                                                                                                                                                                                                                                                                       |
+| PostgreSQL / Neon           | Users/credentials, sessions, Campaigns, Projects/revisions/relationships, videos/versions/receipts, voices, references, creative records, jobs, media lifecycle, and outbox                                           | Standard `node-postgres` transport supports Docker PostgreSQL in authoritative `postgres` development and Neon in `shadow`/`neon` production. Neon URLs explicitly require TLS through `sslmode=require`, `verify-ca`, or `verify-full`. Transactions protect Campaign/Project CAS and membership, Project revision append, exact link replay, byte-deletion claims, video version append, and creative revision replacement. Campaign/Project persistence is not authoritative in `shadow`.                                                                                                                                                                                                                                                                                                                                                                  |
+| Cloudflare R2               | Private video, thumbnail, and reference bytes selected through `AssetByteStore`                                                                                                                                       | Opaque app keys, server-mediated range reads, SHA-256 verification, multipart abort, and database pending/ready/deleting/deleted states. Authoritative PostgreSQL/R2 and Neon/R2 Saved Video writes use owner-scoped one-hour staged rows and five-minute exact-part presigned URLs; only the browser-to-R2 part PUT bypasses the API. The API verifies object metadata, bounded bytes, checksum, and media structure before registration and attachment. Deletion claims the persisted provider/key identity and interrupted cleanup remains retryable. Provider, account, bucket, or prefix changes require a reviewed migration. Unsaved references remain subject to relationship-safe discard and 24-hour inactive-orphan cleanup. Credentials remain server-only; bucket, key, and provider multipart scope appear only inside short-lived signed URLs. |
+| Session memory              | Auth snapshot, URL-owned Project semantic proposal/base token, edit history/candidate, streams, tokens, files, direct-import outfit recents, device IDs, takes, and sidecars                                          | JWT remains only in the HTTP-only cookie. The bounded Project proposal contains validated creative/live/edit values but no bytes, mutable records, or provider state; it is cleared after server save, explicit discard, Project exit, logout, or tab close and is never browser authority. Render candidates remain creator-owned until explicit adoption. Other state is cleaned on auth change, replacement, release/discard, unmount, or tab close as applicable.                                                                                                                                                                                                                                                                                                                                                                                         |
+| Video-job temp root         | Streamed input/reference and inspected provider output                                                                                                                                                                | Process-temporary. Accepted provider jobs can resume status/retrieval from Neon after restart, but input is purged and an unconfirmed submission is never repeated. The fixed accepted-at-plus-60-minute deadline remains authoritative.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                      |
 
 Browser storage is untrusted, schema-migrated, and user-namespaced. Opaque IDs, provenance, and
 timestamps are preserved. The filesystem store uses atomic publication and never exposes internal paths,
@@ -692,7 +716,8 @@ shape, provider and application timeouts remain the fail-safe.
 Browsers may omit `Origin` on same-origin `GET`
 requests, so provider reads accept an exact loopback `Origin` or referrer, or browser
 `Sec-Fetch-Site: same-origin`; their explicit provider-intent header remains mandatory. ElevenLabs
-provider-contact routes require `X-Lightframe-Provider-Intent: voice`; visual batch routes require
+provider-contact routes require `X-Lightframe-Provider-Intent: voice`; the authenticated saved-Voice
+relationship read is app-owned and requires neither provider intent nor provider contact. Visual batch routes require
 `X-Lightframe-Provider-Intent: video`; remote reference import requires
 `X-Lightframe-Provider-Intent: reference-image-import`; Pruna Wardrobe generation requires the
 independent `X-Lightframe-Provider-Intent: wardrobe`. Responses are `no-store`.
@@ -734,6 +759,7 @@ provider path and never causes provider fallback.
 | Creative library            | `GET/PUT /api/creative-library` with an owner-derived revision compare-and-swap when Neon is authoritative                                                                                                                                                                                                                                                                                |
 | Reference optimization/work | `POST /api/reference-images/optimize`, `POST /api/reference-images`, `POST /api/reference-images/import`, `POST /api/reference-images/:sourceAssetId/edits`, `POST /api/reference-images/:sourceAssetId/compositions`, `POST /api/reference-images/:sourceAssetId/outfit-try-ons`                                                                                                         |
 | Reference asset lifecycle   | `POST /api/reference-images/uploads`, `GET /api/reference-images/:assetId`, `GET /api/reference-images/:assetId/content`, trusted-origin `DELETE /api/reference-images/:assetId`                                                                                                                                                                                                          |
+| Saved-Voice relationship    | Authenticated `GET /api/elevenlabs/voices/:voiceId/relationship`; returns only the submitted ID and current owner's saved boolean without provider contact                                                                                                                                                                                                                                |
 | ElevenLabs                  | `GET /api/elevenlabs/voices`, `GET /api/elevenlabs/voices/:voiceId/preview`, `DELETE /api/elevenlabs/voices/:voiceId`, `GET /api/elevenlabs/shared-voices`, `GET /api/elevenlabs/shared-voices/:publicOwnerId/:voiceId/preview`, `POST /api/elevenlabs/shared-voices/:publicOwnerId/:voiceId/save`, `POST /api/elevenlabs/voice-changer/recording`                                        |
 
 Capabilities report configuration presence only. The backend has one configured demo user and no

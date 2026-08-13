@@ -69,3 +69,9 @@ authoritative persistence when configured.
   keeps its conservative retention policy.
 - In browser fullscreen, the video fills the viewport and the bottom tool and capture rails are
   hidden. Any panel triggered from the stage overlays the video.
+- Project selection uses this same owner-scoped repository and hydration path; Project does not
+  copy Shelf records or become their persistence/cleanup owner. An explicit Project checkpoint
+  retains only stable IDs and the exact applied labels/revisions/prompt/reference/settings needed
+  to explain history. A missing, tombstoned, wrong-owner, or changed record is reported generically
+  with its historical label and **Choose another**, without revealing cross-owner existence or
+  failing the Project source.

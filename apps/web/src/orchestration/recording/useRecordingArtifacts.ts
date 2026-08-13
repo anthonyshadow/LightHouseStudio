@@ -95,6 +95,20 @@ export const useRecordingArtifacts = () => {
     [publishOriginal],
   );
 
+  const completeSourceValidation = useCallback(
+    (input: RestorePersistedOriginalInput): RecordingArtifact => {
+      const current = stateRef.current;
+      if (
+        current.processingState !== 'processing' ||
+        current.processingOperation?.kind !== 'source-validation'
+      ) {
+        throw new Error('No owned source validation is ready to complete.');
+      }
+      return restorePersistedOriginal(input);
+    },
+    [restorePersistedOriginal],
+  );
+
   const discardArtifacts = useCallback(() => {
     repairedPlaybackArtifactIdRef.current = null;
     transition({ type: 'discard' });
@@ -257,6 +271,7 @@ export const useRecordingArtifacts = () => {
       originalRef,
       publishOriginal,
       restorePersistedOriginal,
+      completeSourceValidation,
       discardArtifacts,
       markSidecarRecording,
       failSidecar,
@@ -275,6 +290,7 @@ export const useRecordingArtifacts = () => {
       state,
       publishOriginal,
       restorePersistedOriginal,
+      completeSourceValidation,
       discardArtifacts,
       markSidecarRecording,
       failSidecar,

@@ -8,6 +8,7 @@ import {
   VOICE_CONVERSION_CONTENT_TYPES,
   VOICE_CONVERSION_MAX_BYTES,
   workspaceVoiceParamsSchema,
+  workspaceVoiceRelationshipResponseSchema,
   workspaceVoicesQuerySchema,
   workspaceVoicesResponseSchema,
 } from '@studio/contracts';
@@ -27,6 +28,7 @@ import {
   withRequestLifetime,
 } from '../../http/streaming.js';
 import type { VoiceService } from './voice-service.js';
+import type { SavedVoiceRepository } from './saved-voice-repository.js';
 
 export const MAX_RECORDING_AUDIO_BYTES = VOICE_CONVERSION_MAX_BYTES;
 export const SUPPORTED_AUDIO_CONTENT_TYPES = VOICE_CONVERSION_CONTENT_TYPES;
@@ -88,6 +90,7 @@ const contentTypeEssence = (request: HttpRequest): string =>
 export const registerVoiceRoutes = (
   app: ApplicationRuntime,
   service: VoiceService | null,
+  savedVoices: SavedVoiceRepository,
 ): void => {
   app.get('/api/elevenlabs/voices', { onRequest: verifyProviderIntent }, async (request, reply) => {
     const parsed = workspaceVoicesQuerySchema.safeParse(request.query);
@@ -113,6 +116,16 @@ export const registerVoiceRoutes = (
         }),
       ),
     );
+  });
+
+  app.get('/api/elevenlabs/voices/:voiceId/relationship', async (request) => {
+    const parsed = workspaceVoiceParamsSchema.safeParse(request.params);
+    if (!parsed.success) throw validationError('Choose a valid saved-library voice.');
+    const ownerUserId = ownerUserIdForRequest(request);
+    return workspaceVoiceRelationshipResponseSchema.parse({
+      voiceId: parsed.data.voiceId,
+      saved: await savedVoices.has(ownerUserId, parsed.data.voiceId),
+    });
   });
 
   app.get(

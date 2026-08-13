@@ -24,3 +24,7 @@ Character creation, editing, upload, and reference generation belong to
 - Ordinary close preserves all three drafts for the current tab.
 - True character records never expose **Open workshop**.
 - Workshop never starts camera, token, optimizer, image-generation, or realtime provider work.
+- In an open Project, **Use in working draft** still changes only the Studio draft. The separate
+  **Save creative setup** action captures one exact applied prompt/recipe label, durable reference
+  ID, resource revision, and treatment checkpoint through the existing Project session. Workshop
+  remains independently owned and no Project provider Start is enabled.

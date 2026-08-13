@@ -9,6 +9,7 @@ import {
   projectSourceUploadMetadataSchema,
   projectSnapshotSchema,
   projectStatusFactsSchema,
+  projectWorkingMediaResponseSchema,
 } from './projects';
 
 const assetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
@@ -17,7 +18,7 @@ const versionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
 const now = '2026-08-11T12:00:00.000Z';
 
 const validSnapshot = () => ({
-  schemaVersion: 1 as const,
+  schemaVersion: 2 as const,
   sourceAssetId: assetId,
   workingMedia: { kind: 'asset' as const, assetId },
   presentedMedia: {
@@ -25,20 +26,44 @@ const validSnapshot = () => ({
     savedVideoId: videoId,
     videoVersionId: versionId,
   },
-  selectedCharacter: { characterId: 'character-one', variantId: 'red-jacket' },
-  selectedOutfit: { outfitId: 'summer-outfit' },
+  selectedCharacter: {
+    characterId: 'character-one',
+    characterLabel: 'Avery',
+    characterRevision: now,
+    variantId: 'red-jacket',
+    variantLabel: 'Red jacket',
+    variantRevision: now,
+    referenceAssetId: assetId,
+  },
+  selectedOutfit: {
+    outfitId: 'summer-outfit',
+    outfitLabel: 'Summer outfit',
+    outfitRevision: now,
+    referenceAssetId: assetId,
+    inputKind: 'saved-outfit' as const,
+  },
   selectedVoice: {
     kind: 'saved-voice' as const,
     voiceId: 'northstar',
     voiceName: 'Northstar',
+    resourceRevision: now,
     treatment: { stability: 0.5, similarity: 0.8, style: null, speakerBoost: true },
   },
-  visualTreatment: { kind: 'character-swap' as const },
+  visualTreatment: {
+    kind: 'character-swap' as const,
+    providerId: 'fal',
+    outputResolution: '720p' as const,
+  },
   liveMode: null,
   creativeIntent: {
     promptId: 'prompt-one',
+    promptLabel: 'Summer launch prompt',
     recipeId: 'recipe-one',
+    recipeLabel: 'Avery · Red jacket',
     userIntent: 'Create a bright summer campaign launch.',
+    appliedPrompt: 'A bright summer campaign launch.',
+    referenceAssetId: assetId,
+    resourceRevision: now,
   },
   localEdit: {
     trim: { startMs: 0, endMs: 30_000 },
@@ -73,6 +98,46 @@ describe('Project snapshot contract', () => {
     expect(projectSnapshotSchema.parse(validSnapshot())).toEqual(validSnapshot());
   });
 
+  it('migrates v1 snapshots explicitly without fabricating missing applied provenance', () => {
+    const current = validSnapshot();
+    const legacy = {
+      ...current,
+      schemaVersion: 1 as const,
+      selectedCharacter: { characterId: 'character-one', variantId: 'red-jacket' },
+      selectedOutfit: { outfitId: 'summer-outfit' },
+      selectedVoice: {
+        kind: 'saved-voice' as const,
+        voiceId: 'northstar',
+        voiceName: 'Northstar',
+        treatment: current.selectedVoice.treatment,
+      },
+      visualTreatment: { kind: 'character-swap' as const },
+      creativeIntent: {
+        promptId: 'prompt-one',
+        recipeId: 'recipe-one',
+        userIntent: current.creativeIntent.userIntent,
+      },
+    };
+
+    expect(projectSnapshotSchema.parse(legacy)).toMatchObject({
+      schemaVersion: 2,
+      selectedCharacter: {
+        characterId: 'character-one',
+        characterLabel: null,
+        variantId: 'red-jacket',
+        variantLabel: null,
+        referenceAssetId: null,
+      },
+      selectedOutfit: { outfitId: 'summer-outfit', outfitLabel: null, inputKind: null },
+      creativeIntent: {
+        recipeId: 'recipe-one',
+        recipeLabel: null,
+        appliedPrompt: null,
+        resourceRevision: null,
+      },
+    });
+  });
+
   it('rejects missing visual selections, object URLs, unknown state, and invalid edits', () => {
     expect(
       projectSnapshotSchema.safeParse({
@@ -99,6 +164,25 @@ describe('Project snapshot contract', () => {
           ...validSnapshot().localEdit,
           trim: { startMs: 20_000, endMs: 10_000 },
         },
+      }).success,
+    ).toBe(false);
+
+    const promptOnlyTryOn = {
+      ...validSnapshot(),
+      selectedOutfit: null,
+      visualTreatment: {
+        kind: 'virtual-try-on' as const,
+        providerId: 'fal',
+        outputResolution: '720p' as const,
+        inputKind: 'prompt' as const,
+        enhancePrompt: false,
+      },
+    };
+    expect(projectSnapshotSchema.safeParse(promptOnlyTryOn).success).toBe(true);
+    expect(
+      projectSnapshotSchema.safeParse({
+        ...promptOnlyTryOn,
+        visualTreatment: { ...promptOnlyTryOn.visualTreatment, inputKind: 'saved-outfit' },
       }).success,
     ).toBe(false);
   });
@@ -171,7 +255,8 @@ describe('Project snapshot contract', () => {
     ).toBe(false);
   });
 
-  it('accepts only the bounded Prompt 07 semantic session proposal', () => {
+  it('accepts the bounded creative semantic session proposal and rejects working-media bypass', () => {
+    const snapshot = validSnapshot();
     expect(
       appendProjectRevisionRequestSchema.parse({
         expectedVersion: 2,
@@ -183,6 +268,12 @@ describe('Project snapshot contract', () => {
             captureFormat: 'landscape',
             audioSource: 'local-microphone',
           },
+          selectedCharacter: snapshot.selectedCharacter,
+          selectedOutfit: snapshot.selectedOutfit,
+          selectedVoice: snapshot.selectedVoice,
+          visualTreatment: snapshot.visualTreatment,
+          creativeIntent: snapshot.creativeIntent,
+          localEdit: snapshot.localEdit,
         },
       }),
     ).toMatchObject({ proposal: { workflowPhase: 'creative' } });
@@ -193,7 +284,13 @@ describe('Project snapshot contract', () => {
         proposal: {
           workflowPhase: 'creative',
           liveMode: null,
-          selectedCharacter: { characterId: 'not-enabled-yet', variantId: null },
+          selectedCharacter: snapshot.selectedCharacter,
+          selectedOutfit: snapshot.selectedOutfit,
+          selectedVoice: snapshot.selectedVoice,
+          visualTreatment: snapshot.visualTreatment,
+          creativeIntent: snapshot.creativeIntent,
+          localEdit: snapshot.localEdit,
+          workingMedia: { kind: 'asset', assetId },
         },
       }).success,
     ).toBe(false);
@@ -276,6 +373,71 @@ describe('Project snapshot contract', () => {
         filename: 'source.mp4',
         saveTargetVideoId: videoId,
       }).success,
+    ).toBe(false);
+  });
+
+  it('keeps an earlier adoption current across later semantic Project revisions', () => {
+    const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
+    const adoptedRevisionId = '80eb98cb-0dd4-4aac-8507-084789045d71';
+    const currentRevisionId = '66517242-ccf5-4fa5-bcee-5831039119c9';
+    const snapshot = {
+      ...validSnapshot(),
+      workingMedia: { kind: 'asset' as const, assetId },
+      presentedMedia: { kind: 'asset' as const, assetId },
+    };
+    const response = {
+      project: {
+        id: projectId,
+        campaignId: null,
+        title: 'Current working media',
+        status: 'ready' as const,
+        version: 4,
+        currentRevisionId,
+        currentRevisionNumber: 4,
+        archivedAt: null,
+        deletedAt: null,
+        createdAt: now,
+        updatedAt: now,
+      },
+      revision: {
+        id: currentRevisionId,
+        projectId,
+        revisionNumber: 4,
+        parentRevisionId: adoptedRevisionId,
+        parentRevisionNumber: 3,
+        snapshot,
+        authorKind: 'user' as const,
+        source: 'user-edit' as const,
+        createdAt: now,
+      },
+      isCurrent: true,
+      media: {
+        kind: 'local-render' as const,
+        reference: { kind: 'asset' as const, assetId },
+        assetId,
+        savedVideoId: null,
+        videoVersionId: null,
+        mimeType: 'video/mp4' as const,
+        filename: 'working.mp4',
+        sizeBytes: 1_024,
+        checksumSha256: 'a'.repeat(64),
+        container: 'mp4' as const,
+        videoCodec: 'avc' as const,
+        audioCodec: 'aac',
+        durationMs: 10_000,
+        width: 1_280,
+        height: 720,
+        hasAudio: true,
+        adoptedRevisionId,
+        adoptedRevisionNumber: 3,
+        adoptedAt: now,
+        contentUrl: `/api/projects/${projectId}/working-media/${adoptedRevisionId}/content`,
+      },
+    };
+
+    expect(projectWorkingMediaResponseSchema.parse(response)).toEqual(response);
+    expect(
+      projectWorkingMediaResponseSchema.safeParse({ ...response, isCurrent: false }).success,
     ).toBe(false);
   });
 });

@@ -52,8 +52,10 @@ original on failure.
   Per-voice locking makes the action idempotent.
 - Remove deletes only the owner-scoped Lightframe relationship. Preview and conversion both
   revalidate that relationship and reject a stale selection.
-- Every list, preview, add, remove, and conversion request requires the app-owned voice-intent
-  header. Add and remove also require the trusted loopback Origin/Host boundary.
+- Every provider-contact list, preview, add, remove, and conversion request requires the app-owned
+  voice-intent header. Add and remove also require the trusted loopback Origin/Host boundary. An
+  open Project may use the authenticated app-owned saved-Voice relationship read to validate its
+  checkpoint without that header or any ElevenLabs request.
 
 ## Guards and recovery
 
@@ -66,6 +68,13 @@ original on failure.
   immutable capture.
 - Edited 1:1, 4:5, or incompatible Freeform sources remain Voice-eligible when their sidecar is
   valid even when Character Swap and Virtual Try On are disabled.
+- An open Project may checkpoint the selected saved-voice ID/name and exact treatment values as
+  configuration, but provider-backed preview/conversion Start remains disabled in Project context.
+  Hydration restores the current control only when the owner-derived saved relationship still
+  exists; missing and wrong-owner IDs produce the same historical explanation and **Choose
+  another** path. The Project never copies the Voice record, reveals another owner's membership,
+  or contacts ElevenLabs while saving or hydrating that checkpoint. Standalone Latest Take and
+  existing-video conversion retain the explicit provider journey above.
 
 ## Live-provider boundary
 

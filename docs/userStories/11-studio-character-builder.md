@@ -49,6 +49,12 @@ becomes a compact horizontally scrollable row on narrow layouts. A single direct
 visible as a 400px desktop rail and joins the reading order on the Preview step at narrower
 viewports; no character stateful control is duplicated.
 
+A saved Character and its Wardrobe Variant remain independent workspace resources when selected
+inside a Project. Project snapshot v2 references their stable IDs and exact applied name/title,
+resource revision, and immutable reference ID; it does not copy Builder drafts, images, Wardrobe
+records, use counters, or cleanup ownership. Later edits/deletion therefore preserve the Project's
+historical explanation but require **Choose another** before using a new current resource.
+
 Every predefined option uses its profile-aware repository artwork when the catalog provides one.
 Shared semantic options such as adult age, role, style, expression, and mood resolve to
 the artwork for the selected presentation. A per-field **Describe My Own** control is collapsed by

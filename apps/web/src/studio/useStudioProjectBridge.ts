@@ -1,6 +1,7 @@
 import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { RecordingArtifact, RecordingLifecycle } from '../features/recording/types';
 import type { ProjectRecordingCandidate } from '../features/projects/ProjectRouteSurface';
+import type { ProjectWorkingMediaActivity } from '../features/projects/ProjectWorkingMediaSection';
 import type {
   ProjectSourceActivity,
   ProjectSourceRuntime,
@@ -26,6 +27,8 @@ export const useStudioProjectBridge = ({
   const presentSourceRef = useRef(presentSource);
   const clearSourceRef = useRef(clearSource);
   const [sourceActivity, setSourceActivity] = useState<ProjectSourceActivity | null>(null);
+  const [workingMediaActivity, setWorkingMediaActivity] =
+    useState<ProjectWorkingMediaActivity | null>(null);
   const [session, setSession] = useState<ProjectSessionPort | null>(null);
 
   useLayoutEffect(() => {
@@ -55,7 +58,13 @@ export const useStudioProjectBridge = ({
     if (projectIdRef.current === activity.projectId) setSourceActivity(activity);
   }, []);
 
+  const handleWorkingMediaActivity = useCallback((activity: ProjectWorkingMediaActivity) => {
+    if (projectIdRef.current === activity.projectId) setWorkingMediaActivity(activity);
+  }, []);
+
   const activeSourceActivity = sourceActivity?.projectId === projectId ? sourceActivity : null;
+  const activeWorkingMediaActivity =
+    workingMediaActivity?.projectId === projectId ? workingMediaActivity : null;
   const activeSession = session?.projectId === projectId ? session : null;
 
   const recordingCandidate = useMemo<ProjectRecordingCandidate | null>(() => {
@@ -72,9 +81,11 @@ export const useStudioProjectBridge = ({
   return {
     sourceRuntime,
     sourceActivity: activeSourceActivity,
+    workingMediaActivity: activeWorkingMediaActivity,
     session: activeSession,
     recordingCandidate,
     handleSourceActivity,
+    handleWorkingMediaActivity,
     handleSession: setSession,
   } as const;
 };

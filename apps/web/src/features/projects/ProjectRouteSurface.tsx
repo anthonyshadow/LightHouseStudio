@@ -1,6 +1,14 @@
 import { useTheme } from '@emotion/react';
 import type { ProjectContract, ProjectCurrentResponse } from '@studio/contracts';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import {
+  useCallback,
+  useEffect,
+  useLayoutEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
 import { useLocation, useNavigate } from 'react-router';
 import { APP_PATHS, projectIdFromPath, projectPath } from '../../app/paths';
 import { Button, StatusNotice } from '../../ui';
@@ -27,6 +35,8 @@ import {
 } from './ProjectRouteSurface.styles';
 import { useProjectList, useProjectsController } from './useProjectsController';
 import { ProjectSavedVideoPicker } from './ProjectSavedVideoPicker';
+import { ProjectWorkingMediaSection } from './ProjectWorkingMediaSection';
+import type { ProjectWorkingMediaActivity } from './ProjectWorkingMediaSection';
 import { useProjectSession, type ProjectSessionPort } from './useProjectSession';
 import {
   useProjectSourceController,
@@ -220,7 +230,8 @@ const ProjectsWorkspace = () => {
           </h2>
           <p>
             Create and manage focused video work. Each Project can retain one inspected immutable
-            video original; creative-session autosave and output saving arrive later.
+            video original, semantic creative checkpoints, and durable working media. Provider
+            processing and output saving arrive later.
           </p>
         </div>
         <Button
@@ -315,11 +326,13 @@ export interface ProjectRecordingCandidate {
 }
 
 export interface ProjectRouteSurfaceProps {
+  readonly creativeCheckpoint?: ReactNode;
   readonly sourceRuntime?: ProjectSourceRuntime;
   readonly recordingCandidate?: ProjectRecordingCandidate | null;
   readonly recordingActive?: boolean;
   readonly onStartRecording?: () => void;
   readonly onSourceActivityChange?: (activity: ProjectSourceActivity) => void;
+  readonly onWorkingMediaActivityChange?: (activity: ProjectWorkingMediaActivity) => void;
   readonly onSessionChange?: (session: ProjectSessionPort | null) => void;
 }
 
@@ -574,8 +587,8 @@ const ProjectSessionNotice = ({
     case 'saved':
       return (
         <StatusNotice role="status" tone="success" title="All changes saved">
-          Project identity, durable source references, workflow phase, and session metadata match
-          server authority.
+          Project identity, durable media references, creative intent, local edit provenance,
+          workflow phase, and session metadata match server authority.
         </StatusNotice>
       );
   }
@@ -588,7 +601,9 @@ const ProjectDetail = ({
   recordingActive,
   onStartRecording,
   onSourceActivityChange,
+  onWorkingMediaActivityChange,
   onSessionChange,
+  creativeCheckpoint,
 }: { readonly projectId: string } & ProjectRouteSurfaceProps) => {
   const theme = useTheme();
   const navigate = useNavigate();
@@ -721,6 +736,14 @@ const ProjectDetail = ({
 
       <ProjectSessionNotice session={session} sourceBusy={sourceActivity?.busy ?? false} />
 
+      {creativeCheckpoint}
+
+      <StatusNotice role="status" tone="neutral" title="Project processing is gated">
+        Configure creative intent and local edits freely. Provider-backed Start actions remain
+        unavailable until recoverable Project processing is enabled; configuration submits no
+        provider work.
+      </StatusNotice>
+
       <ProjectSourceSection
         key={current.project.id}
         current={current}
@@ -730,6 +753,15 @@ const ProjectDetail = ({
         onStartRecording={onStartRecording}
         onActivityChange={handleSourceActivity}
         onCurrentChange={session.acceptCurrent}
+      />
+
+      <ProjectWorkingMediaSection
+        current={current}
+        session={session.port}
+        archived={archived}
+        {...(onWorkingMediaActivityChange
+          ? { onActivityChange: onWorkingMediaActivityChange }
+          : {})}
       />
 
       {renameTarget ? (

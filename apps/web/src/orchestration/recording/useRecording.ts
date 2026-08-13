@@ -51,9 +51,9 @@ const stopRecorderBestEffort = (recorder: MediaRecorder | null): void => {
   }
 };
 
-export const useRecording = ({
-  onAutomaticStop,
-}: UseRecordingOptions = {}): RecordingController => {
+export const useRecording = ({ onAutomaticStop }: UseRecordingOptions = {}): RecordingController & {
+  readonly completeSourceValidation: (input: RestorePersistedOriginalInput) => RecordingArtifact;
+} => {
   const [lifecycle, setLifecycle] = useState<RecordingLifecycle>('idle');
   const [activeSource, setActiveSource] = useState<RecordingSource | null>(null);
   const [metadata, setMetadata] = useState<TakeMetadata | null>(null);
@@ -514,8 +514,11 @@ export const useRecording = ({
     setLifecycle(domainLifecycleRef.current.status);
   }, [artifacts]);
 
-  const restorePersistedOriginal = useCallback(
-    (input: RestorePersistedOriginalInput): RecordingArtifact => {
+  const commitPersistedOriginal = useCallback(
+    (
+      input: RestorePersistedOriginalInput,
+      completion: 'ordinary' | 'source-validation',
+    ): RecordingArtifact => {
       const status = domainLifecycleRef.current.status;
       if (
         attemptRef.current ||
@@ -525,11 +528,14 @@ export const useRecording = ({
       ) {
         throw new Error('A persisted take cannot be restored while recording is active.');
       }
-      if (artifacts.processingState === 'processing') {
+      if (completion === 'ordinary' && artifacts.processingState === 'processing') {
         throw new Error('A persisted take cannot be restored while voice processing is active.');
       }
 
-      const artifact = artifacts.restorePersistedOriginal(input);
+      const artifact =
+        completion === 'source-validation'
+          ? artifacts.completeSourceValidation(input)
+          : artifacts.restorePersistedOriginal(input);
       pendingMetadataRef.current = null;
       mainStoppedAtRef.current = null;
       setMetadata(input.takeMetadata ? Object.freeze({ ...input.takeMetadata }) : null);
@@ -540,6 +546,16 @@ export const useRecording = ({
       return artifact;
     },
     [artifacts],
+  );
+  const restorePersistedOriginal = useCallback(
+    (input: RestorePersistedOriginalInput): RecordingArtifact =>
+      commitPersistedOriginal(input, 'ordinary'),
+    [commitPersistedOriginal],
+  );
+  const completeSourceValidation = useCallback(
+    (input: RestorePersistedOriginalInput): RecordingArtifact =>
+      commitPersistedOriginal(input, 'source-validation'),
+    [commitPersistedOriginal],
   );
 
   useEffect(() => {
@@ -591,6 +607,7 @@ export const useRecording = ({
       start,
       stop,
       restorePersistedOriginal,
+      completeSourceValidation,
       replaceSource: restorePersistedOriginal,
       discard,
       beginProcessing: artifacts.beginProcessing,
@@ -611,6 +628,7 @@ export const useRecording = ({
       start,
       stop,
       restorePersistedOriginal,
+      completeSourceValidation,
       discard,
     ],
   );

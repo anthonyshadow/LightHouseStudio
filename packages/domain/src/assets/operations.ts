@@ -809,6 +809,7 @@ export const selectCharacterVersion = (
   ) {
     throw new AssetRuleError('not-found', 'The wardrobe variant was not found.');
   }
+  if (character.selectedWardrobeVariantId === variantId) return store;
   return {
     ...store,
     savedCharacterPrompts: store.savedCharacterPrompts.map((candidate) =>

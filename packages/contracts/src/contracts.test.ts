@@ -32,6 +32,7 @@ import {
   voiceChangerQuerySchema,
   voiceConversionContentTypeSchema,
   workspaceVoicesQuerySchema,
+  workspaceVoiceRelationshipResponseSchema,
   workspaceVoicesResponseSchema,
 } from './index';
 
@@ -681,6 +682,19 @@ describe('realtime credential contracts', () => {
 });
 
 describe('ElevenLabs contracts', () => {
+  it('keeps saved-voice relationship checks app-owned and minimal', () => {
+    expect(
+      workspaceVoiceRelationshipResponseSchema.parse({ voiceId: 'voice-1', saved: true }),
+    ).toEqual({ voiceId: 'voice-1', saved: true });
+    expect(
+      workspaceVoiceRelationshipResponseSchema.safeParse({
+        voiceId: 'voice-1',
+        saved: false,
+        providerUrl: 'https://provider.example/voice-1',
+      }).success,
+    ).toBe(false);
+  });
+
   it('trims filters and caps Saved and Browse pagination at 20', () => {
     expect(workspaceVoicesQuerySchema.parse({ search: '  narrator  ' })).toEqual({
       search: 'narrator',

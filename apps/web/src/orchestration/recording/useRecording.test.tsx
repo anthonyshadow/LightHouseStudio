@@ -356,6 +356,45 @@ describe('useRecording recorder construction failures', () => {
     expect(URL.revokeObjectURL).toHaveBeenCalledWith('blob:repaired-original');
   });
 
+  it('completes only the source validation operation that owns persisted publication', () => {
+    installRecorderHarness();
+    vi.mocked(URL.createObjectURL).mockReturnValueOnce('blob:validated-source');
+    const { result, unmount } = renderHook(() => useRecording());
+    const input = {
+      blob: new Blob(['validated'], { type: 'video/mp4' }),
+      artifactMetadata: {
+        id: 'validated-source',
+        mimeType: 'video/mp4',
+        filename: 'validated.mp4',
+        sourceModeId: 'local' as const,
+        startedAt: '2026-08-13T12:00:00.000Z',
+        durationMs: 1_000,
+      },
+    };
+
+    expect(() => result.current.completeSourceValidation(input)).toThrow(
+      'No owned source validation is ready to complete.',
+    );
+    act(() => {
+      result.current.beginProcessing({
+        kind: 'source-validation',
+        title: 'Checking source video…',
+        detail: 'Validating the selected source.',
+      });
+    });
+    act(() => {
+      result.current.completeSourceValidation(input);
+    });
+
+    expect(result.current).toMatchObject({
+      lifecycle: 'recorded',
+      processingState: 'idle',
+      processingOperation: null,
+      original: { id: 'validated-source', objectUrl: 'blob:validated-source' },
+    });
+    unmount();
+  });
+
   it('atomically publishes an edited source before releasing prior original and processed URLs', () => {
     installRecorderHarness();
     vi.mocked(URL.createObjectURL)

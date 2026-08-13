@@ -81,7 +81,7 @@ const RECIPE_COMMIT_BLOCKED_MESSAGE =
 type UseReferenceRecipeHydrationOptions = {
   readonly canStart: (pending: PendingReferenceRecipeUse) => boolean;
   readonly currentReferenceImage: () => SessionReferenceImage | null;
-  readonly onCommit: (result: ReferenceRecipeHydrationResult) => boolean;
+  readonly onCommit: (result: ReferenceRecipeHydrationResult) => boolean | Promise<boolean>;
 };
 
 type ActiveHydrationOperation = {
@@ -161,7 +161,7 @@ export const useReferenceRecipeHydration = ({
           storedReferenceMetadata?.source !== 'generated' ||
           canonicalPrompt(storedReferenceMetadata.originalPrompt) ===
             canonicalPrompt(pending.prompt);
-        const committed = onCommit({
+        const committed = await onCommit({
           pending,
           referenceImage,
           storedReferenceMetadata,

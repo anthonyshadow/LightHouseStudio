@@ -26,6 +26,7 @@ export interface ExistingVideoActionBarProps {
   readonly discardButtonRef?: RefObject<HTMLButtonElement | null>;
   readonly onSaveVideo?: () => void;
   readonly saveVideoState?: SaveVideoState;
+  readonly providerStartBlockedReason?: string;
 }
 
 const readyActionLabel = (workflow: ExistingVideoWorkflow): string => {
@@ -52,6 +53,7 @@ export const ExistingVideoActionBar = ({
   discardButtonRef,
   onSaveVideo,
   saveVideoState = { status: 'idle' },
+  providerStartBlockedReason,
 }: ExistingVideoActionBarProps) => {
   const theme = useTheme();
   const step = workflow.steps[0];
@@ -70,6 +72,8 @@ export const ExistingVideoActionBar = ({
     saveVideoState.status === 'saving' && saveVideoState.artifactId === workflow.result?.id;
   const saved =
     saveVideoState.status === 'saved' && saveVideoState.artifactId === workflow.result?.id;
+  const providerBacked = Boolean(step || workflow.voiceSelection?.kind === 'elevenlabs');
+  const providerStartBlocked = providerBacked ? providerStartBlockedReason : undefined;
 
   if (workflow.phase === 'complete') {
     return (
@@ -115,9 +119,14 @@ export const ExistingVideoActionBar = ({
           <span>Resume checks the same accepted job and creates no new submission.</span>
         </div>
         <div css={actionButtonsStyles(theme)}>
-          <Button variant="primary" onClick={() => void workflow.retryExistingJob()}>
+          <Button
+            variant="primary"
+            disabled={Boolean(providerStartBlockedReason)}
+            onClick={() => void workflow.retryExistingJob()}
+          >
             Resume accepted job · no new submission
           </Button>
+          {providerStartBlockedReason ? <span>{providerStartBlockedReason}</span> : null}
         </div>
       </div>
     );
@@ -181,13 +190,13 @@ export const ExistingVideoActionBar = ({
         <span>
           {visualUnavailable
             ? 'Visual processing is unavailable. The source can still be reviewed and saved.'
-            : plan.detail}
+            : (providerStartBlocked ?? plan.detail)}
         </span>
       </div>
       <div css={actionButtonsStyles(theme)}>
         <Button
           variant="primary"
-          disabled={stepIncomplete || visualUnavailable}
+          disabled={stepIncomplete || visualUnavailable || Boolean(providerStartBlocked)}
           onClick={() => {
             if (!step && !workflow.voiceSelection) onFinish();
             else void workflow.submitPlan();

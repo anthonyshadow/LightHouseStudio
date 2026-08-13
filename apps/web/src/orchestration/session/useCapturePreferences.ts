@@ -179,6 +179,23 @@ export const useCapturePreferences = ({
     setDraft((current) => ({ ...current, aspectRatio }));
   }, []);
 
+  const restoreAspectRatio = useCallback(
+    (aspectRatio: LocalCaptureAspectRatio): boolean => {
+      if (
+        (aspectRatio !== '16:9' && aspectRatio !== '9:16') ||
+        applyInFlightRef.current !== null ||
+        stream?.getVideoTracks().some((track) => track.readyState === 'live')
+      ) {
+        return false;
+      }
+      setApplyError(null);
+      setDraft((current) => ({ ...current, aspectRatio }));
+      setApplied((current) => ({ ...current, aspectRatio }));
+      return true;
+    },
+    [stream],
+  );
+
   const apply = useCallback((): Promise<boolean> => {
     if (applyInFlightRef.current) return applyInFlightRef.current;
     if (samePreferences(draft, applied)) return Promise.resolve(true);
@@ -285,6 +302,7 @@ export const useCapturePreferences = ({
     updateAudioDeviceId,
     updateProfile,
     updateAspectRatio,
+    restoreAspectRatio,
     reportVideoDeviceUnavailable,
     dismissVideoFallbackNotice,
     apply,

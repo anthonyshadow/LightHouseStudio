@@ -77,7 +77,11 @@ export const StudioExitGuard = ({
       projectSourceActivity,
     );
     const unsafeProjectWorkActive =
-      recordingOrFinalizing || projectSourceStaging || projectDraftActive || projectSavePending;
+      recordingOrFinalizing ||
+      videoRenderingActive ||
+      projectSourceStaging ||
+      projectDraftActive ||
+      projectSavePending;
     return (
       shouldBlockStudioExit(currentLocation.pathname, nextLocation.pathname, unsafeWorkActive) ||
       shouldBlockProjectContextChange(
@@ -104,7 +108,7 @@ export const StudioExitGuard = ({
       const projectChangeBlocked = shouldBlockProjectContextChange(
         location.pathname,
         nextPathname,
-        recordingOrFinalizing || projectSourceStaging || projectDraftActive,
+        recordingOrFinalizing || videoRenderingActive || projectSourceStaging || projectDraftActive,
       );
       return outsideStudioBlocked || projectChangeBlocked;
     },
@@ -209,12 +213,20 @@ export const StudioExitGuard = ({
   const projectDiscardConfirmationOpen = temporaryWorkPromptOpen && projectContextChangeBlocked;
   const discardConfirmationOpen = temporaryWorkPromptOpen && !projectContextChangeBlocked;
   const activeWorkCopy = videoRenderingActive
-    ? {
-        title: 'Cancel the video render before leaving',
-        description:
-          'Studio cannot abandon a local video worker. Stay here, cancel the render, then discard or save the draft before leaving.',
-        detail: 'Return to the edit settings and cancel the active render before leaving Studio.',
-      }
+    ? projectContextChangeBlocked
+      ? {
+          title: 'Finish Project media work before switching Projects',
+          description:
+            'The current Project has an active local render or working-media adoption. Stay here until it completes or returns to a cancellable checkpoint.',
+          detail:
+            'Finish or cancel the active media operation before choosing another Project or leaving its workspace.',
+        }
+      : {
+          title: 'Cancel the video render before leaving',
+          description:
+            'Studio cannot abandon a local video worker. Stay here, cancel the render, then discard or save the draft before leaving.',
+          detail: 'Return to the edit settings and cancel the active render before leaving Studio.',
+        }
     : {
         title: projectContextChangeBlocked
           ? 'Finish the take before switching Projects'

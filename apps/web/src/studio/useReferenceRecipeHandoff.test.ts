@@ -217,6 +217,7 @@ describe('reference recipe handoff', () => {
       recordSuccessfulPrompt,
       enrichNewestMatchingRecent: vi.fn(),
       createSavedCharacterPrompt: vi.fn(),
+      selectCharacterVersion: vi.fn().mockResolvedValue(undefined),
     } as unknown as CreativeAssetRepository;
     const draft: SessionDraft = {
       mode: 'lucy-latest' as const,

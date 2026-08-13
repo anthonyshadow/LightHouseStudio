@@ -7,9 +7,27 @@ import { createApp } from '../../app.js';
 import { testConfig } from '../../test/fakes.js';
 import { FileProjectRepository } from './file-project-repository.js';
 import { ProjectService } from './project-service.js';
+import { createDefaultVideoEditSpec } from '@studio/domain';
 
 const browserHeaders = { host: 'localhost:5173', origin: 'http://localhost:5173' };
 const json = <Value>(response: { json(): unknown }): Value => response.json() as Value;
+const emptyCreativeProposal = {
+  selectedCharacter: null,
+  selectedOutfit: null,
+  selectedVoice: null,
+  visualTreatment: { kind: 'none' as const },
+  creativeIntent: {
+    promptId: null,
+    promptLabel: null,
+    recipeId: null,
+    recipeLabel: null,
+    userIntent: '',
+    appliedPrompt: null,
+    referenceAssetId: null,
+    resourceRevision: null,
+  },
+  localEdit: null,
+};
 
 describe('Project lifecycle routes', () => {
   let directory: string;
@@ -127,6 +145,7 @@ describe('Project lifecycle routes', () => {
     const created = (await create(app, 'Session checkpoint')).response;
     const projectId = json<{ project: { id: string } }>(created).project.id;
     const proposal = {
+      ...emptyCreativeProposal,
       workflowPhase: 'creative',
       liveMode: {
         modeId: 'local',
@@ -160,7 +179,11 @@ describe('Project lifecycle routes', () => {
       payload: {
         expectedVersion: 1,
         expectedRevisionNumber: 1,
-        proposal: { workflowPhase: 'review', liveMode: null },
+        proposal: {
+          ...emptyCreativeProposal,
+          workflowPhase: 'review',
+          liveMode: null,
+        },
       },
     });
     expect(staleDifferent.statusCode).toBe(409);
@@ -255,6 +278,103 @@ describe('Project lifecycle routes', () => {
     expect(head.statusCode).toBe(200);
     expect(head.body).toBe('');
     expect(head.headers['content-length']).toBe(String(fixture.byteLength));
+  });
+
+  it('adopts a validated local render explicitly and range-streams it without changing source', async () => {
+    const app = localApp();
+    const created = (await create(app, 'Local render adoption')).response;
+    const projectId = json<{ project: { id: string } }>(created).project.id;
+    const fixture = Buffer.from(
+      (
+        await readFile(
+          new URL('../../../../../e2e/fixtures/decodable-h264-video.base64', import.meta.url),
+          'utf8',
+        )
+      ).replaceAll(/\s/gu, ''),
+      'base64',
+    );
+    const sourceKey = randomUUID();
+    const source = await app.inject({
+      method: 'POST',
+      url: `/api/projects/${projectId}/source`,
+      headers: {
+        ...browserHeaders,
+        'content-type': 'video/mp4',
+        'idempotency-key': sourceKey,
+        'x-lightframe-project-source': encodeURIComponent(
+          JSON.stringify({
+            expectedVersion: 1,
+            expectedRevisionNumber: 1,
+            kind: 'uploaded',
+            filename: 'source.mp4',
+          }),
+        ),
+      },
+      payload: fixture,
+    });
+    expect(source.statusCode).toBe(201);
+    const operationKey = randomUUID();
+    const localEdit = createDefaultVideoEditSpec(1_000);
+    const upload = () =>
+      app.inject({
+        method: 'POST',
+        url: `/api/projects/${projectId}/working-media`,
+        headers: {
+          ...browserHeaders,
+          'content-type': 'video/mp4',
+          'idempotency-key': operationKey,
+          'x-lightframe-project-working-media': encodeURIComponent(
+            JSON.stringify({
+              expectedVersion: 2,
+              expectedRevisionNumber: 2,
+              filename: 'render-preview.mp4',
+              localEdit,
+            }),
+          ),
+        },
+        payload: fixture,
+      });
+
+    const adopted = await upload();
+    expect(adopted.statusCode).toBe(201);
+    expect(adopted.json()).toMatchObject({
+      project: { id: projectId, version: 3, status: 'ready' },
+      revision: {
+        revisionNumber: 3,
+        snapshot: {
+          sourceAssetId: sourceKey,
+          workingMedia: { kind: 'asset', assetId: operationKey },
+          presentedMedia: { kind: 'asset', assetId: operationKey },
+          localEdit,
+          lastSuccessfulOutput: null,
+        },
+      },
+      isCurrent: true,
+      media: {
+        kind: 'local-render',
+        assetId: operationKey,
+      },
+    });
+    expect(adopted.body).not.toContain(directory);
+    const replay = await upload();
+    expect(replay.statusCode).toBe(200);
+    expect(replay.json()).toEqual(adopted.json());
+
+    const hydrated = await app.inject({
+      method: 'GET',
+      url: `/api/projects/${projectId}/working-media`,
+      headers: { host: browserHeaders.host },
+    });
+    expect(hydrated.json()).toEqual(adopted.json());
+    const contentUrl = json<{ media: { contentUrl: string } }>(adopted).media.contentUrl;
+    expect(contentUrl).toContain('/working-media/');
+    const ranged = await app.inject({
+      method: 'GET',
+      url: contentUrl,
+      headers: { host: browserHeaders.host, range: 'bytes=1-5' },
+    });
+    expect(ranged.statusCode).toBe(206);
+    expect(ranged.rawPayload).toEqual(fixture.subarray(1, 6));
   });
 
   it('keeps pagination cursors filter-bound and create idempotency durable across app restart', async () => {

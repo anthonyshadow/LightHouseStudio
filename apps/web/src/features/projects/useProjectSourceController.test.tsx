@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import type { ProjectCurrentResponse, ProjectSourceResponse } from '@studio/contracts';
+import type {
+  ProjectCurrentResponse,
+  ProjectSourceResponse,
+  ProjectWorkingMediaResponse,
+} from '@studio/contracts';
 import { act, cleanup, renderHook, waitFor } from '@testing-library/react';
 import { delay, HttpResponse, http } from 'msw';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -17,6 +21,7 @@ const secondProjectId = '730c73ca-a6af-4509-83c0-b3c18c1ee81a';
 const firstRevisionId = '89a972fe-bfb5-4214-94f7-4bd54f12ce06';
 const acceptedRevisionId = '4159225b-60f4-4f94-a3d5-08feee91a91d';
 const assetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
+const workingAssetId = '08ab9b2e-0cb2-4f07-9bed-b931204e1546';
 const savedVideoId = 'ea77cbd9-c453-4f58-a9a0-42bf8aaef338';
 const videoVersionId = 'b276694b-58c4-40d3-8fb6-315e32b66fd0';
 const now = '2026-08-12T16:00:00.000Z';
@@ -42,7 +47,7 @@ const currentProject = (projectId: string, accepted: boolean): ProjectCurrentRes
     parentRevisionId: accepted ? firstRevisionId : null,
     parentRevisionNumber: accepted ? 1 : null,
     snapshot: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       sourceAssetId: accepted ? assetId : null,
       workingMedia: accepted ? { kind: 'asset', assetId } : null,
       presentedMedia: accepted ? { kind: 'asset', assetId } : null,
@@ -51,7 +56,16 @@ const currentProject = (projectId: string, accepted: boolean): ProjectCurrentRes
       selectedVoice: null,
       visualTreatment: { kind: 'none' },
       liveMode: null,
-      creativeIntent: { promptId: null, recipeId: null, userIntent: '' },
+      creativeIntent: {
+        promptId: null,
+        promptLabel: null,
+        recipeId: null,
+        recipeLabel: null,
+        userIntent: '',
+        appliedPrompt: null,
+        referenceAssetId: null,
+        resourceRevision: null,
+      },
       localEdit: null,
       exportSpecification: null,
       lastSuccessfulOutput: null,
@@ -113,6 +127,45 @@ const reusedSourceResponse = (projectId: string): ProjectSourceResponse => {
   };
 };
 
+const adoptedWorkingResponse = (projectId: string): ProjectWorkingMediaResponse => {
+  const base = currentProject(projectId, true);
+  const revision = {
+    ...base.revision,
+    snapshot: {
+      ...base.revision.snapshot,
+      workingMedia: { kind: 'asset' as const, assetId: workingAssetId },
+      presentedMedia: { kind: 'asset' as const, assetId: workingAssetId },
+    },
+  };
+  return {
+    project: base.project,
+    revision,
+    media: {
+      kind: 'local-render',
+      reference: { kind: 'asset', assetId: workingAssetId },
+      assetId: workingAssetId,
+      savedVideoId: null,
+      videoVersionId: null,
+      mimeType: 'video/mp4',
+      filename: 'adopted-working.mp4',
+      sizeBytes: 4,
+      checksumSha256: 'a'.repeat(64),
+      container: 'mp4',
+      videoCodec: 'avc',
+      audioCodec: null,
+      durationMs: 900,
+      width: 640,
+      height: 360,
+      hasAudio: false,
+      adoptedRevisionId: acceptedRevisionId,
+      adoptedRevisionNumber: 2,
+      adoptedAt: now,
+      contentUrl: `/api/projects/${projectId}/working-media/${acceptedRevisionId}/content`,
+    },
+    isCurrent: true,
+  };
+};
+
 const runtime = () => {
   const present = vi.fn<ProjectSourceRuntime['present']>();
   const clear = vi.fn<ProjectSourceRuntime['clear']>();
@@ -167,6 +220,35 @@ describe('useProjectSourceController', () => {
     const secondInput = mediaOwner.present.mock.calls.at(-1)![1];
     expect(secondInput.blob).toBeInstanceOf(File);
     expect(secondInput.blob).not.toBe(firstInput.blob);
+  });
+
+  it('hydrates the current adopted working reference while keeping source metadata immutable', async () => {
+    const working = adoptedWorkingResponse(firstProjectId);
+    const source = {
+      ...sourceResponse(firstProjectId),
+      revision: working.revision,
+    };
+    mockApiServer.use(
+      http.get(`*/api/projects/${firstProjectId}/source`, () => HttpResponse.json(source)),
+      http.get(`*/api/projects/${firstProjectId}/working-media`, () => HttpResponse.json(working)),
+      http.get(`*/api/projects/${firstProjectId}/working-media/${acceptedRevisionId}/content`, () =>
+        HttpResponse.arrayBuffer(new Uint8Array([4, 3, 2, 1]).buffer, {
+          headers: { 'Content-Type': 'video/mp4', 'Content-Length': '4' },
+        }),
+      ),
+    );
+    const mediaOwner = runtime();
+    const hook = renderHook(() => useProjectSourceController(firstProjectId, working, mediaOwner), {
+      wrapper: RemoteStateTestProvider,
+    });
+
+    await waitFor(() => expect(hook.result.current.phase).toBe('saved'));
+    expect(hook.result.current.source?.filename).toBe(`${firstProjectId}.mp4`);
+    expect(mediaOwner.present).toHaveBeenCalledOnce();
+    expect(mediaOwner.present.mock.calls[0]?.[0]).toBe(firstProjectId);
+    expect(mediaOwner.present.mock.calls[0]?.[1].artifactMetadata.filename).toBe(
+      'adopted-working.mp4',
+    );
   });
 
   it('aborts an old Project hydration so late completion cannot replace the new stage', async () => {

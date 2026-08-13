@@ -205,13 +205,13 @@ export const useReferenceRecipeAttribution = ({
   }, [activeRecipe]);
 
   const commitHydratedRecipe = useCallback(
-    ({
+    async ({
       pending,
       referenceImage,
       storedReferenceMetadata,
       appliedPrompt,
       referenceMatchesPendingPrompt,
-    }: ReferenceRecipeHydrationResult) => {
+    }: ReferenceRecipeHydrationResult): Promise<void> => {
       const repositorySnapshot = repository.getSnapshot().store;
       const sourceAsset = pending.savedCharacterPromptId
         ? repositorySnapshot.savedCharacterPrompts.find(
@@ -301,7 +301,7 @@ export const useReferenceRecipeAttribution = ({
       }
 
       if (exactCharacterPromptId) {
-        void repository.selectCharacterVersion({
+        await repository.selectCharacterVersion({
           characterId: exactCharacterPromptId,
           variantId: pending.savedCharacterVariantId ?? null,
         });
