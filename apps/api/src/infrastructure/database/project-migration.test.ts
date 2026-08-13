@@ -24,6 +24,10 @@ const projectWorkingMediaMigrationUrl = new URL(
   '../../../drizzle/0018_stormy_darkhawk.sql',
   import.meta.url,
 );
+const projectProcessingMigrationUrl = new URL(
+  '../../../drizzle/0019_tearful_microchip.sql',
+  import.meta.url,
+);
 
 describe('Project aggregate migration', () => {
   it('is additive and creates every normalized Project relationship', async () => {
@@ -158,6 +162,22 @@ describe('Project working-media migration', () => {
     expect(migration).toContain('"snapshot_schema_version" in (1, 2)');
     expect(migration).not.toMatch(
       /\b(?:TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b/u,
+    );
+  });
+});
+
+describe('Project processing authority migration', () => {
+  it('adds retry/result correlation and exact result revision linkage without backfill', async () => {
+    const migration = await readFile(projectProcessingMigrationUrl, 'utf8');
+
+    expect(migration).toContain('ADD COLUMN "result_asset_id" uuid');
+    expect(migration).toContain('ADD COLUMN "retry_of_job_id" uuid');
+    expect(migration).toContain('processing_jobs_retry_same_owner_fk');
+    expect(migration).toContain('project_jobs_result_revision_same_project_fk');
+    expect(migration).toContain('processing_jobs_result_consistent');
+    expect(migration).toContain('project_jobs_result_revision_consistent');
+    expect(migration).not.toMatch(
+      /\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b/u,
     );
   });
 });

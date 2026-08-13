@@ -57,6 +57,12 @@ import { ProjectService } from './features/projects/project-service.js';
 import { registerProjectRoutes } from './features/projects/routes.js';
 import { ProjectSourceService } from './features/projects/project-source-service.js';
 import { ProjectWorkingMediaService } from './features/projects/project-working-media-service.js';
+import {
+  isProjectProcessingRepository,
+  type ProjectProcessingRepository,
+} from './features/projects/project-processing-repository.js';
+import { ProjectProcessingService } from './features/projects/project-processing-service.js';
+import { registerProjectProcessingRoutes } from './features/projects/project-processing-routes.js';
 import type { CampaignRepository } from './features/campaigns/campaign-repository.js';
 import { CampaignService } from './features/campaigns/campaign-service.js';
 import { registerCampaignRoutes } from './features/campaigns/routes.js';
@@ -66,6 +72,7 @@ import {
   FileProcessingJobRepository,
   type ProcessingJobTraceWriter,
 } from './features/processing-jobs/file-processing-job-repository.js';
+import { ProjectAwareProcessingJobRepository } from './features/processing-jobs/project-aware-processing-job-repository.js';
 import {
   DecartSdkTokenProvider,
   type DecartTokenProvider,
@@ -106,6 +113,7 @@ export interface AppPersistenceDependencies {
   readonly processingJobTraces?: ProcessingJobTraceWriter;
   readonly processingJobs?: DurableProcessingJobRepository;
   readonly projects?: ProjectRepository;
+  readonly projectProcessing?: ProjectProcessingRepository;
   readonly campaigns?: CampaignRepository;
   readonly projectOutputMetadata?: ProjectOutputMetadataUnitOfWork;
   readonly projectRetention?: ProjectRetentionPolicy;
@@ -284,23 +292,6 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
       optimizerVersion: dependencies.config.openAiPromptOptimizerVersion,
     },
   );
-  const processingJobTraceWriter =
-    dependencies.persistence?.processingJobTraces ??
-    (dependencies.config.nodeEnv === 'test'
-      ? undefined
-      : new FileProcessingJobRepository(dependencies.config.lightframeDataDir));
-  const videoJobService = new VideoJobService(
-    videoJobProviders,
-    dependencies.config.lightframeDataDir,
-    {
-      ...(processingJobTraceWriter === undefined ? {} : { traceWriter: processingJobTraceWriter }),
-      ...(dependencies.persistence?.processingJobs === undefined
-        ? {}
-        : { durableJobRepository: dependencies.persistence.processingJobs }),
-      maximumActiveJobs: dependencies.config.videoJobMaxActive,
-      maximumActiveJobsPerProvider: dependencies.config.videoJobMaxActivePerProvider,
-    },
-  );
   const savedVideoRepository =
     dependencies.persistence?.savedVideos ??
     new FileSavedVideoRepository(dependencies.config.lightframeDataDir);
@@ -309,6 +300,43 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
     (dependencies.config.databaseMode === 'local' || dependencies.config.databaseMode === 'shadow'
       ? new FileProjectRepository(dependencies.config.lightframeDataDir)
       : undefined);
+  const projectProcessingRepository =
+    dependencies.persistence?.projectProcessing ??
+    (isProjectProcessingRepository(projectRepository) ? projectRepository : undefined);
+  const fallbackProcessingJobs =
+    dependencies.persistence?.processingJobs ??
+    (projectProcessingRepository !== undefined || dependencies.config.nodeEnv !== 'test'
+      ? new FileProcessingJobRepository(dependencies.config.lightframeDataDir)
+      : undefined);
+  const projectAwareProcessingJobs =
+    projectProcessingRepository === undefined || fallbackProcessingJobs === undefined
+      ? undefined
+      : new ProjectAwareProcessingJobRepository(
+          projectProcessingRepository,
+          fallbackProcessingJobs,
+          dependencies.config.databaseMode === 'shadow' &&
+            dependencies.persistence?.processingJobTraces !== undefined &&
+            dependencies.persistence.processingJobTraces !== fallbackProcessingJobs
+            ? dependencies.persistence.processingJobTraces
+            : undefined,
+        );
+  const durableProcessingJobs = projectAwareProcessingJobs ?? fallbackProcessingJobs;
+  const processingJobTraceWriter =
+    projectAwareProcessingJobs ??
+    dependencies.persistence?.processingJobTraces ??
+    fallbackProcessingJobs;
+  const videoJobService = new VideoJobService(
+    videoJobProviders,
+    dependencies.config.lightframeDataDir,
+    {
+      ...(processingJobTraceWriter === undefined ? {} : { traceWriter: processingJobTraceWriter }),
+      ...(durableProcessingJobs === undefined
+        ? {}
+        : { durableJobRepository: durableProcessingJobs }),
+      maximumActiveJobs: dependencies.config.videoJobMaxActive,
+      maximumActiveJobsPerProvider: dependencies.config.videoJobMaxActivePerProvider,
+    },
+  );
   const projectRetention =
     dependencies.persistence?.projectRetention ??
     (projectRepository instanceof FileProjectRepository ? projectRepository : undefined);
@@ -338,6 +366,16 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
       : new ProjectWorkingMediaService(projectRepository, savedVideoRepository, assetBytes, {
           ...(projectRetention === undefined ? {} : { projectRetention }),
         });
+  const projectProcessingService =
+    projectRepository === undefined || projectProcessingRepository === undefined
+      ? undefined
+      : new ProjectProcessingService(
+          projectRepository,
+          projectProcessingRepository,
+          videoJobService,
+          assetBytes,
+          referenceImageAssetStore,
+        );
   const directSavedVideoUploads = dependencies.persistence?.directVideoUploads;
   const directSavedVideoUploadService =
     directSavedVideoUploads === undefined
@@ -373,6 +411,7 @@ export const createApp = (dependencies: AppDependencies): ApplicationRuntime => 
   registerVideoJobRoutes(app, videoJobService);
   registerSavedVideoRoutes(app, savedVideoService, directSavedVideoUploadService);
   registerProjectRoutes(app, projectService, projectSourceService, projectWorkingMediaService);
+  registerProjectProcessingRoutes(app, projectProcessingService);
   registerCampaignRoutes(app, campaignService);
   registerCreativeLibraryRoutes(
     app,

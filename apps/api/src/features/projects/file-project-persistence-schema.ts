@@ -1,11 +1,15 @@
 import {
   campaignStatusSchema,
+  inspectedVideoSchema,
+  projectProcessingCapabilitySchema,
   projectAssetRoleSchema,
   projectRevisionSourceSchema,
   projectSnapshotSchema,
   projectSourceKindSchema,
   projectStatusSchema,
   videoInputMimeTypeSchema,
+  videoJobErrorCodeSchema,
+  videoOutputResolutionSchema,
 } from '@studio/contracts';
 import { z } from 'zod';
 import { persistedTimestampSchema } from '../../application/timestamps.js';
@@ -96,6 +100,62 @@ export const storedOutputLinkSchema = z
     createdAt: persistedTimestampSchema,
   })
   .strict();
+
+export const storedProjectProcessingAttemptSchema = z
+  .object({
+    operationId: z.uuid(),
+    ownerUserId: ownerIdSchema,
+    projectId: projectIdSchema,
+    capability: projectProcessingCapabilitySchema,
+    provider: z.string().trim().min(1).max(80),
+    providerJobId: z.string().trim().min(1).max(500).nullable(),
+    requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+    inputAssetId: z.uuid(),
+    resultAssetId: z.uuid(),
+    outputAssetId: z.uuid().nullable(),
+    result: inspectedVideoSchema.nullable(),
+    retryOfOperationId: z.uuid().nullable(),
+    attemptNumber: z.number().int().positive(),
+    initiatingRevisionId: z.uuid(),
+    initiatingRevisionNumber: z.number().int().positive(),
+    resultRevisionId: z.uuid().nullable(),
+    resultRevisionNumber: z.number().int().positive().nullable(),
+    status: z.enum([
+      'pending',
+      'validating',
+      'submitting',
+      'accepted',
+      'ambiguous',
+      'queued',
+      'processing',
+      'retrieving',
+      'ready',
+      'failed',
+      'expired',
+      'cancelled',
+    ]),
+    safeErrorCode: z.union([videoJobErrorCodeSchema, z.literal('processing_failed')]).nullable(),
+    outputResolution: videoOutputResolutionSchema,
+    providerOutputLocation: z.string().trim().min(1).max(2_000).nullable(),
+    sourceDurationMs: z.number().int().positive().max(300_000),
+    sourceOrientation: z.enum(['landscape', 'portrait']),
+    createdAt: persistedTimestampSchema,
+    updatedAt: persistedTimestampSchema,
+    acceptedAt: persistedTimestampSchema.nullable(),
+    completedAt: persistedTimestampSchema.nullable(),
+    expiresAt: persistedTimestampSchema,
+  })
+  .strict()
+  .superRefine((attempt, context) => {
+    if (
+      (attempt.resultRevisionId === null) !== (attempt.resultRevisionNumber === null) ||
+      (attempt.outputAssetId === null) !== (attempt.result === null) ||
+      (attempt.outputAssetId !== null && attempt.outputAssetId !== attempt.resultAssetId) ||
+      (attempt.status === 'ambiguous') !== (attempt.safeErrorCode === 'submission_ambiguous')
+    ) {
+      context.addIssue({ code: 'custom', message: 'Stored Project processing state is invalid.' });
+    }
+  });
 
 export const storedProjectSourceSchema = z
   .object({
@@ -276,11 +336,12 @@ export const createReceiptSchema = z
 
 export const librarySchema = z
   .object({
-    schemaVersion: z.literal(4),
+    schemaVersion: z.literal(5),
     ownerUserId: ownerIdSchema,
     revision: z.number().int().nonnegative(),
     campaigns: z.array(storedCampaignSchema),
     projects: z.array(storedAggregateSchema),
+    processingJobs: z.array(storedProjectProcessingAttemptSchema),
     createReceipts: z.array(createReceiptSchema),
     campaignCreateReceipts: z.array(campaignCreateReceiptSchema),
   })
@@ -294,17 +355,45 @@ export const librarySchema = z
     );
     const projectIdSet = new Set(projectIds);
     const campaignIdSet = new Set(campaignIds);
+    const processingOperationIds = library.processingJobs.map(({ operationId }) => operationId);
     if (
       projectIdSet.size !== projectIds.length ||
       campaignIdSet.size !== campaignIds.length ||
       new Set(operationKeys).size !== operationKeys.length ||
       new Set(campaignOperationKeys).size !== campaignOperationKeys.length ||
+      new Set(processingOperationIds).size !== processingOperationIds.length ||
       library.campaigns.some(({ ownerUserId }) => ownerUserId !== library.ownerUserId) ||
       library.projects.some(({ project }) => project.ownerUserId !== library.ownerUserId) ||
+      library.processingJobs.some(({ ownerUserId }) => ownerUserId !== library.ownerUserId) ||
       library.projects.some(
         ({ project }) => project.campaignId !== null && !campaignIdSet.has(project.campaignId),
       ) ||
       library.createReceipts.some(({ projectId }) => !projectIdSet.has(projectId)) ||
+      library.processingJobs.some(
+        ({
+          projectId,
+          operationId,
+          initiatingRevisionId,
+          initiatingRevisionNumber,
+          retryOfOperationId,
+        }) => {
+          const project = library.projects.find(({ project }) => project.id === projectId);
+          const linked = project?.jobLinks.some(
+            (link) =>
+              link.jobId === operationId &&
+              link.initiatingRevisionId === initiatingRevisionId &&
+              link.initiatingRevisionNumber === initiatingRevisionNumber,
+          );
+          return (
+            !linked ||
+            (retryOfOperationId !== null &&
+              !library.processingJobs.some(
+                (candidate) =>
+                  candidate.operationId === retryOfOperationId && candidate.projectId === projectId,
+              ))
+          );
+        },
+      ) ||
       library.campaignCreateReceipts.some(({ campaignId }) => !campaignIdSet.has(campaignId))
     ) {
       context.addIssue({ code: 'custom', message: 'Stored Project library identity is invalid.' });
@@ -315,7 +404,7 @@ export type ProjectLibrary = z.infer<typeof librarySchema>;
 
 const previousLibraryEnvelopeSchema = z
   .object({
-    schemaVersion: z.union([z.literal(2), z.literal(3)]),
+    schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4)]),
     ownerUserId: ownerIdSchema,
     revision: z.number().int().nonnegative(),
     campaigns: z.array(storedCampaignSchema),
@@ -346,8 +435,9 @@ export const parseLibrary = (
       migrated: true,
       library: librarySchema.parse({
         ...previous.data,
-        schemaVersion: 4,
+        schemaVersion: 5,
         projects: previous.data.projects.map((aggregate) => storedAggregateSchema.parse(aggregate)),
+        processingJobs: [],
       }),
     };
   }
@@ -365,11 +455,12 @@ export const parseLibrary = (
   return {
     migrated: true,
     library: librarySchema.parse({
-      schemaVersion: 4,
+      schemaVersion: 5,
       ownerUserId: legacy.ownerUserId,
       revision: legacy.revision,
       campaigns: [],
       projects,
+      processingJobs: [],
       createReceipts: legacy.createReceipts,
       campaignCreateReceipts: [],
     }),
@@ -378,7 +469,7 @@ export const parseLibrary = (
 
 export const journalSchema = z
   .object({
-    schemaVersion: z.literal(4),
+    schemaVersion: z.literal(5),
     ownerUserId: ownerIdSchema,
     transactionId: z.uuid(),
     state: z.literal('prepared'),
@@ -389,6 +480,22 @@ export const journalSchema = z
           operationKey: z.uuid(),
           requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
           projectId: projectIdSchema,
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('project-processing-admit'),
+          operationId: z.uuid(),
+          requestFingerprint: z.string().regex(/^[a-f0-9]{64}$/u),
+          projectId: projectIdSchema,
+        })
+        .strict(),
+      z
+        .object({
+          kind: z.literal('project-processing-result'),
+          operationId: z.uuid(),
+          projectId: projectIdSchema,
+          assetId: z.uuid(),
         })
         .strict(),
       z
@@ -446,15 +553,29 @@ export const journalSchema = z
                   source.operationKey === operation.operationKey &&
                   source.requestFingerprint === operation.requestFingerprint,
               )
-            : metadata.projects.some(({ workingMediaAdoptions }) =>
-                workingMediaAdoptions.some(
-                  (media) =>
-                    media.projectId === operation.projectId &&
-                    media.adoptedRevisionId === operation.revisionId &&
-                    media.operationKey === operation.operationKey &&
-                    media.requestFingerprint === operation.requestFingerprint,
-                ),
-              );
+            : operation.kind === 'project-working-media-adopt'
+              ? metadata.projects.some(({ workingMediaAdoptions }) =>
+                  workingMediaAdoptions.some(
+                    (media) =>
+                      media.projectId === operation.projectId &&
+                      media.adoptedRevisionId === operation.revisionId &&
+                      media.operationKey === operation.operationKey &&
+                      media.requestFingerprint === operation.requestFingerprint,
+                  ),
+                )
+              : operation.kind === 'project-processing-admit'
+                ? metadata.processingJobs.some(
+                    (attempt) =>
+                      attempt.operationId === operation.operationId &&
+                      attempt.projectId === operation.projectId &&
+                      attempt.requestFingerprint === operation.requestFingerprint,
+                  )
+                : metadata.processingJobs.some(
+                    (attempt) =>
+                      attempt.operationId === operation.operationId &&
+                      attempt.projectId === operation.projectId &&
+                      attempt.outputAssetId === operation.assetId,
+                  );
     if (metadata.ownerUserId !== journal.ownerUserId || !consistent) {
       context.addIssue({ code: 'custom', message: 'Prepared Project journal is inconsistent.' });
     }
@@ -462,7 +583,7 @@ export const journalSchema = z
 
 const previousJournalSchema = z
   .object({
-    schemaVersion: z.union([z.literal(2), z.literal(3)]),
+    schemaVersion: z.union([z.literal(2), z.literal(3), z.literal(4)]),
     ownerUserId: ownerIdSchema,
     transactionId: z.uuid(),
     state: z.literal('prepared'),
@@ -498,14 +619,14 @@ export const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
   if (previous.success) {
     return journalSchema.parse({
       ...previous.data,
-      schemaVersion: 4,
+      schemaVersion: 5,
       writes: { metadata: parseLibrary(previous.data.writes.metadata).library },
     });
   }
   const legacy = legacyJournalSchema.parse(value);
   const metadata = parseLibrary(legacy.writes.projectMetadata).library;
   return journalSchema.parse({
-    schemaVersion: 4,
+    schemaVersion: 5,
     ownerUserId: legacy.ownerUserId,
     transactionId: legacy.transactionId,
     state: legacy.state,
@@ -516,11 +637,12 @@ export const parseJournal = (value: unknown): z.infer<typeof journalSchema> => {
 };
 
 export const emptyLibrary = (ownerUserId: string): ProjectLibrary => ({
-  schemaVersion: 4,
+  schemaVersion: 5,
   ownerUserId: ownerIdSchema.parse(ownerUserId),
   revision: 0,
   campaigns: [],
   projects: [],
+  processingJobs: [],
   createReceipts: [],
   campaignCreateReceipts: [],
 });

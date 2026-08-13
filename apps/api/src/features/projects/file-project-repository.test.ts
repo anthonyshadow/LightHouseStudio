@@ -161,7 +161,7 @@ describe('FileProjectRepository', () => {
     ).rejects.toThrow();
   });
 
-  it('migrates v1 Project metadata to v4 without inventing Campaign membership or source', async () => {
+  it('migrates v1 Project metadata to v5 without inventing Campaign membership or source', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Legacy standalone');
     if (!created.ok) throw new Error('Expected a Project create.');
@@ -175,6 +175,7 @@ describe('FileProjectRepository', () => {
     current.schemaVersion = 1;
     delete current.campaigns;
     delete current.campaignCreateReceipts;
+    delete (current as { processingJobs?: unknown }).processingJobs;
     for (const aggregate of current.projects) delete aggregate.project.campaignId;
     await writeFile(paths.primary, `${JSON.stringify(current)}\n`, 'utf8');
     await writeFile(paths.backup, `${JSON.stringify(current)}\n`, 'utf8');
@@ -187,13 +188,13 @@ describe('FileProjectRepository', () => {
       schemaVersion: number;
       campaigns: unknown[];
     };
-    expect(migrated).toMatchObject({ schemaVersion: 4, campaigns: [] });
+    expect(migrated).toMatchObject({ schemaVersion: 5, campaigns: [], processingJobs: [] });
     expect(
       (migrated as { projects?: Array<{ source?: unknown }> }).projects?.[0]?.source,
     ).toBeNull();
   });
 
-  it('migrates v2 Campaign/Project metadata to v4 with explicit empty source/adoptions', async () => {
+  it('migrates v2 Campaign/Project metadata to v5 with explicit empty source/adoptions', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Prompt 05 Project');
     if (!created.ok) throw new Error('Expected a Project create.');
@@ -203,6 +204,7 @@ describe('FileProjectRepository', () => {
       projects: Array<{ source?: unknown; workingMediaAdoptions?: unknown }>;
     };
     previous.schemaVersion = 2;
+    delete (previous as { processingJobs?: unknown }).processingJobs;
     for (const aggregate of previous.projects) delete aggregate.source;
     await writeFile(paths.primary, `${JSON.stringify(previous)}\n`, 'utf8');
     await writeFile(paths.backup, `${JSON.stringify(previous)}\n`, 'utf8');
@@ -216,14 +218,14 @@ describe('FileProjectRepository', () => {
       schemaVersion: number;
       projects: Array<{ source: unknown }>;
     };
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated.projects[0]?.source).toBeNull();
     expect(
       (migrated.projects[0] as { workingMediaAdoptions?: unknown }).workingMediaAdoptions,
     ).toEqual([]);
   });
 
-  it('migrates v3 snapshot v1 records to v4/snapshot v2 without fabricating applied values', async () => {
+  it('migrates v3 snapshot v1 records to v5/snapshot v2 without fabricating applied values', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Prompt 07 Project');
     if (!created.ok) throw new Error('Expected a Project create.');
@@ -236,6 +238,7 @@ describe('FileProjectRepository', () => {
       }>;
     };
     previous.schemaVersion = 3;
+    delete (previous as { processingJobs?: unknown }).processingJobs;
     for (const aggregate of previous.projects) {
       delete aggregate.workingMediaAdoptions;
       for (const revision of aggregate.revisions) {
@@ -268,7 +271,7 @@ describe('FileProjectRepository', () => {
         revisions: Array<{ snapshot: { schemaVersion: number } }>;
       }>;
     };
-    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.schemaVersion).toBe(5);
     expect(migrated.projects[0]?.workingMediaAdoptions).toEqual([]);
     expect(migrated.projects[0]?.revisions[0]?.snapshot.schemaVersion).toBe(2);
   });
