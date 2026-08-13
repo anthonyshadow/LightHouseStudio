@@ -5,9 +5,11 @@ import {
   VOICE_PROVIDER_INTENT_VALUE,
   sharedVoicesResponseSchema,
   voiceLibraryMutationResponseSchema,
+  workspaceVoiceRelationshipResponseSchema,
   workspaceVoicesResponseSchema,
   type SharedVoicesQuery,
   type VoiceLibraryMutationResponse,
+  type WorkspaceVoiceRelationshipResponse,
 } from '@studio/contracts';
 import type {
   SharedVoiceItem,
@@ -61,6 +63,17 @@ export const listWorkspaceVoices = async (
     voices: payload.voices.map((voice) => ({ kind: 'workspace' as const, voice })),
   };
 };
+
+export const fetchWorkspaceVoiceRelationship = async (
+  voiceId: string,
+  signal: AbortSignal,
+): Promise<WorkspaceVoiceRelationshipResponse> =>
+  requestJson(
+    `/api/elevenlabs/voices/${encodeURIComponent(voiceId)}/relationship`,
+    { signal, cache: 'no-store' },
+    workspaceVoiceRelationshipResponseSchema,
+    () => invalidResponse('saved voice relationship'),
+  );
 
 const voiceParams = (criteria: VoiceFilterCriteria): URLSearchParams => {
   const params = new URLSearchParams({ pageSize: '20' });

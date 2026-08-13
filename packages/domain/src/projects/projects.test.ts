@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   acceptProjectSource,
+  adoptProjectWorkingMedia,
   appendProjectRevision,
   archiveProject,
   canTransitionProjectStatus,
@@ -15,6 +16,7 @@ import {
   restoreProject,
   validateProjectSnapshot,
 } from './index';
+import { createDefaultVideoEditSpec } from '../video-editing';
 
 const projectId = '18b120ac-1578-46e3-8c3d-42307772f391';
 const ownerUserId = '8565ab6c-70ee-409c-bb0a-ff08b7c98070';
@@ -23,6 +25,7 @@ const secondRevisionId = '4159225b-60f4-4f94-a3d5-08feee91a91d';
 const sourceAssetId = '79b94c02-d268-4201-a05b-1f3baa0caed1';
 const now = '2026-08-11T12:00:00.000Z';
 const later = '2026-08-11T12:05:00.000Z';
+const latest = '2026-08-11T12:10:00.000Z';
 const emptyFacts = {
   sourceStatus: 'none',
   currentAttempt: { status: 'none' },
@@ -146,7 +149,11 @@ describe('Project aggregate rules', () => {
     expect(() =>
       validateProjectSnapshot({
         ...snapshot,
-        visualTreatment: { kind: 'character-swap' },
+        visualTreatment: {
+          kind: 'character-swap',
+          providerId: null,
+          outputResolution: null,
+        },
       }),
     ).toThrow('requires a selected character');
     expect(() =>
@@ -158,11 +165,37 @@ describe('Project aggregate rules', () => {
     expect(
       validateProjectSnapshot({
         ...snapshot,
-        selectedCharacter: { characterId: 'character-one', variantId: null },
-        selectedOutfit: { outfitId: 'outfit-one' },
-        visualTreatment: { kind: 'virtual-try-on' },
+        selectedCharacter: {
+          characterId: 'character-one',
+          characterLabel: 'Character One',
+          characterRevision: now,
+          variantId: null,
+          variantLabel: null,
+          variantRevision: null,
+          referenceAssetId: null,
+        },
+        selectedOutfit: null,
+        visualTreatment: {
+          kind: 'virtual-try-on',
+          providerId: null,
+          outputResolution: null,
+          inputKind: 'prompt',
+          enhancePrompt: false,
+        },
       }).visualTreatment,
-    ).toEqual({ kind: 'virtual-try-on' });
+    ).toMatchObject({ kind: 'virtual-try-on', inputKind: 'prompt' });
+    expect(() =>
+      validateProjectSnapshot({
+        ...snapshot,
+        visualTreatment: {
+          kind: 'virtual-try-on',
+          providerId: null,
+          outputResolution: null,
+          inputKind: 'saved-outfit',
+          enhancePrompt: false,
+        },
+      }),
+    ).toThrow('requires a selected outfit');
   });
 
   it('appends monotonic immutable revisions and reports both CAS conflict kinds', () => {
@@ -290,6 +323,56 @@ describe('Project aggregate rules', () => {
         { now: later, createId: () => '80eb98cb-0dd4-4aac-8507-084789045d71' },
       ),
     ).toEqual({ ok: false, conflict: { kind: 'immutable-source', projectId } });
+  });
+
+  it('adopts validated working media without replacing the immutable original or creating output provenance', () => {
+    const accepted = acceptProjectSource(
+      emptyProject(),
+      {
+        expectedProjectVersion: 1,
+        expectedRevisionNumber: 1,
+        assetId: sourceAssetId,
+        mediaReference: { kind: 'asset', assetId: sourceAssetId },
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: later, createId: () => secondRevisionId },
+    );
+    if (!accepted.ok) throw new Error('Expected Project source acceptance.');
+    const workingAssetId = '65cd938f-5ff6-4730-953b-4137136354c7';
+    const edit = createDefaultVideoEditSpec(10_000);
+    const adopted = adoptProjectWorkingMedia(
+      accepted.value,
+      {
+        expectedProjectVersion: 2,
+        expectedRevisionNumber: 2,
+        mediaReference: { kind: 'asset', assetId: workingAssetId },
+        localEdit: edit,
+        author: { kind: 'user', authorId: ownerUserId },
+      },
+      { now: latest, createId: () => '80eb98cb-0dd4-4aac-8507-084789045d71' },
+    );
+
+    expect(adopted).toMatchObject({
+      ok: true,
+      value: {
+        project: { status: 'ready', version: 3, currentRevisionNumber: 3 },
+        revisions: [
+          {},
+          {},
+          {
+            snapshot: {
+              sourceAssetId,
+              workingMedia: { kind: 'asset', assetId: workingAssetId },
+              presentedMedia: { kind: 'asset', assetId: workingAssetId },
+              localEdit: edit,
+              lastSuccessfulOutput: null,
+              workflowPhase: 'review',
+            },
+          },
+        ],
+        outputLinks: [],
+      },
+    });
   });
 
   it('clears a completed pointer when a later revision changes material working state', () => {

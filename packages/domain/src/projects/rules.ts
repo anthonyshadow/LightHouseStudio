@@ -34,6 +34,7 @@ export class ProjectRuleError extends Error {
 
 const PROJECT_TITLE_MAX_LENGTH = 120;
 const PROJECT_INTENT_MAX_LENGTH = 4_000;
+const PROJECT_APPLIED_LABEL_MAX_LENGTH = 120;
 
 const requireTimestamp = (value: string): string => {
   const parsed = new Date(value);
@@ -51,6 +52,14 @@ const requireId = (value: string, label: string): string => {
     /^(?:blob|data|https?):/iu.test(normalized)
   ) {
     throw new ProjectRuleError('invalid-id', `${label} must be an opaque durable identifier.`);
+  }
+  return normalized;
+};
+
+const requireAppliedLabel = (value: string, label: string): string => {
+  const normalized = value.replaceAll(/\s+/gu, ' ').trim();
+  if (normalized.length === 0 || normalized.length > PROJECT_APPLIED_LABEL_MAX_LENGTH) {
+    throw new ProjectRuleError('invalid-snapshot', `${label} is invalid.`);
   }
   return normalized;
 };
@@ -98,19 +107,71 @@ export const validateProjectSnapshot = (snapshot: ProjectSnapshot): ProjectSnaps
   validateMediaReference(snapshot.presentedMedia);
   if (snapshot.selectedCharacter !== null) {
     requireId(snapshot.selectedCharacter.characterId, 'Character');
+    if (snapshot.selectedCharacter.characterLabel !== null) {
+      requireAppliedLabel(snapshot.selectedCharacter.characterLabel, 'Character label');
+    }
+    if (snapshot.selectedCharacter.characterRevision !== null) {
+      requireTimestamp(snapshot.selectedCharacter.characterRevision);
+    }
     if (snapshot.selectedCharacter.variantId !== null) {
       requireId(snapshot.selectedCharacter.variantId, 'Character variant');
+      if (
+        (snapshot.selectedCharacter.variantLabel === null) !==
+        (snapshot.selectedCharacter.variantRevision === null)
+      ) {
+        throw new ProjectRuleError(
+          'invalid-snapshot',
+          'A Character Variant label and revision must be recorded together.',
+        );
+      }
+      if (snapshot.selectedCharacter.variantLabel !== null) {
+        requireAppliedLabel(snapshot.selectedCharacter.variantLabel, 'Character Variant label');
+        requireTimestamp(snapshot.selectedCharacter.variantRevision!);
+      }
+    } else if (
+      snapshot.selectedCharacter.variantLabel !== null ||
+      snapshot.selectedCharacter.variantRevision !== null
+    ) {
+      throw new ProjectRuleError(
+        'invalid-snapshot',
+        'Character Variant applied values require a Variant identifier.',
+      );
+    }
+    if (snapshot.selectedCharacter.referenceAssetId !== null) {
+      requireId(snapshot.selectedCharacter.referenceAssetId, 'Character reference');
     }
   }
-  if (snapshot.selectedOutfit !== null) requireId(snapshot.selectedOutfit.outfitId, 'Outfit');
+  if (snapshot.selectedOutfit !== null) {
+    requireId(snapshot.selectedOutfit.outfitId, 'Outfit');
+    if (snapshot.selectedOutfit.outfitLabel !== null) {
+      requireAppliedLabel(snapshot.selectedOutfit.outfitLabel, 'Outfit label');
+    }
+    if (snapshot.selectedOutfit.outfitRevision !== null) {
+      requireTimestamp(snapshot.selectedOutfit.outfitRevision);
+    }
+    if (snapshot.selectedOutfit.referenceAssetId !== null) {
+      requireId(snapshot.selectedOutfit.referenceAssetId, 'Outfit reference');
+    }
+  }
   if (snapshot.selectedVoice?.kind === 'saved-voice') {
     requireId(snapshot.selectedVoice.voiceId, 'Voice');
+    requireAppliedLabel(snapshot.selectedVoice.voiceName, 'Voice label');
+    if (snapshot.selectedVoice.resourceRevision !== null) {
+      requireTimestamp(snapshot.selectedVoice.resourceRevision);
+    }
   }
   if (snapshot.visualTreatment.kind === 'character-swap' && snapshot.selectedCharacter === null) {
     throw new ProjectRuleError('invalid-snapshot', 'Character Swap requires a selected character.');
   }
-  if (snapshot.visualTreatment.kind === 'virtual-try-on' && snapshot.selectedOutfit === null) {
-    throw new ProjectRuleError('invalid-snapshot', 'Virtual Try-On requires a selected outfit.');
+  if (
+    snapshot.visualTreatment.kind === 'virtual-try-on' &&
+    snapshot.visualTreatment.inputKind === 'saved-outfit' &&
+    snapshot.selectedOutfit === null
+  ) {
+    throw new ProjectRuleError(
+      'invalid-snapshot',
+      'Saved-outfit Virtual Try-On requires a selected outfit.',
+    );
   }
   if (snapshot.liveMode !== null) requireId(snapshot.liveMode.modeId, 'Live mode');
   if (snapshot.creativeIntent.promptId !== null) {
@@ -119,8 +180,26 @@ export const validateProjectSnapshot = (snapshot: ProjectSnapshot): ProjectSnaps
   if (snapshot.creativeIntent.recipeId !== null) {
     requireId(snapshot.creativeIntent.recipeId, 'Recipe');
   }
+  if (snapshot.creativeIntent.promptLabel !== null) {
+    requireAppliedLabel(snapshot.creativeIntent.promptLabel, 'Prompt label');
+  }
+  if (snapshot.creativeIntent.recipeLabel !== null) {
+    requireAppliedLabel(snapshot.creativeIntent.recipeLabel, 'Recipe label');
+  }
+  if (snapshot.creativeIntent.referenceAssetId !== null) {
+    requireId(snapshot.creativeIntent.referenceAssetId, 'Creative reference');
+  }
+  if (snapshot.creativeIntent.resourceRevision !== null) {
+    requireTimestamp(snapshot.creativeIntent.resourceRevision);
+  }
   if (snapshot.creativeIntent.userIntent.length > PROJECT_INTENT_MAX_LENGTH) {
     throw new ProjectRuleError('invalid-snapshot', 'Project intent is too long.');
+  }
+  if (
+    snapshot.creativeIntent.appliedPrompt !== null &&
+    snapshot.creativeIntent.appliedPrompt.length > PROJECT_INTENT_MAX_LENGTH
+  ) {
+    throw new ProjectRuleError('invalid-snapshot', 'The applied Project prompt is too long.');
   }
   if (snapshot.lastSuccessfulOutput !== null) {
     requireId(snapshot.lastSuccessfulOutput.savedVideoId, 'Saved video');
@@ -141,7 +220,16 @@ export const createEmptyProjectSnapshot = (nowValue: string): ProjectSnapshot =>
     selectedVoice: null,
     visualTreatment: { kind: 'none' },
     liveMode: null,
-    creativeIntent: { promptId: null, recipeId: null, userIntent: '' },
+    creativeIntent: {
+      promptId: null,
+      promptLabel: null,
+      recipeId: null,
+      recipeLabel: null,
+      userIntent: '',
+      appliedPrompt: null,
+      referenceAssetId: null,
+      resourceRevision: null,
+    },
     localEdit: null,
     exportSpecification: null,
     lastSuccessfulOutput: null,
@@ -588,6 +676,70 @@ export const acceptProjectSource = (
         presentedMedia: mediaReference,
         lastSuccessfulOutput: null,
         workflowPhase: 'creative',
+        updatedAt: now,
+      },
+      author: input.author,
+      source: 'user-edit',
+      facts: {
+        sourceStatus: 'ready',
+        currentAttempt: { status: 'none' },
+        validatedLastSuccessfulOutput: null,
+      },
+    },
+    { ...context, now },
+  );
+};
+
+export interface AdoptProjectWorkingMediaInput {
+  readonly expectedProjectVersion: number;
+  readonly expectedRevisionNumber: number;
+  readonly mediaReference: ProjectMediaReference;
+  readonly localEdit: ProjectSnapshot['localEdit'];
+  readonly author: ProjectRevisionAuthor;
+}
+
+/**
+ * Advances only the durable working/presented pointers. The immutable source and reusable-resource
+ * ownership stay unchanged; storage readiness and exact same-owner lineage are repository concerns.
+ */
+export const adoptProjectWorkingMedia = (
+  aggregate: ProjectAggregate,
+  input: AdoptProjectWorkingMediaInput,
+  context: ProjectMutationContext,
+): ProjectMutationResult<ProjectAggregate> => {
+  const currentRevision = aggregate.revisions.find(
+    ({ id }) => id === aggregate.project.currentRevisionId,
+  );
+  if (currentRevision === undefined) {
+    throw new ProjectRuleError('invalid-snapshot', 'The current project revision is missing.');
+  }
+  if (currentRevision.snapshot.sourceAssetId === null) {
+    throw new ProjectRuleError(
+      'invalid-transition',
+      'A Project needs an immutable original before working media can be adopted.',
+    );
+  }
+  const mediaReference: ProjectMediaReference =
+    input.mediaReference.kind === 'asset'
+      ? { kind: 'asset', assetId: requireId(input.mediaReference.assetId, 'Working media asset') }
+      : {
+          kind: 'saved-video-version',
+          savedVideoId: requireId(input.mediaReference.savedVideoId, 'Saved video'),
+          videoVersionId: requireId(input.mediaReference.videoVersionId, 'Video version'),
+        };
+  const now = requireTimestamp(context.now);
+  return appendProjectRevision(
+    aggregate,
+    {
+      expectedProjectVersion: input.expectedProjectVersion,
+      expectedRevisionNumber: input.expectedRevisionNumber,
+      snapshot: {
+        ...currentRevision.snapshot,
+        workingMedia: mediaReference,
+        presentedMedia: mediaReference,
+        localEdit: input.localEdit,
+        lastSuccessfulOutput: null,
+        workflowPhase: 'review',
         updatedAt: now,
       },
       author: input.author,

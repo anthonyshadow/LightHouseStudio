@@ -294,9 +294,16 @@ const ToolSettings = ({ session }: { session: VideoEditSession }) => {
 export type VideoEditWorkspaceProps = Readonly<{
   session: VideoEditSession;
   onRequestDiscard: () => void;
+  projectMode?: boolean;
+  appliedProjectEdit?: VideoEditSpec | null;
 }>;
 
-export const VideoEditWorkspace = ({ session, onRequestDiscard }: VideoEditWorkspaceProps) => {
+export const VideoEditWorkspace = ({
+  session,
+  onRequestDiscard,
+  projectMode = false,
+  appliedProjectEdit = null,
+}: VideoEditWorkspaceProps) => {
   const theme = useTheme();
   const busy = isVideoEditBusy(session.phase);
   const activeToolLabel = TOOLS.find((tool) => tool.id === session.activeTool)?.label;
@@ -377,6 +384,21 @@ export const VideoEditWorkspace = ({ session, onRequestDiscard }: VideoEditWorks
               path. Your current video is unchanged and can still be saved.
             </StatusNotice>
           ) : null}
+          {projectMode ? (
+            <StatusNotice tone="neutral" title="Temporary Render preview" role="status">
+              Rendering does not save Project media. After validation, explicitly adopt the preview
+              to make it durable working media; the immutable original stays unchanged.
+            </StatusNotice>
+          ) : null}
+          {projectMode && appliedProjectEdit ? (
+            <StatusNotice tone="neutral" title="Applied Project edit" role="status">
+              The current working-media bytes already include the retained edit from{' '}
+              {Math.round(appliedProjectEdit.trim.startMs)}–
+              {Math.round(appliedProjectEdit.trim.endMs)} ms, {appliedProjectEdit.crop.preset} crop,
+              and {appliedProjectEdit.filter} filter. New controls start from that rendered baseline
+              so the historical edit is not applied twice.
+            </StatusNotice>
+          ) : null}
           <ToolSettings session={session} />
           {session.phase === 'rendering' || session.phase === 'validating' ? (
             <div css={renderProgressStyles(theme)} role="status" aria-live="polite">
@@ -393,7 +415,11 @@ export const VideoEditWorkspace = ({ session, onRequestDiscard }: VideoEditWorks
             </div>
           ) : null}
           {session.error ? (
-            <StatusNotice tone="danger" title="Edit not saved" role="alert">
+            <StatusNotice
+              tone="danger"
+              title={projectMode ? 'Render preview not ready' : 'Edit not saved'}
+              role="alert"
+            >
               {session.error}
             </StatusNotice>
           ) : null}
@@ -414,7 +440,7 @@ export const VideoEditWorkspace = ({ session, onRequestDiscard }: VideoEditWorks
               disabled={!session.dirty || !session.supported || busy}
               onClick={() => void session.startRender()}
             >
-              Save edited video
+              {projectMode ? 'Render preview' : 'Save edited video'}
             </Button>
             <Button variant="danger" disabled={busy} onClick={onRequestDiscard}>
               Discard

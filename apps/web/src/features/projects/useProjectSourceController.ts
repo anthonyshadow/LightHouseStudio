@@ -1,6 +1,7 @@
 import type {
   ProjectCurrentResponse,
   ProjectSourceResponse,
+  ProjectWorkingMediaResponse,
   SavedVideoSummary,
 } from '@studio/contracts';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,6 +12,7 @@ import type { RestorePersistedOriginalInput } from '../recording/types';
 import { projectQueryKeys } from './useProjectsController';
 import {
   getProjectSource,
+  getProjectWorkingMedia,
   ProjectApiConflictError,
   reuseSavedVideoAsProjectSource,
   uploadProjectSource,
@@ -50,17 +52,25 @@ const safeMessage = (error: unknown): string =>
 
 const artifactInput = (
   file: File,
-  source?: ProjectSourceResponse['source'],
+  source?: ProjectSourceResponse['source'] | ProjectWorkingMediaResponse['media'],
 ): RestorePersistedOriginalInput => {
-  const createdAt = source?.acceptedAt ?? new Date().toISOString();
-  const id = `project-source-${crypto.randomUUID()}`;
+  const createdAt =
+    source === undefined
+      ? new Date().toISOString()
+      : 'acceptedAt' in source
+        ? source.acceptedAt
+        : source.adoptedAt;
+  const id = `project-media-${crypto.randomUUID()}`;
   return {
     blob: file,
     artifactMetadata: {
       id,
-      name: `Project source · ${createdAt} · ${id.slice(-8)}`,
+      name: `Project media · ${createdAt} · ${id.slice(-8)}`,
       createdAt,
-      kind: source?.kind === 'recorded' ? 'recorded' : 'uploaded',
+      kind:
+        source !== undefined && 'acceptedAt' in source && source.kind === 'recorded'
+          ? 'recorded'
+          : 'uploaded',
       parentArtifactId: null,
       mimeType: source?.mimeType ?? file.type,
       filename: source?.filename ?? file.name,
@@ -73,7 +83,7 @@ const artifactInput = (
           takeMetadata: {
             kind: 'uploaded' as const,
             mode: 'local' as const,
-            selectedAt: source.acceptedAt,
+            selectedAt: createdAt,
             displayName: source.filename,
             container: source.container,
             videoCodec: source.videoCodec,
@@ -89,7 +99,10 @@ const artifactInput = (
   };
 };
 
-const sourceBlob = async (source: ProjectSourceResponse['source'], signal: AbortSignal) => {
+const mediaBlob = async (
+  source: ProjectSourceResponse['source'] | ProjectWorkingMediaResponse['media'],
+  signal: AbortSignal,
+) => {
   const response = await apiFetch(source.contentUrl, {
     cache: 'no-store',
     headers: { Accept: source.mimeType },
@@ -129,7 +142,7 @@ export const useProjectSourceController = (
     null,
   );
   const generationRef = useRef(0);
-  const hydratedRevisionRef = useRef<string | null>(null);
+  const hydratedMediaRef = useRef<string | null>(null);
   const mountedRef = useRef(true);
 
   const busy = phase === 'preparing' || phase === 'saving';
@@ -159,7 +172,7 @@ export const useProjectSourceController = (
 
   const presentAccepted = useCallback(
     async (response: ProjectSourceResponse, signal: AbortSignal) => {
-      const blob = await sourceBlob(response.source, signal);
+      const blob = await mediaBlob(response.source, signal);
       signal.throwIfAborted();
       const file = new File([blob], response.source.filename, {
         type: response.source.mimeType,
@@ -170,16 +183,57 @@ export const useProjectSourceController = (
     [projectId, runtime],
   );
 
+  const presentCurrent = useCallback(
+    async (sourceResponse: ProjectSourceResponse, signal: AbortSignal) => {
+      const sourceReference =
+        sourceResponse.source.kind === 'saved-video-version'
+          ? {
+              kind: 'saved-video-version' as const,
+              savedVideoId: sourceResponse.source.savedVideoId!,
+              videoVersionId: sourceResponse.source.videoVersionId!,
+            }
+          : {
+              kind: 'asset' as const,
+              assetId: sourceResponse.revision.snapshot.sourceAssetId!,
+            };
+      const presented = current.revision.snapshot.presentedMedia;
+      if (JSON.stringify(presented) === JSON.stringify(sourceReference)) {
+        await presentAccepted(sourceResponse, signal);
+        return;
+      }
+      const working = await getProjectWorkingMedia(projectId, signal);
+      if (
+        !working.isCurrent ||
+        JSON.stringify(working.media.reference) !== JSON.stringify(presented)
+      ) {
+        throw new ApiClientError(
+          'The current Project working-media reference is unavailable.',
+          409,
+          'conflict',
+        );
+      }
+      const blob = await mediaBlob(working.media, signal);
+      signal.throwIfAborted();
+      const file = new File([blob], working.media.filename, {
+        type: working.media.mimeType,
+        lastModified: new Date(working.media.adoptedAt).valueOf(),
+      });
+      runtime.present(projectId, artifactInput(file, working.media));
+    },
+    [current.revision.snapshot.presentedMedia, presentAccepted, projectId, runtime],
+  );
+
   useEffect(() => {
     mountedRef.current = true;
     if (current.revision.snapshot.sourceAssetId === null) {
-      hydratedRevisionRef.current = null;
+      hydratedMediaRef.current = null;
       runtime.clear(projectId);
       return () => {
         mountedRef.current = false;
       };
     }
-    if (hydratedRevisionRef.current === current.revision.id) return;
+    const mediaIdentity = JSON.stringify(current.revision.snapshot.presentedMedia);
+    if (hydratedMediaRef.current === mediaIdentity) return;
     const generation = ++generationRef.current;
     const controller = new AbortController();
     controllerRef.current?.abort('project-source-replaced');
@@ -187,9 +241,9 @@ export const useProjectSourceController = (
     runtime.clear(projectId);
     void getProjectSource(projectId, controller.signal)
       .then(async (response) => {
-        await presentAccepted(response, controller.signal);
+        await presentCurrent(response, controller.signal);
         if (generation !== generationRef.current || !mountedRef.current) return;
-        hydratedRevisionRef.current = response.revision.id;
+        hydratedMediaRef.current = mediaIdentity;
         onCurrentChange?.({ project: response.project, revision: response.revision });
         setSource(response.source);
         setPhase('saved');
@@ -209,8 +263,9 @@ export const useProjectSourceController = (
     };
   }, [
     current.revision.id,
+    current.revision.snapshot.presentedMedia,
     current.revision.snapshot.sourceAssetId,
-    presentAccepted,
+    presentCurrent,
     projectId,
     runtime,
     onCurrentChange,
@@ -225,7 +280,7 @@ export const useProjectSourceController = (
     ) => {
       if (controller.signal.aborted || generation !== generationRef.current) return;
       setPhase('saving');
-      hydratedRevisionRef.current = response.revision.id;
+      hydratedMediaRef.current = JSON.stringify(response.revision.snapshot.presentedMedia);
       queryClient.setQueryData(projectQueryKeys.detail(projectId), {
         project: response.project,
         revision: response.revision,

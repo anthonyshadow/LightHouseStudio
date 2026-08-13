@@ -118,6 +118,7 @@ const harness = vi.hoisted(() => {
     updateAudioDeviceId: vi.fn(),
     updateProfile: vi.fn(),
     updateAspectRatio: vi.fn(),
+    restoreAspectRatio: vi.fn(() => true),
     reportVideoDeviceUnavailable: vi.fn(),
     dismissVideoFallbackNotice: vi.fn(),
     apply: vi.fn(() => Promise.resolve(true)),
@@ -721,12 +722,16 @@ describe('StudioApp composition lifecycle', () => {
     const sessionPort: ProjectSessionPort = {
       projectId: '18b120ac-1578-46e3-8c3d-42307772f391',
       phase: 'dirty',
+      current: null,
+      proposal: null,
       hasLocalProposal: true,
       message: null,
       propose: vi.fn(() => true),
       flush,
       retry: vi.fn(() => Promise.resolve(true)),
       discard: vi.fn(() => true),
+      getCurrent: vi.fn(() => null),
+      acceptCurrent: vi.fn(),
     };
     act(() => harness.latestProjectSurfaceProps?.onSessionChange?.(sessionPort));
 

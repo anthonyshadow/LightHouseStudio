@@ -86,6 +86,21 @@ const renderWorkspace = (session: VideoEditSession, onRequestDiscard = vi.fn()) 
     </StudioDesignProvider>,
   );
 
+const renderProjectWorkspace = (
+  session: VideoEditSession,
+  appliedProjectEdit: VideoEditSpec | null,
+) =>
+  render(
+    <StudioDesignProvider>
+      <VideoEditWorkspace
+        session={session}
+        onRequestDiscard={vi.fn()}
+        projectMode
+        appliedProjectEdit={appliedProjectEdit}
+      />
+    </StudioDesignProvider>,
+  );
+
 describe('VideoEditWorkspace', () => {
   it('formats editor time consistently for controls and playback', () => {
     expect(formatVideoEditTime(-1)).toBe('00:00');
@@ -180,5 +195,20 @@ describe('VideoEditWorkspace', () => {
     expect(screen.getByText('Local editor unavailable')).toBeInTheDocument();
     expect(screen.getByRole('alert')).toHaveTextContent('Render failed.');
     expect(screen.getByRole('button', { name: 'Save edited video' })).toBeDisabled();
+  });
+
+  it('labels a Project render as temporary and shows the exact applied edit baseline', () => {
+    const session = createSession();
+    renderProjectWorkspace(session, session.draft);
+
+    expect(
+      screen.getByText('Temporary Render preview').closest('[role="status"]'),
+    ).toHaveTextContent('Rendering does not save Project media');
+    expect(screen.getByText('Applied Project edit').closest('[role="status"]')).toHaveTextContent(
+      'New controls start from that rendered baseline',
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Render preview' }));
+    expect(session.startRender).toHaveBeenCalledOnce();
+    expect(screen.queryByRole('button', { name: 'Save edited video' })).not.toBeInTheDocument();
   });
 });

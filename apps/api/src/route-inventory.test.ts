@@ -56,6 +56,7 @@ const alwaysRegisteredRoutes: readonly Route[] = [
   'DELETE /api/reference-images/:assetId',
   'GET /api/reference-images/:assetId/content',
   'GET /api/elevenlabs/voices',
+  'GET /api/elevenlabs/voices/:voiceId/relationship',
   'GET /api/elevenlabs/voices/:voiceId/preview',
   'GET /api/elevenlabs/shared-voices',
   'GET /api/elevenlabs/shared-voices/:publicOwnerId/:voiceId/preview',
@@ -72,8 +73,12 @@ const cloudOnlyRoutes: readonly Route[] = [
 const projectSourceRoutes: readonly Route[] = [
   'GET /api/projects/:projectId/source',
   'GET /api/projects/:projectId/source/content',
+  'GET /api/projects/:projectId/working-media',
+  'GET /api/projects/:projectId/working-media/:revisionId/content',
   'POST /api/projects/:projectId/source',
   'POST /api/projects/:projectId/source/reuse',
+  'POST /api/projects/:projectId/working-media',
+  'POST /api/projects/:projectId/working-media/reuse',
 ];
 
 const withExplicitHeadSiblings = (routes: readonly Route[]): Route[] =>

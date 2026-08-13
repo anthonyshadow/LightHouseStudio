@@ -159,6 +159,20 @@ describe('CreativeWorkspace responsive tools', () => {
     expect(screen.getByRole('button', { name: 'Shelf' })).toBeEnabled();
   });
 
+  it('keeps reusable creative setup available beside Project working-media playback', () => {
+    render(
+      <StudioDesignProvider>
+        <CreativeWorkspace {...createProps(true, { projectMode: true })} />
+      </StudioDesignProvider>,
+    );
+
+    expect(screen.getByRole('button', { name: 'Select Character' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Select Outfit' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Workshop' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Shelf' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Edit Video' })).toBeEnabled();
+  });
+
   it('disables the live Workshop and Shelf buttons in the compact tool row during playback', () => {
     render(
       <StudioDesignProvider>

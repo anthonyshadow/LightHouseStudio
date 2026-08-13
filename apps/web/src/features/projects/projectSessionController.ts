@@ -34,14 +34,18 @@ export interface ProjectSessionDependencies {
 const proposalFromCurrent = (current: ProjectCurrentResponse): ProjectSessionProposalContract => ({
   workflowPhase: current.revision.snapshot.workflowPhase,
   liveMode: current.revision.snapshot.liveMode,
+  selectedCharacter: current.revision.snapshot.selectedCharacter,
+  selectedOutfit: current.revision.snapshot.selectedOutfit,
+  selectedVoice: current.revision.snapshot.selectedVoice,
+  visualTreatment: current.revision.snapshot.visualTreatment,
+  creativeIntent: current.revision.snapshot.creativeIntent,
+  localEdit: current.revision.snapshot.localEdit,
 });
 
 const proposalsMatch = (
   left: ProjectSessionProposalContract,
   right: ProjectSessionProposalContract,
-): boolean =>
-  left.workflowPhase === right.workflowPhase &&
-  JSON.stringify(left.liveMode) === JSON.stringify(right.liveMode);
+): boolean => JSON.stringify(left) === JSON.stringify(right);
 
 const safeSessionMessage = (error: unknown): string => {
   if (error instanceof ProjectApiConflictError) {

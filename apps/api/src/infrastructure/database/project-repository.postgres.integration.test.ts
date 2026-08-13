@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import {
   acceptProjectSource,
+  adoptProjectWorkingMedia,
   appendProjectRevision,
+  createDefaultVideoEditSpec,
   createEmptyProjectSnapshot,
   createProject,
   type ProjectAssetLink,
@@ -13,7 +15,10 @@ import { DrizzleAssetLifecycleRegistry } from './asset-lifecycle-registry.js';
 import { DrizzleProjectRepository } from './project-repository.js';
 import { DrizzleProjectRetentionPolicy } from './project-retention-policy.js';
 import { ProjectService } from '../../features/projects/project-service.js';
-import type { ProjectSourceRecord } from '../../features/projects/project-repository.js';
+import type {
+  ProjectSourceRecord,
+  ProjectWorkingMediaRecord,
+} from '../../features/projects/project-repository.js';
 import {
   mediaAssets,
   processingJobs,
@@ -24,6 +29,7 @@ import {
   projectRevisions,
   projects,
   projectSources,
+  projectWorkingMediaAdoptions,
   projectVersionReferences,
   savedVideos,
   users,
@@ -576,11 +582,17 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
     const ownerUserId = randomUUID();
     const projectId = randomUUID();
     const assetId = randomUUID();
+    const workingAssetId = randomUUID();
     const operationKey = randomUUID();
+    const workingOperationKey = randomUUID();
     const firstRevisionId = randomUUID();
     const sourceRevisionId = randomUUID();
+    const workingRevisionId = randomUUID();
+    const creativeRevisionId = randomUUID();
     const createdAt = '2026-08-12T12:00:00.000Z';
     const acceptedAt = '2026-08-12T12:05:00.000Z';
+    const adoptedAt = '2026-08-12T12:10:00.000Z';
+    const creativeAt = '2026-08-12T12:15:00.000Z';
     const repository = new DrizzleProjectRepository(connection.db);
 
     try {
@@ -592,17 +604,30 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
         email: `${ownerUserId}@project-source.test`,
         displayName: 'Project Source Integration',
       });
-      await connection.db.insert(mediaAssets).values({
-        id: assetId,
-        ownerUserId,
-        storageProvider: 'local',
-        storageKey: assetId,
-        status: 'ready',
-        mimeType: 'video/mp4',
-        filename: 'project-source.mp4',
-        sizeBytes: 1_024,
-        checksumSha256: 'c'.repeat(64),
-      });
+      await connection.db.insert(mediaAssets).values([
+        {
+          id: assetId,
+          ownerUserId,
+          storageProvider: 'local',
+          storageKey: assetId,
+          status: 'ready',
+          mimeType: 'video/mp4',
+          filename: 'project-source.mp4',
+          sizeBytes: 1_024,
+          checksumSha256: 'c'.repeat(64),
+        },
+        {
+          id: workingAssetId,
+          ownerUserId,
+          storageProvider: 'local',
+          storageKey: workingAssetId,
+          status: 'ready',
+          mimeType: 'video/mp4',
+          filename: 'project-working.mp4',
+          sizeBytes: 900,
+          checksumSha256: 'f'.repeat(64),
+        },
+      ]);
       const created = createProject(
         {
           id: projectId,
@@ -694,7 +719,174 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
         kind: 'conflict',
         conflict: { kind: 'operation-key', operation: 'source-accept' },
       });
+
+      const localEdit = {
+        ...createDefaultVideoEditSpec(12_000),
+        filter: 'warm' as const,
+      };
+      const adopted = adoptProjectWorkingMedia(
+        accepted.value,
+        {
+          expectedProjectVersion: 2,
+          expectedRevisionNumber: 2,
+          mediaReference: { kind: 'asset', assetId: workingAssetId },
+          localEdit,
+          author: { kind: 'user', authorId: ownerUserId },
+        },
+        { now: adoptedAt, createId: () => workingRevisionId },
+      );
+      if (!adopted.ok) throw new Error('Expected working-media adoption to be formed.');
+      const workingRevision = adopted.value.revisions.at(-1)!;
+      const workingAssetLinks: ProjectAssetLink[] = [
+        { assetId, role: 'source' as const },
+        { assetId: workingAssetId, role: 'working' as const },
+        { assetId: workingAssetId, role: 'presented' as const },
+      ].map((link) => ({
+        projectId,
+        ownerUserId,
+        ...link,
+        revisionId: workingRevisionId,
+        revisionNumber: 3,
+        createdAt: adoptedAt,
+      }));
+      const workingMedia: ProjectWorkingMediaRecord = {
+        projectId,
+        ownerUserId,
+        kind: 'local-render',
+        mediaReference: { kind: 'asset', assetId: workingAssetId },
+        assetId: workingAssetId,
+        savedVideoId: null,
+        videoVersionId: null,
+        adoptedRevisionId: workingRevisionId,
+        adoptedRevisionNumber: 3,
+        operationKey: workingOperationKey,
+        requestFingerprint: 'e'.repeat(64),
+        mimeType: 'video/mp4',
+        filename: 'project-working.mp4',
+        sizeBytes: 900,
+        checksumSha256: 'f'.repeat(64),
+        container: 'mp4',
+        videoCodec: 'avc',
+        audioCodec: 'aac',
+        durationMs: 11_000,
+        width: 1_280,
+        height: 720,
+        hasAudio: true,
+        adoptedAt,
+      };
+      const workingInput = {
+        ownerUserId,
+        projectId,
+        expectedVersion: 2,
+        expectedRevisionNumber: 2,
+        nextProject: adopted.value.project,
+        revision: workingRevision,
+        assetLinks: workingAssetLinks,
+        media: workingMedia,
+      };
+      await expect(repository.adoptWorkingMedia(workingInput)).resolves.toMatchObject({
+        kind: 'adopted',
+        value: {
+          project: { version: 3 },
+          revision: {
+            id: workingRevisionId,
+            snapshot: {
+              sourceAssetId: assetId,
+              workingMedia: { kind: 'asset', assetId: workingAssetId },
+              localEdit,
+              lastSuccessfulOutput: null,
+            },
+          },
+          media: { operationKey: workingOperationKey },
+        },
+      });
+      await expect(repository.adoptWorkingMedia(workingInput)).resolves.toMatchObject({
+        kind: 'replayed',
+        value: {
+          revision: { id: workingRevisionId },
+          media: { operationKey: workingOperationKey },
+        },
+      });
+      await expect(repository.getWorkingMedia(ownerUserId, projectId)).resolves.toMatchObject({
+        revision: { id: workingRevisionId },
+        media: { assetId: workingAssetId },
+      });
+      const checkpointed = appendProjectRevision(
+        adopted.value,
+        {
+          expectedProjectVersion: 3,
+          expectedRevisionNumber: 3,
+          snapshot: {
+            ...workingRevision.snapshot,
+            creativeIntent: {
+              ...workingRevision.snapshot.creativeIntent,
+              userIntent: 'A later creative checkpoint.',
+            },
+            workflowPhase: 'creative',
+            updatedAt: creativeAt,
+          },
+          author: { kind: 'user', authorId: ownerUserId },
+          source: 'user-edit',
+          facts: {
+            sourceStatus: 'ready',
+            currentAttempt: { status: 'none' },
+            validatedLastSuccessfulOutput: null,
+          },
+        },
+        { now: creativeAt, createId: () => creativeRevisionId },
+      );
+      if (!checkpointed.ok) throw new Error('Expected later creative checkpoint to be formed.');
+      const creativeRevision = checkpointed.value.revisions.at(-1)!;
+      const creativeAssetLinks: ProjectAssetLink[] = [
+        { assetId, role: 'source' as const },
+        { assetId: workingAssetId, role: 'working' as const },
+        { assetId: workingAssetId, role: 'presented' as const },
+      ].map((link) => ({
+        projectId,
+        ownerUserId,
+        ...link,
+        revisionId: creativeRevisionId,
+        revisionNumber: 4,
+        createdAt: creativeAt,
+      }));
+      await expect(
+        repository.appendRevision({
+          ownerUserId,
+          projectId,
+          expectedVersion: 3,
+          expectedRevisionNumber: 3,
+          nextProject: checkpointed.value.project,
+          revision: creativeRevision,
+          assetLinks: creativeAssetLinks,
+        }),
+      ).resolves.toEqual({ kind: 'updated' });
+      await expect(repository.getWorkingMedia(ownerUserId, projectId)).resolves.toMatchObject({
+        project: { version: 4, currentRevisionId: creativeRevisionId },
+        revision: { id: creativeRevisionId },
+        media: { adoptedRevisionId: workingRevisionId, assetId: workingAssetId },
+      });
+      await expect(repository.adoptWorkingMedia(workingInput)).resolves.toMatchObject({
+        kind: 'replayed',
+        value: {
+          project: { version: 4 },
+          revision: { id: creativeRevisionId },
+          media: { adoptedRevisionId: workingRevisionId },
+        },
+      });
+      await expect(repository.getSource(ownerUserId, projectId)).resolves.toEqual(source);
+      await expect(
+        repository.adoptWorkingMedia({
+          ...workingInput,
+          media: { ...workingMedia, requestFingerprint: '0'.repeat(64) },
+        }),
+      ).resolves.toEqual({
+        kind: 'conflict',
+        conflict: { kind: 'operation-key', operation: 'working-media-adopt' },
+      });
     } finally {
+      await connection.db
+        .delete(projectWorkingMediaAdoptions)
+        .where(eq(projectWorkingMediaAdoptions.projectId, projectId));
       await connection.db.delete(projectSources).where(eq(projectSources.projectId, projectId));
       await connection.db.delete(projectAssets).where(eq(projectAssets.projectId, projectId));
       await connection.db
@@ -704,6 +896,7 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       await connection.db.delete(projectRevisions).where(eq(projectRevisions.projectId, projectId));
       await connection.db.delete(projects).where(eq(projects.id, projectId));
       await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, assetId));
+      await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, workingAssetId));
       await connection.db.delete(users).where(eq(users.id, ownerUserId));
     }
   }, 20_000);

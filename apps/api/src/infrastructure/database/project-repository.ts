@@ -11,6 +11,7 @@ import {
 import { and, desc, eq, inArray, isNull, lt, or, sql, type SQLWrapper } from 'drizzle-orm';
 import { nullableIsoTimestamp, toIsoTimestamp } from '../../application/timestamps.js';
 import type {
+  AdoptProjectWorkingMediaPersistenceInput,
   AppendProjectRevisionPersistenceInput,
   AcceptProjectSourcePersistenceInput,
   ProjectCreateReceipt,
@@ -27,19 +28,26 @@ import type {
   ProjectSummaryPageInput,
   ProjectSourceAcceptanceResult,
   ProjectSourceRecord,
+  ProjectWorkingMediaAdoptionResult,
+  ProjectWorkingMediaRead,
 } from '../../features/projects/project-repository.js';
+import {
+  projectAssetLinksForRevision,
+  projectMediaReferencesEqual,
+  projectVersionReferenceLinksForRevision,
+} from '../../features/projects/project-snapshot-relations.js';
 import type { LightframeDatabase } from './client.js';
 import { ProjectPersistenceError } from './project-persistence-errors.js';
 import {
   assetLinkValues,
   parseSnapshot,
   projectSourceValues,
+  projectWorkingMediaValues,
   projectValues,
   revisionValues,
-  snapshotAssetLinks,
-  snapshotVersionReferenceLinks,
   toProject,
   toProjectSource,
+  toProjectWorkingMedia,
   toRevision,
   versionReferenceValues,
 } from './project-repository-mappers.js';
@@ -53,6 +61,7 @@ import {
   projectOutputs,
   projectRevisions,
   projectSources,
+  projectWorkingMediaAdoptions,
   projectVersionReferences,
   projects,
   savedVideos,
@@ -62,9 +71,42 @@ import {
 type DatabaseExecutor = Parameters<Parameters<LightframeDatabase['transaction']>[0]>[0];
 type ProjectJobRow = typeof projectJobs.$inferSelect;
 type ProjectOutputRow = typeof projectOutputs.$inferSelect;
+type CurrentProjectRow = {
+  readonly project: typeof projects.$inferSelect;
+  readonly revision: typeof projectRevisions.$inferSelect | null;
+};
 
 export { ProjectPersistenceError } from './project-persistence-errors.js';
 export { mapProjectAggregate } from './project-repository-mappers.js';
+
+const toProjectCurrentRead = (row: CurrentProjectRow): ProjectCurrentRead => {
+  if (row.revision === null) {
+    throw new ProjectPersistenceError(
+      'invalid-aggregate',
+      'The stored Project current revision is unavailable.',
+    );
+  }
+  return { project: toProject(row.project), revision: toRevision(row.revision) };
+};
+
+// UUID columns are compared as text so malformed historical JSON is rejected by snapshot parsing,
+// rather than failing early through a PostgreSQL UUID cast.
+const currentWorkingMediaMatch = sql`(
+  ${projectRevisions.snapshot} -> 'workingMedia' = ${projectRevisions.snapshot} -> 'presentedMedia'
+  and (
+    (
+      ${projectRevisions.snapshot} -> 'workingMedia' ->> 'kind' = 'asset'
+      and ${projectWorkingMediaAdoptions.kind} in ('local-render', 'media-asset')
+      and ${projectWorkingMediaAdoptions.assetId}::text = ${projectRevisions.snapshot} -> 'workingMedia' ->> 'assetId'
+    )
+    or (
+      ${projectRevisions.snapshot} -> 'workingMedia' ->> 'kind' = 'saved-video-version'
+      and ${projectWorkingMediaAdoptions.kind} = 'saved-video-version'
+      and ${projectWorkingMediaAdoptions.savedVideoId}::text = ${projectRevisions.snapshot} -> 'workingMedia' ->> 'savedVideoId'
+      and ${projectWorkingMediaAdoptions.videoVersionId}::text = ${projectRevisions.snapshot} -> 'workingMedia' ->> 'videoVersionId'
+    )
+  )
+)`;
 
 const assertRevisionAssetLinks = (
   revision: ProjectRevision,
@@ -86,7 +128,7 @@ const assertRevisionAssetLinks = (
   }
   const validLink = (required: { assetId: string; role: ProjectAssetLink['role'] }) =>
     links.some((link) => link.assetId === required.assetId && link.role === required.role);
-  if (!snapshotAssetLinks(revision).every(validLink)) {
+  if (!projectAssetLinksForRevision(revision).every(validLink)) {
     throw new ProjectPersistenceError(
       'invalid-aggregate',
       'Every snapshot asset needs an explicit role link from the same revision.',
@@ -359,7 +401,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
       );
     }
     assertRevisionAssetLinks(initialRevision, aggregate.assetLinks);
-    const versionReferenceLinks = snapshotVersionReferenceLinks(initialRevision);
+    const versionReferenceLinks = projectVersionReferenceLinksForRevision(initialRevision);
     await tx
       .insert(projects)
       .values(projectValues(project, { currentRevisionId: null, currentRevisionNumber: 0 }));
@@ -523,14 +565,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
       )
       .for('share', { of: projects })
       .limit(1);
-    if (row === undefined) return null;
-    if (row.revision === null) {
-      throw new ProjectPersistenceError(
-        'invalid-aggregate',
-        'The stored Project current revision is unavailable.',
-      );
-    }
-    return { project: toProject(row.project), revision: toRevision(row.revision) };
+    return row === undefined ? null : toProjectCurrentRead(row);
   }
 
   async getCurrentWithSource(
@@ -566,14 +601,8 @@ export class DrizzleProjectRepository implements ProjectRepository {
       .for('share', { of: projects })
       .limit(1);
     if (row === undefined) return null;
-    if (row.revision === null) {
-      throw new ProjectPersistenceError(
-        'invalid-aggregate',
-        'The stored Project current revision is unavailable.',
-      );
-    }
     return {
-      current: { project: toProject(row.project), revision: toRevision(row.revision) },
+      current: toProjectCurrentRead(row),
       source: row.source === null ? null : toProjectSource(row.source),
     };
   }
@@ -595,6 +624,95 @@ export class DrizzleProjectRepository implements ProjectRepository {
       )
       .limit(1);
     return row === undefined ? null : toProjectSource(row.source);
+  }
+
+  async getWorkingMedia(
+    ownerUserId: string,
+    projectId: string,
+    revisionId?: string,
+  ): Promise<ProjectWorkingMediaRead | null> {
+    const mediaMatch =
+      revisionId === undefined
+        ? currentWorkingMediaMatch
+        : eq(projectWorkingMediaAdoptions.adoptedRevisionId, revisionId);
+    const [row] = await this.db
+      .select({
+        project: projects,
+        revision: projectRevisions,
+        media: projectWorkingMediaAdoptions,
+      })
+      .from(projects)
+      .leftJoin(
+        projectRevisions,
+        and(
+          eq(projectRevisions.projectId, projects.id),
+          eq(projectRevisions.ownerUserId, projects.ownerUserId),
+          eq(projectRevisions.id, projects.currentRevisionId),
+          eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
+        ),
+      )
+      .leftJoin(
+        projectWorkingMediaAdoptions,
+        and(
+          eq(projectWorkingMediaAdoptions.projectId, projects.id),
+          eq(projectWorkingMediaAdoptions.ownerUserId, projects.ownerUserId),
+          mediaMatch,
+        ),
+      )
+      .where(
+        and(
+          eq(projects.id, projectId),
+          eq(projects.ownerUserId, ownerUserId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .orderBy(desc(projectWorkingMediaAdoptions.adoptedRevisionNumber))
+      .for('share', { of: projects })
+      .limit(1);
+    if (row === undefined) return null;
+    const current = toProjectCurrentRead(row);
+    return row.media === null ? null : { ...current, media: toProjectWorkingMedia(row.media) };
+  }
+
+  async getWorkingMediaByOperationKey(
+    ownerUserId: string,
+    operationKey: string,
+  ): Promise<ProjectWorkingMediaRead | null> {
+    const [row] = await this.db
+      .select({
+        project: projects,
+        revision: projectRevisions,
+        media: projectWorkingMediaAdoptions,
+      })
+      .from(projectWorkingMediaAdoptions)
+      .innerJoin(
+        projects,
+        and(
+          eq(projects.id, projectWorkingMediaAdoptions.projectId),
+          eq(projects.ownerUserId, projectWorkingMediaAdoptions.ownerUserId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .leftJoin(
+        projectRevisions,
+        and(
+          eq(projectRevisions.projectId, projects.id),
+          eq(projectRevisions.ownerUserId, projects.ownerUserId),
+          eq(projectRevisions.id, projects.currentRevisionId),
+          eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
+        ),
+      )
+      .where(
+        and(
+          eq(projectWorkingMediaAdoptions.ownerUserId, ownerUserId),
+          eq(projectWorkingMediaAdoptions.operationKey, operationKey),
+        ),
+      )
+      .for('share', { of: projects })
+      .limit(1);
+    return row === undefined
+      ? null
+      : { ...toProjectCurrentRead(row), media: toProjectWorkingMedia(row.media) };
   }
 
   async list(ownerUserId: string, input: ProjectSummaryPageInput): Promise<ProjectSummaryPage> {
@@ -952,7 +1070,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
         );
       }
       assertRevisionAssetLinks(revision, input.assetLinks);
-      const versionReferenceLinks = snapshotVersionReferenceLinks(revision);
+      const versionReferenceLinks = projectVersionReferenceLinksForRevision(revision);
       await assertReadyAssets(tx, input.ownerUserId, input.assetLinks);
       await assertReadyVersionReferences(tx, input.ownerUserId, versionReferenceLinks);
       await assertLastSuccessfulOutput(tx, revision);
@@ -1116,7 +1234,7 @@ export class DrizzleProjectRepository implements ProjectRepository {
         );
       }
       assertRevisionAssetLinks(revision, input.assetLinks);
-      const versionReferenceLinks = snapshotVersionReferenceLinks(revision);
+      const versionReferenceLinks = projectVersionReferenceLinksForRevision(revision);
       const readyAssets = await assertReadyAssets(tx, input.ownerUserId, input.assetLinks);
       const readyVersionReferences = await assertReadyVersionReferences(
         tx,
@@ -1155,6 +1273,200 @@ export class DrizzleProjectRepository implements ProjectRepository {
         kind: 'accepted',
         current: { project: input.nextProject, revision },
         source: input.source,
+      } as const;
+    });
+  }
+
+  async adoptWorkingMedia(
+    input: AdoptProjectWorkingMediaPersistenceInput,
+  ): Promise<ProjectWorkingMediaAdoptionResult> {
+    return this.db.transaction(async (tx) => {
+      const [priorRow] = await tx
+        .select()
+        .from(projectWorkingMediaAdoptions)
+        .where(
+          and(
+            eq(projectWorkingMediaAdoptions.ownerUserId, input.ownerUserId),
+            eq(projectWorkingMediaAdoptions.operationKey, input.media.operationKey),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (priorRow !== undefined) {
+        const prior = toProjectWorkingMedia(priorRow);
+        if (
+          prior.projectId !== input.projectId ||
+          prior.requestFingerprint !== input.media.requestFingerprint
+        ) {
+          return {
+            kind: 'conflict',
+            conflict: { kind: 'operation-key', operation: 'working-media-adopt' },
+          } as const;
+        }
+        const [replayed] = await tx
+          .select({ project: projects, revision: projectRevisions })
+          .from(projects)
+          .innerJoin(
+            projectRevisions,
+            and(
+              eq(projectRevisions.projectId, projects.id),
+              eq(projectRevisions.ownerUserId, projects.ownerUserId),
+              eq(projectRevisions.id, projects.currentRevisionId),
+              eq(projectRevisions.revisionNumber, projects.currentRevisionNumber),
+            ),
+          )
+          .where(
+            and(
+              eq(projects.id, input.projectId),
+              eq(projects.ownerUserId, input.ownerUserId),
+              isNull(projects.deletedAt),
+            ),
+          )
+          .limit(1);
+        if (replayed === undefined) {
+          throw new ProjectPersistenceError(
+            'invalid-aggregate',
+            'Project working-media receipt has no retained revision.',
+          );
+        }
+        return {
+          kind: 'replayed',
+          value: {
+            project: toProject(replayed.project),
+            revision: toRevision(replayed.revision),
+            media: prior,
+          },
+        } as const;
+      }
+
+      const [current] = await tx
+        .select()
+        .from(projects)
+        .where(
+          and(
+            eq(projects.id, input.projectId),
+            eq(projects.ownerUserId, input.ownerUserId),
+            isNull(projects.deletedAt),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (current === undefined) return { kind: 'not-found' } as const;
+      if (current.version !== input.expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'project-version',
+            projectId: input.projectId,
+            expectedVersion: input.expectedVersion,
+            actualVersion: current.version,
+          },
+        } as const;
+      }
+      if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'revision',
+            projectId: input.projectId,
+            expectedRevisionNumber: input.expectedRevisionNumber,
+            actualRevisionNumber: current.currentRevisionNumber,
+          },
+        } as const;
+      }
+      const revision: ProjectRevision = {
+        ...input.revision,
+        snapshot: projectSnapshotSchema.parse(input.revision.snapshot),
+      };
+      const validNextState =
+        input.nextProject.id === current.id &&
+        input.nextProject.ownerUserId === current.ownerUserId &&
+        input.nextProject.version === current.version + 1 &&
+        current.archivedAt === null &&
+        revision.projectId === current.id &&
+        revision.ownerUserId === current.ownerUserId &&
+        revision.parentRevisionId === current.currentRevisionId &&
+        revision.parentRevisionNumber === current.currentRevisionNumber &&
+        revision.revisionNumber === current.currentRevisionNumber + 1 &&
+        input.nextProject.currentRevisionId === revision.id &&
+        input.nextProject.currentRevisionNumber === revision.revisionNumber &&
+        input.media.projectId === current.id &&
+        input.media.ownerUserId === current.ownerUserId &&
+        input.media.adoptedRevisionId === revision.id &&
+        input.media.adoptedRevisionNumber === revision.revisionNumber &&
+        projectMediaReferencesEqual(input.media.mediaReference, revision.snapshot.workingMedia) &&
+        projectMediaReferencesEqual(input.media.mediaReference, revision.snapshot.presentedMedia);
+      if (!validNextState) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          'The adopted working-media revision does not continue the locked aggregate.',
+        );
+      }
+      assertRevisionAssetLinks(revision, input.assetLinks);
+      const versionReferences = projectVersionReferenceLinksForRevision(revision);
+      const readyAssets = await assertReadyAssets(tx, input.ownerUserId, input.assetLinks);
+      const readyVersions = await assertReadyVersionReferences(
+        tx,
+        input.ownerUserId,
+        versionReferences,
+      );
+      const readyAsset = readyAssets.get(input.media.assetId);
+      if (
+        readyAsset === undefined ||
+        readyAsset.mimeType !== input.media.mimeType ||
+        readyAsset.filename !== input.media.filename ||
+        readyAsset.sizeBytes !== input.media.sizeBytes ||
+        readyAsset.checksumSha256 !== input.media.checksumSha256
+      ) {
+        throw new ProjectPersistenceError(
+          'asset-not-ready',
+          'Adopted working media no longer matches its ready byte manifest.',
+        );
+      }
+      if (input.media.kind === 'saved-video-version') {
+        const version = readyVersions.get(
+          versionReferenceKey(input.media.savedVideoId!, input.media.videoVersionId!),
+        );
+        if (
+          version === undefined ||
+          version.assetId !== input.media.assetId ||
+          version.mimeType !== input.media.mimeType ||
+          version.filename !== input.media.filename ||
+          version.sizeBytes !== input.media.sizeBytes ||
+          version.durationMs !== input.media.durationMs ||
+          version.width !== input.media.width ||
+          version.height !== input.media.height
+        ) {
+          throw new ProjectPersistenceError(
+            'asset-not-ready',
+            'Adopted Saved Video Version no longer matches its retained media.',
+          );
+        }
+      }
+      await assertLastSuccessfulOutput(tx, revision);
+      await tx.insert(projectRevisions).values(revisionValues(revision));
+      if (input.assetLinks.length > 0) {
+        await tx.insert(projectAssets).values(input.assetLinks.map(assetLinkValues));
+      }
+      if (versionReferences.length > 0) {
+        await tx
+          .insert(projectVersionReferences)
+          .values(versionReferences.map(versionReferenceValues));
+      }
+      await tx.insert(projectWorkingMediaAdoptions).values(projectWorkingMediaValues(input.media));
+      await tx
+        .update(projects)
+        .set({
+          status: input.nextProject.status,
+          version: input.nextProject.version,
+          currentRevisionId: input.nextProject.currentRevisionId,
+          currentRevisionNumber: input.nextProject.currentRevisionNumber,
+          updatedAt: toIsoTimestamp(input.nextProject.updatedAt),
+        })
+        .where(and(eq(projects.id, current.id), eq(projects.ownerUserId, current.ownerUserId)));
+      return {
+        kind: 'adopted',
+        value: { project: input.nextProject, revision, media: input.media },
       } as const;
     });
   }

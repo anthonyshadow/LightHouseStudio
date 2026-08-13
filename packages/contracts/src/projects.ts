@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
-export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 1 as const;
+export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 2 as const;
+export const LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION = 1 as const;
 export const PROJECT_STATUSES = [
   'draft',
   'ready',
@@ -72,11 +73,21 @@ export const projectOutputReferenceSchema = z
   .object({ savedVideoId: z.uuid(), videoVersionId: z.uuid() })
   .strict();
 
+const projectVoiceTreatmentSchema = z
+  .object({
+    stability: z.number().finite().min(0).max(1).nullable(),
+    similarity: z.number().finite().min(0).max(1).nullable(),
+    style: z.number().finite().min(0).max(1).nullable(),
+    speakerBoost: z.boolean().nullable(),
+  })
+  .strict();
+
 const projectVoiceSelectionSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('local-effect'),
       effectId: z.enum(['warm-studio', 'clear-presenter', 'robot']),
+      effectRevision: z.literal('builtin-v1').nullable(),
     })
     .strict(),
   z
@@ -84,14 +95,8 @@ const projectVoiceSelectionSchema = z.discriminatedUnion('kind', [
       kind: z.literal('saved-voice'),
       voiceId: creativeAssetIdSchema,
       voiceName: z.string().trim().min(1).max(120),
-      treatment: z
-        .object({
-          stability: z.number().finite().min(0).max(1).nullable(),
-          similarity: z.number().finite().min(0).max(1).nullable(),
-          style: z.number().finite().min(0).max(1).nullable(),
-          speakerBoost: z.boolean().nullable(),
-        })
-        .strict(),
+      resourceRevision: z.iso.datetime().nullable(),
+      treatment: projectVoiceTreatmentSchema,
     })
     .strict(),
 ]);
@@ -105,7 +110,7 @@ const projectLiveModeMetadataSchema = z
   .strict()
   .nullable();
 
-const videoEditSpecSchema = z
+export const projectVideoEditSpecSchema = z
   .object({
     trim: z
       .object({
@@ -162,54 +167,101 @@ const videoEditSpecSchema = z
     }
   });
 
-export const projectSnapshotSchema = z
+const projectExportSpecificationSchema = z
+  .object({
+    container: z.literal('video/mp4'),
+    aspect: z.enum(['source', '16:9', '9:16', '1:1', '4:5']),
+    resolution: z
+      .object({
+        width: z.number().int().positive().max(16_384),
+        height: z.number().int().positive().max(16_384),
+      })
+      .strict()
+      .nullable(),
+    includeAudio: z.boolean(),
+  })
+  .strict()
+  .nullable();
+
+const projectSnapshotSharedShape = {
+  sourceAssetId: z.uuid().nullable(),
+  workingMedia: projectMediaReferenceSchema.nullable(),
+  presentedMedia: projectMediaReferenceSchema.nullable(),
+  liveMode: projectLiveModeMetadataSchema,
+  localEdit: projectVideoEditSpecSchema.nullable(),
+  exportSpecification: projectExportSpecificationSchema,
+  lastSuccessfulOutput: projectOutputReferenceSchema.nullable(),
+  workflowPhase: projectWorkflowPhaseSchema,
+  createdAt: z.iso.datetime(),
+  updatedAt: z.iso.datetime(),
+} as const;
+
+const projectCharacterSelectionSchema = z
+  .object({
+    characterId: creativeAssetIdSchema,
+    characterLabel: z.string().trim().min(1).max(120).nullable(),
+    characterRevision: z.iso.datetime().nullable(),
+    variantId: creativeAssetIdSchema.nullable(),
+    variantLabel: z.string().trim().min(1).max(120).nullable(),
+    variantRevision: z.iso.datetime().nullable(),
+    referenceAssetId: z.uuid().nullable(),
+  })
+  .strict()
+  .nullable();
+
+const projectOutfitSelectionSchema = z
+  .object({
+    outfitId: creativeAssetIdSchema,
+    outfitLabel: z.string().trim().min(1).max(120).nullable(),
+    outfitRevision: z.iso.datetime().nullable(),
+    referenceAssetId: z.uuid().nullable(),
+    inputKind: z.enum(['prompt', 'saved-outfit']).nullable(),
+  })
+  .strict()
+  .nullable();
+
+const projectVisualTreatmentSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('none') }).strict(),
+  z
+    .object({
+      kind: z.literal('character-swap'),
+      providerId: creativeAssetIdSchema.nullable(),
+      outputResolution: z.enum(['720p', '1080p']).nullable(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('virtual-try-on'),
+      providerId: creativeAssetIdSchema.nullable(),
+      outputResolution: z.enum(['720p', '1080p']).nullable(),
+      inputKind: z.enum(['prompt', 'saved-outfit', 'reference-image']).nullable(),
+      enhancePrompt: z.boolean().nullable(),
+    })
+    .strict(),
+]);
+
+const projectCreativeIntentSchema = z
+  .object({
+    promptId: creativeAssetIdSchema.nullable(),
+    promptLabel: z.string().trim().min(1).max(120).nullable(),
+    recipeId: creativeAssetIdSchema.nullable(),
+    recipeLabel: z.string().trim().min(1).max(120).nullable(),
+    userIntent: z.string().max(4_000),
+    appliedPrompt: z.string().max(4_000).nullable(),
+    referenceAssetId: z.uuid().nullable(),
+    resourceRevision: z.iso.datetime().nullable(),
+  })
+  .strict();
+
+const projectSnapshotV2Schema = z
   .object({
     schemaVersion: z.literal(PROJECT_SNAPSHOT_SCHEMA_VERSION),
-    sourceAssetId: z.uuid().nullable(),
-    workingMedia: projectMediaReferenceSchema.nullable(),
-    presentedMedia: projectMediaReferenceSchema.nullable(),
-    selectedCharacter: z
-      .object({
-        characterId: creativeAssetIdSchema,
-        variantId: creativeAssetIdSchema.nullable(),
-      })
-      .strict()
-      .nullable(),
-    selectedOutfit: z.object({ outfitId: creativeAssetIdSchema }).strict().nullable(),
+    ...projectSnapshotSharedShape,
+    selectedCharacter: projectCharacterSelectionSchema,
+    selectedOutfit: projectOutfitSelectionSchema,
     selectedVoice: projectVoiceSelectionSchema.nullable(),
-    visualTreatment: z.discriminatedUnion('kind', [
-      z.object({ kind: z.literal('none') }).strict(),
-      z.object({ kind: z.literal('character-swap') }).strict(),
-      z.object({ kind: z.literal('virtual-try-on') }).strict(),
-    ]),
-    liveMode: projectLiveModeMetadataSchema,
-    creativeIntent: z
-      .object({
-        promptId: creativeAssetIdSchema.nullable(),
-        recipeId: creativeAssetIdSchema.nullable(),
-        userIntent: z.string().max(4_000),
-      })
-      .strict(),
-    localEdit: videoEditSpecSchema.nullable(),
-    exportSpecification: z
-      .object({
-        container: z.literal('video/mp4'),
-        aspect: z.enum(['source', '16:9', '9:16', '1:1', '4:5']),
-        resolution: z
-          .object({
-            width: z.number().int().positive().max(16_384),
-            height: z.number().int().positive().max(16_384),
-          })
-          .strict()
-          .nullable(),
-        includeAudio: z.boolean(),
-      })
-      .strict()
-      .nullable(),
-    lastSuccessfulOutput: projectOutputReferenceSchema.nullable(),
-    workflowPhase: projectWorkflowPhaseSchema,
-    createdAt: z.iso.datetime(),
-    updatedAt: z.iso.datetime(),
+    visualTreatment: projectVisualTreatmentSchema,
+    creativeIntent: projectCreativeIntentSchema,
   })
   .strict()
   .superRefine((value, context) => {
@@ -227,11 +279,38 @@ export const projectSnapshotSchema = z
         message: 'Character Swap requires a selected character.',
       });
     }
-    if (value.visualTreatment.kind === 'virtual-try-on' && value.selectedOutfit === null) {
+    if (
+      value.visualTreatment.kind === 'virtual-try-on' &&
+      value.visualTreatment.inputKind === 'saved-outfit' &&
+      value.selectedOutfit === null
+    ) {
       context.addIssue({
         code: 'custom',
         path: ['selectedOutfit'],
-        message: 'Virtual Try-On requires a selected outfit.',
+        message: 'Saved-outfit Virtual Try-On requires a selected outfit.',
+      });
+    }
+    if (
+      value.selectedCharacter?.variantId !== null &&
+      value.selectedCharacter !== null &&
+      (value.selectedCharacter.variantLabel === null) !==
+        (value.selectedCharacter.variantRevision === null)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['selectedCharacter', 'variantLabel'],
+        message: 'A Character Variant label and revision must be recorded together.',
+      });
+    }
+    if (
+      value.selectedCharacter?.variantId === null &&
+      (value.selectedCharacter.variantLabel !== null ||
+        value.selectedCharacter.variantRevision !== null)
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['selectedCharacter', 'variantId'],
+        message: 'Character Variant applied values require a Variant identifier.',
       });
     }
   })
@@ -240,6 +319,114 @@ export const projectSnapshotSchema = z
     createdAt: new Date(value.createdAt).toISOString(),
     updatedAt: new Date(value.updatedAt).toISOString(),
   }));
+
+/** Prompt 07 snapshots are accepted only through this explicit provenance-preserving read map. */
+export const legacyProjectSnapshotSchema = z
+  .object({
+    schemaVersion: z.literal(LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION),
+    ...projectSnapshotSharedShape,
+    selectedCharacter: z
+      .object({
+        characterId: creativeAssetIdSchema,
+        variantId: creativeAssetIdSchema.nullable(),
+      })
+      .strict()
+      .nullable(),
+    selectedOutfit: z.object({ outfitId: creativeAssetIdSchema }).strict().nullable(),
+    selectedVoice: z
+      .discriminatedUnion('kind', [
+        z
+          .object({
+            kind: z.literal('local-effect'),
+            effectId: z.enum(['warm-studio', 'clear-presenter', 'robot']),
+          })
+          .strict(),
+        z
+          .object({
+            kind: z.literal('saved-voice'),
+            voiceId: creativeAssetIdSchema,
+            voiceName: z.string().trim().min(1).max(120),
+            treatment: projectVoiceTreatmentSchema,
+          })
+          .strict(),
+      ])
+      .nullable(),
+    visualTreatment: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('none') }).strict(),
+      z.object({ kind: z.literal('character-swap') }).strict(),
+      z.object({ kind: z.literal('virtual-try-on') }).strict(),
+    ]),
+    creativeIntent: z
+      .object({
+        promptId: creativeAssetIdSchema.nullable(),
+        recipeId: creativeAssetIdSchema.nullable(),
+        userIntent: z.string().max(4_000),
+      })
+      .strict(),
+  })
+  .strict();
+
+export const migrateLegacyProjectSnapshot = (legacy: z.infer<typeof legacyProjectSnapshotSchema>) =>
+  projectSnapshotV2Schema.parse({
+    ...legacy,
+    schemaVersion: PROJECT_SNAPSHOT_SCHEMA_VERSION,
+    selectedCharacter:
+      legacy.selectedCharacter === null
+        ? null
+        : {
+            ...legacy.selectedCharacter,
+            characterLabel: null,
+            characterRevision: null,
+            variantLabel: null,
+            variantRevision: null,
+            referenceAssetId: null,
+          },
+    selectedOutfit:
+      legacy.selectedOutfit === null
+        ? null
+        : {
+            ...legacy.selectedOutfit,
+            outfitLabel: null,
+            outfitRevision: null,
+            referenceAssetId: null,
+            inputKind: null,
+          },
+    selectedVoice:
+      legacy.selectedVoice === null
+        ? null
+        : legacy.selectedVoice.kind === 'local-effect'
+          ? { ...legacy.selectedVoice, effectRevision: null }
+          : { ...legacy.selectedVoice, resourceRevision: null },
+    visualTreatment:
+      legacy.visualTreatment.kind === 'none'
+        ? legacy.visualTreatment
+        : legacy.visualTreatment.kind === 'character-swap'
+          ? {
+              kind: 'character-swap' as const,
+              providerId: null,
+              outputResolution: null,
+            }
+          : {
+              kind: 'virtual-try-on' as const,
+              providerId: null,
+              outputResolution: null,
+              inputKind: null,
+              enhancePrompt: null,
+            },
+    creativeIntent: {
+      ...legacy.creativeIntent,
+      promptLabel: null,
+      recipeLabel: null,
+      appliedPrompt: null,
+      referenceAssetId: null,
+      resourceRevision: null,
+    },
+  });
+
+export const projectSnapshotSchema = z.union([
+  projectSnapshotV2Schema,
+  legacyProjectSnapshotSchema.transform(migrateLegacyProjectSnapshot),
+]);
 
 export const projectSchema = z
   .object({
@@ -330,7 +517,7 @@ export const projectConflictSchema = z.discriminatedUnion('kind', [
   z
     .object({
       kind: z.literal('operation-key'),
-      operation: z.enum(['create', 'source-accept']),
+      operation: z.enum(['create', 'source-accept', 'working-media-adopt']),
     })
     .strict(),
   z
@@ -374,6 +561,9 @@ export const moveProjectCampaignRequestSchema = z
   .object({ campaignId: z.uuid().nullable(), expectedVersion: z.number().int().positive() })
   .strict();
 export const projectParamsSchema = z.object({ projectId: projectIdSchema }).strict();
+export const projectWorkingMediaParamsSchema = z
+  .object({ projectId: projectIdSchema, revisionId: projectRevisionIdSchema })
+  .strict();
 export const projectsQuerySchema = z
   .object({
     lifecycle: z.enum(['active', 'archived']).default('active'),
@@ -403,8 +593,34 @@ export const projectSessionProposalSchema = z
   .object({
     workflowPhase: projectWorkflowPhaseSchema,
     liveMode: projectLiveModeMetadataSchema,
+    selectedCharacter: projectCharacterSelectionSchema,
+    selectedOutfit: projectOutfitSelectionSchema,
+    selectedVoice: projectVoiceSelectionSchema.nullable(),
+    visualTreatment: projectVisualTreatmentSchema,
+    creativeIntent: projectCreativeIntentSchema,
+    localEdit: projectVideoEditSpecSchema.nullable(),
   })
-  .strict();
+  .strict()
+  .superRefine((value, context) => {
+    if (value.visualTreatment.kind === 'character-swap' && value.selectedCharacter === null) {
+      context.addIssue({
+        code: 'custom',
+        path: ['selectedCharacter'],
+        message: 'Character Swap requires a selected character.',
+      });
+    }
+    if (
+      value.visualTreatment.kind === 'virtual-try-on' &&
+      value.visualTreatment.inputKind === 'saved-outfit' &&
+      value.selectedOutfit === null
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['selectedOutfit'],
+        message: 'Saved-outfit Virtual Try-On requires a selected outfit.',
+      });
+    }
+  });
 
 export const appendProjectRevisionRequestSchema = z
   .object({
@@ -433,6 +649,123 @@ export const reuseProjectSourceRequestSchema = z
     videoVersionId: z.uuid(),
   })
   .strict();
+
+export const projectWorkingMediaUploadMetadataSchema = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    expectedRevisionNumber: z.number().int().positive(),
+    filename: z.string().trim().min(1).max(180),
+    localEdit: projectVideoEditSpecSchema,
+  })
+  .strict();
+
+export const adoptProjectWorkingMediaRequestSchema = z
+  .object({
+    expectedVersion: z.number().int().positive(),
+    expectedRevisionNumber: z.number().int().positive(),
+    media: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('asset'), assetId: z.uuid() }).strict(),
+      z
+        .object({
+          kind: z.literal('saved-video-version'),
+          savedVideoId: z.uuid(),
+          videoVersionId: z.uuid(),
+        })
+        .strict(),
+    ]),
+    localEdit: projectVideoEditSpecSchema.nullable(),
+  })
+  .strict();
+
+const projectWorkingMediaSchema = z
+  .object({
+    kind: z.enum(['local-render', 'media-asset', 'saved-video-version']),
+    reference: projectMediaReferenceSchema,
+    assetId: z.uuid(),
+    savedVideoId: z.uuid().nullable(),
+    videoVersionId: z.uuid().nullable(),
+    mimeType: z.enum(['video/mp4', 'video/quicktime', 'video/webm']),
+    filename: z.string().trim().min(1).max(180),
+    sizeBytes: z.number().int().positive().max(300_000_000),
+    checksumSha256: z.string().regex(/^[a-f0-9]{64}$/u),
+    container: z.enum(['mp4', 'quicktime', 'webm']),
+    videoCodec: z.enum(['avc', 'vp8']),
+    audioCodec: z.string().trim().min(1).max(32).nullable(),
+    durationMs: z.number().int().positive().max(300_000),
+    width: z.number().int().positive(),
+    height: z.number().int().positive(),
+    hasAudio: z.boolean(),
+    adoptedRevisionId: projectRevisionIdSchema,
+    adoptedRevisionNumber: z.number().int().positive(),
+    adoptedAt: z.iso.datetime(),
+    contentUrl: z
+      .string()
+      .regex(
+        /^\/api\/projects\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/working-media\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/content$/u,
+      ),
+  })
+  .strict()
+  .superRefine((media, context) => {
+    const saved = media.kind === 'saved-video-version';
+    if (saved !== (media.savedVideoId !== null && media.videoVersionId !== null)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['savedVideoId'],
+        message: 'Working-media Saved Video lineage must be exact and complete.',
+      });
+    }
+    if (
+      saved !== (media.reference.kind === 'saved-video-version') ||
+      (!saved && (media.reference.kind !== 'asset' || media.reference.assetId !== media.assetId)) ||
+      (saved &&
+        media.reference.kind === 'saved-video-version' &&
+        (media.reference.savedVideoId !== media.savedVideoId ||
+          media.reference.videoVersionId !== media.videoVersionId))
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['reference'],
+        message: 'Working-media reference and retained bytes must describe the same media.',
+      });
+    }
+  });
+
+export const projectWorkingMediaResponseSchema = z
+  .object({
+    project: projectSchema,
+    revision: projectRevisionSchema,
+    isCurrent: z.boolean(),
+    media: projectWorkingMediaSchema,
+  })
+  .strict()
+  .superRefine((value, context) => {
+    if (
+      value.revision.projectId !== value.project.id ||
+      value.revision.id !== value.project.currentRevisionId ||
+      value.revision.revisionNumber !== value.project.currentRevisionNumber ||
+      value.media.adoptedRevisionNumber > value.revision.revisionNumber ||
+      value.media.contentUrl !==
+        `/api/projects/${value.project.id}/working-media/${value.media.adoptedRevisionId}/content`
+    ) {
+      context.addIssue({
+        code: 'custom',
+        path: ['revision'],
+        message: 'Working-media responses must describe current Project authority and adoption.',
+      });
+    }
+    const current =
+      JSON.stringify(value.revision.snapshot.workingMedia) ===
+        JSON.stringify(value.media.reference) &&
+      JSON.stringify(value.revision.snapshot.presentedMedia) ===
+        JSON.stringify(value.media.reference);
+    if (current !== value.isCurrent) {
+      context.addIssue({
+        code: 'custom',
+        path: ['isCurrent'],
+        message: 'Working-media current status is inconsistent.',
+      });
+    }
+  });
 
 export const projectSourceResponseSchema = z
   .object({
@@ -485,23 +818,6 @@ export const projectSourceResponseSchema = z
         message: 'Project source responses must describe the exact current accepted revision.',
       });
     }
-    const expectedMedia = reused
-      ? {
-          kind: 'saved-video-version',
-          savedVideoId: value.source.savedVideoId,
-          videoVersionId: value.source.videoVersionId,
-        }
-      : { kind: 'asset', assetId: value.revision.snapshot.sourceAssetId };
-    if (
-      JSON.stringify(value.revision.snapshot.workingMedia) !== JSON.stringify(expectedMedia) ||
-      JSON.stringify(value.revision.snapshot.presentedMedia) !== JSON.stringify(expectedMedia)
-    ) {
-      context.addIssue({
-        code: 'custom',
-        path: ['revision', 'snapshot'],
-        message: 'The current working and presented media must match the immutable source.',
-      });
-    }
   });
 
 export type ProjectSnapshotContract = z.infer<typeof projectSnapshotSchema>;
@@ -522,3 +838,8 @@ export type ProjectSourceKindContract = z.infer<typeof projectSourceKindSchema>;
 export type ProjectSourceUploadMetadata = z.infer<typeof projectSourceUploadMetadataSchema>;
 export type ReuseProjectSourceRequest = z.infer<typeof reuseProjectSourceRequestSchema>;
 export type ProjectSourceResponse = z.infer<typeof projectSourceResponseSchema>;
+export type ProjectWorkingMediaUploadMetadata = z.infer<
+  typeof projectWorkingMediaUploadMetadataSchema
+>;
+export type AdoptProjectWorkingMediaRequest = z.infer<typeof adoptProjectWorkingMediaRequestSchema>;
+export type ProjectWorkingMediaResponse = z.infer<typeof projectWorkingMediaResponseSchema>;

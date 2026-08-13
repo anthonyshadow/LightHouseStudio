@@ -1,10 +1,11 @@
-# Project lifecycle, immutable source, and session guards
+# Project lifecycle, creative checkpoints, and durable working media
 
 ## Story
 
 As the authenticated operator, I can create and manage Projects from one canonical workspace,
 accept one durable video original, reopen the same Project/source by URL, and resolve concurrent
-metadata or source changes without unsafe overwrite or implicit provider work.
+metadata, creative, edit, source, or working-media changes without unsafe overwrite or implicit
+provider work.
 
 ## Observable behavior
 
@@ -57,11 +58,11 @@ metadata or source changes without unsafe overwrite or implicit provider work.
     publishes current server authority to the source controller without owning the Blob, object
     URL, stage, recording, or render lifecycle. Leaving for a global library unmounts that session;
     refreshing the library URL cannot recover a hidden Project identity.
-14. The session exposes one typed semantic-proposal port. Prompt 07 proposals contain only the
-    implemented workflow phase and explicit live-session metadata; the immutable source and
-    current media references are copied from server authority. Compatible proposals coalesce for
-    750 ms and append one revision rather than one revision per input event. **Saving changes** and
-    **All changes saved** describe this server checkpoint only.
+14. The session exposes one typed semantic-proposal port. Proposals contain workflow phase, exact
+    applied creative/Voice/treatment values, explicit live metadata, and validated local edit; the
+    immutable source and current media references are copied from server authority. Compatible
+    proposals coalesce for 750 ms and append one revision rather than one revision per input event.
+    **Saving changes** and **All changes saved** describe this server checkpoint only.
 15. A stale Project/revision CAS or unavailable response preserves the current tab's proposal and
     reloads server authority. If authority already contains the exact proposal, the lost response
     converges without another revision. Otherwise **Conflict** requires explicit **Reapply
@@ -71,12 +72,39 @@ metadata or source changes without unsafe overwrite or implicit provider work.
     Refresh/unload receives the browser warning while a proposal is dirty or saving. No Project
     IndexedDB store is activated: a browser crash, forced unload, or confirmed reload can lose only
     the pending in-memory proposal, never a server-accepted revision or source.
+17. The existing creative rail remains available beside one source-bearing Project stage. Character
+    and Variant, Outfit, prompt/recipe, one visual treatment, optional local/saved Voice, capture
+    metadata, and validated local edit map through feature-local adapters into the same Project
+    session. **Save creative setup** is an explicit semantic boundary; keystrokes, frames, slider
+    ticks, and undo/redo entries never append revisions.
+18. Snapshot v2 records stable resource IDs plus only exact applied labels, child/reference IDs,
+    prompt/treatment/settings, and resource revisions needed to explain the checkpoint. The V1 read
+    migration maps unavailable provenance to null rather than inventing it. Reusable records and
+    their bytes/lifecycles stay independently owned.
+19. Owner-scoped hydration restores only exact compatible resources. Missing, tombstoned,
+    wrong-owner, or changed records keep the historical applied label/explanation and show
+    **Choose another** without failing the source or revealing whether another owner has that ID.
+20. **Render preview** is temporary. **Adopt as working media** accepts a validated local render or
+    exact same-owner ready Media Asset/Saved Video Version, flushes the session, verifies both CAS
+    tokens and one operation-key fingerprint, and appends working/presented lineage. It never
+    changes the immutable source, copies exact retained media unnecessarily, infers Add Version,
+    or creates Project output provenance. Exact replay retains the original adoption revision ID,
+    number, media, and receipt while also reporting the current Project revision; changed replay
+    conflicts.
+21. A material creative/edit/working-media checkpoint clears a stale `lastSuccessfulOutput` and
+    returns status to current ready/attempt truth. Completing a local render or adoption alone does
+    not make the Project `completed`. Saving setup, temporary rendering, and durable working-media
+    readiness use distinct status copy.
+22. Project Character/VTO/ElevenLabs provider-backed Start actions remain gated with explanatory
+    UI. Configuration and the local render/adoption path make no provider call. Rendering or
+    working-media adoption blocks Project switching/exit until it completes or returns to a safe
+    cancellable checkpoint.
 
 ## Boundaries
 
-This story adds bounded Project semantic autosave and guarded exit, but no Campaign expansion,
-creative-resource/edit proposal producer, working-media adoption, processing, output save,
-Version-history UI, browser Project authority, or IndexedDB Project data. Project source selection
-and session hydration start no provider. The standalone existing-video workflow remains
-tab-temporary unless its result is separately saved. Project server/repository authority,
-retention, and cleanup remain as documented in Architecture.
+This story includes bounded semantic creative/edit checkpoints and working-media adoption, but no
+Campaign expansion, Project provider processing/reconnect/retry UI, output save, Version-history
+UI, browser Project authority, or IndexedDB Project data. Project source selection, session
+hydration, configuration, and local adoption start no provider. Standalone existing-video behavior
+retains its separate save/replace contract. Project server/repository authority, retention, and
+cleanup remain as documented in Architecture.

@@ -10,6 +10,12 @@ import type { RecipeShelfEntryIntent } from '../features/creative-assets/RecipeS
 import { useExistingVideoWorkflow } from '../features/existing-video/useExistingVideoWorkflow';
 import { isVideoEditBusy } from '../features/video-editor/types';
 import { useVideoEditSession } from '../features/video-editor/useVideoEditSession';
+import { useProjectWorkingMediaController } from '../features/projects/useProjectWorkingMediaController';
+import { useProjectCreativeSessionAdapter } from '../features/projects/useProjectCreativeSessionAdapter';
+import {
+  ProjectCreativeCheckpointPanel,
+  PROJECT_PROVIDER_START_BLOCKED_REASON,
+} from '../features/projects/ProjectCreativeCheckpointPanel';
 import {
   confirmModeReplacement,
   hasDraftContent,
@@ -173,6 +179,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     finalizingStartedAt,
     finalizingStream,
     publishUploadedVideo,
+    publishValidatedVideo,
   } = takeReview;
   const project = useStudioProjectBridge({
     projectId: activeProjectId,
@@ -182,17 +189,23 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     clearSource: recording.discard,
   });
   const activeProjectSourceActivity = project.sourceActivity;
+  const activeProjectWorkingMediaActivity = project.workingMediaActivity;
   const activeProjectSession = project.session;
   const existingVideo = useExistingVideoWorkflow({
     recording,
     processing,
-    publishUploadedVideo,
+    publishUploadedVideo: publishValidatedVideo,
     onSubmissionAccepted: recordAcceptedBatchStep,
     ...(availability.videoProcessing
       ? { videoProcessingCapabilities: availability.videoProcessing }
       : {}),
   });
   const videoEditor = useVideoEditSession();
+  const projectWorkingMedia = useProjectWorkingMediaController(
+    activeProjectId,
+    activeProjectSession,
+    videoEditor,
+  );
   useEffect(() => {
     const artifact = recording.original;
     if (
@@ -222,6 +235,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
   const aiSessionActive = isModelSessionActive(session);
   const sessionModeLocked = mediaLocked || aiSessionActive || session.lifecycle === 'disconnected';
+  const creativeConfigurationMediaLocked = projectContextActive ? recordingActive : mediaLocked;
+  const creativeConfigurationSessionModeLocked = projectContextActive
+    ? recordingActive || aiSessionActive || session.lifecycle === 'disconnected'
+    : sessionModeLocked;
   const finalizing = finalizingStartedAt !== null || finalizingStream !== null;
   const characterBuilderBlocked = characterBuilderBlockedReasons({
     recordingActive,
@@ -235,9 +252,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     repository,
     store: repositoryStore,
     session,
-    mediaLocked,
+    mediaLocked: creativeConfigurationMediaLocked,
     recordingActive,
-    sessionModeLocked,
+    sessionModeLocked: creativeConfigurationSessionModeLocked,
     characterBuilderOpenBlockedReason,
     openWorkshopOverlay,
     closeOverlay,
@@ -295,6 +312,15 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     saveStudioCharacter: saveBuiltCharacter,
     openOverlay,
     closeOverlay,
+  });
+  const projectCreative = useProjectCreativeSessionAdapter({
+    projectId: activeProjectId,
+    projectSession: activeProjectSession,
+    studioSession: session,
+    handoff,
+    repository,
+    store: repositoryStore,
+    existingVideo,
   });
 
   useLayoutEffect(() => {
@@ -364,8 +390,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     openOverlay('capture-settings');
   };
 
-  const openCharacterSelector = () => openOverlay('character-selector');
-  const openOutfitSelector = () => openOverlay('outfit-selector');
+  const openCharacterSelector = useCallback(() => openOverlay('character-selector'), [openOverlay]);
+  const openOutfitSelector = useCallback(() => openOverlay('outfit-selector'), [openOverlay]);
 
   const creativePanel = creativePanelForOverlay(activeOverlay);
   const activeCreativeTool = creativeToolForOverlay(activeOverlay, creativePanel, videoEditing);
@@ -432,9 +458,10 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     );
   }, [clearActiveRecipe, closeOverlayIf, desktopStudioLayout]);
   const startAdvancedModel = useCallback(() => {
+    if (projectContextActive) return Promise.resolve();
     setRecordingForExistingVideo(false);
     return session.startModel();
-  }, [session]);
+  }, [projectContextActive, session]);
   const advancedLiveSession = useMemo(
     () => ({ ...session, startModel: startAdvancedModel }),
     [session, startAdvancedModel],
@@ -471,6 +498,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     openOverlay('recipe-dock');
   };
   const startPreparedAi = (mode: ModelMode) => {
+    if (projectContextActive) return;
     if (!selectExperienceMode(mode)) return;
     closeOverlay();
     void startAdvancedModel();
@@ -564,7 +592,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     finalizingStartedAt !== null ||
     finalizingStream !== null ||
     existingVideo.providerActive ||
-    isVideoEditBusy(videoEditor.phase);
+    isVideoEditBusy(videoEditor.phase) ||
+    projectWorkingMedia.busy ||
+    (activeProjectWorkingMediaActivity?.busy ?? false);
   const cleanupTemporaryState = useCallback(async () => {
     const cleanup = existingVideo.cleanup();
     discardLocalTemporaryWork();
@@ -595,8 +625,18 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   }, [existingVideo, openOverlay]);
   const openPlaybackEditor = useCallback(() => {
     if (!recording.presented || recordingActive) return;
+    if (projectContextActive && !existingVideo.selection) {
+      setRecordingForExistingVideo(true);
+      return;
+    }
     openExistingVideo();
-  }, [openExistingVideo, recording.presented, recordingActive]);
+  }, [
+    existingVideo.selection,
+    openExistingVideo,
+    projectContextActive,
+    recording.presented,
+    recordingActive,
+  ]);
   const startExistingVideoRecording = useCallback(() => {
     if (!browser.mediaRecorder || !browser.mediaDevices || !browser.secureContext) return;
     setRecordingForExistingVideo(true);
@@ -609,6 +649,31 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
     if (existingVideo.active) existingVideo.cancelBeforeAcceptance();
     closeOverlay();
   }, [closeOverlay, existingVideo]);
+  const chooseAnotherProjectResource = useCallback(
+    (
+      kind:
+        'character' | 'character-variant' | 'outfit' | 'voice' | 'prompt' | 'recipe' | 'reference',
+    ) => {
+      if (kind === 'outfit') {
+        openOutfitSelector();
+        return;
+      }
+      if (kind === 'voice') {
+        openPlaybackEditor();
+        return;
+      }
+      if (kind === 'prompt' || kind === 'recipe') {
+        openOverlay('recipe-shelf');
+        return;
+      }
+      if (kind === 'reference') {
+        openOverlay('recipe-dock');
+        return;
+      }
+      openCharacterSelector();
+    },
+    [openCharacterSelector, openOutfitSelector, openOverlay, openPlaybackEditor],
+  );
   const creativeWorkspace = (
     <CreativeWorkspace
       repository={repository}
@@ -616,6 +681,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         panel: creativePanel,
         activeTool: activeCreativeTool,
         showDesktopAiTools: desktopStudioLayout,
+        projectMode: projectContextActive,
         activeCharacterLabel: activeCharacterName,
         activeOutfitLabel:
           session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
@@ -676,6 +742,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
       }}
     />
   );
+  const projectCreativeCheckpoint = projectContextActive ? (
+    <ProjectCreativeCheckpointPanel
+      controller={projectCreative}
+      workingMedia={projectWorkingMedia}
+      onChooseAnother={chooseAnotherProjectResource}
+    />
+  ) : null;
   const projectRecordingAvailable =
     activeProjectId !== null &&
     activeProjectSourceActivity !== null &&
@@ -745,6 +818,7 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             aiSessionActive,
           }}
           creativeWorkspace={creativeWorkspace}
+          projectCreativeCheckpoint={projectCreativeCheckpoint}
           saveVideoState={savedVideoSave.state}
           actions={{
             startExistingVideoRecording,
@@ -765,7 +839,11 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
             finalizingStream !== null ||
             existingVideo.providerActive
           }
-          videoRenderingActive={isVideoEditBusy(videoEditor.phase)}
+          videoRenderingActive={
+            isVideoEditBusy(videoEditor.phase) ||
+            projectWorkingMedia.busy ||
+            (activeProjectWorkingMediaActivity?.busy ?? false)
+          }
           hasTemporaryTake={Boolean(recording.presented)}
           voiceProcessingActive={recording.processingState === 'processing'}
           shelfDirty={shelfDirty || outfit.dirty || character.wardrobeDirty || videoEditor.dirty}
@@ -779,6 +857,8 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           logout={logout}
           savedVideo={savedVideo}
           videoEditor={videoEditor}
+          projectContextActive={projectContextActive}
+          projectWorkingMedia={projectWorkingMedia}
         />
 
         <StudioLibraryOverlays
@@ -845,6 +925,9 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
           characterRemovalBlockedReason={characterRemovalBlockedReason}
           aiSessionActive={aiSessionActive}
           captureSettingsDisabledReason={captureSettingsDisabledReason}
+          {...(projectContextActive
+            ? { providerStartBlockedReason: PROJECT_PROVIDER_START_BLOCKED_REASON }
+            : {})}
           characterSelectorRef={characterSelectorRef}
           outfitToggleRef={outfitToggleRef}
           shelfToggleRef={shelfToggleRef}

@@ -17,9 +17,14 @@ durable, video-oriented Project authority and lightweight optional Campaigns now
 lists, Quick Start/New Project, open, edit/rename, move/detach, archive, restore, and guarded
 Campaign deletion in every persistence mode. An open Project can now durably accept one inspected
 upload, finalized local recording, or exact active Saved Video Version as its immutable original
-and restore it from the same URL. Project creative autosave, processing, and output saving remain
-future steps. Rich Campaign planning and multi-format content creation remain future product
-directions. The app is not approved for LAN, tunnel, proxy, or public exposure.
+and restore it from the same URL. Project creative configuration is now available through explicit
+semantic checkpoints: reusable Character/Variant, Outfit, Voice, prompt,
+treatment, capture metadata, and validated local-edit state save through the one Project session.
+A validated local Render preview or exact same-owner retained Media Asset/Saved Video Version can
+be explicitly adopted as durable working media without replacing the original or creating output
+provenance. Project provider processing and output saving remain future steps. Rich Campaign
+planning and multi-format content creation remain future product directions. The app is not
+approved for LAN, tunnel, proxy, or public exposure.
 
 ## Status
 
@@ -108,6 +113,14 @@ cancellable source staging or a finalized unaccepted Project take. A temporary t
 source transfer, active Voice work, dirty video edit, or dirty Recipe Shelf/Outfit Builder/Wardrobe
 edit requires confirmed discard; an already committed source remains bound to its original Project
 and cannot replace the newly opened stage.
+
+Inside an open source-bearing Project, the existing creative rail remains available beside the one
+stage. **Save creative setup** appends one coalesced semantic checkpoint; it never saves keystrokes,
+slider ticks, undo history, or provider state. **Edit Video** keeps its worker candidate temporary
+as **Render preview** until **Adopt as working media** stores, inspects, checksums, and CAS-appends
+the ready result. Refresh restores the current working media while retaining the immutable original.
+Project Character/VTO/remote Voice Start actions remain disabled with explanatory copy; local Voice
+configuration and local editing do not contact a provider.
 
 ## Capabilities and provider boundaries
 

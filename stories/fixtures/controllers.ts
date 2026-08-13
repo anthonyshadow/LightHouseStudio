@@ -259,6 +259,7 @@ export const createCapturePreferencesController = (
   updateAudioDeviceId: fn(),
   updateProfile: fn(),
   updateAspectRatio: fn(),
+  restoreAspectRatio: fn(() => true),
   reportVideoDeviceUnavailable: fn(),
   dismissVideoFallbackNotice: fn(),
   apply: fn(() => Promise.resolve(true)),

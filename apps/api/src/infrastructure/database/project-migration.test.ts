@@ -20,6 +20,10 @@ const projectSourceMigrationUrl = new URL(
   '../../../drizzle/0016_purple_layla_miller.sql',
   import.meta.url,
 );
+const projectWorkingMediaMigrationUrl = new URL(
+  '../../../drizzle/0018_stormy_darkhawk.sql',
+  import.meta.url,
+);
 
 describe('Project aggregate migration', () => {
   it('is additive and creates every normalized Project relationship', async () => {
@@ -137,6 +141,23 @@ describe('Project source migration', () => {
     expect(migration).toContain('project_sources_lineage_consistent');
     expect(migration).not.toMatch(
       /\b(?:DROP|TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b/u,
+    );
+  });
+});
+
+describe('Project working-media migration', () => {
+  it('adds revision-scoped adoption receipts and explicit v1/v2 snapshot support without backfill', async () => {
+    const migration = await readFile(projectWorkingMediaMigrationUrl, 'utf8');
+
+    expect(migration).toContain('CREATE TABLE "project_working_media_adoptions"');
+    expect(migration).toContain('project_working_media_owner_operation_unique');
+    expect(migration).toContain('project_working_media_revision_same_project_fk');
+    expect(migration).toContain('project_working_media_asset_owner_fk');
+    expect(migration).toContain('project_working_media_version_same_video_fk');
+    expect(migration).toContain('project_working_media_lineage_consistent');
+    expect(migration).toContain('"snapshot_schema_version" in (1, 2)');
+    expect(migration).not.toMatch(
+      /\b(?:TRUNCATE)\b|\bDELETE\s+FROM\b|\bUPDATE\s+"|\bINSERT\s+INTO\b/u,
     );
   });
 });

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import {
   VOICE_PROVIDER_INTENT_HEADER,
   VOICE_PROVIDER_INTENT_VALUE,
@@ -8,6 +9,7 @@ import { createApp } from '../../app.js';
 import { ProviderError } from '../../providers/provider-error.js';
 import { FakeElevenLabsProvider, standardModel, testConfig, voice } from '../../test/fakes.js';
 import { MAX_RECORDING_AUDIO_BYTES } from './routes.js';
+import { MemorySavedVoiceRepository } from './saved-voice-repository.js';
 import { VOICE_MODEL_CACHE_TTL_MS } from './voice-service.js';
 
 const intentHeaders = { [VOICE_PROVIDER_INTENT_HEADER]: VOICE_PROVIDER_INTENT_VALUE };
@@ -30,6 +32,43 @@ describe('ElevenLabs voice API', () => {
     apps.push(app);
     return { app, provider };
   };
+
+  it('checks saved-voice relationships from app-owned owner data without provider availability', async () => {
+    const savedVoices = new MemorySavedVoiceRepository();
+    const host = 'localhost:5173';
+    const digest = createHash('sha256').update(host).digest('hex');
+    const requestOwnerId = `${digest.slice(0, 8)}-${digest.slice(8, 12)}-4${digest.slice(13, 16)}-a${digest.slice(17, 20)}-${digest.slice(20, 32)}`;
+    await savedVoices.save(requestOwnerId, 'saved-for-owner', null, '2026-08-13T12:00:00.000Z');
+    await savedVoices.save(
+      '2e3bfa18-4421-473d-86bd-80a5c0564a8b',
+      'saved-for-other-owner',
+      null,
+      '2026-08-13T12:00:00.000Z',
+    );
+    const app = createApp({ config: testConfig(), persistence: { savedVoices } });
+    apps.push(app);
+
+    const owned = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/voices/saved-for-owner/relationship',
+      headers: { host },
+    });
+    const missing = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/voices/missing/relationship',
+      headers: { host },
+    });
+    const wrongOwner = await app.inject({
+      method: 'GET',
+      url: '/api/elevenlabs/voices/saved-for-other-owner/relationship',
+      headers: { host },
+    });
+
+    expect(owned.statusCode).toBe(200);
+    expect(owned.json()).toEqual({ voiceId: 'saved-for-owner', saved: true });
+    expect(missing.json()).toEqual({ voiceId: 'missing', saved: false });
+    expect(wrongOwner.json()).toEqual({ voiceId: 'saved-for-other-owner', saved: false });
+  });
 
   it('trims workspace search, caps paging, and returns every saved voice category', async () => {
     const { app, provider } = setup();

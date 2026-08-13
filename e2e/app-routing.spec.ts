@@ -1,8 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
+import type { CreativeAssetStore } from '@studio/domain';
 import {
+  CREATIVE_ASSET_STORAGE_KEY,
   expectNoExternalProviderTraffic,
   installSuccessfulStudioHarness,
+  openCharacterOptions,
   readBrowserState,
+  readCreativeAssetStore,
   startLocalPreview,
 } from './support/studioHarness';
 import { ENTRY_PATH, STUDIO_PATH } from './support/studioRoutes';
@@ -17,6 +21,55 @@ const loginFromEntry = async (page: Page): Promise<void> => {
   await expect(dialog.getByLabel('Password')).toHaveValue('lightframe-demo');
   await dialog.getByRole('button', { name: 'Log in' }).click();
 };
+
+const SEEDED_PROJECT_CREATIVE_STORE = {
+  schemaVersion: 7,
+  savedPrompts: [],
+  recentPrompts: [],
+  savedCharacterPrompts: [
+    {
+      id: 'project-field-host',
+      name: 'Project Field Host',
+      prompt: 'An adult documentary field host in a structured amber jacket.',
+      source: 'generator',
+      promptIntent: 'character-transform',
+      builderDraft: {
+        intent: 'character-transform',
+        presetId: null,
+        customDetails: '',
+        adultAge: 'adult',
+        gender: null,
+        characterBase: 'documentary field host',
+        matchReference: false,
+        appearance: 'natural editorial complexion',
+        ethnicity: '',
+        skinTone: '',
+        bodyShape: '',
+        hair: '',
+        hairColor: '',
+        outfit: 'structured amber jacket',
+        accessories: '',
+        expression: 'focused half-smile',
+        mood: 'grounded',
+        preserve: 'camera framing',
+      },
+      guidedDesign: null,
+      referenceImageStatus: 'prompt-only',
+      referenceImageAssetId: null,
+      uploadedReferenceImageAssetId: null,
+      finalReferenceKind: null,
+      selectedWardrobeVariantId: null,
+      defaultVoice: null,
+      notes: '',
+      tags: ['project'],
+      createdAt: '2026-08-13T12:00:00.000Z',
+      updatedAt: '2026-08-13T12:00:00.000Z',
+      lastUsedAt: '2026-08-13T12:00:00.000Z',
+      useCount: 1,
+    },
+  ],
+  savedCharacterVariants: [],
+} satisfies CreativeAssetStore;
 
 test('entry stays provider-free and Login opens a focused Studio runtime', async ({ page }) => {
   const network = await installSuccessfulStudioHarness(page);
@@ -199,6 +252,82 @@ test('an uploaded Project source accepts once and resumes on the same stage afte
   await expect
     .poll(async () => readBrowserState(page))
     .toMatchObject({ requirementModels: [], connections: [] });
+  expectNoExternalProviderTraffic(network);
+});
+
+test('a Project checkpoints a reusable Character, adopts a local render, and refreshes without provider contact', async ({
+  page,
+}) => {
+  const network = await installSuccessfulStudioHarness(page);
+  const projects = await installProjectHarness(page, true);
+  await page.addInitScript(
+    ({ storageKey, store }) => window.localStorage.setItem(storageKey, JSON.stringify(store)),
+    { storageKey: CREATIVE_ASSET_STORAGE_KEY, store: SEEDED_PROJECT_CREATIVE_STORE },
+  );
+  const fixture = await loadDecodableH264VideoFixture();
+  await page.goto(`/studio/projects/${TEST_PROJECT_ID}`);
+  await page.locator('input[type="file"][accept*="video/mp4"]').setInputFiles({
+    name: 'project-edit-source.mp4',
+    mimeType: 'video/mp4',
+    buffer: fixture,
+  });
+  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+
+  await openCharacterOptions(page);
+  await page.getByRole('button', { name: 'Choose saved character' }).click();
+  const shelf = page.getByRole('dialog', { name: 'Recipe Shelf' });
+  await shelf.getByRole('button', { name: 'Use Project Field Host' }).click();
+  await expect(shelf).not.toBeVisible();
+  const creativeStore = await readCreativeAssetStore(page);
+  const selectedCharacter = creativeStore?.savedCharacterPrompts.find(
+    (character) => character.id === 'project-field-host',
+  );
+  expect(selectedCharacter).toBeDefined();
+  await page.getByRole('button', { name: 'Save creative setup' }).click();
+  await expect(page.getByText('Creative setup saved as one Project checkpoint.')).toBeVisible();
+  expect(projects.checkpointRequests).toHaveLength(1);
+  expect(projects.checkpointRequests[0]?.proposal.selectedCharacter).toMatchObject({
+    characterId: 'project-field-host',
+    characterLabel: 'Project Field Host',
+    characterRevision: selectedCharacter?.updatedAt,
+  });
+  await expect(page.getByText('Project Field Host changed after this checkpoint.')).toHaveCount(0);
+
+  await page
+    .getByRole('navigation', { name: 'Creative workspace tools' })
+    .getByRole('button', { name: 'Edit Video', exact: true })
+    .click();
+  const existingVideo = page.getByRole('dialog', { name: 'Use existing video' });
+  await expect(existingVideo).toBeVisible();
+  await existingVideo.getByRole('button', { name: 'Adjust video' }).click();
+  await page.getByRole('button', { name: 'Lighting', exact: true }).click();
+  await page.getByRole('slider', { name: 'Brightness' }).fill('12');
+  await page.getByRole('button', { name: 'Render preview' }).click();
+
+  const adoption = page.getByRole('dialog', {
+    name: 'Adopt Render preview as Project working media?',
+  });
+  await expect(adoption).toBeVisible({ timeout: 60_000 });
+  await adoption.getByRole('button', { name: 'Adopt as working media' }).click();
+  await expect(adoption).toBeHidden({ timeout: 30_000 });
+  await expect(page.getByText('Durable working media ready', { exact: true })).toBeVisible();
+  await expect(page.getByText('No Saved Video or Video Version was created')).toBeVisible();
+  expect(projects.workingMediaOperationKeys).toHaveLength(1);
+  expect(projects.workingMediaOperationKeys[0]).toMatch(/^[0-9a-f-]{36}$/u);
+
+  await page.getByRole('button', { name: 'Save creative setup' }).click();
+  await expect(page.getByText('Revision 5', { exact: true })).toBeVisible();
+  expect(projects.checkpointRequests).toHaveLength(2);
+
+  await page.reload();
+  await expect(page.getByText('Revision 5', { exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Immutable original' })).toBeVisible();
+  await expect(page.getByLabel('Studio media stage').locator('video')).toHaveAttribute(
+    'src',
+    /^blob:/u,
+  );
+  expect(projects.checkpointRequests).toHaveLength(2);
+  expect(projects.workingMediaOperationKeys).toHaveLength(1);
   expectNoExternalProviderTraffic(network);
 });
 

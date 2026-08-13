@@ -118,6 +118,32 @@ describe('SessionComposer', () => {
     expect(disclosure).toHaveTextContent('Stop AI ends usage');
   });
 
+  it('keeps Project configuration and preflight available while provider Start is gated', async () => {
+    const user = userEvent.setup();
+    const session = createSession('lucy-latest', {
+      draft: { ...createEmptyDraft('lucy-latest'), prompt: 'Prepared Project character' },
+    });
+    render(
+      <StudioDesignProvider>
+        <SessionComposer
+          session={session}
+          recording={false}
+          modelStartBlockedReason="Project provider processing is unavailable until recoverable Project processing is enabled."
+          onOpenWorkshop={vi.fn()}
+        />
+      </StudioDesignProvider>,
+    );
+
+    const start = screen.getByRole('button', { name: 'Start Character AI' });
+    expect(start).toBeDisabled();
+    expect(start).toHaveAccessibleDescription(
+      'Project provider processing is unavailable until recoverable Project processing is enabled.',
+    );
+    await user.click(screen.getByRole('button', { name: 'Check camera & mic' }));
+    expect(session.preflight).toHaveBeenCalledOnce();
+    expect(session.startModel).not.toHaveBeenCalled();
+  });
+
   it('communicates real preflight and live provider state without changing controllers', () => {
     const applied = {
       mode: 'lucy-latest' as const,

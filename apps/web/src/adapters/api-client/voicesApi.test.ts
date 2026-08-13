@@ -11,6 +11,7 @@ import type { SharedVoiceItem, WorkspaceVoiceItem } from '../../application/type
 import {
   convertRecordingVoice,
   fetchVoicePreview,
+  fetchWorkspaceVoiceRelationship,
   listSharedVoices,
   listWorkspaceVoices,
   removeWorkspaceVoice,
@@ -78,6 +79,24 @@ const sharedVoice: SharedVoiceItem = {
 };
 
 describe('voice API provider intent', () => {
+  it('checks the app-owned saved relationship without provider intent', async () => {
+    const { requests, observe } = captureRequests();
+    mockApiServer.use(
+      jsonScenario(
+        'GET',
+        '/api/elevenlabs/voices/workspace-voice/relationship',
+        { body: { voiceId: 'workspace-voice', saved: true } },
+        observe,
+      ),
+    );
+
+    await expect(
+      fetchWorkspaceVoiceRelationship('workspace-voice', new AbortController().signal),
+    ).resolves.toEqual({ voiceId: 'workspace-voice', saved: true });
+    expect(requests).toHaveLength(1);
+    expect(requests[0]?.headers.get(VOICE_PROVIDER_INTENT_HEADER)).toBeNull();
+  });
+
   it('uses the voice-specific invalid response for malformed success JSON', async () => {
     mockApiServer.use(malformedContractScenario('GET', '/api/elevenlabs/voices'));
 

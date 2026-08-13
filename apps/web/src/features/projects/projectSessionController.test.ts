@@ -32,7 +32,7 @@ const currentProject = (
     parentRevisionId: null,
     parentRevisionNumber: null,
     snapshot: {
-      schemaVersion: 1,
+      schemaVersion: 2,
       sourceAssetId: null,
       workingMedia: null,
       presentedMedia: null,
@@ -41,7 +41,16 @@ const currentProject = (
       selectedVoice: null,
       visualTreatment: { kind: 'none' },
       liveMode: null,
-      creativeIntent: { promptId: null, recipeId: null, userIntent: '' },
+      creativeIntent: {
+        promptId: null,
+        promptLabel: null,
+        recipeId: null,
+        recipeLabel: null,
+        userIntent: '',
+        appliedPrompt: null,
+        referenceAssetId: null,
+        resourceRevision: null,
+      },
       localEdit: null,
       exportSpecification: null,
       lastSuccessfulOutput: null,
@@ -57,7 +66,7 @@ const currentProject = (
 
 const withProposal = (
   current: ProjectCurrentResponse,
-  proposal: ProjectSessionProposalContract,
+  proposal: Partial<ProjectSessionProposalContract>,
 ): ProjectCurrentResponse => ({
   project: {
     ...current.project,
@@ -121,6 +130,21 @@ describe('ProjectSessionController', () => {
         captureFormat: 'portrait',
         audioSource: 'local-microphone',
       },
+      selectedCharacter: null,
+      selectedOutfit: null,
+      selectedVoice: null,
+      visualTreatment: { kind: 'none' },
+      creativeIntent: {
+        promptId: null,
+        promptLabel: null,
+        recipeId: null,
+        recipeLabel: null,
+        userIntent: '',
+        appliedPrompt: null,
+        referenceAssetId: null,
+        resourceRevision: null,
+      },
+      localEdit: null,
     });
     expect(controller.getSnapshot()).toMatchObject({ phase: 'saved', hasLocalProposal: false });
   });

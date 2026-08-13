@@ -41,6 +41,13 @@ in the primary editor.
 The Dock can start directly after valid input and optional **Check camera & mic**. It always uses
 the pinned `lucy-vton-latest` model.
 
+In a Project, the same Outfit/prompt/reference configuration can be checkpointed without starting
+VTO. A saved-outfit checkpoint keeps the exact Outfit ID, label, revision, immutable reference,
+input kind, enhancement setting, applied prompt, provider binding, and resolution; a prompt-only or
+reference-image checkpoint does not fabricate an Outfit. Missing or changed owner-scoped resources
+retain historical labels and **Choose another**. Project provider-backed **Start Virtual Try-On**
+remains gated; the standalone live and existing-video journeys retain their current explicit Start.
+
 ## Guards and recovery
 
 - Empty input blocks Start before camera, token, or provider work.

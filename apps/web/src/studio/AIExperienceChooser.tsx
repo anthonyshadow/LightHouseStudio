@@ -10,6 +10,7 @@ type AIExperienceChooserProps = {
   activeCharacterName?: string | undefined;
   characterReady: boolean;
   virtualTryOnReady: boolean;
+  providerStartBlockedReason?: string;
   onClose: () => void;
   onStartCharacter: () => void;
   onCreateCharacter: () => void;
@@ -93,6 +94,7 @@ export const AIExperienceChooser = ({
   activeCharacterName,
   characterReady,
   virtualTryOnReady,
+  providerStartBlockedReason,
   onClose,
   onStartCharacter,
   onCreateCharacter,
@@ -102,8 +104,9 @@ export const AIExperienceChooser = ({
   onChooseSavedVirtualTryOn,
 }: AIExperienceChooserProps) => {
   const theme = useTheme();
-  const startAvailable = capabilityState === 'ready' && decartAvailable;
-  const startUnavailableMessage = unavailableMessage(capabilityState);
+  const startAvailable =
+    capabilityState === 'ready' && decartAvailable && !providerStartBlockedReason;
+  const startUnavailableMessage = providerStartBlockedReason ?? unavailableMessage(capabilityState);
 
   return (
     <OverlayPanel

@@ -161,7 +161,7 @@ describe('FileProjectRepository', () => {
     ).rejects.toThrow();
   });
 
-  it('migrates v1 Project metadata to v3 without inventing Campaign membership or source', async () => {
+  it('migrates v1 Project metadata to v4 without inventing Campaign membership or source', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Legacy standalone');
     if (!created.ok) throw new Error('Expected a Project create.');
@@ -187,20 +187,20 @@ describe('FileProjectRepository', () => {
       schemaVersion: number;
       campaigns: unknown[];
     };
-    expect(migrated).toMatchObject({ schemaVersion: 3, campaigns: [] });
+    expect(migrated).toMatchObject({ schemaVersion: 4, campaigns: [] });
     expect(
       (migrated as { projects?: Array<{ source?: unknown }> }).projects?.[0]?.source,
     ).toBeNull();
   });
 
-  it('migrates v2 Campaign/Project metadata to v3 with an explicit empty source', async () => {
+  it('migrates v2 Campaign/Project metadata to v4 with explicit empty source/adoptions', async () => {
     const service = new ProjectService(new FileProjectRepository(directory));
     const created = await service.create(ownerUserId, randomUUID(), 'Prompt 05 Project');
     if (!created.ok) throw new Error('Expected a Project create.');
     const paths = metadataPaths(directory, ownerUserId);
     const previous = JSON.parse(await readFile(paths.primary, 'utf8')) as {
       schemaVersion: number;
-      projects: Array<{ source?: unknown }>;
+      projects: Array<{ source?: unknown; workingMediaAdoptions?: unknown }>;
     };
     previous.schemaVersion = 2;
     for (const aggregate of previous.projects) delete aggregate.source;
@@ -216,8 +216,61 @@ describe('FileProjectRepository', () => {
       schemaVersion: number;
       projects: Array<{ source: unknown }>;
     };
-    expect(migrated.schemaVersion).toBe(3);
+    expect(migrated.schemaVersion).toBe(4);
     expect(migrated.projects[0]?.source).toBeNull();
+    expect(
+      (migrated.projects[0] as { workingMediaAdoptions?: unknown }).workingMediaAdoptions,
+    ).toEqual([]);
+  });
+
+  it('migrates v3 snapshot v1 records to v4/snapshot v2 without fabricating applied values', async () => {
+    const service = new ProjectService(new FileProjectRepository(directory));
+    const created = await service.create(ownerUserId, randomUUID(), 'Prompt 07 Project');
+    if (!created.ok) throw new Error('Expected a Project create.');
+    const paths = metadataPaths(directory, ownerUserId);
+    const previous = JSON.parse(await readFile(paths.primary, 'utf8')) as {
+      schemaVersion: number;
+      projects: Array<{
+        workingMediaAdoptions?: unknown;
+        revisions: Array<{ snapshot: Record<string, unknown> }>;
+      }>;
+    };
+    previous.schemaVersion = 3;
+    for (const aggregate of previous.projects) {
+      delete aggregate.workingMediaAdoptions;
+      for (const revision of aggregate.revisions) {
+        const snapshot = revision.snapshot;
+        snapshot.schemaVersion = 1;
+        snapshot.creativeIntent = { promptId: null, recipeId: null, userIntent: '' };
+      }
+    }
+    await writeFile(paths.primary, `${JSON.stringify(previous)}\n`, 'utf8');
+    await writeFile(paths.backup, `${JSON.stringify(previous)}\n`, 'utf8');
+
+    const restarted = new ProjectService(new FileProjectRepository(directory));
+    await expect(restarted.get(ownerUserId, created.current.project.id)).resolves.toMatchObject({
+      revision: {
+        snapshot: {
+          schemaVersion: 2,
+          creativeIntent: {
+            promptLabel: null,
+            recipeLabel: null,
+            appliedPrompt: null,
+            resourceRevision: null,
+          },
+        },
+      },
+    });
+    const migrated = JSON.parse(await readFile(paths.primary, 'utf8')) as {
+      schemaVersion: number;
+      projects: Array<{
+        workingMediaAdoptions: unknown[];
+        revisions: Array<{ snapshot: { schemaVersion: number } }>;
+      }>;
+    };
+    expect(migrated.schemaVersion).toBe(4);
+    expect(migrated.projects[0]?.workingMediaAdoptions).toEqual([]);
+    expect(migrated.projects[0]?.revisions[0]?.snapshot.schemaVersion).toBe(2);
   });
 
   it('recovers Campaign create receipts and preserves membership across restart', async () => {

@@ -148,6 +148,7 @@ export type CapturePreferencesController = {
   updateAudioDeviceId: (deviceId: string | null) => void;
   updateProfile: (profile: LocalCaptureProfileId) => void;
   updateAspectRatio: (aspectRatio: LocalCaptureAspectRatio) => void;
+  restoreAspectRatio: (aspectRatio: LocalCaptureAspectRatio) => boolean;
   reportVideoDeviceUnavailable: (deviceId: string) => void;
   dismissVideoFallbackNotice: () => void;
   apply: () => Promise<boolean>;

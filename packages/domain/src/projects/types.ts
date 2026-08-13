@@ -1,6 +1,7 @@
 import type { VideoEditSpec } from '../video-editing';
 
-export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 1 as const;
+export const PROJECT_SNAPSHOT_SCHEMA_VERSION = 2 as const;
+export const LEGACY_PROJECT_SNAPSHOT_SCHEMA_VERSION = 1 as const;
 
 export const PROJECT_STATUSES = [
   'draft',
@@ -58,22 +59,36 @@ export type ProjectMediaReference =
 
 export interface ProjectCharacterSelection {
   readonly characterId: string;
+  /** Applied display value retained even when the reusable Character is later unavailable. */
+  readonly characterLabel: string | null;
+  /** Creative-resource revision used at the checkpoint. Current stores use their updatedAt value. */
+  readonly characterRevision: string | null;
   readonly variantId: string | null;
+  readonly variantLabel: string | null;
+  readonly variantRevision: string | null;
+  /** Exact immutable reference used by this applied selection. */
+  readonly referenceAssetId: string | null;
 }
 
 export interface ProjectOutfitSelection {
   readonly outfitId: string;
+  readonly outfitLabel: string | null;
+  readonly outfitRevision: string | null;
+  readonly referenceAssetId: string | null;
+  readonly inputKind: 'prompt' | 'saved-outfit' | null;
 }
 
 export type ProjectVoiceSelection =
   | {
       readonly kind: 'local-effect';
       readonly effectId: 'warm-studio' | 'clear-presenter' | 'robot';
+      readonly effectRevision: 'builtin-v1' | null;
     }
   | {
       readonly kind: 'saved-voice';
       readonly voiceId: string;
       readonly voiceName: string;
+      readonly resourceRevision: string | null;
       readonly treatment: {
         readonly stability: number | null;
         readonly similarity: number | null;
@@ -84,8 +99,18 @@ export type ProjectVoiceSelection =
 
 export type ProjectVisualTreatment =
   | { readonly kind: 'none' }
-  | { readonly kind: 'character-swap' }
-  | { readonly kind: 'virtual-try-on' };
+  | {
+      readonly kind: 'character-swap';
+      readonly providerId: string | null;
+      readonly outputResolution: '720p' | '1080p' | null;
+    }
+  | {
+      readonly kind: 'virtual-try-on';
+      readonly providerId: string | null;
+      readonly outputResolution: '720p' | '1080p' | null;
+      readonly inputKind: 'prompt' | 'saved-outfit' | 'reference-image' | null;
+      readonly enhancePrompt: boolean | null;
+    };
 
 export interface ProjectLiveModeMetadata {
   readonly modeId: string;
@@ -95,8 +120,14 @@ export interface ProjectLiveModeMetadata {
 
 export interface ProjectCreativeIntent {
   readonly promptId: string | null;
+  readonly promptLabel: string | null;
   readonly recipeId: string | null;
+  readonly recipeLabel: string | null;
   readonly userIntent: string;
+  /** Canonical value applied to the controls, not a copy of the reusable record. */
+  readonly appliedPrompt: string | null;
+  readonly referenceAssetId: string | null;
+  readonly resourceRevision: string | null;
 }
 
 export interface ProjectExportSpecification {
@@ -238,7 +269,7 @@ export interface ProjectStatusFacts {
 export type ProjectConflict =
   | {
       readonly kind: 'operation-key';
-      readonly operation: 'create' | 'source-accept';
+      readonly operation: 'create' | 'source-accept' | 'working-media-adopt';
     }
   | {
       readonly kind: 'project-version';

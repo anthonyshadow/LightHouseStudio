@@ -642,7 +642,10 @@ export const projectRevisions = pgTable(
     ),
     index('project_revisions_project_created_idx').on(table.projectId, table.createdAt),
     check('project_revisions_number_positive', sql`${table.revisionNumber} > 0`),
-    check('project_revisions_snapshot_version_supported', sql`${table.snapshotSchemaVersion} = 1`),
+    check(
+      'project_revisions_snapshot_version_supported',
+      sql`${table.snapshotSchemaVersion} in (1, 2)`,
+    ),
     check(
       'project_revisions_parent_consistent',
       sql`(${table.revisionNumber} = 1 and ${table.parentRevisionId} is null and ${table.parentRevisionNumber} is null) or (${table.revisionNumber} > 1 and ${table.parentRevisionId} is not null and ${table.parentRevisionNumber} = ${table.revisionNumber} - 1)`,
@@ -850,6 +853,102 @@ export const projectSources = pgTable(
     check('project_sources_fingerprint_length', sql`length(${table.requestFingerprint}) = 64`),
     check(
       'project_sources_media_supported',
+      sql`${table.mimeType} in ('video/mp4', 'video/quicktime', 'video/webm') and ${table.container} in ('mp4', 'quicktime', 'webm') and ${table.videoCodec} in ('avc', 'vp8')`,
+    ),
+  ],
+);
+
+export const projectWorkingMediaAdoptions = pgTable(
+  'project_working_media_adoptions',
+  {
+    projectId: uuid('project_id').notNull(),
+    ownerUserId: uuid('owner_user_id').notNull(),
+    kind: text('kind').notNull(),
+    assetId: uuid('asset_id').notNull(),
+    savedVideoId: uuid('saved_video_id'),
+    videoVersionId: uuid('video_version_id'),
+    adoptedRevisionId: uuid('adopted_revision_id').notNull(),
+    adoptedRevisionNumber: integer('adopted_revision_number').notNull(),
+    operationKey: uuid('operation_key').notNull(),
+    requestFingerprint: text('request_fingerprint').notNull(),
+    mimeType: text('mime_type').notNull(),
+    filename: text('filename').notNull(),
+    sizeBytes: bigint('size_bytes', { mode: 'number' }).notNull(),
+    checksumSha256: text('checksum_sha256').notNull(),
+    container: text('container').notNull(),
+    videoCodec: text('video_codec').notNull(),
+    audioCodec: text('audio_codec'),
+    durationMs: integer('duration_ms').notNull(),
+    width: integer('width').notNull(),
+    height: integer('height').notNull(),
+    hasAudio: boolean('has_audio').notNull(),
+    adoptedAt: timestamp('adopted_at', { withTimezone: true, mode: 'string' })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    primaryKey({ columns: [table.projectId, table.adoptedRevisionId] }),
+    uniqueIndex('project_working_media_owner_operation_unique').on(
+      table.ownerUserId,
+      table.operationKey,
+    ),
+    index('project_working_media_asset_idx').on(table.ownerUserId, table.assetId),
+    foreignKey({
+      name: 'project_working_media_project_owner_fk',
+      columns: [table.projectId, table.ownerUserId],
+      foreignColumns: [projects.id, projects.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_working_media_asset_owner_fk',
+      columns: [table.assetId, table.ownerUserId],
+      foreignColumns: [mediaAssets.id, mediaAssets.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_working_media_revision_same_project_fk',
+      columns: [
+        table.projectId,
+        table.ownerUserId,
+        table.adoptedRevisionId,
+        table.adoptedRevisionNumber,
+      ],
+      foreignColumns: [
+        projectRevisions.projectId,
+        projectRevisions.ownerUserId,
+        projectRevisions.id,
+        projectRevisions.revisionNumber,
+      ],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_working_media_saved_video_owner_fk',
+      columns: [table.savedVideoId, table.ownerUserId],
+      foreignColumns: [savedVideos.id, savedVideos.ownerUserId],
+    }).onDelete('restrict'),
+    foreignKey({
+      name: 'project_working_media_version_same_video_fk',
+      columns: [table.savedVideoId, table.ownerUserId, table.videoVersionId],
+      foreignColumns: [videoVersions.videoId, videoVersions.ownerUserId, videoVersions.id],
+    }).onDelete('restrict'),
+    check(
+      'project_working_media_lineage_consistent',
+      sql`(${table.kind} = 'saved-video-version' and ${table.savedVideoId} is not null and ${table.videoVersionId} is not null) or (${table.kind} <> 'saved-video-version' and ${table.savedVideoId} is null and ${table.videoVersionId} is null)`,
+    ),
+    check(
+      'project_working_media_kind_supported',
+      sql`${table.kind} in ('local-render', 'media-asset', 'saved-video-version')`,
+    ),
+    check('project_working_media_revision_positive', sql`${table.adoptedRevisionNumber} > 0`),
+    check('project_working_media_size_positive', sql`${table.sizeBytes} > 0`),
+    check('project_working_media_duration_positive', sql`${table.durationMs} > 0`),
+    check(
+      'project_working_media_dimensions_positive',
+      sql`${table.width} > 0 and ${table.height} > 0`,
+    ),
+    check(
+      'project_working_media_fingerprint_length',
+      sql`length(${table.requestFingerprint}) = 64`,
+    ),
+    check(
+      'project_working_media_media_supported',
       sql`${table.mimeType} in ('video/mp4', 'video/quicktime', 'video/webm') and ${table.container} in ('mp4', 'quicktime', 'webm') and ${table.videoCodec} in ('avc', 'vp8')`,
     ),
   ],
