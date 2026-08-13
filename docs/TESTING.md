@@ -50,8 +50,9 @@ LIGHTFRAME_RUN_PROJECT_POSTGRES_TEST=true node --env-file=.env.development \
   apps/api/src/infrastructure/database/project-repository.postgres.integration.test.ts
 ```
 
-Campaign migration/repository integration cases use the same isolated database gate and run with
-the Project case when `LIGHTFRAME_RUN_PROJECT_POSTGRES_TEST=true`; ordinary tests never contact Neon.
+Campaign and Project-processing migration/repository integration cases use the same isolated
+database gate and run with the Project case when `LIGHTFRAME_RUN_PROJECT_POSTGRES_TEST=true`;
+ordinary tests never contact Neon or a provider.
 
 `test:unit` and `test:integration` are useful focused subsets; `bun run test` runs both categories
 once through a single Node-backed Vitest invocation. Bun owns package installation and the API
@@ -122,6 +123,12 @@ The retained suite protects:
   produced-by lineage, output-pointer clearing, CAS/replay/fingerprint conflict, prepared-journal
   restart, controlled range content, retention-aware cleanup, Project-switch guarding, and
   response-loss reconciliation;
+- Project-processing contracts and policy for current-attempt phases, finite safe errors, exact
+  replay, explicit cost-aware retry, and stale-result rejection; local/relational pre-submit
+  Project-revision admission; restart recovery with a durable provider identity; ambiguous
+  no-identity submission without resubmission; shadow trace failure isolation; active/archive
+  interlock; owner/Origin/provider-intent routes; durable current `job-result` promotion and stale
+  historical `job-output` retention; and proof that neither result path creates a Saved Video;
 - a no-provider Chromium journey from reusable Character selection through one Project semantic
   checkpoint, local edit/Render preview, explicit working-media adoption, and refresh, including
   denial of unexpected external HTTP and WebSocket traffic;

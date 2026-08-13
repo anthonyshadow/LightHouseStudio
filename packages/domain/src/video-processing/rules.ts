@@ -1,9 +1,137 @@
 import type {
+  ProjectProcessingAttemptFacts,
+  ProjectProcessingPublicPhase,
+  ProjectProcessingRestartTransition,
+  ProjectProcessingRetryPolicy,
   UploadedVideoFacts,
   UploadedVideoValidationIssue,
   VideoTransformOperationId,
   VideoTransformStep,
 } from './types';
+
+const ACTIVE_PROJECT_PROCESSING_STATUSES = new Set([
+  'pending',
+  'validating',
+  'submitting',
+  'accepted',
+  'queued',
+  'processing',
+  'retrieving',
+]);
+
+const FAILED_PROJECT_PROCESSING_STATUSES = new Set(['ambiguous', 'failed', 'expired']);
+
+export const projectProcessingPhase = (
+  attempt: Pick<ProjectProcessingAttemptFacts, 'status' | 'outputAssetId'>,
+): ProjectProcessingPublicPhase => {
+  switch (attempt.status) {
+    case 'pending':
+    case 'validating':
+    case 'submitting':
+      return 'submitting';
+    case 'accepted':
+    case 'queued':
+      return 'accepted';
+    case 'processing':
+      return 'processing';
+    case 'retrieving':
+      return 'retrieving';
+    case 'ready':
+      return attempt.outputAssetId === null ? 'saving-result' : 'complete';
+    case 'cancelled':
+      return 'cancelled';
+    case 'ambiguous':
+    case 'failed':
+    case 'expired':
+      return 'needs-attention';
+  }
+};
+
+export const projectProcessingRetryPolicy = (
+  status: ProjectProcessingAttemptFacts['status'],
+): ProjectProcessingRetryPolicy => {
+  if (status === 'ambiguous') return 'explicit-cost-confirmation';
+  if (status === 'failed' || status === 'expired' || status === 'cancelled') return 'explicit';
+  return 'not-allowed';
+};
+
+export const projectProcessingBlocksArchive = (
+  status: ProjectProcessingAttemptFacts['status'],
+): boolean => ACTIVE_PROJECT_PROCESSING_STATUSES.has(status) || status === 'ambiguous';
+
+export const projectProcessingNeedsAttention = (
+  status: ProjectProcessingAttemptFacts['status'],
+): boolean => FAILED_PROJECT_PROCESSING_STATUSES.has(status);
+
+export const projectProcessingRestartTransition = (
+  attempt: Pick<ProjectProcessingAttemptFacts, 'status' | 'providerJobId' | 'outputAssetId'> & {
+    readonly expiresAt: string;
+  },
+  now: string,
+): ProjectProcessingRestartTransition | null => {
+  if (attempt.outputAssetId !== null || attempt.status === 'ambiguous') return null;
+  if (
+    attempt.expiresAt <= now &&
+    attempt.status !== 'failed' &&
+    attempt.status !== 'expired' &&
+    attempt.status !== 'cancelled'
+  ) {
+    return { status: 'expired', safeErrorCode: 'job_expired', completedAt: now };
+  }
+  if (
+    attempt.providerJobId === null &&
+    (attempt.status === 'submitting' || attempt.status === 'accepted')
+  ) {
+    return {
+      status: 'ambiguous',
+      safeErrorCode: 'submission_ambiguous',
+      completedAt: now,
+    };
+  }
+  if (attempt.status === 'pending' || attempt.status === 'validating') {
+    return { status: 'failed', safeErrorCode: 'processing_failed', completedAt: now };
+  }
+  if (attempt.providerJobId !== null && attempt.status === 'submitting') {
+    return { status: 'queued', safeErrorCode: null, completedAt: null };
+  }
+  if (attempt.providerJobId !== null && attempt.status === 'ready') {
+    return { status: 'retrieving', safeErrorCode: null, completedAt: null };
+  }
+  return null;
+};
+
+export const currentProjectProcessingAttempt = <Attempt extends ProjectProcessingAttemptFacts>(
+  currentRevision: Readonly<{ id: string; revisionNumber: number }>,
+  attempts: readonly Attempt[],
+): Attempt | null => {
+  const candidates = attempts.filter(
+    (attempt) =>
+      (attempt.initiatingRevisionId === currentRevision.id &&
+        attempt.initiatingRevisionNumber === currentRevision.revisionNumber) ||
+      (attempt.resultRevisionId === currentRevision.id &&
+        attempt.resultRevisionNumber === currentRevision.revisionNumber),
+  );
+  return (
+    candidates.sort(
+      (left, right) =>
+        right.attemptNumber - left.attemptNumber ||
+        right.createdAt.localeCompare(left.createdAt) ||
+        right.operationId.localeCompare(left.operationId),
+    )[0] ?? null
+  );
+};
+
+export const canPromoteProjectProcessingResult = (input: {
+  readonly currentRevisionId: string;
+  readonly currentRevisionNumber: number;
+  readonly initiatingRevisionId: string;
+  readonly initiatingRevisionNumber: number;
+  readonly currentOperationId: string | null;
+  readonly operationId: string;
+}): boolean =>
+  input.currentRevisionId === input.initiatingRevisionId &&
+  input.currentRevisionNumber === input.initiatingRevisionNumber &&
+  input.currentOperationId === input.operationId;
 
 export const VIDEO_DURATION_LIMIT_MS = 300_000;
 export const GENERAL_VIDEO_SIZE_LIMIT_BYTES = 300_000_000;

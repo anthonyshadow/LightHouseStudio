@@ -70,6 +70,9 @@ original on failure.
   valid even when Character Swap and Virtual Try On are disabled.
 - An open Project may checkpoint the selected saved-voice ID/name and exact treatment values as
   configuration, but provider-backed preview/conversion Start remains disabled in Project context.
+  The Project-processing backend intentionally reports Voice unavailable because this synchronous
+  provider response has no durable status identity for safe restart/reconnect; it stays gated until
+  an adapter can retain success or classify an interrupted acceptance without automatic resubmit.
   Hydration restores the current control only when the owner-derived saved relationship still
   exists; missing and wrong-owner IDs produce the same historical explanation and **Choose
   another** path. The Project never copies the Voice record, reveals another owner's membership,

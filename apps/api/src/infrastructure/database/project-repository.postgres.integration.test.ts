@@ -6,6 +6,7 @@ import {
   createDefaultVideoEditSpec,
   createEmptyProjectSnapshot,
   createProject,
+  promoteProjectJobResult,
   type ProjectAssetLink,
 } from '@studio/domain';
 import { eq } from 'drizzle-orm';
@@ -15,10 +16,12 @@ import { DrizzleAssetLifecycleRegistry } from './asset-lifecycle-registry.js';
 import { DrizzleProjectRepository } from './project-repository.js';
 import { DrizzleProjectRetentionPolicy } from './project-retention-policy.js';
 import { ProjectService } from '../../features/projects/project-service.js';
+import type { ProjectProcessingAttemptRecord } from '../../features/projects/project-processing-repository.js';
 import type {
   ProjectSourceRecord,
   ProjectWorkingMediaRecord,
 } from '../../features/projects/project-repository.js';
+import { projectAssetLinksForRevision } from '../../features/projects/project-snapshot-relations.js';
 import {
   mediaAssets,
   processingJobs,
@@ -589,10 +592,16 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
     const sourceRevisionId = randomUUID();
     const workingRevisionId = randomUUID();
     const creativeRevisionId = randomUUID();
+    const processingOperationId = randomUUID();
+    const processingResultAssetId = randomUUID();
+    const resultRevisionId = randomUUID();
     const createdAt = '2026-08-12T12:00:00.000Z';
     const acceptedAt = '2026-08-12T12:05:00.000Z';
     const adoptedAt = '2026-08-12T12:10:00.000Z';
     const creativeAt = '2026-08-12T12:15:00.000Z';
+    const submittedAt = '2026-08-12T12:20:00.000Z';
+    const acceptedJobAt = '2026-08-12T12:21:00.000Z';
+    const retainedAt = '2026-08-12T12:25:00.000Z';
     const repository = new DrizzleProjectRepository(connection.db);
 
     try {
@@ -883,7 +892,269 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
         kind: 'conflict',
         conflict: { kind: 'operation-key', operation: 'working-media-adopt' },
       });
+
+      const attempt: ProjectProcessingAttemptRecord = {
+        operationId: processingOperationId,
+        ownerUserId,
+        projectId,
+        capability: 'character-swap',
+        provider: 'decart',
+        providerJobId: null,
+        requestFingerprint: '1'.repeat(64),
+        inputAssetId: workingAssetId,
+        resultAssetId: processingResultAssetId,
+        outputAssetId: null,
+        result: null,
+        retryOfOperationId: null,
+        attemptNumber: 1,
+        initiatingRevisionId: creativeRevisionId,
+        initiatingRevisionNumber: 4,
+        resultRevisionId: null,
+        resultRevisionNumber: null,
+        status: 'submitting',
+        safeErrorCode: null,
+        outputResolution: '720p',
+        providerOutputLocation: null,
+        sourceDurationMs: 11_000,
+        sourceOrientation: 'landscape',
+        createdAt: submittedAt,
+        updatedAt: submittedAt,
+        acceptedAt: null,
+        completedAt: null,
+        expiresAt: '2026-08-12T13:20:00.000Z',
+      };
+      const admission = {
+        attempt,
+        link: {
+          projectId,
+          ownerUserId,
+          jobId: processingOperationId,
+          initiatingRevisionId: creativeRevisionId,
+          initiatingRevisionNumber: 4,
+          createdAt: submittedAt,
+        },
+        expectedVersion: 4,
+        expectedRevisionNumber: 4,
+      };
+      await expect(repository.admitProjectAttempt(admission)).resolves.toMatchObject({
+        kind: 'admitted',
+        attempt: { operationId: processingOperationId, status: 'submitting' },
+      });
+      await expect(
+        repository.admitProjectAttempt({
+          ...admission,
+          attempt: { ...attempt, requestFingerprint: '2'.repeat(64) },
+        }),
+      ).resolves.toEqual({ kind: 'conflict', conflict: { kind: 'operation-key' } });
+
+      const [replay, blockedArchive] = await Promise.all([
+        repository.admitProjectAttempt(admission),
+        new ProjectService(repository, { now: () => new Date(acceptedJobAt) }).archive(
+          ownerUserId,
+          projectId,
+          5,
+        ),
+      ]);
+      expect(replay).toMatchObject({
+        kind: 'replayed',
+        attempt: { operationId: processingOperationId },
+      });
+      expect(blockedArchive).toEqual({
+        ok: false,
+        conflict: { kind: 'active-jobs', projectId },
+      });
+      await expect(
+        repository.listProjectAttempts(ownerUserId, projectId, { pageSize: 1 }),
+      ).resolves.toMatchObject({
+        attempts: [{ operationId: processingOperationId }],
+        currentOperationId: processingOperationId,
+        retriedOperationIds: [],
+        nextCursor: null,
+      });
+
+      await expect(
+        repository.updateProjectAttemptTrace({
+          schemaVersion: 1,
+          jobId: processingOperationId,
+          ownerUserId,
+          operation: 'character-swap',
+          provider: 'decart',
+          providerJobId: 'durable-provider-job',
+          requestFingerprint: attempt.requestFingerprint,
+          outputResolution: '720p',
+          providerOutputLocation: null,
+          sourceDurationMs: 11_000,
+          sourceOrientation: 'landscape',
+          status: 'queued',
+          safeErrorCode: null,
+          createdAt: submittedAt,
+          updatedAt: acceptedJobAt,
+          completedAt: null,
+        }),
+      ).resolves.toBe(true);
+      await expect(
+        repository.listResumableProjectAttempts('2026-08-12T12:22:00.000Z'),
+      ).resolves.toMatchObject([
+        {
+          jobId: processingOperationId,
+          providerJobId: 'durable-provider-job',
+          status: 'queued',
+        },
+      ]);
+
+      const inspected = {
+        mimeType: 'video/mp4' as const,
+        container: 'mp4' as const,
+        videoCodec: 'avc' as const,
+        audioCodec: 'aac',
+        durationMs: 11_000,
+        width: 1_280,
+        height: 720,
+        sizeBytes: 880,
+        hasAudio: true,
+      };
+      const resultChecksum = '9'.repeat(64);
+      await connection.db.insert(mediaAssets).values({
+        id: processingResultAssetId,
+        ownerUserId,
+        storageProvider: 'local',
+        storageKey: processingResultAssetId,
+        status: 'ready',
+        mimeType: inspected.mimeType,
+        filename: 'character-swap-result.mp4',
+        sizeBytes: inspected.sizeBytes,
+        checksumSha256: resultChecksum,
+      });
+      const processingCurrent = await repository.getCurrent(ownerUserId, projectId);
+      if (processingCurrent === null)
+        throw new Error('Expected the admitted Project to remain current.');
+      const promoted = promoteProjectJobResult(
+        {
+          project: processingCurrent.project,
+          revisions: [processingCurrent.revision],
+          assetLinks: [],
+          versionReferenceLinks: [],
+          jobLinks: [],
+          outputLinks: [],
+        },
+        {
+          expectedProjectVersion: 5,
+          expectedRevisionNumber: 4,
+          initiatingRevisionId: creativeRevisionId,
+          initiatingRevisionNumber: 4,
+          operationIsCurrent: true,
+          operationId: processingOperationId,
+          assetId: processingResultAssetId,
+          author: { kind: 'system', authorId: 'project-processing' },
+        },
+        { now: retainedAt, createId: () => resultRevisionId },
+      );
+      if (promoted.kind !== 'promoted')
+        throw new Error('Expected the current job result to promote.');
+      const resultRevision = promoted.value.revisions.at(-1)!;
+      const resultMedia: ProjectWorkingMediaRecord = {
+        projectId,
+        ownerUserId,
+        kind: 'media-asset',
+        mediaReference: { kind: 'asset', assetId: processingResultAssetId },
+        assetId: processingResultAssetId,
+        savedVideoId: null,
+        videoVersionId: null,
+        adoptedRevisionId: resultRevisionId,
+        adoptedRevisionNumber: 5,
+        operationKey: processingOperationId,
+        requestFingerprint: '3'.repeat(64),
+        mimeType: inspected.mimeType,
+        filename: 'character-swap-result.mp4',
+        sizeBytes: inspected.sizeBytes,
+        checksumSha256: resultChecksum,
+        container: inspected.container,
+        videoCodec: inspected.videoCodec,
+        audioCodec: inspected.audioCodec,
+        durationMs: inspected.durationMs,
+        width: inspected.width,
+        height: inspected.height,
+        hasAudio: inspected.hasAudio,
+        adoptedAt: retainedAt,
+      };
+      const retentionInput = {
+        ownerUserId,
+        projectId,
+        operationId: processingOperationId,
+        manifest: {
+          schemaVersion: 1 as const,
+          assetId: processingResultAssetId,
+          ownerUserId,
+          mimeType: inspected.mimeType,
+          filename: 'character-swap-result.mp4',
+          sizeBytes: inspected.sizeBytes,
+          checksumSha256: resultChecksum,
+          createdAt: retainedAt,
+        },
+        inspected,
+        jobOutputLink: {
+          projectId,
+          ownerUserId,
+          assetId: processingResultAssetId,
+          role: 'job-output' as const,
+          revisionId: creativeRevisionId,
+          revisionNumber: 4,
+          createdAt: retainedAt,
+        },
+        currentPromotion: {
+          expectedVersion: 5,
+          expectedRevisionNumber: 4,
+          expectedCurrentOperationId: processingOperationId,
+          revision: {
+            ownerUserId,
+            projectId,
+            expectedVersion: 5,
+            expectedRevisionNumber: 4,
+            nextProject: promoted.value.project,
+            revision: resultRevision,
+            assetLinks: projectAssetLinksForRevision(resultRevision),
+          },
+          media: resultMedia,
+        },
+        retainedAt,
+      };
+      await expect(repository.retainProjectResult(retentionInput)).resolves.toMatchObject({
+        kind: 'retained-current',
+        attempt: {
+          operationId: processingOperationId,
+          outputAssetId: processingResultAssetId,
+          resultRevisionId,
+        },
+        workingMedia: {
+          project: { version: 6, currentRevisionId: resultRevisionId },
+          revision: { id: resultRevisionId, source: 'job-result' },
+          media: { assetId: processingResultAssetId, operationKey: processingOperationId },
+        },
+      });
+      await expect(repository.retainProjectResult(retentionInput)).resolves.toMatchObject({
+        kind: 'replayed-current',
+        attempt: { resultRevisionId },
+      });
+      await expect(
+        connection.db
+          .select()
+          .from(projectAssets)
+          .where(eq(projectAssets.assetId, processingResultAssetId)),
+      ).resolves.toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({ role: 'job-output', revisionId: creativeRevisionId }),
+          expect.objectContaining({ role: 'working', revisionId: resultRevisionId }),
+          expect.objectContaining({ role: 'presented', revisionId: resultRevisionId }),
+        ]),
+      );
+      await expect(
+        connection.db.select().from(savedVideos).where(eq(savedVideos.ownerUserId, ownerUserId)),
+      ).resolves.toEqual([]);
     } finally {
+      await connection.db.delete(projectJobs).where(eq(projectJobs.projectId, projectId));
+      await connection.db
+        .delete(processingJobs)
+        .where(eq(processingJobs.id, processingOperationId));
       await connection.db
         .delete(projectWorkingMediaAdoptions)
         .where(eq(projectWorkingMediaAdoptions.projectId, projectId));
@@ -897,6 +1168,7 @@ describe.runIf(databaseUrl !== undefined)('Project repository PostgreSQL invaria
       await connection.db.delete(projects).where(eq(projects.id, projectId));
       await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, assetId));
       await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, workingAssetId));
+      await connection.db.delete(mediaAssets).where(eq(mediaAssets.id, processingResultAssetId));
       await connection.db.delete(users).where(eq(users.id, ownerUserId));
     }
   }, 20_000);

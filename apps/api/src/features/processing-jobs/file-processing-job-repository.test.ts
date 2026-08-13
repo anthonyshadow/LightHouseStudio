@@ -56,4 +56,52 @@ describe('FileProcessingJobRepository', () => {
       repository.upsert({ ...trace('failed'), safeErrorCode: 'x'.repeat(81) }),
     ).rejects.toThrow();
   });
+
+  it('re-downloads an unretained ready result from durable provider identity after restart', async () => {
+    const root = path.join(tmpdir(), `lightframe-processing-${crypto.randomUUID()}`);
+    roots.push(root);
+    const repository = new FileProcessingJobRepository(root);
+    await repository.upsert({
+      ...trace('ready'),
+      providerJobId: 'provider-job',
+      requestFingerprint: 'a'.repeat(64),
+      outputResolution: '720p',
+      sourceDurationMs: 1_000,
+      sourceOrientation: 'landscape',
+    });
+
+    await expect(repository.listResumable('2026-08-05T12:02:00.000Z')).resolves.toEqual([
+      expect.objectContaining({
+        jobId: trace('ready').jobId,
+        providerJobId: 'provider-job',
+        status: 'retrieving',
+      }),
+    ]);
+  });
+
+  it('keeps a submission with no provider identity ambiguous until an explicit decision', async () => {
+    const root = path.join(tmpdir(), `lightframe-processing-${crypto.randomUUID()}`);
+    roots.push(root);
+    const repository = new FileProcessingJobRepository(root);
+    await repository.upsert({
+      ...trace('submitting'),
+      requestFingerprint: 'a'.repeat(64),
+      outputResolution: '720p',
+      sourceDurationMs: 1_000,
+      sourceOrientation: 'landscape',
+    });
+
+    await expect(repository.listResumable('2026-08-05T12:02:00.000Z')).resolves.toEqual([]);
+    await expect(repository.listResumable('2026-08-05T14:00:00.000Z')).resolves.toEqual([]);
+    const stored = JSON.parse(
+      await readFile(
+        path.join(root, 'metadata', 'v1', 'processing-jobs', `${trace('ready').jobId}.json`),
+        'utf8',
+      ),
+    ) as VideoProcessingJobTrace;
+    expect(stored).toMatchObject({
+      status: 'ambiguous',
+      safeErrorCode: 'submission_ambiguous',
+    });
+  });
 });

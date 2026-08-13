@@ -1,13 +1,24 @@
 import { createHash, randomUUID } from 'node:crypto';
-import { chmod, mkdir, open, readFile, rename, rm } from 'node:fs/promises';
+import { chmod, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
-import type {
-  Campaign,
-  Project,
-  ProjectAggregate,
-  ProjectJobLink,
-  ProjectOutputLink,
+import type { InspectedVideo } from '@studio/contracts';
+import {
+  currentProjectProcessingAttempt,
+  projectProcessingBlocksArchive,
+  projectProcessingNeedsAttention,
+  projectProcessingRestartTransition,
+  type Campaign,
+  type Project,
+  type ProjectAggregate,
+  type ProjectAssetLink,
+  type ProjectJobLink,
+  type ProjectOutputLink,
 } from '@studio/domain';
+import type {
+  ResumableVideoProcessingJob,
+  VideoProcessingJobTrace,
+} from '../processing-jobs/file-processing-job-repository.js';
+import type { StoredAssetManifest } from '../../storage/asset-byte-store.js';
 import type {
   CampaignCreatePersistenceResult,
   CampaignCreateReceipt,
@@ -42,6 +53,17 @@ import type {
   ProjectWorkingMediaRecord,
 } from './project-repository.js';
 import {
+  projectProcessingAttemptMatchesTrace,
+  projectProcessingResultInputMatchesAttempt,
+  retainedProjectProcessingResultMatches,
+  resumableProjectProcessingAttempt,
+  type ProjectProcessingAdmissionResult,
+  type ProjectProcessingAttemptRecord,
+  type ProjectProcessingHistoryPage,
+  type ProjectProcessingRepository,
+  type ProjectProcessingResultRetentionResult,
+} from './project-processing-repository.js';
+import {
   campaignCreateReceiptSchema,
   createReceiptSchema,
   emptyLibrary,
@@ -54,6 +76,7 @@ import {
   storedCampaignSchema,
   storedJobLinkSchema,
   storedOutputLinkSchema,
+  storedProjectProcessingAttemptSchema,
   storedProjectSourceSchema,
   storedProjectWorkingMediaSchema,
   type ProjectJournal,
@@ -96,13 +119,34 @@ const workingMediaForOperation = (
   return null;
 };
 
+const attemptForOperation = (
+  library: ProjectLibrary,
+  operationId: string,
+): ProjectProcessingAttemptRecord | null =>
+  library.processingJobs.find((attempt) => attempt.operationId === operationId) ?? null;
+
+const currentAttemptForAggregate = (
+  library: ProjectLibrary,
+  aggregate: StoredProjectAggregate,
+): ProjectProcessingAttemptRecord | null => {
+  const current = currentRead(aggregate);
+  return currentProjectProcessingAttempt(
+    { id: current.revision.id, revisionNumber: current.revision.revisionNumber },
+    library.processingJobs.filter(({ projectId }) => projectId === aggregate.project.id),
+  );
+};
+
 export interface FileProjectRepositoryOptions {
   /** Test seam for proving recovery after a durable journal is prepared. */
   readonly afterJournalPrepared?: () => Promise<void> | void;
 }
 
 export class FileProjectRepository
-  implements ProjectRepository, ProjectRetentionPolicy, CampaignRepository
+  implements
+    ProjectRepository,
+    ProjectRetentionPolicy,
+    CampaignRepository,
+    ProjectProcessingRepository
 {
   readonly #root: string;
   readonly #locks = new Map<string, Promise<unknown>>();
@@ -197,6 +241,31 @@ export class FileProjectRepository
       return backup.library;
     }
     return emptyLibrary(ownerUserId);
+  }
+
+  async #ownerIdsOnDisk(): Promise<readonly string[]> {
+    let entries: readonly string[];
+    try {
+      entries = await readdir(this.#root);
+    } catch (error) {
+      if (isMissingFile(error)) return [];
+      throw error;
+    }
+    const owners = new Set<string>();
+    for (const entry of entries) {
+      if (!entry.endsWith('.json') || entry.includes('.tmp-')) continue;
+      try {
+        const raw = JSON.parse(await readFile(path.join(this.#root, entry), 'utf8')) as unknown;
+        if (entry.endsWith('.journal.json')) {
+          owners.add(parseJournal(raw).ownerUserId);
+        } else if (!entry.endsWith('.bak')) {
+          owners.add(parseLibrary(raw).library.ownerUserId);
+        }
+      } catch {
+        // #read owns primary/backup recovery; an unreadable candidate cannot identify an owner.
+      }
+    }
+    return [...owners];
   }
 
   async #write(
@@ -315,7 +384,7 @@ export class FileProjectRepository
         createReceipts: [...library.createReceipts, receipt],
       });
       await this.#write(library, next, {
-        schemaVersion: 4,
+        schemaVersion: 5,
         ownerUserId: aggregate.project.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -397,6 +466,541 @@ export class FileProjectRepository
       revision: currentRead(match.aggregate).revision,
       media: match.media,
     };
+  }
+
+  async admitProjectAttempt(input: {
+    readonly attempt: ProjectProcessingAttemptRecord;
+    readonly link: ProjectJobLink;
+    readonly expectedVersion: number;
+    readonly expectedRevisionNumber: number;
+  }): Promise<ProjectProcessingAdmissionResult> {
+    const attempt = storedProjectProcessingAttemptSchema.parse(
+      input.attempt,
+    ) as ProjectProcessingAttemptRecord;
+    const link = storedJobLinkSchema.parse(input.link) as ProjectJobLink;
+    return this.#withOwnerLock(attempt.ownerUserId, async () => {
+      const library = await this.#read(attempt.ownerUserId);
+      const prior = attemptForOperation(library, attempt.operationId);
+      if (prior !== null) {
+        return prior.projectId === attempt.projectId &&
+          prior.requestFingerprint === attempt.requestFingerprint
+          ? { kind: 'replayed', attempt: prior }
+          : { kind: 'conflict', conflict: { kind: 'operation-key' } };
+      }
+      const index = library.projects.findIndex(
+        ({ project }) => project.id === attempt.projectId && project.deletedAt === null,
+      );
+      const aggregate = library.projects[index];
+      if (aggregate === undefined) return { kind: 'not-found' };
+      if (aggregate.project.version !== input.expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'project-version',
+            projectId: attempt.projectId,
+            expectedVersion: input.expectedVersion,
+            actualVersion: aggregate.project.version,
+          },
+        };
+      }
+      if (aggregate.project.currentRevisionNumber !== input.expectedRevisionNumber) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'revision',
+            projectId: attempt.projectId,
+            expectedRevisionNumber: input.expectedRevisionNumber,
+            actualRevisionNumber: aggregate.project.currentRevisionNumber,
+          },
+        };
+      }
+      if (
+        aggregate.project.archivedAt !== null ||
+        link.projectId !== attempt.projectId ||
+        link.ownerUserId !== attempt.ownerUserId ||
+        link.jobId !== attempt.operationId ||
+        link.initiatingRevisionId !== aggregate.project.currentRevisionId ||
+        link.initiatingRevisionNumber !== aggregate.project.currentRevisionNumber ||
+        attempt.initiatingRevisionId !== link.initiatingRevisionId ||
+        attempt.initiatingRevisionNumber !== link.initiatingRevisionNumber
+      ) {
+        return { kind: 'not-found' };
+      }
+      const currentRevision = currentRead(aggregate).revision;
+      const working = aggregate.workingMediaAdoptions.findLast(
+        ({ mediaReference }) =>
+          projectMediaReferencesEqual(mediaReference, currentRevision.snapshot.workingMedia) &&
+          projectMediaReferencesEqual(mediaReference, currentRevision.snapshot.presentedMedia),
+      );
+      const sourceReference =
+        aggregate.source === null
+          ? null
+          : aggregate.source.kind === 'saved-video-version'
+            ? {
+                kind: 'saved-video-version' as const,
+                savedVideoId: aggregate.source.savedVideoId!,
+                videoVersionId: aggregate.source.videoVersionId!,
+              }
+            : { kind: 'asset' as const, assetId: aggregate.source.assetId };
+      const exactInputAssetId =
+        working?.assetId ??
+        (projectMediaReferencesEqual(sourceReference, currentRevision.snapshot.workingMedia)
+          ? aggregate.source?.assetId
+          : undefined);
+      if (exactInputAssetId !== attempt.inputAssetId) return { kind: 'not-found' };
+
+      if (attempt.retryOfOperationId !== null) {
+        const previous = attemptForOperation(library, attempt.retryOfOperationId);
+        if (
+          previous === null ||
+          previous.projectId !== attempt.projectId ||
+          !['ambiguous', 'failed', 'expired', 'cancelled'].includes(previous.status) ||
+          attempt.attemptNumber !== previous.attemptNumber + 1
+        ) {
+          return { kind: 'conflict', conflict: { kind: 'retry-mismatch' } };
+        }
+      } else if (attempt.attemptNumber !== 1) {
+        return { kind: 'conflict', conflict: { kind: 'retry-mismatch' } };
+      }
+      const activeOwnerAttempt = library.processingJobs.find(
+        (candidate) =>
+          candidate.ownerUserId === attempt.ownerUserId &&
+          candidate.status !== 'ambiguous' &&
+          projectProcessingBlocksArchive(candidate.status),
+      );
+      if (
+        activeOwnerAttempt !== undefined &&
+        !(
+          attempt.retryOfOperationId === activeOwnerAttempt.operationId &&
+          ['ambiguous', 'failed', 'expired', 'cancelled'].includes(activeOwnerAttempt.status)
+        )
+      ) {
+        return {
+          kind: 'conflict',
+          conflict: { kind: 'active-attempt', operationId: activeOwnerAttempt.operationId },
+        };
+      }
+
+      const nextAggregate = storedAggregateSchema.parse({
+        ...aggregate,
+        project: {
+          ...aggregate.project,
+          status: 'processing',
+          version: aggregate.project.version + 1,
+          updatedAt: attempt.createdAt,
+        },
+        jobLinks: [...aggregate.jobLinks, link],
+      });
+      const projects = [...library.projects];
+      projects[index] = nextAggregate;
+      const next = librarySchema.parse({
+        ...library,
+        revision: library.revision + 1,
+        projects,
+        processingJobs: [...library.processingJobs, attempt],
+      });
+      await this.#write(library, next, {
+        schemaVersion: 5,
+        ownerUserId: attempt.ownerUserId,
+        transactionId: randomUUID(),
+        state: 'prepared',
+        operation: {
+          kind: 'project-processing-admit',
+          operationId: attempt.operationId,
+          requestFingerprint: attempt.requestFingerprint,
+          projectId: attempt.projectId,
+        },
+        preparedAt: attempt.createdAt,
+        writes: { metadata: next },
+      });
+      return { kind: 'admitted', attempt };
+    });
+  }
+
+  async getProjectAttempt(
+    ownerUserId: string,
+    projectId: string,
+    operationId: string,
+  ): Promise<ProjectProcessingAttemptRecord | null> {
+    const library = await this.#read(ownerUserId);
+    const attempt = attemptForOperation(library, operationId);
+    if (attempt?.projectId !== projectId) return null;
+    const project = library.projects.find(
+      ({ project: candidate }) => candidate.id === projectId && candidate.deletedAt === null,
+    );
+    return project === undefined ? null : attempt;
+  }
+
+  async getCurrentProjectAttempt(
+    ownerUserId: string,
+    projectId: string,
+  ): Promise<ProjectProcessingAttemptRecord | null> {
+    const library = await this.#read(ownerUserId);
+    const aggregate = library.projects.find(
+      ({ project }) => project.id === projectId && project.deletedAt === null,
+    );
+    return aggregate === undefined ? null : currentAttemptForAggregate(library, aggregate);
+  }
+
+  async hasProjectAttemptRetry(
+    ownerUserId: string,
+    projectId: string,
+    operationId: string,
+  ): Promise<boolean> {
+    const library = await this.#read(ownerUserId);
+    return library.processingJobs.some(
+      (attempt) => attempt.projectId === projectId && attempt.retryOfOperationId === operationId,
+    );
+  }
+
+  async listProjectAttempts(
+    ownerUserId: string,
+    projectId: string,
+    input: {
+      readonly cursor?: { readonly createdAt: string; readonly operationId: string };
+      readonly pageSize: number;
+    },
+  ): Promise<ProjectProcessingHistoryPage | null> {
+    const library = await this.#read(ownerUserId);
+    const aggregate = library.projects.find(
+      ({ project }) => project.id === projectId && project.deletedAt === null,
+    );
+    if (aggregate === undefined) return null;
+    const projectAttempts = library.processingJobs.filter(
+      (attempt) => attempt.projectId === projectId,
+    );
+    const attempts = projectAttempts
+      .filter(
+        (attempt) =>
+          input.cursor === undefined ||
+          attempt.createdAt < input.cursor.createdAt ||
+          (attempt.createdAt === input.cursor.createdAt &&
+            attempt.operationId < input.cursor.operationId),
+      )
+      .sort(
+        (left, right) =>
+          right.createdAt.localeCompare(left.createdAt) ||
+          right.operationId.localeCompare(left.operationId),
+      );
+    const page = attempts.slice(0, input.pageSize) as ProjectProcessingAttemptRecord[];
+    const last = page.at(-1);
+    const ambiguousOperationIds = new Set(
+      page.filter(({ status }) => status === 'ambiguous').map(({ operationId }) => operationId),
+    );
+    return {
+      attempts: page,
+      currentOperationId: currentAttemptForAggregate(library, aggregate)?.operationId ?? null,
+      retriedOperationIds: [
+        ...new Set(
+          projectAttempts.flatMap(({ retryOfOperationId }) =>
+            retryOfOperationId !== null && ambiguousOperationIds.has(retryOfOperationId)
+              ? [retryOfOperationId]
+              : [],
+          ),
+        ),
+      ],
+      nextCursor:
+        attempts.length > input.pageSize && last !== undefined
+          ? { createdAt: last.createdAt, operationId: last.operationId }
+          : null,
+    };
+  }
+
+  async updateProjectAttemptTrace(trace: VideoProcessingJobTrace): Promise<boolean> {
+    return this.#withOwnerLock(trace.ownerUserId, async () => {
+      const library = await this.#read(trace.ownerUserId);
+      const attemptIndex = library.processingJobs.findIndex(
+        ({ operationId }) => operationId === trace.jobId,
+      );
+      const current = library.processingJobs[attemptIndex] as
+        ProjectProcessingAttemptRecord | undefined;
+      if (current === undefined) return false;
+      if (!projectProcessingAttemptMatchesTrace(current, trace)) {
+        throw new Error('Project processing trace changed immutable operation identity.');
+      }
+      const acceptedAt =
+        current.acceptedAt ?? (trace.providerJobId === null ? null : trace.updatedAt);
+      const nextAttempt = storedProjectProcessingAttemptSchema.parse({
+        ...current,
+        providerJobId: trace.providerJobId,
+        providerOutputLocation: trace.providerOutputLocation,
+        sourceDurationMs: trace.sourceDurationMs ?? current.sourceDurationMs,
+        sourceOrientation: trace.sourceOrientation ?? current.sourceOrientation,
+        status: trace.status,
+        safeErrorCode: trace.safeErrorCode,
+        updatedAt: trace.updatedAt,
+        acceptedAt,
+        completedAt: trace.completedAt,
+      });
+      const processingJobs = [...library.processingJobs];
+      processingJobs[attemptIndex] = nextAttempt;
+      const projects = [...library.projects];
+      const projectIndex = projects.findIndex(
+        ({ project }) => project.id === current.projectId && project.deletedAt === null,
+      );
+      const aggregate = projects[projectIndex];
+      if (aggregate !== undefined) {
+        const latest = currentAttemptForAggregate({ ...library, processingJobs }, aggregate);
+        if (latest?.operationId === current.operationId) {
+          const nextStatus =
+            trace.status === 'cancelled'
+              ? 'ready'
+              : ['ambiguous', 'failed', 'expired'].includes(trace.status)
+                ? 'needs-attention'
+                : aggregate.project.status;
+          if (nextStatus !== aggregate.project.status) {
+            projects[projectIndex] = storedAggregateSchema.parse({
+              ...aggregate,
+              project: {
+                ...aggregate.project,
+                status: nextStatus,
+                version: aggregate.project.version + 1,
+                updatedAt: trace.updatedAt,
+              },
+            });
+          }
+        }
+      }
+      await this.#write(library, {
+        ...library,
+        revision: library.revision + 1,
+        projects,
+        processingJobs,
+      });
+      return true;
+    });
+  }
+
+  async listResumableProjectAttempts(now: string): Promise<readonly ResumableVideoProcessingJob[]> {
+    const result: ResumableVideoProcessingJob[] = [];
+    for (const ownerUserId of await this.#ownerIdsOnDisk()) {
+      await this.#withOwnerLock(ownerUserId, async () => {
+        const library = await this.#read(ownerUserId);
+        let changed = false;
+        const processingJobs = library.processingJobs.map((attempt) => {
+          const transition = projectProcessingRestartTransition(attempt, now);
+          if (transition === null) return attempt;
+          changed = true;
+          return storedProjectProcessingAttemptSchema.parse({
+            ...attempt,
+            ...transition,
+            updatedAt: now,
+          });
+        });
+        const recoveredLibrary: ProjectLibrary = { ...library, processingJobs };
+        const projects = library.projects.map((aggregate) => {
+          const currentAttempt = currentAttemptForAggregate(recoveredLibrary, aggregate);
+          if (
+            currentAttempt === null ||
+            !projectProcessingNeedsAttention(currentAttempt.status) ||
+            aggregate.project.status === 'needs-attention'
+          ) {
+            return aggregate;
+          }
+          return storedAggregateSchema.parse({
+            ...aggregate,
+            project: {
+              ...aggregate.project,
+              status: 'needs-attention',
+              version: aggregate.project.version + 1,
+              updatedAt: now,
+            },
+          });
+        });
+        if (changed) {
+          await this.#write(library, {
+            ...library,
+            revision: library.revision + 1,
+            projects,
+            processingJobs,
+          });
+        }
+        for (const attempt of processingJobs) {
+          const resumable = resumableProjectProcessingAttempt(attempt, now);
+          if (resumable !== null) result.push(resumable);
+        }
+      });
+    }
+    return result;
+  }
+
+  async retainProjectResult(input: {
+    readonly ownerUserId: string;
+    readonly projectId: string;
+    readonly operationId: string;
+    readonly manifest: StoredAssetManifest;
+    readonly inspected: InspectedVideo;
+    readonly jobOutputLink: ProjectAssetLink;
+    readonly currentPromotion: {
+      readonly expectedVersion: number;
+      readonly expectedRevisionNumber: number;
+      readonly expectedCurrentOperationId: string;
+      readonly revision: AppendProjectRevisionPersistenceInput;
+      readonly media: ProjectWorkingMediaRecord;
+    } | null;
+    readonly retainedAt: string;
+  }): Promise<ProjectProcessingResultRetentionResult> {
+    return this.#withOwnerLock(input.ownerUserId, async () => {
+      const library = await this.#read(input.ownerUserId);
+      const attemptIndex = library.processingJobs.findIndex(
+        ({ operationId }) => operationId === input.operationId,
+      );
+      const attempt = library.processingJobs[attemptIndex] as
+        ProjectProcessingAttemptRecord | undefined;
+      if (attempt === undefined || attempt.projectId !== input.projectId) {
+        return { kind: 'not-found' };
+      }
+      if (!projectProcessingResultInputMatchesAttempt(input, attempt)) {
+        return { kind: 'conflict' };
+      }
+
+      const projectIndex = library.projects.findIndex(
+        ({ project }) => project.id === input.projectId && project.deletedAt === null,
+      );
+      const aggregate = library.projects[projectIndex];
+      if (aggregate === undefined) return { kind: 'not-found' };
+      if (attempt.outputAssetId !== null) {
+        if (!retainedProjectProcessingResultMatches(attempt, input.manifest, input.inspected)) {
+          return { kind: 'conflict' };
+        }
+        if (attempt.resultRevisionId === null) {
+          return { kind: 'replayed-historical', attempt };
+        }
+        const media = aggregate.workingMediaAdoptions.find(
+          ({ operationKey }) => operationKey === attempt.operationId,
+        );
+        const revision = aggregate.revisions.find(({ id }) => id === attempt.resultRevisionId);
+        if (media === undefined || revision === undefined) return { kind: 'conflict' };
+        return {
+          kind: 'replayed-current',
+          attempt,
+          workingMedia: { project: aggregate.project, revision, media },
+        };
+      }
+
+      const currentAttempt = currentAttemptForAggregate(library, aggregate);
+      const promotion = input.currentPromotion;
+      const promoteCurrent =
+        promotion !== null &&
+        aggregate.project.version === promotion.expectedVersion &&
+        aggregate.project.currentRevisionNumber === promotion.expectedRevisionNumber &&
+        aggregate.project.currentRevisionId === attempt.initiatingRevisionId &&
+        aggregate.project.currentRevisionNumber === attempt.initiatingRevisionNumber &&
+        currentAttempt?.operationId === promotion.expectedCurrentOperationId &&
+        promotion.expectedCurrentOperationId === attempt.operationId;
+
+      const existingJobOutput = aggregate.assetLinks.find(
+        (link) =>
+          link.assetId === input.jobOutputLink.assetId &&
+          link.role === 'job-output' &&
+          link.revisionId === input.jobOutputLink.revisionId,
+      );
+      if (
+        existingJobOutput !== undefined &&
+        JSON.stringify(existingJobOutput) !== JSON.stringify(input.jobOutputLink)
+      ) {
+        return { kind: 'conflict' };
+      }
+      let nextAggregate: StoredProjectAggregate;
+      let workingMedia: ProjectWorkingMediaRead | null = null;
+      let nextAttempt: ProjectProcessingAttemptRecord;
+      if (promoteCurrent) {
+        const revisionInput = promotion.revision;
+        const media = storedProjectWorkingMediaSchema.parse(
+          promotion.media,
+        ) as ProjectWorkingMediaRecord;
+        if (
+          revisionInput.ownerUserId !== input.ownerUserId ||
+          revisionInput.projectId !== input.projectId ||
+          revisionInput.expectedVersion !== promotion.expectedVersion ||
+          revisionInput.expectedRevisionNumber !== promotion.expectedRevisionNumber ||
+          revisionInput.nextProject.version !== aggregate.project.version + 1 ||
+          revisionInput.revision.source !== 'job-result' ||
+          media.operationKey !== attempt.operationId ||
+          media.assetId !== attempt.resultAssetId ||
+          media.adoptedRevisionId !== revisionInput.revision.id ||
+          media.adoptedRevisionNumber !== revisionInput.revision.revisionNumber
+        ) {
+          return { kind: 'conflict' };
+        }
+        nextAggregate = storedAggregateSchema.parse({
+          ...aggregate,
+          project: revisionInput.nextProject,
+          revisions: [...aggregate.revisions, revisionInput.revision],
+          assetLinks: [
+            ...aggregate.assetLinks,
+            ...(existingJobOutput === undefined ? [input.jobOutputLink] : []),
+            ...revisionInput.assetLinks,
+          ],
+          versionReferenceLinks: [
+            ...aggregate.versionReferenceLinks,
+            ...projectVersionReferenceLinksForRevision(revisionInput.revision),
+          ],
+          workingMediaAdoptions: [...aggregate.workingMediaAdoptions, media],
+        });
+        nextAttempt = storedProjectProcessingAttemptSchema.parse({
+          ...attempt,
+          outputAssetId: attempt.resultAssetId,
+          result: input.inspected,
+          resultRevisionId: revisionInput.revision.id,
+          resultRevisionNumber: revisionInput.revision.revisionNumber,
+          status: 'ready',
+          safeErrorCode: null,
+          updatedAt: input.retainedAt,
+          completedAt: input.retainedAt,
+        });
+        workingMedia = {
+          project: revisionInput.nextProject,
+          revision: revisionInput.revision,
+          media,
+        };
+      } else {
+        nextAggregate = storedAggregateSchema.parse({
+          ...aggregate,
+          assetLinks: [
+            ...aggregate.assetLinks,
+            ...(existingJobOutput === undefined ? [input.jobOutputLink] : []),
+          ],
+        });
+        nextAttempt = storedProjectProcessingAttemptSchema.parse({
+          ...attempt,
+          outputAssetId: attempt.resultAssetId,
+          result: input.inspected,
+          status: 'ready',
+          safeErrorCode: null,
+          updatedAt: input.retainedAt,
+          completedAt: input.retainedAt,
+        });
+      }
+
+      const projects = [...library.projects];
+      projects[projectIndex] = nextAggregate;
+      const processingJobs = [...library.processingJobs];
+      processingJobs[attemptIndex] = nextAttempt;
+      const next = librarySchema.parse({
+        ...library,
+        revision: library.revision + 1,
+        projects,
+        processingJobs,
+      });
+      await this.#write(library, next, {
+        schemaVersion: 5,
+        ownerUserId: input.ownerUserId,
+        transactionId: randomUUID(),
+        state: 'prepared',
+        operation: {
+          kind: 'project-processing-result',
+          operationId: input.operationId,
+          projectId: input.projectId,
+          assetId: input.manifest.assetId,
+        },
+        preparedAt: input.retainedAt,
+        writes: { metadata: next },
+      });
+      return workingMedia === null
+        ? { kind: 'retained-historical', attempt: nextAttempt }
+        : { kind: 'retained-current', attempt: nextAttempt, workingMedia };
+    });
   }
 
   async list(ownerUserId: string, input: ProjectSummaryPageInput): Promise<ProjectSummaryPage> {
@@ -676,7 +1280,7 @@ export class FileProjectRepository
         projects,
       });
       await this.#write(library, next, {
-        schemaVersion: 4,
+        schemaVersion: 5,
         ownerUserId: input.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -776,7 +1380,7 @@ export class FileProjectRepository
         projects,
       });
       await this.#write(library, next, {
-        schemaVersion: 4,
+        schemaVersion: 5,
         ownerUserId: input.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',
@@ -830,7 +1434,18 @@ export class FileProjectRepository
       if (
         aggregate.project.archivedAt === null &&
         nextProject.archivedAt !== null &&
-        aggregate.project.status === 'processing'
+        (aggregate.project.status === 'processing' ||
+          library.processingJobs.some(
+            (attempt) =>
+              attempt.projectId === aggregate.project.id &&
+              projectProcessingBlocksArchive(attempt.status) &&
+              !(
+                attempt.status === 'ambiguous' &&
+                library.processingJobs.some(
+                  (candidate) => candidate.retryOfOperationId === attempt.operationId,
+                )
+              ),
+          ))
       ) {
         return {
           kind: 'conflict',
@@ -933,7 +1548,7 @@ export class FileProjectRepository
         campaignCreateReceipts: [...library.campaignCreateReceipts, receipt],
       });
       await this.#write(library, next, {
-        schemaVersion: 4,
+        schemaVersion: 5,
         ownerUserId: campaign.ownerUserId,
         transactionId: randomUUID(),
         state: 'prepared',

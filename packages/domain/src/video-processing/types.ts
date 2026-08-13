@@ -36,3 +36,68 @@ export type UploadedVideoValidationIssue = Readonly<{
   code: UploadedVideoValidationCode;
   message: string;
 }>;
+
+export const PROJECT_PROCESSING_JOB_STATUSES = [
+  'pending',
+  'validating',
+  'submitting',
+  'accepted',
+  'ambiguous',
+  'queued',
+  'processing',
+  'retrieving',
+  'ready',
+  'failed',
+  'expired',
+  'cancelled',
+] as const;
+
+export type ProjectProcessingJobStatus = (typeof PROJECT_PROCESSING_JOB_STATUSES)[number];
+
+export type ProjectProcessingAttemptFacts = Readonly<{
+  operationId: string;
+  initiatingRevisionId: string;
+  initiatingRevisionNumber: number;
+  resultRevisionId: string | null;
+  resultRevisionNumber: number | null;
+  attemptNumber: number;
+  status: ProjectProcessingJobStatus;
+  providerJobId: string | null;
+  outputAssetId: string | null;
+  createdAt: string;
+}>;
+
+export type ProjectProcessingPublicPhase =
+  | 'submitting'
+  | 'accepted'
+  | 'processing'
+  | 'retrieving'
+  | 'saving-result'
+  | 'complete'
+  | 'needs-attention'
+  | 'cancelled';
+
+export type ProjectProcessingRetryPolicy =
+  'not-allowed' | 'explicit' | 'explicit-cost-confirmation';
+
+export type ProjectProcessingRestartTransition =
+  | Readonly<{
+      status: 'expired';
+      safeErrorCode: 'job_expired';
+      completedAt: string;
+    }>
+  | Readonly<{
+      status: 'ambiguous';
+      safeErrorCode: 'submission_ambiguous';
+      completedAt: string;
+    }>
+  | Readonly<{
+      status: 'failed';
+      safeErrorCode: 'processing_failed';
+      completedAt: string;
+    }>
+  | Readonly<{
+      status: 'queued' | 'retrieving';
+      safeErrorCode: null;
+      completedAt: null;
+    }>;

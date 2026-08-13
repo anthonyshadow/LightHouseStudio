@@ -1,5 +1,5 @@
 import { VIDEO_JOB_TTL_MS } from '@studio/contracts';
-import { and, eq, gt, inArray, lte, sql } from 'drizzle-orm';
+import { and, eq, gt, inArray, isNotNull, isNull, lte, notExists, sql } from 'drizzle-orm';
 import { toIsoTimestamp } from '../../application/timestamps.js';
 import type {
   DurableProcessingJobRepository,
@@ -9,7 +9,11 @@ import type {
   VideoProcessingJobTrace,
 } from '../../features/processing-jobs/file-processing-job-repository.js';
 import type { LightframeDatabase } from './client.js';
-import { processingJobs } from './schema.js';
+import { processingJobs, projectJobs } from './schema.js';
+
+interface DrizzleProcessingJobTraceWriterOptions {
+  readonly excludeProjectLinkedJobs?: boolean;
+}
 
 const persistedDurationMs = (durationMs: number | null): number | null =>
   durationMs === null ? null : Math.round(durationMs);
@@ -42,7 +46,25 @@ const valuesForTrace = (trace: VideoProcessingJobTrace) => ({
 export class DrizzleProcessingJobTraceWriter
   implements ProcessingJobTraceWriter, DurableProcessingJobRepository
 {
-  constructor(private readonly db: LightframeDatabase) {}
+  constructor(
+    private readonly db: LightframeDatabase,
+    private readonly options: DrizzleProcessingJobTraceWriterOptions = {},
+  ) {}
+
+  #standaloneScope() {
+    if (this.options.excludeProjectLinkedJobs !== true) return undefined;
+    return notExists(
+      this.db
+        .select({ jobId: projectJobs.jobId })
+        .from(projectJobs)
+        .where(
+          and(
+            eq(projectJobs.jobId, processingJobs.id),
+            eq(projectJobs.ownerUserId, processingJobs.ownerUserId),
+          ),
+        ),
+    );
+  }
 
   async admit(trace: VideoProcessingJobTrace): Promise<ProcessingJobAdmissionResult> {
     const inserted = await this.db
@@ -102,6 +124,7 @@ export class DrizzleProcessingJobTraceWriter
   }
 
   async listResumable(now: string): Promise<readonly ResumableVideoProcessingJob[]> {
+    const standaloneScope = this.#standaloneScope();
     await this.db
       .update(processingJobs)
       .set({
@@ -120,22 +143,50 @@ export class DrizzleProcessingJobTraceWriter
             'queued',
             'processing',
             'retrieving',
+            'ready',
           ]),
+          isNull(processingJobs.outputAssetId),
           lte(processingJobs.expiresAt, now),
+          standaloneScope,
         ),
       );
     await this.db
       .update(processingJobs)
       .set({
         status: 'ambiguous',
-        safeErrorCode: 'provider_rejected',
+        safeErrorCode: 'submission_ambiguous',
         completedAt: now,
         updatedAt: now,
       })
       .where(
         and(
           inArray(processingJobs.status, ['submitting', 'accepted']),
+          isNull(processingJobs.providerJobId),
           gt(processingJobs.expiresAt, now),
+          standaloneScope,
+        ),
+      );
+    await this.db
+      .update(processingJobs)
+      .set({ status: 'retrieving', safeErrorCode: null, completedAt: null, updatedAt: now })
+      .where(
+        and(
+          eq(processingJobs.status, 'ready'),
+          isNull(processingJobs.outputAssetId),
+          isNotNull(processingJobs.providerJobId),
+          gt(processingJobs.expiresAt, now),
+          standaloneScope,
+        ),
+      );
+    await this.db
+      .update(processingJobs)
+      .set({ status: 'queued', safeErrorCode: null, completedAt: null, updatedAt: now })
+      .where(
+        and(
+          eq(processingJobs.status, 'submitting'),
+          isNotNull(processingJobs.providerJobId),
+          gt(processingJobs.expiresAt, now),
+          standaloneScope,
         ),
       );
     await this.db
@@ -150,6 +201,7 @@ export class DrizzleProcessingJobTraceWriter
         and(
           inArray(processingJobs.status, ['pending', 'validating']),
           gt(processingJobs.expiresAt, now),
+          standaloneScope,
         ),
       );
     const rows = await this.db
@@ -157,8 +209,10 @@ export class DrizzleProcessingJobTraceWriter
       .from(processingJobs)
       .where(
         and(
-          inArray(processingJobs.status, ['queued', 'processing', 'retrieving']),
+          inArray(processingJobs.status, ['accepted', 'queued', 'processing', 'retrieving']),
+          isNotNull(processingJobs.providerJobId),
           gt(processingJobs.expiresAt, now),
+          standaloneScope,
         ),
       );
     const resumable: ResumableVideoProcessingJob[] = [];
@@ -170,7 +224,10 @@ export class DrizzleProcessingJobTraceWriter
         row.sourceDurationMs === null ||
         (row.sourceOrientation !== 'landscape' && row.sourceOrientation !== 'portrait') ||
         (row.operation !== 'character-swap' && row.operation !== 'virtual-try-on') ||
-        (row.status !== 'queued' && row.status !== 'processing' && row.status !== 'retrieving')
+        (row.status !== 'accepted' &&
+          row.status !== 'queued' &&
+          row.status !== 'processing' &&
+          row.status !== 'retrieving')
       ) {
         continue;
       }
@@ -181,7 +238,7 @@ export class DrizzleProcessingJobTraceWriter
         provider: row.provider,
         providerJobId: row.providerJobId,
         requestFingerprint: row.requestFingerprint,
-        status: row.status,
+        status: row.status === 'accepted' ? 'queued' : row.status,
         outputResolution: row.outputResolution,
         providerOutputLocation: row.providerOutputLocation,
         sourceDurationMs: row.sourceDurationMs,

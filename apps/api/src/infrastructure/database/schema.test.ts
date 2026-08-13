@@ -84,6 +84,12 @@ describe('Drizzle persistence schema', () => {
     expect(getTableConfig(processingJobs).indexes.map(({ config }) => config.name)).toContain(
       'processing_jobs_owner_active_unique',
     );
+    expect(getTableConfig(processingJobs).indexes.map(({ config }) => config.name)).toContain(
+      'processing_jobs_retry_idx',
+    );
+    expect(getTableConfig(processingJobs).foreignKeys.map((key) => key.getName())).toContain(
+      'processing_jobs_retry_same_owner_fk',
+    );
     expect(getTableConfig(mediaAssets).indexes).toHaveLength(3);
     expect(getTableConfig(creativeAssets).primaryKeys).toHaveLength(1);
     expect(getTableConfig(projectRevisions).indexes.map(({ config }) => config.name)).toContain(
@@ -115,6 +121,9 @@ describe('Drizzle persistence schema', () => {
         'projects_owner_campaign_active_recent_idx',
         'projects_owner_campaign_archived_recent_idx',
       ]),
+    );
+    expect(getTableConfig(projectJobs).foreignKeys.map((key) => key.getName())).toContain(
+      'project_jobs_result_revision_same_project_fk',
     );
     expect(getTableConfig(projectSources).foreignKeys).toHaveLength(5);
     expect(getTableConfig(projectSources).indexes.map(({ config }) => config.name)).toEqual(

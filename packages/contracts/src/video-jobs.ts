@@ -37,8 +37,10 @@ export const VIDEO_JOB_STATUSES = [
   'processing',
   'retrieving',
   'ready',
+  'ambiguous',
   'failed',
   'expired',
+  'cancelled',
 ] as const;
 export const videoJobStatusSchema = z.enum(VIDEO_JOB_STATUSES);
 
@@ -52,6 +54,7 @@ export const VIDEO_JOB_ERROR_CODES = [
   'provider_unavailable',
   'provider_rejected',
   'provider_timeout',
+  'submission_ambiguous',
   'result_invalid',
   'result_too_large',
   'job_expired',

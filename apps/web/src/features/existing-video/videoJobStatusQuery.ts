@@ -9,7 +9,11 @@ export const videoJobQueryKeys = {
 };
 
 export const isTerminalVideoJobStatus = (status: VideoJobStatusResponse): boolean =>
-  status.status === 'ready' || status.status === 'failed' || status.status === 'expired';
+  status.status === 'ready' ||
+  status.status === 'ambiguous' ||
+  status.status === 'failed' ||
+  status.status === 'expired' ||
+  status.status === 'cancelled';
 
 const pollInterval = (status?: VideoJobStatusResponse): number =>
   Math.max(1, status?.nextPollAfterMs ?? DEFAULT_POLL_INTERVAL_MS);

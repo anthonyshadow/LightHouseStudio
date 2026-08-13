@@ -1,5 +1,15 @@
-import { projectSnapshotSchema } from '@studio/contracts';
 import {
+  type InspectedVideo,
+  inspectedVideoSchema,
+  projectProcessingCapabilitySchema,
+  projectSnapshotSchema,
+  videoJobErrorCodeSchema,
+  videoOutputResolutionSchema,
+} from '@studio/contracts';
+import {
+  currentProjectProcessingAttempt,
+  projectProcessingNeedsAttention,
+  projectProcessingRestartTransition,
   type Project,
   type ProjectAggregate,
   type ProjectAssetLink,
@@ -30,7 +40,25 @@ import type {
   ProjectSourceRecord,
   ProjectWorkingMediaAdoptionResult,
   ProjectWorkingMediaRead,
+  ProjectWorkingMediaRecord,
 } from '../../features/projects/project-repository.js';
+import type { StoredAssetManifest } from '../../storage/asset-byte-store.js';
+import {
+  projectProcessingAttemptMatchesTrace,
+  projectProcessingResultInputMatchesAttempt,
+  retainedProjectProcessingResultMatches,
+  resumableProjectProcessingAttempt,
+  type PersistedProcessingJobStatus,
+  type ProjectProcessingAdmissionResult,
+  type ProjectProcessingAttemptRecord,
+  type ProjectProcessingHistoryPage,
+  type ProjectProcessingRepository,
+  type ProjectProcessingResultRetentionResult,
+} from '../../features/projects/project-processing-repository.js';
+import type {
+  ResumableVideoProcessingJob,
+  VideoProcessingJobTrace,
+} from '../../features/processing-jobs/file-processing-job-repository.js';
 import {
   projectAssetLinksForRevision,
   projectMediaReferencesEqual,
@@ -71,9 +99,73 @@ import {
 type DatabaseExecutor = Parameters<Parameters<LightframeDatabase['transaction']>[0]>[0];
 type ProjectJobRow = typeof projectJobs.$inferSelect;
 type ProjectOutputRow = typeof projectOutputs.$inferSelect;
+type ProcessingJobRow = typeof processingJobs.$inferSelect;
 type CurrentProjectRow = {
   readonly project: typeof projects.$inferSelect;
   readonly revision: typeof projectRevisions.$inferSelect | null;
+};
+
+const processingJobMatchesProjectLink = and(
+  eq(processingJobs.id, projectJobs.jobId),
+  eq(processingJobs.ownerUserId, projectJobs.ownerUserId),
+);
+
+const toProjectProcessingAttempt = (
+  job: ProcessingJobRow,
+  link: ProjectJobRow,
+): ProjectProcessingAttemptRecord => {
+  const capability = projectProcessingCapabilitySchema.parse(job.operation);
+  const outputResolution = videoOutputResolutionSchema.parse(job.outputResolution);
+  const status = job.status;
+  const safeErrorCode =
+    job.safeErrorCode === null
+      ? null
+      : job.safeErrorCode === 'processing_failed'
+        ? 'processing_failed'
+        : videoJobErrorCodeSchema.parse(job.safeErrorCode);
+  if (
+    job.requestFingerprint === null ||
+    job.inputAssetId === null ||
+    job.resultAssetId === null ||
+    job.sourceDurationMs === null ||
+    (job.sourceOrientation !== 'landscape' && job.sourceOrientation !== 'portrait') ||
+    job.attempt < 1
+  ) {
+    throw new ProjectPersistenceError(
+      'invalid-aggregate',
+      'The Project processing attempt is incomplete.',
+    );
+  }
+  return {
+    operationId: job.id,
+    ownerUserId: job.ownerUserId,
+    projectId: link.projectId,
+    capability,
+    provider: job.provider,
+    providerJobId: job.providerJobId,
+    requestFingerprint: job.requestFingerprint,
+    inputAssetId: job.inputAssetId,
+    resultAssetId: job.resultAssetId,
+    outputAssetId: job.outputAssetId,
+    result: job.resultMetadata === null ? null : inspectedVideoSchema.parse(job.resultMetadata),
+    retryOfOperationId: job.retryOfJobId,
+    attemptNumber: job.attempt,
+    initiatingRevisionId: link.initiatingRevisionId,
+    initiatingRevisionNumber: link.initiatingRevisionNumber,
+    resultRevisionId: link.resultRevisionId,
+    resultRevisionNumber: link.resultRevisionNumber,
+    status,
+    safeErrorCode,
+    outputResolution,
+    providerOutputLocation: job.providerOutputLocation,
+    sourceDurationMs: job.sourceDurationMs,
+    sourceOrientation: job.sourceOrientation,
+    createdAt: toIsoTimestamp(job.createdAt),
+    updatedAt: toIsoTimestamp(job.updatedAt),
+    acceptedAt: nullableIsoTimestamp(job.acceptedAt),
+    completedAt: nullableIsoTimestamp(job.completedAt),
+    expiresAt: toIsoTimestamp(job.expiresAt),
+  };
 };
 
 export { ProjectPersistenceError } from './project-persistence-errors.js';
@@ -349,8 +441,64 @@ const replayOrRelationConflict = <Row>(
         conflict: { kind: 'relation-mismatch', projectId, relation },
       };
 
-export class DrizzleProjectRepository implements ProjectRepository {
+export class DrizzleProjectRepository implements ProjectRepository, ProjectProcessingRepository {
   constructor(private readonly db: LightframeDatabase) {}
+
+  async #processingAttempt(
+    executor: LightframeDatabase | DatabaseExecutor,
+    ownerUserId: string,
+    projectId: string,
+    operationId: string,
+  ): Promise<ProjectProcessingAttemptRecord | null> {
+    const [row] = await executor
+      .select({ job: processingJobs, link: projectJobs })
+      .from(projectJobs)
+      .innerJoin(processingJobs, processingJobMatchesProjectLink)
+      .where(
+        and(
+          eq(projectJobs.projectId, projectId),
+          eq(projectJobs.ownerUserId, ownerUserId),
+          eq(projectJobs.jobId, operationId),
+        ),
+      )
+      .limit(1);
+    return row === undefined ? null : toProjectProcessingAttempt(row.job, row.link);
+  }
+
+  async #currentProcessingAttempt(
+    executor: LightframeDatabase | DatabaseExecutor,
+    ownerUserId: string,
+    projectId: string,
+    currentRevision: { readonly id: string; readonly revisionNumber: number },
+  ): Promise<ProjectProcessingAttemptRecord | null> {
+    const [row] = await executor
+      .select({ job: processingJobs, link: projectJobs })
+      .from(projectJobs)
+      .innerJoin(processingJobs, processingJobMatchesProjectLink)
+      .where(
+        and(
+          eq(projectJobs.projectId, projectId),
+          eq(projectJobs.ownerUserId, ownerUserId),
+          or(
+            and(
+              eq(projectJobs.initiatingRevisionId, currentRevision.id),
+              eq(projectJobs.initiatingRevisionNumber, currentRevision.revisionNumber),
+            ),
+            and(
+              eq(projectJobs.resultRevisionId, currentRevision.id),
+              eq(projectJobs.resultRevisionNumber, currentRevision.revisionNumber),
+            ),
+          ),
+        ),
+      )
+      .orderBy(
+        desc(processingJobs.attempt),
+        desc(processingJobs.createdAt),
+        desc(processingJobs.id),
+      )
+      .limit(1);
+    return row === undefined ? null : toProjectProcessingAttempt(row.job, row.link);
+  }
 
   async #campaignMembershipIsValid(tx: DatabaseExecutor, project: Project): Promise<boolean> {
     if (project.campaignId === null) return true;
@@ -1471,6 +1619,853 @@ export class DrizzleProjectRepository implements ProjectRepository {
     });
   }
 
+  async admitProjectAttempt(input: {
+    readonly attempt: ProjectProcessingAttemptRecord;
+    readonly link: ProjectJobLink;
+    readonly expectedVersion: number;
+    readonly expectedRevisionNumber: number;
+  }): Promise<ProjectProcessingAdmissionResult> {
+    return this.db.transaction(async (tx) => {
+      const [existing] = await tx
+        .select({ job: processingJobs, link: projectJobs })
+        .from(processingJobs)
+        .leftJoin(projectJobs, eq(projectJobs.jobId, processingJobs.id))
+        .where(eq(processingJobs.id, input.attempt.operationId))
+        .for('update', { of: processingJobs })
+        .limit(1);
+      if (existing !== undefined) {
+        if (
+          existing.link !== null &&
+          existing.job.ownerUserId === input.attempt.ownerUserId &&
+          existing.link.projectId === input.attempt.projectId &&
+          existing.job.requestFingerprint === input.attempt.requestFingerprint
+        ) {
+          return {
+            kind: 'replayed',
+            attempt: toProjectProcessingAttempt(existing.job, existing.link),
+          } as const;
+        }
+        return { kind: 'conflict', conflict: { kind: 'operation-key' } } as const;
+      }
+
+      const [current] = await tx
+        .select()
+        .from(projects)
+        .where(
+          and(
+            eq(projects.id, input.attempt.projectId),
+            eq(projects.ownerUserId, input.attempt.ownerUserId),
+            isNull(projects.archivedAt),
+            isNull(projects.deletedAt),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (current === undefined) return { kind: 'not-found' } as const;
+      if (current.version !== input.expectedVersion) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'project-version',
+            projectId: current.id,
+            expectedVersion: input.expectedVersion,
+            actualVersion: current.version,
+          },
+        } as const;
+      }
+      if (current.currentRevisionNumber !== input.expectedRevisionNumber) {
+        return {
+          kind: 'conflict',
+          conflict: {
+            kind: 'revision',
+            projectId: current.id,
+            expectedRevisionNumber: input.expectedRevisionNumber,
+            actualRevisionNumber: current.currentRevisionNumber,
+          },
+        } as const;
+      }
+      if (
+        input.link.projectId !== current.id ||
+        input.link.ownerUserId !== current.ownerUserId ||
+        input.link.jobId !== input.attempt.operationId ||
+        input.link.initiatingRevisionId !== current.currentRevisionId ||
+        input.link.initiatingRevisionNumber !== current.currentRevisionNumber ||
+        input.attempt.initiatingRevisionId !== input.link.initiatingRevisionId ||
+        input.attempt.initiatingRevisionNumber !== input.link.initiatingRevisionNumber ||
+        input.attempt.status !== 'submitting' ||
+        input.attempt.providerJobId !== null ||
+        input.attempt.outputAssetId !== null ||
+        input.attempt.result !== null
+      ) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          'Project processing admission must pre-link one submitting operation.',
+        );
+      }
+      const [revisionRow] = await tx
+        .select()
+        .from(projectRevisions)
+        .where(
+          and(
+            eq(projectRevisions.id, current.currentRevisionId),
+            eq(projectRevisions.projectId, current.id),
+            eq(projectRevisions.ownerUserId, current.ownerUserId),
+          ),
+        )
+        .limit(1);
+      if (revisionRow === undefined) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          'The current Project revision is unavailable for processing admission.',
+        );
+      }
+      const snapshot = parseSnapshot(revisionRow.snapshotSchemaVersion, revisionRow.snapshot);
+      const adoptionRows = await tx
+        .select()
+        .from(projectWorkingMediaAdoptions)
+        .where(
+          and(
+            eq(projectWorkingMediaAdoptions.projectId, current.id),
+            eq(projectWorkingMediaAdoptions.ownerUserId, current.ownerUserId),
+          ),
+        );
+      const working = adoptionRows
+        .map(toProjectWorkingMedia)
+        .findLast(
+          ({ mediaReference }) =>
+            projectMediaReferencesEqual(mediaReference, snapshot.workingMedia) &&
+            projectMediaReferencesEqual(mediaReference, snapshot.presentedMedia),
+        );
+      const [sourceRow] = await tx
+        .select()
+        .from(projectSources)
+        .where(
+          and(
+            eq(projectSources.projectId, current.id),
+            eq(projectSources.ownerUserId, current.ownerUserId),
+          ),
+        )
+        .limit(1);
+      const source = sourceRow === undefined ? null : toProjectSource(sourceRow);
+      const sourceReference =
+        source === null
+          ? null
+          : source.kind === 'saved-video-version'
+            ? {
+                kind: 'saved-video-version' as const,
+                savedVideoId: source.savedVideoId!,
+                videoVersionId: source.videoVersionId!,
+              }
+            : { kind: 'asset' as const, assetId: source.assetId };
+      const exactInputAssetId =
+        working?.assetId ??
+        (projectMediaReferencesEqual(sourceReference, snapshot.workingMedia)
+          ? source?.assetId
+          : undefined);
+      if (exactInputAssetId !== input.attempt.inputAssetId) {
+        throw new ProjectPersistenceError(
+          'asset-not-ready',
+          'The exact current Project processing input is unavailable.',
+        );
+      }
+      const [readyInput] = await tx
+        .select({ id: mediaAssets.id })
+        .from(mediaAssets)
+        .where(
+          and(
+            eq(mediaAssets.id, input.attempt.inputAssetId),
+            eq(mediaAssets.ownerUserId, input.attempt.ownerUserId),
+            eq(mediaAssets.status, 'ready'),
+          ),
+        )
+        .for('share')
+        .limit(1);
+      if (readyInput === undefined) {
+        throw new ProjectPersistenceError(
+          'asset-not-ready',
+          'The exact Project processing input is unavailable.',
+        );
+      }
+
+      if (input.attempt.retryOfOperationId !== null) {
+        const previous = await this.#processingAttempt(
+          tx,
+          input.attempt.ownerUserId,
+          input.attempt.projectId,
+          input.attempt.retryOfOperationId,
+        );
+        if (
+          previous === null ||
+          !['ambiguous', 'failed', 'expired', 'cancelled'].includes(previous.status) ||
+          input.attempt.attemptNumber !== previous.attemptNumber + 1
+        ) {
+          return { kind: 'conflict', conflict: { kind: 'retry-mismatch' } } as const;
+        }
+      } else if (input.attempt.attemptNumber !== 1) {
+        return { kind: 'conflict', conflict: { kind: 'retry-mismatch' } } as const;
+      }
+      const [activeOwnerAttempt] = await tx
+        .select({ id: processingJobs.id })
+        .from(processingJobs)
+        .where(
+          and(
+            eq(processingJobs.ownerUserId, input.attempt.ownerUserId),
+            inArray(processingJobs.status, [
+              'pending',
+              'validating',
+              'submitting',
+              'accepted',
+              'queued',
+              'processing',
+              'retrieving',
+            ]),
+          ),
+        )
+        .for('update')
+        .limit(1);
+      if (activeOwnerAttempt !== undefined) {
+        return {
+          kind: 'conflict',
+          conflict: { kind: 'active-attempt', operationId: activeOwnerAttempt.id },
+        } as const;
+      }
+
+      await tx.insert(processingJobs).values({
+        id: input.attempt.operationId,
+        ownerUserId: input.attempt.ownerUserId,
+        operation: input.attempt.capability,
+        provider: input.attempt.provider,
+        providerJobId: null,
+        requestFingerprint: input.attempt.requestFingerprint,
+        outputResolution: input.attempt.outputResolution,
+        providerOutputLocation: null,
+        sourceDurationMs: input.attempt.sourceDurationMs,
+        sourceOrientation: input.attempt.sourceOrientation,
+        status: 'submitting',
+        safeErrorCode: null,
+        inputAssetId: input.attempt.inputAssetId,
+        outputAssetId: null,
+        resultAssetId: input.attempt.resultAssetId,
+        resultMetadata: null,
+        retryOfJobId: input.attempt.retryOfOperationId,
+        leaseOwner: null,
+        leaseExpiresAt: null,
+        attempt: input.attempt.attemptNumber,
+        acceptedAt: null,
+        completedAt: null,
+        expiresAt: toIsoTimestamp(input.attempt.expiresAt),
+        createdAt: toIsoTimestamp(input.attempt.createdAt),
+        updatedAt: toIsoTimestamp(input.attempt.updatedAt),
+      });
+      await tx.insert(projectJobs).values({
+        projectId: input.link.projectId,
+        ownerUserId: input.link.ownerUserId,
+        jobId: input.link.jobId,
+        initiatingRevisionId: input.link.initiatingRevisionId,
+        initiatingRevisionNumber: input.link.initiatingRevisionNumber,
+        resultRevisionId: null,
+        resultRevisionNumber: null,
+        createdAt: toIsoTimestamp(input.link.createdAt),
+      });
+      await tx
+        .update(projects)
+        .set({
+          status: 'processing',
+          version: current.version + 1,
+          updatedAt: toIsoTimestamp(input.attempt.createdAt),
+        })
+        .where(and(eq(projects.id, current.id), eq(projects.ownerUserId, current.ownerUserId)));
+      return { kind: 'admitted', attempt: input.attempt } as const;
+    });
+  }
+
+  async getProjectAttempt(
+    ownerUserId: string,
+    projectId: string,
+    operationId: string,
+  ): Promise<ProjectProcessingAttemptRecord | null> {
+    const [row] = await this.db
+      .select({ job: processingJobs, link: projectJobs })
+      .from(projectJobs)
+      .innerJoin(processingJobs, processingJobMatchesProjectLink)
+      .innerJoin(
+        projects,
+        and(
+          eq(projects.id, projectJobs.projectId),
+          eq(projects.ownerUserId, projectJobs.ownerUserId),
+          isNull(projects.deletedAt),
+        ),
+      )
+      .where(
+        and(
+          eq(projectJobs.projectId, projectId),
+          eq(projectJobs.ownerUserId, ownerUserId),
+          eq(projectJobs.jobId, operationId),
+        ),
+      )
+      .limit(1);
+    return row === undefined ? null : toProjectProcessingAttempt(row.job, row.link);
+  }
+
+  async getCurrentProjectAttempt(
+    ownerUserId: string,
+    projectId: string,
+  ): Promise<ProjectProcessingAttemptRecord | null> {
+    const current = await this.getCurrent(ownerUserId, projectId);
+    if (current === null) return null;
+    return this.#currentProcessingAttempt(this.db, ownerUserId, projectId, {
+      id: current.revision.id,
+      revisionNumber: current.revision.revisionNumber,
+    });
+  }
+
+  async hasProjectAttemptRetry(
+    ownerUserId: string,
+    projectId: string,
+    operationId: string,
+  ): Promise<boolean> {
+    const [row] = await this.db
+      .select({ id: processingJobs.id })
+      .from(projectJobs)
+      .innerJoin(processingJobs, processingJobMatchesProjectLink)
+      .where(
+        and(
+          eq(projectJobs.projectId, projectId),
+          eq(projectJobs.ownerUserId, ownerUserId),
+          eq(processingJobs.retryOfJobId, operationId),
+        ),
+      )
+      .limit(1);
+    return row !== undefined;
+  }
+
+  async listProjectAttempts(
+    ownerUserId: string,
+    projectId: string,
+    input: {
+      readonly cursor?: { readonly createdAt: string; readonly operationId: string };
+      readonly pageSize: number;
+    },
+  ): Promise<ProjectProcessingHistoryPage | null> {
+    const current = await this.getCurrent(ownerUserId, projectId);
+    if (current === null) return null;
+    const cursorCondition =
+      input.cursor === undefined
+        ? undefined
+        : or(
+            lt(processingJobs.createdAt, input.cursor.createdAt),
+            and(
+              eq(processingJobs.createdAt, input.cursor.createdAt),
+              lt(processingJobs.id, input.cursor.operationId),
+            ),
+          );
+    const rows = await this.db
+      .select({ job: processingJobs, link: projectJobs })
+      .from(projectJobs)
+      .innerJoin(processingJobs, processingJobMatchesProjectLink)
+      .where(
+        and(
+          eq(projectJobs.projectId, projectId),
+          eq(projectJobs.ownerUserId, ownerUserId),
+          cursorCondition,
+        ),
+      )
+      .orderBy(desc(processingJobs.createdAt), desc(processingJobs.id))
+      .limit(input.pageSize + 1);
+    const page = rows
+      .slice(0, input.pageSize)
+      .map(({ job, link }) => toProjectProcessingAttempt(job, link));
+    const last = page.at(-1);
+    const currentAttempt = await this.#currentProcessingAttempt(this.db, ownerUserId, projectId, {
+      id: current.revision.id,
+      revisionNumber: current.revision.revisionNumber,
+    });
+    const ambiguousOperationIds = page
+      .filter(({ status }) => status === 'ambiguous')
+      .map(({ operationId }) => operationId);
+    const retryRows =
+      ambiguousOperationIds.length === 0
+        ? []
+        : await this.db
+            .select({ operationId: processingJobs.retryOfJobId })
+            .from(projectJobs)
+            .innerJoin(processingJobs, processingJobMatchesProjectLink)
+            .where(
+              and(
+                eq(projectJobs.projectId, projectId),
+                eq(projectJobs.ownerUserId, ownerUserId),
+                inArray(processingJobs.retryOfJobId, ambiguousOperationIds),
+              ),
+            );
+    return {
+      attempts: page,
+      currentOperationId: currentAttempt?.operationId ?? null,
+      retriedOperationIds: [
+        ...new Set(
+          retryRows.flatMap(({ operationId }) => (operationId === null ? [] : [operationId])),
+        ),
+      ],
+      nextCursor:
+        rows.length > input.pageSize && last !== undefined
+          ? { createdAt: last.createdAt, operationId: last.operationId }
+          : null,
+    };
+  }
+
+  async updateProjectAttemptTrace(trace: VideoProcessingJobTrace): Promise<boolean> {
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ job: processingJobs, link: projectJobs })
+        .from(processingJobs)
+        .innerJoin(projectJobs, processingJobMatchesProjectLink)
+        .where(
+          and(
+            eq(processingJobs.id, trace.jobId),
+            eq(processingJobs.ownerUserId, trace.ownerUserId),
+          ),
+        )
+        .for('update', { of: processingJobs })
+        .limit(1);
+      if (row === undefined) return false;
+      const attempt = toProjectProcessingAttempt(row.job, row.link);
+      if (!projectProcessingAttemptMatchesTrace(attempt, trace)) {
+        throw new ProjectPersistenceError(
+          'invalid-aggregate',
+          'Project processing trace changed immutable operation identity.',
+        );
+      }
+      await tx
+        .update(processingJobs)
+        .set({
+          providerJobId: trace.providerJobId,
+          providerOutputLocation: trace.providerOutputLocation,
+          sourceDurationMs: trace.sourceDurationMs,
+          sourceOrientation: trace.sourceOrientation,
+          status: trace.status,
+          safeErrorCode: trace.safeErrorCode,
+          acceptedAt:
+            trace.providerJobId === null
+              ? row.job.acceptedAt
+              : (row.job.acceptedAt ?? toIsoTimestamp(trace.updatedAt)),
+          completedAt: nullableIsoTimestamp(trace.completedAt),
+          updatedAt: toIsoTimestamp(trace.updatedAt),
+        })
+        .where(
+          and(
+            eq(processingJobs.id, trace.jobId),
+            eq(processingJobs.ownerUserId, trace.ownerUserId),
+          ),
+        );
+      if (trace.status === 'cancelled' || projectProcessingNeedsAttention(trace.status)) {
+        const [project] = await tx
+          .select()
+          .from(projects)
+          .where(
+            and(
+              eq(projects.id, row.link.projectId),
+              eq(projects.ownerUserId, row.link.ownerUserId),
+              isNull(projects.deletedAt),
+            ),
+          )
+          .for('update')
+          .limit(1);
+        if (project !== undefined && project.currentRevisionId !== null) {
+          const latest = await this.#currentProcessingAttempt(tx, project.ownerUserId, project.id, {
+            id: project.currentRevisionId,
+            revisionNumber: project.currentRevisionNumber,
+          });
+          if (latest?.operationId === trace.jobId) {
+            await tx
+              .update(projects)
+              .set({
+                status: trace.status === 'cancelled' ? 'ready' : 'needs-attention',
+                version: project.version + 1,
+                updatedAt: toIsoTimestamp(trace.updatedAt),
+              })
+              .where(
+                and(eq(projects.id, project.id), eq(projects.ownerUserId, project.ownerUserId)),
+              );
+          }
+        }
+      }
+      return true;
+    });
+  }
+
+  async listResumableProjectAttempts(now: string): Promise<readonly ResumableVideoProcessingJob[]> {
+    return this.db.transaction(async (tx) => {
+      const interrupted = await tx
+        .select({ job: processingJobs, link: projectJobs })
+        .from(projectJobs)
+        .innerJoin(processingJobs, processingJobMatchesProjectLink)
+        .where(
+          inArray(processingJobs.status, [
+            'pending',
+            'validating',
+            'submitting',
+            'accepted',
+            'queued',
+            'processing',
+            'retrieving',
+            'ready',
+          ]),
+        )
+        .for('update', { of: processingJobs });
+      const recoveries = interrupted.flatMap(({ job, link }) => {
+        const transition = projectProcessingRestartTransition(
+          {
+            status: job.status,
+            providerJobId: job.providerJobId,
+            outputAssetId: job.outputAssetId,
+            expiresAt: toIsoTimestamp(job.expiresAt),
+          },
+          now,
+        );
+        return transition === null ? [] : [{ job, link, transition }];
+      });
+      const updateRecoveryGroup = async (
+        status: PersistedProcessingJobStatus,
+        safeErrorCode: string | null,
+        completedAt: string | null,
+      ): Promise<void> => {
+        const jobIds = recoveries
+          .filter(({ transition }) => transition.status === status)
+          .map(({ job }) => job.id);
+        if (jobIds.length === 0) return;
+        await tx
+          .update(processingJobs)
+          .set({ status, safeErrorCode, completedAt, updatedAt: now })
+          .where(inArray(processingJobs.id, jobIds));
+      };
+      await updateRecoveryGroup('expired', 'job_expired', now);
+      await updateRecoveryGroup('ambiguous', 'submission_ambiguous', now);
+      await updateRecoveryGroup('failed', 'processing_failed', now);
+      await updateRecoveryGroup('queued', null, null);
+      await updateRecoveryGroup('retrieving', null, null);
+
+      const attentionRecoveries = recoveries.filter(({ transition }) =>
+        projectProcessingNeedsAttention(transition.status),
+      );
+      const attentionProjectIds = [
+        ...new Set(attentionRecoveries.map(({ link }) => link.projectId)),
+      ];
+      if (attentionProjectIds.length > 0) {
+        const projectRows = await tx
+          .select()
+          .from(projects)
+          .where(and(inArray(projects.id, attentionProjectIds), isNull(projects.deletedAt)))
+          .for('update');
+        const attemptRows = await tx
+          .select({ job: processingJobs, link: projectJobs })
+          .from(projectJobs)
+          .innerJoin(processingJobs, processingJobMatchesProjectLink)
+          .where(inArray(projectJobs.projectId, attentionProjectIds));
+        const attemptsByProject = new Map<string, ProjectProcessingAttemptRecord[]>();
+        for (const { job, link } of attemptRows) {
+          const attempts = attemptsByProject.get(link.projectId) ?? [];
+          attempts.push(toProjectProcessingAttempt(job, link));
+          attemptsByProject.set(link.projectId, attempts);
+        }
+        const attentionJobIds = new Set(attentionRecoveries.map(({ job }) => job.id));
+        const projectsToUpdate = projectRows.filter((project) => {
+          if (project.status === 'needs-attention' || project.currentRevisionId === null) {
+            return false;
+          }
+          const current = currentProjectProcessingAttempt(
+            { id: project.currentRevisionId, revisionNumber: project.currentRevisionNumber },
+            attemptsByProject.get(project.id) ?? [],
+          );
+          return current !== null && attentionJobIds.has(current.operationId);
+        });
+        if (projectsToUpdate.length > 0) {
+          await tx
+            .update(projects)
+            .set({
+              status: 'needs-attention',
+              version: sql`${projects.version} + 1`,
+              updatedAt: now,
+            })
+            .where(
+              inArray(
+                projects.id,
+                projectsToUpdate.map(({ id }) => id),
+              ),
+            );
+        }
+      }
+
+      const rows = await tx
+        .select({ job: processingJobs, link: projectJobs })
+        .from(projectJobs)
+        .innerJoin(processingJobs, processingJobMatchesProjectLink)
+        .where(
+          and(
+            inArray(processingJobs.status, ['accepted', 'queued', 'processing', 'retrieving']),
+            sql`${processingJobs.providerJobId} is not null`,
+            sql`${processingJobs.expiresAt} > ${now}`,
+          ),
+        );
+      return rows.flatMap(({ job, link }) => {
+        const attempt = toProjectProcessingAttempt(job, link);
+        const resumable = resumableProjectProcessingAttempt(attempt, now);
+        return resumable === null ? [] : [resumable];
+      });
+    });
+  }
+
+  async retainProjectResult(input: {
+    readonly ownerUserId: string;
+    readonly projectId: string;
+    readonly operationId: string;
+    readonly manifest: StoredAssetManifest;
+    readonly inspected: InspectedVideo;
+    readonly jobOutputLink: ProjectAssetLink;
+    readonly currentPromotion: {
+      readonly expectedVersion: number;
+      readonly expectedRevisionNumber: number;
+      readonly expectedCurrentOperationId: string;
+      readonly revision: AppendProjectRevisionPersistenceInput;
+      readonly media: ProjectWorkingMediaRecord;
+    } | null;
+    readonly retainedAt: string;
+  }): Promise<ProjectProcessingResultRetentionResult> {
+    return this.db.transaction(async (tx) => {
+      const [row] = await tx
+        .select({ job: processingJobs, link: projectJobs, project: projects })
+        .from(processingJobs)
+        .innerJoin(projectJobs, processingJobMatchesProjectLink)
+        .innerJoin(
+          projects,
+          and(
+            eq(projects.id, projectJobs.projectId),
+            eq(projects.ownerUserId, projectJobs.ownerUserId),
+            isNull(projects.deletedAt),
+          ),
+        )
+        .where(
+          and(
+            eq(processingJobs.id, input.operationId),
+            eq(processingJobs.ownerUserId, input.ownerUserId),
+            eq(projectJobs.projectId, input.projectId),
+          ),
+        )
+        .for('update', { of: [processingJobs, projects] })
+        .limit(1);
+      if (row === undefined) return { kind: 'not-found' } as const;
+      const attempt = toProjectProcessingAttempt(row.job, row.link);
+      if (!projectProcessingResultInputMatchesAttempt(input, attempt)) {
+        return { kind: 'conflict' } as const;
+      }
+      const [readyAsset] = await tx
+        .select()
+        .from(mediaAssets)
+        .where(
+          and(
+            eq(mediaAssets.id, input.manifest.assetId),
+            eq(mediaAssets.ownerUserId, input.ownerUserId),
+            eq(mediaAssets.status, 'ready'),
+          ),
+        )
+        .for('share')
+        .limit(1);
+      if (
+        readyAsset === undefined ||
+        readyAsset.mimeType !== input.manifest.mimeType ||
+        readyAsset.filename !== input.manifest.filename ||
+        readyAsset.sizeBytes !== input.manifest.sizeBytes ||
+        readyAsset.checksumSha256 !== input.manifest.checksumSha256
+      ) {
+        throw new ProjectPersistenceError(
+          'asset-not-ready',
+          'The retained processing result does not match a ready owner asset.',
+        );
+      }
+      if (attempt.outputAssetId !== null) {
+        if (!retainedProjectProcessingResultMatches(attempt, input.manifest, input.inspected)) {
+          return { kind: 'conflict' } as const;
+        }
+        if (attempt.resultRevisionId === null) {
+          return { kind: 'replayed-historical', attempt } as const;
+        }
+        const [mediaRow] = await tx
+          .select()
+          .from(projectWorkingMediaAdoptions)
+          .where(
+            and(
+              eq(projectWorkingMediaAdoptions.projectId, input.projectId),
+              eq(projectWorkingMediaAdoptions.ownerUserId, input.ownerUserId),
+              eq(projectWorkingMediaAdoptions.operationKey, input.operationId),
+            ),
+          )
+          .limit(1);
+        const [revisionRow] = await tx
+          .select()
+          .from(projectRevisions)
+          .where(
+            and(
+              eq(projectRevisions.projectId, input.projectId),
+              eq(projectRevisions.ownerUserId, input.ownerUserId),
+              eq(projectRevisions.id, attempt.resultRevisionId),
+            ),
+          )
+          .limit(1);
+        if (mediaRow === undefined || revisionRow === undefined) {
+          return { kind: 'conflict' } as const;
+        }
+        return {
+          kind: 'replayed-current',
+          attempt,
+          workingMedia: {
+            project: toProject(row.project),
+            revision: toRevision(revisionRow),
+            media: toProjectWorkingMedia(mediaRow),
+          },
+        } as const;
+      }
+
+      const currentAttempt =
+        row.project.currentRevisionId === null
+          ? null
+          : await this.#currentProcessingAttempt(tx, input.ownerUserId, input.projectId, {
+              id: row.project.currentRevisionId,
+              revisionNumber: row.project.currentRevisionNumber,
+            });
+      const semanticallyCurrent =
+        input.currentPromotion !== null &&
+        row.project.currentRevisionId === attempt.initiatingRevisionId &&
+        row.project.currentRevisionNumber === attempt.initiatingRevisionNumber &&
+        currentAttempt?.operationId === input.currentPromotion.expectedCurrentOperationId &&
+        currentAttempt.operationId === attempt.operationId;
+      if (
+        semanticallyCurrent &&
+        input.currentPromotion !== null &&
+        (row.project.version !== input.currentPromotion.expectedVersion ||
+          row.project.currentRevisionNumber !== input.currentPromotion.expectedRevisionNumber)
+      ) {
+        return { kind: 'conflict' } as const;
+      }
+
+      const [existingJobOutput] = await tx
+        .select()
+        .from(projectAssets)
+        .where(
+          and(
+            eq(projectAssets.projectId, input.jobOutputLink.projectId),
+            eq(projectAssets.ownerUserId, input.jobOutputLink.ownerUserId),
+            eq(projectAssets.assetId, input.jobOutputLink.assetId),
+            eq(projectAssets.role, 'job-output'),
+            eq(projectAssets.revisionId, input.jobOutputLink.revisionId),
+          ),
+        )
+        .limit(1);
+      if (existingJobOutput === undefined) {
+        await tx.insert(projectAssets).values(assetLinkValues(input.jobOutputLink));
+      }
+
+      let resultRevision: ProjectRevision | null = null;
+      let resultMedia: ProjectWorkingMediaRecord | null = null;
+      let nextProject: Project | null = null;
+      if (semanticallyCurrent) {
+        if (input.currentPromotion === null) return { kind: 'conflict' } as const;
+        const revisionInput = input.currentPromotion.revision;
+        resultRevision = {
+          ...revisionInput.revision,
+          snapshot: projectSnapshotSchema.parse(revisionInput.revision.snapshot),
+        };
+        resultMedia = input.currentPromotion.media;
+        nextProject = revisionInput.nextProject;
+        if (
+          revisionInput.ownerUserId !== input.ownerUserId ||
+          revisionInput.projectId !== input.projectId ||
+          revisionInput.expectedVersion !== row.project.version ||
+          revisionInput.expectedRevisionNumber !== row.project.currentRevisionNumber ||
+          resultRevision.source !== 'job-result' ||
+          resultRevision.parentRevisionId !== row.project.currentRevisionId ||
+          resultRevision.parentRevisionNumber !== row.project.currentRevisionNumber ||
+          resultMedia.operationKey !== attempt.operationId ||
+          resultMedia.assetId !== attempt.resultAssetId ||
+          resultMedia.adoptedRevisionId !== resultRevision.id ||
+          resultMedia.adoptedRevisionNumber !== resultRevision.revisionNumber
+        ) {
+          return { kind: 'conflict' } as const;
+        }
+        assertRevisionAssetLinks(resultRevision, revisionInput.assetLinks);
+        const versionReferences = projectVersionReferenceLinksForRevision(resultRevision);
+        await assertReadyAssets(tx, input.ownerUserId, revisionInput.assetLinks);
+        await assertReadyVersionReferences(tx, input.ownerUserId, versionReferences);
+        await assertLastSuccessfulOutput(tx, resultRevision);
+        await tx.insert(projectRevisions).values(revisionValues(resultRevision));
+        if (revisionInput.assetLinks.length > 0) {
+          await tx.insert(projectAssets).values(revisionInput.assetLinks.map(assetLinkValues));
+        }
+        if (versionReferences.length > 0) {
+          await tx
+            .insert(projectVersionReferences)
+            .values(versionReferences.map(versionReferenceValues));
+        }
+        await tx
+          .insert(projectWorkingMediaAdoptions)
+          .values(projectWorkingMediaValues(resultMedia));
+        await tx
+          .update(projectJobs)
+          .set({
+            resultRevisionId: resultRevision.id,
+            resultRevisionNumber: resultRevision.revisionNumber,
+          })
+          .where(eq(projectJobs.jobId, attempt.operationId));
+        await tx
+          .update(projects)
+          .set({
+            status: nextProject.status,
+            version: nextProject.version,
+            currentRevisionId: nextProject.currentRevisionId,
+            currentRevisionNumber: nextProject.currentRevisionNumber,
+            updatedAt: toIsoTimestamp(nextProject.updatedAt),
+          })
+          .where(
+            and(eq(projects.id, row.project.id), eq(projects.ownerUserId, row.project.ownerUserId)),
+          );
+      }
+
+      await tx
+        .update(processingJobs)
+        .set({
+          outputAssetId: input.manifest.assetId,
+          resultMetadata: input.inspected,
+          status: 'ready',
+          safeErrorCode: null,
+          completedAt: toIsoTimestamp(input.retainedAt),
+          updatedAt: toIsoTimestamp(input.retainedAt),
+        })
+        .where(
+          and(
+            eq(processingJobs.id, attempt.operationId),
+            eq(processingJobs.ownerUserId, input.ownerUserId),
+          ),
+        );
+
+      const retainedAttempt: ProjectProcessingAttemptRecord = {
+        ...attempt,
+        outputAssetId: input.manifest.assetId,
+        result: inspectedVideoSchema.parse(input.inspected),
+        resultRevisionId: resultRevision?.id ?? null,
+        resultRevisionNumber: resultRevision?.revisionNumber ?? null,
+        status: 'ready',
+        safeErrorCode: null,
+        updatedAt: toIsoTimestamp(input.retainedAt),
+        completedAt: toIsoTimestamp(input.retainedAt),
+      };
+      if (resultRevision === null || resultMedia === null || nextProject === null) {
+        return { kind: 'retained-historical', attempt: retainedAttempt } as const;
+      }
+      return {
+        kind: 'retained-current',
+        attempt: retainedAttempt,
+        workingMedia: { project: nextProject, revision: resultRevision, media: resultMedia },
+      } as const;
+    });
+  }
+
   async updateMetadata(
     ownerUserId: string,
     expectedVersion: number,
@@ -1508,8 +2503,12 @@ export class DrizzleProjectRepository implements ProjectRepository {
         );
       }
       if (current.archivedAt === null && nextProject.archivedAt !== null) {
-        const [activeJob] = await tx
-          .select({ id: processingJobs.id })
+        const processing = await tx
+          .select({
+            id: processingJobs.id,
+            status: processingJobs.status,
+            retryOfJobId: processingJobs.retryOfJobId,
+          })
           .from(projectJobs)
           .innerJoin(
             processingJobs,
@@ -1522,19 +2521,25 @@ export class DrizzleProjectRepository implements ProjectRepository {
             and(
               eq(projectJobs.projectId, current.id),
               eq(projectJobs.ownerUserId, current.ownerUserId),
-              inArray(processingJobs.status, [
-                'pending',
-                'validating',
-                'submitting',
-                'accepted',
-                'queued',
-                'processing',
-                'retrieving',
-              ]),
             ),
           )
-          .for('share')
-          .limit(1);
+          .for('share');
+        const retryPredecessors = new Set(
+          processing.flatMap(({ retryOfJobId }) => (retryOfJobId === null ? [] : [retryOfJobId])),
+        );
+        const activeJob = processing.find(
+          ({ id, status }) =>
+            [
+              'pending',
+              'validating',
+              'submitting',
+              'accepted',
+              'queued',
+              'processing',
+              'retrieving',
+            ].includes(status) ||
+            (status === 'ambiguous' && !retryPredecessors.has(id)),
+        );
         if (activeJob !== undefined) {
           return {
             kind: 'conflict',

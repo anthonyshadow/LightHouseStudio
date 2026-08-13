@@ -1,8 +1,12 @@
 import { randomUUID } from 'node:crypto';
-import { chmod, mkdir, open, rename, rm } from 'node:fs/promises';
+import { chmod, mkdir, open, readFile, readdir, rename, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { z } from 'zod';
-import { videoJobStatusSchema, videoOutputResolutionSchema } from '@studio/contracts';
+import {
+  VIDEO_JOB_TTL_MS,
+  videoJobStatusSchema,
+  videoOutputResolutionSchema,
+} from '@studio/contracts';
 import { persistedTimestampSchema } from '../../application/timestamps.js';
 
 const traceSchema = z
@@ -60,11 +64,68 @@ export interface DurableProcessingJobRepository extends ProcessingJobTraceWriter
   listResumable(now: string): Promise<readonly ResumableVideoProcessingJob[]>;
 }
 
-export class FileProcessingJobRepository implements ProcessingJobTraceWriter {
+const activeStatus = (status: VideoProcessingJobTrace['status']): boolean =>
+  ['validating', 'submitting', 'queued', 'processing', 'retrieving'].includes(status);
+
+export class FileProcessingJobRepository implements DurableProcessingJobRepository {
   readonly #root: string;
   readonly #locks = new Map<string, Promise<void>>();
   constructor(dataDirectory: string) {
     this.#root = path.resolve(dataDirectory, 'metadata', 'v1', 'processing-jobs');
+  }
+
+  #file(jobId: string): string {
+    return path.join(this.#root, `${z.uuid().parse(jobId)}.json`);
+  }
+
+  async #read(jobId: string): Promise<VideoProcessingJobTrace | null> {
+    try {
+      return traceSchema.parse(JSON.parse(await readFile(this.#file(jobId), 'utf8')) as unknown);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return null;
+      throw error;
+    }
+  }
+
+  async #list(): Promise<readonly VideoProcessingJobTrace[]> {
+    let entries: readonly string[];
+    try {
+      entries = await readdir(this.#root);
+    } catch (error) {
+      if (error instanceof Error && 'code' in error && error.code === 'ENOENT') return [];
+      throw error;
+    }
+    const traces: VideoProcessingJobTrace[] = [];
+    for (const entry of entries) {
+      if (!/^[0-9a-f-]{36}\.json$/iu.test(entry)) continue;
+      const trace = await this.#read(entry.slice(0, -5));
+      if (trace !== null) traces.push(trace);
+    }
+    return traces;
+  }
+
+  async admit(traceValue: VideoProcessingJobTrace): Promise<ProcessingJobAdmissionResult> {
+    const trace = traceSchema.parse(traceValue);
+    const existing = await this.#read(trace.jobId);
+    if (existing !== null) {
+      if (existing.ownerUserId !== trace.ownerUserId) return 'owner-mismatch';
+      return existing.operation === trace.operation &&
+        existing.provider === trace.provider &&
+        existing.requestFingerprint === trace.requestFingerprint &&
+        existing.outputResolution === trace.outputResolution
+        ? 'duplicate'
+        : 'request-conflict';
+    }
+    if (
+      (await this.#list()).some(
+        (candidate) =>
+          candidate.ownerUserId === trace.ownerUserId && activeStatus(candidate.status),
+      )
+    ) {
+      return 'owner-conflict';
+    }
+    await this.upsert(trace);
+    return 'admitted';
   }
   async upsert(value: VideoProcessingJobTrace): Promise<void> {
     const trace = traceSchema.parse(value);
@@ -79,7 +140,7 @@ export class FileProcessingJobRepository implements ProcessingJobTraceWriter {
     try {
       await mkdir(this.#root, { recursive: true, mode: 0o700 });
       await chmod(this.#root, 0o700);
-      const file = path.join(this.#root, `${trace.jobId}.json`);
+      const file = this.#file(trace.jobId);
       const temporary = `${file}.tmp-${randomUUID()}`;
       try {
         const handle = await open(temporary, 'wx', 0o600);
@@ -98,5 +159,89 @@ export class FileProcessingJobRepository implements ProcessingJobTraceWriter {
       release();
       if (this.#locks.get(trace.jobId) === chain) this.#locks.delete(trace.jobId);
     }
+  }
+
+  async listResumable(now: string): Promise<readonly ResumableVideoProcessingJob[]> {
+    const nowMs = Date.parse(now);
+    const resumable: ResumableVideoProcessingJob[] = [];
+    for (const storedTrace of await this.#list()) {
+      let trace = storedTrace;
+      const expiresAt = new Date(Date.parse(trace.createdAt) + VIDEO_JOB_TTL_MS).toISOString();
+      if (
+        Date.parse(expiresAt) <= nowMs &&
+        (activeStatus(trace.status) || trace.status === 'ready')
+      ) {
+        await this.upsert({
+          ...trace,
+          status: 'expired',
+          safeErrorCode: 'job_expired',
+          updatedAt: now,
+          completedAt: now,
+        });
+        continue;
+      }
+      if (
+        trace.providerJobId !== null &&
+        (trace.status === 'ready' || trace.status === 'submitting')
+      ) {
+        trace = traceSchema.parse({
+          ...trace,
+          status: trace.status === 'ready' ? 'retrieving' : 'queued',
+          safeErrorCode: null,
+          updatedAt: now,
+          completedAt: null,
+        });
+        await this.upsert(trace);
+      }
+      if (trace.status === 'submitting' && trace.providerJobId === null) {
+        await this.upsert({
+          ...trace,
+          status: 'ambiguous',
+          safeErrorCode: 'submission_ambiguous',
+          updatedAt: now,
+          completedAt: now,
+        });
+        continue;
+      }
+      if (trace.status === 'validating') {
+        await this.upsert({
+          ...trace,
+          status: 'failed',
+          safeErrorCode: 'provider_rejected',
+          updatedAt: now,
+          completedAt: now,
+        });
+        continue;
+      }
+      if (
+        trace.providerJobId === null ||
+        trace.requestFingerprint === null ||
+        trace.outputResolution === null ||
+        trace.sourceDurationMs === null ||
+        trace.sourceOrientation === null ||
+        (trace.status !== 'queued' &&
+          trace.status !== 'processing' &&
+          trace.status !== 'retrieving')
+      ) {
+        continue;
+      }
+      resumable.push({
+        jobId: trace.jobId,
+        ownerUserId: trace.ownerUserId,
+        operation: trace.operation,
+        provider: trace.provider,
+        providerJobId: trace.providerJobId,
+        requestFingerprint: trace.requestFingerprint,
+        status: trace.status,
+        outputResolution: trace.outputResolution,
+        providerOutputLocation: trace.providerOutputLocation,
+        sourceDurationMs: trace.sourceDurationMs,
+        sourceOrientation: trace.sourceOrientation,
+        createdAt: trace.createdAt,
+        updatedAt: trace.updatedAt,
+        expiresAt,
+      });
+    }
+    return resumable;
   }
 }

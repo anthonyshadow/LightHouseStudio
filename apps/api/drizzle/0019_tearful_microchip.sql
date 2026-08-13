@@ -1,0 +1,11 @@
+ALTER TABLE "processing_jobs" ADD COLUMN "result_asset_id" uuid;--> statement-breakpoint
+ALTER TABLE "processing_jobs" ADD COLUMN "result_metadata" jsonb;--> statement-breakpoint
+ALTER TABLE "processing_jobs" ADD COLUMN "retry_of_job_id" uuid;--> statement-breakpoint
+ALTER TABLE "project_jobs" ADD COLUMN "result_revision_id" uuid;--> statement-breakpoint
+ALTER TABLE "project_jobs" ADD COLUMN "result_revision_number" integer;--> statement-breakpoint
+ALTER TABLE "processing_jobs" ADD CONSTRAINT "processing_jobs_retry_same_owner_fk" FOREIGN KEY ("retry_of_job_id","owner_user_id") REFERENCES "public"."processing_jobs"("id","owner_user_id") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+ALTER TABLE "project_jobs" ADD CONSTRAINT "project_jobs_result_revision_same_project_fk" FOREIGN KEY ("project_id","owner_user_id","result_revision_id","result_revision_number") REFERENCES "public"."project_revisions"("project_id","owner_user_id","id","revision_number") ON DELETE restrict ON UPDATE no action;--> statement-breakpoint
+CREATE INDEX "processing_jobs_retry_idx" ON "processing_jobs" USING btree ("owner_user_id","retry_of_job_id");--> statement-breakpoint
+CREATE INDEX "project_jobs_result_revision_idx" ON "project_jobs" USING btree ("project_id","result_revision_number","job_id");--> statement-breakpoint
+ALTER TABLE "processing_jobs" ADD CONSTRAINT "processing_jobs_result_consistent" CHECK (("processing_jobs"."result_asset_id" is null and "processing_jobs"."result_metadata" is null) or ("processing_jobs"."result_asset_id" is not null and "processing_jobs"."output_asset_id" is null and "processing_jobs"."result_metadata" is null) or ("processing_jobs"."result_asset_id" is not null and "processing_jobs"."output_asset_id" = "processing_jobs"."result_asset_id" and "processing_jobs"."result_metadata" is not null));--> statement-breakpoint
+ALTER TABLE "project_jobs" ADD CONSTRAINT "project_jobs_result_revision_consistent" CHECK (("project_jobs"."result_revision_id" is null and "project_jobs"."result_revision_number" is null) or ("project_jobs"."result_revision_id" is not null and "project_jobs"."result_revision_number" is not null and "project_jobs"."result_revision_number" > 0));
