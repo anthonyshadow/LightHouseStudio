@@ -1,4 +1,4 @@
-import { and, eq, inArray, isNull, lte } from 'drizzle-orm';
+import { and, asc, eq, inArray, isNull, lte } from 'drizzle-orm';
 import { createDirectSavedVideoUploadRequestSchema } from '@studio/contracts';
 import { toIsoTimestamp } from '../../application/timestamps.js';
 import type {
@@ -199,17 +199,32 @@ export class DrizzleDirectUploadRepository implements DirectUploadRepository {
       );
   }
 
-  async findExpired(now: string, limit: number): Promise<readonly StoredDirectUpload[]> {
-    const rows = await this.db
-      .select()
-      .from(directUploads)
-      .where(
-        and(
-          inArray(directUploads.status, ['pending', 'uploading', 'verifying']),
-          lte(directUploads.expiresAt, toIsoTimestamp(now)),
-        ),
-      )
-      .limit(limit);
-    return rows.map(toStoredUpload);
+  async claimExpired(now: string, limit: number): Promise<readonly StoredDirectUpload[]> {
+    const claimedAt = toIsoTimestamp(now);
+    return this.db.transaction(async (tx) => {
+      const rows = await tx
+        .select()
+        .from(directUploads)
+        .where(
+          and(
+            inArray(directUploads.status, ['pending', 'uploading', 'verifying']),
+            lte(directUploads.expiresAt, claimedAt),
+          ),
+        )
+        .orderBy(asc(directUploads.updatedAt), asc(directUploads.expiresAt), asc(directUploads.id))
+        .limit(limit)
+        .for('update', { skipLocked: true });
+      if (rows.length === 0) return [];
+      await tx
+        .update(directUploads)
+        .set({ updatedAt: claimedAt })
+        .where(
+          inArray(
+            directUploads.id,
+            rows.map(({ id }) => id),
+          ),
+        );
+      return rows.map((row) => toStoredUpload({ ...row, updatedAt: claimedAt }));
+    });
   }
 }

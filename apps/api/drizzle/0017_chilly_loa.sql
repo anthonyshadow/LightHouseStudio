@@ -1,0 +1,2 @@
+CREATE INDEX "processing_jobs_expiry_idx" ON "processing_jobs" USING btree ("status","expires_at");--> statement-breakpoint
+CREATE INDEX "reference_images_updated_at_idx" ON "reference_image_assets" USING btree ("updated_at");

@@ -108,6 +108,11 @@ export interface StoredVideoVersionRead {
   readonly video: StoredSavedVideoAggregate['video'];
   readonly version: StoredVideoVersion;
 }
+export interface StoredSavedVideoSummary {
+  readonly video: StoredSavedVideoAggregate['video'];
+  readonly currentVersion: StoredVideoVersion;
+  readonly versionCount: number;
+}
 export type SavedVideoReceipt = z.infer<typeof receiptSchema>;
 export interface SavedVideoReceiptLookup {
   readonly ownerUserId: string;
@@ -117,7 +122,7 @@ export type OwnedSavedVideoReceipt = SavedVideoReceipt & { readonly ownerUserId:
 type SavedVideoLibrary = z.infer<typeof librarySchema>;
 
 export interface SavedVideoRepositoryPage {
-  readonly videos: readonly StoredSavedVideoAggregate[];
+  readonly videos: readonly StoredSavedVideoSummary[];
   readonly total: number;
   readonly characterNames: readonly string[];
   readonly formats: readonly SavedVideoFormat[];

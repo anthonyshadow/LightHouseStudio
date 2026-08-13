@@ -10,8 +10,3 @@ export const normalizeSavedVideoTitle = (value: string): string => {
   const normalized = removeControlCharacters(value).replaceAll(/\s+/gu, ' ').trim();
   return normalized.slice(0, 120) || 'Untitled video';
 };
-
-export const savedVideoVersionCanAppend = (
-  currentVersionId: string,
-  expectedCurrentVersionId: string,
-): boolean => currentVersionId === expectedCurrentVersionId;

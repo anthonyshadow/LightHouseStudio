@@ -42,7 +42,13 @@ import { StudioWorkspace } from './StudioWorkspace';
 import { useStudioOutfitWorkflow } from './useStudioOutfitWorkflow';
 import { useStudioCharacterWorkflow } from './useStudioCharacterWorkflow';
 import { StudioToolOverlays } from './StudioToolOverlays';
-import { REVIEW_LOCK_REASON } from './studioPolicies';
+import {
+  captureBlockedReason as resolveCaptureBlockedReason,
+  captureSettingsDisabledReason as resolveCaptureSettingsDisabledReason,
+  characterBuilderBlockedReasons,
+  characterRemovalBlockedReason as resolveCharacterRemovalBlockedReason,
+  currentExperienceLabel as resolveCurrentExperienceLabel,
+} from './studioActivityPolicy';
 import { useStudioCreativeRepository } from './useStudioCreativeRepository';
 import { useStudioStageModel } from './useStudioStageModel';
 import {
@@ -216,16 +222,14 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
   const aiSessionActive = isModelSessionActive(session);
   const sessionModeLocked = mediaLocked || aiSessionActive || session.lifecycle === 'disconnected';
-  const characterBuilderActivityBlockedReason = recordingActive
-    ? 'Finish recording and finalization before building a character.'
-    : finalizingStartedAt !== null || finalizingStream !== null
-      ? 'Wait for the current take to finish finalizing before building a character.'
-      : undefined;
-  const characterBuilderOpenBlockedReason =
-    characterBuilderActivityBlockedReason ??
-    (reviewLocked
-      ? 'Save and release or discard the current take before building a character.'
-      : undefined);
+  const finalizing = finalizingStartedAt !== null || finalizingStream !== null;
+  const characterBuilderBlocked = characterBuilderBlockedReasons({
+    recordingActive,
+    finalizing,
+    reviewLocked,
+  });
+  const characterBuilderActivityBlockedReason = characterBuilderBlocked.activity;
+  const characterBuilderOpenBlockedReason = characterBuilderBlocked.open;
   const openWorkshopOverlay = useCallback(() => openOverlay('workshop'), [openOverlay]);
   const handoff = useReferenceRecipeHandoff({
     repository,
@@ -365,30 +369,23 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
 
   const creativePanel = creativePanelForOverlay(activeOverlay);
   const activeCreativeTool = creativeToolForOverlay(activeOverlay, creativePanel, videoEditing);
-  const captureBlockedReason = reviewLocked
-    ? REVIEW_LOCK_REASON
-    : shelfDirty
-      ? 'Save or discard Recipe Shelf changes before recording.'
-      : undefined;
-  const captureSettingsDisabledReason = reviewLocked
-    ? REVIEW_LOCK_REASON
-    : recordingActive
-      ? 'Finish the current take before changing capture settings.'
-      : aiSessionActive
-        ? 'Stop AI before changing camera or microphone sources.'
-        : undefined;
+  const captureBlockedReason = resolveCaptureBlockedReason({ reviewLocked, shelfDirty });
+  const captureSettingsDisabledReason = resolveCaptureSettingsDisabledReason({
+    reviewLocked,
+    recordingActive,
+    aiSessionActive,
+  });
   const activeRecordingSource = recordingActive
     ? recording.activeSource
     : reviewLocked
       ? null
       : recordingSource;
-  const currentExperienceLabel =
-    activeCharacterName ??
-    (session.draft.mode === 'lucy-vton-latest' && hasDraftContent(session.draft)
-      ? activeRecipeLabel
-        ? `Virtual Try-On · ${activeRecipeLabel}`
-        : 'Virtual Try-On'
-      : undefined);
+  const currentExperienceLabel = resolveCurrentExperienceLabel({
+    activeCharacterName,
+    activeRecipeLabel,
+    mode: session.draft.mode,
+    hasDraft: hasDraftContent(session.draft),
+  });
   const currentExperienceImageAssetId =
     activeCharacter?.referenceImageAssetId ??
     persistedReferenceAssetId(session.draft.referenceImage);
@@ -413,17 +410,13 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
   const activeCharacterRecord = activeCharacter
     ? repositoryStore.savedCharacterPrompts.find((candidate) => candidate.id === activeCharacter.id)
     : undefined;
-  const characterRemovalBlockedReason = recordingActive
-    ? 'Finish recording before changing the selected AI recipe.'
-    : finalizingStartedAt !== null || finalizingStream !== null
-      ? 'Wait for the current take to finish finalizing before changing the selected AI recipe.'
-      : reviewLocked
-        ? 'Release or discard the current take before changing the selected AI recipe.'
-        : aiSessionActive
-          ? 'Stop AI before changing the selected AI recipe.'
-          : session.lifecycle === 'disconnected'
-            ? 'Wait for the current session cleanup before changing the selected AI recipe.'
-            : undefined;
+  const characterRemovalBlockedReason = resolveCharacterRemovalBlockedReason({
+    recordingActive,
+    finalizing,
+    reviewLocked,
+    aiSessionActive,
+    sessionDisconnected: session.lifecycle === 'disconnected',
+  });
   const unselectCharacter = useCallback(() => {
     if (!clearActiveCharacter()) return;
     closeOverlayIf(['character-selector']);
@@ -717,45 +710,52 @@ const StudioExperience = ({ focusMainOnMount, initialIntent }: StudioExperienceP
         </div>
 
         <StudioWorkspace
-          mainRef={mainRef}
-          fullscreenWorkspaceRef={fullscreenWorkspaceRef}
-          organizationRouteActive={organizationRouteActive}
-          projectContextActive={projectContextActive}
-          projectRouteActive={projectRouteActive}
-          campaignRouteActive={campaignRouteActive}
-          projectRecordingAvailable={projectRecordingAvailable}
-          showFirstSuccessGuide={firstSuccessGuideVisible}
-          onDismissFirstSuccessGuide={() => setFirstSuccessGuideVisible(false)}
-          desktopStudioLayout={desktopStudioLayout}
-          session={session}
-          takeReview={takeReview}
-          videoEditor={videoEditor}
-          savedVideo={savedVideo}
-          project={project}
-          browser={browser}
-          stagePresentation={stagePresentation}
-          stageAspectRatio={stageAspectRatio}
-          stageNotices={stageNotices}
-          videoEditPreview={videoEditPreview}
-          currentExperienceLabel={currentExperienceLabel}
-          currentExperienceImageAssetId={currentExperienceImageAssetId}
-          effectiveRecordingMode={effectiveRecordingMode}
-          recordingCharacterAttribution={recordingCharacterAttribution}
-          activeRecordingSource={activeRecordingSource}
-          captureBlockedReason={captureBlockedReason}
-          captureSettingsDisabledReason={captureSettingsDisabledReason}
-          aiSessionActive={aiSessionActive}
+          refs={{
+            main: mainRef,
+            fullscreen: fullscreenWorkspaceRef,
+            uploadToggle: uploadToggleRef,
+          }}
+          route={{
+            organizationActive: organizationRouteActive,
+            projectContextActive,
+            projectActive: projectRouteActive,
+            campaignActive: campaignRouteActive,
+            projectRecordingAvailable,
+          }}
+          guide={{
+            visible: firstSuccessGuideVisible,
+            dismiss: () => setFirstSuccessGuideVisible(false),
+          }}
+          controllers={{ session, takeReview, videoEditor, savedVideo, project }}
+          environment={{ browser, desktopLayout: desktopStudioLayout }}
+          stage={{
+            presentation: stagePresentation,
+            aspectRatio: stageAspectRatio,
+            notices: stageNotices,
+            editPreview: videoEditPreview,
+            experienceLabel: currentExperienceLabel,
+            experienceImageAssetId: currentExperienceImageAssetId,
+            recordingMode: effectiveRecordingMode,
+            recordingCharacterAttribution,
+            recordingSource: activeRecordingSource,
+          }}
+          activity={{
+            captureBlockedReason,
+            captureSettingsDisabledReason,
+            aiSessionActive,
+          }}
           creativeWorkspace={creativeWorkspace}
           saveVideoState={savedVideoSave.state}
-          uploadToggleRef={uploadToggleRef}
-          onStartExistingVideoRecording={startExistingVideoRecording}
-          onCloseTakeReview={closeTakeReview}
-          onDiscardExistingVideoSelection={discardExistingVideoSelection}
-          onOpenVoiceTreatments={() => openOverlay('voice-treatments')}
-          onOpenAiExperience={() => openOverlay('ai-experience')}
-          onOpenExistingVideo={openExistingVideo}
-          onOpenCaptureSettings={openCaptureSettings}
-          onStartProjectRecording={startProjectRecording}
+          actions={{
+            startExistingVideoRecording,
+            closeTakeReview,
+            discardExistingVideoSelection,
+            openVoiceTreatments: () => openOverlay('voice-treatments'),
+            openAiExperience: () => openOverlay('ai-experience'),
+            openExistingVideo,
+            openCaptureSettings,
+            startProjectRecording,
+          }}
         />
 
         <StudioExitGuard

@@ -1,5 +1,11 @@
 # Lightframe Studio MVP alignment audit
 
+> **Historical planning record (superseded 2026-08-12).** The Campaign, Project, source-resume,
+> and navigation work described here has since been implemented. Use the current README,
+> Architecture, user stories, and Product Roadmap as implementation authority. The recommendation
+> below to remove the direct Neon SDK was explicitly declined: production uses Neon PostgreSQL,
+> development uses local PostgreSQL, and `@neondatabase/serverless` remains intentionally retained.
+
 **Status:** verified audit and proposed alignment basis; not an implementation claim
 
 **Audit date:** 2026-08-11

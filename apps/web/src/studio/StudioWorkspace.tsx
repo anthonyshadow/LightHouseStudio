@@ -37,89 +37,109 @@ const CampaignRouteSurface = lazy(() =>
 const deferredWorkspaceFallback = <p role="status">Loading studio tool…</p>;
 
 interface StudioWorkspaceProps {
-  readonly mainRef: RefObject<HTMLElement | null>;
-  readonly fullscreenWorkspaceRef: RefObject<HTMLDivElement | null>;
-  readonly organizationRouteActive: boolean;
-  readonly projectContextActive: boolean;
-  readonly projectRouteActive: boolean;
-  readonly campaignRouteActive: boolean;
-  readonly projectRecordingAvailable: boolean;
-  readonly showFirstSuccessGuide: boolean;
-  readonly onDismissFirstSuccessGuide: () => void;
-  readonly desktopStudioLayout: boolean;
-  readonly session: ReturnType<typeof useStudioSession>;
-  readonly takeReview: ReturnType<typeof useTakeReviewFlow>;
-  readonly videoEditor: ReturnType<typeof useVideoEditSession>;
-  readonly savedVideo: ReturnType<typeof useStudioSavedVideoController>;
-  readonly project: ReturnType<typeof useStudioProjectBridge>;
-  readonly browser: BrowserCapabilities;
-  readonly stagePresentation: StagePresentation;
-  readonly stageAspectRatio: NonNullable<MediaStageProps['aspectRatio']>;
-  readonly stageNotices: NonNullable<MediaStageProps['notices']>;
-  readonly videoEditPreview: MediaStageProps['editPreview'] | null;
-  readonly currentExperienceLabel: string | undefined;
-  readonly currentExperienceImageAssetId: string | null;
-  readonly effectiveRecordingMode: StudioMode;
-  readonly recordingCharacterAttribution: SavedVideoCharacterAttribution | null;
-  readonly activeRecordingSource: RecordingSource | null;
-  readonly captureBlockedReason: string | undefined;
-  readonly captureSettingsDisabledReason: string | undefined;
-  readonly aiSessionActive: boolean;
+  readonly refs: {
+    readonly main: RefObject<HTMLElement | null>;
+    readonly fullscreen: RefObject<HTMLDivElement | null>;
+    readonly uploadToggle: RefObject<HTMLButtonElement | null>;
+  };
+  readonly route: {
+    readonly organizationActive: boolean;
+    readonly projectContextActive: boolean;
+    readonly projectActive: boolean;
+    readonly campaignActive: boolean;
+    readonly projectRecordingAvailable: boolean;
+  };
+  readonly guide: {
+    readonly visible: boolean;
+    readonly dismiss: () => void;
+  };
+  readonly controllers: {
+    readonly session: ReturnType<typeof useStudioSession>;
+    readonly takeReview: ReturnType<typeof useTakeReviewFlow>;
+    readonly videoEditor: ReturnType<typeof useVideoEditSession>;
+    readonly savedVideo: ReturnType<typeof useStudioSavedVideoController>;
+    readonly project: ReturnType<typeof useStudioProjectBridge>;
+  };
+  readonly environment: {
+    readonly browser: BrowserCapabilities;
+    readonly desktopLayout: boolean;
+  };
+  readonly stage: {
+    readonly presentation: StagePresentation;
+    readonly aspectRatio: NonNullable<MediaStageProps['aspectRatio']>;
+    readonly notices: NonNullable<MediaStageProps['notices']>;
+    readonly editPreview: MediaStageProps['editPreview'] | null;
+    readonly experienceLabel: string | undefined;
+    readonly experienceImageAssetId: string | null;
+    readonly recordingMode: StudioMode;
+    readonly recordingCharacterAttribution: SavedVideoCharacterAttribution | null;
+    readonly recordingSource: RecordingSource | null;
+  };
+  readonly activity: {
+    readonly captureBlockedReason: string | undefined;
+    readonly captureSettingsDisabledReason: string | undefined;
+    readonly aiSessionActive: boolean;
+  };
   readonly creativeWorkspace: ReactNode;
   readonly saveVideoState: SaveVideoState;
-  readonly uploadToggleRef: RefObject<HTMLButtonElement | null>;
-  readonly onStartExistingVideoRecording: () => void;
-  readonly onCloseTakeReview: () => void;
-  readonly onDiscardExistingVideoSelection: () => void;
-  readonly onOpenVoiceTreatments: () => void;
-  readonly onOpenAiExperience: () => void;
-  readonly onOpenExistingVideo: () => void;
-  readonly onOpenCaptureSettings: () => void;
-  readonly onStartProjectRecording: () => void;
+  readonly actions: {
+    readonly startExistingVideoRecording: () => void;
+    readonly closeTakeReview: () => void;
+    readonly discardExistingVideoSelection: () => void;
+    readonly openVoiceTreatments: () => void;
+    readonly openAiExperience: () => void;
+    readonly openExistingVideo: () => void;
+    readonly openCaptureSettings: () => void;
+    readonly startProjectRecording: () => void;
+  };
 }
 
 export const StudioWorkspace = ({
-  mainRef,
-  fullscreenWorkspaceRef,
-  organizationRouteActive,
-  projectContextActive,
-  projectRouteActive,
-  campaignRouteActive,
-  projectRecordingAvailable,
-  showFirstSuccessGuide,
-  onDismissFirstSuccessGuide,
-  desktopStudioLayout,
-  session,
-  takeReview,
-  videoEditor,
-  savedVideo,
-  project,
-  browser,
-  stagePresentation,
-  stageAspectRatio,
-  stageNotices,
-  videoEditPreview,
-  currentExperienceLabel,
-  currentExperienceImageAssetId,
-  effectiveRecordingMode,
-  recordingCharacterAttribution,
-  activeRecordingSource,
-  captureBlockedReason,
-  captureSettingsDisabledReason,
-  aiSessionActive,
+  refs,
+  route,
+  guide,
+  controllers,
+  environment,
+  stage,
+  activity,
   creativeWorkspace,
   saveVideoState,
-  uploadToggleRef,
-  onStartExistingVideoRecording,
-  onCloseTakeReview,
-  onDiscardExistingVideoSelection,
-  onOpenVoiceTreatments,
-  onOpenAiExperience,
-  onOpenExistingVideo,
-  onOpenCaptureSettings,
-  onStartProjectRecording,
+  actions,
 }: StudioWorkspaceProps) => {
   const theme = useTheme();
+  const { main: mainRef, fullscreen: fullscreenWorkspaceRef, uploadToggle: uploadToggleRef } = refs;
+  const {
+    organizationActive: organizationRouteActive,
+    projectContextActive,
+    projectActive: projectRouteActive,
+    campaignActive: campaignRouteActive,
+    projectRecordingAvailable,
+  } = route;
+  const { visible: showFirstSuccessGuide, dismiss: onDismissFirstSuccessGuide } = guide;
+  const { session, takeReview, videoEditor, savedVideo, project } = controllers;
+  const { browser, desktopLayout: desktopStudioLayout } = environment;
+  const {
+    presentation: stagePresentation,
+    aspectRatio: stageAspectRatio,
+    notices: stageNotices,
+    editPreview: videoEditPreview,
+    experienceLabel: currentExperienceLabel,
+    experienceImageAssetId: currentExperienceImageAssetId,
+    recordingMode: effectiveRecordingMode,
+    recordingCharacterAttribution,
+    recordingSource: activeRecordingSource,
+  } = stage;
+  const { captureBlockedReason, captureSettingsDisabledReason, aiSessionActive } = activity;
+  const {
+    startExistingVideoRecording: onStartExistingVideoRecording,
+    closeTakeReview: onCloseTakeReview,
+    discardExistingVideoSelection: onDiscardExistingVideoSelection,
+    openVoiceTreatments: onOpenVoiceTreatments,
+    openAiExperience: onOpenAiExperience,
+    openExistingVideo: onOpenExistingVideo,
+    openCaptureSettings: onOpenCaptureSettings,
+    startProjectRecording: onStartProjectRecording,
+  } = actions;
   const {
     recording,
     recordingActive,

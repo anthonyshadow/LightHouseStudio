@@ -424,11 +424,11 @@ describe('DrizzleSavedVideoRepository', () => {
       [version, nextVersion],
       [updatedVideo],
       [version, nextVersion],
-      [{ video: updatedVideo }],
+      [{ video: updatedVideo, currentVersion: nextVersion }],
       [{ count: 1 }],
       [{ characterName: 'Mara' }],
       [{ format: 'landscape' }],
-      [version, nextVersion],
+      [{ videoId, count: 2 }],
       [updatedVideo],
       [version, nextVersion],
       [{ id: videoId }],
@@ -486,7 +486,8 @@ describe('DrizzleSavedVideoRepository', () => {
       videos: [
         {
           video: { id: videoId, currentVersionId: nextVersionId },
-          versions: [version, nextVersion],
+          currentVersion: nextVersion,
+          versionCount: 2,
         },
       ],
     });

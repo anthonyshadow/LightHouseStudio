@@ -146,15 +146,21 @@ class MemoryDirectUploadRepository implements DirectUploadRepository {
     return Promise.resolve();
   }
 
-  findExpired(now: string, limit: number): Promise<readonly StoredDirectUpload[]> {
-    return Promise.resolve(
-      [...this.rows.values()]
-        .filter(
-          (row) =>
-            ['pending', 'uploading', 'verifying'].includes(row.status) && row.expiresAt <= now,
-        )
-        .slice(0, limit),
-    );
+  claimExpired(now: string, limit: number): Promise<readonly StoredDirectUpload[]> {
+    const claimed = [...this.rows.values()]
+      .filter(
+        (row) => ['pending', 'uploading', 'verifying'].includes(row.status) && row.expiresAt <= now,
+      )
+      .sort(
+        (left, right) =>
+          left.updatedAt.localeCompare(right.updatedAt) ||
+          left.expiresAt.localeCompare(right.expiresAt) ||
+          left.id.localeCompare(right.id),
+      )
+      .slice(0, limit)
+      .map((row) => ({ ...row, updatedAt: now }));
+    for (const row of claimed) this.rows.set(row.id, row);
+    return Promise.resolve(claimed);
   }
 
   #update(
@@ -185,7 +191,9 @@ describe('DirectSavedVideoUploadService', () => {
       Promise.resolve([{ PartNumber: 1, Size: inspected.sizeBytes, ETag: '"part-1"' }]),
     ),
     completeDirectMultipartUpload: vi.fn(() => Promise.resolve('"complete-etag"')),
-    abortDirectMultipartUpload: vi.fn(() => Promise.resolve()),
+    abortDirectMultipartUpload: vi.fn((_assetId: string, _providerUploadId: string) =>
+      Promise.resolve(),
+    ),
     downloadDirectUpload: vi.fn(() =>
       Promise.resolve({
         sourcePath: path.join(directory, 'downloaded.mp4'),
@@ -313,32 +321,37 @@ describe('DirectSavedVideoUploadService', () => {
     expect(repository.rows.get(staged.uploadId)?.status).toBe('expired');
   });
 
-  it('keeps failed object cleanup claimable until deletion succeeds', async () => {
-    await service.close();
-    service = new DirectSavedVideoUploadService(
-      repository,
-      storage,
-      new SavedVideoService(
-        new FileSavedVideoRepository(directory),
-        new LocalAssetByteStore(directory),
-      ),
-      {
-        now: () => now,
-        inspect: () => Promise.resolve({ ...inspected, sizeBytes: inspected.sizeBytes - 1 }),
-      },
+  it('keeps failed cleanup claimable without starving later expired uploads', async () => {
+    const failing = await service.stage(ownerUserId, request());
+    const failingRow = repository.rows.get(failing.uploadId)!;
+    repository.rows.set(failing.uploadId, {
+      ...failingRow,
+      providerUploadId: 'persistently-failing-upload',
+      updatedAt: '2026-08-09T13:00:00.000Z',
+    });
+    for (let index = 0; index < 26; index += 1) {
+      await service.stage(ownerUserId, request());
+    }
+    storage.abortDirectMultipartUpload.mockImplementation((_assetId, providerUploadId) =>
+      providerUploadId === 'persistently-failing-upload'
+        ? Promise.reject(new Error('R2 unavailable'))
+        : Promise.resolve(),
     );
-    storage.discardDirectUpload.mockRejectedValueOnce(new Error('R2 unavailable'));
-    const staged = await service.stage(ownerUserId, request());
-
-    await expect(
-      service.complete(ownerUserId, staged.uploadId, [{ PartNumber: 1, ETag: '"part-1"' }]),
-    ).rejects.toMatchObject({ code: 'invalid_video' });
-    expect(repository.rows.get(staged.uploadId)?.status).toBe('verifying');
 
     now = new Date('2026-08-09T15:00:01.000Z');
     await service.cleanupExpired();
+    const waitingAfterFirstPass = [...repository.rows.values()].filter(
+      (row) => row.id !== failing.uploadId && row.status === 'uploading',
+    );
+    expect(waitingAfterFirstPass).toHaveLength(2);
+    expect(repository.rows.get(failing.uploadId)?.status).toBe('uploading');
 
-    expect(storage.discardDirectUpload).toHaveBeenCalledTimes(2);
-    expect(repository.rows.get(staged.uploadId)?.status).toBe('expired');
+    now = new Date('2026-08-09T15:10:01.000Z');
+    await service.cleanupExpired();
+
+    expect(
+      waitingAfterFirstPass.every((row) => repository.rows.get(row.id)?.status === 'expired'),
+    ).toBe(true);
+    expect(repository.rows.get(failing.uploadId)?.status).toBe('uploading');
   });
 });

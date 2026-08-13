@@ -1,0 +1,179 @@
+import { useTheme } from '@emotion/react';
+import type { CampaignContract, ProjectContract } from '@studio/contracts';
+import { useState, type FormEvent, type RefObject } from 'react';
+import { ApiClientError } from '../../adapters/api-client/apiClient';
+import { Button, OverlayPanel, TextAreaField, TextField } from '../../ui';
+import { dialogActionsStyles } from '../projects/ProjectRouteSurface.styles';
+import { useProjectsController } from '../projects/useProjectsController';
+import { ProjectCampaignPicker, projectCampaignId } from './ProjectCampaignPicker';
+import { useCampaignsController } from './useCampaignsController';
+
+export const safeCampaignError = (error: unknown): string =>
+  error instanceof ApiClientError
+    ? error.message
+    : 'Campaigns could not be loaded. Check the local API and try again.';
+
+export const CampaignFormDialog = ({
+  campaign,
+  returnFocusRef,
+  onClose,
+  onSaved,
+}: {
+  readonly campaign?: CampaignContract;
+  readonly returnFocusRef: RefObject<HTMLElement | null>;
+  readonly onClose: () => void;
+  readonly onSaved: (campaign: CampaignContract) => void;
+}) => {
+  const theme = useTheme();
+  const controller = useCampaignsController();
+  const [name, setName] = useState(campaign?.name ?? '');
+  const [brief, setBrief] = useState(campaign?.brief ?? '');
+  const [error, setError] = useState<string | null>(null);
+  const editing = campaign !== undefined;
+  const mutation = editing ? controller.editMutation : controller.createMutation;
+
+  const submit = async (event?: FormEvent) => {
+    event?.preventDefault();
+    setError(null);
+    try {
+      const saved = editing
+        ? await controller.editMutation.mutateAsync({
+            campaignId: campaign.id,
+            name,
+            brief: brief.trim() || null,
+            expectedVersion: campaign.version,
+          })
+        : await controller.createMutation.mutateAsync({
+            name,
+            brief: brief.trim() || null,
+          });
+      onSaved(saved);
+    } catch (caught) {
+      setError(safeCampaignError(caught));
+    }
+  };
+
+  return (
+    <OverlayPanel
+      open
+      onClose={onClose}
+      title={editing ? 'Edit Campaign' : 'Create Campaign'}
+      description="Campaigns are lightweight organizers. Only a name is required."
+      placement="bottom"
+      size="standard"
+      closeDisabled={mutation.isPending}
+      closeOnBackdrop={false}
+      initialFocus="heading"
+      returnFocusRef={returnFocusRef}
+      footer={
+        <div css={dialogActionsStyles(theme)}>
+          <Button variant="quiet" disabled={mutation.isPending} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            busy={mutation.isPending}
+            disabled={name.trim().length === 0 || name.trim().length > 120 || brief.length > 1_000}
+            onClick={() => void submit()}
+          >
+            {editing ? 'Save Campaign' : 'Create Campaign'}
+          </Button>
+        </div>
+      }
+    >
+      <form onSubmit={(event) => void submit(event)} css={{ display: 'grid', gap: theme.space.md }}>
+        <TextField
+          label="Campaign name"
+          value={name}
+          required
+          maxLength={120}
+          disabled={mutation.isPending}
+          onChange={(event) => setName(event.target.value)}
+        />
+        <TextAreaField
+          label="Brief (optional)"
+          value={brief}
+          maxLength={1_000}
+          disabled={mutation.isPending}
+          hint={`${brief.length}/1000 characters`}
+          {...(error ? { error } : {})}
+          onChange={(event) => setBrief(event.target.value)}
+        />
+      </form>
+    </OverlayPanel>
+  );
+};
+
+export const MoveProjectDialog = ({
+  project,
+  currentCampaign,
+  returnFocusRef,
+  onClose,
+  onMoved,
+}: {
+  readonly project: ProjectContract;
+  readonly currentCampaign: CampaignContract;
+  readonly returnFocusRef: RefObject<HTMLElement | null>;
+  readonly onClose: () => void;
+  readonly onMoved: (message: string) => void;
+}) => {
+  const theme = useTheme();
+  const projects = useProjectsController();
+  const [target, setTarget] = useState('none');
+  const [targetLabel, setTargetLabel] = useState('No Campaign');
+  const [error, setError] = useState<string | null>(null);
+
+  const submit = async () => {
+    setError(null);
+    try {
+      await projects.moveMutation.mutateAsync({
+        projectId: project.id,
+        campaignId: projectCampaignId(target),
+        expectedVersion: project.version,
+      });
+      onMoved(`${project.title} moved to ${targetLabel}.`);
+    } catch (caught) {
+      setError(safeCampaignError(caught));
+    }
+  };
+
+  return (
+    <OverlayPanel
+      open
+      onClose={onClose}
+      title="Move Project"
+      description="Membership changes use the Project version so concurrent work is never overwritten."
+      placement="bottom"
+      size="standard"
+      closeDisabled={projects.moveMutation.isPending}
+      closeOnBackdrop={false}
+      returnFocusRef={returnFocusRef}
+      footer={
+        <div css={dialogActionsStyles(theme)}>
+          <Button variant="quiet" disabled={projects.moveMutation.isPending} onClick={onClose}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            busy={projects.moveMutation.isPending}
+            onClick={() => void submit()}
+          >
+            Move Project
+          </Button>
+        </div>
+      }
+    >
+      <ProjectCampaignPicker
+        label="New location"
+        value={target}
+        excludeCampaignId={currentCampaign.id}
+        disabled={projects.moveMutation.isPending}
+        {...(error ? { error } : {})}
+        onValueChange={(value, label) => {
+          setTarget(value);
+          setTargetLabel(label);
+        }}
+      />
+    </OverlayPanel>
+  );
+};

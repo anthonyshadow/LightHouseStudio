@@ -71,8 +71,9 @@ JWT secret and password hash.
 
 `AppRouter.tsx` is the browser URL boundary. React Router's data browser router renders the
 provider-free entry at `/` and protects the recognized lazy Studio route family: `/studio`,
-`/studio/projects`, `/studio/projects/:projectId`, `/studio/videos`, `/studio/characters`, and
-`/studio/outfits`. The data-router form is required for route blocking. Route metadata, protected
+`/studio/projects`, `/studio/projects/:projectId`, `/studio/campaigns`,
+`/studio/campaigns/:campaignId`, `/studio/videos`, `/studio/characters`, and `/studio/outfits`.
+The data-router form is required for route blocking. Route metadata, protected
 Login return, focus handoff, and loading/error surfaces remain router-owned; unknown paths return
 to `/`. All Studio children render the same `StudioApp` instance so moving between a workspace and
 its libraries preserves the one media-stage owner and active controller state.
@@ -107,6 +108,12 @@ focused Studio controllers. The persistent workspace, tool overlays, library ove
 lifecycle dialogs are presentation surfaces over those controllers. This keeps cross-feature
 wiring visible at the sole composition boundary without giving that boundary a second copy of
 feature state, provider work, persistence, or media ownership.
+
+Activity locks and experience labels are pure Studio policy. The persistent workspace consumes
+grouped route, controller, stage, activity, and action models rather than a flat cross-feature prop
+surface. Existing Video, Outfit, and Character overlays are separate presentation families; they
+share the same controller instances and never create another stage, session, repository, or media
+owner.
 
 The authenticated Studio composition boundary owns one TanStack Query client for lightweight
 same-origin server state; the provider-free entry does not load that runtime. The client is
@@ -427,6 +434,12 @@ and VTO before submission, and only that active operation is submitted. Browser 
 use `character-swap` and `virtual-try-on`; Lucy model identifiers remain inside Decart/live and
 saved-recipe mappings.
 
+The workflow coordinator delegates reducer/state policy, source adoption, accepted-job lifetime,
+result finalization, Voice composition, and recipe hydration to feature-local owners. These are
+ownership boundaries, not parallel workflows: one coordinator still controls the selected source,
+one retained provider job, one pending visual, and ordered artifact cleanup. The panel separately
+owns only tool selection, focus, saved-recipe recovery presentation, and confirmation UI.
+
 Before the potentially billable `PUT`, the browser creates one operation UUID in `submitting`
 state. A valid success response advances it to `accepted`; an aborted, malformed, or lost success
 response advances it to `acceptance-unknown` without changing the UUID. Both accepted states lock
@@ -588,6 +601,12 @@ The owner lock serializes local metadata changes. Exact create replay returns th
 while reuse of an `Idempotency-Key` with a different normalized request is a typed conflict. The
 shared owner lock/journal makes Campaign create, Project membership, and source acceptance atomic without a second
 transaction mechanism; it remains a metadata mechanism, not a general event system.
+
+Persistence representation is kept adjacent but separate from transaction mechanics. The local
+repository delegates strict schema evolution and prepared-journal parsing to its persistence-schema
+module. The Drizzle repository delegates row/domain conversion and insert projections to its mapper
+module while retaining locks, relationship validation, CAS, and transaction ordering in the
+repository itself.
 
 The Drizzle repository is authoritative in `postgres` and `neon` modes only; `shadow` may still
 write configured remote processing traces but does not replicate or defer Project authority to

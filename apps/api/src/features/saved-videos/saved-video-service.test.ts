@@ -381,8 +381,13 @@ describe('SavedVideoService', () => {
   it('delegates paging to repositories that provide a storage-level query', async () => {
     await service.saveNew(ownerUserId, crypto.randomUUID(), sourcePath, metadata());
     const [aggregate] = await repository.list(ownerUserId);
+    const currentVersion = aggregate!.versions.find(
+      (version) => version.id === aggregate!.video.currentVersionId,
+    )!;
     const listPage = vi.fn().mockResolvedValue({
-      videos: [aggregate],
+      videos: [
+        { video: aggregate!.video, currentVersion, versionCount: aggregate!.versions.length },
+      ],
       total: 2,
       characterNames: ['Mara'],
       formats: ['landscape'],
