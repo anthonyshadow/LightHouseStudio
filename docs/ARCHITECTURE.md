@@ -100,6 +100,14 @@ The mounted Studio owns focused controllers for:
 - account navigation and ordered logout cleanup;
 - overlays and route-owned workspace presentation.
 
+`StudioApp.tsx` assembles those owners but does not implement their lifecycles inline. Project
+route/media bridging, creative-repository scoping, stage presentation derivation, saved-video
+load/save/edit publication, character and outfit workflows, and ordered logout cleanup live in
+focused Studio controllers. The persistent workspace, tool overlays, library overlays, and
+lifecycle dialogs are presentation surfaces over those controllers. This keeps cross-feature
+wiring visible at the sole composition boundary without giving that boundary a second copy of
+feature state, provider work, persistence, or media ownership.
+
 The authenticated Studio composition boundary owns one TanStack Query client for lightweight
 same-origin server state; the provider-free entry does not load that runtime. The client is
 recreated when the authenticated user changes and its previous cache is cleared. Queries and
